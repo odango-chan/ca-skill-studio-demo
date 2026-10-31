@@ -12,7 +12,7 @@
 - 根流程的主路径、所有显式路由和终态都能找到；复杂信息不强迫一次性铺满画布。
 - 选择节点后，能检查其内部阶段、Operator、Binding、Predicate 和 Source。
 - Child Procedure 是独立 Procedure 图，可以进入和返回。
-- 静态定义、Source validator 结果、Case Expected Trace 和真实 Runtime Trace 不混为一谈。
+- 静态定义、编辑诊断与真实 Runtime 执行状态不混为一谈。首版不展示 Runtime Trace。
 - Source 与 Visual 都可编辑，但共享同一 Working Buffer；Visual 修改必须通过 Typed Source Patch，未取得资格的语法保持 Source-only / Preserve-only。
 
 ### 1.2 固定样本来源
@@ -58,21 +58,13 @@
 
 establish 也不能只画 happy path：三个 root Reconcile 节点、两个常规 finalization 分支、四个 terminal 都必须在 Root Graph 可定位。
 
-### 2.3 Case 与 Qualification UI 后置
-
-ensure 的 5 个 Case 文件含有 fixture-shaped inputs / expected trace，但 Case Overlay / Expected Trace Preview 不属于首版 Procedure Designer 的核心编辑闭环，先保留为源资产并在 Package Explorer 中导航。
-
-如果后续确实需要预期路径预览，必须明确标记 **Expected Trace · Not Executed**，不能使用“Run Overlay”“Executed Path”或“Coverage”。
-
-establish 的 36 项是 semantic qualification obligations，不存在可安全映射到 Root Node 的 executable trace。首版不建设 Qualification 面板、不生成 Case-to-Node 映射；只保留原始 Case 文件及其说明，待 Case Editor 阶段再设计适当的资产视图。
-
-### 2.4 Predicate Inspector 不允许展示泛化 Scope
+### 2.3 Predicate Inspector 不允许展示泛化 Scope
 
 不能使用诸如 `Current Session / Current Lifecycle` 的概括文字代替真实 Scope。
 
 Predicate Inspector 应显示源文件里的完整 Scope expression（可折叠 / 格式化），并保留 Observation ref、Freshness、Evaluator 和 Source location。某字段未声明就显示“未声明”，不能推断。
 
-### 2.5 三种视图不应平级
+### 2.4 三种视图不应平级
 
 上一版的 Graph / Routes / Bindings 三个 Tab 容易让人误以为它们是三份不同图形。
 
@@ -84,7 +76,7 @@ Predicate Inspector 应显示源文件里的完整 Scope expression（可折叠 
 
 Source / Visual / Split 是工作区模式，与 Control Flow / Data Flow 是两个不同维度，不能混成一个 Tab 组。
 
-### 2.6 固定尺寸只能是设计起点
+### 2.5 固定尺寸只能是设计起点
 
 1440×900 是首个桌面高保真基准，不是最低支持分辨率或不可变面板宽度。上一版的 240px / 360px 面板会随画布可用宽度、用户折叠和窗口大小调整。
 
@@ -109,7 +101,9 @@ Source / Visual / Split 是工作区模式，与 Control Flow / Data Flow 是两
 │    Root Procedure │             GRAPH CANVAS               │                 │
 │    Child A        │                                        │ Selected object │
 │    Child B        │       Nodes / Routes / Terminals        │ details         │
-│  cases            │                                        │                 │
+│  references       │                                        │                 │
+│  schemas          │                                        │                 │
+│  scripts          │                                        │                 │
 │  predicates       │                                        │                 │
 │                   │                                        │                 │
 ├───────────────────┴────────────────────────────────────────┴─────────────────┤
@@ -122,7 +116,7 @@ Source / Visual / Split 是工作区模式，与 Control Flow / Data Flow 是两
 | 区域 | 初始宽度建议 | 职责 |
 |---|---:|---|
 | Header | 56–64px 高 | Workspace / Skill / Procedure / source revision / compatibility / source state |
-| Navigator | 220–260px | Package Explorer、Procedure tree、Node Outline、Cases、Predicates |
+| Navigator | 220–260px | Runtime Asset Explorer、Procedure tree、Node Outline、Predicates、Scripts / Schemas / References |
 | Canvas toolbar | 40–48px 高 | Control Flow / Data Flow、Search、Fit、Zoom、Layout、Route label density |
 | Canvas | 剩余宽度 | 当前 Procedure 的图形投影 |
 | Inspector | 320–380px | 当前选中 Node / Route / Binding / Predicate 详情 |
@@ -152,8 +146,7 @@ Navigator 的 Procedure tree 和 Node Outline 是 Source-aware 导航，不是�
 - Node Outline 保留源文件 Node 顺序。
 - 选择 Outline 项会定位并选中 Canvas Node。
 - Child Procedure 项可进入独立子图。
-- Cases / Predicates / Contract 通过引用导航进入对应资产。
-- 未映射的 Case obligation 不自动附着到某个 Node。
+- Predicates / Contract / Script / Schema 通过引用导航进入对应资产。
 
 ### 3.5 Inspector
 
@@ -378,20 +371,6 @@ Routes
 
 上面仅列出代表性 Binding。实际 Inspector 必须展示 Blueprint 中的全部输入字段，不得截断后仍显示“完整”。
 
-### 6.4 Case Expected Trace Preview（Deferred）
-
-以下是未来 Case Editor / 预期路径预览的参考行为，不属于首版 Procedure Designer 验收范围。若未来实现，Case 选择器列出 5 个 Case，选择后以虚线 / 预期路径高亮，并始终显示 **Expected Trace · Not Executed**：
-
-| Case | 预期路径 |
-|---|---|
-| 01 already-established | target Verify PASS |
-| 02 create-missing | target FAIL → absence PASS → create COMMITTED → target Verify PASS |
-| 03 existing-identity-mismatch | target FAIL → absence FAIL → strategy-conflict |
-| 04 create-unknown-reconciled | target FAIL → absence PASS → create OUTCOME_UNKNOWN → Reconcile COMMITTED → target Verify PASS |
-| 05 absence-unknown-safe-stop | target FAIL → absence UNKNOWN → unresolved；不调用 Create |
-
-Case 04 还应显示 `forbiddenImmediateRetryAfterUnknown: true`。Case 05 即使声明 Create capability available，也不能把它显示成已调用。
-
 ## 7. establish-pdu-session：屏幕线框
 
 ### 7.1 Root Graph
@@ -584,12 +563,6 @@ Root Graph 的两个常规 finalization 节点和一个成功 finalization 节�
 
 这张表与 Root Reconcile 表共同定义了画布右侧的恢复与终态区域。不要把“资源 finalization 成功”与“原业务成功”混为一谈：例如 `finalize-failed` 的 Child Procedure 返回 SUCCEEDED，Root terminal 仍然是 FAILED。
 
-### 7.8 Case 资产说明（无 Qualification 面板）
-
-establish-pdu-session 的 cases/ 目录包含 36 个 semantic qualification obligations。首版只在 Package Explorer 中按实际文件列出这些 Case，并通过 Source Editor 查看原文；不在 Procedure Designer 中加入 Qualification 面板或 Case Overlay。
-
-这些 Case 不是 executable fixtures。不得生成 Case-to-Node 边、执行状态、覆盖率百分比，也不得将历史退役 trace 重新投影为当前图。专用 Case Editor / Qualification UI 均后置。
-
 ## 8. Binding Inspector
 
 ### 8.1 双向数据导航
@@ -775,7 +748,6 @@ Control Flow / Data Flow 是 Visual 内部的 Canvas lens，不改变 Source / V
 - [ ] 5 个 Terminal Node 保留；`strategy-conflict` 与 `failed` 不合并。
 - [ ] Create / Reconcile / Retry 的所有 outcome 和 target 正确。
 - [ ] Route details 保留原始来源和 Outcome。
-- [ ] 首版不实现 Case Overlay / Expected Trace Preview；5 个 Case 作为 Package 源资产可导航、可查看。
 
 ### establish-pdu-session
 
@@ -786,7 +758,6 @@ Control Flow / Data Flow 是 Visual 内部的 Canvas lens，不改变 Source / V
 - [ ] 隐式成功进入 Postconditions 不被伪造成显式 route。
 - [ ] PCF create governance 的 Source-level blocker note 与 Runtime NOT_RUN 分开。
 - [ ] 三种重要 Handle 不混淆。
-- [ ] 36 个 obligations 只作为 Case 源资产保留；首版不提供 Qualification 面板、虚构 Node mapping 或 Execution coverage。
 
 ## 14. 待确认设计决策
 
@@ -827,7 +798,7 @@ Control Flow / Data Flow 是 Visual 内部的 Canvas lens，不改变 Source / V
 4. 加入 Binding / Data Flow 编辑与引用影响预览；
 5. 加入 Phase / Step 和 Child Procedure 编辑；
 6. 用 establish 验证复杂结构读取与 Transitional Source-only 降级；
-7. 最后扩展 Contract / Predicate / Case 等资产编辑器。
+7. 最后扩展 Contract / Predicate / Script / Schema / Reference 等运行时资产编辑器。
 
 不要先实现 65 条边的“漂亮大图”，先证明一次真实编辑能安全、可逆地写回源文件。
 

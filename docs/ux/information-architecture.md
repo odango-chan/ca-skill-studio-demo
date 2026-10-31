@@ -1,6 +1,6 @@
 # 信息架构与导航
 
-**状态：Proposed · Authoring-first**
+**状态：Proposed · Runtime-asset authoring-first**
 
 ## 1. 顶层结构
 
@@ -9,7 +9,7 @@
 1. **Workspace**：选择和组织 Skill Package。
 2. **Skill Editor**：围绕一个 Package 的持续开发工作区。
 
-不把 Designer、Assets、Qualification 切成互不相关的一级工作台。作者的大多数任务都在同一个 Package Editor 内完成。
+主导航只呈现实际参与模型上下文加载或 Host / Runtime 执行链路的资产。不会按磁盘上所有文件夹机械生成编辑器。
 
 ## 2. 页面 / 文件树
 
@@ -17,11 +17,11 @@
 Workspace
 ├── Recent Packages
 ├── Open Folder
-├── Import Fixture
+├── Import Sample Package
 └── Workspace Settings
 
 Skill Editor
-├── Package Explorer
+├── Runtime Asset Explorer
 │   ├── SKILL.md
 │   ├── assurance/
 │   │   ├── contract.yaml
@@ -29,11 +29,12 @@ Skill Editor
 │   │   │   ├── Root Procedure
 │   │   │   └── Child Procedures
 │   │   └── predicates.yaml
-│   ├── cases/                 # only if present
-│   ├── references/            # only if present
-│   ├── schemas/               # only if present
-│   ├── scripts/               # only if present
-│   └── design/                # only if present; maintainer docs, not runtime assets
+│   ├── references/             # only if present and Host-loadable
+│   │   ├── preload/
+│   │   ├── on-demand/
+│   │   └── samples/
+│   ├── schemas/                # only if runtime / contract referenced
+│   └── scripts/                # only if runtime admitted
 ├── Editor Tabs
 │   ├── Markdown Editor
 │   ├── Procedure Designer
@@ -43,17 +44,18 @@ Skill Editor
 └── Problems (collapsed)
 ~~~
 
-Package Explorer 反映真实文件结构；Procedure / Predicate 等语义索引是辅助导航，不取代文件树。不存在的 optional directory 不显示，也不自动创建。
+Explorer 的主视图按 Runtime Asset Manifest 显示有消费证据的文件。未进入当前 Runtime / Model-context 资产范围的文件不作为一等编辑对象，但必须在完整 Package 工作副本中保留、参与完整文件 Digest 并随导出保存。
+
+不存在的 optional directory 不显示，也不自动创建。
 
 ## 3. Skill Editor 内部导航
 
-### Package Explorer
+### Runtime Asset Explorer
 
-- 展示文件和目录；
-- 区分文件修改状态、解析状态和不支持语法；
-- 可打开、重命名、创建和删除受支持的 Package 文件；
-- 删除 / 重命名前显示引用影响；
-- 可切换 Package 文件树和 Procedure Outline；
+- 展示 SKILL.md、assurance、已存在的 Host-loadable references、被 Contract / Script 引用的 schemas 和已获 Host allowlist 的 scripts；
+- 区分模型上下文资产、Machine Execution 资产、Contract-declared 资产和 Host-external 依赖；
+- 显示文件修改状态、解析状态、引用者和编辑资格；
+- 仅对已建模资产提供结构化编辑；其他文件不因存在而自动获得 Runtime 语义；
 - 提供 Quick Open 和全文搜索。
 
 ### Editor Tabs
@@ -72,7 +74,8 @@ Inspector 是上下文面板，不是独立资产页面：
 - 选中 Route：编辑 Route Source、Outcome、Target；
 - 选中 Phase / Step：编辑有序阶段内容；
 - 选中 Binding：编辑表达式或从已知 Producer 选择；
-- 选中 Predicate / Contract 字段：显示结构化属性和 Source。
+- 选中 Predicate / Contract 字段：显示结构化属性和 Source；
+- 选中 Script / Schema 引用：显示精确路径、消费方和 allowlist / schema 证据。
 
 ### Problems
 
@@ -82,7 +85,8 @@ Problems 仅汇总编辑时有帮助的内容：
 - Missing / Dangling Reference；
 - Unsupported / Preserve-only；
 - Compatibility Profile；
-- Source / Projection Conflict。
+- Source / Projection Conflict；
+- 未注册的 Script / Capability / Observation 引用（只报告证据缺失，不自行授予权限）。
 
 不提供独立 Coverage、Runtime Trace、Qualification Report 或 Publish 页面。
 
@@ -98,7 +102,7 @@ Problems 仅汇总编辑时有帮助的内容：
 
 ### 创建 Skill
 
-Workspace → New Skill → 选择 Blank / Clone Existing（后续实现）→ 生成最小 Package → 编辑 SKILL.md 和 Procedure。创建向导不强制创建 optional 资产。
+Workspace → New Skill → 选择 Blank / Clone Existing（后续实现）→ 生成最小 Package → 编辑 SKILL.md 和实际需要的 Contract / Procedure / Predicate。创建向导不强制创建 optional 资产。
 
 ### 跨资产维护
 
@@ -109,14 +113,17 @@ Workspace → New Skill → 选择 Blank / Clone Existing（后续实现）→ �
 搜索范围：
 
 - Skill 名称 / 描述；
-- 文件路径；
+- Runtime Asset 文件路径；
 - Procedure / Node ID；
 - Operator / Capability ID；
 - Predicate ID；
+- Observation ref；
 - Binding path；
-- Case ID（如存在）。
+- Script identity；
+- Schema title / $id；
+- Reference exact path。
 
-搜索结果显示类型、所属 Package、源文件路径和上下文；点击后直接打开对应 Editor 和 Inspector。
+搜索结果显示类型、所属 Package、源文件路径、消费方和上下文；点击后直接打开对应 Editor 和 Inspector。
 
 ## 6. 当前不设置为一级导航
 

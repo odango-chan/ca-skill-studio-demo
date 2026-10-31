@@ -1,8 +1,8 @@
 # Skill Authoring Workbench
 
-**状态：Proposed · Authoring-first 桌面工作台**
+**状态：Proposed · Runtime-asset authoring-first 桌面工作台**
 
-工作台目标是让作者在同一个 Package 上同时操作文件、图形语义和属性，而不是在彼此割裂的图形浏览页、源码页和属性页之间反复切换。
+工作台目标是让作者在同一个 Package 上同时操作实际运行资产、图形语义和属性；不把磁盘上的所有辅助文件都提升为一等编辑器。
 
 ## 1. 全局布局
 
@@ -10,7 +10,7 @@
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ Skill Studio  / Workspace / Skill                     Saved · Undo · Redo · Save│
 ├──────────────────┬──────────────────────────────────────────┬─────────────────┤
-│ PACKAGE EXPLORER │ EDITOR TABS                               │ SEMANTIC        │
+│ RUNTIME ASSETS   │ EDITOR TABS                               │ SEMANTIC        │
 │                  │ [SKILL.md] [procedure.yaml] [predicates] │ INSPECTOR       │
 │ Skill Package    ├──────────────────────────────────────────┤                 │
 │  SKILL.md        │ [Visual] [Source] [Split]                 │ Selected object │
@@ -18,11 +18,9 @@
 │   contract.yaml  │          ACTIVE EDITOR                    │                 │
 │   procedure.yaml │   Markdown / Graph / YAML / Form         │ Fields          │
 │   predicates.yaml│                                          │ Bindings        │
-│  cases/          │                                          │ References      │
-│  references/     │                                          │ Source          │
-│  schemas/        │                                          │                 │
+│  references/     │                                          │ References      │
+│  schemas/        │                                          │ Source          │
 │  scripts/        │                                          │                 │
-│  design/         │                                          │                 │
 │                  │                                          │                 │
 ├──────────────────┴──────────────────────────────────────────┴─────────────────┤
 │ PROBLEMS (collapsed) · Parse · References · Unsupported · Conflicts           │
@@ -34,7 +32,7 @@
 | 区域 | 建议宽度 / 高度 | 职责 |
 |---|---:|---|
 | Top Bar | 52–60 px | Workspace、Package、Saved / Dirty / Conflict、Undo / Redo、Diff、Save |
-| Package Explorer | 220–260 px | 文件树、Procedure Outline、Quick Open |
+| Runtime Asset Explorer | 220–260 px | 运行时资产树、Procedure Outline、Quick Open |
 | Editor Tabs | 自适应 | 多文件编辑和模式切换 |
 | Semantic Inspector | 320–400 px | 所选对象的可编辑属性、Binding、引用和 Source |
 | Problems | 默认收起；展开约 160–220 px | 编辑时的解析 / 引用 / 兼容性诊断 |
@@ -127,23 +125,33 @@
 - 类型 / 生产时机不确定时允许 Source 手动编辑，但不做自动猜测；
 - 变更 Producer / Consumer 前显示影响范围。
 
-## 6. Diff、Undo / Redo 与 Save
+## 6. Runtime Asset Editors
+
+- SKILL.md 使用 Markdown Source / Preview / Outline；
+- Contract 和 Predicate 使用 Source + 有资格字段的 Inspector；
+- Script 使用 Python Source Editor，不在编辑器中执行；
+- Schema 使用 YAML / JSON Schema Source Editor，并显示消费方；
+- Reference 使用 Markdown Editor，并显示 preload / on-demand / samples 加载规则；
+- 文件存在不代表 Host 已允许其执行或加载。
+
+## 7. Diff、Undo / Redo 与 Save
 
 - 每个 Visual 操作先生成 Typed Patch；破坏性或多文件修改先展示 Impact Preview。
 - Patch Apply 到工作缓冲区后显示真实 Source Diff；用户可继续编辑、Undo / Redo 或 Save。
 - Save 写入用户当前本地工作副本，不自动 Git commit / push。
 - Undo / Redo 跨 Source 与 Visual 共用一个事务历史。
 - 外部文件变化时进入 Conflict，提供 Compare / Reload / Resolve；未解决冲突不得覆盖外部版本。
+- 非 Runtime 文件仍随完整 Package 保存和 Digest 计算，不因 Explorer 不显示而被删除。
 
-## 7. Problems 面板
+## 8. Problems 面板
 
 Problems 是编辑器辅助区，不是独立验证工作台。
 
-Problems 只呈现当前编辑有用的信息：解析错误、未解析引用、悬空 Route、重复 ID、Unsupported / Preserve-only、Compatibility Profile 限制、外部文件冲突。
+Problems 只呈现当前编辑有用的信息：解析错误、未解析引用、悬空 Route、重复 ID、Unsupported / Preserve-only、Compatibility Profile 限制、未获 Host 支持的 Script / Observation / Capability 引用、外部文件冲突。
 
 静态校验按需调用；不执行 Script、Capability、Runtime 或 Live 5GC。
 
-## 8. 响应式
+## 9. 响应式
 
 - 宽桌面：Explorer + Editor + Inspector 三栏。
 - 中等窗口：Explorer 可折叠，Inspector Drawer。

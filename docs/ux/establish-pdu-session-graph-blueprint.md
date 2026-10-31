@@ -2,7 +2,7 @@
 
 **状态：Observed source mapping + Proposed Visual projection · Transitional / Not Runtime-qualified**
 
-本文件把当前 Demo 中的 CreatedSession 根 Procedure、5 个 Child Procedure、节点内部阶段、Binding、Contract、Predicate 和 Case qualification 状态，落实为可逐项核对的 Procedure Designer 蓝图。
+本文件把当前 Demo 中的 CreatedSession 根 Procedure、5 个 Child Procedure、节点内部阶段、Binding、Contract 和 Predicate，落实为可逐项核对的 Procedure Designer 蓝图。
 
 所有 source identifier、operator、route target 和 Binding expression 以固定源 Commit 为准。这里的图形是 authoring source 的投影，不是 Runtime lowered graph。
 
@@ -14,8 +14,6 @@
 - Contract: `skills/establish-pdu-session/assurance/contract.yaml`
 - Predicates: `skills/establish-pdu-session/assurance/predicates.yaml`
 - Skill guide: `skills/establish-pdu-session/SKILL.md`
-- Authoring model: `skills/establish-pdu-session/design/README.md`
-- Case obligations: `skills/establish-pdu-session/cases/README.md`
 - Transitional validator: `scripts/validate_docs.py`
 - Pinned local Schema: `tests/contracts/ca-skill-toolchain/03a42764ee2a67e39f57ab550b63c7a5d7966199/procedure-source.schema.yaml`
 
@@ -26,8 +24,6 @@
 | Package role | `source-first-createdsession-candidate` |
 | `activeInRouting` | `false` |
 | `runtimeCompatible` | `false` |
-| Case count | `36` |
-| Case kind | `semantic-qualification-obligations` |
 | Transitional phase evidence | `demo-custom-validated` |
 
 **不要把它显示为当前已安装、已激活、可执行或 Runtime-qualified 的 Skill。** Contract 中的 `skillType: executable` 是源文件声明，不等于当前 Runtime 已经支持这份 authoring source。
@@ -457,21 +453,7 @@ The canvas should visually separate:
 
 Do not merge FAILED, UNRESOLVED and SAFE_STOPPED into one generic red failure edge.
 
-## 11. Case assets: 36 semantic obligations (no graph overlay)
-
-Current Case status is **36 semantic qualification obligations**, not executable Runtime fixtures.
-
-The current Case README explicitly says the historical trace and mock fixture sections were removed because they referred to the retired explicit execution graph. Do not invent replacement flattened node IDs.
-
-First-version Studio behavior:
-
-- list the actual Case files under Package Explorer and allow Source viewing;
-- do not add a Qualification panel, Case selector or graph overlay to Procedure Designer;
-- do not infer node coverage or attach individual obligations to visually similar nodes;
-- Case 32 remains an action-budget enforcement obligation;
-- only after Toolchain / Runtime lowering and stable trace lineage exist may Cases be rebound to executable traces in a separately designed future workflow.
-
-## 12. Transitional syntax and validator boundary
+## 11. Transitional syntax and validator boundary
 
 The pinned generic Schema snapshot declares core operators such as `call`、`verify`、`script`、`procedure`、`reconcile` and `terminal`, but does not declare node-level `preconditions` / `postconditions` in its node shape.
 
@@ -488,7 +470,7 @@ Current source support is narrower and explicit:
 
 This is `demo-custom-validated`, not generic Schema support and not Runtime compatibility. The authoring design itself says **NOT YET RUNTIME-COMPATIBLE**.
 
-## 13. Recommended canvas composition
+## 12. Recommended canvas composition
 
 ### Default root view
 
@@ -511,7 +493,7 @@ This is `demo-custom-validated`, not generic Schema support and not Runtime comp
 | `n4-session-establishment` | `CHILD` | Open `await-initial-n4-session-establishment` |
 | `finalize-success` | `PRE CHILD` · `CHILD` | UE configuration await, then resource finalization |
 
-## 14. Source line anchors
+## 13. Source line anchors
 
 Line numbers refer to the pinned 758-line `assurance/procedure.yaml`.
 
@@ -545,7 +527,7 @@ Line numbers refer to the pinned 758-line `assurance/procedure.yaml`.
 | `await-ue-session-configuration` | 643 | `await-ue` |
 | `finalize-resource-responsibility` | 700 | `transfer` |
 
-## 15. Implementation acceptance checklist
+## 14. Implementation acceptance checklist
 
 - [ ] Root graph contains exactly 17 nodes and starts at `nudm-sdm-get`.
 - [ ] The five Child Procedures open as separate graphs; none is flattened into the root.
@@ -560,6 +542,5 @@ Line numbers refer to the pinned 758-line `assurance/procedure.yaml`.
 - [ ] UE configuration wait is shown inside `finalize-success` Preconditions, not as a fake main 3GPP node.
 - [ ] Final resource responsibility is retained on normal exits after the first mutation.
 - [ ] Four root terminal states remain distinct.
-- [ ] 36 Cases appear as semantic obligations only: no invented node mapping, no executed / qualified coverage.
 - [ ] All Preconditions / Postconditions and precondition-output Binding paths carry the Demo Transitional evidence label.
 - [ ] No Run / Execute affordance implies Runtime or Live 5GC support.

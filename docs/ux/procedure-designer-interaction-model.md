@@ -155,7 +155,7 @@ Draft 可以语义未完成，但 Source 必须保持可解析；缺少必填字
 
 显示 Parse、Duplicate ID、Dangling Route、Unresolved Binding、Unsupported Syntax、Compatibility Profile 限制和 External Conflict。
 
-Problems 是作者辅助，不等同于完整 Schema / Runtime / Qualification 验收。
+Problems 是作者辅助，不等同于完整 Schema / Runtime compatibility 验收。
 
 ## 12. 键盘与可访问性
 

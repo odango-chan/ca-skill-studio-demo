@@ -1,15 +1,15 @@
 # 产品需求
 
-**状态：Proposed · Authoring-first 第一版需求基线**
+**状态：Proposed · Runtime-asset authoring-first 第一版需求基线**
 
 ## 1. 功能需求
 
 | ID | 需求 | 优先级 | 第一版验收方向 |
 |---|---|---:|---|
-| FR-001 | Package Explorer | P0 | 打开 Workspace，浏览实际存在的 Skill Package 文件 |
+| FR-001 | Runtime Asset Explorer | P0 | 识别并浏览模型上下文和 Host / Runtime 实际消费的 Skill 资产 |
 | FR-002 | Package Open / Create | P0 / P1 | P0 打开现有 Package；P1 创建 Blank / Clone Package |
 | FR-003 | SKILL.md Editor | P0 | Markdown Source、Preview、Outline、Frontmatter |
-| FR-004 | Source Editor | P0 | YAML / JSON / CEL / Script 原文编辑与源位置 |
+| FR-004 | Source Editor | P0 | YAML / JSON / CEL / Python 原文编辑与源位置 |
 | FR-005 | Procedure Projection | P0 | 从 Source 构建准确的 Procedure / Phase / Route / Binding 语义模型 |
 | FR-006 | Visual Procedure Editing | P0 | 创建、选择、编辑、移动、删除受支持节点和路由 |
 | FR-007 | Source / Visual Sync | P0 | 两种编辑入口共享同一 Source revision，修改后双向定位和刷新 |
@@ -17,15 +17,15 @@
 | FR-009 | Typed Source Patch + Diff | P0 | 所有 Visual 修改转成有前置条件的 Source Patch，预览实际文本差异 |
 | FR-010 | Undo / Redo | P0 | Source 与 Visual 修改进入同一事务历史 |
 | FR-011 | Conflict Handling | P0 | 外部文件变化时检测冲突，不静默覆盖 |
-| FR-012 | Cross-asset Navigation | P0 | 在 Procedure、Predicate、Contract、Script、Schema 之间定位引用 |
+| FR-012 | Cross-asset Navigation | P0 | 在 Procedure、Predicate、Contract、Script、Schema 和 Reference 之间定位运行时引用 |
 | FR-013 | Binding Editor | P1 | 有证据的来源选择、类型提示、生产者 / 消费者导航 |
 | FR-014 | Phase Editor | P1 | 有序 Preconditions / Postconditions Step 的增加、删除和重排 |
 | FR-015 | Child Procedure Editor | P1 | 独立子图 Drill-in、内部编辑、父子引用导航 |
 | FR-016 | Contract / Predicate Editors | P1 | 结构化 Inspector + Source 编辑 |
-| FR-017 | Case / Reference / Schema / Script Editors | P2 | Package 内其他资产的专用编辑体验 |
+| FR-017 | Reference / Schema / Script Editors | P1 | 按实际加载 / 消费证据提供 Markdown、Schema 和受治理 Script 编辑 |
 | FR-018 | Inline Diagnostics | P1 | 解析、引用、结构和兼容性问题就地提示 |
 | FR-019 | AI Co-author | P2 | 只提出候选 Patch，人工审查后应用 |
-| FR-020 | Validation / Runtime / Publishing | Deferred | 不建设独立工作台，不进入首个编辑纵切 |
+| FR-020 | Validation / Runtime / Publishing Workbenches | Deferred | 不建设独立工作台，不进入首个编辑纵切 |
 
 ## 2. Procedure 编辑要求
 
@@ -78,24 +78,42 @@
 - 任何一步失败，整个事务回滚；不得留下半应用状态。
 - 无法证明无损的局部区域降级为 Source-only / Preserve-only。
 
-## 4. 资产级需求
+## 4. 运行时资产需求
 
-### SKILL.md
+### SKILL.md 与 References
+
 - 支持 Frontmatter、Markdown Source、Preview 和 Outline。
-- 支持常用标题、链接、列表、代码块编辑；Preview 不自动改写 Source。
-- Model Context Preview 只显示有 Host 证据的加载行为，未知项标为 Approximation。
+- Preview 不自动改写 Source。
+- Model Context Preview 必须区分 SKILL.md、自动 preload 和按精确路径显式读取的 Reference。
+- 不把 assurance、Script 或 Schema 自动塞入模型上下文。
+- 不存在的 references 目录不自动创建。
 
-### Contract / Predicate / Case
-- 使用结构化 Inspector 与 Source 双视图。
-- 字段编辑必须由当前 Manifest / Schema / Validator 能力约束。
-- Predicate 显示 Observation、Scope、Freshness、When、Evaluator 和引用者。
-- Case 编辑区分 semantic obligation、definition、fixture 和实际执行记录。
-- 不以 Case 文件存在推断可执行或已执行。
+### Contract
 
-### References / Schemas / Scripts
-- 展示来源、被引用位置和加载方式。
-- 默认不执行 Script。
-- Schema 与 Demo 专用 Validator 的证据等级分开。
+- 编辑 Entry Procedure、Inputs、Required Facts、Allowed Resources、Postconditions、Dependencies 和 Planning / Failure Policy。
+- 所有 Procedure、Predicate、Schema 和 Capability 引用必须显示其来源及证据等级。
+- Contract 中声明的资源不代表 Host 已经注册或允许执行该资源。
+- requestSchema 等引用需区分 Contract-declared 与 Runtime-loaded；没有消费证据时不得显示 Runtime-proven。
+
+### Predicate
+
+- 显示 Observation ref、Scope、Freshness、When、Evaluator、Script ref 和引用者。
+- CEL / Script 表达式均保留原文；结构化编辑必须有对应 Parser / Patch 资格。
+- Observation ref 和 Script ref 只有在 Host / Runtime Adapter 明确支持时才显示为可执行候选。
+
+### Script / Schema
+
+- Script Source 可编辑，但默认不执行。
+- 新增 Script 文件不自动获得 Runtime 执行权限；必须有 Host allowlist / backend 注册证据。
+- Schema 显示被哪个 Script / Contract 引用、用于哪个输入或输出边界。
+- 区分 Runtime 实际加载的 Schema 与仅被 Contract 声明引用的 Schema。
+
+### References
+
+- references/preload 按 Host 规则自动进入模型上下文。
+- references/on-demand 和 references/samples 仅在 SKILL.md 明确给出精确路径时读取。
+- 显示加载模式、引用路径和 Source location。
+- 不把未被加载的目录内容误报为模型上下文。
 
 ## 5. 质量属性
 
@@ -104,7 +122,7 @@
 - **可逆性**：事务级 Undo / Redo。
 - **冲突安全**：外部修改不能被本地保存静默覆盖。
 - **可访问性**：Node / Route / Step / Binding 提供键盘可达的线性编辑方式。
-- **兼容性诚实**：Observed / Schema-declared / Demo-custom-validated / Runtime-proven 分层。
+- **兼容性诚实**：Observed / Host-loaded / Runtime-consumed / Contract-declared / Demo-custom-validated 分层。
 - **性能**：编辑反馈不要求每次按键都完整重建所有资产索引；允许增量解析，但保存前必须完整一致性检查。
 
 ## 6. 首个编辑纵切验收
@@ -118,4 +136,5 @@
 7. 修改 YAML 注释、字段顺序或未知字段附近的无关区域后，其他区域不被格式化重写。
 8. 解析失败时保留 Source，旧 Graph 明确标记 STALE。
 9. 打开 establish-pdu-session，确认 17 个 Root Node、65 条 Root route entries 和 5 个 Child Procedure 正确解析；过渡 Phase 在未获得专用编辑资格前保持 Source-only。
-10. 普通编辑和保存不执行 Script、Capability、Runtime 或 Live 5GC。
+10. 能从 Predicate 跳转到对应 Observation / Script；Script 和 Schema 的 Runtime allowlist / consumption 证据可见。
+11. 普通编辑和保存不执行 Script、Capability、Runtime 或 Live 5GC。

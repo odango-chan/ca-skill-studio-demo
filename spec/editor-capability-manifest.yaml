@@ -2,72 +2,143 @@ apiVersion: skillstudio.demo/v1alpha1
 kind: EditorCapabilityManifest
 metadata:
   name: ca-skill-studio-demo
-  status: initial-observed-baseline
+  status: observed-runtime-asset-baseline
   generatedAt: "2026-10-31"
   source:
     repository: odango-chan/ca-agent-demo
-    ref: main
     commit: bf445ad777149af5af2dfa0a5bdea18d0451303e
     tree: 89f45b85e025c2a18952495abcf269e99ddb400e
+    evidence:
+      skillContextLoader: src/ca_agent_demo/agent/host/skill_context.py
+      hostAdmission: src/ca_agent_demo/runtime/admission.py
+      exactEntryLinker: src/ca_agent_demo/runtime/linker.py
+      predicateEngine: src/ca_agent_demo/runtime/predicate_engine.py
+      governedScriptBackend: src/ca_agent_demo/runtime/governed_script.py
+      assetRoot: src/ca_agent_demo/support/assets.py
     localSchemaSnapshot: tests/contracts/ca-skill-toolchain/03a42764ee2a67e39f57ab550b63c7a5d7966199
-    validator: scripts/validate_docs.py
+    authoringValidator: scripts/validate_docs.py
     localGate: make verify
   scope:
-    compatibilityTarget: ca-agent-demo-current-main
+    product: runtime-and-model-context-skill-authoring
+    compatibilityTarget: ca-agent-demo-pinned-baseline
     externalToolchainDependency: false
     runtimeAuthority: false
 
 evidenceLevels:
-  observed-and-used: "Present in one or more current Skill source files."
-  demo-schema-declared: "Declared by the schema snapshot checked into ca-agent-demo."
+  model-context-consumed: "Loaded into model context by the Host SkillContextLoader."
+  runtime-consumed: "Read, frozen, validated, or executed by Host / Runtime code in the pinned source path."
+  contract-declared: "Referenced by a runtime-consumed contract, but direct runtime loading was not confirmed."
+  host-external: "Consumed by Host / Runtime but located outside the Skill Package."
+  loader-supported-not-observed: "The Host supports this loading mode, but no current pinned Skill Package uses it."
+  schema-declared: "Declared by the pinned Demo Schema snapshot."
   demo-custom-validated: "Checked by a repository-local specialized validator."
-  optional-package-asset: "Allowed by the current package convention but not required by every Skill."
-  not-established: "Insufficient evidence to promise structured editing or execution support."
+  not-runtime-consumed: "Not loaded into model context or consumed by the current Host / Runtime path."
 
 editorBehaviors:
   editable: "Structured editing is supported and round-trip safety is tested."
-  source-only: "Raw source can be viewed or edited; no structured editor is promised."
-  read-only: "Parsed presentation only; editing is disabled."
-  preserve-only: "Unknown syntax must be retained without semantic editing."
+  source-only: "Raw source can be edited; no structured editor is promised."
+  preserve-only: "Unknown or unsupported syntax must be retained without semantic editing."
+  opaque-preserve: "Not surfaced as a first-class editor asset; preserve bytes and include in complete Package operations."
   unavailable: "Not supported by the current adapter."
+
+runtimeConsumption:
+  modelContext:
+    - path: SKILL.md
+      evidence: model-context-consumed
+      consumer: SkillContextLoader.load_skill
+      behavior: full-markdown-loaded
+      editor: markdown-source-preview
+    - path: references/preload/**
+      evidence: loader-supported-not-observed
+      consumer: SkillContextLoader.load_skill
+      behavior: auto-load-all-files-after-skill-selection
+      editor: markdown-reference-editor
+    - path: references/on-demand/**
+      evidence: loader-supported-not-observed
+      consumer: SkillContextLoader.read_reference
+      behavior: exact-path-only-and-path-must-be-named-in-loaded-SKILL.md
+      editor: markdown-reference-editor
+    - path: references/samples/**
+      evidence: loader-supported-not-observed
+      consumer: SkillContextLoader.read_reference
+      behavior: explicit-exact-path-only-never-auto-load
+      editor: markdown-reference-editor
+  machineExecution:
+    - path: assurance/contract.yaml
+      evidence: runtime-consumed
+      consumer: load_admitted_closure; admit_skill_entry; compile_link_admit_skill_entry
+      behavior: skill-type-entry-dependencies-required-facts-postconditions
+      editor: contract-source-and-inspector
+    - path: assurance/procedure.yaml
+      evidence: runtime-consumed
+      consumer: load_admitted_closure; compile_link_admit_skill_entry; _freeze_procedure_graph
+      behavior: exact-entry-procedure-and-child-procedure-source
+      editor: procedure-designer
+    - path: assurance/predicates.yaml
+      evidence: runtime-consumed
+      consumer: load_admitted_closure; linker; PredicateEngine
+      behavior: frozen-observation-scope-freshness-cel-and-script-evaluator-definitions
+      editor: predicate-source-and-inspector
+    - path: scripts/select_establishment_configuration.py
+      evidence: runtime-consumed
+      consumer: GovernedCreatedSessionScriptBackend.execute
+      behavior: exact-script-allowlist-and-schema-validated-local-compute
+      editor: python-source-editor
+    - path: scripts/evaluate_udm_read.py
+      evidence: runtime-consumed
+      consumer: GovernedCreatedSessionScriptBackend.execute_predicate
+      behavior: exact-script-allowlist-and-schema-validated-predicate-evaluation
+      editor: python-source-editor
+    - path: scripts/evaluate_transfer_start.py
+      evidence: runtime-consumed
+      consumer: GovernedCreatedSessionScriptBackend.execute_predicate
+      behavior: exact-script-allowlist-and-schema-validated-predicate-evaluation
+      editor: python-source-editor
+  schemas:
+    runtime-loaded:
+      - selection-input.schema.yaml
+      - selection.schema.yaml
+      - udm-read-evaluation-input.schema.yaml
+      - transfer-start-evaluation-input.schema.yaml
+      - predicate-evaluation-result.schema.yaml
+    contract-declared-not-runtime-confirmed:
+      - establishment-request.schema.yaml
+  hostExternal:
+    - path: planning/skill-surfaces/5gc-file-transfer.yaml
+      evidence: host-external
+      consumer: load_root_sources
+      behavior: root-local-procedure-allowlist
+      editor: read-only-external-dependency
 
 packageInventory:
   skills:
     - name: 5gc-intent
       role: routing-policy
-      observedFiles: [SKILL.md]
-      cases: 0
+      runtimeAssets: [SKILL.md]
       status: observed
     - name: 5gc-file-transfer
       role: root-business-skill
-      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, schemas, scripts]
-      cases: 0
+      runtimeAssets: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, schemas, scripts]
       status: observed
     - name: ue-registration
       role: registration-convergence
-      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml]
-      cases: 0
+      runtimeAssets: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml]
       status: observed
     - name: ensure-pdu-session
       role: pdu-session-target-convergence
-      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, cases]
-      cases: 5
+      runtimeAssets: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml]
       status: observed
     - name: ensure-session-qos
       role: session-qos-convergence
-      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, cases]
-      cases: 5
+      runtimeAssets: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml]
       status: observed
     - name: ensure-virtual-group
       role: virtual-group-lifecycle-convergence
-      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, cases]
-      cases: 6
+      runtimeAssets: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml]
       status: observed
     - name: establish-pdu-session
       role: source-first-createdsession-candidate
-      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, cases, schemas, scripts, design]
-      cases: 36
-      caseKind: semantic-qualification-obligations
+      runtimeAssets: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, schemas, scripts]
       runtimeCompatible: false
       activeInRouting: false
       status: observed-transitional
@@ -79,26 +150,33 @@ packageShape:
     - assurance/contract.yaml
     - assurance/procedure.yaml
     - assurance/predicates.yaml
-  optional:
-    - cases/
+  optionalRuntimeOrContextAssets:
     - references/
     - schemas/
     - scripts/
-  referenceDirectories:
-    preload: host-auto-load-after-skill-selection
-    on-demand: exact-path-and-trigger-only
-    samples: never-auto-load
+  notSurfacedAsRuntimeAssets:
+    behavior: opaque-preserve
+    identityDigest: included-in-complete-package-artifact-digest
 
-observedAuxiliaryAssets:
-  - path: skills/establish-pdu-session/design/
-    appliesTo: establish-pdu-session
-    kind: maintainer-documentation
-    files:
-      - README.md
-      - llm-execution-experiment.md
-    modelFacing: false
-    runtimeAsset: false
-    initialEditorBehavior: markdown-source-editor
+artifactIdentity:
+  hostSkillArtifactDigest:
+    source:
+      - SkillContextLoader._artifact_digest
+      - local_root_skill_identity
+    includes: every-file-under-the-selected-Skill-root
+  modelContextDigest:
+    source: SkillContextLoader._digest
+    includes:
+      - SKILL.md
+      - references/preload files actually loaded
+  admittedExecutableClosureDigest:
+    source: load_admitted_closure
+    includes:
+      - assurance/contract.yaml
+      - assurance/procedure.yaml
+      - assurance/predicates.yaml
+    canonicalization: parsed-YAML-mapping
+  invariant: digest-domain-membership-is-not-runtime-consumption
 
 yamlCompatibility:
   implementationObserved:
@@ -119,44 +197,44 @@ procedure:
     procedureFieldsObservedOrDeclared: [applicability, inputs, start, nodes]
   nodeConstructs:
     - id: call
-      evidence: observed-and-used
+      evidence: runtime-consumed
       initialEditorBehavior: source-only-until-roundtrip-poc
     - id: verify
-      evidence: observed-and-used
+      evidence: runtime-consumed
       initialEditorBehavior: source-only-until-roundtrip-poc
     - id: script
-      evidence: observed-and-used
+      evidence: runtime-consumed
       initialEditorBehavior: source-only-until-step-model-verified
     - id: procedure
-      evidence: observed-and-used
+      evidence: runtime-consumed
       initialEditorBehavior: source-only-until-composition-semantics-verified
     - id: terminal
-      evidence: observed-and-used
+      evidence: runtime-consumed
       initialEditorBehavior: source-only-until-roundtrip-poc
+    - id: reconcile
+      evidence: schema-declared
+      initialEditorBehavior: source-only
     - id: tool
-      evidence: demo-schema-declared
+      evidence: schema-declared
       initialEditorBehavior: source-only
     - id: predicate
-      evidence: demo-schema-declared
+      evidence: schema-declared
       initialEditorBehavior: source-only
     - id: for
-      evidence: demo-schema-declared
-      initialEditorBehavior: source-only
-    - id: reconcile
-      evidence: demo-schema-declared
+      evidence: schema-declared
       initialEditorBehavior: source-only
   commonFields:
     - id: with-from
-      evidence: observed-and-used
+      evidence: runtime-consumed
       initialEditorBehavior: source-only-until-binding-model
     - id: on
-      evidence: observed-and-used
+      evidence: runtime-consumed
       initialEditorBehavior: source-only-until-route-model
     - id: inputs
-      evidence: observed-and-used
+      evidence: runtime-consumed
       initialEditorBehavior: source-only-until-roundtrip-poc
     - id: applicability
-      evidence: demo-schema-declared
+      evidence: schema-declared
       initialEditorBehavior: source-only
   transitionalExtensions:
     - id: node-preconditions
@@ -185,7 +263,7 @@ procedure:
       initialEditorBehavior: source-only-until-dedicated-profile-tests-pass
 
 contract:
-  evidence: demo-schema-declared
+  evidence: runtime-consumed
   fields:
     - apiVersion
     - kind
@@ -209,7 +287,7 @@ contract:
   initialEditorBehavior: source-first-form-after-schema-tests
 
 predicate:
-  evidence: demo-schema-declared
+  evidence: runtime-consumed
   observedEvaluatorTypes: [cel, script]
   observationFields: [ref, scope, freshness, when]
   evaluatorFields:
@@ -217,51 +295,33 @@ predicate:
     script: [type, ref]
   initialEditorBehavior: source-first-with-structured-inspector
 
-case:
-  evidence: observed-in-current-case-files
-  observedEnvelope:
-    - apiVersion
-    - kind
-    - metadata.skill
-    - metadata.name
-    - spec.classes
-    - spec.purpose
-    - spec.context
-    - spec.expect
-    - spec.fixtures
-  currentFixtureDistinction:
-    ensure-pdu-session: case-files-with-fixture-shape
-    establish-pdu-session: semantic-qualification-obligations-only
-  initialEditorBehavior: source-first-case-inspector
+scriptPolicy:
+  evidence: runtime-consumed
+  executionRequires:
+    - exact-host-script-allowlist
+    - input-schema-validation
+    - output-schema-validation
+  addingFileDoesNotGrantExecution: true
+  currentEstablishPduSessionScripts:
+    - scripts/select_establishment_configuration.py
+    - scripts/evaluate_udm_read.py
+    - scripts/evaluate_transfer_start.py
 
-validation:
-  commands:
-    - make verify
-    - uv run python scripts/validate_docs.py
-    - uv run pytest -q -m "not live_model"
-  currentAdapters:
-    - local-schema-snapshot
-    - createdsession-specialized-authoring-validator
-    - repository-local-pytest-gate
-  notProvenByTheseCommands:
-    - runtime-qualification-of-all-skills
-    - execution-of-all-createdsession-cases
-    - live-5gc-acceptance
+schemaPolicy:
+  runtimeLoaded:
+    - selection-input.schema.yaml
+    - selection.schema.yaml
+    - udm-read-evaluation-input.schema.yaml
+    - transfer-start-evaluation-input.schema.yaml
+    - predicate-evaluation-result.schema.yaml
+  contractDeclaredNotRuntimeConfirmed:
+    - establishment-request.schema.yaml
 
-initialFixtures:
-  - skill: ensure-pdu-session
-    sourceRepository: odango-chan/ca-agent-demo
-    sourceCommit: bf445ad777149af5af2dfa0a5bdea18d0451303e
-    sourcePath: skills/ensure-pdu-session
-    importStatus: not-imported
-    purpose: basic-procedure-and-reconcile-ux
-  - skill: establish-pdu-session
-    sourceRepository: odango-chan/ca-agent-demo
-    sourceCommit: bf445ad777149af5af2dfa0a5bdea18d0451303e
-    sourcePath: skills/establish-pdu-session
-    importStatus: not-imported
-    purpose: complex-procedure-and-transitional-syntax-ux
-
+referencePolicy:
+  preload: host-auto-load-after-skill-selection
+  on-demand: exact-path-only-and-path-must-be-named-in-SKILL.md
+  samples: explicit-exact-path-only-never-auto-load
+  noCurrentPinnedSkillUsesReferences: true
 
 authoringPolicy:
   status: proposed-not-implemented

@@ -1,20 +1,21 @@
 # 实施路线图
 
-**状态：Proposed · Authoring-first**
+**状态：Proposed · Runtime-asset authoring-first**
 
-按源文件风险和功能依赖排序。先证明无损编辑，再搭建应用，最后扩展资产编辑。验证和发布不作为当前主路线。
+按源文件风险和功能依赖排序。先证明无损编辑，再搭建应用，最后扩展实际 Runtime / Model-context 资产编辑。独立验证和发布不作为当前主路线。
 
 ## Phase 0：产品与编辑模型
 
-交付：Authoring-first 产品愿景、Package Editor 信息架构、Procedure 编辑 UX、Source-preserving Edit Model、ADR-0005、固定 Demo baseline 和 Capability Manifest。
+交付：Runtime-asset authoring-first 产品愿景、Runtime Asset Explorer 信息架构、Procedure 编辑 UX、Source-preserving Edit Model、ADR-0005、固定 Demo baseline 和 Capability Manifest。
 
 退出条件：
 
-- 用户确认主要工作台用于开发和编辑；
+- 用户确认只关注实际 Skill 模型上下文与 Host / Runtime 消费的资产；
 - Source 是唯一权威定义；
 - Source / Visual 的双向编辑模型清楚；
 - Typed Patch、Diff、Undo / Redo、Conflict 语义明确；
-- ensure-pdu-session 与 establish-pdu-session 的兼容边界明确。
+- ensure-pdu-session 与 establish-pdu-session 的兼容边界明确；
+- Runtime-consumed、Model-context-consumed、Contract-declared 和 Host-external 资产分层明确。
 
 ## Phase 1：Round-trip YAML + Typed Patch POC
 
@@ -45,21 +46,23 @@
 交付：
 
 - Workspace Open / Recent；
-- Package Explorer；
+- Runtime Asset Explorer；
 - 多文件 Editor Tabs；
-- Markdown / YAML Source Editor；
+- Markdown / YAML / JSON / CEL / Python Source Editor；
 - Source revision / Dirty / Save；
 - File Watch / Conflict；
 - Problems 基础面板；
-- Undo / Redo 基础历史。
+- Undo / Redo 基础历史；
+- 完整 Package 文件保留与 Artifact Digest 更新。
 
 退出条件：
 
-- 打开本地 Package；
-- 编辑并保存 Source；
+- 打开本地 Package 并识别 Runtime Asset Map；
+- 编辑并保存 Runtime / Model-context Source；
 - 外部修改不被静默覆盖；
-- 文件树与编辑 Tab 状态一致；
-- optional 目录不会被自动创建。
+- Runtime Asset Explorer 与实际 Host 消费证据一致；
+- optional 目录不会被自动创建；
+- 未建模文件不被删除或排除出完整 Digest。
 
 ## Phase 3：Procedure Designer 首个可编辑纵切（ensure）
 
@@ -98,32 +101,34 @@
 
 - establish 的 17 Root Nodes、65 Root route entries、5 Child Procedures 正确读取；
 - CreatedSession node-level Preconditions / Postconditions 在专用 Profile 未通过前 Source-only；
-- 不将 36 semantic obligations 误报为执行 Fixture；
 - 三种 Handle、Route Source、隐式阶段转换准确区分。
 
-## Phase 5：其他 Skill Asset Editors
+## Phase 5：Runtime Asset Editors
 
 交付：
 
 - SKILL.md Frontmatter / Markdown Editor；
 - Contract Editor；
 - Predicate Workbench；
-- Case Editor；
-- Reference / Schema / Script Browser；
-- Cross-asset Reference Index。
+- Script Source Editor；
+- Schema Editor；
+- Reference Editor（仅在 Host 支持且样本真实使用时）；
+- Runtime Asset Map / Cross-asset Reference Index。
 
 退出条件：
 
 - 所有结构化表单由 Source Patch 驱动；
 - 不支持字段保留；
 - 引用跳转准确；
-- Source 与 Inspector 同步。
+- Script / Schema 的 Runtime 消费与 allowlist 证据准确；
+- Source 与 Inspector 同步；
+- Model Context Preview 与 Host Loader 行为一致。
 
 ## Phase 6：增强能力（后置）
 
-候选：AI Co-author、Script Sandbox、Runtime Trace Viewer、更多 Compatibility Profile、GitHub integration。
+候选：AI Co-author、更多 Compatibility Profile、GitHub integration。
 
-独立 Validation / Qualification、Registry / Publishing、安装和晋升工作台不属于当前路线，只有后续明确提出需求时再规划。
+独立 Validation / Runtime Operations、Registry / Publishing、安装和晋升工作台不属于当前路线，只有后续明确提出需求时再规划。
 
 ## 技术选型闸门
 

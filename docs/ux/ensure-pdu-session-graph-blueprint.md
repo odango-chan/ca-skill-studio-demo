@@ -2,7 +2,7 @@
 
 **状态：Observed source mapping + Proposed Visual projection**
 
-本文件把当前 Demo 中的 `ensure-pdu-session` 实际 Procedure、Contract、Predicates 和 5 个 Case 投影为 Procedure Designer 的具体样本。所有节点 ID、Operator、路由目标和 Binding expression 均以固定源 Commit 为准。
+本文件把当前 Demo 中的 `ensure-pdu-session` 实际 SKILL.md、Contract、Predicates 和 Procedure 投影为 Procedure Designer 的具体样本。所有节点 ID、Operator、路由目标和 Binding expression 均以固定源 Commit 为准。
 
 ## 1. 来源与资格边界
 
@@ -12,7 +12,6 @@
 - Contract: `skills/ensure-pdu-session/assurance/contract.yaml`
 - Predicates: `skills/ensure-pdu-session/assurance/predicates.yaml`
 - Skill guide: `skills/ensure-pdu-session/SKILL.md`
-- Cases: `skills/ensure-pdu-session/cases/01-* ... 05-*/case.yaml`
 
 当前源文件定义一个命名 Procedure：`ensure-session`，共 11 个节点，没有 Child Procedure，也没有节点级 Preconditions / Postconditions。
 
@@ -29,7 +28,7 @@
 | `allowDynamicProcedure` | `false` |
 | `failureSemantics.outcomeUnknown.requireReconcile` | `true` |
 
-Contract 允许的 Capability 是 `pdu_session.create`、`pdu_session.reconcile`、`pdu_session.query`。当前 Procedure 实际调用前两者；`pdu_session.query` 只出现在 allowedResources / Case resource 声明中，不能因此额外画出一个 Query 节点。
+Contract 允许的 Capability 是 `pdu_session.create`、`pdu_session.reconcile`、`pdu_session.query`。当前 Procedure 实际调用前两者；`pdu_session.query` 只出现在 allowedResources 中，不能因此额外画出一个 Query 节点。
 
 Contract 的 `ue.registered` 是 **Procedure 图外的 Contract Gate**。首屏可在 Graph Header 显示它，但不能把它伪造成 `ensure-session.nodes` 中的一个节点。
 
@@ -213,28 +212,7 @@ It also receives `supi` and `pduSessionId` from Procedure inputs.
 
 The Binding Inspector should show this as a producer/consumer relation and retain the entire path. Do not draw it as a control-flow edge.
 
-## 6. Case source semantics: five fixture-shaped cases (visual overlay deferred)
-
-These Case files contain exact trace expectations and fixture-shaped data. They remain Package source assets and are useful as future Case Editor / Expected Trace Preview inputs. A Case overlay is deferred from the first Procedure Designer release; their presence does not mean the cases have been executed in Runtime.
-
-| Case | Expected trace / branch | Expected terminal |
-|---|---|---|
-| `01-already-established` | `observe-target-session: PASS` | `SUCCEEDED` |
-| `02-create-missing` | target `FAIL` → absence `PASS` → create `COMMITTED` → verify `PASS` | `SUCCEEDED` |
-| `03-existing-identity-mismatch` | target `FAIL` → absence `FAIL` | `FAILED` via `strategy-conflict` |
-| `04-create-unknown-reconciled` | target `FAIL` → absence `PASS` → create `OUTCOME_UNKNOWN` → reconcile `COMMITTED` → verify `PASS` | `SUCCEEDED` |
-| `05-absence-unknown-safe-stop` | target `FAIL` → absence `UNKNOWN`; no create action | `UNRESOLVED` |
-
-The Case fixtures explicitly mark `forbiddenImmediateRetryAfterUnknown: true` for Case 04. Case 05 may declare create as an available resource, but its expected trace contains no create action: an available Capability does not override an UNKNOWN absence Predicate.
-
-First-version behavior:
-
-- List and open the five Case source files through Package Explorer.
-- Do not add a Case selector or graph overlay to the first Procedure Designer release.
-- If a future Expected Trace Preview is implemented, it must use exact `expect.trace.ordered` node references and be labeled `Expected Trace · Not Executed`.
-- Never infer execution history, percentage or coverage from five Case definitions.
-
-## 7. Recommended canvas composition
+## 6. Recommended canvas composition
 
 1. Put `observe-target-session` and `observe-session-absence` on the primary vertical decision lane.
 2. Put `create-session` on the mutation lane.
@@ -246,7 +224,7 @@ First-version behavior:
 
 The first selected node should open Overview; the Bindings tab for `reconcile-create` should make the original create output provenance immediately inspectable.
 
-## 8. Source line anchors
+## 7. Source line anchors
 
 Line numbers refer to the pinned source file:
 
@@ -261,7 +239,7 @@ Line numbers refer to the pinned source file:
 | `verify-created-target` | 111–117 |
 | Terminals | 118–128 |
 
-## 9. Implementation acceptance checklist
+## 8. Implementation acceptance checklist
 
 - [ ] Graph contains exactly 11 source nodes in this Procedure.
 - [ ] Entry is `observe-target-session`.
@@ -271,5 +249,4 @@ Line numbers refer to the pinned source file:
 - [ ] Retry is reachable only from Reconcile `NOT_COMMITTED`.
 - [ ] The retry input points to `controlledRetryBackendOperationRef`.
 - [ ] All five terminals and their terminal values remain distinct.
-- [ ] The five Case traces can highlight exact source nodes without implying that the Cases have run.
 - [ ] The environment-specific authoritative absence boundary is visible.

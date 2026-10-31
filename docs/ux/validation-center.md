@@ -1,8 +1,8 @@
-# Validation Center UX（后置参考设计）
+# Validation / Runtime Workbench（后置参考设计）
 
-**状态：Deferred · 不属于当前主要工作台**
+**状态：Deferred · 不属于当前 Skill Studio 工作台**
 
-本文件保留未来 Validation / Qualification 工作台可能需要的状态语义和证据要求。当前 Skill Studio 的主要任务是开发和编辑 Skill；验证能力只以轻量 Problems / Inline Diagnostics 形式辅助作者。
+本文件保留未来独立 Validation / Runtime 工作台可能需要的状态语义。当前 Skill Studio 的主要任务是开发和编辑实际 Skill Runtime Assets；检查能力只以轻量 Problems / Inline Diagnostics 形式辅助作者。
 
 ## 1. 当前范围
 
@@ -13,6 +13,7 @@
 - Unresolved Binding / Reference；
 - Unsupported / Preserve-only；
 - Compatibility Profile 限制；
+- Script / Capability / Observation 的 Host 支持证据缺失；
 - Source / Projection Conflict。
 
 不建设独立 Validation Center，不管理执行调度、Coverage、Runtime Trace 或 Qualification Report。
@@ -30,13 +31,12 @@
 
 Predicate、Mutation、Procedure 的领域状态不能与 Validation 状态混用。
 
-## 3. 保留的证据原则
+## 3. 证据原则
 
 - 未执行的检查不能显示 PASS；
 - Schema 通过不能显示 Runtime Qualified；
-- Case 文件存在不能显示 Case Executed；
-- Runtime 测试通过不能显示 Live Accepted；
 - Script 静态检查不能显示 Script Runtime Success；
-- 36 个 CreatedSession semantic obligations 不得计入 Executed Coverage。
+- Host 未注册的 Script / Capability / Observation 不得显示为可执行；
+- 本地 Runtime 测试不能显示为 Live 5GC Accepted。
 
 以上内容仅作为未来参考，不构成当前实施承诺。

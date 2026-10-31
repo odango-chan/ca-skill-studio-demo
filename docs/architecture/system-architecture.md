@@ -37,11 +37,11 @@ ca-agent-demo (read-only reference baseline)
 
 ### Workbench UI
 
-负责 Package Explorer、多文件 Tab、Source / Visual / Split、Procedure Canvas、Inspector 和 Problems。UI 不拥有独立 Skill 语义权威。
+负责 Runtime Asset Explorer、多文件 Tab、Source / Visual / Split、Procedure Canvas、Inspector 和 Problems。UI 只把有模型上下文加载或 Host / Runtime 消费证据的资产作为一等编辑对象；UI 不拥有独立 Skill 语义权威。
 
 ### Workspace / Package Service
 
-管理用户明确打开的 Workspace、Package 文件、文件监视、打开状态、Working Buffer、Digest 和本地 Save。首版不自动 commit / push。
+管理用户明确打开的 Workspace、完整 Package 文件集合、Runtime Asset Map、文件监视、打开状态、Working Buffer、完整 Artifact Digest 和本地 Save。未展示为一等编辑资产的文件仍需原样保留。首版不自动 commit / push。
 
 ### Round-trip Source Layer
 
@@ -72,7 +72,7 @@ ca-agent-demo (read-only reference baseline)
 ### 打开 Package
 
 ~~~text
-Workspace path / imported fixture
+Workspace path / imported sample package
   -> discover actual files
   -> load Source buffers
   -> build Round-trip Trees
