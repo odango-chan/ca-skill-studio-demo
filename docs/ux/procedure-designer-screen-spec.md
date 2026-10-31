@@ -162,7 +162,7 @@ Procedure 列表和 Node Outline 是辅助导航，不是另一套流程图。�
 每条边必须保留：
 
 - Source Node；
-- Route Source：Operation / Preconditions / Postconditions / Child Procedure / Loop；
+- Route Source：Operator / Preconditions / Postconditions / Child Procedure / Loop；
 - Outcome 原始值；
 - Target Node；
 - Source Location；
@@ -170,7 +170,7 @@ Procedure 列表和 Node Outline 是辅助导航，不是另一套流程图。�
 
 推荐标签格式：
 
-- `Operation · OUTCOME_UNKNOWN`
+- `Operator · OUTCOME_UNKNOWN`
 - `Preconditions · FAILED`
 - `Postconditions · UNKNOWN`
 - `Child Procedure · UNRESOLVED`
@@ -223,7 +223,7 @@ NODE  nudm-sdm-subscribe
 ┌ 02 · MAIN OPERATION ─────────────────────────────────────┐
 │ CALL  sbi.udm.sdm_subscription.create                    │
 │ with: pcfCreateInputsRef, selection, ingressRef, ...     │
-│ Operation routes: OUTCOME_UNKNOWN → reconcile-...       │
+│ Operator routes: OUTCOME_UNKNOWN → reconcile-...       │
 └─────────────────────────────────────────────────────────┘
                          │ successful operation
                          ▼

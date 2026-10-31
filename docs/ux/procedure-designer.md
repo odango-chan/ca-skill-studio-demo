@@ -125,13 +125,13 @@ Graph、Inspector、Binding Index 和 Diagnostics 均为派生视图，不得单
 | 路由来源 | Source path | 表达内容 | 当前 CreatedSession 结果域 |
 |---|---|---|---|
 | Preconditions | `preconditions.on` | 主操作尚未执行时，入口准备为何退出 | `FAILED / UNRESOLVED` |
-| Main Operation | node-level `on` | 核心 Operator 的实际结果 | 按 Operator / Capability 语义，例如 `NOT_COMMITTED / OUTCOME_UNKNOWN / FAILED / DENIED` |
+| Node Operator | node-level `on` | 核心 Operator 的实际结果 | 结果域取决于 Operator：Verify 可返回 Predicate truth，Call 可返回 mutation certainty / 调用结果，Child Procedure 可返回 Procedure terminal |
 | Postconditions | `postconditions.on` | 主操作之后的事实验证结果 | `PASS / FAIL / UNKNOWN` |
 
 Visual 必须在每条边上显示来源阶段和 outcome，例如：
 
 - `Preconditions · FAILED`
-- `Operation · OUTCOME_UNKNOWN`
+- `Operator · OUTCOME_UNKNOWN`
 - `Postconditions · UNKNOWN`
 
 即使多组路由指向同一个目标节点，也不能把来源信息合并掉。成功进入 Postconditions 的内部语义转移应明确标注为 **implicit success → postconditions**，不能伪装成 YAML 中显式存在的 `on` 路由。
