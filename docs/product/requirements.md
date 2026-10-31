@@ -10,8 +10,8 @@
 | FR-002 | 打开 Skill Package | P0 | 识别必需与可选资产，不创建空目录 |
 | FR-003 | 编辑 SKILL.md | P0 | Markdown 编辑、预览、大纲和链接检查 |
 | FR-004 | 编辑 YAML 源文件 | P0 | 保留注释、顺序、字符串类型和未知字段 |
-| FR-005 | Procedure 图形投影 | P0 | 从源文件构建节点、路由和嵌套视图 |
-| FR-006 | 节点 Inspector | P0 | 展示节点类型、阶段、绑定和来源 |
+| FR-005 | Procedure 图形投影 | P0 | 从源文件构建 Procedure graph、控制流、阶段来源路由和子 Procedure 视图 |
+| FR-006 | 节点 Inspector | P0 | 展示 Operator、Effect（有证据时）、Preconditions / Operation / Postconditions、Binding 和 Source |
 | FR-007 | Contract 浏览与编辑 | P1 | 表单和 Source 双视图 |
 | FR-008 | Predicate 浏览与编辑 | P1 | Observation、Scope、Freshness、CEL / Script |
 | FR-009 | Case 管理 | P1 | 显示语义义务与可执行 Fixture 的差异 |
@@ -38,11 +38,16 @@ P0 为可用编辑工作台基础；P1 为完整 Skill authoring 体验所需；
 ### Procedure
 
 - 支持从 procedures / start / nodes 构建图形投影。
-- 支持节点选择、路由查看、嵌套 Procedure 导航。
-- 显示 inputs、with/from、on 和终态。
-- 正确展示 node-level preconditions / postconditions 的过渡语法。
-- 不把阶段内部步骤错误提升为主业务节点。
-- 不将不同阶段的 on 路由合并为同一组无来源出口。
+- 默认以显式控制流展示业务主流程；数据 Binding 不默认叠加为控制流边。
+- 每个命名 Procedure 独立成图；Child Procedure 通过 Drill-in 导航，不自动扁平化。
+- 支持节点选择、阶段查看、路由来源查看和 Source ↔ Visual 定位。
+- 显示 inputs、with/from、on、operator 和终态。
+- 对节点级 Preconditions / Postconditions 过渡语法，按有序阶段展示；不能提升为额外主业务节点。
+- Operation、Preconditions、Postconditions 的 `on` 路由必须保留来源，不能合并为无来源出口。
+- 对隐式成功进入 Postconditions 的语义转移明确标识，不伪造成源文件中的显式路由。
+- 区分 `reconcile:` Operator 与 `call: ...reconcile`。
+- 区分 Operator、Effect、Outcome 和 Procedure terminal。
+- 不支持的语法必须保留并标记 Unsupported / Source-only。
 
 ### Contract
 
@@ -80,3 +85,8 @@ P0 为可用编辑工作台基础；P1 为完整 Skill authoring 体验所需；
 5. 修改 YAML 后，流程图和诊断同步更新。
 6. 对不支持的语法，编辑器保留源文件且不静默丢字段。
 7. 运行当前 Demo 静态门禁后，Validation Center 显示实际命令与结果范围。
+8. 相同目标的多阶段路由仍能显示各自来源。
+9. 节点声明 Postconditions 时，图形能区分操作成功进入验证阶段与 Postconditions 的 PASS 路由。
+10. 对 CreatedSession 的过渡 Binding path 显示其专用 validator 证据等级，而非标记为通用 Schema 支持。
+11. Source 解析失败时，旧 Graph 标记 STALE。
+12. 普通 Preview / Validate 不触发 Script、Capability、Runtime 或 Live 5GC。

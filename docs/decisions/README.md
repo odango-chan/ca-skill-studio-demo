@@ -7,6 +7,7 @@
 - [ADR-0001：Skill Source 是唯一权威定义](0001-skill-source-is-authority.md)
 - [ADR-0002：第一阶段只适配 ca-agent-demo 当前能力](0002-demo-only-compatibility-baseline.md)
 - [ADR-0003：CreatedSession 过渡语法必须显式建模](0003-createdsession-transitional-syntax.md)
+- [ADR-0004：Procedure Designer 先只读投影](0004-procedure-designer-read-only-first.md)
 
 ## 决策状态
 

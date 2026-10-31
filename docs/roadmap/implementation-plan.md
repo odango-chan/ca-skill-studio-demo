@@ -6,14 +6,16 @@
 
 ## Phase 0：产品与语义基线
 
-交付：产品愿景和范围、信息架构和核心用户旅程、Procedure Designer 交互规范、Demo Capability Manifest、Demo Source baseline、Open Questions / ADR。
+交付：产品愿景和范围、信息架构和核心用户旅程、Procedure Designer 语义 / 屏幕 / 交互规范、Demo Capability Manifest、Demo Source baseline、Open Questions / ADR。
 
 退出条件：
 
 - 用户确认工作台布局和 Procedure 双视图策略；
 - Manifest 的证据等级可解释；
 - CreatedSession Transitional 语法边界明确；
-- 两个初始 Skill 样本和来源 Commit 确认。
+- 两个初始 Skill 样本和来源 Commit 确认；
+- Procedure Graph 对 Operator、Effect、Outcome、Terminal 和阶段路由的表达不混淆；
+- 两个真实样本的图形投影规则可逐条对照源文件。
 
 ## Phase 1：解析与 Workspace 纵切
 
@@ -34,9 +36,13 @@
 
 - ensure-pdu-session 基础流程可正确展示；
 - establish-pdu-session 过渡语法可正确展示；
+- 每个命名 Procedure 单独投影，不把子 Procedure 扁平化；
 - 不把阶段步骤变成主业务节点；
-- 不合并不同阶段的 on 路由；
-- 未支持语法无损保留。
+- Operation / Preconditions / Postconditions 路由始终保留来源；
+- 显式 `on` 与隐式成功进入 Postconditions 不混淆；
+- `reconcile:` Operator 与调用 reconcile Capability 的 Call 节点区分；
+- Binding 数据依赖默认不与控制流混画；
+- 不支持语法无损保留，解析失败时旧图标记 STALE。
 
 ## Phase 3：资产编辑器
 

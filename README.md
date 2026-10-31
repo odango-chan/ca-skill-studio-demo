@@ -10,7 +10,7 @@
 |---|---|
 | 产品定位 | 初版已归档，待评审 |
 | 信息架构与工作台 UX | 初版已归档，待评审 |
-| Procedure Designer | 交互规范初版已归档，待高保真细化 |
+| Procedure Designer | 第二轮语义、屏幕与交互规范已归档，待用户评审 |
 | Demo Capability Manifest | 已建立初始观察基线 |
 | 应用代码 | 尚未开始 |
 | Skill fixtures | 尚未导入 |
@@ -22,11 +22,13 @@
 2. [产品需求](docs/product/requirements.md)
 3. [信息架构](docs/ux/information-architecture.md)
 4. [工作台布局](docs/ux/workbench-layout.md)
-5. [Procedure Designer UX](docs/ux/procedure-designer.md)
-6. [技术架构](docs/architecture/system-architecture.md)
-7. [Demo 基线](docs/reference/demo-baseline.md)
-8. [开放问题与待决策项](docs/decisions/open-questions.md)
-9. [实施路线图](docs/roadmap/implementation-plan.md)
+5. [Procedure Designer 语义规范](docs/ux/procedure-designer.md)
+6. [Procedure Designer 屏幕规范](docs/ux/procedure-designer-screen-spec.md)
+7. [Procedure Designer 交互模型](docs/ux/procedure-designer-interaction-model.md)
+8. [技术架构](docs/architecture/system-architecture.md)
+9. [Demo 基线](docs/reference/demo-baseline.md)
+10. [开放问题与待决策项](docs/decisions/open-questions.md)
+11. [实施路线图](docs/roadmap/implementation-plan.md)
 
 完整文档索引见 [docs/README.md](docs/README.md)。
 
@@ -50,4 +52,4 @@
 
 ## 语言与术语
 
-文档以中文说明为主，Skill 文件名、YAML 字段、状态值、Capability、Predicate、Observation、Procedure 等技术标识保持原样。界面中文化策略仍是待确认的 UX 决策。
+文档以中文说明为主，Skill 文件名、YAML 字段、状态值、Capability、Predicate、Observation、Procedure 等技术标识保持原样。界面中文化策略仍为待确认的 UX 决策。

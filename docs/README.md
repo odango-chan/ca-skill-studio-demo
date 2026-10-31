@@ -1,6 +1,6 @@
 # 文档索引
 
-本文档集描述 Skill Studio Demo 的产品、UX、技术架构和实施计划。当前属于初始设计基线，所有标记为 Proposed / Open 的内容都需要在高保真设计或实现前评审。
+本文档集描述 Skill Studio Demo 的产品、UX、技术架构和实施计划。当前属于设计基线；标记为 Proposed / Open 的内容需要在高保真设计或实现前评审。
 
 ## 产品
 
@@ -12,7 +12,9 @@
 
 - [信息架构](ux/information-architecture.md)
 - [工作台布局](ux/workbench-layout.md)
-- [Procedure Designer](ux/procedure-designer.md)
+- [Procedure Designer 语义规范](ux/procedure-designer.md)
+- [Procedure Designer 屏幕规范](ux/procedure-designer-screen-spec.md)
+- [Procedure Designer 交互模型](ux/procedure-designer-interaction-model.md)
 - [资产编辑器](ux/asset-editors.md)
 - [Validation Center](ux/validation-center.md)
 - [用户旅程](ux/user-journeys.md)

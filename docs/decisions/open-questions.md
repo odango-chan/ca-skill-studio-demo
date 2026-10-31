@@ -9,21 +9,27 @@
 | 问题 | 当前建议 | 状态 |
 |---|---|---|
 | 整体布局 | IDE 式布局；首页 / 管理区与编辑工作台可混合 | Open |
-| 左侧导航 | Package Explorer | Proposed |
+| 左侧导航 | Package Explorer；Procedure 页面内显示 Procedure / Node Outline | Proposed |
 | 右侧 Inspector | 可折叠属性面板 | Proposed |
 | 底部 Diagnostics | 可收起问题面板 | Proposed |
 | 桌面基准 | 1440×900 | Open |
 | 移动端 | 只保证浏览，不保证完整图形编辑 | Proposed |
 
-## 2. Procedure 编辑模式
+## 2. Procedure Designer
 
 | 问题 | 当前建议 | 状态 |
 |---|---|---|
-| Visual / Source | 两种视图同等重要 | Proposed |
-| 默认视图 | 首次打开 Procedure 默认 Visual；熟悉用户可记忆上次视图 | Open |
-| 图形编辑 | 先只读投影，后续开放双向编辑 | Proposed |
-| 自动布局 | 只改变视觉坐标，不重排源顺序 | Proposed |
-| 子流程 | Drill-in + Breadcrumb | Proposed |
+| 首次打开视图 | Visual Business Flow | Proposed |
+| Visual / Source | Visual、Source、Split 三种模式，同一 Source | Proposed |
+| 首版图形编辑 | Visual read-only；Source 可编辑 | Proposed |
+| 主流程布局 | 纵向主路径，侧向分支，终态区域独立 | Proposed |
+| Route label | 显示 Route Source + 原始 Outcome | Proposed |
+| Phase 展示 | 默认折叠在 Node Inspector，按需展开 | Proposed |
+| Binding 数据边 | 默认不绘制，选择 Binding 时局部高亮 | Proposed |
+| Child Procedure | 独立子图 + Breadcrumb Drill-in | Proposed |
+| Qualification Overlay | 默认关闭；仅展示可追溯映射 | Proposed |
+
+高保真设计前需要用户确认：首屏是否默认 Visual、主流程纵向布局是否合适、Inspector 是否默认展开，以及 1440×900 是否作为首个设计基准。
 
 ## 3. 新建 Skill
 
@@ -71,4 +77,4 @@
 
 ## 9. 决策顺序
 
-建议优先确定工作台整体布局、Procedure Visual / Source 的默认关系、新建 Skill 入口、本地 Workspace 与 Git 的首版边界、YAML Round-trip 技术 POC 和 Procedure graph 技术 POC。
+建议优先确定 Procedure Designer 的首屏模式、主流程布局、Inspector 默认行为和目标桌面尺寸；随后完成 Round-trip YAML 与 Procedure Graph 技术 POC，再决定应用技术栈。
