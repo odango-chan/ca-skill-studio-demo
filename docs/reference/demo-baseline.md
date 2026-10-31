@@ -23,7 +23,7 @@
 | ensure-pdu-session | PDU Session target convergence | SKILL.md、assurance、5 Cases |
 | ensure-session-qos | QoS convergence | SKILL.md、assurance、5 Cases |
 | ensure-virtual-group | Virtual Group lifecycle convergence | SKILL.md、assurance、6 Cases |
-| establish-pdu-session | UE-requested initial establishment candidate | SKILL.md、assurance、schemas、scripts、36 Case obligations |
+| establish-pdu-session | UE-requested initial establishment candidate | SKILL.md、assurance、schemas、scripts、design maintainer docs、36 Case obligations |
 
 establish-pdu-session 是 source-first candidate；当前 skills/README 明确说明它不在 routing 或 installed runtime asset snapshot 中。不能将其展示为当前已安装、已激活或 Runtime-qualified。
 
@@ -34,6 +34,7 @@ establish-pdu-session 是 source-first candidate；当前 skills/README 明确�
 - 必需的核心资产：SKILL.md；
 - reusable executable prototype 常见资产：assurance/contract.yaml、procedure.yaml、predicates.yaml；
 - 可选资产：cases、references、schemas、scripts。
+- 当前 establish-pdu-session 还观察到 design/ 维护者文档目录；它是该 Skill 的辅助文档，不属于通用 Package 约定、模型上下文或 Runtime 输入。
 
 不要为了统一 UI 而为每个 Skill 创建空目录。
 

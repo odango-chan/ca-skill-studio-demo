@@ -213,9 +213,9 @@ It also receives `supi` and `pduSessionId` from Procedure inputs.
 
 The Binding Inspector should show this as a producer/consumer relation and retain the entire path. Do not draw it as a control-flow edge.
 
-## 6. Case overlay: five fixture-shaped cases
+## 6. Case source semantics: five fixture-shaped cases (visual overlay deferred)
 
-These Case files contain exact trace expectations and fixture-shaped data. They are useful for validating graph navigation and branch highlighting, but their presence alone does not mean the cases have been executed in Runtime.
+These Case files contain exact trace expectations and fixture-shaped data. They remain Package source assets and are useful as future Case Editor / Expected Trace Preview inputs. A Case overlay is deferred from the first Procedure Designer release; their presence does not mean the cases have been executed in Runtime.
 
 | Case | Expected trace / branch | Expected terminal |
 |---|---|---|
@@ -227,11 +227,12 @@ These Case files contain exact trace expectations and fixture-shaped data. They 
 
 The Case fixtures explicitly mark `forbiddenImmediateRetryAfterUnknown: true` for Case 04. Case 05 may declare create as an available resource, but its expected trace contains no create action: an available Capability does not override an UNKNOWN absence Predicate.
 
-Qualification Overlay behavior:
+First-version behavior:
 
-- Case 01–05 may highlight their exact `expect.trace.ordered` node references when a user selects a Case.
-- The overlay must not imply execution history unless a real run record exists.
-- No inferred percentage or coverage score should be shown from five Case definitions.
+- List and open the five Case source files through Package Explorer.
+- Do not add a Case selector or graph overlay to the first Procedure Designer release.
+- If a future Expected Trace Preview is implemented, it must use exact `expect.trace.ordered` node references and be labeled `Expected Trace · Not Executed`.
+- Never infer execution history, percentage or coverage from five Case definitions.
 
 ## 7. Recommended canvas composition
 

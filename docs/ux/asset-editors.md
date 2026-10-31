@@ -42,3 +42,10 @@
 - Script 仅支持 Source 编辑和静态查看；
 - 默认不执行 Script；
 - 任何未来执行能力必须进入独立 Sandbox，不属于当前编辑闭环。
+
+## 6. Maintainer Documentation
+
+- Package Explorer 按实际文件树显示 design/ 等维护者文档目录（如存在），不把它们提升为所有 Skill 的标准目录；
+- 使用通用 Markdown Source Editor / Preview，不提供虚构的 Runtime 语义；
+- 明确标记 Maintainer-only，不自动纳入模型上下文；
+- 当前 establish-pdu-session/design/ 中的 authoring model 与实验说明属于此类资产。

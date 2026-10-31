@@ -89,6 +89,17 @@ packageShape:
     on-demand: exact-path-and-trigger-only
     samples: never-auto-load
 
+observedAuxiliaryAssets:
+  - path: skills/establish-pdu-session/design/
+    appliesTo: establish-pdu-session
+    kind: maintainer-documentation
+    files:
+      - README.md
+      - llm-execution-experiment.md
+    modelFacing: false
+    runtimeAsset: false
+    initialEditorBehavior: markdown-source-editor
+
 yamlCompatibility:
   implementationObserved:
     library: PyYAML
@@ -163,7 +174,7 @@ procedure:
         - await-ue-session-configuration
       routeOutcomes: [FAILED, UNRESOLVED]
       runtimeCompatible: false
-      initialEditorBehavior: read-only-then-profiled-editor
+      initialEditorBehavior: source-only-until-dedicated-profile-tests-pass
     - id: node-postconditions
       evidence: demo-custom-validated
       appliesTo: establish-pdu-session
@@ -171,7 +182,7 @@ procedure:
       currentStepOperators: [verify]
       routeOutcomes: [PASS, FAIL, UNKNOWN]
       runtimeCompatible: false
-      initialEditorBehavior: read-only-then-profiled-editor
+      initialEditorBehavior: source-only-until-dedicated-profile-tests-pass
 
 contract:
   evidence: demo-schema-declared

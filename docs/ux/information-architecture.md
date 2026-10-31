@@ -32,7 +32,8 @@ Skill Editor
 │   ├── cases/                 # only if present
 │   ├── references/            # only if present
 │   ├── schemas/               # only if present
-│   └── scripts/               # only if present
+│   ├── scripts/               # only if present
+│   └── design/                # only if present; maintainer docs, not runtime assets
 ├── Editor Tabs
 │   ├── Markdown Editor
 │   ├── Procedure Designer

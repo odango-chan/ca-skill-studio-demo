@@ -78,9 +78,9 @@ Fixture 不得自动覆盖来源仓库或被误认为生产安装资产。
 
 复杂样本：多业务节点、node-level preconditions / postconditions、阶段路由、Script / Call / Verify preparation、跨节点输出引用、异步等待子流程和 36 个 semantic qualification obligations。
 
-## 7. Case 状态区分
+## 7. Case 状态区分（未来 Case Editor 参考）
 
-Studio 内部建议使用以下 Case lifecycle：
+未来扩展 Case Editor / Qualification 集成时，应区分以下生命周期状态：
 
 - Defined；
 - Definition Valid；
@@ -89,7 +89,7 @@ Studio 内部建议使用以下 Case lifecycle：
 - Executed；
 - Qualified。
 
-这些状态不得从文件存在与否直接推断。需要对应的校验或执行证据。
+这些状态不得从文件存在与否直接推断，必须有对应的校验或执行证据。该生命周期不是首版 Procedure Designer 的 UI 需求；当前只需把 Case 文件作为 Package 源资产浏览和编辑。
 
 ## 8. 导入 / 导出
 

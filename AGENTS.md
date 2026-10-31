@@ -35,7 +35,7 @@ ca-agent-demo 与其他 ConnectionAgent 组件仓库均为只读参考。未经�
 - 导入的 Fixture 必须记录来源仓库、Commit、源路径和可复现的文件清单或 Digest。
 - 不复制整个 ca-agent-demo 仓库。
 - 不创建空的 optional Skill 目录。
-- 对未知或当前不支持的语法必须无损保留；无法无损编辑时退回 Source-only / Read-only。
+- 对未知或当前不支持的语法必须无损保留。没有结构化编辑资格但原文可安全编辑时退回 Source-only；能保留但无法解释语义时使用 Preserve-only；无法保证无损保留时阻止修改并明确报告，不得把 Read-only 当作 Source-only 的替代。
 
 ## 语法和校验原则
 

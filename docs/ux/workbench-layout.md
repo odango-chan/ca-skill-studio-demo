@@ -2,7 +2,7 @@
 
 **状态：Proposed · Authoring-first 桌面工作台**
 
-工作台目标是让作者在同一个 Package 上同时操作文件、图形语义和属性，而不是在只读图形页、源码页和验证中心之间反复切换。
+工作台目标是让作者在同一个 Package 上同时操作文件、图形语义和属性，而不是在彼此割裂的图形浏览页、源码页和属性页之间反复切换。
 
 ## 1. 全局布局
 
@@ -20,6 +20,9 @@
 │   predicates.yaml│                                          │ Bindings        │
 │  cases/          │                                          │ References      │
 │  references/     │                                          │ Source          │
+│  schemas/        │                                          │                 │
+│  scripts/        │                                          │                 │
+│  design/         │                                          │                 │
 │                  │                                          │                 │
 ├──────────────────┴──────────────────────────────────────────┴─────────────────┤
 │ PROBLEMS (collapsed) · Parse · References · Unsupported · Conflicts           │

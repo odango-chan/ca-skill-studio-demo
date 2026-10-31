@@ -457,19 +457,19 @@ The canvas should visually separate:
 
 Do not merge FAILED, UNRESOLVED and SAFE_STOPPED into one generic red failure edge.
 
-## 11. Case Qualification Overlay
+## 11. Case assets: 36 semantic obligations (no graph overlay)
 
 Current Case status is **36 semantic qualification obligations**, not executable Runtime fixtures.
 
 The current Case README explicitly says the historical trace and mock fixture sections were removed because they referred to the retired explicit execution graph. Do not invent replacement flattened node IDs.
 
-Overlay behavior:
+First-version Studio behavior:
 
-- show `36 semantic obligations` at Skill / Qualification level;
-- label `not executable fixtures` and `NOT_RUN`;
+- list the actual Case files under Package Explorer and allow Source viewing;
+- do not add a Qualification panel, Case selector or graph overlay to Procedure Designer;
 - do not infer node coverage or attach individual obligations to visually similar nodes;
 - Case 32 remains an action-budget enforcement obligation;
-- only after Toolchain / Runtime lowering and stable trace lineage exist may Cases be rebound to executable traces.
+- only after Toolchain / Runtime lowering and stable trace lineage exist may Cases be rebound to executable traces in a separately designed future workflow.
 
 ## 12. Transitional syntax and validator boundary
 
