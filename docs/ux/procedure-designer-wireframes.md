@@ -569,7 +569,22 @@ Root 的三个 DSL Reconcile 节点分别指向：
 
 \`finalize-resource-responsibility\` Child Procedure 内部还有自己的 \`reconcile: transfer\`。它属于 Child Graph，不能与三个 Root Reconcile 节点合并。
 
-### 7.7 36 个 Qualification obligations
+### 7.7 Finalization route details
+
+Root Graph 的两个常规 finalization 节点和一个成功 finalization 节点不能只作为“失败分支”图标展示。选中后，Route details 必须分别显示 Preconditions 与 Child Procedure 的来源：
+
+| Root Node | Route Source | Outcome → Target |
+|---|---|---|
+| `finalize-success` | Preconditions | `FAILED → finalize-failed`；`UNRESOLVED → finalize-unresolved` |
+| `finalize-success` | Child Procedure | `SUCCEEDED → done`；`FAILED → safe-stopped`；`UNRESOLVED → unresolved`；`SAFE_STOPPED → safe-stopped` |
+| `finalize-failed` | Child Procedure | `SUCCEEDED → failed`；`FAILED → safe-stopped`；`UNRESOLVED → unresolved`；`SAFE_STOPPED → safe-stopped` |
+| `finalize-unresolved` | Child Procedure | `SUCCEEDED → unresolved`；`FAILED → safe-stopped`；`UNRESOLVED → unresolved`；`SAFE_STOPPED → safe-stopped` |
+
+另外，`nudm-sdm-get` 在 Operator 级 `FAILED / DENIED` 时直接到 `failed`，`UNKNOWN` 到 `unresolved`；这发生在 UDM Subscribe 资源创建之前，不应绕经 `finalize-failed` / `finalize-unresolved`。
+
+这张表与 Root Reconcile 表共同定义了画布右侧的恢复与终态区域。不要把“资源 finalization 成功”与“原业务成功”混为一谈：例如 `finalize-failed` 的 Child Procedure 返回 SUCCEEDED，Root terminal 仍然是 FAILED。
+
+### 7.8 36 个 Qualification obligations
 
 Qualification 面板显示：
 
