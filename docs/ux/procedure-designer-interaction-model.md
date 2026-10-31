@@ -1,300 +1,174 @@
 # Procedure Designer Interaction Model
 
-**状态：Proposed · 第二轮交互规范**
+**状态：Proposed · 双向编辑交互规范**
 
-本文件定义 Procedure Designer 的交互行为、同步规则、编辑能力边界和验收场景。屏幕结构见 [Screen Specification](procedure-designer-screen-spec.md)。
+本文件定义 Procedure Designer 的选择、编辑、同步、事务、撤销和冲突行为。底层规则见 [Source-preserving Edit Model](../architecture/source-preserving-edit-model.md)。
 
 ## 1. 页面状态模型
-
-Procedure Designer 的状态至少分为四个互相独立的维度。
 
 ### 1.1 Source state
 
 | 状态 | 含义 | 行为 |
 |---|---|---|
-| CLEAN | 当前文件与已保存版本一致 | 正常浏览 |
-| DIRTY | 存在未保存修改 | 显示未保存标记 |
-| SAVING | 正在保存 | 禁止重复提交同一保存动作 |
-| CONFLICT | 文件在外部发生变化 | 保留本地编辑，提供 Diff / Reload / Resolve |
-| INVALID | 当前 Source 无法解析 | 保留原文，Graph 标记 STALE |
+| CLEAN | 与已保存版本一致 | 正常编辑 |
+| DIRTY | Working Buffer 有修改 | 显示未保存 |
+| SAVING | 正在保存 | 防止重复保存 |
+| CONFLICT | 外部文件变化 | 保留本地编辑，Compare / Reload / Resolve |
+| INVALID | Source 无法解析 | 保留原文，Graph 标记 STALE |
 
 ### 1.2 Projection state
 
-| 状态 | 含义 | 行为 |
-|---|---|---|
-| READY | 当前 Source 可完整投影 | 正常显示 |
-| PARTIAL | 部分语法不支持 | 展示支持部分和 Unsupported 节点 |
-| STALE | 图形对应旧 Source | 明确显示旧版本，不得误认为当前状态 |
-| UNAVAILABLE | 无法安全生成图 | 仅显示 Source |
+READY、PARTIAL、STALE、UNAVAILABLE。Projection 始终绑定某个 Working Revision；不能把旧 Graph 当成当前 Source。
 
-### 1.3 Selection state
+### 1.3 Edit capability state
 
-可选对象：
+每个 Node / Field / Phase 显示 editable、source-only、preserve-only 或 unavailable。同一文件中允许不同区域拥有不同编辑资格。
 
-- Procedure；
-- Node；
-- Route Edge；
-- Phase Block；
-- Phase Step；
-- Binding；
-- Diagnostic。
+### 1.4 Selection state
 
-选择对象后 Inspector、Source 和 Canvas 必须保持同一对象上下文。
-
-### 1.4 Validation state
-
-Validation 状态由真实检查记录驱动：
-
-- PASS；
-- FAIL；
-- BLOCKED；
-- NOT_RUN；
-- STALE；
-- NOT_AVAILABLE。
-
-Source 改动后，受影响的历史检查标记 STALE。不能因为解析成功就把 Schema / Transitional / Cross-reference 检查自动标为 PASS。
+Procedure、Node、Route、Phase、Step、Binding、Predicate、Diagnostic。Selection 必须同步到 Inspector 和 Source location。
 
 ## 2. 选择与导航
 
-### 2.1 选择 Node
-
-单击节点：
-
-- 设置当前 Node；
-- 打开 Inspector 的 Overview；
-- 高亮该节点的入边和出边；
-- 其他节点降噪但仍可见；
-- Source 跳转到该节点的 YAML 位置（仅当位置可靠）。
-
-双击 Child Procedure 节点或使用 Open Procedure：
-
-- 进入子图；
-- 添加 Breadcrumb；
-- 保存父图视图状态。
-
-### 2.2 选择 Route Edge
-
-单击边：
-
-- 设置当前 Route；
-- Inspector 显示 Route Source、Outcome、Target、Source Location；
-- 高亮来源 Node、目标 Node；
-- Source 定位到对应 `on` 路由；
-- 显示它是显式源路由还是隐式阶段转移。
-
-若一条边由多个来源产生，必须保留来源列表，不得只展示合并后的 outcome。
-
-### 2.3 选择 Phase / Step
-
-从 Inspector 选择 Preconditions / Main Operation / Postconditions：
-
-- 对应阶段在 Node Card 上突出；
-- 只高亮该阶段的路由；
-- 显示有序 steps；
-- 显示阶段聚合结果域；
-- Source 定位到阶段根字段。
-
-选择某个 step：
-
-- 高亮其 Operator 和输入；
-- 显示 step name（如有）、source path 和 bindings；
-- 不显示虚构的运行结果。
-
-### 2.4 Quick Open / Search
-
-支持按 Skill、Procedure、Node ID、Operator、Capability ID、Predicate ID 和 Case ID 搜索。
-
-结果显示类型、所属 Procedure、路径和上下文。搜索不应执行脚本或外部调用。
+- 单击 Node：选中并打开 Inspector；
+- 双击 Child Procedure：进入独立子图；
+- 单击 Route：显示 Route Source、Outcome、Target、Source Location；
+- 从 Phase / Step 列表选择：高亮阶段和源位置；
+- 从 Binding 选择：高亮 Producer / Consumer 并支持双向跳转；
+- Source 光标位于可解析对象时同步 Visual selection；
+- 未知字段不强行映射到近似对象。
 
 ## 3. Source / Visual / Split 同步
 
 ### Visual → Source
 
-- 选择 Node：定位到 Node 定义；
-- 选择 Route：定位到对应 `on` 项；
-- 选择 Phase：定位到 `preconditions` / `postconditions`；
-- 选择 Step：定位到数组项；
-- 选择 Binding：定位到对应 `from` / `value`。
+选择对象会定位 Source；编辑操作通过 Typed Patch 更新 Source Working Buffer，并显示 Diff。
 
 ### Source → Visual
 
-- 光标位于可解析 Node：选中 Node；
-- 光标位于 `on` 路由：选中 Route；
-- 光标位于 Phase：展开对应 Phase；
-- 光标位于 Binding：选中 Binding 并显示 Producer / Consumer；
-- 光标位于未知字段：显示 Source-only / Unsupported，不强行选中近似节点。
+Source 修改后增量解析；成功时刷新 Semantic Model / Visual；失败时保留 Source 并标记旧 Projection STALE。
 
 ### Split
 
-Split 是同一 Source 的同步视图，不是双文档编辑。
+Source 和 Visual 同时可编辑，但共用一个 Working Buffer、Revision 和事务历史。不存在两个独立文档之间的双向合并。
 
-- Source 编辑后重新解析；
-- Projection 只有在解析成功且能安全映射时才刷新；
-- 解析失败时旧图标记 STALE；
-- 不能把旧图留在屏幕上却不提示用户；
-- Source 光标和 Visual selection 双向同步。
+## 4. Node 编辑
 
-## 4. Binding 交互
+### 新建
 
-### 查看 Binding
+1. 点击 + Node；
+2. 选择当前 Profile 可结构化编辑的 Operator；
+3. 输入 Node ID；
+4. 检查唯一性和 Operator 必需字段；
+5. 创建 Draft Node；
+6. 显示 Source Patch / Diff；
+7. Apply 到 Working Buffer。
 
-1. 从 Node Inspector 打开 Bindings；
-2. 查看 Consumer 字段和原始表达式；
-3. 展开 Producer path；
-4. 显示类型、来源证据和 Source Location；
-5. 点击 Producer / Consumer 跳转。
+Draft 可以语义未完成，但 Source 必须保持可解析；缺少必填字段由 Problems 显示，不伪装成完整 Node。
 
-### 查看依赖关系
+### 编辑
 
-- 默认只显示当前 Node 的入向 / 出向数据依赖；
-- 不在全局画布显示全部 Binding edge；
-- 用户主动选择某条 Binding 后才高亮跨节点依赖；
-- 跨 Procedure 依赖使用 Breadcrumb 和 Reference panel，不跨层拉线。
+- Inspector 字段编辑实时更新 Working Buffer；
+- 单字段修改形成可合并的事务；
+- 切换 Operator 时显示旧字段移除 / 保留 / 转换清单；
+- 未知字段不得自动删除；
+- 不支持 Operator 只能 Source 编辑。
 
-### 编辑边界
+### 重命名
 
-第一阶段 Binding Inspector 只读。Source 模式允许编辑原始表达式。
+重命名先扫描 start、Route target、Binding producer path、Child Procedure 和跨资产引用。第一版若不能安全原子更新所有引用，则拒绝批量 Rename，仅提供影响清单和 Source 导航。
 
-未来结构化 Binding 编辑必须：
-- 只提供当前 Compatibility Profile 已支持的来源；
-- 展示 Producer、Consumer、Declared Type 和 source path；
-- 在类型 / 生产时机不确定时阻止“自动选择”；
-- 对 CreatedSession precondition output path 显示 Transitional；
-- 保存前展示完整 Diff；
-- 保存后执行引用解析和相关 validator。
+### 删除
 
-## 5. 路由交互
+显示入边、出边、Binding 和外部引用。只有用户明确选择处理方式且 Patch 可原子应用时才允许删除。不能留下静默 Dangling Reference。
 
-- Route label 始终包含 Route Source；
-- 点击 Route Source 标签可切换高亮阶段；
-- 同一个 target 的多条不同阶段路由仍分别显示；
-- 不同状态域采用不同的文字和图形标识；
-- 隐式成功进入 Postconditions 用内部阶段连接，不显示成显式 `on`；
-- Route Target 不存在时显示 Dangling Route，并定位源字段；
-- 当前 Procedure 外的目标不允许被自动接受为合法节点。
+## 5. Route 编辑
 
-## 6. 编辑策略
+- 从具体 Route Source 的锚点创建连接；
+- 新建 Route 时明确选择 Operator / Preconditions / Postconditions / Child Procedure 来源；
+- Outcome 只能从 Profile 已知集合中选择；未知值保留 Source-only；
+- Target 只能选择当前 Procedure 中存在的 Node；
+- Route entry 在源映射中保持独立；画布 bundle 仅是视觉呈现；
+- 删除 Route 前显示可能不可达的 Node / Terminal 影响，但不自动重写其他路径。
 
-### Phase 1：Source-first
+## 6. Phase / Step 编辑
 
-允许：
-- Source 文本编辑；
-- 保存与 Diff；
-- Undo / Redo；
-- Visual 只读投影；
-- Inspector 只读；
-- 局部 / 完整静态 Validate。
+- Inspector 中按源顺序列出 Step；
+- 支持已具备 Profile 资格的 Step 增加、编辑、删除和拖动排序；
+- Step reorder 是语义修改，生成 Sequence Patch；
+- 画布 Node 拖动只改 UI layout，不改变 Step 顺序；
+- Phase aggregate route 和 Step Operator outcome 独立编辑；
+- CreatedSession Transitional phase 在专用 Round-trip Profile 未通过前保持 Source-only。
 
-禁止：
-- 在图上 Add / Delete / Rename Node；
-- 拖动边改变 `on`；
-- 结构化修改未知 Operator；
-- 结构化修改 CreatedSession Transitional phase，除非对应专用编辑器和 round-trip 测试已完成；
-- 执行 Script、Capability 或真实 5GC 操作。
+## 7. Binding 编辑
 
-### Phase 2：受控结构化编辑（后续）
+1. 选中 Consumer field；
+2. 查看原始 expression；
+3. Producer Picker 只显示已解析且类型 / 来源明确的候选；
+4. 选中后显示完整 Patch / Diff；
+5. 应用后重新解析 Producer / Consumer；
+6. 无法确定类型或生产时机时，允许 Source 手动编辑，不提供猜测式 Picker。
 
-每种操作必须生成 Typed Source Patch：
+跨文件引用修改必须展示所有消费者；第一版没有原子多文件事务时不自动批量修改。
 
-| 操作 | 必须检查 |
-|---|---|
-| Add Node | Operator capability、Node ID 唯一、必需字段、入口 / 路由完整性 |
-| Rename Node | `start`、所有 `on` target、所有 Binding producer path、Child references |
-| Connect Route | outcome 对应阶段合法、target 存在、无跨 Procedure 越界 |
-| Delete Node | 入边、出边、Binding 引用、start、Case / Trace 引用 |
-| Edit Binding | Producer 存在、字段声明、类型、生产时机、Profile 资格 |
-| Change Operator | 旧字段与新 Operator 语义差异、未知字段、相关引用 |
-| Reorder | 是否允许改变源顺序；CreatedSession 主业务节点顺序校验 |
+## 8. Typed Patch 与事务
 
-所有 Patch：预览 → 用户确认 → 应用 → 重新解析 → 重新验证 → 展示 Diff。任一步失败都不得留下半应用状态。
+每个 Visual 命令都携带 Source Revision、Semantic Target、Expected Old Value / Structure Fingerprint、Compatibility Profile 和 Patch operation。
 
-## 7. Diagnostics 行为
+事务顺序：
 
-- 诊断点击后定位 Node / Phase / Step / Binding；
-- 同时在 Source 和 Graph 高亮；
-- 显示原始 validator message；
-- 可附加 Studio 的中文解释，但不能覆盖原文；
-- Suggested Fix 只能是有证据的建议；
-- AI / 自动修复只能生成候选 Patch，必须展示 Diff 并由用户确认；
-- 诊断位置不精确时退回文件级定位。
+1. Resolve target；
+2. Check edit capability；
+3. Check source revision / preconditions；
+4. Build Typed Patch；
+5. Build impact preview if needed；
+6. Apply to temporary Round-trip Tree；
+7. Serialize only touched region；
+8. Reparse and compare intended semantic result；
+9. Verify untouched source regions；
+10. Show Diff；
+11. Apply to Working Buffer。
 
-## 8. Qualification Overlay 行为
+任何步骤失败，整个事务回滚。
 
-- 默认关闭；
-- 只有存在明确 mapping / trace 才能显示关联；
-- Semantic obligation 显示为 obligation，不显示为 executable / executed；
-- 没有实际运行记录时状态为 NOT_RUN；
-- Source Digest 变化后旧 Trace / Qualification 标记 STALE；
-- 不在 Visual 图上自动把 36 个 CreatedSession obligations 分配给“看起来相似”的节点。
+## 9. Undo / Redo / Save
 
-## 9. 键盘与可访问性
+- 一次 Visual 命令为一个 Undo transaction；
+- Source typing 按编辑器边界合理分组；
+- 复合引用更新是一个原子事务；
+- Undo / Redo 跨 Source 和 Visual 共用历史；
+- Save 只写本地工作副本；
+- Save 不触发 Git commit / push、PR、发布或安装。
 
-建议快捷键：
+## 10. Conflict
 
-| 快捷键 | 动作 |
-|---|---|
-| Ctrl/Cmd + P | Quick Open |
-| Ctrl/Cmd + F | 当前 Procedure 搜索 |
-| Ctrl/Cmd + Shift + F | Package 全局搜索 |
-| Ctrl/Cmd + S | Save |
-| Ctrl/Cmd + Z | Undo |
-| Ctrl/Cmd + Shift + Z | Redo |
-| Ctrl/Cmd + Enter | Validate 当前范围 |
-| Escape | 取消选择 / 关闭临时面板 |
+检测到外部文件 Digest 变化：
 
-可访问性要求：
+- 标记 CONFLICT；
+- 保留本地 Working Buffer；
+- 显示本地 / 磁盘 Diff；
+- 提供 Reload 或人工 Resolve；
+- 不自动覆盖磁盘；
+- Resolve 后重新解析并重建 Patch history。
 
-- Node 和 Edge 可通过键盘导航；
-- 提供 Outline 替代纯画布导航；
-- 所有状态同时有文字和图形表达；
-- 焦点可见；
-- 画布缩放不导致文本无法访问；
-- Inspector 所有字段具备可读 Label；
-- 不能只依赖颜色表达状态。
+## 11. Inline Problems
 
-## 10. 验收场景
+显示 Parse、Duplicate ID、Dangling Route、Unresolved Binding、Unsupported Syntax、Compatibility Profile 限制和 External Conflict。
 
-1. 打开 `ensure-pdu-session`，从 `start` 看到完整控制流和所有 terminal。
-2. 选择 `create-session`，看到 mutation outcome 与 `OUTCOME_UNKNOWN` 到 Reconcile 的路径。
-3. 选择 `reconcile-create`，确认它是 Call Operator `pdu_session.reconcile`，而不是 DSL `reconcile:`。
-4. 打开 `establish-pdu-session`，主图只显示根 Procedure 的业务节点，不把所有 await 子 Procedure 展平。
-5. 选择 `nudm-sdm-subscribe`，按顺序查看五个 Preconditions steps、Main Operation 和 Postcondition。
-6. 选择 `namf-communication-n1n2-message-transfer`，看到三个阶段独立的 routes，不把 Operation 和 Postconditions 的 UNKNOWN 合并。
-7. 点击一个跨节点 precondition output Binding，能定位到生产者和消费者，并标记 Demo Transitional。
-8. 进入 `await-pdu-session-resource-setup` 子图，返回时父图视图状态恢复。
-9. 编辑 YAML 使其无法解析，Source 原文保留，旧 Graph 标记 STALE。
-10. 查看 CreatedSession Case Overlay，36 个 obligations 明确显示为非可执行、未执行义务。
-11. 对未知 Operator，Visual 不做错误的语义猜测，Source 原文可见。
-12. 普通 Preview / Validate 不触发 Script、Capability、Runtime 或 Live 5GC。
+Problems 是作者辅助，不等同于完整 Schema / Runtime / Qualification 验收。
 
+## 12. 键盘与可访问性
 
-## 11. 源样本驱动的导航验收
+- Node / Route / Step / Binding 可键盘访问；
+- Canvas 提供 Node Outline 和 Route List 线性替代；
+- Enter 选择 / 打开，Delete 进入影响预览，Escape 取消；
+- Ctrl/Cmd+S 保存；Ctrl/Cmd+Z 撤销；Ctrl/Cmd+Shift+Z 重做；
+- 所有状态有文字表达，不只依赖颜色；
+- 快捷键实现前检查浏览器 / OS 冲突。
 
-具体节点与路径以两份蓝图为准：
+## 13. 样本驱动编辑验收
 
-- [ensure-pdu-session Graph Blueprint](ensure-pdu-session-graph-blueprint.md)
-- [establish-pdu-session Graph Blueprint](establish-pdu-session-graph-blueprint.md)
-
-至少应能完成以下真实导航：
-
-1. 从 `observe-target-session` 沿 FAIL 选择到 `observe-session-absence`，再沿 PASS 选择到 `create-session`。
-2. 从 `create-session.OUTCOME_UNKNOWN` 定位到 `reconcile-create`，并查看其原始 Create output Binding；确认 Call `pdu_session.reconcile` 不被误画成 DSL `reconcile:`。
-3. 在 `nudm-sdm-subscribe` 中依次选中 5 个 Preconditions steps，再选 Main Operator 和 Postcondition Verify。
-4. 从 `nudm-sdm-subscribe` 的 PCF create inputs producer 跳转到 N4 Child Procedure 使用的 `currentSessionInstanceRef`，并显示两者不是同一个 handle。
-5. 从 `namf-communication-n1n2-message-transfer` 的 Postcondition operationRef Binding 跳转到 RAN / N4 / UE Child Procedure 的 `afterOperationRef` 消费者。
-6. Drill-in 到 5 个独立 Child Procedure，返回时恢复 root Graph 的视图状态。
-7. 打开 Case overlay 时，ensure 的 5 个 fixture-shaped traces 可定位到确切节点；establish 的 36 个 semantic obligations 不生成虚构 node mapping。
-
-
-## 12. Canvas Lens 与 Route Density
-
-Canvas 的关系类型与工作区模式分开：
-
-- Source / Visual / Split：工作区模式；
-- Control Flow：默认 Canvas；
-- Route details：Control Flow 的 Inspector / 侧栏，不建立第二套 Graph Layout；
-- Data Flow：Binding 的独立 Lens，不与 Control Flow edges 默认叠加。
-
-Route outcome entries 可以在同一 Node、同一 Phase / Route Source、同一 Target 的范围内视觉 bundle；bundle 内每个原始 outcome 必须可独立选择。不同 Phase / Route Source 不得合并。
-
-完整样本线框、路由密度策略和设计复盘见 [Screen-level Wireframes](procedure-designer-wireframes.md)。
+- ensure：编辑 Node 属性、Add Route、Update Route、Delete Route、Undo / Redo、Diff；
+- establish：17 Root Node、65 Route entries、5 Child Procedure 正确读取；Transitional phases 在未资格化前 Source-only；
+- 所有编辑操作保持源文件未触及区域不变；
+- 不执行 Script、Capability、Runtime 或 Live 5GC。

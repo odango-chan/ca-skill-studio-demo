@@ -1,278 +1,157 @@
 # Procedure Designer UX
 
-**状态：Proposed · 第二轮设计基线，待用户评审**
+**状态：Proposed · Authoring-first 编辑规范**
 
-本文件定义 Procedure Designer 的语义呈现原则。具体屏幕分区见 [Screen Specification](procedure-designer-screen-spec.md)，交互、同步和状态行为见 [Interaction Model](procedure-designer-interaction-model.md)，真实样本的屏幕线框和设计复盘见 [Screen-level Wireframes](procedure-designer-wireframes.md)。
+本文件定义 Procedure Designer 的语义模型和编辑原则。屏幕结构见 [Screen Specification](procedure-designer-screen-spec.md)，交互 / 同步见 [Interaction Model](procedure-designer-interaction-model.md)，真实样本与编辑型线框见 [Screen-level Wireframes](procedure-designer-wireframes.md)，底层源文件编辑规则见 [Source-preserving Edit Model](../architecture/source-preserving-edit-model.md)。
 
 ## 1. 产品职责
 
-Procedure Designer 负责让作者理解和编辑一个 Skill Package 中的 Procedure。它不是通用流程图绘制器，也不是把 YAML 节点逐项翻译成方框的可视化器。
+Procedure Designer 是 Skill IDE 的核心编辑器。它不是通用流程图绘制器，也不是只读 YAML Viewer。
 
-它必须同时表达：
+它必须支持作者在同一个 Procedure 上完成：
 
-- 从 `start` 开始、由显式路由连接起来的业务过程；
-- 每个节点实际使用的 operator 和输入输出；
-- 节点内部有序的 Preconditions、Main Operation、Postconditions；
-- 不同阶段各自拥有的失败 / 未知 / 成功路由；
-- 子 Procedure、异步等待和恢复边界；
-- Binding 的数据生产者、消费者和来源路径；
-- 当前语法的证据等级、校验结果和源文件位置。
+- 理解业务主线和分支；
+- 创建、选择、编辑和删除受支持 Node；
+- 编辑 Operator、输入和输出；
+- 创建和修改 Route；
+- 编辑有序 Preconditions / Postconditions Steps；
+- 追踪和编辑 Binding；
+- 进入 Child Procedure；
+- 在 Source 与 Visual 间双向切换；
+- 预览 Source Diff，Undo / Redo 并保存。
 
-**首要原则：业务主流程清晰，节点内部细节可展开，源文件语义不能被图形简化掉。**
+所有编辑都受当前 Compatibility Profile 和 Source-preserving Patch Engine 约束。
 
 ## 2. 权威源与视图
 
-Skill Package 源文件是唯一权威定义。Procedure Designer 提供三个互相同步的视图：
+Skill Package Source 是唯一权威定义。Procedure Designer 提供：
 
-1. **Visual**：从源文件派生的 Procedure 图形投影；
-2. **Source**：原始 YAML 编辑器；
-3. **Split**：图形和源文件并排，选择与定位双向同步。
+1. **Visual**：结构化图形编辑；
+2. **Source**：原始 YAML 文本编辑；
+3. **Split**：同一 Working Buffer 的双向同步编辑。
 
-Graph、Inspector、Binding Index 和 Diagnostics 均为派生视图，不得单独保存业务定义。
+Graph、Inspector、Binding Index、Source Map 和 Problems 都是派生对象。Visual 不能独立保存业务语义。
 
-首个实现阶段采用 **Visual read-only + Source editable**。只有 Round-trip AST / CST、未知字段保留、注释保留和双向一致性测试通过后，才开放图形结构编辑。Visual 不能安全解释的语法必须显示 Unsupported / Partial，不得猜测或静默丢弃。
+Visual 操作通过 Typed Source Patch 作用于 Round-trip Tree；Source 编辑重新解析并刷新 Visual。保存前显示 Diff；任何 Patch 无法安全 round-trip 时拒绝应用。
 
 ## 3. Procedure 与 Graph 的边界
 
-每个命名 Procedure 对应独立的图形视图：
+每个命名 Procedure 对应独立图形视图：
 
-- Procedure 的 `start` 是入口；
-- Procedure 的 `nodes` 是该 Procedure 内的节点集合；
-- 节点之间的业务转移来自显式 `on` 路由或相应 operator 的语义；
-- `procedure: child-name` 是一个子 Procedure 调用节点；
-- 子 Procedure 有自己的图，进入时 Drill-in，返回时保留父图状态；
+- Procedure 的 start 是入口；
+- Procedure 的 nodes 是该 Procedure 内的节点集合；
+- 显式 on 路由连接节点；
+- Operator / Phase 的内部阶段转换单独表达；
+- procedure: child-name 是 Child Procedure 调用；
+- Child Procedure 有自己的图，进入时 Drill-in，返回时保留父图状态；
 - 不把所有 Procedure 扁平化成一张跨层大图。
 
-布局由图结构生成，而不是按 YAML 文本顺序连线。与此同时，源文件节点顺序和注释必须原样保留；当前 CreatedSession 专用 validator 还检查了根 Procedure 的主业务节点顺序，因此自动布局绝不能重排源文件映射。
+画布布局与 YAML 节点顺序分开。拖动 Node 只改变 UI layout，不自动重排源映射；只有明确的 Reorder Source 命令才改变语义顺序，并需检查专用 validator 约束。
 
 ## 4. 节点模型：Operator 与业务含义分开
 
-一个节点的核心 Operator 决定其源语义。节点名或 Capability 名称不能替代 Operator。
-
-| Source operator | Visual 表达 | 说明 |
+| Source operator | Visual 表达 | 编辑原则 |
 |---|---|---|
-| `call` | Call / Operation | 调用 Capability；可能是只读、计算、等待或 mutation，不能仅凭 `call` 判断副作用 |
-| `verify` | Verify | 对 Predicate / 事实进行判定 |
-| `script` | Script | Skill-local 确定性计算；预览和静态校验不得执行 |
-| `procedure` | Child Procedure | 调用另一个 Procedure，进入独立子图 |
-| `reconcile` | Reconcile Operator | 对指定原操作进行协调 / 对账 |
-| `terminal` | Terminal | Procedure 终态 |
-| `tool` | Skill Tool | 当前仅为 Schema-declared，按 Source-only / Unsupported 处理 |
-| `predicate` | Predicate Operator | 当前仅为 Schema-declared，按 Source-only / Unsupported 处理 |
-| `for` + `do` | Loop Container | 当前仅为 Schema-declared，未在首批样本中建立编辑资格 |
-| unknown | Unknown / Unsupported | 保留源文本和位置，不做语义转换 |
+| call | Call / Operation | Capability ID 与输入字段分开；Effect 不从名字猜测 |
+| verify | Verify | Predicate 引用和 with 输入分开编辑 |
+| script | Script | Script ref / 参数可编辑；不执行 |
+| procedure | Child Procedure | 引用现有命名 Procedure；创建 / 删除受组合语义资格限制 |
+| reconcile | Reconcile Operator | 保留 DSL 原始目标 |
+| terminal | Terminal | 保留准确 terminal value |
+| tool / predicate / for | Source-only / Unsupported | Schema-declared 不自动获得 Visual edit |
+| unknown | Unknown / Preserve-only | 保留原文，不结构化编辑 |
 
-### 4.1 特别区分两种 Reconcile 写法
+### 4.1 两种 Reconcile 必须区分
 
-以下两种源写法不能画成同一种节点：
+- reconcile: original-node-id：DSL Reconcile Operator；
+- call: pdu_session.reconcile：普通 Call Operator，Capability 名称含 reconcile。
 
-- `reconcile: original-node-id`：使用 DSL 的 Reconcile Operator；
-- `call: pdu_session.reconcile`：普通 Call Operator，调用的 Capability 名称含有 reconcile。
+例如 ensure 中的 reconcile-create 是 Call；establish 中的 reconcile-nudm-sdm-subscribe 是 DSL Reconcile。
 
-例如 `ensure-pdu-session` 中的 `reconcile-create` 是第二种：它是 `call: pdu_session.reconcile`。而 `establish-pdu-session` 中的 `reconcile-nudm-sdm-subscribe` 使用第一种：`reconcile: nudm-sdm-subscribe`。
+### 4.2 Operator、Effect 和状态是不同维度
 
-只有当 Capability Catalog / Operator 语义明确时，Visual 才可额外显示业务用途标签。不得根据节点 ID 中是否包含 reconcile 猜测 Operator。
+- Operator：call / verify / script / procedure 等；
+- Effect：只读、local compute、evidence wait、mutation 等，只有可信元数据可确认；
+- Outcome：当前 Operator 的结果；
+- Procedure terminal：整个 Procedure 的结束状态。
 
-### 4.2 Operator、效果和状态是不同维度
-
-- Operator：`call` / `verify` / `script` / `procedure` 等；
-- Effect：只读、local compute、evidence wait、mutation 等；由可信 Capability 元数据或已验证的语义提供；
-- Outcome：当前 Operator 实际返回的结果；
-- Procedure terminal：整个 Procedure 的终态。
-
-`call` 不是 mutation 的同义词，`ca.*` 也不代表一定只读。无法确定 Effect 时显示 Unknown，不得推断。
+无法确定 Effect 时显示 Unknown，不得推断。
 
 ## 5. 节点内部阶段
 
-当前 CreatedSession authoring model 引入的节点级阶段：
+有阶段结构的 Node 包含：
 
-1. **Preconditions**：主操作之前按顺序执行的入口准备；
-2. **Main Operation**：节点的唯一核心 Operator；
-3. **Postconditions**：主操作成功后按顺序验证业务事实。
+1. Preconditions；
+2. Main Operation；
+3. Postconditions。
 
-这些阶段属于同一个业务节点，不是三个独立的主流程节点。
+这些阶段属于同一业务节点，不是三个独立主流程节点。
 
-### 5.1 Preconditions
+- preconditions.steps 按源顺序执行；
+- postconditions.steps 按源顺序执行；
+- Phase 聚合路由与每个 Step Operator 的 Outcome 分开；
+- 成功进入 Postconditions 是隐式阶段转换，不伪造成显式 on；
+- CreatedSession node-level phases 属于 Demo Transitional syntax，结构化编辑需要专用 Profile 资格。
 
-- `preconditions.steps` 按源顺序执行；
-- 遇到第一个非成功步骤即停止；
-- 当前窄范围 authoring profile 允许受限的 `script`、只读 `call`、`verify` 和指定的只读子 Procedure；
-- 全部步骤成功后才可进入 Main Operation；
-- 聚合路由为 `preconditions.on`，当前 CreatedSession validator 要求 `FAILED / UNRESOLVED`；
-- Preconditions 失败时主操作尚未执行，不能显示为 mutation 失败。
+## 6. Route 与状态域
 
-步骤结果折叠规则以 CreatedSession authoring design 为准：Script / read-only Call / Child Procedure 的成功结果继续下一步；Verify 的 `PASS` 继续，`FAIL` 折叠为 `FAILED`，`UNKNOWN` 折叠为 `UNRESOLVED`。
-
-### 5.2 Main Operation
-
-主操作是节点的核心 Operator。其输入来自 `with` Binding。节点根级 `on` 只表达主操作自身的结果路由。
-
-如果节点声明了 Postconditions，成功结果进入 Postconditions；它不能直接跳过事实验证。若没有 Postconditions，则成功转移必须由该节点的正常语义 / 显式路由表达。
-
-### 5.3 Postconditions
-
-- `postconditions.steps` 按源顺序执行；
-- 当前 CreatedSession validator 只允许 `verify` 步骤及其可选 `with`；
-- 第一个非 PASS 结果结束阶段；
-- 聚合路由为 `postconditions.on`，当前要求 `PASS / FAIL / UNKNOWN`；
-- 只有所有步骤都 PASS，才走 PASS 路由；
-- Postconditions 验证当前节点操作之后的事实，不替代 Skill Contract 的最终 Postconditions。
-
-### 5.4 三个路由来源必须分开
-
-同一个节点最多可能有三组出口：
-
-| 路由来源 | Source path | 表达内容 | 当前 CreatedSession 结果域 |
-|---|---|---|---|
-| Preconditions | `preconditions.on` | 主操作尚未执行时，入口准备为何退出 | `FAILED / UNRESOLVED` |
-| Node Operator | node-level `on` | 核心 Operator 的实际结果 | 结果域取决于 Operator：Verify 可返回 Predicate truth，Call 可返回 mutation certainty / 调用结果，Child Procedure 可返回 Procedure terminal |
-| Postconditions | `postconditions.on` | 主操作之后的事实验证结果 | `PASS / FAIL / UNKNOWN` |
-
-Visual 必须在每条边上显示来源阶段和 outcome，例如：
-
-- `Preconditions · FAILED`
-- `Operator · OUTCOME_UNKNOWN`
-- `Postconditions · UNKNOWN`
-
-即使多组路由指向同一个目标节点，也不能把来源信息合并掉。成功进入 Postconditions 的内部语义转移应明确标注为 **implicit success → postconditions**，不能伪装成 YAML 中显式存在的 `on` 路由。
-
-## 6. 状态域不可混用
+Route 必须保留 Route Source、原始 Outcome、Target 和 Source Location。
 
 | 状态域 | 值 | 含义 |
 |---|---|---|
-| Predicate truth | `PASS / FAIL / UNKNOWN` | 事实判定 |
-| Mutation certainty | `COMMITTED / NOT_COMMITTED / OUTCOME_UNKNOWN` | 副作用是否提交 / 是否确定 |
-| Procedure terminal | `SUCCEEDED / FAILED / UNRESOLVED / SAFE_STOPPED` | 整个 Procedure 的结束状态 |
-| Validation | `PASS / FAIL / BLOCKED / NOT_RUN / STALE` 等 | Studio 检查源文件的结果 |
+| Predicate truth | PASS / FAIL / UNKNOWN | 事实判定 |
+| Mutation certainty | COMMITTED / NOT_COMMITTED / OUTCOME_UNKNOWN | 副作用提交确定性 |
+| Procedure terminal | SUCCEEDED / FAILED / UNRESOLVED / SAFE_STOPPED | 整个 Procedure 终态 |
+| Validation / diagnostics | PASS / FAIL / BLOCKED / NOT_RUN / STALE | 编辑器辅助检查 |
 
-节点上的 `FAILED`、`DENIED`、`UNKNOWN` 等 Operator outcome 仍须保留其原始来源，不能直接映射为 Predicate 或 Procedure terminal。
-
-状态展示必须同时包含文字和语义说明，不能只用颜色。
+不得把不同阶段同名 Outcome 合并成无来源的出口。
 
 ## 7. Binding 与数据流
 
-Binding Inspector 的目标是解释 `with` / `from`：某个输入值来自哪里、由谁生产、经过哪个阶段产生、有哪些消费者。
+Binding 表达数据依赖；Route 表达控制流。两者分开呈现。
 
-初始来源类型：
+Binding Inspector 显示 Consumer Node / Phase / Step / Field、原始 from / value 表达式、Producer Procedure / Node / Phase / Step / Field、Declared Type、Source Location、Evidence Level 和编辑资格。
 
-- Procedure input；
-- `context.subject / request / facts / constraints`；
-- 先前节点的 `output`；
-- 当前 CreatedSession 过渡语法中的节点级 Preconditions step output；
-- Schema 声明但尚未资格验收的 Loop item；
-- literal `value`。
+Producer Picker 只列出能解析、来源明确、类型 / 生产时机有证据的候选。未知类型或跨 Procedure 语义不明时不自动选择。
 
-### 7.1 标准来源与过渡来源
+当前 CreatedSession 的 preconditions.<step>.output.* 和跨节点 precondition output path 必须标记 Demo Transitional，不得宣称为通用 Schema / Runtime 能力。
 
-必须明确区分：
+## 8. Child Procedure
 
-- 通用本地 Schema 中的 `input.*`、`context.*`、`<node>.output.*`、`loop.*`；
-- 当前 CreatedSession authoring source 中使用的 `preconditions.<step>.output.*` 以及跨节点的 `<node>.preconditions.<step>.output.*`。
+- 每个命名 Procedure 独立成图；
+- 进入 Child 时显示 Breadcrumb；
+- 返回时恢复父图 zoom / pan / selection / Inspector；
+- 编辑 Child 内部不自动扁平化 Root；
+- 新建 / 重命名 / 删除 Procedure definition 前检查所有调用点和引用；
+- 当前组合语义尚未建立编辑资格的部分保持 Source-only。
 
-后者由 ca-agent-demo 的窄范围专用 validator 检查，不得宣称为通用 Schema 或 Runtime 能力。
+## 9. 编辑操作与安全约束
 
-### 7.2 Binding Inspector 字段
+| 操作 | 必须检查 |
+|---|---|
+| Add Node | Operator 资格、Node ID 唯一、必需字段 |
+| Rename Node | start、所有 Route target、Binding producer path、Child reference |
+| Delete Node | 入边、出边、Binding / 跨资产引用 |
+| Add / Update Route | Route Source、Outcome、Target、当前 Profile |
+| Edit Binding | Producer、字段、类型、生产时机和 Profile |
+| Reorder Step | Sequence 语义与源顺序约束 |
+| Change Operator | 旧 / 新字段语义、未知字段和引用 |
+| Add / Delete Procedure | 调用点、Entry Procedure 和跨 Procedure 引用 |
 
-每条 Binding 显示：
+每个操作生成 Typed Source Patch；破坏性操作先显示 Impact Preview；Patch 应用后重新解析、比较语义并显示 Diff。
 
-- Consumer node / phase / step；
-- Consumer field；
-- Source expression；
-- Producer Procedure / node / phase / step；
-- Output field；
-- Declared type（无法证明时 Unknown）；
-- Source file location；
-- Evidence level；
-- Validation state。
+## 10. 两个真实样本
 
-点击 Binding 时在当前图中高亮生产者和消费者；跨 Procedure 时显示 Procedure breadcrumb，不将它们强行连成同一层的图边。
+- [ensure-pdu-session Graph Blueprint](ensure-pdu-session-graph-blueprint.md)：首个可编辑样本，逐项开放经过 Round-trip 测试的 Call / Verify / Terminal / Route / Binding 操作。
+- [establish-pdu-session Graph Blueprint](establish-pdu-session-graph-blueprint.md)：复杂兼容性样本；先确保完整读取和无损 round-trip，CreatedSession Transitional phases 在专用编辑资格通过前保持 Source-only。
 
-### 7.3 数据依赖不等于控制流
+蓝图绑定固定 ca-agent-demo commit，是实现验收基准，不是第二份 Skill 定义。
 
-`from` 表达数据依赖，`on` 表达控制流。两者必须分开呈现。
+## 11. 编辑资格与降级
 
-默认画布只显示控制流。选中节点或 Binding 后，才显示数据依赖高亮 / 侧栏，避免所有数据边与控制流边叠在一起形成“意大利面图”。
+- editable：Parser、Patch、Round-trip 和测试全部通过；
+- source-only：原文可编辑，但没有结构化控件；
+- preserve-only：语义不理解，但必须无损保留；
+- unavailable：无法安全解析或保留，明确阻止修改并提供恢复路径。
 
-## 8. 子 Procedure 与异步过程
-
-- `procedure: child-name` 显示为 Child Procedure 节点；
-- 双击或选择 Open Procedure 进入子图；
-- Breadcrumb 显示父 / 子层级；
-- 子图返回时恢复父图缩放、位置、选择和展开状态；
-- 不将子 Procedure 内部节点自动展开到父图；
-- 对异步网络收敛使用明确的 await / convergence 子 Procedure，不把它压扁成一个普通 Verify 节点；
-- Schema-declared、但没有当前 Demo 使用 / 校验 / Runtime 证据的跨 Skill Composition，只显示其证据等级，不提供“已可执行”的视觉暗示。
-
-## 9. 案例映射与 Qualification
-
-Procedure Designer 可以展示与当前节点相关的 Case / Qualification obligations，但必须遵循：
-
-- 只有存在明确的 source reference / trace mapping 时才展示映射关系；
-- Semantic obligation、Schema-valid Case、Executable Fixture、Executed 和 Qualified 分开显示；
-- 不从 Case 数量推断覆盖率；
-- 不将 `establish-pdu-session` 的 36 个 semantic qualification obligations 显示为已执行测试；
-- 不在当前 Procedure Designer 内直接触发 Runtime 或 Live 5GC。
-
-## 10. 初始样本的设计目标
-
-本节的语义目标已进一步落实为两份逐节点、逐路由的源代码级蓝图：
-
-- [ensure-pdu-session · Graph Projection Blueprint](ensure-pdu-session-graph-blueprint.md)
-- [establish-pdu-session · Graph Projection Blueprint](establish-pdu-session-graph-blueprint.md)
-
-蓝图中的节点 ID、Operator、路由和 Binding 均绑定到固定 Demo source commit。它们是 Visual projection 的验收基准，不是第二份可编辑的 Procedure 定义。
-
-### ensure-pdu-session
-
-用于验证基础流程：
-
-- Verify 的 `PASS / FAIL / UNKNOWN`；
-- Call 的 mutation certainty；
-- `OUTCOME_UNKNOWN` 进入精确的 Reconcile 路径；
-- Reconcile 后的 retry / verify / unresolved / safe-stopped 分支；
-- 显式 terminal。
-
-注意：该样本的 `reconcile-create` 节点使用 `call: pdu_session.reconcile`，不是 DSL 的 `reconcile:` Operator。
-
-### establish-pdu-session
-
-用于验证复杂流程：
-
-- 3GPP 主业务节点顺序；
-- 节点内部 Preconditions / Main Operation / Postconditions；
-- 多阶段 `on` 路由；
-- 跨节点与节点内 Preparation output Binding；
-- N4 / RAN / UE 异步等待子 Procedure；
-- 资源责任 finalization；
-- 对三个不确定 mutation 的精确 Reconcile + SAFE_STOPPED；
-- 36 个 semantic qualification obligations 的诚实呈现。
-
-当前源仓的 CreatedSession authoring design 明确标记 **NOT YET RUNTIME-COMPATIBLE**。Studio 只承诺正确读取、展示和执行当前 Demo 专用静态校验；不承诺 Runtime Qualification。
-
-## 11. 第一阶段编辑边界
-
-第一阶段：
-
-- Visual：Read-only projection；
-- Source：原始 YAML 文本编辑；
-- Inspector：只读语义详情；
-- Binding Inspector：只读来源解析与定位；
-- Diagnostics：只读诊断和导航；
-- Validate：只执行明确配置的本地静态检查。
-
-后续双向图形编辑必须以 Typed Source Patch 为中介，执行 Patch 前检查语义前置条件，保存前显示 Diff，保存后重新解析并重新校验。对未知语法、未建立类型信息或不支持的 Operator，不允许结构化修改。
-
-## 12. 来源与兼容性基线
-
-当前第一阶段兼容性来源：
-
-- Repository: `odango-chan/ca-agent-demo`
-- Commit: `bf445ad777149af5af2dfa0a5bdea18d0451303e`
-- `skills/ensure-pdu-session/assurance/procedure.yaml`
-- `skills/establish-pdu-session/assurance/procedure.yaml`
-- `skills/establish-pdu-session/design/README.md`
-- `skills/establish-pdu-session/cases/README.md`
-- `scripts/validate_docs.py`
-- `tests/contracts/ca-skill-toolchain/03a42764ee2a67e39f57ab550b63c7a5d7966199/procedure-source.schema.yaml`
-
-具体的屏幕和交互规则见配套规范。更新 Demo baseline 时，必须重新核对这些源文件和 validator，不得静默沿用旧假设。
+能力以 Manifest 为准。出现未知语法时，不静默删除、不猜测、不自动重写。
