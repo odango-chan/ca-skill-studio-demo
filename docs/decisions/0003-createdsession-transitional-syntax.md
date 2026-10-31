@@ -1,0 +1,28 @@
+# ADR-0003：CreatedSession 过渡语法必须显式建模
+
+- 状态：Accepted
+- 日期：2026-10-31
+
+## 背景
+
+当前 Demo 的 establish-pdu-session 使用 node-level preconditions / postconditions。Demo 的本地 ProcedureSource Schema 快照没有这些字段；scripts/validate_docs.py 通过专用窄范围 validator 检查当前 authoring source。
+
+该 Skill 的设计文档将其 authoring model 标记为 NOT YET RUNTIME-COMPATIBLE，36 个 Case 是 semantic qualification obligations，而不是 executable Runtime fixtures。
+
+## 决策
+
+Skill Studio 必须将该语法作为显式 Demo Transitional Profile 展示。
+
+## UX 约束
+
+- 显示 Transitional 标识和校验器来源；
+- 不按本地通用 Procedure Schema 错误拒绝该 Skill；
+- 不把专用 validator 误称为通用语法支持；
+- 不把 36 个 Case 误报为已执行 Fixture；
+- 不把 Source Validation 通过解释为 Runtime Qualification；
+- 在尚未实现可靠语法支持前，允许 Source-only / 受限编辑；
+- 对 preconditions / postconditions 保留阶段归属和路由来源。
+
+## 后果
+
+Capability Manifest 需要表达 evidence level、editor behavior 和 qualification status 三个不同维度。

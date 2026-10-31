@@ -1,0 +1,252 @@
+apiVersion: skillstudio.demo/v1alpha1
+kind: EditorCapabilityManifest
+metadata:
+  name: ca-skill-studio-demo
+  status: initial-observed-baseline
+  generatedAt: "2026-10-31"
+  source:
+    repository: odango-chan/ca-agent-demo
+    ref: main
+    commit: bf445ad777149af5af2dfa0a5bdea18d0451303e
+    tree: 89f45b85e025c2a18952495abcf269e99ddb400e
+    localSchemaSnapshot: tests/contracts/ca-skill-toolchain/03a42764ee2a67e39f57ab550b63c7a5d7966199
+    validator: scripts/validate_docs.py
+    localGate: make verify
+  scope:
+    compatibilityTarget: ca-agent-demo-current-main
+    externalToolchainDependency: false
+    runtimeAuthority: false
+
+evidenceLevels:
+  observed-and-used: "Present in one or more current Skill source files."
+  demo-schema-declared: "Declared by the schema snapshot checked into ca-agent-demo."
+  demo-custom-validated: "Checked by a repository-local specialized validator."
+  optional-package-asset: "Allowed by the current package convention but not required by every Skill."
+  not-established: "Insufficient evidence to promise structured editing or execution support."
+
+editorBehaviors:
+  editable: "Structured editing is supported and round-trip safety is tested."
+  source-only: "Raw source can be viewed or edited; no structured editor is promised."
+  read-only: "Parsed presentation only; editing is disabled."
+  preserve-only: "Unknown syntax must be retained without semantic editing."
+  unavailable: "Not supported by the current adapter."
+
+packageInventory:
+  skills:
+    - name: 5gc-intent
+      role: routing-policy
+      observedFiles: [SKILL.md]
+      cases: 0
+      status: observed
+    - name: 5gc-file-transfer
+      role: root-business-skill
+      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, schemas, scripts]
+      cases: 0
+      status: observed
+    - name: ue-registration
+      role: registration-convergence
+      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml]
+      cases: 0
+      status: observed
+    - name: ensure-pdu-session
+      role: pdu-session-target-convergence
+      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, cases]
+      cases: 5
+      status: observed
+    - name: ensure-session-qos
+      role: session-qos-convergence
+      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, cases]
+      cases: 5
+      status: observed
+    - name: ensure-virtual-group
+      role: virtual-group-lifecycle-convergence
+      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, cases]
+      cases: 6
+      status: observed
+    - name: establish-pdu-session
+      role: source-first-createdsession-candidate
+      observedFiles: [SKILL.md, assurance/contract.yaml, assurance/procedure.yaml, assurance/predicates.yaml, cases, schemas, scripts, design]
+      cases: 36
+      caseKind: semantic-qualification-obligations
+      runtimeCompatible: false
+      activeInRouting: false
+      status: observed-transitional
+
+packageShape:
+  required:
+    - SKILL.md
+  commonExecutableAssets:
+    - assurance/contract.yaml
+    - assurance/procedure.yaml
+    - assurance/predicates.yaml
+  optional:
+    - cases/
+    - references/
+    - schemas/
+    - scripts/
+  referenceDirectories:
+    preload: host-auto-load-after-skill-selection
+    on-demand: exact-path-and-trigger-only
+    samples: never-auto-load
+
+yamlCompatibility:
+  implementationObserved:
+    library: PyYAML
+    loader: SafeLoader-with-custom-bool-resolver
+    booleanValues: [true, false]
+    unquotedOnKey: string
+    roundTripCommentsPreservedByDemoLoader: false
+  editorRequirement:
+    useRoundTripParserForEditing: true
+    preserveCommentsAndOrder: true
+    preserveUnknownFields: true
+    validateSavedOutputWithDemoLoader: true
+
+procedure:
+  sourceEnvelope:
+    topLevel: procedures
+    procedureFieldsObservedOrDeclared: [applicability, inputs, start, nodes]
+  nodeConstructs:
+    - id: call
+      evidence: observed-and-used
+      initialEditorBehavior: source-only-until-roundtrip-poc
+    - id: verify
+      evidence: observed-and-used
+      initialEditorBehavior: source-only-until-roundtrip-poc
+    - id: script
+      evidence: observed-and-used
+      initialEditorBehavior: source-only-until-step-model-verified
+    - id: procedure
+      evidence: observed-and-used
+      initialEditorBehavior: source-only-until-composition-semantics-verified
+    - id: terminal
+      evidence: observed-and-used
+      initialEditorBehavior: source-only-until-roundtrip-poc
+    - id: tool
+      evidence: demo-schema-declared
+      initialEditorBehavior: source-only
+    - id: predicate
+      evidence: demo-schema-declared
+      initialEditorBehavior: source-only
+    - id: for
+      evidence: demo-schema-declared
+      initialEditorBehavior: source-only
+    - id: reconcile
+      evidence: demo-schema-declared
+      initialEditorBehavior: source-only
+  commonFields:
+    - id: with-from
+      evidence: observed-and-used
+      initialEditorBehavior: source-only-until-binding-model
+    - id: on
+      evidence: observed-and-used
+      initialEditorBehavior: source-only-until-route-model
+    - id: inputs
+      evidence: observed-and-used
+      initialEditorBehavior: source-only-until-roundtrip-poc
+    - id: applicability
+      evidence: demo-schema-declared
+      initialEditorBehavior: source-only
+  transitionalExtensions:
+    - id: node-preconditions
+      evidence: demo-custom-validated
+      appliesTo: establish-pdu-session
+      sourceShape: preconditions.steps + preconditions.on
+      currentStepOperators: [script, call, verify, procedure]
+      currentAllowedCalls:
+        - ca.session.operation_context.read
+        - ca.session.pcf_create_inputs.read
+        - ca.session.establishment_response.prepare
+      currentAllowedScripts:
+        - scripts/select_establishment_configuration.py
+      currentAllowedProcedures:
+        - await-ue-session-configuration
+      routeOutcomes: [FAILED, UNRESOLVED]
+      runtimeCompatible: false
+      initialEditorBehavior: read-only-then-profiled-editor
+    - id: node-postconditions
+      evidence: demo-custom-validated
+      appliesTo: establish-pdu-session
+      sourceShape: postconditions.steps + postconditions.on
+      currentStepOperators: [verify]
+      routeOutcomes: [PASS, FAIL, UNKNOWN]
+      runtimeCompatible: false
+      initialEditorBehavior: read-only-then-profiled-editor
+
+contract:
+  evidence: demo-schema-declared
+  fields:
+    - apiVersion
+    - kind
+    - metadata.name
+    - spec.skillType
+    - spec.goal
+    - spec.entryProcedure
+    - spec.inputs.requestSchema
+    - spec.context.requiredFacts
+    - spec.allowedResources.capabilities
+    - spec.allowedResources.localTools
+    - spec.preconditions
+    - spec.requirements
+    - spec.postconditions
+    - spec.dependencies
+    - spec.planning.maxActions
+    - spec.planning.allowDynamicProcedure
+    - spec.planning.fallbackProcedure
+    - spec.planning.budgetPartition
+    - spec.failureSemantics.outcomeUnknown.requireReconcile
+  initialEditorBehavior: source-first-form-after-schema-tests
+
+predicate:
+  evidence: demo-schema-declared
+  observedEvaluatorTypes: [cel, script]
+  observationFields: [ref, scope, freshness, when]
+  evaluatorFields:
+    cel: [type, expression]
+    script: [type, ref]
+  initialEditorBehavior: source-first-with-structured-inspector
+
+case:
+  evidence: observed-in-current-case-files
+  observedEnvelope:
+    - apiVersion
+    - kind
+    - metadata.skill
+    - metadata.name
+    - spec.classes
+    - spec.purpose
+    - spec.context
+    - spec.expect
+    - spec.fixtures
+  currentFixtureDistinction:
+    ensure-pdu-session: case-files-with-fixture-shape
+    establish-pdu-session: semantic-qualification-obligations-only
+  initialEditorBehavior: source-first-case-inspector
+
+validation:
+  commands:
+    - make verify
+    - uv run python scripts/validate_docs.py
+    - uv run pytest -q -m "not live_model"
+  currentAdapters:
+    - local-schema-snapshot
+    - createdsession-specialized-authoring-validator
+    - repository-local-pytest-gate
+  notProvenByTheseCommands:
+    - runtime-qualification-of-all-skills
+    - execution-of-all-createdsession-cases
+    - live-5gc-acceptance
+
+initialFixtures:
+  - skill: ensure-pdu-session
+    sourceRepository: odango-chan/ca-agent-demo
+    sourceCommit: bf445ad777149af5af2dfa0a5bdea18d0451303e
+    sourcePath: skills/ensure-pdu-session
+    importStatus: not-imported
+    purpose: basic-procedure-and-reconcile-ux
+  - skill: establish-pdu-session
+    sourceRepository: odango-chan/ca-agent-demo
+    sourceCommit: bf445ad777149af5af2dfa0a5bdea18d0451303e
+    sourcePath: skills/establish-pdu-session
+    importStatus: not-imported
+    purpose: complex-procedure-and-transitional-syntax-ux
