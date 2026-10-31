@@ -78,3 +78,24 @@
 ## 9. 决策顺序
 
 建议优先确定 Procedure Designer 的首屏模式、主流程布局、Inspector 默认行为和目标桌面尺寸；随后完成 Round-trip YAML 与 Procedure Graph 技术 POC，再决定应用技术栈。
+
+
+## 10. Procedure Designer 屏幕级决策复盘
+
+样本级线框见 [Procedure Designer Screen-level Wireframes](../ux/procedure-designer-wireframes.md)。当前推荐基线：
+
+| 决策 | 推荐 | 状态 |
+|---|---|---|
+| Canvas 关系视图 | Control Flow 默认；Data Flow 为独立 Lens | Proposed |
+| Routes | Route details 面板 + Route label density，不独立成图 | Proposed |
+| Route bundle | 同 Node + 同 Phase / Route Source + 同 Target 才允许 bundle | Proposed |
+| route 数量 | 区分源 route outcome entries 与绘制 connector 数 | Proposed |
+| ensure 标签 | Auto 默认，Fit 后尽可能显示全部 | Proposed |
+| establish 标签 | Auto 默认；选中 Node 后展开该 Node 的所有 route labels | Proposed |
+| Predicate Scope | 展示原始 Scope expression，不使用推断的泛化标签 | Proposed |
+| 响应式 | 宽桌面三栏；窄窗口 Drawer；移动端线性列表 | Proposed |
+| 可访问性 | Node / Route / Binding 具备键盘与线性导航 | Proposed |
+| 1440×900 | 首个高保真设计基准，不是最低支持尺寸 | Proposed |
+| 具体断点 / 布局引擎 | 通过高保真原型和 POC 验证 | Open |
+
+下一次评审优先确认 Canvas Lens、Route label density、Inspector 默认行为和窄窗口降级；不要在这些决策未验证前锁定具体 Graph library。

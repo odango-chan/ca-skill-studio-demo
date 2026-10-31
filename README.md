@@ -10,7 +10,7 @@
 |---|---|
 | 产品定位 | 初版已归档，待评审 |
 | 信息架构与工作台 UX | 初版已归档，待评审 |
-| Procedure Designer | 第二轮语义、屏幕与交互规范已归档，待用户评审 |
+| Procedure Designer | 语义、屏幕、交互、真实样本蓝图和屏幕级线框 / 设计复盘已归档，待用户评审 |
 | Demo Capability Manifest | 已建立初始观察基线 |
 | 应用代码 | 尚未开始 |
 | Skill fixtures | 尚未导入 |
@@ -25,12 +25,13 @@
 5. [Procedure Designer 语义规范](docs/ux/procedure-designer.md)
 6. [Procedure Designer 屏幕规范](docs/ux/procedure-designer-screen-spec.md)
 7. [Procedure Designer 交互模型](docs/ux/procedure-designer-interaction-model.md)
-8. [ensure-pdu-session Graph Blueprint](docs/ux/ensure-pdu-session-graph-blueprint.md)
-9. [establish-pdu-session Graph Blueprint](docs/ux/establish-pdu-session-graph-blueprint.md)
-8. [技术架构](docs/architecture/system-architecture.md)
-9. [Demo 基线](docs/reference/demo-baseline.md)
-10. [开放问题与待决策项](docs/decisions/open-questions.md)
-11. [实施路线图](docs/roadmap/implementation-plan.md)
+8. [Procedure Designer 屏幕级线框与设计复盘](docs/ux/procedure-designer-wireframes.md)
+9. [ensure-pdu-session Graph Blueprint](docs/ux/ensure-pdu-session-graph-blueprint.md)
+10. [establish-pdu-session Graph Blueprint](docs/ux/establish-pdu-session-graph-blueprint.md)
+11. [技术架构](docs/architecture/system-architecture.md)
+12. [Demo 基线](docs/reference/demo-baseline.md)
+13. [开放问题与待决策项](docs/decisions/open-questions.md)
+14. [实施路线图](docs/roadmap/implementation-plan.md)
 
 完整文档索引见 [docs/README.md](docs/README.md)。
 

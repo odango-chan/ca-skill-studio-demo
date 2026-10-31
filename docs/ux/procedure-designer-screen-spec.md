@@ -1,6 +1,6 @@
 # Procedure Designer Screen Specification
 
-**状态：Proposed · 第二轮屏幕规范**
+**状态：Proposed · 第二轮屏幕规范；样本级线框见配套文件**
 
 本文件把 Procedure Designer 的语义原则落实为可供高保真设计和后续实现使用的屏幕结构。尺寸为设计起点，不是固定实现约束。
 
@@ -362,3 +362,10 @@ Child Procedure 节点显示：
 - [establish-pdu-session](establish-pdu-session-graph-blueprint.md)：17 个根节点、5 个 Child Procedure、Preconditions / Operator / Postconditions、多来源 Binding、资源责任 finalization 和 36 个非执行型 qualification obligations。
 
 高保真稿必须覆盖两份蓝图中列出的 route source、原始 outcome 和 target；不能只展示 happy path。
+
+
+## 13. 样本级屏幕线框与设计复盘
+
+具体到两个真实样本的桌面布局、Node card、完整 route 分区、选中节点 Inspector、Child Procedure Drill-in、Binding / Predicate Inspector、响应式与可访问性，见 [Procedure Designer · Screen-level Wireframes & Design Review](procedure-designer-wireframes.md)。
+
+该文件同时修正上一版示意图中的信息遗漏，并明确 **Control Flow / Route details / Data Flow** 的关系：Routes 是控制流的解释层，不是与 Graph 平级的第二张图；Bindings 使用独立 Data Flow Lens。Source / Visual / Split 则是工作区模式，与 Canvas Lens 分开。

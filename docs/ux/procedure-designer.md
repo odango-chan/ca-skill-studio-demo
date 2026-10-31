@@ -2,7 +2,7 @@
 
 **状态：Proposed · 第二轮设计基线，待用户评审**
 
-本文件定义 Procedure Designer 的语义呈现原则。具体屏幕分区见 [Screen Specification](procedure-designer-screen-spec.md)，交互、同步和状态行为见 [Interaction Model](procedure-designer-interaction-model.md)。
+本文件定义 Procedure Designer 的语义呈现原则。具体屏幕分区见 [Screen Specification](procedure-designer-screen-spec.md)，交互、同步和状态行为见 [Interaction Model](procedure-designer-interaction-model.md)，真实样本的屏幕线框和设计复盘见 [Screen-level Wireframes](procedure-designer-wireframes.md)。
 
 ## 1. 产品职责
 

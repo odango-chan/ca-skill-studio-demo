@@ -30,7 +30,7 @@
 
 ## Phase 2：Procedure Read-only Designer
 
-交付：Procedure Graph Projection、Node Inspector、路由分组、Preconditions / Operation / Postconditions 展示、Child Procedure Drill-in、Binding Source Navigation、Source ↔ Graph selection sync。
+交付：Procedure Graph Projection、Node / Route Inspector、Control Flow / Data Flow Lens、路由分组与 route detail、Preconditions / Operation / Postconditions 展示、Child Procedure Drill-in、Binding Source Navigation、Source ↔ Graph selection sync、Expected Trace Preview、键盘与窄窗口导航。
 
 退出条件：
 
@@ -42,6 +42,11 @@
 - 显式 `on` 与隐式成功进入 Postconditions 不混淆；
 - `reconcile:` Operator 与调用 reconcile Capability 的 Call 节点区分；
 - Binding 数据依赖默认不与控制流混画；
+- Route bundle 仅允许同 Node + 同 Phase / Route Source + 同 Target，且每个 Outcome 可单独检查；
+- route outcome entry 数量与 rendered connector 数量分开；
+- Expected Trace Preview 不冒充 Runtime Trace；
+- Node / Route / Binding 可键盘访问，并提供 Outline / Route list 线性替代；
+- 窄窗口使用可折叠 Navigator / Inspector，不强制三栏；
 - 不支持语法无损保留，解析失败时旧图标记 STALE。
 
 ## Phase 3：资产编辑器

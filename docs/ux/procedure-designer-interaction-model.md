@@ -284,3 +284,17 @@ Split 是同一 Source 的同步视图，不是双文档编辑。
 5. 从 `namf-communication-n1n2-message-transfer` 的 Postcondition operationRef Binding 跳转到 RAN / N4 / UE Child Procedure 的 `afterOperationRef` 消费者。
 6. Drill-in 到 5 个独立 Child Procedure，返回时恢复 root Graph 的视图状态。
 7. 打开 Case overlay 时，ensure 的 5 个 fixture-shaped traces 可定位到确切节点；establish 的 36 个 semantic obligations 不生成虚构 node mapping。
+
+
+## 12. Canvas Lens 与 Route Density
+
+Canvas 的关系类型与工作区模式分开：
+
+- Source / Visual / Split：工作区模式；
+- Control Flow：默认 Canvas；
+- Route details：Control Flow 的 Inspector / 侧栏，不建立第二套 Graph Layout；
+- Data Flow：Binding 的独立 Lens，不与 Control Flow edges 默认叠加。
+
+Route outcome entries 可以在同一 Node、同一 Phase / Route Source、同一 Target 的范围内视觉 bundle；bundle 内每个原始 outcome 必须可独立选择。不同 Phase / Route Source 不得合并。
+
+完整样本线框、路由密度策略和设计复盘见 [Screen-level Wireframes](procedure-designer-wireframes.md)。

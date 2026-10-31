@@ -92,3 +92,13 @@ P0 为可用编辑工作台基础；P1 为完整 Skill authoring 体验所需；
 12. 普通 Preview / Validate 不触发 Script、Capability、Runtime 或 Live 5GC。
 13. ensure-pdu-session 的 Visual projection 与源蓝图一致：11 个节点、所有 route target、Reconcile / retry 路径和 5 个 terminal。
 14. establish-pdu-session 的 Visual projection 与源蓝图一致：17 个根节点、5 个独立 Child Procedure、全部阶段路由和 Binding provenance；36 个 Case 只显示为 semantic obligations。
+
+
+## 5. 补充 UX 验收要求
+
+15. Route outcome entry 与绘制出来的物理 connector 分开计数；视觉 bundle 不丢失原始 outcome、Route Source 或 Target。
+16. Routes 作为 Control Flow 的详情层；Bindings 作为独立 Data Flow Lens；两者不与控制流默认混画。
+17. Case Expected Trace Preview 不得冒充已执行 Runtime Trace；无执行记录时 Execution = NOT_RUN。
+18. Predicate Inspector 显示源定义中的精确 Observation Scope / Freshness / Evaluator；没有声明的字段不得推断。
+19. Graph / Route / Binding / Predicate 有键盘可达的线性导航方式；状态不只依赖颜色。
+20. 复杂 Procedure 在窄窗口下通过折叠面板 / Drawer 保持可读，不强行保留三栏布局。
