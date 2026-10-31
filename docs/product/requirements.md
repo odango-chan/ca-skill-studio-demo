@@ -1,104 +1,121 @@
 # 产品需求
 
-**状态：Proposed · 第一版需求基线**
+**状态：Proposed · Authoring-first 第一版需求基线**
 
 ## 1. 功能需求
 
 | ID | 需求 | 优先级 | 第一版验收方向 |
 |---|---|---:|---|
-| FR-001 | 浏览 Skill Library | P0 | 列出当前 Workspace 可见的 Skill，并显示来源与状态 |
-| FR-002 | 打开 Skill Package | P0 | 识别必需与可选资产，不创建空目录 |
-| FR-003 | 编辑 SKILL.md | P0 | Markdown 编辑、预览、大纲和链接检查 |
-| FR-004 | 编辑 YAML 源文件 | P0 | 保留注释、顺序、字符串类型和未知字段 |
-| FR-005 | Procedure 图形投影 | P0 | 从源文件构建 Procedure graph、控制流、阶段来源路由和子 Procedure 视图 |
-| FR-006 | 节点 Inspector | P0 | 展示 Operator、Effect（有证据时）、Preconditions / Operation / Postconditions、Binding 和 Source |
-| FR-007 | Contract 浏览与编辑 | P1 | 表单和 Source 双视图 |
-| FR-008 | Predicate 浏览与编辑 | P1 | Observation、Scope、Freshness、CEL / Script |
-| FR-009 | Case 管理 | P1 | 显示语义义务与可执行 Fixture 的差异 |
-| FR-010 | 跨资产导航 | P0 | 从引用跳转定义，并展示引用者 |
-| FR-011 | Validation Center | P0 | 调用当前 Demo 现有校验入口并展示诊断 |
-| FR-012 | Diff / Undo / Redo | P1 | 可审查、撤销和恢复源文件修改 |
-| FR-013 | Fixture 导入 | P1 | 记录源仓、Commit、路径和文件 Digest |
-| FR-014 | AI Co-author | P2 | 只产生候选 Patch，必须人工确认 |
-| FR-015 | Runtime Trace 展示 | P2 | 仅展示已有、可验证的 Trace |
-| FR-016 | 发布 / Registry 集成 | Deferred | 当前不在实现范围内 |
+| FR-001 | Package Explorer | P0 | 打开 Workspace，浏览实际存在的 Skill Package 文件 |
+| FR-002 | Package Open / Create | P0 / P1 | P0 打开现有 Package；P1 创建 Blank / Clone Package |
+| FR-003 | SKILL.md Editor | P0 | Markdown Source、Preview、Outline、Frontmatter |
+| FR-004 | Source Editor | P0 | YAML / JSON / CEL / Script 原文编辑与源位置 |
+| FR-005 | Procedure Projection | P0 | 从 Source 构建准确的 Procedure / Phase / Route / Binding 语义模型 |
+| FR-006 | Visual Procedure Editing | P0 | 创建、选择、编辑、移动、删除受支持节点和路由 |
+| FR-007 | Source / Visual Sync | P0 | 两种编辑入口共享同一 Source revision，修改后双向定位和刷新 |
+| FR-008 | Semantic Inspector | P0 | 编辑 Node、Operator、Phase、Step、Binding 和引用属性 |
+| FR-009 | Typed Source Patch + Diff | P0 | 所有 Visual 修改转成有前置条件的 Source Patch，预览实际文本差异 |
+| FR-010 | Undo / Redo | P0 | Source 与 Visual 修改进入同一事务历史 |
+| FR-011 | Conflict Handling | P0 | 外部文件变化时检测冲突，不静默覆盖 |
+| FR-012 | Cross-asset Navigation | P0 | 在 Procedure、Predicate、Contract、Script、Schema 之间定位引用 |
+| FR-013 | Binding Editor | P1 | 有证据的来源选择、类型提示、生产者 / 消费者导航 |
+| FR-014 | Phase Editor | P1 | 有序 Preconditions / Postconditions Step 的增加、删除和重排 |
+| FR-015 | Child Procedure Editor | P1 | 独立子图 Drill-in、内部编辑、父子引用导航 |
+| FR-016 | Contract / Predicate Editors | P1 | 结构化 Inspector + Source 编辑 |
+| FR-017 | Case / Reference / Schema / Script Editors | P2 | Package 内其他资产的专用编辑体验 |
+| FR-018 | Inline Diagnostics | P1 | 解析、引用、结构和兼容性问题就地提示 |
+| FR-019 | AI Co-author | P2 | 只提出候选 Patch，人工审查后应用 |
+| FR-020 | Validation / Runtime / Publishing | Deferred | 不建设独立工作台，不进入首个编辑纵切 |
 
-P0 为可用编辑工作台基础；P1 为完整 Skill authoring 体验所需；P2 为增强能力；Deferred 为明确后置。
+## 2. Procedure 编辑要求
 
-## 2. 资产级需求
+### Node
+
+- 支持创建、选择、编辑属性、重命名和删除受支持 Node。
+- Operator 类型与 Operator 标识分开编辑。
+- 修改 Operator 时检查旧字段、新字段、输入输出和路由语义差异。
+- Duplicate 必须生成新的唯一 ID，并检查复制后的内部引用。
+- 未知 Operator / Preserve-only Node 不开放结构化编辑。
+
+### Route
+
+- 支持创建、修改 Outcome、修改 Target 和删除 Route。
+- 新建 Route 时必须明确 Route Source：Operator、Preconditions、Postconditions 或 Child Procedure。
+- 只有当前 Compatibility Profile 声明的 Outcome 才能被结构化选择；未知 Outcome 保留 Source-only。
+- Target 必须属于当前 Procedure；跨 Procedure 路由不能被静默接受。
+- 删除 Node 前必须处理入边、出边和引用。
+
+### Phase / Step
+
+- 有序 Step 的顺序必须保留。
+- 支持受支持 Phase 中的 Step 增加、删除、编辑和重排。
+- Preconditions / Postconditions 的聚合 Route 与 Step 自身 Operator Route 不得混淆。
+- CreatedSession node-level phases 只有在专用 Profile 的 parser、patch 和 round-trip 测试通过后才开放结构化编辑。
+
+### Binding
+
+- 显示 Consumer、原始表达式、Producer、Field、Declared Type、Source Location 和 Evidence Level。
+- 可从已解析且类型证据充分的 Producer 中选择。
+- 不确定类型、生产时机或跨 Procedure 语义时，不提供自动补全或自动修复。
+- 删除或重命名 Producer 时，必须先显示受影响 Binding 并要求在同一事务中处理或明确保留为 unresolved。
+
+### Child Procedure
+
+- 每个命名 Procedure 独立成图。
+- Drill-in / Back 保留父图视图状态。
+- 编辑 Child 内部资产不能自动重排或扁平化 Root。
+- 新建 / 删除 / 重命名 Child Procedure 前，检查所有调用点、Procedure reference 和 Entry reference。
+- 当前样本中的组合语义若尚未建立编辑资格，保持 Source-only。
+
+## 3. Source-preserving 编辑要求
+
+- YAML 编辑层使用 Round-trip AST / CST；普通 SafeLoader 仅用于语义校验，不作为无损编辑器。
+- 局部修改只改动目标语法节点，不对整份 YAML 做无关格式化。
+- 保留注释、键顺序、空行、缩进、引号 / 标量风格、Block Scalar、未知字段及不支持语法。
+- on 必须按 Demo 的 YAML 1.2 语义解析为字符串键；true / false 才是布尔值。
+- 每个 Patch 包含 Source revision、目标路径、预期旧值 / 结构指纹和操作类型。
+- Patch 应用后重新解析，并验证用户操作结果与新 Semantic Model 一致。
+- 任何一步失败，整个事务回滚；不得留下半应用状态。
+- 无法证明无损的局部区域降级为 Source-only / Preserve-only。
+
+## 4. 资产级需求
 
 ### SKILL.md
+- 支持 Frontmatter、Markdown Source、Preview 和 Outline。
+- 支持常用标题、链接、列表、代码块编辑；Preview 不自动改写 Source。
+- Model Context Preview 只显示有 Host 证据的加载行为，未知项标为 Approximation。
 
-- 支持 Frontmatter 和 Markdown。
-- 显示文档大纲和渲染预览。
-- 检查内部路径引用。
-- 不自动把 assurance、cases 或 scripts 塞入模型上下文。
-- Model Context Preview 必须与实际 Host 装配行为区分；无法确认的部分标记为 Preview。
+### Contract / Predicate / Case
+- 使用结构化 Inspector 与 Source 双视图。
+- 字段编辑必须由当前 Manifest / Schema / Validator 能力约束。
+- Predicate 显示 Observation、Scope、Freshness、When、Evaluator 和引用者。
+- Case 编辑区分 semantic obligation、definition、fixture 和实际执行记录。
+- 不以 Case 文件存在推断可执行或已执行。
 
-### Procedure
+### References / Schemas / Scripts
+- 展示来源、被引用位置和加载方式。
+- 默认不执行 Script。
+- Schema 与 Demo 专用 Validator 的证据等级分开。
 
-- 支持从 procedures / start / nodes 构建图形投影。
-- 默认以显式控制流展示业务主流程；数据 Binding 不默认叠加为控制流边。
-- 每个命名 Procedure 独立成图；Child Procedure 通过 Drill-in 导航，不自动扁平化。
-- 支持节点选择、阶段查看、路由来源查看和 Source ↔ Visual 定位。
-- 显示 inputs、with/from、on、operator 和终态。
-- 对节点级 Preconditions / Postconditions 过渡语法，按有序阶段展示；不能提升为额外主业务节点。
-- Operation、Preconditions、Postconditions 的 `on` 路由必须保留来源，不能合并为无来源出口。
-- 对隐式成功进入 Postconditions 的语义转移明确标识，不伪造成源文件中的显式路由。
-- 区分 `reconcile:` Operator 与 `call: ...reconcile`。
-- 区分 Operator、Effect、Outcome 和 Procedure terminal。
-- 不支持的语法必须保留并标记 Unsupported / Source-only。
+## 5. 质量属性
 
-### Contract
+- **无损性**：不相关源文本在局部编辑后保持不变。
+- **一致性**：Source、Semantic Model、Visual、Inspector 对同一 revision 一致。
+- **可逆性**：事务级 Undo / Redo。
+- **冲突安全**：外部修改不能被本地保存静默覆盖。
+- **可访问性**：Node / Route / Step / Binding 提供键盘可达的线性编辑方式。
+- **兼容性诚实**：Observed / Schema-declared / Demo-custom-validated / Runtime-proven 分层。
+- **性能**：编辑反馈不要求每次按键都完整重建所有资产索引；允许增量解析，但保存前必须完整一致性检查。
 
-- 显示 Goal、Skill Type、Entry Procedure、Inputs、Context、Allowed Resources、Preconditions、Requirements、Postconditions、Planning 和 Failure Semantics。
-- 对 Capability / Local Tool 引用提供来源导航。
-- 检查 Procedure 使用的资源与 Contract 授权之间的一致性；没有可靠目录时显示 Unknown，而不是猜测。
+## 6. 首个编辑纵切验收
 
-### Predicate
-
-- 显示 Predicate ID、Observation、Scope、Freshness、When 和 Evaluator。
-- 支持 CEL / Script 源码查看与编辑。
-- 显示被哪些 Procedure 和 Contract 使用。
-- 离线 Fixture 求值与真实 Observation 获取必须明确分开。
-
-### Case
-
-- 显示 scenario purpose、context、availableResources、expected planning status、terminal、postconditions 和 trace / fixtures（如存在）。
-- 明确区分 semantic obligation、schema-valid case 和 executable fixture。
-- 只有真实执行记录才能产生执行状态和覆盖率。
-
-## 3. 质量属性
-
-- **正确性**：无损读取和写入；保留 YAML 1.2 对 true / false 的解析行为，尤其是字符串键 on。
-- **可理解性**：主业务流程默认可读；节点详情按需展开。
-- **可追溯性**：验证绑定 Package Digest、Schema / Validator 标识和执行范围。
-- **安全性**：Preview 和静态验证不执行脚本或外部操作。
-- **可扩展性**：新语法通过 Capability Manifest 描述；未知语法无损保留。
-
-## 4. UX 验收场景
-
-1. 第一次打开 ensure-pdu-session，用户能理解观察、创建、Reconcile、复核和终态。
-2. 打开 establish-pdu-session，用户能看到复杂主流程、节点内阶段、子流程和 36 个 Case 义务。
-3. 选择一个 Binding，能够追踪生产者、输出字段和消费者。
-4. 点击 Predicate，能够查看 Observation 来源和 CEL / Script。
-5. 修改 YAML 后，流程图和诊断同步更新。
-6. 对不支持的语法，编辑器保留源文件且不静默丢字段。
-7. 运行当前 Demo 静态门禁后，Validation Center 显示实际命令与结果范围。
-8. 相同目标的多阶段路由仍能显示各自来源。
-9. 节点声明 Postconditions 时，图形能区分操作成功进入验证阶段与 Postconditions 的 PASS 路由。
-10. 对 CreatedSession 的过渡 Binding path 显示其专用 validator 证据等级，而非标记为通用 Schema 支持。
-11. Source 解析失败时，旧 Graph 标记 STALE。
-12. 普通 Preview / Validate 不触发 Script、Capability、Runtime 或 Live 5GC。
-13. ensure-pdu-session 的 Visual projection 与源蓝图一致：11 个节点、所有 route target、Reconcile / retry 路径和 5 个 terminal。
-14. establish-pdu-session 的 Visual projection 与源蓝图一致：17 个根节点、5 个独立 Child Procedure、全部阶段路由和 Binding provenance；36 个 Case 只显示为 semantic obligations。
-
-
-## 5. 补充 UX 验收要求
-
-15. Route outcome entry 与绘制出来的物理 connector 分开计数；视觉 bundle 不丢失原始 outcome、Route Source 或 Target。
-16. Routes 作为 Control Flow 的详情层；Bindings 作为独立 Data Flow Lens；两者不与控制流默认混画。
-17. Case Expected Trace Preview 不得冒充已执行 Runtime Trace；无执行记录时 Execution = NOT_RUN。
-18. Predicate Inspector 显示源定义中的精确 Observation Scope / Freshness / Evaluator；没有声明的字段不得推断。
-19. Graph / Route / Binding / Predicate 有键盘可达的线性导航方式；状态不只依赖颜色。
-20. 复杂 Procedure 在窄窗口下通过折叠面板 / Drawer 保持可读，不强行保留三栏布局。
+1. 打开固定基线中的 ensure-pdu-session。
+2. Source 修改一个 Node 字段，Visual 选择与 Inspector 同步。
+3. Visual 修改一个受支持 Node 属性，生成精确 Typed Patch 和 Diff。
+4. 添加一条有合法 Outcome 和 Target 的 Route；Diff 只改动对应 on 项。
+5. Undo / Redo 在 Source 与 Visual 中结果一致。
+6. 删除被引用 Node 时显示入边和 Binding 影响；未处理影响时阻止删除。
+7. 修改 YAML 注释、字段顺序或未知字段附近的无关区域后，其他区域不被格式化重写。
+8. 解析失败时保留 Source，旧 Graph 明确标记 STALE。
+9. 打开 establish-pdu-session，确认 17 个 Root Node、65 条 Root route entries 和 5 个 Child Procedure 正确解析；过渡 Phase 在未获得专用编辑资格前保持 Source-only。
+10. 普通编辑和保存不执行 Script、Capability、Runtime 或 Live 5GC。

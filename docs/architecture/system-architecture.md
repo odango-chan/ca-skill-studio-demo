@@ -1,32 +1,33 @@
 # 系统架构
 
-**状态：Proposed · 仅定义边界，不锁定技术栈**
+**状态：Proposed · Authoring-first · 技术栈未锁定**
 
 ## 1. 总体结构
 
 ~~~text
-Skill Studio UI
+Skill Studio Workbench
   ├── Workspace / Package Explorer
-  ├── Markdown & Source Editors
-  ├── Procedure Graph Projection
-  ├── Asset Inspectors
-  └── Validation Center
+  ├── Markdown / Source Editors
+  ├── Procedure Designer (Visual / Source / Split)
+  ├── Semantic Inspector
+  └── Problems / Inline Diagnostics
           |
           v
-Workspace Application Services
-  ├── Package Discovery
-  ├── Source / Round-trip AST
-  ├── Cross-reference Index
-  ├── Diagnostics Model
-  ├── Diff / Undo / Redo
-  └── Source Digest
+Authoring Application Services
+  ├── Package Discovery / File Watch
+  ├── Source Buffer / Revision Manager
+  ├── Round-trip AST / CST
+  ├── Compatibility Parser / Semantic Extractor
+  ├── Source Map / Cross-reference Index
+  ├── Typed Patch Engine
+  ├── Diff / Undo / Redo / Conflict Resolver
+  └── Save Adapter (local working copy)
           |
           v
 Demo Compatibility Adapters
-  ├── YAML / Package Parser Adapter
+  ├── YAML Semantic Loader Adapter
   ├── Local Schema Snapshot Adapter
-  ├── CreatedSession Transitional Validator Adapter
-  └── make verify / pytest Adapter
+  └── CreatedSession Transitional Validator Adapter
           |
           v
 ca-agent-demo (read-only reference baseline)
@@ -34,97 +35,110 @@ ca-agent-demo (read-only reference baseline)
 
 ## 2. 模块职责
 
-### UI
+### Workbench UI
 
-负责交互、布局、画布、Source 编辑、Inspector 和诊断呈现。不包含独立的 Skill 语义权威。
+负责 Package Explorer、多文件 Tab、Source / Visual / Split、Procedure Canvas、Inspector 和 Problems。UI 不拥有独立 Skill 语义权威。
 
-### Workspace Service
+### Workspace / Package Service
 
-管理用户打开的 Package、文件状态、AST、引用索引、Diff、Undo / Redo 和 Digest。
+管理用户明确打开的 Workspace、Package 文件、文件监视、打开状态、Working Buffer、Digest 和本地 Save。首版不自动 commit / push。
 
-### Parser / Round-trip AST
+### Round-trip Source Layer
 
-解析 Markdown、YAML、JSON 和 CEL 文本。YAML 编辑层必须支持注释、顺序、标量风格和源位置保留。Demo validator 可继续使用自己的 PyYAML Loader 作为校验适配器，但不应将其当作无损编辑器。
+维护 Concrete Syntax / Round-trip Tree，负责源位置、注释、顺序、标量样式、未知字段和局部 Patch。普通 YAML SafeLoader 不能替代该层。
+
+### Compatibility Parser / Semantic Extractor
+
+在保留 CST 的基础上解析出 Procedure / Node / Operator / Phase / Route / Binding 等类型化语义。Parser 必须带 Compatibility Profile 和来源版本。
+
+### Typed Patch Engine
+
+将 Visual / Inspector 编辑操作转成 Typed Source Patch；检查目标 revision、语义前置条件和编辑资格；在临时 Tree 中应用并序列化局部区域；重新解析并验证结果；失败时原子回滚。
+
+### Semantic Index
+
+维护 Node、Predicate、Capability、Contract、Binding Producer / Consumer 和跨文件引用关系。索引可重建，不得成为权威源。
+
+### Problems
+
+呈现 Parse、Dangling Reference、Unsupported Syntax、Conflict 和轻量静态诊断。它是编辑辅助面板，不是独立 Validation Center。
 
 ### Compatibility Adapter
 
-以固定 Demo baseline 为依据调用现有解析和校验行为。Adapter 应报告使用的 Demo Commit、Schema snapshot 路径和 Digest、Validator 路径和版本、检查范围、原始诊断和退出码。
+以固定 Demo baseline 为依据解释语法和运行已有静态校验器。必须报告 Demo Commit、Schema Snapshot Digest、Validator 路径 / 版本和原始诊断。它不拥有 Runtime authority。
 
-### Qualification Adapter
-
-第一阶段只呈现当前本地门禁和可用的 Case 定义。真实 Runtime、Live 5GC 或远程执行集成不属于当前阶段。
-
-## 3. 数据流
+## 3. 核心数据流
 
 ### 打开 Package
 
 ~~~text
 Workspace path / imported fixture
-  -> discover package files
-  -> parse source files
-  -> build typed document model
+  -> discover actual files
+  -> load Source buffers
+  -> build Round-trip Trees
+  -> parse with Compatibility Profile
+  -> build Semantic Model + Source Map
   -> build cross-reference index
-  -> derive visual projections
-  -> render editors
+  -> render Source / Visual / Inspector
 ~~~
 
-### 修改源文件
+### Source 编辑
 
 ~~~text
-User edit
-  -> source patch
-  -> round-trip serialization
-  -> update document model
-  -> refresh graph / references
-  -> mark affected diagnostics stale
-  -> persist draft
+User edits source buffer
+  -> incremental parse
+  -> update affected semantic objects
+  -> update graph / inspector / references
+  -> if parse fails: keep source, mark projection STALE
 ~~~
 
-### 图形编辑（后续阶段）
+### Visual 编辑
 
 ~~~text
-Graph interaction
-  -> typed semantic patch
-  -> validate patch preconditions
-  -> apply to source AST
-  -> round-trip serialize
-  -> reparse and compare
-  -> show diff
-  -> user save
+User visual command
+  -> resolve semantic target
+  -> create Typed Source Patch
+  -> check revision / capability / preconditions
+  -> apply to temporary Round-trip Tree
+  -> serialize touched region
+  -> reparse + compare intended semantics
+  -> show Diff
+  -> apply to working buffer
+  -> user Save
 ~~~
 
 ## 4. 单一权威源
 
-Skill Package 文件是唯一源。Graph JSON、Inspector State、Reference Index 和 Validation Report 都是派生数据或带版本的记录。
+Skill Package 文件是唯一源。Semantic Model、Graph、Inspector State、Reference Index 和 Problems 都是派生数据。
 
-任何派生数据都必须能够由源文件和固定工具版本重新生成。
+画布坐标、折叠、选择、缩放和布局属于 UI state，不得静默写入 Skill YAML。若未来需要持久化布局，使用独立 Studio metadata，并明确它不是 Skill Runtime 输入。
 
-## 5. 解析与无损编辑
+## 5. YAML 兼容性
 
-Demo 当前的 YAML Loader 通过 PyYAML SafeLoader 调整 bool resolver，使 true / false 保持布尔值，而未加引号的 on 仍作为字符串键。这是兼容性要求。
+Demo 当前 Loader 通过 PyYAML SafeLoader 调整 bool resolver，使 true / false 保持布尔值，而未加引号的 on 仍作为字符串键。
 
-该 Loader 本身不提供完整的注释 round-trip 编辑能力。Studio 需要独立选择支持 round-trip 的 AST / CST 方案，并用 Demo validator 对保存后的结果重新验证。
+Studio 的 Round-trip Parser 与 Demo Validator Adapter 必须对这一行为达成一致。Round-trip Parser 还必须保留注释、顺序和 scalar style。不能把 Demo Loader 本身当成无损编辑器。
 
-如果无法无损处理未知语法，则 Source-only / Read-only 优先于有损保存。
+如果 Round-trip POC 无法证明局部修改无损，则对应区域只允许 Source 编辑或 Preserve-only，不开放 Visual Patch。
 
-## 6. 版本与缓存
+## 6. 版本、冲突和事务
 
-建议所有缓存键和验证结果绑定 Source Package Digest、Baseline Commit、Schema Snapshot Digest、Adapter Version、Fixture Digest 和 Execution Environment。
+每个 Document 绑定 Base Revision、Working Revision、External Revision。每个 Typed Patch 绑定生成时的 Source Revision 和目标结构指纹。
 
-缓存只用于加速，不能成为验证权威。
+跨文件重命名、删除和引用更新必须作为可审查的多文件事务；在原子写入能力未实现前，先显示影响清单，不自动批量修改。
 
-## 7. 安全模型
+## 7. 安全边界
 
-- Workspace 文件访问限制在用户选择的根目录；
+- 文件访问限制在用户明确选择的 Workspace 根目录；
 - 禁止路径穿越和未经授权的符号链接逃逸；
-- Preview 不执行 Script；
-- 静态 Validate 不调用 Capability；
-- Script Sandbox 是单独能力；
-- 外部副作用操作需显式授权；
-- AI Patch 经过 Diff 和人工确认。
+- Preview、Parse 和 Problems 不执行 Script；
+- 静态诊断不调用 Capability；
+- AI 只能提出候选 Patch；
+- Save 只写本地工作副本；
+- 外部副作用、Runtime、Live 5GC 和发布操作不属于当前架构范围。
 
-## 8. 技术栈决策
+## 8. 技术决策状态
 
-当前不锁定 React / Vue、Graph Library、Monaco / CodeMirror、Tauri / Electron 或纯 Web。
+当前没有应用脚手架，也不锁定 React / Vue / Svelte、Monaco / CodeMirror、Graph Library、Tauri / Electron 或纯 Web。
 
-技术选型前应完成 Round-trip YAML POC、Procedure graph 可访问性和大图性能 POC、本地文件 Workspace 安全模型、Demo validator Adapter 可执行性验证，以及 Windows / WSL 开发体验评估。
+先完成 Round-trip YAML POC 和 Typed Patch 最小模型，再根据编辑器部署目标选择 UI / Graph 技术。具体 POC 顺序见 [Source-preserving Edit Model](source-preserving-edit-model.md)。

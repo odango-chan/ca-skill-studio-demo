@@ -49,3 +49,24 @@ Studio 的 Source Parser、Round-trip Serializer 和 Demo Validator Adapter 必�
 更新能力时必须指明源仓 Commit、Schema / Validator 路径，区分 Schema-declared 与 source-observed，标记当前是否可编辑及 Runtime / Qualification 证据是否存在，并增加对应 Parser / UI / Validator 测试。
 
 不得只因新增一个字段示例，就宣称完整支持某个语法特性。
+
+
+## 7. Authoring Editability Gate
+
+源文件出现某个语法，不代表该语法已经可以结构化编辑。每个语法 / 字段的 Visual editability 必须有独立证据：
+
+1. Parser 能识别并提供准确 Source Map；
+2. Typed Patch 能准确表达该修改；
+3. Round-trip 测试证明注释、顺序、样式和未知字段不丢失；
+4. 修改后重新解析得到预期语义；
+5. 对应 Demo Schema / 专用 Validator 证据已记录（若适用）。
+
+因此：
+
+- observed-and-used 不自动等于 editable；
+- demo-schema-declared 不自动等于 editable 或 Runtime-proven；
+- demo-custom-validated 不自动等于通用 Schema；
+- establish-pdu-session 的 Transitional Phase 在专用 Profile 通过前保持 Source-only；
+- 未知字段和语法必须 Preserve-only，不得因全量序列化而消失。
+
+机器可读 Manifest 中的 authoringPolicy 当前是 Proposed，不代表这些编辑能力已经实现。

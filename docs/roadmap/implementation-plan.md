@@ -1,101 +1,130 @@
 # 实施路线图
 
-**状态：Proposed**
+**状态：Proposed · Authoring-first**
 
-本路线图按风险和依赖排序。先完成文档与语义基线，再做可运行的最小纵切，避免先堆页面、后发现源文件模型不成立。
+按源文件风险和功能依赖排序。先证明无损编辑，再搭建应用，最后扩展资产编辑。验证和发布不作为当前主路线。
 
-## Phase 0：产品与语义基线
+## Phase 0：产品与编辑模型
 
-交付：产品愿景和范围、信息架构和核心用户旅程、Procedure Designer 语义 / 屏幕 / 交互规范、ensure / establish 两份源代码级 Graph Projection Blueprint、Demo Capability Manifest、Demo Source baseline、Open Questions / ADR。
-
-退出条件：
-
-- 用户确认工作台布局和 Procedure 双视图策略；
-- Manifest 的证据等级可解释；
-- CreatedSession Transitional 语法边界明确；
-- 两个初始 Skill 样本和来源 Commit 确认；
-- Procedure Graph 对 Operator、Effect、Outcome、Terminal 和阶段路由的表达不混淆；
-- 两个真实样本的图形投影规则可逐条对照源文件；节点、路由、阶段、Binding 和 Child Procedure 均有具体蓝图可供实现验收。
-
-## Phase 1：解析与 Workspace 纵切
-
-交付：Package Explorer、Skill Package discovery、YAML / Markdown Source Editor、Round-trip AST POC、Source location、Digest / modified state、Diagnostics 基础模型。
+交付：Authoring-first 产品愿景、Package Editor 信息架构、Procedure 编辑 UX、Source-preserving Edit Model、ADR-0005、固定 Demo baseline 和 Capability Manifest。
 
 退出条件：
 
-- 打开两个 Fixture；
-- 修改并保存 YAML 后注释、顺序、on 字符串键和未知字段保留；
-- 再用 Demo Validator 重新验证；
-- 外部文件变化可检测并提示冲突。
+- 用户确认主要工作台用于开发和编辑；
+- Source 是唯一权威定义；
+- Source / Visual 的双向编辑模型清楚；
+- Typed Patch、Diff、Undo / Redo、Conflict 语义明确；
+- ensure-pdu-session 与 establish-pdu-session 的兼容边界明确。
 
-## Phase 2：Procedure Read-only Designer
+## Phase 1：Round-trip YAML + Typed Patch POC
 
-交付：Procedure Graph Projection、Node / Route Inspector、Control Flow / Data Flow Lens、路由分组与 route detail、Preconditions / Operation / Postconditions 展示、Child Procedure Drill-in、Binding Source Navigation、Source ↔ Graph selection sync、Expected Trace Preview、键盘与窄窗口导航。
+交付：独立于 UI 框架的最小源文件 POC。
 
-退出条件：
+覆盖：
 
-- ensure-pdu-session 的 11 个节点、精确路由和 Case trace overlay 可正确展示；
-- establish-pdu-session 的 17 个根节点、5 个 Child Procedure、阶段路由和 Binding provenance 可正确展示；
-- 每个命名 Procedure 单独投影，不把子 Procedure 扁平化；
-- 不把阶段步骤变成主业务节点；
-- Operation / Preconditions / Postconditions 路由始终保留来源；
-- 显式 `on` 与隐式成功进入 Postconditions 不混淆；
-- `reconcile:` Operator 与调用 reconcile Capability 的 Call 节点区分；
-- Binding 数据依赖默认不与控制流混画；
-- Route bundle 仅允许同 Node + 同 Phase / Route Source + 同 Target，且每个 Outcome 可单独检查；
-- route outcome entry 数量与 rendered connector 数量分开；
-- Expected Trace Preview 不冒充 Runtime Trace；
-- Node / Route / Binding 可键盘访问，并提供 Outline / Route list 线性替代；
-- 窄窗口使用可折叠 Navigator / Inspector，不强制三栏；
-- 不支持语法无损保留，解析失败时旧图标记 STALE。
-
-## Phase 3：资产编辑器
-
-交付：Contract Editor、Predicate Workbench、Case Studio、References / Schemas / Scripts Browser、Cross-reference Index、Local Diff / Undo / Redo。
+- 无修改 round-trip；
+- 注释、键顺序、空行、缩进、scalar style、block scalar、未知字段；
+- on 字符串键和 true / false 布尔语义；
+- SetScalar、AddRoute、RenameNode、InsertSequenceItem；
+- 局部 Diff；
+- Patch 前置条件；
+- Reparse / Semantic comparison；
+- 失败原子回滚；
+- 固定 Demo Loader / Validator 复核。
 
 退出条件：
 
-- 跨文件引用可定位；
-- Case obligations 与 executable fixtures 区分；
-- 资产修改能正确使受影响校验结果 Stale。
+- 两个真实样本无修改 round-trip；
+- ensure 的有限局部 Patch 不重写无关区域；
+- establish Transitional 结构完整保留；
+- 不支持 / 未知结构可 Source-only / Preserve-only；
+- 技术 POC 报告给出 YAML CST / Round-trip Parser 决策。
 
-## Phase 4：Validation Center
+## Phase 2：Package Workspace + Source Editor
 
-交付：Demo Schema Adapter、CreatedSession Transitional Validator Adapter、make verify Adapter、Diagnostics UI、Validation History、Digest-bound reports。
+交付：
+
+- Workspace Open / Recent；
+- Package Explorer；
+- 多文件 Editor Tabs；
+- Markdown / YAML Source Editor；
+- Source revision / Dirty / Save；
+- File Watch / Conflict；
+- Problems 基础面板；
+- Undo / Redo 基础历史。
 
 退出条件：
 
-- 所有状态有真实来源；
-- 未执行检查显示 NOT_RUN；
-- 语义义务不计入执行覆盖率；
-- 不把本地门禁 PASS 解释为 Runtime / Live PASS。
+- 打开本地 Package；
+- 编辑并保存 Source；
+- 外部修改不被静默覆盖；
+- 文件树与编辑 Tab 状态一致；
+- optional 目录不会被自动创建。
 
-## Phase 5：双向图形编辑
+## Phase 3：Procedure Designer 首个可编辑纵切（ensure）
 
-交付：Typed Graph Patch、Node create / rename / connect / delete、Binding Designer、Phase Editor、Undo / Redo、Diff Preview。
+交付：
+
+- Control Flow Canvas；
+- Node / Route / Phase Inspector；
+- Visual Node / Route editing；
+- Typed Patch Engine；
+- Source / Visual / Split 双向同步；
+- Diff Preview；
+- Undo / Redo；
+- Node / Route Outline 键盘导航。
 
 退出条件：
 
-- 每种操作都有 AST Patch 和 round-trip tests；
-- Source 与 Visual 双向修改结果一致；
-- 无损性测试覆盖未知字段和注释；
-- 不支持语法有明确限制。
+- ensure 的 11 个 Node、24 条显式 route entries 与 5 个 terminal nodes 正确投影；
+- 支持的 Node / Route 编辑生成精确 Patch；
+- Node rename / delete 显示引用影响；
+- Route Source / Outcome / Target 不丢失；
+- Source 注释 / 顺序 / 未知字段不被无关重写；
+- Undo / Redo 与 Source / Visual 一致；
+- 失败操作原子回滚。
 
-## Phase 6：增强能力
+## Phase 4：Procedure 编辑扩展
 
-候选内容：AI Co-author、Script Sandbox、Runtime Trace Viewer、更多 Skill Compatibility Profiles、GitHub integration、Artifact export / freeze。这些功能不自动进入首版承诺。
+交付：
 
-## 首个端到端纵切
+- Binding Editor / Data Flow Lens；
+- Ordered Phase / Step Editor；
+- Child Procedure Drill-in 与受支持内容编辑；
+- 多文件引用 Impact Preview；
+- establish 复杂样本的 Compatibility Profile。
 
-优先顺序：
+退出条件：
 
-1. 打开 ensure-pdu-session；
-2. 解析 Procedure；
-3. 展示主流程和状态路由；
-4. 选择节点并查看 Binding；
-5. Source 编辑一处无风险字段；
-6. 保存后重新解析；
-7. 调用 Demo 当前校验器；
-8. 打开 establish-pdu-session 验证 Transitional 阶段和路由。
+- establish 的 17 Root Nodes、65 Root route entries、5 Child Procedures 正确读取；
+- CreatedSession node-level Preconditions / Postconditions 在专用 Profile 未通过前 Source-only；
+- 不将 36 semantic obligations 误报为执行 Fixture；
+- 三种 Handle、Route Source、隐式阶段转换准确区分。
 
-首个纵切应证明数据模型和源文件处理正确，而不是先追求完整视觉效果。
+## Phase 5：其他 Skill Asset Editors
+
+交付：
+
+- SKILL.md Frontmatter / Markdown Editor；
+- Contract Editor；
+- Predicate Workbench；
+- Case Editor；
+- Reference / Schema / Script Browser；
+- Cross-asset Reference Index。
+
+退出条件：
+
+- 所有结构化表单由 Source Patch 驱动；
+- 不支持字段保留；
+- 引用跳转准确；
+- Source 与 Inspector 同步。
+
+## Phase 6：增强能力（后置）
+
+候选：AI Co-author、Script Sandbox、Runtime Trace Viewer、更多 Compatibility Profile、GitHub integration。
+
+独立 Validation / Qualification、Registry / Publishing、安装和晋升工作台不属于当前路线，只有后续明确提出需求时再规划。
+
+## 技术选型闸门
+
+仓库当前没有应用脚手架。Phase 1 Round-trip POC 完成前，不锁定 UI 框架、Graph Library、编辑器控件或 Desktop Shell。先证明源文件编辑不会丢语义，再决定应用技术。

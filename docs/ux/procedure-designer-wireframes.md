@@ -1,8 +1,8 @@
 # Procedure Designer · Screen-level Wireframes & Design Review
 
-**状态：Proposed · Read-only Designer vertical slice · 待用户评审**
+**状态：Proposed · Authoring-first Procedure Designer · 待用户评审**
 
-本文件把 Procedure Designer 的语义规范、交互规范和两个源代码级 Graph Blueprint 落到具体工作台线框，并对上一版线框进行设计复盘。它是屏幕级 UX 基线，不是应用实现，也不改变 Skill source。
+本文件把 Procedure Designer 的语义规范、交互规范和两个源代码级 Graph Blueprint 落到具体编辑工作台线框，并对上一版只读方案进行设计复盘。Visual 与 Source 都是正式编辑入口；Visual 的可编辑范围由 Compatibility Profile 和 Round-trip / Patch 测试逐项决定。
 
 ## 1. 设计范围与依据
 
@@ -13,12 +13,12 @@
 - 选择节点后，能检查其内部阶段、Operator、Binding、Predicate 和 Source。
 - Child Procedure 是独立 Procedure 图，可以进入和返回。
 - 静态定义、Source validator 结果、Case Expected Trace 和真实 Runtime Trace 不混为一谈。
-- 第一阶段 Visual 只读；Source 文本可编辑。两者共享同一 Source revision。
+- Source 与 Visual 都可编辑，但共享同一 Working Buffer；Visual 修改必须通过 Typed Source Patch，未取得资格的语法保持 Source-only / Preserve-only。
 
 ### 1.2 固定样本来源
 
-- Repository: \`odango-chan/ca-agent-demo\`
-- Commit: \`bf445ad777149af5af2dfa0a5bdea18d0451303e\`
+- Repository: `odango-chan/ca-agent-demo`
+- Commit: `bf445ad777149af5af2dfa0a5bdea18d0451303e`
 - [ensure-pdu-session Graph Blueprint](ensure-pdu-session-graph-blueprint.md)
 - [establish-pdu-session Graph Blueprint](establish-pdu-session-graph-blueprint.md)
 - [Procedure Designer semantic spec](procedure-designer.md)
@@ -40,21 +40,21 @@
 
 说明：
 
-- Route outcome entry 是源文件 \`on\` 映射中的一条 Outcome → Target，不等同于最终绘制出来的物理线条数量。
+- Route outcome entry 是源文件 `on` 映射中的一条 Outcome → Target，不等同于最终绘制出来的物理线条数量。
 - 数量不包括隐式的“主 Operator 成功 → Postconditions”阶段转换。
-- ensure 有 5 个 Terminal Node，但只有 4 种 terminal value，因为 \`strategy-conflict\` 和 \`failed\` 都是 \`FAILED\`。
+- ensure 有 5 个 Terminal Node，但只有 4 种 terminal value，因为 `strategy-conflict` 和 `failed` 都是 `FAILED`。
 - establish 的 5 个 Child Procedure 是独立 Procedure definitions，不计入 17 个 Root Nodes，也不能自动扁平化进 Root Graph。
 - establish 的 65 条是 Root Procedure 显式 route outcome entries；5 个 Child Procedure 自己还有独立路由。
 
 ### 2.2 上一版 ASCII 图不是完整路由表
 
-上一版 ensure 示意图省略了部分 \`FAILED / DENIED\` 分支，并把多个终态挤在一行。新设计以 Blueprint 的逐条路由表为准：
+上一版 ensure 示意图省略了部分 `FAILED / DENIED` 分支，并把多个终态挤在一行。新设计以 Blueprint 的逐条路由表为准：
 
-- create 的 \`NOT_COMMITTED / FAILED / DENIED\` → \`failed\`；
-- create 的 \`OUTCOME_UNKNOWN\` → \`reconcile-create\`；
-- Reconcile 的 \`FAILED / DENIED\` → \`safe-stopped\`；
-- retry 的 \`OUTCOME_UNKNOWN\` → \`unresolved\`，源文件没有第二次 Reconcile；
-- \`strategy-conflict\` 和 \`failed\` 是两个不同 Node，虽然 terminal value 相同。
+- create 的 `NOT_COMMITTED / FAILED / DENIED` → `failed`；
+- create 的 `OUTCOME_UNKNOWN` → `reconcile-create`；
+- Reconcile 的 `FAILED / DENIED` → `safe-stopped`；
+- retry 的 `OUTCOME_UNKNOWN` → `unresolved`，源文件没有第二次 Reconcile；
+- `strategy-conflict` 和 `failed` 是两个不同 Node，虽然 terminal value 相同。
 
 establish 也不能只画 happy path：三个 root Reconcile 节点、两个常规 finalization 分支、四个 terminal 都必须在 Root Graph 可定位。
 
@@ -68,7 +68,7 @@ establish 的 36 项是 semantic qualification obligations，不存在可安全�
 
 ### 2.4 Predicate Inspector 不允许展示泛化 Scope
 
-不能使用诸如 \`Current Session / Current Lifecycle\` 的概括文字代替真实 Scope。
+不能使用诸如 `Current Session / Current Lifecycle` 的概括文字代替真实 Scope。
 
 Predicate Inspector 应显示源文件里的完整 Scope expression（可折叠 / 格式化），并保留 Observation ref、Freshness、Evaluator 和 Source location。某字段未声明就显示“未声明”，不能推断。
 
@@ -176,7 +176,7 @@ Inspector 根据选中对象切换内容：
 Control Flow 只表达：
 
 - Node；
-- 显式 \`on\` Outcome → Target；
+- 显式 `on` Outcome → Target；
 - Child Procedure 节点及其返回结果；
 - Terminal；
 - 有阶段节点的内部隐式转换标识。
@@ -189,8 +189,8 @@ Route details 不是另一套 Graph Layout。选中 Node / Edge 后，在 Inspec
 
 | Route Source | Outcome | Target | Source |
 |---|---|---|---|
-| Operator | OUTCOME_UNKNOWN | reconcile-create | \`nodes.create-session.on\` |
-| Postconditions | UNKNOWN | finalize-unresolved | \`nodes.<id>.postconditions.on\` |
+| Operator | OUTCOME_UNKNOWN | reconcile-create | `nodes.create-session.on` |
+| Postconditions | UNKNOWN | finalize-unresolved | `nodes.<id>.postconditions.on` |
 
 具体行以源文件为准。上表仅说明 UI 字段，不是所有 Skill 的固定路由。
 
@@ -268,17 +268,17 @@ Data Flow 只表达 Binding：
 - DSL Reconcile：显示原始目标 Node。
 - Terminal：显示确切 terminal value。
 
-\`call: ...reconcile\` 必须按 Call 展示；不能因为 Capability 名字含 reconcile 就显示成 DSL Reconcile。
+`call: ...reconcile` 必须按 Call 展示；不能因为 Capability 名字含 reconcile 就显示成 DSL Reconcile。
 
 ### 5.3 Phase chips
 
 有 Preconditions / Postconditions 的 Node 显示阶段数量，例如：
 
-- \`PRE 5 · CALL · POST 1\`
-- \`PRE 2 · CALL · POST 1\`
-- \`PRE 3 · CALL · POST 1\`
+- `PRE 5 · CALL · POST 1`
+- `PRE 2 · CALL · POST 1`
+- `PRE 3 · CALL · POST 1`
 
-Child Procedure 节点显示 \`CHILD\`。像 \`finalize-success\` 这种同时具有 Preconditions Child step 和主 Child Procedure 的节点，应明确显示 \`PRE · CHILD\`，详细结构进入 Inspector。
+Child Procedure 节点显示 `CHILD`。像 `finalize-success` 这种同时具有 Preconditions Child step 和主 Child Procedure 的节点，应明确显示 `PRE · CHILD`，详细结构进入 Inspector。
 
 ## 6. ensure-session：屏幕线框
 
@@ -343,7 +343,7 @@ Child Procedure 节点显示 \`CHILD\`。像 \`finalize-success\` 这种同时�
 
 不得因为空间不足而删除边或丢失 outcome。
 
-### 6.3 选中 \`reconcile-create\`
+### 6.3 选中 `reconcile-create`
 
 Inspector 的 Overview：
 
@@ -390,7 +390,7 @@ Case 选择器列出 5 个 Case。选择后以虚线 / 预期路径高亮，并�
 | 04 create-unknown-reconciled | target FAIL → absence PASS → create OUTCOME_UNKNOWN → Reconcile COMMITTED → target Verify PASS |
 | 05 absence-unknown-safe-stop | target FAIL → absence UNKNOWN → unresolved；不调用 Create |
 
-Case 04 还应显示 \`forbiddenImmediateRetryAfterUnknown: true\`。Case 05 即使声明 Create capability available，也不能把它显示成已调用。
+Case 04 还应显示 `forbiddenImmediateRetryAfterUnknown: true`。Case 05 即使声明 Create capability available，也不能把它显示成已调用。
 
 ## 7. establish-pdu-session：屏幕线框
 
@@ -401,7 +401,7 @@ Case 04 还应显示 \`forbiddenImmediateRetryAfterUnknown: true\`。Case 05 即
 Root Graph 的 17 个 Node 全部可定位。默认布局使用四个 swimlanes：
 
 1. **Main business lane**：8 个业务主线 Node；
-2. **Normal finalization lane**：\`finalize-failed\`、\`finalize-unresolved\`；
+2. **Normal finalization lane**：`finalize-failed`、`finalize-unresolved`；
 3. **Reconcile lane**：三个针对原始 mutation 的精确 DSL Reconcile Node；
 4. **Terminal shelf**：done / failed / unresolved / safe-stopped。
 
@@ -451,19 +451,19 @@ Root Graph 的 17 个 Node 全部可定位。默认布局使用四个 swimlanes�
 └────────────────────────────────────────────────────────────────────────────┘
 ~~~
 
-**注意：**上图的成功 lane 仅用于表达 3GPP 主业务顺序和 Node 结构，不是完整 Route map。65 条显式 route outcome entries 全部保留在图形模型和 Route details 中。图中标注的 implicit success 是阶段内转换，不是源文件 \`on\` route。
+**注意：**上图的成功 lane 仅用于表达 3GPP 主业务顺序和 Node 结构，不是完整 Route map。65 条显式 route outcome entries 全部保留在图形模型和 Route details 中。图中标注的 implicit success 是阶段内转换，不是源文件 `on` route。
 
 ### 7.2 Route detail 展开
 
-选中 \`namf-communication-n1n2-message-transfer\` 时，Inspector 按三个来源分组，不合并：
+选中 `namf-communication-n1n2-message-transfer` 时，Inspector 按三个来源分组，不合并：
 
-- Preconditions：\`FAILED → finalize-failed\`、\`UNRESOLVED → finalize-unresolved\`；
-- Node Operator：\`NOT_COMMITTED → finalize-failed\`、\`OUTCOME_UNKNOWN → reconcile-n1n2-message-transfer\`、\`FAILED / DENIED → finalize-failed\`；
-- Postconditions：\`PASS → pdu-session-resource-setup\`、\`FAIL → finalize-failed\`、\`UNKNOWN → finalize-unresolved\`。
+- Preconditions：`FAILED → finalize-failed`、`UNRESOLVED → finalize-unresolved`；
+- Node Operator：`NOT_COMMITTED → finalize-failed`、`OUTCOME_UNKNOWN → reconcile-n1n2-message-transfer`、`FAILED / DENIED → finalize-failed`；
+- Postconditions：`PASS → pdu-session-resource-setup`、`FAIL → finalize-failed`、`UNKNOWN → finalize-unresolved`。
 
-主 Operator 成功进入 Postconditions 是隐式阶段转换；不生成虚构的 \`COMMITTED → pdu-session-resource-setup\` 边。
+主 Operator 成功进入 Postconditions 是隐式阶段转换；不生成虚构的 `COMMITTED → pdu-session-resource-setup` 边。
 
-### 7.3 选中 \`nudm-sdm-subscribe\`
+### 7.3 选中 `nudm-sdm-subscribe`
 
 Inspector 的 Phases Tab：
 
@@ -509,17 +509,17 @@ POSTCONDITIONS · 1 ordered step
 
 ### 7.4 PCF Create 的源级阻塞说明
 
-选中 \`npcf-sm-policy-control-create\`：
+选中 `npcf-sm-policy-control-create`：
 
-- Preconditions 显示 \`createdsession.pcf.create_governed\` 和 \`createdsession.lifecycle.ready\`。
+- Preconditions 显示 `createdsession.pcf.create_governed` 和 `createdsession.lifecycle.ready`。
 - Predicate Inspector 显示精确 Observation / Scope / Freshness / CEL 条件。
 - 源文件注释指出当前没有 admitted owner 提供 clean lifecycle isolation 与 competing-create governance evidence。
 - UI 把它呈现为 **Source-defined blocking condition / runtime evaluation NOT_RUN**，而不是当前网络的动态 UNKNOWN 读数。
-- \`pcfCreateInputsRef\` 的 readiness 与 create authorization 是两个不同事实，不可合并成一个 Gate。
+- `pcfCreateInputsRef` 的 readiness 与 create authorization 是两个不同事实，不可合并成一个 Gate。
 
 ### 7.5 Child Procedure Drill-in
 
-从 Root Node \`pdu-session-resource-setup\` 进入：
+从 Root Node `pdu-session-resource-setup` 进入：
 
 ~~~text
 Root / pdu-session-resource-setup
@@ -547,13 +547,13 @@ Root / pdu-session-resource-setup
 
 五个 Child Procedure 分别打开独立图：
 
-1. \`await-initial-n4-session-establishment\`
-2. \`await-pdu-session-resource-setup\`
-3. \`await-n4-forwarding-convergence\`
-4. \`await-ue-session-configuration\`
-5. \`finalize-resource-responsibility\`
+1. `await-initial-n4-session-establishment`
+2. `await-pdu-session-resource-setup`
+3. `await-n4-forwarding-convergence`
+4. `await-ue-session-configuration`
+5. `finalize-resource-responsibility`
 
-最后一个 Child Procedure 的终态集合是 \`SUCCEEDED / UNRESOLVED / SAFE_STOPPED\`，没有 \`FAILED\` terminal。不能用统一模板凭空添加。
+最后一个 Child Procedure 的终态集合是 `SUCCEEDED / UNRESOLVED / SAFE_STOPPED`，没有 `FAILED` terminal。不能用统一模板凭空添加。
 
 返回 Root 时恢复 pan、zoom、selection、Inspector tab、折叠状态和当前 route filter。
 
@@ -561,13 +561,13 @@ Root / pdu-session-resource-setup
 
 Root 的三个 DSL Reconcile 节点分别指向：
 
-- \`nudm-sdm-subscribe\`
-- \`npcf-sm-policy-control-create\`
-- \`namf-communication-n1n2-message-transfer\`
+- `nudm-sdm-subscribe`
+- `npcf-sm-policy-control-create`
+- `namf-communication-n1n2-message-transfer`
 
-每个节点的 \`COMMITTED / NOT_COMMITTED / UNRESOLVED\` 都路由到 \`safe-stopped\`。当前 source 没有从这些 Root Reconcile 节点直接恢复主业务流程或 retry 的边。
+每个节点的 `COMMITTED / NOT_COMMITTED / UNRESOLVED` 都路由到 `safe-stopped`。当前 source 没有从这些 Root Reconcile 节点直接恢复主业务流程或 retry 的边。
 
-\`finalize-resource-responsibility\` Child Procedure 内部还有自己的 \`reconcile: transfer\`。它属于 Child Graph，不能与三个 Root Reconcile 节点合并。
+`finalize-resource-responsibility` Child Procedure 内部还有自己的 `reconcile: transfer`。它属于 Child Graph，不能与三个 Root Reconcile 节点合并。
 
 ### 7.7 Finalization route details
 
@@ -588,10 +588,10 @@ Root Graph 的两个常规 finalization 节点和一个成功 finalization 节�
 
 Qualification 面板显示：
 
-- \`36 semantic qualification obligations\`
-- \`Executable fixtures: not established\`
-- \`Execution: NOT_RUN\`
-- \`Node mapping: unavailable / not declared\`
+- `36 semantic qualification obligations`
+- `Executable fixtures: not established`
+- `Execution: NOT_RUN`
+- `Node mapping: unavailable / not declared`
 
 不生成 Case-to-Node 边、不生成覆盖率百分比，也不将历史退役 trace 重新投影为当前图。
 
@@ -632,9 +632,9 @@ Inspector 必须能区分：
 
 | Handle | Source | Meaning |
 |---|---|---|
-| \`pcfCreateInputsRef\` | \`ca.session.pcf_create_inputs.read\` | PCF Create input-readiness evidence |
-| \`currentSessionInstanceRef\` | 同一 inputs read 的另一个输出字段 | 精确 SMF / UPF session-instance correlation |
-| \`contextRef\` | \`ca.session.operation_context.read\` | Effective Session Configuration operation context |
+| `pcfCreateInputsRef` | `ca.session.pcf_create_inputs.read` | PCF Create input-readiness evidence |
+| `currentSessionInstanceRef` | 同一 inputs read 的另一个输出字段 | 精确 SMF / UPF session-instance correlation |
+| `contextRef` | `ca.session.operation_context.read` | Effective Session Configuration operation context |
 
 三者即使在代码里都是 string / opaque reference，也不能被 UI 归一化成可互换的“Context Handle”。
 
@@ -642,10 +642,10 @@ Inspector 必须能区分：
 
 对以下 CreatedSession path：
 
-- \`preconditions.<step>.output.*\`
-- \`<node>.preconditions.<step>.output.*\`
+- `preconditions.<step>.output.*`
+- `<node>.preconditions.<step>.output.*`
 
-显示 \`Demo Transitional\` evidence label，并提示当前由 ca-agent-demo 的专用 validator 检查；不标记为通用 Schema 或 Runtime-compatible。
+显示 `Demo Transitional` evidence label，并提示当前由 ca-agent-demo 的专用 validator 检查；不标记为通用 Schema 或 Runtime-compatible。
 
 ## 9. Predicate Inspector
 
@@ -663,41 +663,63 @@ Predicate Inspector 显示：
 - Source file / line；
 - Static source note（如果存在）。
 
-没有 Runtime observation / evaluation 时，状态显示 \`NOT_EVALUATED\`，不能显示 PASS / FAIL / UNKNOWN。
+没有 Runtime observation / evaluation 时，状态显示 `NOT_EVALUATED`，不能显示 PASS / FAIL / UNKNOWN。
 
-### 9.2 真实样本：\`createdsession.pcf.create_governed\`
+### 9.2 真实样本：`createdsession.pcf.create_governed`
 
 Source-defined detail：
 
-- Observation ref：\`createdsession.pcf_create_governance\`
-- Scope：\`{"ueRef": subject.ueRef, "lifecycleRef": facts.createdsession_lifecycle, "ingressRef": facts.createdsession_ingress}\`
-- Freshness：\`5s\`
+- Observation ref：`createdsession.pcf_create_governance`
+- Scope：`{"ueRef": subject.ueRef, "lifecycleRef": facts.createdsession_lifecycle, "ingressRef": facts.createdsession_ingress}`
+- Freshness：`5s`
 - Evaluator：CEL
 - 条件：Lifecycle isolation state 为 CLEAN 且有 evidence ref；competing create state 为 NOT_FORWARDED 且有 governance ref。
 
 UI 应同时显示源注释中的治理证据缺口。这是 Source-level design note，不是本地 UI 对真实网络做出的动态判断。
 
-## 10. Source / Visual / Split 与只读边界
+## 10. Source / Visual / Split 与双向编辑边界
 
 Source / Visual / Split 是工作区模式：
 
-- **Visual**：只读 Graph Projection / Inspector；
+- **Visual**：受支持语法的结构化编辑；
 - **Source**：原始 YAML 文本编辑；
-- **Split**：同一 Source 的同步视图，不是两个独立文档。
+- **Split**：同一 Working Buffer 的双向同步编辑，不是两个独立文档。
 
 Control Flow / Data Flow 是 Visual 内部的 Canvas lens，不改变 Source / Visual / Split 的状态。
 
-第一阶段：
+### 10.1 Source → Visual
 
-- Visual 节点、边、Binding、Phase 全部只读；
-- Source 可编辑并显示 Diff / Save；
-- Split 共享同一文件和 Source revision；
-- Source 解析失败时旧图标记 STALE；
-- Source 改动后旧 Validation 标记 STALE；
-- Validate 只执行显式配置的静态检查；
-- 不提供 Run / Execute / Live 5GC。
+- Source 修改后增量解析；
+- 成功时刷新 Semantic Model、Graph、Inspector 和引用索引；
+- 解析失败时保留 Source 原文，旧图标记 STALE；
+- 不自动修复或覆盖用户输入；
+- 诊断绑定当前 Working Revision。
 
-未来 Visual Authoring 必须经 Typed Source Patch、Diff Preview、Round-trip、重新解析和重新验证；本轮不承诺图形回写。
+### 10.2 Visual → Source
+
+- 所有结构化编辑生成 Typed Source Patch；
+- Patch 绑定 Source revision、目标语义路径、预期旧值 / 结构指纹和 Compatibility Profile；
+- 在临时 Round-trip Tree 中应用，只序列化目标区域；
+- 重新解析并核对语义结果；
+- 检查未修改区域没有发生意外重写；
+- 显示真实 Source Diff；
+- Apply 后更新 Working Buffer；Save 才写入本地文件。
+
+### 10.3 首版编辑资格
+
+- ensure-pdu-session：作为首个有限可编辑样本，逐项开放通过 Round-trip 测试的 Node / Route / Binding 操作；
+- establish-pdu-session：先作为复杂读取与无损 round-trip 样本；
+- CreatedSession node-level Preconditions / Postconditions 在专用 Profile 的 Parser、Patch 和 Round-trip 测试通过前保持 Source-only；
+- Unknown / Preserve-only 语法不开放结构化修改；
+- Save 不自动 Git commit / push、创建 PR 或发布。
+
+### 10.4 Undo / Redo / Conflict
+
+- Source 与 Visual 共用事务历史；
+- 一次 Visual 命令是一个 Undo transaction；
+- Patch 失败时回滚，不留下半应用状态；
+- 外部文件变化时进入 CONFLICT，保留本地 Buffer，提供 Compare / Reload / Resolve；
+- 未解决冲突不得覆盖磁盘版本。
 
 ## 11. 响应式、可访问性与键盘
 
@@ -755,7 +777,7 @@ Control Flow / Data Flow 是 Visual 内部的 Canvas lens，不改变 Source / V
 ### ensure-session
 
 - [ ] 11 个 Node、24 个显式 route outcome entries 全部可访问。
-- [ ] 5 个 Terminal Node 保留；\`strategy-conflict\` 与 \`failed\` 不合并。
+- [ ] 5 个 Terminal Node 保留；`strategy-conflict` 与 `failed` 不合并。
 - [ ] Create / Reconcile / Retry 的所有 outcome 和 target 正确。
 - [ ] Route details 保留原始来源和 Outcome。
 - [ ] 5 个 Case 以 Expected Trace Preview 展示，不冒充执行记录。
@@ -800,15 +822,111 @@ Control Flow / Data Flow 是 Visual 内部的 Canvas lens，不改变 Source / V
 - Inspector 是统一详情入口，避免为了每个语义对象建立独立页面。
 - Source / Visual / Split 负责编辑工作区，不与 Canvas Lens 混合。
 
-这比三个平级 Graph / Routes / Bindings Tab 更容易理解，也更适合后续从只读投影演进到 Typed Graph Patch。
+这比三个平级 Graph / Routes / Bindings Tab 更容易理解，也能直接承载 Typed Source Patch 驱动的结构化编辑。
 
 实现顺序建议：
 
-1. 先完成 ensure-session 的 Control Flow + Node Inspector + Route details；
-2. 加入 Binding Inspector 和 Data Flow Lens；
-3. 加入 establish 的 Phase Inspector；
-4. 加入 Child Procedure Drill-in；
-5. 加入 Expected Trace Preview / Qualification obligations；
-6. 最后验证窄窗口、键盘和复杂边布局。
+1. 先完成 Round-trip YAML / Typed Patch POC；
+2. 建立 Package Explorer、Source Buffer、Diff 和 Undo / Redo；
+3. 在 ensure 上实现 Node / Route 的首批 Visual 编辑操作；
+4. 加入 Binding / Data Flow 编辑与引用影响预览；
+5. 加入 Phase / Step 和 Child Procedure 编辑；
+6. 用 establish 验证复杂结构读取与 Transitional Source-only 降级；
+7. 最后扩展 Contract / Predicate / Case 等资产编辑器。
 
-不要先实现 65 条边的“漂亮大图”，先证明语义不会被 UI 丢失。
+不要先实现 65 条边的“漂亮大图”，先证明一次真实编辑能安全、可逆地写回源文件。
+
+
+## 16. Authoring-first 编辑线框
+
+### 16.1 编辑器顶栏
+
+~~~text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ procedure.yaml · Root Procedure    [Visual] [Source] [Split]                │
+│ + Node   + Route   Fit   Zoom   Undo   Redo   Diff   Save     DIRTY          │
+└─────────────────────────────────────────────────────────────────────────────┘
+~~~
+
+- + Node 只列出当前 Profile 已具备结构化编辑资格的 Operator；
+- + Route 必须选择来源阶段和 Outcome，不能只凭拖线推断；
+- Undo / Redo 与 Source Editor 共用历史；
+- Diff 显示真实 YAML 文本变化；
+- Save 写本地 Working Copy。
+
+### 16.2 选中 Node 的可编辑 Inspector
+
+~~~text
+NODE · create-session                         [Source] [Reset]
+
+Identity
+  Node ID             [ create-session          ]
+
+Operator
+  Kind                [ call                    ]
+  Capability          [ pdu_session.create      ]
+
+Inputs
+  supi                [ input.supi              ]
+  pduSessionId        [ input.pdu-session-id    ]
+
+Outputs
+  c6BackendOperationRef
+  protocolTransactionRefs
+
+Routes · Operator
+  COMMITTED           → [ verify-created-target ]
+  NOT_COMMITTED       → [ failed                ]
+  OUTCOME_UNKNOWN     → [ reconcile-create      ]
+  FAILED              → [ failed                ]
+  DENIED              → [ failed                ]
+
+[Add Input] [Add Route] [Preview Source Diff]
+~~~
+
+这是字段结构示意，不代表每个 Node 都拥有相同字段。Inspector 必须从真实 Source / Profile 生成，不得把样例字段套用到其他 Operator。
+
+### 16.3 新建 Route 的显式语义步骤
+
+~~~text
+Connect from: create-session
+Route Source:  Operator
+Outcome:       OUTCOME_UNKNOWN
+Target:        reconcile-create
+
+Source Patch:
+  nodes.create-session.on.OUTCOME_UNKNOWN = reconcile-create
+
+[Cancel] [Apply Patch]
+~~~
+
+如果 Node 有多个 Route Source，必须先选择阶段锚点。不同阶段即使 Outcome 文本相同，也属于不同 Route entry。
+
+### 16.4 Phase / Step 编辑
+
+Inspector 展示有序列表，支持拖动重排、插入、删除和编辑。拖动 Step 改变源 Sequence 顺序；拖动 Node 只改变画布布局，两者不能混淆。
+
+CreatedSession Transitional Phase 在专用 Profile 资格通过前显示 Source-only，并提供 Open in Source。
+
+### 16.5 Binding 编辑
+
+Binding Inspector 同时显示 Consumer、原始表达式、Producer、Field、Declared Type 和 Evidence Level。
+
+Producer Picker 只提供能确定来源和类型的候选；不确定时允许 Source 手动编辑，但不显示猜测式自动补全。
+
+### 16.6 删除与重命名的影响预览
+
+删除 Node / 重命名 Node 前显示：
+
+- Incoming / Outgoing Routes；
+- Binding Producer / Consumer；
+- start / Entry references；
+- Child Procedure / cross-file references；
+- 是否需要多文件原子事务。
+
+不能安全处理的引用会阻止结构化删除 / 重命名，而不是留下静默断链。
+
+### 16.7 Source / Split
+
+Source 与 Visual 两侧都能编辑同一 Working Buffer。Source 编辑后 Graph 更新；Visual Patch 应用后 Source Diff 更新。解析失败时保留原文并标记 Graph STALE，不用旧图覆盖新文本。
+

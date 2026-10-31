@@ -250,3 +250,31 @@ initialFixtures:
     sourcePath: skills/establish-pdu-session
     importStatus: not-imported
     purpose: complex-procedure-and-transitional-syntax-ux
+
+
+authoringPolicy:
+  status: proposed-not-implemented
+  sourceAuthority: package-files
+  semanticModelAuthority: derived-only
+  visualWriteback: typed-source-patch-only
+  saveTarget: local-working-copy
+  roundTripRequiredBeforeStructuredEdit: true
+  failureBehavior: atomic-rollback
+  unknownSyntax: preserve-only-or-source-only
+  sharedHistory:
+    sourceAndVisual: true
+    undoRedo: required
+  initialProfiles:
+    ensure-pdu-session:
+      role: first-limited-visual-editing-sample
+      status: proposed
+      allowedOnlyAfterRoundTripTests:
+        - call
+        - verify
+        - terminal
+        - with-from
+        - on
+    establish-pdu-session:
+      role: complex-compatibility-sample
+      status: read-and-roundtrip-first
+      transitionalNodePhases: source-only-until-dedicated-profile-tests-pass

@@ -1,101 +1,79 @@
 # 开放问题与待决策项
 
-**状态：Open**
+**状态：Open · 以 Skill Authoring 为中心**
 
-以下事项尚未由用户最终确认。当前文档中的推荐方案不能被实现为不可配置的产品事实。
+本页只保留会影响第一版编辑器实现的决策。验证 / 发布工作台不进入当前设计主线。
 
-## 1. 工作台布局
-
-| 问题 | 当前建议 | 状态 |
-|---|---|---|
-| 整体布局 | IDE 式布局；首页 / 管理区与编辑工作台可混合 | Open |
-| 左侧导航 | Package Explorer；Procedure 页面内显示 Procedure / Node Outline | Proposed |
-| 右侧 Inspector | 可折叠属性面板 | Proposed |
-| 底部 Diagnostics | 可收起问题面板 | Proposed |
-| 桌面基准 | 1440×900 | Open |
-| 移动端 | 只保证浏览，不保证完整图形编辑 | Proposed |
-
-## 2. Procedure Designer
+## 1. Source-preserving 技术 POC
 
 | 问题 | 当前建议 | 状态 |
 |---|---|---|
-| 首次打开视图 | Visual Business Flow | Proposed |
-| Visual / Source | Visual、Source、Split 三种模式，同一 Source | Proposed |
-| 首版图形编辑 | Visual read-only；Source 可编辑 | Proposed |
-| 主流程布局 | 纵向主路径，侧向分支，终态区域独立 | Proposed |
-| Route label | 显示 Route Source + 原始 Outcome | Proposed |
-| Phase 展示 | 默认折叠在 Node Inspector，按需展开 | Proposed |
-| Binding 数据边 | 默认不绘制，选择 Binding 时局部高亮 | Proposed |
-| Child Procedure | 独立子图 + Breadcrumb Drill-in | Proposed |
-| Qualification Overlay | 默认关闭；仅展示可追溯映射 | Proposed |
+| YAML Round-trip Parser | 先做候选库 POC，不提前锁定 | Open |
+| CST / AST 层 | 必须保留 comments、order、style、unknown fields 和 source spans | Proposed |
+| YAML 语义 | 对齐 Demo Loader：on 是字符串键，true / false 是布尔值 | Confirmed constraint |
+| 局部序列化 | 只改目标语法区域，不全文件 dump | Proposed |
+| Patch protocol | Typed Patch + source revision + preconditions + inverse | Proposed |
+| Round-trip 失败 | 回滚；该语法降级 Source-only / Preserve-only | Proposed |
 
-高保真设计前需要用户确认：首屏是否默认 Visual、主流程纵向布局是否合适、Inspector 是否默认展开，以及 1440×900 是否作为首个设计基准。
-
-## 3. 新建 Skill
+## 2. 工作区交互
 
 | 问题 | 当前建议 | 状态 |
 |---|---|---|
-| 创建方式 | Guided 与 Advanced 两种入口 | Proposed |
-| 模板 | Blank / Clone Existing / Template | Proposed |
-| 模板范围 | 先基于当前 Demo 的 Package 形态 | Proposed |
+| 主工作区 | Package Explorer + Editor Tabs + Semantic Inspector | Proposed |
+| 默认编辑模式 | 新开 Procedure 时默认 Visual；随时切 Source / Split | Proposed |
+| Split | 两侧都可编辑，同一 Working Buffer | Proposed |
+| Problems | 底部收起，仅显示编辑辅助诊断 | Proposed |
+| 多文件 | 支持 Tab；跨文件修改先展示 Impact Preview | Proposed |
+| Save | 保存本地工作副本；不自动 Git commit / push | Proposed |
+| Layout persistence | 首版先作为 UI state，不写入 Skill YAML | Proposed |
 
-## 4. 技术栈
+## 3. Procedure 编辑能力
 
-尚未决定 React / Vue / Svelte、Monaco / CodeMirror、Procedure graph library、YAML Round-trip AST / CST 实现、Web / Desktop shell、本地文件 Workspace Adapter 和本地 Git 操作方式。
-
-技术选型应由 Round-trip YAML、复杂图形可用性、桌面文件安全和 Windows / WSL 体验验证驱动。
-
-## 5. Workspace 与 Git
-
-- 首版只打开本地目录，还是同时支持 GitHub Repository？
-- 是否允许 Studio 直接 commit / push？
-- 是否需要只读远程浏览？
-- 多 Workspace 是否属于首版？
-- 导入后是只读 Fixture，还是可编辑副本？
-
-## 6. 视觉与语言
-
-- Light / Dark 默认值；
-- 中文 UI + 英文标识符是否作为默认语言；
-- 是否提供用户自定义快捷键；
-- 是否需要紧凑 / 舒适两种密度。
-
-## 7. Qualification
-
-- 首版是否直接调用本地 make verify？
-- Case Studio 是否只管理定义，还是同时提供本地 Runner？
-- Script Sandbox 是否首版实现？
-- Runtime Trace 是否只做导入展示？
-- 真实 5GC Live Acceptance 是否永远留在独立工具链？
-
-## 8. AI Co-author
-
-- 首版是否需要 AI 建议；
-- AI 是否只支持文本 Patch，还是也支持结构化 Procedure Patch；
-- 是否需要 Prompt / Context Preview；
-- 如何展示 AI 修改的来源和依据。
-
-## 9. 决策顺序
-
-建议优先确定 Procedure Designer 的首屏模式、主流程布局、Inspector 默认行为和目标桌面尺寸；随后完成 Round-trip YAML 与 Procedure Graph 技术 POC，再决定应用技术栈。
-
-
-## 10. Procedure Designer 屏幕级决策复盘
-
-样本级线框见 [Procedure Designer Screen-level Wireframes](../ux/procedure-designer-wireframes.md)。当前推荐基线：
-
-| 决策 | 推荐 | 状态 |
+| 问题 | 当前建议 | 状态 |
 |---|---|---|
-| Canvas 关系视图 | Control Flow 默认；Data Flow 为独立 Lens | Proposed |
-| Routes | Route details 面板 + Route label density，不独立成图 | Proposed |
-| Route bundle | 同 Node + 同 Phase / Route Source + 同 Target 才允许 bundle | Proposed |
-| route 数量 | 区分源 route outcome entries 与绘制 connector 数 | Proposed |
-| ensure 标签 | Auto 默认，Fit 后尽可能显示全部 | Proposed |
-| establish 标签 | Auto 默认；选中 Node 后展开该 Node 的所有 route labels | Proposed |
-| Predicate Scope | 展示原始 Scope expression，不使用推断的泛化标签 | Proposed |
-| 响应式 | 宽桌面三栏；窄窗口 Drawer；移动端线性列表 | Proposed |
-| 可访问性 | Node / Route / Binding 具备键盘与线性导航 | Proposed |
-| 1440×900 | 首个高保真设计基准，不是最低支持尺寸 | Proposed |
-| 具体断点 / 布局引擎 | 通过高保真原型和 POC 验证 | Open |
+| Node 编辑 | 受支持 Operator 可创建 / 编辑 / 重命名 / 删除 | Proposed |
+| Route 编辑 | 明确 Route Source、Outcome、Target | Proposed |
+| Node drag | 只改变画布位置，不重排 YAML 节点顺序 | Proposed |
+| Phase / Step | 有序编辑；Transitional syntax 单独资格 | Proposed |
+| Binding | 类型和生产来源明确时提供 Picker；不确定时 Source-only | Proposed |
+| Child Procedure | 独立图；编辑资格按 Operator / Profile 决定 | Proposed |
+| 删除 / 重命名 | 显示入边、出边、Binding 和跨资产引用影响 | Proposed |
+| Draft | 允许语法正确但语义未完成的草稿，Problems 显示未完成项 | Proposed |
 
-下一次评审优先确认 Canvas Lens、Route label density、Inspector 默认行为和窄窗口降级；不要在这些决策未验证前锁定具体 Graph library。
+## 4. Compatibility Profile
+
+| 问题 | 当前建议 | 状态 |
+|---|---|---|
+| ensure | 首个 Visual editing 样本，逐项开放已测试 Patch | Proposed |
+| establish | 先读取 / round-trip；Transitional phase 保持 Source-only | Proposed |
+| Manifest | 语法证据与 editability 分开；无测试不标 editable | Proposed |
+| 新语法 | 不自动猜测；新增 Profile / Patch / round-trip 测试后再开放 | Proposed |
+
+## 5. 应用技术栈
+
+当前仓库没有应用脚手架。需先完成 Round-trip POC，再决定：
+
+- YAML Round-trip Parser / CST；
+- UI Framework；
+- Source Editor（Monaco / CodeMirror 或其他）；
+- Graph Library / 自研 Canvas；
+- Web / Desktop Shell；
+- 本地文件访问和 Workspace 安全模型；
+- Windows / WSL 开发与运行体验。
+
+## 6. 当前明确后置
+
+- 独立 Validation / Qualification Center；
+- Runtime Trace / Execution；
+- Script Sandbox；
+- Live 5GC；
+- Registry / Publishing / Install；
+- AI 自动生成完整 Skill；
+- 多人实时协作。
+
+## 7. 下一次评审顺序
+
+1. 先评审 Source-preserving Edit Model 和 Round-trip POC 测试集；
+2. 再确定首个 ensure Visual 编辑操作集合；
+3. 再选择应用技术栈与 Graph 技术；
+4. 最后进入可点击原型和应用脚手架。
