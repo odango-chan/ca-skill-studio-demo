@@ -352,3 +352,13 @@ Child Procedure 节点显示：
 - Graph toolbar：约 40 px。
 
 窄窗口时 Navigator / Inspector 改为抽屉；Visual 与 Source 默认单视图；Diagnostics 作为独立面板。手机端不承诺完整图形编辑。
+
+
+## 12. 源样本蓝图
+
+屏幕实现不得只按通用节点模板验收。以下两份蓝图是第一阶段 Graph Canvas / Inspector 的具体样本：
+
+- [ensure-pdu-session](ensure-pdu-session-graph-blueprint.md)：11 个节点、精确 absence gate、create / reconcile / controlled retry、5 个终态 / 案例分支。
+- [establish-pdu-session](establish-pdu-session-graph-blueprint.md)：17 个根节点、5 个 Child Procedure、Preconditions / Operator / Postconditions、多来源 Binding、资源责任 finalization 和 36 个非执行型 qualification obligations。
+
+高保真稿必须覆盖两份蓝图中列出的 route source、原始 outcome 和 target；不能只展示 happy path。

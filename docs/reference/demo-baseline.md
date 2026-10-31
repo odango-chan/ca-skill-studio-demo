@@ -96,3 +96,8 @@ Studio 必须保留并显示这些限制。
 2. establish-pdu-session：验证复杂图形、阶段结构、Binding、Transitional 语法和 Case obligations。
 
 当前尚未复制任何 Skill 文件。导入前应重新确认 source Commit，并生成完整文件清单和 Digest。
+
+对应的源代码级图形投影基准：
+
+- [ensure-pdu-session Graph Projection Blueprint](../ux/ensure-pdu-session-graph-blueprint.md)
+- [establish-pdu-session Graph Projection Blueprint](../ux/establish-pdu-session-graph-blueprint.md)

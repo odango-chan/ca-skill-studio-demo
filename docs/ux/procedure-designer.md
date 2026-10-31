@@ -215,6 +215,13 @@ Procedure Designer 可以展示与当前节点相关的 Case / Qualification obl
 
 ## 10. 初始样本的设计目标
 
+本节的语义目标已进一步落实为两份逐节点、逐路由的源代码级蓝图：
+
+- [ensure-pdu-session · Graph Projection Blueprint](ensure-pdu-session-graph-blueprint.md)
+- [establish-pdu-session · Graph Projection Blueprint](establish-pdu-session-graph-blueprint.md)
+
+蓝图中的节点 ID、Operator、路由和 Binding 均绑定到固定 Demo source commit。它们是 Visual projection 的验收基准，不是第二份可编辑的 Procedure 定义。
+
 ### ensure-pdu-session
 
 用于验证基础流程：

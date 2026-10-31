@@ -90,3 +90,5 @@ P0 为可用编辑工作台基础；P1 为完整 Skill authoring 体验所需；
 10. 对 CreatedSession 的过渡 Binding path 显示其专用 validator 证据等级，而非标记为通用 Schema 支持。
 11. Source 解析失败时，旧 Graph 标记 STALE。
 12. 普通 Preview / Validate 不触发 Script、Capability、Runtime 或 Live 5GC。
+13. ensure-pdu-session 的 Visual projection 与源蓝图一致：11 个节点、所有 route target、Reconcile / retry 路径和 5 个 terminal。
+14. establish-pdu-session 的 Visual projection 与源蓝图一致：17 个根节点、5 个独立 Child Procedure、全部阶段路由和 Binding provenance；36 个 Case 只显示为 semantic obligations。

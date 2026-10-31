@@ -25,6 +25,8 @@
 5. [Procedure Designer 语义规范](docs/ux/procedure-designer.md)
 6. [Procedure Designer 屏幕规范](docs/ux/procedure-designer-screen-spec.md)
 7. [Procedure Designer 交互模型](docs/ux/procedure-designer-interaction-model.md)
+8. [ensure-pdu-session Graph Blueprint](docs/ux/ensure-pdu-session-graph-blueprint.md)
+9. [establish-pdu-session Graph Blueprint](docs/ux/establish-pdu-session-graph-blueprint.md)
 8. [技术架构](docs/architecture/system-architecture.md)
 9. [Demo 基线](docs/reference/demo-baseline.md)
 10. [开放问题与待决策项](docs/decisions/open-questions.md)

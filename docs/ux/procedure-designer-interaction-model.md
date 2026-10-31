@@ -266,3 +266,21 @@ Split 是同一 Source 的同步视图，不是双文档编辑。
 10. 查看 CreatedSession Case Overlay，36 个 obligations 明确显示为非可执行、未执行义务。
 11. 对未知 Operator，Visual 不做错误的语义猜测，Source 原文可见。
 12. 普通 Preview / Validate 不触发 Script、Capability、Runtime 或 Live 5GC。
+
+
+## 11. 源样本驱动的导航验收
+
+具体节点与路径以两份蓝图为准：
+
+- [ensure-pdu-session Graph Blueprint](ensure-pdu-session-graph-blueprint.md)
+- [establish-pdu-session Graph Blueprint](establish-pdu-session-graph-blueprint.md)
+
+至少应能完成以下真实导航：
+
+1. 从 `observe-target-session` 沿 FAIL 选择到 `observe-session-absence`，再沿 PASS 选择到 `create-session`。
+2. 从 `create-session.OUTCOME_UNKNOWN` 定位到 `reconcile-create`，并查看其原始 Create output Binding；确认 Call `pdu_session.reconcile` 不被误画成 DSL `reconcile:`。
+3. 在 `nudm-sdm-subscribe` 中依次选中 5 个 Preconditions steps，再选 Main Operator 和 Postcondition Verify。
+4. 从 `nudm-sdm-subscribe` 的 PCF create inputs producer 跳转到 N4 Child Procedure 使用的 `currentSessionInstanceRef`，并显示两者不是同一个 handle。
+5. 从 `namf-communication-n1n2-message-transfer` 的 Postcondition operationRef Binding 跳转到 RAN / N4 / UE Child Procedure 的 `afterOperationRef` 消费者。
+6. Drill-in 到 5 个独立 Child Procedure，返回时恢复 root Graph 的视图状态。
+7. 打开 Case overlay 时，ensure 的 5 个 fixture-shaped traces 可定位到确切节点；establish 的 36 个 semantic obligations 不生成虚构 node mapping。

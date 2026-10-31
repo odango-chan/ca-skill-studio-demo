@@ -15,6 +15,8 @@
 - [Procedure Designer 语义规范](ux/procedure-designer.md)
 - [Procedure Designer 屏幕规范](ux/procedure-designer-screen-spec.md)
 - [Procedure Designer 交互模型](ux/procedure-designer-interaction-model.md)
+- [ensure-pdu-session Graph Projection Blueprint](ux/ensure-pdu-session-graph-blueprint.md)
+- [establish-pdu-session Graph Projection Blueprint](ux/establish-pdu-session-graph-blueprint.md)
 - [资产编辑器](ux/asset-editors.md)
 - [Validation Center](ux/validation-center.md)
 - [用户旅程](ux/user-journeys.md)

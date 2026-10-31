@@ -6,7 +6,7 @@
 
 ## Phase 0：产品与语义基线
 
-交付：产品愿景和范围、信息架构和核心用户旅程、Procedure Designer 语义 / 屏幕 / 交互规范、Demo Capability Manifest、Demo Source baseline、Open Questions / ADR。
+交付：产品愿景和范围、信息架构和核心用户旅程、Procedure Designer 语义 / 屏幕 / 交互规范、ensure / establish 两份源代码级 Graph Projection Blueprint、Demo Capability Manifest、Demo Source baseline、Open Questions / ADR。
 
 退出条件：
 
@@ -15,7 +15,7 @@
 - CreatedSession Transitional 语法边界明确；
 - 两个初始 Skill 样本和来源 Commit 确认；
 - Procedure Graph 对 Operator、Effect、Outcome、Terminal 和阶段路由的表达不混淆；
-- 两个真实样本的图形投影规则可逐条对照源文件。
+- 两个真实样本的图形投影规则可逐条对照源文件；节点、路由、阶段、Binding 和 Child Procedure 均有具体蓝图可供实现验收。
 
 ## Phase 1：解析与 Workspace 纵切
 
@@ -34,8 +34,8 @@
 
 退出条件：
 
-- ensure-pdu-session 基础流程可正确展示；
-- establish-pdu-session 过渡语法可正确展示；
+- ensure-pdu-session 的 11 个节点、精确路由和 Case trace overlay 可正确展示；
+- establish-pdu-session 的 17 个根节点、5 个 Child Procedure、阶段路由和 Binding provenance 可正确展示；
 - 每个命名 Procedure 单独投影，不把子 Procedure 扁平化；
 - 不把阶段步骤变成主业务节点；
 - Operation / Preconditions / Postconditions 路由始终保留来源；
