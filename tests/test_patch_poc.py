@@ -177,3 +177,101 @@ def test_new_identifier_inside_comment_is_not_rewritten():
     preview=doc.preview(patch(doc,'RenameNode',node='first',expected_old='first',new_name='check'))
     assert '# first.output.message is documentation' in preview.after_text
     assert 'start: check' in preview.after_text
+
+SEQUENCE = '''# header preserved
+procedures:
+  example:
+    start: first
+    nodes:
+      first:
+        preconditions:
+          steps:
+            - verify: alpha.ready
+              with:
+                x:
+                  from: input.x
+            - verify: beta.ready
+          'on':
+            FAILED: failed
+        call: some.action
+        'on':
+          FAILED: failed
+      failed:
+        terminal: FAILED
+'''
+
+
+def test_insert_sequence_item_before_existing_item_preserves_other_text():
+    doc = SourceDocument(SEQUENCE, profile='poc-sequence')
+    spec = TypedPatch('InsertSequenceItem', doc.source_revision, 'example',
+                      path=('procedures','example','nodes','first','preconditions','steps'),
+                      expected_old=2, value={'verify':'new.ready'}, index=1,
+                      profile='poc-sequence')
+    result = doc.apply(doc.preview(spec))
+    assert result.text.replace('            - verify: new.ready\n','') == SEQUENCE
+    steps = result.snapshot()['procedures']['example']['nodes']['first']['preconditions']['steps']
+    assert [s['verify'] for s in steps] == ['alpha.ready','new.ready','beta.ready']
+    assert load_demo_yaml(result.text) == result.snapshot()
+
+
+def test_insert_sequence_item_append_preserves_route_and_nested_fields():
+    doc = SourceDocument(SEQUENCE, profile='poc-sequence')
+    spec = TypedPatch('InsertSequenceItem', doc.source_revision, 'example',
+                      path=('procedures','example','nodes','first','preconditions','steps'),
+                      expected_old=2, value={'verify':'new.ready'}, index=2,
+                      profile='poc-sequence')
+    result = doc.apply(doc.preview(spec))
+    assert result.text.replace('            - verify: new.ready\n','') == SEQUENCE
+    assert '            - verify: new.ready\n          \'on\':' in result.text
+
+
+def test_insert_sequence_rejects_stale_length_ambiguous_comments_and_real_profile():
+    doc = SourceDocument(SEQUENCE,profile='poc-sequence')
+    base = dict(kind='InsertSequenceItem', base_revision=doc.source_revision,
+                procedure='example', path=('procedures','example','nodes','first','preconditions','steps'),
+                expected_old=1, value={'verify':'new.ready'},index=2,profile='poc-sequence')
+    with pytest.raises(PatchRejected,match='precondition'):
+        doc.preview(TypedPatch(**base))
+    bad = SEQUENCE.replace('          \'on\':','          # route comment\n          \'on\':')
+    doc_bad = SourceDocument(bad,profile='poc-sequence')
+    with pytest.raises(PatchRejected,match='comments'):
+        doc_bad.preview(TypedPatch(**{**base,'base_revision':doc_bad.source_revision,'expected_old':2}))
+    prod = SourceDocument(SEQUENCE,profile='ensure-pdu-session')
+    with pytest.raises(PatchRejected,match='not qualified'):
+        prod.preview(TypedPatch(**{**base,'base_revision':prod.source_revision,'expected_old':2,'profile':'ensure-pdu-session'}))
+
+
+def test_anchors_are_source_only_and_bom_roundtrip_safe():
+    anchored = BASIC.replace('verify: subject.valid','verify: &evidence subject.valid')
+    doc = SourceDocument(anchored)
+    assert doc.round_trip() == anchored
+    with pytest.raises(PatchRejected,match='anchors'):
+        doc.preview(patch(doc,'AddRoute',node='first',outcome='FAIL',target='unresolved'))
+    bom = '\ufeff' + BASIC
+    doc_bom = SourceDocument(bom)
+    assert doc_bom.round_trip() == bom
+    result=doc_bom.apply(doc_bom.preview(patch(doc_bom,'AddRoute',node='first',outcome='FAIL',target='unresolved')))
+    assert result.text.startswith('\ufeff')
+    assert result.text.replace('          FAIL: unresolved\n','') == bom
+
+
+def test_apply_rejects_forged_preview_with_self_consistent_digest():
+    from dataclasses import replace
+    from skill_studio_poc.patch import revision
+    doc=SourceDocument(BASIC)
+    good=doc.preview(patch(doc,'AddRoute',node='first',outcome='FAIL',target='unresolved'))
+    forged_text=good.after_text.replace('terminal: SUCCEEDED','terminal: FAILED')
+    fabricated=replace(good,after_text=forged_text,after_revision=revision(forged_text))
+    with pytest.raises(PatchRejected,match='canonical'):
+        doc.apply(fabricated)
+    assert doc.text == BASIC
+
+
+def test_sequence_insertion_respects_crlf_and_initial_index():
+    doc=SourceDocument(SEQUENCE.replace('\n','\r\n'),profile='poc-sequence')
+    spec=TypedPatch('InsertSequenceItem',doc.source_revision,'example',
+                    path=('procedures','example','nodes','first','preconditions','steps'),
+                    expected_old=2,value={'verify':'fresh.ready'},index=0,profile='poc-sequence')
+    updated=doc.apply(doc.preview(spec))
+    assert updated.text.replace('            - verify: fresh.ready\r\n','')==doc.text
+    assert updated.snapshot()['procedures']['example']['nodes']['first']['preconditions']['steps'][0]['verify']=='fresh.ready'

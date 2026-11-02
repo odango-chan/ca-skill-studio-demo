@@ -11,4 +11,4 @@ python -m pytest -q
 
 固定源文件在 `fixtures/baseline/`，来源以 `fixtures/baseline/manifest.json` 为准，保持只读，不覆盖原始 Demo。
 
-详见 `docs/reference/phase1-source-poc-report.md`。当前仅验证 `SetScalar`、`AddRoute`、`RenameNode` 的安全文本局部修改。若要求完整 Phase 1，请继续 `InsertSequenceItem`、Manifest Parser 测试、CreatedSession 完整读取和真实 Demo Validator 适配。
+详见 `docs/reference/phase1-source-poc-report.md`。当前已验证 `SetScalar`、`AddRoute`、`RenameNode` 的安全局部修改，并在合成 `poc-sequence` Profile 上验证受限的 `InsertSequenceItem`。生产 Profile 尚未开放 Phase / Step 结构化编辑。下一步需在完整 checkout 中消除 Manifest 与 CreatedSession 两项 skip，并补真实 Demo Validator 适配。

@@ -8,12 +8,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from collections.abc import Mapping
+from io import StringIO
 import difflib
 import json
 import re
 
 from ruamel.yaml import YAML
-from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.scalarstring import LiteralScalarString, FoldedScalarString
 
 
@@ -63,6 +64,7 @@ class TypedPatch:
     target: str = ""
     new_name: str = ""
     profile: str = "ensure-pdu-session"
+    index: int = -1
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,7 @@ class Preview:
     after_text: str
     unified_diff: str
     modified_spans: int
+    patch: TypedPatch
 
 
 @dataclass(frozen=True)
@@ -96,11 +99,17 @@ class SourceDocument:
         return self.text
 
     def preview(self, patch: TypedPatch) -> Preview:
-        if self.profile != "ensure-pdu-session" or patch.profile != self.profile:
+        if patch.profile != self.profile or self.profile not in {"ensure-pdu-session", "poc-sequence"}:
             raise PatchRejected("transitional / unsupported profile is Source-only")
+        if self.profile == "poc-sequence" and patch.kind != "InsertSequenceItem":
+            raise PatchRejected("synthetic sequence profile only supports InsertSequenceItem")
+        if self.profile == "ensure-pdu-session" and patch.kind == "InsertSequenceItem":
+            raise PatchRejected("phase Step insertion not qualified for ensure-pdu-session")
         if patch.base_revision != self.source_revision:
             raise PatchRejected("stale Source revision")
         tree = _parse(self.text)
+        if _contains_anchor_or_alias(tree):
+            raise PatchRejected("anchors / aliases require Source-only editing")
         try:
             proc = tree["procedures"][patch.procedure]
             nodes = proc["nodes"]
@@ -114,6 +123,8 @@ class SourceDocument:
             spans = self._add_route(proc, nodes, patch)
         elif patch.kind == "RenameNode":
             spans = self._rename_node(proc, nodes, patch)
+        elif patch.kind == "InsertSequenceItem":
+            spans = self._insert_sequence_item(tree, patch)
         else:
             raise PatchRejected(f"unsupported Typed Patch operation: {patch.kind}")
         new_text = _apply_spans(self.text, spans)
@@ -124,14 +135,80 @@ class SourceDocument:
         diff = "".join(difflib.unified_diff(self.text.splitlines(keepends=True),
                     new_text.splitlines(keepends=True), fromfile="before.yaml", tofile="after.yaml"))
         return Preview(self.source_revision, revision(new_text), self.text,
-                       new_text, diff, len(spans))
+                       new_text, diff, len(spans), patch)
 
     def apply(self, preview: Preview) -> "SourceDocument":
         if self.source_revision != preview.before_revision or self.text != preview.before_text:
             raise PatchRejected("preview no longer matches current Source revision")
         if revision(preview.after_text) != preview.after_revision:
             raise PatchRejected("preview content digest mismatch")
-        return SourceDocument(preview.after_text, self.profile)
+        # A Preview is a proposal, never an authorization to write arbitrary text.
+        # Revalidate the TypedPatch against this exact Source revision.
+        canonical = self.preview(preview.patch)
+        if canonical != preview:
+            raise PatchRejected("preview differs from canonical Typed Patch result")
+        return SourceDocument(canonical.after_text, self.profile)
+
+    def _insert_sequence_item(self, tree: CommentedMap, patch: TypedPatch):
+        """Strict test-only Step insertion; no production phase edit qualification.
+
+        The insertion is an exact new line span; the whole YAML tree is never
+        serialized. Real CreatedSession phases remain Source-only.
+        """
+        if self.profile != "poc-sequence":
+            raise PatchRejected("InsertSequenceItem requires the synthetic POC profile")
+        if len(patch.path) != 6 or patch.path[:2] != ("procedures", patch.procedure):
+            raise PatchRejected("InsertSequenceItem requires an exact Step sequence path")
+        if patch.path[2] != "nodes" or patch.path[4] not in {"preconditions", "postconditions"} or patch.path[5] != "steps":
+            raise PatchRejected("InsertSequenceItem can only edit a test Phase steps sequence")
+        steps = _lookup(tree, patch.path)
+        if not isinstance(steps, CommentedSeq) or not steps:
+            raise PatchRejected("empty or non-sequence Step list is Source-only")
+        if type(patch.expected_old) is not int or patch.expected_old != len(steps):
+            raise PatchRejected("InsertSequenceItem length precondition failed")
+        if type(patch.index) is not int or not 0 <= patch.index <= len(steps):
+            raise PatchRejected("InsertSequenceItem index is out of bounds")
+        value = patch.value
+        if not isinstance(value, dict) or type(value) is not dict:
+            raise PatchRejected("inserted Step must be a plain mapping")
+        # For this small proof, support a syntactically safe minimal Step only.
+        if set(value) != {"verify"} or type(value["verify"]) is not str or not _IDENTIFIER.fullmatch(value["verify"].replace(".", "")):
+            raise PatchRejected("only a single verify Step is supported by the POC")
+        for i in range(len(steps)):
+            if not isinstance(steps[i], Mapping):
+                raise PatchRejected("non-mapping Step list is Source-only")
+        line, col = steps.lc.item(0)
+        first = self.text.splitlines(keepends=True)[line]
+        dash = re.match(r"^(\s*)-\s", first)
+        if dash is None or dash.end() > col + 1:
+            raise PatchRejected("cannot locate the exact YAML sequence marker")
+        indent = len(dash.group(1))
+        newline = "\r\n" if "\r\n" in self.text else "\n"
+        inserted = " " * indent + "- verify: " + _encode_scalar("", value["verify"]) + newline
+        if patch.index < len(steps):
+            target_line, _ = steps.lc.item(patch.index)
+            # Comment association is ambiguous; decline adjacent comment edits.
+            if target_line > 0 and self.text.splitlines()[target_line - 1].lstrip().startswith("#"):
+                raise PatchRejected("comments before Step require Source-only editing")
+            offset = sum(len(x) for x in self.text.splitlines(keepends=True)[:target_line])
+        else:
+            last_line, _ = steps.lc.item(len(steps) - 1)
+            lines = self.text.splitlines(keepends=True)
+            offset = None
+            for i in range(last_line + 1, len(lines)):
+                stripped = lines[i].strip()
+                if not stripped:
+                    raise PatchRejected("trailing blank lines near Step boundary are Source-only")
+                if stripped.startswith("#"):
+                    raise PatchRejected("trailing comments near Step boundary are Source-only")
+                depth = len(lines[i]) - len(lines[i].lstrip(" "))
+                if depth <= indent:
+                    offset = sum(len(x) for x in lines[:i]); break
+            if offset is None:
+                if not self.text.endswith(("\n", "\r\n")):
+                    raise PatchRejected("cannot append Step after an unterminated final line")
+                offset = len(self.text)
+        return [(offset, offset, inserted)]
 
     def _set_scalar(self, tree: CommentedMap, patch: TypedPatch):
         if len(patch.path) < 2:
@@ -230,6 +307,13 @@ class SourceDocument:
             node = after["procedures"][patch.procedure]["nodes"][patch.node]
             if node["on"].get(patch.outcome) != patch.target:
                 raise PatchRejected("AddRoute semantic verification failed")
+        elif patch.kind == "InsertSequenceItem":
+            old_steps = _lookup(before, patch.path)
+            new_steps = _lookup(after, patch.path)
+            if len(new_steps) != len(old_steps) + 1 or new_steps[patch.index] != patch.value:
+                raise PatchRejected("InsertSequenceItem semantic verification failed")
+            if list(new_steps[:patch.index]) != list(old_steps[:patch.index]) or list(new_steps[patch.index+1:]) != list(old_steps[patch.index:]):
+                raise PatchRejected("InsertSequenceItem changed unrelated sequence items")
         elif patch.kind == "RenameNode":
             nodes = after["procedures"][patch.procedure]["nodes"]
             if patch.new_name not in nodes or patch.node in nodes:
@@ -344,3 +428,22 @@ def _apply_spans(text: str, spans: list[tuple[int, int, str]]) -> str:
         text = text[:start] + replacement + text[end:]
         last_start = start
     return text
+
+
+def _contains_anchor_or_alias(root: object) -> bool:
+    """Conservative gate until CST anchor/alias mutation semantics are proven."""
+    seen = set()
+    def scan(item):
+        if isinstance(item, (Mapping, list)):
+            if id(item) in seen:
+                return True
+            seen.add(id(item))
+        anchor = getattr(item, "anchor", None)
+        if anchor is not None and getattr(anchor, "value", None):
+            return True
+        if isinstance(item, Mapping):
+            return any(scan(k) or scan(v) for k, v in item.items())
+        if isinstance(item, list):
+            return any(scan(v) for v in item)
+        return False
+    return scan(root)
