@@ -15,3 +15,9 @@ python -m pytest -q
 
 
 本地回归：`PYTHONPATH=packages python -m pytest -q -ra` → **92 passed / 0 skipped**。新一轮具体边界见 [Workspace Watch / Batch Save POC](docs/reference/phase1-workspace-watch-batch.md)。
+
+## 包级一致性与恢复意图（新增离线 POC）
+
+新增 `package_guard.py`（完整 Skill 文件清单与 opaque 文件漂移检测）、`recovery_batch.py`（对已有 `save_batch` 的可选写入前恢复记录）、`test_package_guard.py` 和 `test_recovery_batch.py`。恢复记录存放在包外私有目录，只记录旧/新哈希；部分提交后要求人工核对，**不自动回滚**。详见 [Package Recovery POC](docs/reference/phase1-package-recovery.md)。
+
+本轮 **23 项新增隔离测试通过**，其中 8 项使用模拟批量写入器；上一轮仓库的 92 项测试本轮**未与新增测试合并运行**，不要推断 115 项全量 PASS。真正多文件提交仍非原子操作，单文件临时文件进入包目录的问题也尚未修复。
