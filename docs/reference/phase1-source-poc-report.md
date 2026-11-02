@@ -1,6 +1,6 @@
 # Phase 1 · Source-preserving Typed Patch POC
 
-**状态：Offline POC + pinned authoring-function parity PASS (46 tests) · Production editor qualification still NOT_READY**
+**状态：Offline POC + pinned authoring-function parity PASS (56 tests) · Production editor qualification still NOT_READY**
 
 ## 1. 范围
 
@@ -34,6 +34,7 @@ Visual Patch：
 - `RenameNode`：改名 Node Key、`start`、当前 Procedure 内 `on` Route Target、`reconcile` target、`from: old.output.*` 生产者绑定；不对注释做全文替换。
 - `InsertSequenceItem`（**合成 `poc-sequence` Profile，仅测试**）：对已存在的非空 Phase Step 序列，允许在指定索引插入单条最小 `verify` Step；只插入一行，保持嵌套字段和 Route 不动。空序列、注释边界和不确定源位置一律 Reject。
 - `SourceDocument.preview/apply`：Revision 检查、Source Diff、语义复核、再次验证 Preview 防篡改、失败原子回滚。
+- `EditorSession`：新建内存事务层，Source 原文编辑和受控 Visual Patch 共用一份 Working Buffer、Undo / Redo 历史；支持非法 YAML 草稿保留并将旧图标记为 STALE；观察到外部文件变化则进入 CONFLICT，阻止编辑和保存，提供显式 Reload / Manual Resolve；`prepare_save` / `acknowledge_save` 只是**内存级条件提交协议**，不包含实际文件写入。
 - Anchor / Alias：Round-trip 原文保留；任何结构化修改均保守 Reject，回退 Source-only。
 - BOM / CRLF：局部修改后保持开头 BOM、CRLF 换行格式。
 - `DemoYaml12Loader`：独立复现当前 Demo 对 `on`、`true` / `false` 的布尔解析意图并拒绝重复键；只作 POC 交叉检查。
@@ -45,12 +46,12 @@ Visual Patch：
 
 ~~~text
 PYTHONPATH=packages python -m pytest -q -ra
-46 passed in 2.46s
+56 passed in 3.30s
 python -m compileall -q packages tests
 PASS
 ~~~
 
-- **46 passed / 0 skipped / 0 failed**；
+- **56 passed / 0 skipped / 0 failed**；
 - 原先缺失的 Manifest 和完整 CreatedSession Procedure 已按 Git Blob SHA 与当前 Studio 远端仓库原件核对一致；
 - ensure Procedure Blob：`1ead0efb0665b7ccb652501bc0075b36079c5017`；
 - establish Procedure Blob：`cf502fa54363a5302161cc7cccb191ce73e453de`；
@@ -67,10 +68,10 @@ PASS
 - Manifest 的 Demo 兼容解析与完整 establish Procedure 只读回归已执行 PASS，不再列为缺口。
 - `InsertSequenceItem` 已完成**受限合成 Profile POC**，真实 Skill 的结构化 Phase / Step 编辑仍 **NOT_IMPLEMENTED**；禁止对 CreatedSession 开放。
 - Anchor / Alias 和 BOM 的保留 / 拒绝边界已有测试；anchors / merge keys 的可靠结构化编辑、复杂编码和无换行文件的序列插入仍 **NOT_PROVEN**，应视为 Source-only / Reject。
-- 跨文件 Rename / Undo-Redo 状态机 / File Watch / Save / 外部冲突处理 **NOT_IMPLEMENTED**。
+- **内存级** Undo / Redo 与显式外部文件快照冲突检查已完成并通过 10 项回归；但 File Watch、真实磁盘原子 Compare-and-Write、持久化 Undo / Redo、多文件事务、跨文件 Rename **NOT_IMPLEMENTED**。不能凭内存模拟宣称已有安全的实际 Save。
 - `validator.py` 属于 **Demo-authoring subset adapter**；已执行精确提取的上游原始 authoring 函数并完成 13 项隔离对照，**但尚未运行完整 `scripts/validate_docs.py` 或 `make verify`**。原函数并不校验 `terminal: SAFE_STOPPED` 的枚举合法性，因此此门禁的 PASS 也不能取代完整 Schema / Runtime 校验。
 - 所有 Capability / Observation / Script allowlist 的运行时可执行性 **NOT_PROVEN**。
 
 ## 6. 下一道闸门
 
-在固定 ca-agent-demo 的完整源码 checkout 中运行**整个** `scripts/validate_docs.py` / `make verify`，核对所有 Schema / 专项检查；再处理 Anchor / Alias、跨文件原子事务、Undo / Redo 和外部冲突。在特定 Profile 的 Parser、Typed Patch、无损回归和 Validator 证据全部齐备前，不授予结构化写回资格。本 POC **不修改 Capability Manifest 的编辑资格声明**。
+在固定 ca-agent-demo 的完整源码 checkout 中运行**整个** `scripts/validate_docs.py` / `make verify`，核对所有 Schema / 专项检查；下一步处理真实文件 Compare-and-Write + Watcher、跨文件原子事务与 Anchor / Alias 保留边界。[内存事务与冲突 POC 细节](phase1-editor-session.md)。在特定 Profile 的 Parser、Typed Patch、无损回归和 Validator 证据全部齐备前，不授予结构化写回资格。本 POC **不修改 Capability Manifest 的编辑资格声明**。
