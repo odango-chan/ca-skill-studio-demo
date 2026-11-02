@@ -28,7 +28,7 @@ Visual 目前支持**两条固定失败终态 Route 的实验性 SetRouteTarget*
 
 ## Actions / Pages
 
-.github/workflows/pages.yml 支持 push main 的静态站点变更自动部署以及 workflow_dispatch 手动触发。Build Job 使用 Node 24 安装固定版本 yaml@2.9.1 和 esbuild@0.28.2，执行 YAML CST / Typed Route Patch 回归测试，构建浏览器端 bundle（dist/），并发布 dist/ 到 Pages。首个流水线会产出 package-lock.json 附件，锁文件需要随后提交到仓库并切换 npm ci。
+.github/workflows/pages.yml 支持 push main 的静态站点变更自动部署以及 workflow_dispatch 手动触发。Build Job 使用 Node 24 安装固定版本 yaml@2.9.1 和 esbuild@0.28.2，执行 YAML CST / Typed Route Patch 回归测试，构建浏览器端 bundle（dist/），并发布 dist/ 到 Pages。package-lock.json 已从通过的 CI 构建原样归档到仓库，后续统一使用 npm ci 进行锁定依赖安装。
 
 - [Actions](https://github.com/odango-chan/ca-skill-studio-demo/actions/workflows/pages.yml)
 - [PR #1 · UX / Architecture](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)

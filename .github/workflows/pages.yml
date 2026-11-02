@@ -30,17 +30,11 @@ jobs:
         with:
           node-version: "24"
       - name: Install exact toolchain dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Run YAML AST / CST regression tests
         run: npm test
       - name: Bundle browser site
         run: npm run build
-      - name: Save generated lockfile for reproducibility follow-up
-        uses: actions/upload-artifact@v4
-        with:
-          name: studio-npm-lock
-          path: package-lock.json
-          retention-days: 7
       - name: Check static site and asset references
         run: |
           python3 - <<'PY'
