@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "tests/graph.test.mjs"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -21,25 +22,33 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
-      - name: Check static preview exists
-        run: |
-          test -s site/index.html
-          grep -q 'Skill Studio' site/index.html
-      - name: Validate HTML and JavaScript syntax
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check static site and asset references
         run: |
           python3 - <<'PY'
           from html.parser import HTMLParser
           from pathlib import Path
           import re
 
-          source = Path("site/index.html").read_text(encoding="utf-8")
-          HTMLParser().feed(source)
-          assert source.lstrip().lower().startswith("<!doctype html>")
-          scripts = re.findall(r"<script>(.*?)</script>", source, flags=re.S)
-          assert len(scripts) == 1, "Expected exactly one embedded JavaScript block"
-          Path("/tmp/skill-studio-pages.js").write_text(scripts[0], encoding="utf-8")
+          html = Path("site/index.html").read_text(encoding="utf-8")
+          assert html.lstrip().lower().startswith("<!doctype html>")
+          HTMLParser().feed(html)
+          for asset in ("./studio.css", "./app.mjs", "./graph.mjs", "./samples/ensure-pdu-session.procedure.yaml"):
+              assert Path("site", asset.removeprefix("./")).is_file(), asset
+          assert 'src="./app.mjs"' in html
+          assert 'href="./studio.css"' in html
+          assert not re.search(r'<script[^>]+src=["\']https?://', html, re.I)
           PY
-          node --check /tmp/skill-studio-pages.js
+      - name: Check JavaScript syntax
+        run: |
+          node --check site/app.mjs
+          node --check site/graph.mjs
+          node --check tests/graph.test.mjs
+      - name: Run source-projection regression
+        run: node --test tests/graph.test.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site

@@ -1,36 +1,41 @@
 # ConnectionAgent Skill Studio Demo
 
-面向 ConnectionAgent Skill 开发与编辑的独立 Demo 仓库。
+ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是**无后端的浏览器前端**，不是 Agent Runtime。
 
-## 在线 Source 编辑预览
-
-GitHub Pages 计划发布到：
+## 在线预览
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前 site/ 是**无需后端、无需构建工具**的浏览器端 Source 编辑预览，支持：
+当前实现（Stage: Procedure source projection preview）：
 
-- 打开单个本地 Markdown / YAML / JSON / Script 文本文件（≤ 1 MiB）。
-- 在浏览器内存中编辑，查看简单文本大纲。
-- 下载修改后的文件；Ctrl/Cmd+S 触发导出。
-- 不上传源文件、不执行 Skill、Script 或 Capability。
+- 从固定的 Demo ensure-pdu-session Procedure YAML 文件即时投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
+- Visual / Source / Split 三视图；画布支持平移、缩放、适配；Node Outline 搜索及按源码顺序导航；点击节点/边查看 Inspector 和 Source 行。
+- 支持导入本地文本文件、直接编辑 Source、重置本地缓冲区、导出文件。
+- 对未知或不支持的 Procedure 结构**拒绝重新投影**；若原有可用视图存在，会显示 STALE 警告。不会把旧图伪装成新 YAML 的正确语义。
+- 不上传用户文件、不调用 Capability、不执行 Skill 或 Script，不进行发布。
 
-**重要限制：** 此在线原型尚未实现 Visual Graph、跨文件 Workspace、Typed Source Patch、Diff、无损 round-trip 保证、可靠原子保存、Demo Validator 或 Runtime 验收。页面上的简单大纲**不是** Procedure 语义投影。导出下载也不是对原工作区文件的原地保存。
+## 边界和兼容性
 
-## GitHub Pages 自动部署
+**这是有限 ensure-subset 文本投影器，不是全量 YAML Parser。** 其静态检查只针对固定样本中的简化 Procedure / node / on 形式，不能据此声称通用 Schema、Runtime 或 Validated Authoring PASS。其他文件（SKILL.md、JSON、复杂 YAML、多 Procedure、CreatedSession Transitional phases）仍可 Source-only 编辑；不承诺这些文件获得图形投影。
 
-工作流：.github/workflows/pages.yml。支持 main 分支 site/** 修改后的自动部署，以及在 Actions 页面手动运行（workflow_dispatch）。
+Visual 当前只可**选择、导航和检查**，不能结构化添加、重命名或删除节点/Route。真正的视觉修改应先经过 Typed Patch、Revision Guard、Source Diff、Round-trip、语义复核和 Compatibility Profile 测试，再向 UI 开放。来源不明的节点或字段不猜测、不自动全量重写 YAML。
 
-GitHub 仓库设置需要在 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**；之后在 **Actions → Deploy Skill Studio Pages → Run workflow** 可手动部署 main。如果 Pages 尚未开启，工作流可能因目标站点未配置而失败；不能将工作流文件已提交视为网站已上线。
+导出是浏览器下载请求，**不是本地原文件的原地或原子 Save**。浏览器 textarea 可能规范化 CRLF；当前不承诺逐字节文件保真、完整 Source map 或跨文件事务，重要文件应自行比对 Diff 后再替换。此站点不与 packages/skill_studio_poc/ Python POC 通信。
 
-部署制品只包含 site/ 内的公开前端文件。不要把私密数据、真实账号凭据或敏感 Skill 资产提交至 site/。
+样本来源：ca-agent-demo@bf445ad777149af5af2dfa0a5bdea18d0451303e 的 skills/ensure-pdu-session/assurance/procedure.yaml，来自本仓 PR #2 的固定 Fixture。完整 Demo 与 Live 5GC 验证 **NOT_RUN**。
 
-## 设计与 POC 分支
+## Actions / Pages
 
-- [PR #1 · 设计与 UX 文档](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)：尚未合并 main。
-- [PR #2 · Python source-preserving Typed Patch POC](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)：尚未合并 main；代码不在此 Pages 静态站点内运行。
-- [兼容性参考 ca-agent-demo](https://github.com/odango-chan/ca-agent-demo)：只读。
+.github/workflows/pages.yml 支持 push main 的静态站点变更自动部署以及 workflow_dispatch 手动触发。Build Job 使用 Node 24 检查浏览器模块语法并运行 Node 原生回归测试（无需 npm 安装），通过后上传 site/ 静态文件到 Pages。
 
-当前产品范围聚焦 SKILL.md、Contract / Procedure / Predicate、受治理 Script 与实际被 Host 消费的 Reference；Case、独立验证中心、发布/安装工作台暂不实现。
+- [Actions](https://github.com/odango-chan/ca-skill-studio-demo/actions/workflows/pages.yml)
+- [PR #1 · UX / Architecture](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)
+- [PR #2 · Python Typed Patch POC](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)
 
-**下一步：** 以实际 Procedure 资产和 Compatibility Profile 为依据，设计 React/TypeScript 的 Visual/Split 界面及大型图形导航；结构化修改必须先具备可审查的 source-preserving Patch 能力，不能用图形修改绕过现有 POC 的限制。
+两条 PR 在此阶段保持独立、未自动合并。
+
+## 下一阶段
+
+先推进带真实 YAML 解析与 Source Map 的 TypeScript 编辑核心，再逐项让确保无损的 Typed Patch 成为 Visual 可编辑操作。在图形层选型上，大图和可编辑连接线优先评估 React + TypeScript + React Flow / ELK，**本次上线的 Canvas 是无依赖 SVG 预览，不等于已选型或完成正式 Visual 编辑器**。
+
+当前只建设 SKILL 开发与编辑，不做 Case、独立验证工作台、Registry / Publishing、Agent Runtime 调用或 Live 5GC。
