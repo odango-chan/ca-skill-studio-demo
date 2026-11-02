@@ -9,6 +9,7 @@
 - [ADR-0003：CreatedSession 过渡语法必须显式建模](0003-createdsession-transitional-syntax.md)
 - [ADR-0004：Procedure Designer 先只读投影（已被取代）](0004-procedure-designer-read-only-first.md)
 - [ADR-0005：Source-preserving 双向编辑模型](0005-source-preserving-bidirectional-editing.md)
+- [ADR-0006：包级一致性与显式崩溃恢复（Proposed）](0006-package-consistency-recovery.md)
 
 ## 决策状态
 
