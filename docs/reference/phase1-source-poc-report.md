@@ -1,6 +1,6 @@
 # Phase 1 · Source-preserving Typed Patch POC
 
-**状态：Offline POC + pinned authoring-function parity PASS (71 tests) · Production editor qualification still NOT_READY**
+**状态：Offline POC + pinned authoring-function parity PASS (92 tests) · Production editor qualification still NOT_READY**
 
 ## 1. 范围
 
@@ -36,6 +36,7 @@ Visual Patch：
 - `SourceDocument.preview/apply`：Revision 检查、Source Diff、语义复核、再次验证 Preview 防篡改、失败原子回滚。
 - `EditorSession`：Source 与受控 Visual Patch 共用 Working Buffer 和 Undo / Redo，非法草稿标记 STALE，外部变化进入 CONFLICT。
 - `storage.py`：新增 **POSIX 单文件保存 POC**，父目录 advisory flock（不创建会改变 Skill Artifact Digest 的锁文件）、源文件常规文件检查、内容与 inode 二次检查、同目录临时文件、fsync、os.replace 和目录 fsync；写入前失败清理临时文件，替换后 fsync 失败返回 UNCERTAIN 并要求重新读取。只支持合作写入者，不是对不合作进程的内核 CAS。
+- `workspace.py`：新增**显式轮询**（非后台/非 OS 事件）对已打开源文件识别内容变化、同内容 inode 替换、缺失/不可读取；受限 POSIX 同目录批量保存先对全部文件预检，临时文件位于包外私有目录。多文件依次 `os.replace`，失败时显式报告 `BatchSaveUncertain`（不是原子事务）。[设计和测试](phase1-workspace-watch-batch.md)。
 - Anchor / Alias：Round-trip 原文保留；任何结构化修改均保守 Reject，回退 Source-only。
 - BOM / CRLF：局部修改后保持开头 BOM、CRLF 换行格式。
 - `DemoYaml12Loader`：独立复现当前 Demo 对 `on`、`true` / `false` 的布尔解析意图并拒绝重复键；只作 POC 交叉检查。
@@ -47,12 +48,12 @@ Visual Patch：
 
 ~~~text
 PYTHONPATH=packages python -m pytest -q -ra
-71 passed in 4.34s
+92 passed in 4.49s
 python -m compileall -q packages tests
 PASS
 ~~~
 
-- **71 passed / 0 skipped / 0 failed**；
+- **92 passed / 0 skipped / 0 failed**；
 - 原先缺失的 Manifest 和完整 CreatedSession Procedure 已按 Git Blob SHA 与当前 Studio 远端仓库原件核对一致；
 - ensure Procedure Blob：`1ead0efb0665b7ccb652501bc0075b36079c5017`；
 - establish Procedure Blob：`cf502fa54363a5302161cc7cccb191ce73e453de`；
@@ -70,10 +71,11 @@ PASS
 - `InsertSequenceItem` 已完成**受限合成 Profile POC**，真实 Skill 的结构化 Phase / Step 编辑仍 **NOT_IMPLEMENTED**；禁止对 CreatedSession 开放。
 - Anchor / Alias 和 BOM 的保留 / 拒绝边界已有测试；anchors / merge keys 的可靠结构化编辑、复杂编码和无换行文件的序列插入仍 **NOT_PROVEN**，应视为 Source-only / Reject。
 - 内存 Undo / Redo 和显式冲突检查：10 项回归通过；单文件 POSIX 写入：15 项新增回归通过（含替换前失败清理、外部竞态检测、替换后 fsync 失败的不确定状态、BOM/CRLF、符号链接、硬链接、协作锁、Digest 无新增文件）。
-- **仍未实现** File Watch、Windows 原生保存、跨文件事务、持久化 Undo / Redo、跨文件 Rename、ACL / xattr / owner 完整保留及不合作写入者的真正原子 CAS；不能宣称生产级安全 Save。
+- 已实现显式 Workspace Polling 和有全局预检、外部暂存、部分提交报告的**同目录批量保存 POC**，新增 21 项回归通过。
+- **仍未实现** OS 原生 File Watch / 后台事件循环、真正原子的跨文件提交或崩溃恢复、跨目录事务、Windows 原生保存、持久化 Undo / Redo、跨文件 Rename、ACL / xattr / owner 完整保留及不合作写入者的严格 CAS；不能宣称生产级安全 Save。
 - `validator.py` 属于 **Demo-authoring subset adapter**；已执行精确提取的上游原始 authoring 函数并完成 13 项隔离对照，**但尚未运行完整 `scripts/validate_docs.py` 或 `make verify`**。原函数并不校验 `terminal: SAFE_STOPPED` 的枚举合法性，因此此门禁的 PASS 也不能取代完整 Schema / Runtime 校验。
 - 所有 Capability / Observation / Script allowlist 的运行时可执行性 **NOT_PROVEN**。
 
 ## 6. 下一道闸门
 
-在固定 ca-agent-demo 的完整源码 checkout 中运行**整个** `scripts/validate_docs.py` / `make verify`，核对所有 Schema / 专项检查；下一步评估 Windows / WSL 平台契约、外部编辑器竞争、File Watch 与多文件事务，并完成原始 Demo 全量验证。[内存事务 POC](phase1-editor-session.md) · [POSIX 单文件保存 POC](phase1-file-save-poc.md)。在特定 Profile 的 Parser、Typed Patch、无损回归和 Validator 证据全部齐备前，不授予结构化写回资格。本 POC **不修改 Capability Manifest 的编辑资格声明**。
+在固定 ca-agent-demo 的完整源码 checkout 中运行**整个** `scripts/validate_docs.py` / `make verify`，核对所有 Schema / 专项检查；下一步评估 WSL2 / Windows 平台契约、真实外部编辑器竞争、跨文件崩溃恢复和真正一致的 Package 级保存方案，同时完成原始 Demo 全量验证。[内存事务 POC](phase1-editor-session.md) · [POSIX 单文件保存 POC](phase1-file-save-poc.md) · [Workspace Watch / Batch Save POC](phase1-workspace-watch-batch.md)。在特定 Profile 的 Parser、Typed Patch、无损回归和 Validator 证据全部齐备前，不授予结构化写回资格。本 POC **不修改 Capability Manifest 的编辑资格声明**。

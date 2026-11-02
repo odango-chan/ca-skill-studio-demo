@@ -46,3 +46,6 @@ PASS
 - 对真实 5GC / Script / Capability 的执行或验证。
 
 创建 UI 或安装能力之前，需要把保存失败的不确定状态完整暴露给用户，并增加跨平台与多文件测试。
+## Later batch-save note
+
+This single-file POC creates a temporary file in the destination directory. During saving, a concurrent Host traversal can observe this temporary file and temporarily change the complete Skill artifact digest. The separate [Workspace polling and batch-save POC](phase1-workspace-watch-batch.md) instead requires a private staging directory outside the Skill package. That batch still performs sequential, not atomic, multi-file replacements.
