@@ -1,0 +1,58 @@
+name: Skill Studio Pages Demo
+
+on:
+  push:
+    branches:
+      - feat/typescript-procedure-designer-spike
+    paths:
+      - 'site/**'
+      - 'fixtures/baseline/**'
+      - '.github/workflows/pages-demo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skill-studio-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install TypeScript compiler
+        run: npm install --no-save --package-lock=false typescript@5.8.3
+      - name: Typecheck and compile browser UI
+        run: ./node_modules/.bin/tsc --project site/tsconfig.json
+      - name: Package the pinned real Skill examples
+        run: |
+          mkdir -p site/fixtures
+          cp fixtures/baseline/ensure-pdu-session/procedure.yaml site/fixtures/ensure.yaml
+          cp fixtures/baseline/establish-pdu-session/procedure.yaml site/fixtures/establish.yaml
+          touch site/.nojekyll
+          node --check site/assets/studio.js
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload the static site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
