@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import stat
+import tempfile
 
 import pytest
 
@@ -33,6 +34,12 @@ def doc(tmp_path):
     return path
 
 
+def _save(doc, session):
+    """Always stage outside the package root; even transient files affect Host digest."""
+    with tempfile.TemporaryDirectory(prefix="skillstudio-test-", dir=doc.parent.parent) as stage:
+        return save_session(doc, session, package_root=doc.parent, staging_dir=Path(stage))
+
+
 def _edit(s):
     return s.source_edit(s.working_text.replace('subject.valid', 'subject.ready'))
 
@@ -46,7 +53,7 @@ def test_write_uses_atomic_replace_and_cleans_temp_preserves_mode(doc):
     before_inode = doc.stat().st_ino
     initial = load_session(doc)
     changed = _edit(initial)
-    saved = save_session(doc, changed)
+    saved = _save(doc, changed)
     assert saved.working_text == doc.read_text(encoding='utf-8')
     assert not saved.is_dirty and saved.undo().is_dirty
     assert doc.stat().st_ino != before_inode
@@ -57,7 +64,7 @@ def test_write_uses_atomic_replace_and_cleans_temp_preserves_mode(doc):
 
 def test_clean_save_does_not_rewrite_file(doc):
     original_inode = doc.stat().st_ino
-    saved = save_session(doc, load_session(doc))
+    saved = _save(doc, load_session(doc))
     assert not saved.is_dirty and doc.stat().st_ino == original_inode
     assert not _tmp_files(doc)
 
@@ -67,12 +74,12 @@ def test_external_edit_rejected_and_working_copy_unmodified(doc):
     external = BASE + '# external writer\n'
     doc.write_text(external, encoding='utf-8')
     with pytest.raises(EditRejected, match='disk changed'):
-        save_session(doc, s)
+        _save(doc, s)
     assert doc.read_text() == external and s.working_text != external
     observed = observe_session(doc, s)
     assert observed.is_conflicted
     with pytest.raises(EditRejected, match='conflict'):
-        save_session(doc, observed)
+        _save(doc, observed)
 
 
 def test_manual_resolution_can_be_saved_after_new_disk_baseline(doc):
@@ -81,7 +88,7 @@ def test_manual_resolution_can_be_saved_after_new_disk_baseline(doc):
     doc.write_text(external, encoding='utf-8')
     conflict = observe_session(doc, s)
     resolved = conflict.resolve_manual(external, s.working_text + '# their change\n')
-    done = save_session(doc, resolved)
+    done = _save(doc, resolved)
     assert not done.is_dirty
     assert doc.read_text() == done.working_text
 
@@ -97,7 +104,7 @@ def test_pre_replace_external_race_fails_without_overwrite(doc, monkeypatch):
 
     monkeypatch.setattr(storage, '_check_pre_replace', race)
     with pytest.raises(FileSaveRejected, match='between temporary'):
-        save_session(doc, s)
+        _save(doc, s)
     assert doc.read_text(encoding='utf-8') == external
     assert s.is_dirty and not _tmp_files(doc)
 
@@ -108,7 +115,7 @@ def test_failed_replace_keeps_original_and_unsaved_buffer(doc, monkeypatch):
         raise OSError('injected failure before atomic replace')
     monkeypatch.setattr(storage.os, 'replace', deny)
     with pytest.raises(OSError, match='injected failure'):
-        save_session(doc, s)
+        _save(doc, s)
     assert doc.read_text() == BASE and s.is_dirty and not _tmp_files(doc)
 
 
@@ -124,7 +131,7 @@ def test_failure_after_replace_requires_observe_not_rollback(doc, monkeypatch):
         return original_fsync(fd)
     monkeypatch.setattr(storage.os, 'fsync', fsync)
     with pytest.raises(FileSaveUncertain, match='re-read disk'):
-        save_session(doc, s)
+        _save(doc, s)
     # Rename happened, even though the caller did not receive an ack.
     assert doc.read_text() == s.working_text and s.is_dirty
     assert not _tmp_files(doc)
@@ -157,7 +164,7 @@ def test_crlf_bom_preserved_after_real_save(doc):
     text = '\ufeff' + BASE.replace('\n', '\r\n')
     doc.write_bytes(text.encode('utf-8'))
     s = load_session(doc)
-    saved = save_session(doc, _edit(s))
+    saved = _save(doc, _edit(s))
     assert doc.read_bytes() == saved.working_text.encode('utf-8')
     assert saved.working_text.startswith('\ufeff')
     assert '\r\n' in saved.working_text
@@ -168,7 +175,7 @@ def test_real_ensure_fixture_copy_remains_parseable(doc):
     doc.write_bytes(fixture.read_bytes())
     s = load_session(doc)
     edited = s.source_edit(s.working_text + '# locally edited\n')
-    saved = save_session(doc, edited)
+    saved = _save(doc, edited)
     assert saved.working_text == fixture.read_text() + '# locally edited\n'
     assert fixture.read_bytes() != doc.read_bytes()
 
@@ -176,7 +183,7 @@ def test_real_ensure_fixture_copy_remains_parseable(doc):
 def test_invalid_yaml_draft_is_not_saved(doc):
     s = load_session(doc).source_edit('procedures: [bad\n')
     with pytest.raises(EditRejected, match='invalid Source'):
-        save_session(doc, s)
+        _save(doc, s)
     assert doc.read_text() == BASE
 
 
@@ -209,7 +216,7 @@ def test_cooperating_file_lock_held_during_final_check(doc, monkeypatch):
         original_check(path, snapshot)
 
     monkeypatch.setattr(storage, '_check_pre_replace', check)
-    saved = save_session(doc, s)
+    saved = _save(doc, s)
     assert seen_lock and not saved.is_dirty
 
 
@@ -222,3 +229,36 @@ def test_direct_observation_retains_dirty_working_buffer(doc):
     restored = observe_session(doc, changed)
     assert not restored.is_conflicted
     assert restored.working_text == session.working_text
+
+
+def test_direct_single_save_requires_explicit_outside_stage(doc):
+    s = _edit(load_session(doc))
+    with pytest.raises(FileSaveRejected, match="outside-package"):
+        save_session(doc, s)
+    assert doc.read_text() == BASE
+
+
+def test_single_save_rejects_staging_inside_skill_package(doc):
+    s = _edit(load_session(doc))
+    internal = doc.parent / "staging"
+    internal.mkdir(mode=0o700)
+    with pytest.raises(FileSaveRejected, match="outside Skill Package"):
+        save_session(doc, s, package_root=doc.parent, staging_dir=internal)
+    assert doc.read_text() == BASE
+
+
+def test_single_save_stages_outside_package_even_during_write(doc, monkeypatch):
+    s = _edit(load_session(doc))
+    real_mkstemp = storage.tempfile.mkstemp
+    entered = False
+    def check_stage(*args, **kwargs):
+        nonlocal entered
+        entered = True
+        assert Path(kwargs["dir"]).is_absolute()
+        assert not Path(kwargs["dir"]).is_relative_to(doc.parent)
+        assert set(doc.parent.iterdir()) == {doc}
+        return real_mkstemp(*args, **kwargs)
+    monkeypatch.setattr(storage.tempfile, "mkstemp", check_stage)
+    saved = _save(doc, s)
+    assert entered and not saved.is_dirty
+    assert set(doc.parent.iterdir()) == {doc}

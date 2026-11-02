@@ -45,3 +45,11 @@ The existing repository's **92 previous tests were not rerun together with these
 - The complete pinned ca-agent-demo make verify and Runtime acceptance were not run.
 
 **Next gate:** run tests against the real save_batch in a complete checkout with fault injection, then unify single-file staging and strengthen the package transaction boundary.
+
+## 联合回归增补（2026-11-02）
+
+- 新增 `tests/test_recovery_real_workspace.py`：不再 mock `save_batch`，而是通过真实 `workspace.save_batch` 验证成功写入、第二次 `os.replace` 失败、外部竞争修改以及 `KeyboardInterrupt` 后恢复记录保留。
+- 隔离测试目录中的 `workspace.py`、`storage.py` 与 PR 原始源文件的 Git Blob SHA 一致；测试中的 `EditorSession` 使用精简适配器，**不是完整仓库的 Session 实现**。
+- 同时修正 `tests/test_recovery_batch.py` 中 `BatchSaveUncertain` 的模拟调用参数，改为传入实际接口要求的 `(replaced_paths, reason)`。
+- 在该隔离目录运行包清单、恢复单元、联合批量保存、单文件包外暂存的聚焦回归：**33 passed、0 skipped、0 failed**。**完整仓库现有 92 项 + 新增测试的合并回归仍 NOT_RUN**，不得以加法声称总数。
+- 未模拟真实掉电、不同进程、WSL2 挂载、Windows 文件系统及跨进程严格 CAS。多文件写入的非原子性不变。

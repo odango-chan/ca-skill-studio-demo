@@ -58,7 +58,7 @@ def test_partial_save_leaves_journal_and_detects_state(world,monkeypatch):
     path=next(iter(sess))
     def fail(*args,**kwargs):
         path.write_text(sess[path].working_text)
-        raise BatchSaveUncertain('partial')
+        raise BatchSaveUncertain((path,), OSError('partial'))
     monkeypatch.setattr(rb,'save_batch',fail)
     with pytest.raises(rb.RecoveryRequired,match='PARTIAL') as error:
         rb.save_batch_recoverable(sess,package_root=root,staging_dir=stage,expected_package=before)
@@ -84,7 +84,7 @@ def test_all_new_but_writer_throws_is_uncertain_and_keeps_journal(world,monkeypa
     root,stage,before,sess=world
     def fail(*args,**kwargs):
         for p,s in sess.items():p.write_text(s.working_text)
-        raise BatchSaveUncertain('dir sync')
+        raise BatchSaveUncertain(tuple(sess), OSError('dir sync'))
     monkeypatch.setattr(rb,'save_batch',fail)
     with pytest.raises(rb.RecoveryRequired) as error:
         rb.save_batch_recoverable(sess,package_root=root,staging_dir=stage,expected_package=before)

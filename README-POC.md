@@ -21,3 +21,7 @@ python -m pytest -q
 新增 `package_guard.py`（完整 Skill 文件清单与 opaque 文件漂移检测）、`recovery_batch.py`（对已有 `save_batch` 的可选写入前恢复记录）、`test_package_guard.py` 和 `test_recovery_batch.py`。恢复记录存放在包外私有目录，只记录旧/新哈希；部分提交后要求人工核对，**不自动回滚**。详见 [Package Recovery POC](docs/reference/phase1-package-recovery.md)。
 
 本轮 **23 项新增隔离测试通过**，其中 8 项使用模拟批量写入器；上一轮仓库的 92 项测试本轮**未与新增测试合并运行**，不要推断 115 项全量 PASS。真正多文件提交仍非原子操作，单文件临时文件进入包目录的问题也尚未修复。
+
+## 2026-11-02：包外单文件保存与恢复联合测试
+
+`save_session` 已收紧为必须显式提供 `package_root` / `staging_dir`，并复用包外私有同文件系统暂存约束；不再允许写入时创建 Skill 根目录内临时文件。新增 `tests/test_recovery_real_workspace.py` 验证恢复封装与真实 `workspace.save_batch` 的正常和注入失败路径；同步修复 `BatchSaveUncertain` 测试参数。**隔离聚焦回归 33 PASS**，但完整旧/新合并回归仍 NOT_RUN。参见 [单文件保存](docs/reference/phase1-file-save-poc.md) 与 [Package Recovery](docs/reference/phase1-package-recovery.md)。

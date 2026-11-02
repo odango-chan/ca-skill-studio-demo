@@ -49,3 +49,11 @@ PASS
 ## Later batch-save note
 
 This single-file POC creates a temporary file in the destination directory. During saving, a concurrent Host traversal can observe this temporary file and temporarily change the complete Skill artifact digest. The separate [Workspace polling and batch-save POC](phase1-workspace-watch-batch.md) instead requires a private staging directory outside the Skill package. That batch still performs sequential, not atomic, multi-file replacements.
+
+## 安全修订：单文件包外暂存（2026-11-02）
+
+原 `save_session(path, session)` 在目标目录创建临时文件，即使最终删除，也可能影响并发 Host Artifact Digest 扫描。现在**保存写入必须同时显式提供** `package_root` 与 `staging_dir`；缺少参数直接 `FileSaveRejected`，不再默认写入 Skill 目录。
+
+用法：`save_session(path, session, package_root=skill_root, staging_dir=private_stage)`。暂存目录必须位于包外、与目标位于同一文件系统、归当前用户所有并保持 mode 0700。原 15 项单文件测试已经迁移为明确的包外暂存调用，新增缺失配置、包内目录和写入期间暂存位置保护测试。此项是 **POC API 的显式收紧**，不是兼容旧调用。
+
+聚焦集（含恢复联合测试）本地 **33 PASS、0 skipped**；完整仓库 92 项旧回归没有在本次与新增测试联合执行。文件元数据、非合作写入者竞争及掉电持久化限制仍然存在。

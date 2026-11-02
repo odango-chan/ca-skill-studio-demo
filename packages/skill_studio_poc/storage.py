@@ -154,13 +154,23 @@ def _check_pre_replace(path: Path, expected: DiskSnapshot) -> None:
         raise FileSaveRejected("source changed between temporary write and replace")
 
 
-def save_session(path: str | Path, session: EditorSession) -> EditorSession:
+def save_session(
+    path: str | Path, session: EditorSession, *,
+    package_root: Path | None = None, staging_dir: Path | None = None,
+) -> EditorSession:
     """Safely replace a single source under cooperating POSIX flock discipline.
 
     Before replace: all failures preserve the original file and session.
     After replace: fsync failure is *uncertain*, never claim rollback.
     """
     path = Path(path)
+    if package_root is None or staging_dir is None:
+        raise FileSaveRejected("explicit outside-package staging_dir and package_root required")
+    # No in-package temp files, even transiently: the Host artifact identity
+    # enumerates the entire Skill directory while saves may be in progress.
+    from .workspace import _private_stage_folder
+    staging_dir = Path(staging_dir)
+    _private_stage_folder(staging_dir, Path(package_root), path.parent)
     with _locked_source(path):
         snapshot = _read_snapshot(path)
         # This must reject stale snapshots / conflicts before temp files exist.
@@ -171,7 +181,7 @@ def save_session(path: str | Path, session: EditorSession) -> EditorSession:
         staged: str | None = None
         replaced = False
         try:
-            fd, staged = tempfile.mkstemp(prefix=f".{path.name}.skillstudio-", dir=path.parent)
+            fd, staged = tempfile.mkstemp(prefix="skillstudio-single-", dir=staging_dir)
             # Preserve standard mode bits; ACLs, xattrs, ownership, and other
             # metadata are intentionally not asserted to be preserved.
             os.fchmod(fd, stat.S_IMODE(snapshot.identity[2]))
