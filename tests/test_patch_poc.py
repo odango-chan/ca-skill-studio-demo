@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from hashlib import sha1
 import pytest
 
 from skill_studio_poc.patch import PatchRejected, SourceDocument, TypedPatch
@@ -114,8 +115,7 @@ def test_crlf_insert_preserves_crlf():
 
 def test_manifest_yaml_parses():
     manifest = ROOT / 'spec/editor-capability-manifest.yaml'
-    if not manifest.exists():
-        pytest.skip('Manifest exists in GitHub source checkout; not local scratch copy')
+    assert manifest.is_file(), 'complete repository Manifest is mandatory for Phase 1'
     result = load_demo_yaml(manifest.read_text(encoding='utf-8'))
     assert result['kind'] == 'EditorCapabilityManifest'
     assert result['authoringPolicy']['sourceAuthority'] == 'package-files'
@@ -125,8 +125,7 @@ def test_manifest_yaml_parses():
 
 
 def test_real_ensure_roundtrip_and_rename():
-    if not ENSURE.exists():
-        pytest.skip('versioned source fixtures exist in GitHub checkout')
+    assert ENSURE.is_file(), 'pinned ensure fixture is mandatory for Phase 1'
     doc = SourceDocument(ENSURE.read_text(encoding='utf-8'))
     assert doc.round_trip() == doc.text
     assert load_demo_yaml(doc.text) == doc.snapshot()
@@ -142,8 +141,7 @@ def test_real_ensure_roundtrip_and_rename():
 
 
 def test_real_establish_read_only_roundtrip():
-    if not ESTABLISH.exists():
-        pytest.skip('versioned source fixtures exist in GitHub checkout')
+    assert ESTABLISH.is_file(), 'pinned establish fixture is mandatory for Phase 1'
     doc = SourceDocument(ESTABLISH.read_text(encoding='utf-8'),profile='establish-pdu-session')
     assert doc.round_trip() == doc.text
     assert len(doc.snapshot()['procedures']) == 6
@@ -284,3 +282,21 @@ def test_sequence_insertion_rejects_malformed_verify_identifier():
                     expected_old=2,value={'verify':'a..b'},index=1,profile='poc-sequence')
     with pytest.raises(PatchRejected,match='single verify'):
         doc.preview(spec)
+
+
+def _git_blob_sha(raw: bytes) -> str:
+    return sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+
+
+def test_pinned_fixture_blobs_are_exact_upstream_bytes():
+    from json import loads
+    fixture_manifest = ROOT / 'fixtures/baseline/manifest.json'
+    assert fixture_manifest.is_file(), 'pinned fixture manifest is mandatory'
+    manifest = loads(fixture_manifest.read_text(encoding='utf-8'))
+    assert manifest['source']['commit'] == 'bf445ad777149af5af2dfa0a5bdea18d0451303e'
+    for entry in manifest['fixtures']:
+        source_path = ROOT / entry['path']
+        assert source_path.is_file(), f'missing pinned fixture: {source_path}'
+        raw = source_path.read_bytes()
+        assert _git_blob_sha(raw) == entry['sourceGitBlobSha'], f'fixture content drifted: {source_path}'
+        assert len(raw.decode('utf-8').split('\n')) == entry['sourceLines'], f'fixture lines drifted: {source_path}'

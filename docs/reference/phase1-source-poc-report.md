@@ -1,6 +1,6 @@
 # Phase 1 · Source-preserving Typed Patch POC
 
-**状态：PARTIAL · Not production-ready**
+**状态：Offline POC regression PASS (33 tests) · Production editor qualification still NOT_READY**
 
 ## 1. 范围
 
@@ -41,24 +41,35 @@ Visual Patch：
 
 ## 4. 本地测试结果
 
-在当前隔离环境执行 `python -m pytest -q -ra`：
+在完整固定样本与 Manifest 均已恢复、并经过 Git Blob SHA 校验的本地测试目录运行：
 
-- **27 passed**；
-- **2 skipped**（完整 CreatedSession Fixture 与现有远端 Manifest 在隔离本地工作目录不可用）；
-- **0 failed**；新增 8 项本地**合成源码**的 Validator 正反向测试通过。
+~~~text
+PYTHONPATH=packages python -m pytest -q -ra
+33 passed in 1.56s
+python -m compileall -q packages tests
+PASS
+~~~
 
-其中完整 `ensure-pdu-session` Fixture 的节点数、精确绑定的 RenameNode 与解析前后语义对照均通过。完整 `establish-pdu-session` Fixture 已以源 Git Blob 原样加入 Studio 分支，在完整仓库 checkout 中应重新运行上述两项测试；这里不声称已经运行。
+- **33 passed / 0 skipped / 0 failed**；
+- 原先缺失的 Manifest 和完整 CreatedSession Procedure 已按 Git Blob SHA 与当前 Studio 远端仓库原件核对一致；
+- ensure Procedure Blob：`1ead0efb0665b7ccb652501bc0075b36079c5017`；
+- establish Procedure Blob：`cf502fa54363a5302161cc7cccb191ce73e453de`；
+- Studio Capability Manifest Blob：`93b145396639dfee047f4da6ca94e894d47a976c`；
+- 两个曾 skipped 的测试现在实际执行：Manifest 使用 Demo 兼容 Loader 解析成功，完整 establish 源读取、语义对照和无修改保留成功；
+- 测试用例已改为 **fail-closed**：缺少 Manifest / Fixture 时直接失败，且固定 Fixture Git Blob 必须匹配基线清单；
+- CreatedSession 子集适配器对完整固定 establish 源报告 **0 diagnostics**；人为修改同一真实源的 Reconcile Target 和未批准 precondition Call，诊断正确拒绝。
+
+此处的 PASS 指 Studio 离线 POC 测试；**不等价于真实 Demo Validator、Runtime 兼容性或真实 5GC 验收**。
 
 ## 5. 尚未满足的 Phase 1 目标
 
-- 现有 `spec/editor-capability-manifest.yaml` 的实际 YAML Parser 回归在此隔离工作目录中 **NOT_RUN**，测试已入库，需在完整 checkout 验证。
-- 完整 `establish-pdu-session` 原文读取、过渡语法 parse 与无修改 round-trip 测试 **NOT_RUN**，测试已入库。
+- Manifest 的 Demo 兼容解析与完整 establish Procedure 只读回归已执行 PASS，不再列为缺口。
 - `InsertSequenceItem` 已完成**受限合成 Profile POC**，真实 Skill 的结构化 Phase / Step 编辑仍 **NOT_IMPLEMENTED**；禁止对 CreatedSession 开放。
 - Anchor / Alias 和 BOM 的保留 / 拒绝边界已有测试；anchors / merge keys 的可靠结构化编辑、复杂编码和无换行文件的序列插入仍 **NOT_PROVEN**，应视为 Source-only / Reject。
 - 跨文件 Rename / Undo-Redo 状态机 / File Watch / Save / 外部冲突处理 **NOT_IMPLEMENTED**。
-- `validator.py` 属于 **Demo-authoring subset adapter**，但未直接执行上游 `scripts/validate_docs.py` 或 `make verify`；本地 8 项合成场景不能代替真实固定 CreatedSession 源码的 validator 联合验收。**真实 Demo Validator PASS 仍为 NOT_RUN**。
+- `validator.py` 属于 **Demo-authoring subset adapter**；已用真实固定 establish 源及两种故障注入验证，但仍未直接执行上游 `scripts/validate_docs.py` 或 `make verify`，未证明与 Demo 完整 Validator 的逐项诊断等价。**真实 Demo Validator PASS 仍为 NOT_RUN**。
 - 所有 Capability / Observation / Script allowlist 的运行时可执行性 **NOT_PROVEN**。
 
 ## 6. 下一道闸门
 
-在真实 Git checkout 中运行测试，修复跳过项，验证固定 Manifest；随后对完整固定源码补齐无跳过回归，扩展合成 `InsertSequenceItem` 到真正被专用 Profile 验证的 Step 结构，并对接/对比 Demo 的真实 Validator（subset adapter 已实现）。取得完整 Round-trip / Patch 证据后，才把特定操作标记为 `editable`。本 POC **不修改 Capability Manifest 的编辑资格声明**。
+在固定 ca-agent-demo 完整源环境中直接运行其文档 / 专项 Validator，并把结果与 Studio 子集诊断做对照；再处理 Anchor / Alias、跨文件原子事务、Undo / Redo 和外部冲突。在特定 Profile 的 Parser、Typed Patch、无损回归和 Validator 证据全部齐备前，不授予结构化写回资格。本 POC **不修改 Capability Manifest 的编辑资格声明**。

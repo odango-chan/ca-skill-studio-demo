@@ -1,5 +1,6 @@
 """Synthetic, read-only tests; not a substitute for the pinned full Demo fixture."""
 from copy import deepcopy
+from pathlib import Path
 import yaml
 
 from skill_studio_poc.validator import (
@@ -87,3 +88,29 @@ def test_first_mutation_requires_three_jit_predicates():
 
 def test_parse_errors_are_diagnostics_not_exceptions():
     assert 'YAML_PARSE' in codes('procedures:\n  x: [invalid')
+
+
+def test_exact_pinned_createdsession_source_has_no_subset_diagnostics():
+    fixture = Path(__file__).resolve().parents[1] / 'fixtures/baseline/establish-pdu-session/procedure.yaml'
+    assert fixture.is_file(), 'complete CreatedSession source is mandatory'
+    assert validate_createdsession_source(fixture.read_text(encoding='utf-8')) == ()
+
+
+def test_real_createdsession_rejects_broken_reconcile_target():
+    fixture = Path(__file__).resolve().parents[1] / 'fixtures/baseline/establish-pdu-session/procedure.yaml'
+    assert fixture.is_file()
+    src = fixture.read_text(encoding='utf-8')
+    needle = 'OUTCOME_UNKNOWN: reconcile-nudm-sdm-subscribe'
+    assert src.count(needle) == 1
+    altered = src.replace(needle, 'OUTCOME_UNKNOWN: failed', 1)
+    assert 'RECONCILE_TARGET' in codes(altered)
+
+
+def test_real_createdsession_rejects_unsupported_precondition_operator():
+    fixture = Path(__file__).resolve().parents[1] / 'fixtures/baseline/establish-pdu-session/procedure.yaml'
+    assert fixture.is_file()
+    src = fixture.read_text(encoding='utf-8')
+    needle = 'call: ca.session.operation_context.read'
+    assert needle in src
+    altered = src.replace(needle, 'call: unapproved.action', 1)
+    assert 'PRECONDITION_CALL' in codes(altered)
