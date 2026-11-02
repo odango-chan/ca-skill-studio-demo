@@ -42,7 +42,7 @@ Visual Patch：
 
 在当前隔离环境执行 `python -m pytest -q`：
 
-- **18 passed**；
+- **19 passed**；
 - **2 skipped**（完整 CreatedSession Fixture 与现有远端 Manifest 在隔离本地工作目录不可用）；
 - **0 failed**。
 

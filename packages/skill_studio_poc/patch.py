@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from collections.abc import Mapping
-from io import StringIO
 import difflib
 import json
 import re
@@ -23,6 +22,7 @@ class PatchRejected(ValueError):
 
 
 _IDENTIFIER = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
+_DOTTED_IDENTIFIER = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$")
 _VERIFY_OUTCOMES = frozenset({"PASS", "FAIL", "UNKNOWN"})
 _CREATE_OUTCOMES = frozenset({"COMMITTED", "NOT_COMMITTED", "OUTCOME_UNKNOWN", "FAILED", "DENIED"})
 _RECONCILE_OUTCOMES = frozenset({"COMMITTED", "NOT_COMMITTED", "UNRESOLVED", "FAILED", "DENIED"})
@@ -172,7 +172,7 @@ class SourceDocument:
         if not isinstance(value, dict) or type(value) is not dict:
             raise PatchRejected("inserted Step must be a plain mapping")
         # For this small proof, support a syntactically safe minimal Step only.
-        if set(value) != {"verify"} or type(value["verify"]) is not str or not _IDENTIFIER.fullmatch(value["verify"].replace(".", "")):
+        if set(value) != {"verify"} or type(value["verify"]) is not str or not _DOTTED_IDENTIFIER.fullmatch(value["verify"]):
             raise PatchRejected("only a single verify Step is supported by the POC")
         for i in range(len(steps)):
             if not isinstance(steps[i], Mapping):

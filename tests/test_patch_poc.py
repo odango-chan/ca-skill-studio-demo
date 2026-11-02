@@ -275,3 +275,12 @@ def test_sequence_insertion_respects_crlf_and_initial_index():
     updated=doc.apply(doc.preview(spec))
     assert updated.text.replace('            - verify: fresh.ready\r\n','')==doc.text
     assert updated.snapshot()['procedures']['example']['nodes']['first']['preconditions']['steps'][0]['verify']=='fresh.ready'
+
+
+def test_sequence_insertion_rejects_malformed_verify_identifier():
+    doc=SourceDocument(SEQUENCE,profile='poc-sequence')
+    spec=TypedPatch('InsertSequenceItem',doc.source_revision,'example',
+                    path=('procedures','example','nodes','first','preconditions','steps'),
+                    expected_old=2,value={'verify':'a..b'},index=1,profile='poc-sequence')
+    with pytest.raises(PatchRejected,match='single verify'):
+        doc.preview(spec)
