@@ -25,6 +25,21 @@ jobs:
         run: |
           test -s site/index.html
           grep -q 'Skill Studio' site/index.html
+      - name: Validate HTML and JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re
+
+          source = Path("site/index.html").read_text(encoding="utf-8")
+          HTMLParser().feed(source)
+          assert source.lstrip().lower().startswith("<!doctype html>")
+          scripts = re.findall(r"<script>(.*?)</script>", source, flags=re.S)
+          assert len(scripts) == 1, "Expected exactly one embedded JavaScript block"
+          Path("/tmp/skill-studio-pages.js").write_text(scripts[0], encoding="utf-8")
+          PY
+          node --check /tmp/skill-studio-pages.js
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
