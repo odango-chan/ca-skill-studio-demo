@@ -72,3 +72,23 @@ export function inspectorTabItems(selection) {
 export function preferredTab(selection) {
   return selection?.kind==="route" ? "routes" : "overview";
 }
+
+/** Ordered execution summary for UI, never a runnable plan or a new YAML AST. */
+export function nodeJourney(procedure, nodeId) {
+  const detail=nodeDetails(procedure,nodeId);
+  if(!detail)return null;
+  const phase=name=>detail.conditions.find(p=>p.name===name)||null;
+  const sourceRoutes=name=>procedure.routes.filter(r=>r.source===nodeId&&r.routeSource===name+".on");
+  const mainRoutes=procedure.routes.filter(r=>r.source===nodeId&&r.routeSource==="operator.on");
+  return {
+    node:detail.node,
+    prepare:{phase:phase("preconditions"),routes:sourceRoutes("preconditions")},
+    execute:{operator:detail.node.operator,value:detail.node.value,
+      children:detail.childRefs.filter(r=>r.via==="operator"),routes:mainRoutes},
+    confirm:{phase:phase("postconditions"),routes:sourceRoutes("postconditions")},
+    branches:detail.outgoing,
+    incoming:detail.incoming,
+    children:detail.childRefs,
+    routeCount:detail.routeCount
+  };
+}

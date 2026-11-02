@@ -6,11 +6,13 @@ ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前实现（Stage: UX V2 Authoring Workspace + ELK large-graph navigation + Multi-Procedure explorer + bounded ensure SetRouteTarget）：
+当前实现（Stage: UX V3 light canvas-first authoring + ELK large-graph navigation + Multi-Procedure explorer + bounded ensure SetRouteTarget）：
 
 - 从固定的 Demo ensure-pdu-session 和 establish-pdu-session 的真实 YAML 文件投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
 - CreatedSession 样本支持 Root 和 5 个 Child Procedure 的下钻与返回，保留 Node 顺序和 Route Source（operator / preconditions / postconditions）；Phase Step 在 Inspector 按顺序展示，不把局部过程冒充业务 Node。
-- **UX V2 产品化工作区**：统一的文件状态与导出顶栏、Procedure 树、当前流程 Node 搜索与定位、Root / Child 路径、Visual / Source / Split 视图、可操作的 Inspector 概览 / 条件 / 路由标签。概览呈现 Operator 与 Child 入口，条件页按 YAML 原始顺序展示 Phase Steps，路由页区分原始 Route Source；仍然仅暴露已批准的两条 ensure Route Patch 操作。
+- **UX V3 浅色画布优先工作区**：全站采用浅色主题，画布、节点、边、Source、预览 Diff 统一白/浅灰/青绿配色，目录与详情可单独折叠，默认画布不被 Inspector 占据。点击 Node / Route 只出现画布内快捷操作卡，可以直接打开对应 Source、查看完整过程或进入唯一 Child。
+- **连续的 Node Journey Inspector**：不再频繁切换 tabs，Node 以「准备 → 执行 → 确认 → 分支」四阶段折叠区连续展示；Phase Step 与 Route 都保留原始来源和源码行号；复杂多 Procedure 仍完全只读。
+- 文件导出、Undo / Redo、Procedure Explorer、搜索、Root / Child 路径和 Visual / Source / Split 继续存在，保留旧的固定 ensure Route Patch 安全边界。
 - **ELK layered 自动布局**：从左到右 / 从上到下切换、正交边路径、画布平移缩放和适配；Node Outline 选择后自动居中；相邻视图只显示所选 Node 的入边/出边一跳，不改写 Source。
 - **按 Route Source 分组而非语义合并**：画布上的连线按 `source + target + routeSource` 分组；点击同一组连线可轮流定位每个原始 Route，在 Inspector 查看原始 outcome、target、line；Phase 的 on 路由不与 Operator 的 on 混淆。ELK 失败时退回旧布局，并显示状态。
 - Visual / Source / Split 三视图；画布支持平移、缩放、适配；Node Outline 搜索及按源码顺序导航；点击节点/边查看 Inspector 和 Source 行。
@@ -46,9 +48,11 @@ Visual 目前仅在 ensure 单 Procedure 的**两条固定失败终态 Route**�
 
 当前只建设 SKILL 开发与编辑，不做 Case、独立验证工作台、Registry / Publishing、Agent Runtime 调用或 Live 5GC。
 
-## UX V2 实现边界
+## UX V3 实现边界
 
 - Explorer 的 Procedure 树与 Node 列表只从当前解析投影生成；任何无法安全投影的 Source 都禁用图形选择与编辑。
-- Inspector 的分区纯属 UI 视图，**不改变 SKILL YAML 结构或引入新语法**，点击 Step 会定位真实 Source 行。
+- Inspector 的四阶段 Journey 纯属 UI 视图，**不改变 SKILL YAML 结构或引入新语法**，点击 Step 会定位真实 Source 行。
 - 文件状态表示是否与本次打开时的文本相同；导出触发浏览器下载，不是直接保存回原文件，也不会替用户标记为已保存。
 - 页面布局和键盘标签页可由静态 / 模型层回归检查；真实鼠标、键盘、辅助技术及手机交互浏览器 E2E 仍需单独验收。
+
+UX V3 的自动化测试覆盖控件存在性、Node Journey 语义投影、Route Source 隔离和 Source Patch 边界。**真实浏览器 E2E、视觉截图与可访问性测试仍为 NOT_RUN**，部署成功不应等同于这些验收完成。

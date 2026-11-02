@@ -10,6 +10,7 @@ const html = readFileSync("site/index.html", "utf8");
 if (!html.includes('src="./app.mjs"')) throw new Error("Unable to locate source app entry in HTML");
 writeFileSync(join(dist, "index.html"), html.replace('src="./app.mjs"', 'src="./app.js"'));
 copyFileSync("site/studio.css", join(dist, "studio.css"));
+copyFileSync("site/light.css", join(dist, "light.css"));
 copyFileSync("site/samples/ensure-pdu-session.procedure.yaml", join(dist, "samples/ensure-pdu-session.procedure.yaml"));
 copyFileSync("site/samples/establish-pdu-session.procedure.yaml", join(dist, "samples/establish-pdu-session.procedure.yaml"));
 

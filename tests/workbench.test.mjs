@@ -83,8 +83,9 @@ test("product shell includes all referenced static controls",()=>{
   const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
   const referenced=[...new Set([...app.matchAll(/\$\("([A-Za-z][A-Za-z0-9-]*)"\)/g)].map(m=>m[1]))];
   assert.deepEqual(referenced.filter(id=>!ids.has(id)),[]);
-  for(const id of ["procedureTree","inspectorTabs","inspectorContext","source",
-    "canvas","patchDialog","downloadButton","fileStatus","resetButton"]){
+  for(const id of ["procedureTree","nodeQuickCard","quickDetails","quickSource","inspectorContext","source",
+    "canvas","patchDialog","downloadButton","fileStatus","resetButton",
+    "toggleExplorer","toggleInspector","closeInspector","showAllLabels","clearSelection"]){
     assert.ok(ids.has(id),id);
   }
 });

@@ -45,10 +45,11 @@ jobs:
           html = Path("dist/index.html").read_text(encoding="utf-8")
           assert html.lstrip().lower().startswith("<!doctype html>")
           HTMLParser().feed(html)
-          for asset in ("./studio.css", "./app.js", "./samples/ensure-pdu-session.procedure.yaml", "./samples/establish-pdu-session.procedure.yaml"):
+          for asset in ("./studio.css", "./light.css", "./app.js", "./samples/ensure-pdu-session.procedure.yaml", "./samples/establish-pdu-session.procedure.yaml"):
               assert Path("dist", asset.removeprefix("./")).is_file(), asset
           assert 'src="./app.js"' in html
           assert 'href="./studio.css"' in html
+          assert 'href="./light.css"' in html
           assert not re.search(r'<script[^>]+src=["\']https?://', html, re.I)
           PY
       - name: Check JavaScript syntax
@@ -65,6 +66,7 @@ jobs:
           node --check tests/workspace.test.mjs
           node --check tests/layout.test.mjs
           node --check tests/workbench.test.mjs
+          node --check tests/journey.test.mjs
           node --check scripts/build.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5

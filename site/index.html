@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#0c1320">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f5f7fb">
   <title>ConnectionAgent — SKILL Studio</title>
   <link rel="stylesheet" href="./studio.css">
+  <link rel="stylesheet" href="./light.css">
 </head>
 <body>
 <div class="shell">
@@ -27,8 +28,8 @@
     </div>
   </header>
 
-  <main class="workbench">
-    <aside class="explorer" aria-label="SKILL Explorer">
+  <main class="workbench" id="workbench" data-explorer="open" data-inspector="closed">
+    <aside class="explorer" id="explorerPanel" aria-label="SKILL Explorer">
       <div class="panel-intro">
         <span class="eyebrow">WORKSPACE</span>
         <h2>探索器</h2>
@@ -74,6 +75,7 @@
       </div>
 
       <div class="modebar">
+        <button id="toggleExplorer" class="panel-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" title="展开或收起 Procedure 导航">☰ <span>目录</span></button>
         <div class="segmented" role="group" aria-label="编辑视图">
           <button id="mode-visual" type="button" aria-pressed="true">Visual</button>
           <button id="mode-source" type="button" aria-pressed="false">Source</button>
@@ -89,6 +91,8 @@
           <button id="neighborsOnly" type="button" aria-pressed="false" title="只显示选中节点的一跳邻居">聚焦邻居</button>
           <button id="centerSelection" type="button" title="定位当前选择">定位</button>
         </div>
+        <button id="showAllLabels" class="panel-toggle" type="button" aria-pressed="false" title="切换全部 Route 标签">全部标签</button>
+        <button id="toggleInspector" class="panel-toggle" type="button" aria-controls="inspectorPanel" aria-expanded="false" title="展开或收起节点详情">详情 ▣</button>
         <div class="zoom-actions">
           <button id="zoomOut" type="button" aria-label="缩小">−</button>
           <button id="zoomIn" type="button" aria-label="放大">+</button>
@@ -97,14 +101,27 @@
       </div>
 
       <div id="editorBody" class="editor-body" data-mode="visual">
-        <div id="graphPane" class="graph-pane">
-          <div class="canvas-help">拖动画布 · 滚轮缩放 · 双击单 Child 节点进入</div>
+        <div id="graphPane" class="graph-pane" data-labels="key">
+          <div class="canvas-help">点击节点看完整过程 · 双击进入子过程 · 滚轮缩放</div>
           <div id="layoutStatus" class="layout-status" role="status">准备布局…</div>
           <svg id="canvas" aria-label="Procedure control flow" role="img">
-            <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8198b5"></path></marker></defs>
+            <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#9cb0c7"></path></marker></defs>
             <g id="world"></g>
           </svg>
           <div id="graphWarning" class="graph-warning" role="alert" hidden></div>
+          <div id="nodeQuickCard" class="node-quick-card" hidden aria-live="polite">
+            <div class="quick-card-heading">
+              <span id="quickKind" class="quick-kind">NODE</span>
+              <button id="clearSelection" type="button" class="quick-close" aria-label="清除选择" title="清除选择">×</button>
+            </div>
+            <strong id="quickTitle"></strong>
+            <span id="quickSubtitle" class="quick-subtitle"></span>
+            <div class="quick-actions">
+              <button id="quickDetails" type="button">查看完整过程</button>
+              <button id="quickSource" type="button">打开 YAML</button>
+              <button id="quickChild" type="button" hidden>进入子过程 ↗</button>
+            </div>
+          </div>
         </div>
         <div id="sourcePane" class="source-pane">
           <div class="source-caption"><span class="source-indicator"></span> SOURCE · YAML 1.2 <span class="caption-note">直接修改源文件工作缓冲区</span></div>
@@ -118,12 +135,12 @@
       </div>
     </section>
 
-    <aside class="inspector-panel" aria-label="Node inspector">
-      <div class="inspector-header"><span class="eyebrow">INSPECTOR</span><span id="inspectorState" class="inspector-status">VIEW</span></div>
+    <aside class="inspector-panel" id="inspectorPanel" aria-label="Node inspector">
+      <div class="inspector-header"><span class="eyebrow">NODE JOURNEY</span><span id="inspectorState" class="inspector-status">READ ONLY</span><button id="closeInspector" type="button" class="quick-close" aria-label="收起详情" title="收起详情">×</button></div>
       <div id="inspectorContext" class="inspector-context"><h2>流程属性</h2><p>选择图上的一个节点查看详情</p></div>
-      <div id="inspectorTabs" class="inspector-tabs" role="tablist" aria-label="Inspector 分区"></div>
-      <div id="inspector" class="inspector-content" role="tabpanel" aria-live="polite"></div>
-      <div class="inspector-footer">只读结构与编辑资格分离 · Source 是唯一权威</div>
+      <div class="inspector-sequence" aria-hidden="true">准备 <span>→</span> 执行 <span>→</span> 确认 <span>→</span> 分支</div>
+      <div id="inspector" class="inspector-content" aria-live="polite"></div>
+      <div class="inspector-footer">流程为只读投影 · 查看源码可编辑 YAML，修改资格不会自动扩展</div>
     </aside>
   </main>
 
