@@ -2,6 +2,7 @@ import { layoutProcedure } from "./graph.mjs";
 import { layoutProcedureELK } from "./layout.mjs";
 import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
+import {procedureItems,nodeItems,nodeDetails,routeDetails,inspectorTabItems,preferredTab} from "./workbench.mjs";
 
 const $ = (id) => document.getElementById(id);
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -13,6 +14,7 @@ const nodeOutline = $("nodeOutline");
 const inspector = $("inspector");
 const problems = $("problems");
 const filePicker = $("filePicker");
+const procedureTree = $("procedureTree");
 let filename = "ensure-pdu-session.procedure.yaml";
 let initialText = "";
 let projection = null;
@@ -27,6 +29,7 @@ let dragging = null;
 let projectedText = null;
 let history = createEditorHistory("");
 let pendingPatch = null;
+let inspectorTab = "overview";
 let layoutDirection = "RIGHT";
 let neighborView = false;
 let layoutTicket = 0;
@@ -128,6 +131,8 @@ function loadDocument(name, text) {
   history = createEditorHistory(text);
   closePreview();
   selection = null;
+  inspectorTab = "overview";
+  $("search").value = "";
   lastGood = null;
   lastWorkspace = null;
   activeProcedureId = null;
@@ -144,7 +149,11 @@ function loadDocument(name, text) {
 }
 function refresh(refit = false) {
   const text = source.value;
-  setText("dirty", text === initialText ? "初始版本" : "未导出修改");
+  const dirty = text !== initialText;
+  setText("dirty", dirty ? "有未导出修改" : "初始版本");
+  $("dirty").classList.toggle("is-dirty",dirty);
+  $("fileStatus").classList.toggle("is-dirty",dirty);
+  $("fileStatus").lastChild.textContent = dirty ? "待导出" : "未修改";
   setText("stats", text.split("\n").length + " 行 · " + new TextEncoder().encode(text).length + " bytes");
   $("undoButton").disabled = !history.canUndo();
   $("redoButton").disabled = !history.canRedo();
@@ -190,6 +199,7 @@ function enterProcedure(name) {
   lastGood = lastWorkspace.procedures.get(name);
   graph = layoutProcedure(lastGood);
   selection = null;
+  inspectorTab = "overview";
   neighborView = false;
   $("neighborsOnly").setAttribute("aria-pressed","false");
   renderProcedureNavigation();
@@ -203,22 +213,37 @@ function renderProcedureNavigation() {
   const picker = $("procedurePicker");
   const unavailable = projection?.state !== "READY";
   picker.replaceChildren();
-  if (lastWorkspace) {
-    for (const [name, item] of lastWorkspace.procedures) {
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = (name === lastWorkspace.entry ? "ROOT · " : "CHILD · ") + name;
-      picker.appendChild(opt);
-    }
-    if (activeProcedureId) picker.value = activeProcedureId;
+  procedureTree.replaceChildren();
+  const items=procedureItems(lastWorkspace);
+  setText("procedureCount",items.length);
+  for(const item of items){
+    const option=document.createElement("option");
+    option.value=item.id;option.textContent=item.id;
+    picker.appendChild(option);
+    const b=document.createElement("button");
+    b.replaceChildren();
+    b.type="button";
+    b.className=(item.kind==="child"?"child ":"")+(item.id===activeProcedureId?"active":"");
+    b.setAttribute("aria-current",item.id===activeProcedureId?"page":"false");
+    b.disabled=unavailable;
+    const emblem=document.createElement("span");emblem.className="tree-icon";
+    emblem.textContent=item.kind==="root"?"◆":"◇";
+    const body=document.createElement("span");body.className="tree-info";
+    const title=document.createElement("span");title.className="tree-title";title.textContent=item.title;
+    const meta=document.createElement("span");meta.className="tree-description";
+    meta.textContent=(item.kind==="root"?"主流程":"子流程")+" · "+item.nodes+" Nodes";
+    body.append(title,meta);b.append(emblem,body);
+    b.addEventListener("click",()=>enterProcedure(item.id));
+    procedureTree.appendChild(b);
   }
-  picker.disabled = unavailable;
-  $("backProcedure").disabled = unavailable || !lastWorkspace || activeProcedureId === lastWorkspace.entry;
-  setText("procedureBread", unavailable
-    ? "Graph STALE / unavailable"
-    : (activeProcedureId === lastWorkspace.entry
-        ? "Root · " + activeProcedureId
-        : "Root / " + activeProcedureId));
+  if(activeProcedureId)picker.value=activeProcedureId;
+  picker.disabled=unavailable;
+  $("backProcedure").disabled=unavailable||!lastWorkspace||
+    activeProcedureId===lastWorkspace.entry;
+  setText("procedureBread",unavailable?"当前投影不可用":activeProcedureId||"Procedure");
+  setText("workspaceSummary",unavailable?"图形投影不可用":(items.length+" 个 Procedure"));
+  setText("editorContext",unavailable?"检查 Source 诊断":
+    (selection?.kind==="node"?"已选择节点":selection?.kind==="route"?"已选择路由":"选择节点查看属性"));
 }
 $("procedurePicker").addEventListener("change", value => enterProcedure(value.target.value));
 $("backProcedure").addEventListener("click", () => {
@@ -227,27 +252,34 @@ $("backProcedure").addEventListener("click", () => {
 
 function renderOutline() {
   nodeOutline.replaceChildren();
-  const search = $("search").value.trim().toLowerCase();
-  if (!lastGood) {
-    const p = document.createElement("li");
-    p.className = "muted";
-    p.textContent = "无可用 Node Outline";
-    nodeOutline.appendChild(p);
-    return;
+  const items=nodeItems(lastGood,$("search").value);
+  setText("outlineCount",items.length+"/"+(lastGood?.nodes.length??0));
+  if(!lastGood || !items.length) {
+    const li=document.createElement("li");
+    li.className="empty-state";
+    li.textContent=lastGood?"没有匹配的节点":"暂无节点";
+    nodeOutline.appendChild(li);return;
   }
-  lastGood.nodes.forEach((node, index) => {
-    if (search && ![node.id, node.value, node.operator].join(" ").toLowerCase().includes(search)) return;
-    const li = document.createElement("li");
-    const selected = selection?.kind === "node" && selection.id === node.id;
-    const prefix = String(index + 1).padStart(2, "0");
-    const b = button(prefix + " · " + node.id, () => selectNode(node.id), selected ? "active" : "");
-    b.title = node.operator + ": " + node.value;
-    b.disabled = projection?.state !== "READY";
-    li.appendChild(b);
-    nodeOutline.appendChild(li);
-  });
+  for(const item of items){
+    const li=document.createElement("li");
+    const b=button("",()=>selectNode(item.id));
+    const selected=selection?.kind==="node"&&selection.id===item.id;
+    if(selected)b.className="active";
+    b.disabled=projection?.state!=="READY";
+    b.title=item.operator+": "+item.identifier;
+    const op=document.createElement("span");
+    op.className="outline-kind"+(item.operator==="terminal"?" terminal":"");
+    op.textContent=item.operator==="procedure"?"PROC":item.operator==="terminal"?"END":item.operator==="verify"?"CHK":item.operator==="reconcile"?"REC":"CALL";
+    const name=document.createElement("span");name.className="outline-name";name.textContent=item.id;
+    b.append(op,name);
+    if(item.isStart||item.childCount){
+      const badge=document.createElement("span");badge.className="outline-arrow";
+      badge.textContent=item.isStart?"●":"↗";b.append(badge);
+    }
+    li.appendChild(b);nodeOutline.appendChild(li);
+  }
 }
-$("search").addEventListener("input", renderOutline);
+$("search").addEventListener("input",renderOutline);
 
 function lineJump(line) {
   if (!line || line < 1) return;
@@ -260,147 +292,237 @@ function lineJump(line) {
   const lineHeight = Number.parseFloat(getComputedStyle(source).lineHeight) || 20;
   source.scrollTop = Math.max(0, (line - 4) * lineHeight);
 }
-function inspectorLine(label, value) {
-  const row = document.createElement("div");
-  row.className = "inspector-row";
-  const head = document.createElement("span");
-  head.className = "muted";
-  head.textContent = label;
-  const valueEl = document.createElement("span");
-  valueEl.className = "code-value";
-  valueEl.textContent = String(value);
-  row.append(head, valueEl);
-  inspector.appendChild(row);
+function el(tag,className="",text) {
+  const item=document.createElement(tag);
+  if(className)item.className=className;
+  if(text!==undefined)item.textContent=String(text);
+  return item;
 }
-function inspectorTitle(text) {
-  const el = document.createElement("h3");
-  el.textContent = text;
-  inspector.appendChild(el);
+function inspectorLine(label,value,parent=inspector) {
+  const row=el("div","inspector-row");
+  row.append(el("span","muted",label),el("span","code-value",value));
+  parent.appendChild(row);
 }
-function inspectorRoute(route) {
-  const row = document.createElement("div");
-  row.className = "route-row";
-  const b = button(route.outcome + " → " + route.target, () => selectRoute(route.id), selection?.kind === "route" && route.id === selection.id ? "active" : "");
-  b.disabled = projection?.state !== "READY";
-  const jump = button("L" + route.line, () => lineJump(route.line), "source-link");
-  row.append(b, jump);
-  inspector.appendChild(row);
+function inspectorTitle(title,parent=inspector) {
+  parent.appendChild(el("h3","",title));
+}
+function inspectorNote(text,parent=inspector) {
+  parent.appendChild(el("p","subtle-note",text));
+}
+function section(title,count) {
+  const outer=el("section","inspector-section");
+  const head=el("div","inspector-section-head");
+  head.append(el("span","",title),el("span","section-count",count));
+  const body=el("div","inspector-section-body");
+  outer.append(head,body);inspector.appendChild(outer);
+  return body;
+}
+function inspectorRoute(route,parent=inspector) {
+  const row=el("div","route-row");
+  const b=button(route.outcome+" → "+route.target,()=>selectRoute(route.id),
+    selection?.kind==="route" && route.id===selection.id?"active":"");
+  b.disabled=projection?.state!=="READY";
+  b.title=route.routeSource+" · "+route.id;
+  const jump=button("L"+route.line,()=>lineJump(route.line),"source-link");
+  row.append(b,jump);parent.appendChild(row);
+}
+function inspectorNavigation() {
+  const tablist=$("inspectorTabs");
+  tablist.replaceChildren();
+  const items=inspectorTabItems(selection);
+  if(!items.some(item=>item.id===inspectorTab))inspectorTab="overview";
+  for(const item of items){
+    const tab=button(item.name,()=>{
+      inspectorTab=item.id;
+      renderInspector();
+    });
+    tab.setAttribute("role","tab");
+    tab.setAttribute("aria-selected",String(inspectorTab===item.id));
+    tab.setAttribute("tabindex",inspectorTab===item.id?"0":"-1");
+    tab.addEventListener("keydown",event=>{
+      if(event.key!=="ArrowLeft" && event.key!=="ArrowRight")return;
+      event.preventDefault();
+      const idx=items.findIndex(x=>x.id===inspectorTab);
+      const next=items[(idx+(event.key==="ArrowRight"?1:items.length-1))%items.length];
+      inspectorTab=next.id;renderInspector();
+      [...tablist.querySelectorAll('button')].find(b=>b.textContent===next.name)?.focus();
+    });
+    tablist.appendChild(tab);
+  }
+}
+function setInspectorContext(title,caption,kind="") {
+  const wrap=$("inspectorContext");
+  wrap.replaceChildren();
+  if(kind)wrap.appendChild(el("span","kind-label",kind));
+  wrap.appendChild(el("h2","",title));
+  wrap.appendChild(el("p","",caption));
+}
+function inspectorHero(value,description) {
+  const hero=el("div","info-hero");
+  hero.append(el("strong","",value),el("p","",description));
+  inspector.appendChild(hero);
+}
+function inspectorStats(stats) {
+  const grid=el("div","info-stats");
+  for(const [number,title] of stats){
+    const box=el("div","info-stat");
+    box.append(el("strong","",number),el("span","",title));
+    grid.appendChild(box);
+  }
+  inspector.appendChild(grid);
+}
+function inspectorSourceAction(line,label="在 Source 中定位") {
+  inspector.appendChild(button(label+" · L"+line,()=>lineJump(line),"source-link"));
+}
+function addPatchControls(route) {
+  const eligible=routeEditTargets(lastGood,route.id);
+  if(!eligible.length || lastWorkspace?.procedures.size!==1)return false;
+  const body=section("修改目标 · 有限授权","PATCH");
+  const note=el("p","subtle-note",
+    "仅固定 ensure 的两条失败 Route 可修改目标。Source Diff 确认后应用；不代表完整 Validator 通过。");
+  body.appendChild(note);
+  const select=el("select","target-select");
+  select.setAttribute("aria-label","选择新的终态目标");
+  for(const target of eligible){
+    const opt=el("option","",target);
+    opt.value=target;select.appendChild(opt);
+  }
+  select.value=route.target;body.appendChild(select);
+  const preview=button("预览 YAML 差异",()=>{
+    try{showPreview(previewRouteTargetPatch(source.value,route.id,select.value));}
+    catch(error){message("未应用："+String(error?.message??error));}
+  },"preview-button");
+  preview.disabled=true;
+  select.addEventListener("change",()=>{preview.disabled=select.value===route.target;});
+  body.appendChild(preview);
+  return true;
 }
 function renderInspector() {
   inspector.replaceChildren();
-  if (!lastGood) { inspectorTitle("尚未选择对象"); inspectorLine("模式", "Source-only"); return; }
-  if (projection?.state !== "READY") {
-    inspectorTitle("投影已过期");
-    inspectorLine("安全限制", "Source 改动无法被解析，选择和图形编辑已禁用");
+  if(!lastGood){
+    setInspectorContext("尚未载入 Procedure","打开一个 YAML 文件或加载示例。");
+    $("inspectorState").textContent="SOURCE";
+    inspectorTab="overview";inspectorNavigation();
+    inspectorNote("当前文件仅可在 Source 工作区查看或编辑。");return;
+  }
+  if(projection?.state!=="READY"){
+    setInspectorContext("投影不可用","当前 Source 与图形不同步。");
+    $("inspectorState").textContent="STALE";
+    inspectorTab="overview";inspectorNavigation();
+    inspectorNote("Source 存在无法安全投影的修改。请先解决诊断；图形及 Inspector 的选择已停用。");return;
+  }
+  const route=selection?.kind==="route" ? routeDetails(lastGood,selection.id):null;
+  const node=selection?.kind==="node" ? nodeDetails(lastGood,selection.id):null;
+  const editable=Boolean(route&&routeEditTargets(lastGood,route.id).length&&lastWorkspace?.procedures.size===1);
+  $("inspectorState").textContent=editable?"PATCH":"READ ONLY";
+  if(!node&&!route){
+    setInspectorContext(lastGood.name,"Procedure · "+lastGood.nodes.length+" Nodes / "+lastGood.routes.length+" Routes","PROCEDURE");
+    inspectorTab="overview";inspectorNavigation();
+    inspectorHero("从画布开始","点击节点查看 Operator、Condition 与 Route。也可以从左侧的 Node 列表快速定位。");
+    inspectorStats([[lastGood.nodes.length,"Nodes"],[lastGood.routes.length,"Route entries"],
+      [lastGood.children?.length??0,"Child calls"],[lastWorkspace?.procedures.size??1,"Procedures"]]);
+    const details=section("当前 Procedure","SOURCE");
+    inspectorLine("Start",lastGood.start,details);
+    inspectorLine("Source", "L"+lastGood.line,details);
+    inspectorLine("可视化","源文件只读投影",details);
+    inspectorSourceAction(lastGood.line,"查看 Procedure 定义");
     return;
   }
-  if (!selection) {
-    inspectorTitle(lastGood.name);
-    inspectorLine("入口", lastGood.start);
-    inspectorLine("Node", lastGood.nodes.length);
-    inspectorLine("Route entries", lastGood.routes.length);
-    inspectorLine("本文件 Procedure", lastWorkspace?.procedures.size ?? 1);
-    inspectorLine("Child references", lastGood.children?.length ?? 0);
-    inspectorLine("编辑资格", lastWorkspace?.procedures.size > 1 ? "Visual read-only" : "有限 SetRouteTarget");
-    inspectorLine("语法范围", lastGood.profile + " · 无 Runtime 验证");
-    return;
-  }
-  if (selection.kind === "node") {
-    const node = lastGood.nodes.find(n => n.id === selection.id);
-    if (!node) return;
-    inspectorTitle(node.id);
-    inspectorLine("Operator", node.operator.toUpperCase());
-    inspectorLine("Identifier", node.value);
-    inspectorLine("Source", "L" + node.line);
-    inspector.appendChild(button("定位 Source 行", () => lineJump(node.line), "source-link"));
-    if (node.children?.length) {
-      inspectorTitle("Child Procedure");
-      for (const child of node.children) {
-        inspectorLine("调用位置", child.via + " · L" + child.line);
-        inspector.appendChild(button("进入 " + child.procedure, () => enterProcedure(child.procedure), "preview-button"));
+  if(node){
+    setInspectorContext(node.node.id,node.node.value,node.node.operator.toUpperCase()+(node.start?" · START":""));
+    inspectorNavigation();
+    if(inspectorTab==="overview"){
+      inspectorHero(node.node.operator.toUpperCase()+" · "+node.node.value,
+        node.childRefs.length?"此节点包含 Child Procedure 调用。":"当前节点的主要 Operator 与基本信息。");
+      const meta=section("基础属性","SOURCE");
+      inspectorLine("Node ID",node.node.id,meta);
+      inspectorLine("Operator",node.node.operator.toUpperCase(),meta);
+      inspectorLine("行号","L"+node.node.line,meta);
+      inspectorLine("Start",node.start?"是":"否",meta);
+      inspectorSourceAction(node.node.line,"定位节点定义");
+      if(node.childRefs.length){
+        const children=section("子过程调用",node.childRefs.length);
+        for(const child of node.childRefs){
+          inspectorLine("来源",child.via+" · L"+child.line,children);
+          children.appendChild(button("进入 · "+child.procedure,
+            ()=>enterProcedure(child.procedure),"preview-button"));
+        }
       }
-    }
-    if (node.phases?.length) {
-      inspectorTitle("Phases · 按 Source 顺序");
-      for (const phase of node.phases) {
-        inspectorLine(phase.name.toUpperCase(), phase.steps.length + " steps · L" + phase.line);
-        for (const step of phase.steps) {
-          const b = button(step.index + ". " + (step.name ? step.name + " · " : "") +
-            step.operator.toUpperCase() + " " + step.value,
-            () => lineJump(step.line), "phase-step");
-          b.title = phase.name + " step " + step.index + " at L" + step.line;
-          inspector.appendChild(b);
+      inspectorStats([[node.conditions.reduce((n,p)=>n+p.steps.length,0),"Phase steps"],
+        [node.routeCount,"Outgoing routes"]]);
+    }else if(inspectorTab==="conditions"){
+      if(!node.conditions.length){
+        inspectorHero("未定义前后置条件","此节点没有显式的 Preconditions 或 Postconditions；不会自动创建额外的检查节点。");
+      }else{
+        for(const phase of node.conditions){
+          const body=section(phase.name==="preconditions"?"前置条件":"后置条件",
+            phase.steps.length+" STEPS");
+          inspectorLine("YAML 位置","L"+phase.line,body);
+          for(const step of phase.steps){
+            const label=step.index+". "+(step.name?step.name+" · ":"")+
+              step.operator.toUpperCase()+" "+step.value;
+            const control=button(label,()=>lineJump(step.line),"phase-step");
+            control.title="定位 Source L"+step.line;
+            body.appendChild(control);
+          }
+          if(!phase.steps.length)body.appendChild(el("p","muted","无显式 Steps"));
+          inspectorLine("Phase routes",phase.routeCount,body);
+        }
+      }
+      inspectorNote("Phase Steps 属于局部过程，按 YAML 顺序展示，不会作为单独业务 Node 插入流程图。");
+    }else if(inspectorTab==="routes"){
+      if(!node.outgoing.length)inspectorHero("终态节点","当前节点没有 Outgoing Route。");
+      for(const group of node.outgoing){
+        const body=section("出站 · "+group.title,group.entries.length);
+        for(const item of group.entries)inspectorRoute(item,body);
+      }
+      if(node.incoming.length){
+        for(const group of node.incoming){
+          const body=section("入站 · "+group.title,group.entries.length);
+          for(const item of group.entries)inspectorRoute(item,body);
         }
       }
     }
-    inspectorTitle("显式 Route entries");
-    const outgoing = lastGood.routes.filter(r => r.source === node.id);
-    if (!outgoing.length) inspectorLine("终态", "没有路由");
-    for (const route of outgoing) {
-      inspectorLine("来源", route.routeSource);
-      inspectorRoute(route);
-    }
-    const incoming = lastGood.routes.filter(r => r.target === node.id);
-    inspectorTitle("Incoming · " + incoming.length);
-    for (const route of incoming) inspectorRoute(route);
-  } else if (selection.kind === "route") {
-    const route = lastGood.routes.find(r => r.id === selection.id);
-    if (!route) return;
-    inspectorTitle("Route · " + route.outcome);
-    inspectorLine("Route Source", route.routeSource);
-    inspectorLine("Source Node", route.source);
-    inspectorLine("Outcome", route.outcome);
-    inspectorLine("Target", route.target);
-    inspectorLine("Source", "L" + route.line);
-    inspector.appendChild(button("定位 Route 源码", () => lineJump(route.line), "source-link"));
-    const eligibleTargets = routeEditTargets(lastGood, route.id);
-    if (eligibleTargets.length && lastWorkspace?.procedures.size === 1) {
-      inspectorTitle("SetRouteTarget · 限定试验");
-      const warning = document.createElement("p");
-      warning.className = "subtle-note";
-      warning.textContent = "只支持固定 ensure 拓扑中的两条失败 Route；从 YAML CST Source Span 定位标量、预览 Diff 后确认。不是完整 Demo Validator。";
-      inspector.appendChild(warning);
-      const select = document.createElement("select");
-      select.className = "target-select";
-      select.setAttribute("aria-label", "选择新的终态目标");
-      for (const target of eligibleTargets) {
-        const option = document.createElement("option");
-        option.value = target;
-        option.textContent = target;
-        select.appendChild(option);
-      }
-      select.value = route.target;
-      inspector.appendChild(select);
-      const previewButton = button("预览 YAML Patch", () => {
-        try {
-          const patch = previewRouteTargetPatch(source.value, route.id, select.value);
-          showPreview(patch);
-        } catch (error) {
-          message("未应用：" + String(error?.message ?? error));
-        }
-      }, "preview-button");
-      select.addEventListener("change", () => { previewButton.disabled = select.value === route.target; });
-      previewButton.disabled = true;
-      inspector.appendChild(previewButton);
+  }else if(route){
+    setInspectorContext(route.outcome+" → "+route.target,
+      route.source+" · "+route.routeSource,"ROUTE");
+    inspectorNavigation();
+    if(inspectorTab==="overview"){
+      inspectorHero("来源明确的 Route","当前连线由 YAML 中的明确 Outcome 映射生成，视图中的分组不会合并原始 Route。");
+      const meta=section("Route 信息","SOURCE");
+      inspectorLine("Source",route.source,meta);
+      inspectorLine("Outcome",route.outcome,meta);
+      inspectorLine("Target",route.target,meta);
+      inspectorLine("来源",route.routeSource,meta);
+      inspectorSourceAction(route.line,"定位 YAML Route");
+    }else{
+      const meta=section("路由映射","SOURCE");
+      inspectorLine("From",route.source,meta);
+      inspectorLine("Outcome",route.outcome,meta);
+      inspectorLine("To",route.target,meta);
+      inspectorLine("Route Source",route.routeSource,meta);
+      inspectorLine("行号","L"+route.line,meta);
+      inspectorSourceAction(route.line,"跳转到 Route 源码");
+      addPatchControls(route);
     }
   }
-  const note = document.createElement("p");
-  note.className = "subtle-note";
-  note.textContent = lastWorkspace?.procedures.size > 1
-    ? "多 Procedure / Phase 当前只读。仅查看真实 Source，不展开 Phase 为业务节点，也不运行 Runtime。"
-    : "仅固定 ensure 的两条失败 Route 可进行受限 Typed Patch；其他 Visual 修改未开放。";
-  inspector.appendChild(note);
+  inspectorNote(lastWorkspace?.procedures.size>1
+    ?"当前多 Procedure 与 Phase 保持只读；可在 Source 编辑，图形不获得新的修改授权。"
+    :"仅特定 ensure 失败 Route 允许受限修改；其他结构仍为只读。");
 }
 function renderProblems() {
   problems.replaceChildren();
   const title = document.createElement("strong");
-  title.textContent = "Problems · 仅投影解析反馈";
+  title.textContent = "PROBLEMS";
   problems.appendChild(title);
   const items = projection?.diagnostics ?? [];
   if (!items.length) {
     const text = document.createElement("span");
-    text.textContent = "当前有限 Profile 可投影；不代表完整 YAML 或 Runtime 验证通过。";
+    text.className = "problem-success";
+    text.textContent = "0 个投影问题";
     problems.appendChild(text);
+    problems.appendChild(el("span","muted",
+      "本地结构投影 · 不代表完整 Runtime Validator PASS"));
   } else {
     for (const item of items) {
       const b = button("L" + item.line + " · " + item.message, () => lineJump(item.line));
@@ -411,7 +533,9 @@ function renderProblems() {
 function selectNode(id) {
   if (projection?.state !== "READY") return;
   selection = {kind:"node",id};
+  inspectorTab = preferredTab(selection);
   renderOutline();
+  renderProcedureNavigation();
   renderInspector();
   if(neighborView)scheduleELKLayout(0,true);
   else{
@@ -422,7 +546,9 @@ function selectNode(id) {
 function selectRoute(id) {
   if(projection?.state!=="READY")return;
   selection={kind:"route",id};
+  inspectorTab=preferredTab(selection);
   renderOutline();
+  renderProcedureNavigation();
   renderInspector();
   renderGraph();
 }

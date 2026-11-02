@@ -59,10 +59,12 @@ jobs:
           node --check site/semantic.mjs
           node --check site/workspace.mjs
           node --check site/layout.mjs
+          node --check site/workbench.mjs
           node --check tests/graph.test.mjs
           node --check tests/patch.test.mjs
           node --check tests/workspace.test.mjs
           node --check tests/layout.test.mjs
+          node --check tests/workbench.test.mjs
           node --check scripts/build.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
