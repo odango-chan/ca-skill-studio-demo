@@ -31,7 +31,7 @@ Visual 目前仅在 ensure 单 Procedure 的**两条固定失败终态 Route**�
 
 ## Actions / Pages
 
-.github/workflows/pages.yml 支持 push main 的静态站点变更自动部署以及 workflow_dispatch 手动触发。Build Job 使用 Node 24 安装固定版本 yaml@2.9.1、elkjs@0.12.1 和 esbuild@0.28.2，执行 YAML CST / Typed Route Patch / ELK 布局回归测试，构建自包含浏览器 bundle（dist/），并发布 dist/ 到 Pages。首次 ELK 流水线会产生更新锁文件附件，之后重新提交 lock 并恢复 npm ci。package-lock.json 已从通过的 CI 构建原样归档到仓库，后续统一使用 npm ci 进行锁定依赖安装。
+.github/workflows/pages.yml 支持 push main 的静态站点变更自动部署以及 workflow_dispatch 手动触发。Build Job 使用 Node 24 安装固定版本 yaml@2.9.1、elkjs@0.12.1 和 esbuild@0.28.2，执行 YAML CST / Typed Route Patch / ELK 布局回归测试，构建自包含浏览器 bundle（dist/），并发布 dist/ 到 Pages。package-lock.json 已与成功构建的 GitHub Actions 产物进行字节级 Git Blob SHA 对比并固定入库，流水线使用 npm ci 安装精确依赖。package-lock.json 已从通过的 CI 构建原样归档到仓库，后续统一使用 npm ci 进行锁定依赖安装。
 
 - [Actions](https://github.com/odango-chan/ca-skill-studio-demo/actions/workflows/pages.yml)
 - [PR #1 · UX / Architecture](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)
