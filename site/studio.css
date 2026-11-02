@@ -26,3 +26,14 @@
 .phase-step{display:block;text-align:left;width:100%;background:#1b2b41;border:1px solid #344b67;margin:6px 0;padding:8px;font:11px/1.55 ui-monospace,monospace;overflow-wrap:anywhere}
 .sidebar-actions{grid-template-columns:1fr}
 @media(max-width:620px){.procedure-navigation #procedureBread{width:100%}.sidebar-actions{grid-template-columns:1fr 1fr}.sidebar-actions #openButton{grid-column:span 2}}
+
+/* ELK large graph navigation */
+.modebar{flex-wrap:wrap}
+.graph-options{display:flex;align-items:center;gap:6px}
+.graph-options select{color:#d7e7fc;border:1px solid #405a7b;border-radius:7px;background:#1c3048;font:11px ui-monospace,monospace;padding:8px}
+.graph-options button[aria-pressed="true"]{border-color:#b6d6ff;color:#fff;background:#385c88}
+.layout-status{position:absolute;right:12px;top:12px;z-index:3;border:1px solid #38506f;background:#132238e8;color:#bbd5f5;border-radius:8px;font:11px ui-monospace,monospace;padding:7px 9px;pointer-events:none}
+.edge-label{font-size:10px}
+.edge-label-bg{fill:#14263b;fill-opacity:.94}
+@media(max-width:1130px){.mode-help{display:none}}
+@media(max-width:620px){.graph-options{order:3;flex-wrap:wrap}.modebar{gap:7px}.zoom-actions{margin-left:auto}.layout-status{top:43px}}

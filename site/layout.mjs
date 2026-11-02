@@ -1,0 +1,134 @@
+import ELK from "elkjs/lib/elk.bundled.js";
+
+// Visual-only graph extraction. The original Procedure route list and source
+// locations remain untouched; grouping never merges distinct Source origins.
+const DIMENSION = Object.freeze({ width: 238, height: 80 });
+const DIRECTIONS = new Set(["RIGHT", "DOWN"]);
+const MAX_NODE_COUNT = 300;
+const MAX_ROUTE_COUNT = 1600;
+const elk = new ELK();
+
+export function selectGraphScope(procedure, centerId = null, neighborsOnly = false) {
+  const nodes = procedure.nodes;
+  const routes = procedure.routes;
+  if (!neighborsOnly || !centerId || !nodes.some(n => n.id === centerId)) {
+    return { nodes, routes, isFiltered: false };
+  }
+  const ids = new Set([centerId]);
+  for (const r of routes) {
+    if (r.source === centerId) ids.add(r.target);
+    if (r.target === centerId) ids.add(r.source);
+  }
+  return {
+    nodes: nodes.filter(n => ids.has(n.id)),
+    routes: routes.filter(r => ids.has(r.source) && ids.has(r.target)),
+    isFiltered: true
+  };
+}
+
+export function groupRouteEntries(routes) {
+  const groups = new Map();
+  for (const route of routes) {
+    // Route Source is part of visual identity. Same source+target from an
+    // operator and a postcondition must NEVER become one indistinguishable line.
+    const key = JSON.stringify([route.source, route.target, route.routeSource]);
+    if (!groups.has(key)) groups.set(key, {
+      source: route.source, target: route.target,
+      routeSource: route.routeSource, outcomes: [], routes: []
+    });
+    const g = groups.get(key);
+    g.outcomes.push(route.outcome);
+    g.routes.push(route);
+  }
+  return [...groups.values()];
+}
+
+function validate(procedure, scope, direction) {
+  if (!DIRECTIONS.has(direction)) throw Error("Unsupported graph direction");
+  if (!procedure?.nodes || !procedure?.routes ||
+    procedure.nodes.length > MAX_NODE_COUNT ||
+    procedure.routes.length > MAX_ROUTE_COUNT) throw Error("Graph exceeds preview bounds");
+  const ids = new Set(scope.nodes.map(n => n.id));
+  if (ids.size !== scope.nodes.length) throw Error("Duplicate graph node");
+  for (const route of scope.routes) {
+    if (!ids.has(route.source) || !ids.has(route.target)) throw Error("Unresolved route in graph scope");
+  }
+}
+function serializePath(sections, offset = 30) {
+  if (!Array.isArray(sections) || !sections.length) return null;
+  const all = [];
+  for (const section of sections) {
+    if (!section.startPoint || !section.endPoint) continue;
+    const points = [section.startPoint, ...(section.bendPoints ?? []), section.endPoint];
+    all.push(points.map((point, i) => (i ? "L" : "M") +
+      (point.x + offset).toFixed(1) + " " + (point.y + offset).toFixed(1)).join(" "));
+  }
+  return all.length ? all.join(" ") : null;
+}
+function labelPoint(sections, source, target, positions) {
+  const segments = [];
+  for (const section of sections || []) {
+    const points = [section.startPoint, ...(section.bendPoints ?? []), section.endPoint].filter(Boolean);
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1], b = points[i];
+      segments.push({length: Math.abs(a.x - b.x) + Math.abs(a.y - b.y),
+        x: (a.x + b.x) / 2 + 30, y: (a.y + b.y) / 2 + 30});
+    }
+  }
+  if (segments.length) {
+    segments.sort((a, b) => b.length - a.length);
+    return {x:segments[0].x,y:segments[0].y-9};
+  }
+  const a=positions.get(source), b=positions.get(target);
+  return {x: ((a?.x || 0) + (b?.x || 0)) / 2 + 70,
+    y: ((a?.y || 0) + (b?.y || 0)) / 2 - 9};
+}
+
+export async function layoutProcedureELK(procedure, {
+  direction = "RIGHT", focus = null, neighborsOnly = false
+} = {}) {
+  const scope = selectGraphScope(procedure, focus, neighborsOnly);
+  validate(procedure, scope, direction);
+  const bundles = groupRouteEntries(scope.routes);
+  const edges = bundles.map((b,i) => ({
+    id: "bundle-" + i, sources: [b.source], targets: [b.target]
+  }));
+  const input = {
+    id: "skill-procedure",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": direction,
+      "elk.edgeRouting": "ORTHOGONAL",
+      "elk.spacing.nodeNode": "70",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "125",
+      "elk.layered.spacing.edgeNodeBetweenLayers": "35",
+      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+      "elk.padding": "[left=35, top=35, right=35, bottom=35]"
+    },
+    children: scope.nodes.map(n => ({id: n.id, ...DIMENSION})),
+    edges
+  };
+  const output = await elk.layout(input);
+  if (!output || !Array.isArray(output.children) || output.children.length !== scope.nodes.length)
+    throw Error("ELK returned incomplete node positions");
+  const offset = 30;
+  const positions = new Map();
+  for (const node of output.children) {
+    if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) throw Error("ELK returned nonfinite coordinates");
+    positions.set(node.id,{x: node.x + offset, y: node.y + offset});
+  }
+  const edgeMap = new Map((output.edges||[]).map(e=>[e.id,e]));
+  for (let i=0;i<bundles.length;i++) {
+    const e=edgeMap.get("bundle-"+i);
+    bundles[i].path=serializePath(e?.sections, offset);
+    bundles[i].label=labelPoint(e?.sections,bundles[i].source,bundles[i].target,positions);
+  }
+  if (!bundles.every(b => b.routes.length > 0)) throw Error("ELK empty route bundle");
+  if (bundles.reduce((total,b)=>total+b.routes.length,0)!==scope.routes.length)
+    throw Error("ELK bundle changed route entry accounting");
+  const width=(output.width??100)+2*offset, height=(output.height??100)+2*offset;
+  if (!Number.isFinite(width) || !Number.isFinite(height)) throw Error("ELK invalid graph dimensions");
+  return { positions, bundles, width, height,
+    visibleNodes: scope.nodes, visibleRoutes: scope.routes,
+    isFiltered: scope.isFiltered, direction, engine: "ELK layered" };
+}

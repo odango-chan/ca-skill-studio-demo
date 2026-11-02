@@ -12,14 +12,14 @@
   <header class="topbar">
     <div class="logo" aria-hidden="true">CA</div>
     <div class="branding">
-      <h1>Skill Studio <span class="chip">Multi Procedure explorer</span></h1>
+      <h1>Skill Studio <span class="chip">ELK graph explorer</span></h1>
       <p>ConnectionAgent · Source-authoritative authoring</p>
     </div>
     <div class="header-right"><span id="projectionState" class="projection" role="status">LOADING</span>
       <a href="https://github.com/odango-chan/ca-skill-studio-demo" target="_blank" rel="noopener noreferrer">Repository</a>
     </div>
   </header>
-  <div class="scope-note"><strong>YAML AST/CST 有限预览：</strong>图形从当前 YAML 的 <em>ensure-cst-v1</em> 结构即时投影；并非通用 YAML Parser、Runtime Validator 或 Visual Typed Patch。图形支持 Root / Child Procedure 导航、Phase / Step 检视，以及 ensure 固定失败 Route 的受限 Target 修改（先 Diff 再 Apply）；<strong>其余编辑请使用 Source</strong>，不会执行 Skill / Script / Capability。</div>
+  <div class="scope-note"><strong>YAML AST/CST 有限预览：</strong>图形从当前 YAML 的 <em>ensure-cst-v1</em> 结构即时投影；并非通用 YAML Parser、Runtime Validator 或 Visual Typed Patch。图形使用 ELK 自动布局，可按 Route Source 分组、切换相邻视图和定位节点；支持 Root / Child Procedure 导航、Phase / Step 检视，以及 ensure 固定失败 Route 的受限 Target 修改（先 Diff 再 Apply）；<strong>其余编辑请使用 Source</strong>，不会执行 Skill / Script / Capability。</div>
   <main class="workbench">
     <aside class="explorer">
       <div class="sidebar-title">SOURCE WORKSPACE</div>
@@ -59,7 +59,16 @@
           <button id="mode-source" type="button" aria-pressed="false">Source</button>
           <button id="mode-split" type="button" aria-pressed="false">Split</button>
         </div>
-        <span class="muted mode-help">Control Flow · Root / Child navigation · guarded ensure patch</span>
+        <span class="muted mode-help">ELK layered · 路由按来源分别呈现 · Source 不变</span>
+        <div class="graph-options">
+          <label for="layoutDirection" class="sr-only">自动布局方向</label>
+          <select id="layoutDirection" aria-label="自动布局方向">
+            <option value="RIGHT">从左到右</option>
+            <option value="DOWN">从上到下</option>
+          </select>
+          <button id="neighborsOnly" type="button" aria-pressed="false" title="仅看所选 Node 及其直接邻居（不会改变 Source）">相邻视图</button>
+          <button id="centerSelection" type="button" title="定位选中的 Node；未选择时适配全图">定位</button>
+        </div>
         <div class="zoom-actions">
           <button id="zoomOut" type="button" aria-label="缩小">−</button>
           <button id="zoomIn" type="button" aria-label="放大">+</button>
@@ -68,7 +77,8 @@
       </div>
       <div id="editorBody" class="editor-body" data-mode="visual">
         <div id="graphPane" class="graph-pane">
-          <div class="canvas-help">滚轮缩放 · 空白处拖拽平移 · 单击 Node / Route 查看详情</div>
+          <div class="canvas-help">滚轮缩放 · 拖拽平移 · 选 Node 定位 · 点击同一组 Route 可轮换条目</div>
+          <div id="layoutStatus" class="layout-status" role="status">正在准备布局…</div>
           <svg id="canvas" aria-label="Procedure control flow" role="img">
             <defs>
               <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">

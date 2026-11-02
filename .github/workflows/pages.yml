@@ -30,7 +30,13 @@ jobs:
         with:
           node-version: "24"
       - name: Install exact toolchain dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
+      - name: Archive verified dependency lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-elk-lock
+          path: package-lock.json
+          retention-days: 7
       - name: Run YAML AST / CST regression tests
         run: npm test
       - name: Bundle browser site
@@ -58,9 +64,11 @@ jobs:
           node --check site/patch.mjs
           node --check site/semantic.mjs
           node --check site/workspace.mjs
+          node --check site/layout.mjs
           node --check tests/graph.test.mjs
           node --check tests/patch.test.mjs
           node --check tests/workspace.test.mjs
+          node --check tests/layout.test.mjs
           node --check scripts/build.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5

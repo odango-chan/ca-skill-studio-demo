@@ -6,10 +6,12 @@ ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前实现（Stage: Multi-Procedure read-only explorer + bounded ensure SetRouteTarget）：
+当前实现（Stage: ELK large-graph navigation + Multi-Procedure explorer + bounded ensure SetRouteTarget）：
 
 - 从固定的 Demo ensure-pdu-session 和 establish-pdu-session 的真实 YAML 文件投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
 - CreatedSession 样本支持 Root 和 5 个 Child Procedure 的下钻与返回，保留 Node 顺序和 Route Source（operator / preconditions / postconditions）；Phase Step 在 Inspector 按顺序展示，不把局部过程冒充业务 Node。
+- **ELK layered 自动布局**：从左到右 / 从上到下切换、正交边路径、画布平移缩放和适配；Node Outline 选择后自动居中；相邻视图只显示所选 Node 的入边/出边一跳，不改写 Source。
+- **按 Route Source 分组而非语义合并**：画布上的连线按 `source + target + routeSource` 分组；点击同一组连线可轮流定位每个原始 Route，在 Inspector 查看原始 outcome、target、line；Phase 的 on 路由不与 Operator 的 on 混淆。ELK 失败时退回旧布局，并显示状态。
 - Visual / Source / Split 三视图；画布支持平移、缩放、适配；Node Outline 搜索及按源码顺序导航；点击节点/边查看 Inspector 和 Source 行。
 - 支持导入本地文本文件、直接编辑 Source、重置本地缓冲区、导出文件。
 - **第一条 Visual 编辑纵切**：Inspector 只允许对固定 ensure 结构中的 verify-created-target.FAIL 和 observe-session-absence.FAIL 修改目标为已有的失败/未决/安全停止 Terminal；必须 Preview 真实单行 Source Diff → Apply 到当前 Working Buffer → 导出。其他 Route 仍只读。
@@ -29,7 +31,7 @@ Visual 目前仅在 ensure 单 Procedure 的**两条固定失败终态 Route**�
 
 ## Actions / Pages
 
-.github/workflows/pages.yml 支持 push main 的静态站点变更自动部署以及 workflow_dispatch 手动触发。Build Job 使用 Node 24 安装固定版本 yaml@2.9.1 和 esbuild@0.28.2，执行 YAML CST / Typed Route Patch 回归测试，构建浏览器端 bundle（dist/），并发布 dist/ 到 Pages。package-lock.json 已从通过的 CI 构建原样归档到仓库，后续统一使用 npm ci 进行锁定依赖安装。
+.github/workflows/pages.yml 支持 push main 的静态站点变更自动部署以及 workflow_dispatch 手动触发。Build Job 使用 Node 24 安装固定版本 yaml@2.9.1、elkjs@0.12.1 和 esbuild@0.28.2，执行 YAML CST / Typed Route Patch / ELK 布局回归测试，构建自包含浏览器 bundle（dist/），并发布 dist/ 到 Pages。首次 ELK 流水线会产生更新锁文件附件，之后重新提交 lock 并恢复 npm ci。package-lock.json 已从通过的 CI 构建原样归档到仓库，后续统一使用 npm ci 进行锁定依赖安装。
 
 - [Actions](https://github.com/odango-chan/ca-skill-studio-demo/actions/workflows/pages.yml)
 - [PR #1 · UX / Architecture](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)
@@ -39,6 +41,6 @@ Visual 目前仅在 ensure 单 Procedure 的**两条固定失败终态 Route**�
 
 ## 下一阶段
 
-下一阶段优化大图自动排版（评估 ELK / React Flow）、提供 Child 返回路径与局部图折叠，并引入完整 Demo Schema / 专用 Validator 的可执行一致性检查。获得新的 Typed Patch 编辑资格之前，复杂 CreatedSession 仍坚持只读。在图形层选型上，大图和可编辑连接线优先评估 React + TypeScript + React Flow / ELK，**本次上线的 Canvas 是无依赖 SVG 预览，不等于已选型或完成正式 Visual 编辑器**。
+下一阶段为真实浏览器 E2E 交互验收、选中节点的分支折叠与复杂回边标签避让，并评估是否有足够收益迁移 React Flow。随后接入完整 Demo Schema / 专用 Validator 的可执行一致性检查。获得新的 Typed Patch 编辑资格之前，复杂 CreatedSession 仍坚持只读。在图形层选型上，大图和可编辑连接线优先评估 React + TypeScript + React Flow / ELK，**本次上线仍使用 SVG 画布 + ELK 布局，而非 React Flow 的正式编辑器；ELK 只负责视觉位置与边路由，不改变 YAML 语义**。
 
 当前只建设 SKILL 开发与编辑，不做 Case、独立验证工作台、Registry / Publishing、Agent Runtime 调用或 Live 5GC。

@@ -1,4 +1,5 @@
 import { layoutProcedure } from "./graph.mjs";
+import { layoutProcedureELK } from "./layout.mjs";
 import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
 
@@ -26,6 +27,64 @@ let dragging = null;
 let projectedText = null;
 let history = createEditorHistory("");
 let pendingPatch = null;
+let layoutDirection = "RIGHT";
+let neighborView = false;
+let layoutTicket = 0;
+let layoutTimer = null;
+
+function invalidateLayout() {
+  layoutTicket++;
+  if (layoutTimer !== null) {
+    clearTimeout(layoutTimer);
+    layoutTimer = null;
+  }
+}
+function centerNode(id) {
+  const p=graph?.positions.get(id);
+  if (!p) return;
+  const rect=graphPane.getBoundingClientRect();
+  camera.x=rect.width/2-(p.x+119)*camera.scale;
+  camera.y=rect.height/2-(p.y+40)*camera.scale;
+  transform();
+}
+function scheduleELKLayout(wait=0, autoFit=false) {
+  invalidateLayout();
+  if (projection?.state!=="READY" || !lastGood) return;
+  const ticket=layoutTicket;
+  const proc=lastGood, procId=activeProcedureId, revision=projectedText;
+  const direction=layoutDirection;
+  const focus=neighborView && selection?.kind==="node" ? selection.id : null;
+  const filtered=Boolean(focus);
+  const fallback=layoutProcedure(proc);
+  graph={...fallback, visibleNodes:proc.nodes, visibleRoutes:proc.routes, isFiltered:false};
+  renderGraph();
+  setText("layoutStatus","正在自动布局…");
+  layoutTimer=setTimeout(async()=>{
+    layoutTimer=null;
+    try{
+      const result=await layoutProcedureELK(proc,{
+        direction,focus,neighborsOnly:filtered
+      });
+      if(ticket!==layoutTicket || revision!==projectedText ||
+        procId!==activeProcedureId || projection?.state!=="READY")return;
+      graph=result;
+      renderGraph();
+      setText("layoutStatus",(result.isFiltered ? "相邻视图 · " : "全图 · ")+
+        result.visibleNodes.length+" Node / "+result.visibleRoutes.length+
+        " Route · ELK");
+      if(autoFit || result.isFiltered)fit();
+      else if(selection?.kind==="node")centerNode(selection.id);
+    }catch(error){
+      if(ticket!==layoutTicket)return;
+      graph={...fallback,visibleNodes:proc.nodes,visibleRoutes:proc.routes,isFiltered:false};
+      renderGraph();
+      setText("layoutStatus","ELK 不可用，回退到基础布局");
+      message("自动布局失败，已使用基础画布："+String(error?.message??error));
+      if(autoFit)fit();
+    }
+  },wait);
+}
+
 
 function button(label, handler, className = "") {
   const el = document.createElement("button");
@@ -72,6 +131,9 @@ function loadDocument(name, text) {
   lastGood = null;
   lastWorkspace = null;
   activeProcedureId = null;
+  neighborView = false;
+  $("neighborsOnly").setAttribute("aria-pressed","false");
+  invalidateLayout();
   projectedText = null;
   setText("fileName", name);
   setText("titleFile", name);
@@ -111,6 +173,8 @@ function refresh(refit = false) {
   renderInspector();
   renderProblems();
   renderGraph();
+  if (parsed.state === "READY") scheduleELKLayout(refit?0:180,refit);
+  else invalidateLayout();
   if (refit && graph) requestAnimationFrame(fit);
 }
 source.addEventListener("input", () => {
@@ -126,10 +190,13 @@ function enterProcedure(name) {
   lastGood = lastWorkspace.procedures.get(name);
   graph = layoutProcedure(lastGood);
   selection = null;
+  neighborView = false;
+  $("neighborsOnly").setAttribute("aria-pressed","false");
   renderProcedureNavigation();
   renderOutline();
   renderInspector();
   renderGraph();
+  scheduleELKLayout(0,true);
   requestAnimationFrame(fit);
 }
 function renderProcedureNavigation() {
@@ -343,14 +410,18 @@ function renderProblems() {
 }
 function selectNode(id) {
   if (projection?.state !== "READY") return;
-  selection = { kind: "node", id };
+  selection = {kind:"node",id};
   renderOutline();
   renderInspector();
-  renderGraph();
+  if(neighborView)scheduleELKLayout(0,true);
+  else{
+    renderGraph();
+    centerNode(id);
+  }
 }
 function selectRoute(id) {
-  if (projection?.state !== "READY") return;
-  selection = { kind: "route", id };
+  if(projection?.state!=="READY")return;
+  selection={kind:"route",id};
   renderOutline();
   renderInspector();
   renderGraph();
@@ -360,12 +431,12 @@ function fit() {
   if (!graph) return;
   const rect = graphPane.getBoundingClientRect();
   if (rect.width < 80 || rect.height < 80) return;
-  const scale = Math.min(1.1, Math.max(0.14, Math.min((rect.width - 60) / graph.width, (rect.height - 60) / graph.height)));
+  const scale = Math.min(1.25, Math.max(0.035, Math.min((rect.width - 60) / graph.width, (rect.height - 60) / graph.height)));
   camera = { scale, x: (rect.width - graph.width * scale) / 2, y: (rect.height - graph.height * scale) / 2 };
   transform();
 }
 function zoomTo(scale, x = svg.clientWidth / 2, y = svg.clientHeight / 2) {
-  const updated = Math.min(2.2, Math.max(0.13, scale));
+  const updated = Math.min(2.5, Math.max(0.035, scale));
   const ratio = updated / camera.scale;
   camera.x = x - (x - camera.x) * ratio;
   camera.y = y - (y - camera.y) * ratio;
@@ -394,6 +465,24 @@ svg.addEventListener("pointermove", event => {
 svg.addEventListener("pointerup", () => { dragging = null; });
 svg.addEventListener("pointercancel", () => { dragging = null; });
 window.addEventListener("resize", () => { if (mode !== "source") fit(); });
+$("layoutDirection").addEventListener("change", next=>{
+  layoutDirection=next;
+  scheduleELKLayout(0,true);
+});
+$("neighborsOnly").addEventListener("click",()=>{
+  neighborView=!neighborView;
+  $("neighborsOnly").setAttribute("aria-pressed",String(neighborView));
+  scheduleELKLayout(0,true);
+});
+$("centerSelection").addEventListener("click",()=>{
+  if(selection?.kind==="node")centerNode(selection.id);
+  else fit();
+});
+function chooseEdgeRoute(bundle) {
+  const i=bundle.routes.findIndex(r=>selection?.kind==="route"&&selection.id===r.id);
+  selectRoute(bundle.routes[(i+1)%bundle.routes.length].id);
+}
+
 
 function renderGraph() {
   world.replaceChildren();
@@ -405,28 +494,35 @@ function renderGraph() {
     if (!a || !b) continue;
     const selected = selection?.kind === "route" && bundle.routes.some(r => r.id === selection.id);
     const reverse = b.x <= a.x;
-    const sx = a.x + 222, sy = a.y + 37, tx = reverse ? b.x + 111 : b.x, ty = b.y + 37;
+    const nodeWidth=graph.engine==="ELK layered"?238:222;
+    const nodeHeight=graph.engine==="ELK layered"?80:74;
+    const sx = a.x + nodeWidth, sy = a.y + nodeHeight/2, tx = reverse ? b.x + nodeWidth/2 : b.x, ty = b.y + nodeHeight/2;
     const bend = reverse ? Math.max(110, Math.abs(tx - sx) * .5) : Math.max(50, (tx - sx) * .52);
-    const d = "M " + sx + " " + sy + " C " + (sx + bend) + " " + sy + ", " + (tx - bend) + " " + ty + ", " + tx + " " + ty;
+    const d = bundle.path || ("M " + sx + " " + sy + " C " + (sx + bend) + " " + sy + ", " + (tx - bend) + " " + ty + ", " + tx + " " + ty);
     const group = svgEl("g", { class: selected ? "edge selected" : "edge", "data-selectable": "route", tabindex: "0", role: "button", "aria-label": bundle.source + " to " + bundle.target + ": " + bundle.outcomes.join(", ") });
     group.appendChild(svgEl("path", { d, class: "edge-path", "marker-end": "url(#arrowhead)" }));
     group.appendChild(svgEl("path", { d, class: "edge-hit" }));
-    const cx = (sx + tx) / 2, cy = (sy + ty) / 2 - 8;
-    const text = bundle.outcomes.join(" / ");
+    const cx = bundle.label?.x ?? (sx + tx) / 2, cy = bundle.label?.y ?? ((sy + ty) / 2 - 8);
+    const phase=bundle.routeSource?.replace(".on","")??"operator";
+    const text = (phase==="operator"?"":phase+" · ")+bundle.outcomes.join(" / ");
     const short = text.length > 34 ? text.slice(0, 31) + "…" : text;
     group.appendChild(svgEl("rect", { x: cx - Math.max(33, short.length * 3.2 + 12), y: cy - 14, rx: 8, width: Math.max(66, short.length * 6.4 + 24), height: 23, class: "edge-label-bg" }));
     group.appendChild(svgEl("text", { x: cx, y: cy + 2, "text-anchor": "middle", class: "edge-label" }, short));
-    group.addEventListener("click", () => selectRoute(bundle.routes[0].id));
-    group.addEventListener("keydown", event => { if (event.key === "Enter") selectRoute(bundle.routes[0].id); });
+    group.appendChild(svgEl("title",{},
+      bundle.routes.map(r=>r.routeSource+" · "+r.outcome+" → "+r.target).join("\n")));
+    group.addEventListener("click",()=>chooseEdgeRoute(bundle));
+    group.addEventListener("keydown",event=>{
+      if(event.key==="Enter"||event.key===" "){event.preventDefault();chooseEdgeRoute(bundle);}
+    });
     edgesGroup.appendChild(group);
   }
   const nodesGroup = svgEl("g", { class: "nodes" });
-  for (const node of lastGood.nodes) {
+  for (const node of graph.visibleNodes??lastGood.nodes) {
     const p = graph.positions.get(node.id);
     const selected = selection?.kind === "node" && selection.id === node.id;
     const classes = "node " + (node.operator === "terminal" ? "terminal " : "") + (selected ? "selected" : "");
     const group = svgEl("g", { transform: "translate(" + p.x + "," + p.y + ")", class: classes, "data-selectable": "node", tabindex: "0", role: "button", "aria-label": node.id + ", " + node.operator + " " + node.value });
-    group.appendChild(svgEl("rect", { width: 222, height: 74, rx: 13, class: "node-body" }));
+    group.appendChild(svgEl("rect", { width: graph.engine==="ELK layered"?238:222, height: graph.engine==="ELK layered"?80:74, rx: 13, class: "node-body" }));
     group.appendChild(svgEl("text", { x: 13, y: 19, class: "node-kind" }, node.operator.toUpperCase() + (node.id === lastGood.start ? " · START" : "") + (node.children?.length ? " · CHILD ↗" : "")));
     group.appendChild(svgEl("text", { x: 13, y: 40, class: "node-title" }, node.id.length > 28 ? node.id.slice(0, 27) + "…" : node.id));
     group.appendChild(svgEl("text", { x: 13, y: 59, class: "node-meta" }, node.value.length > 30 ? node.value.slice(0, 29) + "…" : node.value));
