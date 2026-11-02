@@ -64,3 +64,7 @@ PASS
 - Schema / Runtime compatibility、Live 5GC：NOT_PROVEN / NOT_RUN。
 
 EditorSession 仅是可独立验证的内存状态机，不授予任何新的 Visual 编辑资格，也不改变 Skill Package 数据模型。
+
+## 续作：单文件保存适配器
+
+后续已增加独立的 [POSIX 单文件保存 POC](phase1-file-save-poc.md)，负责实际磁盘文件的保守保存。它不改变本文件描述的 `EditorSession` **内存事务**职责；文件 I/O 由 `storage.py` 负责，且其父目录 advisory lock **不构成对不合作写入者的严格 CAS**。跨文件事务、File Watch 与 Windows 原生实现仍未完成。
