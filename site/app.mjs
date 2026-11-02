@@ -1,4 +1,5 @@
-import { projectProcedure, layoutProcedure } from "./graph.mjs";
+import { layoutProcedure } from "./graph.mjs";
+import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -15,6 +16,8 @@ let filename = "ensure-pdu-session.procedure.yaml";
 let initialText = "";
 let projection = null;
 let lastGood = null;
+let lastWorkspace = null;
+let activeProcedureId = null;
 let graph = null;
 let selection = null;
 let mode = "visual";
@@ -67,6 +70,8 @@ function loadDocument(name, text) {
   closePreview();
   selection = null;
   lastGood = null;
+  lastWorkspace = null;
+  activeProcedureId = null;
   projectedText = null;
   setText("fileName", name);
   setText("titleFile", name);
@@ -81,21 +86,27 @@ function refresh(refit = false) {
   setText("stats", text.split("\n").length + " 行 · " + new TextEncoder().encode(text).length + " bytes");
   $("undoButton").disabled = !history.canUndo();
   $("redoButton").disabled = !history.canRedo();
-  const parsed = projectProcedure(text);
+  const parsed = projectWorkspace(text);
   projection = parsed;
   if (parsed.state === "READY") {
-    lastGood = parsed.procedure;
+    lastWorkspace = parsed;
+    if (!activeProcedureId || !parsed.procedures.has(activeProcedureId)) {
+      activeProcedureId = parsed.entry;
+      selection = null;
+    }
+    lastGood = parsed.procedures.get(activeProcedureId);
     projectedText = text;
     graph = layoutProcedure(lastGood);
     if (selection && selection.kind === "node" && !lastGood.nodes.some(n => n.id === selection.id)) selection = null;
     if (selection && selection.kind === "route" && !lastGood.routes.some(r => r.id === selection.id)) selection = null;
-    setText("projectionState", "READY · YAML AST/CST");
+    setText("projectionState", "READY · " + parsed.procedures.size + " Procedures");
   } else {
     setText("projectionState", lastGood ? "STALE · source changed" : "UNAVAILABLE");
     if (!lastGood) graph = null;
   }
   $("graphWarning").hidden = parsed.state === "READY";
   setText("graphWarning", parsed.state === "READY" ? "" : (lastGood ? "Graph 已过期，仅供对照，不能代表当前 Source。" : "当前 Source 无可用的 Procedure 投影。") + " " + (parsed.diagnostics[0]?.message ?? ""));
+  renderProcedureNavigation();
   renderOutline();
   renderInspector();
   renderProblems();
@@ -106,6 +117,45 @@ source.addEventListener("input", () => {
   history.record(source.value);
   closePreview();
   refresh(false);
+});
+
+function enterProcedure(name) {
+  if (projection?.state !== "READY" || !lastWorkspace?.procedures.has(name)) return;
+  if (activeProcedureId === name) return;
+  activeProcedureId = name;
+  lastGood = lastWorkspace.procedures.get(name);
+  graph = layoutProcedure(lastGood);
+  selection = null;
+  renderProcedureNavigation();
+  renderOutline();
+  renderInspector();
+  renderGraph();
+  requestAnimationFrame(fit);
+}
+function renderProcedureNavigation() {
+  const picker = $("procedurePicker");
+  const unavailable = projection?.state !== "READY";
+  picker.replaceChildren();
+  if (lastWorkspace) {
+    for (const [name, item] of lastWorkspace.procedures) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = (name === lastWorkspace.entry ? "ROOT · " : "CHILD · ") + name;
+      picker.appendChild(opt);
+    }
+    if (activeProcedureId) picker.value = activeProcedureId;
+  }
+  picker.disabled = unavailable;
+  $("backProcedure").disabled = unavailable || !lastWorkspace || activeProcedureId === lastWorkspace.entry;
+  setText("procedureBread", unavailable
+    ? "Graph STALE / unavailable"
+    : (activeProcedureId === lastWorkspace.entry
+        ? "Root · " + activeProcedureId
+        : "Root / " + activeProcedureId));
+}
+$("procedurePicker").addEventListener("change", value => enterProcedure(value.target.value));
+$("backProcedure").addEventListener("click", () => {
+  if (lastWorkspace) enterProcedure(lastWorkspace.entry);
 });
 
 function renderOutline() {
@@ -182,8 +232,10 @@ function renderInspector() {
     inspectorLine("入口", lastGood.start);
     inspectorLine("Node", lastGood.nodes.length);
     inspectorLine("Route entries", lastGood.routes.length);
-    inspectorLine("编辑资格", "Visual read-only");
-    inspectorLine("语法范围", "ensure-cst-v1 · 不是完整 Demo Validator");
+    inspectorLine("本文件 Procedure", lastWorkspace?.procedures.size ?? 1);
+    inspectorLine("Child references", lastGood.children?.length ?? 0);
+    inspectorLine("编辑资格", lastWorkspace?.procedures.size > 1 ? "Visual read-only" : "有限 SetRouteTarget");
+    inspectorLine("语法范围", lastGood.profile + " · 无 Runtime 验证");
     return;
   }
   if (selection.kind === "node") {
@@ -194,10 +246,33 @@ function renderInspector() {
     inspectorLine("Identifier", node.value);
     inspectorLine("Source", "L" + node.line);
     inspector.appendChild(button("定位 Source 行", () => lineJump(node.line), "source-link"));
+    if (node.children?.length) {
+      inspectorTitle("Child Procedure");
+      for (const child of node.children) {
+        inspectorLine("调用位置", child.via + " · L" + child.line);
+        inspector.appendChild(button("进入 " + child.procedure, () => enterProcedure(child.procedure), "preview-button"));
+      }
+    }
+    if (node.phases?.length) {
+      inspectorTitle("Phases · 按 Source 顺序");
+      for (const phase of node.phases) {
+        inspectorLine(phase.name.toUpperCase(), phase.steps.length + " steps · L" + phase.line);
+        for (const step of phase.steps) {
+          const b = button(step.index + ". " + (step.name ? step.name + " · " : "") +
+            step.operator.toUpperCase() + " " + step.value,
+            () => lineJump(step.line), "phase-step");
+          b.title = phase.name + " step " + step.index + " at L" + step.line;
+          inspector.appendChild(b);
+        }
+      }
+    }
     inspectorTitle("显式 Route entries");
     const outgoing = lastGood.routes.filter(r => r.source === node.id);
     if (!outgoing.length) inspectorLine("终态", "没有路由");
-    for (const route of outgoing) inspectorRoute(route);
+    for (const route of outgoing) {
+      inspectorLine("来源", route.routeSource);
+      inspectorRoute(route);
+    }
     const incoming = lastGood.routes.filter(r => r.target === node.id);
     inspectorTitle("Incoming · " + incoming.length);
     for (const route of incoming) inspectorRoute(route);
@@ -212,7 +287,7 @@ function renderInspector() {
     inspectorLine("Source", "L" + route.line);
     inspector.appendChild(button("定位 Route 源码", () => lineJump(route.line), "source-link"));
     const eligibleTargets = routeEditTargets(lastGood, route.id);
-    if (eligibleTargets.length) {
+    if (eligibleTargets.length && lastWorkspace?.procedures.size === 1) {
       inspectorTitle("SetRouteTarget · 限定试验");
       const warning = document.createElement("p");
       warning.className = "subtle-note";
@@ -244,7 +319,9 @@ function renderInspector() {
   }
   const note = document.createElement("p");
   note.className = "subtle-note";
-  note.textContent = "结构化写回未启用：Typed Patch / Round-trip / Validator 尚未在浏览器端接入。";
+  note.textContent = lastWorkspace?.procedures.size > 1
+    ? "多 Procedure / Phase 当前只读。仅查看真实 Source，不展开 Phase 为业务节点，也不运行 Runtime。"
+    : "仅固定 ensure 的两条失败 Route 可进行受限 Typed Patch；其他 Visual 修改未开放。";
   inspector.appendChild(note);
 }
 function renderProblems() {
@@ -350,10 +427,13 @@ function renderGraph() {
     const classes = "node " + (node.operator === "terminal" ? "terminal " : "") + (selected ? "selected" : "");
     const group = svgEl("g", { transform: "translate(" + p.x + "," + p.y + ")", class: classes, "data-selectable": "node", tabindex: "0", role: "button", "aria-label": node.id + ", " + node.operator + " " + node.value });
     group.appendChild(svgEl("rect", { width: 222, height: 74, rx: 13, class: "node-body" }));
-    group.appendChild(svgEl("text", { x: 13, y: 19, class: "node-kind" }, node.operator.toUpperCase() + (node.id === lastGood.start ? " · START" : "")));
+    group.appendChild(svgEl("text", { x: 13, y: 19, class: "node-kind" }, node.operator.toUpperCase() + (node.id === lastGood.start ? " · START" : "") + (node.children?.length ? " · CHILD ↗" : "")));
     group.appendChild(svgEl("text", { x: 13, y: 40, class: "node-title" }, node.id.length > 28 ? node.id.slice(0, 27) + "…" : node.id));
     group.appendChild(svgEl("text", { x: 13, y: 59, class: "node-meta" }, node.value.length > 30 ? node.value.slice(0, 29) + "…" : node.value));
     group.addEventListener("click", () => selectNode(node.id));
+    group.addEventListener("dblclick", () => {
+      if (node.children?.length === 1) enterProcedure(node.children[0].procedure);
+    });
     group.addEventListener("keydown", event => { if (event.key === "Enter") selectNode(node.id); });
     nodesGroup.appendChild(group);
   }
@@ -375,13 +455,19 @@ filePicker.addEventListener("change", async () => {
 });
 $("sampleButton").addEventListener("click", async () => {
   if (source.value !== initialText && !confirm("尚有未导出的修改。确定重载样本？")) return;
-  await loadSample();
+  await loadSample("ensure");
 });
-async function loadSample() {
+$("establishSampleButton").addEventListener("click", async () => {
+  if (source.value !== initialText && !confirm("尚有未导出的修改。确定打开 CreatedSession 样本？")) return;
+  await loadSample("establish");
+});
+async function loadSample(sample = "ensure") {
   try {
-    const response = await fetch("./samples/ensure-pdu-session.procedure.yaml", { cache: "no-cache" });
+    const name = sample === "establish" ? "establish-pdu-session" : "ensure-pdu-session";
+    const filename = name + ".procedure.yaml";
+    const response = await fetch("./samples/" + filename, { cache: "no-cache" });
     if (!response.ok) throw new Error("HTTP " + response.status);
-    loadDocument("ensure-pdu-session.procedure.yaml", await response.text());
+    loadDocument(filename, await response.text());
   } catch (error) {
     message("样本加载失败，请从本地打开 YAML：" + String(error?.message ?? error));
     setMode("source");
