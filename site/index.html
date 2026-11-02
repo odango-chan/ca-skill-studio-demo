@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Skill Studio · ConnectionAgent</title>
+  <link rel="stylesheet" href="./assets/studio.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">◎</span><div><strong>Skill Studio</strong><span>CONNECTIONAGENT</span></div></div>
+      <div class="side-heading">WORKSPACE <span class="side-heading-small">DEMO</span></div>
+      <label class="side-label" for="skill-select">Skill</label>
+      <select id="skill-select" aria-label="选择 Skill"><option value="ensure">ensure-pdu-session</option><option value="establish">establish-pdu-session</option></select>
+      <div class="source-pill" id="edit-capability">Visual patch enabled</div>
+      <div class="side-heading">PROCEDURE <span id="node-count" class="side-heading-small"></span></div>
+      <div class="search-wrap"><span>⌕</span><input id="node-filter" placeholder="搜索节点…" aria-label="搜索节点" /></div>
+      <div id="node-list" class="node-list"></div>
+      <div class="side-bottom"><div class="dot-status"><span class="status-dot"></span> Static Pages Demo</div><div class="small-muted">真实 Fixture · 浏览器内编辑<br/>不运行 Skill，不上传文件</div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumbs">Skill Studio <span>/</span> <strong id="breadcrumb-skill">ensure-pdu-session</strong> <span>/</span> <span id="breadcrumb-procedure">ensure-session</span></div>
+        <div class="top-actions">
+          <button class="quiet-btn" id="btn-undo" title="撤销 Ctrl+Z">↶ <span>Undo</span></button>
+          <button class="quiet-btn" id="btn-redo" title="重做 Ctrl+Shift+Z">↷ <span>Redo</span></button>
+          <span class="action-divider"></span>
+          <button class="quiet-btn" id="btn-import">↥ Import</button>
+          <button class="primary-btn" id="btn-export">↓ Export YAML</button>
+          <input type="file" id="file-input" accept=".yaml,.yml,.txt" hidden />
+        </div>
+      </header>
+
+      <div class="headline"><div><div class="eyebrow">PROCEDURE DESIGNER <span class="eyebrow-line"></span> PHASE 1</div><h1 id="page-title">ensure-session</h1><p id="page-subtitle">真实 Skill 来源文件的可视化投影，Source 是唯一权威。</p></div><div class="headline-right"><div class="mode-pill" id="mode-pill">EDITABLE DEMO</div><div class="tiny-metadata" id="revision-label">SOURCE · DEMO FIXTURE</div></div></div>
+
+      <div class="workbench"><section class="canvas-panel">
+        <div class="panel-head"><div class="view-switch"><button id="tab-visual" class="tab active">◈ Visual</button><button id="tab-source" class="tab">⌘ Source</button></div><div class="canvas-tools"><button id="btn-zoom-out" title="缩小">−</button><button id="btn-zoom-in" title="放大">+</button><button id="btn-fit">Fit</button><span id="zoom-level">100%</span></div></div>
+        <div id="visual-view" class="visual-view"><div id="graph" class="graph"><svg id="svg-graph" role="img" aria-label="Procedure 流程图"><defs><pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#d3dce8" /></pattern><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#9dabc0" /></marker></defs><g id="viewport"></g></svg></div><div class="canvas-foot"><span>◉ <strong id="graph-engine">SVG graph</strong> <span class="muted" id="graph-meta"></span></span><div class="bench"><button id="btn-bench">Large graph ↗</button></div></div></div>
+        <div id="source-view" class="source-view" hidden><div class="source-header"><span>PROCEDURE.YAML</span><span id="source-state">● Working source</span></div><textarea id="source-editor" spellcheck="false" aria-label="YAML 源码编辑器"></textarea><div class="source-footer"><span>可直接编辑原文。修改前请检查 Diff。</span><button id="btn-source-preview" class="secondary-btn">Review source changes</button></div></div>
+      </section>
+      <aside class="inspector"><div class="inspector-head"><span>INSPECTOR</span><span class="inspector-chip">PROPERTIES</span></div><div id="inspector-body"></div><div class="inspector-foot">Properties are derived from the source.<br />Visual edits apply exact-line patches only.</div></aside>
+      </div>
+      <footer class="statusbar"><div><span class="live-dot"></span><span id="footer-status">Ready</span></div><div><span id="footer-nodes">0 nodes</span><span>·</span><span id="footer-dirty">No local changes</span><span>·</span><span>GitHub Pages preview</span></div></footer>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="review-dialog"><div class="dialog-head"><div><div class="eyebrow">REVIEW CHANGE</div><h2>Source Diff</h2></div><button id="close-dialog" class="icon-btn" title="关闭">×</button></div><p class="dialog-hint">请确认文本差异。Preview 不修改原始文件，应用后可 Undo。</p><pre id="diff-preview" class="diff-preview"></pre><div class="dialog-footer"><button class="secondary-btn" id="btn-cancel">Cancel</button><button class="primary-btn" id="btn-apply">Apply to working source</button></div></dialog>
+  <dialog id="benchmark-dialog"><div class="dialog-head"><div><div class="eyebrow">SCALE EXPERIMENT</div><h2>Large procedure graph</h2></div><button id="close-benchmark" class="icon-btn">×</button></div><p class="dialog-hint">在浏览器内生成模拟节点以观察聚合视图。不是 X6、ELK 性能跑分。</p><div class="bench-grid"><button data-scale="100">100 nodes</button><button data-scale="500">500 nodes</button><button data-scale="2000">2,000 nodes</button></div><p class="bench-result" id="bench-result">选择一个规模开始。</p><div class="dialog-footer"><button id="btn-benchmark-close" class="secondary-btn">Return to Skill</button></div></dialog>
+  <script type="module" src="./assets/studio.js"></script>
+</body>
+</html>
