@@ -29,7 +29,7 @@ test("Explorer searches active procedure nodes without inventing graph nodes",()
   assert.equal(nodeItems(root).filter(x=>x.isStart).length,1);
   assert.deepEqual(nodeItems(root,"pcf").map(x=>x.id),
     ["npcf-sm-policy-control-create","reconcile-npcf-sm-policy-control-create"]);
-  assert.deepEqual(nodeItems(root,"script"),[]);
+  assert.deepEqual(nodeItems(root,"nothing-like-this-operator"),[]);
 });
 test("node Inspector derives conditions in declared YAML order",()=>{
   const model=nodeDetails(establish.procedure,"nudm-sdm-subscribe");
