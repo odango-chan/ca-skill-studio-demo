@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - "site/**"
-      - "tests/graph.test.mjs"
+      - "tests/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -46,9 +46,11 @@ jobs:
         run: |
           node --check site/app.mjs
           node --check site/graph.mjs
+          node --check site/patch.mjs
           node --check tests/graph.test.mjs
+          node --check tests/patch.test.mjs
       - name: Run source-projection regression
-        run: node --test tests/graph.test.mjs
+        run: node --test tests/*.test.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site

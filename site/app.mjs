@@ -1,4 +1,5 @@
 import { projectProcedure, layoutProcedure } from "./graph.mjs";
+import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
 
 const $ = (id) => document.getElementById(id);
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -20,6 +21,8 @@ let mode = "visual";
 let camera = { x: 0, y: 0, scale: 1 };
 let dragging = null;
 let projectedText = null;
+let history = createEditorHistory("");
+let pendingPatch = null;
 
 function button(label, handler, className = "") {
   const el = document.createElement("button");
@@ -60,6 +63,8 @@ function loadDocument(name, text) {
   filename = name;
   initialText = text;
   source.value = text;
+  history = createEditorHistory(text);
+  closePreview();
   selection = null;
   lastGood = null;
   projectedText = null;
@@ -74,6 +79,8 @@ function refresh(refit = false) {
   const text = source.value;
   setText("dirty", text === initialText ? "初始版本" : "未导出修改");
   setText("stats", text.split("\n").length + " 行 · " + new TextEncoder().encode(text).length + " bytes");
+  $("undoButton").disabled = !history.canUndo();
+  $("redoButton").disabled = !history.canRedo();
   const parsed = projectProcedure(text);
   projection = parsed;
   if (parsed.state === "READY") {
@@ -95,7 +102,11 @@ function refresh(refit = false) {
   renderGraph();
   if (refit && graph) requestAnimationFrame(fit);
 }
-source.addEventListener("input", () => refresh(false));
+source.addEventListener("input", () => {
+  history.record(source.value);
+  closePreview();
+  refresh(false);
+});
 
 function renderOutline() {
   nodeOutline.replaceChildren();
@@ -200,6 +211,36 @@ function renderInspector() {
     inspectorLine("Target", route.target);
     inspectorLine("Source", "L" + route.line);
     inspector.appendChild(button("定位 Route 源码", () => lineJump(route.line), "source-link"));
+    const eligibleTargets = routeEditTargets(lastGood, route.id);
+    if (eligibleTargets.length) {
+      inspectorTitle("SetRouteTarget · 限定试验");
+      const warning = document.createElement("p");
+      warning.className = "subtle-note";
+      warning.textContent = "只支持两条固定 ensure 失败 Route 的终态目标修改；必须预览 Diff 并确认。此操作不是完整 Demo Validator。";
+      inspector.appendChild(warning);
+      const select = document.createElement("select");
+      select.className = "target-select";
+      select.setAttribute("aria-label", "选择新的终态目标");
+      for (const target of eligibleTargets) {
+        const option = document.createElement("option");
+        option.value = target;
+        option.textContent = target;
+        select.appendChild(option);
+      }
+      select.value = route.target;
+      inspector.appendChild(select);
+      const previewButton = button("预览 YAML Patch", () => {
+        try {
+          const patch = previewRouteTargetPatch(source.value, route.id, select.value);
+          showPreview(patch);
+        } catch (error) {
+          message("未应用：" + String(error?.message ?? error));
+        }
+      }, "preview-button");
+      select.addEventListener("change", () => { previewButton.disabled = select.value === route.target; });
+      previewButton.disabled = true;
+      inspector.appendChild(previewButton);
+    }
   }
   const note = document.createElement("p");
   note.className = "subtle-note";
@@ -358,12 +399,62 @@ $("downloadButton").addEventListener("click", () => {
 $("resetButton").addEventListener("click", () => {
   if (source.value !== initialText && !confirm("丢弃全部本地修改？")) return;
   source.value = initialText;
+  history.record(source.value);
+  closePreview();
   refresh(true);
 });
+function closePreview() {
+  pendingPatch = null;
+  $("patchDialog").hidden = true;
+}
+function showPreview(preview) {
+  pendingPatch = preview;
+  setText("patchDiff", preview.diff);
+  setText("patchSummary", preview.routeId + " · " + preview.oldTarget + " → " + preview.newTarget);
+  $("patchDialog").hidden = false;
+  $("applyPatch").focus();
+}
+$("closePatch").addEventListener("click", closePreview);
+$("patchDialog").addEventListener("click", event => {
+  if (event.target === $("patchDialog")) closePreview();
+});
+$("applyPatch").addEventListener("click", () => {
+  if (!pendingPatch) return;
+  try {
+    const nextSource = applyRouteTargetPatch(source.value, pendingPatch);
+    source.value = nextSource;
+    history.record(nextSource);
+    closePreview();
+    refresh(false);
+    message("SetRouteTarget 已应用到工作缓冲区；请审查 Diff 后导出。未运行完整 Validator。");
+  } catch (error) {
+    closePreview();
+    message("Patch 拒绝应用：" + String(error?.message ?? error));
+  }
+});
+function runHistory(action) {
+  closePreview();
+  const next = action === "undo" ? history.undo() : history.redo();
+  if (next === null) return;
+  source.value = next;
+  refresh(false);
+  message(action === "undo" ? "已撤销一次 Source / Visual 修改" : "已重做一次 Source / Visual 修改");
+}
+$("undoButton").addEventListener("click", () => runHistory("undo"));
+$("redoButton").addEventListener("click", () => runHistory("redo"));
 document.addEventListener("keydown", event => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+  if (event.key === "Escape" && !$("patchDialog").hidden) { closePreview(); return; }
+  if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+  const key = event.key.toLowerCase();
+  if (key === "s") {
     event.preventDefault();
     $("downloadButton").click();
+  } else if (key === "z") {
+    event.preventDefault();
+    runHistory(event.shiftKey ? "redo" : "undo");
+  } else if (key === "y") {
+    event.preventDefault();
+    runHistory("redo");
   }
 });
 loadSample();

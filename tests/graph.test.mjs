@@ -74,3 +74,13 @@ test("layout positions all nodes and bundles only visual edges", () => {
   assert.ok(layout.width > 400 && layout.height > 200);
   assert.ok([...layout.positions.values()].every(pos => Number.isFinite(pos.x) && Number.isFinite(pos.y)));
 });
+
+test("duplicate on mapping is not silently projected as one map", () => {
+  const broken = fixture.replace(
+    "          PASS: done\n          FAIL: observe-session-absence",
+    "          PASS: done\n        'on':\n          FAIL: observe-session-absence"
+  );
+  const result = projectProcedure(broken);
+  assert.equal(result.state, "UNAVAILABLE");
+  assert.match(result.diagnostics[0].message, /重复 YAML 字段/);
+});

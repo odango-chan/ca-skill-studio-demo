@@ -7,3 +7,14 @@
 @media(max-width:1140px){.workbench{grid-template-columns:210px minmax(360px,1fr) 255px}.mode-help{display:none}}
 @media(max-width:900px){.workbench{grid-template-columns:200px minmax(0,1fr)}.inspector-panel{grid-column:1/-1;border-left:0;border-top:1px solid var(--border);max-height:220px}.shell{height:auto;min-height:100vh}.editor-body{min-height:560px}.inspector-content{columns:2}}
 @media(max-width:620px){.topbar{padding:12px}.header-right{gap:8px}.header-right a{display:none}.scope-note{padding:9px 12px}.workbench{display:flex;flex-direction:column}.explorer{border:0;border-bottom:1px solid var(--border)}.outline{max-height:120px}.sidebar-actions{grid-template-columns:1fr 1fr}.editor{min-height:590px}.editorbar{flex-wrap:wrap}.editor-actions{margin-left:0}.zoom-actions button{font-size:11px}.editor-body{min-height:470px}#editorBody[data-mode=split]{flex-direction:column}#editorBody[data-mode=split] .graph-pane{min-height:280px}#editorBody[data-mode=split] .source-pane{min-height:250px;border-left:0;border-top:1px solid var(--border)}.inspector-content{columns:1}}
+
+/* Bounded visual route patch controls and revision-bound diff preview */
+.target-select{display:block;width:100%;background:#101c2c;border:1px solid #486283;border-radius:8px;padding:9px;color:#e7f1fc;font:12px ui-monospace,monospace;margin:12px 0 8px}
+.preview-button{width:100%;background:#315d91;border-color:#5078af}.preview-button:disabled{opacity:.5}
+.modal-backdrop{position:fixed;z-index:100;inset:0;background:rgba(1,7,16,.8);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-backdrop[hidden]{display:none}
+.modal-content{background:#17243a;border:1px solid #52739e;border-radius:14px;padding:24px;box-shadow:0 30px 70px #000a;width:min(740px,100%);max-height:90vh;overflow:auto}
+.modal-content h2{font-size:19px;margin:0 0 11px}.modal-content p{font-size:12px;color:#cbd9eb;line-height:1.6}
+.modal-warning{border:1px solid #695638;padding:12px;border-radius:9px;background:#30291e}
+#patchDiff{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1423;border:1px solid #344c68;border-radius:9px;padding:18px;font:12px/1.7 ui-monospace,monospace;max-height:45vh;overflow:auto;color:#deecff}
+.modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}

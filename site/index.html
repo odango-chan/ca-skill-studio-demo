@@ -12,14 +12,14 @@
   <header class="topbar">
     <div class="logo" aria-hidden="true">CA</div>
     <div class="branding">
-      <h1>Skill Studio <span class="chip">Procedure preview</span></h1>
+      <h1>Skill Studio <span class="chip">Route Patch preview</span></h1>
       <p>ConnectionAgent · Source-authoritative authoring</p>
     </div>
     <div class="header-right"><span id="projectionState" class="projection" role="status">LOADING</span>
       <a href="https://github.com/odango-chan/ca-skill-studio-demo" target="_blank" rel="noopener noreferrer">Repository</a>
     </div>
   </header>
-  <div class="scope-note"><strong>有限预览：</strong>图形从当前 YAML 的 <em>ensure-subset</em> 结构即时投影；并非通用 YAML Parser、Runtime Validator 或 Visual Typed Patch。图形只能选择和导航，<strong>编辑请使用 Source</strong>，不会执行 Skill / Script / Capability。</div>
+  <div class="scope-note"><strong>有限预览：</strong>图形从当前 YAML 的 <em>ensure-subset</em> 结构即时投影；并非通用 YAML Parser、Runtime Validator 或 Visual Typed Patch。图形支持选择、导航和两条固定失败 Route 的受限 Target 修改（先 Diff 再 Apply）；<strong>其余编辑请使用 Source</strong>，不会执行 Skill / Script / Capability。</div>
   <main class="workbench">
     <aside class="explorer">
       <div class="sidebar-title">SOURCE WORKSPACE</div>
@@ -40,6 +40,8 @@
         <strong id="titleFile">procedure.yaml</strong>
         <span id="dirty" class="chip">初始版本</span>
         <div class="editor-actions">
+          <button id="undoButton" type="button" title="Ctrl/Cmd+Z" disabled>撤销</button>
+          <button id="redoButton" type="button" title="Ctrl/Cmd+Shift+Z" disabled>重做</button>
           <button id="resetButton" type="button" title="恢复打开文件时的内容">重置</button>
           <button id="downloadButton" class="primary" type="button" title="Ctrl/Cmd + S">导出 Source</button>
         </div>
@@ -50,7 +52,7 @@
           <button id="mode-source" type="button" aria-pressed="false">Source</button>
           <button id="mode-split" type="button" aria-pressed="false">Split</button>
         </div>
-        <span class="muted mode-help">Control Flow · read-only</span>
+        <span class="muted mode-help">Control Flow · guarded Route Target Patch</span>
         <div class="zoom-actions">
           <button id="zoomOut" type="button" aria-label="缩小">−</button>
           <button id="zoomIn" type="button" aria-label="放大">+</button>
@@ -82,11 +84,23 @@
       </div>
     </section>
     <aside class="inspector-panel">
-      <div class="sidebar-title">SEMANTIC INSPECTOR <span class="chip">read-only</span></div>
+      <div class="sidebar-title">SEMANTIC INSPECTOR <span class="chip">limited patch</span></div>
       <div id="inspector" class="inspector-content"></div>
     </aside>
   </main>
   <section id="problems" class="problems" aria-label="Editor problems"></section>
+  <div id="patchDialog" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="patchTitle" hidden>
+    <div class="modal-content">
+      <h2 id="patchTitle">Typed Source Patch · Preview</h2>
+      <p id="patchSummary"></p>
+      <p class="modal-warning">只修改原始 YAML 中选定 Route 的目标标量；应用后不执行完整 Demo Validator。请检查 Diff 并自行决定是否导出。</p>
+      <pre id="patchDiff" aria-label="YAML source diff"></pre>
+      <div class="modal-actions">
+        <button id="closePatch" type="button">取消</button>
+        <button id="applyPatch" type="button" class="primary">确认应用到工作缓冲区</button>
+      </div>
+    </div>
+  </div>
   <footer class="footer">
     <span>Demo baseline: ca-agent-demo@bf445ad · ensure-pdu-session</span>
     <span><a href="https://github.com/odango-chan/ca-skill-studio-demo/pull/1" target="_blank" rel="noopener noreferrer">UX design</a> · <a href="https://github.com/odango-chan/ca-skill-studio-demo/pull/2" target="_blank" rel="noopener noreferrer">Source-preserving POC</a></span>

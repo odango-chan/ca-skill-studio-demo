@@ -81,7 +81,7 @@ export function projectProcedure(text) {
       if (ids.has(match[1])) return fail("重复 Node ID: " + match[1], index + 1);
       ids.add(match[1]);
       if (nodes.length >= maxNodes) return fail("节点数量超出当前预览上限", index + 1);
-      current = { id: match[1], operator: "", value: "", line: index + 1 };
+      current = { id: match[1], operator: "", value: "", line: index + 1, fields: new Set() };
       nodes.push(current);
       inRoutes = false;
       continue;
@@ -92,6 +92,8 @@ export function projectProcedure(text) {
       const key = /^ {8}(['"]?)([a-zA-Z][\w-]*)\1:\s*(.*)$/.exec(raw);
       if (!key) return fail("不支持的节点字段语法", index + 1);
       const field = key[2];
+      if (current.fields.has(field)) return fail("节点内重复 YAML 字段: " + field, index + 1);
+      current.fields.add(field);
       if (field === "preconditions" || field === "postconditions") return fail("当前不投影 Transitional Phase；请使用 Source", index + 1);
       if (!allowedNodeFields.has(field)) return fail("未知节点字段不能被安全投影: " + field, index + 1);
       if (field === "on") {
