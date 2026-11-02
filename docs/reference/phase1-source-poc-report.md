@@ -1,6 +1,6 @@
 # Phase 1 · Source-preserving Typed Patch POC
 
-**状态：Offline POC regression PASS (33 tests) · Production editor qualification still NOT_READY**
+**状态：Offline POC + pinned authoring-function parity PASS (46 tests) · Production editor qualification still NOT_READY**
 
 ## 1. 范围
 
@@ -45,12 +45,12 @@ Visual Patch：
 
 ~~~text
 PYTHONPATH=packages python -m pytest -q -ra
-33 passed in 1.56s
+46 passed in 2.46s
 python -m compileall -q packages tests
 PASS
 ~~~
 
-- **33 passed / 0 skipped / 0 failed**；
+- **46 passed / 0 skipped / 0 failed**；
 - 原先缺失的 Manifest 和完整 CreatedSession Procedure 已按 Git Blob SHA 与当前 Studio 远端仓库原件核对一致；
 - ensure Procedure Blob：`1ead0efb0665b7ccb652501bc0075b36079c5017`；
 - establish Procedure Blob：`cf502fa54363a5302161cc7cccb191ce73e453de`；
@@ -58,6 +58,7 @@ PASS
 - 两个曾 skipped 的测试现在实际执行：Manifest 使用 Demo 兼容 Loader 解析成功，完整 establish 源读取、语义对照和无修改保留成功；
 - 测试用例已改为 **fail-closed**：缺少 Manifest / Fixture 时直接失败，且固定 Fixture Git Blob 必须匹配基线清单；
 - CreatedSession 子集适配器对完整固定 establish 源报告 **0 diagnostics**；人为修改同一真实源的 Reconcile Target 和未批准 precondition Call，诊断正确拒绝。
+- 已从 `ca-agent-demo@bf445ad` 的 `scripts/validate_docs.py` 精确提取原始 `validate_createdsession_authoring_source` 函数，建立只读隔离调用：**13 个原函数 / Studio 子集对照用例通过**（含固定正向输入、错误路由、未批准操作、JIT、退役写法等）。[详细对照报告](phase1-validator-parity.md)。
 
 此处的 PASS 指 Studio 离线 POC 测试；**不等价于真实 Demo Validator、Runtime 兼容性或真实 5GC 验收**。
 
@@ -67,9 +68,9 @@ PASS
 - `InsertSequenceItem` 已完成**受限合成 Profile POC**，真实 Skill 的结构化 Phase / Step 编辑仍 **NOT_IMPLEMENTED**；禁止对 CreatedSession 开放。
 - Anchor / Alias 和 BOM 的保留 / 拒绝边界已有测试；anchors / merge keys 的可靠结构化编辑、复杂编码和无换行文件的序列插入仍 **NOT_PROVEN**，应视为 Source-only / Reject。
 - 跨文件 Rename / Undo-Redo 状态机 / File Watch / Save / 外部冲突处理 **NOT_IMPLEMENTED**。
-- `validator.py` 属于 **Demo-authoring subset adapter**；已用真实固定 establish 源及两种故障注入验证，但仍未直接执行上游 `scripts/validate_docs.py` 或 `make verify`，未证明与 Demo 完整 Validator 的逐项诊断等价。**真实 Demo Validator PASS 仍为 NOT_RUN**。
+- `validator.py` 属于 **Demo-authoring subset adapter**；已执行精确提取的上游原始 authoring 函数并完成 13 项隔离对照，**但尚未运行完整 `scripts/validate_docs.py` 或 `make verify`**。原函数并不校验 `terminal: SAFE_STOPPED` 的枚举合法性，因此此门禁的 PASS 也不能取代完整 Schema / Runtime 校验。
 - 所有 Capability / Observation / Script allowlist 的运行时可执行性 **NOT_PROVEN**。
 
 ## 6. 下一道闸门
 
-在固定 ca-agent-demo 完整源环境中直接运行其文档 / 专项 Validator，并把结果与 Studio 子集诊断做对照；再处理 Anchor / Alias、跨文件原子事务、Undo / Redo 和外部冲突。在特定 Profile 的 Parser、Typed Patch、无损回归和 Validator 证据全部齐备前，不授予结构化写回资格。本 POC **不修改 Capability Manifest 的编辑资格声明**。
+在固定 ca-agent-demo 的完整源码 checkout 中运行**整个** `scripts/validate_docs.py` / `make verify`，核对所有 Schema / 专项检查；再处理 Anchor / Alias、跨文件原子事务、Undo / Redo 和外部冲突。在特定 Profile 的 Parser、Typed Patch、无损回归和 Validator 证据全部齐备前，不授予结构化写回资格。本 POC **不修改 Capability Manifest 的编辑资格声明**。
