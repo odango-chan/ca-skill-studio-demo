@@ -126,3 +126,56 @@ test("unsupported history data does not enter source buffer", () => {
   const history = createEditorHistory("");
   assert.throws(() => history.record(null), PatchConflict);
 });
+
+
+test("Visual edits reject a procedurally unsafe but otherwise valid topology", () => {
+  const changed = fixture.replace("          PASS: create-session", "          PASS: done");
+  const result = projectProcedure(changed);
+  assert.equal(result.state, "READY"); // syntax valid but not authorized topology
+  assert.deepEqual(routeEditTargets(result.procedure, firstRoute), []);
+  assert.throws(() => previewRouteTargetPatch(changed, firstRoute, nextTarget), /拓扑/);
+});
+
+test("a valid but unqualified route outcome cannot be Visual edited", () => {
+  const changed = fixture.replace("          NOT_COMMITTED: failed", "          RETRY: failed");
+  assert.equal(projectProcedure(changed).state, "READY");
+  assert.deepEqual(routeEditTargets(projectProcedure(changed).procedure, firstRoute), []);
+});
+
+test("quoted route target remains source-only even if its value equals a known terminal", () => {
+  const quoted = fixture.replace(
+    "          FAIL: failed\n          UNKNOWN: unresolved",
+    "          FAIL: \"failed\"\n          UNKNOWN: unresolved"
+  );
+  assert.equal(projectProcedure(quoted).state, "READY");
+  assert.deepEqual(routeEditTargets(projectProcedure(quoted).procedure, firstRoute), []);
+  assert.throws(() => previewRouteTargetPatch(quoted, firstRoute, nextTarget), PatchConflict);
+});
+
+test("CST source offsets are precisely bound across comment and padding changes", () => {
+  const source = fixture.replace(
+    "          FAIL: failed\n          UNKNOWN: unresolved",
+    "          FAIL  :   failed   # preserve-me\n          UNKNOWN: unresolved"
+  );
+  const p = projectProcedure(source);
+  assert.equal(p.state, "READY", JSON.stringify(p.diagnostics));
+  const candidate = applyRouteTargetPatch(source, previewRouteTargetPatch(source, firstRoute, nextTarget));
+  assert.equal(candidate.replace("FAIL  :   safe-stopped", "FAIL  :   failed"), source);
+});
+
+test("source patch rejects stale revision even if only one comment changed elsewhere", () => {
+  const preview = previewRouteTargetPatch(fixture, firstRoute, nextTarget);
+  assert.throws(
+    () => applyRouteTargetPatch(fixture.replace("          PASS: done", "          PASS: done # unrelated"), preview),
+    /Revision/
+  );
+});
+
+test("forged source span cannot redirect patch to another YAML scalar", () => {
+  const preview = previewRouteTargetPatch(fixture, firstRoute, nextTarget);
+  assert.throws(
+    () => applyRouteTargetPatch(fixture, {
+      ...preview, sourceSpan: {...preview.sourceSpan, start: 0, end: 1}
+    }), /Source Span/
+  );
+});

@@ -82,5 +82,64 @@ test("duplicate on mapping is not silently projected as one map", () => {
   );
   const result = projectProcedure(broken);
   assert.equal(result.state, "UNAVAILABLE");
-  assert.match(result.diagnostics[0].message, /重复 YAML 字段/);
+  assert.match(result.diagnostics[0].message, /重复 YAML 字段|YAML 解析失败/);
+});
+
+
+test("CST source map locates every route scalar in the original YAML", () => {
+  const parsed = projectProcedure(fixture);
+  assert.equal(parsed.state, "READY", JSON.stringify(parsed.diagnostics));
+  for (const route of parsed.procedure.routes) {
+    assert.ok(route.sourceSpan);
+    assert.equal(fixture.slice(route.sourceSpan.start, route.sourceSpan.end), route.target);
+    assert.equal(route.patchable, true);
+    const before = fixture.slice(0, route.sourceSpan.start);
+    assert.equal(route.line, before.split("\n").length);
+  }
+});
+
+test("YAML 1.2 treats unquoted on as a string key, preserving core booleans", () => {
+  const src = fixture.replaceAll("'on':", "on:");
+  const parsed = projectProcedure(src);
+  assert.equal(parsed.state, "READY", JSON.stringify(parsed.diagnostics));
+  assert.equal(parsed.procedure.routes.length, 24);
+});
+
+test("duplicate YAML keys in nested mapping fail closed", () => {
+  const src = fixture.replace(
+    "          supi:\n            from: input.supi",
+    "          supi:\n            from: input.supi\n            from: input.dnn"
+  );
+  const result = projectProcedure(src);
+  assert.equal(result.state, "UNAVAILABLE");
+  assert.match(result.diagnostics[0].message, /YAML 解析失败|重复 YAML/);
+});
+
+test("malformed YAML never retains a READY projection", () => {
+  const src = fixture.replace("          FAIL: failed", "          FAIL: [failed");
+  assert.equal(projectProcedure(src).state, "UNAVAILABLE");
+});
+
+test("aliases and anchors are not admitted for Visual modification", () => {
+  const anchored = fixture.replace(
+    "verify: pdu_session.absent", "verify: &whichPredicate pdu_session.absent"
+  );
+  const aliased = fixture.replace(
+    "verify: pdu_session.absent", "verify: *whichPredicate"
+  );
+  assert.equal(projectProcedure(anchored).state, "UNAVAILABLE");
+  assert.equal(projectProcedure(aliased).state, "UNAVAILABLE");
+});
+
+test("multi-document YAML, unsafe tags and unsupported phases refuse the graph", () => {
+  assert.equal(projectProcedure(fixture + "\n---\nprocedures: {}\n").state, "UNAVAILABLE");
+  assert.equal(projectProcedure(fixture.replace("terminal: FAILED","terminal: !!str FAILED")).state, "UNAVAILABLE");
+  assert.equal(projectProcedure(fixture.replace("verify: pdu_session.absent","verify: pdu_session.absent\n        postconditions: {}")).state, "UNAVAILABLE");
+});
+
+test("unsupported quoted target stays projectable but is not patchable", () => {
+  const src = fixture.replace("          FAIL: failed\n          UNKNOWN: unresolved", "          FAIL: 'failed'\n          UNKNOWN: unresolved");
+  const parsed = projectProcedure(src);
+  assert.equal(parsed.state, "READY", JSON.stringify(parsed.diagnostics));
+  assert.equal(parsed.procedure.routes.find(r => r.id === "verify-created-target:FAIL").patchable, false);
 });

@@ -6,6 +6,9 @@ on:
     paths:
       - "site/**"
       - "tests/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -26,6 +29,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Install exact toolchain dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run YAML AST / CST regression tests
+        run: npm test
+      - name: Bundle browser site
+        run: npm run build
+      - name: Save generated lockfile for reproducibility follow-up
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-npm-lock
+          path: package-lock.json
+          retention-days: 7
       - name: Check static site and asset references
         run: |
           python3 - <<'PY'
@@ -33,12 +48,12 @@ jobs:
           from pathlib import Path
           import re
 
-          html = Path("site/index.html").read_text(encoding="utf-8")
+          html = Path("dist/index.html").read_text(encoding="utf-8")
           assert html.lstrip().lower().startswith("<!doctype html>")
           HTMLParser().feed(html)
-          for asset in ("./studio.css", "./app.mjs", "./graph.mjs", "./samples/ensure-pdu-session.procedure.yaml"):
-              assert Path("site", asset.removeprefix("./")).is_file(), asset
-          assert 'src="./app.mjs"' in html
+          for asset in ("./studio.css", "./app.js", "./samples/ensure-pdu-session.procedure.yaml"):
+              assert Path("dist", asset.removeprefix("./")).is_file(), asset
+          assert 'src="./app.js"' in html
           assert 'href="./studio.css"' in html
           assert not re.search(r'<script[^>]+src=["\']https?://', html, re.I)
           PY
@@ -47,16 +62,16 @@ jobs:
           node --check site/app.mjs
           node --check site/graph.mjs
           node --check site/patch.mjs
+          node --check site/semantic.mjs
           node --check tests/graph.test.mjs
           node --check tests/patch.test.mjs
-      - name: Run source-projection regression
-        run: node --test tests/*.test.mjs
+          node --check scripts/build.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:
-          path: site
+          path: dist
 
   deploy:
     needs: build

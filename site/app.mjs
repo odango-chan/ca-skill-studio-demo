@@ -89,7 +89,7 @@ function refresh(refit = false) {
     graph = layoutProcedure(lastGood);
     if (selection && selection.kind === "node" && !lastGood.nodes.some(n => n.id === selection.id)) selection = null;
     if (selection && selection.kind === "route" && !lastGood.routes.some(r => r.id === selection.id)) selection = null;
-    setText("projectionState", "READY · narrow Profile");
+    setText("projectionState", "READY · YAML AST/CST");
   } else {
     setText("projectionState", lastGood ? "STALE · source changed" : "UNAVAILABLE");
     if (!lastGood) graph = null;
@@ -183,7 +183,7 @@ function renderInspector() {
     inspectorLine("Node", lastGood.nodes.length);
     inspectorLine("Route entries", lastGood.routes.length);
     inspectorLine("编辑资格", "Visual read-only");
-    inspectorLine("语法范围", "ensure-subset · 非完整 YAML validator");
+    inspectorLine("语法范围", "ensure-cst-v1 · 不是完整 Demo Validator");
     return;
   }
   if (selection.kind === "node") {
@@ -216,7 +216,7 @@ function renderInspector() {
       inspectorTitle("SetRouteTarget · 限定试验");
       const warning = document.createElement("p");
       warning.className = "subtle-note";
-      warning.textContent = "只支持两条固定 ensure 失败 Route 的终态目标修改；必须预览 Diff 并确认。此操作不是完整 Demo Validator。";
+      warning.textContent = "只支持固定 ensure 拓扑中的两条失败 Route；从 YAML CST Source Span 定位标量、预览 Diff 后确认。不是完整 Demo Validator。";
       inspector.appendChild(warning);
       const select = document.createElement("select");
       select.className = "target-select";
