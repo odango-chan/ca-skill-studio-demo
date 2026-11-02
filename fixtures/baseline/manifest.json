@@ -1,0 +1,27 @@
+{
+  "source": {
+    "repository": "odango-chan/ca-agent-demo",
+    "commit": "bf445ad777149af5af2dfa0a5bdea18d0451303e"
+  },
+  "status": "pinned-source-copies-for-parser-and-patch-regression-only",
+  "fixtures": [
+    {
+      "path": "fixtures/baseline/ensure-pdu-session/procedure.yaml",
+      "sourcePath": "skills/ensure-pdu-session/assurance/procedure.yaml",
+      "sourceGitBlobSha": "1ead0efb0665b7ccb652501bc0075b36079c5017",
+      "sourceLines": 128
+    },
+    {
+      "path": "fixtures/baseline/establish-pdu-session/procedure.yaml",
+      "sourcePath": "skills/establish-pdu-session/assurance/procedure.yaml",
+      "sourceGitBlobSha": "cf502fa54363a5302161cc7cccb191ce73e453de",
+      "sourceLines": 758
+    }
+  ],
+  "constraints": {
+    "readonly": true,
+    "noRuntimeExecution": true,
+    "noLive5GC": true,
+    "completeDemoRepositoryCopied": false
+  }
+}

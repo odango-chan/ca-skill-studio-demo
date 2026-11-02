@@ -1,0 +1,20 @@
+[project]
+name = "connectionagent-skill-studio-source-poc"
+version = "0.1.0"
+description = "Offline source-preserving YAML Typed Patch proof of concept"
+requires-python = ">=3.11"
+dependencies = ["ruamel.yaml>=0.18.10,<0.19"]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "PyYAML>=6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["packages"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["packages"]
