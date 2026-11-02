@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>ConnectionAgent · Skill Studio Demo</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0c1120; --panel:#151d2d; --line:#303c50; --muted:#aab7cb; --text:#f3f7fd; --accent:#9dbdff; --soft:#1e2b42; font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    * {box-sizing:border-box} body {margin:0;background:var(--bg);color:var(--text)}
+    a {color:var(--accent)} button {background:var(--soft);border:1px solid #455a79;color:var(--text);border-radius:9px;padding:9px 13px;font:inherit;cursor:pointer}
+    button:hover {background:#2a405f} button:focus-visible, textarea:focus-visible, a:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
+    button.primary {background:#315d9b;border-color:#4b7bc5} button.primary:hover {background:#386caf}
+    .app {min-height:100vh;display:flex;flex-direction:column}
+    header {padding:17px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    .mark {display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:#283d64;color:#d6e4ff;font-weight:800}
+    header h1 {font-size:18px;margin:0} header p {font-size:12px;color:var(--muted);margin:3px 0 0}
+    .tag {font-size:11px;color:#c8daff;padding:4px 7px;border:1px solid #496389;border-radius:20px}
+    .headlink {margin-left:auto;font-size:12px}
+    .notice {padding:11px 24px;background:#1c2a40;border-bottom:1px solid var(--line);font-size:12px;color:#c8d5e7;line-height:1.6}
+    main {display:grid;grid-template-columns:230px minmax(340px,1fr) 275px;flex:1;min-height:0}
+    aside {background:#121a29;padding:18px;border-right:1px solid var(--line);min-width:0}
+    aside.right {border-left:1px solid var(--line);border-right:none}
+    .eyebrow {text-transform:uppercase;letter-spacing:1px;font-weight:700;font-size:11px;color:#92a6c5;margin:0 0 14px}
+    .file {background:#22344d;color:#dfebff;display:block;border:1px solid #4d6588;border-radius:9px;padding:10px;font-size:13px;overflow-wrap:anywhere}
+    .muted {color:var(--muted)} .small {font-size:12px;line-height:1.65}
+    .tools {display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:13px 18px;border-bottom:1px solid var(--line)}
+    .tools strong {margin-right:auto;font-size:14px;overflow-wrap:anywhere}
+    .editor-column {min-width:0;display:flex;flex-direction:column;background:var(--panel)}
+    .source-label {padding:10px 18px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line)}
+    textarea {flex:1;min-height:430px;width:100%;resize:vertical;background:#111927;color:#e2edfb;border:0;outline:none;padding:22px 24px;font:13px/1.75 ui-monospace,SFMono-Regular,Consolas,monospace;tab-size:2}
+    .status {padding:9px 18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted)}
+    .outline {list-style:none;margin:0;padding:0;max-height:48vh;overflow:auto}
+    .outline li {font-size:12px;padding:7px 5px;border-bottom:1px solid #253046;overflow-wrap:anywhere}
+    .outline button {border:0;background:transparent;padding:3px;text-align:left;color:#d6e3f7;font-size:12px;width:100%}
+    .outline button:hover {color:white;background:#273d5c}
+    .pill {display:inline-block;font-size:11px;padding:3px 7px;border-radius:6px;background:#263851;color:#c7d9fc}
+    .note {margin-top:18px;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12px;line-height:1.7;color:var(--muted)}
+    footer {font-size:11px;color:var(--muted);border-top:1px solid var(--line);padding:10px 24px}
+    input[type=file] {display:none}
+    @media(max-width:1050px) {main{grid-template-columns:190px minmax(0,1fr)} aside.right{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}.outline{max-height:200px}}
+    @media(max-width:640px) {header{padding:14px}.headlink{margin-left:0}.notice{padding:10px 14px}main{display:flex;flex-direction:column}aside{border-right:0;border-bottom:1px solid var(--line)}.tools{padding:12px}textarea{min-height:52vh;padding:15px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="mark">CA</div>
+      <div><h1>Skill Studio <span class="tag">Source prototype</span></h1><p>ConnectionAgent · Authoring-first editor</p></div>
+      <a class="headlink" href="https://github.com/odango-chan/ca-skill-studio-demo" target="_blank" rel="noopener noreferrer">查看源仓</a>
+    </header>
+    <div class="notice"><strong>范围说明：</strong>这是 GitHub Pages 上的独立浏览器端 Source 编辑演示，不是完整的 Procedure Designer。支持本地导入、编辑、文本大纲、导出。<strong>不会上传文件，也不会执行 Skill / Script。</strong> Graph、Typed Patch、完整 YAML 语义校验与自动保存尚未接入。</div>
+    <main>
+      <aside>
+        <p class="eyebrow">Workspace / Local</p>
+        <div class="file" id="fileName" aria-label="Current file">example-SKILL.md</div>
+        <p class="small muted">这里只编辑当前浏览器内存中的一个文件。导出后请自行保存到本地工作副本。</p>
+        <button id="openButton" type="button">打开本地文件</button>
+        <input id="filePicker" type="file" accept=".md,.yaml,.yml,.json,.txt,.py,.js,.ts,.sh,text/plain,text/markdown,application/json">
+        <div class="note">设计与编辑内核仍在独立分支审查中。此页面不调用 Python POC，也不提供未验证的 Visual 写回功能。</div>
+      </aside>
+      <section class="editor-column" aria-label="Source editor">
+        <div class="tools">
+          <strong id="editorTitle">example-SKILL.md</strong>
+          <span class="pill" id="dirtyStatus" role="status">未修改</span>
+          <button id="resetButton" type="button">撤销全部修改</button>
+          <button class="primary" id="downloadButton" type="button">导出文件</button>
+        </div>
+        <div class="source-label">SOURCE · UTF-8 · 原文编辑（不做静默格式化）</div>
+        <textarea id="source" spellcheck="false" aria-label="Skill source file contents"></textarea>
+        <div class="status"><span id="stats">0 lines</span><span id="noticeText" role="status">本地编辑 · 未验证</span></div>
+      </section>
+      <aside class="right">
+        <p class="eyebrow">文本大纲 <span class="pill">非语义解析</span></p>
+        <ul class="outline" id="outline" aria-label="Source headings"></ul>
+        <p class="small muted" id="outlineEmpty">检测 Markdown 标题；YAML 文件只显示顶层键。此视图不代表 Procedure Graph。</p>
+        <div class="note"><strong>下一阶段</strong><br>接入已固定基线的 YAML Parser / Typed Patch 资格层，再实现 Control Flow / Inspector / Diff。未知字段保留原样，不靠画布推测来源语义。</div>
+      </aside>
+    </main>
+    <footer>Pages 静态前端 · 所有文件操作仅发生在你的浏览器中 · <a href="https://github.com/odango-chan/ca-skill-studio-demo/pull/1" target="_blank" rel="noopener noreferrer">UX 设计 PR</a> · <a href="https://github.com/odango-chan/ca-skill-studio-demo/pull/2" target="_blank" rel="noopener noreferrer">Typed Patch POC</a></footer>
+  </div>
+  <script>
+    "use strict";
+    const source = document.getElementById("source");
+    const filePicker = document.getElementById("filePicker");
+    const fileName = document.getElementById("fileName");
+    const editorTitle = document.getElementById("editorTitle");
+    const outline = document.getElementById("outline");
+    const dirtyStatus = document.getElementById("dirtyStatus");
+    const noticeText = document.getElementById("noticeText");
+    const stats = document.getElementById("stats");
+    const defaultText = [
+      "---",
+      "name: example-skill",
+      "description: Example source-only editing sandbox",
+      "---",
+      "",
+      "# Example Skill",
+      "",
+      "This page is an offline source-editing preview.",
+      "",
+      "## Instructions",
+      "",
+      "- Edit the content in the source pane.",
+      "- Open an existing local file or export your changes.",
+      "- No capability or script is executed by this site."
+    ].join("\n");
+    let currentName = "example-SKILL.md";
+    let baseline = defaultText;
+
+    function updateUI() {
+      const text = source.value;
+      const dirty = text !== baseline;
+      dirtyStatus.textContent = dirty ? "未导出修改" : "未修改";
+      stats.textContent = text.split("\n").length + " 行 · " + new TextEncoder().encode(text).length + " UTF-8 bytes";
+      outline.replaceChildren();
+      const lines = text.split("\n");
+      const markdown = currentName.toLowerCase().endsWith(".md");
+      const entries = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const match = markdown ? /^(#{1,5})\s+(.+?)\s*$/.exec(line) : /^([A-Za-z_][\w.-]*):(?:\s|$)/.exec(line);
+        if (match) entries.push({ line: i, text: markdown ? match[2] : match[1], depth: markdown ? match[1].length : 1 });
+        if (entries.length >= 60) break;
+      }
+      for (const entry of entries) {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = (entry.depth > 1 ? "  ".repeat(Math.min(entry.depth - 1, 4)) : "") + entry.text;
+        button.setAttribute("aria-label", entry.text + " line " + (entry.line + 1));
+        button.addEventListener("click", () => {
+          const index = lines.slice(0, entry.line).join("\n").length + (entry.line ? 1 : 0);
+          source.focus();
+          source.setSelectionRange(index, index + lines[entry.line].length);
+        });
+        li.appendChild(button);
+        outline.appendChild(li);
+      }
+      document.getElementById("outlineEmpty").hidden = entries.length > 0;
+    }
+    function setDocument(name, text) {
+      currentName = name;
+      baseline = text;
+      source.value = text;
+      fileName.textContent = currentName;
+      editorTitle.textContent = currentName;
+      noticeText.textContent = "本地编辑 · 未验证";
+      updateUI();
+    }
+    source.addEventListener("input", updateUI);
+    document.getElementById("openButton").addEventListener("click", () => filePicker.click());
+    filePicker.addEventListener("change", async () => {
+      const file = filePicker.files && filePicker.files[0];
+      if (!file) return;
+      if (source.value !== baseline && !confirm("当前存在未导出的修改。确定放弃这些修改并打开新文件吗？")) { filePicker.value = ""; return; }
+      if (file.size > 1024 * 1024) { alert("演示版只接受不大于 1 MiB 的文件。"); filePicker.value = ""; return; }
+      try {
+        const text = await file.text();
+        if (text.includes("\u0000")) throw new Error("文件可能不是纯文本");
+        setDocument(file.name, text);
+      } catch (error) {
+        noticeText.textContent = "读取失败：" + String(error.message || error);
+      }
+      filePicker.value = "";
+    });
+    document.getElementById("downloadButton").addEventListener("click", () => {
+      const blob = new Blob([source.value], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = currentName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      baseline = source.value;
+      noticeText.textContent = "已请求浏览器下载；请确认文件已保存";
+      updateUI();
+    });
+    document.getElementById("resetButton").addEventListener("click", () => {
+      if (source.value !== baseline && !confirm("放弃当前未导出的修改？")) return;
+      source.value = baseline;
+      updateUI();
+    });
+    document.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        document.getElementById("downloadButton").click();
+      }
+    });
+    window.addEventListener("beforeunload", event => {
+      if (source.value !== baseline) { event.preventDefault(); event.returnValue = ""; }
+    });
+    setDocument(currentName, defaultText);
+  </script>
+</body>
+</html>
