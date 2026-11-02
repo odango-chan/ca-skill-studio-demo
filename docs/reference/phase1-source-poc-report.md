@@ -36,15 +36,16 @@ Visual Patch：
 - `SourceDocument.preview/apply`：Revision 检查、Source Diff、语义复核、再次验证 Preview 防篡改、失败原子回滚。
 - Anchor / Alias：Round-trip 原文保留；任何结构化修改均保守 Reject，回退 Source-only。
 - BOM / CRLF：局部修改后保持开头 BOM、CRLF 换行格式。
-- `DemoYaml12Loader`：独立复现当前 Demo 对 `on`、`true` / `false` 的布尔解析意图并拒绝重复键；只作 POC 交叉检查，不能冒充直接执行 Demo Validator。
+- `DemoYaml12Loader`：独立复现当前 Demo 对 `on`、`true` / `false` 的布尔解析意图并拒绝重复键；只作 POC 交叉检查。
+- `validator.py`：以固定 `ca-agent-demo@bf445ad` 的 `scripts/validate_docs.py::validate_createdsession_authoring_source` 为依据，新增**不执行任何 Skill 动作**的 CreatedSession 作者语法 **subset diagnostic adapter**。检查主业务节点顺序、阶段形状与允许 Operator、JIT Predicate、局部 Route 完整性和 Reconcile safe-stop；返回可定位的诊断，不授予 Visual 编辑或 Runtime 执行资格。
 
 ## 4. 本地测试结果
 
-在当前隔离环境执行 `python -m pytest -q`：
+在当前隔离环境执行 `python -m pytest -q -ra`：
 
-- **19 passed**；
+- **27 passed**；
 - **2 skipped**（完整 CreatedSession Fixture 与现有远端 Manifest 在隔离本地工作目录不可用）；
-- **0 failed**。
+- **0 failed**；新增 8 项本地**合成源码**的 Validator 正反向测试通过。
 
 其中完整 `ensure-pdu-session` Fixture 的节点数、精确绑定的 RenameNode 与解析前后语义对照均通过。完整 `establish-pdu-session` Fixture 已以源 Git Blob 原样加入 Studio 分支，在完整仓库 checkout 中应重新运行上述两项测试；这里不声称已经运行。
 
@@ -55,9 +56,9 @@ Visual Patch：
 - `InsertSequenceItem` 已完成**受限合成 Profile POC**，真实 Skill 的结构化 Phase / Step 编辑仍 **NOT_IMPLEMENTED**；禁止对 CreatedSession 开放。
 - Anchor / Alias 和 BOM 的保留 / 拒绝边界已有测试；anchors / merge keys 的可靠结构化编辑、复杂编码和无换行文件的序列插入仍 **NOT_PROVEN**，应视为 Source-only / Reject。
 - 跨文件 Rename / Undo-Redo 状态机 / File Watch / Save / 外部冲突处理 **NOT_IMPLEMENTED**。
-- 没有使用 Demo 的真实 `scripts/validate_docs.py` 或 `make verify`；本地语义对照仅为兼容性近似检查，不代表 Demo Validator PASS。
+- `validator.py` 属于 **Demo-authoring subset adapter**，但未直接执行上游 `scripts/validate_docs.py` 或 `make verify`；本地 8 项合成场景不能代替真实固定 CreatedSession 源码的 validator 联合验收。**真实 Demo Validator PASS 仍为 NOT_RUN**。
 - 所有 Capability / Observation / Script allowlist 的运行时可执行性 **NOT_PROVEN**。
 
 ## 6. 下一道闸门
 
-在真实 Git checkout 中运行测试，修复跳过项，验证固定 Manifest；随后对完整固定源码补齐无跳过回归，扩展合成 `InsertSequenceItem` 到真正被专用 Profile 验证的 Step 结构，并开发 Demo Validator 适配。取得完整 Round-trip / Patch 证据后，才把特定操作标记为 `editable`。本 POC **不修改 Capability Manifest 的编辑资格声明**。
+在真实 Git checkout 中运行测试，修复跳过项，验证固定 Manifest；随后对完整固定源码补齐无跳过回归，扩展合成 `InsertSequenceItem` 到真正被专用 Profile 验证的 Step 结构，并对接/对比 Demo 的真实 Validator（subset adapter 已实现）。取得完整 Round-trip / Patch 证据后，才把特定操作标记为 `editable`。本 POC **不修改 Capability Manifest 的编辑资格声明**。
