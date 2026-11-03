@@ -145,7 +145,7 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
               warn("INPUT_MISSING",FILES.procedure,scalar,
                 procId+"/"+nodeId+" 引用了未声明 Procedure input："+key);
           }else{
-            const match=val.match(/^([A-Za-z_][A-Za-z0-9_-]*)\.(?:output|preconditions|postconditions)\./);
+            const match=val.match(/^([A-Za-z_][A-Za-z0-9_-]*)\.(?:output(?:\.|$)|preconditions\.|postconditions\.)/);
             if(match&&!nodeIds.has(match[1])&&!["preconditions","postconditions"].includes(match[1]))
               warn("PRODUCER_MISSING",FILES.procedure,scalar,
                 procId+"/"+nodeId+" 引用了不存在的 Node："+match[1]);

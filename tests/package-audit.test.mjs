@@ -84,5 +84,5 @@ test("A5 handles partial workspace, invalid companion YAML and invalid Procedure
   assert.equal(audit(w)[0].code,"YAML_PARSE");
   w.files.get("assurance/predicates.yaml").text="kind: PredicateSet\nmetadata:\n  skill: ensure-pdu-session\npredicates: {}\n";
   w.files.get("assurance/procedure.yaml").text="bad: [";
-  assert.deepEqual(audit(w),[]);
+  assert.equal(audit(w)[0].code,"YAML_PARSE");
 });
