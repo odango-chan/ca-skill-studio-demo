@@ -40,8 +40,8 @@ function RouteEdge(props:EdgeProps){
   const label=String(data?.label??"");
   const show=Boolean(data?.displayLabel||selected);
   return <>
-    <BaseEdge id={id} path={d}
-      interactionWidth={26}
+    <BaseEdge id={id} path={d} markerEnd={props.markerEnd}
+      interactionWidth={16}
       className={"designer-edge"+(data?.important?" is-primary":"")+
         (selected?" is-selected":"")}/>
     {show&&<EdgeLabelRenderer>

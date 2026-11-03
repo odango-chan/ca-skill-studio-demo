@@ -66,7 +66,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .graph-options button:hover:not(:disabled),.zoom-actions button:hover:not(:disabled){background:#eef5f9}
 .graph-options button[aria-pressed=true]{background:#e4f6ef;color:#067668;border-color:#a1d6c5}
 .graph-pane{background-color:#f7f9fc;background-image:radial-gradient(#cfdae7 .85px,transparent .85px)}
-.graph-pane svg{cursor:grab}
+
 .canvas-help{background:#ffffffed;color:#6c8199;border-color:#dce6ef;box-shadow:0 2px 10px #23405e0b}
 .layout-status{background:#ffffffed;color:#37756d;border-color:#d7e6ea;box-shadow:0 1px 6px #12243d0c}
 .graph-warning{background:#fff7e9;border-color:#e9be79;color:#87581a}
@@ -1072,3 +1072,33 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   font-size:8px;
   opacity:.7;
 }
+
+
+/* React Flow D1 regression fix: at fit-to-graph zoom the full CreatedSession
+   is tall; ordinary ~2px strokes scale to sub-pixel lines and seem missing.
+   Non-scaling strokes preserve readable edges without changing ELK positions. */
+.procedure-flow .react-flow__edge-path.designer-edge{
+  fill:none;
+  stroke:#66899f;
+  stroke-width:2.6px;
+  stroke-opacity:1;
+  vector-effect:non-scaling-stroke;
+  shape-rendering:geometricPrecision;
+}
+.procedure-flow .react-flow__edge-path.designer-edge.is-primary{
+  stroke:#138f7a;
+  stroke-width:3px;
+}
+.procedure-flow .react-flow__edge-path.designer-edge.is-selected{
+  stroke:#087e71;
+  stroke-width:3.5px;
+}
+.procedure-flow .react-flow__edge-interaction{
+  vector-effect:non-scaling-stroke;
+}
+.procedure-flow .react-flow__edges{
+  overflow:visible;
+  pointer-events:none;
+}
+/* The historical .graph-pane svg rule must not apply to nested React Flow
+   edge SVGs, otherwise it overrides their own sizing and pointer behavior. */

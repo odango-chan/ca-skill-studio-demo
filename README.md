@@ -139,3 +139,7 @@ The previous implementation used `explorerPanel.hidden=true` and relied on a sep
 完整迁移界限及 CreatedSession 验收依据见 [D1 Procedure Designer](docs/D1-procedure-designer.md)。D1 使用 React Flow + TSX 替换原生 SVG 画布，ELK 继续负责默认垂直的自动布局；文件树、Source/Preview/Split、Inspector、CST/AST、Typed Patch、Undo/Redo 与 ZIP 均保持原有实现。React Flow 的节点和边不是另一份业务权威模型。CreatedSession Root 以 17 Node / 65 Outcome 为回归基线。
 
 此阶段支持 Node、Route 选中与子 Procedure 钻取；重新连接现有 Route 仍需要通过现有资格检查和 YAML Diff 才能生效。新建/删除 Node、创建 Route、修改 DSL 及持久化拖拽坐标不属于 D1，不能以图形变化假装修改了 Skill。真实浏览器 E2E 仍是单独验收项。
+
+### React Flow D1 · CreatedSession Route visibility fix (2026-11-03)
+
+Chromium DOM smoke found all 17 Root nodes and 39 bundled SVG paths representing 65 original Outcomes, with nonzero path length. In the tall default DOWN layout, initial fit-to-view scales ~2px SVG stroke widths to fractions of a display pixel, so routes can appear to disappear although the semantic projection is complete. React Flow paths now use visible higher-contrast, **non-scaling-stroke** rendering, retained pointer hit areas, and direction markers. Broad legacy `.graph-pane svg` styles have been removed to prevent React Flow SVG interference. Browser smoke now asserts **actual visible path CSS** and non-scaling strokes on CreatedSession, in addition to the existing source/projection counts; it runs before Pages deployment. No SKILL YAML/Typed Patch semantics changed.

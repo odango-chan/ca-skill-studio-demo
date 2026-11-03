@@ -44,6 +44,11 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       sourceHandle:"out",targetHandle:"in",
       type:"procedure-route",selectable:true,
       selected,
+      markerEnd:{
+        type:"arrowclosed",
+        color:important?"#138f7a":"#66899f",
+        width:24,height:24
+      },
       // Only the verified handler may propose a YAML patch on reconnect.
       reconnectable:true,
       data:{

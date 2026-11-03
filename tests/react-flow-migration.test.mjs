@@ -19,6 +19,7 @@ test("D1 projects the real CreatedSession 17-node / 65-Outcome graph unchanged",
   const flow=makeFlowElements(graph,created.procedure);
   assert.equal(flow.direction,"DOWN");
   assert.equal(flow.nodes.length,17);
+  assert.equal(flow.edges.length,39);
   assert.equal(flow.edges.reduce((n,e)=>n+e.data.bundle.routes.length,0),65);
   assert.equal(flow.nodes.find(n=>n.id===created.procedure.start).data.start,true);
   assert.equal(new Set(flow.nodes.map(n=>n.id)).size,flow.nodes.length);
@@ -27,6 +28,8 @@ test("D1 projects the real CreatedSession 17-node / 65-Outcome graph unchanged",
     flow.nodes.map(n=>n.id),created.procedure.nodes.map(n=>n.id));
   assert.ok(flow.nodes.every(n=>n.draggable===false));
   assert.ok(flow.edges.every(e=>e.reconnectable===true));
+  assert.ok(flow.edges.every(e=>e.markerEnd?.type==="arrowclosed"));
+  assert.ok(flow.edges.every(e=>e.markerEnd?.width>=20));
   assert.equal(JSON.stringify(created.procedure),before);
 });
 test("routeSource and all exact Outcome ids survive React Flow projection",async()=>{
@@ -84,4 +87,17 @@ test("D1 keeps SVG source logic outside React Flow and retains Typed Patch autho
   assert.match(canvas,/nodesDraggable=\{false\}/);
   assert.match(canvas,/deleteKeyCode=\{null\}/);
   assert.deepEqual(FLOW_NODE_SIZE,{width:238,height:80});
+});
+
+test("React Flow edges keep screen-space stroke width at default fit zoom",()=>{
+  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
+  const old=readFileSync(new URL("../site/studio.css",import.meta.url),"utf8");
+  const jsx=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  assert.match(css,/\.procedure-flow \.react-flow__edge-path\.designer-edge\{/);
+  assert.match(css,/vector-effect:non-scaling-stroke/);
+  assert.match(css,/\.procedure-flow \.react-flow__edge-interaction\{/);
+  assert.match(css,/\.procedure-flow \.react-flow__edges\{[^}]*overflow:visible/s);
+  assert.doesNotMatch(old,/\.graph-pane svg\{/);
+  assert.match(jsx,/markerEnd=\{props\.markerEnd\}/);
+  assert.match(jsx,/interactionWidth=\{16\}/);
 });
