@@ -51,13 +51,13 @@ test("AGENTS safety and evidence rules are paired with repository ignore",()=>{
     assert.ok(agents.includes(mark),"Missing mandatory Agent guidance: "+mark);
   assert.match(ignore,/^\.agent-tmp\/\s*$/m);
 });
-test("WORK / D3 stages distinguish shipped A1, A2 candidate and unstarted A3",()=>{
+test("WORK / D3 stages distinguish shipped A1 and A2 from unstarted A3",()=>{
   const state=content("docs/WORK.md"),spec=content("docs/design/route-designer.md");
   assert.match(state,/\|\s*D3-A1[^\n]*\|\s*ACCEPTED\s*\|\s*IMPLEMENTED\s*\|\s*PASS/);
-  assert.match(state,/\|\s*D3-A2[^\n]*\|\s*PROPOSED[^\n]*\|\s*PARTIAL[^\n]*\|\s*PASS/);
+  assert.match(state,/\|\s*D3-A2[^\n]*\|\s*ACCEPTED\s*\|\s*IMPLEMENTED\s*\|\s*PASS/);
   assert.match(state,/\|\s*D3-A3[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
   assert.match(spec,/Status: Proposed overall/);
-  assert.match(spec,/A1 IMPLEMENTED/);
+  assert.match(spec,/A1\/A2 IMPLEMENTED/);
   assert.match(spec,/A3 NOT_STARTED/);
   assert.match(spec,/A3 NOT_RUN/);
   const trace=content("docs/TRACEABILITY.md");
