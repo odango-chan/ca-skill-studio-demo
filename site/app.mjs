@@ -65,7 +65,7 @@ let explorerOpen = true;
 const expandedAssetFolders=new Set(["assurance","schemas","scripts"]);
 let procedureNavOpen=true;
 let showAllLabels = false;
-let layoutDirection = "RIGHT";
+let layoutDirection = "DOWN";
 let neighborView = false;
 let layoutTicket = 0;
 let layoutTimer = null;
@@ -94,7 +94,7 @@ function scheduleELKLayout(wait=0, autoFit=false) {
   const direction=layoutDirection;
   const focus=neighborView && selection?.kind==="node" ? selection.id : null;
   const filtered=Boolean(focus);
-  const fallback=layoutProcedure(proc);
+  const fallback=layoutProcedure(proc,direction);
   graph={...fallback, visibleNodes:proc.nodes, visibleRoutes:proc.routes, isFiltered:false};
   renderGraph();
   setText("layoutStatus","正在自动布局…");
@@ -1039,12 +1039,20 @@ function renderGraph() {
     if (!a || !b) continue;
     const selectedRoute=bundle.routes.find(r=>selection?.kind==="route"&&selection.id===r.id);
     const selected=Boolean(selectedRoute);
-    const reverse = b.x <= a.x;
+    const vertical=graph.direction==="DOWN";
+    const reverse=vertical ? b.y<=a.y : b.x<=a.x;
     const nodeWidth=graph.engine==="ELK layered"?238:222;
     const nodeHeight=graph.engine==="ELK layered"?80:74;
-    const sx = a.x + nodeWidth, sy = a.y + nodeHeight/2, tx = reverse ? b.x + nodeWidth/2 : b.x, ty = b.y + nodeHeight/2;
-    const bend = reverse ? Math.max(110, Math.abs(tx - sx) * .5) : Math.max(50, (tx - sx) * .52);
-    const d = bundle.path || ("M " + sx + " " + sy + " C " + (sx + bend) + " " + sy + ", " + (tx - bend) + " " + ty + ", " + tx + " " + ty);
+    const sx=vertical?a.x+nodeWidth/2:a.x+nodeWidth;
+    const sy=vertical?a.y+nodeHeight:a.y+nodeHeight/2;
+    const tx=vertical?b.x+nodeWidth/2:(reverse?b.x+nodeWidth/2:b.x);
+    const ty=vertical?b.y:b.y+nodeHeight/2;
+    const bend=vertical?
+      (reverse?-1:1)*Math.max(45,Math.abs(ty-sy)*.5):
+      reverse?Math.max(110,Math.abs(tx-sx)*.5):Math.max(50,(tx-sx)*.52);
+    const d=bundle.path || (vertical?
+      ("M "+sx+" "+sy+" C "+sx+" "+(sy+bend)+", "+tx+" "+(ty-bend)+", "+tx+" "+ty):
+      ("M "+sx+" "+sy+" C "+(sx+bend)+" "+sy+", "+(tx-bend)+" "+ty+", "+tx+" "+ty));
     const keyRoute=bundle.outcomes.some(o=>["PASS","SUCCEEDED"].includes(o));
     const edgeClass="edge"+(selected?" selected":"")+(keyRoute?"":" secondary-label");
     const group = svgEl("g", { class: edgeClass, "data-selectable": "route", tabindex: "0", role: "button", "aria-label": bundle.source + " to " + bundle.target + ": " + bundle.outcomes.join(", ") });

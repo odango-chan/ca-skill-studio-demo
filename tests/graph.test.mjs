@@ -143,3 +143,17 @@ test("unsupported quoted target stays projectable but is not patchable", () => {
   assert.equal(parsed.state, "READY", JSON.stringify(parsed.diagnostics));
   assert.equal(parsed.procedure.routes.find(r => r.id === "verify-created-target:FAIL").patchable, false);
 });
+
+test("basic fallback supports vertical direction without losing any graph node or route",()=>{
+  const proc=projectProcedure(fixture).procedure;
+  const right=layoutProcedure(proc,"RIGHT");
+  const down=layoutProcedure(proc,"DOWN");
+  assert.equal(right.direction,"RIGHT");
+  assert.equal(down.direction,"DOWN");
+  assert.deepEqual([...right.positions.keys()],[...down.positions.keys()]);
+  assert.equal(down.bundles.reduce((sum,b)=>sum+b.routes.length,0),proc.routes.length);
+  assert.ok(down.width>0&&down.height>0);
+  assert.ok([...down.positions.values()].every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)));
+  assert.notDeepEqual(right.positions.get(proc.nodes[1].id),down.positions.get(proc.nodes[1].id));
+  assert.throws(()=>layoutProcedure(proc,"SIDEWAYS"),/Unsupported/);
+});

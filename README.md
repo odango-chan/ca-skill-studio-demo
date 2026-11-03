@@ -21,7 +21,7 @@ https://odango-chan.github.io/ca-skill-studio-demo/
 - **资产优先的左栏**：示例现在加载真实 Runtime / Model-context 文件组成的 Package（仅固定样本）；Local 文件导入仍是单文件。Root / Child Procedure 是 procedure.yaml 内部视图，Node Outline 默认为折叠的线性导航。Case、Design 和其他非运行相关文件不会出现在示例资产树里。
 - **Inspector 统一入口**：准备、执行、确认、路由在一个上下文面板中，低频内容默认折叠；Phase Step 与 Route 仍保留原始 Source 路径和行号；只读与可编辑资格严格分离。
 - 文件导出、Undo / Redo、Procedure Explorer、搜索、Root / Child 路径和 Visual / Source / Split 继续存在，保留旧的固定 ensure Route Patch 安全边界。
-- **ELK layered 自动布局**：从左到右 / 从上到下切换、正交边路径、画布平移缩放和适配；Node Outline 选择后自动居中；相邻视图只显示所选 Node 的入边/出边一跳，不改写 Source。
+- **ELK layered 自动布局**：**默认从上到下（DOWN / 垂直）**，仍可切到从左到右（RIGHT / 水平）；正交边路径、画布平移缩放和适配；Node Outline 选择后自动居中；相邻视图只显示所选 Node 的入边/出边一跳，不改写 Source。ELK 暂时失败时的基础布局也会沿当前方向显示。
 - **按 Route Source 分组而非语义合并**：画布上的连线按 `source + target + routeSource` 分组；点击同一组连线可轮流定位每个原始 Route，在 Inspector 查看原始 outcome、target、line；Phase 的 on 路由不与 Operator 的 on 混淆。ELK 失败时退回旧布局，并显示状态。
 - Visual / Source / Split 三视图；画布支持平移、缩放、适配；Node Outline 搜索及按源码顺序导航；点击节点/边查看 Inspector 和 Source 行。
 - 支持导入本地文本文件、直接编辑 Source、重置本地缓冲区、导出文件。
@@ -127,3 +127,9 @@ The Explorer owns its collapse button beside its title. When collapsed, the Expl
 ### 2026-11-03 · Collapsed Explorer recovery fix
 
 The previous implementation used `explorerPanel.hidden=true` and relied on a separate 27px chevron in a rail. Users could not reliably find the way back. Now the Explorer itself stays in the DOM and visible when compact; its sections are hidden only by CSS, the header and the same collapse/expand button remain visible. The compact state uses a tinted 54px strip with a clearly labeled expand action; on narrow/flex layouts it becomes a horizontal strip. This avoids the hidden-parent problem and creates a consistent location for both actions. Automated tests assert the DOM identity, state transition, and breakpoint-specific visible styles; browser-driven E2E remains NOT_RUN.
+
+### 2026-11-03 · Default vertical Procedure graph
+
+- On first load the layout select and the ELK renderer use `DOWN`, so Procedures flow from top to bottom. Users can still select `RIGHT` for horizontal layout; this remains a visual option only and never rewrites the SKILL source.
+- The basic fallback layout now honors the chosen direction instead of flashing a horizontal-only graph while ELK initializes or fails. The SVG fallback also draws the fallback edge paths in the matching direction.
+- Current renderer remains dependency-light DOM SVG plus ELK layered (`elkjs`); React Flow is not installed. For a future general-purpose Procedure Designer, evaluate `@xyflow/react` for node/edge interaction while retaining ELK for layout and YAML Source Patch as the editing authority. Do not migrate just to change layout direction.

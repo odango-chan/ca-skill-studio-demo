@@ -1,7 +1,9 @@
 import { projectProcedure } from "./semantic.mjs";
 export { projectProcedure };
 
-export function layoutProcedure(procedure) {
+export function layoutProcedure(procedure, direction = "RIGHT") {
+  if(direction!=="RIGHT"&&direction!=="DOWN")
+    throw new Error("Unsupported basic layout direction");
   const nodes = procedure.nodes;
   const depth = new Map([[procedure.start, 0]]);
   const queue = [procedure.start];
@@ -30,7 +32,9 @@ export function layoutProcedure(procedure) {
     maxColumn = Math.max(maxColumn, column);
     const totalHeight = entries.length * 106;
     height = Math.max(height, totalHeight + 160);
-    entries.forEach((node, i) => positions.set(node.id, { x: 80 + column * 305, y: 80 + i * 106 }));
+    entries.forEach((node, i) => positions.set(node.id, direction==="DOWN"
+      ? { x: 80 + i * 265, y: 80 + column * 165 }
+      : { x: 80 + column * 305, y: 80 + i * 106 }));
   }
   const bundled = new Map();
   for (const route of procedure.routes) {
@@ -39,5 +43,12 @@ export function layoutProcedure(procedure) {
     bundled.get(key).outcomes.push(route.outcome);
     bundled.get(key).routes.push(route);
   }
-  return { positions, bundles: [...bundled.values()], width: 80 + (maxColumn + 1) * 305 + 200, height };
+  if(direction==="DOWN"){
+    const maxPerLayer=Math.max(1,...[...byColumn.values()].map(entries=>entries.length));
+    return {positions,bundles:[...bundled.values()],
+      width:Math.max(400,80+maxPerLayer*265+160),
+      height:80+(maxColumn+1)*165+180,
+      direction};
+  }
+  return { positions, bundles: [...bundled.values()], width: 80 + (maxColumn + 1) * 305 + 200, height, direction };
 }

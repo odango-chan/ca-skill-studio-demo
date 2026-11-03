@@ -85,7 +85,7 @@ function labelPoint(sections, source, target, positions) {
 }
 
 export async function layoutProcedureELK(procedure, {
-  direction = "RIGHT", focus = null, neighborsOnly = false
+  direction = "DOWN", focus = null, neighborsOnly = false
 } = {}) {
   const scope = selectGraphScope(procedure, focus, neighborsOnly);
   validate(procedure, scope, direction);
