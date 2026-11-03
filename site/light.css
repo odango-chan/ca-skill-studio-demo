@@ -1102,3 +1102,34 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 }
 /* The historical .graph-pane svg rule must not apply to nested React Flow
    edge SVGs, otherwise it overrides their own sizing and pointer behavior. */
+
+
+/* Explorer file icon theme: suffix-specific SVG icons, no remote fonts/assets. */
+.asset-tree .asset-file-icon,
+.asset-tree .asset-folder-icon{
+  display:block;
+  flex:0 0 18px;
+  width:18px;
+  height:18px;
+  min-width:18px;
+  overflow:visible;
+  color:inherit;
+}
+.asset-folder-title .asset-folder-icon{
+  margin-right:1px;
+}
+.asset-folder-title .asset-folder-label{
+  display:block;
+  flex:1 1 auto;
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.asset-folder-icon .asset-folder-open{display:none}
+.asset-folder-group[open]>.asset-folder-title .asset-folder-open{display:inline}
+.asset-folder-group[open]>.asset-folder-title .asset-folder-closed{display:none}
+.asset-tree .asset-file:hover .asset-file-icon,
+.asset-folder-title:hover .asset-folder-icon{
+  filter:drop-shadow(0 1px 1px #1c46651c);
+}

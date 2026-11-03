@@ -116,6 +116,34 @@ try{
   if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
   if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
   console.log("CreatedSession visible paths PASS: "+result.valid);
+
+  // The same real browser also validates the Explorer's suffix theme.
+  const iconResult=await evaluate([
+    "(()=>{",
+    " const files=[...document.querySelectorAll('.asset-file-icon')].map(svg=>({",
+    "   kind:svg.getAttribute('data-icon-kind'),",
+    "   path:svg.closest('button')?.getAttribute('aria-label'),",
+    "   hidden:svg.getAttribute('aria-hidden'),",
+    "   colors:[...svg.querySelectorAll('path')].map(p=>p.getAttribute('stroke'))",
+    " }));",
+    " const folders=[...document.querySelectorAll('.asset-folder-icon')];",
+    " return {fileCount:files.length,folderCount:folders.length,",
+    "  kinds:[...new Set(files.map(x=>x.kind))],",
+    "  missingAccessible:files.filter(x=>!x.path||x.hidden!=='true').length,",
+    "  yaml:files.filter(x=>x.kind==='yaml').length,",
+    "  markdown:files.filter(x=>x.kind==='markdown').length,",
+    "  python:files.filter(x=>x.kind==='python').length,",
+    "  samples:files.slice(0,7)};",
+    "})()"
+  ].join("\n"));
+  console.log("CREATED_SESSION_FILE_ICON_SMOKE",JSON.stringify(iconResult));
+  if(iconResult?.fileCount!==13||iconResult.folderCount!==3||
+     iconResult.yaml<4||iconResult.markdown<1||iconResult.python<3||
+     iconResult.missingAccessible!==0){
+    throw Error("Explorer themed icons FAIL: "+JSON.stringify(iconResult));
+  }
+  console.log("CreatedSession themed file icons PASS");
+
 }finally{
   if(ws)ws.close();
   child.kill("SIGKILL");

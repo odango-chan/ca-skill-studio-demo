@@ -87,6 +87,8 @@ jobs:
           node --check site/view-policy.mjs
           node --check site/visual-route-edit.mjs
           node --check site/react-flow-projection.mjs
+          node --check site/file-icons.mjs
+          node --check tests/file-icons.test.mjs
           node --check tests/react-flow-migration.test.mjs
           node --check tests/visual-route-edit.test.mjs
           node --check tests/navigation-menu.test.mjs

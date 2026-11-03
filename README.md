@@ -143,3 +143,7 @@ The previous implementation used `explorerPanel.hidden=true` and relied on a sep
 ### React Flow D1 · CreatedSession Route visibility fix (2026-11-03)
 
 The source projection for CreatedSession contains 17 Root nodes and 48 bundled routes representing 65 original Outcomes. A first Chromium smoke found only 39 rendered SVG paths (all nonzero): the initial smoke was insufficient because it checked visible paths but did not verify the entire expected bundle count. The new smoke must render all 48. In the tall default DOWN layout, initial fit-to-view scales ~2px SVG stroke widths to fractions of a display pixel, so routes can appear to disappear although the semantic projection is complete. React Flow paths now use visible higher-contrast, **non-scaling-stroke** rendering, retained pointer hit areas, and direction markers. Broad legacy `.graph-pane svg` styles have been removed to prevent React Flow SVG interference. Browser smoke now asserts **actual visible path CSS** and non-scaling strokes on CreatedSession, in addition to the existing source/projection counts; it runs before Pages deployment. No SKILL YAML/Typed Patch semantics changed.
+
+### Explorer 文件图标主题（2026-11-03）
+
+左侧 Explorer 按文件后缀使用本地 SVG 图标而非统一的 `▤`：YAML/YML 使用洋红色 Y；Markdown/MD 使用蓝色 M↓；Python/PYW 使用蓝黄双色 PY；JSON/JSONC 使用琥珀色 `{}`；Shell、文本与常见源码有各自主题，未知后缀保留通用文件图标。文件夹使用可展开/收起的暖金色图标。图标均为装饰性 `aria-hidden`，可访问名称仍由文件路径提供；不修改导入文件、YAML、Procedure 导航或 Package 导出。固定映射与 SVG 结构有 Node 回归，Chromium E2E 还会检查 CreatedSession 中实际出现的 YAML、Markdown、Python 与文件夹图标。

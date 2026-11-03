@@ -10,6 +10,7 @@ import {renderMarkdown} from "./markdown-preview.mjs";
 import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from "./view-policy.mjs";
 import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
 import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
+import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
@@ -388,8 +389,9 @@ function renderAssetNavigation(){
       if(!folders.has(folderPath)){
         const disclosure=el("details","asset-folder-group");
         disclosure.open=expandedAssetFolders.has(folderPath);
-        const summary=el("summary","asset-folder-title",name+"/");
+        const summary=el("summary","asset-folder-title");
         summary.title=folderPath+"/";
+        summary.append(createFolderIcon(document),el("span","asset-folder-label",name+"/"));
         const children=el("div","asset-folder-children");
         disclosure.append(summary,children);
         disclosure.addEventListener("toggle",()=>{
@@ -415,8 +417,7 @@ function renderAssetNavigation(){
     btn.title=file.path+(dirty?" · 修改未导出":"");
     btn.setAttribute("aria-label",file.path+(dirty?" · 已修改":""));
     btn.setAttribute("aria-current",current?"page":"false");
-    const glyph=el("span","asset-file-icon","▤");
-    glyph.setAttribute("aria-hidden","true");
+    const glyph=createFileIcon(document,file.path);
     const title=el("span","asset-file-label",parts.at(-1));
     btn.append(glyph,title);
     if(dirty){
