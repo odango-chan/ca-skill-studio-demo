@@ -75,16 +75,14 @@ function scheduleELKLayout(wait=0, autoFit=false) {
         procId!==activeProcedureId || projection?.state!=="READY")return;
       graph=result;
       renderGraph();
-      setText("layoutStatus",(result.isFiltered ? "相邻视图 · " : "全图 · ")+
-        result.visibleNodes.length+" Node / "+result.visibleRoutes.length+
-        " Route · ELK");
+      setText("layoutStatus",result.isFiltered?"邻居视图":"");
       if(autoFit || result.isFiltered)fit();
       else if(selection?.kind==="node")centerNode(selection.id);
     }catch(error){
       if(ticket!==layoutTicket)return;
       graph={...fallback,visibleNodes:proc.nodes,visibleRoutes:proc.routes,isFiltered:false};
       renderGraph();
-      setText("layoutStatus","ELK 不可用，回退到基础布局");
+      setText("layoutStatus","自动布局失败 · 使用基础布局");
       message("自动布局失败，已使用基础画布："+String(error?.message??error));
       if(autoFit)fit();
     }
@@ -182,8 +180,7 @@ function loadDocument(name, text, origin="local") {
   invalidateLayout();
   projectedText = null;
   setText("fileName", name);
-  setText("titleFile", name);
-  setText("hint", "本地 Source 工作缓冲区；不会上传或执行");
+  setText("hint", "");
   refresh(true);
   if (!lastGood) setMode("source");
   else setMode("visual");
@@ -191,11 +188,9 @@ function loadDocument(name, text, origin="local") {
 function refresh(refit = false) {
   const text = source.value;
   const dirty = text !== initialText;
-  setText("dirty", dirty ? "有未导出修改" : "初始版本");
-  $("dirty").classList.toggle("is-dirty",dirty);
   $("fileStatus").classList.toggle("is-dirty",dirty);
-  $("fileStatus").lastChild.textContent = dirty ? "待导出" : "未修改";
-  setText("stats", text.split("\n").length + " 行 · " + new TextEncoder().encode(text).length + " bytes");
+  $("fileStatus").lastChild.textContent = dirty ? "已修改" : "未修改";
+  setText("stats", text.split("\n").length + " 行");
   $("undoButton").disabled = !history.canUndo();
   $("redoButton").disabled = !history.canRedo();
   const parsed = projectWorkspace(text);
@@ -211,9 +206,9 @@ function refresh(refit = false) {
     graph = layoutProcedure(lastGood);
     if (selection && selection.kind === "node" && !lastGood.nodes.some(n => n.id === selection.id)) selection = null;
     if (selection && selection.kind === "route" && !lastGood.routes.some(r => r.id === selection.id)) selection = null;
-    setText("projectionState", "READY · " + parsed.procedures.size + " Procedures");
+    setText("projectionState", "图形就绪");
   } else {
-    setText("projectionState", lastGood ? "STALE · source changed" : "UNAVAILABLE");
+    setText("projectionState", lastGood ? "图形已过期" : "仅源码");
     if (!lastGood) graph = null;
   }
   $("graphWarning").hidden = parsed.state === "READY";
@@ -256,12 +251,12 @@ function renderAssetNavigation() {
   tree.replaceChildren();
   if(assetOrigin==="sample"){
     const folder=el("div","asset-folder");
-    folder.textContent="⌄  assurance/";
+    folder.textContent="assurance /";
     tree.appendChild(folder);
   }
   const file=button("▤  "+(assetOrigin==="sample"?"procedure.yaml":filename),
     ()=>{setMode("source");source.focus();},"asset-file active");
-  file.title=filename+" · 当前已加载的唯一文件";
+  file.title=filename+" · 打开源码";
   file.setAttribute("aria-current","page");
   tree.appendChild(file);
 }
@@ -294,12 +289,10 @@ function renderProcedureNavigation() {
   }
   if(activeProcedureId)picker.value=activeProcedureId;
   picker.disabled=unavailable;
-  $("backProcedure").disabled=unavailable||!lastWorkspace||
-    activeProcedureId===lastWorkspace.entry;
+  const root=Boolean(lastWorkspace&&activeProcedureId===lastWorkspace.entry);
+  $("backProcedure").hidden=unavailable||root;
+  $("backProcedure").disabled=unavailable||root;
   setText("procedureBread",unavailable?"当前投影不可用":activeProcedureId||"Procedure");
-  setText("workspaceSummary",unavailable?"图形投影不可用":(items.length+" 个 Procedure"));
-  setText("editorContext",unavailable?"检查 Source 诊断":
-    (selection?.kind==="node"?"已选择节点":selection?.kind==="route"?"已选择路由":"选择节点查看属性"));
 }
 $("procedurePicker").addEventListener("change", value => enterProcedure(value.target.value));
 $("backProcedure").addEventListener("click", () => {
@@ -389,21 +382,7 @@ function setInspectorContext(title,caption,kind="") {
   wrap.replaceChildren();
   if(kind)wrap.appendChild(el("span","kind-label",kind));
   wrap.appendChild(el("h2","",title));
-  wrap.appendChild(el("p","",caption));
-}
-function inspectorHero(value,description) {
-  const hero=el("div","info-hero");
-  hero.append(el("strong","",value),el("p","",description));
-  inspector.appendChild(hero);
-}
-function inspectorStats(stats) {
-  const grid=el("div","info-stats");
-  for(const [number,title] of stats){
-    const box=el("div","info-stat");
-    box.append(el("strong","",number),el("span","",title));
-    grid.appendChild(box);
-  }
-  inspector.appendChild(grid);
+  if(caption)wrap.appendChild(el("p","",caption));
 }
 function inspectorSourceAction(line,label="查看 YAML") {
   inspector.appendChild(button(label+" · L"+line,()=>lineJump(line),"source-link"));
@@ -434,21 +413,16 @@ function journeyStage(index,title,summaryText,{expanded=true}={}) {
   const outer=el("details","journey-stage");
   outer.open=expanded;
   const head=el("summary","journey-head");
-  const number=el("span","journey-number",String(index).padStart(2,"0"));
   const copy=el("span","journey-copy");
-  copy.append(el("strong","",title),el("small","",summaryText));
-  head.append(number,copy,el("span","journey-chevron","⌄"));
+  copy.append(el("strong","",title));
+  if(summaryText)copy.appendChild(el("small","",summaryText));
+  head.append(copy,el("span","journey-chevron","⌄"));
   const body=el("div","journey-body");
   outer.append(head,body);inspector.appendChild(outer);
   return body;
 }
 function renderPhase(phase,body,phaseChildren) {
-  if(!phase){
-    body.appendChild(el("p","journey-empty","未声明这一阶段，直接进入下一步。"));return;
-  }
-  if(!phase.steps?.length){
-    body.appendChild(el("p","journey-empty","本阶段没有显式 Steps。"));
-  }
+  if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
     const meta=el("div","step-copy");
@@ -462,9 +436,7 @@ function renderPhase(phase,body,phaseChildren) {
     if(ref)body.appendChild(button("进入子过程 · "+ref.procedure,
       ()=>enterProcedure(ref.procedure),"journey-child"));
   }
-  const phaseRoutes=(lastGood?.routes||[]).filter(r=>r.source===selection?.id && r.routeSource===phase.name+".on");
-  if(phaseRoutes.length)body.appendChild(el("div","stage-caption",
-    phaseRoutes.length+" 条阶段分支 · 见下方「后续分支」"));
+
 }
 function routeFriendlySource(routeSource){
   return routeSource==="preconditions.on"?"准备阶段"
@@ -474,41 +446,43 @@ function routeFriendlySource(routeSource){
 }
 function renderNodeJourney(model) {
   const node=model.node;
-  const phaseStepCount=p=>p?.phase?.steps?.length??0;
-  const prepare=journeyStage(1,"执行前准备",
-    model.prepare.phase?phaseStepCount(model.prepare)+" 个 Step":"未声明",{expanded:false});
-  renderPhase(model.prepare.phase,prepare,model.children);
-  const main=journeyStage(2,"执行 Operator",
-    model.execute.operator.toUpperCase()+" · "+model.execute.value);
+  if(model.prepare.phase || model.prepare.routes.length){
+    const body=journeyStage(1,"准备",
+      model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
+      {expanded:false});
+    renderPhase(model.prepare.phase,body,model.children);
+  }
+  const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
-  action.append(el("span","step-op",model.execute.operator.toUpperCase()),
-    el("strong","step-value",model.execute.value));
+  action.appendChild(el("strong","step-value",model.execute.value));
   main.appendChild(action);
-  main.appendChild(button("打开 Operator 对应 YAML · L"+node.line,()=>lineJump(node.line),"source-link"));
+  main.appendChild(button("查看源码 · L"+node.line,()=>lineJump(node.line),"source-link"));
   for(const child of model.execute.children){
-    main.appendChild(button("进入子过程 · "+child.procedure,
+    main.appendChild(button("进入 · "+child.procedure,
       ()=>enterProcedure(child.procedure),"journey-child"));
   }
-  const confirm=journeyStage(3,"执行后确认",
-    model.confirm.phase?phaseStepCount(model.confirm)+" 个 Step":"未声明",
-    {expanded:false});
-  renderPhase(model.confirm.phase,confirm,model.children);
-  const branches=journeyStage(4,"后续分支",
-    model.routeCount+" 条 Route · "+model.branches.length+" 个来源",{expanded:model.routeCount<=3});
-  if(!model.branches.length)branches.appendChild(el("p","journey-empty","终态：没有后续 Route。"));
-  for(const group of model.branches){
-    const heading=el("div","stage-caption",routeFriendlySource(group.title)+" · "+group.entries.length);
-    branches.appendChild(heading);
-    for(const route of group.entries)inspectorRoute(route,branches);
+  if(model.confirm.phase || model.confirm.routes.length){
+    const body=journeyStage(3,"确认",
+      model.confirm.phase?.steps.length ? model.confirm.phase.steps.length+" steps" : "",
+      {expanded:false});
+    renderPhase(model.confirm.phase,body,model.children);
+  }
+  if(model.routeCount){
+    const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
+    for(const group of model.branches){
+      branches.appendChild(el("div","stage-caption",routeFriendlySource(group.title)));
+      for(const route of group.entries)inspectorRoute(route,branches);
+    }
   }
   if(model.incoming.length){
     const incoming=el("details","journey-incoming");
-    incoming.append(el("summary","", "来自其他节点 · "+
-      model.incoming.reduce((n,g)=>n+g.entries.length,0)+" 条"));
+    incoming.append(el("summary","","入站路由 · "+
+      model.incoming.reduce((n,g)=>n+g.entries.length,0)));
     const body=el("div","journey-body");
     for(const group of model.incoming)
       for(const route of group.entries)inspectorRoute(route,body);
-    incoming.appendChild(body);inspector.appendChild(incoming);
+    incoming.appendChild(body);
+    inspector.appendChild(incoming);
   }
 }
 function renderInspector() {
@@ -526,54 +500,35 @@ function renderInspector() {
   const route=selection?.kind==="route"?routeDetails(lastGood,selection.id):null;
   const model=selection?.kind==="node"?nodeJourney(lastGood,selection.id):null;
   const editable=Boolean(route&&routeEditTargets(lastGood,route.id).length&&lastWorkspace?.procedures.size===1);
-  $("inspectorState").textContent=editable?"PATCH AVAILABLE":"READ ONLY";
+  $("inspectorState").textContent=editable?"可修改":"只读";
   if(model){
-    setInspectorContext(model.node.id,model.node.value,
+    setInspectorContext(model.node.id,"",
       model.node.operator.toUpperCase()+(model.node.id===lastGood.start?" · START":""));
     renderNodeJourney(model);
     return;
   }
   if(route){
-    setInspectorContext(route.outcome+" → "+route.target,
-      route.source+" · "+routeFriendlySource(route.routeSource),"ROUTE");
-    const back=button("← 返回来源节点",()=>selectNode(route.source),"journey-back");
-    inspector.appendChild(back);
-    const body=section("Route 映射","SOURCE");
-    inspectorLine("From",route.source,body);
-    inspectorLine("Outcome",route.outcome,body);
-    inspectorLine("To",route.target,body);
-    inspectorLine("阶段",routeFriendlySource(route.routeSource),body);
-    inspectorLine("YAML 行号","L"+route.line,body);
-    inspectorSourceAction(route.line,"打开 Route 源码");
-    if(!addPatchControls(route))inspectorNote(
-      "这条 Route 没有图形修改权限。可以在 Source 中修改 YAML，但需自行校验语义。");
+    setInspectorContext(route.source+" → "+route.target,
+      route.outcome+" · "+routeFriendlySource(route.routeSource),"ROUTE");
+    inspector.appendChild(button("← 来源节点",()=>selectNode(route.source),"journey-back"));
+    inspectorLine("Route Source",route.routeSource);
+    inspectorSourceAction(route.line,"查看源码");
+    addPatchControls(route);
     return;
   }
-  setInspectorContext(lastGood.name,
-    lastGood.nodes.length+" 个 Node · "+lastGood.routes.length+" 条 Route","PROCEDURE");
-  inspectorHero("选择画布中的节点","从 Node 开始，顺着「准备 → 执行 → 确认 → 分支」阅读，再按需打开原始 YAML。");
-  inspectorStats([[lastGood.nodes.length,"节点"],[lastGood.routes.length,"路由"],
-    [lastGood.children?.length??0,"Child 调用"],[lastWorkspace?.procedures.size??1,"Procedure"]]);
-  inspectorSourceAction(lastGood.line,"打开当前 Procedure 源码");
+  setInspectorContext(lastGood.name,"选择一个节点或路由","PROCEDURE");
+  inspectorSourceAction(lastGood.line,"查看源码");
 }
 
 function renderProblems() {
+  const items=projection?.diagnostics??[];
+  problems.hidden=items.length===0;
   problems.replaceChildren();
-  const title = document.createElement("strong");
-  title.textContent = "Problems";
-  problems.appendChild(title);
-  const items = projection?.diagnostics ?? [];
-  if (!items.length) {
-    const text = document.createElement("span");
-    text.className = "problem-success";
-    text.textContent = "0";
-    text.title = "仅表示当前文件能够进行有限图形投影；不是 Runtime Validator 结论";
-    problems.appendChild(text);
-  } else {
-    for (const item of items) {
-      const b = button("L" + item.line + " · " + item.message, () => lineJump(item.line));
-      problems.appendChild(b);
-    }
+  if(!items.length)return;
+  problems.appendChild(el("strong","","问题 · "+items.length));
+  for(const item of items){
+    problems.appendChild(button("L"+item.line+" · "+item.message,
+      ()=>lineJump(item.line)));
   }
 }
 function selectNode(id) {

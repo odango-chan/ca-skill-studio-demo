@@ -284,3 +284,98 @@ textarea{background:#fcfdff;color:#223851;caret-color:#078b77}
  .editor-foot #layoutStatus{display:none}
  .editor-foot #hint{max-width:68%}
 }
+
+
+/* UX Trim: reduce repeated chrome; retain important editor/error states. */
+.topbar{height:54px;padding:0 16px;gap:14px}
+.brand{min-width:0;flex:none;gap:8px}
+.brand-logo{width:28px;height:28px;border-radius:8px}
+.brand-logo span:first-child,.brand-logo span:nth-child(3){height:10px}
+.brand-logo span:nth-child(2){height:16px}
+.brand-title strong{font-size:13px}
+.top-file{min-width:0;max-width:360px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+border-left:1px solid #e3eaf0;padding-left:15px;color:#5a7088;
+font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
+.topbar-actions{gap:4px}
+.topbar-actions .workspace-status{font-size:10px;margin-right:5px}
+.topbar-actions .button-primary{padding:7px 10px;font-size:11px}
+.explorer-compact-heading{font-weight:650;font-size:11px;color:#6c8096;letter-spacing:.02em;padding:6px 9px 8px}
+.scope-tag{color:#8395a8;font-size:9px;font-weight:450;letter-spacing:0;margin-left:5px}
+.asset-section{padding:12px 10px 7px;border-bottom:1px solid #edf0f4}
+.asset-tree{padding:0 3px}
+.asset-folder{font-size:10px;padding-left:9px}
+.asset-file{border-color:transparent;background:#f1f8f5;padding:8px 9px;box-shadow:none}
+.asset-section .procedure-tree{margin:7px 1px 0 15px;padding-left:9px;border-left:1px solid #e4ebf0;gap:0}
+.asset-section .procedure-tree button{padding:6px 6px;font-size:10px}
+.asset-section .procedure-tree button.child{padding-left:10px}
+.asset-section .procedure-tree .tree-title{font-size:10px}
+.explorer-nodes{padding-bottom:5px}
+.explorer-bottom{padding:10px 11px 12px}
+.explorer-bottom .explorer-action{background:transparent;border:0;padding:8px 10px;color:#4d6983}
+.sample-picker{margin-top:2px}
+.sample-picker summary{font-size:11px;cursor:pointer;color:#70869b;padding:7px 10px;list-style:none}
+.sample-picker summary::-webkit-details-marker{display:none}
+.sample-picker summary:before{content:"▸";color:#95a5b6;margin-right:7px;font-size:9px}
+.sample-picker[open] summary:before{content:"▾"}
+.sample-picker .explorer-action{margin-left:9px;width:calc(100% - 9px);font-size:10px}
+.compact-toolbar{min-height:49px;gap:10px;padding:7px 13px;border-bottom:1px solid #e4eaf1;flex-wrap:nowrap}
+.compact-toolbar #toggleExplorer{flex:none;font-size:15px;padding:4px 10px;border-color:transparent;background:transparent}
+.compact-toolbar .breadcrumbs{min-width:0;max-width:min(34vw,430px);flex:0 1 auto;gap:3px}
+.compact-toolbar .breadcrumbs #procedureBread{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#37556c}
+.compact-toolbar .breadcrumbs #backProcedure{font-size:14px;color:#297c74;flex:none;padding:4px}
+.compact-toolbar .segmented{flex:none}
+.compact-toolbar .segmented button{font-size:11px;padding:6px 10px}
+.compact-toolbar .mode-spacer{min-width:0;flex:1}
+.compact-toolbar .view-menu{flex:none}
+.compact-toolbar .fit-control{flex:none}
+.source-caption{padding:8px 12px;min-height:31px}
+.source-caption .source-indicator{height:6px;width:6px}
+.editor-foot{min-height:27px;padding:5px 12px;gap:14px;justify-content:flex-start;background:#fbfcfe}
+.editor-foot #stats{font-size:10px}
+.editor-foot #projectionState{font-size:10px;color:#648776;min-width:0;white-space:nowrap}
+.editor-foot #layoutStatus{margin:0;max-width:30%}
+.editor-foot #hint{margin-left:auto;max-width:45%}
+.editor-foot #layoutStatus:empty,.editor-foot #hint:empty{display:none}
+.inspector-header{padding:13px 14px 8px}
+.inspector-header .eyebrow{letter-spacing:0;font-size:11px;color:#415b73}
+.inspector-header .inspector-status{font-size:9px;padding:3px 6px;background:#f3f6fa;color:#7e8c9b;border-color:transparent}
+.inspector-header .inspector-status:where(:not(:empty)){font-weight:500}
+.inspector-context{padding:8px 13px 11px}
+.inspector-context .kind-label{font-size:9px;margin-bottom:4px;color:#728a9c}
+.inspector-context h2{font-size:12px;margin:0;line-height:1.5}
+.inspector-context p{font-size:10px;margin-top:3px}
+.inspector-content{padding:9px 12px 13px}
+.journey-stage{margin-bottom:5px;border-color:#e8edf3}
+.journey-stage[open]{border-color:#d5e6e2}
+.journey-head{padding:10px 11px;gap:8px}
+.journey-copy strong{font-size:11px}
+.journey-copy small{font-size:10px;font-weight:400}
+.journey-body{padding:9px 11px 10px}
+.journey-operation{padding:8px 9px;background:#fafcfd;border-color:#edf1f5}
+.journey-operation .step-value{font-size:11px;font-weight:550}
+.journey-step{margin:4px 0;padding:6px 8px}
+.journey-incoming{margin-top:7px}
+.route-row{margin:5px 0}
+.route-row button:first-child{font-size:10px;padding:7px 9px}
+.inspector-content .source-link{font-size:10px;padding:6px 8px}
+.inspector-section{border-color:#e6ecf2}
+.inspector-section-head{padding:8px 10px}
+.inspector-section-body{padding:8px 10px}
+.problems[hidden]{display:none!important}
+@media(max-width:980px){
+ .top-file{max-width:240px}
+ .compact-toolbar .breadcrumbs{max-width:min(31vw,280px)}
+}
+@media(max-width:680px){
+ .topbar{padding:8px 9px;gap:8px}
+ .brand-logo{width:25px;height:25px}
+ .brand-title strong{font-size:12px}
+ .top-file{font-size:10px;max-width:110px;padding-left:8px}
+ .topbar-actions .button-primary{font-size:10px;padding:7px}
+ .compact-toolbar{padding:5px 7px;gap:4px;flex-wrap:wrap}
+ .compact-toolbar .breadcrumbs{max-width:45vw}
+ .compact-toolbar .segmented{order:3;width:100%;justify-content:center}
+ .compact-toolbar .segmented button{flex:1}
+ .compact-toolbar .view-menu{margin-left:auto}
+ .compact-toolbar .mode-spacer{display:none}
+}

@@ -49,3 +49,18 @@ The UX V2/V3 iterations accumulated duplicated access paths: node selection → 
 ## Verification and remaining gaps
 
 Node/route projections, HTML control wiring, and the unchanged safety checks are covered by automated regression. Visual browser E2E, responsive screenshots, accessibility navigation and real package-level workflows remain **NOT_RUN**, not implied by a successful static site deployment.
+
+## 2026-11-03 · UX Trim / Information hierarchy
+
+After the first UX Consolidation, the UI still duplicated metadata across a header, editor title, breadcrumb, status bar and Inspector. This pass deliberately **removes visible information rather than hiding safety-critical state**:
+
+- One filename and one dirty flag, both in the top bar. Export remains explicitly a browser download, not an in-place save.
+- One compact editor toolbar for current Procedure, Visual / Source / Split and View controls; no separate editor-title and breadcrumb rows.
+- The left side keeps one real file plus nested procedures. Node outline and example choices are collapsed until requested. No unsupported virtual Package files.
+- Inspector shows only phases and route lists that actually occur in the selected Node. No empty phases, stage serial numbers, duplicated Operator identifier or permanent read-only disclaimer; context header retains the edit-eligibility label.
+- No always-visible Problems zero row. Parse errors and STALE projection still surface warnings; original Source is never overwritten by a visual projection.
+- No decorative footer, ELK success counter or sample provenance headline in the editing area.
+
+**Not changed:** YAML AST/CST source authority, route identity and outcome source, deterministic ELK graph, guarded two-route ensure Patch, diff preview, shared Undo/Redo, and CreatedSession Visual read-only boundary.
+
+The change is covered by static UI integrity and existing parser/patch/layout tests. Real browser interaction and visual regression remain **NOT_RUN**.

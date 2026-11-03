@@ -14,12 +14,9 @@
   <header class="topbar">
     <div class="brand">
       <span class="brand-logo" aria-hidden="true"><span></span><span></span><span></span></span>
-      <div class="brand-title"><strong>SKILL Studio</strong><small>ConnectionAgent / Authoring Workspace</small></div>
+      <div class="brand-title"><strong>SKILL Studio</strong></div>
     </div>
-    <div class="top-workspace">
-      <span class="top-workspace-icon" aria-hidden="true">◇</span>
-      <div class="top-workspace-text"><span>Local workspace</span><strong id="fileName">正在载入…</strong></div>
-    </div>
+    <span id="fileName" class="top-file" title="当前工作文件">正在载入…</span>
     <div class="topbar-actions">
       <span class="workspace-status" id="fileStatus" role="status"><span class="status-dot"></span>未修改</span>
       <button id="undoButton" class="icon-button" type="button" title="撤销 · Ctrl/Cmd + Z" disabled aria-label="撤销">↶</button>
@@ -30,19 +27,11 @@
 
   <main class="workbench" id="workbench" data-explorer="open" data-inspector="closed">
     <aside class="explorer" id="explorerPanel" aria-label="SKILL Explorer">
-      <div class="panel-intro">
-        <span class="eyebrow">EXPLORER</span>
-        <h2>工作区</h2>
-        <p>当前仅打开一个运行时资产文件</p>
-      </div>
-      <section class="explorer-section asset-section" aria-label="当前文件">
-        <div class="section-heading"><span>ASSETS</span><span class="count">1</span></div>
+      <section class="explorer-section asset-section" aria-label="当前文件和流程">
+        <div class="explorer-compact-heading">文件 <span class="scope-tag" title="当前仅加载了一个文件，不是完整 SKILL Package">单文件</span></div>
         <div id="assetTree" class="asset-tree"></div>
-        <p class="asset-scope">单文件 Demo · 未加载完整 Skill Package</p>
-      </section>
-      <section class="explorer-section">
-        <div class="section-heading"><span>PROCEDURES</span><span id="procedureCount" class="count">—</span></div>
-        <nav id="procedureTree" class="procedure-tree" aria-label="Procedure 列表"></nav>
+        <nav id="procedureTree" class="procedure-tree" aria-label="当前文件的 Procedure"></nav>
+        <span id="procedureCount" class="sr-only"></span>
         <select id="procedurePicker" class="sr-only" aria-label="切换 Procedure"></select>
       </section>
       <details class="explorer-section explorer-nodes" id="nodeOutlineDisclosure">
@@ -52,35 +41,23 @@
         <ol id="nodeOutline" class="outline"></ol>
       </details>
       <div class="explorer-bottom">
-        <div class="section-heading"><span>EXAMPLES & FILES</span></div>
-        <button id="establishSampleButton" type="button" class="explorer-action"><span aria-hidden="true">◇</span>CreatedSession 示例</button>
-        <button id="sampleButton" type="button" class="explorer-action"><span aria-hidden="true">◇</span>Ensure Session 示例</button>
-        <button id="openButton" type="button" class="explorer-action"><span aria-hidden="true">↥</span>打开本地文件</button>
+        <button id="openButton" type="button" class="explorer-action">＋ 打开文件</button>
+        <details class="sample-picker">
+          <summary>加载示例</summary>
+          <button id="establishSampleButton" type="button" class="explorer-action">CreatedSession</button>
+          <button id="sampleButton" type="button" class="explorer-action">Ensure Session</button>
+        </details>
         <input id="filePicker" type="file" hidden accept=".yaml,.yml,.md,.json,.txt,.py,.js,.ts,.sh,text/plain">
-        <p class="privacy-note">仅在浏览器本地编辑 · 不上传文件</p>
       </div>
     </aside>
 
     <section class="editor" aria-label="Procedure authoring editor">
-      <div class="editorbar">
-        <div class="document-heading">
-          <span class="eyebrow">PROCEDURE DESIGNER</span>
-          <strong id="titleFile">procedure.yaml</strong>
-          <div class="document-subhead"><span id="projectionState" role="status">LOADING</span><span class="separator">·</span><span id="workspaceSummary">Source authoritative</span></div>
+      <div class="editorbar compact-toolbar">
+        <button id="toggleExplorer" class="panel-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" title="展开或收起文件导航">☰</button>
+        <div class="breadcrumbs">
+          <button id="backProcedure" type="button" title="返回 Root Procedure">←</button>
+          <span id="procedureBread">Procedure</span>
         </div>
-        <div class="editor-actions">
-          <span id="dirty" class="file-chip">初始版本</span>
-          <button id="resetButton" class="button-secondary" type="button" title="恢复打开时的内容">恢复初始</button>
-        </div>
-      </div>
-
-      <div class="procedure-navigation">
-        <div class="breadcrumbs"><button id="backProcedure" type="button" title="返回 Root">Root</button><span aria-hidden="true">/</span><span id="procedureBread">Procedure</span></div>
-        <span id="editorContext" class="context-hint">选择节点查看属性</span>
-      </div>
-
-      <div class="modebar">
-        <button id="toggleExplorer" class="panel-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" title="展开或收起 Procedure 导航">☰ <span>目录</span></button>
         <div class="segmented" role="group" aria-label="编辑视图">
           <button id="mode-visual" type="button" aria-pressed="true">Visual</button>
           <button id="mode-source" type="button" aria-pressed="false">Source</button>
@@ -101,6 +78,9 @@
             <button id="showAllLabels" type="button" aria-pressed="false" title="显示全部 Route 的标签">显示全部 Route 标签</button>
             <button id="centerSelection" type="button">定位当前选择</button>
             <div class="menu-divider"></div>
+            <div class="menu-heading">操作</div>
+            <button id="resetButton" type="button" title="恢复打开时的原始文本">恢复初始文件</button>
+            <div class="menu-divider"></div>
             <div class="menu-heading">缩放</div>
             <div class="menu-zoom">
               <button id="zoomOut" type="button" aria-label="缩小">−</button>
@@ -108,9 +88,9 @@
             </div>
           </div>
         </details>
+
         <button id="fit" class="fit-control" type="button" title="适配画布">适配</button>
       </div>
-
       <div id="editorBody" class="editor-body" data-mode="visual">
         <div id="graphPane" class="graph-pane" data-labels="key">
           <svg id="canvas" aria-label="Procedure control flow" role="img">
@@ -120,29 +100,29 @@
           <div id="graphWarning" class="graph-warning" role="alert" hidden></div>
         </div>
         <div id="sourcePane" class="source-pane">
-          <div class="source-caption"><span class="source-indicator"></span> SOURCE · YAML 1.2 <span class="caption-note">直接修改源文件工作缓冲区</span></div>
+          <div class="source-caption"><span class="source-indicator"></span> YAML</div>
           <label for="source" class="sr-only">Procedure YAML Source</label>
           <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
         </div>
       </div>
       <div class="editor-foot">
         <span id="stats">0 行</span>
-        <span id="layoutStatus" role="status">准备布局…</span>
-        <span id="hint" role="status">已在本地工作区打开文件</span>
+        <span id="projectionState" role="status">正在载入…</span>
+        <span id="layoutStatus" role="status"></span>
+        <span id="hint" role="status"></span>
       </div>
     </section>
 
     <aside class="inspector-panel" id="inspectorPanel" aria-label="Node inspector">
-      <div class="inspector-header"><span class="eyebrow">PROPERTIES</span><span id="inspectorState" class="inspector-status">READ ONLY</span><button id="closeInspector" type="button" class="quick-close" aria-label="收起详情" title="收起详情">×</button></div>
+      <div class="inspector-header"><span class="eyebrow">属性</span><span id="inspectorState" class="inspector-status">只读</span><button id="closeInspector" type="button" class="quick-close" aria-label="收起详情" title="收起详情">×</button></div>
       <div id="inspectorContext" class="inspector-context"><h2>流程属性</h2><p>选择图上的一个节点查看详情</p></div>
       
       <div id="inspector" class="inspector-content" aria-live="polite"></div>
-      <div class="inspector-footer">结构化编辑仅对已授权的 Source Patch 开放</div>
     </aside>
   </main>
 
-  <section id="problems" class="problems" aria-label="Editor diagnostics"></section>
-  <footer class="footer"><span>SKILL Studio / Prototype · Local-first</span><a href="https://github.com/odango-chan/ca-skill-studio-demo" target="_blank" rel="noopener noreferrer">查看源代码</a><span>Demo baseline: ca-agent-demo@bf445ad</span></footer>
+  <section id="problems" class="problems" aria-label="Editor diagnostics" hidden></section>
+
 
   <div id="patchDialog" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="patchTitle" hidden>
     <div class="modal-content">

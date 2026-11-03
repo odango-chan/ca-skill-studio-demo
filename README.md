@@ -6,11 +6,12 @@ ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前实现（Stage: UX Consolidation — light authoring workspace + bounded single-file Procedure editing）：
+当前实现（Stage: UX Trim — minimalist single-file Procedure workbench + bounded editing）：
 
 - 从固定的 Demo ensure-pdu-session 和 establish-pdu-session 的真实 YAML 文件投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
 - CreatedSession 样本支持 Root 和 5 个 Child Procedure 的下钻与返回，保留 Node 顺序和 Route Source（operator / preconditions / postconditions）；Phase Step 在 Inspector 按顺序展示，不把局部过程冒充业务 Node。
 - **UX Consolidation**：删去重复的 Node Quick Card 和独立 Inspector 开关。单击 Node / Route 直接进入唯一的上下文 Inspector；关闭后回到宽画布。布局方向、标签策略、邻居焦点与缩放合并进单个 View 菜单。
+- **UX Trim 信息减负**：移除重复的编辑器标题 / 文件状态、空 Problems 与运行时说明、重复计数和 Canvas 状态浮层；文件名与未导出修改只在顶栏显示，Procedure 面包屑与 Visual / Source / Split 合为一条紧凑工具栏。仅显示真正存在的 Preconditions / Postconditions / Routes，Node Inspector 默认以 Operator 和可折叠信息为主。Sample 与 Node Outline 按需展开，必要的 Source 错误与 Patch Diff 保留。
 - **资产优先的左栏（诚实范围）**：只列出当前确实加载的 YAML 文件；固定 Procedure 样本在 assurance/ 下，Local 文件不伪造 Package 路径。Root / Child Procedure 是文件内部视图，Node Outline 默认为折叠的线性导航。**完整 Skill Package 尚未加载，绝不显示假的 SKILL.md / Contract / Predicate。**
 - **Inspector 统一入口**：准备、执行、确认、路由在一个上下文面板中，低频内容默认折叠；Phase Step 与 Route 仍保留原始 Source 路径和行号；只读与可编辑资格严格分离。
 - 文件导出、Undo / Redo、Procedure Explorer、搜索、Root / Child 路径和 Visual / Source / Split 继续存在，保留旧的固定 ensure Route Patch 安全边界。
