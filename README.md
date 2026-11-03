@@ -36,3 +36,5 @@ React 19 / React Flow 12 / ELK / TypeScript 7 / YAML 2.9.1 / Node 24 / esbuild�
 开发前先读 [AGENTS.md](AGENTS.md)、[WORK](docs/WORK.md)、[TRACEABILITY](docs/TRACEABILITY.md)。现有架构与编辑约束详见 [Workbench](docs/design/authoring-workbench.md)；[D3 Route Designer](docs/design/route-designer.md) 已完成 A1 有界 Outcome 新增和 [A2 受限重命名/删除](https://github.com/odango-chan/ca-skill-studio-demo/pull/11)，[A3 实际画布拖线](https://github.com/odango-chan/ca-skill-studio-demo/pull/13) 已通过编辑器级验收（仅有界 `operator.on`），统一跟踪 [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)。
 
 早期 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)（初始架构）、[PR #2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)（Python 编辑 POC）、[PR #3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3)（早期 TypeScript Pages）都还是**未合并的历史候选**，不代表 `main` 的实际实现。文档治理基线完成记录 [#6](https://github.com/odango-chan/ca-skill-studio-demo/issues/6)。
+
+画布缩放提供三个并列按钮：**适配**（完整流程）、**横向**（宽度铺满）、**纵向**（高度铺满）。它们只改变当前流程图的视口，不会修改 Source，更多细节见 [Workbench](docs/design/authoring-workbench.md)。
