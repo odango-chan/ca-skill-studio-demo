@@ -1,6 +1,6 @@
 # D2 Node Designer · source-backed authoring
 
-Status: D2-A1/A2/A3 plus bounded D2-A4 editing implemented; D2 overall remains incomplete.
+Status: D2-A1 through D2-A5 bounded editing and editor checks implemented. Full Runtime qualification remains out of scope.
 
 ## Architecture
 
@@ -9,7 +9,7 @@ Status: D2-A1/A2/A3 plus bounded D2-A4 editing implemented; D2 overall remains i
 - D2-A1 RenameNode rewrites exact plain-source spans for the Node mapping key, current Procedure start, inbound Route targets, and explicit from references.
 - Each change is recomputed from the complete source revision, reprojected, structurally compared and shown as a Diff before confirmation. Existing Undo/Redo applies.
 - Quoted, unsupported or ambiguous references fail closed. Direct Source editing is the escape hatch.
-- Cross-file semantic checks (predicates, capabilities, scripts) are not implemented. Structural PASS is not Runtime PASS.
+- D2-A5 adds conservative cross-file **editor hints** for Contract, PredicateSet, Procedure and script presence. They are warnings, not Runtime PASS.
 
 ## D2 milestones
 
@@ -19,7 +19,7 @@ Status: D2-A1/A2/A3 plus bounded D2-A4 editing implemented; D2 overall remains i
 | A2 | Insert typed terminal/call/verify Node onto one existing Route | Implemented · bounded |
 | A3 | Delete/merge a same-status terminal or bypass a single-outcome Node, with inbound Route rewrites | Implemented · bounded |
 | A4 | Edit existing Node Operator values and existing with.<name>.from scalars | Implemented · bounded |
-| A5 | Browser interactions, package semantic validation and large graph checks | Not implemented |
+| A5 | Conservative Package editor hints, 300-Node stress, guarded large-graph layout, recovery and Chromium regressions | Implemented · bounded |
 
 ## Acceptance
 
@@ -108,3 +108,61 @@ and unknown Predicate/Procedure targets are refused.
 editing Phase-step bindings, deep from trees, output shape checking, type-aware
 binding compatibility, or Runtime authority/capability checks. These need
 source/schema-backed qualification rather than speculative graph changes.
+
+
+## D2-A5 · Editing safety and large-graph resilience (2026-11-03)
+
+This phase intentionally does **not** introduce the heavyweight Toolchain,
+Runtime validation workbench, Case management or publication pipeline.
+
+### Editor-stage package diagnostics
+
+\`site/package-audit.mjs\` reads the current in-memory files in one workspace:
+\`assurance/contract.yaml\`, \`assurance/predicates.yaml\` and
+\`assurance/procedure.yaml\`. The source remains authoritative.
+
+The Problems panel shows source-linked warnings for:
+
+- Contract name, PredicateSet skill and entryProcedure identity mismatches;
+  missing declared request Schema file.
+- Unresolved Contract / Node / Phase-step Predicate names, unmatched Call /
+  Tool names relative to declared capabilities and missing referenced script
+  paths in the opened Package.
+- Explicit missing \`input.*\` names and unresolved \`node.output.*\` producer
+  identities (not producer output-schema contents).
+- A **heuristic** warning when an existing \`with.<key>.from\` is redirected
+  from its matching Procedure input to a different input (e.g.
+  \`with.ueRef.from: input.psi\`). This does **not** prove a type error.
+
+Preview Diff reports the number of newly introduced warnings, without
+blocking the authoring action. Warnings are never presented as a successful
+Runtime check or as a complete set of semantic defects. Editing an incomplete
+single-file workspace does not fabricate companion files. A malformed
+Procedure still fails closed through the existing Source parser.
+
+### Large graphs and recovery
+
+- The canonical Procedure parser remains bounded to 300 Nodes and 1600 Route
+  entries per Procedure. Stress tests cover 300 Nodes / 1495 distinct Route
+  entries, preserving node/Route identity and Basic layout visibility.
+- Full-graph ELK is bypassed above **90 visible Nodes** or **250 visible
+  Route entries**. The graph switches to the basic layout with an explicit
+  notice; switching to a small neighbor scope may use ELK again.
+- Inspector editing qualification is cached per source revision, Procedure,
+  selected Node and PredicateSet revision to avoid repeated whole-source
+  parsing within one Inspector render.
+- On invalid Source, the stale canvas is cleared and editing is disabled,
+  but current Procedure and Node identity are retained for recovery via Source
+  correction or Undo. Browser tests cover actual recovery and graph restoration.
+
+These are deterministic guardrails rather than latency SLAs. Performance
+depends on topology, browser and hardware. A5 does not validate output
+schemas, typed binding compatibility, 3GPP causality, external capability
+availability or Runtime execution outcomes.
+
+## A5 acceptance
+
+Run \`npm test\`, \`npm run typecheck\`, \`npm run build\`,
+\`node scripts/edge-smoke.mjs\`. Validate both pinned package baselines,
+advisory warnings after editing, Diff/Apply/Undo/Redo, Source failure
+recovery into a Child Procedure and a 95-Node real-browser fallback.

@@ -17,6 +17,9 @@ D2-A3 adds guarded deletion for duplicate-status terminals and single-outcome
 Node bypass, with inbound Route remediation, source-reference checks and Diff.
 D2-A4 adds existing Operator value and qualified with.<key>.from scalar edits,
 without changing Operator kinds or introducing new Binding fields.
+D2-A5 adds cross-file editor warnings, graph-size-aware ELK fallback, source
+recovery and per-revision Inspector qualification caching. These remain authoring
+checks, **not** complete Runtime validation.
 
 
 **Still not implemented:** unrestricted Node creation/deletion, Operator-kind switching,
