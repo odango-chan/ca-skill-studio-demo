@@ -128,8 +128,15 @@ function compute(source,procedureId,nodeId,outcome,target){
     r.source===nodeId&&r.routeSource==="operator.on");
   if(lastIndex<0)reject("Missing existing operator Route");
   item.routes.splice(lastIndex+1,0,newRoute);
-  if(JSON.stringify(expected)!==JSON.stringify(signature(after)))
-    reject("New Outcome changed unrelated Procedure, Node, Phase or Route");
+  const actual=signature(after);
+  if(JSON.stringify(expected)!==JSON.stringify(actual)){
+    const beforeString=JSON.stringify(expected),afterString=JSON.stringify(actual);
+    let at=0;while(at<Math.min(beforeString.length,afterString.length)&&
+      beforeString[at]===afterString[at])at++;
+    reject("New Outcome changed unrelated Procedure, Node, Phase or Route at "+
+      at+" expected="+beforeString.slice(at,at+130)+
+      " actual="+afterString.slice(at,at+130));
+  }
   const line=source.slice(0,ctx.insertAt).split("\n").length;
   const preview={
     type:"AddRouteOutcome",profile:"d3-a1-observed-operator-on-v1",
