@@ -107,6 +107,7 @@ jobs:
           node --check tests/journey.test.mjs
           node --check scripts/build.mjs
           node --check scripts/edge-smoke.mjs
+          node --check scripts/d1-interaction-smoke.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site

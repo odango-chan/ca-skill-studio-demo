@@ -55,3 +55,18 @@ D1 不是完整可视化编辑器，不允许无 Patch 的 Node/Route 创建、�
 D2 = Node Designer，D3 = Route Designer，D4 = Phase Designer，D5 = 多 Procedure Designer，D6 = 源码双向一致性和浏览器回归强化。
 
 门禁除了 Node 单测、类型检查、CI Build 和 Pages Deploy，仍需真实浏览器覆盖 CreatedSession Root/Child、选择、重连、Split、滚动/缩放和折叠导航。**未完成真实浏览器 E2E 前不可声称此项 PASS**。
+
+## D1 交互验收补全（2026-11-03）
+
+迁移后的流程图不仅要把 CreatedSession 的 17 Node / 48 ELK Route bundle / 65 Outcome 显示正确，还需要验证**现有编辑闭环**。GitHub Actions 在 `npm test`、TypeScript 类型检查和打包之后使用 Headless Chromium 打开实际生成的 `dist/index.html`，通过真实 DOM 交互验证：
+
+1. 点击 React Flow Node，Inspector 显示对应 Node Journey，详情面板打开。
+2. 点击 React Flow Route，Inspector 显示原始 Route 与目标候选，用户选择一个授权的不同 Target。
+3. 先预览 YAML Diff：源文本不能改变；取消仍不改变 Source；再次打开并确认修改；Undo 恢复原文，Redo 重做，随后再 Undo 清理验证状态。
+4. Visual / Source / Split 切换不丢图；Source 添加注释时重新投影；Undo/Redo 生效；不合法 YAML 时画布应 fail closed，撤销后重建 17 Node。
+5. Child Procedure 导航、返回 Root；画布缩放、水平/垂直布局切换；Explorer 折叠/展开；窄屏下仍可发现恢复按钮。
+6. 连线 DOM 保留 48 条可见 Path、96 个实际 ELK 边界端点；检查 SVG Path 与 Handle 对齐及箭头样式，不以静态数量断言代替视觉结果。
+
+箭头采用 React Flow **内置的空心 Arrow**，尺寸由 13×13 稍增至 **16×16**，仍比此前 24×24 的 ArrowClosed 克制。ELK 正交路径和多 Handle 对齐不变；箭头与连线始终同色。没有修改任何 Runtime YAML。
+
+**验收界限**：上述项目是 Chromium 浏览器级回归。完整的实际人工交互审查（长链路重连拖动、视觉密度、屏幕阅读器体验）仍需要单独验收；单元测试或纯数据投影不能代替浏览器检查。D2/D3 的新增 Node/Route 也不纳入 D1。

@@ -3,6 +3,7 @@ import {createServer} from "node:http";
 import {readFile,mkdtemp,rm} from "node:fs/promises";
 import {existsSync,createReadStream} from "node:fs";
 import {spawn} from "node:child_process";
+import {runD1Interactions} from "./d1-interaction-smoke.mjs";
 import {tmpdir} from "node:os";
 import {join,extname,resolve,sep} from "node:path";
 
@@ -123,6 +124,8 @@ try{
     "    e.display!=='none'&&e.visibility!=='hidden'&&",
     "    Number(e.opacity)>0&&parseFloat(e.strokeWidth)>0&&",
     "    e.vectorEffect==='non-scaling-stroke').length,",
+    "  markersOk:info.filter(x=>x.markerEnd?.includes('height=16')&&",
+    "    x.markerEnd?.includes('type=arrow&')).length,",
     "  samples:info.slice(0,4),",
     "  status:document.getElementById('layoutStatus')?.textContent,",
     "  zoomTransform:getComputedStyle(document.querySelector('.react-flow__viewport')).transform,",
@@ -132,7 +135,7 @@ try{
   ].join("\n");
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
-  if(result?.nodes!==17||result.edges!==48||result.valid!==48||
+  if(result?.nodes!==17||result.edges!==48||result.valid!==48||result.markersOk!==48||
      result.attachedPorts!==96||result.maxPortGap>1.5)
     throw Error("CreatedSession visible edges FAIL");
   if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
@@ -166,6 +169,8 @@ try{
     throw Error("Explorer themed icons FAIL: "+JSON.stringify(iconResult));
   }
   console.log("CreatedSession themed file icons PASS");
+
+  await runD1Interactions(evaluate,command);
 
 }finally{
   if(ws)ws.close();

@@ -29,7 +29,7 @@ test("D1 projects the real CreatedSession 17-node / 65-Outcome graph unchanged",
   assert.ok(flow.nodes.every(n=>n.draggable===false));
   assert.ok(flow.edges.every(e=>e.reconnectable===true));
   assert.ok(flow.edges.every(e=>e.markerEnd?.type==="arrow"));
-  assert.ok(flow.edges.every(e=>e.markerEnd?.width<=13));
+  assert.ok(flow.edges.every(e=>e.markerEnd?.width===16&&e.markerEnd.height===16));
   assert.ok(flow.edges.every(e=>e.markerEnd?.markerUnits==="userSpaceOnUse"));
   assert.equal(JSON.stringify(created.procedure),before);
 });

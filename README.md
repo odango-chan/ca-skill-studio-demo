@@ -158,3 +158,7 @@ The source projection for CreatedSession contains 17 Root nodes and 48 bundled r
 #### Port 边框偏移修正
 
 React Flow 的自定义 Node 存在普通 1px、选中 2px，以及起始节点左侧 4px 边框。HTML 绝对定位的 Handle 相对其 padding edge 定位，因此仅使用 ELK 的局部坐标会产生 1–4 CSS 单位的端点偏差，在放大时更明显。每条 ELK Port 的 top/bottom/left/right 现在按当前 Node 边框宽度扣除对应偏移；Chrome 的真实边路径到 Handle 屏幕坐标误差须低于 1.5px。此修正仅影响视图坐标。
+
+### D1 浏览器交互回归门禁
+
+已扩展 Chromium 自动化，从原先只验证可见连线和文件图标，进一步覆盖 CreatedSession Node→Inspector、Route→Diff 预览/取消/应用、Undo/Redo、Source/Split 同步、非法 YAML 的 fail-closed 与恢复、Child Procedure 返回、导航折叠、缩放和布局切换。这些是对真实浏览器页面的交互验收，而非单纯静态断言。空心箭头由 13×13 调至 16×16，保持 ELK 连线和 React Flow Handle 原有一致性。相关验收边界见 [D1 文档](docs/D1-procedure-designer.md)。

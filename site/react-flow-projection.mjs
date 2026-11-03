@@ -62,7 +62,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       markerEnd:{
         type:"arrow",
         color:important?"#138f7a":"#66899f",
-        width:13,height:13,
+        width:16,height:16,
         strokeWidth:1.2,
         markerUnits:"userSpaceOnUse"
       },
