@@ -123,7 +123,7 @@ function compute(source,procedureId,nodeId,outcome,target){
   const expected=signature(ctx.before);
   const item=expected.find(p=>p.name===procedureId);
   const newRoute={id:nodeId+":"+outcome,source:nodeId,target,
-    outcome,routeSource:"operator.on"};
+    routeSource:"operator.on",outcome};
   const lastIndex=item.routes.findLastIndex(r=>
     r.source===nodeId&&r.routeSource==="operator.on");
   if(lastIndex<0)reject("Missing existing operator Route");
