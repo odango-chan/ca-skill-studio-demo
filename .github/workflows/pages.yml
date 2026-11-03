@@ -78,6 +78,10 @@ jobs:
           node --check site/attribute-patch.mjs
           node --check site/highlight.mjs
           node --check site/extended-attributes.mjs
+          node --check site/markdown-preview.mjs
+          node --check site/view-policy.mjs
+          node --check tests/markdown-preview.test.mjs
+          node --check tests/view-policy.test.mjs
           node --check tests/highlight.test.mjs
           node --check tests/extended-attributes.test.mjs
           node --check tests/package.test.mjs

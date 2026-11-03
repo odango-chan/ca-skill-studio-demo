@@ -6,6 +6,8 @@ import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./w
 import {SAMPLE_PACKAGES,packageFilesForSample,createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState} from "./sample-packages.mjs";
 import {zipPackage} from "./zip.mjs";
 import {highlightSource} from "./highlight.mjs";
+import {renderMarkdown} from "./markdown-preview.mjs";
+import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from "./view-policy.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
@@ -39,6 +41,7 @@ const filePicker = $("filePicker");
 const procedureTree = $("procedureTree");
 let filename = "ensure-pdu-session.procedure.yaml";
 let assetOrigin = "sample";
+let localProcedureDocument = false;
 let activePackage = null;
 let activeFilePath = null;
 let initialText = "";
@@ -49,6 +52,7 @@ let activeProcedureId = null;
 let graph = null;
 let selection = null;
 let mode = "visual";
+let viewKind = "source";
 let camera = { x: 0, y: 0, scale: 1 };
 let dragging = null;
 let projectedText = null;
@@ -176,19 +180,54 @@ function onDirtyNavigation(event) {
 window.addEventListener("beforeunload", onDirtyNavigation);
 
 function setMode(next) {
-  mode = next;
-  $("editorBody").dataset.mode = next;
-  for (const id of ["visual", "source", "split"]) {
-    const el = $("mode-" + id);
-    el.setAttribute("aria-pressed", id === mode ? "true" : "false");
+  const allowed=permittedMode(viewKind,next);
+  mode=allowed;
+  $("editorBody").dataset.mode=allowed;
+  for(const id of ["visual","source","split"]){
+    const control=$("mode-"+id);
+    control.setAttribute("aria-pressed",String(id===mode));
   }
-  if (next !== "source" && lastGood) requestAnimationFrame(fit);
+  if(allowed!=="source"&&viewKind==="procedure"&&lastGood)
+    requestAnimationFrame(fit);
+}
+function updateViewAvailability(nextKind) {
+  viewKind=nextKind;
+  const isGraph=graphControlsAvailable(viewKind);
+  const hasVisual=viewKind!=="source";
+  $("editorModes").hidden=!hasVisual;
+  $("mode-visual").hidden=!hasVisual;
+  $("mode-split").hidden=!hasVisual;
+  $("mode-visual").title=viewKind==="markdown"?"Markdown 预览":"Procedure 流程图";
+  $("mode-visual").textContent=viewKind==="markdown"?"预览":"Visual";
+  $("graphPane").hidden=!isGraph;
+  $("markdownPane").hidden=viewKind!=="markdown";
+  $("graphViewOptions").hidden=!isGraph;
+  $("zoomViewOptions").hidden=!isGraph;
+  $("fit").hidden=!isGraph;
+  $("procedureBreadcrumbs").hidden=!isGraph;
+  $("viewMenuTitle").textContent=isGraph?"视图":"更多";
+  if(!hasVisual&&mode!=="source")setMode("source");
+}
+function updateMarkdownPreview(text) {
+  if(!isMarkdownFile(activeFilePath||filename)){
+    $("markdownPreview").replaceChildren();
+    return false;
+  }
+  const rendered=renderMarkdown(text);
+  if(rendered.available){
+    $("markdownPreview").innerHTML=rendered.html;
+    return true;
+  }
+  $("markdownPreview").replaceChildren();
+  return false;
 }
 for (const id of ["visual", "source", "split"]) $("mode-" + id).addEventListener("click", () => setMode(id));
 
 function loadDocument(name,text,origin="local",{initial=text,historyState=null}={}) {
   filename=name.split("/").at(-1);
   assetOrigin=origin;
+  localProcedureDocument=origin==="local"&&/\.ya?ml$/i.test(filename)&&
+    (/\bprocedures\s*:/m.test(initial)||/procedure\.ya?ml$/i.test(filename));
   source.scrollTop=0;source.scrollLeft=0;
   initialText=initial;
   source.value=text;
@@ -208,8 +247,7 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
     ? activePackage.name+" / "+activeFilePath : name);
   setText("hint", "");
   refresh(true);
-  if (!lastGood) setMode("source");
-  else setMode("visual");
+  setMode(viewKind==="source"?"source":"visual");
 }
 function refresh(refit = false) {
   const text = source.value;
@@ -222,8 +260,7 @@ function refresh(refit = false) {
   $("redoButton").disabled = !history.canRedo();
   if(activePackage && activeFilePath)
     markFileEdited(activePackage,activeFilePath,text,history);
-  const isProcedure=activeFilePath==="assurance/procedure.yaml" ||
-    (assetOrigin==="local" && /^\s*procedures\s*:/m.test(text));
+  const isProcedure=activeFilePath==="assurance/procedure.yaml" || localProcedureDocument;
   const parsed=isProcedure ? projectWorkspace(text)
     : {state:"SOURCE_ONLY",diagnostics:[],entry:null,procedures:new Map(),procedure:null};
   projection=parsed;
@@ -239,17 +276,31 @@ function refresh(refit = false) {
     if (selection && selection.kind === "node" && !lastGood.nodes.some(n => n.id === selection.id)) selection = null;
     if (selection && selection.kind === "route" && !lastGood.routes.some(r => r.id === selection.id)) selection = null;
     setText("projectionState", "图形就绪");
-  } else if(parsed.state==="SOURCE_ONLY"){
-    lastWorkspace=null;lastGood=null;graph=null;activeProcedureId=null;selection=null;
-    setText("projectionState","源码编辑");
   } else {
-    setText("projectionState",lastGood?"图形已过期":"仅源码");
-    if(!lastGood)graph=null;
+    invalidateLayout();
+    lastWorkspace=null;
+    lastGood=null;
+    graph=null;
+    activeProcedureId=null;
+    selection=null;
+    projectedText=null;
+    if(parsed.state==="SOURCE_ONLY")
+      setText("projectionState","源码编辑");
+    else {
+      setText("projectionState","投影失败 · 仅源码");
+      if(inspectorOpen)setInspectorOpen(false,false);
+    }
   }
-  $("graphWarning").hidden = parsed.state==="READY"||parsed.state==="SOURCE_ONLY";
-  setText("graphWarning",parsed.state==="READY"||parsed.state==="SOURCE_ONLY"?""
-    :(lastGood?"Graph 已过期，仅供对照，不能代表当前 Source。":
-      "当前 Source 无可用的 Procedure 投影。")+" "+(parsed.diagnostics[0]?.message??""));
+  const markdownAvailable=updateMarkdownPreview(text);
+  updateViewAvailability(viewKindFor({
+    path:activeFilePath||filename,projection:parsed,
+    previewAvailable:markdownAvailable
+  }));
+  if(viewKind==="markdown")setText("projectionState","Markdown 预览");
+  if(isMarkdownFile(activeFilePath||filename)&&!markdownAvailable)
+    setText("projectionState","文件过大 · 仅源码");
+  $("graphWarning").hidden=true;
+  setText("graphWarning","");
   renderAssetNavigation();
   renderProcedureNavigation();
   renderOutline();

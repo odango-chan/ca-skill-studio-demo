@@ -55,19 +55,20 @@
     <section class="editor" aria-label="Procedure authoring editor">
       <div class="editorbar compact-toolbar">
         <button id="toggleExplorer" class="panel-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" title="展开或收起文件导航">☰</button>
-        <div class="breadcrumbs">
+        <div class="breadcrumbs" id="procedureBreadcrumbs">
           <button id="backProcedure" type="button" title="返回 Root Procedure">←</button>
           <span id="procedureBread">Procedure</span>
         </div>
-        <div class="segmented" role="group" aria-label="编辑视图">
+        <div class="segmented" id="editorModes" role="group" aria-label="编辑视图">
           <button id="mode-visual" type="button" aria-pressed="true">Visual</button>
           <button id="mode-source" type="button" aria-pressed="false">Source</button>
           <button id="mode-split" type="button" aria-pressed="false">Split</button>
         </div>
         <span class="mode-spacer"></span>
         <details class="view-menu" id="viewMenu">
-          <summary aria-label="图形视图设置">视图 <span aria-hidden="true">⌄</span></summary>
+          <summary aria-label="编辑器更多选项"><span id="viewMenuTitle">视图</span> <span aria-hidden="true">⌄</span></summary>
           <div class="view-menu-panel">
+            <div id="graphViewOptions">
             <div class="menu-heading">图形显示</div>
             <label class="menu-field" for="layoutDirection">布局方向
               <select id="layoutDirection" aria-label="自动布局方向">
@@ -79,14 +80,15 @@
             <button id="showAllLabels" type="button" aria-pressed="false" title="显示全部 Route 的标签">显示全部 Route 标签</button>
             <button id="centerSelection" type="button">定位当前选择</button>
             <div class="menu-divider"></div>
+            </div>
             <div class="menu-heading">操作</div>
             <button id="resetButton" type="button" title="恢复打开时的原始文本">恢复初始文件</button>
             <div class="menu-divider"></div>
-            <div class="menu-heading">缩放</div>
+            <div id="zoomViewOptions"><div class="menu-heading">缩放</div>
             <div class="menu-zoom">
               <button id="zoomOut" type="button" aria-label="缩小">−</button>
               <button id="zoomIn" type="button" aria-label="放大">+</button>
-            </div>
+            </div></div>
           </div>
         </details>
 
@@ -99,6 +101,9 @@
             <g id="world"></g>
           </svg>
           <div id="graphWarning" class="graph-warning" role="alert" hidden></div>
+        </div>
+        <div id="markdownPane" class="markdown-pane" hidden aria-label="Markdown 预览" role="region">
+          <article id="markdownPreview" class="markdown-preview"></article>
         </div>
         <div id="sourcePane" class="source-pane">
           <div class="source-caption"><span class="source-indicator"></span> <span id="sourceLanguage">YAML</span></div>

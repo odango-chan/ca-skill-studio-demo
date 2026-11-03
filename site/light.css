@@ -462,3 +462,60 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .step-enum .preview-button{margin:0;padding:8px}
 .source-editor .source-highlight::-webkit-scrollbar{display:none}
+
+
+/* File-aware Visual: real Procedure canvas, Markdown preview, or Source only. */
+[hidden]{display:none!important}
+#graphViewOptions[hidden],#zoomViewOptions[hidden]{display:none!important}
+#editorBody .markdown-pane{flex:1;min-width:0;min-height:0;overflow:auto;
+  background:#fff;overscroll-behavior:contain}
+#editorBody[data-mode="source"] .markdown-pane{display:none}
+#editorBody[data-mode="visual"] .source-pane{display:none}
+#editorBody[data-mode="split"] .markdown-pane{flex:1.15}
+#editorBody[data-mode="split"] .source-pane{border-left:1px solid #e3eaf0}
+.markdown-preview{max-width:860px;margin:0 auto;padding:34px clamp(22px,5vw,64px) 80px;
+  color:#29394c;font:14px/1.8 system-ui,-apple-system,"Segoe UI",sans-serif;
+  overflow-wrap:anywhere;word-break:normal}
+.markdown-preview h1,.markdown-preview h2,.markdown-preview h3,.markdown-preview h4,
+.markdown-preview h5,.markdown-preview h6{color:#243b51;line-height:1.35;font-weight:720;
+  margin:1.55em 0 .6em}
+.markdown-preview h1{font-size:25px;letter-spacing:-.02em;border-bottom:1px solid #e8eef4;
+  padding-bottom:.4em;margin-top:.2em}
+.markdown-preview h2{font-size:20px;border-bottom:1px solid #e9eef3;padding-bottom:.34em}
+.markdown-preview h3{font-size:16px}
+.markdown-preview h4,.markdown-preview h5,.markdown-preview h6{font-size:14px}
+.markdown-preview p{margin:.7em 0 1em}
+.markdown-preview ul,.markdown-preview ol{margin:.5em 0 1.25em;padding-left:1.8em}
+.markdown-preview li{margin:.25em 0}
+.markdown-preview li>ul,.markdown-preview li>ol{margin:.2em 0}
+.markdown-preview blockquote{margin:1.2em 0;padding:.2em 1.2em;border-left:3px solid #8cbfc2;
+  color:#546e80;background:#f8fbfc}
+.markdown-preview a{color:#077e89;text-decoration:underline;text-underline-offset:2px}
+.markdown-preview a:hover{color:#0b5e68}
+.markdown-preview code{font:12px/1.5 ui-monospace,Consolas,monospace;
+  background:#ecf3f7;border-radius:4px;padding:2px 5px;color:#b3475e;
+  word-break:break-word}
+.markdown-preview pre{overflow:auto;margin:1.2em 0 1.5em;padding:15px 17px;
+  border:1px solid #dee8f1;border-radius:9px;background:#f5f8fb;
+  white-space:pre;line-height:1.6}
+.markdown-preview pre code{font-size:12px;padding:0;background:transparent;border-radius:0;
+  color:#364c60;white-space:pre;word-break:normal}
+.markdown-preview .md-table-wrap{overflow:auto;margin:1.2em 0 1.5em}
+.markdown-preview table{border-collapse:collapse;font-size:12px;width:max-content;min-width:100%}
+.markdown-preview th,.markdown-preview td{border:1px solid #e1e7ee;padding:8px 12px;text-align:left}
+.markdown-preview th{background:#f1f6fa;font-weight:680}
+.markdown-preview tbody tr:nth-child(even){background:#fafcfd}
+.markdown-preview hr{border:0;border-top:1px solid #e1e7ee;margin:1.7em 0}
+.markdown-preview .md-frontmatter{font-size:12px;margin:0 0 22px;color:#647b91;
+  background:#f7fafc;border:1px solid #e6edf3;border-radius:7px}
+.markdown-preview .md-frontmatter summary{cursor:pointer;padding:9px 12px}
+.markdown-preview .md-frontmatter pre{margin:0;border:0;border-top:1px solid #e6edf3;
+  border-radius:0;background:#fcfdff}
+.markdown-preview .md-image-ref,.markdown-preview .md-unresolved-link{color:#71849a}
+.markdown-preview .md-unresolved-link{border-bottom:1px dotted #a8b7c6}
+@media(max-width:680px){
+ #editorBody[data-mode="split"] .markdown-pane{min-height:260px;flex:none}
+ .markdown-preview{padding:25px 18px 60px;font-size:13px}
+ .markdown-preview h1{font-size:21px}
+ .markdown-preview h2{font-size:17px}
+}

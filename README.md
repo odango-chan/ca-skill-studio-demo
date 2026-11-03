@@ -6,10 +6,12 @@ ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前实现（Stage: Syntax Highlight + Source-Backed Enum Editors + Multi-file Package）：
+当前实现（Stage: File-aware Visual + Markdown Preview + Source-backed Editing）：
 
 - **真实多文件 Skill Package 示例**：从固定 `ca-agent-demo@bf445ad` 源码精确归档 `ensure-pdu-session` 的 4 个 Runtime Asset 文件和 `establish-pdu-session` 的 13 个运行相关文件（SKILL.md、Contract、Procedure、Predicates、3 个 Script、6 个 Schema；不展示 Case）。文件树可切换编辑，修改留在各文件独立的浏览器内存工作副本，当前文件可单独导出、整套文件可导出 ZIP；不增加 Package 内的 sidecar 文件。
 - **Source 语法高亮**：YAML、Markdown、Python、JSON 本地着色；源文件仍由原生 textarea 编辑，着色层只读、HTML 转义、滚动同步；超出 260K 字符或不支持的扩展名安全退回纯文本，不引入云端代码服务。
+- **按文件能力决定 Visual**：Procedure YAML 当前投影 `READY` 时才有流程图；投影失败立即切到 Source，隐藏 Visual/Split、清除旧图且保留错误诊断。Contract / Predicate / Schema / Script 等没有专用预览的文件仅显示 Source，不再输出“无法投影流程图”的无效提示。
+- **Markdown Visual = 文档阅读预览**：SKILL.md、其他 Markdown 文件在 Visual 显示本地渲染的标题、正文、列表、代码块、表格、引用与安全链接；Split 让预览和 Source 并排，输入时立即更新。原始 HTML 转义、危险链接不渲染、图片不主动请求外部地址。此实现是**安全的基础 Markdown 子集**，尚非完整 GitHub Flavored Markdown/MDX 渲染器。超出 300K 字符时仅开放 Source。
 - **真实文件名单行显示**：资产树中的长文件名不再换行，自动省略并用悬停 title 提供完整相对路径；顶栏也维持单行文件路径。
 - **来源驱动的更多枚举**：Ensure Verify Node 从该 Package `predicates.yaml` 选择；CreatedSession 的 Phase Verify Step 从其真实 PredicateSet 选择引用（具体步骤的折叠编辑区）；CreatedSession Route 目标从当前 Procedure 已定义的 Node 列表选择；Contract `planning.maxActions` 保留自由整数输入并增加常用预算预设。选择只负责局部 AST Scalar Patch 与完整源码 Diff、Revision guard 和重新投影；不代替业务正确性 / 3GPP Runtime 验证。
 - 从真实 Demo Procedure YAML 投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
@@ -30,7 +32,7 @@ https://odango-chan.github.io/ca-skill-studio-demo/
 
 ## 边界和兼容性
 
-**图形投影基于 yaml@2.9.1 的 YAML 1.2 Document AST / CST source tokens 与 LineCounter，目前只有有限的 Source-backed 编辑资格，并非完整 Demo Schema / Runtime 校验。** 它拒绝重复键、Alias / Anchor / Tag、额外 Procedure、未资格化的 Phase 和不安全语法；不支持跨文件语义。其他文件（SKILL.md、JSON、复杂 YAML、多 Procedure、CreatedSession Transitional phases）仍可 Source-only 编辑；不承诺这些文件获得图形投影。
+**图形投影基于 yaml@2.9.1 的 YAML 1.2 Document AST / CST source tokens 与 LineCounter，目前只有有限的 Source-backed 编辑资格，并非完整 Demo Schema / Runtime 校验。** 它拒绝重复键、Alias / Anchor / Tag、额外 Procedure、未资格化的 Phase 和不安全语法；不支持跨文件语义。其他文件（Contract、Predicate、Schema、Script、JSON）仍可 Source-only 编辑；Markdown 使用阅读预览，多 Procedure / CreatedSession 的限定局部编辑继续可用；不承诺这些文件获得图形投影。
 
 Visual 当前在 ensure 单 Procedure 的**两条固定失败终态 Route**支持实验性 SetRouteTarget，并对 Ensure Verify 的 Predicate ref 提供独立的受限标量编辑。Contract 的 maxActions 则由 Contract 源文件的精确标量 Patch 实现。**CreatedSession 多 Procedure 的主 Operator、Binding、Procedure 结构仍只读**，但有限 Phase Verify Scalar 和 Route Target Scalar 已开放有界编辑；其余对象仍需在 Source 中修改。Patch 使用 YAML Scalar.range 确定真实 Source Span，只替换目标标量，绑定完整源文本 Revision、重新解析并比对全部 Node 和 Route 投影、冻结其余 22 条路由目标，保留所有未触及文本及注释。Preview 如果过期或被修改会拒绝应用。**这不等于完整 YAML CST Round-trip 或 Demo Validator 通过**，也不意味着已接入 Python POC；语义安全仍需人工检查。未知字段和复杂结构不能凭 Graph 自动修改。
 
@@ -79,3 +81,15 @@ UX Consolidation 的自动化测试覆盖 View 菜单与单一 Inspector 控件�
 - 文件树采用单行省略号，完整相对路径通过浏览器的悬停提示查看。
 - CreatedSession 的 Predicate 候选值由 `assurance/predicates.yaml` 定义；Route 候选值由选中 Procedure 内已有的 Node ID 定义。新字段通过精确 Source Span、修改前后投影比对和完整 Source Revision guard；仅保证结构隔离，不保证业务语义、运行成功或新路线无环。
 - 保留既有 Ensure 失败 Route 限制，未扩展原 Patch 的编辑资格。Contract 的 maxActions 预设是快捷输入，不是 SKILL DSL 内建枚举。
+
+## 文件类型视图规则（2026-11-03）
+
+| 文件 / 当前状态 | Visual | Source | Split |
+| --- | --- | --- | --- |
+| Procedure YAML，当前版本成功投影 | 流程图 | 源文本 | 图 + 源文本 |
+| Markdown / SKILL.md（300K 字符以内） | Markdown 阅读预览 | 源文本 | 预览 + 源文本 |
+| Contract、Predicate、Schema、Python、JSON 等 | 不显示 | 源文本 | 不显示 |
+| Procedure YAML 解析 / 投影失败 | 不显示，旧图立即清除 | 源文本 + 错误定位 | 不显示 |
+| Markdown 超出预览限制 | 不显示 | 源文本 | 不显示 |
+
+Visual 仅表示有可用的可视化表达，不暗示完整的图形编辑资格。Markdown 预览的阅读内容派生于当前 Source，不参与文件导出和 Undo/Redo。工作区文件类型切换和源码语法恢复均不会替用户覆盖 Source 或自动应用修改。
