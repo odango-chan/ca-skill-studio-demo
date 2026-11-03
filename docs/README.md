@@ -9,7 +9,8 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 3. [TRACEABILITY](TRACEABILITY.md) — Contract/设计 → 生产代码 → 测试 → 实际证据
 4. [Architecture](architecture/studio-boundaries.md) — ownership、Source authority
 5. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
-6. [D3 Route Designer](design/route-designer.md) — 下一阶段 **Proposed**
+6. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
+7. [D4 Phase Designer](design/phase-designer.md) — A1 有界输入编辑已通过浏览器测试；A2–A4 Proposed
 7. [Documentation Governance](DOCUMENTATION.md) — canonical source map
 
 ## 已完成阶段技术记录
@@ -25,6 +26,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | Owner / Authority / Source truth | [Architecture](architecture/studio-boundaries.md) |
 | 现有 UI 和 Source-backed 编辑契约 | [Workbench](design/authoring-workbench.md) |
 | Route 编辑 D3 设计 | [D3 Route Designer](design/route-designer.md) |
+| Phase Step 输入绑定与后续结构编辑 | [D4 Phase Designer](design/phase-designer.md) |
 | 为何采用 Source-first | [ADR-0001](decisions/0001-source-first-visual.md) |
 | 当前状态 | [WORK](WORK.md) |
 | 实施、测试与证据 locator | [TRACEABILITY](TRACEABILITY.md) |

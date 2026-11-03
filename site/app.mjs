@@ -28,6 +28,8 @@ import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue,
  previewNodeBindingFrom,applyNodeBindingFrom} from "./node-attributes.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
+import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding}
+  from "./phase-bindings.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
@@ -1198,7 +1200,47 @@ function addPhaseVerifyEditor(phase,step,container){
   controls.append(select,preview);
   disclosure.append(summary,controls);container.appendChild(disclosure);
 }
-function renderPhase(phase,body,phaseChildren) {
+function addPhaseInputBindingEditors(phase,step,container,bindings){
+  const options=bindings?.filter(b=>b.phaseName===phase.name&&
+    b.stepIndex===step.index-1);
+  if(!options?.length)return false;
+  const disclosure=el("details","step-enum");
+  disclosure.dataset.phaseInputStep=phase.name+":"+step.index;
+  disclosure.appendChild(el("summary","",
+    "编辑输入绑定 · "+options.length+" 项 · D4-A1"));
+  const controls=el("div","step-enum-controls");
+  controls.appendChild(el("p","small-edit-note",
+    "只允许换成当前 Procedure 已声明且类型相同的 input 来源。" +
+    "这是 Source 编辑资格，不保证消费端参数语义或 Runtime 类型完全兼容。"));
+  for(const option of options){
+    const label=el("label","attribute-label",
+      option.bindingKey+" · "+option.inputType+" · from");
+    const select=el("select","target-select");
+    select.setAttribute("aria-label","D4 "+phase.name+" Step "+step.index+
+      " Binding "+option.bindingKey);
+    for(const choice of option.choices){
+      const row=el("option","",choice);row.value=choice;select.append(row);
+    }
+    select.value=option.value;
+    label.append(select);controls.append(label);
+    const preview=button("预览 Phase Binding 修改",()=>{
+      try{
+        showPreview(previewPhaseInputBinding(source.value,activeProcedureId,
+          selection.id,phase.name,step.index-1,option.bindingKey,select.value));
+      }catch(error){message("Phase Binding 未应用："+String(error?.message??error));}
+    },"preview-button");
+    preview.disabled=true;
+    select.addEventListener("change",()=>{
+      preview.disabled=select.value===option.value;
+    });
+    controls.append(preview);
+  }
+  disclosure.append(controls);
+  container.append(disclosure);
+  return true;
+}
+
+function renderPhase(phase,body,phaseChildren,phaseBindings=[]) {
   if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
@@ -1209,6 +1251,7 @@ function renderPhase(phase,body,phaseChildren) {
     const jump=button("L"+step.line,()=>lineJump(step.line),"source-link");
     item.append(meta,jump);body.appendChild(item);
     addPhaseVerifyEditor(phase,step,body);
+    addPhaseInputBindingEditors(phase,step,body,phaseBindings);
     const ref=phaseChildren.find(c=>c.via.startsWith(phase.name+".steps[") &&
       c.procedure===step.value && c.line===step.line);
     if(ref)body.appendChild(button("进入子过程 · "+ref.procedure,
@@ -1235,7 +1278,8 @@ function nodeEditorCapabilities(nodeId){
     deletion:deleteNodeOptions(text,activeProcedureId,nodeId),
     rename:nodeRenameAvailable(text,activeProcedureId,nodeId),
     verify:verifyNodeChoices(nodeId),
-    newRoute:addRouteOutcomeOptions(text,activeProcedureId,nodeId)
+    newRoute:addRouteOutcomeOptions(text,activeProcedureId,nodeId),
+    phaseBindings:phaseStepBindingOptions(text,activeProcedureId,nodeId)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1254,7 +1298,7 @@ function renderNodeJourney(model,caps) {
     const body=journeyStage(1,"准备",
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
       {expanded:false});
-    renderPhase(model.prepare.phase,body,model.children);
+    renderPhase(model.prepare.phase,body,model.children,caps.phaseBindings);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1269,7 +1313,7 @@ function renderNodeJourney(model,caps) {
     const body=journeyStage(3,"确认",
       model.confirm.phase?.steps.length ? model.confirm.phase.steps.length+" steps" : "",
       {expanded:false});
-    renderPhase(model.confirm.phase,body,model.children);
+    renderPhase(model.confirm.phase,body,model.children,caps.phaseBindings);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
@@ -1318,6 +1362,7 @@ function renderInspector() {
       packagePredicateSource(),activePackage?.name)))||
     Boolean(model&&((caps.attributes?.operator||caps.attributes?.bindings?.length)||
       caps.deletion||caps.rename||caps.verify.length||caps.newRoute||
+      caps.phaseBindings?.length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -1537,6 +1582,8 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyContractMaxActionsPatch(source.value,pendingPatch);
     else if(pendingPatch.type==="SetPhaseVerify")
       nextSource=applyPhaseVerifyPatch(source.value,pendingPatch,packagePredicateSource());
+    else if(pendingPatch.type==="SetPhaseInputFrom")
+      nextSource=applyPhaseInputBinding(source.value,pendingPatch);
     else if(pendingPatch.type==="SetCreatedRouteTarget")
       nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
     else if(pendingPatch.type==="RenameNode")
