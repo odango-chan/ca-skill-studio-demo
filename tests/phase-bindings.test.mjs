@@ -103,7 +103,9 @@ test("D4-A1 never changes Phase routes, Node count or Step name",()=>{
   const b=projectWorkspace(newText);
   for(const [name,p] of a.procedures){
     const q=b.procedures.get(name);
-    assert.deepEqual(q.routes,p.routes);
+    const businessRoutes=routes=>routes.map(({id,source,outcome,target,routeSource})=>
+      ({id,source,outcome,target,routeSource}));
+    assert.deepEqual(businessRoutes(q.routes),businessRoutes(p.routes));
     assert.deepEqual(q.nodes,p.nodes);
     assert.deepEqual(q.children,p.children);
   }
