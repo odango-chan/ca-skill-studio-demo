@@ -8,6 +8,7 @@ import {zipPackage} from "./zip.mjs";
 import {highlightSource} from "./highlight.mjs";
 import {renderMarkdown} from "./markdown-preview.mjs";
 import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from "./view-policy.mjs";
+import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
@@ -55,6 +56,7 @@ let mode = "visual";
 let viewKind = "source";
 let camera = { x: 0, y: 0, scale: 1 };
 let dragging = null;
+let rerouteDrag = null;
 let projectedText = null;
 let history = createEditorHistory("");
 let pendingPatch = null;
@@ -67,6 +69,7 @@ let layoutTicket = 0;
 let layoutTimer = null;
 
 function invalidateLayout() {
+  cancelRouteDrag();
   layoutTicket++;
   if (layoutTimer !== null) {
     clearTimeout(layoutTimer);
@@ -498,17 +501,27 @@ function setInspectorContext(title,caption,kind="") {
 function inspectorSourceAction(line,label="查看 YAML") {
   inspector.appendChild(button(label+" · L"+line,()=>lineJump(line),"source-link"));
 }
+function currentRouteEditContext(routeId){
+  return {
+    source:source.value,
+    procedure:lastGood,
+    procedureId:activeProcedureId,
+    routeId,
+    packageName:activePackage?.name
+  };
+}
+function eligibleGraphRouteTargets(routeId){
+  if(viewKind!=="procedure"||projection?.state!=="READY"||!lastGood)return [];
+  return visualRouteTargets(currentRouteEditContext(routeId));
+}
 function addPatchControls(route) {
-  const ensureChoices=lastWorkspace?.procedures.size===1
-    ?routeEditTargets(lastGood,route.id):[];
-  const createdChoices=activeFilePath==="assurance/procedure.yaml"
-    ?createdRouteTargets(source.value,activePackage?.name,activeProcedureId,route.id):[];
-  const eligible=ensureChoices.length?ensureChoices:createdChoices;
+  const eligible=eligibleGraphRouteTargets(route.id);
   if(!eligible.length)return false;
+  const ensure=routeEditTargets(lastGood,route.id).length>0;
   const body=section("Route Target",eligible.length+" 选项");
-  const note=ensureChoices.length?
-    "当前 Ensure Profile 仅允许修改两条失败分支的终态。":
-    "目标来自当前 Procedure 的实际 Node；仅做结构检查，改动可能影响业务执行路径。";
+  const note=ensure?
+    "Ensure 仅允许修改两条失败 Route 的终态。":
+    "目标来自当前 Procedure 的 Node。可在图上选中连线后拖动 ↗ 到目标节点；修改需预览 Diff。";
   body.appendChild(el("p","small-edit-note",note));
   const select=el("select","target-select");
   select.setAttribute("aria-label","选择当前 Procedure 中的 Route Target");
@@ -517,12 +530,8 @@ function addPatchControls(route) {
   }
   select.value=route.target;body.appendChild(select);
   const preview=button("预览 Route 修改",()=>{
-    try{
-      showPreview(ensureChoices.length?
-        previewRouteTargetPatch(source.value,route.id,select.value):
-        previewCreatedRoutePatch(source.value,activePackage.name,
-          activeProcedureId,route.id,select.value));
-    }catch(error){message("未应用："+String(error?.message??error));}
+    try{showPreview(previewVisualRouteEdit(currentRouteEditContext(route.id),select.value));}
+    catch(error){message("未应用："+String(error?.message??error));}
   },"preview-button");
   preview.disabled=true;
   select.addEventListener("change",()=>{preview.disabled=select.value===route.target;});
@@ -736,13 +745,10 @@ function renderInspector() {
   }
   const route=selection?.kind==="route"?routeDetails(lastGood,selection.id):null;
   const model=selection?.kind==="node"?nodeJourney(lastGood,selection.id):null;
-  const editable=Boolean(route&&(
-    (lastWorkspace?.procedures.size===1&&routeEditTargets(lastGood,route.id).length)||
-    (activeFilePath==="assurance/procedure.yaml"&&
-      createdRouteTargets(source.value,activePackage?.name,activeProcedureId,route.id).length)
-  ))||Boolean(model&&(verifyNodeChoices(model.node.id).length||
-     (activePackage?.name==="establish-pdu-session"&&
-      model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
+  const editable=Boolean(route&&eligibleGraphRouteTargets(route.id).length)||
+    Boolean(model&&(verifyNodeChoices(model.node.id).length||
+      (activePackage?.name==="establish-pdu-session"&&
+       model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
   if(model){
     setInspectorContext(model.node.id,"",
@@ -821,23 +827,100 @@ svg.addEventListener("wheel", event => {
   const rect = svg.getBoundingClientRect();
   zoomTo(camera.scale * (event.deltaY < 0 ? 1.12 : 0.88), event.clientX - rect.left, event.clientY - rect.top);
 }, { passive: false });
+function graphPoint(clientX,clientY){
+  const rect=svg.getBoundingClientRect();
+  return {
+    x:(clientX-rect.left-camera.x)/camera.scale,
+    y:(clientY-rect.top-camera.y)/camera.scale
+  };
+}
+function cancelRouteDrag(){
+  if(!rerouteDrag)return;
+  const state=rerouteDrag;
+  rerouteDrag=null;
+  state.ghost.remove();
+  try{
+    if(svg.hasPointerCapture(state.pointerId))
+      svg.releasePointerCapture(state.pointerId);
+  }catch{ /* Capture may already have ended. */ }
+  svg.classList.remove("is-rerouting");
+}
+function beginRouteDrag(event,route,point,targets){
+  if(event.button!==0||rerouteDrag||projection?.state!=="READY")return;
+  event.preventDefault();
+  event.stopPropagation();
+  const ghost=svgEl("path",{
+    class:"route-reroute-ghost",d:"M "+point.x+" "+point.y+
+      " L "+point.x+" "+point.y,"marker-end":"url(#arrowhead)"
+  });
+  world.appendChild(ghost);
+  rerouteDrag={
+    pointerId:event.pointerId,ghost,point,
+    routeId:route.id,oldTarget:route.target,
+    procedureId:activeProcedureId,revision:source.value,
+    targets:[...targets]
+  };
+  dragging=null;
+  svg.classList.add("is-rerouting");
+  svg.setPointerCapture(event.pointerId);
+}
+function finishRouteDrag(event){
+  const drag=rerouteDrag;
+  if(!drag)return;
+  const dropped=document.elementFromPoint(event.clientX,event.clientY);
+  const target=dropped?.closest?.('[data-selectable="node"]')?.getAttribute("data-node-id");
+  cancelRouteDrag();
+  if(!dropTargetAllowed(drag.targets,drag.oldTarget,target)){
+    message("未修改 Route：请拖到允许的其他目标节点，也可在右侧属性中选择。");
+    return;
+  }
+  if(source.value!==drag.revision||activeProcedureId!==drag.procedureId||
+     selection?.kind!=="route"||selection.id!==drag.routeId||
+     projection?.state!=="READY"){
+    message("Source 或选择已变化，请重新选择 Route。");
+    return;
+  }
+  try{
+    showPreview(previewVisualRouteEdit(currentRouteEditContext(drag.routeId),target));
+  }catch(error){
+    message("Route 修改未应用："+String(error?.message??error));
+  }
+}
 svg.addEventListener("pointerdown", event => {
-  if (event.button !== 0 || event.target.closest("[data-selectable]")) return;
-  dragging = { x: event.clientX, y: event.clientY, startX: camera.x, startY: camera.y };
+  if(event.button!==0 || rerouteDrag || event.target.closest("[data-selectable]"))return;
+  dragging={x:event.clientX,y:event.clientY,startX:camera.x,startY:camera.y};
   svg.setPointerCapture(event.pointerId);
 });
 svg.addEventListener("pointermove", event => {
-  if (!dragging) return;
-  camera.x = dragging.startX + event.clientX - dragging.x;
-  camera.y = dragging.startY + event.clientY - dragging.y;
+  if(rerouteDrag){
+    if(event.pointerId!==rerouteDrag.pointerId)return;
+    const next=graphPoint(event.clientX,event.clientY);
+    rerouteDrag.ghost.setAttribute("d","M "+rerouteDrag.point.x+" "+
+      rerouteDrag.point.y+" L "+next.x+" "+next.y);
+    return;
+  }
+  if(!dragging)return;
+  camera.x=dragging.startX+event.clientX-dragging.x;
+  camera.y=dragging.startY+event.clientY-dragging.y;
   transform();
 });
-svg.addEventListener("pointerup", () => { dragging = null; });
-svg.addEventListener("pointercancel", () => { dragging = null; });
+svg.addEventListener("pointerup", event => {
+  if(rerouteDrag && event.pointerId===rerouteDrag.pointerId){
+    finishRouteDrag(event);
+    return;
+  }
+  dragging=null;
+});
+svg.addEventListener("pointercancel",()=>{
+  dragging=null;
+  cancelRouteDrag();
+});
 window.addEventListener("resize", () => { if (mode !== "source") fit(); });
-$("layoutDirection").addEventListener("change", next=>{
-  layoutDirection=next;
-  scheduleELKLayout(0,true);
+$("layoutDirection").addEventListener("change", event=>{
+  const value=event.currentTarget.value;
+  if(value!=="RIGHT"&&value!=="DOWN")return;
+  layoutDirection=value;
+  if(viewKind==="procedure")scheduleELKLayout(0,true);
 });
 $("neighborsOnly").addEventListener("click",()=>{
   neighborView=!neighborView;
@@ -855,6 +938,7 @@ function chooseEdgeRoute(bundle) {
 
 
 function renderGraph() {
+  cancelRouteDrag();
   world.replaceChildren();
   if (!graph || !lastGood) return;
   const edgesGroup = svgEl("g", { class: "edges" });
@@ -862,7 +946,8 @@ function renderGraph() {
     const a = graph.positions.get(bundle.source);
     const b = graph.positions.get(bundle.target);
     if (!a || !b) continue;
-    const selected = selection?.kind === "route" && bundle.routes.some(r => r.id === selection.id);
+    const selectedRoute=bundle.routes.find(r=>selection?.kind==="route"&&selection.id===r.id);
+    const selected=Boolean(selectedRoute);
     const reverse = b.x <= a.x;
     const nodeWidth=graph.engine==="ELK layered"?238:222;
     const nodeHeight=graph.engine==="ELK layered"?80:74;
@@ -882,6 +967,33 @@ function renderGraph() {
     group.appendChild(svgEl("text", { x: cx, y: cy + 2, "text-anchor": "middle", class: "edge-label" }, short));
     group.appendChild(svgEl("title",{},
       bundle.routes.map(r=>r.routeSource+" · "+r.outcome+" → "+r.target).join("\n")));
+    if(selectedRoute){
+      const targets=eligibleGraphRouteTargets(selectedRoute.id);
+      if(targets.some(target=>target!==selectedRoute.target)){
+        const handle=svgEl("g",{
+          class:"route-rewire-handle","data-selectable":"route-edit",
+          role:"button",tabindex:"0",
+          "aria-label":"拖动修改 "+selectedRoute.outcome+" Route 的目标节点"
+        });
+        const hx=cx,hy=cy-31;
+        handle.appendChild(svgEl("circle",{cx:hx,cy:hy,r:14,class:"rewire-grip"}));
+        handle.appendChild(svgEl("text",{
+          x:hx,y:hy+4,"text-anchor":"middle",class:"rewire-grip-label"
+        },"↗"));
+        handle.appendChild(svgEl("title",{},"拖动到其他节点，预览 Route Target 修改"));
+        handle.addEventListener("pointerdown",event=>
+          beginRouteDrag(event,selectedRoute,{x:sx,y:sy},targets));
+        handle.addEventListener("click",event=>event.stopPropagation());
+        handle.addEventListener("keydown",event=>{
+          if(event.key==="Enter"||event.key===" "){
+            event.preventDefault();event.stopPropagation();
+            selectRoute(selectedRoute.id);
+            message("可拖动 ↗ 到目标节点，或使用右侧 Route Target 下拉菜单。");
+          }
+        });
+        group.appendChild(handle);
+      }
+    }
     group.addEventListener("click",()=>chooseEdgeRoute(bundle));
     group.addEventListener("keydown",event=>{
       if(event.key==="Enter"||event.key===" "){event.preventDefault();chooseEdgeRoute(bundle);}
@@ -893,7 +1005,7 @@ function renderGraph() {
     const p = graph.positions.get(node.id);
     const selected = selection?.kind === "node" && selection.id === node.id;
     const classes = "node " + (node.operator === "terminal" ? "terminal " : "") + (selected ? "selected" : "");
-    const group = svgEl("g", { transform: "translate(" + p.x + "," + p.y + ")", class: classes, "data-selectable": "node", tabindex: "0", role: "button", "aria-label": node.id + ", " + node.operator + " " + node.value });
+    const group = svgEl("g", { transform: "translate(" + p.x + "," + p.y + ")", class: classes, "data-selectable": "node", "data-node-id":node.id, tabindex: "0", role: "button", "aria-label": node.id + ", " + node.operator + " " + node.value });
     group.appendChild(svgEl("rect", { width: graph.engine==="ELK layered"?238:222, height: graph.engine==="ELK layered"?80:74, rx: 13, class: "node-body" }));
     group.appendChild(svgEl("text", { x: 13, y: 19, class: "node-kind" }, node.operator.toUpperCase() + (node.id === lastGood.start ? " · START" : "") + (node.children?.length ? " · CHILD ↗" : "")));
     group.appendChild(svgEl("text", { x: 13, y: 40, class: "node-title" }, node.id.length > 28 ? node.id.slice(0, 27) + "…" : node.id));

@@ -519,3 +519,88 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
  .markdown-preview h1{font-size:21px}
  .markdown-preview h2{font-size:17px}
 }
+
+
+/* Tall NODES explorer: use remaining column height instead of a fixed 220px cap. */
+@media(min-width:981px){
+  .workbench .explorer{
+    overflow:hidden;
+    min-height:0;
+  }
+  .workbench .explorer .asset-section{
+    flex:0 1 auto;
+    min-height:0;
+    max-height:54%;
+    overflow-y:auto;
+    overflow-x:hidden;
+  }
+  .workbench .explorer .explorer-nodes:not([open]){
+    flex:0 0 auto;
+    min-height:0;
+  }
+  .workbench .explorer .explorer-nodes[open]{
+    display:flex;
+    flex:1 1 0;
+    flex-direction:column;
+    min-height:110px;
+    overflow:hidden;
+  }
+  .workbench .explorer .explorer-nodes[open] .node-disclosure-heading{
+    flex:none;
+  }
+  .workbench .explorer .explorer-nodes[open] .search-wrap{
+    flex:none;
+  }
+  .workbench .explorer .explorer-nodes[open] .outline{
+    flex:1 1 auto;
+    min-height:0;
+    max-height:none;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+  .workbench .explorer .explorer-bottom{
+    flex:none;
+    margin-top:auto;
+  }
+}
+@media(max-width:980px){
+  .workbench .explorer .explorer-nodes[open] .outline{
+    max-height:min(48vh,500px);
+    overflow-y:auto;
+  }
+}
+
+/* On-canvas Route rewiring handle, only present when source-backed edits qualify. */
+.graph-pane .route-rewire-handle{
+  cursor:crosshair;
+  outline:none;
+}
+.graph-pane .rewire-grip{
+  fill:#effaf5;
+  stroke:#178978;
+  stroke-width:2px;
+  filter:drop-shadow(0 2px 3px #1c665029);
+}
+.graph-pane .route-rewire-handle:hover .rewire-grip,
+.graph-pane .route-rewire-handle:focus .rewire-grip{
+  fill:#d8f4e8;
+  stroke:#087b67;
+  stroke-width:3px;
+}
+.graph-pane .rewire-grip-label{
+  pointer-events:none;
+  font-size:15px;
+  font-weight:700;
+  fill:#087e6e;
+}
+.graph-pane .route-reroute-ghost{
+  pointer-events:none;
+  fill:none;
+  stroke:#12937d;
+  stroke-width:3px;
+  stroke-dasharray:8 6;
+  opacity:.95;
+}
+.graph-pane svg.is-rerouting{
+  cursor:crosshair;
+}
