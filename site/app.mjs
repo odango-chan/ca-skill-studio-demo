@@ -12,6 +12,7 @@ import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./vis
 import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
 import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
 import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "./node-designer.mjs";
+import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "./node-create.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
@@ -638,6 +639,86 @@ function addPatchControls(route) {
   body.appendChild(preview);
   return true;
 }
+function addInsertNodeEditor(route){
+  const options=insertNodeOptions(source.value,activeProcedureId,route.id,
+    packagePredicateSource(),activePackage?.name);
+  if(!options)return false;
+  const body=section("在此 Route 后插入 Node","D2-A2");
+  const desc=el("p","small-edit-note",
+    "原 Route 将先进入新 Node；Call / Verify 通过指定 Outcome 回到原目标。仅编辑源码，不验证运行时行为。");
+  body.append(desc);
+  const idLabel=el("label","attribute-label","新 Node ID");
+  const idInput=el("input","attribute-input");
+  idInput.type="text";idInput.value="new-node";idInput.maxLength=80;
+  idInput.setAttribute("aria-label","新 Node ID");
+  idLabel.append(idInput);body.append(idLabel);
+  const typeLabel=el("label","attribute-label","Operator");
+  const type=el("select","target-select");
+  type.setAttribute("aria-label","新 Node Operator");
+  for(const key of ["terminal","call",...(options.predicates.length?["verify"]:[])]){
+    const option=el("option","",key);option.value=key;type.append(option);
+  }
+  typeLabel.append(type);body.append(typeLabel);
+  const valueHost=el("div","node-create-value");
+  const outcomeHost=el("div","node-create-outcome");
+  body.append(valueHost,outcomeHost);
+  const preview=button("预览插入 Node",()=>{
+    try{
+      const value=valueHost.querySelector("input,select")?.value??"";
+      const outcome=type.value==="terminal"?"":outcomeHost.querySelector("input")?.value??"";
+      showPreview(previewNodeInsert(source.value,activeProcedureId,route.id,
+        {nodeId:idInput.value,operator:type.value,value,outcome},
+        packagePredicateSource(),activePackage?.name));
+    }catch(error){message("未应用："+String(error?.message??error));}
+  },"preview-button");
+  function update(){
+    const name=idInput.value;
+    const val=valueHost.querySelector("input,select")?.value??"";
+    const outcome=type.value==="terminal"?"":outcomeHost.querySelector("input")?.value??"";
+    preview.disabled=!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name)||
+      name.length>80||lastGood.nodes.some(n=>n.id===name)||
+      !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(val)||
+      (type.value!=="terminal"&&!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(outcome));
+  }
+  function fields(){
+    valueHost.replaceChildren();outcomeHost.replaceChildren();
+    const label=el("label","attribute-label",
+      type.value==="terminal"?"Terminal status":
+      type.value==="verify"?"Predicate":"Call operation");
+    const values=type.value==="terminal"?options.terminalValues:
+      type.value==="verify"?options.predicates:null;
+    let input;
+    if(values){
+      input=el("select","target-select");
+      for(const value of values){
+        const opt=el("option","",value);opt.value=value;input.append(opt);
+      }
+    }else{
+      input=el("input","attribute-input");
+      input.type="text";input.placeholder="tool.operation.name";
+    }
+    input.setAttribute("aria-label","新 Node 值");
+    input.addEventListener("input",update);input.addEventListener("change",update);
+    label.append(input);valueHost.append(label);
+    if(type.value!=="terminal"){
+      const routeLabel=el("label","attribute-label","新 Node Outcome");
+      const routeInput=el("input","attribute-input");
+      routeInput.type="text";
+      routeInput.value=type.value==="verify"?"PASS":"COMMITTED";
+      routeInput.maxLength=80;
+      routeInput.setAttribute("aria-label","新 Node Outcome");
+      routeInput.addEventListener("input",update);
+      routeLabel.append(routeInput);outcomeHost.append(routeLabel);
+    }
+    update();
+  }
+  idInput.addEventListener("input",update);
+  type.addEventListener("change",fields);
+  body.append(preview);
+  fields();
+  return true;
+}
+
 function packagePredicateSource(){
   return activePackage?.files.get("assurance/predicates.yaml")?.text??null;
 }
@@ -870,7 +951,9 @@ function renderInspector() {
   }
   const route=selection?.kind==="route"?routeDetails(lastGood,selection.id):null;
   const model=selection?.kind==="node"?nodeJourney(lastGood,selection.id):null;
-  const editable=Boolean(route&&eligibleGraphRouteTargets(route.id).length)||
+  const editable=Boolean(route&&(eligibleGraphRouteTargets(route.id).length||
+    insertNodeOptions(source.value,activeProcedureId,route.id,
+      packagePredicateSource(),activePackage?.name)))||
     Boolean(model&&(nodeRenameAvailable(source.value,activeProcedureId,model.node.id)||
       verifyNodeChoices(model.node.id).length||
       (activePackage?.name==="establish-pdu-session"&&
@@ -889,6 +972,7 @@ function renderInspector() {
     inspectorLine("Route Source",route.routeSource);
     inspectorSourceAction(route.line,"查看源码");
     addPatchControls(route);
+    addInsertNodeEditor(route);
     return;
   }
   setInspectorContext(lastGood.name,"选择一个节点或路由","PROCEDURE");
@@ -1065,10 +1149,15 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
     else if(pendingPatch.type==="RenameNode")
       nextSource=applyNodeRename(source.value,pendingPatch);
+    else if(pendingPatch.type==="InsertNode")
+      nextSource=applyNodeInsert(source.value,pendingPatch,
+        packagePredicateSource(),activePackage?.name);
     else throw new Error("未知的属性 Patch 类型");
     if(pendingPatch.type==="RenameNode"&&selection?.kind==="node"&&
        activeProcedureId===pendingPatch.procedureId&&selection.id===pendingPatch.nodeId)
       selection={kind:"node",id:pendingPatch.newId};
+    if(pendingPatch.type==="InsertNode"&&activeProcedureId===pendingPatch.procedureId)
+      selection={kind:"node",id:pendingPatch.nodeId};
     source.value = nextSource;
     history.record(nextSource);
     closePreview();

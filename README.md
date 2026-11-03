@@ -11,7 +11,10 @@ YAML patch with Diff preview, confirmation and Undo/Redo. It updates the current
 Procedure start, inbound Route targets and explicit from references; unsupported
 references fail closed. No CreatedSession-specific Node mutator was added.
 
-**Still not implemented:** Node creation/deletion, generic operator/phase editing,
+D2-A2 adds guarded insertion of a terminal/call/verify Node on a selected Route,
+with an explicit forwarding Outcome for nonterminal nodes.
+
+**Still not implemented:** unrestricted Node creation/deletion, generic operator/phase editing,
 full package import, whole-package Runtime validation and in-place filesystem save.
 See [D2 Node Designer](docs/D2-node-designer.md).
 
