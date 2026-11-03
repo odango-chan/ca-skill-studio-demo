@@ -143,12 +143,10 @@ function message(text) { setText("hint", text); }
 function updatePanelControls(){
   const nav=$("toggleExplorer");
   nav.setAttribute("aria-expanded",String(explorerOpen));
-  nav.setAttribute("aria-label","收起左侧导航");
-  nav.title="收起左侧导航";
-  const rail=$("reopenExplorer");
-  rail.setAttribute("aria-expanded",String(explorerOpen));
-  rail.setAttribute("aria-label","展开左侧导航");
-  rail.title="展开左侧导航";
+  const label=explorerOpen?"收起左侧导航":"展开左侧导航";
+  nav.setAttribute("aria-label",label);
+  nav.title=label;
+  nav.querySelector(".explorer-toggle-icon").textContent=explorerOpen?"‹":"☰";
   const detail=$("inspectorVisibility");
   const available=inspectorOpen||
     (viewKind==="procedure"&&Boolean(selection))||
@@ -171,16 +169,15 @@ function setInspectorOpen(open,recenter=true) {
 function setExplorerOpen(open) {
   explorerOpen=Boolean(open);
   $("workbench").dataset.explorer=explorerOpen?"open":"closed";
-  $("explorerPanel").hidden=!explorerOpen;
-  $("explorerRail").hidden=explorerOpen;
+  // Keep the same Explorer and toggle mounted in both states.
+  // Collapsed styling hides only its content; the control remains visible.
   updatePanelControls();
   requestAnimationFrame(()=>{
     if(selection?.kind==="node")centerNode(selection.id);
     else fit();
   });
 }
-$("toggleExplorer").addEventListener("click",()=>setExplorerOpen(false));
-$("reopenExplorer").addEventListener("click",()=>setExplorerOpen(true));
+$("toggleExplorer").addEventListener("click",()=>setExplorerOpen(!explorerOpen));
 $("inspectorVisibility").addEventListener("click",()=>{
   if(inspectorOpen){
     setInspectorOpen(false);

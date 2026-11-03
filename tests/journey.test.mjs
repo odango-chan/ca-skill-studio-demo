@@ -65,7 +65,7 @@ test("light theme and view controls are declared without remote assets",()=>{
   assert.doesNotMatch(html,/id="nodeQuickCard"/);
   assert.match(html,/id="assetTree"/);
   assert.doesNotMatch(html,/id="viewMenu"/);
-  assert.match(html,/id="explorerRail"/);
+  assert.match(html,/id="toggleExplorer"/);
   assert.match(html,/id="nodeOutlineDisclosure"/);
   assert.match(html,/id="showAllLabels"/);
   assert.match(css,/color-scheme:\s*light/);

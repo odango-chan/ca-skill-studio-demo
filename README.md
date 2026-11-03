@@ -28,7 +28,7 @@ https://odango-chan.github.io/ca-skill-studio-demo/
 - **Ensure Route 编辑边界**：保持原来的严格约束，仅允许固定 ensure 结构中的两条失败 Route 修改为已有终态；必须 Preview Source Diff → Apply → 可撤销。CreatedSession Route 使用独立的 Source-backed Preview Patch，候选项限定为该 Procedure 真实 Node，并逐字段检查其他节点、步骤与路由没有变化。
 - **Visual 连线目标拖动编辑（首条真实图形交互）**：单击现有 Route，若其 Source 取得编辑资格，连线上出现 ↗ 手柄；拖动到另一个允许的目标 Node，必须经 YAML Diff Preview → Apply，最终由 Source Patch + Undo/Redo 保存在浏览器工作副本。Ensure 仅两条失败 Route；CreatedSession 仅当前 Procedure 现有节点。拖到空白 / 原目标 / 未授权节点或编辑过程中 Source 变化，拒绝修改。**此操作是现有 Route 的重定向，不是新建连线、自动增删 Node 或调整 YAML 节点布局**。
 - **NODES 纵向空间自适应**：桌面端展开时占用左栏文件区与底部操作之间的剩余空间，Node Outline 独立滚动，不再受 220px 固定上限；窄屏时使用更大的视口相对上限。仍保持按需折叠，避免恢复信息过载。
-- **直接可见的画布操作**：取消「视图」下拉菜单；Visual / Source / Split、布局方向、邻居焦点、标签、定位、适配，以及适用时的属性开关与恢复按钮都在编辑区工具栏。放大和缩小按钮位于流程画布左下侧。左侧导航的折叠按钮置于 Explorer 自己的标题旁，收起后保留细窄的左侧重新展开入口，不需要寻找菜单。
+- **直接可见的画布操作**：取消「视图」下拉菜单；Visual / Source / Split、布局方向、邻居焦点、标签、定位、适配，以及适用时的属性开关与恢复按钮都在编辑区工具栏。放大和缩小按钮位于流程画布左下侧。左侧导航的折叠按钮置于 Explorer 自己的标题旁，收起后 Explorer 自身缩成一条醒目的窄栏，同一个按钮显示「展开导航」，无需依赖另外生成的恢复入口。
 - **真实层级的资产树**：文件夹现在可以展开/折叠，文件以 ▤ 标示，Folder 内缩进与细连接线分层；Procedure 使用 ◆ / ├ / └ 区分 Root 与 Child，NODES 保持已有 Operator 标识。Folder 展开状态保留在浏览器当前会话的工作区内存中，即使编辑 Source 触发重新渲染也不会折叠。原有长文件名单行省略、鼠标悬停路径与未导出修改标记保留。
 - **Procedure 层级修正**：Root / Child 不再额外列在所有文件的末尾，而是作为 `assurance/procedure.yaml` 的真正子层，紧跟该文件显示。文件名负责打开 Source，旁边的 ▸ / ▾ 负责展开或收起子流程；当前没有有效 Procedure 投影时收起子树。编辑、切换文件、返回 Root 后仍保留展开意图，且不重复创建树形导航。
 - Source 修改与此受限 Visual Patch 共用**有上限的内存 Undo / Redo 历史**；每次 Source 输入事件视作独立事务，尚无打字分组或持久历史。
@@ -122,4 +122,8 @@ This is a navigation and layout fix, not a YAML restructuring or a second source
 
 ## 2026-11-03 · Sidebar and graph controls
 
-The Explorer owns its collapse button beside its title. When collapsed, a slim adjacent rail exposes the reopen button. The editor toolbar contains graph layout, neighbor focus, label visibility, centering, fit and editing modes without a secondary View menu. The zoom pair is inside the left edge of the graph canvas. Contract and procedure.yaml stay aligned at the same asset-tree depth using equal-width disclosure gutters; only Root/Child Procedure entries are indented under procedure.yaml. Automated source/UI assertions cover these relationships; browser-driven interaction remains NOT_RUN.
+The Explorer owns its collapse button beside its title. When collapsed, the Explorer itself remains mounted as an accessible 54px strip; the same toggle visibly reads "展开导航". No secondary rail or disappearing aside is involved. The editor toolbar contains graph layout, neighbor focus, label visibility, centering, fit and editing modes without a secondary View menu. The zoom pair is inside the left edge of the graph canvas. Contract and procedure.yaml stay aligned at the same asset-tree depth using equal-width disclosure gutters; only Root/Child Procedure entries are indented under procedure.yaml. Automated source/UI assertions cover these relationships; browser-driven interaction remains NOT_RUN.
+
+### 2026-11-03 · Collapsed Explorer recovery fix
+
+The previous implementation used `explorerPanel.hidden=true` and relied on a separate 27px chevron in a rail. Users could not reliably find the way back. Now the Explorer itself stays in the DOM and visible when compact; its sections are hidden only by CSS, the header and the same collapse/expand button remain visible. The compact state uses a tinted 54px strip with a clearly labeled expand action; on narrow/flex layouts it becomes a horizontal strip. This avoids the hidden-parent problem and creates a consistent location for both actions. Automated tests assert the DOM identity, state transition, and breakpoint-specific visible styles; browser-driven E2E remains NOT_RUN.

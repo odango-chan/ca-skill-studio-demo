@@ -84,7 +84,7 @@ test("product shell includes all referenced static controls",()=>{
   const referenced=[...new Set([...app.matchAll(/\$\("([A-Za-z][A-Za-z0-9-]*)"\)/g)].map(m=>m[1]))];
   assert.deepEqual(referenced.filter(id=>!ids.has(id)),[]);
   for(const id of ["assetTree","procedureTree","nodeOutlineDisclosure","inspectorContext","source",
-    "canvas","patchDialog","downloadButton","fileStatus","resetButton","explorerRail","reopenExplorer",
+    "canvas","patchDialog","downloadButton","fileStatus","resetButton",
     "toggleExplorer","closeInspector","showAllLabels","layoutDirection","neighborsOnly"]){
     assert.ok(ids.has(id),id);
   }

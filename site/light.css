@@ -707,41 +707,25 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 }
 
 
-/* Sidebar control belongs to Explorer. When closed, a slim adjacent rail reopens it. */
+/* Explorer always retains its one toggle, even when collapsed. */
 .explorer-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  flex:0 0 auto;
-  min-height:39px;
-  padding:7px 12px 6px 17px;
-  border-bottom:1px solid #e6edf2;
-  color:#5a7288;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  flex:0 0 auto;min-height:39px;padding:7px 12px 6px 17px;
+  border-bottom:1px solid #e6edf2;color:#5a7288
 }
 .explorer-header-label{font-size:11px;font-weight:650;letter-spacing:.02em}
-.explorer-toggle,
-.explorer-rail button{
+.explorer-toggle{
   display:inline-flex;align-items:center;justify-content:center;
-  width:27px;height:27px;border-radius:6px;
-  background:transparent;border:1px solid transparent;
-  font:23px/1 system-ui,sans-serif;color:#688497;
-  cursor:pointer;
+  flex:0 0 auto;width:29px;height:29px;padding:0;
+  border-radius:6px;background:transparent;border:1px solid transparent;
+  color:#527989;cursor:pointer
 }
-.explorer-toggle:hover,.explorer-rail button:hover{
+.explorer-toggle-icon{font:26px/1 system-ui,sans-serif}
+.explorer-toggle-caption{display:none}
+.explorer-toggle:hover{
   background:#eaf5f5;border-color:#d0e8e5;color:#0c8173
 }
-.explorer-toggle:focus-visible,.explorer-rail button:focus-visible{
-  outline:2px solid #148b7c;outline-offset:2px
-}
-.explorer-rail{
-  min-width:0;display:flex;align-items:flex-start;justify-content:center;
-  background:#f8fafc;border-right:1px solid #e1eaf1;padding-top:8px;
-}
-.workbench[data-explorer="closed"]{grid-template-columns:38px minmax(0,1fr) 370px}
-.workbench[data-explorer="closed"][data-inspector="closed"]{
-  grid-template-columns:38px minmax(0,1fr)
-}
+.explorer-toggle:focus-visible{outline:2px solid #148b7c;outline-offset:2px}
 
 /* All actual graph options live directly in the authoring toolbar, not a menu. */
 .compact-toolbar .toolbar-graph-controls{
@@ -787,16 +771,8 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   .workbench[data-inspector="closed"][data-explorer="closed"]{
     grid-template-columns:38px minmax(0,1fr)
   }
-  .workbench[data-inspector="open"][data-explorer="closed"] .explorer-rail{
-    flex:none;height:38px;min-height:38px;padding:4px 8px;
-    justify-content:flex-start;align-self:stretch;border-bottom:1px solid #e1eaf1
-  }
 }
 @media(max-width:680px){
-  .workbench[data-explorer="closed"] .explorer-rail{
-    width:100%;height:36px;min-height:36px;padding:3px 9px;
-    justify-content:flex-start;border-right:0;border-bottom:1px solid #e1eaf1
-  }
 }
 
 /* Zoom is a left-edge canvas control, independent of editor toolbar width. */
@@ -838,4 +814,132 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .asset-tree .asset-procedure-row{width:100%;min-width:0}
 .asset-tree .asset-procedure-entry .procedure-tree{
   margin-left:23px;max-width:calc(100% - 23px);
+}
+
+
+/* Collapsed Explorer stays present: the exact same button is the recovery control.
+   Do not hide the whole aside or depend on a separately mounted rail. */
+.workbench[data-explorer="closed"]{
+  grid-template-columns:54px minmax(0,1fr) 370px;
+}
+.workbench[data-explorer="closed"][data-inspector="closed"]{
+  grid-template-columns:54px minmax(0,1fr);
+}
+.workbench[data-explorer="closed"] .explorer{
+  display:flex!important;
+  min-width:0;
+  overflow:hidden;
+  background:#eff9f5;
+  border-right:1px solid #c8e5da;
+}
+.workbench[data-explorer="closed"] .explorer>:not(.explorer-header){
+  display:none!important;
+}
+.workbench[data-explorer="closed"] .explorer-header{
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  align-items:center;
+  padding:9px 3px;
+  min-height:145px;
+  gap:0;
+  border-bottom:0;
+}
+.workbench[data-explorer="closed"] .explorer-header-label{
+  display:none;
+}
+.workbench[data-explorer="closed"] .explorer-toggle{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  width:45px;
+  min-height:120px;
+  height:auto;
+  padding:11px 3px;
+  color:#0a7167;
+  background:#e0f3eb;
+  border:1px solid #b5ded1;
+  border-radius:9px;
+  box-shadow:0 1px 4px #244b4016;
+}
+.workbench[data-explorer="closed"] .explorer-toggle:hover{
+  background:#c9ecdf;
+  border-color:#77c6ac;
+}
+.workbench[data-explorer="closed"] .explorer-toggle-icon{
+  font-size:24px;
+}
+.workbench[data-explorer="closed"] .explorer-toggle-caption{
+  display:block;
+  writing-mode:vertical-rl;
+  font:600 11px/1.3 system-ui,sans-serif;
+  letter-spacing:2px;
+}
+@media(max-width:1180px){
+  .workbench[data-explorer="closed"]{
+    grid-template-columns:54px minmax(0,1fr) 315px;
+  }
+  .workbench[data-explorer="closed"][data-inspector="closed"]{
+    grid-template-columns:54px minmax(0,1fr);
+  }
+}
+@media(min-width:681px) and (max-width:980px){
+  .workbench[data-inspector="closed"][data-explorer="closed"]{
+    grid-template-columns:54px minmax(0,1fr);
+  }
+}
+@media(max-width:980px){
+  .workbench[data-inspector="open"][data-explorer="closed"] .explorer{
+    align-self:stretch;
+    flex:0 0 46px;
+    min-height:46px;
+    max-height:46px;
+  }
+  .workbench[data-inspector="open"][data-explorer="closed"] .explorer-header{
+    flex-direction:row;
+    justify-content:flex-start;
+    min-height:44px;
+    padding:4px 9px;
+    width:100%;
+  }
+  .workbench[data-inspector="open"][data-explorer="closed"] .explorer-toggle{
+    flex-direction:row;
+    min-height:34px;
+    width:auto;
+    height:34px;
+    padding:4px 12px;
+  }
+  .workbench[data-inspector="open"][data-explorer="closed"] .explorer-toggle-caption{
+    writing-mode:horizontal-tb;letter-spacing:0;
+  }
+}
+@media(max-width:680px){
+  .workbench[data-explorer="closed"] .explorer{
+    flex:0 0 46px;
+    width:100%;
+    max-width:100%;
+    min-height:46px;
+    max-height:46px;
+  }
+  .workbench[data-explorer="closed"] .explorer-header{
+    flex-direction:row;
+    justify-content:flex-start;
+    min-height:44px;
+    width:100%;
+    padding:4px 9px;
+  }
+  .workbench[data-explorer="closed"] .explorer-toggle{
+    flex-direction:row;
+    justify-content:center;
+    width:auto;
+    height:34px;
+    min-height:34px;
+    padding:4px 12px;
+  }
+  .workbench[data-explorer="closed"] .explorer-toggle-caption{
+    writing-mode:horizontal-tb;
+    letter-spacing:0;
+  }
 }

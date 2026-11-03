@@ -5,27 +5,37 @@ import {readFileSync} from "node:fs";
 const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
 const html=read("site/index.html"),app=read("site/app.mjs"),css=read("site/light.css");
 
-test("sidebar toggle lives in its own Explorer header, with a separate reopen rail",()=>{
+test("a single Explorer-owned toggle remains mounted in both states",()=>{
   const explorer=html.slice(html.indexOf('<aside class="explorer"'),html.indexOf('</aside>'));
-  const rail=html.slice(html.indexOf('id="explorerRail"'),html.indexOf('class="editor"'));
   const toolbar=html.slice(html.indexOf('class="editorbar compact-toolbar"'),html.indexOf('id="editorBody"'));
   assert.match(explorer,/class="explorer-header"/);
   assert.match(explorer,/id="toggleExplorer"/);
-  assert.match(rail,/id="reopenExplorer"/);
-  assert.match(rail,/aria-controls="explorerPanel"/);
-  assert.doesNotMatch(toolbar,/id="toggleExplorer"|id="reopenExplorer"/);
-  for(const id of ["toggleExplorer","explorerRail","reopenExplorer"])
-    assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1);
+  assert.match(explorer,/class="explorer-toggle-caption"[^>]*>展开导航/);
+  assert.match(explorer,/aria-controls="explorerPanel"/);
+  assert.doesNotMatch(toolbar,/id="toggleExplorer"/);
+  assert.doesNotMatch(html,/id="explorerRail"|id="reopenExplorer"/);
+  assert.equal((html.match(/id="toggleExplorer"/g)||[]).length,1);
 });
-test("sidebar can be reopened after closing, without relying on an editor menu",()=>{
-  assert.match(app,/function updatePanelControls\(\)/);
-  assert.match(app,/explorerRail"\)\.hidden=explorerOpen/);
-  assert.match(app,/explorerPanel"\)\.hidden=!explorerOpen/);
-  assert.match(app,/reopenExplorer"\)\.addEventListener\("click",\(\)=>setExplorerOpen\(true\)\)/);
-  assert.match(app,/toggleExplorer"\)\.addEventListener\("click",\(\)=>setExplorerOpen\(false\)\)/);
-  assert.match(app,/aria-expanded",String\(explorerOpen\)/);
-  assert.match(css,/\.workbench\[data-explorer="closed"\]\{grid-template-columns:38px minmax\(0,1fr\)/);
-  assert.match(css,/\.explorer-rail\{/);
+test("closing Explorer never sets hidden on the whole aside; the same button reopens it",()=>{
+  const start=app.indexOf("function setExplorerOpen(open)");
+  const end=app.indexOf('$("inspectorVisibility").addEventListener',start);
+  const handler=app.slice(start,end);
+  assert.ok(start>=0 && end>start);
+  assert.match(handler,/dataset\.explorer=explorerOpen\?"open":"closed"/);
+  assert.match(handler,/toggleExplorer"\)\.addEventListener\("click",\(\)=>setExplorerOpen\(!explorerOpen\)\)/);
+  assert.doesNotMatch(handler,/explorerPanel"\)\.hidden|explorerRail|reopenExplorer/);
+  assert.match(app,/const label=explorerOpen\?"收起左侧导航":"展开左侧导航"/);
+  assert.match(app,/nav\.setAttribute\("aria-expanded",String\(explorerOpen\)\)/);
+  assert.match(app,/nav\.querySelector\("\.explorer-toggle-icon"\)\.textContent=explorerOpen\?"‹":"☰"/);
+});
+test("the collapsed sidebar and recovery button remain visible across responsive layouts",()=>{
+  assert.match(css,/\.workbench\[data-explorer="closed"\] \.explorer\{[^}]*display:flex!important/s);
+  assert.match(css,/\.workbench\[data-explorer="closed"\] \.explorer>:not\(\.explorer-header\)\{[^}]*display:none!important/s);
+  assert.match(css,/\.workbench\[data-explorer="closed"\] \.explorer-toggle\{[^}]*min-height:120px/s);
+  assert.match(css,/\.workbench\[data-explorer="closed"\] \.explorer-toggle-caption\{[^}]*writing-mode:vertical-rl/s);
+  assert.match(css,/@media\(max-width:980px\)\{[^]*?\.workbench\[data-inspector="open"\]\[data-explorer="closed"\] \.explorer/s);
+  assert.match(css,/@media\(max-width:680px\)\{[^]*?\.workbench\[data-explorer="closed"\] \.explorer-toggle/s);
+  assert.doesNotMatch(css,/\.explorer-rail/);
 });
 test("graph display controls are not hidden in a View menu",()=>{
   const toolbar=html.slice(html.indexOf('class="editorbar compact-toolbar"'),html.indexOf('id="editorBody"'));

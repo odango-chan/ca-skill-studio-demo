@@ -29,7 +29,7 @@
     <aside class="explorer" id="explorerPanel" aria-label="SKILL Explorer">
       <div class="explorer-header">
         <span class="explorer-header-label">资源</span>
-        <button id="toggleExplorer" class="explorer-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" aria-label="收起左侧导航" title="收起左侧导航">◧</button>
+        <button id="toggleExplorer" class="explorer-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" aria-label="收起左侧导航" title="收起左侧导航"><span class="explorer-toggle-icon" aria-hidden="true">‹</span><span class="explorer-toggle-caption" aria-hidden="true">展开导航</span></button>
       </div>
       <section class="explorer-section asset-section" aria-label="当前文件和流程">
         <div class="explorer-compact-heading">文件 <span id="fileCount" class="scope-tag" title="工作区实际加载的文件数量">单文件</span></div>
@@ -56,10 +56,6 @@
         <input id="filePicker" type="file" hidden accept=".yaml,.yml,.md,.json,.txt,.py,.js,.ts,.sh,text/plain">
       </div>
     </aside>
-    <div id="explorerRail" class="explorer-rail" hidden>
-      <button id="reopenExplorer" type="button" aria-controls="explorerPanel" aria-expanded="false"
-        aria-label="展开左侧导航" title="展开左侧导航">›</button>
-    </div>
 
     <section class="editor" aria-label="Procedure authoring editor">
       <div class="editorbar compact-toolbar">

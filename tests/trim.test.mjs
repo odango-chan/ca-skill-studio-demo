@@ -20,8 +20,8 @@ test("editor uses progressive disclosure without duplicating object panels",()=>
   assert.match(html,/id="nodeOutlineDisclosure"/);
   assert.match(html,/class="sample-picker"/);
   assert.doesNotMatch(html,/id="viewMenu"/);
-  assert.match(html,/id="explorerRail"/);
-  assert.match(html,/id="reopenExplorer"/);
+  assert.match(html,/id="toggleExplorer"/);
+  assert.doesNotMatch(html,/id="explorerRail"|id="reopenExplorer"/);
   assert.match(html,/id="inspectorPanel"/);
   assert.doesNotMatch(html,/id="nodeQuickCard"|id="toggleInspector"/);
   assert.doesNotMatch(html,/class="inspector-footer"|class="inspector-sequence"/);
