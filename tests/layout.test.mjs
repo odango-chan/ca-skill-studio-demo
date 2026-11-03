@@ -125,5 +125,5 @@ test("vertical is the default across initial UI and ELK, with horizontal still s
   assert.match(html,/<option value="RIGHT">水平<\/option>/);
   assert.match(html,/<option value="DOWN" selected>垂直<\/option>/);
   assert.match(layout,/direction = "DOWN", focus = null/);
-  assert.match(app,/const vertical=graph.direction==="DOWN";/);
+  assert.match(app,/mountProcedureCanvas\(\$\("reactFlowRoot"\)/);
 });

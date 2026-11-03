@@ -29,12 +29,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
-      # One-time D1 bootstrap: resolve new React/React Flow dependencies and
-      # print an exact lock for pinning. Remove this step once lock is committed.
-      - name: Bootstrap pinned D1 dependency lock
-        run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          node -e 'const fs=require("fs");console.log("D1_LOCK_BEGIN");console.log(fs.readFileSync("package-lock.json").toString("base64"));console.log("D1_LOCK_END")'
       - name: Install exact toolchain dependencies
         run: npm ci --no-audit --no-fund
       - name: Run YAML AST / CST regression tests
