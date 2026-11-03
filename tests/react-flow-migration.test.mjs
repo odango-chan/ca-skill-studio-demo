@@ -172,3 +172,23 @@ test("D3-A3 source-only creation affordance is explicit, selected and never term
   assert.match(canvas,/title="连接到这个 Node"/);
   assert.ok(enabled.edges.every(e=>!e.id.startsWith("new-route-")));
 });
+
+
+test("Procedure toolbar keeps full, horizontal and vertical fit controls separate from zoom",()=>{
+  const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
+  const canvas=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
+  const icons=readFileSync(new URL("../site/icons.mjs",import.meta.url),"utf8");
+  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
+  for(const id of ["fit","fitWidth","fitHeight","zoomIn","zoomOut"])
+    assert.ok(html.includes('id="'+id+'"'),id);
+  assert.match(canvas,/axisFitViewport/);
+  assert.match(canvas,/fitAxis\(axis\)/);
+  assert.match(canvas,/instance\?\.setViewport\(viewport,\{duration:150\}\)/);
+  assert.match(app,/\$\("fitWidth"\)\.addEventListener\("click"/);
+  assert.match(app,/\$\("fitHeight"\)\.addEventListener\("click"/);
+  assert.match(app,/let fitMode = "all"/);
+  assert.match(css,/\.compact-toolbar \.toolbar-axis-fit/);
+  assert.match(icons,/"fit-width":\[/);
+  assert.match(icons,/"fit-height":\[/);
+});

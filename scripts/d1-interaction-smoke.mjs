@@ -528,6 +528,88 @@ export async function runD1Interactions(evaluate,command){
     "  hidden,reopened,zoomed,horizontal,original,afterZoom:transform()};"
   ]);
 
+  await check(evaluate,"FIT_AXIS_LAYOUTS",[
+    sleepLine,clickLine,
+    " const source=document.getElementById('source'),before=source.value;",
+    " const pane=document.querySelector('.react-flow');",
+    " const viewport=document.querySelector('.react-flow__viewport');",
+    " const clamp=n=>Math.max(0.05,Math.min(2.5,n));",
+    " const measure=()=>{",
+    "  const nodes=[...document.querySelectorAll('.react-flow__node')];",
+    "  const rects=nodes.map(n=>n.getBoundingClientRect());",
+    "  const paneRect=pane.getBoundingClientRect();",
+    "  const zoom=new DOMMatrix(getComputedStyle(viewport).transform).a;",
+    "  const left=Math.min(...rects.map(r=>r.left));",
+    "  const right=Math.max(...rects.map(r=>r.right));",
+    "  const top=Math.min(...rects.map(r=>r.top));",
+    "  const bottom=Math.max(...rects.map(r=>r.bottom));",
+    "  return {zoom,nodeCount:nodes.length,paneWidth:paneRect.width,",
+    "    paneHeight:paneRect.height,worldWidth:(right-left)/zoom,",
+    "    worldHeight:(bottom-top)/zoom,",
+    "    centerX:(left+right)/2,centerY:(top+bottom)/2,",
+    "    expectedCenterX:paneRect.x+paneRect.width/2,",
+    "    expectedCenterY:paneRect.y+paneRect.height/2};",
+    " };",
+    " const outcomes=[];",
+    " const layout=document.getElementById('layoutDirection');",
+    " for(const direction of ['DOWN','RIGHT']){",
+    "  layout.value=direction;",
+    "  layout.dispatchEvent(new Event('change',{bubbles:true}));",
+    "  await sleep(1100);",
+    "  const base=measure();",
+    "  click(document.getElementById('fitWidth'));await sleep(400);",
+    "  const width=measure();",
+    "  click(document.getElementById('fitHeight'));await sleep(400);",
+    "  const height=measure();",
+    "  const expectedWidth=clamp((base.paneWidth-48)/base.worldWidth);",
+    "  const expectedHeight=clamp((base.paneHeight-48)/base.worldHeight);",
+    "  const centerOk=fit=>Math.abs(fit.centerX-fit.expectedCenterX)<8&&",
+    "    Math.abs(fit.centerY-fit.expectedCenterY)<8;",
+    "  const ok=base.nodeCount===17&&",
+    "    Math.abs(width.zoom-expectedWidth)<0.035&&",
+    "    Math.abs(height.zoom-expectedHeight)<0.035&&",
+    "    centerOk(width)&&centerOk(height);",
+    "  outcomes.push({direction,ok,widthZoom:width.zoom,heightZoom:height.zoom,",
+    "   expectedWidth,expectedHeight,centerWidth:centerOk(width),",
+    "   centerHeight:centerOk(height)});",
+    " }",
+    " click(document.getElementById('fit'));await sleep(450);",
+    " const all=measure();",
+    " click(document.getElementById('fitWidth'));await sleep(380);",
+    " const widthAgain=measure();",
+    " const buttons=['fit','fitWidth','fitHeight'].every(id=>",
+    "  !!document.getElementById(id)&&!document.getElementById(id).hidden);",
+    " const labels=document.getElementById('fitWidth')?.getAttribute('aria-label')?.includes('横向')&&",
+    "  document.getElementById('fitHeight')?.getAttribute('aria-label')?.includes('纵向');",
+    " const unchanged=source.value===before;",
+    " return {ok:outcomes.every(v=>v.ok)&&buttons&&labels&&unchanged&&",
+    "  all.zoom<=widthAgain.zoom+0.03,outcomes,buttons,labels,unchanged,",
+    "  allZoom:all.zoom,widthZoom:widthAgain.zoom};"
+  ]);
+  // A chosen axis remains the preferred fit during browser resizing.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1180,height:820,deviceScaleFactor:1,mobile:false
+  });
+  await new Promise(resolve=>setTimeout(resolve,700));
+  await check(evaluate,"FIT_AXIS_RESIZE",[
+    sleepLine,clickLine,
+    " const pane=document.querySelector('.react-flow'),",
+    "  viewport=document.querySelector('.react-flow__viewport');",
+    " const nodes=[...document.querySelectorAll('.react-flow__node')];",
+    " const rects=nodes.map(n=>n.getBoundingClientRect());",
+    " const z=new DOMMatrix(getComputedStyle(viewport).transform).a;",
+    " const r=pane.getBoundingClientRect();",
+    " const natural=(Math.max(...rects.map(x=>x.right))-",
+    "   Math.min(...rects.map(x=>x.left)))/z;",
+    " const expected=Math.min(2.5,Math.max(.05,(r.width-48)/natural));",
+    " const responsive=nodes.length===17&&Math.abs(z-expected)<.035;",
+    " click(document.getElementById('fit'));await sleep(320);",
+    " return {ok:responsive,responsive,zoom:z,expected,width:r.width};"
+  ]);
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1440,height:900,deviceScaleFactor:1,mobile:false
+  });
+
   await command("Emulation.setDeviceMetricsOverride",{
     width:390,height:844,deviceScaleFactor:1,mobile:true
   });
