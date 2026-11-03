@@ -115,9 +115,10 @@ export async function runD1Interactions(evaluate,command){
   const hit=async(point)=>evaluate("(()=>{const el=document.elementFromPoint("+
     point.x+","+point.y+");return {tag:el?.tagName,cls:el?.getAttribute('class'),"+
     "pointer:el&&getComputedStyle(el).pointerEvents,html:el?.outerHTML.slice(0,230)}})()");
-  console.log("D1_DRAG_POINTER_HITS",JSON.stringify({
-    start:await hit(gesture.start),end:await hit(gesture.end)
-  }));
+  const startHit=await hit(gesture.start),endHit=await hit(gesture.end);
+  if(!startHit?.cls?.includes("react-flow__edgeupdater-target")||
+     !endHit?.cls?.includes("react-flow__handle"))
+    throw Error("Drag endpoints must receive actual browser pointer events");
 
   await command("Input.dispatchMouseEvent",{
     type:"mouseMoved",x:gesture.start.x,y:gesture.start.y,button:"none"
@@ -136,8 +137,10 @@ export async function runD1Interactions(evaluate,command){
     });
     await new Promise(resolve=>setTimeout(resolve,25));
   }
-  const updating=await evaluate("document.querySelector('.react-flow__edge.selected')?.getAttribute('class')");
-  console.log("D1_DRAG_UPDATING",JSON.stringify({updating,hover:await hit(gesture.end)}));
+  const hover=await hit(gesture.end);
+  if(!hover?.cls?.split(/\s+/).includes("valid")||
+     !hover?.cls?.split(/\s+/).includes("connectingto"))
+    throw Error("React Flow did not recognize a valid reconnect target");
   await command("Input.dispatchMouseEvent",{
     type:"mouseReleased",x:gesture.end.x,y:gesture.end.y,
     button:"left",buttons:0,clickCount:1

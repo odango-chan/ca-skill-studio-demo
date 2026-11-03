@@ -70,3 +70,23 @@ D2 = Node Designer，D3 = Route Designer，D4 = Phase Designer，D5 = 多 Proced
 箭头采用 React Flow **内置的空心 Arrow**，尺寸由 13×13 稍增至 **16×16**，仍比此前 24×24 的 ArrowClosed 克制。ELK 正交路径和多 Handle 对齐不变；箭头与连线始终同色。没有修改任何 Runtime YAML。
 
 **验收界限**：上述项目是 Chromium 浏览器级回归。完整的实际人工交互审查（长链路重连拖动、视觉密度、屏幕阅读器体验）仍需要单独验收；单元测试或纯数据投影不能代替浏览器检查。D2/D3 的新增 Node/Route 也不纳入 D1。
+
+## D1 浏览器级最终验收报告（2026-11-03）
+
+**验收基线：CreatedSession / `assurance/procedure.yaml`，React Flow 12 + ELK layered，默认 DOWN。**
+
+| 验收场景 | Chromium 结果 | 证据 |
+| --- | --- | --- |
+| 数据/显示完整性 | PASS | 17 Node、48 Route bundle、65 Outcome，48 SVG path 均有非零长度 |
+| 端点/箭头 | PASS | 96 个 ELK 端点均映射到 React Flow Handle，16×16 内置 Arrow、非缩放线宽 |
+| Node 选中 | PASS | 实际点击 Node，Inspector Journey 及画布选中高亮一致 |
+| Route 编辑预览 | PASS | 实际点击边，在 Inspector 修改允许的 Target；Diff 预览不改 Source；取消不改；确认应用后可 Undo、Redo，再 Undo 恢复 |
+| **画布端点拖拽重连** | **PASS** | Chrome 使用 `Input.dispatchMouseEvent` 从 `.react-flow__edgeupdater-target` 拖到另一个节点实际 Target Handle；React Flow 确认目标有效，弹出真实 YAML Diff，取消后 Source 不变且 48 条连线仍完整 |
+| Source / Visual / Split | PASS | 切换及 Source 注释编辑；重新投影后 17 Node；Undo / Redo；无效 YAML 不显示旧图，Undo 恢复 |
+| 子 Procedure | PASS | 从 Root 进入 4 Node Child，导航返回 Root 后恢复 17 Node / 48 Edge |
+| 画布及导航 | PASS | 缩放、DOWN/RIGHT 切换、Explorer 隐藏/恢复、390px 窄屏恢复按钮 |
+| 类型、单测、构建、Pages | PASS | 详见当次 GitHub Actions 的 CI 和 Headless Chromium 日志 |
+
+修复了一个真实 D1 回归：此前为提高线条可见性，错误地把 `.react-flow__edges` 整个连线层设置为 `pointer-events:none`，使得 React Flow 端点 `onReconnect` 事件无法收到鼠标输入。现已移除这个过宽限制，保留非缩放线宽、ELK 正交路径、多 Handle 和箭头渲染。**验收既覆盖通过 Inspector 编辑，也覆盖图上的实际拖拽手势**。
+
+D1 的 UI 迁移与上述浏览器交互验收可以标记 PASS；后续人工视觉审查、屏幕阅读器体验及更大图规模压测未纳入本次自动门禁。D2（节点增删改）及 D3（新建 Route）仍是独立后续工作，不能把其缺失视为 D1 已支持。

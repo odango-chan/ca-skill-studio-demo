@@ -162,3 +162,7 @@ React Flow 的自定义 Node 存在普通 1px、选中 2px，以及起始节点�
 ### D1 浏览器交互回归门禁
 
 已扩展 Chromium 自动化，从原先只验证可见连线和文件图标，进一步覆盖 CreatedSession Node→Inspector、Route→Diff 预览/取消/应用、Undo/Redo、Source/Split 同步、非法 YAML 的 fail-closed 与恢复、Child Procedure 返回、导航折叠、缩放和布局切换。这些是对真实浏览器页面的交互验收，而非单纯静态断言。空心箭头由 13×13 调至 16×16，保持 ELK 连线和 React Flow Handle 原有一致性。相关验收边界见 [D1 文档](docs/D1-procedure-designer.md)。
+
+### D1 最终交互补测：实际 Route 拖动可用
+
+原 CSS 在 `.react-flow__edges` 上设置 `pointer-events:none`，会让原生 React Flow 连线端点拖动不能工作。现在保留 ELK 连线但允许 Edge Updater 正常接收鼠标事件；Headless Chromium 真实 `Input.dispatchMouseEvent` 验证从边端拖到另一个节点的合法 Handle，显示实际 YAML Diff，取消时 Source 不变。另覆盖 Inspector 编辑、Source/Split、Undo/Redo、Child Procedure、布局和窄屏导航等。箭头保持 React Flow 内置细线 `16×16`，不引入新编辑器语法。详见 [D1 验收记录](docs/D1-procedure-designer.md)。
