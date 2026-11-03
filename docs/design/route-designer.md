@@ -1,7 +1,8 @@
 # D3 Route Designer · bounded source-backed authoring
 
-**Status: Proposed · Date: 2026-11-03**  
-**Implementation: NOT_STARTED · Acceptance: NOT_RUN**  
+**Status: Proposed overall · Date: 2026-11-03**  
+**Implementation: A1 IMPLEMENTED on main; A2 PR #11 candidate; A3 NOT_STARTED**  
+**Acceptance: A1 PASS (editor tier); A2 PR CI PASS (editor tier); A3 NOT_RUN**  
 **Tracking: [Issue #7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)**
 
 本页是新阶段**候选设计**，不能当成已经允许全部 Route 修改或 Runtime 验收通过。
@@ -51,12 +52,20 @@ Duplicate Outcome；operator 和 Phase 的相同 Outcome 被错配；最后一�
 - Phase `on` 的具体规则与局部 `steps`/postcondition verdict 的映射需单独确认，不能默认为 Operator 的同类 Outcome。
 - 删除可能影响引用或下游消费；无法证明影响范围的语义必须 Source-only / Editor Warning，不能用 UI 猜测 Runtime 结果。
 
-先在 Issue #7 完成最小 A1 契约评审，再写代码和聚焦测试，最后执行真实浏览器门禁。没有验收前保持 NOT_STARTED/NOT_RUN。
+D3-A1 的保守 Operator 子集已落地并通过浏览器测试；D3-A2 仅属于候选 PR #11。D3-A3 和 Runtime Outcome 合法性验证尚未实现，也没有 Live PASS。
 
-## D3-A1 implementation candidate (PR #10)
+## D3-A1 implemented on main (PR #10)
 
-**Branch candidate only:** `site/route-create.mjs` and `tests/route-create.test.mjs`. This does **not** change the `main` status of D3 (Proposed / NOT_STARTED / NOT_RUN).
+**Merged:** [PR #10](https://github.com/odango-chan/ca-skill-studio-demo/pull/10), `main@ac64a048968faa53f438d79e31f3499eec555bbb`. Focused tests and Chromium actual authoring [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41615104253). This covers A1 only, not full D3.
 
 The first slice is limited to **existing explicit quoted `'on'` maps** on nonterminal Node Operators. It adds exactly one `outcome: existingTarget` line with original line endings, no creation of new `on` maps and no Phase modification. Candidate Outcome labels come only from Outcome names already observed for the same exact Operator value in the current Source (or the same `verify`/`predicate` operator kind). They are editor hints, not Runtime owner permission or a guarantee of real execution. If nothing is qualified, the Inspector remains Source-only for this capability.
 
-Preview integrity is recomputed on Apply; source revision, structural snapshot, Route ID/origin and non-target bytes are checked. Chromium acceptance will exercise selection → preview → cancel → apply → Undo/Redo on a fixture with one pre-existing Outcome intentionally removed. D3-A2/D3-A3 remain deferred.
+Preview integrity is recomputed on Apply; source revision, structural snapshot, Route ID/origin and non-target bytes are checked. Chromium acceptance exercised selection → preview → cancel → apply → Undo/Redo on an actual fixture with one pre-existing Outcome removed.
+
+## D3-A2 candidate implementation (PR #11)
+
+**Review status: Proposed, implemented on the branch only.** [PR #11](https://github.com/odango-chan/ca-skill-studio-demo/pull/11) implements Route-Inspector editing of **one original `operator.on` Outcome**. A source-backed rename is only allowed to an *unused* Outcome already observed for a comparable Operator in the current Source; the target is unchanged. Deletion requires a nonterminal Node with more than one Route, no adjacent or inline comment potentially lost with the line, no detected references to that Route ID, and **no newly unreachable Node** when the single Route is removed. Common core verdicts such as `PASS`, `FAIL`, `UNKNOWN`, `COMMITTED`, `OUTCOME_UNKNOWN`, `DENIED` and `FAILED` are protected from Visual deletion.
+
+Both use exact original YAML span and immutable revision-bound Preview → Source Diff → Confirm → Reparse → Undo/Redo. Quoted keys/values, anchors, aliases, duplicate Outcomes, Phase origin, target drift, ambiguous comments, stale or modified preview fail closed. Browser acceptance covers real Rename and guarded Delete flows; real CreatedSession Child-Procedure qualification is also unit-tested. [CI #41622728664](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41622728664): 208/208 and Chromium PASS on the candidate head.
+
+**Important limitation:** The structural and reachability gates are not proof that a Runtime Operator accepts the renamed Outcome or that a removed branch was genuinely optional. Other runtime-required outcomes may exist beyond the protected list. This UI only provides a conservative edit, with explicit impact warning and human Diff confirmation. For complete contracts, defer to the actual Demo/Runtime owner validator; **Runtime acceptance = NOT_RUN**. D3-A3 and Phase edits remain unimplemented.
