@@ -174,7 +174,15 @@ try{
 
 }finally{
   if(ws)ws.close();
-  child.kill("SIGKILL");
-  await rm(temp,{recursive:true,force:true});
+  // Chromium may still be writing its profile after SIGKILL is sent.
+  // Wait for process exit before removing the temporary profile; otherwise
+  // Node 24 can fail with ENOTEMPTY while the browser tests already passed.
+  const exited=new Promise(resolve=>{
+    if(child.exitCode!==null||child.signalCode!==null){resolve();return;}
+    child.once("exit",resolve);
+  });
+  if(child.exitCode===null&&child.signalCode===null)child.kill("SIGKILL");
+  await Promise.race([exited,sleep(1500)]);
+  await rm(temp,{recursive:true,force:true,maxRetries:8,retryDelay:120});
   await new Promise(r=>server.close(r));
 }
