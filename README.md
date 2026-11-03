@@ -30,6 +30,7 @@ https://odango-chan.github.io/ca-skill-studio-demo/
 - **NODES 纵向空间自适应**：桌面端展开时占用左栏文件区与底部操作之间的剩余空间，Node Outline 独立滚动，不再受 220px 固定上限；窄屏时使用更大的视口相对上限。仍保持按需折叠，避免恢复信息过载。
 - **工具栏与视图菜单整理**：主要栏保留 Visual / Source / Split（按文件能力显隐）；原独立的左侧导航开关及「适配画布」收进统一视图菜单，增加在适用时显示的右侧属性开关。图形方向、聚焦、标签、缩放与恢复初始文件仍在该菜单。关闭菜单后键盘焦点返回菜单标题。
 - **真实层级的资产树**：文件夹现在可以展开/折叠，文件以 ▤ 标示，Folder 内缩进与细连接线分层；Procedure 使用 ◆ / ├ / └ 区分 Root 与 Child，NODES 保持已有 Operator 标识。Folder 展开状态保留在浏览器当前会话的工作区内存中，即使编辑 Source 触发重新渲染也不会折叠。原有长文件名单行省略、鼠标悬停路径与未导出修改标记保留。
+- **Procedure 层级修正**：Root / Child 不再额外列在所有文件的末尾，而是作为 `assurance/procedure.yaml` 的真正子层，紧跟该文件显示。文件名负责打开 Source，旁边的 ▸ / ▾ 负责展开或收起子流程；当前没有有效 Procedure 投影时收起子树。编辑、切换文件、返回 Root 后仍保留展开意图，且不重复创建树形导航。
 - Source 修改与此受限 Visual Patch 共用**有上限的内存 Undo / Redo 历史**；每次 Source 输入事件视作独立事务，尚无打字分组或持久历史。
 - 对未知或不支持的 Procedure 结构**拒绝重新投影**，自动切回 Source 并清除旧图，保留诊断与错误定位。不会把过期图伪装成新 YAML 的正确语义。
 - 不上传用户文件、不调用 Capability、不执行 Skill 或 Script，不进行发布。
@@ -112,3 +113,9 @@ Visual 仅表示有可用的可视化表达，不暗示完整的图形编辑资�
 - Procedure hierarchy is navigation within procedure.yaml, not a separate file or a second authoritative representation.
 - When there is no qualified Inspector context, the View menu hides the Inspector entry rather than presenting a dead button.
 - Browser interaction, screen reader and responsive visual E2E remain NOT_RUN.
+
+## Procedure navigation nesting (2026-11-03)
+
+Previously the `procedureTree` was a sibling of the entire `assetTree`, so even though its items referred to `assurance/procedure.yaml`, they appeared after all assets. It now has one stable DOM identity, mounted inside that source file's row with a separate disclosure control. The nav is only shown for the currently selected Procedure document with a READY projection. When unavailable it remains hidden, not incorrectly relocated to the explorer footer.
+
+This is a navigation and layout fix, not a YAML restructuring or a second source of truth. The file and its children are not separately exported. Static DOM integrity and layout tests cover the relationship; interactive browser visual checks remain NOT_RUN.

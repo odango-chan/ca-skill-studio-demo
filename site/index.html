@@ -29,8 +29,9 @@
     <aside class="explorer" id="explorerPanel" aria-label="SKILL Explorer">
       <section class="explorer-section asset-section" aria-label="当前文件和流程">
         <div class="explorer-compact-heading">文件 <span id="fileCount" class="scope-tag" title="工作区实际加载的文件数量">单文件</span></div>
-        <div id="assetTree" class="asset-tree"></div>
-        <nav id="procedureTree" class="procedure-tree" aria-label="当前文件的 Procedure"></nav>
+        <div id="assetTree" class="asset-tree">
+          <nav id="procedureTree" class="procedure-tree" aria-label="procedure.yaml 中的 Procedure"></nav>
+        </div>
         <span id="procedureCount" class="sr-only"></span>
         <select id="procedurePicker" class="sr-only" aria-label="切换 Procedure"></select>
       </section>

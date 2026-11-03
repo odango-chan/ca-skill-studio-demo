@@ -647,3 +647,61 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .asset-section .procedure-tree .tree-title{display:block;max-width:100%;
   white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
 .explorer-nodes[open] .outline{margin-left:6px;border-left:1px solid #e4ebf2;padding-left:5px}
+
+
+/* Procedure navigation is a child of its source file, never a footer of the asset list. */
+.asset-procedure-entry{
+  display:block;
+  min-width:0;
+  max-width:100%;
+}
+.asset-procedure-row{
+  display:flex;
+  align-items:center;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+}
+.asset-procedure-row .asset-file{
+  flex:1 1 auto;
+  width:auto;
+  min-width:0;
+  padding-left:3px;
+}
+.asset-procedure-toggle{
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  flex:0 0 18px;
+  width:18px;
+  min-height:28px;
+  margin:0 1px 0 0;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#7893a6;
+  cursor:pointer;
+  border-radius:4px;
+  font-size:12px;
+}
+.asset-procedure-toggle:hover:not(:disabled),
+.asset-procedure-toggle:focus-visible{
+  background:#eaf2f6;
+  color:#137e78;
+}
+.asset-procedure-toggle:disabled{
+  opacity:.45;
+  cursor:default;
+}
+.asset-procedure-entry .procedure-tree{
+  min-width:0;
+  max-width:calc(100% - 23px);
+  margin:1px 0 5px 23px;
+  padding:0 0 0 8px;
+  border-left:1px solid #d5e5ec;
+}
+.asset-procedure-entry .procedure-tree[hidden]{display:none!important}
+.asset-procedure-entry .procedure-tree button{
+  min-width:0;
+  max-width:100%;
+}

@@ -63,6 +63,7 @@ let pendingPatch = null;
 let inspectorOpen = false;
 let explorerOpen = true;
 const expandedAssetFolders=new Set(["assurance","schemas","scripts"]);
+let procedureNavOpen=true;
 let showAllLabels = false;
 let layoutDirection = "RIGHT";
 let neighborView = false;
@@ -402,8 +403,15 @@ function renderAssetNavigation(){
     }
     const dirty=fileDirtyState(activePackage,file.path);
     const current=file.path===activeFilePath;
-    const btn=button("",()=>switchFile(file.path),
-      "asset-file"+(current?" active":""));
+    const isProcedureFile=file.path==="assurance/procedure.yaml"||
+      (current&&localProcedureDocument);
+    const btn=button("",()=>{
+      if(isProcedureFile&&current&&!procedureNavOpen&&projection?.state==="READY"){
+        procedureNavOpen=true;
+        renderAssetNavigation();
+        renderProcedureNavigation();
+      }else switchFile(file.path);
+    },"asset-file"+(current?" active":""));
     btn.title=file.path+(dirty?" · 修改未导出":"");
     btn.setAttribute("aria-label",file.path+(dirty?" · 已修改":""));
     btn.setAttribute("aria-current",current?"page":"false");
@@ -416,7 +424,32 @@ function renderAssetNavigation(){
       mark.setAttribute("aria-label","有未导出修改");
       btn.appendChild(mark);
     }
-    parent.appendChild(btn);
+    if(isProcedureFile){
+      const group=el("div","asset-procedure-entry");
+      const row=el("div","asset-procedure-row");
+      const expanded=current&&procedureNavOpen&&projection?.state==="READY";
+      const toggle=button(expanded?"▾":"▸",()=>{
+        if(!current){
+          procedureNavOpen=true;
+          switchFile(file.path);
+          return;
+        }
+        if(projection?.state!=="READY")return;
+        procedureNavOpen=!procedureNavOpen;
+        renderAssetNavigation();
+        renderProcedureNavigation();
+      },"asset-procedure-toggle");
+      toggle.title=expanded?"收起此文件中的 Procedure":"展开此文件中的 Procedure";
+      toggle.setAttribute("aria-label",toggle.title);
+      toggle.setAttribute("aria-expanded",String(expanded));
+      toggle.setAttribute("aria-controls","procedureTree");
+      toggle.disabled=current&&projection?.state!=="READY";
+      row.append(toggle,btn);
+      group.appendChild(row);
+      procedureTree.hidden=!expanded;
+      group.appendChild(procedureTree);
+      parent.appendChild(group);
+    }else parent.appendChild(btn);
   }
 }
 function switchFile(path){
