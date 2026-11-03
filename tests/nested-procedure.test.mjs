@@ -19,7 +19,9 @@ test("Procedure navigation is parented immediately under its procedure.yaml entr
   assert.match(app,/const row=el\("div","asset-file-row asset-procedure-row"\)/);
   assert.match(app,/row\.append\(toggle,btn\)/);
   assert.match(app,/group\.appendChild\(row\);\s*procedureTree\.hidden=!expanded;\s*group\.appendChild\(procedureTree\);\s*parent\.appendChild\(group\)/);
-  assert.match(app,/else parent\.appendChild\(btn\)/);
+  assert.match(app,/const gutter=el\("span","asset-file-gutter"\)/);
+  assert.match(app,/row\.append\(gutter,btn\)/);
+  assert.match(app,/parent\.appendChild\(row\)/);
 });
 test("File row and Procedure subtree have separate click/collapse controls and accessible state",()=>{
   assert.match(app,/const toggle=button\(expanded\?"▾":"▸"/);
