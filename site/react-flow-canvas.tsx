@@ -7,6 +7,7 @@ import {
 import type {EdgeProps} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {makeFlowElements,resolveReconnectedRoute} from "./react-flow-projection.mjs";
+import {axisFitViewport} from "./fit-axis.mjs";
 import {iconShapes,operatorIcon} from "./icons.mjs";
 
 // D1 is a view adapter, not a second workflow store.
@@ -161,6 +162,15 @@ export function mountProcedureCanvas(host,callbacks){
         callbacks={callbacks} onReady={onReady}/>);
     },
     fit,
+    fitAxis(axis){
+      if(!instance||!scene.graph||!scene.procedure)return false;
+      const {width,height}=host.getBoundingClientRect();
+      const viewport=axisFitViewport(scene.graph,scene.procedure,
+        {width,height},axis);
+      if(!viewport)return false;
+      requestAnimationFrame(()=>instance?.setViewport(viewport,{duration:150}));
+      return true;
+    },
     center(id){
       const p=scene.graph?.positions.get(id);
       if(!p||!instance)return;

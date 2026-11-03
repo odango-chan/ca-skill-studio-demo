@@ -80,6 +80,7 @@ const expandedAssetFolders=new Set(["assurance","schemas","scripts"]);
 let procedureNavOpen=true;
 let showAllLabels = false;
 let layoutDirection = "DOWN";
+let fitMode = "all"; // a chosen axis survives layout and window resize
 let neighborView = false;
 let layoutTicket = 0;
 let layoutTimer = null;
@@ -212,6 +213,8 @@ function decorateToolbar(){
     ["neighborsOnly","git-branch","邻居"],
     ["centerSelection","locate-fixed","定位"],
     ["fit","maximize","适配"],
+    ["fitWidth","fit-width","横向"],
+    ["fitHeight","fit-height","纵向"],
     ["resetButton","rotate-ccw","恢复"]
   ])setIconLabel($(id),name,label);
   setIconLabel($("mode-visual"),"network","Visual");
@@ -362,6 +365,7 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
   history=historyState||createEditorHistory(text);
   closePreview();
   canvasRouteProposal=null;
+  fitMode="all";
   selection = null;
   setInspectorOpen(false,false);
   $("search").value = "";
@@ -1383,10 +1387,16 @@ function selectRoute(id) {
   renderInspector();
   renderGraph();
 }
-function fit(){ if(graph&&lastGood)flowCanvas.fit(); }
+function fit(){
+  if(!graph||!lastGood)return;
+  if(fitMode!=="all"&&flowCanvas.fitAxis(fitMode))return;
+  flowCanvas.fit();
+}
 $("zoomIn").addEventListener("click",()=>flowCanvas.zoomIn());
 $("zoomOut").addEventListener("click",()=>flowCanvas.zoomOut());
-$("fit").addEventListener("click",fit);
+$("fit").addEventListener("click",()=>{fitMode="all";fit();});
+$("fitWidth").addEventListener("click",()=>{fitMode="width";fit();});
+$("fitHeight").addEventListener("click",()=>{fitMode="height";fit();});
 window.addEventListener("resize",()=>{if(mode!=="source")fit();});
 $("layoutDirection").addEventListener("change", event=>{
   const value=event.currentTarget.value;

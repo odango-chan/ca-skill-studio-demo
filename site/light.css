@@ -1274,3 +1274,18 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   opacity:1!important;background:#0e9483;
   box-shadow:0 0 0 2px #95e5d2;
 }
+
+
+/* Fit modes sit next to the existing full-fit button in the main toolbar.
+   Zoom +/- remains on the left edge of the canvas. */
+.compact-toolbar .toolbar-axis-fit{
+  display:inline-flex;align-items:center;gap:2px;
+  padding-left:5px;margin-left:2px;
+  border-left:1px solid #dbe6ee;
+}
+.compact-toolbar .toolbar-axis-fit button{
+  min-height:31px;
+}
+@media(max-width:1180px){
+  .compact-toolbar .toolbar-axis-fit{margin-left:0}
+}

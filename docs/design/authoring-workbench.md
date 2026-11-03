@@ -10,7 +10,7 @@
 - 顶部：当前文件名、Dirty、Undo/Redo、导出。内存文件工作副本为唯一可写源。
 - Explorer：固定样本 Package 实际文件和路径；`procedure.yaml` 的 Root/Child 是**当前文件内**的导航子树。Root workflow 图标、Child git-branch，不能冒充两个不同文件。
 - NODES：可折叠当前 Procedure 顺序导航，按 Operator 图标区分。主画布由 React Flow + ELK 投影。
-- Visual / Source / Split 同一工作副本；布局默认 DOWN，可切 RIGHT；邻居视图、Route 标签、定位、适配直接在 toolbar，Zoom 在画布左下。**没有 View dropdown**。
+- Visual / Source / Split 同一工作副本；布局默认 DOWN，可切 RIGHT；邻居视图、Route 标签、定位、**适配全部 / 横向铺满 / 纵向铺满**直接在 toolbar，Zoom ± 仍在画布左下。**没有 View dropdown**。横向/纵向只缩放并居中当前 Procedure 的可见节点范围，允许另一轴溢出；默认打开仍使用适配全部。当前选择会在布局重算和浏览器调整尺寸后继续应用，切换文件后恢复为适配全部。
 - 单一 Inspector：选中 Node/Route 后按 `preconditions → operator → postconditions → routes` 显示；Phase Step 在 Inspector 内，不创建假业务 Node。
 - Problems：语法失败及 editor-only warnings，**不是 Runtime Validator**。
 
@@ -40,3 +40,11 @@
 React 19、React Flow 12、ELK 0.12、YAML 2.9、TypeScript 7、esbuild，静态浏览器 Bundle。坚持一个 Inspector、Source-only 降级、负面测试；不重新引入 Node Quick Card、Python POC Server 或 CreatedSession 专用平行 CRUD。
 
 [已完成 D1](../D1-procedure-designer.md) / [D2](../D2-node-designer.md) 是里程碑记录；[D3 Route 设计](route-designer.md) 仅 Proposed。
+
+## Axis-fit viewport controls (2026-11-03)
+
+- Three explicit controls adjacent in the existing main graph toolbar: **适配** (fit entire current graph, default), **横向** (fit visible graph width), **纵向** (fit visible graph height). This does **not** change the graph's layout direction selector (垂直 / 水平).
+- Width/height modes compute the active graph's visible node bounding box using the same 238 × 80 React Flow node footprint, with 24 px canvas padding and the existing min/max zoom limits (0.05–2.5). The opposite axis stays centered and may overflow; users can pan or zoom afterward.
+- Current Procedure, Child Procedure, neighbor-scoped view, ELK layout and large-graph fallback are treated independently. All three are view actions only: **no Source Patch, no YAML change, no extra graph model**.
+- The requested mode survives layout recalculation and window resizing. On opening another document it resets to default whole-graph fit.
+- Browser acceptance checks actual node bounds and viewport zoom for both ELK orientations, the three controls, resize behavior and Source-byte identity; unit tests verify math and huge graph bounds.
