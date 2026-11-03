@@ -1,8 +1,8 @@
 # D3 Route Designer · bounded source-backed authoring
 
 **Status: Proposed overall · Date: 2026-11-03**  
-**Implementation: A1 IMPLEMENTED on main; A2 PR #11 candidate; A3 NOT_STARTED**  
-**Acceptance: A1 PASS (editor tier); A2 PR CI PASS (editor tier); A3 NOT_RUN**  
+**Implementation: A1/A2 IMPLEMENTED on main; A3 NOT_STARTED**  
+**Acceptance: A1/A2 PASS (editor tier); A3 NOT_RUN · Runtime NOT_RUN**  
 **Tracking: [Issue #7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)**
 
 本页是新阶段**候选设计**，不能当成已经允许全部 Route 修改或 Runtime 验收通过。
@@ -52,7 +52,7 @@ Duplicate Outcome；operator 和 Phase 的相同 Outcome 被错配；最后一�
 - Phase `on` 的具体规则与局部 `steps`/postcondition verdict 的映射需单独确认，不能默认为 Operator 的同类 Outcome。
 - 删除可能影响引用或下游消费；无法证明影响范围的语义必须 Source-only / Editor Warning，不能用 UI 猜测 Runtime 结果。
 
-D3-A1 的保守 Operator 子集已落地并通过浏览器测试；D3-A2 仅属于候选 PR #11。D3-A3 和 Runtime Outcome 合法性验证尚未实现，也没有 Live PASS。
+D3-A1/A2 的保守 Operator 子集已落地并通过浏览器测试；D3-A3 和 Runtime Outcome 合法性验证尚未实现，也没有 Live PASS。
 
 ## D3-A1 implemented on main (PR #10)
 
@@ -62,10 +62,10 @@ The first slice is limited to **existing explicit quoted `'on'` maps** on nonter
 
 Preview integrity is recomputed on Apply; source revision, structural snapshot, Route ID/origin and non-target bytes are checked. Chromium acceptance exercised selection → preview → cancel → apply → Undo/Redo on an actual fixture with one pre-existing Outcome removed.
 
-## D3-A2 candidate implementation (PR #11)
+## D3-A2 implemented on main (PR #11)
 
-**Review status: Proposed, implemented on the branch only.** [PR #11](https://github.com/odango-chan/ca-skill-studio-demo/pull/11) implements Route-Inspector editing of **one original `operator.on` Outcome**. A source-backed rename is only allowed to an *unused* Outcome already observed for a comparable Operator in the current Source; the target is unchanged. Deletion requires a nonterminal Node with more than one Route, no adjacent or inline comment potentially lost with the line, no detected references to that Route ID, and **no newly unreachable Node** when the single Route is removed. Common core verdicts such as `PASS`, `FAIL`, `UNKNOWN`, `COMMITTED`, `OUTCOME_UNKNOWN`, `DENIED` and `FAILED` are protected from Visual deletion.
+**Merged:** [PR #11](https://github.com/odango-chan/ca-skill-studio-demo/pull/11), `main@b4d15d47a3ccee22c05b948f79510013d473558d`. Implements Route-Inspector editing of **one original `operator.on` Outcome**. A source-backed rename is only allowed to an *unused* Outcome already observed for a comparable Operator in the current Source; the target is unchanged. Deletion requires a nonterminal Node with more than one Route, no adjacent or inline comment potentially lost with the line, no detected references to that Route ID, and **no newly unreachable Node** when the single Route is removed. Common core verdicts such as `PASS`, `FAIL`, `UNKNOWN`, `COMMITTED`, `OUTCOME_UNKNOWN`, `DENIED` and `FAILED` are protected from Visual deletion.
 
-Both use exact original YAML span and immutable revision-bound Preview → Source Diff → Confirm → Reparse → Undo/Redo. Quoted keys/values, anchors, aliases, duplicate Outcomes, Phase origin, target drift, ambiguous comments, stale or modified preview fail closed. Browser acceptance covers real Rename and guarded Delete flows; real CreatedSession Child-Procedure qualification is also unit-tested. [CI #41622728664](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41622728664): 208/208 and Chromium PASS on the candidate head.
+Both use exact original YAML span and immutable revision-bound Preview → Source Diff → Confirm → Reparse → Undo/Redo. Quoted keys/values, anchors, aliases, duplicate Outcomes, Phase origin, target drift, ambiguous comments, stale or modified preview fail closed. Browser acceptance covers real Rename and guarded Delete flows; real CreatedSession Child-Procedure qualification is also unit-tested. [CI #41623111837](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41623111837): 208/208 and Chromium PASS. [Resulting-main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41623429905) verifies browser build/deploy.
 
 **Important limitation:** The structural and reachability gates are not proof that a Runtime Operator accepts the renamed Outcome or that a removed branch was genuinely optional. Other runtime-required outcomes may exist beyond the protected list. This UI only provides a conservative edit, with explicit impact warning and human Diff confirmation. For complete contracts, defer to the actual Demo/Runtime owner validator; **Runtime acceptance = NOT_RUN**. D3-A3 and Phase edits remain unimplemented.
