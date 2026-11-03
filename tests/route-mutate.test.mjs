@@ -75,7 +75,7 @@ test("D3-A2 rejects arbitrary renames, existing Outcome collisions and Phase ori
   const before=renamed();
   assert.throws(()=>previewRenameRouteOutcome(before,proc,extraId,"INVENTED"));
   assert.throws(()=>previewRenameRouteOutcome(before,proc,extraId,"PASS"));
-  assert.throws(()=>previewRenameRouteOutcome(before,proc,id+":PASS","UNKNOWN"));
+  assert.throws(()=>previewRenameRouteOutcome(before,proc,id+":PASS","FAIL"));
   assert.throws(()=>previewRenameRouteOutcome(before,proc,"missing:EXTRA","UNKNOWN"));
   const p=projectWorkspace(created);
   const phase=p.procedure.routes.find(r=>r.routeSource==="postconditions.on");

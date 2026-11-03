@@ -19,6 +19,9 @@ import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "./node-create
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from "./node-delete.mjs";
 import {addRouteOutcomeOptions,previewAddRouteOutcome,applyAddRouteOutcome}
   from "./route-create.mjs";
+import {routeOutcomeEditOptions,previewRenameRouteOutcome,
+  previewDeleteRouteOutcome,applyRenameRouteOutcome,applyDeleteRouteOutcome}
+  from "./route-mutate.mjs";
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue,
  previewNodeBindingFrom,applyNodeBindingFrom} from "./node-attributes.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
@@ -721,6 +724,50 @@ function addPatchControls(route) {
   body.appendChild(preview);
   return true;
 }
+function addRouteMutationEditor(route,options){
+  if(!options)return false;
+  const body=section("修改 Outcome","D3-A2 · operator.on");
+  body.appendChild(el("p","small-edit-note",
+    "仅修改所选原始 Route；同目标的其他 Outcome 不受影响。" +
+    "候选来自已观察 Source，结构检查不代表 Runtime 分支完整性。"));
+  if(options.renameChoices.length){
+    const label=el("label","attribute-label","重命名 Outcome");
+    const select=el("select","target-select");
+    select.setAttribute("aria-label","D3 重命名 Outcome");
+    const placeholder=el("option","","请选择已有候选 Outcome");
+    placeholder.value="";select.append(placeholder);
+    for(const value of options.renameChoices){
+      const opt=el("option","",value);opt.value=value;select.append(opt);
+    }
+    select.value="";
+    label.append(select);body.append(label);
+    const preview=button("预览重命名 Outcome",()=>{
+      try{
+        showPreview(previewRenameRouteOutcome(source.value,activeProcedureId,
+          route.id,select.value));
+      }catch(error){message("未应用："+String(error?.message??error));}
+    },"preview-button");
+    preview.disabled=true;
+    select.addEventListener("change",()=>{preview.disabled=!select.value;});
+    body.append(preview);
+  }
+  if(options.canDelete){
+    body.appendChild(el("p","small-edit-note",
+      "删除会丢失此条件的处理分支；必须确认业务允许遗漏该 Outcome。" +
+      "受保护状态、最后出口和失去可达性的编辑会被拒绝。"));
+    const preview=button("预览删除 Outcome",()=>{
+      try{
+        showPreview(previewDeleteRouteOutcome(source.value,
+          activeProcedureId,route.id));
+      }catch(error){message("未应用："+String(error?.message??error));}
+    },"preview-button");
+    body.append(preview);
+  }else if(options.deleteBlockedReason)
+    body.appendChild(el("p","small-edit-note",
+      "删除已保护："+options.deleteBlockedReason));
+  return true;
+}
+
 function addInsertNodeEditor(route){
   const options=insertNodeOptions(source.value,activeProcedureId,route.id,
     packagePredicateSource(),activePackage?.name);
@@ -1200,8 +1247,10 @@ function renderInspector() {
   const route=selection?.kind==="route"?routeDetails(lastGood,selection.id):null;
   const model=selection?.kind==="node"?nodeJourney(lastGood,selection.id):null;
   const caps=model?nodeEditorCapabilities(model.node.id):null;
+  const mutation=route?routeOutcomeEditOptions(source.value,
+    activeProcedureId,route.id):null;
   const editable=Boolean(route&&(eligibleGraphRouteTargets(route.id).length||
-    insertNodeOptions(source.value,activeProcedureId,route.id,
+    mutation||insertNodeOptions(source.value,activeProcedureId,route.id,
       packagePredicateSource(),activePackage?.name)))||
     Boolean(model&&((caps.attributes?.operator||caps.attributes?.bindings?.length)||
       caps.deletion||caps.rename||caps.verify.length||caps.newRoute||
@@ -1221,6 +1270,7 @@ function renderInspector() {
     inspectorLine("Route Source",route.routeSource);
     inspectorSourceAction(route.line,"查看源码");
     addPatchControls(route);
+    addRouteMutationEditor(route,mutation);
     addInsertNodeEditor(route);
     return;
   }
@@ -1427,6 +1477,10 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyNodeBindingFrom(source.value,pendingPatch);
     else if(pendingPatch.type==="AddRouteOutcome")
       nextSource=applyAddRouteOutcome(source.value,pendingPatch);
+    else if(pendingPatch.type==="RenameRouteOutcome")
+      nextSource=applyRenameRouteOutcome(source.value,pendingPatch);
+    else if(pendingPatch.type==="DeleteRouteOutcome")
+      nextSource=applyDeleteRouteOutcome(source.value,pendingPatch);
     else throw new Error("未知的属性 Patch 类型");
     if(pendingPatch.type==="RenameNode"&&selection?.kind==="node"&&
        activeProcedureId===pendingPatch.procedureId&&selection.id===pendingPatch.nodeId)
@@ -1438,6 +1492,12 @@ $("applyPatch").addEventListener("click", () => {
     if(pendingPatch.type==="AddRouteOutcome"&&
        activeProcedureId===pendingPatch.procedureId)
       selection={kind:"route",id:pendingPatch.nodeId+":"+pendingPatch.outcome};
+    if(pendingPatch.type==="RenameRouteOutcome"&&
+       activeProcedureId===pendingPatch.procedureId)
+      selection={kind:"route",id:pendingPatch.nodeId+":"+pendingPatch.newOutcome};
+    if(pendingPatch.type==="DeleteRouteOutcome"&&
+       activeProcedureId===pendingPatch.procedureId)
+      selection={kind:"node",id:pendingPatch.nodeId};
     source.value = nextSource;
     history.record(nextSource);
     closePreview();
