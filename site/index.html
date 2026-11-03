@@ -20,9 +20,9 @@
     <span id="fileName" class="top-file" title="当前工作文件">正在载入…</span>
     <div class="topbar-actions">
       <span class="workspace-status" id="fileStatus" role="status"><span class="status-dot"></span>未修改</span>
-      <button id="undoButton" class="icon-button" type="button" title="撤销 · Ctrl/Cmd + Z" disabled aria-label="撤销">↶</button>
-      <button id="redoButton" class="icon-button" type="button" title="重做 · Ctrl/Cmd + Shift + Z" disabled aria-label="重做">↷</button>
-      <button id="downloadButton" class="button-primary" type="button" title="导出当前文件 · Ctrl/Cmd + S"><span aria-hidden="true">↓</span> 导出文件</button>
+      <button id="undoButton" class="icon-button" type="button" title="撤销 · Ctrl/Cmd + Z" disabled aria-label="撤销"></button>
+      <button id="redoButton" class="icon-button" type="button" title="重做 · Ctrl/Cmd + Shift + Z" disabled aria-label="重做"></button>
+      <button id="downloadButton" class="button-primary" type="button" title="导出当前文件 · Ctrl/Cmd + S">导出文件</button>
     </div>
   </header>
 
@@ -30,7 +30,7 @@
     <aside class="explorer" id="explorerPanel" aria-label="SKILL Explorer">
       <div class="explorer-header">
         <span class="explorer-header-label">资源</span>
-        <button id="toggleExplorer" class="explorer-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" aria-label="收起左侧导航" title="收起左侧导航"><span class="explorer-toggle-icon" aria-hidden="true">‹</span><span class="explorer-toggle-caption" aria-hidden="true">展开导航</span></button>
+        <button id="toggleExplorer" class="explorer-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" aria-label="收起左侧导航" title="收起左侧导航"><span class="explorer-toggle-icon" aria-hidden="true"></span><span class="explorer-toggle-caption" aria-hidden="true">展开导航</span></button>
       </div>
       <section class="explorer-section asset-section" aria-label="当前文件和流程">
         <div class="explorer-compact-heading">文件 <span id="fileCount" class="scope-tag" title="工作区实际加载的文件数量">单文件</span></div>
@@ -43,12 +43,12 @@
       <details class="explorer-section explorer-nodes" id="nodeOutlineDisclosure">
         <summary class="section-heading node-disclosure-heading"><span>NODES · 当前 Procedure</span><span id="outlineCount" class="count">—</span></summary>
         <label for="search" class="sr-only">搜索当前 Procedure 的节点</label>
-        <div class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="查找节点" autocomplete="off"></div>
+        <div class="search-wrap"><span aria-hidden="true"></span><input id="search" type="search" placeholder="查找节点" autocomplete="off"></div>
         <ol id="nodeOutline" class="outline"></ol>
       </details>
       <div class="explorer-bottom">
-        <button id="openButton" type="button" class="explorer-action">＋ 打开本地文件</button>
-        <button id="exportPackageButton" type="button" class="explorer-action" hidden>↓ 导出整个 Package (.zip)</button>
+        <button id="openButton" type="button" class="explorer-action">打开本地文件</button>
+        <button id="exportPackageButton" type="button" class="explorer-action" hidden>导出整个 Package (.zip)</button>
         <details class="sample-picker">
           <summary>加载示例</summary>
           <button id="establishSampleButton" type="button" class="explorer-action">CreatedSession</button>
@@ -61,7 +61,7 @@
     <section class="editor" aria-label="Procedure authoring editor">
       <div class="editorbar compact-toolbar">
         <div class="breadcrumbs" id="procedureBreadcrumbs">
-          <button id="backProcedure" type="button" title="返回 Root Procedure">←</button>
+          <button id="backProcedure" type="button" title="返回 Root Procedure" aria-label="返回 Root Procedure"></button>
           <span id="procedureBread">Procedure</span>
         </div>
         <div class="segmented" id="editorModes" role="group" aria-label="编辑视图">
@@ -89,8 +89,8 @@
         <div id="graphPane" class="graph-pane" data-labels="key">
           <div id="reactFlowRoot" class="procedure-flow-root" aria-label="Procedure Designer 交互画布"></div>
           <div id="zoomViewOptions" class="canvas-zoom-tools" role="group" aria-label="缩放流程图">
-            <button id="zoomIn" type="button" aria-label="放大流程图" title="放大">+</button>
-            <button id="zoomOut" type="button" aria-label="缩小流程图" title="缩小">−</button>
+            <button id="zoomIn" type="button" aria-label="放大流程图" title="放大"></button>
+            <button id="zoomOut" type="button" aria-label="缩小流程图" title="缩小"></button>
           </div>
           <div id="graphWarning" class="graph-warning" role="alert" hidden></div>
         </div>
@@ -115,7 +115,7 @@
     </section>
 
     <aside class="inspector-panel" id="inspectorPanel" aria-label="Node inspector">
-      <div class="inspector-header"><span class="eyebrow">属性</span><span id="inspectorState" class="inspector-status">只读</span><button id="closeInspector" type="button" class="quick-close" aria-label="收起详情" title="收起详情">×</button></div>
+      <div class="inspector-header"><span class="eyebrow">属性</span><span id="inspectorState" class="inspector-status">只读</span><button id="closeInspector" type="button" class="quick-close" aria-label="收起详情" title="收起详情"></button></div>
       <div id="inspectorContext" class="inspector-context"><h2>流程属性</h2><p>选择图上的一个节点查看详情</p></div>
       
       <div id="inspector" class="inspector-content" aria-live="polite"></div>

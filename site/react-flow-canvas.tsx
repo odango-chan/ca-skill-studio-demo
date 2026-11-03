@@ -7,6 +7,7 @@ import {
 import type {EdgeProps} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {makeFlowElements,resolveReconnectedRoute} from "./react-flow-projection.mjs";
+import {iconShapes,operatorIcon} from "./icons.mjs";
 
 // D1 is a view adapter, not a second workflow store.
 // All gestures delegate to the existing source-backed Inspector and Typed Patch.
@@ -20,6 +21,16 @@ function portStyle(port){
   if(port.side==="bottom")return {left,bottom:"calc(0px - var(--port-border-bottom))"};
   if(port.side==="left")return {top,left:"calc(0px - var(--port-border-left))"};
   return {top,right:"calc(0px - var(--port-border-right))"};
+}
+function OperatorGlyph({operator}){
+  const name=operatorIcon(operator);
+  return <svg className="studio-icon designer-kind-icon" viewBox="0 0 24 24"
+    width="15" height="15" fill="none" stroke="currentColor"
+    strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
+    aria-hidden="true" focusable="false" data-icon={name}>
+    {iconShapes(name).map((item,i)=>
+      React.createElement(item.tag,{...item.attrs,key:i}))}
+  </svg>;
 }
 function ProcedureCard({data,selected}){
   const direction=data.direction==="RIGHT"?"RIGHT":"DOWN";
@@ -46,8 +57,10 @@ function ProcedureCard({data,selected}){
       type={port.type} position={sidePositions[port.side]}
       className="designer-port designer-port-elk"
       style={portStyle(port)}/>)}
-    <span className="designer-node-kind">{String(data.operator).toUpperCase()}
-      {data.start?" · START":""}{data.childCount?" · CHILD ↗":""}
+    <span className="designer-node-kind">
+      <OperatorGlyph operator={data.operator}/>
+      {String(data.operator).toUpperCase()}
+      {data.start?" · START":""}{data.childCount?" · CHILD":""}
     </span>
     <strong className="designer-node-id" title={data.id}>{data.id}</strong>
     <span className="designer-node-meta" title={data.value}>{data.value}</span>
