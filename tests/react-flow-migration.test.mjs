@@ -98,6 +98,7 @@ test("React Flow edges keep screen-space stroke width at default fit zoom",()=>{
   assert.match(css,/vector-effect:non-scaling-stroke/);
   assert.match(css,/\.procedure-flow \.react-flow__edge-interaction\{/);
   assert.match(css,/\.procedure-flow \.react-flow__edges\{[^}]*overflow:visible/s);
+  assert.doesNotMatch(css,/\.procedure-flow \.react-flow__edges\{[^}]*pointer-events:none/s);
   assert.doesNotMatch(old,/\.graph-pane svg\{/);
   assert.match(jsx,/markerEnd=\{props\.markerEnd\}/);
   assert.match(jsx,/interactionWidth=\{16\}/);

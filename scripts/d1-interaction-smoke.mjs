@@ -14,6 +14,12 @@ const sleepLine=" const sleep=t=>new Promise(r=>setTimeout(r,t));";
 const clickLine=" const click=el=>el?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));";
 
 export async function runD1Interactions(evaluate,command){
+  // Exercise authoring in a real desktop viewport; the later separate test
+  // explicitly switches to a 390px mobile viewport.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1440,height:900,deviceScaleFactor:1,mobile:false
+  });
+  await new Promise(resolve=>setTimeout(resolve,350));
   await check(evaluate,"NODE_INSPECTOR",[
     sleepLine,clickLine,
     " const node=document.querySelector('.react-flow__node');",
@@ -93,12 +99,14 @@ export async function runD1Interactions(evaluate,command){
     " const end=t&&{x:t.x+t.width/2,y:t.y+t.height/2};",
     " const bounds=document.getElementById('graphPane').getBoundingClientRect();",
     " const within=point=>point&&point.x>=bounds.left&&point.x<=bounds.right&&",
-    "  point.y>=bounds.top&&point.y<=bounds.bottom;",
+    "  point.y>=bounds.top&&point.y<=bounds.bottom&&",
+    "  point.x>=0&&point.x<window.innerWidth&&point.y>=0&&point.y<window.innerHeight;",
     " return {ok:Boolean(updater&&handle&&within(start)&&within(end)),",
     "  start,end,target,currentTarget:select?.value,",
     "  updaterClass:updater?.getAttribute('class'),",
     "  updaterRect:u?.toJSON(),targetRect:t?.toJSON(),",
-    "  edgeSelected:edge?.getAttribute('class'),graphBounds:bounds.toJSON()};"
+    "  edgeSelected:edge?.getAttribute('class'),graphBounds:bounds.toJSON(),",
+    "  browser:{width:window.innerWidth,height:window.innerHeight}};"
   ]);
 
   // Actual Chrome mouse events from a React Flow edge updater to another

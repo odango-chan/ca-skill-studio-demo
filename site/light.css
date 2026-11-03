@@ -1107,7 +1107,7 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 }
 .procedure-flow .react-flow__edges{
   overflow:visible;
-  pointer-events:none;
+  /* React Flow edge hit paths and reconnect anchors must receive pointer events. */
 }
 /* The historical .graph-pane svg rule must not apply to nested React Flow
    edge SVGs, otherwise it overrides their own sizing and pointer behavior. */
