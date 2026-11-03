@@ -141,7 +141,10 @@ test("React Flow uses its built-in thin open arrow, not a second hand-drawn arro
   const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
   assert.match(canvas,/useUpdateNodeInternals/);
   assert.match(canvas,/ports\.map\(port=><Handle/);
-  assert.match(canvas,/style=\{port\.side==="top"/);
+  assert.match(canvas,/style=\{portStyle\(port\)\}/);
+  assert.match(canvas,/function portStyle\(port\)/);
+  assert.match(css,/--port-border-left:4px/);
+  assert.match(css,/--port-border-top:2px/);
   assert.match(canvas,/markerEnd=\{props\.markerEnd\}/);
   assert.match(css,/\.procedure-flow \.designer-port-elk\{/);
   assert.match(css,/stroke-width:2\.1px/);

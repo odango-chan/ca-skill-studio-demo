@@ -12,6 +12,15 @@ import {makeFlowElements,resolveReconnectedRoute} from "./react-flow-projection.
 // All gestures delegate to the existing source-backed Inspector and Typed Patch.
 const sidePositions={top:Position.Top,bottom:Position.Bottom,
   left:Position.Left,right:Position.Right};
+function portStyle(port){
+  const offset=port.offset+"px";
+  const left="calc("+offset+" - var(--port-border-left))";
+  const top="calc("+offset+" - var(--port-border-top))";
+  if(port.side==="top")return {left,top:"calc(0px - var(--port-border-top))"};
+  if(port.side==="bottom")return {left,bottom:"calc(0px - var(--port-border-bottom))"};
+  if(port.side==="left")return {top,left:"calc(0px - var(--port-border-left))"};
+  return {top,right:"calc(0px - var(--port-border-right))"};
+}
 function ProcedureCard({data,selected}){
   const direction=data.direction==="RIGHT"?"RIGHT":"DOWN";
   const inputPosition=direction==="DOWN"?Position.Top:Position.Left;
@@ -36,8 +45,7 @@ function ProcedureCard({data,selected}){
     {ports.map(port=><Handle key={port.id} id={port.id}
       type={port.type} position={sidePositions[port.side]}
       className="designer-port designer-port-elk"
-      style={port.side==="top"||port.side==="bottom"
-        ?{left:port.offset+"px"}:{top:port.offset+"px"}}/>)}
+      style={portStyle(port)}/>)}
     <span className="designer-node-kind">{String(data.operator).toUpperCase()}
       {data.start?" · START":""}{data.childCount?" · CHILD ↗":""}
     </span>

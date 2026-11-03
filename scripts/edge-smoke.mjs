@@ -133,7 +133,7 @@ try{
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
   if(result?.nodes!==17||result.edges!==48||result.valid!==48||
-     result.attachedPorts!==96||result.maxPortGap>3)
+     result.attachedPorts!==96||result.maxPortGap>1.5)
     throw Error("CreatedSession visible edges FAIL");
   if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
   if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));

@@ -154,3 +154,7 @@ The source projection for CreatedSession contains 17 Root nodes and 48 bundled r
 - **调整**：保留 ELK 分流路径以免 CreatedSession 的不同 Route / Outcome 重叠，但将 ELK 的起止端点映射成真实的、每条合并 Route 专属的 React Flow Handle；连接端点跟边界准确重合。箭头改用 React Flow 内置的轻量 Arrow（细线、非填充、13×13），边线降为更克制的非缩放宽度，不再自行绘制第二套箭头。
 - **验收**：Node 测试核对 17 Node、48 个可见边束、65 Outcome，逐条校验 ELK path 与 React Flow Port 的坐标；Chromium UI 检查 48 条实际连线的可见性和 96 个端点的屏幕空间对齐。整个流程仍通过 YAML Source 和 Typed Patch 管理，连线/端口都只属于 UI 投影。
 - **后续优先级**：先补真实浏览器的 Route 选择与 Inspector、重连预览/拒绝、Split/Undo/Redo、小屏浏览验收，再进入 D2 Node Designer；大型流程可交互性和线条标签密度属于持续视觉优化，不要为了“默认连线”破坏 ELK 的分流能力。
+
+#### Port 边框偏移修正
+
+React Flow 的自定义 Node 存在普通 1px、选中 2px，以及起始节点左侧 4px 边框。HTML 绝对定位的 Handle 相对其 padding edge 定位，因此仅使用 ELK 的局部坐标会产生 1–4 CSS 单位的端点偏差，在放大时更明显。每条 ELK Port 的 top/bottom/left/right 现在按当前 Node 边框宽度扣除对应偏移；Chrome 的真实边路径到 Handle 屏幕坐标误差须低于 1.5px。此修正仅影响视图坐标。

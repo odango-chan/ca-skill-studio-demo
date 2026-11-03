@@ -977,6 +977,10 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   border-radius:14px;
 }
 .designer-node{
+  --port-border-left:1px;
+  --port-border-right:1px;
+  --port-border-top:1px;
+  --port-border-bottom:1px;
   position:relative;
   width:238px;
   height:80px;
@@ -999,11 +1003,16 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   box-shadow:0 5px 14px #27436025;
 }
 .designer-node.is-selected{
+  --port-border-left:2px;
+  --port-border-right:2px;
+  --port-border-top:2px;
+  --port-border-bottom:2px;
   border:2px solid #0c9785;
   background:#f6fdf9;
   box-shadow:0 0 0 4px #bbebe040,0 4px 16px #17665320;
 }
 .designer-node.is-start{
+  --port-border-left:4px;
   border-left:4px solid #0d9b84;
 }
 .designer-node.is-terminal{
