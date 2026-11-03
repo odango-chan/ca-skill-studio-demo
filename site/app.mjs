@@ -17,6 +17,8 @@ import {createIcon,operatorIcon} from "./icons.mjs";
 import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "./node-designer.mjs";
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "./node-create.mjs";
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from "./node-delete.mjs";
+import {addRouteOutcomeOptions,previewAddRouteOutcome,applyAddRouteOutcome}
+  from "./route-create.mjs";
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue,
  previewNodeBindingFrom,applyNodeBindingFrom} from "./node-attributes.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
@@ -930,6 +932,48 @@ function addNodeBindingEditors(model,attributes){
   return true;
 }
 
+function addRouteOutcomeEditor(model,options){
+  if(!options?.outcomes?.length||!options?.targets?.length)return false;
+  const body=section("新增 Outcome","D3-A1 · operator.on");
+  body.appendChild(el("p","small-edit-note",
+    "仅提供当前 Source 中同类 Operator 的已观察 Outcome。" +
+    "这是编辑期候选，不能证明 Runtime 接受该 Outcome。"));
+  const label=el("label","attribute-label","新增 Outcome");
+  const outcome=el("select","target-select");
+  outcome.setAttribute("aria-label","D3 新增 Outcome");
+  const outcomePlaceholder=el("option","","请选择 Outcome");
+  outcomePlaceholder.value="";outcome.append(outcomePlaceholder);
+  for(const value of options.outcomes){
+    const elOption=el("option","",value);elOption.value=value;
+    outcome.append(elOption);
+  }
+  outcome.value="";label.append(outcome);body.append(label);
+  const targetLabel=el("label","attribute-label","Route Target");
+  const target=el("select","target-select");
+  target.setAttribute("aria-label","D3 新增 Route Target");
+  const targetPlaceholder=el("option","","请选择目标 Node");
+  targetPlaceholder.value="";target.append(targetPlaceholder);
+  for(const value of options.targets){
+    const elOption=el("option","",value);elOption.value=value;
+    target.append(elOption);
+  }
+  target.value="";targetLabel.append(target);body.append(targetLabel);
+  const preview=button("预览新增 Outcome",()=>{
+    try{
+      showPreview(previewAddRouteOutcome(source.value,activeProcedureId,
+        model.node.id,outcome.value,target.value));
+    }catch(error){
+      message("新增 Route 未应用："+String(error?.message??error));
+    }
+  },"preview-button");
+  preview.disabled=true;
+  const update=()=>preview.disabled=!(outcome.value&&target.value);
+  outcome.addEventListener("change",update);
+  target.addEventListener("change",update);
+  body.append(preview);
+  return true;
+}
+
 function addNodeDeleteEditor(model,options){
   if(!options)return false;
   const body=section("删除 Node","D2-A3");
@@ -1080,7 +1124,8 @@ function nodeEditorCapabilities(nodeId){
     attributes:currentNodeAttributes(nodeId),
     deletion:deleteNodeOptions(text,activeProcedureId,nodeId),
     rename:nodeRenameAvailable(text,activeProcedureId,nodeId),
-    verify:verifyNodeChoices(nodeId)
+    verify:verifyNodeChoices(nodeId),
+    newRoute:addRouteOutcomeOptions(text,activeProcedureId,nodeId)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1093,6 +1138,7 @@ function renderNodeJourney(model,caps) {
   addNodeOperatorEditor(model,caps.attributes);
   addNodeBindingEditors(model,caps.attributes);
   addNodeDeleteEditor(model,caps.deletion);
+  addRouteOutcomeEditor(model,caps.newRoute);
   if(model.prepare.phase || model.prepare.routes.length){
     const body=journeyStage(1,"准备",
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
@@ -1158,7 +1204,7 @@ function renderInspector() {
     insertNodeOptions(source.value,activeProcedureId,route.id,
       packagePredicateSource(),activePackage?.name)))||
     Boolean(model&&((caps.attributes?.operator||caps.attributes?.bindings?.length)||
-      caps.deletion||caps.rename||caps.verify.length||
+      caps.deletion||caps.rename||caps.verify.length||caps.newRoute||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -1379,6 +1425,8 @@ $("applyPatch").addEventListener("click", () => {
         packagePredicateSource(),activePackage?.name);
     else if(pendingPatch.type==="SetNodeBindingFrom")
       nextSource=applyNodeBindingFrom(source.value,pendingPatch);
+    else if(pendingPatch.type==="AddRouteOutcome")
+      nextSource=applyAddRouteOutcome(source.value,pendingPatch);
     else throw new Error("未知的属性 Patch 类型");
     if(pendingPatch.type==="RenameNode"&&selection?.kind==="node"&&
        activeProcedureId===pendingPatch.procedureId&&selection.id===pendingPatch.nodeId)
@@ -1387,6 +1435,9 @@ $("applyPatch").addEventListener("click", () => {
       selection={kind:"node",id:pendingPatch.nodeId};
     if(pendingPatch.type==="DeleteNode"&&activeProcedureId===pendingPatch.procedureId)
       selection=null;
+    if(pendingPatch.type==="AddRouteOutcome"&&
+       activeProcedureId===pendingPatch.procedureId)
+      selection={kind:"route",id:pendingPatch.nodeId+":"+pendingPatch.outcome};
     source.value = nextSource;
     history.record(nextSource);
     closePreview();
