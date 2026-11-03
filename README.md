@@ -35,4 +35,4 @@ React 19 / React Flow 12 / ELK / TypeScript 7 / YAML 2.9.1 / Node 24 / esbuild�
 
 开发前先读 [AGENTS.md](AGENTS.md)、[WORK](docs/WORK.md)、[TRACEABILITY](docs/TRACEABILITY.md)。现有架构与编辑约束详见 [Workbench](docs/design/authoring-workbench.md)；下一步的 [D3 Route Designer](docs/design/route-designer.md) 尚为 **Proposed**，跟踪 [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)。
 
-早期 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)（初始架构）、[PR #2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)（Python 编辑 POC）、[PR #3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3)（早期 TypeScript Pages）都还是**未合并的历史候选**，不代表 `main` 的实际实现。文档整顿追踪 [#6](https://github.com/odango-chan/ca-skill-studio-demo/issues/6)。
+早期 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)（初始架构）、[PR #2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)（Python 编辑 POC）、[PR #3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3)（早期 TypeScript Pages）都还是**未合并的历史候选**，不代表 `main` 的实际实现。文档治理基线完成记录 [#6](https://github.com/odango-chan/ca-skill-studio-demo/issues/6)。

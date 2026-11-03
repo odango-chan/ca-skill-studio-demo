@@ -1,7 +1,7 @@
 # Current Authoring Workbench · Source-backed Editing
 
 **Status: Accepted · Date: 2026-11-03**  
-**Verified implementation baseline: `main@3df893f4aed6bb2c361dc445c007f6a2b23112f9`**
+**Verified implementation baseline: `main@69bd8ef5900c68fff85653619eda770599ac9d3a`**
 
 本文件描述当前浏览器应用行为；早期 [UX Consolidation](../ux/ux-consolidation.md) 的“View 菜单 / CreatedSession 只读 / 单文件视图”为已退役阶段描述。
 
