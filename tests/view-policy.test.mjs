@@ -54,6 +54,6 @@ test("Markdown renderer stays independent of source history and canonical text",
   assert.match(app,/renderMarkdown\(text\)/);
   assert.match(app,/markdownPreview"\)\.innerHTML=rendered\.html/);
   assert.match(app,/history\.record\(source\.value\)/);
-  assert.match(app,/source\.value=nextSource/);
+  assert.match(app,/source\.value\s*=\s*nextSource/);
   assert.doesNotMatch(app,/source\.value\s*=\s*rendered\.html/);
 });
