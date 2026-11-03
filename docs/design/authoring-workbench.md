@@ -48,3 +48,9 @@ React 19、React Flow 12、ELK 0.12、YAML 2.9、TypeScript 7、esbuild，静态
 - Current Procedure, Child Procedure, neighbor-scoped view, ELK layout and large-graph fallback are treated independently. All three are view actions only: **no Source Patch, no YAML change, no extra graph model**.
 - The requested mode survives layout recalculation and window resizing. On opening another document it resets to default whole-graph fit.
 - Browser acceptance checks actual node bounds and viewport zoom for both ELK orientations, the three controls, resize behavior and Source-byte identity; unit tests verify math and huge graph bounds.
+
+## D4 Phase Designer · A1 bounded candidate
+
+Phase Steps 继续是 Node Inspector 内的有序行，**不是**主业务图中的 Node。D4-A1 只更改已经存在的 Step `with.<key>.from`，且源值和候选值必须均为**当前 Procedure 已声明、且类型完全一致的 `input.*`**。原有 Step Operator、Step name、顺序、Phase 路由和 Node/Child 结构不改变。
+
+必须经过精确 YAML Source span、重新解析与语义对比、Diff/确认、Undo/Redo。虽然 input 的 `type` 相同，也不代表工具参数语义或 Runtime 类型完全相容。任何未资格化 Step/引用都仅支持 Source 编辑。详细约束见 [D4 Phase Designer](phase-designer.md)。
