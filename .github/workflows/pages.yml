@@ -37,6 +37,8 @@ jobs:
         run: npm run typecheck
       - name: Bundle browser site
         run: npm run build
+      - name: Chromium E2E — CreatedSession visible Route paths
+        run: node scripts/edge-smoke.mjs
       - name: Check static site and asset references
         run: |
           python3 - <<'PY'
@@ -102,6 +104,7 @@ jobs:
           node --check tests/workbench.test.mjs
           node --check tests/journey.test.mjs
           node --check scripts/build.mjs
+          node --check scripts/edge-smoke.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
