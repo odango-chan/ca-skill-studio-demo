@@ -16,7 +16,7 @@ test("Procedure tree has one stable DOM identity originating inside the asset ex
 test("Procedure navigation is parented immediately under its procedure.yaml entry, not appended after all files",()=>{
   assert.match(app,/const isProcedureFile=file\.path==="assurance\/procedure\.yaml"\|\|/);
   assert.match(app,/const group=el\("div","asset-procedure-entry"\)/);
-  assert.match(app,/const row=el\("div","asset-procedure-row"\)/);
+  assert.match(app,/const row=el\("div","asset-file-row asset-procedure-row"\)/);
   assert.match(app,/row\.append\(toggle,btn\)/);
   assert.match(app,/group\.appendChild\(row\);\s*procedureTree\.hidden=!expanded;\s*group\.appendChild\(procedureTree\);\s*parent\.appendChild\(group\)/);
   assert.match(app,/else parent\.appendChild\(btn\)/);

@@ -3,60 +3,69 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
 const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
-const html=read("site/index.html");
-const app=read("site/app.mjs");
-const css=read("site/light.css");
+const html=read("site/index.html"),app=read("site/app.mjs"),css=read("site/light.css");
 
-test("toolbar keeps modes visible, while panel and fit actions live inside View menu",()=>{
-  const toolbar=html.slice(html.indexOf('class="editorbar compact-toolbar"'),
-    html.indexOf('<div id="editorBody"'));
-  const menu=toolbar.slice(toolbar.indexOf('id="viewMenu"'));
-  const beforeMenu=toolbar.slice(0,toolbar.indexOf('id="viewMenu"'));
-  for(const id of ["toggleExplorer","inspectorVisibility","fit"]){
-    assert.match(menu,new RegExp('id="'+id+'"'));
-    assert.doesNotMatch(beforeMenu,new RegExp('id="'+id+'"'));
+test("sidebar toggle lives in its own Explorer header, with a separate reopen rail",()=>{
+  const explorer=html.slice(html.indexOf('<aside class="explorer"'),html.indexOf('</aside>'));
+  const rail=html.slice(html.indexOf('id="explorerRail"'),html.indexOf('class="editor"'));
+  const toolbar=html.slice(html.indexOf('class="editorbar compact-toolbar"'),html.indexOf('id="editorBody"'));
+  assert.match(explorer,/class="explorer-header"/);
+  assert.match(explorer,/id="toggleExplorer"/);
+  assert.match(rail,/id="reopenExplorer"/);
+  assert.match(rail,/aria-controls="explorerPanel"/);
+  assert.doesNotMatch(toolbar,/id="toggleExplorer"|id="reopenExplorer"/);
+  for(const id of ["toggleExplorer","explorerRail","reopenExplorer"])
     assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1);
+});
+test("sidebar can be reopened after closing, without relying on an editor menu",()=>{
+  assert.match(app,/function updatePanelControls\(\)/);
+  assert.match(app,/explorerRail"\)\.hidden=explorerOpen/);
+  assert.match(app,/explorerPanel"\)\.hidden=!explorerOpen/);
+  assert.match(app,/reopenExplorer"\)\.addEventListener\("click",\(\)=>setExplorerOpen\(true\)\)/);
+  assert.match(app,/toggleExplorer"\)\.addEventListener\("click",\(\)=>setExplorerOpen\(false\)\)/);
+  assert.match(app,/aria-expanded",String\(explorerOpen\)/);
+  assert.match(css,/\.workbench\[data-explorer="closed"\]\{grid-template-columns:38px minmax\(0,1fr\)/);
+  assert.match(css,/\.explorer-rail\{/);
+});
+test("graph display controls are not hidden in a View menu",()=>{
+  const toolbar=html.slice(html.indexOf('class="editorbar compact-toolbar"'),html.indexOf('id="editorBody"'));
+  assert.doesNotMatch(html,/id="viewMenu"|id="viewMenuTitle"/);
+  for(const id of ["editorModes","mode-visual","mode-source","mode-split",
+    "graphViewOptions","layoutDirection","neighborsOnly","showAllLabels",
+    "centerSelection","fit","inspectorVisibility","resetButton"]){
+    assert.match(toolbar,new RegExp('id="'+id+'"'));
   }
-  for(const id of ["mode-visual","mode-source","mode-split"])
-    assert.match(beforeMenu,new RegExp('id="'+id+'"'));
-  assert.match(menu,/id="graphViewOptions"/);
-  assert.match(menu,/id="zoomViewOptions"/);
-  assert.match(menu,/id="resetButton"/);
-});
-test("menu toggles are real actions, preserve visibility state, and restore focus",()=>{
-  assert.match(app,/function updatePanelMenu\(\)/);
-  assert.match(app,/setExplorerOpen\(!explorerOpen\)/);
-  assert.match(app,/setInspectorOpen\(true\)/);
-  assert.match(app,/setInspectorOpen\(false\)/);
-  assert.match(app,/detail\.hidden=!available/);
-  assert.match(app,/nav\.setAttribute\("aria-pressed",String\(explorerOpen\)\)/);
-  assert.match(app,/detail\.setAttribute\("aria-pressed",String\(inspectorOpen\)\)/);
-  assert.match(app,/closeViewMenu\(\)/);
-  assert.match(app,/viewMenu"\)\.querySelector\("summary"\)\.focus\(\)/);
-  assert.match(app,/fit\(\);closeViewMenu\(\)/);
-});
-test("navigation renders nested real file groups and preserves their expansion on source edits",()=>{
-  assert.match(app,/const expandedAssetFolders=new Set\(/);
-  assert.match(app,/const folderPath=parts\.slice\(0,level\+1\)\.join\("\/"\)/);
-  assert.match(app,/disclosure\.open=expandedAssetFolders\.has\(folderPath\)/);
-  assert.match(app,/disclosure\.addEventListener\("toggle"/);
-  assert.match(app,/folders\.set\(folderPath,children\)/);
-  assert.match(app,/btn\.append\(glyph,title\)/);
-  assert.match(app,/fileDirtyState\(activePackage,file\.path\)/);
-  assert.match(css,/\.asset-folder-children\{[^}]*border-left:1px solid/s);
-  assert.match(css,/\.asset-file-label\{[^}]*text-overflow:ellipsis/s);
-  assert.match(html,/id="assetTree"/);
-});
-test("Procedure and Node navigation have lightweight branch symbols and clear indentation",()=>{
-  assert.match(app,/index===items\.length-1\?"└":"├"/);
-  assert.match(app,/item\.kind==="root"\?"◆"/);
-  assert.match(css,/\.procedure-tree button\.child\{padding-left:14px\}/);
-  assert.match(css,/\.asset-section \.procedure-tree\{[^}]*border-left:1px solid/s);
-  assert.match(css,/\.explorer-nodes\[open\] \.outline\{[^}]*border-left:1px solid/s);
-});
-test("source-only and Markdown continue to suppress unavailable graph tools",()=>{
   assert.match(app,/graphViewOptions"\)\.hidden=!isGraph/);
-  assert.match(app,/zoomViewOptions"\)\.hidden=!isGraph/);
   assert.match(app,/fit"\)\.hidden=!isGraph/);
-  assert.match(app,/viewKind==="procedure"&&Boolean\(selection\)/);
+  assert.match(app,/inspectorVisibility"\)\.addEventListener\("click"/);
+  assert.doesNotMatch(app,/viewMenu|closeViewMenu/);
+});
+test("zoom controls are at the left of the graph, not inside toolbar or menu",()=>{
+  const graph=html.slice(html.indexOf('<div id="graphPane"'),html.indexOf('<div id="markdownPane"'));
+  const toolbar=html.slice(html.indexOf('class="editorbar compact-toolbar"'),html.indexOf('id="editorBody"'));
+  for(const id of ["zoomViewOptions","zoomIn","zoomOut"]){
+    assert.match(graph,new RegExp('id="'+id+'"'));
+    assert.doesNotMatch(toolbar,new RegExp('id="'+id+'"'));
+  }
+  assert.match(css,/\.graph-pane \.canvas-zoom-tools\{[^}]*left:12px;bottom:12px/s);
+  assert.match(app,/zoomViewOptions"\)\.hidden=!isGraph/);
+});
+test("contract and procedure file names align despite procedure disclosure arrow",()=>{
+  assert.match(app,/const row=el\("div","asset-file-row asset-procedure-row"\)/);
+  assert.match(app,/const row=el\("div","asset-file-row"\)/);
+  assert.match(app,/const gutter=el\("span","asset-file-gutter"\)/);
+  assert.match(app,/row\.append\(gutter,btn\)/);
+  assert.match(app,/row\.append\(toggle,btn\)/);
+  assert.match(app,/group\.appendChild\(procedureTree\)/);
+  assert.match(css,/\.asset-tree \.asset-file-gutter,\s*\.asset-tree \.asset-procedure-toggle\{/);
+  assert.match(css,/\.asset-tree \.asset-file-row>\.asset-file\{/);
+  assert.match(css,/\.asset-tree \.asset-procedure-entry \.procedure-tree\{/);
+});
+test("navigation remains hierarchical and source remains authoritative",()=>{
+  assert.match(app,/const expandedAssetFolders=new Set\(/);
+  assert.match(app,/disclosure\.open=expandedAssetFolders\.has\(folderPath\)/);
+  assert.match(app,/procedureTree\.hidden=!expanded/);
+  assert.match(app,/fileDirtyState\(activePackage,file\.path\)/);
+  assert.match(app,/history\.record\(source\.value\)/);
+  assert.match(app,/previewVisualRouteEdit/);
 });

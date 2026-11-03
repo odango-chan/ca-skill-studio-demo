@@ -33,7 +33,8 @@ test("one toolbar reuses Visual for Markdown and hides unsupported modes",()=>{
   assert.match(html,/id="editorModes"/);
   assert.match(html,/id="graphViewOptions"/);
   assert.match(html,/id="zoomViewOptions"/);
-  assert.match(html,/id="viewMenuTitle"/);
+  assert.doesNotMatch(html,/id="viewMenuTitle"/);
+  assert.match(html,/id="explorerRail"/);
   assert.match(app,/function updateViewAvailability\(nextKind\)/);
   assert.match(app,/editorModes"\)\.hidden=!hasVisual/);
   assert.match(app,/graphPane"\)\.hidden=!isGraph/);

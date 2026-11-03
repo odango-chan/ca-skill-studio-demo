@@ -140,16 +140,15 @@ function svgEl(name, attrs = {}, text) {
 }
 function message(text) { setText("hint", text); }
 
-function closeViewMenu(){
-  if(!$("viewMenu").open)return;
-  $("viewMenu").open=false;
-  $("viewMenu").querySelector("summary").focus();
-}
-function updatePanelMenu(){
+function updatePanelControls(){
   const nav=$("toggleExplorer");
   nav.setAttribute("aria-expanded",String(explorerOpen));
-  nav.setAttribute("aria-pressed",String(explorerOpen));
-  nav.textContent=explorerOpen?"隐藏左侧导航":"显示左侧导航";
+  nav.setAttribute("aria-label","收起左侧导航");
+  nav.title="收起左侧导航";
+  const rail=$("reopenExplorer");
+  rail.setAttribute("aria-expanded",String(explorerOpen));
+  rail.setAttribute("aria-label","展开左侧导航");
+  rail.title="展开左侧导航";
   const detail=$("inspectorVisibility");
   const available=inspectorOpen||
     (viewKind==="procedure"&&Boolean(selection))||
@@ -163,7 +162,7 @@ function setInspectorOpen(open,recenter=true) {
   const pane=$("workbench");
   pane.dataset.inspector=inspectorOpen?"open":"closed";
   $("inspectorPanel").hidden=!inspectorOpen;
-  updatePanelMenu();
+  updatePanelControls();
   if(recenter)requestAnimationFrame(()=>{
     if(selection?.kind==="node")centerNode(selection.id);
     else fit();
@@ -173,16 +172,15 @@ function setExplorerOpen(open) {
   explorerOpen=Boolean(open);
   $("workbench").dataset.explorer=explorerOpen?"open":"closed";
   $("explorerPanel").hidden=!explorerOpen;
-  updatePanelMenu();
+  $("explorerRail").hidden=explorerOpen;
+  updatePanelControls();
   requestAnimationFrame(()=>{
     if(selection?.kind==="node")centerNode(selection.id);
     else fit();
   });
 }
-$("toggleExplorer").addEventListener("click",()=>{
-  setExplorerOpen(!explorerOpen);
-  closeViewMenu();
-});
+$("toggleExplorer").addEventListener("click",()=>setExplorerOpen(false));
+$("reopenExplorer").addEventListener("click",()=>setExplorerOpen(true));
 $("inspectorVisibility").addEventListener("click",()=>{
   if(inspectorOpen){
     setInspectorOpen(false);
@@ -190,7 +188,6 @@ $("inspectorVisibility").addEventListener("click",()=>{
     renderInspector();
     setInspectorOpen(true);
   }
-  closeViewMenu();
 });
 $("closeInspector").addEventListener("click",()=>setInspectorOpen(false));
 $("showAllLabels").addEventListener("click",()=>{
@@ -241,8 +238,7 @@ function updateViewAvailability(nextKind) {
   $("zoomViewOptions").hidden=!isGraph;
   $("fit").hidden=!isGraph;
   $("procedureBreadcrumbs").hidden=!isGraph;
-  $("viewMenuTitle").textContent="视图";
-  updatePanelMenu();
+  updatePanelControls();
   if(!hasVisual&&mode!=="source")setMode("source");
 }
 function updateMarkdownPreview(text) {
@@ -426,7 +422,7 @@ function renderAssetNavigation(){
     }
     if(isProcedureFile){
       const group=el("div","asset-procedure-entry");
-      const row=el("div","asset-procedure-row");
+      const row=el("div","asset-file-row asset-procedure-row");
       const expanded=current&&procedureNavOpen&&projection?.state==="READY";
       const toggle=button(expanded?"▾":"▸",()=>{
         if(!current){
@@ -449,7 +445,13 @@ function renderAssetNavigation(){
       procedureTree.hidden=!expanded;
       group.appendChild(procedureTree);
       parent.appendChild(group);
-    }else parent.appendChild(btn);
+    }else{
+      const row=el("div","asset-file-row");
+      const gutter=el("span","asset-file-gutter");
+      gutter.setAttribute("aria-hidden","true");
+      row.append(gutter,btn);
+      parent.appendChild(row);
+    }
   }
 }
 function switchFile(path){
@@ -913,7 +915,7 @@ function zoomTo(scale, x = svg.clientWidth / 2, y = svg.clientHeight / 2) {
 }
 $("zoomIn").addEventListener("click", () => zoomTo(camera.scale * 1.18));
 $("zoomOut").addEventListener("click", () => zoomTo(camera.scale / 1.18));
-$("fit").addEventListener("click",()=>{fit();closeViewMenu();});
+$("fit").addEventListener("click",fit);
 svg.addEventListener("wheel", event => {
   event.preventDefault();
   const rect = svg.getBoundingClientRect();
@@ -1022,7 +1024,6 @@ $("neighborsOnly").addEventListener("click",()=>{
 $("centerSelection").addEventListener("click",()=>{
   if(selection?.kind==="node")centerNode(selection.id);
   else fit();
-  closeViewMenu();
 });
 function chooseEdgeRoute(bundle) {
   const i=bundle.routes.findIndex(r=>selection?.kind==="route"&&selection.id===r.id);
@@ -1242,11 +1243,6 @@ $("undoButton").addEventListener("click", () => runHistory("undo"));
 $("redoButton").addEventListener("click", () => runHistory("redo"));
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !$("patchDialog").hidden) { closePreview(); return; }
-  if (event.key === "Escape" && $("viewMenu").open) {
-    $("viewMenu").open=false;
-    $("viewMenu").querySelector("summary").focus();
-    return;
-  }
   if (event.key === "Escape" && !["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName)) {
     clearSelection();return;
   }

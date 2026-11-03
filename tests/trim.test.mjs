@@ -19,7 +19,9 @@ test("one file identity, one edit status, one compact editor toolbar",()=>{
 test("editor uses progressive disclosure without duplicating object panels",()=>{
   assert.match(html,/id="nodeOutlineDisclosure"/);
   assert.match(html,/class="sample-picker"/);
-  assert.match(html,/id="viewMenu"/);
+  assert.doesNotMatch(html,/id="viewMenu"/);
+  assert.match(html,/id="explorerRail"/);
+  assert.match(html,/id="reopenExplorer"/);
   assert.match(html,/id="inspectorPanel"/);
   assert.doesNotMatch(html,/id="nodeQuickCard"|id="toggleInspector"/);
   assert.doesNotMatch(html,/class="inspector-footer"|class="inspector-sequence"/);

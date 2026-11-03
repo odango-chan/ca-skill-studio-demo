@@ -6,7 +6,7 @@ ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前实现（Stage: View Menu Consolidation + Hierarchical Explorer + Route Rewire）：
+当前实现（Stage: Direct Canvas Controls + Explorer-owned Collapse + Aligned File Tree）：
 
 - **真实多文件 Skill Package 示例**：从固定 `ca-agent-demo@bf445ad` 源码精确归档 `ensure-pdu-session` 的 4 个 Runtime Asset 文件和 `establish-pdu-session` 的 13 个运行相关文件（SKILL.md、Contract、Procedure、Predicates、3 个 Script、6 个 Schema；不展示 Case）。文件树可切换编辑，修改留在各文件独立的浏览器内存工作副本，当前文件可单独导出、整套文件可导出 ZIP；不增加 Package 内的 sidecar 文件。
 - **Source 语法高亮**：YAML、Markdown、Python、JSON 本地着色；源文件仍由原生 textarea 编辑，着色层只读、HTML 转义、滚动同步；超出 260K 字符或不支持的扩展名安全退回纯文本，不引入云端代码服务。
@@ -16,7 +16,7 @@ https://odango-chan.github.io/ca-skill-studio-demo/
 - **来源驱动的更多枚举**：Ensure Verify Node 从该 Package `predicates.yaml` 选择；CreatedSession 的 Phase Verify Step 从其真实 PredicateSet 选择引用（具体步骤的折叠编辑区）；CreatedSession Route 目标从当前 Procedure 已定义的 Node 列表选择；Contract `planning.maxActions` 保留自由整数输入并增加常用预算预设。选择只负责局部 AST Scalar Patch 与完整源码 Diff、Revision guard 和重新投影；不代替业务正确性 / 3GPP Runtime 验证。
 - 从真实 Demo Procedure YAML 投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
 - CreatedSession 样本支持 Root 和 5 个 Child Procedure 的下钻与返回，保留 Node 顺序和 Route Source（operator / preconditions / postconditions）；Phase Step 在 Inspector 按顺序展示，不把局部过程冒充业务 Node。
-- **UX Consolidation**：删去重复的 Node Quick Card 和独立 Inspector 开关。单击 Node / Route 直接进入唯一的上下文 Inspector；关闭后回到宽画布。布局方向、标签策略、邻居焦点与缩放合并进单个 View 菜单。
+- **UX Consolidation**：删去重复的 Node Quick Card 和独立 Inspector 开关。单击 Node / Route 直接进入唯一的上下文 Inspector；关闭后回到宽画布。布局方向、标签策略、邻居焦点保留为直接操作，缩放放在画布左下。
 - **UX Trim 信息减负**：移除重复的编辑器标题 / 文件状态、空 Problems 与运行时说明、重复计数和 Canvas 状态浮层；文件名与未导出修改只在顶栏显示，Procedure 面包屑与 Visual / Source / Split 合为一条紧凑工具栏。仅显示真正存在的 Preconditions / Postconditions / Routes，Node Inspector 默认以 Operator 和可折叠信息为主。Sample 与 Node Outline 按需展开，必要的 Source 错误与 Patch Diff 保留。
 - **资产优先的左栏**：示例现在加载真实 Runtime / Model-context 文件组成的 Package（仅固定样本）；Local 文件导入仍是单文件。Root / Child Procedure 是 procedure.yaml 内部视图，Node Outline 默认为折叠的线性导航。Case、Design 和其他非运行相关文件不会出现在示例资产树里。
 - **Inspector 统一入口**：准备、执行、确认、路由在一个上下文面板中，低频内容默认折叠；Phase Step 与 Route 仍保留原始 Source 路径和行号；只读与可编辑资格严格分离。
@@ -28,7 +28,7 @@ https://odango-chan.github.io/ca-skill-studio-demo/
 - **Ensure Route 编辑边界**：保持原来的严格约束，仅允许固定 ensure 结构中的两条失败 Route 修改为已有终态；必须 Preview Source Diff → Apply → 可撤销。CreatedSession Route 使用独立的 Source-backed Preview Patch，候选项限定为该 Procedure 真实 Node，并逐字段检查其他节点、步骤与路由没有变化。
 - **Visual 连线目标拖动编辑（首条真实图形交互）**：单击现有 Route，若其 Source 取得编辑资格，连线上出现 ↗ 手柄；拖动到另一个允许的目标 Node，必须经 YAML Diff Preview → Apply，最终由 Source Patch + Undo/Redo 保存在浏览器工作副本。Ensure 仅两条失败 Route；CreatedSession 仅当前 Procedure 现有节点。拖到空白 / 原目标 / 未授权节点或编辑过程中 Source 变化，拒绝修改。**此操作是现有 Route 的重定向，不是新建连线、自动增删 Node 或调整 YAML 节点布局**。
 - **NODES 纵向空间自适应**：桌面端展开时占用左栏文件区与底部操作之间的剩余空间，Node Outline 独立滚动，不再受 220px 固定上限；窄屏时使用更大的视口相对上限。仍保持按需折叠，避免恢复信息过载。
-- **工具栏与视图菜单整理**：主要栏保留 Visual / Source / Split（按文件能力显隐）；原独立的左侧导航开关及「适配画布」收进统一视图菜单，增加在适用时显示的右侧属性开关。图形方向、聚焦、标签、缩放与恢复初始文件仍在该菜单。关闭菜单后键盘焦点返回菜单标题。
+- **直接可见的画布操作**：取消「视图」下拉菜单；Visual / Source / Split、布局方向、邻居焦点、标签、定位、适配，以及适用时的属性开关与恢复按钮都在编辑区工具栏。放大和缩小按钮位于流程画布左下侧。左侧导航的折叠按钮置于 Explorer 自己的标题旁，收起后保留细窄的左侧重新展开入口，不需要寻找菜单。
 - **真实层级的资产树**：文件夹现在可以展开/折叠，文件以 ▤ 标示，Folder 内缩进与细连接线分层；Procedure 使用 ◆ / ├ / └ 区分 Root 与 Child，NODES 保持已有 Operator 标识。Folder 展开状态保留在浏览器当前会话的工作区内存中，即使编辑 Source 触发重新渲染也不会折叠。原有长文件名单行省略、鼠标悬停路径与未导出修改标记保留。
 - **Procedure 层级修正**：Root / Child 不再额外列在所有文件的末尾，而是作为 `assurance/procedure.yaml` 的真正子层，紧跟该文件显示。文件名负责打开 Source，旁边的 ▸ / ▾ 负责展开或收起子流程；当前没有有效 Procedure 投影时收起子树。编辑、切换文件、返回 Root 后仍保留展开意图，且不重复创建树形导航。
 - Source 修改与此受限 Visual Patch 共用**有上限的内存 Undo / Redo 历史**；每次 Source 输入事件视作独立事务，尚无打字分组或持久历史。
@@ -68,7 +68,7 @@ Visual 当前在 ensure 单 Procedure 的**两条固定失败终态 Route**支�
 - 文件状态表示是否与本次打开时的文本相同；导出触发浏览器下载，不是直接保存回原文件，也不会替用户标记为已保存。
 - 界面元素和投影模型由静态 / 模型层回归检查；真实鼠标、键盘、辅助技术及手机交互浏览器 E2E 仍需单独验收。
 
-UX Consolidation 的自动化测试覆盖 View 菜单与单一 Inspector 控件、Node Journey 语义投影、Route Source 隔离和 Source Patch 边界。**真实浏览器 E2E、视觉截图与可访问性测试仍为 NOT_RUN**，部署成功不应等同于这些验收完成。
+UX Consolidation 的自动化测试覆盖直接操作与单一 Inspector 控件、Node Journey 语义投影、Route Source 隔离和 Source Patch 边界。**真实浏览器 E2E、视觉截图与可访问性测试仍为 NOT_RUN**，部署成功不应等同于这些验收完成。
 
 参见 [UX Consolidation / 与原始设计对照](docs/ux/ux-consolidation.md)。原始 authoring-first 设计仍在未合并的 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)，当前单文件 Demo 不等于完整 Skill Package IDE。
 
@@ -108,10 +108,10 @@ Visual 仅表示有可用的可视化表达，不暗示完整的图形编辑资�
 
 ## Navigation polish (2026-11-03)
 
-- One visible View menu provides panel visibility, canvas fit, layout and zoom controls. Do not restore redundant toolbar buttons.
+- No generic View dropdown: modes and relevant graph display controls are visible in the toolbar; canvas zoom is anchored at the lower-left of the graph.
 - Asset groups reflect file paths, not invented Skill metadata; disclosure stays expanded/collapsed across reactive tree rebuilds.
 - Procedure hierarchy is navigation within procedure.yaml, not a separate file or a second authoritative representation.
-- When there is no qualified Inspector context, the View menu hides the Inspector entry rather than presenting a dead button.
+- When there is no qualified Inspector context, the toolbar hides the Inspector action rather than presenting a dead button.
 - Browser interaction, screen reader and responsive visual E2E remain NOT_RUN.
 
 ## Procedure navigation nesting (2026-11-03)
@@ -119,3 +119,7 @@ Visual 仅表示有可用的可视化表达，不暗示完整的图形编辑资�
 Previously the `procedureTree` was a sibling of the entire `assetTree`, so even though its items referred to `assurance/procedure.yaml`, they appeared after all assets. It now has one stable DOM identity, mounted inside that source file's row with a separate disclosure control. The nav is only shown for the currently selected Procedure document with a READY projection. When unavailable it remains hidden, not incorrectly relocated to the explorer footer.
 
 This is a navigation and layout fix, not a YAML restructuring or a second source of truth. The file and its children are not separately exported. Static DOM integrity and layout tests cover the relationship; interactive browser visual checks remain NOT_RUN.
+
+## 2026-11-03 · Sidebar and graph controls
+
+The Explorer owns its collapse button beside its title. When collapsed, a slim adjacent rail exposes the reopen button. The editor toolbar contains graph layout, neighbor focus, label visibility, centering, fit and editing modes without a secondary View menu. The zoom pair is inside the left edge of the graph canvas. Contract and procedure.yaml stay aligned at the same asset-tree depth using equal-width disclosure gutters; only Root/Child Procedure entries are indented under procedure.yaml. Automated source/UI assertions cover these relationships; browser-driven interaction remains NOT_RUN.

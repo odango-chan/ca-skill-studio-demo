@@ -705,3 +705,137 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   min-width:0;
   max-width:100%;
 }
+
+
+/* Sidebar control belongs to Explorer. When closed, a slim adjacent rail reopens it. */
+.explorer-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  flex:0 0 auto;
+  min-height:39px;
+  padding:7px 12px 6px 17px;
+  border-bottom:1px solid #e6edf2;
+  color:#5a7288;
+}
+.explorer-header-label{font-size:11px;font-weight:650;letter-spacing:.02em}
+.explorer-toggle,
+.explorer-rail button{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:27px;height:27px;border-radius:6px;
+  background:transparent;border:1px solid transparent;
+  font:23px/1 system-ui,sans-serif;color:#688497;
+  cursor:pointer;
+}
+.explorer-toggle:hover,.explorer-rail button:hover{
+  background:#eaf5f5;border-color:#d0e8e5;color:#0c8173
+}
+.explorer-toggle:focus-visible,.explorer-rail button:focus-visible{
+  outline:2px solid #148b7c;outline-offset:2px
+}
+.explorer-rail{
+  min-width:0;display:flex;align-items:flex-start;justify-content:center;
+  background:#f8fafc;border-right:1px solid #e1eaf1;padding-top:8px;
+}
+.workbench[data-explorer="closed"]{grid-template-columns:38px minmax(0,1fr) 370px}
+.workbench[data-explorer="closed"][data-inspector="closed"]{
+  grid-template-columns:38px minmax(0,1fr)
+}
+
+/* All actual graph options live directly in the authoring toolbar, not a menu. */
+.compact-toolbar .toolbar-graph-controls{
+  display:flex;align-items:center;gap:4px;min-width:0;flex:none
+}
+.compact-toolbar .toolbar-graph-controls button,
+.compact-toolbar .toolbar-minor-action,
+.compact-toolbar .toolbar-layout{
+  border:1px solid transparent;border-radius:6px;
+  background:transparent;color:#597388;font-size:11px;
+  white-space:nowrap;
+}
+.compact-toolbar .toolbar-graph-controls button,
+.compact-toolbar .toolbar-minor-action{
+  cursor:pointer;padding:7px 8px;min-height:31px
+}
+.compact-toolbar .toolbar-graph-controls button:hover,
+.compact-toolbar .toolbar-minor-action:hover{
+  background:#edf6f7;color:#0e7c70;border-color:#d5e7e6
+}
+.compact-toolbar .toolbar-graph-controls button[aria-pressed="true"],
+.compact-toolbar .toolbar-minor-action[aria-pressed="true"]{
+  background:#e7f5ee;border-color:#c6e6d6;color:#0a7466
+}
+.compact-toolbar .toolbar-layout{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 4px 3px 8px
+}
+.compact-toolbar .toolbar-layout select{
+  border:1px solid #d9e5ed;border-radius:5px;padding:5px 5px;
+  background:#fff;color:#456176;max-width:80px;font-size:11px
+}
+.compact-toolbar .toolbar-minor-action{flex:none}
+@media(max-width:1180px){
+  .workbench[data-explorer="closed"]{grid-template-columns:38px minmax(0,1fr) 315px}
+  .workbench[data-explorer="closed"][data-inspector="closed"]{
+    grid-template-columns:38px minmax(0,1fr)
+  }
+  .compact-toolbar{flex-wrap:wrap;row-gap:3px}
+  .compact-toolbar .toolbar-graph-controls{flex-wrap:wrap}
+  .compact-toolbar .mode-spacer{flex:1 1 auto}
+}
+@media(max-width:980px){
+  .workbench[data-inspector="closed"][data-explorer="closed"]{
+    grid-template-columns:38px minmax(0,1fr)
+  }
+  .workbench[data-inspector="open"][data-explorer="closed"] .explorer-rail{
+    flex:none;height:38px;min-height:38px;padding:4px 8px;
+    justify-content:flex-start;align-self:stretch;border-bottom:1px solid #e1eaf1
+  }
+}
+@media(max-width:680px){
+  .workbench[data-explorer="closed"] .explorer-rail{
+    width:100%;height:36px;min-height:36px;padding:3px 9px;
+    justify-content:flex-start;border-right:0;border-bottom:1px solid #e1eaf1
+  }
+}
+
+/* Zoom is a left-edge canvas control, independent of editor toolbar width. */
+.graph-pane .canvas-zoom-tools{
+  position:absolute;left:12px;bottom:12px;z-index:4;
+  display:flex;flex-direction:column;gap:2px;padding:4px;
+  border:1px solid #dce6ed;border-radius:9px;
+  background:#ffffffed;box-shadow:0 4px 15px #20354f18;
+}
+.graph-pane .canvas-zoom-tools button{
+  display:flex;align-items:center;justify-content:center;
+  width:32px;height:31px;border:0;border-radius:6px;
+  background:transparent;color:#45687e;font:18px/1 ui-monospace,monospace;
+  cursor:pointer;
+}
+.graph-pane .canvas-zoom-tools button:hover{
+  background:#e7f5f0;color:#0b7c70
+}
+.graph-pane .canvas-zoom-tools button:focus-visible{
+  outline:2px solid #108577;outline-offset:-2px
+}
+
+/* All file names share one indentation. Only the Procedure children nest. */
+.asset-tree .asset-file-row{
+  display:flex;align-items:center;width:100%;
+  min-width:0;max-width:100%;
+}
+.asset-tree .asset-file-gutter,
+.asset-tree .asset-procedure-toggle{
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 18px;width:18px;min-width:18px;
+  height:27px;padding:0;margin:0 1px 0 0
+}
+.asset-tree .asset-file-gutter{pointer-events:none}
+.asset-tree .asset-file-row>.asset-file{
+  flex:1 1 auto;width:auto;min-width:0;max-width:100%;
+  padding-left:3px;
+}
+.asset-tree .asset-procedure-row{width:100%;min-width:0}
+.asset-tree .asset-procedure-entry .procedure-tree{
+  margin-left:23px;max-width:calc(100% - 23px);
+}

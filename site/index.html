@@ -27,6 +27,10 @@
 
   <main class="workbench" id="workbench" data-explorer="open" data-inspector="closed">
     <aside class="explorer" id="explorerPanel" aria-label="SKILL Explorer">
+      <div class="explorer-header">
+        <span class="explorer-header-label">资源</span>
+        <button id="toggleExplorer" class="explorer-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" aria-label="收起左侧导航" title="收起左侧导航">◧</button>
+      </div>
       <section class="explorer-section asset-section" aria-label="当前文件和流程">
         <div class="explorer-compact-heading">文件 <span id="fileCount" class="scope-tag" title="工作区实际加载的文件数量">单文件</span></div>
         <div id="assetTree" class="asset-tree">
@@ -52,6 +56,10 @@
         <input id="filePicker" type="file" hidden accept=".yaml,.yml,.md,.json,.txt,.py,.js,.ts,.sh,text/plain">
       </div>
     </aside>
+    <div id="explorerRail" class="explorer-rail" hidden>
+      <button id="reopenExplorer" type="button" aria-controls="explorerPanel" aria-expanded="false"
+        aria-label="展开左侧导航" title="展开左侧导航">›</button>
+    </div>
 
     <section class="editor" aria-label="Procedure authoring editor">
       <div class="editorbar compact-toolbar">
@@ -65,38 +73,20 @@
           <button id="mode-split" type="button" aria-pressed="false">Split</button>
         </div>
         <span class="mode-spacer"></span>
-        <details class="view-menu" id="viewMenu">
-          <summary aria-label="视图与面板选项"><span id="viewMenuTitle">视图</span> <span aria-hidden="true">⌄</span></summary>
-          <div class="view-menu-panel">
-            <div class="menu-heading">面板</div>
-            <button id="toggleExplorer" type="button" aria-controls="explorerPanel" aria-expanded="true" aria-pressed="true">隐藏左侧导航</button>
-            <button id="inspectorVisibility" type="button" aria-controls="inspectorPanel" aria-pressed="false" hidden>显示右侧属性</button>
-            <div class="menu-divider"></div>
-            <div id="graphViewOptions">
-            <div class="menu-heading">图形显示</div>
-            <label class="menu-field" for="layoutDirection">布局方向
-              <select id="layoutDirection" aria-label="自动布局方向">
-                <option value="RIGHT">水平 · 左到右</option>
-                <option value="DOWN">垂直 · 上到下</option>
-              </select>
-            </label>
-            <button id="neighborsOnly" type="button" aria-pressed="false" title="仅显示选中节点的一跳邻居">只看直接邻居</button>
-            <button id="showAllLabels" type="button" aria-pressed="false" title="显示全部 Route 的标签">显示全部 Route 标签</button>
-            <button id="centerSelection" type="button">定位当前选择</button>
-            <button id="fit" type="button">适配画布</button>
-            <div class="menu-divider"></div>
-            </div>
-            <div class="menu-heading">操作</div>
-            <button id="resetButton" type="button" title="恢复打开时的原始文本">恢复初始文件</button>
-            <div class="menu-divider"></div>
-            <div id="zoomViewOptions"><div class="menu-heading">缩放</div>
-            <div class="menu-zoom">
-              <button id="zoomOut" type="button" aria-label="缩小">−</button>
-              <button id="zoomIn" type="button" aria-label="放大">+</button>
-            </div></div>
-          </div>
-        </details>
-
+        <div id="graphViewOptions" class="toolbar-graph-controls" role="group" aria-label="流程图显示选项">
+          <label class="toolbar-layout" for="layoutDirection"><span>布局</span>
+            <select id="layoutDirection" aria-label="自动布局方向">
+              <option value="RIGHT">水平</option>
+              <option value="DOWN">垂直</option>
+            </select>
+          </label>
+          <button id="neighborsOnly" type="button" aria-pressed="false" title="仅显示选中节点的一跳邻居">邻居</button>
+          <button id="showAllLabels" type="button" aria-pressed="false" title="显示全部 Route 标签">标签</button>
+          <button id="centerSelection" type="button" title="定位当前选择">定位</button>
+          <button id="fit" type="button" title="适配画布">适配</button>
+        </div>
+        <button id="inspectorVisibility" class="toolbar-minor-action" type="button" aria-controls="inspectorPanel" aria-pressed="false" hidden>属性</button>
+        <button id="resetButton" class="toolbar-minor-action" type="button" title="恢复当前文件的初始文本（需要确认）">恢复</button>
       </div>
       <div id="editorBody" class="editor-body" data-mode="visual">
         <div id="graphPane" class="graph-pane" data-labels="key">
@@ -104,6 +94,10 @@
             <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#9cb0c7"></path></marker></defs>
             <g id="world"></g>
           </svg>
+          <div id="zoomViewOptions" class="canvas-zoom-tools" role="group" aria-label="缩放流程图">
+            <button id="zoomIn" type="button" aria-label="放大流程图" title="放大">+</button>
+            <button id="zoomOut" type="button" aria-label="缩小流程图" title="缩小">−</button>
+          </div>
           <div id="graphWarning" class="graph-warning" role="alert" hidden></div>
         </div>
         <div id="markdownPane" class="markdown-pane" hidden aria-label="Markdown 预览" role="region">
