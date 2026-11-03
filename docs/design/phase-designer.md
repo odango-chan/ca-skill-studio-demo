@@ -1,7 +1,8 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: Proposed · Date: 2026-11-03**  
-**Implementation: A1 candidate / PARTIAL · Acceptance: NOT_RUN until verified CI**  
+**Status: A1 Accepted (bounded Studio editor only); A2–A4 Proposed · Date: 2026-11-03**  
+**Implementation: A1 implemented in PR #16; A2–A4 NOT_STARTED**  
+**Acceptance: A1 229 tests + real Chromium PASS at d349526; final PR head recheck required · Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
 ## Model and visual hierarchy
@@ -36,3 +37,7 @@ D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, numbe
 - Gates: unit/negative tests, TypeScript typecheck, build and real Chromium browser interactions. No Runtime/5GC operation or qualification will run.
 
 A2/A3/A4 are intentionally NOT_STARTED; do not generalize A1's input-type equality into a full Skill Runtime binding validator.
+
+## A1 actual acceptance
+
+[PR #16](https://github.com/odango-chan/ca-skill-studio-demo/pull/16) contains the bounded Source patch and Inspector editor; [CI #41631114017](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41631114017) verified 229/229 tests, TypeScript, build, and Chromium, including the selected CreatedSession preparation Step, exact Diff, cancel, Apply, Undo/Redo, and Source restoration. Later [CI #41631247083](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41631247083) passed unit/type/build but its Chromium could not start the DevTools debugging port (runner environment); that failure must not be represented as a browser-test assertion PASS. Final head acceptance to be checked before merge.

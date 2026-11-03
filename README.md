@@ -39,4 +39,4 @@ React 19 / React Flow 12 / ELK / TypeScript 7 / YAML 2.9.1 / Node 24 / esbuild�
 
 画布缩放提供三个并列按钮：**适配**（完整流程）、**横向**（宽度铺满）、**纵向**（高度铺满）。它们只改变当前流程图的视口，不会修改 Source，更多细节见 [Workbench](docs/design/authoring-workbench.md)。
 
-D4 Phase Designer 正在实现有界的 Phase Step 编辑；第一阶段只允许在 Inspector 中将已有 `with.<key>.from` 更换为当前 Procedure 中声明、且类型相同的 `input.*`，不增加流程图节点或改变步骤顺序。见 [D4 设计](docs/design/phase-designer.md) 与 [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)。
+D4 Phase Designer 的 A1 已实现有界的 Phase Step 编辑；目前只允许在 Inspector 中将已有 `with.<key>.from` 更换为当前 Procedure 中声明、且类型相同的 `input.*`，不增加流程图节点或改变步骤顺序。见 [D4 设计](docs/design/phase-designer.md) 与 [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)。
