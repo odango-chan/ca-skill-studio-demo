@@ -1,5 +1,10 @@
 # D2 Node Designer · source-backed authoring
 
+**Status: Accepted (completed D2 milestone record) · Date: 2026-11-03**  
+**Current state:** [WORK](WORK.md) · [TRACEABILITY](TRACEABILITY.md)
+
+此文记录 D2-A1 至 A5 的实现及验收边界；后续 Route/Phase 的拟议能力见 [D3](design/route-designer.md)，不能将 D3 的 Proposed 写成 D2 PASS。
+
 Status: D2-A1 through D2-A5 bounded editing and editor checks implemented. Full Runtime qualification remains out of scope.
 
 ## Architecture

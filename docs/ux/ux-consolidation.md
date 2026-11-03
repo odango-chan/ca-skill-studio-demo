@@ -1,3 +1,13 @@
+# Historical UX Consolidation · superseded
+
+**Status: Deprecated · Date: 2026-11-03**  
+**Canonical current workbench:** [Authoring Workbench](../design/authoring-workbench.md)  
+**Current implementation:** [WORK](../WORK.md), [TRACEABILITY](../TRACEABILITY.md)
+
+**Historical note:** The following early single-file/read-only/View-menu/Chromium-NOT_RUN phase was superseded by real sample Package navigation, D2 limited Visual edits, direct toolbar controls and tested Chromium interactions. It is preserved as an early UX decision record. Do not implement against its old assumptions; update the canonical Workbench instead.
+
+---
+
 # UX Consolidation — Authoring-first Single-file Demo
 
 **Status:** Implemented layout simplification on `main`, against the proposed original UX baseline in [draft PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1). **This note does not merge or supersede that PR.**

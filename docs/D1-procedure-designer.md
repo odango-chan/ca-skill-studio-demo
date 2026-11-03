@@ -1,5 +1,10 @@
 # Procedure Designer · D1 UI 迁移
 
+**Status: Accepted (completed D1 milestone record) · Date: 2026-11-03**  
+**Current behavior:** [Workbench](design/authoring-workbench.md) · [WORK](WORK.md)
+
+本页只描述 D1 范围与当时验收；其中有关“D2 尚未实现”的语句是历史阶段陈述，并不代表当前代码。
+
 范围：**只迁移 Procedure 画布**。不修改 SKILL DSL，不重写 Source / Inspector，不增加后端，也不开发 Case/验证发布工作台。
 
 ## 技术决策

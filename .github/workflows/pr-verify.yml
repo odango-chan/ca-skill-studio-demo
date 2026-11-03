@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - 'site/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'AGENTS.md'
+      - '.gitignore'
       - 'tests/**'
       - 'scripts/**'
       - 'package.json'
