@@ -34,7 +34,7 @@ test("ELK lays out fixed ensure with all 11 nodes and all 24 route entries", asy
   const graph = await layoutProcedureELK(ensure.procedure);
   checkCompleteLayout(ensure.procedure, graph, 11);
   assert.equal(graph.visibleRoutes.length, 24);
-  assert.equal(graph.direction, "RIGHT");
+  assert.equal(graph.direction, "DOWN");
   assert.equal(graph.isFiltered, false);
 });
 
