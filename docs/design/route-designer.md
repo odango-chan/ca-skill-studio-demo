@@ -48,7 +48,15 @@ Duplicate Outcome；operator 和 Phase 的相同 Outcome 被错配；最后一�
 ## Review decisions still open
 
 - Outcome 名称、Outcome State 合法性应从对应 Demo Schema / Operator 语义得出，不能仅因 YAML parser READY 就放行；缺 owner 合同先限定 subset。
-- Phase ``on` 的具体规则与局部 `steps`/postcondition verdict 的映射需单独确认，不能默认为 Operator 的同类 Outcome。
+- Phase `on` 的具体规则与局部 `steps`/postcondition verdict 的映射需单独确认，不能默认为 Operator 的同类 Outcome。
 - 删除可能影响引用或下游消费；无法证明影响范围的语义必须 Source-only / Editor Warning，不能用 UI 猜测 Runtime 结果。
 
 先在 Issue #7 完成最小 A1 契约评审，再写代码和聚焦测试，最后执行真实浏览器门禁。没有验收前保持 NOT_STARTED/NOT_RUN。
+
+## D3-A1 implementation candidate (PR #10)
+
+**Branch candidate only:** `site/route-create.mjs` and `tests/route-create.test.mjs`. This does **not** change the `main` status of D3 (Proposed / NOT_STARTED / NOT_RUN).
+
+The first slice is limited to **existing explicit quoted `'on'` maps** on nonterminal Node Operators. It adds exactly one `outcome: existingTarget` line with original line endings, no creation of new `on` maps and no Phase modification. Candidate Outcome labels come only from Outcome names already observed for the same exact Operator value in the current Source (or the same `verify`/`predicate` operator kind). They are editor hints, not Runtime owner permission or a guarantee of real execution. If nothing is qualified, the Inspector remains Source-only for this capability.
+
+Preview integrity is recomputed on Apply; source revision, structural snapshot, Route ID/origin and non-target bytes are checked. Chromium acceptance will exercise selection → preview → cancel → apply → Undo/Redo on a fixture with one pre-existing Outcome intentionally removed. D3-A2/D3-A3 remain deferred.
