@@ -29,8 +29,9 @@ test("D3-A1 adds one known verify Outcome with exact source-only line insertion"
   const preview=previewAddRouteOutcome(text,p.name,"observe-target-session",
     "UNKNOWN","unresolved");
   assert.equal(preview.type,"AddRouteOutcome");
-  assert.equal(text.includes("UNKNOWN: unresolved"),false);
-  assert.equal(preview.candidateSource.includes("UNKNOWN: unresolved"),true);
+  assert.equal(p.routes.some(r=>r.id==="observe-target-session:UNKNOWN"),false);
+  assert.equal(projectWorkspace(preview.candidateSource).procedure.routes.some(r=>
+    r.id==="observe-target-session:UNKNOWN"&&r.target==="unresolved"),true);
   assert.equal(preview.sourceSpan.start,preview.sourceSpan.end);
   const output=applyAddRouteOutcome(text,preview),next=projectWorkspace(output);
   assert.equal(next.state,"READY");
