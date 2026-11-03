@@ -146,7 +146,7 @@ function updatePanelControls(){
   const label=explorerOpen?"收起左侧导航":"展开左侧导航";
   nav.setAttribute("aria-label",label);
   nav.title=label;
-  nav.querySelector(".explorer-toggle-icon").textContent=explorerOpen?"‹":"☰";
+  nav.querySelector(".explorer-toggle-icon").textContent=explorerOpen?"‹":"›";
   const detail=$("inspectorVisibility");
   const available=inspectorOpen||
     (viewKind==="procedure"&&Boolean(selection))||
