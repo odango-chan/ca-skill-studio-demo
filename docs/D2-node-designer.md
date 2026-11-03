@@ -17,7 +17,7 @@ Status: A1 first vertical slice; not a complete Node Designer.
 | --- | --- | --- |
 | A1 | Rename existing Node ID with guarded source reference rewrites | Implemented |
 | A2 | Insert typed terminal/call/verify Node onto one existing Route | Implemented · bounded |
-| A3 | Delete Node with explicit reference remediation and start protection | Not implemented |
+| A3 | Delete/merge a same-status terminal or bypass a single-outcome Node, with inbound Route rewrites | Implemented · bounded |
 | A4 | Edit generic Node operator/with/from with source qualification | Not implemented |
 | A5 | Browser interactions, package semantic validation and large graph checks | Not implemented |
 
@@ -52,3 +52,30 @@ A2 **does not** create a disconnected Node, freely create Routes, bulk edit
 Node bindings, guarantee reachability, or validate operation/result compatibility.
 Generated Call/Verify specs are structurally well-formed editing scaffolds and
 require subsequent author review and the actual Skill/Runtime validators before use.
+
+
+## D2-A3 · Guarded Node delete (2026-11-03)
+
+Two explicit deletion modes are permitted across any READY Procedure, without
+CreatedSession-specific mutation logic:
+
+1. **Merge terminal:** a non-start terminal may be removed only when another
+   terminal in the same Procedure has the identical terminal status. Every
+   inbound Route to the deleted Node is retargeted to the chosen terminal.
+2. **Bypass single-outcome Node:** a non-start, non-Procedure Node without
+   preconditions or postconditions, with exactly one operator Route that does
+   not lead back to itself, may be removed. All inbound Routes point to its
+   sole outgoing target. The removed Node's outgoing Route is deleted as well.
+
+Protection: do not delete the start Node; reject ambiguous/multiple outgoing
+outcomes, child Procedure invocations, phase-bearing nodes, references from
+any other Node/Procedure including from: node.output, quoted inbound targets,
+unsupported indentation, overlaps, incomplete patch preview or changed source
+revision. Terminal replacements must have equal status. All untouched Source
+text must be preserved; the operation reprojects the whole Procedure file and
+checks its complete expected semantic delta. Source Diff preview is mandatory.
+
+Not supported: arbitrary Route rewrites, force-delete, replacements of missing
+node outputs, cross-file reference repair, Runtime behavior proof and workflow
+publication. In particular bypassing even a single-outcome call **removes that
+operation** and requires explicit business review before executing the Skill.

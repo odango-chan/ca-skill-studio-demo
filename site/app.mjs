@@ -13,6 +13,7 @@ import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
 import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
 import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "./node-designer.mjs";
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "./node-create.mjs";
+import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from "./node-delete.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
@@ -782,6 +783,34 @@ function addNodeRenameEditor(model){
   return true;
 }
 
+function addNodeDeleteEditor(model){
+  const options=deleteNodeOptions(source.value,activeProcedureId,model.node.id);
+  if(!options)return false;
+  const body=section("删除 Node","D2-A3");
+  body.append(el("p","small-edit-note",
+    options.mode==="merge-terminal"
+      ?"将此终态的全部入站 Route 合并到同状态的另一终态。"
+      :"此 Node 只有一条出口，可将其入站 Route 转向唯一出口目标。"));
+  const label=el("label","attribute-label",
+    "入站 Route 重定向目标（"+options.incomingCount+" 条）");
+  const select=el("select","target-select");
+  select.setAttribute("aria-label","删除 Node 后的重定向目标");
+  for(const target of options.targets){
+    const opt=el("option","",target);opt.value=target;select.append(opt);
+  }
+  label.append(select);body.append(label);
+  const preview=button("预览删除 Node",()=>{
+    try{
+      showPreview(previewNodeDelete(source.value,activeProcedureId,model.node.id,
+        select.value));
+    }catch(error){message("删除未应用："+String(error?.message??error));}
+  },"preview-button");
+  body.append(preview);
+  body.append(el("p","small-edit-note",
+    "删除会移除选中 Node 及其出站 Route；仅有界结构检查，不代替业务确认或 Runtime Validator。"));
+  return true;
+}
+
 function renderContractAttributes(){
   const value=contractMaxActions(source.value,activePackage?.name);
   if(!value)return false;
@@ -897,6 +926,7 @@ function renderNodeJourney(model) {
   const node=model.node;
   addNodeRenameEditor(model);
   addNodeAttributeEditor(model);
+  addNodeDeleteEditor(model);
   if(model.prepare.phase || model.prepare.routes.length){
     const body=journeyStage(1,"准备",
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
@@ -954,7 +984,8 @@ function renderInspector() {
   const editable=Boolean(route&&(eligibleGraphRouteTargets(route.id).length||
     insertNodeOptions(source.value,activeProcedureId,route.id,
       packagePredicateSource(),activePackage?.name)))||
-    Boolean(model&&(nodeRenameAvailable(source.value,activeProcedureId,model.node.id)||
+    Boolean(model&&(deleteNodeOptions(source.value,activeProcedureId,model.node.id)||
+      nodeRenameAvailable(source.value,activeProcedureId,model.node.id)||
       verifyNodeChoices(model.node.id).length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
@@ -1152,12 +1183,16 @@ $("applyPatch").addEventListener("click", () => {
     else if(pendingPatch.type==="InsertNode")
       nextSource=applyNodeInsert(source.value,pendingPatch,
         packagePredicateSource(),activePackage?.name);
+    else if(pendingPatch.type==="DeleteNode")
+      nextSource=applyNodeDelete(source.value,pendingPatch);
     else throw new Error("未知的属性 Patch 类型");
     if(pendingPatch.type==="RenameNode"&&selection?.kind==="node"&&
        activeProcedureId===pendingPatch.procedureId&&selection.id===pendingPatch.nodeId)
       selection={kind:"node",id:pendingPatch.newId};
     if(pendingPatch.type==="InsertNode"&&activeProcedureId===pendingPatch.procedureId)
       selection={kind:"node",id:pendingPatch.nodeId};
+    if(pendingPatch.type==="DeleteNode"&&activeProcedureId===pendingPatch.procedureId)
+      selection=null;
     source.value = nextSource;
     history.record(nextSource);
     closePreview();

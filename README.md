@@ -13,6 +13,9 @@ references fail closed. No CreatedSession-specific Node mutator was added.
 
 D2-A2 adds guarded insertion of a terminal/call/verify Node on a selected Route,
 with an explicit forwarding Outcome for nonterminal nodes.
+D2-A3 adds guarded deletion for duplicate-status terminals and single-outcome
+Node bypass, with inbound Route remediation, source-reference checks and Diff.
+
 
 **Still not implemented:** unrestricted Node creation/deletion, generic operator/phase editing,
 full package import, whole-package Runtime validation and in-place filesystem save.
