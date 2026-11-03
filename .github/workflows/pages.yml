@@ -82,6 +82,7 @@ jobs:
           node --check site/view-policy.mjs
           node --check site/visual-route-edit.mjs
           node --check tests/visual-route-edit.test.mjs
+          node --check tests/navigation-menu.test.mjs
           node --check tests/markdown-preview.test.mjs
           node --check tests/view-policy.test.mjs
           node --check tests/highlight.test.mjs

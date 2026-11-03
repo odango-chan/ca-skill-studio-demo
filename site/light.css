@@ -604,3 +604,46 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .graph-pane svg.is-rerouting{
   cursor:crosshair;
 }
+
+
+/* Navigation consolidation: one View menu for panels/canvas controls; authentic tree hierarchy. */
+.compact-toolbar .breadcrumbs{margin-left:2px}
+.view-menu-panel .menu-heading{padding-top:9px}
+.view-menu-panel #graphViewOptions{min-width:0}
+.view-menu-panel #fit{display:block;width:100%;text-align:left;padding:9px 10px;
+  color:#3f5e78;background:transparent;border:0;border-radius:7px;font-size:11px}
+.view-menu-panel #fit:hover{background:#eef6f9}
+.asset-tree{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:0}
+.asset-folder-group{min-width:0;max-width:100%;margin:1px 0}
+.asset-folder-title{cursor:pointer;display:flex;align-items:center;gap:5px;min-width:0;
+  list-style:none;padding:7px 7px;color:#5e798e;
+  font:600 11px/1.35 ui-monospace,Consolas,monospace;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:6px}
+.asset-folder-title::-webkit-details-marker{display:none}
+.asset-folder-title::before{content:"▸";display:inline-block;flex:0 0 13px;
+  color:#91a3b1;font-size:10px}
+.asset-folder-group[open]>.asset-folder-title::before{content:"▾"}
+.asset-folder-title:hover{background:#f0f5f8}
+.asset-folder-children{margin-left:13px;padding-left:8px;
+  border-left:1px solid #dae5ed;min-width:0;display:flex;flex-direction:column;gap:1px}
+.asset-tree .asset-file{display:flex!important;align-items:center;gap:7px;
+  min-width:0;max-width:100%;white-space:nowrap!important;
+  padding:6px 8px;line-height:1.6}
+.asset-file-icon{flex:none;font-size:12px;color:#9aaebb;line-height:1}
+.asset-tree .asset-file.active .asset-file-icon{color:#0c8772}
+.asset-file-label{display:block;flex:1 1 auto;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.asset-dirty{flex:none;color:#e2a045;font-size:9px}
+.asset-section .procedure-tree{margin:7px 0 2px 20px;padding:1px 0 1px 8px;
+  border-left:1px solid #dce7ee;min-width:0}
+.asset-section .procedure-tree:empty{display:none}
+.asset-section .procedure-tree button{display:flex;align-items:center;gap:5px;
+  width:100%;padding:6px 5px;min-width:0;max-width:100%}
+.asset-section .procedure-tree button.child{padding-left:14px}
+.asset-section .procedure-tree .tree-icon{flex:none;width:16px;min-width:16px;
+  height:auto;background:transparent!important;color:#95acbb;font:12px/1.4 ui-monospace,monospace}
+.asset-section .procedure-tree button.active .tree-icon{color:#0b8875}
+.asset-section .procedure-tree .tree-info{flex:1;min-width:0;overflow:hidden}
+.asset-section .procedure-tree .tree-title{display:block;max-width:100%;
+  white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.explorer-nodes[open] .outline{margin-left:6px;border-left:1px solid #e4ebf2;padding-left:5px}

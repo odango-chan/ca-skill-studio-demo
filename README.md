@@ -6,7 +6,7 @@ ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前实现（Stage: Route Rewire Gesture + Adaptive NODES + File-aware Visual）：
+当前实现（Stage: View Menu Consolidation + Hierarchical Explorer + Route Rewire）：
 
 - **真实多文件 Skill Package 示例**：从固定 `ca-agent-demo@bf445ad` 源码精确归档 `ensure-pdu-session` 的 4 个 Runtime Asset 文件和 `establish-pdu-session` 的 13 个运行相关文件（SKILL.md、Contract、Procedure、Predicates、3 个 Script、6 个 Schema；不展示 Case）。文件树可切换编辑，修改留在各文件独立的浏览器内存工作副本，当前文件可单独导出、整套文件可导出 ZIP；不增加 Package 内的 sidecar 文件。
 - **Source 语法高亮**：YAML、Markdown、Python、JSON 本地着色；源文件仍由原生 textarea 编辑，着色层只读、HTML 转义、滚动同步；超出 260K 字符或不支持的扩展名安全退回纯文本，不引入云端代码服务。
@@ -28,6 +28,8 @@ https://odango-chan.github.io/ca-skill-studio-demo/
 - **Ensure Route 编辑边界**：保持原来的严格约束，仅允许固定 ensure 结构中的两条失败 Route 修改为已有终态；必须 Preview Source Diff → Apply → 可撤销。CreatedSession Route 使用独立的 Source-backed Preview Patch，候选项限定为该 Procedure 真实 Node，并逐字段检查其他节点、步骤与路由没有变化。
 - **Visual 连线目标拖动编辑（首条真实图形交互）**：单击现有 Route，若其 Source 取得编辑资格，连线上出现 ↗ 手柄；拖动到另一个允许的目标 Node，必须经 YAML Diff Preview → Apply，最终由 Source Patch + Undo/Redo 保存在浏览器工作副本。Ensure 仅两条失败 Route；CreatedSession 仅当前 Procedure 现有节点。拖到空白 / 原目标 / 未授权节点或编辑过程中 Source 变化，拒绝修改。**此操作是现有 Route 的重定向，不是新建连线、自动增删 Node 或调整 YAML 节点布局**。
 - **NODES 纵向空间自适应**：桌面端展开时占用左栏文件区与底部操作之间的剩余空间，Node Outline 独立滚动，不再受 220px 固定上限；窄屏时使用更大的视口相对上限。仍保持按需折叠，避免恢复信息过载。
+- **工具栏与视图菜单整理**：主要栏保留 Visual / Source / Split（按文件能力显隐）；原独立的左侧导航开关及「适配画布」收进统一视图菜单，增加在适用时显示的右侧属性开关。图形方向、聚焦、标签、缩放与恢复初始文件仍在该菜单。关闭菜单后键盘焦点返回菜单标题。
+- **真实层级的资产树**：文件夹现在可以展开/折叠，文件以 ▤ 标示，Folder 内缩进与细连接线分层；Procedure 使用 ◆ / ├ / └ 区分 Root 与 Child，NODES 保持已有 Operator 标识。Folder 展开状态保留在浏览器当前会话的工作区内存中，即使编辑 Source 触发重新渲染也不会折叠。原有长文件名单行省略、鼠标悬停路径与未导出修改标记保留。
 - Source 修改与此受限 Visual Patch 共用**有上限的内存 Undo / Redo 历史**；每次 Source 输入事件视作独立事务，尚无打字分组或持久历史。
 - 对未知或不支持的 Procedure 结构**拒绝重新投影**，自动切回 Source 并清除旧图，保留诊断与错误定位。不会把过期图伪装成新 YAML 的正确语义。
 - 不上传用户文件、不调用 Capability、不执行 Skill 或 Script，不进行发布。
@@ -102,3 +104,11 @@ Visual 仅表示有可用的可视化表达，不暗示完整的图形编辑资�
 2. 仅当现有 `routeEditTargets` / `createdRouteTargets` 返回候选目标时展示手柄。拖动只构建预览，不直接修改 YAML；统一经过 Source Revision 检查、原有 Typed Patch 的重解析和 Diff 确认。ELK 继续负责自动布局。
 3. **未实现**：新建/删除/复制 Node、连接线以新建 Outcome、Node Operator/Phase 的通用编辑，以及拖动布局位置的持久化。这些需要独立类型化 Source Patch 与 Runtime 语义资格，不通过假 UI 宣称完成。
 4. NODES 列表已取消桌面端固定高度与双重滚动截断。真实浏览器拖拽、触控、焦点导航和截图视觉回归仍属 NOT_RUN，不因静态测试与 Pages 部署成功而自动视为 PASS。
+
+## Navigation polish (2026-11-03)
+
+- One visible View menu provides panel visibility, canvas fit, layout and zoom controls. Do not restore redundant toolbar buttons.
+- Asset groups reflect file paths, not invented Skill metadata; disclosure stays expanded/collapsed across reactive tree rebuilds.
+- Procedure hierarchy is navigation within procedure.yaml, not a separate file or a second authoritative representation.
+- When there is no qualified Inspector context, the View menu hides the Inspector entry rather than presenting a dead button.
+- Browser interaction, screen reader and responsive visual E2E remain NOT_RUN.

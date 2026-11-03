@@ -54,7 +54,6 @@
 
     <section class="editor" aria-label="Procedure authoring editor">
       <div class="editorbar compact-toolbar">
-        <button id="toggleExplorer" class="panel-toggle" type="button" aria-controls="explorerPanel" aria-expanded="true" title="展开或收起文件导航">☰</button>
         <div class="breadcrumbs" id="procedureBreadcrumbs">
           <button id="backProcedure" type="button" title="返回 Root Procedure">←</button>
           <span id="procedureBread">Procedure</span>
@@ -66,8 +65,12 @@
         </div>
         <span class="mode-spacer"></span>
         <details class="view-menu" id="viewMenu">
-          <summary aria-label="编辑器更多选项"><span id="viewMenuTitle">视图</span> <span aria-hidden="true">⌄</span></summary>
+          <summary aria-label="视图与面板选项"><span id="viewMenuTitle">视图</span> <span aria-hidden="true">⌄</span></summary>
           <div class="view-menu-panel">
+            <div class="menu-heading">面板</div>
+            <button id="toggleExplorer" type="button" aria-controls="explorerPanel" aria-expanded="true" aria-pressed="true">隐藏左侧导航</button>
+            <button id="inspectorVisibility" type="button" aria-controls="inspectorPanel" aria-pressed="false" hidden>显示右侧属性</button>
+            <div class="menu-divider"></div>
             <div id="graphViewOptions">
             <div class="menu-heading">图形显示</div>
             <label class="menu-field" for="layoutDirection">布局方向
@@ -79,6 +82,7 @@
             <button id="neighborsOnly" type="button" aria-pressed="false" title="仅显示选中节点的一跳邻居">只看直接邻居</button>
             <button id="showAllLabels" type="button" aria-pressed="false" title="显示全部 Route 的标签">显示全部 Route 标签</button>
             <button id="centerSelection" type="button">定位当前选择</button>
+            <button id="fit" type="button">适配画布</button>
             <div class="menu-divider"></div>
             </div>
             <div class="menu-heading">操作</div>
@@ -92,7 +96,6 @@
           </div>
         </details>
 
-        <button id="fit" class="fit-control" type="button" title="适配画布">适配</button>
       </div>
       <div id="editorBody" class="editor-body" data-mode="visual">
         <div id="graphPane" class="graph-pane" data-labels="key">

@@ -62,6 +62,7 @@ let history = createEditorHistory("");
 let pendingPatch = null;
 let inspectorOpen = false;
 let explorerOpen = true;
+const expandedAssetFolders=new Set(["assurance","schemas","scripts"]);
 let showAllLabels = false;
 let layoutDirection = "RIGHT";
 let neighborView = false;
@@ -138,11 +139,30 @@ function svgEl(name, attrs = {}, text) {
 }
 function message(text) { setText("hint", text); }
 
+function closeViewMenu(){
+  if(!$("viewMenu").open)return;
+  $("viewMenu").open=false;
+  $("viewMenu").querySelector("summary").focus();
+}
+function updatePanelMenu(){
+  const nav=$("toggleExplorer");
+  nav.setAttribute("aria-expanded",String(explorerOpen));
+  nav.setAttribute("aria-pressed",String(explorerOpen));
+  nav.textContent=explorerOpen?"隐藏左侧导航":"显示左侧导航";
+  const detail=$("inspectorVisibility");
+  const available=inspectorOpen||
+    (viewKind==="procedure"&&Boolean(selection))||
+    (activeFilePath==="assurance/contract.yaml"&&Boolean(activePackage));
+  detail.hidden=!available;
+  detail.setAttribute("aria-pressed",String(inspectorOpen));
+  detail.textContent=inspectorOpen?"隐藏右侧属性":"显示右侧属性";
+}
 function setInspectorOpen(open,recenter=true) {
   inspectorOpen=Boolean(open);
   const pane=$("workbench");
   pane.dataset.inspector=inspectorOpen?"open":"closed";
   $("inspectorPanel").hidden=!inspectorOpen;
+  updatePanelMenu();
   if(recenter)requestAnimationFrame(()=>{
     if(selection?.kind==="node")centerNode(selection.id);
     else fit();
@@ -151,14 +171,26 @@ function setInspectorOpen(open,recenter=true) {
 function setExplorerOpen(open) {
   explorerOpen=Boolean(open);
   $("workbench").dataset.explorer=explorerOpen?"open":"closed";
-  $("toggleExplorer").setAttribute("aria-expanded",String(explorerOpen));
   $("explorerPanel").hidden=!explorerOpen;
+  updatePanelMenu();
   requestAnimationFrame(()=>{
     if(selection?.kind==="node")centerNode(selection.id);
     else fit();
   });
 }
-$("toggleExplorer").addEventListener("click",()=>setExplorerOpen(!explorerOpen));
+$("toggleExplorer").addEventListener("click",()=>{
+  setExplorerOpen(!explorerOpen);
+  closeViewMenu();
+});
+$("inspectorVisibility").addEventListener("click",()=>{
+  if(inspectorOpen){
+    setInspectorOpen(false);
+  }else{
+    renderInspector();
+    setInspectorOpen(true);
+  }
+  closeViewMenu();
+});
 $("closeInspector").addEventListener("click",()=>setInspectorOpen(false));
 $("showAllLabels").addEventListener("click",()=>{
   showAllLabels=!showAllLabels;
@@ -208,7 +240,8 @@ function updateViewAvailability(nextKind) {
   $("zoomViewOptions").hidden=!isGraph;
   $("fit").hidden=!isGraph;
   $("procedureBreadcrumbs").hidden=!isGraph;
-  $("viewMenuTitle").textContent=isGraph?"视图":"更多";
+  $("viewMenuTitle").textContent="视图";
+  updatePanelMenu();
   if(!hasVisual&&mode!=="source")setMode("source");
 }
 function updateMarkdownPreview(text) {
@@ -340,24 +373,50 @@ function enterProcedure(name) {
 function renderAssetNavigation(){
   const tree=$("assetTree");
   tree.replaceChildren();
-  const files=activePackage ? [...activePackage.files.values()] : [];
+  const files=activePackage?[...activePackage.files.values()]:[];
   $("fileCount").textContent=files.length+" 文件";
   $("exportPackageButton").hidden=!activePackage||files.length<=1;
   if(!files.length)return;
-  let lastGroup=null;
+  const folders=new Map();
   for(const file of files){
-    const folder=file.path.includes("/")?file.path.slice(0,file.path.lastIndexOf("/")):"";
-    if(folder!==lastGroup&&folder){
-      const group=el("div","asset-folder",folder+"/");
-      tree.appendChild(group);
+    const parts=file.path.split("/");
+    let parent=tree;
+    for(let level=0;level<parts.length-1;level++){
+      const name=parts[level];
+      const folderPath=parts.slice(0,level+1).join("/");
+      if(!folders.has(folderPath)){
+        const disclosure=el("details","asset-folder-group");
+        disclosure.open=expandedAssetFolders.has(folderPath);
+        const summary=el("summary","asset-folder-title",name+"/");
+        summary.title=folderPath+"/";
+        const children=el("div","asset-folder-children");
+        disclosure.append(summary,children);
+        disclosure.addEventListener("toggle",()=>{
+          if(disclosure.open)expandedAssetFolders.add(folderPath);
+          else expandedAssetFolders.delete(folderPath);
+        });
+        parent.appendChild(disclosure);
+        folders.set(folderPath,children);
+      }
+      parent=folders.get(folderPath);
     }
-    lastGroup=folder;
-    const display=file.path.slice(folder?folder.length+1:0);
-    const btn=button(display+(fileDirtyState(activePackage,file.path)?" •":""),
-      ()=>switchFile(file.path),"asset-file"+(file.path===activeFilePath?" active":""));
-    btn.title=file.path+(fileDirtyState(activePackage,file.path)?" · 修改未导出":"");
-    btn.setAttribute("aria-current",file.path===activeFilePath?"page":"false");
-    tree.appendChild(btn);
+    const dirty=fileDirtyState(activePackage,file.path);
+    const current=file.path===activeFilePath;
+    const btn=button("",()=>switchFile(file.path),
+      "asset-file"+(current?" active":""));
+    btn.title=file.path+(dirty?" · 修改未导出":"");
+    btn.setAttribute("aria-label",file.path+(dirty?" · 已修改":""));
+    btn.setAttribute("aria-current",current?"page":"false");
+    const glyph=el("span","asset-file-icon","▤");
+    glyph.setAttribute("aria-hidden","true");
+    const title=el("span","asset-file-label",parts.at(-1));
+    btn.append(glyph,title);
+    if(dirty){
+      const mark=el("span","asset-dirty","●");
+      mark.setAttribute("aria-label","有未导出修改");
+      btn.appendChild(mark);
+    }
+    parent.appendChild(btn);
   }
 }
 function switchFile(path){
@@ -380,7 +439,7 @@ function renderProcedureNavigation() {
   procedureTree.replaceChildren();
   const items=procedureItems(lastWorkspace);
   setText("procedureCount",items.length);
-  for(const item of items){
+  for(const [index,item] of items.entries()){
     const option=document.createElement("option");
     option.value=item.id;option.textContent=item.id;
     picker.appendChild(option);
@@ -391,7 +450,7 @@ function renderProcedureNavigation() {
     b.setAttribute("aria-current",item.id===activeProcedureId?"page":"false");
     b.disabled=unavailable;
     const emblem=document.createElement("span");emblem.className="tree-icon";
-    emblem.textContent=item.kind==="root"?"◆":"◇";
+    emblem.textContent=item.kind==="root"?"◆":index===items.length-1?"└":"├";
     const body=document.createElement("span");body.className="tree-info";
     const title=document.createElement("span");title.className="tree-title";title.textContent=item.title;
     const meta=document.createElement("span");meta.className="tree-description";
@@ -821,7 +880,7 @@ function zoomTo(scale, x = svg.clientWidth / 2, y = svg.clientHeight / 2) {
 }
 $("zoomIn").addEventListener("click", () => zoomTo(camera.scale * 1.18));
 $("zoomOut").addEventListener("click", () => zoomTo(camera.scale / 1.18));
-$("fit").addEventListener("click", fit);
+$("fit").addEventListener("click",()=>{fit();closeViewMenu();});
 svg.addEventListener("wheel", event => {
   event.preventDefault();
   const rect = svg.getBoundingClientRect();
@@ -930,6 +989,7 @@ $("neighborsOnly").addEventListener("click",()=>{
 $("centerSelection").addEventListener("click",()=>{
   if(selection?.kind==="node")centerNode(selection.id);
   else fit();
+  closeViewMenu();
 });
 function chooseEdgeRoute(bundle) {
   const i=bundle.routes.findIndex(r=>selection?.kind==="route"&&selection.id===r.id);
