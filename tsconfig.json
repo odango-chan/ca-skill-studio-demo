@@ -19,6 +19,7 @@
     ]
   },
   "include": [
-    "site/react-flow-canvas.tsx"
+    "site/react-flow-canvas.tsx",
+    "site/styles.d.ts"
   ]
 }
