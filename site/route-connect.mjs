@@ -3,6 +3,9 @@ import {addRouteOutcomeOptions,previewAddRouteOutcome} from "./route-create.mjs"
 // A canvas connection is only an *intent*. The sole business write path
 // remains D3-A1's version-bound YAML source Patch and Diff confirmation.
 const ID=/^[A-Za-z_][A-Za-z0-9_.-]*$/;
+// In-memory gesture ownership: a spread/copy of a proposal is not a real
+// connection event. This is a UI integrity guard, not an auth credential.
+const issuedProposals=new WeakSet();
 const fail=reason=>{throw new Error(reason);};
 
 export function proposeCanvasRouteConnection({
@@ -23,16 +26,20 @@ export function proposeCanvasRouteConnection({
   if(!options||options.routeSource!=="operator.on"||
     !options.outcomes.length||!options.targets.includes(targetId))
     fail("No source-qualified operator.on Outcome available for this connection");
-  return Object.freeze({
+  const proposal=Object.freeze({
     type:"CanvasRouteProposal",profile:"d3-a3-canvas-only-v1",
     baseSource:source,procedureId,sourceId,targetId,
     routeSource:"operator.on",
     outcomes:Object.freeze([...options.outcomes])
   });
+  issuedProposals.add(proposal);
+  return proposal;
 }
 
 export function previewCanvasRouteConnection(source,proposal,outcome){
-  if(!proposal||proposal.type!=="CanvasRouteProposal"||
+  if(!proposal||typeof proposal!=="object"||
+    !issuedProposals.has(proposal)||
+    proposal.type!=="CanvasRouteProposal"||
     proposal.profile!=="d3-a3-canvas-only-v1"||
     source!==proposal.baseSource)
     fail("Canvas connection is stale or unsupported");
