@@ -708,6 +708,12 @@ export async function runD1Interactions(evaluate,command){
 
   // D3-A3 deliberately uses actual Chromium pointer input. An onConnect()
   // callback call would not prove the React Flow handles are wired.
+  // Earlier mobile and split-panel tests intentionally resize the viewport.
+  // Restore a full desktop viewport before exercising a distant target.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1440,height:1200,deviceScaleFactor:1,mobile:false
+  });
+  await new Promise(resolve=>setTimeout(resolve,450));
   const canvasSetup=await check(evaluate,"D3_A3_DRAG_HANDLES",[
     "const sleep=t=>new Promise(r=>setTimeout(r,t));",
     "const click=el=>el?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));",
@@ -747,7 +753,8 @@ export async function runD1Interactions(evaluate,command){
     "   targetHandle:endHandle?.getAttribute('class'),",
     "   graphBounds:bounds.toJSON(),sourceUnchanged:source.value===edited,",
     "   viewport:document.querySelector('.react-flow__viewport')?.getAttribute('style'),",
-    "   layoutStatus:document.getElementById('layoutStatus')?.textContent};"
+    "   layoutStatus:document.getElementById('layoutStatus')?.textContent,",
+    "   windowSize:{width:window.innerWidth,height:window.innerHeight}};"
   ]);
   const canvasHit=async p=>evaluate("(()=>{const e=document.elementFromPoint("+
     p.x+","+p.y+");return {tag:e?.tagName,cls:e?.getAttribute('class'),"+
