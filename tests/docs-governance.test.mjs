@@ -51,12 +51,16 @@ test("AGENTS safety and evidence rules are paired with repository ignore",()=>{
     assert.ok(agents.includes(mark),"Missing mandatory Agent guidance: "+mark);
   assert.match(ignore,/^\.agent-tmp\/\s*$/m);
 });
-test("WORK / D3 states cannot claim future Route creation is implemented",()=>{
+test("WORK / D3 stages distinguish shipped A1, A2 candidate and unstarted A3",()=>{
   const state=content("docs/WORK.md"),spec=content("docs/design/route-designer.md");
-  assert.match(state,/\|\s*D3 Route Designer[\s\S]*?\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
-  assert.match(spec,/Status: Proposed/);
-  assert.match(spec,/Implementation: NOT_STARTED/);
-  assert.match(spec,/Acceptance: NOT_RUN/);
-  assert.match(content("docs/TRACEABILITY.md"),/D3 Route Designer/);
+  assert.match(state,/\|\s*D3-A1[^\n]*\|\s*ACCEPTED\s*\|\s*IMPLEMENTED\s*\|\s*PASS/);
+  assert.match(state,/\|\s*D3-A2[^\n]*\|\s*PROPOSED[^\n]*\|\s*PARTIAL[^\n]*\|\s*PASS/);
+  assert.match(state,/\|\s*D3-A3[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
+  assert.match(spec,/Status: Proposed overall/);
+  assert.match(spec,/A1 IMPLEMENTED/);
+  assert.match(spec,/A3 NOT_STARTED/);
+  assert.match(spec,/A3 NOT_RUN/);
+  const trace=content("docs/TRACEABILITY.md");
+  for(const x of ["D3-A1","D3-A2","D3-A3"])assert.ok(trace.includes(x));
   assert.match(content("docs/DOCUMENTATION.md"),/tool-mcp-gw/);
 });
