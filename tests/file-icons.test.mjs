@@ -77,7 +77,9 @@ test("Explorer keeps path/selection/dirty state while replacing uniform ▤ glyp
   const css=read("site/light.css");
   assert.match(app,/import \{createFileIcon,createFolderIcon\} from "\.\/file-icons\.mjs"/);
   assert.match(app,/const glyph=createFileIcon\(document,file\.path\)/);
-  assert.match(app,/summary\.append\(createFolderIcon\(document\)/);
+  assert.match(app,/summary\.append\(/);
+  assert.match(app,/createIcon\(document,"chevron-right",\{size:13,className:"disclosure-chevron"\}\)/);
+  assert.match(app,/createFolderIcon\(document\)/);
   assert.match(app,/btn\.append\(glyph,title\)/);
   assert.match(app,/btn\.setAttribute\("aria-label",file\.path/);
   assert.match(app,/fileDirtyState\(activePackage,file\.path\)/);
