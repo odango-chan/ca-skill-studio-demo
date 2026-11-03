@@ -117,9 +117,9 @@ Runtime validation workbench, Case management or publication pipeline.
 
 ### Editor-stage package diagnostics
 
-\`site/package-audit.mjs\` reads the current in-memory files in one workspace:
-\`assurance/contract.yaml\`, \`assurance/predicates.yaml\` and
-\`assurance/procedure.yaml\`. The source remains authoritative.
+`site/package-audit.mjs` reads the current in-memory files in one workspace:
+`assurance/contract.yaml`, `assurance/predicates.yaml` and
+`assurance/procedure.yaml`. The source remains authoritative.
 
 The Problems panel shows source-linked warnings for:
 
@@ -128,11 +128,11 @@ The Problems panel shows source-linked warnings for:
 - Unresolved Contract / Node / Phase-step Predicate names, unmatched Call /
   Tool names relative to declared capabilities and missing referenced script
   paths in the opened Package.
-- Explicit missing \`input.*\` names and unresolved \`node.output.*\` producer
+- Explicit missing `input.*` names and unresolved `node.output.*` producer
   identities (not producer output-schema contents).
-- A **heuristic** warning when an existing \`with.<key>.from\` is redirected
+- A **heuristic** warning when an existing `with.<key>.from` is redirected
   from its matching Procedure input to a different input (e.g.
-  \`with.ueRef.from: input.psi\`). This does **not** prove a type error.
+  `with.ueRef.from: input.psi`). This does **not** prove a type error.
 
 Preview Diff reports the number of newly introduced warnings, without
 blocking the authoring action. Warnings are never presented as a successful
@@ -162,7 +162,7 @@ availability or Runtime execution outcomes.
 
 ## A5 acceptance
 
-Run \`npm test\`, \`npm run typecheck\`, \`npm run build\`,
-\`node scripts/edge-smoke.mjs\`. Validate both pinned package baselines,
+Run `npm test`, `npm run typecheck`, `npm run build`,
+`node scripts/edge-smoke.mjs`. Validate both pinned package baselines,
 advisory warnings after editing, Diff/Apply/Undo/Redo, Source failure
 recovery into a Child Procedure and a 95-Node real-browser fallback.
