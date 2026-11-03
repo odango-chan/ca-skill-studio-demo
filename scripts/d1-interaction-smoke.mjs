@@ -104,6 +104,13 @@ export async function runD1Interactions(evaluate,command){
   // Actual Chrome mouse events from a React Flow edge updater to another
   // node's target handle. This must open a preview, never mutate YAML.
   const original=await evaluate("document.getElementById('source').value");
+  const hit=async(point)=>evaluate("(()=>{const el=document.elementFromPoint("+
+    point.x+","+point.y+");return {tag:el?.tagName,cls:el?.getAttribute('class'),"+
+    "pointer:el&&getComputedStyle(el).pointerEvents,html:el?.outerHTML.slice(0,230)}})()");
+  console.log("D1_DRAG_POINTER_HITS",JSON.stringify({
+    start:await hit(gesture.start),end:await hit(gesture.end)
+  }));
+
   await command("Input.dispatchMouseEvent",{
     type:"mouseMoved",x:gesture.start.x,y:gesture.start.y,button:"none"
   });
@@ -121,6 +128,8 @@ export async function runD1Interactions(evaluate,command){
     });
     await new Promise(resolve=>setTimeout(resolve,25));
   }
+  const updating=await evaluate("document.querySelector('.react-flow__edge.selected')?.getAttribute('class')");
+  console.log("D1_DRAG_UPDATING",JSON.stringify({updating,hover:await hit(gesture.end)}));
   await command("Input.dispatchMouseEvent",{
     type:"mouseReleased",x:gesture.end.x,y:gesture.end.y,
     button:"left",buttons:0,clickCount:1
@@ -141,6 +150,7 @@ export async function runD1Interactions(evaluate,command){
     JSON.stringify(original)+",",
     "  preview,diffSnippet:diff?.slice(0,140),cancelled:dialog.hidden,",
     "  sourceUnchanged:source.value==="+JSON.stringify(original)+",",
+    "  hint:document.getElementById('hint')?.textContent,",
     "  edges:document.querySelectorAll('.react-flow__edge-path').length};"
   ]);
 
