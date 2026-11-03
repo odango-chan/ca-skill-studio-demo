@@ -76,6 +76,10 @@ jobs:
           node --check site/sample-packages.mjs
           node --check site/zip.mjs
           node --check site/attribute-patch.mjs
+          node --check site/highlight.mjs
+          node --check site/extended-attributes.mjs
+          node --check tests/highlight.test.mjs
+          node --check tests/extended-attributes.test.mjs
           node --check tests/package.test.mjs
           node --check tests/attributes.test.mjs
           node --check tests/graph.test.mjs

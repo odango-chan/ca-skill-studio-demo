@@ -6,10 +6,12 @@ ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前实现（Stage: Multi-file SKILL Package samples + scoped Inspector edits + UX Trim）：
+当前实现（Stage: Syntax Highlight + Source-Backed Enum Editors + Multi-file Package）：
 
 - **真实多文件 Skill Package 示例**：从固定 `ca-agent-demo@bf445ad` 源码精确归档 `ensure-pdu-session` 的 4 个 Runtime Asset 文件和 `establish-pdu-session` 的 13 个运行相关文件（SKILL.md、Contract、Procedure、Predicates、3 个 Script、6 个 Schema；不展示 Case）。文件树可切换编辑，修改留在各文件独立的浏览器内存工作副本，当前文件可单独导出、整套文件可导出 ZIP；不增加 Package 内的 sidecar 文件。
-- **Inspector 两条受限属性写回**：Ensure 样本的 Verify Node 可从该 Package 实际 `predicates.yaml` 中选择 Predicate；Contract 的 `planning.maxActions` 可在 1–128 内修改。两者均通过 AST 标量 Source Span 局部替换、Patch Diff / 确认、Revision guard、重新解析和独立 Undo/Redo；其他 Node 属性、Binding、Phase 和 CreatedSession Transitional 语法没有结构化编辑资格。
+- **Source 语法高亮**：YAML、Markdown、Python、JSON 本地着色；源文件仍由原生 textarea 编辑，着色层只读、HTML 转义、滚动同步；超出 260K 字符或不支持的扩展名安全退回纯文本，不引入云端代码服务。
+- **真实文件名单行显示**：资产树中的长文件名不再换行，自动省略并用悬停 title 提供完整相对路径；顶栏也维持单行文件路径。
+- **来源驱动的更多枚举**：Ensure Verify Node 从该 Package `predicates.yaml` 选择；CreatedSession 的 Phase Verify Step 从其真实 PredicateSet 选择引用（具体步骤的折叠编辑区）；CreatedSession Route 目标从当前 Procedure 已定义的 Node 列表选择；Contract `planning.maxActions` 保留自由整数输入并增加常用预算预设。选择只负责局部 AST Scalar Patch 与完整源码 Diff、Revision guard 和重新投影；不代替业务正确性 / 3GPP Runtime 验证。
 - 从真实 Demo Procedure YAML 投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
 - CreatedSession 样本支持 Root 和 5 个 Child Procedure 的下钻与返回，保留 Node 顺序和 Route Source（operator / preconditions / postconditions）；Phase Step 在 Inspector 按顺序展示，不把局部过程冒充业务 Node。
 - **UX Consolidation**：删去重复的 Node Quick Card 和独立 Inspector 开关。单击 Node / Route 直接进入唯一的上下文 Inspector；关闭后回到宽画布。布局方向、标签策略、邻居焦点与缩放合并进单个 View 菜单。
@@ -21,16 +23,16 @@ https://odango-chan.github.io/ca-skill-studio-demo/
 - **按 Route Source 分组而非语义合并**：画布上的连线按 `source + target + routeSource` 分组；点击同一组连线可轮流定位每个原始 Route，在 Inspector 查看原始 outcome、target、line；Phase 的 on 路由不与 Operator 的 on 混淆。ELK 失败时退回旧布局，并显示状态。
 - Visual / Source / Split 三视图；画布支持平移、缩放、适配；Node Outline 搜索及按源码顺序导航；点击节点/边查看 Inspector 和 Source 行。
 - 支持导入本地文本文件、直接编辑 Source、重置本地缓冲区、导出文件。
-- **第一条 Visual 编辑纵切**：Inspector 只允许对固定 ensure 结构中的 verify-created-target.FAIL 和 observe-session-absence.FAIL 修改目标为已有的失败/未决/安全停止 Terminal；必须 Preview 真实单行 Source Diff → Apply 到当前 Working Buffer → 导出。其他 Route 仍只读。
+- **Ensure Route 编辑边界**：保持原来的严格约束，仅允许固定 ensure 结构中的两条失败 Route 修改为已有终态；必须 Preview Source Diff → Apply → 可撤销。CreatedSession Route 使用独立的 Source-backed Preview Patch，候选项限定为该 Procedure 真实 Node，并逐字段检查其他节点、步骤与路由没有变化。
 - Source 修改与此受限 Visual Patch 共用**有上限的内存 Undo / Redo 历史**；每次 Source 输入事件视作独立事务，尚无打字分组或持久历史。
 - 对未知或不支持的 Procedure 结构**拒绝重新投影**；若原有可用视图存在，会显示 STALE 警告。不会把旧图伪装成新 YAML 的正确语义。
 - 不上传用户文件、不调用 Capability、不执行 Skill 或 Script，不进行发布。
 
 ## 边界和兼容性
 
-**图形投影基于 yaml@2.9.1 的 YAML 1.2 Document AST / CST source tokens 与 LineCounter，当前具有单 Procedure 写回 Profile 和多 Procedure 只读 Profile，并非完整 Demo Schema / Runtime 校验。** 它拒绝重复键、Alias / Anchor / Tag、额外 Procedure、未资格化的 Phase 和不安全语法；不支持跨文件语义。其他文件（SKILL.md、JSON、复杂 YAML、多 Procedure、CreatedSession Transitional phases）仍可 Source-only 编辑；不承诺这些文件获得图形投影。
+**图形投影基于 yaml@2.9.1 的 YAML 1.2 Document AST / CST source tokens 与 LineCounter，目前只有有限的 Source-backed 编辑资格，并非完整 Demo Schema / Runtime 校验。** 它拒绝重复键、Alias / Anchor / Tag、额外 Procedure、未资格化的 Phase 和不安全语法；不支持跨文件语义。其他文件（SKILL.md、JSON、复杂 YAML、多 Procedure、CreatedSession Transitional phases）仍可 Source-only 编辑；不承诺这些文件获得图形投影。
 
-Visual 当前在 ensure 单 Procedure 的**两条固定失败终态 Route**支持实验性 SetRouteTarget，并对 Ensure Verify 的 Predicate ref 提供独立的受限标量编辑。Contract 的 maxActions 则由 Contract 源文件的精确标量 Patch 实现。**CreatedSession 多 Procedure 的所有 Node / Route / Phase 均只读**；其余对象也只读。Patch 使用 YAML Scalar.range 确定真实 Source Span，只替换目标标量，绑定完整源文本 Revision、重新解析并比对全部 Node 和 Route 投影、冻结其余 22 条路由目标，保留所有未触及文本及注释。Preview 如果过期或被修改会拒绝应用。**这不等于完整 YAML CST Round-trip 或 Demo Validator 通过**，也不意味着已接入 Python POC；语义安全仍需人工检查。未知字段和复杂结构不能凭 Graph 自动修改。
+Visual 当前在 ensure 单 Procedure 的**两条固定失败终态 Route**支持实验性 SetRouteTarget，并对 Ensure Verify 的 Predicate ref 提供独立的受限标量编辑。Contract 的 maxActions 则由 Contract 源文件的精确标量 Patch 实现。**CreatedSession 多 Procedure 的主 Operator、Binding、Procedure 结构仍只读**，但有限 Phase Verify Scalar 和 Route Target Scalar 已开放有界编辑；其余对象仍需在 Source 中修改。Patch 使用 YAML Scalar.range 确定真实 Source Span，只替换目标标量，绑定完整源文本 Revision、重新解析并比对全部 Node 和 Route 投影、冻结其余 22 条路由目标，保留所有未触及文本及注释。Preview 如果过期或被修改会拒绝应用。**这不等于完整 YAML CST Round-trip 或 Demo Validator 通过**，也不意味着已接入 Python POC；语义安全仍需人工检查。未知字段和复杂结构不能凭 Graph 自动修改。
 
 当前文件导出及 Package ZIP 导出都是浏览器下载请求，**不是本地原文件的原地或原子 Save**。浏览器 textarea 可能规范化 CRLF；当前不承诺逐字节文件保真、完整 Source map 或跨文件事务，重要文件应自行比对 Diff 后再替换。此站点不与 packages/skill_studio_poc/ Python POC 通信。
 
@@ -48,7 +50,7 @@ Visual 当前在 ensure 单 Procedure 的**两条固定失败终态 Route**支�
 
 ## 下一阶段
 
-下一阶段为真实浏览器 E2E 交互验收、选中节点的分支折叠与复杂回边标签避让，并评估是否有足够收益迁移 React Flow。随后接入完整 Demo Schema / 专用 Validator 的可执行一致性检查。获得新的 Typed Patch 编辑资格之前，复杂 CreatedSession 仍坚持只读。在图形层选型上，大图和可编辑连接线优先评估 React + TypeScript + React Flow / ELK，**本次上线仍使用 SVG 画布 + ELK 布局，而非 React Flow 的正式编辑器；ELK 只负责视觉位置与边路由，不改变 YAML 语义**。
+下一阶段为真实浏览器 E2E 交互验收、选中节点的分支折叠与复杂回边标签避让，并评估是否有足够收益迁移 React Flow。随后接入完整 Demo Schema / 专用 Validator 的可执行一致性检查。目前 CreatedSession 的枚举 Patch 只证明源码结构未意外损坏，业务路径变化仍需单独验收。在图形层选型上，大图和可编辑连接线优先评估 React + TypeScript + React Flow / ELK，**本次上线仍使用 SVG 画布 + ELK 布局，而非 React Flow 的正式编辑器；ELK 只负责视觉位置与边路由，不改变 YAML 语义**。
 
 当前只建设 SKILL 开发与编辑，不做 Case、独立验证工作台、Registry / Publishing、Agent Runtime 调用或 Live 5GC。
 
@@ -69,4 +71,11 @@ UX Consolidation 的自动化测试覆盖 View 菜单与单一 Inspector 控件�
 - 当前 Bundle 是单浏览器页面的临时内存工作副本，文件切换不会丢掉尚未导出的文本。每个文件保留自己的 Source + Patch Undo/Redo 历史；**不承诺多文件跨资产事务、文件系统保存、外部变更冲突管理或多文件 Schema / Runtime Validator**。
 - 更改 Verify Predicate 的引用属于行为语义修改：即使目标 Predicate 在 Package 中存在，也不证明门禁或业务流程正确；修改后必须经 Demo Validator 和人工审查。更改 maxActions 也只检查数值及 Source 结构，不验证整体预算策略。
 - Browser ZIP 是无压缩 UTF-8 标准 ZIP（store method），包含文件内存最新内容，不添加隐藏元数据。它不自动覆盖原文件，不执行 Python Script，不运行 5GC。
-- **完整本地 Package 文件夹导入、文件创建 / 删除、Contract 全字段表单、Predicate / Binding / Step 的可编辑 Inspector 仍 NOT_IMPLEMENTED**；本轮的目标是验证真实多文件浏览与安全的有限属性编辑。
+- **完整本地 Package 文件夹导入、文件创建 / 删除、Contract 全字段表单、Predicate 定义 / Binding 编辑仍 NOT_IMPLEMENTED（Phase Verify Step 引用编辑已实现）**；本轮的目标是验证真实多文件浏览与安全的有限属性编辑。
+
+## 编辑器细节（2026-11-03）
+
+- Source 高亮是独立的只读 HTML 转义渲染层，不是语言服务或自动格式化；不修改 textarea 内容和 Undo/Redo。编辑区是无自动换行的等宽字体，输入、光标、选择和滚动以 textarea 为权威。
+- 文件树采用单行省略号，完整相对路径通过浏览器的悬停提示查看。
+- CreatedSession 的 Predicate 候选值由 `assurance/predicates.yaml` 定义；Route 候选值由选中 Procedure 内已有的 Node ID 定义。新字段通过精确 Source Span、修改前后投影比对和完整 Source Revision guard；仅保证结构隔离，不保证业务语义、运行成功或新路线无环。
+- 保留既有 Ensure 失败 Route 限制，未扩展原 Patch 的编辑资格。Contract 的 maxActions 预设是快捷输入，不是 SKILL DSL 内建枚举。

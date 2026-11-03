@@ -5,12 +5,30 @@ import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, creat
 import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./workbench.mjs";
 import {SAMPLE_PACKAGES,packageFilesForSample,createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState} from "./sample-packages.mjs";
 import {zipPackage} from "./zip.mjs";
+import {highlightSource} from "./highlight.mjs";
+import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
+ createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
 const $ = (id) => document.getElementById(id);
 const SVG_NS = "http://www.w3.org/2000/svg";
 const source = $("source");
+const sourceHighlight=$("sourceHighlight");
+const sourceEditor=$("sourceEditor");
+function syncHighlightScroll(){
+  sourceHighlight.scrollTop=source.scrollTop;
+  sourceHighlight.scrollLeft=source.scrollLeft;
+}
+source.addEventListener("scroll",syncHighlightScroll,{passive:true});
+function refreshHighlight(){
+  const highlighted=highlightSource(source.value,activeFilePath||filename);
+  sourceEditor.dataset.highlight=highlighted.enabled?"on":"off";
+  $("sourceLanguage").textContent=highlighted.language.toUpperCase();
+  if(highlighted.enabled)sourceHighlight.innerHTML=highlighted.html;
+  else sourceHighlight.textContent="";
+  syncHighlightScroll();
+}
 const graphPane = $("graphPane");
 const svg = $("canvas");
 const world = $("world");
@@ -171,6 +189,7 @@ for (const id of ["visual", "source", "split"]) $("mode-" + id).addEventListener
 function loadDocument(name,text,origin="local",{initial=text,historyState=null}={}) {
   filename=name.split("/").at(-1);
   assetOrigin=origin;
+  source.scrollTop=0;source.scrollLeft=0;
   initialText=initial;
   source.value=text;
   history=historyState||createEditorHistory(text);
@@ -194,6 +213,7 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
 }
 function refresh(refit = false) {
   const text = source.value;
+  refreshHighlight();
   const dirty = text !== initialText;
   $("fileStatus").classList.toggle("is-dirty",dirty);
   $("fileStatus").lastChild.textContent = dirty ? "已修改" : "未修改";
@@ -428,31 +448,43 @@ function inspectorSourceAction(line,label="查看 YAML") {
   inspector.appendChild(button(label+" · L"+line,()=>lineJump(line),"source-link"));
 }
 function addPatchControls(route) {
-  const eligible=routeEditTargets(lastGood,route.id);
-  if(!eligible.length || lastWorkspace?.procedures.size!==1)return false;
-  const body=section("允许修改的目标","PATCH");
-  body.appendChild(el("p","subtle-note",
-    "仅固定 ensure 的两条失败 Route 支持目标修改，必须先预览源码差异；不代表完整 Validator 通过。"));
+  const ensureChoices=lastWorkspace?.procedures.size===1
+    ?routeEditTargets(lastGood,route.id):[];
+  const createdChoices=activeFilePath==="assurance/procedure.yaml"
+    ?createdRouteTargets(source.value,activePackage?.name,activeProcedureId,route.id):[];
+  const eligible=ensureChoices.length?ensureChoices:createdChoices;
+  if(!eligible.length)return false;
+  const body=section("Route Target",eligible.length+" 选项");
+  const note=ensureChoices.length?
+    "当前 Ensure Profile 仅允许修改两条失败分支的终态。":
+    "目标来自当前 Procedure 的实际 Node；仅做结构检查，改动可能影响业务执行路径。";
+  body.appendChild(el("p","small-edit-note",note));
   const select=el("select","target-select");
-  select.setAttribute("aria-label","选择新的终态目标");
+  select.setAttribute("aria-label","选择当前 Procedure 中的 Route Target");
   for(const target of eligible){
-    const opt=el("option","",target);
-    opt.value=target;select.appendChild(opt);
+    const opt=el("option","",target);opt.value=target;select.appendChild(opt);
   }
   select.value=route.target;body.appendChild(select);
-  const preview=button("预览 YAML 差异",()=>{
-    try{showPreview(previewRouteTargetPatch(source.value,route.id,select.value));}
-    catch(error){message("未应用："+String(error?.message??error));}
+  const preview=button("预览 Route 修改",()=>{
+    try{
+      showPreview(ensureChoices.length?
+        previewRouteTargetPatch(source.value,route.id,select.value):
+        previewCreatedRoutePatch(source.value,activePackage.name,
+          activeProcedureId,route.id,select.value));
+    }catch(error){message("未应用："+String(error?.message??error));}
   },"preview-button");
   preview.disabled=true;
   select.addEventListener("change",()=>{preview.disabled=select.value===route.target;});
   body.appendChild(preview);
   return true;
 }
+function packagePredicateSource(){
+  return activePackage?.files.get("assurance/predicates.yaml")?.text??null;
+}
 function selectedPredicateSource(){
   if(activePackage?.name!=="ensure-pdu-session"||
      activeFilePath!=="assurance/procedure.yaml")return null;
-  return activePackage.files.get("assurance/predicates.yaml")?.text??null;
+  return packagePredicateSource();
 }
 function verifyNodeChoices(nodeId){
   const predicates=selectedPredicateSource();
@@ -508,6 +540,20 @@ function renderContractAttributes(){
       Number(input.value)===value.value;
   });
   body.appendChild(preview);
+  const presets=[4,6,8,12,16,24,32,48,64,96,128];
+  const preset=el("select","target-select");
+  preset.setAttribute("aria-label","选择常用 maxActions 预算");
+  const placeholder=el("option","","选择常用值…");placeholder.value="";
+  preset.appendChild(placeholder);
+  for(const n of presets){
+    const opt=el("option","",String(n));opt.value=String(n);preset.appendChild(opt);
+  }
+  preset.addEventListener("change",()=>{
+    if(!preset.value)return;
+    input.value=preset.value;
+    preview.disabled=Number(input.value)===value.value;
+  });
+  body.appendChild(preset);
   inspectorSourceAction(value.line,"查看 YAML");
   body.appendChild(el("p","small-edit-note",
     "只写回 planning.maxActions 的整数标量；其他 Contract 字段可在 Source 修改。"));
@@ -525,6 +571,39 @@ function journeyStage(index,title,summaryText,{expanded=true}={}) {
   outer.append(head,body);inspector.appendChild(outer);
   return body;
 }
+function addPhaseVerifyEditor(phase,step,container){
+  if(activePackage?.name!=="establish-pdu-session"||
+     activeFilePath!=="assurance/procedure.yaml"||
+     selection?.kind!=="node"||step.operator!=="verify")return;
+  const predicates=packagePredicateSource();
+  if(!predicates)return;
+  const stepIndex=step.index-1;
+  const choices=phaseVerifyChoices(source.value,activePackage.name,
+    activeProcedureId,selection.id,phase.name,stepIndex,predicates);
+  if(choices.length<2)return;
+  const disclosure=el("details","step-enum");
+  const summary=el("summary","", "选择 Verify Predicate · "+choices.length+" 项");
+  const controls=el("div","step-enum-controls");
+  const select=el("select","target-select");
+  select.setAttribute("aria-label","选择 "+phase.name+" Step "+step.index+" 的 Predicate");
+  for(const choice of choices){
+    const option=el("option","",choice);option.value=choice;select.appendChild(option);
+  }
+  select.value=step.value;
+  const preview=button("预览修改",()=>{
+    try{
+      showPreview(previewPhaseVerifyPatch(source.value,activePackage.name,
+        activeProcedureId,selection.id,phase.name,stepIndex,select.value,
+        packagePredicateSource()));
+    }catch(error){message("未应用："+String(error?.message??error));}
+  },"preview-button");
+  preview.disabled=true;
+  select.addEventListener("change",()=>{
+    preview.disabled=select.value===step.value;
+  });
+  controls.append(select,preview);
+  disclosure.append(summary,controls);container.appendChild(disclosure);
+}
 function renderPhase(phase,body,phaseChildren) {
   if(!phase)return;
   for(const step of phase.steps||[]){
@@ -535,6 +614,7 @@ function renderPhase(phase,body,phaseChildren) {
     if(step.name)meta.append(el("small","",step.value));
     const jump=button("L"+step.line,()=>lineJump(step.line),"source-link");
     item.append(meta,jump);body.appendChild(item);
+    addPhaseVerifyEditor(phase,step,body);
     const ref=phaseChildren.find(c=>c.via.startsWith(phase.name+".steps[") &&
       c.procedure===step.value && c.line===step.line);
     if(ref)body.appendChild(button("进入子过程 · "+ref.procedure,
@@ -605,9 +685,13 @@ function renderInspector() {
   }
   const route=selection?.kind==="route"?routeDetails(lastGood,selection.id):null;
   const model=selection?.kind==="node"?nodeJourney(lastGood,selection.id):null;
-  const editable=Boolean(
-    route&&routeEditTargets(lastGood,route.id).length&&lastWorkspace?.procedures.size===1
-  )||Boolean(model&&verifyNodeChoices(model.node.id).length);
+  const editable=Boolean(route&&(
+    (lastWorkspace?.procedures.size===1&&routeEditTargets(lastGood,route.id).length)||
+    (activeFilePath==="assurance/procedure.yaml"&&
+      createdRouteTargets(source.value,activePackage?.name,activeProcedureId,route.id).length)
+  ))||Boolean(model&&(verifyNodeChoices(model.node.id).length||
+     (activePackage?.name==="establish-pdu-session"&&
+      model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
   if(model){
     setInspectorContext(model.node.id,"",
@@ -875,6 +959,10 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyVerifyPredicatePatch(source.value,pendingPatch,selectedPredicateSource());
     else if(pendingPatch.type==="SetMaxActions")
       nextSource=applyContractMaxActionsPatch(source.value,pendingPatch);
+    else if(pendingPatch.type==="SetPhaseVerify")
+      nextSource=applyPhaseVerifyPatch(source.value,pendingPatch,packagePredicateSource());
+    else if(pendingPatch.type==="SetCreatedRouteTarget")
+      nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
     else throw new Error("未知的属性 Patch 类型");
     source.value = nextSource;
     history.record(nextSource);

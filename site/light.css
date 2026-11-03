@@ -400,3 +400,65 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .small-edit-note{font-size:10px;line-height:1.5;color:#7b8fa2;margin:10px 0 0}
 .inspector-section-head .section-count{color:#178576}
 .inspector-section-head{padding:10px}
+
+
+/* Editor polish: compact single-line file tree and source-authoritative highlighting. */
+.asset-tree,.asset-section,.explorer{min-width:0}
+.asset-tree .asset-file,.asset-folder,.procedure-tree .tree-title{
+  display:block;min-width:0;max-width:100%;white-space:nowrap!important;
+  overflow:hidden!important;text-overflow:ellipsis!important;overflow-wrap:normal!important
+}
+.asset-tree .asset-file{line-height:1.65}
+.asset-tree .asset-file:hover{white-space:nowrap!important}
+.asset-tree .asset-folder{margin:2px 0}
+.source-editor{position:relative;flex:1;min-height:0;min-width:0;
+  overflow:hidden;background:#fcfdff}
+.source-editor .source-highlight,
+.source-editor textarea{
+  position:absolute;inset:0;display:block;width:100%;height:100%;
+  box-sizing:border-box;margin:0;padding:17px;border:0;border-radius:0;
+  font:12px/1.75 ui-monospace,SFMono-Regular,Consolas,monospace!important;
+  font-kerning:none;letter-spacing:0!important;tab-size:2;
+  white-space:pre!important;overflow-wrap:normal!important;word-break:normal!important;
+  text-align:left;direction:ltr
+}
+.source-editor .source-highlight{
+  pointer-events:none;z-index:0;overflow:hidden;
+  background:transparent;color:#31475e;user-select:none;
+  /* Textarea scrollTop/Left are mirrored so syntax and caret stay aligned. */
+}
+.source-editor textarea{
+  z-index:1;overflow:auto;resize:none;background:transparent!important;
+  color:transparent!important;-webkit-text-fill-color:transparent;
+  caret-color:#107c70;outline:none
+}
+.source-editor textarea::selection{background:rgba(62,148,215,.24)}
+.source-editor textarea:focus{outline:none}
+.source-editor:focus-within{box-shadow:inset 0 0 0 1px #c3e5da}
+.source-editor[data-highlight="off"] .source-highlight{display:none}
+.source-editor[data-highlight="off"] textarea{
+  color:#233851!important;-webkit-text-fill-color:#233851
+}
+.source-editor .tok-key{color:#176f96;font-weight:590}
+.source-editor .tok-string{color:#a44c22}
+.source-editor .tok-comment{color:#8b98a6;font-style:italic}
+.source-editor .tok-keyword{color:#7b4caa;font-weight:590}
+.source-editor .tok-literal{color:#8652a7;font-weight:550}
+.source-editor .tok-number{color:#117a75}
+.source-editor .tok-syntax{color:#627b93}
+.source-editor .tok-heading{color:#1a8178;font-weight:690}
+.source-editor .tok-link{color:#176f96;text-decoration:underline}
+
+/* Optional, source-backed enum controls appear only on qualified fields. */
+.step-enum{margin:2px 0 9px 0;border:1px solid #e2edf0;border-radius:8px;
+  background:#fbfefd;max-width:100%;overflow:hidden}
+.step-enum summary{padding:9px 11px;color:#157b73;cursor:pointer;
+  font-size:10px;font-weight:600;list-style:none;display:flex;align-items:center}
+.step-enum summary::-webkit-details-marker{display:none}
+.step-enum summary:before{content:"▸";margin-right:7px;color:#89b6aa}
+.step-enum[open] summary:before{content:"▾"}
+.step-enum-controls{padding:0 10px 11px}
+.step-enum .target-select,.inspector-content .target-select{width:100%;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.step-enum .preview-button{margin:0;padding:8px}
+.source-editor .source-highlight::-webkit-scrollbar{display:none}

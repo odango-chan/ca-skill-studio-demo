@@ -101,9 +101,12 @@
           <div id="graphWarning" class="graph-warning" role="alert" hidden></div>
         </div>
         <div id="sourcePane" class="source-pane">
-          <div class="source-caption"><span class="source-indicator"></span> YAML</div>
-          <label for="source" class="sr-only">Procedure YAML Source</label>
-          <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+          <div class="source-caption"><span class="source-indicator"></span> <span id="sourceLanguage">YAML</span></div>
+          <label for="source" class="sr-only">当前文件源码</label>
+          <div id="sourceEditor" class="source-editor" data-highlight="on">
+            <pre id="sourceHighlight" class="source-highlight" aria-hidden="true"></pre>
+            <textarea id="source" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="编辑当前文件源码"></textarea>
+          </div>
         </div>
       </div>
       <div class="editor-foot">
