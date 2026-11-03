@@ -711,6 +711,7 @@ export async function runD1Interactions(evaluate,command){
   const canvasSetup=await check(evaluate,"D3_A3_DRAG_HANDLES",[
     "const sleep=t=>new Promise(r=>setTimeout(r,t));",
     "const click=el=>el?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));",
+    " click(document.getElementById('mode-visual'));await sleep(500);",
     " const source=document.getElementById('source');",
     " const original=source.value;",
     " if(!original.includes('start: observe-target-session'))return {ok:false,reason:'Ensure sample missing'};",
@@ -728,7 +729,8 @@ export async function runD1Interactions(evaluate,command){
     "  if(root.querySelector('.react-flow__handle[data-handleid=\"new-route-out\"]'))break;",
     "  await sleep(90);",
     " }",
-    " click(document.getElementById('fit'));await sleep(650);",
+    " await sleep(800);",
+    " click(document.getElementById('fit'));await sleep(850);",
     " const startHandle=root.querySelector('.react-flow__handle[data-handleid=\"new-route-out\"]');",
     " const endNode=document.querySelector('.react-flow__node[data-id=\"unresolved\"]');",
     " const endHandle=endNode?.querySelector('.react-flow__handle[data-handleid=\"in\"]');",
@@ -743,7 +745,9 @@ export async function runD1Interactions(evaluate,command){
     "   start,end,rootSelected:!!root.querySelector('.is-selected'),",
     "   startHandle:startHandle?.getAttribute('class'),",
     "   targetHandle:endHandle?.getAttribute('class'),",
-    "   graphBounds:bounds.toJSON(),sourceUnchanged:source.value===edited};"
+    "   graphBounds:bounds.toJSON(),sourceUnchanged:source.value===edited,",
+    "   viewport:document.querySelector('.react-flow__viewport')?.getAttribute('style'),",
+    "   layoutStatus:document.getElementById('layoutStatus')?.textContent};"
   ]);
   const canvasHit=async p=>evaluate("(()=>{const e=document.elementFromPoint("+
     p.x+","+p.y+");return {tag:e?.tagName,cls:e?.getAttribute('class'),"+
