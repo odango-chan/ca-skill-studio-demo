@@ -3,6 +3,7 @@ import {createRoot} from "react-dom/client";
 import {
   ReactFlow,BaseEdge,EdgeLabelRenderer,Handle,Position,getSmoothStepPath
 } from "@xyflow/react";
+import type {EdgeProps} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {makeFlowElements,resolveReconnectedRoute} from "./react-flow-projection.mjs";
 
@@ -26,8 +27,9 @@ function ProcedureCard({data,selected}){
   </div>;
 }
 
-function RouteEdge({id,sourceX,sourceY,targetX,targetY,
-                    sourcePosition,targetPosition,data,selected}){
+function RouteEdge(props:EdgeProps){
+  const {id,sourceX,sourceY,targetX,targetY,sourcePosition,targetPosition,selected}=props;
+  const data:any=props.data;
   const [fallback,fx,fy]=getSmoothStepPath({
     sourceX,sourceY,targetX,targetY,sourcePosition,targetPosition,
     borderRadius:10,offset:24
