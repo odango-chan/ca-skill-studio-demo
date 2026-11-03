@@ -74,6 +74,26 @@ export async function runD1Interactions(evaluate,command){
     "  diffSnippet:diff?.slice(0,160),projection:document.getElementById('projectionState')?.textContent};"
   ]);
 
+  await check(evaluate,"RECONNECT_ANCHORS",[
+    sleepLine,clickLine,
+    " click(document.querySelector('.react-flow__edge[data-id=\"flow-edge-0\"]'));",
+    " for(let i=0;i<40;i++){",
+    "  if(document.querySelector('.react-flow__edge[data-id=\"flow-edge-0\"] .react-flow__edgeupdater-target'))break;",
+    "  await sleep(75);",
+    " }",
+    " const edge=document.querySelector('.react-flow__edge[data-id=\"flow-edge-0\"]');",
+    " const updater=edge?.querySelector('.react-flow__edgeupdater-target');",
+    " const select=document.querySelector('#inspector select[aria-label=\"选择当前 Procedure 中的 Route Target\"]');",
+    " const target=[...select?.options??[]].map(o=>o.value).find(v=>v!==select?.value&&v!=='nudm-sdm-get');",
+    " const node=target&&document.querySelector('.react-flow__node[data-id=\"'+target+'\"]');",
+    " const handle=node?.querySelector('.react-flow__handle.target');",
+    " return {ok:Boolean(updater&&target&&handle),",
+    "  updaterClass:updater?.getAttribute('class'),target,",
+    "  updaterRect:updater?.getBoundingClientRect().toJSON(),",
+    "  targetRect:handle?.getBoundingClientRect().toJSON(),",
+    "  edgeSelected:edge?.getAttribute('class'),currentTarget:select?.value};"
+  ]);
+
   await check(evaluate,"SOURCE_SPLIT_FAIL_CLOSED",[
     sleepLine,clickLine,
     " const source=document.getElementById('source');",
