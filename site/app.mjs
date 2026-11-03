@@ -64,6 +64,7 @@ let projectedText = null;
 let history = createEditorHistory("");
 let pendingPatch = null;
 let packageDiagnostics = [];
+let nodeEditorCache = null;
 let inspectorOpen = false;
 let explorerOpen = true;
 const expandedAssetFolders=new Set(["assurance","schemas","scripts"]);
@@ -317,6 +318,7 @@ function refresh(refit = false) {
   $("redoButton").disabled = !history.canRedo();
   if(activePackage && activeFilePath)
     markFileEdited(activePackage,activeFilePath,text,history);
+  nodeEditorCache=null;
   const isProcedure=activeFilePath==="assurance/procedure.yaml" || localProcedureDocument;
   const parsed=isProcedure ? projectWorkspace(text)
     : {state:"SOURCE_ONLY",diagnostics:[],entry:null,procedures:new Map(),procedure:null};
@@ -343,14 +345,18 @@ function refresh(refit = false) {
     lastWorkspace=null;
     lastGood=null;
     graph=null;
-    activeProcedureId=null;
-    selection=null;
+    // Preserve identities through a transient Source parse failure. With
+    // graph=null all graphic operations are disabled until valid reprojection.
+    if(parsed.state==="SOURCE_ONLY"){
+      activeProcedureId=null;
+      selection=null;
+    }
     projectedText=null;
     if(parsed.state==="SOURCE_ONLY")
       setText("projectionState","源码编辑");
     else {
       setText("projectionState","投影失败 · 仅源码");
-      if(inspectorOpen)setInspectorOpen(false,false);
+      // Keep disclosure state; repairing Source restores Node/Procedure focus.
     }
   }
   const markdownAvailable=updateMarkdownPreview(text);
@@ -780,8 +786,8 @@ function addNodeAttributeEditor(model){
   body.append(el("p","small-edit-note","修改验证引用可能影响业务门禁；此处仅验证源码结构，不运行完整 Runtime Validator。"));
   return true;
 }
-function addNodeRenameEditor(model){
-  if(!nodeRenameAvailable(source.value,activeProcedureId,model.node.id))return false;
+function addNodeRenameEditor(model,available){
+  if(!available)return false;
   const body=section("Node ID","D2-A1");
   const label=el("label","attribute-label","Node ID");
   const input=el("input","attribute-input");
@@ -872,8 +878,7 @@ function addNodeBindingEditors(model,attributes){
   return true;
 }
 
-function addNodeDeleteEditor(model){
-  const options=deleteNodeOptions(source.value,activeProcedureId,model.node.id);
+function addNodeDeleteEditor(model,options){
   if(!options)return false;
   const body=section("删除 Node","D2-A3");
   body.append(el("p","small-edit-note",
@@ -1011,13 +1016,31 @@ function routeFriendlySource(routeSource){
     :routeSource==="operator.on"?"主执行"
     :routeSource;
 }
-function renderNodeJourney(model) {
+function nodeEditorCapabilities(nodeId){
+  const text=source.value,ps=packagePredicateSource(),skill=activePackage?.name;
+  if(nodeEditorCache&&nodeEditorCache.text===text&&
+     nodeEditorCache.procedure===activeProcedureId&&nodeEditorCache.nodeId===nodeId&&
+     nodeEditorCache.predicateSource===ps&&nodeEditorCache.skill===skill)
+    return nodeEditorCache.value;
+  // One expensive source-backed qualification pass per Inspector selection.
+  // A new Source revision or Package PredicateSet invalidates the cache.
+  const value={
+    attributes:currentNodeAttributes(nodeId),
+    deletion:deleteNodeOptions(text,activeProcedureId,nodeId),
+    rename:nodeRenameAvailable(text,activeProcedureId,nodeId),
+    verify:verifyNodeChoices(nodeId)
+  };
+  nodeEditorCache={text,procedure:activeProcedureId,nodeId,
+    predicateSource:ps,skill,value};
+  return value;
+}
+
+function renderNodeJourney(model,caps) {
   const node=model.node;
-  addNodeRenameEditor(model);
-  const attributes=currentNodeAttributes(node.id);
-  addNodeOperatorEditor(model,attributes);
-  addNodeBindingEditors(model,attributes);
-  addNodeDeleteEditor(model);
+  addNodeRenameEditor(model,caps.rename);
+  addNodeOperatorEditor(model,caps.attributes);
+  addNodeBindingEditors(model,caps.attributes);
+  addNodeDeleteEditor(model,caps.deletion);
   if(model.prepare.phase || model.prepare.routes.length){
     const body=journeyStage(1,"准备",
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
@@ -1059,6 +1082,12 @@ function renderNodeJourney(model) {
 }
 function renderInspector() {
   inspector.replaceChildren();
+  if(projection?.state==="UNAVAILABLE"){
+    setInspectorContext("投影不可用","Source 修复后可恢复 Procedure / Node 选择");
+    $("inspectorState").textContent="STALE";
+    inspectorNote("图形编辑已暂停。可在 Source 修复或使用 Undo 恢复。");
+    return;
+  }
   if(!lastGood){
     if(activeFilePath==="assurance/contract.yaml"&&renderContractAttributes())return;
     setInspectorContext("文件源码","当前文件可直接在 Source 编辑。");
@@ -1072,21 +1101,19 @@ function renderInspector() {
   }
   const route=selection?.kind==="route"?routeDetails(lastGood,selection.id):null;
   const model=selection?.kind==="node"?nodeJourney(lastGood,selection.id):null;
+  const caps=model?nodeEditorCapabilities(model.node.id):null;
   const editable=Boolean(route&&(eligibleGraphRouteTargets(route.id).length||
     insertNodeOptions(source.value,activeProcedureId,route.id,
       packagePredicateSource(),activePackage?.name)))||
-    Boolean(model&&((currentNodeAttributes(model.node.id)?.operator||
-      currentNodeAttributes(model.node.id)?.bindings?.length)||
-      deleteNodeOptions(source.value,activeProcedureId,model.node.id)||
-      nodeRenameAvailable(source.value,activeProcedureId,model.node.id)||
-      verifyNodeChoices(model.node.id).length||
+    Boolean(model&&((caps.attributes?.operator||caps.attributes?.bindings?.length)||
+      caps.deletion||caps.rename||caps.verify.length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
   if(model){
     setInspectorContext(model.node.id,"",
       model.node.operator.toUpperCase()+(model.node.id===lastGood.start?" · START":""));
-    renderNodeJourney(model);
+    renderNodeJourney(model,caps);
     return;
   }
   if(route){
