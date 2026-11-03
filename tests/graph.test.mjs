@@ -157,3 +157,23 @@ test("basic fallback supports vertical direction without losing any graph node o
   assert.notDeepEqual(right.positions.get(proc.nodes[1].id),down.positions.get(proc.nodes[1].id));
   assert.throws(()=>layoutProcedure(proc,"SIDEWAYS"),/Unsupported/);
 });
+
+
+test("basic layout preserves Route origin boundaries even for identical endpoints",()=>{
+  const proc=projectProcedure(fixture).procedure;
+  const a=proc.start,b=proc.routes.find(r=>r.source===a).target;
+  const synthetic={...proc,routes:[
+    {id:"same:operator",source:a,target:b,outcome:"PASS",routeSource:"operator.on"},
+    {id:"same:post",source:a,target:b,outcome:"PASS",routeSource:"postconditions.on"}
+  ]};
+  for(const direction of ["DOWN","RIGHT"]){
+    const graph=layoutProcedure(synthetic,direction);
+    assert.equal(graph.positions.size,proc.nodes.length);
+    assert.equal(graph.bundles.length,2);
+    assert.deepEqual(graph.bundles.map(x=>x.routeSource),
+      ["operator.on","postconditions.on"]);
+    assert.deepEqual(graph.bundles.map(x=>x.routes[0].id),
+      ["same:operator","same:post"]);
+    assert.equal(graph.bundles.reduce((sum,x)=>sum+x.routes.length,0),2);
+  }
+});

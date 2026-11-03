@@ -1,5 +1,7 @@
 import { layoutProcedure } from "./graph.mjs";
-import { layoutProcedureELK } from "./layout.mjs";
+import { layoutProcedureELK,selectGraphScope } from "./layout.mjs";
+import {detailedLayoutAllowed} from "./graph-scale.mjs";
+import {auditPackageWorkspace} from "./package-audit.mjs";
 import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
 import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./workbench.mjs";
@@ -11,6 +13,11 @@ import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from ".
 import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
 import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
 import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
+import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "./node-designer.mjs";
+import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "./node-create.mjs";
+import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from "./node-delete.mjs";
+import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue,
+ previewNodeBindingFrom,applyNodeBindingFrom} from "./node-attributes.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
@@ -56,6 +63,8 @@ let viewKind = "source";
 let projectedText = null;
 let history = createEditorHistory("");
 let pendingPatch = null;
+let packageDiagnostics = [];
+let nodeEditorCache = null;
 let inspectorOpen = false;
 let explorerOpen = true;
 const expandedAssetFolders=new Set(["assurance","schemas","scripts"]);
@@ -107,9 +116,19 @@ function scheduleELKLayout(wait=0, autoFit=false) {
   const direction=layoutDirection;
   const focus=neighborView && selection?.kind==="node" ? selection.id : null;
   const filtered=Boolean(focus);
-  const fallback=layoutProcedure(proc,direction);
-  graph={...fallback, visibleNodes:proc.nodes, visibleRoutes:proc.routes, isFiltered:false};
+  const scope=selectGraphScope(proc,focus,filtered);
+  const basic=scope.isFiltered
+    ? {...proc,start:focus,nodes:scope.nodes,routes:scope.routes}
+    : proc;
+  const fallback=layoutProcedure(basic,direction);
+  graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
+    isFiltered:scope.isFiltered};
   renderGraph();
+  if(!detailedLayoutAllowed(scope)){
+    setText("layoutStatus","大型流程 · 基础布局（可使用邻居视图）");
+    if(autoFit || scope.isFiltered)requestAnimationFrame(fit);
+    return;
+  }
   setText("layoutStatus","正在自动布局…");
   layoutTimer=setTimeout(async()=>{
     layoutTimer=null;
@@ -126,7 +145,8 @@ function scheduleELKLayout(wait=0, autoFit=false) {
       else if(selection?.kind==="node")centerNode(selection.id);
     }catch(error){
       if(ticket!==layoutTicket)return;
-      graph={...fallback,visibleNodes:proc.nodes,visibleRoutes:proc.routes,isFiltered:false};
+      graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
+        isFiltered:scope.isFiltered};
       renderGraph();
       setText("layoutStatus","自动布局失败 · 使用基础布局");
       message("自动布局失败，已使用基础画布："+String(error?.message??error));
@@ -298,10 +318,16 @@ function refresh(refit = false) {
   $("redoButton").disabled = !history.canRedo();
   if(activePackage && activeFilePath)
     markFileEdited(activePackage,activeFilePath,text,history);
+  nodeEditorCache=null;
   const isProcedure=activeFilePath==="assurance/procedure.yaml" || localProcedureDocument;
   const parsed=isProcedure ? projectWorkspace(text)
     : {state:"SOURCE_ONLY",diagnostics:[],entry:null,procedures:new Map(),procedure:null};
   projection=parsed;
+  // A5 package hints are advisory; a broken Procedure uses the existing
+  // authoritative Source parser diagnosis instead of duplicating it here.
+  packageDiagnostics=parsed.state==="UNAVAILABLE"?[]:
+    auditPackageWorkspace(activePackage,
+      activeFilePath==="assurance/procedure.yaml"?text:null);
   if (parsed.state === "READY") {
     lastWorkspace = parsed;
     if (!activeProcedureId || !parsed.procedures.has(activeProcedureId)) {
@@ -319,14 +345,18 @@ function refresh(refit = false) {
     lastWorkspace=null;
     lastGood=null;
     graph=null;
-    activeProcedureId=null;
-    selection=null;
+    // Preserve identities through a transient Source parse failure. With
+    // graph=null all graphic operations are disabled until valid reprojection.
+    if(parsed.state==="SOURCE_ONLY"){
+      activeProcedureId=null;
+      selection=null;
+    }
     projectedText=null;
     if(parsed.state==="SOURCE_ONLY")
       setText("projectionState","源码编辑");
     else {
       setText("projectionState","投影失败 · 仅源码");
-      if(inspectorOpen)setInspectorOpen(false,false);
+      // Keep disclosure state; repairing Source restores Node/Procedure focus.
     }
   }
   const markdownAvailable=updateMarkdownPreview(text);
@@ -637,6 +667,86 @@ function addPatchControls(route) {
   body.appendChild(preview);
   return true;
 }
+function addInsertNodeEditor(route){
+  const options=insertNodeOptions(source.value,activeProcedureId,route.id,
+    packagePredicateSource(),activePackage?.name);
+  if(!options)return false;
+  const body=section("在此 Route 后插入 Node","D2-A2");
+  const desc=el("p","small-edit-note",
+    "原 Route 将先进入新 Node；Call / Verify 通过指定 Outcome 回到原目标。仅编辑源码，不验证运行时行为。");
+  body.append(desc);
+  const idLabel=el("label","attribute-label","新 Node ID");
+  const idInput=el("input","attribute-input");
+  idInput.type="text";idInput.value="new-node";idInput.maxLength=80;
+  idInput.setAttribute("aria-label","新 Node ID");
+  idLabel.append(idInput);body.append(idLabel);
+  const typeLabel=el("label","attribute-label","Operator");
+  const type=el("select","target-select");
+  type.setAttribute("aria-label","新 Node Operator");
+  for(const key of ["terminal","call",...(options.predicates.length?["verify"]:[])]){
+    const option=el("option","",key);option.value=key;type.append(option);
+  }
+  typeLabel.append(type);body.append(typeLabel);
+  const valueHost=el("div","node-create-value");
+  const outcomeHost=el("div","node-create-outcome");
+  body.append(valueHost,outcomeHost);
+  const preview=button("预览插入 Node",()=>{
+    try{
+      const value=valueHost.querySelector("input,select")?.value??"";
+      const outcome=type.value==="terminal"?"":outcomeHost.querySelector("input")?.value??"";
+      showPreview(previewNodeInsert(source.value,activeProcedureId,route.id,
+        {nodeId:idInput.value,operator:type.value,value,outcome},
+        packagePredicateSource(),activePackage?.name));
+    }catch(error){message("未应用："+String(error?.message??error));}
+  },"preview-button");
+  function update(){
+    const name=idInput.value;
+    const val=valueHost.querySelector("input,select")?.value??"";
+    const outcome=type.value==="terminal"?"":outcomeHost.querySelector("input")?.value??"";
+    preview.disabled=!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name)||
+      name.length>80||lastGood.nodes.some(n=>n.id===name)||
+      !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(val)||
+      (type.value!=="terminal"&&!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(outcome));
+  }
+  function fields(){
+    valueHost.replaceChildren();outcomeHost.replaceChildren();
+    const label=el("label","attribute-label",
+      type.value==="terminal"?"Terminal status":
+      type.value==="verify"?"Predicate":"Call operation");
+    const values=type.value==="terminal"?options.terminalValues:
+      type.value==="verify"?options.predicates:null;
+    let input;
+    if(values){
+      input=el("select","target-select");
+      for(const value of values){
+        const opt=el("option","",value);opt.value=value;input.append(opt);
+      }
+    }else{
+      input=el("input","attribute-input");
+      input.type="text";input.placeholder="tool.operation.name";
+    }
+    input.setAttribute("aria-label","新 Node 值");
+    input.addEventListener("input",update);input.addEventListener("change",update);
+    label.append(input);valueHost.append(label);
+    if(type.value!=="terminal"){
+      const routeLabel=el("label","attribute-label","新 Node Outcome");
+      const routeInput=el("input","attribute-input");
+      routeInput.type="text";
+      routeInput.value=type.value==="verify"?"PASS":"COMMITTED";
+      routeInput.maxLength=80;
+      routeInput.setAttribute("aria-label","新 Node Outcome");
+      routeInput.addEventListener("input",update);
+      routeLabel.append(routeInput);outcomeHost.append(routeLabel);
+    }
+    update();
+  }
+  idInput.addEventListener("input",update);
+  type.addEventListener("change",fields);
+  body.append(preview);
+  fields();
+  return true;
+}
+
 function packagePredicateSource(){
   return activePackage?.files.get("assurance/predicates.yaml")?.text??null;
 }
@@ -676,6 +786,125 @@ function addNodeAttributeEditor(model){
   body.append(el("p","small-edit-note","修改验证引用可能影响业务门禁；此处仅验证源码结构，不运行完整 Runtime Validator。"));
   return true;
 }
+function addNodeRenameEditor(model,available){
+  if(!available)return false;
+  const body=section("Node ID","D2-A1");
+  const label=el("label","attribute-label","Node ID");
+  const input=el("input","attribute-input");
+  input.type="text";input.value=model.node.id;input.maxLength=80;
+  input.setAttribute("aria-label","重命名 Node ID");
+  input.setAttribute("autocomplete","off");input.setAttribute("spellcheck","false");
+  label.appendChild(input);body.appendChild(label);
+  const preview=button("预览 Node 重命名",()=>{
+    try{
+      showPreview(previewNodeRename(source.value,activeProcedureId,model.node.id,input.value));
+    }catch(error){message("未应用："+String(error?.message??error));}
+  },"preview-button");
+  preview.disabled=true;
+  input.addEventListener("input",()=>{
+    preview.disabled=input.value===model.node.id||
+      !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(input.value);
+  });
+  body.append(preview,el("p","small-edit-note",
+    "同步调整当前 Procedure 的 start、Route 目标和可识别的 from 引用；必须确认 Diff。跨文件语义仍需验证。"));
+  return true;
+}
+
+function currentNodeAttributes(nodeId){
+  return nodeAttributeState(source.value,activeProcedureId,nodeId,
+    packagePredicateSource(),activePackage?.name);
+}
+function addNodeOperatorEditor(model,attributes){
+  const operator=attributes?.operator;
+  if(!operator)return false;
+  const body=section("Operator Value","D2-A4");
+  const label=el("label","attribute-label",model.node.operator+" 值");
+  let input;
+  if(operator.type==="select"){
+    input=el("select","target-select");
+    for(const v of operator.values){
+      const option=el("option","",v);option.value=v;input.append(option);
+    }
+  }else{
+    input=el("input","attribute-input");
+    input.type="text";input.maxLength=120;
+    input.setAttribute("spellcheck","false");
+  }
+  input.value=operator.value;
+  input.setAttribute("aria-label","编辑 Node Operator 值");
+  label.append(input);body.append(label);
+  const preview=button("预览 Operator 修改",()=>{
+    try{
+      showPreview(previewNodeOperatorValue(source.value,activeProcedureId,
+        model.node.id,input.value,packagePredicateSource(),activePackage?.name));
+    }catch(error){message("Operator 未应用："+String(error?.message??error));}
+  },"preview-button");
+  const update=()=>{
+    preview.disabled=input.value===operator.value||
+      !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(input.value);
+  };
+  input.addEventListener("input",update);
+  input.addEventListener("change",update);
+  update();body.append(preview);
+  body.append(el("p","small-edit-note",
+    "这里只修改现有 Operator 的值，不切换类型。Tool/Call 能否执行、结果类型是否兼容，需另做 Runtime 校验。"));
+  return true;
+}
+function addNodeBindingEditors(model,attributes){
+  if(!attributes?.bindings?.length)return false;
+  const body=section("with / from",attributes.bindings.length+" BINDINGS · D2-A4");
+  body.append(el("p","small-edit-note",
+    "仅能将已有 with.<参数>.from 替换为本 Procedure 中出现过的来源或已声明 input；不生成新的输出路径。"));
+  for(const binding of attributes.bindings){
+    const label=el("label","attribute-label",binding.key+" · from");
+    const select=el("select","target-select");
+    select.setAttribute("aria-label","Binding 来源 · "+binding.key);
+    for(const ref of binding.choices){
+      const option=el("option","",ref);option.value=ref;select.append(option);
+    }
+    select.value=binding.value;label.append(select);body.append(label);
+    const preview=button("预览 Binding 修改",()=>{
+      try{
+        showPreview(previewNodeBindingFrom(source.value,activeProcedureId,
+          model.node.id,binding.key,select.value));
+      }catch(error){message("Binding 未应用："+String(error?.message??error));}
+    },"preview-button");
+    preview.disabled=true;
+    select.addEventListener("change",()=>{preview.disabled=select.value===binding.value;});
+    body.append(preview);
+  }
+  body.append(el("p","small-edit-note",
+    "Binding 类型、操作参数契约和生产者输出结构尚未进行全 Package 验证。"));
+  return true;
+}
+
+function addNodeDeleteEditor(model,options){
+  if(!options)return false;
+  const body=section("删除 Node","D2-A3");
+  body.append(el("p","small-edit-note",
+    options.mode==="merge-terminal"
+      ?"将此终态的全部入站 Route 合并到同状态的另一终态。"
+      :"此 Node 只有一条出口，可将其入站 Route 转向唯一出口目标。"));
+  const label=el("label","attribute-label",
+    "入站 Route 重定向目标（"+options.incomingCount+" 条）");
+  const select=el("select","target-select");
+  select.setAttribute("aria-label","删除 Node 后的重定向目标");
+  for(const target of options.targets){
+    const opt=el("option","",target);opt.value=target;select.append(opt);
+  }
+  label.append(select);body.append(label);
+  const preview=button("预览删除 Node",()=>{
+    try{
+      showPreview(previewNodeDelete(source.value,activeProcedureId,model.node.id,
+        select.value));
+    }catch(error){message("删除未应用："+String(error?.message??error));}
+  },"preview-button");
+  body.append(preview);
+  body.append(el("p","small-edit-note",
+    "删除会移除选中 Node 及其出站 Route；仅有界结构检查，不代替业务确认或 Runtime Validator。"));
+  return true;
+}
+
 function renderContractAttributes(){
   const value=contractMaxActions(source.value,activePackage?.name);
   if(!value)return false;
@@ -787,9 +1016,31 @@ function routeFriendlySource(routeSource){
     :routeSource==="operator.on"?"主执行"
     :routeSource;
 }
-function renderNodeJourney(model) {
+function nodeEditorCapabilities(nodeId){
+  const text=source.value,ps=packagePredicateSource(),skill=activePackage?.name;
+  if(nodeEditorCache&&nodeEditorCache.text===text&&
+     nodeEditorCache.procedure===activeProcedureId&&nodeEditorCache.nodeId===nodeId&&
+     nodeEditorCache.predicateSource===ps&&nodeEditorCache.skill===skill)
+    return nodeEditorCache.value;
+  // One expensive source-backed qualification pass per Inspector selection.
+  // A new Source revision or Package PredicateSet invalidates the cache.
+  const value={
+    attributes:currentNodeAttributes(nodeId),
+    deletion:deleteNodeOptions(text,activeProcedureId,nodeId),
+    rename:nodeRenameAvailable(text,activeProcedureId,nodeId),
+    verify:verifyNodeChoices(nodeId)
+  };
+  nodeEditorCache={text,procedure:activeProcedureId,nodeId,
+    predicateSource:ps,skill,value};
+  return value;
+}
+
+function renderNodeJourney(model,caps) {
   const node=model.node;
-  addNodeAttributeEditor(model);
+  addNodeRenameEditor(model,caps.rename);
+  addNodeOperatorEditor(model,caps.attributes);
+  addNodeBindingEditors(model,caps.attributes);
+  addNodeDeleteEditor(model,caps.deletion);
   if(model.prepare.phase || model.prepare.routes.length){
     const body=journeyStage(1,"准备",
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
@@ -831,6 +1082,12 @@ function renderNodeJourney(model) {
 }
 function renderInspector() {
   inspector.replaceChildren();
+  if(projection?.state==="UNAVAILABLE"){
+    setInspectorContext("投影不可用","Source 修复后可恢复 Procedure / Node 选择");
+    $("inspectorState").textContent="STALE";
+    inspectorNote("图形编辑已暂停。可在 Source 修复或使用 Undo 恢复。");
+    return;
+  }
   if(!lastGood){
     if(activeFilePath==="assurance/contract.yaml"&&renderContractAttributes())return;
     setInspectorContext("文件源码","当前文件可直接在 Source 编辑。");
@@ -844,15 +1101,19 @@ function renderInspector() {
   }
   const route=selection?.kind==="route"?routeDetails(lastGood,selection.id):null;
   const model=selection?.kind==="node"?nodeJourney(lastGood,selection.id):null;
-  const editable=Boolean(route&&eligibleGraphRouteTargets(route.id).length)||
-    Boolean(model&&(verifyNodeChoices(model.node.id).length||
+  const caps=model?nodeEditorCapabilities(model.node.id):null;
+  const editable=Boolean(route&&(eligibleGraphRouteTargets(route.id).length||
+    insertNodeOptions(source.value,activeProcedureId,route.id,
+      packagePredicateSource(),activePackage?.name)))||
+    Boolean(model&&((caps.attributes?.operator||caps.attributes?.bindings?.length)||
+      caps.deletion||caps.rename||caps.verify.length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
   if(model){
     setInspectorContext(model.node.id,"",
       model.node.operator.toUpperCase()+(model.node.id===lastGood.start?" · START":""));
-    renderNodeJourney(model);
+    renderNodeJourney(model,caps);
     return;
   }
   if(route){
@@ -862,6 +1123,7 @@ function renderInspector() {
     inspectorLine("Route Source",route.routeSource);
     inspectorSourceAction(route.line,"查看源码");
     addPatchControls(route);
+    addInsertNodeEditor(route);
     return;
   }
   setInspectorContext(lastGood.name,"选择一个节点或路由","PROCEDURE");
@@ -869,14 +1131,23 @@ function renderInspector() {
 }
 
 function renderProblems() {
-  const items=projection?.diagnostics??[];
+  const errors=projection?.diagnostics??[];
+  const items=[...errors,...packageDiagnostics];
   problems.hidden=items.length===0;
   problems.replaceChildren();
   if(!items.length)return;
-  problems.appendChild(el("strong","","问题 · "+items.length));
+  problems.appendChild(el("strong","",
+    errors.length?"问题 · "+errors.length+" / 编辑期提示 · "+packageDiagnostics.length:
+      "编辑期提示 · "+packageDiagnostics.length));
   for(const item of items){
-    problems.appendChild(button("L"+item.line+" · "+item.message,
-      ()=>lineJump(item.line)));
+    const path=item.path||activeFilePath;
+    const label=(item.code?"⚠ ":"")+(path?path+" · ":"")+
+      "L"+item.line+" · "+item.message;
+    problems.appendChild(button(label,()=>{
+      if(path&&activePackage?.files.has(path)&&path!==activeFilePath)
+        switchFile(path);
+      lineJump(item.line);
+    }));
   }
 }
 function selectNode(id) {
@@ -1014,7 +1285,15 @@ function closePreview() {
 function showPreview(preview) {
   pendingPatch = preview;
   setText("patchDiff", preview.diff);
-  setText("patchSummary",preview.summary??(preview.routeId+" · "+preview.oldTarget+" → "+preview.newTarget));
+  const baseSummary=preview.summary??(preview.routeId+" · "+preview.oldTarget+" → "+preview.newTarget);
+  let added=0;
+  if(activeFilePath==="assurance/procedure.yaml"&&
+     typeof preview.candidateSource==="string"){
+    const after=auditPackageWorkspace(activePackage,preview.candidateSource);
+    const old=new Set(packageDiagnostics.map(d=>d.code+"|"+d.message));
+    added=after.filter(d=>!old.has(d.code+"|"+d.message)).length;
+  }
+  setText("patchSummary",baseSummary+(added?" · 新增 "+added+" 条编辑期提示（非 Runtime 校验）":""));
   $("patchDialog").hidden = false;
   $("applyPatch").focus();
 }
@@ -1036,7 +1315,26 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyPhaseVerifyPatch(source.value,pendingPatch,packagePredicateSource());
     else if(pendingPatch.type==="SetCreatedRouteTarget")
       nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
+    else if(pendingPatch.type==="RenameNode")
+      nextSource=applyNodeRename(source.value,pendingPatch);
+    else if(pendingPatch.type==="InsertNode")
+      nextSource=applyNodeInsert(source.value,pendingPatch,
+        packagePredicateSource(),activePackage?.name);
+    else if(pendingPatch.type==="DeleteNode")
+      nextSource=applyNodeDelete(source.value,pendingPatch);
+    else if(pendingPatch.type==="SetNodeOperatorValue")
+      nextSource=applyNodeOperatorValue(source.value,pendingPatch,
+        packagePredicateSource(),activePackage?.name);
+    else if(pendingPatch.type==="SetNodeBindingFrom")
+      nextSource=applyNodeBindingFrom(source.value,pendingPatch);
     else throw new Error("未知的属性 Patch 类型");
+    if(pendingPatch.type==="RenameNode"&&selection?.kind==="node"&&
+       activeProcedureId===pendingPatch.procedureId&&selection.id===pendingPatch.nodeId)
+      selection={kind:"node",id:pendingPatch.newId};
+    if(pendingPatch.type==="InsertNode"&&activeProcedureId===pendingPatch.procedureId)
+      selection={kind:"node",id:pendingPatch.nodeId};
+    if(pendingPatch.type==="DeleteNode"&&activeProcedureId===pendingPatch.procedureId)
+      selection=null;
     source.value = nextSource;
     history.record(nextSource);
     closePreview();

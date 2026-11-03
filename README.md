@@ -2,6 +2,31 @@
 
 ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是**无后端的浏览器前端**，不是 Agent Runtime。
 
+
+## Current milestone · D2 Node Designer (2026-11-03)
+
+D1 React Flow migration and Chromium mouse-interaction smoke have passed on main.
+D2-A1 adds a **generic Node ID rename** via a source-preserving, guarded multi-span
+YAML patch with Diff preview, confirmation and Undo/Redo. It updates the current
+Procedure start, inbound Route targets and explicit from references; unsupported
+references fail closed. No CreatedSession-specific Node mutator was added.
+
+D2-A2 adds guarded insertion of a terminal/call/verify Node on a selected Route,
+with an explicit forwarding Outcome for nonterminal nodes.
+D2-A3 adds guarded deletion for duplicate-status terminals and single-outcome
+Node bypass, with inbound Route remediation, source-reference checks and Diff.
+D2-A4 adds existing Operator value and qualified with.<key>.from scalar edits,
+without changing Operator kinds or introducing new Binding fields.
+D2-A5 adds cross-file editor warnings, graph-size-aware ELK fallback, source
+recovery and per-revision Inspector qualification caching. These remain authoring
+checks, **not** complete Runtime validation.
+
+
+**Still not implemented:** unrestricted Node creation/deletion, Operator-kind switching,
+Binding shape changes, generic Phase editing,
+full package import, whole-package Runtime validation and in-place filesystem save.
+See [D2 Node Designer](docs/D2-node-designer.md).
+
 ## 在线预览
 
 https://odango-chan.github.io/ca-skill-studio-demo/
@@ -57,7 +82,7 @@ Visual 当前在 ensure 单 Procedure 的**两条固定失败终态 Route**支�
 
 ## 下一阶段
 
-下一阶段为真实浏览器 E2E 交互验收、选中节点的分支折叠与复杂回边标签避让，并评估是否有足够收益迁移 React Flow。随后接入完整 Demo Schema / 专用 Validator 的可执行一致性检查。目前 CreatedSession 的枚举 Patch 只证明源码结构未意外损坏，业务路径变化仍需单独验收。在图形层选型上，大图和可编辑连接线优先评估 React + TypeScript + React Flow / ELK，**本次上线仍使用 SVG 画布 + ELK 布局，而非 React Flow 的正式编辑器；ELK 只负责视觉位置与边路由，不改变 YAML 语义**。
+下一阶段为真实浏览器 E2E 交互验收、选中节点的分支折叠与复杂回边标签避让，并评估是否有足够收益迁移 React Flow。随后接入完整 Demo Schema / 专用 Validator 的可执行一致性检查。目前 CreatedSession 的枚举 Patch 只证明源码结构未意外损坏，业务路径变化仍需单独验收。在图形层选型上，大图和可编辑连接线优先评估 React + TypeScript + React Flow / ELK，**当前 D1 已使用 React Flow + ELK；此处为早期阶段记录；ELK 只负责视觉位置与边路由，不改变 YAML 语义**。
 
 当前只建设 SKILL 开发与编辑，不做 Case、独立验证工作台、Registry / Publishing、Agent Runtime 调用或 Live 5GC。
 
@@ -132,7 +157,7 @@ The previous implementation used `explorerPanel.hidden=true` and relied on a sep
 
 - On first load the layout select and the ELK renderer use `DOWN`, so Procedures flow from top to bottom. Users can still select `RIGHT` for horizontal layout; this remains a visual option only and never rewrites the SKILL source.
 - The basic fallback layout now honors the chosen direction instead of flashing a horizontal-only graph while ELK initializes or fails. The SVG fallback also draws the fallback edge paths in the matching direction.
-- Current renderer remains dependency-light DOM SVG plus ELK layered (`elkjs`); React Flow is not installed. For a future general-purpose Procedure Designer, evaluate `@xyflow/react` for node/edge interaction while retaining ELK for layout and YAML Source Patch as the editing authority. Do not migrate just to change layout direction.
+- Current renderer remains dependency-light DOM SVG plus ELK layered (`elkjs`); React Flow is installed as of D1. For a future general-purpose Procedure Designer, evaluate `@xyflow/react` for node/edge interaction while retaining ELK for layout and YAML Source Patch as the editing authority. Do not migrate just to change layout direction.
 
 ## Procedure Designer D1 · React Flow canvas
 

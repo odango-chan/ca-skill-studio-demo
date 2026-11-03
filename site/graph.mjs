@@ -38,8 +38,13 @@ export function layoutProcedure(procedure, direction = "RIGHT") {
   }
   const bundled = new Map();
   for (const route of procedure.routes) {
-    const key = route.source + "\0" + route.target;
-    if (!bundled.has(key)) bundled.set(key, { source: route.source, target: route.target, outcomes: [], routes: [] });
+    // The Route origin is part of visual identity. Operator.on and
+    // postconditions.on must never look like one semantically shared edge.
+    const key = JSON.stringify([route.source,route.target,route.routeSource]);
+    if (!bundled.has(key)) bundled.set(key, {
+      source:route.source,target:route.target,routeSource:route.routeSource,
+      outcomes:[],routes:[]
+    });
     bundled.get(key).outcomes.push(route.outcome);
     bundled.get(key).routes.push(route);
   }
