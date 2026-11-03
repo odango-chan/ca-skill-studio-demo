@@ -16,6 +16,7 @@ const problems = $("problems");
 const filePicker = $("filePicker");
 const procedureTree = $("procedureTree");
 let filename = "ensure-pdu-session.procedure.yaml";
+let assetOrigin = "sample";
 let initialText = "";
 let projection = null;
 let lastGood = null;
@@ -32,7 +33,6 @@ let pendingPatch = null;
 let inspectorOpen = false;
 let explorerOpen = true;
 let showAllLabels = false;
-let lastNodeId = null;
 let layoutDirection = "RIGHT";
 let neighborView = false;
 let layoutTicket = 0;
@@ -113,7 +113,6 @@ function setInspectorOpen(open,recenter=true) {
   inspectorOpen=Boolean(open);
   const pane=$("workbench");
   pane.dataset.inspector=inspectorOpen?"open":"closed";
-  $("toggleInspector").setAttribute("aria-expanded",String(inspectorOpen));
   $("inspectorPanel").hidden=!inspectorOpen;
   if(recenter)requestAnimationFrame(()=>{
     if(selection?.kind==="node")centerNode(selection.id);
@@ -131,47 +130,21 @@ function setExplorerOpen(open) {
   });
 }
 $("toggleExplorer").addEventListener("click",()=>setExplorerOpen(!explorerOpen));
-$("toggleInspector").addEventListener("click",()=>setInspectorOpen(!inspectorOpen));
 $("closeInspector").addEventListener("click",()=>setInspectorOpen(false));
 $("showAllLabels").addEventListener("click",()=>{
   showAllLabels=!showAllLabels;
   $("showAllLabels").setAttribute("aria-pressed",String(showAllLabels));
+  $("showAllLabels").textContent=showAllLabels?"只显示重点 Route 标签":"显示全部 Route 标签";
   graphPane.dataset.labels=showAllLabels?"all":"key";
 });
 function clearSelection() {
   selection=null;
-  lastNodeId=null;
-  renderQuickCard();
   renderOutline();
   renderProcedureNavigation();
   renderGraph();
+  renderInspector();
   setInspectorOpen(false);
 }
-$("clearSelection").addEventListener("click",clearSelection);
-$("quickDetails").addEventListener("click",()=>setInspectorOpen(true));
-$("quickSource").addEventListener("click",()=>{
-  const item=selection?.kind==="node"
-    ?lastGood?.nodes.find(n=>n.id===selection.id)
-    :lastGood?.routes.find(r=>r.id===selection?.id);
-  if(item)lineJump(item.line);
-});
-$("quickChild").addEventListener("click",()=>{
-  const item=lastGood?.nodes.find(n=>n.id===selection?.id);
-  if(item?.children?.length===1)enterProcedure(item.children[0].procedure);
-});
-function renderQuickCard() {
-  const card=$("nodeQuickCard");
-  const isReady=projection?.state==="READY" && lastGood;
-  const node=isReady&&selection?.kind==="node" ?lastGood.nodes.find(n=>n.id===selection.id):null;
-  const route=isReady&&selection?.kind==="route" ?lastGood.routes.find(r=>r.id===selection.id):null;
-  card.hidden=!(node||route);
-  if(card.hidden)return;
-  setText("quickKind",node?node.operator.toUpperCase()+" · NODE":"ROUTE · "+route.routeSource);
-  setText("quickTitle",node?node.id:route.outcome+" → "+route.target);
-  setText("quickSubtitle",node?node.value:route.source+" · L"+route.line);
-  $("quickChild").hidden=!node||node.children?.length!==1;
-}
-
 function onDirtyNavigation(event) {
   if (source.value !== initialText) {
     event.preventDefault();
@@ -191,14 +164,14 @@ function setMode(next) {
 }
 for (const id of ["visual", "source", "split"]) $("mode-" + id).addEventListener("click", () => setMode(id));
 
-function loadDocument(name, text) {
+function loadDocument(name, text, origin="local") {
   filename = name;
+  assetOrigin = origin;
   initialText = text;
   source.value = text;
   history = createEditorHistory(text);
   closePreview();
   selection = null;
-  lastNodeId = null;
   setInspectorOpen(false,false);
   $("search").value = "";
   lastGood = null;
@@ -245,12 +218,12 @@ function refresh(refit = false) {
   }
   $("graphWarning").hidden = parsed.state === "READY";
   setText("graphWarning", parsed.state === "READY" ? "" : (lastGood ? "Graph 已过期，仅供对照，不能代表当前 Source。" : "当前 Source 无可用的 Procedure 投影。") + " " + (parsed.diagnostics[0]?.message ?? ""));
+  renderAssetNavigation();
   renderProcedureNavigation();
   renderOutline();
   renderInspector();
   renderProblems();
   renderGraph();
-  renderQuickCard();
   if (parsed.state === "READY") scheduleELKLayout(refit?0:180,refit);
   else invalidateLayout();
   if (refit && graph) requestAnimationFrame(fit);
@@ -268,18 +241,29 @@ function enterProcedure(name) {
   lastGood = lastWorkspace.procedures.get(name);
   graph = layoutProcedure(lastGood);
   selection = null;
-  lastNodeId = null;
   setInspectorOpen(false,false);
   neighborView = false;
   $("neighborsOnly").setAttribute("aria-pressed","false");
   renderProcedureNavigation();
   renderOutline();
   renderInspector();
-  renderQuickCard();
-  setInspectorOpen(false,false);
   renderGraph();
   scheduleELKLayout(0,true);
   requestAnimationFrame(fit);
+}
+function renderAssetNavigation() {
+  const tree=$("assetTree");
+  tree.replaceChildren();
+  if(assetOrigin==="sample"){
+    const folder=el("div","asset-folder");
+    folder.textContent="⌄  assurance/";
+    tree.appendChild(folder);
+  }
+  const file=button("▤  "+(assetOrigin==="sample"?"procedure.yaml":filename),
+    ()=>{setMode("source");source.focus();},"asset-file active");
+  file.title=filename+" · 当前已加载的唯一文件";
+  file.setAttribute("aria-current","page");
+  tree.appendChild(file);
 }
 function renderProcedureNavigation() {
   const picker = $("procedurePicker");
@@ -492,7 +476,7 @@ function renderNodeJourney(model) {
   const node=model.node;
   const phaseStepCount=p=>p?.phase?.steps?.length??0;
   const prepare=journeyStage(1,"执行前准备",
-    model.prepare.phase?phaseStepCount(model.prepare)+" 个 Step":"未声明",{expanded:!!model.prepare.phase});
+    model.prepare.phase?phaseStepCount(model.prepare)+" 个 Step":"未声明",{expanded:false});
   renderPhase(model.prepare.phase,prepare,model.children);
   const main=journeyStage(2,"执行 Operator",
     model.execute.operator.toUpperCase()+" · "+model.execute.value);
@@ -507,10 +491,10 @@ function renderNodeJourney(model) {
   }
   const confirm=journeyStage(3,"执行后确认",
     model.confirm.phase?phaseStepCount(model.confirm)+" 个 Step":"未声明",
-    {expanded:!!model.confirm.phase});
+    {expanded:false});
   renderPhase(model.confirm.phase,confirm,model.children);
   const branches=journeyStage(4,"后续分支",
-    model.routeCount+" 条 Route · "+model.branches.length+" 个来源");
+    model.routeCount+" 条 Route · "+model.branches.length+" 个来源",{expanded:model.routeCount<=3});
   if(!model.branches.length)branches.appendChild(el("p","journey-empty","终态：没有后续 Route。"));
   for(const group of model.branches){
     const heading=el("div","stage-caption",routeFriendlySource(group.title)+" · "+group.entries.length);
@@ -526,9 +510,6 @@ function renderNodeJourney(model) {
       for(const route of group.entries)inspectorRoute(route,body);
     incoming.appendChild(body);inspector.appendChild(incoming);
   }
-  inspectorNote(lastWorkspace?.procedures.size>1
-    ?"当前复杂 Procedure 为只读图形投影。需要修改时打开具体 YAML；图形不会擅自写入结构。"
-    :"当前图形用于浏览。只有受限 ensure Route 具有专门的预览与修改操作。");
 }
 function renderInspector() {
   inspector.replaceChildren();
@@ -579,16 +560,15 @@ function renderInspector() {
 function renderProblems() {
   problems.replaceChildren();
   const title = document.createElement("strong");
-  title.textContent = "PROBLEMS";
+  title.textContent = "Problems";
   problems.appendChild(title);
   const items = projection?.diagnostics ?? [];
   if (!items.length) {
     const text = document.createElement("span");
     text.className = "problem-success";
-    text.textContent = "0 个投影问题";
+    text.textContent = "0";
+    text.title = "仅表示当前文件能够进行有限图形投影；不是 Runtime Validator 结论";
     problems.appendChild(text);
-    problems.appendChild(el("span","muted",
-      "本地结构投影 · 不代表完整 Runtime Validator PASS"));
   } else {
     for (const item of items) {
       const b = button("L" + item.line + " · " + item.message, () => lineJump(item.line));
@@ -597,25 +577,22 @@ function renderProblems() {
   }
 }
 function selectNode(id) {
-  if (projection?.state !== "READY") return;
-  selection = {kind:"node",id};
-  lastNodeId=id;
-  if(inspectorOpen)renderInspector();
-  renderQuickCard();
+  if(projection?.state!=="READY")return;
+  selection={kind:"node",id};
+  setInspectorOpen(true,false);
   renderOutline();
   renderProcedureNavigation();
   renderInspector();
   if(neighborView)scheduleELKLayout(0,true);
   else{
     renderGraph();
-    centerNode(id);
+    requestAnimationFrame(()=>centerNode(id));
   }
 }
 function selectRoute(id) {
   if(projection?.state!=="READY")return;
   selection={kind:"route",id};
-  if(inspectorOpen)renderInspector();
-  renderQuickCard();
+  setInspectorOpen(true,false);
   renderOutline();
   renderProcedureNavigation();
   renderInspector();
@@ -760,7 +737,7 @@ async function loadSample(sample = "ensure") {
     const filename = name + ".procedure.yaml";
     const response = await fetch("./samples/" + filename, { cache: "no-cache" });
     if (!response.ok) throw new Error("HTTP " + response.status);
-    loadDocument(filename, await response.text());
+    loadDocument(filename, await response.text(),"sample");
   } catch (error) {
     message("样本加载失败，请从本地打开 YAML：" + String(error?.message ?? error));
     setMode("source");
@@ -823,6 +800,11 @@ $("undoButton").addEventListener("click", () => runHistory("undo"));
 $("redoButton").addEventListener("click", () => runHistory("redo"));
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !$("patchDialog").hidden) { closePreview(); return; }
+  if (event.key === "Escape" && $("viewMenu").open) {
+    $("viewMenu").open=false;
+    $("viewMenu").querySelector("summary").focus();
+    return;
+  }
   if (event.key === "Escape" && !["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName)) {
     clearSelection();return;
   }

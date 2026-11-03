@@ -31,21 +31,26 @@
   <main class="workbench" id="workbench" data-explorer="open" data-inspector="closed">
     <aside class="explorer" id="explorerPanel" aria-label="SKILL Explorer">
       <div class="panel-intro">
-        <span class="eyebrow">WORKSPACE</span>
-        <h2>探索器</h2>
-        <p>开发和浏览当前 SKILL 的流程结构</p>
+        <span class="eyebrow">EXPLORER</span>
+        <h2>工作区</h2>
+        <p>当前仅打开一个运行时资产文件</p>
       </div>
+      <section class="explorer-section asset-section" aria-label="当前文件">
+        <div class="section-heading"><span>ASSETS</span><span class="count">1</span></div>
+        <div id="assetTree" class="asset-tree"></div>
+        <p class="asset-scope">单文件 Demo · 未加载完整 Skill Package</p>
+      </section>
       <section class="explorer-section">
         <div class="section-heading"><span>PROCEDURES</span><span id="procedureCount" class="count">—</span></div>
         <nav id="procedureTree" class="procedure-tree" aria-label="Procedure 列表"></nav>
         <select id="procedurePicker" class="sr-only" aria-label="切换 Procedure"></select>
       </section>
-      <section class="explorer-section explorer-nodes">
-        <div class="section-heading"><span>NODES</span><span id="outlineCount" class="count">—</span></div>
+      <details class="explorer-section explorer-nodes" id="nodeOutlineDisclosure">
+        <summary class="section-heading node-disclosure-heading"><span>NODES · 当前 Procedure</span><span id="outlineCount" class="count">—</span></summary>
         <label for="search" class="sr-only">搜索当前 Procedure 的节点</label>
-        <div class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="查找节点或 Operator" autocomplete="off"></div>
+        <div class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="查找节点" autocomplete="off"></div>
         <ol id="nodeOutline" class="outline"></ol>
-      </section>
+      </details>
       <div class="explorer-bottom">
         <div class="section-heading"><span>EXAMPLES & FILES</span></div>
         <button id="establishSampleButton" type="button" class="explorer-action"><span aria-hidden="true">◇</span>CreatedSession 示例</button>
@@ -82,46 +87,37 @@
           <button id="mode-split" type="button" aria-pressed="false">Split</button>
         </div>
         <span class="mode-spacer"></span>
-        <div class="graph-options">
-          <label for="layoutDirection" class="sr-only">自动布局方向</label>
-          <select id="layoutDirection" aria-label="自动布局方向">
-            <option value="RIGHT">→ 水平布局</option>
-            <option value="DOWN">↓ 垂直布局</option>
-          </select>
-          <button id="neighborsOnly" type="button" aria-pressed="false" title="只显示选中节点的一跳邻居">聚焦邻居</button>
-          <button id="centerSelection" type="button" title="定位当前选择">定位</button>
-        </div>
-        <button id="showAllLabels" class="panel-toggle" type="button" aria-pressed="false" title="切换全部 Route 标签">全部标签</button>
-        <button id="toggleInspector" class="panel-toggle" type="button" aria-controls="inspectorPanel" aria-expanded="false" title="展开或收起节点详情">详情 ▣</button>
-        <div class="zoom-actions">
-          <button id="zoomOut" type="button" aria-label="缩小">−</button>
-          <button id="zoomIn" type="button" aria-label="放大">+</button>
-          <button id="fit" type="button" title="适配画布">适配</button>
-        </div>
+        <details class="view-menu" id="viewMenu">
+          <summary aria-label="图形视图设置">视图 <span aria-hidden="true">⌄</span></summary>
+          <div class="view-menu-panel">
+            <div class="menu-heading">图形显示</div>
+            <label class="menu-field" for="layoutDirection">布局方向
+              <select id="layoutDirection" aria-label="自动布局方向">
+                <option value="RIGHT">水平 · 左到右</option>
+                <option value="DOWN">垂直 · 上到下</option>
+              </select>
+            </label>
+            <button id="neighborsOnly" type="button" aria-pressed="false" title="仅显示选中节点的一跳邻居">只看直接邻居</button>
+            <button id="showAllLabels" type="button" aria-pressed="false" title="显示全部 Route 的标签">显示全部 Route 标签</button>
+            <button id="centerSelection" type="button">定位当前选择</button>
+            <div class="menu-divider"></div>
+            <div class="menu-heading">缩放</div>
+            <div class="menu-zoom">
+              <button id="zoomOut" type="button" aria-label="缩小">−</button>
+              <button id="zoomIn" type="button" aria-label="放大">+</button>
+            </div>
+          </div>
+        </details>
+        <button id="fit" class="fit-control" type="button" title="适配画布">适配</button>
       </div>
 
       <div id="editorBody" class="editor-body" data-mode="visual">
         <div id="graphPane" class="graph-pane" data-labels="key">
-          <div class="canvas-help">点击节点看完整过程 · 双击进入子过程 · 滚轮缩放</div>
-          <div id="layoutStatus" class="layout-status" role="status">准备布局…</div>
           <svg id="canvas" aria-label="Procedure control flow" role="img">
             <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#9cb0c7"></path></marker></defs>
             <g id="world"></g>
           </svg>
           <div id="graphWarning" class="graph-warning" role="alert" hidden></div>
-          <div id="nodeQuickCard" class="node-quick-card" hidden aria-live="polite">
-            <div class="quick-card-heading">
-              <span id="quickKind" class="quick-kind">NODE</span>
-              <button id="clearSelection" type="button" class="quick-close" aria-label="清除选择" title="清除选择">×</button>
-            </div>
-            <strong id="quickTitle"></strong>
-            <span id="quickSubtitle" class="quick-subtitle"></span>
-            <div class="quick-actions">
-              <button id="quickDetails" type="button">查看完整过程</button>
-              <button id="quickSource" type="button">打开 YAML</button>
-              <button id="quickChild" type="button" hidden>进入子过程 ↗</button>
-            </div>
-          </div>
         </div>
         <div id="sourcePane" class="source-pane">
           <div class="source-caption"><span class="source-indicator"></span> SOURCE · YAML 1.2 <span class="caption-note">直接修改源文件工作缓冲区</span></div>
@@ -131,16 +127,17 @@
       </div>
       <div class="editor-foot">
         <span id="stats">0 行</span>
+        <span id="layoutStatus" role="status">准备布局…</span>
         <span id="hint" role="status">已在本地工作区打开文件</span>
       </div>
     </section>
 
     <aside class="inspector-panel" id="inspectorPanel" aria-label="Node inspector">
-      <div class="inspector-header"><span class="eyebrow">NODE JOURNEY</span><span id="inspectorState" class="inspector-status">READ ONLY</span><button id="closeInspector" type="button" class="quick-close" aria-label="收起详情" title="收起详情">×</button></div>
+      <div class="inspector-header"><span class="eyebrow">PROPERTIES</span><span id="inspectorState" class="inspector-status">READ ONLY</span><button id="closeInspector" type="button" class="quick-close" aria-label="收起详情" title="收起详情">×</button></div>
       <div id="inspectorContext" class="inspector-context"><h2>流程属性</h2><p>选择图上的一个节点查看详情</p></div>
-      <div class="inspector-sequence" aria-hidden="true">准备 <span>→</span> 执行 <span>→</span> 确认 <span>→</span> 分支</div>
+      
       <div id="inspector" class="inspector-content" aria-live="polite"></div>
-      <div class="inspector-footer">流程为只读投影 · 查看源码可编辑 YAML，修改资格不会自动扩展</div>
+      <div class="inspector-footer">结构化编辑仅对已授权的 Source Patch 开放</div>
     </aside>
   </main>
 

@@ -6,12 +6,13 @@ ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前实现（Stage: UX V3 light canvas-first authoring + ELK large-graph navigation + Multi-Procedure explorer + bounded ensure SetRouteTarget）：
+当前实现（Stage: UX Consolidation — light authoring workspace + bounded single-file Procedure editing）：
 
 - 从固定的 Demo ensure-pdu-session 和 establish-pdu-session 的真实 YAML 文件投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
 - CreatedSession 样本支持 Root 和 5 个 Child Procedure 的下钻与返回，保留 Node 顺序和 Route Source（operator / preconditions / postconditions）；Phase Step 在 Inspector 按顺序展示，不把局部过程冒充业务 Node。
-- **UX V3 浅色画布优先工作区**：全站采用浅色主题，画布、节点、边、Source、预览 Diff 统一白/浅灰/青绿配色，目录与详情可单独折叠，默认画布不被 Inspector 占据。点击 Node / Route 只出现画布内快捷操作卡，可以直接打开对应 Source、查看完整过程或进入唯一 Child。
-- **连续的 Node Journey Inspector**：不再频繁切换 tabs，Node 以「准备 → 执行 → 确认 → 分支」四阶段折叠区连续展示；Phase Step 与 Route 都保留原始来源和源码行号；复杂多 Procedure 仍完全只读。
+- **UX Consolidation**：删去重复的 Node Quick Card 和独立 Inspector 开关。单击 Node / Route 直接进入唯一的上下文 Inspector；关闭后回到宽画布。布局方向、标签策略、邻居焦点与缩放合并进单个 View 菜单。
+- **资产优先的左栏（诚实范围）**：只列出当前确实加载的 YAML 文件；固定 Procedure 样本在 assurance/ 下，Local 文件不伪造 Package 路径。Root / Child Procedure 是文件内部视图，Node Outline 默认为折叠的线性导航。**完整 Skill Package 尚未加载，绝不显示假的 SKILL.md / Contract / Predicate。**
+- **Inspector 统一入口**：准备、执行、确认、路由在一个上下文面板中，低频内容默认折叠；Phase Step 与 Route 仍保留原始 Source 路径和行号；只读与可编辑资格严格分离。
 - 文件导出、Undo / Redo、Procedure Explorer、搜索、Root / Child 路径和 Visual / Source / Split 继续存在，保留旧的固定 ensure Route Patch 安全边界。
 - **ELK layered 自动布局**：从左到右 / 从上到下切换、正交边路径、画布平移缩放和适配；Node Outline 选择后自动居中；相邻视图只显示所选 Node 的入边/出边一跳，不改写 Source。
 - **按 Route Source 分组而非语义合并**：画布上的连线按 `source + target + routeSource` 分组；点击同一组连线可轮流定位每个原始 Route，在 Inspector 查看原始 outcome、target、line；Phase 的 on 路由不与 Operator 的 on 混淆。ELK 失败时退回旧布局，并显示状态。
@@ -48,11 +49,13 @@ Visual 目前仅在 ensure 单 Procedure 的**两条固定失败终态 Route**�
 
 当前只建设 SKILL 开发与编辑，不做 Case、独立验证工作台、Registry / Publishing、Agent Runtime 调用或 Live 5GC。
 
-## UX V3 实现边界
+## UX Consolidation 实现边界
 
 - Explorer 的 Procedure 树与 Node 列表只从当前解析投影生成；任何无法安全投影的 Source 都禁用图形选择与编辑。
 - Inspector 的四阶段 Journey 纯属 UI 视图，**不改变 SKILL YAML 结构或引入新语法**，点击 Step 会定位真实 Source 行。
 - 文件状态表示是否与本次打开时的文本相同；导出触发浏览器下载，不是直接保存回原文件，也不会替用户标记为已保存。
-- 页面布局和键盘标签页可由静态 / 模型层回归检查；真实鼠标、键盘、辅助技术及手机交互浏览器 E2E 仍需单独验收。
+- 界面元素和投影模型由静态 / 模型层回归检查；真实鼠标、键盘、辅助技术及手机交互浏览器 E2E 仍需单独验收。
 
-UX V3 的自动化测试覆盖控件存在性、Node Journey 语义投影、Route Source 隔离和 Source Patch 边界。**真实浏览器 E2E、视觉截图与可访问性测试仍为 NOT_RUN**，部署成功不应等同于这些验收完成。
+UX Consolidation 的自动化测试覆盖 View 菜单与单一 Inspector 控件、Node Journey 语义投影、Route Source 隔离和 Source Patch 边界。**真实浏览器 E2E、视觉截图与可访问性测试仍为 NOT_RUN**，部署成功不应等同于这些验收完成。
+
+参见 [UX Consolidation / 与原始设计对照](docs/ux/ux-consolidation.md)。原始 authoring-first 设计仍在未合并的 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)，当前单文件 Demo 不等于完整 Skill Package IDE。

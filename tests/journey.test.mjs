@@ -62,7 +62,10 @@ test("light theme and view controls are declared without remote assets",()=>{
   assert.match(html,/name="color-scheme" content="light"/);
   assert.match(html,/href="\.\/light\.css"/);
   assert.match(html,/id="workbench" data-explorer="open" data-inspector="closed"/);
-  assert.match(html,/id="nodeQuickCard"/);
+  assert.doesNotMatch(html,/id="nodeQuickCard"/);
+  assert.match(html,/id="assetTree"/);
+  assert.match(html,/id="viewMenu"/);
+  assert.match(html,/id="nodeOutlineDisclosure"/);
   assert.match(html,/id="showAllLabels"/);
   assert.match(css,/color-scheme:\s*light/);
   assert.match(css,/\.node-body/);
@@ -73,8 +76,10 @@ test("source guard and controlled inspector disclosure remain wired",()=>{
   const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
   assert.match(app,/function setInspectorOpen\(/);
   assert.match(app,/function setExplorerOpen\(/);
-  assert.match(app,/function renderQuickCard\(/);
+  assert.match(app,/function renderAssetNavigation\(/);
+  assert.doesNotMatch(app,/renderQuickCard|quickDetails|toggleInspector/);
   assert.match(app,/function renderNodeJourney\(/);
+  assert.match(app,/setInspectorOpen\(true,false\)/);
   assert.match(app,/previewRouteTargetPatch\(source\.value/);
   assert.match(app,/applyRouteTargetPatch\(source\.value/);
   assert.doesNotMatch(app,/inspectorTabItems|preferredTab|inspectorTabs/);
