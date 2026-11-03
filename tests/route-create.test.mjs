@@ -43,21 +43,28 @@ test("D3-A1 adds one known verify Outcome with exact source-only line insertion"
   assert.ok(output.endsWith(text.slice(preview.sourceSpan.end)));
   assert.equal(ensure,fixture("ensure-pdu-session"));
 });
-test("D3-A1 is available in CreatedSession when a verified known Outcome is omitted",()=>{
+test("D3-A1 adds a known Outcome across CreatedSession child Procedures without changing siblings",()=>{
   const before=projectWorkspace(created);
-  const candidates=[...before.procedures.values()].flatMap(p=>
-    p.nodes.filter(n=>n.operator==="verify").map(n=>({p,n})));
-  const pick=candidates.find(({p,n})=>p.routes.filter(r=>r.source===n.id&&
-    r.routeSource==="operator.on").length>1);
-  if(!pick)return; // actual CreatedSession operators may be call-based
-  const route=pick.p.routes.find(r=>r.source===pick.n.id&&
-    r.routeSource==="operator.on");
-  const text=removeOutcome(created,pick.n.id,route.outcome);
-  const opts=addRouteOutcomeOptions(text,pick.p.name,pick.n.id);
-  assert.ok(opts?.outcomes.includes(route.outcome));
-  const output=applyAddRouteOutcome(text,previewAddRouteOutcome(text,pick.p.name,
-    pick.n.id,route.outcome,route.target));
-  assert.equal(projectWorkspace(output).state,"READY");
+  const procedure=before.procedures.get("await-initial-n4-session-establishment");
+  const node=procedure.nodes.find(n=>n.id==="await-initial-resources");
+  assert.equal(node.operator,"call");
+  assert.equal(node.value,"ca.session.evidence.await");
+  const route=procedure.routes.find(r=>r.source===node.id&&
+    r.routeSource==="operator.on"&&r.outcome==="DENIED");
+  assert.ok(route,"real CreatedSession child Procedure must have DENIED");
+  const text=removeOutcome(created,node.id,route.outcome);
+  const opts=addRouteOutcomeOptions(text,procedure.name,node.id);
+  assert.ok(opts?.outcomes.includes(route.outcome),
+    "the repeated ca.session.evidence.await Operator provides known outcome evidence");
+  const preview=previewAddRouteOutcome(text,procedure.name,node.id,
+    route.outcome,route.target);
+  const output=applyAddRouteOutcome(text,preview);
+  const after=projectWorkspace(output);
+  assert.equal(after.state,"READY");
+  assert.equal(after.procedures.size,before.procedures.size);
+  assert.equal(after.procedures.get(procedure.name).routes.find(r=>
+    r.id===node.id+":DENIED").target,route.target);
+  assert.deepEqual([...after.procedures.keys()],[...before.procedures.keys()]);
 });
 test("D3-A1 never adds arbitrary Outcomes, missing nodes or duplicated keys",()=>{
   const text=removeOutcome(ensure,"observe-target-session","UNKNOWN");

@@ -627,7 +627,8 @@ export async function runD1Interactions(evaluate,command){
     " const undone=source.value===edited;",
     " click(document.getElementById('redoButton'));await sleep(250);",
     " const redone=source.value===original;",
-    " const noDuplicate=source.value.split('observe-target-session:UNKNOWN').length===1;",
+    " const nodeBlock=source.value.split('      observe-target-session:')[1]?.split('      observe-session-absence:')[0]??'';",
+    " const noDuplicate=(nodeBlock.match(/^\\s*UNKNOWN:/gm)||[]).length===1;",
     " return {ok:enabled&&previewed&&canceled&&applied&&undone&&redone&&noDuplicate,",
     "   enabled,previewed,canceled,applied,undone,redone,noDuplicate};"
   ]);
