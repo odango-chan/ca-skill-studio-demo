@@ -26,7 +26,8 @@ test("closing Explorer never sets hidden on the whole aside; the same button reo
   assert.doesNotMatch(handler,/explorerPanel"\)\.hidden|explorerRail|reopenExplorer/);
   assert.match(app,/const label=explorerOpen\?"收起左侧导航":"展开左侧导航"/);
   assert.match(app,/nav\.setAttribute\("aria-expanded",String\(explorerOpen\)\)/);
-  assert.match(app,/nav\.querySelector\("\.explorer-toggle-icon"\)\.textContent=explorerOpen\?"‹":"›"/);
+  assert.match(app,/nav\.querySelector\("\.explorer-toggle-icon"\)\.replaceChildren\(createIcon/);
+  assert.match(app,/explorerOpen\?"panel-left-close":"panel-left-open"/);
 });
 test("the collapsed sidebar and recovery button remain visible across responsive layouts",()=>{
   assert.match(css,/\.workbench\[data-explorer="closed"\] \.explorer\{[^}]*display:flex!important/s);

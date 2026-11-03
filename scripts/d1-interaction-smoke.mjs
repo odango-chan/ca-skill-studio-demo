@@ -394,6 +394,47 @@ export async function runD1Interactions(evaluate,command){
     "  currentMode:document.getElementById('editorBody').dataset.mode};"
   ]);
 
+  await check(evaluate,"UNIFIED_OUTLINE_ICONS",[
+    sleepLine,clickLine,
+    " const q=s=>document.querySelector(s),all=s=>[...document.querySelectorAll(s)];",
+    " const icon=(id,name)=>q('#'+id+' svg.studio-icon[data-icon=\"'+name+'\"]');",
+    " const procedures=all('#procedureTree button');",
+    " const root=procedures.find(x=>!x.classList.contains('child'));",
+    " const child=procedures.find(x=>x.classList.contains('child'));",
+    " const rootIcon=root?.querySelector('.tree-icon-root svg[data-icon=\"workflow\"]');",
+    " const childIcon=child?.querySelector('.tree-icon-child svg[data-icon=\"git-branch\"]');",
+    " const noLegacy=procedures.every(x=>!x.querySelector('.tree-icon')?.textContent?.trim());",
+    " const fileIcons=all('#assetTree svg.asset-file-icon');",
+    " const oneStyle=fileIcons.length>4&&fileIcons.every(x=>",
+    "   x.getAttribute('fill')==='none'&&x.getAttribute('stroke')==='currentColor');",
+    " const controls=!!icon('undoButton','undo-2')&&!!icon('redoButton','redo-2')&&",
+    "   !!icon('zoomIn','zoom-in')&&!!icon('zoomOut','zoom-out')&&",
+    "   !!icon('mode-visual','network')&&!!icon('mode-source','code-2')&&",
+    "   !!icon('mode-split','columns-2')&&!!icon('fit','maximize');",
+    " const cards=all('.react-flow__node .designer-kind-icon');",
+    " const cardIcons=cards.length===17&&cards.every(x=>",
+    "   x.getAttribute('data-icon')&&x.getAttribute('aria-hidden')==='true');",
+    " const outline=all('#nodeOutline .outline-kind svg.studio-icon');",
+    " const outlineIcons=outline.length===17;",
+    " const folderChevron=!!q('#assetTree .asset-folder-title .disclosure-chevron[data-icon=\"chevron-right\"]');",
+    " const nodeChevron=!!q('#nodeOutlineDisclosure summary .disclosure-chevron[data-icon=\"chevron-right\"]');",
+    " const sampleChevron=!!q('.sample-picker summary .disclosure-chevron[data-icon=\"chevron-right\"]');",
+    " click(child);",
+    " for(let i=0;i<60;i++){",
+    "  if(document.querySelectorAll('.react-flow__node').length!==17)break;",
+    "  await sleep(90);",
+    " }",
+    " const childStill=!!q('#procedureTree button.child .tree-icon-child svg[data-icon=\"git-branch\"]');",
+    " click(document.getElementById('backProcedure'));await sleep(450);",
+    " return {ok:!!rootIcon&&!!childIcon&&noLegacy&&oneStyle&&controls&&",
+    "   cardIcons&&outlineIcons&&folderChevron&&nodeChevron&&sampleChevron&&",
+    "   childStill&&!!q('#procedureTree .tree-icon-root svg[data-icon=\"workflow\"]'),",
+    "   rootIcon:!!rootIcon,childIcon:!!childIcon,noLegacy,oneStyle,",
+    "   fileIconCount:fileIcons.length,controls,cardCount:cards.length,",
+    "   outlineCount:outline.length,outlineIcons,folderChevron,nodeChevron,",
+    "   sampleChevron,childStill};"
+  ]);
+
   await check(evaluate,"CHILD_NAVIGATION",[
     sleepLine,clickLine,
     " const child=document.querySelector('#procedureTree button.child');",

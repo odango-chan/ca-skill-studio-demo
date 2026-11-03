@@ -1163,3 +1163,90 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   width:6px;
   height:6px;
 }
+
+
+/* Unified studio icon language · 24px rounded outline geometry, 1.75 stroke.
+   Every icon uses currentColor. Interactive labels remain plain text. */
+.studio-icon{display:inline-block;flex:none;vertical-align:middle;width:16px;height:16px;
+  fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;
+  pointer-events:none}
+.topbar-actions button .studio-icon,.explorer-bottom button .studio-icon,
+.compact-toolbar button .studio-icon,.toolbar-layout>.studio-icon,
+.search-wrap .studio-icon{width:16px;height:16px}
+.topbar-actions button:not(.icon-button),.explorer-bottom .explorer-action,
+.compact-toolbar button:not(#backProcedure):not(#zoomIn):not(#zoomOut){
+  display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.topbar-actions .icon-button,.breadcrumbs #backProcedure,
+.inspector-header .quick-close{display:inline-flex;align-items:center;justify-content:center}
+.topbar-actions .icon-button{font-size:inherit}
+.explorer-toggle-icon{display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;font-size:inherit}
+.explorer-toggle-icon .studio-icon{width:17px;height:17px}
+.search-wrap>span{display:inline-flex;align-items:center;justify-content:center}
+.search-wrap>span .studio-icon{width:15px;height:15px}
+.compact-toolbar .toolbar-layout{gap:6px}
+.compact-toolbar .toolbar-layout>.studio-icon{color:#69889b}
+.segmented button{display:inline-flex;align-items:center;justify-content:center;gap:5px}
+.segmented button .studio-icon{width:14px;height:14px}
+.asset-tree .asset-file-icon,.asset-tree .asset-folder-icon{
+  width:17px;min-width:17px;height:17px;overflow:visible;stroke-width:1.65;
+  filter:none!important;color:#71889c}
+.asset-tree .asset-file-icon[data-icon-kind="yaml"]{color:#678a9a}
+.asset-tree .asset-file-icon[data-icon-kind="markdown"]{color:#7483a0}
+.asset-tree .asset-file-icon[data-icon-kind="python"],
+.asset-tree .asset-file-icon[data-icon-kind="script"]{color:#638798}
+.asset-tree .asset-file-icon[data-icon-kind="json"]{color:#927f9b}
+.asset-tree .asset-file.active .asset-file-icon,.asset-tree .asset-file:hover .asset-file-icon,
+.asset-folder-title:hover .asset-folder-icon{color:#0d8777;filter:none}
+.asset-tree .asset-folder-icon{color:#6c8198}
+.asset-folder-icon .asset-folder-closed,.asset-folder-icon .asset-folder-open{
+  fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
+.asset-section .procedure-tree button{font-family:inherit}
+.asset-section .procedure-tree .tree-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 19px;width:19px;min-width:19px;height:20px;
+  background:transparent!important;font-size:inherit;color:#4e8a81;
+  border:0;border-radius:0}
+.asset-section .procedure-tree .tree-icon .studio-icon{width:16px;height:16px}
+.asset-section .procedure-tree button.child .tree-icon{color:#7f8fa6}
+.asset-section .procedure-tree button.active .tree-icon{color:#087c6e}
+.asset-section .procedure-tree button.child{padding-left:8px}
+.asset-section .procedure-tree .tree-title{font-family:inherit;font-weight:600;
+  letter-spacing:-.015em}
+.asset-section .procedure-tree button.child .tree-title{font-weight:500}
+.asset-section .procedure-tree .tree-description{font-family:inherit;letter-spacing:0}
+.asset-procedure-toggle .studio-icon{width:14px;height:14px}
+.outline-kind,.outline-kind.terminal{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:23px;width:23px;color:#66879c;font:inherit;letter-spacing:0}
+.outline-kind .studio-icon{width:16px;height:16px}
+.outline-kind.terminal{color:#8f887c}
+.outline li button.active .outline-kind{color:#087d6d}
+.outline-arrow{display:inline-flex;align-items:center;justify-content:center}
+.outline-arrow .studio-icon{width:12px;height:12px}
+.graph-pane .canvas-zoom-tools button{font:inherit}
+.graph-pane .canvas-zoom-tools button .studio-icon{width:17px;height:17px}
+.procedure-flow .designer-node-kind{display:inline-flex;align-items:center;gap:5px}
+.procedure-flow .designer-kind-icon{width:15px;height:15px;stroke-width:1.75}
+.quick-close .studio-icon{width:15px;height:15px}
+@media(max-width:680px){
+  .compact-toolbar button .studio-icon{width:15px;height:15px}
+  .segmented button{gap:4px}
+}
+
+
+/* The disclosure hierarchy uses the same SVG chevron, not font arrows.
+   Native <summary> keyboard activation and expanded state are unchanged. */
+.asset-folder-title::before,.asset-folder-group[open]>.asset-folder-title::before,
+.node-disclosure-heading::before,.explorer-nodes[open] .node-disclosure-heading::before,
+.sample-picker summary::before,.sample-picker[open] summary::before{
+  content:none!important;display:none!important}
+.asset-folder-title,.node-disclosure-heading,.sample-picker summary{
+  display:flex;align-items:center;gap:6px}
+.disclosure-chevron{
+  flex:0 0 13px;width:13px;height:13px;color:#899aab;
+  transform:rotate(0deg);transition:transform .12s ease}
+.asset-folder-group[open]>.asset-folder-title>.disclosure-chevron,
+.explorer-nodes[open] .node-disclosure-heading>.disclosure-chevron,
+.sample-picker[open] summary>.disclosure-chevron{transform:rotate(90deg)}
+.node-disclosure-heading .count{margin-left:auto}

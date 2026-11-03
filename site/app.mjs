@@ -13,6 +13,7 @@ import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from ".
 import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
 import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
 import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
+import {createIcon,operatorIcon} from "./icons.mjs";
 import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "./node-designer.mjs";
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "./node-create.mjs";
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from "./node-delete.mjs";
@@ -164,6 +165,46 @@ function button(label, handler, className = "") {
   el.addEventListener("click", handler);
   return el;
 }
+// Keep labels and stable DOM ids; only the decorative SVG changes.
+function setIconLabel(node,name,label){
+  node.replaceChildren(createIcon(document,name),
+    document.createTextNode(label));
+}
+function setIconOnly(node,name){
+  node.replaceChildren(createIcon(document,name));
+}
+function decorateToolbar(){
+  for(const [id,name] of Object.entries({
+    undoButton:"undo-2",redoButton:"redo-2",zoomIn:"zoom-in",
+    zoomOut:"zoom-out",backProcedure:"arrow-left",
+    closeInspector:"panel-right-close"
+  }))setIconOnly($(id),name);
+  for(const [id,name,label] of [
+    ["downloadButton","download","导出文件"],
+    ["openButton","folder-plus","打开本地文件"],
+    ["exportPackageButton","archive","导出整个 Package (.zip)"],
+    ["mode-source","code-2","Source"],
+    ["mode-split","columns-2","Split"],
+    ["neighborsOnly","git-branch","邻居"],
+    ["centerSelection","locate-fixed","定位"],
+    ["fit","maximize","适配"],
+    ["resetButton","rotate-ccw","恢复"]
+  ])setIconLabel($(id),name,label);
+  setIconLabel($("mode-visual"),"network","Visual");
+  setIconLabel($("showAllLabels"),"eye","标签");
+  setIconLabel($("inspectorVisibility"),"panel-right-open","显示右侧属性");
+  const layout=$("layoutDirection").parentElement;
+  layout.prepend(createIcon(document,"workflow",{size:15}));
+  const search=$("search").parentElement.querySelector("span");
+  search.replaceChildren(createIcon(document,"search"));
+  for(const element of [
+    $("nodeOutlineDisclosure").querySelector("summary"),
+    document.querySelector(".sample-picker summary")
+  ])element.prepend(createIcon(document,"chevron-right",{
+    size:13,className:"disclosure-chevron"
+  }));
+}
+decorateToolbar();
 function setText(id, text) { $(id).textContent = text; }
 function message(text) { setText("hint", text); }
 
@@ -173,14 +214,16 @@ function updatePanelControls(){
   const label=explorerOpen?"收起左侧导航":"展开左侧导航";
   nav.setAttribute("aria-label",label);
   nav.title=label;
-  nav.querySelector(".explorer-toggle-icon").textContent=explorerOpen?"‹":"›";
+  nav.querySelector(".explorer-toggle-icon").replaceChildren(createIcon(document,
+    explorerOpen?"panel-left-close":"panel-left-open",{size:17}));
   const detail=$("inspectorVisibility");
   const available=inspectorOpen||
     (viewKind==="procedure"&&Boolean(selection))||
     (activeFilePath==="assurance/contract.yaml"&&Boolean(activePackage));
   detail.hidden=!available;
   detail.setAttribute("aria-pressed",String(inspectorOpen));
-  detail.textContent=inspectorOpen?"隐藏右侧属性":"显示右侧属性";
+  setIconLabel(detail,inspectorOpen?"panel-right-close":"panel-right-open",
+    inspectorOpen?"隐藏右侧属性":"显示右侧属性");
 }
 function setInspectorOpen(open,recenter=true) {
   inspectorOpen=Boolean(open);
@@ -217,7 +260,8 @@ $("closeInspector").addEventListener("click",()=>setInspectorOpen(false));
 $("showAllLabels").addEventListener("click",()=>{
   showAllLabels=!showAllLabels;
   $("showAllLabels").setAttribute("aria-pressed",String(showAllLabels));
-  $("showAllLabels").textContent=showAllLabels?"只显示重点 Route 标签":"显示全部 Route 标签";
+  setIconLabel($("showAllLabels"),"eye",
+    showAllLabels?"只显示重点 Route 标签":"显示全部 Route 标签");
   graphPane.dataset.labels=showAllLabels?"all":"key";
   renderGraph();
 });
@@ -256,7 +300,8 @@ function updateViewAvailability(nextKind) {
   $("mode-visual").hidden=!hasVisual;
   $("mode-split").hidden=!hasVisual;
   $("mode-visual").title=viewKind==="markdown"?"Markdown 预览":"Procedure 流程图";
-  $("mode-visual").textContent=viewKind==="markdown"?"预览":"Visual";
+  setIconLabel($("mode-visual"),viewKind==="markdown"?"file-text":"network",
+    viewKind==="markdown"?"预览":"Visual");
   $("graphPane").hidden=!isGraph;
   $("markdownPane").hidden=viewKind!=="markdown";
   $("graphViewOptions").hidden=!isGraph;
@@ -421,7 +466,9 @@ function renderAssetNavigation(){
         disclosure.open=expandedAssetFolders.has(folderPath);
         const summary=el("summary","asset-folder-title");
         summary.title=folderPath+"/";
-        summary.append(createFolderIcon(document),el("span","asset-folder-label",name+"/"));
+        summary.append(
+          createIcon(document,"chevron-right",{size:13,className:"disclosure-chevron"}),
+          createFolderIcon(document),el("span","asset-folder-label",name+"/"));
         const children=el("div","asset-folder-children");
         disclosure.append(summary,children);
         disclosure.addEventListener("toggle",()=>{
@@ -459,7 +506,7 @@ function renderAssetNavigation(){
       const group=el("div","asset-procedure-entry");
       const row=el("div","asset-file-row asset-procedure-row");
       const expanded=current&&procedureNavOpen&&projection?.state==="READY";
-      const toggle=button(expanded?"▾":"▸",()=>{
+      const toggle=button("",()=>{
         if(!current){
           procedureNavOpen=true;
           switchFile(file.path);
@@ -470,6 +517,7 @@ function renderAssetNavigation(){
         renderAssetNavigation();
         renderProcedureNavigation();
       },"asset-procedure-toggle");
+      setIconOnly(toggle,expanded?"chevron-down":"chevron-right");
       toggle.title=expanded?"收起此文件中的 Procedure":"展开此文件中的 Procedure";
       toggle.setAttribute("aria-label",toggle.title);
       toggle.setAttribute("aria-expanded",String(expanded));
@@ -519,8 +567,9 @@ function renderProcedureNavigation() {
     b.className=(item.kind==="child"?"child ":"")+(item.id===activeProcedureId?"active":"");
     b.setAttribute("aria-current",item.id===activeProcedureId?"page":"false");
     b.disabled=unavailable;
-    const emblem=document.createElement("span");emblem.className="tree-icon";
-    emblem.textContent=item.kind==="root"?"◆":index===items.length-1?"└":"├";
+    const emblem=document.createElement("span");
+    emblem.className="tree-icon "+(item.kind==="root"?"tree-icon-root":"tree-icon-child");
+    emblem.appendChild(createIcon(document,item.kind==="root"?"workflow":"git-branch",{size:17}));
     const body=document.createElement("span");body.className="tree-info";
     const title=document.createElement("span");title.className="tree-title";title.textContent=item.title;
     const meta=document.createElement("span");meta.className="tree-description";
@@ -561,12 +610,15 @@ function renderOutline() {
     b.title=item.operator+": "+item.identifier;
     const op=document.createElement("span");
     op.className="outline-kind"+(item.operator==="terminal"?" terminal":"");
-    op.textContent=item.operator==="procedure"?"PROC":item.operator==="terminal"?"END":item.operator==="verify"?"CHK":item.operator==="reconcile"?"REC":"CALL";
+    op.title=item.operator;
+    op.appendChild(createIcon(document,operatorIcon(item.operator),{size:16}));
     const name=document.createElement("span");name.className="outline-name";name.textContent=item.id;
     b.append(op,name);
     if(item.isStart||item.childCount){
       const badge=document.createElement("span");badge.className="outline-arrow";
-      badge.textContent=item.isStart?"●":"↗";b.append(badge);
+      badge.title=item.isStart?"Start Node":"包含子 Procedure";
+      badge.appendChild(createIcon(document,item.isStart?"flag":"git-branch",{size:12}));
+      b.append(badge);
     }
     li.appendChild(b);nodeOutline.appendChild(li);
   }

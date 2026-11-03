@@ -191,3 +191,23 @@ React Flow 的自定义 Node 存在普通 1px、选中 2px，以及起始节点�
 ### D1 最终交互补测：实际 Route 拖动可用
 
 原 CSS 在 `.react-flow__edges` 上设置 `pointer-events:none`，会让原生 React Flow 连线端点拖动不能工作。现在保留 ELK 连线但允许 Edge Updater 正常接收鼠标事件；Headless Chromium 真实 `Input.dispatchMouseEvent` 验证从边端拖到另一个节点的合法 Handle，显示实际 YAML Diff，取消时 Source 不变。另覆盖 Inspector 编辑、Source/Split、Undo/Redo、Child Procedure、布局和窄屏导航等。箭头保持 React Flow 内置细线 `16×16`，不引入新编辑器语法。详见 [D1 验收记录](docs/D1-procedure-designer.md)。
+
+
+## Studio Icon System (D2 visual polish)
+
+The Explorer, nested Procedure navigation, Node outline, React Flow cards and
+toolbars share one locally rendered rounded outline SVG vocabulary from
+site/icons.mjs (24x24 viewBox, 1.75 default stroke, currentColor).
+No CDN, external icon font or added npm dependency is required. File type
+icons are thin monochrome outlines instead of filled glyph badges; folder
+and disclosure chevrons follow the same style.
+
+The root Procedure uses workflow; invoked child Procedures use git-branch,
+with indentation and source-backed identifiers unchanged. Node operators retain
+their text labels and gain type-specific icons. Accessible button labels,
+keyboard controls, YAML Source authority, Typed Patch, Undo/Redo and graph
+route semantics are unaffected.
+
+To modify the visual vocabulary, update icon geometry in site/icons.mjs and
+styling in site/light.css; do not scatter hard-coded SVG snippets or Unicode
+arrows across components.

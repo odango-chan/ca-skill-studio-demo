@@ -29,15 +29,15 @@ test("Explorer file suffixes map to distinct, case-insensitive theme icons",()=>
     assert.equal(fileIconKind(path),kind,path);
   assert.equal(fileIconKind("windows\\nested\\SKILL.MD"),"markdown");
 });
-test("file theme provides visually distinct glyphs and colors",()=>{
+test("file types share one stroke-only geometry vocabulary, without emoji/badges",()=>{
   const known=["yaml","markdown","python","json","script","text","generic"];
-  const icons=known.map(ext=>fileIconSpec("file."+({
+  const specs=known.map(ext=>fileIconSpec("file."+({
     yaml:"yaml",markdown:"md",python:"py",json:"json",
     script:"sh",text:"txt",generic:"bin"
   })[ext]));
-  assert.equal(new Set(icons.map(x=>x.ink)).size,known.length);
-  assert.equal(new Set(icons.map(x=>x.glyph||x.name)).size,known.length);
-  assert.ok(icons.every(x=>/^#[0-9a-f]{6}$/i.test(x.fill)&&x.name));
+  assert.ok(specs.every(x=>x.icon.startsWith("file")&&x.name&&x.tone));
+  assert.ok(new Set(specs.map(x=>x.icon)).size>=4);
+  assert.ok(specs.every(x=>!Object.hasOwn(x,"fill")&&!Object.hasOwn(x,"glyph")));
 });
 test("icons are real locally-rendered SVG with hidden decorative shapes",()=>{
   class Node {
@@ -45,6 +45,7 @@ test("icons are real locally-rendered SVG with hidden decorative shapes",()=>{
     setAttribute(k,v){this.attributes[k]=String(v);}
     append(...children){this.children.push(...children);}
     appendChild(node){this.children.push(node);return node;}
+    get firstChild(){return this.children[0]??null;}
   }
   const document={createElementNS:(ns,tag)=>{
     assert.equal(ns,"http://www.w3.org/2000/svg");
@@ -59,11 +60,14 @@ test("icons are real locally-rendered SVG with hidden decorative shapes",()=>{
     assert.equal(svg.tag,"svg");
     assert.equal(svg.attributes["data-icon-kind"],kind);
     assert.equal(svg.attributes["aria-hidden"],"true");
-    assert.equal(svg.attributes.viewBox,"0 0 20 20");
+    assert.equal(svg.attributes.viewBox,"0 0 24 24");
+    assert.equal(svg.attributes.fill,"none");
+    assert.equal(svg.attributes.stroke,"currentColor");
     assert.ok(svg.children.some(x=>x.tag==="path"));
   }
   const folder=createFolderIcon(document);
   assert.equal(folder.tag,"svg");
+  assert.equal(folder.attributes.stroke,"currentColor");
   assert.equal(folder.attributes["aria-hidden"],"true");
   assert.ok(folder.children.some(x=>x.attributes.class==="asset-folder-closed"));
   assert.ok(folder.children.some(x=>x.attributes.class==="asset-folder-open"));
@@ -73,7 +77,9 @@ test("Explorer keeps path/selection/dirty state while replacing uniform ▤ glyp
   const css=read("site/light.css");
   assert.match(app,/import \{createFileIcon,createFolderIcon\} from "\.\/file-icons\.mjs"/);
   assert.match(app,/const glyph=createFileIcon\(document,file\.path\)/);
-  assert.match(app,/summary\.append\(createFolderIcon\(document\)/);
+  assert.match(app,/summary\.append\(/);
+  assert.match(app,/createIcon\(document,"chevron-right",\{size:13,className:"disclosure-chevron"\}\)/);
+  assert.match(app,/createFolderIcon\(document\)/);
   assert.match(app,/btn\.append\(glyph,title\)/);
   assert.match(app,/btn\.setAttribute\("aria-label",file\.path/);
   assert.match(app,/fileDirtyState\(activePackage,file\.path\)/);
@@ -82,4 +88,32 @@ test("Explorer keeps path/selection/dirty state while replacing uniform ▤ glyp
   assert.match(css,/\.asset-folder-group\[open\]>.asset-folder-title \.asset-folder-open\{display:inline\}/);
   assert.match(css,/\.asset-tree \.asset-file-icon,\s*\.asset-tree \.asset-folder-icon\{/);
   assert.doesNotMatch(app,/asset-file-icon","▤"/);
+});
+
+test("shared icon registry uses deterministic, stroke-only and accessible SVG",async()=>{
+  const {createIcon,iconShapes,operatorIcon}=await import("../site/icons.mjs");
+  const made=[];
+  const document={createElementNS:(ns,tag)=>{
+    assert.equal(ns,"http://www.w3.org/2000/svg");
+    const node={tag,attributes:{},children:[],
+      setAttribute(key,v){this.attributes[key]=String(v);},
+      appendChild(child){this.children.push(child);return child;}};
+    made.push(node);return node;
+  }};
+  for(const name of ["workflow","git-branch","undo-2","redo-2","zoom-in","zoom-out",
+    "panel-left-close","panel-left-open","network","columns-2","code-2",
+    "file-code","file-text","folder","shield-check","plug-zap"]){
+    const svg=createIcon(document,name,{size:16});
+    assert.equal(svg.attributes["data-icon"],name);
+    assert.equal(svg.attributes["aria-hidden"],"true");
+    assert.equal(svg.attributes.fill,"none");
+    assert.equal(svg.attributes.stroke,"currentColor");
+    assert.equal(svg.attributes["stroke-linejoin"],"round");
+    assert.ok(svg.children.length>0);
+    assert.equal(svg.children.length,iconShapes(name).length);
+    assert.ok(svg.children.every(x=>["path","rect","line","circle","polyline"].includes(x.tag)));
+  }
+  assert.equal(operatorIcon("procedure"),"workflow");
+  assert.equal(operatorIcon("verify"),"shield-check");
+  assert.throws(()=>iconShapes("not-a-real-icon"),/Unknown Studio icon/);
 });
