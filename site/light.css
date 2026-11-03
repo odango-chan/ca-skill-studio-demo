@@ -379,3 +379,24 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
  .compact-toolbar .view-menu{margin-left:auto}
  .compact-toolbar .mode-spacer{display:none}
 }
+
+/* Multi-file Package workspace and actual source-backed property inputs. */
+.asset-tree{display:flex;flex-direction:column;gap:1px}
+.asset-tree .asset-folder{font-size:10px;font-weight:650;color:#73879b;padding-top:10px;padding-bottom:2px}
+.asset-tree .asset-file{width:100%;display:block;text-align:left;
+ font:11px/1.5 ui-monospace,Consolas,monospace;padding:6px 9px;
+ border-radius:6px;white-space:normal;overflow-wrap:anywhere;
+ background:transparent;border-color:transparent;color:#4a647c}
+.asset-tree .asset-file:hover:not(:disabled){background:#f0f7fa}
+.asset-tree .asset-file.active{background:#e6f5ee;color:#0a7768;font-weight:700}
+.asset-tree .asset-file[aria-current="page"]{outline-offset:-2px}
+.asset-section .scope-tag{font-size:10px;font-variant-numeric:tabular-nums}
+.explorer-bottom #exportPackageButton{color:#168474;background:#ebf8f2;border:1px solid #c9e9db}
+.attribute-label{display:block;color:#5f758a;font-size:11px;line-height:1.5;margin-bottom:8px}
+.attribute-input{display:block;width:100%;margin-top:7px;background:#fff;
+ border:1px solid #d5e2ea;border-radius:7px;padding:9px 10px;
+ color:#2b4b60;font:12px ui-monospace,Consolas,monospace}
+.attribute-input:focus{border-color:#1d9782}
+.small-edit-note{font-size:10px;line-height:1.5;color:#7b8fa2;margin:10px 0 0}
+.inspector-section-head .section-count{color:#178576}
+.inspector-section-head{padding:10px}

@@ -21,14 +21,14 @@
       <span class="workspace-status" id="fileStatus" role="status"><span class="status-dot"></span>未修改</span>
       <button id="undoButton" class="icon-button" type="button" title="撤销 · Ctrl/Cmd + Z" disabled aria-label="撤销">↶</button>
       <button id="redoButton" class="icon-button" type="button" title="重做 · Ctrl/Cmd + Shift + Z" disabled aria-label="重做">↷</button>
-      <button id="downloadButton" class="button-primary" type="button" title="导出 YAML · Ctrl/Cmd + S"><span aria-hidden="true">↓</span> 导出 YAML</button>
+      <button id="downloadButton" class="button-primary" type="button" title="导出当前文件 · Ctrl/Cmd + S"><span aria-hidden="true">↓</span> 导出文件</button>
     </div>
   </header>
 
   <main class="workbench" id="workbench" data-explorer="open" data-inspector="closed">
     <aside class="explorer" id="explorerPanel" aria-label="SKILL Explorer">
       <section class="explorer-section asset-section" aria-label="当前文件和流程">
-        <div class="explorer-compact-heading">文件 <span class="scope-tag" title="当前仅加载了一个文件，不是完整 SKILL Package">单文件</span></div>
+        <div class="explorer-compact-heading">文件 <span id="fileCount" class="scope-tag" title="工作区实际加载的文件数量">单文件</span></div>
         <div id="assetTree" class="asset-tree"></div>
         <nav id="procedureTree" class="procedure-tree" aria-label="当前文件的 Procedure"></nav>
         <span id="procedureCount" class="sr-only"></span>
@@ -41,7 +41,8 @@
         <ol id="nodeOutline" class="outline"></ol>
       </details>
       <div class="explorer-bottom">
-        <button id="openButton" type="button" class="explorer-action">＋ 打开文件</button>
+        <button id="openButton" type="button" class="explorer-action">＋ 打开本地文件</button>
+        <button id="exportPackageButton" type="button" class="explorer-action" hidden>↓ 导出整个 Package (.zip)</button>
         <details class="sample-picker">
           <summary>加载示例</summary>
           <button id="establishSampleButton" type="button" class="explorer-action">CreatedSession</button>
@@ -126,8 +127,8 @@
 
   <div id="patchDialog" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="patchTitle" hidden>
     <div class="modal-content">
-      <div class="modal-kicker">SOURCE CHANGE PREVIEW</div><h2 id="patchTitle">确认 Route 目标修改</h2>
-      <p id="patchSummary"></p><p class="modal-warning">仅允许固定 ensure 失败 Route。请核对源码差异；本操作不运行完整 Demo Validator。</p>
+      <div class="modal-kicker">SOURCE CHANGE PREVIEW</div><h2 id="patchTitle">确认源码修改</h2>
+      <p id="patchSummary"></p><p class="modal-warning">仅允许已授权的字段或 Route 修改。请核对源码差异；此操作不等于完整 Runtime Validator 通过。</p>
       <pre id="patchDiff" aria-label="YAML source diff"></pre>
       <div class="modal-actions"><button id="closePatch" type="button">取消</button><button id="applyPatch" type="button" class="button-primary">确认应用修改</button></div>
     </div>

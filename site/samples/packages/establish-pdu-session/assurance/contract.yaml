@@ -1,0 +1,44 @@
+apiVersion: connectionagent.io/v1alpha1
+kind: SkillContract
+metadata:
+  name: establish-pdu-session
+spec:
+  skillType: executable
+  goal: pdu_session.initial_request_fulfilled
+  entryProcedure: ue-requested-pdu-session-establishment
+  inputs:
+    requestSchema: schemas/establishment-request.schema.yaml
+  context:
+    requiredFacts:
+    - createdsession_ingress
+    - createdsession_lifecycle
+  allowedResources:
+    capabilities:
+    - sbi.udm.sm_data.get
+    - ca.session.operation_context.read
+    - ca.session.pcf_create_inputs.read
+    - sbi.udm.sdm_subscription.create
+    - sbi.pcf.sm_policy.create
+    - sbi.amf.n1n2.transfer
+    - ca.session.resource_responsibility.transfer
+    - ca.session.evidence.await
+    - ca.session.establishment_response.prepare
+    localTools:
+    - skill.select-establishment-configuration
+    - skill.evaluate-udm-read
+    - skill.evaluate-transfer-start
+  postconditions:
+  - predicate: createdsession.ran.setup_accepted
+    expect: PASS
+  - predicate: createdsession.n4.forwarding_ready
+    expect: PASS
+  - predicate: createdsession.ue.configuration_accepted
+    expect: PASS
+  - predicate: createdsession.resources.managed
+    expect: PASS
+  planning:
+    maxActions: 32
+    allowDynamicProcedure: false
+  failureSemantics:
+    outcomeUnknown:
+      requireReconcile: true

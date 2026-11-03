@@ -6,13 +6,15 @@ ConnectionAgent Skill 的独立开发与编辑原型。在线 Pages 托管的是
 
 https://odango-chan.github.io/ca-skill-studio-demo/
 
-当前实现（Stage: UX Trim — minimalist single-file Procedure workbench + bounded editing）：
+当前实现（Stage: Multi-file SKILL Package samples + scoped Inspector edits + UX Trim）：
 
-- 从固定的 Demo ensure-pdu-session 和 establish-pdu-session 的真实 YAML 文件投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
+- **真实多文件 Skill Package 示例**：从固定 `ca-agent-demo@bf445ad` 源码精确归档 `ensure-pdu-session` 的 4 个 Runtime Asset 文件和 `establish-pdu-session` 的 13 个运行相关文件（SKILL.md、Contract、Procedure、Predicates、3 个 Script、6 个 Schema；不展示 Case）。文件树可切换编辑，修改留在各文件独立的浏览器内存工作副本，当前文件可单独导出、整套文件可导出 ZIP；不增加 Package 内的 sidecar 文件。
+- **Inspector 两条受限属性写回**：Ensure 样本的 Verify Node 可从该 Package 实际 `predicates.yaml` 中选择 Predicate；Contract 的 `planning.maxActions` 可在 1–128 内修改。两者均通过 AST 标量 Source Span 局部替换、Patch Diff / 确认、Revision guard、重新解析和独立 Undo/Redo；其他 Node 属性、Binding、Phase 和 CreatedSession Transitional 语法没有结构化编辑资格。
+- 从真实 Demo Procedure YAML 投影 Control Flow；显示准确的 Node / Route entry 数量、原始 Operator、Outcome、Target。
 - CreatedSession 样本支持 Root 和 5 个 Child Procedure 的下钻与返回，保留 Node 顺序和 Route Source（operator / preconditions / postconditions）；Phase Step 在 Inspector 按顺序展示，不把局部过程冒充业务 Node。
 - **UX Consolidation**：删去重复的 Node Quick Card 和独立 Inspector 开关。单击 Node / Route 直接进入唯一的上下文 Inspector；关闭后回到宽画布。布局方向、标签策略、邻居焦点与缩放合并进单个 View 菜单。
 - **UX Trim 信息减负**：移除重复的编辑器标题 / 文件状态、空 Problems 与运行时说明、重复计数和 Canvas 状态浮层；文件名与未导出修改只在顶栏显示，Procedure 面包屑与 Visual / Source / Split 合为一条紧凑工具栏。仅显示真正存在的 Preconditions / Postconditions / Routes，Node Inspector 默认以 Operator 和可折叠信息为主。Sample 与 Node Outline 按需展开，必要的 Source 错误与 Patch Diff 保留。
-- **资产优先的左栏（诚实范围）**：只列出当前确实加载的 YAML 文件；固定 Procedure 样本在 assurance/ 下，Local 文件不伪造 Package 路径。Root / Child Procedure 是文件内部视图，Node Outline 默认为折叠的线性导航。**完整 Skill Package 尚未加载，绝不显示假的 SKILL.md / Contract / Predicate。**
+- **资产优先的左栏**：示例现在加载真实 Runtime / Model-context 文件组成的 Package（仅固定样本）；Local 文件导入仍是单文件。Root / Child Procedure 是 procedure.yaml 内部视图，Node Outline 默认为折叠的线性导航。Case、Design 和其他非运行相关文件不会出现在示例资产树里。
 - **Inspector 统一入口**：准备、执行、确认、路由在一个上下文面板中，低频内容默认折叠；Phase Step 与 Route 仍保留原始 Source 路径和行号；只读与可编辑资格严格分离。
 - 文件导出、Undo / Redo、Procedure Explorer、搜索、Root / Child 路径和 Visual / Source / Split 继续存在，保留旧的固定 ensure Route Patch 安全边界。
 - **ELK layered 自动布局**：从左到右 / 从上到下切换、正交边路径、画布平移缩放和适配；Node Outline 选择后自动居中；相邻视图只显示所选 Node 的入边/出边一跳，不改写 Source。
@@ -28,9 +30,9 @@ https://odango-chan.github.io/ca-skill-studio-demo/
 
 **图形投影基于 yaml@2.9.1 的 YAML 1.2 Document AST / CST source tokens 与 LineCounter，当前具有单 Procedure 写回 Profile 和多 Procedure 只读 Profile，并非完整 Demo Schema / Runtime 校验。** 它拒绝重复键、Alias / Anchor / Tag、额外 Procedure、未资格化的 Phase 和不安全语法；不支持跨文件语义。其他文件（SKILL.md、JSON、复杂 YAML、多 Procedure、CreatedSession Transitional phases）仍可 Source-only 编辑；不承诺这些文件获得图形投影。
 
-Visual 目前仅在 ensure 单 Procedure 的**两条固定失败终态 Route**支持实验性 SetRouteTarget。**CreatedSession 多 Procedure 的所有 Node / Route / Phase 均只读**；其余对象也只读。Patch 使用 YAML Scalar.range 确定真实 Source Span，只替换目标标量，绑定完整源文本 Revision、重新解析并比对全部 Node 和 Route 投影、冻结其余 22 条路由目标，保留所有未触及文本及注释。Preview 如果过期或被修改会拒绝应用。**这不等于完整 YAML CST Round-trip 或 Demo Validator 通过**，也不意味着已接入 Python POC；语义安全仍需人工检查。未知字段和复杂结构不能凭 Graph 自动修改。
+Visual 当前在 ensure 单 Procedure 的**两条固定失败终态 Route**支持实验性 SetRouteTarget，并对 Ensure Verify 的 Predicate ref 提供独立的受限标量编辑。Contract 的 maxActions 则由 Contract 源文件的精确标量 Patch 实现。**CreatedSession 多 Procedure 的所有 Node / Route / Phase 均只读**；其余对象也只读。Patch 使用 YAML Scalar.range 确定真实 Source Span，只替换目标标量，绑定完整源文本 Revision、重新解析并比对全部 Node 和 Route 投影、冻结其余 22 条路由目标，保留所有未触及文本及注释。Preview 如果过期或被修改会拒绝应用。**这不等于完整 YAML CST Round-trip 或 Demo Validator 通过**，也不意味着已接入 Python POC；语义安全仍需人工检查。未知字段和复杂结构不能凭 Graph 自动修改。
 
-导出是浏览器下载请求，**不是本地原文件的原地或原子 Save**。浏览器 textarea 可能规范化 CRLF；当前不承诺逐字节文件保真、完整 Source map 或跨文件事务，重要文件应自行比对 Diff 后再替换。此站点不与 packages/skill_studio_poc/ Python POC 通信。
+当前文件导出及 Package ZIP 导出都是浏览器下载请求，**不是本地原文件的原地或原子 Save**。浏览器 textarea 可能规范化 CRLF；当前不承诺逐字节文件保真、完整 Source map 或跨文件事务，重要文件应自行比对 Diff 后再替换。此站点不与 packages/skill_studio_poc/ Python POC 通信。
 
 样本来源：ca-agent-demo@bf445ad777149af5af2dfa0a5bdea18d0451303e 的 skills/ensure-pdu-session/assurance/procedure.yaml，来自本仓 PR #2 的固定 Fixture。完整 Demo 与 Live 5GC 验证 **NOT_RUN**。
 
@@ -60,3 +62,11 @@ Visual 目前仅在 ensure 单 Procedure 的**两条固定失败终态 Route**�
 UX Consolidation 的自动化测试覆盖 View 菜单与单一 Inspector 控件、Node Journey 语义投影、Route Source 隔离和 Source Patch 边界。**真实浏览器 E2E、视觉截图与可访问性测试仍为 NOT_RUN**，部署成功不应等同于这些验收完成。
 
 参见 [UX Consolidation / 与原始设计对照](docs/ux/ux-consolidation.md)。原始 authoring-first 设计仍在未合并的 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)，当前单文件 Demo 不等于完整 Skill Package IDE。
+
+## 多文件示例及属性编辑边界
+
+- 确定性 Source Fixture 来自 `ca-agent-demo@bf445ad777149af5af2dfa0a5bdea18d0451303e`，`site/samples/packages/` 下的样本逐文件保留 upstream Git Blob；静态目录只用于浏览器下载，不等于实际已装载 Runtime。
+- 当前 Bundle 是单浏览器页面的临时内存工作副本，文件切换不会丢掉尚未导出的文本。每个文件保留自己的 Source + Patch Undo/Redo 历史；**不承诺多文件跨资产事务、文件系统保存、外部变更冲突管理或多文件 Schema / Runtime Validator**。
+- 更改 Verify Predicate 的引用属于行为语义修改：即使目标 Predicate 在 Package 中存在，也不证明门禁或业务流程正确；修改后必须经 Demo Validator 和人工审查。更改 maxActions 也只检查数值及 Source 结构，不验证整体预算策略。
+- Browser ZIP 是无压缩 UTF-8 标准 ZIP（store method），包含文件内存最新内容，不添加隐藏元数据。它不自动覆盖原文件，不执行 Python Script，不运行 5GC。
+- **完整本地 Package 文件夹导入、文件创建 / 删除、Contract 全字段表单、Predicate / Binding / Step 的可编辑 Inspector 仍 NOT_IMPLEMENTED**；本轮的目标是验证真实多文件浏览与安全的有限属性编辑。

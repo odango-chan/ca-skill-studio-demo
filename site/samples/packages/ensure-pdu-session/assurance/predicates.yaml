@@ -1,0 +1,49 @@
+apiVersion: connectionagent.io/v1alpha1
+kind: PredicateSet
+metadata:
+  skill: ensure-pdu-session
+predicates:
+  # TRANSITIONAL DRAFT: production Toolchain still needs #129 to materialize
+  # child-local subject/request from existing Procedure inputs[].from after
+  # composition binding. The source syntax itself does not change.
+  ue.registered:
+    observations:
+      registration:
+        ref: ue.registration.snapshot
+        scope: '{"ueRef": subject.ueRef}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.registration.registrationState == "REGISTERED"
+
+  # Leaf-only mutation gate. PASS means the selected environment has supplied
+  # a definite owner fact for the exact Session and that fact says it is absent.
+  # UNKNOWN/unavailable evidence never becomes absence.
+  pdu_session.absent:
+    observations:
+      session:
+        ref: pdu.session.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.session.exists == false
+
+  # EXPORTED-PREDICATE DRAFT: this is the producer definition intended to be
+  # exported by ensure-pdu-session. Consumers must eventually import its exact
+  # identity/digest instead of defining another evaluator (ca-skill-toolchain#128).
+  # Active Demo reference semantics: env-5gc-sim owns this strong composite
+  # snapshot. Do not generalize the same boolean contract to real Open5GS.
+  pdu_session.target.satisfied:
+    observations:
+      session:
+        ref: pdu.session.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: >-
+        observations.session.established == true &&
+        observations.session.dnn == request.dnn &&
+        observations.session.sNssai.sst == request.sst &&
+        observations.session.sNssai.sd == request.sd

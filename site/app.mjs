@@ -3,6 +3,10 @@ import { layoutProcedureELK } from "./layout.mjs";
 import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
 import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./workbench.mjs";
+import {SAMPLE_PACKAGES,packageFilesForSample,createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState} from "./sample-packages.mjs";
+import {zipPackage} from "./zip.mjs";
+import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
+  contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
 const $ = (id) => document.getElementById(id);
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -17,6 +21,8 @@ const filePicker = $("filePicker");
 const procedureTree = $("procedureTree");
 let filename = "ensure-pdu-session.procedure.yaml";
 let assetOrigin = "sample";
+let activePackage = null;
+let activeFilePath = null;
 let initialText = "";
 let projection = null;
 let lastGood = null;
@@ -162,12 +168,12 @@ function setMode(next) {
 }
 for (const id of ["visual", "source", "split"]) $("mode-" + id).addEventListener("click", () => setMode(id));
 
-function loadDocument(name, text, origin="local") {
-  filename = name;
-  assetOrigin = origin;
-  initialText = text;
-  source.value = text;
-  history = createEditorHistory(text);
+function loadDocument(name,text,origin="local",{initial=text,historyState=null}={}) {
+  filename=name.split("/").at(-1);
+  assetOrigin=origin;
+  initialText=initial;
+  source.value=text;
+  history=historyState||createEditorHistory(text);
   closePreview();
   selection = null;
   setInspectorOpen(false,false);
@@ -179,7 +185,8 @@ function loadDocument(name, text, origin="local") {
   $("neighborsOnly").setAttribute("aria-pressed","false");
   invalidateLayout();
   projectedText = null;
-  setText("fileName", name);
+  setText("fileName", activePackage && activeFilePath
+    ? activePackage.name+" / "+activeFilePath : name);
   setText("hint", "");
   refresh(true);
   if (!lastGood) setMode("source");
@@ -193,8 +200,13 @@ function refresh(refit = false) {
   setText("stats", text.split("\n").length + " 行");
   $("undoButton").disabled = !history.canUndo();
   $("redoButton").disabled = !history.canRedo();
-  const parsed = projectWorkspace(text);
-  projection = parsed;
+  if(activePackage && activeFilePath)
+    markFileEdited(activePackage,activeFilePath,text,history);
+  const isProcedure=activeFilePath==="assurance/procedure.yaml" ||
+    (assetOrigin==="local" && /^\s*procedures\s*:/m.test(text));
+  const parsed=isProcedure ? projectWorkspace(text)
+    : {state:"SOURCE_ONLY",diagnostics:[],entry:null,procedures:new Map(),procedure:null};
+  projection=parsed;
   if (parsed.state === "READY") {
     lastWorkspace = parsed;
     if (!activeProcedureId || !parsed.procedures.has(activeProcedureId)) {
@@ -207,12 +219,17 @@ function refresh(refit = false) {
     if (selection && selection.kind === "node" && !lastGood.nodes.some(n => n.id === selection.id)) selection = null;
     if (selection && selection.kind === "route" && !lastGood.routes.some(r => r.id === selection.id)) selection = null;
     setText("projectionState", "图形就绪");
+  } else if(parsed.state==="SOURCE_ONLY"){
+    lastWorkspace=null;lastGood=null;graph=null;activeProcedureId=null;selection=null;
+    setText("projectionState","源码编辑");
   } else {
-    setText("projectionState", lastGood ? "图形已过期" : "仅源码");
-    if (!lastGood) graph = null;
+    setText("projectionState",lastGood?"图形已过期":"仅源码");
+    if(!lastGood)graph=null;
   }
-  $("graphWarning").hidden = parsed.state === "READY";
-  setText("graphWarning", parsed.state === "READY" ? "" : (lastGood ? "Graph 已过期，仅供对照，不能代表当前 Source。" : "当前 Source 无可用的 Procedure 投影。") + " " + (parsed.diagnostics[0]?.message ?? ""));
+  $("graphWarning").hidden = parsed.state==="READY"||parsed.state==="SOURCE_ONLY";
+  setText("graphWarning",parsed.state==="READY"||parsed.state==="SOURCE_ONLY"?""
+    :(lastGood?"Graph 已过期，仅供对照，不能代表当前 Source。":
+      "当前 Source 无可用的 Procedure 投影。")+" "+(parsed.diagnostics[0]?.message??""));
   renderAssetNavigation();
   renderProcedureNavigation();
   renderOutline();
@@ -246,19 +263,41 @@ function enterProcedure(name) {
   scheduleELKLayout(0,true);
   requestAnimationFrame(fit);
 }
-function renderAssetNavigation() {
+function renderAssetNavigation(){
   const tree=$("assetTree");
   tree.replaceChildren();
-  if(assetOrigin==="sample"){
-    const folder=el("div","asset-folder");
-    folder.textContent="assurance /";
-    tree.appendChild(folder);
+  const files=activePackage ? [...activePackage.files.values()] : [];
+  $("fileCount").textContent=files.length+" 文件";
+  $("exportPackageButton").hidden=!activePackage||files.length<=1;
+  if(!files.length)return;
+  let lastGroup=null;
+  for(const file of files){
+    const folder=file.path.includes("/")?file.path.slice(0,file.path.lastIndexOf("/")):"";
+    if(folder!==lastGroup&&folder){
+      const group=el("div","asset-folder",folder+"/");
+      tree.appendChild(group);
+    }
+    lastGroup=folder;
+    const display=file.path.slice(folder?folder.length+1:0);
+    const btn=button(display+(fileDirtyState(activePackage,file.path)?" •":""),
+      ()=>switchFile(file.path),"asset-file"+(file.path===activeFilePath?" active":""));
+    btn.title=file.path+(fileDirtyState(activePackage,file.path)?" · 修改未导出":"");
+    btn.setAttribute("aria-current",file.path===activeFilePath?"page":"false");
+    tree.appendChild(btn);
   }
-  const file=button("▤  "+(assetOrigin==="sample"?"procedure.yaml":filename),
-    ()=>{setMode("source");source.focus();},"asset-file active");
-  file.title=filename+" · 打开源码";
-  file.setAttribute("aria-current","page");
-  tree.appendChild(file);
+}
+function switchFile(path){
+  const file=activePackage?.files.get(path);
+  if(!file||path===activeFilePath)return;
+  if(activeFilePath)markFileEdited(activePackage,activeFilePath,source.value,history);
+  activeFilePath=path;
+  loadDocument(path,file.text,"sample",{
+    initial:file.initialText,historyState:file.history
+  });
+  if(path==="assurance/contract.yaml"&&contractMaxActions(source.value,activePackage.name)){
+    setInspectorOpen(true,false);
+    renderInspector();
+  }
 }
 function renderProcedureNavigation() {
   const picker = $("procedurePicker");
@@ -287,6 +326,7 @@ function renderProcedureNavigation() {
     b.addEventListener("click",()=>enterProcedure(item.id));
     procedureTree.appendChild(b);
   }
+  $("nodeOutlineDisclosure").hidden=unavailable;
   if(activeProcedureId)picker.value=activeProcedureId;
   picker.disabled=unavailable;
   const root=Boolean(lastWorkspace&&activeProcedureId===lastWorkspace.entry);
@@ -409,6 +449,70 @@ function addPatchControls(route) {
   body.appendChild(preview);
   return true;
 }
+function selectedPredicateSource(){
+  if(activePackage?.name!=="ensure-pdu-session"||
+     activeFilePath!=="assurance/procedure.yaml")return null;
+  return activePackage.files.get("assurance/predicates.yaml")?.text??null;
+}
+function verifyNodeChoices(nodeId){
+  const predicates=selectedPredicateSource();
+  return predicates===null?[]:nodeVerifyEditChoices(source.value,
+    activeProcedureId,nodeId,predicates);
+}
+function addNodeAttributeEditor(model){
+  const choices=verifyNodeChoices(model.node.id);
+  if(!choices.length)return false;
+  const body=section("Verify Predicate","EDITABLE");
+  const select=el("select","target-select");
+  select.setAttribute("aria-label","选择当前 Package 中的 Predicate");
+  for(const predicate of choices){
+    const option=el("option","",predicate);option.value=predicate;
+    select.appendChild(option);
+  }
+  select.value=model.node.value;
+  const preview=button("预览属性修改",()=>{
+    try{
+      const predicates=selectedPredicateSource();
+      showPreview(previewVerifyPredicatePatch(source.value,activeProcedureId,
+        model.node.id,select.value,predicates));
+    }catch(error){message("未应用："+String(error?.message??error));}
+  },"preview-button");
+  preview.disabled=select.value===model.node.value;
+  select.addEventListener("change",()=>{
+    preview.disabled=select.value===model.node.value;
+  });
+  body.append(select,preview);
+  body.append(el("p","small-edit-note","修改验证引用可能影响业务门禁；此处仅验证源码结构，不运行完整 Runtime Validator。"));
+  return true;
+}
+function renderContractAttributes(){
+  const value=contractMaxActions(source.value,activePackage?.name);
+  if(!value)return false;
+  setInspectorContext("Contract","规划设置","SKILL CONTRACT");
+  $("inspectorState").textContent="可修改";
+  const body=section("Planning","EDITABLE");
+  const label=el("label","attribute-label","maxActions (1–128)");
+  const input=el("input","attribute-input");
+  input.type="number";input.min="1";input.max="128";input.step="1";
+  input.value=String(value.value);input.setAttribute("aria-label","maxActions");
+  label.appendChild(input);body.appendChild(label);
+  const preview=button("预览属性修改",()=>{
+    try{
+      showPreview(previewContractMaxActionsPatch(source.value,
+        activePackage.name,Number(input.value)));
+    }catch(error){message("未应用："+String(error?.message??error));}
+  },"preview-button");
+  preview.disabled=true;
+  input.addEventListener("input",()=>{
+    preview.disabled=input.value===""||!input.checkValidity()||
+      Number(input.value)===value.value;
+  });
+  body.appendChild(preview);
+  inspectorSourceAction(value.line,"查看 YAML");
+  body.appendChild(el("p","small-edit-note",
+    "只写回 planning.maxActions 的整数标量；其他 Contract 字段可在 Source 修改。"));
+  return true;
+}
 function journeyStage(index,title,summaryText,{expanded=true}={}) {
   const outer=el("details","journey-stage");
   outer.open=expanded;
@@ -446,6 +550,7 @@ function routeFriendlySource(routeSource){
 }
 function renderNodeJourney(model) {
   const node=model.node;
+  addNodeAttributeEditor(model);
   if(model.prepare.phase || model.prepare.routes.length){
     const body=journeyStage(1,"准备",
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
@@ -488,7 +593,8 @@ function renderNodeJourney(model) {
 function renderInspector() {
   inspector.replaceChildren();
   if(!lastGood){
-    setInspectorContext("尚未载入 Procedure","打开 YAML 文件或加载示例。");
+    if(activeFilePath==="assurance/contract.yaml"&&renderContractAttributes())return;
+    setInspectorContext("文件源码","当前文件可直接在 Source 编辑。");
     $("inspectorState").textContent="SOURCE";
     inspectorNote("当前文件只能使用 Source 工作区。");return;
   }
@@ -499,7 +605,9 @@ function renderInspector() {
   }
   const route=selection?.kind==="route"?routeDetails(lastGood,selection.id):null;
   const model=selection?.kind==="node"?nodeJourney(lastGood,selection.id):null;
-  const editable=Boolean(route&&routeEditTargets(lastGood,route.id).length&&lastWorkspace?.procedures.size===1);
+  const editable=Boolean(
+    route&&routeEditTargets(lastGood,route.id).length&&lastWorkspace?.procedures.size===1
+  )||Boolean(model&&verifyNodeChoices(model.node.id).length);
   $("inspectorState").textContent=editable?"可修改":"只读";
   if(model){
     setInspectorContext(model.node.id,"",
@@ -665,51 +773,79 @@ function renderGraph() {
   world.append(edgesGroup, nodesGroup);
   transform();
 }
-$("openButton").addEventListener("click", () => filePicker.click());
-filePicker.addEventListener("change", async () => {
-  const file = filePicker.files?.[0];
-  if (!file) return;
-  filePicker.value = "";
-  if (file.size > 1024 * 1024) { message("只支持 1 MiB 以内的本地文本文件"); return; }
-  if (source.value !== initialText && !confirm("尚有未导出的修改。确定载入其他文件？")) return;
-  try {
-    const text = await file.text();
-    if (text.includes("\u0000")) throw new Error("检测到二进制内容");
-    loadDocument(file.name, text);
-  } catch (error) { message("本地读取失败：" + String(error?.message ?? error)); }
+function activateWorkspace(workspace,entry,origin="sample") {
+  activePackage=workspace;
+  activeFilePath=null;
+  const file=workspace.files.get(entry);
+  if(!file)throw new Error("Workspace entry not found");
+  activeFilePath=entry;
+  loadDocument(entry,file.text,origin,{initial:file.initialText,historyState:file.history});
+}
+$("openButton").addEventListener("click",()=>filePicker.click());
+filePicker.addEventListener("change",async()=>{
+  const file=filePicker.files?.[0];
+  if(!file)return;
+  filePicker.value="";
+  if(file.size>1024*1024){message("仅支持 1 MiB 以内的文本文件");return;}
+  if(hasUnsavedEdits(activePackage)&&!confirm("当前工作区还有未导出的修改。确定替换？"))return;
+  try{
+    const text=await file.text();
+    if(text.includes("\u0000"))throw new Error("不支持二进制文件");
+    const workspace=createFileWorkspace("local",[{path:file.name,text}]);
+    activateWorkspace(workspace,file.name,"local");
+  }catch(error){message("本地文件读取失败："+String(error?.message??error));}
 });
-$("sampleButton").addEventListener("click", async () => {
-  if (source.value !== initialText && !confirm("尚有未导出的修改。确定重载样本？")) return;
+$("sampleButton").addEventListener("click",async()=>{
+  if(hasUnsavedEdits(activePackage)&&!confirm("当前 Package 还有未导出的修改。确定重新载入示例？"))return;
   await loadSample("ensure");
 });
-$("establishSampleButton").addEventListener("click", async () => {
-  if (source.value !== initialText && !confirm("尚有未导出的修改。确定打开 CreatedSession 样本？")) return;
+$("establishSampleButton").addEventListener("click",async()=>{
+  if(hasUnsavedEdits(activePackage)&&!confirm("当前 Package 还有未导出的修改。确定重新载入示例？"))return;
   await loadSample("establish");
 });
-async function loadSample(sample = "ensure") {
-  try {
-    const name = sample === "establish" ? "establish-pdu-session" : "ensure-pdu-session";
-    const filename = name + ".procedure.yaml";
-    const response = await fetch("./samples/" + filename, { cache: "no-cache" });
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    loadDocument(filename, await response.text(),"sample");
-  } catch (error) {
-    message("样本加载失败，请从本地打开 YAML：" + String(error?.message ?? error));
-    setMode("source");
+async function loadSample(sample="ensure"){
+  try{
+    const spec=SAMPLE_PACKAGES[sample];
+    if(!spec)throw new Error("未知示例");
+    const files=await Promise.all(packageFilesForSample(sample).map(async item=>{
+      const response=await fetch(item.url,{cache:"no-cache"});
+      if(!response.ok)throw new Error(item.path+" HTTP "+response.status);
+      const text=await response.text();
+      return {path:item.path,text};
+    }));
+    const workspace=createFileWorkspace(spec.name,files);
+    activateWorkspace(workspace,spec.entry,"sample");
+  }catch(error){
+    message("Package 示例读取失败："+String(error?.message??error));
   }
 }
-$("downloadButton").addEventListener("click", () => {
-  const data = new Blob([source.value], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(data);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  message("已请求浏览器导出；请确认下载完成。工作区文件未被直接覆盖。");
+function downloadBlob(data,name,type="text/plain;charset=utf-8"){
+  const blob=data instanceof Blob?data:new Blob([data],{type});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+  window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+$("downloadButton").addEventListener("click",()=>{
+  downloadBlob(source.value,filename);
+  message("已请求下载当前文件；不会直接覆盖本地原文件。");
 });
-$("resetButton").addEventListener("click", () => {
-  if (source.value !== initialText && !confirm("丢弃全部本地修改？")) return;
-  source.value = initialText;
+$("exportPackageButton").addEventListener("click",()=>{
+  try{
+    if(!activePackage||activePackage.files.size<2)return;
+    markFileEdited(activePackage,activeFilePath,source.value,history);
+    const entries=[...activePackage.files.values()].map(({path,text})=>({path,text}));
+    const bytes=zipPackage(entries);
+    downloadBlob(bytes,activePackage.name+".zip","application/zip");
+    message("已请求下载 Package ZIP（"+entries.length+" 文件）；工作区不变。");
+  }catch(error){
+    message("导出 Package 失败："+String(error?.message??error));
+  }
+});
+$("resetButton").addEventListener("click",()=>{
+  if(source.value!==initialText&&!confirm("丢弃当前文件的修改？"))return;
+  source.value=initialText;
   history.record(source.value);
   closePreview();
   refresh(true);
@@ -721,7 +857,7 @@ function closePreview() {
 function showPreview(preview) {
   pendingPatch = preview;
   setText("patchDiff", preview.diff);
-  setText("patchSummary", preview.routeId + " · " + preview.oldTarget + " → " + preview.newTarget);
+  setText("patchSummary",preview.summary??(preview.routeId+" · "+preview.oldTarget+" → "+preview.newTarget));
   $("patchDialog").hidden = false;
   $("applyPatch").focus();
 }
@@ -732,12 +868,19 @@ $("patchDialog").addEventListener("click", event => {
 $("applyPatch").addEventListener("click", () => {
   if (!pendingPatch) return;
   try {
-    const nextSource = applyRouteTargetPatch(source.value, pendingPatch);
+    let nextSource;
+    if(pendingPatch.type==="SetRouteTarget")
+      nextSource=applyRouteTargetPatch(source.value,pendingPatch);
+    else if(pendingPatch.type==="SetVerifyPredicate")
+      nextSource=applyVerifyPredicatePatch(source.value,pendingPatch,selectedPredicateSource());
+    else if(pendingPatch.type==="SetMaxActions")
+      nextSource=applyContractMaxActionsPatch(source.value,pendingPatch);
+    else throw new Error("未知的属性 Patch 类型");
     source.value = nextSource;
     history.record(nextSource);
     closePreview();
     refresh(false);
-    message("SetRouteTarget 已应用到工作缓冲区；请审查 Diff 后导出。未运行完整 Validator。");
+    message("属性修改已应用到工作缓冲区。可撤销；未执行完整 Runtime Validator。");
   } catch (error) {
     closePreview();
     message("Patch 拒绝应用：" + String(error?.message ?? error));

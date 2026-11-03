@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, cpSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 const dist = "dist";
@@ -13,6 +13,7 @@ copyFileSync("site/studio.css", join(dist, "studio.css"));
 copyFileSync("site/light.css", join(dist, "light.css"));
 copyFileSync("site/samples/ensure-pdu-session.procedure.yaml", join(dist, "samples/ensure-pdu-session.procedure.yaml"));
 copyFileSync("site/samples/establish-pdu-session.procedure.yaml", join(dist, "samples/establish-pdu-session.procedure.yaml"));
+cpSync("site/samples/packages",join(dist,"samples/packages"),{recursive:true});
 
 await build({
   entryPoints: ["site/app.mjs"],

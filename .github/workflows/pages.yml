@@ -45,7 +45,19 @@ jobs:
           html = Path("dist/index.html").read_text(encoding="utf-8")
           assert html.lstrip().lower().startswith("<!doctype html>")
           HTMLParser().feed(html)
-          for asset in ("./studio.css", "./light.css", "./app.js", "./samples/ensure-pdu-session.procedure.yaml", "./samples/establish-pdu-session.procedure.yaml"):
+          for asset in ("./studio.css", "./light.css", "./app.js",
+                        "./samples/ensure-pdu-session.procedure.yaml",
+                        "./samples/establish-pdu-session.procedure.yaml",
+                        "./samples/packages/ensure-pdu-session/SKILL.md",
+                        "./samples/packages/ensure-pdu-session/assurance/contract.yaml",
+                        "./samples/packages/ensure-pdu-session/assurance/procedure.yaml",
+                        "./samples/packages/ensure-pdu-session/assurance/predicates.yaml",
+                        "./samples/packages/establish-pdu-session/SKILL.md",
+                        "./samples/packages/establish-pdu-session/assurance/contract.yaml",
+                        "./samples/packages/establish-pdu-session/assurance/procedure.yaml",
+                        "./samples/packages/establish-pdu-session/assurance/predicates.yaml",
+                        "./samples/packages/establish-pdu-session/scripts/evaluate_udm_read.py",
+                        "./samples/packages/establish-pdu-session/schemas/establishment-request.schema.yaml"):
               assert Path("dist", asset.removeprefix("./")).is_file(), asset
           assert 'src="./app.js"' in html
           assert 'href="./studio.css"' in html
@@ -61,6 +73,11 @@ jobs:
           node --check site/workspace.mjs
           node --check site/layout.mjs
           node --check site/workbench.mjs
+          node --check site/sample-packages.mjs
+          node --check site/zip.mjs
+          node --check site/attribute-patch.mjs
+          node --check tests/package.test.mjs
+          node --check tests/attributes.test.mjs
           node --check tests/graph.test.mjs
           node --check tests/patch.test.mjs
           node --check tests/workspace.test.mjs

@@ -1,0 +1,118 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {createHash} from "node:crypto";
+import {createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState,
+  SAMPLE_PACKAGES,packageFilesForSample} from "../site/sample-packages.mjs";
+import {zipPackage} from "../site/zip.mjs";
+import {createEditorHistory} from "../site/patch.mjs";
+import {projectWorkspace} from "../site/workspace.mjs";
+
+const read=(name,path)=>readFileSync(
+  new URL("../site/samples/packages/"+name+"/"+path,import.meta.url),"utf8");
+const sha=text=>{
+  const bytes=Buffer.from(text);
+  return createHash("sha1").update("blob "+bytes.length+"\0").update(bytes).digest("hex");
+};
+
+test("two pinned real SKILL Package fixtures include real runtime assets",()=>{
+  assert.equal(SAMPLE_PACKAGES.ensure.files.length,4);
+  assert.equal(SAMPLE_PACKAGES.establish.files.length,13);
+  for(const key of ["ensure","establish"]){
+    const spec=SAMPLE_PACKAGES[key];
+    assert.equal(spec.entry,"assurance/procedure.yaml");
+    assert.ok(spec.files.includes("SKILL.md"));
+    assert.ok(spec.files.includes("assurance/contract.yaml"));
+    assert.ok(spec.files.includes("assurance/predicates.yaml"));
+    assert.ok(spec.files.includes("assurance/procedure.yaml"));
+    assert.deepEqual(packageFilesForSample(key).map(x=>x.path),spec.files);
+    for(const path of spec.files){
+      const value=read(spec.name,path);
+      assert.ok(value.trim().length>0,path);
+    }
+  }
+  assert.deepEqual(SAMPLE_PACKAGES.establish.files.filter(p=>p.startsWith("scripts/")).length,3);
+  assert.deepEqual(SAMPLE_PACKAGES.establish.files.filter(p=>p.startsWith("schemas/")).length,6);
+});
+test("fixtures are byte-for-byte the pinned ca-agent-demo Git blob sources",()=>{
+  assert.equal(sha(read("ensure-pdu-session","SKILL.md")),"aef72afd2ffa2fde9c5c9fd5f52108c3005522b8");
+  assert.equal(sha(read("ensure-pdu-session","assurance/contract.yaml")),"f5b7310af240127e943a2f9d64a374fd23d3359d");
+  assert.equal(sha(read("ensure-pdu-session","assurance/procedure.yaml")),"1ead0efb0665b7ccb652501bc0075b36079c5017");
+  assert.equal(sha(read("ensure-pdu-session","assurance/predicates.yaml")),"2abe20975d709b93a27a215fc8eab1c5a33aaa23");
+  assert.equal(sha(read("establish-pdu-session","SKILL.md")),"29a1c1f5142e320f423dd916448af58859d6f398");
+  assert.equal(sha(read("establish-pdu-session","assurance/contract.yaml")),"af4f47c9a9bf21f241e359bba6e4b47951c5d246");
+  assert.equal(sha(read("establish-pdu-session","assurance/procedure.yaml")),"cf502fa54363a5302161cc7cccb191ce73e453de");
+  assert.equal(sha(read("establish-pdu-session","assurance/predicates.yaml")),"8cc773b2f428274acb40b6460f78df1106bd413d");
+  assert.equal(sha(read("establish-pdu-session","schemas/establishment-request.schema.yaml")),"c8027b6f9625949302900fa170ad59fec3b4a8f7");
+  assert.equal(sha(read("establish-pdu-session","schemas/predicate-evaluation-result.schema.yaml")),"c34c65ac00dcebb0a306a7cee2224566617fceca");
+  assert.equal(sha(read("establish-pdu-session","schemas/selection-input.schema.yaml")),"b3ff6984c693daf7e71758106aacbf8f08cd7487");
+  assert.equal(sha(read("establish-pdu-session","schemas/selection.schema.yaml")),"29a3f172be5dc815926ae1288ad4c29b1c052342");
+  assert.equal(sha(read("establish-pdu-session","schemas/transfer-start-evaluation-input.schema.yaml")),"29b78e251f78c2137ddfc8db448e02775ac13af6");
+  assert.equal(sha(read("establish-pdu-session","schemas/udm-read-evaluation-input.schema.yaml")),"f26a877d55b4e94c9a1a9487e0eceb702c0778ee");
+  assert.equal(sha(read("establish-pdu-session","scripts/evaluate_transfer_start.py")),"f5319a6d9383f7bcb984544325aefc844e8c503d");
+  assert.equal(sha(read("establish-pdu-session","scripts/evaluate_udm_read.py")),"c542b0699ff0357b9f7d2a0e10b1f13cd7d62657");
+  assert.equal(sha(read("establish-pdu-session","scripts/select_establishment_configuration.py")),"4b76b87b09b0d617327c42b4002be3fac80878aa");
+});
+test("real Procedure files project to the expected Root and Child graph",()=>{
+  const ensure=projectWorkspace(read("ensure-pdu-session","assurance/procedure.yaml"));
+  const establish=projectWorkspace(read("establish-pdu-session","assurance/procedure.yaml"));
+  assert.equal(ensure.state,"READY");
+  assert.equal(ensure.procedure.nodes.length,11);
+  assert.equal(ensure.procedure.routes.length,24);
+  assert.equal(establish.state,"READY");
+  assert.equal(establish.procedure.nodes.length,17);
+  assert.equal(establish.procedure.routes.length,65);
+  assert.equal(establish.procedures.size,6);
+});
+test("file workspace retains per-file source and revision history independently",()=>{
+  const ws=createFileWorkspace("ensure-pdu-session",[
+    {path:"SKILL.md",text:"# Demo"},
+    {path:"assurance/procedure.yaml",text:"procedures: {}"}
+  ]);
+  assert.equal(hasUnsavedEdits(ws),false);
+  const first=createEditorHistory("# Demo");
+  first.record("# Updated");
+  markFileEdited(ws,"SKILL.md","# Updated",first);
+  assert.equal(hasUnsavedEdits(ws),true);
+  assert.equal(fileDirtyState(ws,"SKILL.md"),true);
+  assert.equal(fileDirtyState(ws,"assurance/procedure.yaml"),false);
+  assert.equal(ws.files.get("SKILL.md").history.undo(),"# Demo");
+  assert.equal(ws.files.get("SKILL.md").history.redo(),"# Updated");
+  assert.equal(ws.files.get("assurance/procedure.yaml").text,"procedures: {}");
+});
+test("workspace rejects duplicate, traversal, binary and empty manifests",()=>{
+  assert.throws(()=>createFileWorkspace("x",[]));
+  assert.throws(()=>createFileWorkspace("x",[{path:"../escape",text:"hi"}]));
+  assert.throws(()=>createFileWorkspace("x",[{path:"a",text:"x"},{path:"a",text:"y"}]));
+  assert.throws(()=>createFileWorkspace("x",[{path:"unsafe.txt",text:"x\u0000y"}]));
+  assert.ok(createFileWorkspace("local",[{path:"相闻.txt",text:"中文"}]).files.has("相闻.txt"));
+});
+test("ZIP export keeps all file names and working-copy bytes in store entries",()=>{
+  const entries=[{path:"SKILL.md",text:"# Hello\n"},
+    {path:"assurance/contract.yaml",text:"maxActions: 7\n"},
+    {path:"docs/中文.txt",text:"原文🙂\n"}];
+  const zip=zipPackage(entries);
+  const view=new DataView(zip.buffer,zip.byteOffset,zip.byteLength);
+  const decoder=new TextDecoder();
+  let pos=0;
+  for(const item of entries){
+    assert.equal(view.getUint32(pos,true),0x04034b50);
+    assert.equal(view.getUint16(pos+8,true),0);
+    const size=view.getUint32(pos+18,true);
+    const nameLength=view.getUint16(pos+26,true);
+    const name=decoder.decode(zip.slice(pos+30,pos+30+nameLength));
+    const value=decoder.decode(zip.slice(pos+30+nameLength,pos+30+nameLength+size));
+    assert.equal(name,item.path);
+    assert.equal(value,item.text);
+    pos+=30+nameLength+size;
+  }
+  assert.equal(view.getUint32(pos,true),0x02014b50);
+  assert.equal(view.getUint32(zip.length-22,true),0x06054b50);
+  assert.equal(view.getUint16(zip.length-12,true),entries.length);
+});
+test("ZIP export rejects path traversal and duplicate file identity",()=>{
+  assert.throws(()=>zipPackage([{path:"../x",text:"data"}]));
+  assert.throws(()=>zipPackage([{path:"x",text:"a"},{path:"x",text:"b"}]));
+  assert.throws(()=>zipPackage([{path:"",text:"x"}]));
+  assert.throws(()=>zipPackage([{path:"x",text:"a".repeat(1024*1024+1)}]));
+});

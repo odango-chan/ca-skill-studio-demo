@@ -1,0 +1,127 @@
+procedures:
+  ensure-session:
+    inputs:
+      supi:
+        type: string
+        from: context.subject.ueRef
+      pdu-session-id:
+        type: integer
+        from: context.request.pduSessionId
+      dnn:
+        type: string
+        from: context.request.dnn
+      sst:
+        type: integer
+        from: context.request.sst
+      sd:
+        type: string
+        from: context.request.sd
+    start: observe-target-session
+    nodes:
+      observe-target-session:
+        verify: pdu_session.target.satisfied
+        'on':
+          PASS: done
+          FAIL: observe-session-absence
+          UNKNOWN: unresolved
+
+      observe-session-absence:
+        verify: pdu_session.absent
+        'on':
+          PASS: create-session
+          FAIL: strategy-conflict
+          UNKNOWN: unresolved
+
+      create-session:
+        call: pdu_session.create
+        with:
+          supi:
+            from: input.supi
+          pduSessionId:
+            from: input.pdu-session-id
+          dnn:
+            from: input.dnn
+          sst:
+            from: input.sst
+          sd:
+            from: input.sd
+        'on':
+          COMMITTED: verify-created-target
+          NOT_COMMITTED: failed
+          OUTCOME_UNKNOWN: reconcile-create
+          FAILED: failed
+          DENIED: failed
+
+      reconcile-create:
+        call: pdu_session.reconcile
+        with:
+          supi:
+            from: input.supi
+          pduSessionId:
+            from: input.pdu-session-id
+          c6BackendOperationRef:
+            from: create-session.output.c6BackendOperationRef
+          c6OperationSemantic:
+            from: create-session.output.c6OperationSemantic
+          c6ResultCode:
+            from: create-session.output.c6ResultCode
+          c6BackendEffectDispatch:
+            from: create-session.output.c6BackendEffectDispatch
+          c6WorldRef:
+            from: create-session.output.c6WorldRef
+          c6WorldGeneration:
+            from: create-session.output.c6WorldGeneration
+          c6EndWorldRevision:
+            from: create-session.output.c6EndWorldRevision
+          c6SubjectRef:
+            from: create-session.output.c6SubjectRef
+          protocolTransactionRefs:
+            from: create-session.output.protocolTransactionRefs
+          protocolTransactions:
+            from: create-session.output.protocolTransactions
+        'on':
+          COMMITTED: verify-created-target
+          NOT_COMMITTED: retry-create-session
+          UNRESOLVED: unresolved
+          FAILED: safe-stopped
+          DENIED: safe-stopped
+
+      retry-create-session:
+        call: pdu_session.create
+        with:
+          supi:
+            from: input.supi
+          pduSessionId:
+            from: input.pdu-session-id
+          dnn:
+            from: input.dnn
+          sst:
+            from: input.sst
+          sd:
+            from: input.sd
+          retryOfBackendOperationRef:
+            from: reconcile-create.output.controlledRetryBackendOperationRef
+        'on':
+          COMMITTED: verify-created-target
+          NOT_COMMITTED: failed
+          OUTCOME_UNKNOWN: unresolved
+          FAILED: failed
+          DENIED: failed
+
+      verify-created-target:
+        verify: pdu_session.target.satisfied
+        'on':
+          PASS: done
+          FAIL: failed
+          UNKNOWN: unresolved
+
+      done:
+        terminal: SUCCEEDED
+      strategy-conflict:
+        terminal: FAILED
+      failed:
+        terminal: FAILED
+      unresolved:
+        terminal: UNRESOLVED
+      safe-stopped:
+        terminal: SAFE_STOPPED

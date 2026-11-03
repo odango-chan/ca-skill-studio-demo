@@ -25,11 +25,14 @@ test("editor uses progressive disclosure without duplicating object panels",()=>
   assert.doesNotMatch(html,/class="inspector-footer"|class="inspector-sequence"/);
   assert.match(css,/\.compact-toolbar/);
 });
-test("only actual document is shown and not a fictitious package",()=>{
+test("actual Package example files are navigable without an invented disk workspace",()=>{
   assert.match(html,/id="assetTree"/);
-  assert.match(html,/单文件/);
-  assert.doesNotMatch(html,/SKILL\.md|predicates\.yaml|contract\.yaml/);
-  assert.match(app,/assetOrigin==="sample"/);
+  assert.match(html,/id="fileCount"/);
+  assert.match(html,/id="exportPackageButton"/);
+  assert.match(app,/packageFilesForSample\(sample\)/);
+  assert.match(app,/function switchFile\(path\)/);
+  assert.match(app,/markFileEdited\(activePackage/);
+  assert.match(app,/zipPackage\(entries\)/);
 });
 test("zero diagnostics do not create a persistent problems strip",()=>{
   assert.match(html,/id="problems"[^>]*hidden/);
