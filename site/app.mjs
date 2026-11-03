@@ -11,6 +11,7 @@ import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from ".
 import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
 import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
 import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
+import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "./node-designer.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
@@ -676,6 +677,30 @@ function addNodeAttributeEditor(model){
   body.append(el("p","small-edit-note","修改验证引用可能影响业务门禁；此处仅验证源码结构，不运行完整 Runtime Validator。"));
   return true;
 }
+function addNodeRenameEditor(model){
+  if(!nodeRenameAvailable(source.value,activeProcedureId,model.node.id))return false;
+  const body=section("Node ID","D2-A1");
+  const label=el("label","attribute-label","Node ID");
+  const input=el("input","attribute-input");
+  input.type="text";input.value=model.node.id;input.maxLength=80;
+  input.setAttribute("aria-label","重命名 Node ID");
+  input.setAttribute("autocomplete","off");input.setAttribute("spellcheck","false");
+  label.appendChild(input);body.appendChild(label);
+  const preview=button("预览 Node 重命名",()=>{
+    try{
+      showPreview(previewNodeRename(source.value,activeProcedureId,model.node.id,input.value));
+    }catch(error){message("未应用："+String(error?.message??error));}
+  },"preview-button");
+  preview.disabled=true;
+  input.addEventListener("input",()=>{
+    preview.disabled=input.value===model.node.id||
+      !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(input.value);
+  });
+  body.append(preview,el("p","small-edit-note",
+    "同步调整当前 Procedure 的 start、Route 目标和可识别的 from 引用；必须确认 Diff。跨文件语义仍需验证。"));
+  return true;
+}
+
 function renderContractAttributes(){
   const value=contractMaxActions(source.value,activePackage?.name);
   if(!value)return false;
@@ -789,6 +814,7 @@ function routeFriendlySource(routeSource){
 }
 function renderNodeJourney(model) {
   const node=model.node;
+  addNodeRenameEditor(model);
   addNodeAttributeEditor(model);
   if(model.prepare.phase || model.prepare.routes.length){
     const body=journeyStage(1,"准备",
@@ -845,7 +871,8 @@ function renderInspector() {
   const route=selection?.kind==="route"?routeDetails(lastGood,selection.id):null;
   const model=selection?.kind==="node"?nodeJourney(lastGood,selection.id):null;
   const editable=Boolean(route&&eligibleGraphRouteTargets(route.id).length)||
-    Boolean(model&&(verifyNodeChoices(model.node.id).length||
+    Boolean(model&&(nodeRenameAvailable(source.value,activeProcedureId,model.node.id)||
+      verifyNodeChoices(model.node.id).length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -1036,7 +1063,12 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyPhaseVerifyPatch(source.value,pendingPatch,packagePredicateSource());
     else if(pendingPatch.type==="SetCreatedRouteTarget")
       nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
+    else if(pendingPatch.type==="RenameNode")
+      nextSource=applyNodeRename(source.value,pendingPatch);
     else throw new Error("未知的属性 Patch 类型");
+    if(pendingPatch.type==="RenameNode"&&selection?.kind==="node"&&
+       activeProcedureId===pendingPatch.procedureId&&selection.id===pendingPatch.nodeId)
+      selection={kind:"node",id:pendingPatch.newId};
     source.value = nextSource;
     history.record(nextSource);
     closePreview();
