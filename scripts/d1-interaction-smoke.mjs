@@ -70,6 +70,48 @@ export async function runD1Interactions(evaluate,command){
     "  oldId,next,previewed,cancelled,applied,undone,redone,restored};"
   ]);
 
+  await check(evaluate,"D2_INSERT_NODE",[
+    sleepLine,clickLine,
+    " const source=document.getElementById('source'),before=source.value;",
+    " const edge=document.querySelector('.react-flow__edge[data-id=\"flow-edge-0\"]');",
+    " if(!edge)return {ok:false,reason:'Route missing'};",
+    " click(edge);await sleep(150);",
+    " const idInput=document.querySelector('#inspector input[aria-label=\"新 Node ID\"]');",
+    " const type=document.querySelector('#inspector select[aria-label=\"新 Node Operator\"]');",
+    " if(!idInput||!type)return {ok:false,reason:'D2 Route insertion editor missing'};",
+    " const id='d2-inserted-read';",
+    " idInput.value=id;idInput.dispatchEvent(new Event('input',{bubbles:true}));",
+    " type.value='call';type.dispatchEvent(new Event('change',{bubbles:true}));",
+    " const opInput=document.querySelector('#inspector input[aria-label=\"新 Node 值\"]');",
+    " const outcome=document.querySelector('#inspector input[aria-label=\"新 Node Outcome\"]');",
+    " if(!opInput||!outcome)return {ok:false,reason:'Call inputs missing'};",
+    " opInput.value='sbi.demo.call';opInput.dispatchEvent(new Event('input',{bubbles:true}));",
+    " const preview=[...document.querySelectorAll('#inspector .preview-button')].find(x=>x.textContent.includes('插入 Node'));",
+    " if(!preview||preview.disabled)return {ok:false,reason:'Node insertion Preview disabled'};",
+    " click(preview);await sleep(70);",
+    " const dialog=document.getElementById('patchDialog');",
+    " const diff=document.getElementById('patchDiff').textContent;",
+    " const previewed=!dialog.hidden&&diff.includes(id+':')&&",
+    "   diff.includes('call: sbi.demo.call')&&source.value===before;",
+    " click(document.getElementById('closePatch'));await sleep(35);",
+    " const cancelled=dialog.hidden&&source.value===before;",
+    " click(preview);await sleep(60);",
+    " if(dialog.hidden)return {ok:false,reason:'Insertion Preview did not reopen'};",
+    " click(document.getElementById('applyPatch'));await sleep(300);",
+    " const appliedSource=source.value;",
+    " const applied=appliedSource!==before&&appliedSource.includes('      '+id+':')&&",
+    "   appliedSource.includes('call: sbi.demo.call')&&",
+    "   document.querySelector('#inspectorContext h2')?.textContent===id;",
+    " click(document.getElementById('undoButton'));await sleep(220);",
+    " const undone=source.value===before;",
+    " click(document.getElementById('redoButton'));await sleep(220);",
+    " const redone=source.value===appliedSource;",
+    " click(document.getElementById('undoButton'));await sleep(250);",
+    " const restored=source.value===before;",
+    " return {ok:previewed&&cancelled&&applied&&undone&&redone&&restored,",
+    "  previewed,cancelled,applied,undone,redone,restored};"
+  ]);
+
   await check(evaluate,"ROUTE_DIFF_HISTORY",[
     sleepLine,clickLine,
     " const source=document.getElementById('source');",
