@@ -98,8 +98,16 @@ export async function runD1Interactions(evaluate,command){
     " click(preview);await sleep(60);",
     " if(dialog.hidden)return {ok:false,reason:'Insertion Preview did not reopen'};",
     " click(document.getElementById('applyPatch'));await sleep(300);",
+    " for(let i=0;i<30;i++){",
+    "   if(document.querySelectorAll('.react-flow__node').length===18&&",
+    "      document.querySelectorAll('.react-flow__edge-path').length===49)break;",
+    "   await sleep(100);",
+    " }",
+    " const nodes=document.querySelectorAll('.react-flow__node').length;",
+    " const edges=document.querySelectorAll('.react-flow__edge-path').length;",
     " const appliedSource=source.value;",
-    " const applied=appliedSource!==before&&appliedSource.includes('      '+id+':')&&",
+    " const applied=appliedSource!==before&&nodes===18&&edges===49&&",
+    "   appliedSource.includes('      '+id+':')&&",
     "   appliedSource.includes('call: sbi.demo.call')&&",
     "   document.querySelector('#inspectorContext h2')?.textContent===id;",
     " click(document.getElementById('undoButton'));await sleep(220);",
@@ -109,7 +117,7 @@ export async function runD1Interactions(evaluate,command){
     " click(document.getElementById('undoButton'));await sleep(250);",
     " const restored=source.value===before;",
     " return {ok:previewed&&cancelled&&applied&&undone&&redone&&restored,",
-    "  previewed,cancelled,applied,undone,redone,restored};"
+    "  nodes,edges,previewed,cancelled,applied,undone,redone,restored};"
   ]);
 
   await check(evaluate,"ROUTE_DIFF_HISTORY",[

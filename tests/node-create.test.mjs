@@ -38,8 +38,8 @@ test("insert a call Node on an existing Route with a return edge to old target",
   const p=projectWorkspace(applied).procedure;
   assert.equal(p.nodes.length,ensureProc.nodes.length+1);
   assert.equal(p.routes.length,ensureProc.routes.length+1);
-  assert.deepEqual(p.routes.find(r=>r.id==="read-again:COMMITTED"),
-    {...p.routes.find(r=>r.id==="read-again:COMMITTED")});
+  assert.equal(p.routes.find(r=>r.id==="read-again:COMMITTED").routeSource,
+    "operator.on");
   assert.equal(p.routes.find(r=>r.id==="read-again:COMMITTED").target,route.target);
   assert.equal(p.routes.find(r=>r.id===route.id).target,"read-again");
   assert.match(applied,/read-again:\n        call: sbi\.demo\.read\n        'on':\n          COMMITTED: observe-session-absence/);
