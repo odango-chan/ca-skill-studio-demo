@@ -1,0 +1,5 @@
+# Agent scratch (ConnectionAgent safety baseline)
+.agent-tmp/
+node_modules/
+dist/
+*.log
