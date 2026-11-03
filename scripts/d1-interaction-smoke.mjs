@@ -37,6 +37,39 @@ export async function runD1Interactions(evaluate,command){
     "  nodeSelected:highlighted,wrapperSelected:document.querySelectorAll('.react-flow__node.selected').length};"
   ]);
 
+  await check(evaluate,"D2_NODE_RENAME",[
+    sleepLine,clickLine,
+    " const source=document.getElementById('source'),before=source.value;",
+    " const node=document.querySelector('.react-flow__node[data-id=\"nudm-sdm-get\"]');",
+    " if(!node)return {ok:false,reason:'CreatedSession start Node not rendered'};",
+    " click(node);await sleep(200);",
+    " const input=document.querySelector('#inspector input[aria-label=\"重命名 Node ID\"]');",
+    " if(!input)return {ok:false,reason:'Node Rename Inspector unavailable'};",
+    " const oldId=input.value,next=oldId+'-d2-smoke';",
+    " input.value=next;input.dispatchEvent(new Event('input',{bubbles:true}));",
+    " const preview=[...document.querySelectorAll('#inspector .preview-button')].find(x=>x.textContent.includes('Node 重命名'));",
+    " if(!preview||preview.disabled)return {ok:false,reason:'Rename Preview disabled'};",
+    " click(preview);await sleep(70);",
+    " const dialog=document.getElementById('patchDialog'),diff=document.getElementById('patchDiff').textContent;",
+    " const previewed=!dialog.hidden&&diff.includes('start: '+next)&&source.value===before;",
+    " click(document.getElementById('closePatch'));await sleep(35);",
+    " const cancelled=dialog.hidden&&source.value===before;",
+    " click(preview);await sleep(55);",
+    " if(dialog.hidden)return {ok:false,reason:'Rename Preview did not reopen'};",
+    " click(document.getElementById('applyPatch'));await sleep(180);",
+    " const appliedSource=source.value;",
+    " const applied=appliedSource!==before&&appliedSource.includes('start: '+next)&&",
+    "   document.querySelector('#inspectorContext h2')?.textContent===next;",
+    " click(document.getElementById('undoButton'));await sleep(150);",
+    " const undone=source.value===before;",
+    " click(document.getElementById('redoButton'));await sleep(150);",
+    " const redone=source.value===appliedSource;",
+    " click(document.getElementById('undoButton'));await sleep(170);",
+    " const restored=source.value===before;",
+    " return {ok:previewed&&cancelled&&applied&&undone&&redone&&restored,",
+    "  oldId,next,previewed,cancelled,applied,undone,redone,restored};"
+  ]);
+
   await check(evaluate,"ROUTE_DIFF_HISTORY",[
     sleepLine,clickLine,
     " const source=document.getElementById('source');",
