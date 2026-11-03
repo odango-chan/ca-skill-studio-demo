@@ -121,7 +121,8 @@ test("vertical is the default across initial UI and ELK, with horizontal still s
   const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
   const layout=readFileSync(new URL("../site/layout.mjs",import.meta.url),"utf8");
   assert.match(app,/let layoutDirection = "DOWN";/);
-  assert.match(app,/layoutProcedure\(proc,direction\)/);
+  assert.match(app,/layoutProcedure\(basic,direction\)/);
+  assert.match(app,/detailedLayoutAllowed\(scope\)/);
   assert.match(html,/<option value="RIGHT">水平<\/option>/);
   assert.match(html,/<option value="DOWN" selected>垂直<\/option>/);
   assert.match(layout,/direction = "DOWN", focus = null/);
