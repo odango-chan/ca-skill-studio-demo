@@ -92,7 +92,9 @@ test("product shell includes all referenced static controls",()=>{
 test("source-preserving guard controls remain in editor and patch modules",()=>{
   const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
   const patch=readFileSync(new URL("../site/patch.mjs",import.meta.url),"utf8");
-  assert.match(app,/previewRouteTargetPatch\(source\.value/);
+  const routeEditor=readFileSync(new URL("../site/visual-route-edit.mjs",import.meta.url),"utf8");
+  assert.match(app,/previewVisualRouteEdit\(currentRouteEditContext/);
+  assert.match(routeEditor,/previewRouteTargetPatch\(context\.source/);
   assert.match(app,/applyRouteTargetPatch\(source\.value/);
   assert.match(app,/history\.record\(nextSource\)/);
   assert.match(patch,/currentSource !== preview\.baseSource/);

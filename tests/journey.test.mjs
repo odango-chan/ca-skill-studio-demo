@@ -80,7 +80,8 @@ test("source guard and controlled inspector disclosure remain wired",()=>{
   assert.doesNotMatch(app,/renderQuickCard|quickDetails|toggleInspector/);
   assert.match(app,/function renderNodeJourney\(/);
   assert.match(app,/setInspectorOpen\(true,false\)/);
-  assert.match(app,/previewRouteTargetPatch\(source\.value/);
+  assert.match(app,/previewVisualRouteEdit\(currentRouteEditContext/);
+  assert.match(readFileSync(new URL("../site/visual-route-edit.mjs",import.meta.url),"utf8"),/previewRouteTargetPatch\(context\.source/);
   assert.match(app,/applyRouteTargetPatch\(source\.value/);
   assert.doesNotMatch(app,/inspectorTabItems|preferredTab|inspectorTabs/);
 });

@@ -58,7 +58,8 @@ test("important source and safety feedback remains visible on demand",()=>{
   assert.match(html,/id="projectionState"[^>]*role="status"/);
   assert.match(html,/id="patchDialog"/);
   assert.match(app,/history\.record\(source\.value\)/);
-  assert.match(app,/previewRouteTargetPatch\(source\.value/);
+  assert.match(app,/previewVisualRouteEdit\(currentRouteEditContext/);
+  assert.match(read("site/visual-route-edit.mjs"),/previewRouteTargetPatch\(context\.source/);
   assert.match(app,/applyRouteTargetPatch\(source\.value/);
   assert.match(app,/setInspectorOpen\(true,false\)/);
 });
