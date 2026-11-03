@@ -74,9 +74,10 @@ export async function runD1Interactions(evaluate,command){
     "  diffSnippet:diff?.slice(0,160),projection:document.getElementById('projectionState')?.textContent};"
   ]);
 
-  await check(evaluate,"RECONNECT_ANCHORS",[
+  const gesture=await check(evaluate,"RECONNECT_ANCHORS",[
     sleepLine,clickLine,
     " click(document.querySelector('.react-flow__edge[data-id=\"flow-edge-0\"]'));",
+    " click(document.getElementById('fit'));await sleep(600);",
     " for(let i=0;i<40;i++){",
     "  if(document.querySelector('.react-flow__edge[data-id=\"flow-edge-0\"] .react-flow__edgeupdater-target'))break;",
     "  await sleep(75);",
@@ -86,12 +87,61 @@ export async function runD1Interactions(evaluate,command){
     " const select=document.querySelector('#inspector select[aria-label=\"选择当前 Procedure 中的 Route Target\"]');",
     " const target=[...select?.options??[]].map(o=>o.value).find(v=>v!==select?.value&&v!=='nudm-sdm-get');",
     " const node=target&&document.querySelector('.react-flow__node[data-id=\"'+target+'\"]');",
-    " const handle=node?.querySelector('.react-flow__handle.target');",
-    " return {ok:Boolean(updater&&target&&handle),",
-    "  updaterClass:updater?.getAttribute('class'),target,",
-    "  updaterRect:updater?.getBoundingClientRect().toJSON(),",
-    "  targetRect:handle?.getBoundingClientRect().toJSON(),",
-    "  edgeSelected:edge?.getAttribute('class'),currentTarget:select?.value};"
+    " const handle=node?.querySelector('.designer-port-elk.target')??node?.querySelector('.react-flow__handle.target');",
+    " const u=updater?.getBoundingClientRect(),t=handle?.getBoundingClientRect();",
+    " const start=u&&{x:u.x+u.width/2,y:u.y+u.height/2};",
+    " const end=t&&{x:t.x+t.width/2,y:t.y+t.height/2};",
+    " const bounds=document.getElementById('graphPane').getBoundingClientRect();",
+    " const within=point=>point&&point.x>=bounds.left&&point.x<=bounds.right&&",
+    "  point.y>=bounds.top&&point.y<=bounds.bottom;",
+    " return {ok:Boolean(updater&&handle&&within(start)&&within(end)),",
+    "  start,end,target,currentTarget:select?.value,",
+    "  updaterClass:updater?.getAttribute('class'),",
+    "  updaterRect:u?.toJSON(),targetRect:t?.toJSON(),",
+    "  edgeSelected:edge?.getAttribute('class'),graphBounds:bounds.toJSON()};"
+  ]);
+
+  // Actual Chrome mouse events from a React Flow edge updater to another
+  // node's target handle. This must open a preview, never mutate YAML.
+  const original=await evaluate("document.getElementById('source').value");
+  await command("Input.dispatchMouseEvent",{
+    type:"mouseMoved",x:gesture.start.x,y:gesture.start.y,button:"none"
+  });
+  await command("Input.dispatchMouseEvent",{
+    type:"mousePressed",x:gesture.start.x,y:gesture.start.y,
+    button:"left",buttons:1,clickCount:1
+  });
+  for(let i=1;i<=16;i++){
+    const f=i/16;
+    await command("Input.dispatchMouseEvent",{
+      type:"mouseMoved",
+      x:gesture.start.x+(gesture.end.x-gesture.start.x)*f,
+      y:gesture.start.y+(gesture.end.y-gesture.start.y)*f,
+      button:"left",buttons:1
+    });
+    await new Promise(resolve=>setTimeout(resolve,25));
+  }
+  await command("Input.dispatchMouseEvent",{
+    type:"mouseReleased",x:gesture.end.x,y:gesture.end.y,
+    button:"left",buttons:0,clickCount:1
+  });
+  await check(evaluate,"RECONNECT_DRAG_PREVIEW",[
+    sleepLine,
+    " for(let i=0;i<30;i++){",
+    "  if(!document.getElementById('patchDialog').hidden)break;",
+    "  await sleep(90);",
+    " }",
+    " const dialog=document.getElementById('patchDialog');",
+    " const diff=document.getElementById('patchDiff')?.textContent;",
+    " const source=document.getElementById('source');",
+    " const preview=!dialog.hidden&&diff?.includes('@@');",
+    " if(preview)document.getElementById('closePatch').click();",
+    " await sleep(90);",
+    " return {ok:!!preview&&dialog.hidden&&source.value===",
+    JSON.stringify(original)+",",
+    "  preview,diffSnippet:diff?.slice(0,140),cancelled:dialog.hidden,",
+    "  sourceUnchanged:source.value==="+JSON.stringify(original)+",",
+    "  edges:document.querySelectorAll('.react-flow__edge-path').length};"
   ]);
 
   await check(evaluate,"SOURCE_SPLIT_FAIL_CLOSED",[
