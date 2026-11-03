@@ -24,9 +24,10 @@ export async function runD1Interactions(evaluate,command){
     "  await sleep(80);",
     " }",
     " const title=document.querySelector('#inspectorContext h2')?.textContent;",
-    " return {ok:!!id&&title===id&&document.getElementById('workbench').dataset.inspector==='open',",
+    " const highlighted=document.querySelectorAll('.designer-node.is-selected').length;",
+    " return {ok:!!id&&title===id&&highlighted===1&&document.getElementById('workbench').dataset.inspector==='open',",
     "  id,title,inspectorState:document.getElementById('inspectorState')?.textContent,",
-    "  nodeSelected:document.querySelectorAll('.react-flow__node.selected').length};"
+    "  nodeSelected:highlighted,wrapperSelected:document.querySelectorAll('.react-flow__node.selected').length};"
   ]);
 
   await check(evaluate,"ROUTE_DIFF_HISTORY",[
@@ -76,9 +77,15 @@ export async function runD1Interactions(evaluate,command){
     sleepLine,clickLine,
     " const source=document.getElementById('source');",
     " const before=source.value;",
-    " click(document.getElementById('mode-split'));await sleep(180);",
+    " click(document.getElementById('mode-split'));",
+    " for(let i=0;i<55;i++){",
+    "  if(document.getElementById('layoutStatus')?.textContent!=='正在自动布局…'&&",
+    "    document.querySelectorAll('.react-flow__edge-path').length===48)break;",
+    "  await sleep(100);",
+    " }",
     " const split=document.getElementById('editorBody').dataset.mode==='split';",
-    " const hasGraph=document.querySelectorAll('.react-flow__edge-path').length===48;",
+    " const edgeCount=document.querySelectorAll('.react-flow__edge-path').length;",
+    " const hasGraph=edgeCount===48;",
     " click(document.getElementById('mode-source'));",
     " const sourceMode=document.getElementById('editorBody').dataset.mode==='source';",
     " click(document.getElementById('mode-split'));",
@@ -102,7 +109,7 @@ export async function runD1Interactions(evaluate,command){
     "  document.querySelectorAll('.react-flow__node').length===17;",
     " click(document.getElementById('mode-visual'));await sleep(160);",
     " return {ok:Boolean(split&&hasGraph&&sourceMode&&synced&&undo&&redo&&invalid&&recovered),",
-    "  split,hasGraph,sourceMode,synced,undo,redo,invalid,recovered,",
+    "  split,hasGraph,edgeCount,sourceMode,synced,undo,redo,invalid,recovered,",
     "  currentMode:document.getElementById('editorBody').dataset.mode};"
   ]);
 
