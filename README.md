@@ -15,9 +15,12 @@ D2-A2 adds guarded insertion of a terminal/call/verify Node on a selected Route,
 with an explicit forwarding Outcome for nonterminal nodes.
 D2-A3 adds guarded deletion for duplicate-status terminals and single-outcome
 Node bypass, with inbound Route remediation, source-reference checks and Diff.
+D2-A4 adds existing Operator value and qualified with.<key>.from scalar edits,
+without changing Operator kinds or introducing new Binding fields.
 
 
-**Still not implemented:** unrestricted Node creation/deletion, generic operator/phase editing,
+**Still not implemented:** unrestricted Node creation/deletion, Operator-kind switching,
+Binding shape changes, generic Phase editing,
 full package import, whole-package Runtime validation and in-place filesystem save.
 See [D2 Node Designer](docs/D2-node-designer.md).
 

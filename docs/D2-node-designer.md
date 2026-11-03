@@ -1,6 +1,6 @@
 # D2 Node Designer · source-backed authoring
 
-Status: D2-A1/A2/A3 bounded source-backed authoring implemented; D2 overall remains incomplete.
+Status: D2-A1/A2/A3 plus bounded D2-A4 editing implemented; D2 overall remains incomplete.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ Status: D2-A1/A2/A3 bounded source-backed authoring implemented; D2 overall rema
 | A1 | Rename existing Node ID with guarded source reference rewrites | Implemented |
 | A2 | Insert typed terminal/call/verify Node onto one existing Route | Implemented · bounded |
 | A3 | Delete/merge a same-status terminal or bypass a single-outcome Node, with inbound Route rewrites | Implemented · bounded |
-| A4 | Edit generic Node operator/with/from with source qualification | Not implemented |
+| A4 | Edit existing Node Operator values and existing with.<name>.from scalars | Implemented · bounded |
 | A5 | Browser interactions, package semantic validation and large graph checks | Not implemented |
 
 ## Acceptance
@@ -79,3 +79,32 @@ Not supported: arbitrary Route rewrites, force-delete, replacements of missing
 node outputs, cross-file reference repair, Runtime behavior proof and workflow
 publication. In particular bypassing even a single-outcome call **removes that
 operation** and requires explicit business review before executing the Skill.
+
+
+## D2-A4 · Typed Node attributes
+
+The Node Inspector offers two source-bound edits independent of the sample Skill:
+
+- **Operator value**: retains the existing operator *kind*. Call / tool / reconcile
+  values accept plain identifier-like names but do not assert that a Runtime
+  operation exists. Verify / predicate values must occur in the matching
+  Package PredicateSet. Terminal values are chosen from statuses already used
+  in this Procedure. Procedure values must name a Procedure in the current YAML,
+  with recursion rejected. Script paths are not editable until package-aware
+  path checks exist.
+- **Existing with.<parameter>.from references**: source entries must already
+  be plain scalar values; editing uses a controlled dropdown of existing
+  authored references within the same Procedure and declared input.* names.
+  No unknown output paths or new with keys are fabricated.
+
+Each edit patches exactly one scalar span and reprojects the full YAML file.
+Operator-value edits assert the exact graph semantic delta; Binding edits keep
+the graph projection untouched and verify the target Binding's new plain value.
+The complete patch is recomputed on Apply, with a Diff and Undo/Redo.
+Quoted scalars, stale revisions, forged previews, unrelated structural changes
+and unknown Predicate/Procedure targets are refused.
+
+**Not supported:** changing operator kinds, adding/removing/renaming with keys,
+editing Phase-step bindings, deep from trees, output shape checking, type-aware
+binding compatibility, or Runtime authority/capability checks. These need
+source/schema-backed qualification rather than speculative graph changes.

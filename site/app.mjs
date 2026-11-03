@@ -14,6 +14,8 @@ import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
 import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "./node-designer.mjs";
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "./node-create.mjs";
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from "./node-delete.mjs";
+import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue,
+ previewNodeBindingFrom,applyNodeBindingFrom} from "./node-attributes.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
@@ -783,6 +785,74 @@ function addNodeRenameEditor(model){
   return true;
 }
 
+function currentNodeAttributes(nodeId){
+  return nodeAttributeState(source.value,activeProcedureId,nodeId,
+    packagePredicateSource(),activePackage?.name);
+}
+function addNodeOperatorEditor(model,attributes){
+  const operator=attributes?.operator;
+  if(!operator)return false;
+  const body=section("Operator Value","D2-A4");
+  const label=el("label","attribute-label",model.node.operator+" 值");
+  let input;
+  if(operator.type==="select"){
+    input=el("select","target-select");
+    for(const v of operator.values){
+      const option=el("option","",v);option.value=v;input.append(option);
+    }
+  }else{
+    input=el("input","attribute-input");
+    input.type="text";input.maxLength=120;
+    input.setAttribute("spellcheck","false");
+  }
+  input.value=operator.value;
+  input.setAttribute("aria-label","编辑 Node Operator 值");
+  label.append(input);body.append(label);
+  const preview=button("预览 Operator 修改",()=>{
+    try{
+      showPreview(previewNodeOperatorValue(source.value,activeProcedureId,
+        model.node.id,input.value,packagePredicateSource(),activePackage?.name));
+    }catch(error){message("Operator 未应用："+String(error?.message??error));}
+  },"preview-button");
+  const update=()=>{
+    preview.disabled=input.value===operator.value||
+      !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(input.value);
+  };
+  input.addEventListener("input",update);
+  input.addEventListener("change",update);
+  update();body.append(preview);
+  body.append(el("p","small-edit-note",
+    "这里只修改现有 Operator 的值，不切换类型。Tool/Call 能否执行、结果类型是否兼容，需另做 Runtime 校验。"));
+  return true;
+}
+function addNodeBindingEditors(model,attributes){
+  if(!attributes?.bindings?.length)return false;
+  const body=section("with / from",attributes.bindings.length+" BINDINGS · D2-A4");
+  body.append(el("p","small-edit-note",
+    "仅能将已有 with.<参数>.from 替换为本 Procedure 中出现过的来源或已声明 input；不生成新的输出路径。"));
+  for(const binding of attributes.bindings){
+    const label=el("label","attribute-label",binding.key+" · from");
+    const select=el("select","target-select");
+    select.setAttribute("aria-label","Binding 来源 · "+binding.key);
+    for(const ref of binding.choices){
+      const option=el("option","",ref);option.value=ref;select.append(option);
+    }
+    select.value=binding.value;label.append(select);body.append(label);
+    const preview=button("预览 Binding 修改",()=>{
+      try{
+        showPreview(previewNodeBindingFrom(source.value,activeProcedureId,
+          model.node.id,binding.key,select.value));
+      }catch(error){message("Binding 未应用："+String(error?.message??error));}
+    },"preview-button");
+    preview.disabled=true;
+    select.addEventListener("change",()=>{preview.disabled=select.value===binding.value;});
+    body.append(preview);
+  }
+  body.append(el("p","small-edit-note",
+    "Binding 类型、操作参数契约和生产者输出结构尚未进行全 Package 验证。"));
+  return true;
+}
+
 function addNodeDeleteEditor(model){
   const options=deleteNodeOptions(source.value,activeProcedureId,model.node.id);
   if(!options)return false;
@@ -925,7 +995,9 @@ function routeFriendlySource(routeSource){
 function renderNodeJourney(model) {
   const node=model.node;
   addNodeRenameEditor(model);
-  addNodeAttributeEditor(model);
+  const attributes=currentNodeAttributes(node.id);
+  addNodeOperatorEditor(model,attributes);
+  addNodeBindingEditors(model,attributes);
   addNodeDeleteEditor(model);
   if(model.prepare.phase || model.prepare.routes.length){
     const body=journeyStage(1,"准备",
@@ -984,7 +1056,9 @@ function renderInspector() {
   const editable=Boolean(route&&(eligibleGraphRouteTargets(route.id).length||
     insertNodeOptions(source.value,activeProcedureId,route.id,
       packagePredicateSource(),activePackage?.name)))||
-    Boolean(model&&(deleteNodeOptions(source.value,activeProcedureId,model.node.id)||
+    Boolean(model&&((currentNodeAttributes(model.node.id)?.operator||
+      currentNodeAttributes(model.node.id)?.bindings?.length)||
+      deleteNodeOptions(source.value,activeProcedureId,model.node.id)||
       nodeRenameAvailable(source.value,activeProcedureId,model.node.id)||
       verifyNodeChoices(model.node.id).length||
       (activePackage?.name==="establish-pdu-session"&&
@@ -1185,6 +1259,11 @@ $("applyPatch").addEventListener("click", () => {
         packagePredicateSource(),activePackage?.name);
     else if(pendingPatch.type==="DeleteNode")
       nextSource=applyNodeDelete(source.value,pendingPatch);
+    else if(pendingPatch.type==="SetNodeOperatorValue")
+      nextSource=applyNodeOperatorValue(source.value,pendingPatch,
+        packagePredicateSource(),activePackage?.name);
+    else if(pendingPatch.type==="SetNodeBindingFrom")
+      nextSource=applyNodeBindingFrom(source.value,pendingPatch);
     else throw new Error("未知的属性 Patch 类型");
     if(pendingPatch.type==="RenameNode"&&selection?.kind==="node"&&
        activeProcedureId===pendingPatch.procedureId&&selection.id===pendingPatch.nodeId)
