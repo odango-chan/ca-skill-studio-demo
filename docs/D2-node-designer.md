@@ -1,6 +1,6 @@
 # D2 Node Designer · source-backed authoring
 
-Status: A1 first vertical slice; not a complete Node Designer.
+Status: D2-A1/A2/A3 bounded source-backed authoring implemented; D2 overall remains incomplete.
 
 ## Architecture
 

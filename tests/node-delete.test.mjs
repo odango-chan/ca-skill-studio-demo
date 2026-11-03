@@ -29,6 +29,31 @@ test("A3 merge a FAILED terminal, repairing every incoming Route",()=>{
   assert.match(preview.diff,/-      strategy-conflict:/);
   assert.equal(ensure,read("ensure-pdu-session"));
 });
+
+test("A3 retargets multiple independent inbound Routes before deleting the terminal",()=>{
+  const p=ensureModel.procedure;
+  const inbound=p.routes.filter(r=>r.target==="failed");
+  assert.ok(inbound.length>2);
+  assert.deepEqual(deleteNodeOptions(ensure,p.name,"failed").targets,
+    ["strategy-conflict"]);
+  const preview=previewNodeDelete(ensure,p.name,"failed","strategy-conflict");
+  const after=projectWorkspace(applyNodeDelete(ensure,preview)).procedure;
+  assert.equal(after.nodes.length,p.nodes.length-1);
+  assert.equal(after.routes.length,p.routes.length);
+  assert.equal(after.start,p.start);
+  for(const route of inbound)
+    assert.equal(after.routes.find(x=>x.id===route.id)?.target,"strategy-conflict");
+});
+test("A3 preserves comments associated with the following Node",()=>{
+  const changed=ensure.replace("      failed:",
+    "      # preserve with the following terminal\n      failed:");
+  assert.equal(projectWorkspace(changed).state,"READY");
+  const preview=previewNodeDelete(changed,"ensure-session",
+    "strategy-conflict","failed");
+  const after=applyNodeDelete(changed,preview);
+  assert.match(after,/# preserve with the following terminal\n      failed:/);
+  assert.equal(projectWorkspace(after).state,"READY");
+});
 test("A3 bypass an inserted single-outcome call, round-tripping both YAML and graph",()=>{
   const p=ensureModel.procedure;
   const route=p.routes.find(r=>r.source==="observe-target-session"&&r.outcome==="FAIL");
