@@ -39,7 +39,8 @@ test("one toolbar reuses Visual for Markdown and hides unsupported modes",()=>{
   assert.match(app,/editorModes"\)\.hidden=!hasVisual/);
   assert.match(app,/graphPane"\)\.hidden=!isGraph/);
   assert.match(app,/markdownPane"\)\.hidden=viewKind!=="markdown"/);
-  assert.match(app,/mode-visual"\)\.textContent=viewKind==="markdown"\?"预览":"Visual"/);
+  assert.match(app,/setIconLabel\(\$\("mode-visual"\),viewKind==="markdown"\?"file-text":"network"/);
+  assert.match(app,/viewKind==="markdown"\?"预览":"Visual"/);
   assert.match(app,/if\(!hasVisual&&mode!=="source"\)setMode\("source"\)/);
 });
 test("projection failure clears stale graph and preserves diagnostics and Source",()=>{

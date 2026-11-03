@@ -24,7 +24,8 @@ test("Procedure navigation is parented immediately under its procedure.yaml entr
   assert.match(app,/parent\.appendChild\(row\)/);
 });
 test("File row and Procedure subtree have separate click/collapse controls and accessible state",()=>{
-  assert.match(app,/const toggle=button\(expanded\?"▾":"▸"/);
+  assert.match(app,/const toggle=button\("",\(\)=>\{/);
+  assert.match(app,/setIconOnly\(toggle,expanded\?"chevron-down":"chevron-right"\)/);
   assert.match(app,/toggle\.setAttribute\("aria-expanded",String\(expanded\)\)/);
   assert.match(app,/toggle\.setAttribute\("aria-controls","procedureTree"\)/);
   assert.match(app,/toggle\.disabled=current&&projection\?\.state!=="READY"/);
