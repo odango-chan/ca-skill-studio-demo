@@ -1,5 +1,7 @@
 import { layoutProcedure } from "./graph.mjs";
-import { layoutProcedureELK } from "./layout.mjs";
+import { layoutProcedureELK,selectGraphScope } from "./layout.mjs";
+import {detailedLayoutAllowed} from "./graph-scale.mjs";
+import {auditPackageWorkspace} from "./package-audit.mjs";
 import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
 import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./workbench.mjs";
@@ -61,6 +63,7 @@ let viewKind = "source";
 let projectedText = null;
 let history = createEditorHistory("");
 let pendingPatch = null;
+let packageDiagnostics = [];
 let inspectorOpen = false;
 let explorerOpen = true;
 const expandedAssetFolders=new Set(["assurance","schemas","scripts"]);
@@ -112,9 +115,19 @@ function scheduleELKLayout(wait=0, autoFit=false) {
   const direction=layoutDirection;
   const focus=neighborView && selection?.kind==="node" ? selection.id : null;
   const filtered=Boolean(focus);
-  const fallback=layoutProcedure(proc,direction);
-  graph={...fallback, visibleNodes:proc.nodes, visibleRoutes:proc.routes, isFiltered:false};
+  const scope=selectGraphScope(proc,focus,filtered);
+  const basic=scope.isFiltered
+    ? {...proc,start:focus,nodes:scope.nodes,routes:scope.routes}
+    : proc;
+  const fallback=layoutProcedure(basic,direction);
+  graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
+    isFiltered:scope.isFiltered};
   renderGraph();
+  if(!detailedLayoutAllowed(scope)){
+    setText("layoutStatus","大型流程 · 基础布局（可使用邻居视图）");
+    if(autoFit || scope.isFiltered)requestAnimationFrame(fit);
+    return;
+  }
   setText("layoutStatus","正在自动布局…");
   layoutTimer=setTimeout(async()=>{
     layoutTimer=null;
@@ -131,7 +144,8 @@ function scheduleELKLayout(wait=0, autoFit=false) {
       else if(selection?.kind==="node")centerNode(selection.id);
     }catch(error){
       if(ticket!==layoutTicket)return;
-      graph={...fallback,visibleNodes:proc.nodes,visibleRoutes:proc.routes,isFiltered:false};
+      graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
+        isFiltered:scope.isFiltered};
       renderGraph();
       setText("layoutStatus","自动布局失败 · 使用基础布局");
       message("自动布局失败，已使用基础画布："+String(error?.message??error));
@@ -307,6 +321,11 @@ function refresh(refit = false) {
   const parsed=isProcedure ? projectWorkspace(text)
     : {state:"SOURCE_ONLY",diagnostics:[],entry:null,procedures:new Map(),procedure:null};
   projection=parsed;
+  // A5 package hints are advisory; a broken Procedure uses the existing
+  // authoritative Source parser diagnosis instead of duplicating it here.
+  packageDiagnostics=parsed.state==="UNAVAILABLE"?[]:
+    auditPackageWorkspace(activePackage,
+      activeFilePath==="assurance/procedure.yaml"?text:null);
   if (parsed.state === "READY") {
     lastWorkspace = parsed;
     if (!activeProcedureId || !parsed.procedures.has(activeProcedureId)) {
@@ -1085,14 +1104,23 @@ function renderInspector() {
 }
 
 function renderProblems() {
-  const items=projection?.diagnostics??[];
+  const errors=projection?.diagnostics??[];
+  const items=[...errors,...packageDiagnostics];
   problems.hidden=items.length===0;
   problems.replaceChildren();
   if(!items.length)return;
-  problems.appendChild(el("strong","","问题 · "+items.length));
+  problems.appendChild(el("strong","",
+    errors.length?"问题 · "+errors.length+" / 编辑期提示 · "+packageDiagnostics.length:
+      "编辑期提示 · "+packageDiagnostics.length));
   for(const item of items){
-    problems.appendChild(button("L"+item.line+" · "+item.message,
-      ()=>lineJump(item.line)));
+    const path=item.path||activeFilePath;
+    const label=(item.code?"⚠ ":"")+(path?path+" · ":"")+
+      "L"+item.line+" · "+item.message;
+    problems.appendChild(button(label,()=>{
+      if(path&&activePackage?.files.has(path)&&path!==activeFilePath)
+        switchFile(path);
+      lineJump(item.line);
+    }));
   }
 }
 function selectNode(id) {
@@ -1230,7 +1258,15 @@ function closePreview() {
 function showPreview(preview) {
   pendingPatch = preview;
   setText("patchDiff", preview.diff);
-  setText("patchSummary",preview.summary??(preview.routeId+" · "+preview.oldTarget+" → "+preview.newTarget));
+  const baseSummary=preview.summary??(preview.routeId+" · "+preview.oldTarget+" → "+preview.newTarget);
+  let added=0;
+  if(activeFilePath==="assurance/procedure.yaml"&&
+     typeof preview.candidateSource==="string"){
+    const after=auditPackageWorkspace(activePackage,preview.candidateSource);
+    const old=new Set(packageDiagnostics.map(d=>d.code+"|"+d.message));
+    added=after.filter(d=>!old.has(d.code+"|"+d.message)).length;
+  }
+  setText("patchSummary",baseSummary+(added?" · 新增 "+added+" 条编辑期提示（非 Runtime 校验）":""));
   $("patchDialog").hidden = false;
   $("applyPatch").focus();
 }
