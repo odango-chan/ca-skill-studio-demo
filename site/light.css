@@ -1233,3 +1233,20 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   .compact-toolbar button .studio-icon{width:15px;height:15px}
   .segmented button{gap:4px}
 }
+
+
+/* The disclosure hierarchy uses the same SVG chevron, not font arrows.
+   Native <summary> keyboard activation and expanded state are unchanged. */
+.asset-folder-title::before,.asset-folder-group[open]>.asset-folder-title::before,
+.node-disclosure-heading::before,.explorer-nodes[open] .node-disclosure-heading::before,
+.sample-picker summary::before,.sample-picker[open] summary::before{
+  content:none!important;display:none!important}
+.asset-folder-title,.node-disclosure-heading,.sample-picker summary{
+  display:flex;align-items:center;gap:6px}
+.disclosure-chevron{
+  flex:0 0 13px;width:13px;height:13px;color:#899aab;
+  transform:rotate(0deg);transition:transform .12s ease}
+.asset-folder-group[open]>.asset-folder-title>.disclosure-chevron,
+.explorer-nodes[open] .node-disclosure-heading>.disclosure-chevron,
+.sample-picker[open] summary>.disclosure-chevron{transform:rotate(90deg)}
+.node-disclosure-heading .count{margin-left:auto}

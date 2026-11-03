@@ -197,6 +197,12 @@ function decorateToolbar(){
   layout.prepend(createIcon(document,"workflow",{size:15}));
   const search=$("search").parentElement.querySelector("span");
   search.replaceChildren(createIcon(document,"search"));
+  for(const element of [
+    $("nodeOutlineDisclosure").querySelector("summary"),
+    document.querySelector(".sample-picker summary")
+  ])element.prepend(createIcon(document,"chevron-right",{
+    size:13,className:"disclosure-chevron"
+  }));
 }
 decorateToolbar();
 function setText(id, text) { $(id).textContent = text; }
@@ -460,7 +466,9 @@ function renderAssetNavigation(){
         disclosure.open=expandedAssetFolders.has(folderPath);
         const summary=el("summary","asset-folder-title");
         summary.title=folderPath+"/";
-        summary.append(createFolderIcon(document),el("span","asset-folder-label",name+"/"));
+        summary.append(
+          createIcon(document,"chevron-right",{size:13,className:"disclosure-chevron"}),
+          createFolderIcon(document),el("span","asset-folder-label",name+"/"));
         const children=el("div","asset-folder-children");
         disclosure.append(summary,children);
         disclosure.addEventListener("toggle",()=>{
