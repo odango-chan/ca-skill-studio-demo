@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#f5f7fb">
   <title>ConnectionAgent — SKILL Studio</title>
   <link rel="stylesheet" href="./studio.css">
+  <link rel="stylesheet" href="./app.css">
   <link rel="stylesheet" href="./light.css">
 </head>
 <body>
@@ -86,10 +87,7 @@
       </div>
       <div id="editorBody" class="editor-body" data-mode="visual">
         <div id="graphPane" class="graph-pane" data-labels="key">
-          <svg id="canvas" aria-label="Procedure control flow" role="img">
-            <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#9cb0c7"></path></marker></defs>
-            <g id="world"></g>
-          </svg>
+          <div id="reactFlowRoot" class="procedure-flow-root" aria-label="Procedure Designer 交互画布"></div>
           <div id="zoomViewOptions" class="canvas-zoom-tools" role="group" aria-label="缩放流程图">
             <button id="zoomIn" type="button" aria-label="放大流程图" title="放大">+</button>
             <button id="zoomOut" type="button" aria-label="缩小流程图" title="缩小">−</button>

@@ -943,3 +943,132 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
     letter-spacing:0;
   }
 }
+
+
+/* D1 Procedure Designer: React Flow owns the graph only. Source/Inspector stay vanilla. */
+.procedure-flow-root{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+}
+.procedure-flow,
+.procedure-flow .react-flow__renderer{
+  width:100%;
+  height:100%;
+}
+.procedure-flow .react-flow__pane{
+  cursor:grab;
+}
+.procedure-flow .react-flow__pane:active{
+  cursor:grabbing;
+}
+.procedure-flow .react-flow__node{
+  width:238px;
+  height:80px;
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.procedure-flow .react-flow__node:focus-visible{
+  outline:2px solid #139381;
+  outline-offset:4px;
+  border-radius:14px;
+}
+.designer-node{
+  position:relative;
+  width:238px;
+  height:80px;
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:5px;
+  padding:10px 15px;
+  border:1px solid #cedde9;
+  border-radius:12px;
+  background:#fff;
+  box-shadow:0 3px 11px #27436017;
+  color:#283d53;
+  line-height:1.2;
+  transition:border-color .1s,box-shadow .1s;
+}
+.designer-node:hover{
+  border-color:#88bdc1;
+  box-shadow:0 5px 14px #27436025;
+}
+.designer-node.is-selected{
+  border:2px solid #0c9785;
+  background:#f6fdf9;
+  box-shadow:0 0 0 4px #bbebe040,0 4px 16px #17665320;
+}
+.designer-node.is-start{
+  border-left:4px solid #0d9b84;
+}
+.designer-node.is-terminal{
+  border-color:#d8cfc4;
+  background:#fbf8f4;
+}
+.designer-node-kind{
+  display:block;
+  color:#13816f;
+  font:700 10px/1.25 ui-monospace,Consolas,monospace;
+  letter-spacing:.07em;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.designer-node.is-terminal .designer-node-kind{color:#856b55}
+.designer-node-id{
+  display:block;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:#2b4054;font-size:12px;font-weight:670;
+}
+.designer-node-meta{
+  display:block;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:#7a8ea0;
+  font:10px/1.2 ui-monospace,Consolas,monospace;
+}
+.procedure-flow .designer-port{
+  width:9px;height:9px;
+  border:2px solid #fff;
+  background:#91b6c2;
+  box-shadow:0 0 0 1px #7ba0ae;
+}
+.procedure-flow .designer-edge{
+  fill:none;
+  stroke:#a0b8c8;
+  stroke-width:1.9;
+}
+.procedure-flow .designer-edge.is-primary{
+  stroke:#2d9d87;
+  stroke-width:2.1;
+}
+.procedure-flow .designer-edge.is-selected{
+  stroke:#0b8d7b;
+  stroke-width:3;
+}
+.designer-route-label{
+  position:absolute;
+  pointer-events:none;
+  max-width:250px;
+  padding:4px 8px;
+  border:1px solid #dce6ed;
+  border-radius:6px;
+  background:#fffffff0;
+  color:#506d81;
+  white-space:nowrap;
+  font:600 10px/1.2 ui-monospace,Consolas,monospace;
+  box-shadow:0 1px 4px #1b41571b;
+}
+.designer-route-label.is-selected{
+  border-color:#8dcebe;
+  background:#eaf9f2;
+  color:#077f70;
+}
+.procedure-flow .react-flow__attribution{
+  font-size:8px;
+  opacity:.7;
+}

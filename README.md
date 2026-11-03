@@ -133,3 +133,9 @@ The previous implementation used `explorerPanel.hidden=true` and relied on a sep
 - On first load the layout select and the ELK renderer use `DOWN`, so Procedures flow from top to bottom. Users can still select `RIGHT` for horizontal layout; this remains a visual option only and never rewrites the SKILL source.
 - The basic fallback layout now honors the chosen direction instead of flashing a horizontal-only graph while ELK initializes or fails. The SVG fallback also draws the fallback edge paths in the matching direction.
 - Current renderer remains dependency-light DOM SVG plus ELK layered (`elkjs`); React Flow is not installed. For a future general-purpose Procedure Designer, evaluate `@xyflow/react` for node/edge interaction while retaining ELK for layout and YAML Source Patch as the editing authority. Do not migrate just to change layout direction.
+
+## Procedure Designer D1 · React Flow canvas
+
+完整迁移界限及 CreatedSession 验收依据见 [D1 Procedure Designer](docs/D1-procedure-designer.md)。D1 使用 React Flow + TSX 替换原生 SVG 画布，ELK 继续负责默认垂直的自动布局；文件树、Source/Preview/Split、Inspector、CST/AST、Typed Patch、Undo/Redo 与 ZIP 均保持原有实现。React Flow 的节点和边不是另一份业务权威模型。CreatedSession Root 以 17 Node / 65 Outcome 为回归基线。
+
+此阶段支持 Node、Route 选中与子 Procedure 钻取；重新连接现有 Route 仍需要通过现有资格检查和 YAML Diff 才能生效。新建/删除 Node、创建 Route、修改 DSL 及持久化拖拽坐标不属于 D1，不能以图形变化假装修改了 Skill。真实浏览器 E2E 仍是单独验收项。

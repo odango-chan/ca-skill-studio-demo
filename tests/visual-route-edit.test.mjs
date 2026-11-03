@@ -63,18 +63,17 @@ test("graph targets fail closed for unrelated package and unsupported Route",()=
   assert.deepEqual(visualRouteTargets({...ctx,routeId:created.procedure.routes[0].id,
     packageName:"unknown-skill"}),[]);
 });
-test("on-canvas drag is preview-only, uses hit-tested Node IDs and preserves the existing apply gate",()=>{
+test("React Flow reconnect remains preview-only and enforces existing target eligibility",()=>{
   const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
-  assert.match(app,/class:"route-rewire-handle"/);
-  assert.match(app,/"data-node-id":node\.id/);
-  assert.match(app,/document\.elementFromPoint\(event\.clientX,event\.clientY\)/);
-  assert.match(app,/dropTargetAllowed\(drag\.targets,drag\.oldTarget,target\)/);
-  assert.match(app,/showPreview\(previewVisualRouteEdit\(currentRouteEditContext\(drag\.routeId\),target\)\)/);
-  assert.match(app,/if\(source\.value!==drag\.revision/);
-  assert.match(app,/svg\.setPointerCapture\(event\.pointerId\)/);
-  assert.match(app,/svg\.addEventListener\("pointercancel"/);
+  const canvas=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  assert.match(canvas,/onReconnect=\{/);
+  assert.match(canvas,/resolveReconnectedRoute\(edge\.data\?\.bundle,selectionId\)/);
+  assert.match(app,/dropTargetAllowed\(targets,route\.target,targetId\)/);
+  assert.match(app,/showPreview\(previewVisualRouteEdit\(currentRouteEditContext\(route\.id\),targetId\)\)/);
+  assert.match(canvas,/nodesDraggable=\{false\}/);
+  assert.match(canvas,/deleteKeyCode=\{null\}/);
   assert.match(app,/history\.record\(nextSource\)/);
-  assert.doesNotMatch(app,/source\.value\s*=\s*drag\.newTarget/);
+  assert.doesNotMatch(canvas,/candidateSource\s*=/);
 });
 test("NODES owns the remaining left column, with its own scroll and no fixed 220px cap",()=>{
   const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
@@ -83,5 +82,5 @@ test("NODES owns the remaining left column, with its own scroll and no fixed 220
   assert.match(css,/\.workbench \.explorer \.explorer-nodes\[open\] \.outline\s*\{[^}]*max-height:none/s);
   assert.match(css,/overscroll-behavior:contain/);
   assert.match(css,/@media\(max-width:980px\)/);
-  assert.match(css,/\.route-reroute-ghost/);
+  assert.match(css,/\.procedure-flow \.designer-edge/);
 });

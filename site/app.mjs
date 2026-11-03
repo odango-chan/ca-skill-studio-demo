@@ -9,13 +9,13 @@ import {highlightSource} from "./highlight.mjs";
 import {renderMarkdown} from "./markdown-preview.mjs";
 import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from "./view-policy.mjs";
 import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
+import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
 const $ = (id) => document.getElementById(id);
-const SVG_NS = "http://www.w3.org/2000/svg";
 const source = $("source");
 const sourceHighlight=$("sourceHighlight");
 const sourceEditor=$("sourceEditor");
@@ -33,8 +33,6 @@ function refreshHighlight(){
   syncHighlightScroll();
 }
 const graphPane = $("graphPane");
-const svg = $("canvas");
-const world = $("world");
 const nodeOutline = $("nodeOutline");
 const inspector = $("inspector");
 const problems = $("problems");
@@ -54,9 +52,6 @@ let graph = null;
 let selection = null;
 let mode = "visual";
 let viewKind = "source";
-let camera = { x: 0, y: 0, scale: 1 };
-let dragging = null;
-let rerouteDrag = null;
 let projectedText = null;
 let history = createEditorHistory("");
 let pendingPatch = null;
@@ -70,22 +65,39 @@ let neighborView = false;
 let layoutTicket = 0;
 let layoutTimer = null;
 
+// React Flow is confined to the Procedure canvas. The existing Source, Inspector,
+// file workspace and Typed Patch remain the only editing/state authority.
+const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
+  onNodeSelect:id=>selectNode(id),
+  onNodeDoubleClick:id=>{
+    const node=lastGood?.nodes.find(item=>item.id===id);
+    if(node?.children?.length===1)enterProcedure(node.children[0].procedure);
+  },
+  onEdgeSelect:bundle=>chooseEdgeRoute(bundle),
+  onReconnect:(routeId,sourceId,targetId)=>{
+    if(projection?.state!=="READY"||!lastGood)return;
+    const route=lastGood.routes.find(item=>item.id===routeId);
+    if(!route||route.source!==sourceId)return;
+    const targets=eligibleGraphRouteTargets(route.id);
+    if(!dropTargetAllowed(targets,route.target,targetId)){
+      message("未应用：目标节点不在允许的 Route 编辑范围内。");return;
+    }
+    try{showPreview(previewVisualRouteEdit(currentRouteEditContext(route.id),targetId));}
+    catch(error){message("Route 修改未应用："+String(error?.message??error));}
+  },
+  onAmbiguousReconnect:()=>message("该连线包含多个 Outcome。请先选中具体 Route 再重连。"),
+  onCreateUnsupported:()=>message("D1 仅迁移画布；新建 Route 将在 D3 引入 YAML Patch 后开放。"),
+  onPaneClick:()=>{if(selection)clearSelection();}
+});
+
 function invalidateLayout() {
-  cancelRouteDrag();
   layoutTicket++;
   if (layoutTimer !== null) {
     clearTimeout(layoutTimer);
     layoutTimer = null;
   }
 }
-function centerNode(id) {
-  const p=graph?.positions.get(id);
-  if (!p) return;
-  const rect=graphPane.getBoundingClientRect();
-  camera.x=rect.width/2-(p.x+119)*camera.scale;
-  camera.y=rect.height/2-(p.y+40)*camera.scale;
-  transform();
-}
+function centerNode(id) { flowCanvas.center(id); }
 function scheduleELKLayout(wait=0, autoFit=false) {
   invalidateLayout();
   if (projection?.state!=="READY" || !lastGood) return;
@@ -132,12 +144,6 @@ function button(label, handler, className = "") {
   return el;
 }
 function setText(id, text) { $(id).textContent = text; }
-function svgEl(name, attrs = {}, text) {
-  const element = document.createElementNS(SVG_NS, name);
-  Object.entries(attrs).forEach(([key, value]) => element.setAttribute(key, String(value)));
-  if (text !== undefined) element.textContent = String(text);
-  return element;
-}
 function message(text) { setText("hint", text); }
 
 function updatePanelControls(){
@@ -192,6 +198,7 @@ $("showAllLabels").addEventListener("click",()=>{
   $("showAllLabels").setAttribute("aria-pressed",String(showAllLabels));
   $("showAllLabels").textContent=showAllLabels?"只显示重点 Route 标签":"显示全部 Route 标签";
   graphPane.dataset.labels=showAllLabels?"all":"key";
+  renderGraph();
 });
 function clearSelection() {
   selection=null;
@@ -893,120 +900,11 @@ function selectRoute(id) {
   renderInspector();
   renderGraph();
 }
-function transform() { world.setAttribute("transform", "translate(" + camera.x + "," + camera.y + ") scale(" + camera.scale + ")"); }
-function fit() {
-  if (!graph) return;
-  const rect = graphPane.getBoundingClientRect();
-  if (rect.width < 80 || rect.height < 80) return;
-  const scale = Math.min(1.25, Math.max(0.035, Math.min((rect.width - 60) / graph.width, (rect.height - 60) / graph.height)));
-  camera = { scale, x: (rect.width - graph.width * scale) / 2, y: (rect.height - graph.height * scale) / 2 };
-  transform();
-}
-function zoomTo(scale, x = svg.clientWidth / 2, y = svg.clientHeight / 2) {
-  const updated = Math.min(2.5, Math.max(0.035, scale));
-  const ratio = updated / camera.scale;
-  camera.x = x - (x - camera.x) * ratio;
-  camera.y = y - (y - camera.y) * ratio;
-  camera.scale = updated;
-  transform();
-}
-$("zoomIn").addEventListener("click", () => zoomTo(camera.scale * 1.18));
-$("zoomOut").addEventListener("click", () => zoomTo(camera.scale / 1.18));
+function fit(){ if(graph&&lastGood)flowCanvas.fit(); }
+$("zoomIn").addEventListener("click",()=>flowCanvas.zoomIn());
+$("zoomOut").addEventListener("click",()=>flowCanvas.zoomOut());
 $("fit").addEventListener("click",fit);
-svg.addEventListener("wheel", event => {
-  event.preventDefault();
-  const rect = svg.getBoundingClientRect();
-  zoomTo(camera.scale * (event.deltaY < 0 ? 1.12 : 0.88), event.clientX - rect.left, event.clientY - rect.top);
-}, { passive: false });
-function graphPoint(clientX,clientY){
-  const rect=svg.getBoundingClientRect();
-  return {
-    x:(clientX-rect.left-camera.x)/camera.scale,
-    y:(clientY-rect.top-camera.y)/camera.scale
-  };
-}
-function cancelRouteDrag(){
-  if(!rerouteDrag)return;
-  const state=rerouteDrag;
-  rerouteDrag=null;
-  state.ghost.remove();
-  try{
-    if(svg.hasPointerCapture(state.pointerId))
-      svg.releasePointerCapture(state.pointerId);
-  }catch{ /* Capture may already have ended. */ }
-  svg.classList.remove("is-rerouting");
-}
-function beginRouteDrag(event,route,point,targets){
-  if(event.button!==0||rerouteDrag||projection?.state!=="READY")return;
-  event.preventDefault();
-  event.stopPropagation();
-  const ghost=svgEl("path",{
-    class:"route-reroute-ghost",d:"M "+point.x+" "+point.y+
-      " L "+point.x+" "+point.y,"marker-end":"url(#arrowhead)"
-  });
-  world.appendChild(ghost);
-  rerouteDrag={
-    pointerId:event.pointerId,ghost,point,
-    routeId:route.id,oldTarget:route.target,
-    procedureId:activeProcedureId,revision:source.value,
-    targets:[...targets]
-  };
-  dragging=null;
-  svg.classList.add("is-rerouting");
-  svg.setPointerCapture(event.pointerId);
-}
-function finishRouteDrag(event){
-  const drag=rerouteDrag;
-  if(!drag)return;
-  const dropped=document.elementFromPoint(event.clientX,event.clientY);
-  const target=dropped?.closest?.('[data-selectable="node"]')?.getAttribute("data-node-id");
-  cancelRouteDrag();
-  if(!dropTargetAllowed(drag.targets,drag.oldTarget,target)){
-    message("未修改 Route：请拖到允许的其他目标节点，也可在右侧属性中选择。");
-    return;
-  }
-  if(source.value!==drag.revision||activeProcedureId!==drag.procedureId||
-     selection?.kind!=="route"||selection.id!==drag.routeId||
-     projection?.state!=="READY"){
-    message("Source 或选择已变化，请重新选择 Route。");
-    return;
-  }
-  try{
-    showPreview(previewVisualRouteEdit(currentRouteEditContext(drag.routeId),target));
-  }catch(error){
-    message("Route 修改未应用："+String(error?.message??error));
-  }
-}
-svg.addEventListener("pointerdown", event => {
-  if(event.button!==0 || rerouteDrag || event.target.closest("[data-selectable]"))return;
-  dragging={x:event.clientX,y:event.clientY,startX:camera.x,startY:camera.y};
-  svg.setPointerCapture(event.pointerId);
-});
-svg.addEventListener("pointermove", event => {
-  if(rerouteDrag){
-    if(event.pointerId!==rerouteDrag.pointerId)return;
-    const next=graphPoint(event.clientX,event.clientY);
-    rerouteDrag.ghost.setAttribute("d","M "+rerouteDrag.point.x+" "+
-      rerouteDrag.point.y+" L "+next.x+" "+next.y);
-    return;
-  }
-  if(!dragging)return;
-  camera.x=dragging.startX+event.clientX-dragging.x;
-  camera.y=dragging.startY+event.clientY-dragging.y;
-  transform();
-});
-svg.addEventListener("pointerup", event => {
-  if(rerouteDrag && event.pointerId===rerouteDrag.pointerId){
-    finishRouteDrag(event);
-    return;
-  }
-  dragging=null;
-});
-svg.addEventListener("pointercancel",()=>{
-  dragging=null;
-  cancelRouteDrag();
-});
-window.addEventListener("resize", () => { if (mode !== "source") fit(); });
+window.addEventListener("resize",()=>{if(mode!=="source")fit();});
 $("layoutDirection").addEventListener("change", event=>{
   const value=event.currentTarget.value;
   if(value!=="RIGHT"&&value!=="DOWN")return;
@@ -1029,95 +927,7 @@ function chooseEdgeRoute(bundle) {
 
 
 function renderGraph() {
-  cancelRouteDrag();
-  world.replaceChildren();
-  if (!graph || !lastGood) return;
-  const edgesGroup = svgEl("g", { class: "edges" });
-  for (const bundle of graph.bundles) {
-    const a = graph.positions.get(bundle.source);
-    const b = graph.positions.get(bundle.target);
-    if (!a || !b) continue;
-    const selectedRoute=bundle.routes.find(r=>selection?.kind==="route"&&selection.id===r.id);
-    const selected=Boolean(selectedRoute);
-    const vertical=graph.direction==="DOWN";
-    const reverse=vertical ? b.y<=a.y : b.x<=a.x;
-    const nodeWidth=graph.engine==="ELK layered"?238:222;
-    const nodeHeight=graph.engine==="ELK layered"?80:74;
-    const sx=vertical?a.x+nodeWidth/2:a.x+nodeWidth;
-    const sy=vertical?a.y+nodeHeight:a.y+nodeHeight/2;
-    const tx=vertical?b.x+nodeWidth/2:(reverse?b.x+nodeWidth/2:b.x);
-    const ty=vertical?b.y:b.y+nodeHeight/2;
-    const bend=vertical?
-      (reverse?-1:1)*Math.max(45,Math.abs(ty-sy)*.5):
-      reverse?Math.max(110,Math.abs(tx-sx)*.5):Math.max(50,(tx-sx)*.52);
-    const d=bundle.path || (vertical?
-      ("M "+sx+" "+sy+" C "+sx+" "+(sy+bend)+", "+tx+" "+(ty-bend)+", "+tx+" "+ty):
-      ("M "+sx+" "+sy+" C "+(sx+bend)+" "+sy+", "+(tx-bend)+" "+ty+", "+tx+" "+ty));
-    const keyRoute=bundle.outcomes.some(o=>["PASS","SUCCEEDED"].includes(o));
-    const edgeClass="edge"+(selected?" selected":"")+(keyRoute?"":" secondary-label");
-    const group = svgEl("g", { class: edgeClass, "data-selectable": "route", tabindex: "0", role: "button", "aria-label": bundle.source + " to " + bundle.target + ": " + bundle.outcomes.join(", ") });
-    group.appendChild(svgEl("path", { d, class: "edge-path", "marker-end": "url(#arrowhead)" }));
-    group.appendChild(svgEl("path", { d, class: "edge-hit" }));
-    const cx = bundle.label?.x ?? (sx + tx) / 2, cy = bundle.label?.y ?? ((sy + ty) / 2 - 8);
-    const phase=bundle.routeSource?.replace(".on","")??"operator";
-    const text = (phase==="operator"?"":phase+" · ")+bundle.outcomes.join(" / ");
-    const short = text.length > 34 ? text.slice(0, 31) + "…" : text;
-    group.appendChild(svgEl("rect", { x: cx - Math.max(33, short.length * 3.2 + 12), y: cy - 14, rx: 8, width: Math.max(66, short.length * 6.4 + 24), height: 23, class: "edge-label-bg" }));
-    group.appendChild(svgEl("text", { x: cx, y: cy + 2, "text-anchor": "middle", class: "edge-label" }, short));
-    group.appendChild(svgEl("title",{},
-      bundle.routes.map(r=>r.routeSource+" · "+r.outcome+" → "+r.target).join("\n")));
-    if(selectedRoute){
-      const targets=eligibleGraphRouteTargets(selectedRoute.id);
-      if(targets.some(target=>target!==selectedRoute.target)){
-        const handle=svgEl("g",{
-          class:"route-rewire-handle","data-selectable":"route-edit",
-          role:"button",tabindex:"0",
-          "aria-label":"拖动修改 "+selectedRoute.outcome+" Route 的目标节点"
-        });
-        const hx=cx,hy=cy-31;
-        handle.appendChild(svgEl("circle",{cx:hx,cy:hy,r:14,class:"rewire-grip"}));
-        handle.appendChild(svgEl("text",{
-          x:hx,y:hy+4,"text-anchor":"middle",class:"rewire-grip-label"
-        },"↗"));
-        handle.appendChild(svgEl("title",{},"拖动到其他节点，预览 Route Target 修改"));
-        handle.addEventListener("pointerdown",event=>
-          beginRouteDrag(event,selectedRoute,{x:sx,y:sy},targets));
-        handle.addEventListener("click",event=>event.stopPropagation());
-        handle.addEventListener("keydown",event=>{
-          if(event.key==="Enter"||event.key===" "){
-            event.preventDefault();event.stopPropagation();
-            selectRoute(selectedRoute.id);
-            message("可拖动 ↗ 到目标节点，或使用右侧 Route Target 下拉菜单。");
-          }
-        });
-        group.appendChild(handle);
-      }
-    }
-    group.addEventListener("click",()=>chooseEdgeRoute(bundle));
-    group.addEventListener("keydown",event=>{
-      if(event.key==="Enter"||event.key===" "){event.preventDefault();chooseEdgeRoute(bundle);}
-    });
-    edgesGroup.appendChild(group);
-  }
-  const nodesGroup = svgEl("g", { class: "nodes" });
-  for (const node of graph.visibleNodes??lastGood.nodes) {
-    const p = graph.positions.get(node.id);
-    const selected = selection?.kind === "node" && selection.id === node.id;
-    const classes = "node " + (node.operator === "terminal" ? "terminal " : "") + (selected ? "selected" : "");
-    const group = svgEl("g", { transform: "translate(" + p.x + "," + p.y + ")", class: classes, "data-selectable": "node", "data-node-id":node.id, tabindex: "0", role: "button", "aria-label": node.id + ", " + node.operator + " " + node.value });
-    group.appendChild(svgEl("rect", { width: graph.engine==="ELK layered"?238:222, height: graph.engine==="ELK layered"?80:74, rx: 13, class: "node-body" }));
-    group.appendChild(svgEl("text", { x: 13, y: 19, class: "node-kind" }, node.operator.toUpperCase() + (node.id === lastGood.start ? " · START" : "") + (node.children?.length ? " · CHILD ↗" : "")));
-    group.appendChild(svgEl("text", { x: 13, y: 40, class: "node-title" }, node.id.length > 28 ? node.id.slice(0, 27) + "…" : node.id));
-    group.appendChild(svgEl("text", { x: 13, y: 59, class: "node-meta" }, node.value.length > 30 ? node.value.slice(0, 29) + "…" : node.value));
-    group.addEventListener("click", () => selectNode(node.id));
-    group.addEventListener("dblclick", () => {
-      if (node.children?.length === 1) enterProcedure(node.children[0].procedure);
-    });
-    group.addEventListener("keydown", event => { if (event.key === "Enter") selectNode(node.id); });
-    nodesGroup.appendChild(group);
-  }
-  world.append(edgesGroup, nodesGroup);
-  transform();
+  flowCanvas.render(graph,lastGood,selection,showAllLabels);
 }
 function activateWorkspace(workspace,entry,origin="sample") {
   activePackage=workspace;

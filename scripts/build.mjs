@@ -22,6 +22,7 @@ await build({
   platform: "browser",
   format: "esm",
   target: ["es2022"],
+  loader: {".tsx":"tsx"},
   minify: true,
   legalComments: "none",
   logLevel: "info",

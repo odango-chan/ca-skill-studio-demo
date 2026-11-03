@@ -29,10 +29,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+      # One-time D1 bootstrap: resolve new React/React Flow dependencies and
+      # print an exact lock for pinning. Remove this step once lock is committed.
+      - name: Bootstrap pinned D1 dependency lock
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          node -e 'const fs=require("fs");console.log("D1_LOCK_BEGIN");console.log(fs.readFileSync("package-lock.json").toString("base64"));console.log("D1_LOCK_END")'
       - name: Install exact toolchain dependencies
         run: npm ci --no-audit --no-fund
       - name: Run YAML AST / CST regression tests
         run: npm test
+      - name: Check Procedure Designer TypeScript
+        run: npm run typecheck
       - name: Bundle browser site
         run: npm run build
       - name: Check static site and asset references
@@ -45,7 +53,7 @@ jobs:
           html = Path("dist/index.html").read_text(encoding="utf-8")
           assert html.lstrip().lower().startswith("<!doctype html>")
           HTMLParser().feed(html)
-          for asset in ("./studio.css", "./light.css", "./app.js",
+          for asset in ("./studio.css", "./light.css", "./app.css", "./app.js",
                         "./samples/ensure-pdu-session.procedure.yaml",
                         "./samples/establish-pdu-session.procedure.yaml",
                         "./samples/packages/ensure-pdu-session/SKILL.md",
@@ -62,6 +70,7 @@ jobs:
           assert 'src="./app.js"' in html
           assert 'href="./studio.css"' in html
           assert 'href="./light.css"' in html
+          assert 'href="./app.css"' in html
           assert not re.search(r'<script[^>]+src=["\']https?://', html, re.I)
           PY
       - name: Check JavaScript syntax
@@ -81,6 +90,8 @@ jobs:
           node --check site/markdown-preview.mjs
           node --check site/view-policy.mjs
           node --check site/visual-route-edit.mjs
+          node --check site/react-flow-projection.mjs
+          node --check tests/react-flow-migration.test.mjs
           node --check tests/visual-route-edit.test.mjs
           node --check tests/navigation-menu.test.mjs
           node --check tests/nested-procedure.test.mjs
