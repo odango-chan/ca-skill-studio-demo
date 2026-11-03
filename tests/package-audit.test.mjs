@@ -31,7 +31,7 @@ test("A5 checks Contract entry, PredicateSet skill and missing schema",()=>{
   w.files.get("assurance/contract.yaml").text=w.files.get("assurance/contract.yaml").text
     .replace("entryProcedure: ensure-session","entryProcedure: deleted-entry")
     .replace("name: ensure-pdu-session","name: wrong-skill")
-    .replace("skillType: executable","skillType: executable\n    inputs:\n      requestSchema: schemas/not-present.yaml");
+    .replace("skillType: executable","skillType: executable\n  inputs:\n    requestSchema: schemas/not-present.yaml");
   w.files.get("assurance/predicates.yaml").text=
     w.files.get("assurance/predicates.yaml").text.replace(
       "skill: ensure-pdu-session","skill: wrong-skill");
