@@ -1,0 +1,17 @@
+# Skill Studio 实施证据追溯
+
+**Status: Accepted · Date: 2026-11-03**
+
+`WORK` 回答 **现在到哪**；本页回答 **规范→代码→测试→何种证据**。下表不复制 owner Runtime 契约，也不把静态/Mock 宣告为 Live PASS。
+
+| WORK Scope | Canonical design / contract | Production / machine source | Focused tests | Acceptance / evidence |
+|---|---|---|---|---|
+| D1 React Flow + ELK、Existing Route Rewire | [Workbench](design/authoring-workbench.md)、[D1 Record](D1-procedure-designer.md) | `site/workspace.mjs`、`site/graph.mjs`、`site/layout.mjs`、`site/react-flow-projection.mjs`、`site/react-flow-canvas.tsx`、`site/visual-route-edit.mjs` | `tests/workspace.test.mjs`、`tests/graph.test.mjs`、`tests/layout.test.mjs`、`tests/react-flow-migration.test.mjs`、`tests/visual-route-edit.test.mjs` | [D1 Browser Record](D1-procedure-designer.md)、[main CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
+| D2 有界 Node Authoring | [D2 Record](D2-node-designer.md) | `site/node-designer.mjs`、`site/node-create.mjs`、`site/node-delete.mjs`、`site/node-attributes.mjs`、`site/app.mjs` | `tests/node-designer.test.mjs`、`tests/node-create.test.mjs`、`tests/node-delete.test.mjs`、`tests/node-attributes.test.mjs` | [PR #4](https://github.com/odango-chan/ca-skill-studio-demo/pull/4)、[Chromium/Unit CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605140297) |
+| D2 Editor Hints / Large Graph | [D2-A5](D2-node-designer.md) | `site/package-audit.mjs`、`site/graph-scale.mjs` | `tests/package-audit.test.mjs`、`tests/graph-scale.test.mjs` | [PR #4 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605140297) |
+| Sample Package, Source & Markdown / ZIP | [Workbench](design/authoring-workbench.md) | `site/sample-packages.mjs`、`site/samples/packages/`、`site/markdown-preview.mjs`、`site/zip.mjs` | `tests/package.test.mjs`、`tests/markdown-preview.test.mjs`、`tests/view-policy.test.mjs` | [main CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
+| Navigation / Icons | [Workbench](design/authoring-workbench.md) | `site/file-icons.mjs`、`site/icons.mjs`、`site/app.mjs`、`site/light.css` | `tests/file-icons.test.mjs`、`tests/navigation-menu.test.mjs`、`tests/nested-procedure.test.mjs`、`scripts/d1-interaction-smoke.mjs` | [PR #5 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41607922279)、[Pages Deploy](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41608219330) |
+| Docs governance | [DOCUMENTATION](DOCUMENTATION.md)、[AGENTS](../AGENTS.md) | `README.md`、`docs/WORK.md`、`docs/TRACEABILITY.md`、`docs/design/` | `tests/docs-governance.test.mjs`（新增文档 PR Gate） | [Issue #6](https://github.com/odango-chan/ca-skill-studio-demo/issues/6)、**NOT_RUN until PR CI** |
+| D3 Route Designer | [Proposed design](design/route-designer.md) | **NOT_STARTED** | **NOT_RUN** | [Issue #7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7) |
+
+任何 `IMPLEMENTED` 必须能够从该表定位到当前代码和测试；`PASS` 还需要有对应真实 Gate 与稳定证据 URL/仓内 Artifact。不得用 `/tmp` 或个人绝对路径作为唯一 durable locator。Code/Schema/Focused test/Acceptance 变化时，WORK 和 TRACEABILITY 在同 PR 内同步更新。
