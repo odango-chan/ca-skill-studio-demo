@@ -22,6 +22,8 @@ import {addRouteOutcomeOptions,previewAddRouteOutcome,applyAddRouteOutcome}
 import {routeOutcomeEditOptions,previewRenameRouteOutcome,
   previewDeleteRouteOutcome,applyRenameRouteOutcome,applyDeleteRouteOutcome}
   from "./route-mutate.mjs";
+import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
+  from "./route-connect.mjs";
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue,
  previewNodeBindingFrom,applyNodeBindingFrom} from "./node-attributes.mjs";
 import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
@@ -69,6 +71,7 @@ let viewKind = "source";
 let projectedText = null;
 let history = createEditorHistory("");
 let pendingPatch = null;
+let canvasRouteProposal = null; // UI-only intent, never a persisted graph edge
 let packageDiagnostics = [];
 let nodeEditorCache = null;
 let inspectorOpen = false;
@@ -102,8 +105,24 @@ const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
     catch(error){message("Route 修改未应用："+String(error?.message??error));}
   },
   onAmbiguousReconnect:()=>message("该连线包含多个 Outcome。请先选中具体 Route 再重连。"),
-  onCreateUnsupported:()=>message("D1 仅迁移画布；新建 Route 将在 D3 引入 YAML Patch 后开放。"),
-  onPaneClick:()=>{if(selection)clearSelection();}
+  onCreateRoute:connection=>{
+    if(projection?.state!=="READY"||!lastGood||
+       viewKind!=="procedure"||mode==="source")return;
+    try{
+      const intent=proposeCanvasRouteConnection({
+        source:source.value,procedureId:activeProcedureId,
+        sourceId:connection.source,targetId:connection.target,
+        sourceHandle:connection.sourceHandle,targetHandle:connection.targetHandle
+      });
+      canvasRouteProposal=intent;
+      selectNode(intent.sourceId);
+      message("连线只生成了提案；请在右侧选择 Outcome 并预览 Diff。");
+    }catch(error){
+      canvasRouteProposal=null;
+      message("新建 Route 未应用："+String(error?.message??error));
+    }
+  },
+  onPaneClick:()=>{if(canvasRouteProposal)return;if(selection)clearSelection();}
 });
 
 function invalidateLayout() {
@@ -271,6 +290,7 @@ $("showAllLabels").addEventListener("click",()=>{
   renderGraph();
 });
 function clearSelection() {
+  canvasRouteProposal=null;
   selection=null;
   renderOutline();
   renderProcedureNavigation();
@@ -341,6 +361,7 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
   source.value=text;
   history=historyState||createEditorHistory(text);
   closePreview();
+  canvasRouteProposal=null;
   selection = null;
   setInspectorOpen(false,false);
   $("search").value = "";
@@ -359,6 +380,9 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
 }
 function refresh(refit = false) {
   const text = source.value;
+  if(canvasRouteProposal && (canvasRouteProposal.baseSource!==text||
+    canvasRouteProposal.procedureId!==activeProcedureId))
+    canvasRouteProposal=null;
   refreshHighlight();
   const dirty = text !== initialText;
   $("fileStatus").classList.toggle("is-dirty",dirty);
@@ -438,6 +462,7 @@ source.addEventListener("input", () => {
 function enterProcedure(name) {
   if (projection?.state !== "READY" || !lastWorkspace?.procedures.has(name)) return;
   if (activeProcedureId === name) return;
+  canvasRouteProposal=null;
   activeProcedureId = name;
   lastGood = lastWorkspace.procedures.get(name);
   graph = layoutProcedure(lastGood);
@@ -979,6 +1004,40 @@ function addNodeBindingEditors(model,attributes){
   return true;
 }
 
+function addCanvasConnectionProposalEditor(model){
+  const intent=canvasRouteProposal;
+  if(!intent||intent.sourceId!==model.node.id||
+    intent.procedureId!==activeProcedureId||
+    intent.baseSource!==source.value)return false;
+  const body=section("画布连线提案","D3-A3 · operator.on");
+  body.appendChild(el("p","small-edit-note",
+    intent.sourceId+" → "+intent.targetId+
+    "。尚未修改 YAML；请明确选择此连线对应的 Outcome。" +
+    " 候选来自当前已观察 Source，不等于 Runtime 允许的结果集合。"));
+  const label=el("label","attribute-label","这条新连线的 Outcome");
+  const select=el("select","target-select");
+  select.setAttribute("aria-label","D3 画布连线 Outcome");
+  const placeholder=el("option","","请选择 Outcome");
+  placeholder.value="";select.append(placeholder);
+  for(const value of intent.outcomes){
+    const option=el("option","",value);option.value=value;select.append(option);
+  }
+  select.value="";label.append(select);body.append(label);
+  const preview=button("预览连线新增 Route",()=>{
+    try{
+      showPreview(previewCanvasRouteConnection(source.value,intent,select.value));
+    }catch(error){message("连线提案未应用："+String(error?.message??error));}
+  },"preview-button");
+  preview.disabled=true;
+  select.addEventListener("change",()=>{preview.disabled=!select.value;});
+  const cancel=button("放弃连线提案",()=>{
+    canvasRouteProposal=null;renderInspector();renderGraph();
+    message("连线提案已取消；YAML 未变化。");
+  },"");
+  body.append(preview,cancel);
+  return true;
+}
+
 function addRouteOutcomeEditor(model,options){
   if(!options?.outcomes?.length||!options?.targets?.length)return false;
   const body=section("新增 Outcome","D3-A1 · operator.on");
@@ -1185,6 +1244,7 @@ function renderNodeJourney(model,caps) {
   addNodeOperatorEditor(model,caps.attributes);
   addNodeBindingEditors(model,caps.attributes);
   addNodeDeleteEditor(model,caps.deletion);
+  addCanvasConnectionProposalEditor(model);
   addRouteOutcomeEditor(model,caps.newRoute);
   if(model.prepare.phase || model.prepare.routes.length){
     const body=journeyStage(1,"准备",
@@ -1300,6 +1360,8 @@ function renderProblems() {
 }
 function selectNode(id) {
   if(projection?.state!=="READY")return;
+  if(canvasRouteProposal&&canvasRouteProposal.sourceId!==id)
+    canvasRouteProposal=null;
   selection={kind:"node",id};
   setInspectorOpen(true,false);
   renderOutline();
@@ -1313,6 +1375,7 @@ function selectNode(id) {
 }
 function selectRoute(id) {
   if(projection?.state!=="READY")return;
+  canvasRouteProposal=null;
   selection={kind:"route",id};
   setInspectorOpen(true,false);
   renderOutline();
@@ -1347,7 +1410,10 @@ function chooseEdgeRoute(bundle) {
 
 
 function renderGraph() {
-  flowCanvas.render(graph,lastGood,selection,showAllLabels);
+  const sourceId=selection?.kind==="node"&&
+    nodeEditorCapabilities(selection.id).newRoute?.outcomes?.length
+    ? selection.id:null;
+  flowCanvas.render(graph,lastGood,selection,showAllLabels,sourceId);
 }
 function activateWorkspace(workspace,entry,origin="sample") {
   activePackage=workspace;
@@ -1490,8 +1556,10 @@ $("applyPatch").addEventListener("click", () => {
     if(pendingPatch.type==="DeleteNode"&&activeProcedureId===pendingPatch.procedureId)
       selection=null;
     if(pendingPatch.type==="AddRouteOutcome"&&
-       activeProcedureId===pendingPatch.procedureId)
+       activeProcedureId===pendingPatch.procedureId){
       selection={kind:"route",id:pendingPatch.nodeId+":"+pendingPatch.outcome};
+      canvasRouteProposal=null;
+    }
     if(pendingPatch.type==="RenameRouteOutcome"&&
        activeProcedureId===pendingPatch.procedureId)
       selection={kind:"route",id:pendingPatch.nodeId+":"+pendingPatch.newOutcome};
