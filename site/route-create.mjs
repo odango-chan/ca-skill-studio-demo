@@ -8,7 +8,7 @@ const ID=/^[A-Za-z_][A-Za-z0-9_.-]*$/;
 const KEY=/^[A-Z][A-Z0-9_]*$/;
 const reject=reason=>{throw new Error(reason);};
 
-function signature(projected){
+export function routeProjectionSignature(projected){
   return [...projected.procedures.values()].map(proc=>({
     name:proc.name,start:proc.start,
     nodes:proc.nodes.map(n=>({
@@ -23,6 +23,20 @@ function signature(projected){
       routeSource:r.routeSource,outcome:r.outcome
     }))
   }));
+}
+export function observedOperatorOutcomes(projected,node){
+  const known=new Set();
+  if(!node||!projected?.procedures)return [];
+  for(const proc of projected.procedures.values())
+    for(const other of proc.nodes){
+      if(other.operator!==node.operator)continue;
+      if(other.value!==node.value&&
+        !["verify","predicate"].includes(node.operator))continue;
+      for(const route of proc.routes)
+        if(route.source===other.id&&route.routeSource==="operator.on"&&
+          KEY.test(route.outcome))known.add(route.outcome);
+    }
+  return [...known].sort();
 }
 function sourceContext(source,procedureId,nodeId){
   if(typeof source!=="string"||source.length>1024*1024||
@@ -83,16 +97,7 @@ function sourceContext(source,procedureId,nodeId){
   // Candidate outcomes only from current *observed* source, for identical
   // operation identity; generic verify/predicate verdicts can be shared
   // across nodes of that same operator kind. This is an authoring hint.
-  const known=new Set();
-  for(const proc of before.procedures.values())
-    for(const other of proc.nodes){
-      if(other.operator!==node.operator)continue;
-      if(other.value!==node.value&&
-        !["verify","predicate"].includes(node.operator))continue;
-      for(const route of proc.routes)
-        if(route.source===other.id&&route.routeSource==="operator.on"&&
-          KEY.test(route.outcome))known.add(route.outcome);
-    }
+  const known=new Set(observedOperatorOutcomes(before,node));
   for(const existing of routeRows)known.delete(existing.outcome);
   return {before,procedure,node,routeRows,known:[...known].sort(),
     indent:routeRows[0].indent,eol,insertAt};
@@ -120,7 +125,7 @@ function compute(source,procedureId,nodeId,outcome,target){
   const after=projectWorkspace(candidateSource);
   if(after.state!=="READY")
     reject("New Outcome does not reproject: "+(after.diagnostics?.[0]?.message??"unknown"));
-  const expected=signature(ctx.before);
+  const expected=routeProjectionSignature(ctx.before);
   const item=expected.find(p=>p.name===procedureId);
   const newRoute={id:nodeId+":"+outcome,source:nodeId,target,
     routeSource:"operator.on",outcome};
@@ -128,7 +133,7 @@ function compute(source,procedureId,nodeId,outcome,target){
     r.source===nodeId&&r.routeSource==="operator.on");
   if(lastIndex<0)reject("Missing existing operator Route");
   item.routes.splice(lastIndex+1,0,newRoute);
-  const actual=signature(after);
+  const actual=routeProjectionSignature(after);
   if(JSON.stringify(expected)!==JSON.stringify(actual)){
     const beforeString=JSON.stringify(expected),afterString=JSON.stringify(actual);
     let at=0;while(at<Math.min(beforeString.length,afterString.length)&&
