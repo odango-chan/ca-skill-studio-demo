@@ -150,3 +150,25 @@ test("React Flow uses its built-in thin open arrow, not a second hand-drawn arro
   assert.match(css,/\.procedure-flow \.designer-port-elk\{/);
   assert.match(css,/stroke-width:2\.1px/);
 });
+
+
+test("D3-A3 source-only creation affordance is explicit, selected and never terminal",async()=>{
+  const graph=await layoutProcedureELK(ensure.procedure);
+  const chosen=ensure.procedure.nodes.find(n=>n.id===ensure.procedure.start);
+  assert.ok(chosen&&chosen.operator!=="terminal");
+  const baseline=makeFlowElements(graph,ensure.procedure);
+  assert.ok(baseline.nodes.every(n=>!n.data.canAddRoute));
+  const enabled=makeFlowElements(graph,ensure.procedure,
+    {kind:"node",id:chosen.id},false,chosen.id);
+  assert.equal(enabled.nodes.filter(n=>n.data.canAddRoute).length,1);
+  assert.equal(enabled.nodes.find(n=>n.id===chosen.id).data.canAddRoute,true);
+  const blocked=makeFlowElements(graph,ensure.procedure,
+    {kind:"node",id:chosen.id},false,"done");
+  assert.ok(blocked.nodes.every(n=>!n.data.canAddRoute));
+  const canvas=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  assert.match(canvas,/onConnect=\{connection=>callbacks\.onCreateRoute\(connection\)\}/);
+  assert.match(canvas,/id="new-route-out"/);
+  assert.match(canvas,/data\.canAddRoute/);
+  assert.match(canvas,/title="连接到这个 Node"/);
+  assert.ok(enabled.edges.every(e=>!e.id.startsWith("new-route-")));
+});
