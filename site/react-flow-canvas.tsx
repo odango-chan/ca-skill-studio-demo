@@ -1,7 +1,8 @@
-import React,{useMemo} from "react";
+import React,{useMemo,useEffect} from "react";
 import {createRoot} from "react-dom/client";
 import {
-  ReactFlow,BaseEdge,EdgeLabelRenderer,Handle,Position,getSmoothStepPath
+  ReactFlow,BaseEdge,EdgeLabelRenderer,Handle,Position,getSmoothStepPath,
+  useUpdateNodeInternals
 } from "@xyflow/react";
 import type {EdgeProps} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -9,21 +10,39 @@ import {makeFlowElements,resolveReconnectedRoute} from "./react-flow-projection.
 
 // D1 is a view adapter, not a second workflow store.
 // All gestures delegate to the existing source-backed Inspector and Typed Patch.
+const sidePositions={top:Position.Top,bottom:Position.Bottom,
+  left:Position.Left,right:Position.Right};
 function ProcedureCard({data,selected}){
   const direction=data.direction==="RIGHT"?"RIGHT":"DOWN";
   const inputPosition=direction==="DOWN"?Position.Top:Position.Left;
   const outputPosition=direction==="DOWN"?Position.Bottom:Position.Right;
+  const updateNodeInternals=useUpdateNodeInternals();
+  const ports=data.ports??[];
+  // ELK initially follows a temporary fallback layout. Once exact port
+  // positions arrive, React Flow must remeasure the new handle boundaries.
+  useEffect(()=>{
+    updateNodeInternals(data.id);
+  },[updateNodeInternals,data.id,data.portSignature,direction]);
   return <div className={
       "designer-node"+(data.terminal?" is-terminal":"")+
       (data.start?" is-start":"")+(selected?" is-selected":"")
     }>
-    <Handle type="target" id="in" position={inputPosition} className="designer-port"/>
+    <Handle type="target" id="in" position={inputPosition}
+      className="designer-port designer-port-fallback"
+      style={{opacity:ports.length?0:0.55}}/>
+    <Handle type="source" id="out" position={outputPosition}
+      className="designer-port designer-port-fallback"
+      style={{opacity:ports.length?0:0.55}}/>
+    {ports.map(port=><Handle key={port.id} id={port.id}
+      type={port.type} position={sidePositions[port.side]}
+      className="designer-port designer-port-elk"
+      style={port.side==="top"||port.side==="bottom"
+        ?{left:port.offset+"px"}:{top:port.offset+"px"}}/>)}
     <span className="designer-node-kind">{String(data.operator).toUpperCase()}
       {data.start?" · START":""}{data.childCount?" · CHILD ↗":""}
     </span>
     <strong className="designer-node-id" title={data.id}>{data.id}</strong>
     <span className="designer-node-meta" title={data.value}>{data.value}</span>
-    <Handle type="source" id="out" position={outputPosition} className="designer-port"/>
   </div>;
 }
 

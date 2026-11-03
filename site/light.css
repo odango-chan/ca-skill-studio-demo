@@ -1080,18 +1080,18 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .procedure-flow .react-flow__edge-path.designer-edge{
   fill:none;
   stroke:#66899f;
-  stroke-width:2.6px;
+  stroke-width:2.1px;
   stroke-opacity:1;
   vector-effect:non-scaling-stroke;
   shape-rendering:geometricPrecision;
 }
 .procedure-flow .react-flow__edge-path.designer-edge.is-primary{
   stroke:#138f7a;
-  stroke-width:3px;
+  stroke-width:2.4px;
 }
 .procedure-flow .react-flow__edge-path.designer-edge.is-selected{
   stroke:#087e71;
-  stroke-width:3.5px;
+  stroke-width:2.8px;
 }
 .procedure-flow .react-flow__edge-interaction{
   vector-effect:non-scaling-stroke;
@@ -1132,4 +1132,25 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .asset-tree .asset-file:hover .asset-file-icon,
 .asset-folder-title:hover .asset-folder-icon{
   filter:drop-shadow(0 1px 1px #1c46651c);
+}
+
+
+/* Each ELK bundle attaches to an actual React Flow handle at the matching
+   boundary point. Make ports subtle until node interaction, without hiding
+   the edge/port relationship or using a second hand-written SVG edge. */
+.procedure-flow .designer-port-elk{
+  width:6px;
+  height:6px;
+  opacity:.4;
+  background:#699ca7;
+  box-shadow:0 0 0 1px #d8eced;
+}
+.procedure-flow .designer-node:hover .designer-port-elk,
+.procedure-flow .designer-node.is-selected .designer-port-elk{
+  opacity:1;
+  background:#168c7a;
+}
+.procedure-flow .designer-port-fallback{
+  width:6px;
+  height:6px;
 }

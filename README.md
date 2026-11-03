@@ -147,3 +147,10 @@ The source projection for CreatedSession contains 17 Root nodes and 48 bundled r
 ### Explorer 文件图标主题（2026-11-03）
 
 左侧 Explorer 按文件后缀使用本地 SVG 图标而非统一的 `▤`：YAML/YML 使用洋红色 Y；Markdown/MD 使用蓝色 M↓；Python/PYW 使用蓝黄双色 PY；JSON/JSONC 使用琥珀色 `{}`；Shell、文本与常见源码有各自主题，未知后缀保留通用文件图标。文件夹使用可展开/收起的暖金色图标。图标均为装饰性 `aria-hidden`，可访问名称仍由文件路径提供；不修改导入文件、YAML、Procedure 导航或 Package 导出。固定映射与 SVG 结构有 Node 回归，Chromium E2E 还会检查 CreatedSession 中实际出现的 YAML、Markdown、Python 与文件夹图标。
+
+### Procedure 箭头与连线接点精修（2026-11-03）
+
+- **原因**：之前的连线使用 React Flow 的 BaseEdge，但路径是 ELK 的正交路由（不是 React Flow 的默认 Bezier）。单个居中的 React Flow Handle 与 ELK 每条 Route 的边界端点不一致；同时人为指定 24×24 实心 ArrowClosed，使箭头相对非缩放线宽显得过粗。
+- **调整**：保留 ELK 分流路径以免 CreatedSession 的不同 Route / Outcome 重叠，但将 ELK 的起止端点映射成真实的、每条合并 Route 专属的 React Flow Handle；连接端点跟边界准确重合。箭头改用 React Flow 内置的轻量 Arrow（细线、非填充、13×13），边线降为更克制的非缩放宽度，不再自行绘制第二套箭头。
+- **验收**：Node 测试核对 17 Node、48 个可见边束、65 Outcome，逐条校验 ELK path 与 React Flow Port 的坐标；Chromium UI 检查 48 条实际连线的可见性和 96 个端点的屏幕空间对齐。整个流程仍通过 YAML Source 和 Typed Patch 管理，连线/端口都只属于 UI 投影。
+- **后续优先级**：先补真实浏览器的 Route 选择与 Inspector、重连预览/拒绝、Split/Undo/Redo、小屏浏览验收，再进入 D2 Node Designer；大型流程可交互性和线条标签密度属于持续视觉优化，不要为了“默认连线”破坏 ELK 的分流能力。

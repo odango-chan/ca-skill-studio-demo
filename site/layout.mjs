@@ -65,6 +65,37 @@ function serializePath(sections, offset = 30) {
   }
   return all.length ? all.join(" ") : null;
 }
+// ELK decides the exact edge attachment point per bundle. React Flow's
+// single centered handle cannot represent those points: custom edge SVG paths
+// then visibly diverge from their reconnect/preview handles.
+// Map the ELK endpoints into source/target node-local handle coordinates.
+function portAnchor(point, nodeId, positions, offset) {
+  if(!point)return null;
+  const position=positions.get(nodeId);
+  if(!position)return null;
+  const x=point.x+offset-position.x,y=point.y+offset-position.y;
+  if(!Number.isFinite(x)||!Number.isFinite(y))return null;
+  const candidates=[
+    {side:"top",distance:Math.abs(y),offset:x,length:DIMENSION.width},
+    {side:"bottom",distance:Math.abs(y-DIMENSION.height),offset:x,length:DIMENSION.width},
+    {side:"left",distance:Math.abs(x),offset:y,length:DIMENSION.height},
+    {side:"right",distance:Math.abs(x-DIMENSION.width),offset:y,length:DIMENSION.height}
+  ].sort((a,b)=>a.distance-b.distance);
+  const chosen=candidates[0];
+  if(chosen.distance>3||chosen.offset < -2||chosen.offset>chosen.length+2)
+    return null;
+  return {side:chosen.side,offset:Math.max(0,Math.min(chosen.length,
+    Math.round(chosen.offset*100)/100))};
+}
+function bundleAnchors(sections, source, target, positions, offset) {
+  if(!Array.isArray(sections)||!sections.length)return null;
+  const first=sections.find(section=>section.startPoint&&section.endPoint);
+  const last=[...sections].reverse().find(section=>section.startPoint&&section.endPoint);
+  if(!first||!last)return null;
+  const from=portAnchor(first.startPoint,source,positions,offset);
+  const to=portAnchor(last.endPoint,target,positions,offset);
+  return from&&to?{source:from,target:to}:null;
+}
 function labelPoint(sections, source, target, positions) {
   const segments = [];
   for (const section of sections || []) {
@@ -121,6 +152,8 @@ export async function layoutProcedureELK(procedure, {
   for (let i=0;i<bundles.length;i++) {
     const e=edgeMap.get("bundle-"+i);
     bundles[i].path=serializePath(e?.sections, offset);
+    bundles[i].anchors=bundleAnchors(e?.sections,bundles[i].source,
+      bundles[i].target,positions,offset);
     bundles[i].label=labelPoint(e?.sections,bundles[i].source,bundles[i].target,positions);
   }
   if (!bundles.every(b => b.routes.length > 0)) throw Error("ELK empty route bundle");

@@ -28,8 +28,9 @@ test("D1 projects the real CreatedSession 17-node / 65-Outcome graph unchanged",
     flow.nodes.map(n=>n.id),created.procedure.nodes.map(n=>n.id));
   assert.ok(flow.nodes.every(n=>n.draggable===false));
   assert.ok(flow.edges.every(e=>e.reconnectable===true));
-  assert.ok(flow.edges.every(e=>e.markerEnd?.type==="arrowclosed"));
-  assert.ok(flow.edges.every(e=>e.markerEnd?.width>=20));
+  assert.ok(flow.edges.every(e=>e.markerEnd?.type==="arrow"));
+  assert.ok(flow.edges.every(e=>e.markerEnd?.width<=13));
+  assert.ok(flow.edges.every(e=>e.markerEnd?.markerUnits==="userSpaceOnUse"));
   assert.equal(JSON.stringify(created.procedure),before);
 });
 test("routeSource and all exact Outcome ids survive React Flow projection",async()=>{
@@ -100,4 +101,48 @@ test("React Flow edges keep screen-space stroke width at default fit zoom",()=>{
   assert.doesNotMatch(old,/\.graph-pane svg\{/);
   assert.match(jsx,/markerEnd=\{props\.markerEnd\}/);
   assert.match(jsx,/interactionWidth=\{16\}/);
+});
+
+test("ELK endpoints and React Flow per-edge ports coincide, not just their center handles",async()=>{
+  const graph=await layoutProcedureELK(created.procedure);
+  const flow=makeFlowElements(graph,created.procedure);
+  const nodes=new Map(flow.nodes.map(n=>[n.id,n]));
+  let anchored=0;
+  for(const edge of flow.edges){
+    const bundle=edge.data.bundle;
+    if(!bundle.path||!bundle.anchors){
+      assert.equal(edge.sourceHandle,"out");
+      assert.equal(edge.targetHandle,"in");
+      continue;
+    }
+    anchored++;
+    const pathPoints=[...bundle.path.matchAll(/[ML]\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/g)]
+      .map(m=>({x:Number(m[1]),y:Number(m[2])}));
+    const starts=[pathPoints[0],pathPoints.at(-1)];
+    const nodesFor=[nodes.get(edge.source),nodes.get(edge.target)];
+    const portsFor=[edge.sourceHandle,edge.targetHandle];
+    for(let k=0;k<2;k++){
+      const node=nodesFor[k];
+      const port=node.data.ports.find(p=>p.id===portsFor[k]);
+      assert.ok(port,edge.id+" missing "+(k?"target":"source")+" handle");
+      const local=port.side==="top"?{x:port.offset,y:0}:
+        port.side==="bottom"?{x:port.offset,y:80}:
+        port.side==="left"?{x:0,y:port.offset}:{x:238,y:port.offset};
+      const global={x:node.position.x+local.x,y:node.position.y+local.y};
+      assert.ok(Math.hypot(global.x-starts[k].x,global.y-starts[k].y)<1.2,
+        edge.id+" ELK path and handle do not meet");
+    }
+  }
+  assert.equal(anchored,48,"all CreatedSession ELK routes require exact handles");
+  assert.equal(flow.edges.reduce((sum,e)=>sum+e.data.bundle.routes.length,0),65);
+});
+test("React Flow uses its built-in thin open arrow, not a second hand-drawn arrow",()=>{
+  const canvas=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
+  assert.match(canvas,/useUpdateNodeInternals/);
+  assert.match(canvas,/ports\.map\(port=><Handle/);
+  assert.match(canvas,/style=\{port\.side==="top"/);
+  assert.match(canvas,/markerEnd=\{props\.markerEnd\}/);
+  assert.match(css,/\.procedure-flow \.designer-port-elk\{/);
+  assert.match(css,/stroke-width:2\.1px/);
 });

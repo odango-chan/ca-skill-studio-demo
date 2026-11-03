@@ -92,11 +92,30 @@ try{
     "    opacity:c.opacity,display:c.display,visibility:c.visibility,",
     "    strokeWidth:c.strokeWidth,vectorEffect:c.vectorEffect,markerEnd:c.markerEnd};",
     " });",
+    " const portGaps=[];",
+    " for(const edge of document.querySelectorAll('.react-flow__edge')){",
+    "  const id=edge.getAttribute('data-id');",
+    "  const i=Number(id?.replace('flow-edge-',''));",
+    "  const path=edge.querySelector('.react-flow__edge-path');",
+    "  const source=document.querySelector('[data-handleid=\"edge-'+i+'-out\"]');",
+    "  const target=document.querySelector('[data-handleid=\"edge-'+i+'-in\"]');",
+    "  if(!path||!source||!target)continue;",
+    "  const matrix=path.getScreenCTM();",
+    "  if(!matrix)continue;",
+    "  const last=path.getTotalLength();",
+    "  for(const [el,p] of [[source,path.getPointAtLength(0)],[target,path.getPointAtLength(last)]]){",
+    "   const screen=new DOMPoint(p.x,p.y).matrixTransform(matrix);",
+    "   const rect=el.getBoundingClientRect();",
+    "   portGaps.push({id,dist:Math.hypot(screen.x-(rect.x+rect.width/2),",
+    "     screen.y-(rect.y+rect.height/2))});",
+    "  }",
+    " }",
     " const ids=[...document.querySelectorAll('.react-flow__edge')].map(x=>x.getAttribute('data-id'));",
     " const expected=Array.from({length:48},(_,i)=>'flow-edge-'+i);",
     " return {nodes:document.querySelectorAll('.react-flow__node').length,",
     "  edges:paths.length,edgeIds:ids,missing:expected.filter(x=>!ids.includes(x)),",
     "  handles:document.querySelectorAll('.react-flow__handle').length,",
+    "  attachedPorts:portGaps.length,maxPortGap:Math.max(0,...portGaps.map(p=>p.dist)),",
     "  edgesOverflow:getComputedStyle(document.querySelector('.react-flow__edges')).overflow,",
     "  valid:info.filter(e=>e.length>1&&e.stroke!=='none'&&",
     "    e.display!=='none'&&e.visibility!=='hidden'&&",
@@ -111,11 +130,13 @@ try{
   ].join("\n");
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
-  if(result?.nodes!==17||result.edges!==48||result.valid!==48)
+  if(result?.nodes!==17||result.edges!==48||result.valid!==48||
+     result.attachedPorts!==96||result.maxPortGap>3)
     throw Error("CreatedSession visible edges FAIL");
   if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
   if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
-  console.log("CreatedSession visible paths PASS: "+result.valid);
+  console.log("CreatedSession visible paths and aligned React Flow ports PASS: "+
+    result.valid+" / "+result.attachedPorts);
 
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([

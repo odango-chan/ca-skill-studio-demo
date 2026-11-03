@@ -9,6 +9,15 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
   const direction=graph.direction==="RIGHT"?"RIGHT":"DOWN";
   const present=new Set((graph.visibleNodes??procedure.nodes).map(n=>n.id));
   const selectedRoute=selection?.kind==="route"?selection.id:null;
+  const ports=new Map([...present].map(id=>[id,[]]));
+  for(const [i,bundle] of graph.bundles.entries()){
+    const anchors=bundle.anchors;
+    if(!anchors||!bundle.path)continue;
+    const src=ports.get(bundle.source),dst=ports.get(bundle.target);
+    if(!src||!dst)throw Error("Route ports have dangling nodes");
+    src.push({id:"edge-"+i+"-out",type:"source",...anchors.source});
+    dst.push({id:"edge-"+i+"-in",type:"target",...anchors.target});
+  }
   const nodes=(graph.visibleNodes??procedure.nodes).map(node=>{
     const position=graph.positions.get(node.id);
     if(!position||!Number.isFinite(position.x)||!Number.isFinite(position.y))
@@ -26,7 +35,10 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         id:node.id,operator:node.operator,value:node.value,
         start:node.id===procedure.start,
         terminal:node.operator==="terminal",
-        childCount:node.children?.length??0,direction
+        childCount:node.children?.length??0,direction,
+        ports:ports.get(node.id)??[],
+        portSignature:(ports.get(node.id)??[])
+          .map(port=>port.id+":"+port.side+":"+port.offset).join("|")
       }
     };
   });
@@ -41,13 +53,18 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
     return {
       id:"flow-edge-"+i,
       source:bundle.source,target:bundle.target,
-      sourceHandle:"out",targetHandle:"in",
+      sourceHandle:bundle.anchors&&bundle.path?"edge-"+i+"-out":"out",
+      targetHandle:bundle.anchors&&bundle.path?"edge-"+i+"-in":"in",
       type:"procedure-route",selectable:true,
       selected,
+      // Use React Flow's built-in slender open marker, not an oversized,
+      // filled 24x24 closed arrow. Its color follows the corresponding edge.
       markerEnd:{
-        type:"arrowclosed",
+        type:"arrow",
         color:important?"#138f7a":"#66899f",
-        width:24,height:24
+        width:13,height:13,
+        strokeWidth:1.2,
+        markerUnits:"userSpaceOnUse"
       },
       // Only the verified handler may propose a YAML patch on reconnect.
       reconnectable:true,
