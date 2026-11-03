@@ -51,8 +51,7 @@ test("D4-A1 rejects wrong types, invented and cross-procedure references",()=>{
     "nudm-sdm-get.output","preconditions.other.output",null,""]){
     assert.throws(()=>previewPhaseInputBinding(...args(procedure,to)));
   }
-  assert.throws(()=>previewPhaseInputBinding(...args()),/./);
-  // The previous assert simply proves that the selected step is qualified.
+  assert.throws(()=>previewPhaseInputBinding(...args(procedure,"input.dnn")),/No Phase Step binding change/);
 });
 test("D4-A1 is isolated to a valid Phase, Step, node and declared input",()=>{
   const invalid=[
