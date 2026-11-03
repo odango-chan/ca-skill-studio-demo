@@ -30,7 +30,7 @@ const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",
   "--remote-debugging-port=0","--user-data-dir="+temp,"about:blank"],{stdio:"ignore"});
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 let ws=null,seq=0;
-const pending=new Map(),exceptions=[];
+const pending=new Map(),exceptions=[],warnings=[];
 function command(method,params={}){
   const id=++seq;
   return new Promise((res,rej)=>{pending.set(id,{res,rej});
@@ -59,6 +59,7 @@ try{
   ws.addEventListener("message",event=>{
     const msg=JSON.parse(event.data);
     if(msg.method==="Runtime.exceptionThrown")exceptions.push(msg.params?.exceptionDetails?.text);
+    if(msg.method==="Runtime.consoleAPICalled"&&["warning","error"].includes(msg.params?.type))warnings.push(msg.params.args?.map(a=>a.value||a.description).join(" "));
     if(msg.id&&pending.has(msg.id)){
       const task=pending.get(msg.id);pending.delete(msg.id);
       if(msg.error)task.rej(Error(msg.error.message));else task.res(msg.result);
@@ -79,9 +80,11 @@ try{
     " button.click();",
     " for(let i=0;i<130;i++){",
     "  if(document.querySelectorAll('.react-flow__node').length===17 &&",
+    "    document.querySelectorAll('.react-flow__edge-path').length===48 &&",
     "    document.getElementById('layoutStatus')?.textContent!=='正在自动布局…')break;",
     "  await sleep(100);",
     " }",
+    " await sleep(300);",
     " const paths=[...document.querySelectorAll('.react-flow__edge-path')];",
     " const info=paths.map(el=>{const c=getComputedStyle(el);",
     "  let length=0;try{length=el.getTotalLength();}catch{}",
@@ -89,8 +92,13 @@ try{
     "    opacity:c.opacity,display:c.display,visibility:c.visibility,",
     "    strokeWidth:c.strokeWidth,vectorEffect:c.vectorEffect,markerEnd:c.markerEnd};",
     " });",
+    " const ids=[...document.querySelectorAll('.react-flow__edge')].map(x=>x.getAttribute('data-id'));",
+    " const expected=Array.from({length:48},(_,i)=>'flow-edge-'+i);",
     " return {nodes:document.querySelectorAll('.react-flow__node').length,",
-    "  edges:paths.length,valid:info.filter(e=>e.length>1&&e.stroke!=='none'&&",
+    "  edges:paths.length,edgeIds:ids,missing:expected.filter(x=>!ids.includes(x)),",
+    "  handles:document.querySelectorAll('.react-flow__handle').length,",
+    "  edgesOverflow:getComputedStyle(document.querySelector('.react-flow__edges')).overflow,",
+    "  valid:info.filter(e=>e.length>1&&e.stroke!=='none'&&",
     "    e.display!=='none'&&e.visibility!=='hidden'&&",
     "    Number(e.opacity)>0&&parseFloat(e.strokeWidth)>0&&",
     "    e.vectorEffect==='non-scaling-stroke').length,",
@@ -103,8 +111,9 @@ try{
   ].join("\n");
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
-  if(result?.nodes!==17||result.edges<1||result.valid!==result.edges)
+  if(result?.nodes!==17||result.edges!==48||result.valid!==48)
     throw Error("CreatedSession visible edges FAIL");
+  if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
   if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
   console.log("CreatedSession visible paths PASS: "+result.valid);
 }finally{

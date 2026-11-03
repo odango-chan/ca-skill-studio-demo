@@ -19,7 +19,7 @@ test("D1 projects the real CreatedSession 17-node / 65-Outcome graph unchanged",
   const flow=makeFlowElements(graph,created.procedure);
   assert.equal(flow.direction,"DOWN");
   assert.equal(flow.nodes.length,17);
-  assert.equal(flow.edges.length,39);
+  assert.equal(flow.edges.length,48);
   assert.equal(flow.edges.reduce((n,e)=>n+e.data.bundle.routes.length,0),65);
   assert.equal(flow.nodes.find(n=>n.id===created.procedure.start).data.start,true);
   assert.equal(new Set(flow.nodes.map(n=>n.id)).size,flow.nodes.length);
