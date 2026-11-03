@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-03**  
-**Reviewed implementation baseline: main@b4d15d47a3ccee22c05b948f79510013d473558d**（D3-A1/A2 已合入）
+**Reviewed implementation baseline: main@ce5c6930974ed89def7426435d6fa38810d05f7a**（A1/A2 已合入；本 PR 将 A3 纳入 Studio Editor）
 
 ## Overall
 
@@ -18,13 +18,13 @@
 | Canonical 文档整顿 | ACCEPTED | IMPLEMENTED | PASS（193 单测、Typecheck、Build、Chromium、resulting-main Pages） | [PR #8](https://github.com/odango-chan/ca-skill-studio-demo/pull/8)、[PR CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41611856550)、[Pages CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41612728393)、[#6](https://github.com/odango-chan/ca-skill-studio-demo/issues/6) |
 | D3-A1 受限新增 `operator.on` Outcome | ACCEPTED | IMPLEMENTED | PASS（200 单测 + Chromium） | [PR #10](https://github.com/odango-chan/ca-skill-studio-demo/pull/10)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41615104253) |
 | D3-A2 有界 Outcome 重命名、受保护删除 | ACCEPTED | IMPLEMENTED | PASS（208 单测 + Chromium，主分支构建） | [PR #11 merged](https://github.com/odango-chan/ca-skill-studio-demo/pull/11)、[PR CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41623111837)、[main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41623429905) |
-| D3-A3 画布连线新增 Outcome | PROPOSED | NOT_STARTED | NOT_RUN | [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)、[设计](design/route-designer.md) |
+| D3-A3 画布拖线 → 显式 Outcome → Source Diff | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #13） | PASS（213 单测 + 实际 Chromium 鼠标拖拽） | [PR #13](https://github.com/odango-chan/ca-skill-studio-demo/pull/13)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41626562455)、[设计](design/route-designer.md) |
 | 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
 ## Current open work
 
-- [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3-A1/A2 已合入；A3 连线新增和 Runtime Outcome 资格仍待设计与实现。
+- [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3-A1/A2 已合入，A3 在 PR #13 实现并通过浏览器级测试；Phase-specific Route authoring 与真实 Runtime Outcome 资格仍未覆盖。
 - 早期未合并 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)、[#2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)、[#3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3) 目前只作为历史候选，**不推断可直接合并**。
 
 ## Authority / evidence

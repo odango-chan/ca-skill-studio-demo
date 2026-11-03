@@ -30,7 +30,7 @@
 - Bundle identity 应区分 `source + target + routeSource`。保留每个 Outcome 的来源、ID、目标与 Source Span，不允许混合 Operator/Phase。
 - **当前有限的** Node 编辑：`site/node-designer.mjs` 重命名，`node-create.mjs` 在已有 Route 上插入 terminal/call/verify，`node-delete.mjs` 受限 merge/bypass，`node-attributes.mjs` 修改现有 Operator scalar / `with.<key>.from`。这些不是任意 Node/Binding/Phase 创建。
 - 现有 Route Target Patch：`site/visual-route-edit.mjs` 接收被允许的目标，走完整源码 Diff。
-- D3-A1 已合入：`site/route-create.mjs` 在现有 `operator.on` 中新增一个源可证明的候选 Outcome。D3-A2 已合入主分支：`site/route-mutate.mjs` 有界重命名或删除一个 Route 条目，保留其他 source identity 和评论。**不等于**自由图形连线编辑或 Runtime 语义验证。
+- D3-A1 已合入：`site/route-create.mjs` 在现有 `operator.on` 中新增一个源可证明的候选 Outcome。D3-A2 已合入主分支：`site/route-mutate.mjs` 有界重命名或删除一个 Route 条目，保留其他 source identity 和评论。D3-A3 已实现专用画布加号拖线，只创建待确认提案，并通过 Inspector 显式选择 Outcome 后复用 A1 YAML Patch；**不等于**任意 Phase 路由或 Runtime 语义验证。
 - 任何 Visual Patch 都先源文 revision+span+资格、后重新解析/结构比对、预览 Diff、确认、撤销。源已变化或者歧义时拒绝。
 - `site/package-audit.mjs` 是保守编辑期提示，可能不完整；绿色 CI 不能代替 Demo/Runtime Validator。
 - `site/icons.mjs` 是本地描边 SVG 的唯一图标源，不散落混用字符图标。

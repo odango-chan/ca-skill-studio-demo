@@ -4,7 +4,8 @@ const NODE_WIDTH=238;
 const NODE_HEIGHT=80;
 export const FLOW_NODE_SIZE=Object.freeze({width:NODE_WIDTH,height:NODE_HEIGHT});
 
-export function makeFlowElements(graph,procedure,selection=null,showAllLabels=false){
+export function makeFlowElements(graph,procedure,selection=null,showAllLabels=false,
+  routeCreationSourceId=null){
   if(!graph||!procedure)return {nodes:[],edges:[],direction:"DOWN"};
   const direction=graph.direction==="RIGHT"?"RIGHT":"DOWN";
   const present=new Set((graph.visibleNodes??procedure.nodes).map(n=>n.id));
@@ -36,6 +37,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         start:node.id===procedure.start,
         terminal:node.operator==="terminal",
         childCount:node.children?.length??0,direction,
+        canAddRoute:node.operator!=="terminal"&&
+          selection?.kind==="node"&&selection.id===node.id&&
+          routeCreationSourceId===node.id,
         ports:ports.get(node.id)??[],
         portSignature:(ports.get(node.id)??[])
           .map(port=>port.id+":"+port.side+":"+port.offset).join("|")

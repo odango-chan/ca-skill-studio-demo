@@ -48,11 +48,17 @@ function ProcedureCard({data,selected}){
       (data.start?" is-start":"")+(selected?" is-selected":"")
     }>
     <Handle type="target" id="in" position={inputPosition}
-      className="designer-port designer-port-fallback"
-      style={{opacity:ports.length?0:0.55}}/>
+      className="designer-port designer-port-fallback designer-port-target"
+      title="连接到这个 Node"
+      style={{opacity:ports.length?0.3:0.55}}/>
     <Handle type="source" id="out" position={outputPosition}
       className="designer-port designer-port-fallback"
       style={{opacity:ports.length?0:0.55}}/>
+    {data.canAddRoute&&<Handle type="source" id="new-route-out"
+      position={direction==="DOWN"?Position.Right:Position.Bottom}
+      className="designer-port designer-port-create"
+      title="拖动以提出新的 operator.on Route（需选择 Outcome 并确认 Diff）"
+      aria-label="从此节点添加 Route"/>}
     {ports.map(port=><Handle key={port.id} id={port.id}
       type={port.type} position={sidePositions[port.side]}
       className="designer-port designer-port-elk"
@@ -96,8 +102,10 @@ const edgeTypes={"procedure-route":RouteEdge};
 
 function ProcedureScene({scene,callbacks,onReady}){
   const elements=useMemo(()=>
-    makeFlowElements(scene.graph,scene.procedure,scene.selection,scene.showAllLabels),
-    [scene.graph,scene.procedure,scene.selection,scene.showAllLabels]);
+    makeFlowElements(scene.graph,scene.procedure,scene.selection,
+      scene.showAllLabels,scene.routeCreationSourceId),
+    [scene.graph,scene.procedure,scene.selection,scene.showAllLabels,
+      scene.routeCreationSourceId]);
   const selectionId=scene.selection?.kind==="route"?scene.selection.id:null;
   return <ReactFlow
     nodes={elements.nodes} edges={elements.edges}
@@ -111,7 +119,7 @@ function ProcedureScene({scene,callbacks,onReady}){
       if(!route){callbacks.onAmbiguousReconnect();return;}
       callbacks.onReconnect(route.id,connection.source,connection.target);
     }}
-    onConnect={()=>callbacks.onCreateUnsupported()}
+    onConnect={connection=>callbacks.onCreateRoute(connection)}
     onPaneClick={()=>callbacks.onPaneClick()}
     nodesDraggable={false}
     nodesConnectable={true}
@@ -134,7 +142,8 @@ export function mountProcedureCanvas(host,callbacks){
   if(!host)throw new Error("React Flow mount element missing");
   const root=createRoot(host);
   let instance=null;
-  let scene={graph:null,procedure:null,selection:null,showAllLabels:false};
+  let scene={graph:null,procedure:null,selection:null,showAllLabels:false,
+    routeCreationSourceId:null};
   let pendingFit=false;
   const fit=()=>{
     if(!instance){pendingFit=true;return;}
@@ -146,8 +155,8 @@ export function mountProcedureCanvas(host,callbacks){
     if(pendingFit||scene.graph){pendingFit=false;fit();}
   };
   const api={
-    render(graph,procedure,selection,showAllLabels){
-      scene={graph,procedure,selection,showAllLabels};
+    render(graph,procedure,selection,showAllLabels,routeCreationSourceId=null){
+      scene={graph,procedure,selection,showAllLabels,routeCreationSourceId};
       root.render(<ProcedureScene scene={scene}
         callbacks={callbacks} onReady={onReady}/>);
     },

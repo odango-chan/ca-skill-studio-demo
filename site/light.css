@@ -1250,3 +1250,27 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .explorer-nodes[open] .node-disclosure-heading>.disclosure-chevron,
 .sample-picker[open] summary>.disclosure-chevron{transform:rotate(90deg)}
 .node-disclosure-heading .count{margin-left:auto}
+
+
+/* D3-A3: a single visible source gesture affordance only on qualified
+   selected Nodes; all graph handles remain UI-only, never YAML authority. */
+.procedure-flow .designer-port-create{
+  width:14px;height:14px;
+  border:2px solid #fff;background:#168e80;
+  box-shadow:0 0 0 2px #61c9b4,0 1px 4px #164f4b45;
+  cursor:crosshair;z-index:8;opacity:1;
+  transition:transform .12s ease,box-shadow .12s ease
+}
+.procedure-flow .designer-port-create::after{
+  content:"+";position:absolute;inset:0;
+  display:flex;justify-content:center;align-items:center;
+  font:700 11px/10px system-ui,sans-serif;color:white;
+  pointer-events:none
+}
+.procedure-flow .designer-port-create:hover{
+  transform:scale(1.24);box-shadow:0 0 0 3px #59d6b5,0 3px 9px #17625045
+}
+.procedure-flow .designer-port-target:hover{
+  opacity:1!important;background:#0e9483;
+  box-shadow:0 0 0 2px #95e5d2;
+}

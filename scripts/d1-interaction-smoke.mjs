@@ -705,4 +705,126 @@ export async function runD1Interactions(evaluate,command){
     " return {ok:reviewed&&canceled&&applied&&undone&&redone,",
     "   reviewed,canceled,applied,undone,redone};"
   ]);
+
+  // D3-A3 deliberately uses actual Chromium pointer input. An onConnect()
+  // callback call would not prove the React Flow handles are wired.
+  // Earlier mobile and split-panel tests intentionally resize the viewport.
+  // Restore a full desktop viewport before exercising a distant target.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1440,height:1200,deviceScaleFactor:1,mobile:false
+  });
+  await new Promise(resolve=>setTimeout(resolve,450));
+  const canvasSetup=await check(evaluate,"D3_A3_DRAG_HANDLES",[
+    "const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    "const click=el=>el?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));",
+    " click(document.getElementById('mode-visual'));await sleep(500);",
+    " const source=document.getElementById('source');",
+    " const original=source.value;",
+    " if(!original.includes('start: observe-target-session'))return {ok:false,reason:'Ensure sample missing'};",
+    " const edited=original.replace('          UNKNOWN: unresolved\\n','');",
+    " if(edited===original)return {ok:false,reason:'Test Outcome not found'};",
+    " source.value=edited;source.dispatchEvent(new Event('input',{bubbles:true}));",
+    " for(let i=0;i<75;i++){",
+    "  if(document.querySelectorAll('.react-flow__node').length===11)break;",
+    "  await sleep(90);",
+    " }",
+    " const root=document.querySelector('.react-flow__node[data-id=\"observe-target-session\"]');",
+    " if(!root)return {ok:false,reason:'Root not present'};",
+    " click(root);",
+    " for(let i=0;i<75;i++){",
+    "  if(root.querySelector('.react-flow__handle[data-handleid=\"new-route-out\"]'))break;",
+    "  await sleep(90);",
+    " }",
+    " await sleep(800);",
+    " click(document.getElementById('fit'));await sleep(850);",
+    " const startHandle=root.querySelector('.react-flow__handle[data-handleid=\"new-route-out\"]');",
+    " const endNode=document.querySelector('.react-flow__node[data-id=\"unresolved\"]');",
+    " const endHandle=endNode?.querySelector('.react-flow__handle[data-handleid=\"in\"]');",
+    " const a=startHandle?.getBoundingClientRect(),b=endHandle?.getBoundingClientRect();",
+    " const start=a&&{x:a.x+a.width/2,y:a.y+a.height/2};",
+    " const end=b&&{x:b.x+b.width/2,y:b.y+b.height/2};",
+    " const bounds=document.getElementById('graphPane').getBoundingClientRect();",
+    " const within=p=>p&&p.x>=bounds.left+1&&p.x<bounds.right-1&&",
+    "  p.y>=bounds.top+1&&p.y<bounds.bottom-1&&",
+    "  p.x>1&&p.x<window.innerWidth-1&&p.y>1&&p.y<window.innerHeight-1;",
+    " return {ok:!!startHandle&&!!endHandle&&!!within(start)&&!!within(end),",
+    "   start,end,rootSelected:!!root.querySelector('.is-selected'),",
+    "   startHandle:startHandle?.getAttribute('class'),",
+    "   targetHandle:endHandle?.getAttribute('class'),",
+    "   graphBounds:bounds.toJSON(),sourceUnchanged:source.value===edited,",
+    "   viewport:document.querySelector('.react-flow__viewport')?.getAttribute('style'),",
+    "   layoutStatus:document.getElementById('layoutStatus')?.textContent,",
+    "   windowSize:{width:window.innerWidth,height:window.innerHeight}};"
+  ]);
+  const canvasHit=async p=>evaluate("(()=>{const e=document.elementFromPoint("+
+    p.x+","+p.y+");return {tag:e?.tagName,cls:e?.getAttribute('class'),"+
+    "handleId:e?.getAttribute('data-handleid'),html:e?.outerHTML.slice(0,260)}})()");
+  const fromHit=await canvasHit(canvasSetup.start);
+  const toHit=await canvasHit(canvasSetup.end);
+  if(fromHit?.handleId!=="new-route-out"||toHit?.handleId!=="in")
+    throw Error("D3-A3 actual drag endpoints are not exposed handles: "+
+      JSON.stringify({fromHit,toHit}));
+  await command("Input.dispatchMouseEvent",{
+    type:"mouseMoved",x:canvasSetup.start.x,y:canvasSetup.start.y,button:"none"
+  });
+  await command("Input.dispatchMouseEvent",{
+    type:"mousePressed",x:canvasSetup.start.x,y:canvasSetup.start.y,
+    button:"left",buttons:1,clickCount:1
+  });
+  for(let i=1;i<=20;i++){
+    const f=i/20;
+    await command("Input.dispatchMouseEvent",{
+      type:"mouseMoved",
+      x:canvasSetup.start.x+(canvasSetup.end.x-canvasSetup.start.x)*f,
+      y:canvasSetup.start.y+(canvasSetup.end.y-canvasSetup.start.y)*f,
+      button:"left",buttons:1
+    });
+    await new Promise(resolve=>setTimeout(resolve,24));
+  }
+  const beforeRelease=await canvasHit(canvasSetup.end);
+  if(!beforeRelease?.cls?.split(/\s+/).includes("valid"))
+    throw Error("D3-A3 target did not accept the actual drag: "+
+      JSON.stringify(beforeRelease));
+  await command("Input.dispatchMouseEvent",{
+    type:"mouseReleased",x:canvasSetup.end.x,y:canvasSetup.end.y,
+    button:"left",buttons:0,clickCount:1
+  });
+  await check(evaluate,"D3_A3_CANVAS_OUTCOME_CONFIRM",[
+  " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+  " const click=el=>el?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));",
+  " for(let i=0;i<65;i++){",
+  "  if(document.querySelector('#inspector select[aria-label=\"D3 画布连线 Outcome\"]'))break;",
+  "  await sleep(90);",
+  " }",
+  " const source=document.getElementById('source');",
+  " const select=document.querySelector('#inspector select[aria-label=\"D3 画布连线 Outcome\"]');",
+  " const modal=document.getElementById('patchDialog');",
+  " const before=source.value;",
+  " const proposed=!!select&&modal.hidden&&",
+  "   document.getElementById('inspector')?.textContent.includes('observe-target-session → unresolved');",
+  " if(!proposed)return {ok:false,reason:'Gesture produced no explicit proposal',hint:document.getElementById('hint')?.textContent};",
+  " select.value='UNKNOWN';select.dispatchEvent(new Event('change',{bubbles:true}));",
+  " const preview=[...document.querySelectorAll('#inspector .preview-button')].find(x=>x.textContent.includes('连线新增 Route'));",
+  " const enabled=!!preview&&!preview.disabled;",
+  " if(!enabled)return {ok:false,reason:'No qualified preview after choosing Outcome'};",
+  " click(preview);await sleep(80);",
+  " const diff=document.getElementById('patchDiff')?.textContent??'';",
+  " const diffShown=!modal.hidden&&diff.includes('+          UNKNOWN: unresolved')&&source.value===before;",
+  " click(document.getElementById('closePatch'));await sleep(80);",
+  " const canceled=modal.hidden&&source.value===before&&!!document.querySelector('#inspector select[aria-label=\"D3 画布连线 Outcome\"]');",
+  " click(preview);await sleep(90);",
+  " click(document.getElementById('applyPatch'));await sleep(550);",
+  " const applied=source.value.includes('          UNKNOWN: unresolved\\n')&&",
+  "   !source.value.includes('          EXTRA: unresolved\\n')&&",
+  "   document.getElementById('inspectorContext')?.textContent.includes('UNKNOWN');",
+  " click(document.getElementById('undoButton'));await sleep(260);",
+  " const undone=source.value===before;",
+  " click(document.getElementById('redoButton'));await sleep(290);",
+  " const redone=source.value.includes('          UNKNOWN: unresolved\\n');",
+  " const noGhost=!!document.querySelector('.react-flow__edge')&&",
+  "   !document.querySelector('#inspector select[aria-label=\"D3 画布连线 Outcome\"]');",
+  " return {ok:proposed&&enabled&&diffShown&&canceled&&applied&&undone&&redone&&noGhost,",
+  "   proposed,enabled,diffShown,canceled,applied,undone,redone,noGhost};"
+]);
+
 }
