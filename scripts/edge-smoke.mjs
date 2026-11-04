@@ -318,6 +318,36 @@ try{
   await runD1Interactions(evaluate,command);
 
   // E2-A2: real Owner schemas, schema diagnostics, completion and hover.
+  // E3-A1: actual script Inspector links switch Package Source files, without
+  // executing Python or applying a Visual mutation.
+  const scriptLinks=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const file=path=>[...document.querySelectorAll('#assetTree button.asset-file')]",
+    "  .find(el=>el.getAttribute('aria-label')===path);",
+    " file('scripts/evaluate_udm_read.py')?.click();await sleep(240);",
+    " const available=!document.getElementById('inspectorVisibility').hidden;",
+    " document.getElementById('inspectorVisibility')?.click();await sleep(90);",
+    " const links=()=>[...document.querySelectorAll('#inspector button.source-link')];",
+    " const labels=links().map(b=>b.textContent);",
+    " const caller=links().find(b=>b.textContent.includes('Predicate'));",
+    " caller?.click();await sleep(240);",
+    " const callerOk=document.getElementById('fileName').textContent.includes('assurance/predicates.yaml')&&",
+    "  document.getElementById('source').value.includes('ref: skill.evaluate-udm-read');",
+    " file('scripts/evaluate_udm_read.py')?.click();await sleep(200);",
+    " document.getElementById('inspectorVisibility')?.click();await sleep(90);",
+    " const schema=links().find(b=>b.textContent.includes('输入'));",
+    " schema?.click();await sleep(240);",
+    " const schemaOk=document.getElementById('fileName').textContent.includes('schemas/udm-read-evaluation-input.schema.yaml')&&",
+    "  document.getElementById('source').value.includes('title: UdmReadEvaluationInput');",
+    " return {available,labels,callerOk,schemaOk};",
+    "})()"
+  ].join("\n"));
+  console.log("E3_SCRIPT_REFERENCE_NAVIGATION",JSON.stringify(scriptLinks));
+  if(!scriptLinks?.available||!scriptLinks.callerOk||!scriptLinks.schemaOk||
+     scriptLinks.labels.length<3)
+    throw Error("E3 script reference navigation failed: "+JSON.stringify(scriptLinks));
+
   const ownerSchemaSmoke=await evaluate([
     "(async()=>{",
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
