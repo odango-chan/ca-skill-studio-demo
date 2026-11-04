@@ -338,6 +338,9 @@ try{
     "})()"
   ].join("\n"));
   console.log("E2_OWNER_SCHEMA_VALIDATION",JSON.stringify(ownerSchemaSmoke));
+  console.log("E2_OWNER_SCHEMA_DIAGNOSTICS",JSON.stringify(await evaluate("document.getElementById(\"monacoHost\").__studioYamlDiagnostics?.()||null")));
+  console.log("MONACO_WORKER_CALLS",JSON.stringify(await evaluate("window.__studioWorkerCalls||[]")));
+  console.log("BROWSER_EXCEPTIONS_BEFORE_E2_ASSERT",JSON.stringify(exceptions));
   if(!ownerSchemaSmoke?.ok)
     throw Error("E2 Owner schema validation / offline Procedure boundary FAIL: "+JSON.stringify(ownerSchemaSmoke));
 
