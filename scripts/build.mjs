@@ -23,10 +23,27 @@ await build({
   platform: "browser",
   format: "esm",
   target: ["es2022"],
-  loader: {".tsx":"tsx"},
+  loader: {".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file",".png":"file"},
+  assetNames: "assets/[name]-[hash]",
   minify: true,
-  legalComments: "none",
+  legalComments: "eof",
   logLevel: "info",
   sourcemap: false
 });
-console.log("Pages build: dist/ (browser bundle + static assets)");
+// Monaco's worker is a separate same-origin ES module. The app's
+// MonacoEnvironment points to this static asset; no CDN or inline worker.
+await build({
+  entryPoints: ["node_modules/monaco-editor/esm/vs/editor/editor.worker.js"],
+  outfile: join(dist, "editor.worker.js"),
+  bundle: true,
+  platform: "browser",
+  format: "esm",
+  target: ["es2022"],
+  minify: true,
+  legalComments: "eof",
+  logLevel: "info"
+});
+copyFileSync("node_modules/monaco-editor/LICENSE",join(dist,"LICENSE.monaco.txt"));
+copyFileSync("node_modules/monaco-editor/ThirdPartyNotices.txt",
+  join(dist,"ThirdPartyNotices.monaco.txt"));
+console.log("Pages build: dist/ (Monaco + local editor.worker.js + static assets)");
