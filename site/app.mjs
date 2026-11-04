@@ -30,6 +30,8 @@ import {phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch} from "./extended-attributes.mjs";
 import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding}
   from "./phase-bindings.mjs";
+import {phaseOutputReferenceOptions,previewPhaseOutputReference,
+  applyPhaseOutputReference} from "./phase-output-refs.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
@@ -1240,7 +1242,51 @@ function addPhaseInputBindingEditors(phase,step,container,bindings){
   return true;
 }
 
-function renderPhase(phase,body,phaseChildren,phaseBindings=[]) {
+function addPhaseOutputReferenceEditors(phase,step,container,references){
+  const options=references?.filter(r=>r.phaseName===phase.name&&
+    r.stepIndex===step.index-1);
+  if(!options?.length)return false;
+  const disclosure=el("details","step-enum");
+  disclosure.dataset.phaseOutputStep=phase.name+":"+step.index;
+  disclosure.appendChild(el("summary","",
+    "输出引用写法 · "+options.length+" 项 · D4-A2"));
+  const controls=el("div","step-enum-controls");
+  controls.appendChild(el("p","small-edit-note",
+    "仅切换当前 Source 已使用过的两种等价定位写法：生产者 Step 和输出字段不变，" +
+    "且生产者必须早于当前 Step。此操作未验证 Runtime 对引用别名的解释。"));
+  for(const option of options){
+    const label=el("label","attribute-label",
+      option.bindingKey+" · "+option.producerPhase+"."+
+      option.producerStep+".output"+option.outputSuffix);
+    const select=el("select","target-select");
+    select.setAttribute("aria-label","D4 输出引用 "+phase.name+" Step "+
+      step.index+" Binding "+option.bindingKey);
+    for(const value of option.choices){
+      const row=el("option","",value);row.value=value;select.append(row);
+    }
+    select.value=option.value;
+    label.append(select);
+    controls.append(label);
+    const preview=button("预览 Output Reference 修改",()=>{
+      try{
+        showPreview(previewPhaseOutputReference(source.value,
+          activeProcedureId,selection.id,phase.name,step.index-1,
+          option.bindingKey,select.value));
+      }catch(error){
+        message("输出引用未应用："+String(error?.message??error));
+      }
+    },"preview-button");
+    preview.disabled=true;
+    select.addEventListener("change",()=>{
+      preview.disabled=select.value===option.value;
+    });
+    controls.append(preview);
+  }
+  disclosure.append(controls);container.append(disclosure);
+  return true;
+}
+
+function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[]) {
   if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
@@ -1252,6 +1298,7 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[]) {
     item.append(meta,jump);body.appendChild(item);
     addPhaseVerifyEditor(phase,step,body);
     addPhaseInputBindingEditors(phase,step,body,phaseBindings);
+    addPhaseOutputReferenceEditors(phase,step,body,phaseOutputs);
     const ref=phaseChildren.find(c=>c.via.startsWith(phase.name+".steps[") &&
       c.procedure===step.value && c.line===step.line);
     if(ref)body.appendChild(button("进入子过程 · "+ref.procedure,
@@ -1279,7 +1326,8 @@ function nodeEditorCapabilities(nodeId){
     rename:nodeRenameAvailable(text,activeProcedureId,nodeId),
     verify:verifyNodeChoices(nodeId),
     newRoute:addRouteOutcomeOptions(text,activeProcedureId,nodeId),
-    phaseBindings:phaseStepBindingOptions(text,activeProcedureId,nodeId)
+    phaseBindings:phaseStepBindingOptions(text,activeProcedureId,nodeId),
+    phaseOutputs:phaseOutputReferenceOptions(text,activeProcedureId,nodeId)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1298,7 +1346,8 @@ function renderNodeJourney(model,caps) {
     const body=journeyStage(1,"准备",
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
       {expanded:false});
-    renderPhase(model.prepare.phase,body,model.children,caps.phaseBindings);
+    renderPhase(model.prepare.phase,body,model.children,
+      caps.phaseBindings,caps.phaseOutputs);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1313,7 +1362,8 @@ function renderNodeJourney(model,caps) {
     const body=journeyStage(3,"确认",
       model.confirm.phase?.steps.length ? model.confirm.phase.steps.length+" steps" : "",
       {expanded:false});
-    renderPhase(model.confirm.phase,body,model.children,caps.phaseBindings);
+    renderPhase(model.confirm.phase,body,model.children,
+      caps.phaseBindings,caps.phaseOutputs);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
@@ -1362,7 +1412,7 @@ function renderInspector() {
       packagePredicateSource(),activePackage?.name)))||
     Boolean(model&&((caps.attributes?.operator||caps.attributes?.bindings?.length)||
       caps.deletion||caps.rename||caps.verify.length||caps.newRoute||
-      caps.phaseBindings?.length||
+      caps.phaseBindings?.length||caps.phaseOutputs?.length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -1584,6 +1634,8 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyPhaseVerifyPatch(source.value,pendingPatch,packagePredicateSource());
     else if(pendingPatch.type==="SetPhaseInputFrom")
       nextSource=applyPhaseInputBinding(source.value,pendingPatch);
+    else if(pendingPatch.type==="NormalizePhaseOutputReference")
+      nextSource=applyPhaseOutputReference(source.value,pendingPatch);
     else if(pendingPatch.type==="SetCreatedRouteTarget")
       nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
     else if(pendingPatch.type==="RenameNode")

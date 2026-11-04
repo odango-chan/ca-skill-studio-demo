@@ -60,9 +60,7 @@ test("D4-A2 refuses arbitrary producers, output keys, external nodes and future 
     "nudm-sdm-get","postconditions",0,"udmReadReceipt",qualified));
 });
 test("D4-A2 never introduces an unobserved reference or silently accepts absent aliases",()=>{
-  const edited=source.replace(
-    "          selection:\n            from: nudm-sdm-subscribe.preconditions.select-subscription-configuration.output",
-    "          selection:\n            from: input.dnn");
+  const edited=source.replaceAll(qualified,"input.dnn");
   const option=phaseOutputReferenceOptions(edited,pid,node).find(x=>x.bindingKey===key);
   assert.equal(option,undefined);
   assert.throws(()=>previewPhaseOutputReference(...args(edited)));
