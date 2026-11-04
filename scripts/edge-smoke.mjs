@@ -229,16 +229,33 @@ try{
     const debug=await evaluate("(()=>{const h=document.getElementById('monacoHost');return {active:document.activeElement?.outerHTML.slice(0,240),hostContains:h.contains(document.activeElement),mirror:document.getElementById('source').value.slice(0,100),rendered:h.querySelector('.view-lines')?.textContent?.slice(0,160)}})()");
     throw Error("E1 Monaco typing did not reach shared Source buffer: "+JSON.stringify(debug));
   }
-  await evaluate("document.getElementById('undoButton').click()");
-  await sleep(120);
-  const undone=await evaluate("document.getElementById('source').value");
-  await evaluate("document.getElementById('redoButton').click()");
-  await sleep(120);
-  const redone=await evaluate("document.getElementById('source').value");
-  await evaluate("document.getElementById('undoButton').click()");
-  await sleep(150);
-  if(undone!==initialSource||redone!==typedSource)
-    throw Error("E1 Monaco typing, undo and redo drifted from Studio history: "+JSON.stringify({before:initialSource.length,typed:typedSource.length,undone:undone.length,redone:redone.length,undoMatches:undone===initialSource,redoMatches:redone===typedSource,undoPrefix:undone.slice(0,120),typedPrefix:typedSource.slice(0,120)}));
+  // A single CDP Input.insertText may be emitted by Monaco as several model
+  // changes. Verify *complete* round-trip through the shared Studio history
+  // rather than incorrectly assuming all characters form one transaction.
+  const historyResult=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const source=document.getElementById('source');",
+    " const undo=document.getElementById('undoButton');",
+    " const redo=document.getElementById('redoButton');",
+    " let undos=0,redos=0,restores=0;",
+    " while(source.value.length>"+initialSource.length+"&&undos<40&&!undo.disabled){undo.click();undos++;await sleep(25);}",
+    " const undone=source.value;",
+    " while(source.value.length<"+typedSource.length+"&&redos<40&&!redo.disabled){redo.click();redos++;await sleep(25);}",
+    " const redone=source.value;",
+    " while(source.value.length>"+initialSource.length+"&&restores<40&&!undo.disabled){undo.click();restores++;await sleep(25);}",
+    " return {undos,redos,restores,undone,redone,final:source.value};",
+    "})()"
+  ].join("\n"));
+  if(historyResult.undone!==initialSource||historyResult.redone!==typedSource||
+     historyResult.final!==initialSource||
+     historyResult.undos!==historyResult.redos||
+     historyResult.undos!==historyResult.restores)
+    throw Error("E1 Source/Visual shared history round-trip failed: "+JSON.stringify({
+      undos:historyResult.undos,redos:historyResult.redos,restores:historyResult.restores,
+      initialRecovered:historyResult.undone===initialSource,typedRecovered:historyResult.redone===typedSource,
+      finalRecovered:historyResult.final===initialSource
+    }));
   const switched=await evaluate([
     "(async()=>{",
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
