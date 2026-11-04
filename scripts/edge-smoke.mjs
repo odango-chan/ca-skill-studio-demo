@@ -157,6 +157,7 @@ try{
   if(result?.nodes!==17||result.edges!==48||result.valid!==48||result.markersOk!==48||
      result.attachedPorts!==96||result.maxPortGap>1.5)
     throw Error("CreatedSession visible edges FAIL");
+  console.log("MONACO_WORKER_CALLS",JSON.stringify(await evaluate("window.__studioWorkerCalls||[]")));
   if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
   if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
   console.log("CreatedSession visible paths and aligned React Flow ports PASS: "+
