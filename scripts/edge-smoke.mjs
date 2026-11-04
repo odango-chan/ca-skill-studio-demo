@@ -222,10 +222,10 @@ try{
   if(pos.width<200||pos.height<120)throw Error("Monaco canvas has no editable bounds");
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:pos.x,y:pos.y,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:pos.x,y:pos.y,button:"left",clickCount:1});
-  await command("Input.insertText",{text:"# E1 Monaco keyboard input\\n"});
+  await command("Input.insertText",{text:"E1_MONACO_INPUT"});
   await sleep(250);
   const typedSource=await evaluate("document.getElementById('source').value");
-  if(typedSource===initialSource||!typedSource.includes("# E1 Monaco keyboard input")){
+  if(typedSource===initialSource||!typedSource.includes("E1_MONACO_INPUT")){
     const debug=await evaluate("(()=>{const h=document.getElementById('monacoHost');return {active:document.activeElement?.outerHTML.slice(0,240),hostContains:h.contains(document.activeElement),mirror:document.getElementById('source').value.slice(0,100),rendered:h.querySelector('.view-lines')?.textContent?.slice(0,160)}})()");
     throw Error("E1 Monaco typing did not reach shared Source buffer: "+JSON.stringify(debug));
   }
@@ -238,7 +238,7 @@ try{
   await evaluate("document.getElementById('undoButton').click()");
   await sleep(150);
   if(undone!==initialSource||redone!==typedSource)
-    throw Error("E1 Monaco typing, undo and redo drifted from Studio history");
+    throw Error("E1 Monaco typing, undo and redo drifted from Studio history: "+JSON.stringify({before:initialSource.length,typed:typedSource.length,undone:undone.length,redone:redone.length,undoMatches:undone===initialSource,redoMatches:redone===typedSource,undoPrefix:undone.slice(0,120),typedPrefix:typedSource.slice(0,120)}));
   const switched=await evaluate([
     "(async()=>{",
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
