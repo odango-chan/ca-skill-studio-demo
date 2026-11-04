@@ -11,7 +11,8 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 5. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
 6. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
 7. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
-7. [Documentation Governance](DOCUMENTATION.md) — canonical source map
+8. [E Source Editor Workstream](design/source-editor-workstream.md) — 与 D4 并行的 Monaco / YAML / Python / Package Source 编辑设计（E1–E4 尚未实施）
+9. [Documentation Governance](DOCUMENTATION.md) — canonical source map
 
 ## 已完成阶段技术记录
 
@@ -27,6 +28,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | 现有 UI 和 Source-backed 编辑契约 | [Workbench](design/authoring-workbench.md) |
 | Route 编辑 D3 设计 | [D3 Route Designer](design/route-designer.md) |
 | Phase Step 输入绑定与后续结构编辑 | [D4 Phase Designer](design/phase-designer.md) |
+| Source Editor E1–E4 与 D 并行契约 | [E Source Editor Workstream](design/source-editor-workstream.md) |
 | 为何采用 Source-first | [ADR-0001](decisions/0001-source-first-visual.md) |
 | 当前状态 | [WORK](WORK.md) |
 | 实施、测试与证据 locator | [TRACEABILITY](TRACEABILITY.md) |
