@@ -2000,7 +2000,9 @@ async function initializeMonaco(){
   try{
     // Created before importing Monaco: workers are emitted as local Pages assets.
     self.MonacoEnvironment={
-      getWorker:()=>new Worker(new URL("./editor.worker.js",import.meta.url),{type:"module"})
+      getWorker:(_moduleId,label)=>label==="yaml"
+        ? new Worker(new URL("./yaml.worker.js",import.meta.url),{type:"module"})
+        : new Worker(new URL("./editor.worker.js",import.meta.url),{type:"module"})
     };
     const {createMonacoSourceBackend}=await import("./monaco-source-backend.mjs");
     candidate=createMonacoSourceBackend(host,{
