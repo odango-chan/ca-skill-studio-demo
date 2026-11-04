@@ -63,4 +63,4 @@ D4-A4b1（[PR #39](https://github.com/odango-chan/ca-skill-studio-demo/pull/39) 
 
 E1 Monaco Source Editor 已通过 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 合入最新 D4 主分支：本地 Monaco/Worker，YAML、Python、Markdown、JSON 的 Source 编辑，保留唯一工作副本及 Source/Visual/Split、Diff/确认/Undo/Redo；初始化失败回退原有文本编辑器。[322/322 + real Chromium 集成 CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366)，[resulting-main Pages PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343)，参见 [E 线设计](docs/design/source-editor-workstream.md)。
 
-E2 YAML 1.2 语法诊断和离线 Contract/Predicate Owner Schema 提示正在 [PR #42](https://github.com/odango-chan/ca-skill-studio-demo/pull/42) 集成验收；保留 Procedure syntax-only，避免旧 Procedure Schema 误判新版 Phase。旧堆叠 PR #35/#38 不视为已通过真实补全门禁；Runtime/5GC NOT_RUN。
+E2 YAML 1.2 语法诊断和离线 Contract/Predicate Owner Schema 提示已在 [PR #42 代码 CI #41802445121](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41802445121) 通过 327/327 + 真实补全/hover Chromium，正在完成最终 PR/Pages 验收；保留 Procedure syntax-only，避免旧 Procedure Schema 误判新版 Phase。旧堆叠 PR #35/#38 不视为已通过真实补全门禁；Runtime/5GC NOT_RUN。

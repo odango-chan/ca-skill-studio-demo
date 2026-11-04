@@ -1,7 +1,7 @@
 # E · Source Editor Workstream（与 D Visual Designer 并行）
 
 **Status: Accepted (development boundary) · Date: 2026-11-04**  
-**Implementation: E1 ACCEPTED / MERGED; E2-A1/A2 integrated candidate PR #42 from latest main@07850bf1, old stacked PR #35/#38 retained as history; E3/E4 NOT_STARTED · Acceptance: E1 resulting-main Pages PASS; E2 true completion/hover Chromium pending · Runtime NOT_RUN**  
+**Implementation: E1 ACCEPTED / MERGED; E2-A1/A2 integrated candidate PR #42 from latest main@07850bf1, old stacked PR #35/#38 retained as history; E3/E4 NOT_STARTED · Acceptance: E1 resulting-main Pages PASS; E2 code-head 327/327 tests + real completion/hover Chromium PASS; final PR/Pages pending · Runtime NOT_RUN**  
 **Current integration baseline:** `main@ccf17bfe94e150053feeda7db3a3b875d894c7b7`; [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) ports the E1-A1/A2 integration from historical [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) onto current D4-A4b1. [Final PR CI #41796985366](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366) **322/322 + real Chromium PASS** and [resulting-main Pages #41797402343](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343) **PASS** at `main@a5db46ee`. 本文件为 E 线的唯一 canonical 设计正文；追踪在 E1 #23、E2 #24、E3 #25 和 E4 #26。
 
 ## 1. 目标和不做的事
@@ -114,6 +114,6 @@ E2 集成从 `main@07850bf1529f9439046f0768dcc35eba730136e2` 出发，选取旧 
 
 `site/schemas/connectionagent/v1alpha1/manifest.json` 固定 `ca-agent-demo@7570b309` 的 Toolchain snapshot `03a42764ee2a67e39f57ab550b63c7a5d7966199`，逐个标记 3 个 vendored Schema 的 Git blob SHA；`tests/yaml-owner-schemas.test.mjs` 验证字节级来源。仅在 `assurance/contract.yaml` 和 `assurance/predicates.yaml` 使用对应 Owner Schema；公共 Schema 仅解析本地 `$ref`。`assurance/procedure.yaml` 继续仅检测 YAML 1.2 语法，**绝不**套用缺少 Phase 定义的旧 Procedure Schema，也不自造新的 Procedure 语义。
 
-本地 `yaml.worker.js`、`editor.worker.js` 使用相同 Pages 源域；`enableSchemaRequest:false` 禁止远端 Schema 读取，`format:{enable:false}` 不自动格式化 YAML。Schema 补全与 Hover 必须由真实 Chromium 的 Monaco UI 证明；旧堆叠 [PR #38 CI #41796543903](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796543903) 的语法/约束错误标记通过，但 Ctrl+Space 补全没有弹出，属于 **FAIL**，不可重用为 E2 验收证据。最新 [PR #42](https://github.com/odango-chan/ca-skill-studio-demo/pull/42) 需重新通过全部 327+ 单测、TypeScript、Build、真实 Chromium、最终 Pages Worker 与静态资源检查。
+本地 `yaml.worker.js`、`editor.worker.js` 使用相同 Pages 源域；`enableSchemaRequest:false` 禁止远端 Schema 读取，`format:{enable:false}` 不自动格式化 YAML。Schema 补全与 Hover 必须由真实 Chromium 的 Monaco UI 证明；旧堆叠 [PR #38 CI #41796543903](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796543903) 的语法/约束错误标记通过，但 Ctrl+Space 补全没有弹出，属于 **FAIL**，不可重用为 E2 验收证据。最新 [PR #42 代码 CI #41802445121](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41802445121) **327/327 单测、TypeScript、Build 与真实 Chromium PASS**：确证 YAML 1.2 语法、Contract/Predicate Schema 约束、Procedure schema 不误报、真实 Contract 字段补全弹出 `allowedResources`/`entryProcedure`/`goal` 和 `skillType` 枚举 Hover。最终文档提交的完整 PR CI、resulting-main Pages 仍需独立验收。
 
 E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**，不得冒充 Runtime/Toolchain Qualification。旧快照未必涵盖后续 owner Schema 更新；没有版本相容证明的路径必须 fail closed 为 syntax-only，不得静默追加新 Schema。
