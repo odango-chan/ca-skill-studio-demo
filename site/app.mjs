@@ -3,6 +3,7 @@ import { layoutProcedureELK,selectGraphScope } from "./layout.mjs";
 import {detailedLayoutAllowed} from "./graph-scale.mjs";
 import {auditPackageWorkspace} from "./package-audit.mjs";
 import {scriptNavigationReport} from "./script-navigation.mjs";
+import {pythonTopLevelOutline} from "./python-outline.mjs";
 import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
 import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./workbench.mjs";
@@ -1810,6 +1811,16 @@ function renderInspector() {
       for(const link of links.callers)
         inspector.appendChild(button(link.label+" · L"+link.line,
           ()=>jump(link),"source-link"));
+      inspectorTitle("文件符号");
+      const symbols=pythonTopLevelOutline(source.value);
+      if(!symbols.symbols.length)inspectorNote("没有可明确定位的顶层符号。");
+      for(const symbol of symbols.symbols)
+        inspector.appendChild(button(
+          (symbol.async?"async ":"")+
+          (symbol.kind==="class"?"class ":"def ")+
+          symbol.name+" · L"+symbol.line,
+          ()=>lineJump(symbol.line),"source-link"));
+      for(const warning of symbols.warnings)inspectorNote("⚠ "+warning);
       inspectorTitle("声明的 Schema");
       if(!links.schemas.length)inspectorNote("没有可唯一定位的 Schema。");
       for(const link of links.schemas)

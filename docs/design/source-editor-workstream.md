@@ -117,3 +117,19 @@ E2 集成从 `main@07850bf1529f9439046f0768dcc35eba730136e2` 出发，选取旧 
 本地 `yaml.worker.js`、`editor.worker.js` 使用相同 Pages 源域；`enableSchemaRequest:false` 禁止远端 Schema 读取，`format:{enable:false}` 不自动格式化 YAML。Schema 补全与 Hover 必须由真实 Chromium 的 Monaco UI 证明；旧堆叠 [PR #38 CI #41796543903](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796543903) 的语法/约束错误标记通过，但 Ctrl+Space 补全没有弹出，属于 **FAIL**，不可重用为 E2 验收证据。最新 [PR #42 代码 CI #41802445121](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41802445121) **327/327 单测、TypeScript、Build 与真实 Chromium PASS**：确证 YAML 1.2 语法、Contract/Predicate Schema 约束、Procedure schema 不误报、真实 Contract 字段补全弹出 `allowedResources`/`entryProcedure`/`goal` 和 `skillType` 枚举 Hover。[最终 PR CI #41803566642](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41803566642) 328/328 单测、TypeScript、Build、真实 Chromium 全 PASS，[resulting-main Pages #41804005500](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41804005500) 同 SHA `9708528f` 的打包、yaml.worker.js、静态资源/语法、Chromium 和部署均 PASS。
 
 E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**，不得冒充 Runtime/Toolchain Qualification。旧快照未必涵盖后续 owner Schema 更新；没有版本相容证明的路径必须 fail closed 为 syntax-only，不得静默追加新 Schema。
+
+## 11. E3 Python 编辑与导航：有界实施候选（2026-11-04）
+
+**E3-A1:** [PR #45](https://github.com/odango-chan/ca-skill-studio-demo/pull/45) 已合入 `main@fc6c42a`；333 项测试、TypeScript/构建及真实 Chromium 通过；resulting-main Pages 另行核验。**E3-A2:** [PR #46](https://github.com/odango-chan/ca-skill-studio-demo/pull/46) 的源代码在旧 A1 分支上通过 338/338 项单测、TypeScript、构建与真实 Chromium；本次将相同源码树接到已合入 A1 的 main 重新验收，未通过新 HEAD CI / resulting-main Pages 前不宣称最终验收完成。
+
+| 能力 | 实施 / 限制 |
+| --- | --- |
+| Python 语法着色、括号/缩进与编辑 | E1 Monaco 已提供基础语言模式，原始脚本始终是内存 Package 的权威 Source |
+| Procedure `script:` 与 Predicate `skill.<name>` 来路 | A1 扫描已有 YAML AST 的精确字面引用；工具名必须唯一，含糊时只提示不伪造跳转 |
+| `# inputSchema` / `# outputSchema` | A1 仅关联唯一标题一致的当前 Package Schema；**不推断 Tool ABI** |
+| Python 文件内 `class` / `def` / `async def` | A2 只索引明确的零缩进顶层声明；注释、三引号文本、嵌套声明不建立跳转，重复名称不建立链接 |
+| Python 诊断 / 类型推断 | **未实现**；A2 的词法导航不是 Python parser、Pyright 或 Runtime Validator |
+| Ruff / 自动格式化 / 脚本运行 | **未实现且未授权**；不执行用户脚本、不自动改写文件 |
+| 完整本地 Package 打开/保存 | 属于 E4，尚未实现；当前 Download/ZIP 不是原位 Save |
+
+上述可点击跳转走现有 `source.revealLine`、`switchFile`，不建立第二业务真源，不更改 D4 编辑资格或 Source 事务。A2 必须通过全部 Node 单测、TS 类型检查、打包、真实 Chromium（包括三份 Python 的符号点击与 E1/E2/D4 回归），且合并后需独立核对 resulting-main Pages。若词法无法可靠分析，Inspector 必须关闭不确定跳转，而不是制造假语义。
