@@ -95,3 +95,5 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 ### A3b1 验收证据
 
 [PR #30 CI #41777788675](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41777788675) 验证 272/272 单元测试 PASS、TypeScript PASS、Build PASS 和真实 Chromium PASS；浏览器分别检查新增与删除 Verify 的资格门槛、Diff、取消、应用、Undo/Redo、Source 精确恢复，并证明带绑定的 Step 不显示误删入口。首次单测发现重复 Verify 删除资格的边界遗漏，已补充拒绝规则并复验成功。最终证据不代表 Runtime/5GC E2E。
+
+[PR #30 文档集成验收 CI #41778044582](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41778044582) 亦通过单元测试、类型检查、构建和真实 Chromium；Pages 部署需按合并后的精确主分支结果单独确认。
