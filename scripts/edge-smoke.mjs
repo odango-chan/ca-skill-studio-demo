@@ -368,14 +368,15 @@ try{
     "  row:blank?.textContent||'',index};",
     "})()"
   ].join("\n"));
+  console.log("E2_COMPLETION_SETUP",JSON.stringify(completionSetup));
   if(!completionSetup?.found||completionSetup.policy!=="owner-schema-v1alpha1"||completionSetup.width<200||completionSetup.height<120)
     throw Error("E2 completion editor position unavailable: "+JSON.stringify(completionSetup));
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:completionSetup.x,y:completionSetup.y,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:completionSetup.x,y:completionSetup.y,button:"left",clickCount:1});
-  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Control",code:"ControlLeft",modifiers:2});
-  await command("Input.dispatchKeyEvent",{type:"keyDown",key:" ",code:"Space",modifiers:2});
-  await command("Input.dispatchKeyEvent",{type:"keyUp",key:" ",code:"Space",modifiers:2});
-  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Control",code:"ControlLeft",modifiers:0});
+  await command("Input.dispatchKeyEvent",{type:"rawKeyDown",key:"Control",code:"ControlLeft",modifiers:2,windowsVirtualKeyCode:17,nativeVirtualKeyCode:17});
+  await command("Input.dispatchKeyEvent",{type:"rawKeyDown",key:" ",code:"Space",modifiers:2,windowsVirtualKeyCode:32,nativeVirtualKeyCode:32});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:" ",code:"Space",modifiers:2,windowsVirtualKeyCode:32,nativeVirtualKeyCode:32});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Control",code:"ControlLeft",modifiers:0,windowsVirtualKeyCode:17,nativeVirtualKeyCode:17});
   console.log("E2_COMPLETION_FOCUS",JSON.stringify(await evaluate("({active:document.activeElement?.className||document.activeElement?.tagName,aria:document.activeElement?.getAttribute?.('aria-label'),input:document.querySelector('.monaco-editor textarea.inputarea')===document.activeElement})")));
   await sleep(900);
   const completion=await evaluate([
