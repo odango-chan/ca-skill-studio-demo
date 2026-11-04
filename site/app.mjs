@@ -1420,7 +1420,7 @@ function addNamedStepImpact(phase,step,container,impacts,effectImpacts=[]){
   const effect=effectImpacts.find(row=>row.phaseName===phase.name&&
     row.stepIndex===step.index-1);
   if(effect){
-    const audit=el("div","phase-dependency-item");
+    const audit=el("div","phase-step-effect-audit");
     audit.dataset.stepMutationImpact=phase.name+":"+step.index;
     audit.dataset.deleteVerdict=effect.deletion.code;
     audit.dataset.moveVerdict=effect.move.code;
