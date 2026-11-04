@@ -1,7 +1,7 @@
 # E · Source Editor Workstream（与 D Visual Designer 并行）
 
 **Status: Accepted (development boundary) · Date: 2026-11-04**  
-**Implementation: E1 IMPLEMENTED on PR #33; E2/E3/E4 NOT_STARTED · Acceptance: E1 PR CI PASS; main/Pages NOT_RUN**  
+**Implementation: E1 IMPLEMENTED on PR #33; E2-A1 YAML syntax candidate IMPLEMENTED, E2-A2/E3/E4 NOT_STARTED · Acceptance: E1 PR CI PASS; E2-A1 CI NOT_RUN; main/Pages NOT_RUN**  
 **Baseline initially inspected:** `main@ef40178f81e166aca59ea73fb7dbac42b5ccdeb8`; **integrated implementation**: [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) HEAD `a066a48c` on D4 `main@a9580749`, [286 unit tests + Chromium PR CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41785473857). Not merged or deployed on Pages。本文件为 E 线的唯一 canonical 设计正文；任务与验收追踪在 [E1 #23](https://github.com/odango-chan/ca-skill-studio-demo/issues/23)、[E2 #24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24)、[E3 #25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25)、[E4 #26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)。
 
 ## 1. 目标和不做的事
@@ -101,3 +101,11 @@ E2/E3 依赖稳定 E1 adapter，但 D4 与 E1 可同时进行。E4 不以静态 
 - E2-A1 先做 Owner Schema 兼容性审计/路径关联的纯函数与正反测试；仅能对已证实结构一致的 Contract/Predicate 引入严格提示。
 - Schema 不匹配的 Procedure 仍保留 YAML syntax diagnostics 和基础编辑，不自行推断新的可执行 DSL、不能丢弃引用与注释，更不能显示 Runtime qualification PASS。
 - E2-A2 才进行 `monaco-yaml` Worker 集成；禁用远端 Schema 自动请求，保证 static Pages 离线可用、运行期只读，Schema Version/owner 明确固定。
+
+## 9. E2-A1 Grammar-only 实现边界
+
+E2-A1 候选分支在 Monaco 上使用 `site/yaml-source-diagnostics.mjs` 的 YAML 1.2 syntax markers（非 `monaco-yaml` Schema diagnostics）；与现有 Graph 的 `stringKeys`、`uniqueKeys`、`strict` 一致。只诊断语法；对整个 Procedure 的编排是否正确、Reference 解析、Runtime 是否可执行不作结论。
+
+`yamlSchemaCapability(path)` 对 `assurance/procedure.yaml` 固定返回 `procedure-schema-incompatible`，`contract.yaml` / `predicates.yaml` 仅为 `schema-candidate-not-attached`。不能显示“Owner Schema 验证通过”，也不能将 Toolchain 旧 Procedure Schema 直接绑定至当前示例。
+
+E2-A2 待另行评审的 `monaco-yaml` Worker、真正 Owner Schema JSON 配置、补全/hover，以及关闭远端 schema 请求不属于 A1 的交付。
