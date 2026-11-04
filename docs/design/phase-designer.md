@@ -1,8 +1,8 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a Accepted; A2.2b1 read-only candidate; A2.2b2/A3/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a merged; A2.2b1 PR #19 candidate; A2.2b2/A3/A4 NOT_STARTED**  
-**Acceptance: A2.2a 245 tests + real Chromium PASS; A2.2b1 unit 253 PASS, browser Gate pending; Runtime/5GC NOT_RUN**  
+**Status: A1/A2.1/A2.2a/A2.2b1 read-only Accepted; A2.2b2/A3/A4 Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a merged; A2.2b1 implemented in PR #19; A2.2b2/A3/A4 NOT_STARTED**  
+**Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 253 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
 ## Model and visual hierarchy
@@ -67,4 +67,4 @@ Implementation `site/phase-consumer-contract.mjs` reads only the current Package
 
 Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_create_inputs.read` do **not** have a complete, package-discoverable versioned output+input ABI binding for this Studio; their fields remain unresolved rather than borrowing a similarly named external JSON Schema. To implement D4-A2.2b2, owner integration must explicitly map each concrete operation identity to versioned consumer input and producer output schemas, define the accepted Phase reference namespace, and validate execution order and source-to-consumer constraint compatibility. The editor must not author guesses.
 
-[PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19) includes unit and actual-browser acceptance; Runtime/5GC qualification remains NOT_RUN. Type evidence does not modify YAML or introduce a second graph state.
+[PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19) [CI #41760140209](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41760140209) verified 253/253 tests, TypeScript, build and real Chromium. The actual browser checked Script consumer input Schema, `TYPE_ONLY_MATCH`, missing producer and consumer ABI, no write controls, unchanged YAML/Node count. Runtime/5GC qualification remains NOT_RUN. Type evidence does not modify YAML or introduce a second graph state.
