@@ -1,8 +1,8 @@
 # E · Source Editor Workstream（与 D Visual Designer 并行）
 
 **Status: Accepted (development boundary) · Date: 2026-11-04**  
-**Implementation: E1 integrated candidate PR #40 on main@ccf17bfe; E2 #35/#38 stacked PRs OPEN, E3/E4 NOT_STARTED · Acceptance: E1 code-head 322 tests + Chromium PASS; final PR/main Pages pending**  
-**Current integration baseline:** `main@ccf17bfe94e150053feeda7db3a3b875d894c7b7`; [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) ports the E1-A1/A2 integration from historical [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) onto current D4-A4b1. [Code CI #41796287748](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796287748): **322/322 tests and real Chromium PASS**. Final PR/main Pages not yet accepted. 本文件为 E 线的唯一 canonical 设计正文；追踪在 E1 #23、E2 #24、E3 #25 和 E4 #26。
+**Implementation: E1 ACCEPTED and MERGED as main@a5db46ee (PR #40); E2 #35/#38 stacked PRs OPEN, E3/E4 NOT_STARTED · Acceptance: 322/322 tests, real Chromium and resulting-main Pages PASS · Runtime NOT_RUN**  
+**Current integration baseline:** `main@ccf17bfe94e150053feeda7db3a3b875d894c7b7`; [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) ports the E1-A1/A2 integration from historical [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) onto current D4-A4b1. [Final PR CI #41796985366](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366) **322/322 + real Chromium PASS** and [resulting-main Pages #41797402343](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343) **PASS** at `main@a5db46ee`. 本文件为 E 线的唯一 canonical 设计正文；追踪在 E1 #23、E2 #24、E3 #25 和 E4 #26。
 
 ## 1. 目标和不做的事
 
@@ -90,9 +90,9 @@ E2/E3 依赖稳定 E1 adapter，但 D4 与 E1 可同时进行。E4 不以静态 
 
 ## 7. E1 已验证的实际实现状态（2026-11-04）
 
-- E1-A1 [PR #28](https://github.com/odango-chan/ca-skill-studio-demo/pull/28) — backend-neutral `source.value` facade，旧 textarea 回退；E1-A2 [PR #31](https://github.com/odango-chan/ca-skill-studio-demo/pull/31) — Monaco 0.57.0、本地 Editor Worker、YAML/Python/Markdown/JSON grammar；最终以从最新 D4 主分支启动的 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 为当前交付候选；旧 PR #33 仅保留历史证据。
+- E1-A1 [PR #28](https://github.com/odango-chan/ca-skill-studio-demo/pull/28) — backend-neutral `source.value` facade，旧 textarea 回退；E1-A2 [PR #31](https://github.com/odango-chan/ca-skill-studio-demo/pull/31) — Monaco 0.57.0、本地 Editor Worker、YAML/Python/Markdown/JSON grammar；最终以从最新 D4 主分支启动的 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 作为正式交付，已合入 main 并成功部署；旧 PR #33 仅保留历史证据。
 - [PR #40 code CI #41796287748](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796287748) **PASS 322/322**，Typecheck、Build、真实 Chromium：Monaco 本地挂载、typing→Source、shared Undo/Redo、YAML/Python/Markdown 切换；最新 D4-A4b1 Phase Outcome 修复 Chromium 操作和历史回归也 PASS。
-- E1 当前正在 PR #40 最终 CI 与 resulting-main Pages 阶段，合入前不得写成正式部署。代码仍保留原 textarea 作为不交互镜像与初始化失败的回退，原样保留 Source/Visual/Split、文件历史、Patch Diff。
+- E1 已于 2026-11-04 合入 main 并通过 resulting-main Pages（精确 merge SHA）。原 textarea 仍作为不交互测试镜像与 Monaco 初始化失败时的回退；保留 Source/Visual/Split、文件历史和 Patch Diff。
 
 ## 8. E2 重要 Owner Schema 相容性门禁
 
@@ -104,6 +104,6 @@ E2/E3 依赖稳定 E1 adapter，但 D4 与 E1 可同时进行。E4 不以静态 
 
 ## 9. E1 最新 D4 集成证据（PR #40）
 
-在 `main@ccf17bfe` D4-A4b1 基线上仅移植 E1 Source 连接层，保留最新 Phase Outcome 修复、Step/Route 资格与浏览器测试。实际 Chromium 的 `E1_MONACO_READY`、`E1_MONACO_SOURCE_HISTORY` 证明 Monaco 本地加载、YAML/Python/Markdown 文件切换与共享 Undo/Redo；最新版 `D4_A4B1_PHASE_OUTCOME_REPAIR` 仍 PASS。Worker 从同源 Pages 静态资源加载，不使用外部 CDN；旧 textarea 作为初始化失败 fallback。最终 Pages 需检查 Worker、Monaco license/notice 与语法，再归档结果。
+在 `main@ccf17bfe` D4-A4b1 基线上仅移植 E1 Source 连接层，保留最新 Phase Outcome 修复、Step/Route 资格与浏览器测试。实际 Chromium 的 `E1_MONACO_READY`、`E1_MONACO_SOURCE_HISTORY` 证明 Monaco 本地加载、YAML/Python/Markdown 文件切换与共享 Undo/Redo；最新版 `D4_A4B1_PHASE_OUTCOME_REPAIR` 仍 PASS。Worker 从同源 Pages 静态资源加载，不使用外部 CDN；旧 textarea 作为初始化失败 fallback。[Pages #41797402343](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343) 已在合并 SHA 对 Worker、Monaco license/notice、JavaScript 语法、浏览器交互和发布进行验收，全部 PASS。
 
 E2 #35/#38 仍叠在旧 E1 分支，E1 合入后需重新选择最新 main 为 E2 基线并独立回归，不能把 E2 智能提示当作 E1 的默认能力。Studio 不取得 Runtime/5GC 的业务认证权。
