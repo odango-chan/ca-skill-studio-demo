@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-04**  
-**Reviewed implementation baseline: main@ef40178f81e166aca59ea73fb7dbac42b5ccdeb8**（D4-A2.2b1 已合入且 Pages PASS；D4-A3a 候选审查中）
+**Reviewed implementation baseline: main@ef40178f81e166aca59ea73fb7dbac42b5ccdeb8**（D4-A2.2b1 已合入且 Pages PASS；D4-A3a 已通过首轮编辑器级验收）
 
 ## Overall
 
@@ -25,7 +25,7 @@
 | D4-A2.1 同生产 Step 的输出引用写法 | ACCEPTED（Editor-tier） | IMPLEMENTED（main） | PASS（238 tests + Chromium） | [PR #17 merged](https://github.com/odango-chan/ca-skill-studio-demo/pull/17)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41756050731)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41756351449) |
 | D4-A2.2a Phase Step 依赖/Schema 证据审查（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（main） | PASS（245 tests + Chromium） | [PR #18 merged](https://github.com/odango-chan/ca-skill-studio-demo/pull/18)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41758229256)、[设计](design/phase-designer.md) |
 | D4-A2.2b1 Script 消费参数 Schema / 生产者类型对照（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（PR #19） | PASS（258 tests + real Chromium；PR #19 已合入） | [PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19)、[最终 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41769318870)、[设计](design/phase-designer.md) |
-| D4-A3a 相邻独立 Verify Step 的 Source-backed 换序 | PROPOSED（Editor-tier） | IMPLEMENTED（候选） | NOT_RUN（待本分支 CI） | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
+| D4-A3a 相邻独立 Verify Step 的 Source-backed 换序 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #29） | PASS（264 tests + Chromium；首轮提交） | [PR #29](https://github.com/odango-chan/ca-skill-studio-demo/pull/29)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41770964460)、[设计](design/phase-designer.md) |
 | D4-A2.2b2/A3b/A4 生产者改绑 / Step 新增删除及通用排序 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
@@ -36,7 +36,7 @@
 ## Current open work
 
 - [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3 有界 operator.on Route 编辑已合入；Runtime Outcome 资格和 Phase-specific Route 仍未覆盖。
-- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（候选待验收）；A2.2b2、A3b 新增/删除/通用排序和 A4 尚未开始。
+- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b 新增/删除/通用排序和 A4 尚未开始。
 - 早期未合并 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)、[#2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)、[#3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3) 目前只作为历史候选，**不推断可直接合并**。
 
 ## Authority / evidence

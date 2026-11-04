@@ -71,7 +71,7 @@ test("D4 read-only consumer ABI evidence accepted; cross-producer edits still de
   assert.match(work,/\|\s*D4-A2\.1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A2\.2a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A2\.2b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A3a[^\n]*\|\s*PROPOSED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*NOT_RUN/);
+  assert.match(work,/\|\s*D4-A3a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A2\.2b2\/A3b\/A4[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
   assert.match(spec,/Runtime\/5GC NOT_RUN/);
   const trace=content("docs/TRACEABILITY.md");

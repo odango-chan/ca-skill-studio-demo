@@ -83,6 +83,6 @@ Studio 本身**不是** Agent Host 的 `read_reference`，不会替模型自行�
 验收包含 owner blob SHA 校验、引用路径及安全预览、16 文件 ZIP、真实浏览器的文件夹导航、
 三文档预览、编辑/Undo/Redo、返回原 17 Node 的 Procedure。参见 [PR #20](https://github.com/odango-chan/ca-skill-studio-demo/pull/20)。
 
-## D4-A3a · 最小 Phase Step 顺序编辑（候选）
+## D4-A3a · 最小 Phase Step 顺序编辑（编辑器级验收通过）
 
 Inspector 在 Source 能证明是两个紧邻、未命名、单行、无 Binding 的 Verify 时，在前一个 Step 行显示「下移」。操作复用现有 Source Diff、确认和 Undo/Redo；复杂 Step 不出现可点击按钮。此项不创建流程主画布 Node，也不代表 Runtime 验证顺序无关。详见 [Phase Designer](phase-designer.md)。

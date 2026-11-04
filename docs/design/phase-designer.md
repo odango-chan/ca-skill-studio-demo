@@ -1,6 +1,6 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1 Accepted; A3a bounded Verify swap candidate; A2.2b2/A3b/A4 Proposed · Date: 2026-11-04**  
+**Status: A1/A2.1/A2.2a/A2.2b1 Accepted; A3a bounded Verify swap Accepted; A2.2b2/A3b/A4 Proposed · Date: 2026-11-04**  
 **Implementation: A1/A2.1/A2.2a merged; A2.2b1 implemented in PR #19; A2.2b2/A3/A4 NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
@@ -70,7 +70,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 
 [PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19) [CI #41769084899](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41769084899) verified 258/258 tests, TypeScript, build and real Chromium. The actual browser checked Script consumer input Schema, `TYPE_ONLY_MATCH`, missing producer and consumer ABI, no write controls, unchanged YAML/Node count. Runtime/5GC qualification remains NOT_RUN. Type evidence does not modify YAML or introduce a second graph state.
 
-## D4-A3a · 受限相邻 Verify Step 换序（候选）
+## D4-A3a · 受限相邻 Verify Step 换序（已通过编辑器级验收）
 
 第一阶段只处理一个 Node 内同一 Phase 的两个紧邻 Step：二者必须是不同的、未命名、单行纯标量 Verify，不能有 with、name、额外字段、注释、引用或脚本/调用副作用。只交换两行原始 YAML 字节，不反序列化整份源文件；Phase Route、主 Operator、Node、Child、Route 和其他 Procedure 必须重新投影后结构一致。
 
@@ -79,4 +79,4 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 - 实例：nudm-sdm-subscribe.preconditions 最后两条 ingress.eligible 和 lifecycle.ready；有绑定或命名输出的 Step 不提供移动按钮。
 - 这是编辑期结构操作；即使两个 Verify 没有数据依赖，也不证明它们的失败短路语义、观测顺序或 Runtime 效果等价。A3b 的新增、删除和更通用的安全重排需单独建立引用影响判定。
 
-CI/Chromium 和部署验收在 PR 完成后更新，不提前标为 PASS。
+首轮 [CI #41770964460](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41770964460)：264/264 单测、TypeScript、Build、Chromium 均 PASS。浏览器确认只有一个可交换入口、Diff、取消、应用、Undo/Redo、原文恢复。最终文档提交与 Pages 部署仍需单独验证；Runtime/5GC NOT_RUN。
