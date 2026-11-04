@@ -57,8 +57,11 @@ test("D4-A4a retarget existing preconditions FAILED without touching operator/on
   assert.equal(after.procedures.get(pid).routes.find(x=>
     x.id===sub+":postconditions:PASS").target,
     before().procedures.get(pid).routes.find(x=>x.id===sub+":postconditions:PASS").target);
-  const reverse=previewPhaseRouteTarget(applied,pid,rid,"failed");
-  assert.equal(applyPhaseRouteTarget(applied,reverse),source);
+  // Only current same-Phase/same-Outcome values qualify. After the edit
+  // the original target is no longer observed there; Undo is authoritative.
+  assert.throws(()=>previewPhaseRouteTarget(applied,pid,rid,"failed"));
+  assert.equal(phaseRouteTargetOptions(applied,pid,sub).some(x=>
+    x.routeId===rid),false);
 });
 
 test("D4-A4a postconditions FAIL can retarget but PASS happy-path cannot",()=>{
@@ -131,8 +134,7 @@ test("D4-A4a keeps CRLF bytes and refuses mixed EOL",()=>{
   assert.equal(changed,crlf.slice(0,p.sourceSpan.start)+"finalize-failed"+
     crlf.slice(p.sourceSpan.end));
   assert.equal(changed.match(/\r\n/g).length,crlf.match(/\r\n/g).length);
-  assert.equal(applyPhaseRouteTarget(changed,
-    previewPhaseRouteTarget(changed,pid,rid,"failed")),crlf);
+  assert.throws(()=>previewPhaseRouteTarget(changed,pid,rid,"failed"));
   assert.throws(()=>previewPhaseRouteTarget(source.replace("\n","\r\n"),
     pid,rid,"finalize-failed"),/Mixed/);
 });
