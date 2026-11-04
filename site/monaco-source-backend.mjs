@@ -97,25 +97,6 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
     ensureMonacoWorkerCompatibility();
     ensureYamlLanguage();
     host.dataset.yamlSchemaEngine="monaco-yaml@5.5.1";
-    host.__studioYamlDiagnostics=()=>{
-      const active=model;
-      const markers=active?monaco.editor.getModelMarkers({resource:active.uri}):[];
-      return {uri:active?.uri.toString()||null,language:active?.getLanguageId()||null,
-        value:active?.getValue()||"",markers:markers.map(({severity,message,startLineNumber,startColumn,endLineNumber,endColumn,owner})=>
-          ({severity,message,startLineNumber,startColumn,endLineNumber,endColumn,owner}))};
-    };
-
-    host.__studioEditorDebug=()=>({
-      uri:editor.getModel()?.uri.toString()||null,
-      position:editor.getPosition(),
-      focused:editor.hasTextFocus()
-    });
-    host.__studioSetEditorPosition=(lineNumber,column)=>
-      editor.setPosition({lineNumber,column});
-    host.__studioTriggerCompletion=()=>{
-      editor.focus();
-      editor.trigger("keyboard","editor.action.triggerSuggest",{});
-    };
     editor=monaco.editor.create(host,{
       model:null,theme:"vs",automaticLayout:true,minimap:{enabled:false},
       fontSize:12,lineHeight:21,tabSize:2,insertSpaces:true,
