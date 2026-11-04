@@ -68,7 +68,16 @@ try{
     ws.addEventListener("error",rej,{once:true});});
   ws.addEventListener("message",event=>{
     const msg=JSON.parse(event.data);
-    if(msg.method==="Runtime.exceptionThrown")exceptions.push(msg.params?.exceptionDetails?.text);
+    if(msg.method==="Runtime.exceptionThrown"){
+      const details=msg.params?.exceptionDetails;
+      exceptions.push({
+        text:details?.text,
+        message:details?.exception?.description||details?.exception?.value,
+        stack:details?.stackTrace?.callFrames?.slice(0,6).map(frame=>({
+          url:frame.url,line:frame.lineNumber+1,column:frame.columnNumber+1,function:frame.functionName
+        }))
+      });
+    }
     if(msg.method==="Runtime.consoleAPICalled"&&["warning","error"].includes(msg.params?.type))warnings.push(msg.params.args?.map(a=>a.value||a.description).join(" "));
     if(msg.id&&pending.has(msg.id)){
       const task=pending.get(msg.id);pending.delete(msg.id);
