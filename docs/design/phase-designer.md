@@ -1,7 +1,7 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a effect/dependency impact candidate (read-only); A2.2b2/A3b2b2b/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 merged; A3b2b2a PR #36 candidate; A2.2b2/A3b2b2b/A4 NOT_STARTED**  
+**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a effect/dependency impact Accepted (read-only); A2.2b2/A3b2b2b/A4 Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 merged; A3b2b2a implemented in PR #36; A2.2b2/A3b2b2b/A4 NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
@@ -129,7 +129,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 
 [PR #34 集成 CI #41786616595](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41786616595)：289/289 单元测试、TypeScript、Build、真实 Chromium 全部 PASS。浏览器在 `nudm-sdm-subscribe.preconditions` 中完成「命名 Verify → 相邻换序 → 删除」的 Source Diff、取消、应用、Undo/Redo 与原 YAML 完整恢复；命名脚本/工具调用没有获得删除或换序入口。最终文档提交与 Pages 部署还需另外验证；Runtime/5GC E2E NOT_RUN。
 
-## D4-A3b2b2a · 命名 Step 删除/换序影响门禁（PR #36）
+## D4-A3b2b2a · 命名 Step 删除/换序影响门禁（PR #36，编辑器级验收通过）
 
 第一阶段明确 **只读审查**。对一个命名 Phase Step，结合现有当前 Procedure AST/Source 的生产者唯一性、命名输出消费者、同 Node Phase `with.*.from` 依赖，以及 D4-A2.2a 的依赖路径报告，单独形成删除与「同 Phase 与下一条 Step 换序」的证据状态。
 
@@ -138,3 +138,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 当前真实样例 `nudm-sdm-subscribe.preconditions` 中：`select-subscription-configuration` 的输出通过 `with.selection.from` 被紧邻的 `resolve-pcf-create-inputs` 消费；后者的输出又被紧邻 Verify 的两个输入消费。Inspector 在既有折叠「引用影响」下显示对应依赖的 Source 行号、键、原值及禁止原因，保持现有图、Source 和编辑按钮不变。
 
 负面场景：移除显式相邻 from 依赖后仍因 effect 语义未证明而禁止 script/call 调序；带输出消费者的 Verify 不得错误地通过仅凭 operator 的检查；引号/未知引用 fail closed；独立且命名的纯 Verify 仅返回 VERIFY_EDITOR_RULES，实际编辑仍走 A3b2b1 的 AST 精确资格、Diff、确认、Undo/Redo。此处不会执行真实脚本、Tool 或 5GC；Runtime/5GC E2E NOT_RUN。
+
+### D4-A3b2b2a 验收证据
+
+[PR #36 代码与文档 CI #41788514319](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41788514319)：298/298 单元测试、TypeScript、Build、真实 Chromium PASS。实际浏览器确认 Script → Call 与 Call → Verify 的直接输出依赖各在已有 Inspector 里显示 Source 行号、阻止原因；没有新写入口；原有命名 Step 的 5 条消费引用列表及 Diff/确认/Undo/Redo 回归 PASS。第一次 CI 在浏览器中发现新增影响行复用 consumer 类导致计数回归，修复为独立 UI 类后同一完整浏览器套件通过。Runtime/5GC E2E NOT_RUN。
