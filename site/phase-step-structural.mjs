@@ -147,6 +147,9 @@ function deletePreview(source,procedureId,nodeId,phaseName,stepIndex){
   const {phase}=steps(ctx,phaseName);
   if(phase.steps.length<2)fail("Cannot leave an empty Steps YAML sequence");
   const target=lineFor(ctx,phaseName,stepIndex);
+  if(phase.steps.filter(step=>step.operator==="verify"&&
+       step.value===target.step.value).length!==1)
+    fail("Duplicate Verify predicate in this Phase is ambiguous");
   const start=target.start,end=target.end;
   const candidateSource=source.slice(0,start)+source.slice(end);
   verifyCandidate(ctx,candidateSource,phaseName,"delete",stepIndex,target.step.value);
