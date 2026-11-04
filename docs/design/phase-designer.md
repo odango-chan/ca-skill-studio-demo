@@ -1,7 +1,7 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a Accepted; A3b2b1 named Verify lifecycle Accepted; A2.2b2/A3b2b2/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a merged; A3b2b1 implemented in PR #34; A2.2b2/A3b2b2/A4 NOT_STARTED**  
+**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a effect/dependency impact Accepted (read-only); A2.2b2/A3b2b2b/A4 Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 merged; A3b2b2a implemented in PR #36; A2.2b2/A3b2b2b/A4 NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
@@ -22,7 +22,8 @@ Only authored Procedure business Nodes belong to the React Flow main graph. `pre
 | D4-A3b1 | Append a PredicateSet-declared unnamed/unbound plain Verify to an existing Phase or delete one eligible plain Verify | Never remove the only Step, duplicate a Verify, move comments, delete named/bound producers, create a Phase, or claim runtime equivalence |
 | D4-A3b2a | Read-only named Step reference impact + bounded rename with all recognized consumers | Fail closed on unknown occurrences/quoted/duplicate names; no deletion, reorder, guessed alias or Runtime name-equivalence claim |
 | D4-A3b2b1 | Give existing plain Verify a unique name, or delete/swap an unreferenced named plain Verify | Zero Source-proven references required; no call/script/procedure effects, named outputs, unsafe comments or Runtime claims |
-| D4-A3b2b2 | General Step creation, deletion and dependency-aware reorder with side effects, named outputs or bindings | Requires owner effect semantics and full dataflow impact analysis; no graph-node inflation |
+| D4-A3b2b2a | Read-only delete/reorder verdict for named Steps: output consumers, direct adjacent from edges and effect-contract blockers | No new mutation; do not treat lack of output refs as proof of effect safety |
+| D4-A3b2b2b | General Step creation, deletion or reordering with side effects, named outputs or bindings | Needs owner effect semantics and explicit Runtime contract; no graph-node inflation |
 | D4-A4 | Phase-specific `on` Route authoring | Must separate `preconditions.on` / `postconditions.on` from `operator.on` and use owner Outcome eligibility |
 
 D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, number, boolean, object, array) to build a **conservative editor-only choice set**. This does not mean that a same-type input is semantically appropriate for a specific Tool/Script/Verify consumer. No Runtime qualification is inferred.
@@ -43,7 +44,7 @@ D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, numbe
 - Browser: expand owning Node's 准备 Step, select qualified input, Diff/cancel/Apply/Undo/Redo and verify main graph's Node count unchanged.
 - Gates: unit/negative tests, TypeScript typecheck, build and real Chromium browser interactions. No Runtime/5GC operation or qualification will run.
 
-A2.2b2/A3b2b2/A4 remain NOT_STARTED; A3a/A3b1/A3b2a/A3b2b1 are bounded editor-tier Step edits, not general side-effect-aware deletion/reorder or Runtime qualification.
+A2.2b2/A3b2b2b/A4 remain NOT_STARTED; A3b2b2a remains read-only, A3a/A3b1/A3b2a/A3b2b1 are bounded editor-tier Step edits, not general effectful deletion/reorder or Runtime qualification.
 
 ## A1 actual acceptance
 
@@ -127,3 +128,17 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 ### D4-A3b2b1 验收证据
 
 [PR #34 集成 CI #41786616595](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41786616595)：289/289 单元测试、TypeScript、Build、真实 Chromium 全部 PASS。浏览器在 `nudm-sdm-subscribe.preconditions` 中完成「命名 Verify → 相邻换序 → 删除」的 Source Diff、取消、应用、Undo/Redo 与原 YAML 完整恢复；命名脚本/工具调用没有获得删除或换序入口。最终文档提交与 Pages 部署还需另外验证；Runtime/5GC E2E NOT_RUN。
+
+## D4-A3b2b2a · 命名 Step 删除/换序影响门禁（PR #36，编辑器级验收通过）
+
+第一阶段明确 **只读审查**。对一个命名 Phase Step，结合现有当前 Procedure AST/Source 的生产者唯一性、命名输出消费者、同 Node Phase `with.*.from` 依赖，以及 D4-A2.2a 的依赖路径报告，单独形成删除与「同 Phase 与下一条 Step 换序」的证据状态。
+
+判定区分 OUTPUT_CONSUMERS（有下游引用）、DIRECT_DATA_DEPENDENCY（相邻后一步明确消费前一步的输出）、UNKNOWN_REFERENCES（名称/引用无法闭集核验）、EFFECT_UNPROVEN（script/call/procedure 真实副作用和先后顺序没有 owner 契约）、UNRESOLVED_INPUTS、NO_NEXT_STEP，以及 VERIFY_EDITOR_RULES（仅为已有纯 Verify 专用 Source 编辑器候选，绝不是此模块授予的新写权限）。即使不存在任何 `from` 引用，也不能据此给 Call/Script 开放删除或重排。
+
+当前真实样例 `nudm-sdm-subscribe.preconditions` 中：`select-subscription-configuration` 的输出通过 `with.selection.from` 被紧邻的 `resolve-pcf-create-inputs` 消费；后者的输出又被紧邻 Verify 的两个输入消费。Inspector 在既有折叠「引用影响」下显示对应依赖的 Source 行号、键、原值及禁止原因，保持现有图、Source 和编辑按钮不变。
+
+负面场景：移除显式相邻 from 依赖后仍因 effect 语义未证明而禁止 script/call 调序；带输出消费者的 Verify 不得错误地通过仅凭 operator 的检查；引号/未知引用 fail closed；独立且命名的纯 Verify 仅返回 VERIFY_EDITOR_RULES，实际编辑仍走 A3b2b1 的 AST 精确资格、Diff、确认、Undo/Redo。此处不会执行真实脚本、Tool 或 5GC；Runtime/5GC E2E NOT_RUN。
+
+### D4-A3b2b2a 验收证据
+
+[PR #36 代码与文档 CI #41788514319](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41788514319)：298/298 单元测试、TypeScript、Build、真实 Chromium PASS。实际浏览器确认 Script → Call 与 Call → Verify 的直接输出依赖各在已有 Inspector 里显示 Source 行号、阻止原因；没有新写入口；原有命名 Step 的 5 条消费引用列表及 Diff/确认/Undo/Redo 回归 PASS。第一次 CI 在浏览器中发现新增影响行复用 consumer 类导致计数回归，修复为独立 UI 类后同一完整浏览器套件通过。Runtime/5GC E2E NOT_RUN。
