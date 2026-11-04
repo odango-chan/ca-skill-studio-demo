@@ -1,0 +1,134 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: common.schema.yaml
+title: ConnectionAgent v1alpha1 common definitions
+$defs:
+  apiVersion:
+    const: connectionagent.io/v1alpha1
+  skillName:
+    type: string
+    pattern: '^[a-z0-9][a-z0-9]*(?:-[a-z0-9]+)*$'
+    minLength: 1
+    maxLength: 128
+  caseName:
+    type: string
+    pattern: '^[a-z0-9][a-z0-9]*(?:-[a-z0-9]+)*$'
+    minLength: 1
+    maxLength: 128
+  semanticId:
+    type: string
+    pattern: '^[a-z][a-z0-9_]*(?:[._][a-z0-9_]+)*$'
+    minLength: 1
+    maxLength: 160
+  nodeId:
+    type: string
+    pattern: '^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$'
+    minLength: 1
+    maxLength: 128
+  toolRefString:
+    type: string
+    pattern: '^(?:[a-z][a-z0-9_-]*/[a-z][a-z0-9_-]*|skill\.[a-z0-9][a-z0-9]*(?:-[a-z0-9]+)*)$'
+  capabilityVersion:
+    type: string
+    pattern: '^v[1-9][0-9]*$'
+  registryRef:
+    type: string
+    pattern: '^registry://schemas/[A-Za-z0-9._/-]+@v[1-9][0-9]*$'
+  registryRefIndexName:
+    type: string
+    pattern: '^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$'
+    minLength: 1
+    maxLength: 128
+  semver:
+    type: string
+    pattern: '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
+  utcTimestamp:
+    type: string
+    format: date-time
+    pattern: '^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]+)?Z$'
+  duration:
+    type: string
+    pattern: '^[1-9][0-9]*(?:ms|s|m)$'
+  digest:
+    type: string
+    pattern: '^sha256:[0-9a-f]{64}$'
+  triState:
+    enum: [PASS, FAIL, UNKNOWN]
+  terminalResult:
+    enum:
+      - SUCCEEDED
+      - FAILED
+      - UNRESOLVED
+      - PRECONDITION_UNSATISFIED
+      - PLANNING_BLOCKED
+      - SAFE_STOPPED
+      - NOT_A_SKILL
+      - REVIEW_REQUIRED
+  actionOutcome:
+    enum:
+      - COMMITTED
+      - NOT_COMMITTED
+      - OUTCOME_UNKNOWN
+      - SUCCEEDED
+      - FAILED
+      - UNKNOWN
+      - DENIED
+      - UNRESOLVED
+      - PASS
+      - FAIL
+  effect:
+    enum: [mutation, read_only, local_compute]
+  transition:
+    type: object
+    required: [next]
+    properties:
+      next:
+        $ref: '#/$defs/nodeId'
+    additionalProperties: false
+  resourceRef:
+    oneOf:
+      - $ref: '#/$defs/semanticId'
+      - type: object
+        required: [kind, value]
+        properties:
+          kind:
+            const: tool
+          value:
+            $ref: '#/$defs/toolRefString'
+        additionalProperties: false
+  predicateExpectation:
+    type: object
+    required: [predicate, expect]
+    properties:
+      predicate:
+        $ref: '#/$defs/semanticId'
+      expect:
+        $ref: '#/$defs/triState'
+    additionalProperties: false
+  requirementExpectation:
+    type: object
+    required: [predicate, expect, satisfiable]
+    properties:
+      predicate:
+        $ref: '#/$defs/semanticId'
+      expect:
+        $ref: '#/$defs/triState'
+      satisfiable:
+        const: true
+    additionalProperties: false
+  standardRef:
+    type: object
+    required: [organization, specification]
+    properties:
+      organization:
+        type: string
+        minLength: 1
+      specification:
+        type: string
+        minLength: 1
+      section:
+        type: string
+      release:
+        type: string
+      note:
+        type: string
+    additionalProperties: false
