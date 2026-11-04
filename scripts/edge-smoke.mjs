@@ -179,6 +179,80 @@ try{
   }
   console.log("CreatedSession themed file icons PASS");
 
+  // E1-A2 must show the *actual* Monaco editor, not only a fallback
+  // textarea or the old syntax-highlight overlay.
+  const monacoReady=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const root=document.getElementById('sourceEditor');",
+    " for(let i=0;i<170&&root?.dataset.monaco!=='on';i++)await sleep(100);",
+    " const host=document.getElementById('monacoHost');",
+    " const mirror=document.getElementById('source');",
+    " const css=getComputedStyle(host);",
+    " return {ok:root?.dataset.monaco==='on'&&!!host?.querySelector('.monaco-editor')&&",
+    "  mirror?.getAttribute('aria-hidden')==='true'&&",
+    "  !!mirror.value.includes('procedures:'),",
+    "  status:root?.dataset.monaco,language:host?.dataset.language,display:css.display};",
+    "})()"
+  ].join("\n"));
+  console.log("E1_MONACO_READY",JSON.stringify(monacoReady));
+  if(!monacoReady?.ok||monacoReady.language!=="yaml")
+    throw Error("E1 Monaco was not mounted over YAML Source: "+JSON.stringify(monacoReady));
+
+  const initialSource=await evaluate("document.getElementById('source').value");
+  const focused=await evaluate([
+    "(async()=>{",
+    " const click=el=>el?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));",
+    " click(document.getElementById('mode-source'));",
+    " await new Promise(r=>setTimeout(r,250));",
+    " const area=document.querySelector('#monacoHost .monaco-editor textarea.inputarea');",
+    " area?.focus();",
+    " return {focused:!!area&&document.activeElement===area,visible:",
+    "  getComputedStyle(document.getElementById('monacoHost')).display!=='none'};",
+    "})()"
+  ].join("\n"));
+  if(!focused?.focused||!focused?.visible)
+    throw Error("E1 Monaco keyboard focus FAIL: "+JSON.stringify(focused));
+  await command("Input.insertText",{text:"# E1 Monaco keyboard input\n"});
+  await sleep(180);
+  const typedSource=await evaluate("document.getElementById('source').value");
+  if(typedSource===initialSource||!typedSource.includes("# E1 Monaco keyboard input"))
+    throw Error("E1 Monaco typing did not reach shared Source buffer");
+  await evaluate("document.getElementById('undoButton').click()");
+  await sleep(120);
+  const undone=await evaluate("document.getElementById('source').value");
+  await evaluate("document.getElementById('redoButton').click()");
+  await sleep(120);
+  const redone=await evaluate("document.getElementById('source').value");
+  await evaluate("document.getElementById('undoButton').click()");
+  await sleep(150);
+  if(undone!==initialSource||redone!==typedSource)
+    throw Error("E1 Monaco typing, undo and redo drifted from Studio history");
+  const switched=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const file=path=>[...document.querySelectorAll('#assetTree button.asset-file')]",
+    "  .find(el=>el.getAttribute('aria-label')===path);",
+    " file('scripts/evaluate_udm_read.py')?.click();await sleep(160);",
+    " const python=document.getElementById('monacoHost').dataset.language;",
+    " file('references/session-selection.md')?.click();await sleep(160);",
+    " const markdown=document.getElementById('monacoHost').dataset.language;",
+    " file('assurance/procedure.yaml')?.click();await sleep(160);",
+    " const yaml=document.getElementById('monacoHost').dataset.language;",
+    " document.getElementById('mode-visual')?.click();await sleep(250);",
+    " return {python,markdown,yaml,source:document.getElementById('source').value};",
+    "})()"
+  ].join("\n"));
+  console.log("E1_MONACO_SOURCE_HISTORY",JSON.stringify({
+    typed:true,undo:true,redo:true,languageModes:[switched.python,switched.markdown,switched.yaml]
+  }));
+  if(switched.python!=="python"||switched.markdown!=="markdown"||
+     switched.yaml!=="yaml"||switched.source!==initialSource)
+    throw Error("E1 Monaco file switch or history FAIL: "+JSON.stringify({
+      python:switched.python,markdown:switched.markdown,yaml:switched.yaml,
+      originalLength:initialSource.length,actualLength:switched.source?.length
+    }));
+
   await runD1Interactions(evaluate,command);
 
 }finally{
