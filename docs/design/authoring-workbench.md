@@ -98,3 +98,7 @@ Inspector 在 Source 能证明是两个紧邻、未命名、单行、无 Binding
 ## D4-A3b2b1 · 命名 Verify 生命周期（编辑器级验收通过）
 
 在现有「准备/确认」Inspector 中，仅对 Source 可精确定位的独立 Verify 显示折叠「命名 Verify」；已命名且无任何已知输出引用的纯 Verify 可显示「删除」或「下移」。任何命名脚本/工具调用、依赖引用、额外字段、注释归属不清时均不显示危险操作。各操作保留原文 Source Diff/确认/Undo/Redo，Runtime/5GC 未验证。参见 [Phase Designer](phase-designer.md)。
+
+## D4-A3b2b2a · 命名 Step 删除/换序影响审查（只读候选）
+
+命名 Step 的已有「引用影响」折叠区域中补充两行只读结论：「删除评估」与「与下一步换序」。显示能够证明的下游输出消费者、跨越的直接 `with.from` 依赖行号，以及 Script/Call 效果契约未证明的阻止原因。没有新编辑按钮，也不声称 0 引用等于 Runtime 安全。参见 [Phase Designer](phase-designer.md)。

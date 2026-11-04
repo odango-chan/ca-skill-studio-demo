@@ -75,7 +75,8 @@ test("D4 read-only consumer ABI evidence accepted; cross-producer edits still de
   assert.match(work,/\|\s*D4-A3b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A3b2a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A3b2b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A2\.2b2\/A3b2b2\/A4[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
+  assert.match(work,/\|\s*D4-A3b2b2a[^\n]*\|\s*PROPOSED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*NOT_RUN/);
+  assert.match(work,/\|\s*D4-A2\.2b2\/A3b2b2b\/A4[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
   assert.match(spec,/Runtime\/5GC NOT_RUN/);
   const trace=content("docs/TRACEABILITY.md");
   assert.match(trace,/D4-A1 Phase Step input rebind/);
@@ -159,4 +160,14 @@ test("D4-A3b2b1 named Verify changes have Source authority and Pages syntax gate
   assert.match(app,/applySwapAdjacentNamedVerify/);
   assert.match(ci,/node --check site\/phase-named-verify\.mjs/);
   assert.match(ci,/node --check tests\/phase-named-verify\.test\.mjs/);
+});
+
+test("D4-A3b2b2a named Step impact remains read-only and syntax-gated",()=>{
+  const doc=content("docs/design/phase-designer.md");
+  const app=content("site/app.mjs"),ci=content(".github/workflows/pages.yml");
+  assert.match(doc,/D4-A3b2b2a/);
+  assert.match(doc,/EFFECT_UNPROVEN/);
+  assert.match(app,/namedStepMutationImpactReport/);
+  assert.match(ci,/node --check site\/phase-step-impact\.mjs/);
+  assert.match(ci,/node --check tests\/phase-step-impact\.test\.mjs/);
 });
