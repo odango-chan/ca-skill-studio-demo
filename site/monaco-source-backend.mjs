@@ -32,7 +32,6 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
   if(!host || !mirror)throw new TypeError("Monaco requires a host and source mirror");
   const callbacks={input:new Set(),scroll:new Set()};
   let suppress=0,raw="",model=null,modelChange=null,disposed=false;
-  let currentPath="";
   // The private mirror supports existing DOM-based D4 regression probes.
   // It is hidden from the user once Monaco is mounted and cannot write except
   // through a deliberate input event; Monaco alone receives keyboard input.
@@ -102,7 +101,6 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           // existing per-file Package Source buffer, not by Monaco models.
           const uri=monaco.Uri.from({scheme:"inmemory",path:"/"+path});
           model=monaco.editor.createModel(next,languageId(path),uri);
-          currentPath=path;
           host.dataset.language=languageId(path);
           host.dataset.yamlSchemaCapability=yamlSchemaCapability(path);
           raw=next;
