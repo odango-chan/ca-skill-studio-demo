@@ -11,6 +11,7 @@
   "dependencies": {
     "@xyflow/react": "12.12.0",
     "elkjs": "0.12.1",
+    "monaco-editor": "0.57.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "yaml": "2.9.1"
@@ -20,5 +21,8 @@
     "@types/react-dom": "19.3.0",
     "esbuild": "0.28.2",
     "typescript": "7.0.2"
+  },
+  "overrides": {
+    "dompurify": "3.4.17"
   }
 }
