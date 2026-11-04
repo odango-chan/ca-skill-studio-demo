@@ -1,7 +1,7 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1 Accepted; A3a bounded Verify swap Accepted; A3b1 bounded Verify add/delete candidate; A2.2b2/A3b2/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a merged; A3b1 in PR #30 candidate; A2.2b2/A3b2/A4 NOT_STARTED**  
+**Status: A1/A2.1/A2.2a/A2.2b1 Accepted; A3a bounded Verify swap Accepted; A3b1 bounded Verify add/delete Accepted; A2.2b2/A3b2/A4 Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a merged; A3b1 implemented in PR #30; A2.2b2/A3b2/A4 NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
@@ -82,7 +82,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 
 首轮 [CI #41770964460](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41770964460)：264/264 单测、TypeScript、Build、Chromium 均 PASS。浏览器确认只有一个可交换入口、Diff、取消、应用、Undo/Redo、原文恢复。最终文档提交与 Pages 部署仍需单独验证；Runtime/5GC NOT_RUN。
 
-## D4-A3b1 · 受限 Verify Step 新增与删除（PR #30）
+## D4-A3b1 · 受限 Verify Step 新增与删除（PR #30，编辑器级验收通过）
 
 新增只允许在已存在的 Phase.steps 序列末尾插入一个单行、未命名、无 with 的 Verify。必须通过当前 Package 的 PredicateSet（kind、metadata.skill 与声明名均匹配）限定候选，当前 Phase 不得已有同一 Verify。只能采用原 YAML 最后一个纯标量 Step 的原始缩进和换行风格；存在注释/空行、尾部嵌套字段、非安全边界、空 Step 序列或达到 80 Step 上限时拒绝。
 
@@ -91,3 +91,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 所有变更只作用于原 Source 的精确完整行插入/删除；随后必须重投影并比较完整 Procedure/Node/Phase/Step/Child/Route 语义签名，差异只能是所选 Step 的出现或消失。Inspector 只展示已证明可编辑的入口，新增控件默认折叠；所有操作必须显示包含业务门禁变化警告的 Source Diff，经确认后才进入历史栈；Apply 重算并检测整个源文件和新增时 PredicateSet 的 revision、预览对象抗篡改，支持 Undo/Redo。
 
 **编辑资格不等于业务或 Runtime 资格**：新增/删除 Verify 会改变流程判定条件、故障短路和执行时序。Studio 不会声称能证明该编辑符合 3GPP 或 Runtime/5GC 的业务要求；真实 E2E 仍为 NOT_RUN。后续 A3b2 才扩展到命名输出、带绑定的 Step 以及引用依赖感知的通用增删改序。
+
+### A3b1 验收证据
+
+[PR #30 CI #41777788675](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41777788675) 验证 272/272 单元测试 PASS、TypeScript PASS、Build PASS 和真实 Chromium PASS；浏览器分别检查新增与删除 Verify 的资格门槛、Diff、取消、应用、Undo/Redo、Source 精确恢复，并证明带绑定的 Step 不显示误删入口。首次单测发现重复 Verify 删除资格的边界遗漏，已补充拒绝规则并复验成功。最终证据不代表 Runtime/5GC E2E。

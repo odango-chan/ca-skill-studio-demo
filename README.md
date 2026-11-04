@@ -49,4 +49,4 @@ D4-A2.2b1 已补齐当前有界范围内的**消费者输入契约证据**：当
 
 D4-A3a 已通过编辑器级测试，提供最小的 Phase Step 顺序编辑：只允许两个物理相邻且未命名、无绑定的单行 Verify 换序；仍走 Source Diff/确认/Undo/Redo。其余 Step 新增、删除及通用重排仍未实现，见 [D4 设计](docs/design/phase-designer.md)。
 
-D4-A3b1（[PR #30](https://github.com/odango-chan/ca-skill-studio-demo/pull/30) 候选）允许在已存在 Phase 末尾新增来自当前 PredicateSet 的无名 Verify，或删除明确符合资格的单行 Verify；仍走 Source Diff / 确认 / Undo/Redo，未实现命名或带绑定 Step 的增删和通用依赖感知排序。此处会改变业务检查集合，Runtime/5GC 验证未执行。
+D4-A3b1（[PR #30](https://github.com/odango-chan/ca-skill-studio-demo/pull/30) 编辑器级验收通过）允许在已存在 Phase 末尾新增来自当前 PredicateSet 的无名 Verify，或删除明确符合资格的单行 Verify；仍走 Source Diff / 确认 / Undo/Redo，未实现命名或带绑定 Step 的增删和通用依赖感知排序。此处会改变业务检查集合，Runtime/5GC 验证未执行。
