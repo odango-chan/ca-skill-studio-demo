@@ -144,8 +144,9 @@ export async function runD1Interactions(evaluate,command){
     " click(preview);await sleep(85);",
     " const dialog=document.getElementById('patchDialog');",
     " const diff=document.getElementById('patchDiff')?.textContent??'';",
-    " const reviewed=!dialog.hidden&&diff.includes('-            from: '+relative)&&",
-    "  diff.includes('+            from: '+full)&&source.value===before;",
+    " const oldLine=diff.split('\\n').some(x=>x.startsWith('-')&&x.includes('from: '+relative));",
+    " const newLine=diff.split('\\n').some(x=>x.startsWith('+')&&x.includes('from: '+full));",
+    " const reviewed=!dialog.hidden&&oldLine&&newLine&&source.value===before;",
     " click(document.getElementById('closePatch'));await sleep(80);",
     " const canceled=dialog.hidden&&source.value===before;",
     " click(preview);await sleep(85);",
@@ -163,7 +164,8 @@ export async function runD1Interactions(evaluate,command){
     " click(document.getElementById('undoButton'));await sleep(220);",
     " const restored=source.value===before;",
     " return {ok:qualified&&reviewed&&canceled&&applied&&undone&&redone&&restored,",
-    "  qualified,reviewed,canceled,applied,undone,redone,restored,choices};"
+    "  qualified,reviewed,canceled,applied,undone,redone,restored,choices,",
+    "  diffExcerpt:reviewed?'':diff.slice(0,400),oldLine,newLine};"
   ]);
 
   await check(evaluate,"D2_A4_OPERATOR_BINDING",[
