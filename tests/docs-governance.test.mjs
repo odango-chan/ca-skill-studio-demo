@@ -105,3 +105,9 @@ test("only owner-named establish-pdu-session is public and loads by default",()=
   assert.match(manifest,/establish:Object\.freeze/);
   assert.doesNotMatch(manifest,/ensure:Object\.freeze/);
 });
+
+test("new Phase consumer contract is checked by the Pages syntax gate",()=>{
+  const ci=content(".github/workflows/pages.yml");
+  assert.match(ci,/node --check site\/phase-consumer-contract\.mjs/);
+  assert.match(ci,/node --check tests\/phase-consumer-contract\.test\.mjs/);
+});
