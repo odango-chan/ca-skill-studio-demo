@@ -8,6 +8,7 @@ import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./w
 import {SAMPLE_PACKAGES,packageFilesForSample,createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState} from "./sample-packages.mjs";
 import {zipPackage} from "./zip.mjs";
 import {highlightSource} from "./highlight.mjs";
+import {createSourceEditorAdapter,createTextareaSourceBackend} from "./source-editor-adapter.mjs";
 import {renderMarkdown} from "./markdown-preview.mjs";
 import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from "./view-policy.mjs";
 import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
@@ -57,15 +58,20 @@ import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePa
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
 const $ = (id) => document.getElementById(id);
-const source = $("source");
+const source = createSourceEditorAdapter(createTextareaSourceBackend($("source")));
 const sourceHighlight=$("sourceHighlight");
 const sourceEditor=$("sourceEditor");
+let monacoBackend=null;
 function syncHighlightScroll(){
   sourceHighlight.scrollTop=source.scrollTop;
   sourceHighlight.scrollLeft=source.scrollLeft;
 }
 source.addEventListener("scroll",syncHighlightScroll,{passive:true});
 function refreshHighlight(){
+  if(sourceEditor.dataset.monaco==="on"){
+    $("sourceLanguage").textContent=languageForMonaco(activeFilePath||filename);
+    return;
+  }
   const highlighted=highlightSource(source.value,activeFilePath||filename);
   sourceEditor.dataset.highlight=highlighted.enabled?"on":"off";
   $("sourceLanguage").textContent=highlighted.language.toUpperCase();
@@ -344,6 +350,7 @@ function setMode(next) {
   }
   if(allowed!=="source"&&viewKind==="procedure"&&lastGood)
     requestAnimationFrame(fit);
+  if(allowed!=="visual")requestAnimationFrame(()=>source.layout());
 }
 function updateViewAvailability(nextKind) {
   viewKind=nextKind;
@@ -386,7 +393,7 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
     (/\bprocedures\s*:/m.test(initial)||/procedure\.ya?ml$/i.test(filename));
   source.scrollTop=0;source.scrollLeft=0;
   initialText=initial;
-  source.value=text;
+  source.openDocument(name,text);
   history=historyState||createEditorHistory(text);
   closePreview();
   canvasRouteProposal=null;
@@ -688,13 +695,7 @@ function lineJump(line) {
   if (!line || line < 1) return;
   if (mode === "visual") setMode("split");
   setInspectorOpen(false,false);
-  const lines = source.value.split("\n");
-  const before = lines.slice(0, line - 1);
-  const index = before.join("\n").length + (before.length ? 1 : 0);
-  source.focus();
-  source.setSelectionRange(index, index + (lines[line - 1] || "").length);
-  const lineHeight = Number.parseFloat(getComputedStyle(source).lineHeight) || 20;
-  source.scrollTop = Math.max(0, (line - 4) * lineHeight);
+  requestAnimationFrame(()=>source.revealLine(line));
 }
 function el(tag,className="",text) {
   const item=document.createElement(tag);
@@ -2125,6 +2126,8 @@ document.addEventListener("keydown", event => {
     clearSelection();return;
   }
   if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+  // Monaco owns its shortcuts while focused; do not record twice.
+  if(sourceEditor.dataset.monaco==="on"&&sourceEditor.contains(document.activeElement))return;
   const key = event.key.toLowerCase();
   if (key === "s") {
     event.preventDefault();
@@ -2137,4 +2140,36 @@ document.addEventListener("keydown", event => {
     runHistory("redo");
   }
 });
+function languageForMonaco(path){
+  return (String(path).match(/\.([^.]+)$/)?.[1]||"TEXT").replace(/^yml$/i,"YAML").toUpperCase();
+}
+async function initializeMonaco(){
+  const host=$("monacoHost"),mirror=$("source");
+  let candidate=null;
+  try{
+    // Worker bundled with Pages; no remote CDN.
+    self.MonacoEnvironment={
+      getWorker:()=>new Worker(new URL("./editor.worker.js",import.meta.url),{type:"module"})
+    };
+    const {createMonacoSourceBackend}=await import("./monaco-source-backend.mjs");
+    candidate=createMonacoSourceBackend(host,{
+      mirror,
+      onUndo:()=>runHistory("undo"),
+      onRedo:()=>runHistory("redo"),
+      onSave:()=>$("downloadButton").click()
+    });
+    source.useBackend(candidate);
+    monacoBackend=candidate;
+    sourceEditor.dataset.monaco="on";
+    mirror.setAttribute("aria-hidden","true");
+    mirror.tabIndex=-1;
+    refreshHighlight();
+    requestAnimationFrame(()=>source.layout());
+  }catch(error){
+    candidate?.dispose();
+    sourceEditor.dataset.monaco="fallback";
+    message("Monaco 初始化失败，已保留原始 Source 编辑器："+String(error?.message??error));
+  }
+}
+initializeMonaco();
 loadSample();

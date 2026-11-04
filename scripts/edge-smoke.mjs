@@ -179,6 +179,108 @@ try{
   }
   console.log("CreatedSession themed file icons PASS");
 
+  // E1-A2 must show the *actual* Monaco editor, not only a fallback
+  // textarea or the old syntax-highlight overlay.
+  const monacoReady=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const root=document.getElementById('sourceEditor');",
+    " for(let i=0;i<170&&root?.dataset.monaco!=='on';i++)await sleep(100);",
+    " const host=document.getElementById('monacoHost');",
+    " const mirror=document.getElementById('source');",
+    " const css=getComputedStyle(host);",
+    " return {ok:root?.dataset.monaco==='on'&&!!host?.querySelector('.monaco-editor')&&",
+    "  mirror?.getAttribute('aria-hidden')==='true'&&",
+    "  !!mirror.value.includes('procedures:'),",
+    "  status:root?.dataset.monaco,language:host?.dataset.language,display:css.display};",
+    "})()"
+  ].join("\n"));
+  console.log("E1_MONACO_READY",JSON.stringify(monacoReady));
+  if(!monacoReady?.ok||monacoReady.language!=="yaml")
+    throw Error("E1 Monaco was not mounted over YAML Source: "+JSON.stringify(monacoReady));
+
+  const initialSource=await evaluate("document.getElementById('source').value");
+  const focused=await evaluate([
+    "(async()=>{",
+    " const click=el=>el?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));",
+    " click(document.getElementById('mode-source'));",
+    " await new Promise(r=>setTimeout(r,250));",
+    " const host=document.getElementById('monacoHost');",
+    " const area=host.querySelector('.monaco-editor .inputarea')||",
+    "  host.querySelector('.monaco-editor textarea')||",
+    "  host.querySelector('.monaco-editor [contenteditable]');",
+    " area?.focus();",
+    " return {focused:!!area&&host.contains(document.activeElement),visible:",
+    "  getComputedStyle(host).display!=='none',candidate:area?.outerHTML.slice(0,200),",
+    "  active:document.activeElement?.outerHTML.slice(0,200)};",
+    "})()"
+  ].join("\n"));
+  if(!focused?.visible)
+    throw Error("E1 Monaco Source surface hidden: "+JSON.stringify(focused));
+  // Trusted CDP click activates Monaco's own input controller, unlike DOM focus.
+  const pos=await evaluate("(()=>{const r=document.getElementById('monacoHost').getBoundingClientRect();return {x:r.x+120,y:r.y+60,width:r.width,height:r.height}})()");
+  if(pos.width<200||pos.height<120)throw Error("Monaco canvas has no editable bounds");
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:pos.x,y:pos.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:pos.x,y:pos.y,button:"left",clickCount:1});
+  await command("Input.insertText",{text:"E1_MONACO_INPUT"});
+  await sleep(250);
+  const typedSource=await evaluate("document.getElementById('source').value");
+  if(typedSource===initialSource||!typedSource.includes("E1_MONACO_INPUT")){
+    const debug=await evaluate("(()=>{const h=document.getElementById('monacoHost');return {active:document.activeElement?.outerHTML.slice(0,240),hostContains:h.contains(document.activeElement),mirror:document.getElementById('source').value.slice(0,100),rendered:h.querySelector('.view-lines')?.textContent?.slice(0,160)}})()");
+    throw Error("E1 Monaco typing did not reach shared Source buffer: "+JSON.stringify(debug));
+  }
+  // A single CDP Input.insertText may be emitted by Monaco as several model
+  // changes. Verify *complete* round-trip through the shared Studio history
+  // rather than incorrectly assuming all characters form one transaction.
+  const historyResult=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const source=document.getElementById('source');",
+    " const undo=document.getElementById('undoButton');",
+    " const redo=document.getElementById('redoButton');",
+    " let undos=0,redos=0,restores=0;",
+    " while(source.value.length>"+initialSource.length+"&&undos<40&&!undo.disabled){undo.click();undos++;await sleep(25);}",
+    " const undone=source.value;",
+    " while(source.value.length<"+typedSource.length+"&&redos<40&&!redo.disabled){redo.click();redos++;await sleep(25);}",
+    " const redone=source.value;",
+    " while(source.value.length>"+initialSource.length+"&&restores<40&&!undo.disabled){undo.click();restores++;await sleep(25);}",
+    " return {undos,redos,restores,undone,redone,final:source.value};",
+    "})()"
+  ].join("\n"));
+  if(historyResult.undone!==initialSource||historyResult.redone!==typedSource||
+     historyResult.final!==initialSource||
+     historyResult.undos!==historyResult.redos||
+     historyResult.undos!==historyResult.restores)
+    throw Error("E1 Source/Visual shared history round-trip failed: "+JSON.stringify({
+      undos:historyResult.undos,redos:historyResult.redos,restores:historyResult.restores,
+      initialRecovered:historyResult.undone===initialSource,typedRecovered:historyResult.redone===typedSource,
+      finalRecovered:historyResult.final===initialSource
+    }));
+  const switched=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const file=path=>[...document.querySelectorAll('#assetTree button.asset-file')]",
+    "  .find(el=>el.getAttribute('aria-label')===path);",
+    " file('scripts/evaluate_udm_read.py')?.click();await sleep(160);",
+    " const python=document.getElementById('monacoHost').dataset.language;",
+    " file('references/session-selection.md')?.click();await sleep(160);",
+    " const markdown=document.getElementById('monacoHost').dataset.language;",
+    " file('assurance/procedure.yaml')?.click();await sleep(160);",
+    " const yaml=document.getElementById('monacoHost').dataset.language;",
+    " document.getElementById('mode-visual')?.click();await sleep(250);",
+    " return {python,markdown,yaml,source:document.getElementById('source').value};",
+    "})()"
+  ].join("\n"));
+  console.log("E1_MONACO_SOURCE_HISTORY",JSON.stringify({
+    typed:true,undo:true,redo:true,languageModes:[switched.python,switched.markdown,switched.yaml]
+  }));
+  if(switched.python!=="python"||switched.markdown!=="markdown"||
+     switched.yaml!=="yaml"||switched.source!==initialSource)
+    throw Error("E1 Monaco file switch or history FAIL: "+JSON.stringify({
+      python:switched.python,markdown:switched.markdown,yaml:switched.yaml,
+      originalLength:initialSource.length,actualLength:switched.source?.length
+    }));
+
   await runD1Interactions(evaluate,command);
 
 }finally{

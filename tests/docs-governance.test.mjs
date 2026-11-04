@@ -196,3 +196,15 @@ test("D4-A4b1 protected Phase outcomes are source-backed and syntax-gated",()=>{
   assert.match(ci,/node --check site\/phase-outcomes\.mjs/);
   assert.match(ci,/node --check tests\/phase-outcomes\.test\.mjs/);
 });
+
+test("E1 Monaco integration retains Source authority and Pages Worker assets",()=>{
+  const spec=content("docs/design/source-editor-workstream.md");
+  const app=content("site/app.mjs"),ci=content(".github/workflows/pages.yml");
+  assert.match(spec,/PR #40/);
+  assert.match(app,/createSourceEditorAdapter/);
+  assert.match(app,/initializeMonaco/);
+  assert.match(ci,/editor\.worker\.js/);
+  assert.match(ci,/LICENSE\.monaco\.txt/);
+  assert.match(ci,/node --check site\/source-editor-adapter\.mjs/);
+  assert.match(ci,/node --check tests\/source-editor-adapter\.test\.mjs/);
+});

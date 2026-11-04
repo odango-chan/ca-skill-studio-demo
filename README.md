@@ -60,3 +60,5 @@ D4-A3b2b2a（[PR #36](https://github.com/odango-chan/ca-skill-studio-demo/pull/3
 D4-A4a（[PR #37](https://github.com/odango-chan/ca-skill-studio-demo/pull/37) 编辑器级验收通过）在「准备/确认」阶段允许将现有失败/未知 Route 目标改为同 Procedure、同 Phase、同 Outcome 已观察过的目标；走 Source Diff、确认和 Undo/Redo，不影响主执行 Route，也不声明 Runtime/5GC 安全。
 
 D4-A4b1（[PR #39](https://github.com/odango-chan/ca-skill-studio-demo/pull/39) 编辑器级验收通过）支持在现有 Phase `on` map 中补齐已观察的缺失核心 Outcome，以及受限修正/删除无歧义非核心 Outcome；完整的 owner 示例不会添加分支或显示多余按钮。Runtime/5GC NOT_RUN。
+
+E1 Monaco Source Editor 正在 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 与最新 D4 主分支整合：本地 Monaco/Worker，YAML、Python、Markdown、JSON 的 Source 编辑，保留唯一工作副本及 Source/Visual/Split、Diff/确认/Undo/Redo；初始化失败回退原有文本编辑器。[322/322 + real Chromium 代码 CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796287748)，最终 main/Pages 验收尚待确认，参见 [E 线设计](docs/design/source-editor-workstream.md)。
