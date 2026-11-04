@@ -8,6 +8,7 @@ import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./w
 import {SAMPLE_PACKAGES,packageFilesForSample,createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState} from "./sample-packages.mjs";
 import {zipPackage} from "./zip.mjs";
 import {highlightSource} from "./highlight.mjs";
+import {createSourceEditorAdapter, createTextareaSourceBackend} from "./source-editor-adapter.mjs";
 import {renderMarkdown} from "./markdown-preview.mjs";
 import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from "./view-policy.mjs";
 import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
@@ -38,7 +39,7 @@ import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePa
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
 const $ = (id) => document.getElementById(id);
-const source = $("source");
+const source = createSourceEditorAdapter(createTextareaSourceBackend($("source")));
 const sourceHighlight=$("sourceHighlight");
 const sourceEditor=$("sourceEditor");
 function syncHighlightScroll(){
@@ -367,7 +368,7 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
     (/\bprocedures\s*:/m.test(initial)||/procedure\.ya?ml$/i.test(filename));
   source.scrollTop=0;source.scrollLeft=0;
   initialText=initial;
-  source.value=text;
+  source.openDocument(name,text);
   history=historyState||createEditorHistory(text);
   closePreview();
   canvasRouteProposal=null;
