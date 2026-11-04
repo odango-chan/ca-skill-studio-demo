@@ -1,7 +1,7 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a impact Accepted (read-only); A4a observed Phase Route retarget Accepted; A4b1 bounded Phase Outcome repair candidate; A2.2b2/A3b2b2b/A4b2 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1/A3b2b2a merged; A4a merged; A4b1 PR #39 candidate; A2.2b2/A3b2b2b/A4b2 NOT_STARTED**  
+**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a impact Accepted (read-only); A4a observed Phase Route retarget Accepted; A4b1 bounded Phase Outcome repair Accepted; A2.2b2/A3b2b2b/A4b2 Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1/A3b2b2a merged; A4a merged; A4b1 implemented in PR #39; A2.2b2/A3b2b2b/A4b2 NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
@@ -161,7 +161,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 
 [PR #37 集成 CI #41791294195](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41791294195)：305/305 单元测试、TypeScript、Build、真实 Chromium PASS。浏览器在真实 `nudm-sdm-subscribe` 的准备阶段对 `preconditions.on.FAILED` 执行候选选择、Source Diff、取消、应用、Undo/Redo，原 YAML 完整恢复；主 Operator Route 与其他 Phase 未被修改。单测覆盖后置 `FAIL`、同 Phase/同 Outcome 候选、结构可达性、引号/注释/alias、过期篡改 Preview 及 CRLF。初轮测试错误地要求改名后仍有相同「旧目标观察来源」，已收紧为只允许当前 Source 观察值，要求通过 Undo 恢复；最终整合 CI 通过。Runtime/5GC E2E NOT_RUN。
 
-## D4-A4b1 · Phase Outcome 的已有来源修复（PR #39）
+## D4-A4b1 · Phase Outcome 的已有来源修复（PR #39，编辑器级验收通过）
 
 真实 owner 的 `establish-pdu-session` 示例当前包含 13 组 Phase on-map，准备阶段都已有 `FAILED / UNRESOLVED`，确认阶段都已有 `PASS / FAIL / UNKNOWN`。因此正常主样例不应出现新增/删除动作；此切片专用于编辑期间修复不完整或拼写错误的 **已有** Phase on-map。
 
@@ -174,3 +174,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 全部操作要求原 Phase 的 YAML 1.2 AST/CST 含真实字面量 `\'on\'` 字符串键、同缩进且相邻的普通单行 Outcome 行、无引号/alias/anchor/tag、无不明注释或多空行。只修改一个 Outcome 名称、一条完整行或尾部新增一行，随后重投影 Procedure/Node/Phase/Route 全签名并保持该 Procedure 的可达 Node 集；Apply 重算当前 Source revision、完整 Preview 字段，对话框显式 Diff 确认并记录 Undo/Redo。
 
 此处 `FAILED/UNRESOLVED`、`PASS/FAIL/UNKNOWN` 是 **Studio 的当前样例编辑观察集**，不是由 Runtime owner 发布的全部可能 Outcome schema。不认识的非核心键并非自动错误，可能属于 owner 专有语义；因此删除/修复即使通过编辑器结构检查也不等于运行时安全。主执行 `operator.on`、Phase route Target A4a 和真实 5GC 运行结果不受该修复模块修改。Runtime/5GC E2E NOT_RUN。
+
+### D4-A4b1 验收证据
+
+[PR #39 代码 CI #41793627245](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41793627245)：315/315 单元测试、TypeScript、Build、真实 Chromium PASS。浏览器在真实 owner 的临时 Source 工作副本中分别补齐缺失 FAILED、将 MISTYPED 改回 FAILED、删除独立 EXTRA，逐一验证 Diff 预览、取消、应用、Undo/Redo、核心键保护以及原始 YAML 完整恢复。首轮失败的两个边界检查已修正：多余空行的归属拒绝、EOL 报错大小写断言；最终代码 CI PASS。Runtime/5GC E2E NOT_RUN。
