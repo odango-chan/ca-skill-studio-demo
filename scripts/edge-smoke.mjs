@@ -308,7 +308,7 @@ try{
     "  policy==='procedure-schema-incompatible',",
     "  valid,invalid,restored,policy};",
     "})()"
-  ].join("\\n"));
+  ].join("\n"));
   console.log("E2_YAML_SYNTAX_SOURCE_SAFE",JSON.stringify(yamlDiagnostics));
   if(!yamlDiagnostics?.ok)
     throw Error("E2 YAML syntax diagnostics / provenance guard FAIL: "+JSON.stringify(yamlDiagnostics));
