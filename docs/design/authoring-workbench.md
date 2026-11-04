@@ -106,3 +106,7 @@ Inspector 在 Source 能证明是两个紧邻、未命名、单行、无 Binding
 ## D4-A4a · Phase 失败 Route 目标编辑（编辑器级验收通过）
 
 Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的现有 Phase Route 上展示折叠「阶段 Route 目标」。只允许从同 Procedure、同 Phase、同失败 Outcome 已存在的目标选择；不允许编辑 `operator.on` 或将 `PASS` 改走失败分支。路径变更走 YAML 精确 Diff、显式确认和 Undo/Redo；改变失败清理路径可能影响 Runtime 行为，不做语义等价保证。参见 [Phase Designer](phase-designer.md)。
+
+## D4-A4b1 · Phase Outcome 补齐与受限修复（编辑器级验收通过）
+
+现有 Phase Inspector 的「准备 / 确认」只在 Source 中确实出现可核对的缺失或独有非核心 Outcome 时，展开一个轻量「阶段 Outcome」编辑区。正常 owner 样例所有核心分支齐全，不额外显示无意义按钮。操作沿用精确 Source Diff、确认、Undo/Redo；核心 Outcome 永远没有删除入口，非核心键也不自动判断为 Runtime 错误。详见 [Phase Designer](phase-designer.md)。

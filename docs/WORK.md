@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-04**  
-**Reviewed implementation baseline: main@e82b38c2a60b66e5deb0b5f937aeabc5c8b18c46**（D4-A3b2b2a 已合入且 Pages PASS；D4-A4a 编辑器级验收已通过）
+**Reviewed implementation baseline: main@b8740901313ad1b6231f0d067637259019e0fffa**（D4-A4a 已合入且 Pages PASS；D4-A4b1 编辑器级验收通过）
 
 ## Overall
 
@@ -31,7 +31,8 @@
 | D4-A3b2b1 无引用命名 Verify 的命名、删除和相邻换序 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #34） | PASS（289 tests + Chromium；集成提交） | [PR #34](https://github.com/odango-chan/ca-skill-studio-demo/pull/34)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41786616595)、[设计](design/phase-designer.md) |
 | D4-A3b2b2a 命名 Step 删除/换序影响门禁（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（PR #36） | PASS（298 tests + real Chromium；集成代码） | [PR #36](https://github.com/odango-chan/ca-skill-studio-demo/pull/36)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41788514319)、[设计](design/phase-designer.md) |
 | D4-A4a 现有 Phase 失败 Route 的已观察目标重定向 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #37） | PASS（305 tests + real Chromium；集成候选） | [PR #37](https://github.com/odango-chan/ca-skill-studio-demo/pull/37)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41791294195)、[设计](design/phase-designer.md) |
-| D4-A2.2b2/A3b2b2b/A4b 跨生产者写入 / 带副作用或输出依赖 Step 的写入 / Phase Outcome 结构编辑 | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
+| D4-A4b1 Phase Outcome 缺失修复、非核心拼写修正与受限删除 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #39） | PASS（315 tests + real Chromium；代码提交） | [PR #39](https://github.com/odango-chan/ca-skill-studio-demo/pull/39)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41793627245)、[设计](design/phase-designer.md) |
+| D4-A2.2b2/A3b2b2b/A4b2 跨生产者写入 / 带副作用或输出依赖 Step 的写入 / 新 Phase on-map 与 owner Outcome 契约 | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
@@ -41,7 +42,7 @@
 ## Current open work
 
 - [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3 有界 operator.on Route 编辑已合入；Runtime Outcome 资格和 Phase-specific Route 仍未覆盖。
-- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b2b2b 具副作用或带引用 Step 的写入与 A4b Phase Outcome 结构编辑尚未开始；A4a 仅实现已存在失败分支目标的同 Phase/同 Outcome 观察值重定向（本仓编辑器级验收通过）；A3b2b2a 仅提供已验收的执行/引用风险只读审查；A3b2b1 仅允许无输出引用的纯 Verify 命名/删除/相邻换序（本仓编辑器级验收通过）；A3b2a 先审查命名输出引用并受限改名，不能据此宣称 Runtime 兼容。
+- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b2b2b 具副作用或带引用 Step 的写入与 A4b1 仅提供已有 Phase on-map 的受限 Outcome 修复（本仓编辑器级验收通过）；A4b2 新 Phase on-map 及 owner Outcome 完整性验证仍未开始；A4a 仅实现已存在失败分支目标的同 Phase/同 Outcome 观察值重定向（本仓编辑器级验收通过）；A3b2b2a 仅提供已验收的执行/引用风险只读审查；A3b2b1 仅允许无输出引用的纯 Verify 命名/删除/相邻换序（本仓编辑器级验收通过）；A3b2a 先审查命名输出引用并受限改名，不能据此宣称 Runtime 兼容。
 - 早期未合并 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)、[#2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)、[#3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3) 目前只作为历史候选，**不推断可直接合并**。
 
 ## Authority / evidence

@@ -24,6 +24,10 @@ import {routeOutcomeEditOptions,previewRenameRouteOutcome,
   from "./route-mutate.mjs";
 import {phaseRouteTargetOptions,previewPhaseRouteTarget,
   applyPhaseRouteTarget} from "./phase-routes.mjs";
+import {phaseOutcomeEditOptions,previewAddObservedPhaseOutcome,
+  previewRenameNoncorePhaseOutcome,previewDeleteNoncorePhaseOutcome,
+  applyAddObservedPhaseOutcome,applyRenameNoncorePhaseOutcome,
+  applyDeleteNoncorePhaseOutcome} from "./phase-outcomes.mjs";
 import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
   from "./route-connect.mjs";
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue,
@@ -1580,6 +1584,52 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
   }
   addPhaseVerifyCreation(phase,body,addOptions);
 }
+function addPhaseOutcomeEditor(phaseName,container,options=[]){
+  const opt=options.find(x=>x.phaseName===phaseName);
+  if(!opt||(!opt.adds.length&&!opt.renames.length&&!opt.deletions.length)||
+     activePackage?.name!=="establish-pdu-session"||
+     activeFilePath!=="assurance/procedure.yaml"||
+     selection?.kind!=="node")return;
+  const disclosure=el("details","step-enum phase-outcome-editor");
+  disclosure.dataset.phaseOutcomeEditor=phaseName;
+  disclosure.appendChild(el("summary","",
+    "阶段 Outcome · "+(opt.adds.length+opt.renames.length+
+      opt.deletions.length)+" 项可修复 · D4-A4b1"));
+  const body=el("div","step-enum-controls");
+  body.appendChild(el("p","small-edit-note",
+    "只修复当前 Source 缺失的已知 Outcome，或有限地修正/删除独有的"+
+    "非核心 Outcome。核心分支禁止删除；可能改变失败/完成行为。"));
+  for(const item of opt.adds){
+    const control=button("补齐 "+item.outcome+" → "+item.target,()=>{
+      try{showPreview(previewAddObservedPhaseOutcome(source.value,
+        activeProcedureId,selection.id,phaseName,item.outcome,item.target));}
+      catch(error){message("Phase Outcome 补齐被拒绝："+String(error?.message??error));}
+    },"preview-button");
+    control.dataset.phaseOutcomeAdd=phaseName+":"+item.outcome+":"+item.target;
+    body.appendChild(control);
+  }
+  for(const item of opt.renames){
+    const control=button("修正 "+item.oldOutcome+" → "+item.newOutcome,()=>{
+      try{showPreview(previewRenameNoncorePhaseOutcome(source.value,
+        activeProcedureId,selection.id,phaseName,
+        item.oldOutcome,item.newOutcome));}
+      catch(error){message("Outcome 改名被拒绝："+String(error?.message??error));}
+    },"preview-button");
+    control.dataset.phaseOutcomeRename=phaseName+":"+item.oldOutcome+":"+
+      item.newOutcome;
+    body.appendChild(control);
+  }
+  for(const item of opt.deletions){
+    const control=button("删除非核心 "+item.outcome,()=>{
+      try{showPreview(previewDeleteNoncorePhaseOutcome(source.value,
+        activeProcedureId,selection.id,phaseName,item.outcome));}
+      catch(error){message("Outcome 删除被拒绝："+String(error?.message??error));}
+    },"preview-button");
+    control.dataset.phaseOutcomeDelete=phaseName+":"+item.outcome;
+    body.appendChild(control);
+  }
+  disclosure.append(body);container.append(disclosure);
+}
 function addPhaseRouteTargetEditor(phaseName,routes,container,options=[]){
   const targets=options.filter(x=>x.phaseName===phaseName&&
     routes.some(r=>r.id===x.routeId));
@@ -1660,7 +1710,8 @@ function nodeEditorCapabilities(nodeId){
     namedVerify:namedVerifyEditOptions(text,activeProcedureId,nodeId),
     phaseEffect:namedStepMutationImpactReport(text,activeProcedureId,nodeId,
       activePackage?.files),
-    phaseRoutes:phaseRouteTargetOptions(text,activeProcedureId,nodeId)
+    phaseRoutes:phaseRouteTargetOptions(text,activeProcedureId,nodeId),
+    phaseOutcome:phaseOutcomeEditOptions(text,activeProcedureId,nodeId)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1691,6 +1742,7 @@ function renderNodeJourney(model,caps) {
       caps.namedVerify,caps.phaseEffect?.steps);
     addPhaseRouteTargetEditor("preconditions",model.prepare.routes,body,
       caps.phaseRoutes);
+    addPhaseOutcomeEditor("preconditions",body,caps.phaseOutcome);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1711,6 +1763,7 @@ function renderNodeJourney(model,caps) {
       caps.namedVerify,caps.phaseEffect?.steps);
     addPhaseRouteTargetEditor("postconditions",model.confirm.routes,body,
       caps.phaseRoutes);
+    addPhaseOutcomeEditor("postconditions",body,caps.phaseOutcome);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
@@ -1764,6 +1817,8 @@ function renderInspector() {
       caps.phaseNamed?.some(x=>x.editEligible)||
       caps.namedVerify?.names?.length||caps.namedVerify?.deletions?.length||
       caps.namedVerify?.swaps?.length||caps.phaseRoutes?.length||
+      caps.phaseOutcome?.some(x=>x.adds.length||x.renames.length||
+        x.deletions.length)||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -2019,6 +2074,12 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyDeleteRouteOutcome(source.value,pendingPatch);
     else if(pendingPatch.type==="SetPhaseRouteTarget")
       nextSource=applyPhaseRouteTarget(source.value,pendingPatch);
+    else if(pendingPatch.type==="AddObservedPhaseOutcome")
+      nextSource=applyAddObservedPhaseOutcome(source.value,pendingPatch);
+    else if(pendingPatch.type==="RenameNoncorePhaseOutcome")
+      nextSource=applyRenameNoncorePhaseOutcome(source.value,pendingPatch);
+    else if(pendingPatch.type==="DeleteNoncorePhaseOutcome")
+      nextSource=applyDeleteNoncorePhaseOutcome(source.value,pendingPatch);
     else throw new Error("未知的属性 Patch 类型");
     if(pendingPatch.type==="RenameNode"&&selection?.kind==="node"&&
        activeProcedureId===pendingPatch.procedureId&&selection.id===pendingPatch.nodeId)
