@@ -1,8 +1,8 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1 and bounded A2.1 Accepted (Studio editor only); A2.2/A3/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1 merged; A2.1 implemented in PR #17; A2.2/A3/A4 NOT_STARTED**  
-**Acceptance: A1 230 tests + Chromium PASS; A2.1 238 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
+**Status: A1/A2.1 Accepted; A2.2a read-only Accepted; A2.2b/A3/A4 Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1 merged; A2.2a PR #18; A2.2b/A3/A4 NOT_STARTED**  
+**Acceptance: A1 230 tests; A2.1 238 tests; A2.2a 245 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
 ## Model and visual hierarchy
@@ -15,7 +15,8 @@ Only authored Procedure business Nodes belong to the React Flow main graph. `pre
 |---|---|---|
 | D4-A1 | Existing Step `with.<key>.from` rebind between **same-Procedure declared `input.*` of the exact same declared `type`** | No new Steps/Bindings, output refs, Step name/operator edit or Phase `on` mutation |
 | D4-A2.1 | Switch between two already-observed spellings of the identical earlier named Step output under the same Node | Exact producer, output suffix and ordering fixed; no new refs, cross-Node relinking or field type inference |
-| D4-A2.2 | Other producers/fields, cross-Node outputs and Step metadata | Needs actual owner output shapes, dependency ordering, consumer ABI/type contracts |
+| D4-A2.2a | Read-only evidence for input refs, same-Node prior/future Steps, cross-Node graph dominance, script outputSchema title and package schema field declarations | No Source mutation, no producer change, no inference that graph dominance proves output availability or ABI compatibility |
+| D4-A2.2b | Actual cross-producer/field rebind and Step metadata | Requires authoritative owner output shape + type + consumer ABI and execution evidence, not merely graph position or observed references |
 | D4-A3 | Step create, delete and reorder | Requires reference/dependency impact analysis for named Steps and `preconditions.<step>.output`, without graph-node inflation |
 | D4-A4 | Phase-specific `on` Route authoring | Must separate `preconditions.on` / `postconditions.on` from `operator.on` and use owner Outcome eligibility |
 
@@ -37,7 +38,7 @@ D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, numbe
 - Browser: expand owning Node's 准备 Step, select qualified input, Diff/cancel/Apply/Undo/Redo and verify main graph's Node count unchanged.
 - Gates: unit/negative tests, TypeScript typecheck, build and real Chromium browser interactions. No Runtime/5GC operation or qualification will run.
 
-A2.2/A3/A4 remain NOT_STARTED; neither A1 same-type inputs nor A2.1 observed spellings imply full Runtime binding qualification.
+A2.2b/A3/A4 remain NOT_STARTED; neither input type hints, A2.1 observed spellings nor A2.2a schema evidence imply full Runtime binding qualification.
 
 ## A1 actual acceptance
 
@@ -47,4 +48,12 @@ A2.2/A3/A4 remain NOT_STARTED; neither A1 same-type inputs nor A2.1 observed spe
 
 Only an existing Phase Step `with.<key>.from` referencing a uniquely named **earlier Step of the same Node** is eligible. Both `preconditions.<step>.output[.field]` and `<own-node>.preconditions.<step>.output[.field]` (or a correspondingly earlier postcondition) must already appear as plain `from` values in the **same Procedure's YAML Source**. The selected producer Step, Phase, Node, output field suffix and consumer binding key cannot change. Forward references, self-references, cross-Node/Procedure values, renamed/duplicate producers and unobserved aliases fail closed.
 
-UI keeps the Step in its owning Inspector section, never a main graph node. Exact Source span patch → reparse and graph identity check → original YAML Diff → confirmation → Undo/Redo. The real CreatedSession `nudm-sdm-subscribe.preconditions.steps[1].with.selection.from` is the positive specimen; both local and own-node-qualified forms already occur in that root Procedure. These are **observed syntax alternatives, not proved Runtime aliases**. No field type, consumer ABI or 5GC result is inferred. [PR #17](https://github.com/odango-chan/ca-skill-studio-demo/pull/17) [CI #41755713730](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41755713730) verified 238/238 tests, TypeScript, build and real Chromium (selection, exact Diff, cancel, Apply, Undo/Redo, Source restoration). Merge requires this final document-only commit to pass too. All broader D4-A2.2 cross-producer and A3/A4 authoring remains deferred.
+UI keeps the Step in its owning Inspector section, never a main graph node. Exact Source span patch → reparse and graph identity check → original YAML Diff → confirmation → Undo/Redo. The real CreatedSession `nudm-sdm-subscribe.preconditions.steps[1].with.selection.from` is the positive specimen; both local and own-node-qualified forms already occur in that root Procedure. These are **observed syntax alternatives, not proved Runtime aliases**. No field type, consumer ABI or 5GC result is inferred. [PR #17](https://github.com/odango-chan/ca-skill-studio-demo/pull/17) [CI #41755713730](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41755713730) verified 238/238 tests, TypeScript, build and real Chromium (selection, exact Diff, cancel, Apply, Undo/Redo, Source restoration). Merge requires this final document-only commit to pass too. All D4-A2.2b cross-producer editing and D4-A3/A4 authoring remain deferred.
+
+## D4-A2.2a · Source-authored dataflow review (PR #18)
+
+The Node Inspector now shows a collapsed **数据依赖** view beside each Phase Step that owns `with.<key>.from` values. From current Source it resolves declared Procedure inputs, earlier/same/future Phase Steps, own Node Operator availability by phase, qualified cross-Node Step/Operator references, ambiguous or absent producer IDs and cross-Node graph-dominator relationships. **Dominator means on every structurally reachable route, not Runtime proof of output existence.** Unknown/future/ambiguous dependencies are explicitly diagnosed instead of silently qualified.
+
+When a same-Package local script declares `# outputSchema: <Name>`, the inspector can match **exactly one** schema by `title` under `schemas/` and report the resolved property `type` where the schema explicitly declares it. Missing/conflicting schema, unresolved `$ref` or unknown fields stay unqualified. Neither these producer declarations nor the available Procedure input types constitute verified consumer Tool/Script input ABI. Every dataflow entry is **read-only** and has a Source line jump; there are no cross-producer edit controls, new graph nodes or YAML writes. The D4-A1/A2.1 write paths remain unchanged.
+
+Real CreatedSession coverage includes `nudm-sdm-subscribe` with the preceding `select-subscription-configuration` script and UDM read provenance from `nudm-sdm-get`. Negatives cover future/self references, duplicate or nonexistent producers, unknown inputs, and absent/conflicting script output schema. [PR #18](https://github.com/odango-chan/ca-skill-studio-demo/pull/18) [CI #41757831884](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41757831884): 245/245 tests, typecheck, build, real Chromium read-only Inspector interaction PASS. Still **Runtime/5GC NOT_RUN**.
