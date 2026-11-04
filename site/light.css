@@ -414,7 +414,7 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .source-editor{position:relative;flex:1;min-height:0;min-width:0;
   overflow:hidden;background:#fcfdff}
 .source-editor .source-highlight,
-.source-editor textarea{
+.source-editor > #source{
   position:absolute;inset:0;display:block;width:100%;height:100%;
   box-sizing:border-box;margin:0;padding:17px;border:0;border-radius:0;
   font:12px/1.75 ui-monospace,SFMono-Regular,Consolas,monospace!important;
@@ -427,16 +427,16 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   background:transparent;color:#31475e;user-select:none;
   /* Textarea scrollTop/Left are mirrored so syntax and caret stay aligned. */
 }
-.source-editor textarea{
+.source-editor > #source{
   z-index:1;overflow:auto;resize:none;background:transparent!important;
   color:transparent!important;-webkit-text-fill-color:transparent;
   caret-color:#107c70;outline:none
 }
-.source-editor textarea::selection{background:rgba(62,148,215,.24)}
-.source-editor textarea:focus{outline:none}
+.source-editor > #source::selection{background:rgba(62,148,215,.24)}
+.source-editor > #source:focus{outline:none}
 .source-editor:focus-within{box-shadow:inset 0 0 0 1px #c3e5da}
 .source-editor[data-highlight="off"] .source-highlight{display:none}
-.source-editor[data-highlight="off"] textarea{
+.source-editor[data-highlight="off"] > #source{
   color:#233851!important;-webkit-text-fill-color:#233851
 }
 .source-editor .tok-key{color:#176f96;font-weight:590}
