@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-04**  
-**Reviewed implementation baseline: main@4991fd89c7ee42b0da33ca9aea7530b74cf7e91e**（D4-A2.2a 与 owner-pinned `establish-pdu-session` 已合入；本分支的示例收敛待验收）
+**Reviewed implementation baseline: main@50836c7c0adffd6c7fc7e061d03ec9302231dd2e**（唯一公开 `establish-pdu-session` 示例及默认 Reference 展开已随 PR #21 合入）
 
 ## Overall
 
@@ -29,7 +29,7 @@
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
 
-唯一公开示例名称与 owner 的 SKILL 目录 `establish-pdu-session` 完全一致；Ensure Package 已从选择器、清单和发布资源中移除。旧 Ensure Package 原文与独立 Procedure YAML 仅保留在源码中给单测/浏览器回归使用，发布到 Pages 的 `dist/` 仅包含 `establish-pdu-session` Package。`references/` 在 Explorer 默认展开。本分支 CI/浏览器验证尚待完成，不将该变更标记为已验收。
+唯一公开示例名称与 owner 的 SKILL 目录 `establish-pdu-session` 完全一致；Ensure Package 已从选择器、清单和发布资源中移除。旧 Ensure Package 原文与独立 Procedure YAML 仅保留在源码中给单测/浏览器回归使用，发布到 Pages 的 `dist/` 仅包含 `establish-pdu-session` Package。`references/` 在 Explorer 默认展开。[PR #21 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41766617644) 已验证单测、TypeScript、构建和真实 Chromium 交互 PASS；[main Pages #41766966707](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41766966707) 因旧 Ensure 静态资源断言失败，待本次 Pages workflow 修复重新部署；不能声称该次 Pages PASS。
 
 ## Current open work
 
