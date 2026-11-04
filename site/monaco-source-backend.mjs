@@ -4,6 +4,7 @@ import * as monaco from "monaco-editor/editor";
 import "monaco-editor/features/register.all";
 import "monaco-editor/languages/definitions/register.all";
 import {monacoLanguageForPath} from "./monaco-language.mjs";
+import {diagnoseYamlSyntax,yamlSchemaCapability} from "./yaml-source-diagnostics.mjs";
 const languageId = monacoLanguageForPath;
 const ensureText = text => {
   if(typeof text !== "string")throw new TypeError("Source must be text");
@@ -14,6 +15,24 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
   if(!host || !mirror)throw new TypeError("Monaco requires a host and source mirror");
   const callbacks={input:new Set(),scroll:new Set()};
   let suppress=0,raw="",model=null,modelChange=null,disposed=false;
+  let currentPath="",diagnosticsTimer=null;
+  const showYamlSyntax=()=>{
+    if(disposed||!model)return;
+    const results=diagnoseYamlSyntax(currentPath,raw);
+    monaco.editor.setModelMarkers(model,"studio-yaml-syntax",
+      results.map(({severity,...item})=>({
+        ...item,severity:monaco.MarkerSeverity.Error
+      })));
+    host.dataset.yamlSyntaxErrors=String(results.length);
+    host.dataset.yamlSchemaCapability=yamlSchemaCapability(currentPath);
+  };
+  const scheduleYamlSyntax=()=>{
+    if(diagnosticsTimer!==null)clearTimeout(diagnosticsTimer);
+    diagnosticsTimer=setTimeout(()=>{
+      diagnosticsTimer=null;
+      showYamlSyntax();
+    },150);
+  };
   // The private mirror supports existing DOM-based D4 regression probes.
   // It is hidden from the user once Monaco is mounted and cannot write except
   // through a deliberate input event; Monaco alone receives keyboard input.
@@ -24,6 +43,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
     if(suppress||disposed||!model)return;
     raw=model.getValue(monaco.editor.EndOfLinePreference.TextDefined,true);
     syncMirror();
+    scheduleYamlSyntax();
     for(const handler of [...callbacks.input])handler();
   };
   const onMirrorInput=()=>{
@@ -67,6 +87,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           if(model && model.getValue(monaco.editor.EndOfLinePreference.TextDefined,true)!==next)
             model.setValue(next);
           syncMirror();
+          showYamlSyntax();
         });
       },
       openDocument(path,text){
@@ -81,6 +102,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           // existing per-file Package Source buffer, not by Monaco models.
           const uri=monaco.Uri.from({scheme:"inmemory",path:"/"+path});
           model=monaco.editor.createModel(next,languageId(path),uri);
+          currentPath=path;
           host.dataset.language=languageId(path);
           raw=next;
           editor.setModel(model);
@@ -88,6 +110,8 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           syncMirror();
           editor.setScrollTop(0);
           editor.setScrollLeft(0);
+          if(diagnosticsTimer!==null){clearTimeout(diagnosticsTimer);diagnosticsTimer=null;}
+          showYamlSyntax();
         });
       },
       onInput(callback){
@@ -114,6 +138,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
       dispose(){
         if(disposed)return;
         disposed=true;
+        if(diagnosticsTimer!==null)clearTimeout(diagnosticsTimer);
         modelChange?.dispose();
         editor.setModel(null);
         model?.dispose();
