@@ -333,7 +333,7 @@ try{
     "  procedureValid&&procedureSyntaxError&&procedureRestored,",
     "  engine:host.dataset.yamlSchemaEngine,contractPolicy,predicatePolicy,procedurePolicy,",
     "  contractValid,contractRejectsUnknown,contractRestored,",
-    "  predicateValid,predicateRejectsUnknown,predicateRestored,"
+    "  predicateValid,predicateRejectsUnknown,predicateRestored,",
     "  procedureValid,procedureSyntaxError,procedureRestored};",
     "})()"
   ].join("\n"));
