@@ -1,5 +1,5 @@
-// Explicit read-only fixture inventories: ensure sample retains its older pin;
-// establish sample mirrors the runtime-used files of ca-agent-demo@7570b309.
+// The only selectable sample matches the owner Skill path at ca-agent-demo@7570b309.
+// Legacy Ensure regression YAML is kept separately, never as a selectable Package.
 // This UI manifest is not inserted into the exported SKILL Package.
 const core=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml","assurance/predicates.yaml"];
 const establishExtras=[
@@ -17,7 +17,6 @@ const establishExtras=[
   "scripts/select_establishment_configuration.py"
 ];
 export const SAMPLE_PACKAGES=Object.freeze({
-  ensure:Object.freeze({name:"ensure-pdu-session",entry:"assurance/procedure.yaml",files:Object.freeze([...core])}),
   establish:Object.freeze({name:"establish-pdu-session",entry:"assurance/procedure.yaml",files:Object.freeze([...core,...establishExtras])})
 });
 

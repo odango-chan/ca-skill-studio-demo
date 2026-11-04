@@ -16,7 +16,7 @@ test("Markdown preview renders headings, emphasis, inline code, lists and blockq
   assert.match(html,/<blockquote><p>A quote<\/p><\/blockquote>/);
 });
 test("SKILL.md frontmatter is readable and actual fixture renders as a document",()=>{
-  for(const name of ["ensure-pdu-session","establish-pdu-session"]){
+  for(const name of ["establish-pdu-session"]){
     const content=fixture(name);
     const result=renderMarkdown(content);
     assert.equal(result.available,true);
