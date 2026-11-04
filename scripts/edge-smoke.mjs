@@ -283,6 +283,36 @@ try{
 
   await runD1Interactions(evaluate,command);
 
+  // E2-A1 grammar-only markers must never flag valid owner Phase steps.
+  // Deliberately malformed YAML yields Monaco syntax markers; after restoring
+  // byte-identical Source the markers disappear. Owner Procedure Schema stays
+  // DISABLED until its Phase shape is supported.
+  const yamlDiagnostics=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const host=document.getElementById('monacoHost');",
+    " const source=document.getElementById('source');",
+    " const procedure=[...document.querySelectorAll('#assetTree button.asset-file')]",
+    "  .find(el=>el.getAttribute('aria-label')==='assurance/procedure.yaml');",
+    " procedure?.click();await sleep(250);",
+    " const before=source.value,valid=Number(host.dataset.yamlSyntaxErrors);",
+    " const policy=host.dataset.yamlSchemaCapability;",
+    " source.value='procedures: [\\n';",
+    " source.dispatchEvent(new Event('input',{bubbles:true}));await sleep(280);",
+    " const invalid=Number(host.dataset.yamlSyntaxErrors);",
+    " source.value=before;source.dispatchEvent(new Event('input',{bubbles:true}));",
+    " await sleep(300);",
+    " const restored=source.value===before &&",
+    "  Number(host.dataset.yamlSyntaxErrors)===0;",
+    " return {ok:valid===0&&invalid>0&&restored&&",
+    "  policy==='procedure-schema-incompatible',",
+    "  valid,invalid,restored,policy};",
+    "})()"
+  ].join("\\n"));
+  console.log("E2_YAML_SYNTAX_SOURCE_SAFE",JSON.stringify(yamlDiagnostics));
+  if(!yamlDiagnostics?.ok)
+    throw Error("E2 YAML syntax diagnostics / provenance guard FAIL: "+JSON.stringify(yamlDiagnostics));
+
 }finally{
   if(ws)ws.close();
   // Chromium may still be writing its profile after SIGKILL is sent.
