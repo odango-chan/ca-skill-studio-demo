@@ -35,6 +35,8 @@ import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from "./phase-output-refs.mjs";
 import {phaseStepDependencyReport} from "./phase-dataflow.mjs";
 import {phaseConsumerContractReport} from "./phase-consumer-contract.mjs";
+import {namedPhaseStepImpactReport,previewNamedPhaseStepRename,
+  applyNamedPhaseStepRename} from "./phase-step-rename.mjs";
 import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   previewAddPhaseVerify,applyAddPhaseVerify,
   previewDeletePhaseVerify,applyDeletePhaseVerify}
@@ -1393,8 +1395,55 @@ function addPhaseVerifyCreation(phase,container,addOptions){
   controls.append(selector,preview);
   disclosure.append(controls);container.appendChild(disclosure);
 }
+function addNamedStepImpact(phase,step,container,impacts){
+  if(!step.name)return;
+  const impact=impacts.find(row=>row.phaseName===phase.name&&
+    row.stepIndex===step.index-1);
+  if(!impact)return;
+  const disclosure=el("details","step-enum phase-step-impact");
+  disclosure.dataset.phaseNamedStep=phase.name+":"+step.index;
+  disclosure.dataset.impactStatus=impact.status;
+  disclosure.appendChild(el("summary","",
+    "引用影响 · "+(impact.referenceCount===null?"未能完整审查":
+      impact.referenceCount+" 处")+" · D4-A3b2a"));
+  const body=el("div","step-enum-controls");
+  body.appendChild(el("p","small-edit-note",
+    impact.editEligible?
+      "已对当前 Procedure 的原始 Source 做全量出现位置审计。"+
+      "改名会同时更新已确认的本地/全限定 from；不代表 Runtime 资格。":
+      "暂不可改名：存在未知、引用歧义或无法安全归属的 Source 用法。"+
+      (impact.reason?" "+impact.reason:"")));
+  for(const row of impact.references){
+    const info=el("div","phase-dependency-item");
+    info.appendChild(el("small","",
+      row.consumerNodeId+" · L"+row.line+" · "+row.value));
+    info.appendChild(button("查看引用 · L"+row.line,
+      ()=>lineJump(row.line),"source-link"));
+    body.appendChild(info);
+  }
+  if(impact.editEligible&&activePackage?.name==="establish-pdu-session"&&
+     activeFilePath==="assurance/procedure.yaml"){
+    const input=el("input","target-select");
+    input.value=impact.stepName;
+    input.setAttribute("aria-label","重命名 "+phase.name+" Step "+step.index);
+    input.setAttribute("spellcheck","false");
+    const preview=button("预览 Step 改名及全部引用",()=>{
+      try{
+        showPreview(previewNamedPhaseStepRename(source.value,
+          activeProcedureId,selection.id,phase.name,step.index-1,input.value));
+      }catch(error){message("命名 Step 改名被拒绝："+String(error?.message??error));}
+    },"preview-button");
+    preview.disabled=true;
+    input.addEventListener("input",()=>{
+      preview.disabled=input.value===impact.stepName||!input.value;
+    });
+    body.append(input,preview);
+  }
+  disclosure.append(body);container.appendChild(disclosure);
+}
 function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
-  lineage=null,contracts=null,reorderOptions=[],addOptions=[],removeOptions=[]) {
+  lineage=null,contracts=null,reorderOptions=[],addOptions=[],removeOptions=[],
+  namedImpacts=[]) {
   if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
@@ -1432,6 +1481,7 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
     }
     body.appendChild(item);
     addPhaseVerifyEditor(phase,step,body);
+    addNamedStepImpact(phase,step,body,namedImpacts);
     addPhaseInputBindingEditors(phase,step,body,phaseBindings);
     addPhaseOutputReferenceEditors(phase,step,body,phaseOutputs);
     addPhaseDependencyInspector(phase,step,body,lineage,contracts);
@@ -1466,7 +1516,8 @@ function nodeEditorCapabilities(nodeId){
     phaseOutputs:phaseOutputReferenceOptions(text,activeProcedureId,nodeId),
     phaseOrder:adjacentVerifyReorderOptions(text,activeProcedureId,nodeId),
     phaseAdd:phaseVerifyAddOptions(text,activeProcedureId,nodeId,ps,skill),
-    phaseDelete:phaseVerifyDeleteOptions(text,activeProcedureId,nodeId)
+    phaseDelete:phaseVerifyDeleteOptions(text,activeProcedureId,nodeId),
+    phaseNamed:namedPhaseStepImpactReport(text,activeProcedureId,nodeId)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1493,7 +1544,7 @@ function renderNodeJourney(model,caps) {
       {expanded:false});
     renderPhase(model.prepare.phase,body,model.children,
       caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
-      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete);
+      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1510,7 +1561,7 @@ function renderNodeJourney(model,caps) {
       {expanded:false});
     renderPhase(model.confirm.phase,body,model.children,
       caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
-      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete);
+      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
@@ -1561,6 +1612,7 @@ function renderInspector() {
       caps.deletion||caps.rename||caps.verify.length||caps.newRoute||
       caps.phaseBindings?.length||caps.phaseOutputs?.length||caps.phaseOrder?.length||
       caps.phaseAdd?.length||caps.phaseDelete?.length||
+      caps.phaseNamed?.some(x=>x.editEligible)||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -1786,6 +1838,8 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyAddPhaseVerify(source.value,pendingPatch,packagePredicateSource());
     else if(pendingPatch.type==="DeletePhaseVerifyStep")
       nextSource=applyDeletePhaseVerify(source.value,pendingPatch);
+    else if(pendingPatch.type==="RenameNamedPhaseStepAndReferences")
+      nextSource=applyNamedPhaseStepRename(source.value,pendingPatch);
     else if(pendingPatch.type==="SetCreatedRouteTarget")
       nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
     else if(pendingPatch.type==="RenameNode")

@@ -90,3 +90,7 @@ Inspector 在 Source 能证明是两个紧邻、未命名、单行、无 Binding
 ## D4-A3b1 · Verify Step 受限增删（编辑器级验收通过）
 
 在选中 Node 的「准备 / 确认」Inspector 中，符合条件的单行 Verify 提供「删除」入口；若 Phase 存在可证明的安全末尾插入点，则展开「新增 Verify」后从当前 Package PredicateSet 选一个尚未出现在该 Phase 的 Predicate。所有操作必须先看 YAML Diff，再显式确认并支持撤销/重做。Complex/named/bound/commented Step 保持 Source-only。新增或删除会改变业务门禁，本编辑器不承担 Runtime 合法性判定。参见 [Phase Designer](phase-designer.md)。
+
+## D4-A3b2a · 命名 Step 引用影响与同步改名（编辑器级验收通过）
+
+每条命名 Phase Step 在 Inspector 下有折叠「引用影响」视图，展示从当前 Procedure YAML 证明的 consumer 数、来源 Node、Source 行号。若所有旧名称出现位置均经严格审计为唯一生产者的合法未引号 from 引用，则可以提交命名 Step 的原子改名 Diff；任何未知/注释/歧义引用会拒绝可视改名。主画布不会新增业务节点。Runtime/5GC 未验证。参见 [Phase Designer](phase-designer.md)。

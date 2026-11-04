@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-04**  
-**Reviewed implementation baseline: main@f93f1e3f95e38e33f197ea84a003d8420cc3e26e**（D4-A3a 已随 PR #29 合入且 Pages PASS；D4-A3b1 编辑器级验收已通过）
+**Reviewed implementation baseline: main@95d18cb92a17d6a5726b3a190e6fa87e3fd4b624**（D4-A3b1 已合入且 Pages PASS；D4-A3b2a 编辑器级验收通过）
 
 ## Overall
 
@@ -27,7 +27,8 @@
 | D4-A2.2b1 Script 消费参数 Schema / 生产者类型对照（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（PR #19） | PASS（258 tests + real Chromium；PR #19 已合入） | [PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19)、[最终 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41769318870)、[设计](design/phase-designer.md) |
 | D4-A3a 相邻独立 Verify Step 的 Source-backed 换序 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #29） | PASS（264 tests + Chromium；首轮提交） | [PR #29](https://github.com/odango-chan/ca-skill-studio-demo/pull/29)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41770964460)、[设计](design/phase-designer.md) |
 | D4-A3b1 已有 Phase 尾部新增 / 有界删除独立 Verify | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #30） | PASS（272 tests + Chromium；集成文档 CI 已验收） | [PR #30](https://github.com/odango-chan/ca-skill-studio-demo/pull/30)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41778044582)、[设计](design/phase-designer.md) |
-| D4-A2.2b2/A3b2/A4 生产者改绑 / 命名或绑定 Step 的结构编辑 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
+| D4-A3b2a 命名 Step 引用影响审查与原子改名 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #32） | PASS（279 tests + real Chromium；集成提交） | [PR #32](https://github.com/odango-chan/ca-skill-studio-demo/pull/32)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41784309105)、[设计](design/phase-designer.md) |
+| D4-A2.2b2/A3b2b/A4 跨生产者写入 / 命名 Step 增删与依赖排序 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
@@ -37,7 +38,7 @@
 ## Current open work
 
 - [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3 有界 operator.on Route 编辑已合入；Runtime Outcome 资格和 Phase-specific Route 仍未覆盖。
-- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b2 命名/绑定 Step 结构编辑和 A4 尚未开始；A3b1 只覆盖现有 Phase 中的无名无绑定 Verify 增删（本仓编辑器级验收通过）。
+- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b2b 命名 Step 增删及依赖重排和 A4 尚未开始；A3b2a 先审查命名输出引用并受限改名，不能据此宣称 Runtime 兼容。
 - 早期未合并 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)、[#2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)、[#3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3) 目前只作为历史候选，**不推断可直接合并**。
 
 ## Authority / evidence
