@@ -29,6 +29,10 @@
 | D4-A3b1 已有 Phase 尾部新增 / 有界删除独立 Verify | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #30） | PASS（272 tests + Chromium；集成文档 CI 已验收） | [PR #30](https://github.com/odango-chan/ca-skill-studio-demo/pull/30)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41778044582)、[设计](design/phase-designer.md) |
 | D4-A3b2a 命名 Step 引用影响审查与原子改名 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #32） | PASS（279 tests + real Chromium；集成提交） | [PR #32](https://github.com/odango-chan/ca-skill-studio-demo/pull/32)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41784309105)、[设计](design/phase-designer.md) |
 | D4-A2.2b2/A3b2b/A4 跨生产者写入 / 命名 Step 增删与依赖排序 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
+| E1 Monaco Source Editor（仍在 PR，未合主分支） | ACCEPTED | IMPLEMENTED（PR #33） | PASS（286 tests + Chromium，**仅 PR HEAD**） | [设计](design/source-editor-workstream.md)、[PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41785473857)、[#23](https://github.com/odango-chan/ca-skill-studio-demo/issues/23) |
+| E2 YAML 语言智能 / Owner Schema 绑定 | ACCEPTED（分阶段、拒绝错误 Schema） | NOT_STARTED | NOT_RUN | [设计](design/source-editor-workstream.md)、[#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24) |
+| E3 Python Script 智能编辑与导航 | ACCEPTED（方向） | NOT_STARTED | NOT_RUN | [设计](design/source-editor-workstream.md)、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) |
+| E4 Package 目录打开/保存与冲突 | PROPOSED | NOT_STARTED | NOT_RUN | [设计](design/source-editor-workstream.md)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
 | 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
@@ -36,6 +40,8 @@
 唯一公开示例名称与 owner 的 SKILL 目录 `establish-pdu-session` 完全一致；Ensure Package 已从选择器、清单和发布资源中移除。旧 Ensure Package 原文与独立 Procedure YAML 仅保留在源码中给单测/浏览器回归使用，发布到 Pages 的 `dist/` 仅包含 `establish-pdu-session` Package。`references/` 在 Explorer 默认展开。[PR #21 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41766617644) 已验证单测、TypeScript、构建和真实 Chromium 交互 PASS；[main Pages #41771402007](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41771402007) 已在 `f93f1e3f`（重跑 attempt 2）完成静态资产检查、Chromium 和 Pages 部署 PASS。
 
 ## Current open work
+
+- **E Source Editor 与 D4 并行**：E1 Monaco [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) 已通过分支 CI，但未合入 main 或通过 resulting-main Pages；E2 [#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24) 的旧 Owner Procedure Schema 与 Phase 结构不兼容，必须拒绝错误 Schema 关联；E3/E4 未实施。见 [统一设计](design/source-editor-workstream.md)。
 
 - [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3 有界 operator.on Route 编辑已合入；Runtime Outcome 资格和 Phase-specific Route 仍未覆盖。
 - [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b2b 命名 Step 增删及依赖重排和 A4 尚未开始；A3b2a 先审查命名输出引用并受限改名，不能据此宣称 Runtime 兼容。
