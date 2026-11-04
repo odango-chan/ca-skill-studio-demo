@@ -94,6 +94,9 @@ function sourceContext(source,procedureId,nodeId,phaseName){
      rows.some((row,i)=>i>0&&rows[i-1].end!==row.start)||
      new Set(rows.map(x=>x.outcome)).size!==rows.length)
     fail("Phase Outcome row order or comments are ambiguous");
+  const tail=source.slice(rows.at(-1).end);
+  if(/^(?:\r?\n){2}/.test(tail))
+    fail("More than one blank line after Phase Outcome has unclear ownership");
   const next=source.slice(rows.at(-1).end).split(/\r?\n/,1)[0];
   if(next.trimStart().startsWith("#"))
     fail("A comment following this mapping has ambiguous ownership");

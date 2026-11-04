@@ -213,5 +213,5 @@ test("D4-A4b1 preserve original CRLF and reject mixed line endings",()=>{
     previewDeleteNoncorePhaseOutcome(ext,pid,subscribe,prepare,"EXTRA")),
     original.replace(/\n/g,"\r\n"));
  assert.throws(()=>addPreview(missingSource.replace("\n","\r\n")),
-   /Mixed|unsupported/);
+   /[Mm]ixed|[Uu]nsupported/);
 });
