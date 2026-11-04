@@ -2001,6 +2001,8 @@ async function initializeMonaco(){
     // Created before importing Monaco: workers are emitted as local Pages assets.
     self.MonacoEnvironment={
       getWorker:(moduleId,label)=>{
+        self.__studioWorkerCalls??=[];
+        self.__studioWorkerCalls.push({moduleId,label});
         // Monaco versions may expose the worker label alongside the module id;
         // keep the YAML module id as a second exact discriminator.
         const yamlWorker=label==="yaml"||moduleId==="monaco-yaml/yaml.worker"||moduleId==="yaml";
