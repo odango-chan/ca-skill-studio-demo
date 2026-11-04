@@ -94,3 +94,7 @@ Inspector 在 Source 能证明是两个紧邻、未命名、单行、无 Binding
 ## D4-A3b2a · 命名 Step 引用影响与同步改名（编辑器级验收通过）
 
 每条命名 Phase Step 在 Inspector 下有折叠「引用影响」视图，展示从当前 Procedure YAML 证明的 consumer 数、来源 Node、Source 行号。若所有旧名称出现位置均经严格审计为唯一生产者的合法未引号 from 引用，则可以提交命名 Step 的原子改名 Diff；任何未知/注释/歧义引用会拒绝可视改名。主画布不会新增业务节点。Runtime/5GC 未验证。参见 [Phase Designer](phase-designer.md)。
+
+## D4-A3b2b1 · 命名 Verify 生命周期（PR #34 候选）
+
+在现有「准备/确认」Inspector 中，仅对 Source 可精确定位的独立 Verify 显示折叠「命名 Verify」；已命名且无任何已知输出引用的纯 Verify 可显示「删除」或「下移」。任何命名脚本/工具调用、依赖引用、额外字段、注释归属不清时均不显示危险操作。各操作保留原文 Source Diff/确认/Undo/Redo，Runtime/5GC 未验证。参见 [Phase Designer](phase-designer.md)。
