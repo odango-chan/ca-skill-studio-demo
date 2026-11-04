@@ -315,8 +315,9 @@ try{
     " const predicates=await open('assurance/predicates.yaml');",
     " const predicatePolicy=host.dataset.yamlSchemaCapability;",
     " await sleep(700);const predicateValid=markers()===0;",
-    " source.value=predicates+'studioUnknownProbe: true\\n';dispatch();",
+    " source.value=predicates.replace('metadata:\n  skill:','metadata:\n  studioUnknownProbe: true\n  skill:');dispatch();",
     " const predicateRejectsUnknown=await waitFor(()=>markers()>0);",
+    " const predicateDebug=host.__studioYamlDiagnostics?.()||null;",
     " source.value=predicates;dispatch();",
     " await sleep(700);const predicateRestored=markers()===0;",
     " const procedure=await open('assurance/procedure.yaml');",
@@ -333,11 +334,12 @@ try{
     "  procedureValid&&procedureSyntaxError&&procedureRestored,",
     "  engine:host.dataset.yamlSchemaEngine,contractPolicy,predicatePolicy,procedurePolicy,",
     "  contractValid,contractRejectsUnknown,contractRestored,",
-    "  predicateValid,predicateRejectsUnknown,predicateRestored,",
+    "  predicateValid,predicateRejectsUnknown,predicateRestored,predicateDebug,",
     "  procedureValid,procedureSyntaxError,procedureRestored};",
     "})()"
   ].join("\n"));
   console.log("E2_OWNER_SCHEMA_VALIDATION",JSON.stringify(ownerSchemaSmoke));
+  console.log("E2_OWNER_PREDICATE_DIAGNOSTICS",JSON.stringify(ownerSchemaSmoke?.predicateDebug||null));
   console.log("E2_OWNER_SCHEMA_DIAGNOSTICS",JSON.stringify(await evaluate("document.getElementById(\"monacoHost\").__studioYamlDiagnostics?.()||null")));
   console.log("MONACO_WORKER_CALLS",JSON.stringify(await evaluate("window.__studioWorkerCalls||[]")));
   console.log("BROWSER_EXCEPTIONS_BEFORE_E2_ASSERT",JSON.stringify(exceptions));
