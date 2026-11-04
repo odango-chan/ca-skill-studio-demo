@@ -65,17 +65,20 @@ test("WORK / D3 stages distinguish shipped A1/A2 from scoped editor-tier A3",()=
   assert.match(content("docs/DOCUMENTATION.md"),/tool-mcp-gw/);
 });
 
-test("D4-A1/A2.1 and read-only A2.2a accepted, broader A2.2b/A3/A4 deferred",()=>{
+test("D4 read-only consumer ABI evidence accepted; cross-producer edits still deferred",()=>{
   const work=content("docs/WORK.md"),spec=content("docs/design/phase-designer.md");
   assert.match(work,/\|\s*D4-A1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A2\.1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A2\.2a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A2\.2b\/A3\/A4[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
+  assert.match(work,/\|\s*D4-A2\.2b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
+  assert.match(work,/\|\s*D4-A2\.2b2\/A3\/A4[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
   assert.match(spec,/Runtime\/5GC NOT_RUN/);
   const trace=content("docs/TRACEABILITY.md");
   assert.match(trace,/D4-A1 Phase Step input rebind/);
   assert.match(trace,/D4-A2\.1 Same-producer output reference normalization/);
   assert.match(trace,/D4-A2\.2a Phase dependency evidence/);
+  assert.match(trace,/D4-A2\.2b1 script consumer field/);
+  assert.match(spec,/consumer schema/i);
   assert.match(spec,/Runtime\/5GC NOT_RUN/);
 });
 

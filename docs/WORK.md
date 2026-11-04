@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-04**  
-**Reviewed implementation baseline: main@50836c7c0adffd6c7fc7e061d03ec9302231dd2e**（唯一公开 `establish-pdu-session` 示例及默认 Reference 展开已随 PR #21 合入）
+**Reviewed implementation baseline: main@d5eedb3741afdbc9b1014e29bf78e4953b3c8b63**（PR #21/#22 已合入且 Pages PASS；D4-A2.2b1 集成中）
 
 ## Overall
 
@@ -23,18 +23,19 @@
 | 画布整体 / 横向 / 纵向适配 | ACCEPTED | IMPLEMENTED | PASS（222 单测 + Chromium） | [PR #14 merged](https://github.com/odango-chan/ca-skill-studio-demo/pull/14)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41628951327)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41629222963) |
 | D4-A1 有界 Phase Step `with.from` 输入重绑定 | ACCEPTED（Editor-tier） | IMPLEMENTED（main） | PASS（230 tests + Chromium） | [PR #16 merged](https://github.com/odango-chan/ca-skill-studio-demo/pull/16)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41631580489)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41631903456) |
 | D4-A2.1 同生产 Step 的输出引用写法 | ACCEPTED（Editor-tier） | IMPLEMENTED（main） | PASS（238 tests + Chromium） | [PR #17 merged](https://github.com/odango-chan/ca-skill-studio-demo/pull/17)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41756050731)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41756351449) |
-| D4-A2.2a Phase Step 依赖/Schema 证据审查（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（PR #18） | PASS（245 tests + real Chromium；最终文档 head 待复核） | [PR #18](https://github.com/odango-chan/ca-skill-studio-demo/pull/18)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41757831884)、[设计](design/phase-designer.md) |
-| D4-A2.2b/A3/A4 跨生产者编辑 / Steps 结构 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
+| D4-A2.2a Phase Step 依赖/Schema 证据审查（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（main） | PASS（245 tests + Chromium） | [PR #18 merged](https://github.com/odango-chan/ca-skill-studio-demo/pull/18)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41758229256)、[设计](design/phase-designer.md) |
+| D4-A2.2b1 Script 消费参数 Schema / 生产者类型对照（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（PR #19） | PASS（253 tests + Chromium；旧 PR HEAD，新集成提交待 CI） | [PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19)、[旧 HEAD CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41760448800)、[设计](design/phase-designer.md) |
+| D4-A2.2b2/A3/A4 跨生产者写入 / Steps 结构 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
 
-唯一公开示例名称与 owner 的 SKILL 目录 `establish-pdu-session` 完全一致；Ensure Package 已从选择器、清单和发布资源中移除。旧 Ensure Package 原文与独立 Procedure YAML 仅保留在源码中给单测/浏览器回归使用，发布到 Pages 的 `dist/` 仅包含 `establish-pdu-session` Package。`references/` 在 Explorer 默认展开。[PR #21 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41766617644) 已验证单测、TypeScript、构建和真实 Chromium 交互 PASS；[main Pages #41766966707](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41766966707) 因旧 Ensure 静态资源断言失败，待本次 Pages workflow 修复重新部署；不能声称该次 Pages PASS。
+唯一公开示例名称与 owner 的 SKILL 目录 `establish-pdu-session` 完全一致；Ensure Package 已从选择器、清单和发布资源中移除。旧 Ensure Package 原文与独立 Procedure YAML 仅保留在源码中给单测/浏览器回归使用，发布到 Pages 的 `dist/` 仅包含 `establish-pdu-session` Package。`references/` 在 Explorer 默认展开。[PR #21 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41766617644) 已验证单测、TypeScript、构建和真实 Chromium 交互 PASS；[main Pages #41767797399](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41767797399) 已在 `d5eedb37` 完成所有静态资产检查、Chromium 和 Pages 部署 PASS。
 
 ## Current open work
 
 - [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3 有界 operator.on Route 编辑已合入；Runtime Outcome 资格和 Phase-specific Route 仍未覆盖。
-- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1 已合入，A2.2a 只读依赖审查通过编辑器级验收，A2.2b/A3/A4 仍未开始。
+- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照在 PR #19 集成中；A2.2b2/A3/A4 仍未开始。
 - 早期未合并 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)、[#2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)、[#3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3) 目前只作为历史候选，**不推断可直接合并**。
 
 ## Authority / evidence

@@ -10,7 +10,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 4. [Architecture](architecture/studio-boundaries.md) — ownership、Source authority
 5. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
 6. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
-7. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1 已合入；A2.2a 只读依赖审查通过；A2.2b/A3/A4 Proposed
+7. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
 7. [Documentation Governance](DOCUMENTATION.md) — canonical source map
 
 ## 已完成阶段技术记录
