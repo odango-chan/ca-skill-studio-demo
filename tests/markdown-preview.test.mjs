@@ -63,3 +63,21 @@ test("unsupported oversized Markdown fails closed to Source only",()=>{
   assert.match(result.reason,/太大/);
   assert.throws(()=>renderMarkdown(null),TypeError);
 });
+
+
+test("all three current CreatedSession business References render safely in Markdown Visual",()=>{
+  const paths=["3gpp-procedure.md","session-selection.md","failure-handling.md"];
+  for(const name of paths){
+    const source=readFileSync(new URL("../site/samples/packages/"+
+      "establish-pdu-session/references/"+name,import.meta.url),"utf8");
+    const rendered=renderMarkdown(source);
+    assert.equal(rendered.available,true,name);
+    assert.match(rendered.html,/<h1>[^<]+<\/h1>/,name);
+    assert.doesNotMatch(rendered.html,/<script\b|<iframe\b|<img\b/i,name);
+    assert.ok(rendered.html.length>1000,name);
+  }
+  const gpp=renderMarkdown(readFileSync(new URL("../site/samples/packages/"+
+    "establish-pdu-session/references/3gpp-procedure.md",import.meta.url),"utf8"));
+  assert.match(gpp.html,/md-unresolved-link/);
+  assert.doesNotMatch(gpp.html,/href="\.\.\/SKILL.md"/);
+});
