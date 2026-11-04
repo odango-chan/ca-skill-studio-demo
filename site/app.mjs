@@ -59,7 +59,7 @@ const inspector = $("inspector");
 const problems = $("problems");
 const filePicker = $("filePicker");
 const procedureTree = $("procedureTree");
-let filename = "ensure-pdu-session.procedure.yaml";
+let filename = "establish-pdu-session.procedure.yaml";
 let assetOrigin = "sample";
 let localProcedureDocument = false;
 let activePackage = null;
@@ -81,7 +81,7 @@ let packageDiagnostics = [];
 let nodeEditorCache = null;
 let inspectorOpen = false;
 let explorerOpen = true;
-const expandedAssetFolders=new Set(["assurance","schemas","scripts"]);
+const expandedAssetFolders=new Set(["assurance","schemas","scripts","references"]);
 let procedureNavOpen=true;
 let showAllLabels = false;
 let layoutDirection = "DOWN";
@@ -1590,15 +1590,11 @@ filePicker.addEventListener("change",async()=>{
     activateWorkspace(workspace,file.name,"local");
   }catch(error){message("本地文件读取失败："+String(error?.message??error));}
 });
-$("sampleButton").addEventListener("click",async()=>{
-  if(hasUnsavedEdits(activePackage)&&!confirm("当前 Package 还有未导出的修改。确定重新载入示例？"))return;
-  await loadSample("ensure");
-});
 $("establishSampleButton").addEventListener("click",async()=>{
   if(hasUnsavedEdits(activePackage)&&!confirm("当前 Package 还有未导出的修改。确定重新载入示例？"))return;
   await loadSample("establish");
 });
-async function loadSample(sample="ensure"){
+async function loadSample(sample="establish"){
   try{
     const spec=SAMPLE_PACKAGES[sample];
     if(!spec)throw new Error("未知示例");

@@ -83,10 +83,22 @@ test("current owner-pinned CreatedSession Reference example is documented withou
   const work=content("docs/WORK.md"),trace=content("docs/TRACEABILITY.md");
   const docs=content("docs/design/authoring-workbench.md");
   assert.match(work,/7570b309a998580a6952352e2bf4b1c19e5c710d/);
-  assert.match(trace,/Refreshed CreatedSession optional references/);
+  assert.match(trace,/Refreshed establish-pdu-session optional references/);
   for(const name of ["3gpp-procedure.md","session-selection.md","failure-handling.md"])
     assert.ok(work.includes("references/"+name),name);
   assert.match(docs,/read_reference/);
   assert.match(work,/cases\//);
   assert.match(work,/可选业务参考材料/);
+});
+
+test("only owner-named establish-pdu-session is public and loads by default",()=>{
+  const html=content("site/index.html"),app=content("site/app.mjs");
+  const manifest=content("site/sample-packages.mjs");
+  assert.match(html,/id="establishSampleButton"[^>]*>establish-pdu-session<\/button>/);
+  assert.doesNotMatch(html,/Ensure Session|CreatedSession|id="sampleButton"/);
+  assert.match(app,/async function loadSample\(sample="establish"\)/);
+  assert.match(app,/const expandedAssetFolders=new Set\(\[[^\]]*"references"\]\)/);
+  assert.match(app,/loadSample\(\);\s*$/);
+  assert.match(manifest,/establish:Object\.freeze/);
+  assert.doesNotMatch(manifest,/ensure:Object\.freeze/);
 });

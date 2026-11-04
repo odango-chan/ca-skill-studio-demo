@@ -15,22 +15,19 @@ const sha=text=>{
   return createHash("sha1").update("blob "+bytes.length+"\0").update(bytes).digest("hex");
 };
 
-test("two pinned real SKILL Package fixtures include real runtime assets",()=>{
-  assert.equal(SAMPLE_PACKAGES.ensure.files.length,4);
+test("only the owner-named establish-pdu-session is a selectable real SKILL Package",()=>{
+  assert.deepEqual(Object.keys(SAMPLE_PACKAGES),["establish"]);
+  assert.equal(SAMPLE_PACKAGES.establish.name,"establish-pdu-session");
   assert.equal(SAMPLE_PACKAGES.establish.files.length,16);
-  for(const key of ["ensure","establish"]){
-    const spec=SAMPLE_PACKAGES[key];
-    assert.equal(spec.entry,"assurance/procedure.yaml");
-    assert.ok(spec.files.includes("SKILL.md"));
-    assert.ok(spec.files.includes("assurance/contract.yaml"));
-    assert.ok(spec.files.includes("assurance/predicates.yaml"));
-    assert.ok(spec.files.includes("assurance/procedure.yaml"));
-    assert.deepEqual(packageFilesForSample(key).map(x=>x.path),spec.files);
-    for(const path of spec.files){
-      const value=read(spec.name,path);
-      assert.ok(value.trim().length>0,path);
-    }
-  }
+  const spec=SAMPLE_PACKAGES.establish;
+  assert.equal(spec.entry,"assurance/procedure.yaml");
+  for(const path of ["SKILL.md","assurance/contract.yaml",
+    "assurance/predicates.yaml","assurance/procedure.yaml"])
+    assert.ok(spec.files.includes(path),path);
+  assert.deepEqual(packageFilesForSample("establish").map(x=>x.path),spec.files);
+  assert.throws(()=>packageFilesForSample("ensure"));
+  for(const path of spec.files)
+    assert.ok(read(spec.name,path).trim().length>0,path);
   assert.deepEqual(SAMPLE_PACKAGES.establish.files.filter(p=>p.startsWith("scripts/")).length,3);
   assert.deepEqual(SAMPLE_PACKAGES.establish.files.filter(p=>p.startsWith("schemas/")).length,6);
   assert.deepEqual(SAMPLE_PACKAGES.establish.files.filter(p=>p.startsWith("references/")),[
@@ -42,10 +39,6 @@ test("two pinned real SKILL Package fixtures include real runtime assets",()=>{
     !path.startsWith("cases/")&&!path.startsWith("design/")));
 });
 test("fixtures are byte-for-byte the pinned ca-agent-demo Git blob sources",()=>{
-  assert.equal(sha(read("ensure-pdu-session","SKILL.md")),"aef72afd2ffa2fde9c5c9fd5f52108c3005522b8");
-  assert.equal(sha(read("ensure-pdu-session","assurance/contract.yaml")),"f5b7310af240127e943a2f9d64a374fd23d3359d");
-  assert.equal(sha(read("ensure-pdu-session","assurance/procedure.yaml")),"1ead0efb0665b7ccb652501bc0075b36079c5017");
-  assert.equal(sha(read("ensure-pdu-session","assurance/predicates.yaml")),"2abe20975d709b93a27a215fc8eab1c5a33aaa23");
   assert.equal(sha(read("establish-pdu-session","SKILL.md")),"394027efb3f940490c69fcf6f0593ebf29daca81");
   assert.equal(sha(read("establish-pdu-session","references/3gpp-procedure.md")),"d70148210dcd6ea7a7ddebbb1ffcba34e2bb33b3");
   assert.equal(sha(read("establish-pdu-session","references/session-selection.md")),"341a29272ee5b593760b5ee8632ac7c9e7508105");
@@ -64,18 +57,14 @@ test("fixtures are byte-for-byte the pinned ca-agent-demo Git blob sources",()=>
   assert.equal(sha(read("establish-pdu-session","scripts/select_establishment_configuration.py")),"4b76b87b09b0d617327c42b4002be3fac80878aa");
 });
 test("real Procedure files project to the expected Root and Child graph",()=>{
-  const ensure=projectWorkspace(read("ensure-pdu-session","assurance/procedure.yaml"));
   const establish=projectWorkspace(read("establish-pdu-session","assurance/procedure.yaml"));
-  assert.equal(ensure.state,"READY");
-  assert.equal(ensure.procedure.nodes.length,11);
-  assert.equal(ensure.procedure.routes.length,24);
   assert.equal(establish.state,"READY");
   assert.equal(establish.procedure.nodes.length,17);
   assert.equal(establish.procedure.routes.length,65);
   assert.equal(establish.procedures.size,6);
 });
 test("file workspace retains per-file source and revision history independently",()=>{
-  const ws=createFileWorkspace("ensure-pdu-session",[
+  const ws=createFileWorkspace("establish-pdu-session",[
     {path:"SKILL.md",text:"# Demo"},
     {path:"assurance/procedure.yaml",text:"procedures: {}"}
   ]);

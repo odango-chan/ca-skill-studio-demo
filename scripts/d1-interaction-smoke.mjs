@@ -794,7 +794,11 @@ export async function runD1Interactions(evaluate,command){
 
   await check(evaluate,"D3_A1_ADD_OUTCOME",[
     sleepLine,clickLine,
-    " click(document.getElementById('sampleButton'));",
+    " const legacy=await (await fetch('./samples/ensure-pdu-session.procedure.yaml',{cache:'no-cache'})).text();",
+    " const dt=new DataTransfer();dt.items.add(new File([legacy],'legacy.procedure.yaml',{type:'text/yaml'}));",
+    " const picker=document.getElementById('filePicker');picker.files=dt.files;",
+    " picker.dispatchEvent(new Event('change',{bubbles:true}));",
+    " await sleep(180);",
     " for(let i=0;i<80;i++){",
     "  if(document.getElementById('source')?.value.includes('start: observe-target-session'))break;",
     "  await sleep(90);",
