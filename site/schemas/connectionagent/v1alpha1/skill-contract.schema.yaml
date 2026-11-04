@@ -1,0 +1,181 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: skill-contract.schema.yaml
+title: SkillContract
+type: object
+required: [apiVersion, kind, metadata, spec]
+properties:
+  apiVersion:
+    $ref: common.schema.yaml#/$defs/apiVersion
+  kind:
+    const: SkillContract
+  metadata:
+    type: object
+    required: [name]
+    properties:
+      name:
+        $ref: common.schema.yaml#/$defs/skillName
+    additionalProperties: false
+  spec:
+    type: object
+    required: [skillType, goal, allowedResources, postconditions, planning]
+    properties:
+      skillType:
+        enum: [executable, authoring_assistant]
+      goal:
+        $ref: common.schema.yaml#/$defs/semanticId
+      entryProcedure:
+        $ref: common.schema.yaml#/$defs/nodeId
+      inputs:
+        type: object
+        required: [requestSchema]
+        properties:
+          requestSchema:
+            type: string
+            pattern: '^schemas/[A-Za-z0-9._/-]+\.schema\.(?:yaml|json)$'
+        additionalProperties: false
+      context:
+        type: object
+        required: [requiredFacts]
+        properties:
+          requiredFacts:
+            type: array
+            items:
+              $ref: common.schema.yaml#/$defs/semanticId
+            uniqueItems: true
+        additionalProperties: false
+      allowedResources:
+        type: object
+        required: [capabilities, localTools]
+        properties:
+          capabilities:
+            type: array
+            items:
+              $ref: common.schema.yaml#/$defs/semanticId
+            uniqueItems: true
+          localTools:
+            type: array
+            items:
+              type: string
+              pattern: '^skill\.[a-z0-9][a-z0-9]*(?:-[a-z0-9]+)*$'
+            uniqueItems: true
+        additionalProperties: false
+      preconditions:
+        type: array
+        items:
+          $ref: common.schema.yaml#/$defs/predicateExpectation
+      requirements:
+        type: array
+        items:
+          $ref: common.schema.yaml#/$defs/requirementExpectation
+      postconditions:
+        type: array
+        minItems: 1
+        items:
+          $ref: common.schema.yaml#/$defs/predicateExpectation
+      dependencies:
+        type: array
+        maxItems: 32
+        items:
+          $ref: '#/$defs/dependency'
+      planning:
+        type: object
+        required: [maxActions, allowDynamicProcedure]
+        properties:
+          maxActions:
+            type: integer
+            minimum: 1
+            maximum: 256
+          allowDynamicProcedure:
+            type: boolean
+          fallbackProcedure:
+            $ref: common.schema.yaml#/$defs/nodeId
+          budgetPartition:
+            $ref: '#/$defs/budgetPartition'
+        additionalProperties: false
+      failureSemantics:
+        type: object
+        properties:
+          outcomeUnknown:
+            type: object
+            required: [requireReconcile]
+            properties:
+              requireReconcile:
+                const: true
+            additionalProperties: false
+        additionalProperties: false
+    additionalProperties: false
+$defs:
+  dependency:
+    description: >-
+      Immutable reference to one executable dependent Skill/Artifact/Variant.
+      The digest is the frozen dependent source-package digest resolved at
+      compile time; a missing or mismatched digest fails closed.
+    type: object
+    required: [name, artifactRef, digest]
+    properties:
+      name:
+        type: string
+        pattern: '^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$'
+        maxLength: 128
+      artifactRef:
+        $ref: common.schema.yaml#/$defs/skillName
+      digest:
+        $ref: common.schema.yaml#/$defs/digest
+      variant:
+        type: string
+        pattern: '^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$'
+        maxLength: 128
+    additionalProperties: false
+  budgetPartition:
+    description: >-
+      Authoring-time parent/child action-budget ACCOUNTING declaration for
+      composed procedures. Never implicit: parentActions + childActions must
+      equal planning.maxActions. This declaration is validated at compile time
+      only and is NOT carried into the frozen SkillBuildArtifact or the Runtime:
+      the compiled procedure and the Runtime enforce a single flat maxActions
+      budget, and no parent/child sub-budget is enforced or reported at Runtime.
+      Runtime-side contract: ca-runtime docs/design/executable-procedure.md
+      section 4.1 (ca-runtime#119).
+    type: object
+    required: [parentActions, childActions]
+    properties:
+      parentActions:
+        type: integer
+        minimum: 1
+        maximum: 256
+      childActions:
+        type: integer
+        minimum: 1
+        maximum: 256
+    additionalProperties: false
+additionalProperties: false
+allOf:
+  - if:
+      properties:
+        spec:
+          properties:
+            dependencies:
+              type: array
+              minItems: 1
+          required: [dependencies]
+      required: [spec]
+    then:
+      properties:
+        spec:
+          properties:
+            planning:
+              required: [budgetPartition]
+  - if:
+      properties:
+        spec:
+          properties:
+            skillType:
+              const: authoring_assistant
+    then:
+      properties:
+        spec:
+          properties:
+            planning:
+              properties:
+                allowDynamicProcedure:
+                  const: true
