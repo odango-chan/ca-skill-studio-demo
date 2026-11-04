@@ -50,6 +50,8 @@ jobs:
           assert html.lstrip().lower().startswith("<!doctype html>")
           HTMLParser().feed(html)
           for asset in ("./studio.css", "./light.css", "./app.css", "./app.js",
+                        "./editor.worker.js", "./LICENSE.monaco.txt",
+                        "./ThirdPartyNotices.monaco.txt",
                         "./samples/establish-pdu-session.procedure.yaml",
                         "./samples/packages/establish-pdu-session/SKILL.md",
                         "./samples/packages/establish-pdu-session/assurance/contract.yaml",
@@ -74,6 +76,9 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check site/app.mjs
+          node --check site/source-editor-adapter.mjs
+          node --check site/monaco-source-backend.mjs
+          node --check site/monaco-language.mjs
           node --check site/graph.mjs
           node --check site/graph-scale.mjs
           node --check site/node-designer.mjs
@@ -129,6 +134,8 @@ jobs:
           node --check tests/phase-step-impact.test.mjs
           node --check tests/phase-routes.test.mjs
           node --check tests/phase-outcomes.test.mjs
+          node --check tests/source-editor-adapter.test.mjs
+          node --check tests/monaco-language.test.mjs
           node --check tests/graph.test.mjs
           node --check tests/patch.test.mjs
           node --check tests/workspace.test.mjs
