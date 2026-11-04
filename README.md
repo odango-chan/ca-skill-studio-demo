@@ -58,3 +58,5 @@ D4-A3b2b1（[PR #34](https://github.com/odango-chan/ca-skill-studio-demo/pull/34
 D4-A3b2b2a（[PR #36](https://github.com/odango-chan/ca-skill-studio-demo/pull/36) 编辑器级验收通过）在现有命名 Step「引用影响」中只读展示删除与相邻换序的依赖/副作用门禁；不新增 Script/Call 的危险写操作，Runtime/5GC NOT_RUN。
 
 D4-A4a（[PR #37](https://github.com/odango-chan/ca-skill-studio-demo/pull/37) 编辑器级验收通过）在「准备/确认」阶段允许将现有失败/未知 Route 目标改为同 Procedure、同 Phase、同 Outcome 已观察过的目标；走 Source Diff、确认和 Undo/Redo，不影响主执行 Route，也不声明 Runtime/5GC 安全。
+
+D4-A4b1（[PR #39](https://github.com/odango-chan/ca-skill-studio-demo/pull/39) 候选）支持在现有 Phase `on` map 中补齐已观察的缺失核心 Outcome，以及受限修正/删除无歧义非核心 Outcome；完整的 owner 示例不会添加分支或显示多余按钮。Runtime/5GC NOT_RUN。
