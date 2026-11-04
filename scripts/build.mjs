@@ -65,7 +65,7 @@ await build({
       // Monaco's "./*.js" export map. Resolve it to the already bundled local
       // editor worker source instead of the doubled /esm/vs/esm/vs/ path.
       build.onResolve({
-        filter: /^monaco-editor\\/esm\\/vs\\/editor\\/editor\\.worker\\.js$/
+        filter: /^monaco-editor.*editor\.worker\.js$/
       }, () => ({
         path: join(process.cwd(),"node_modules/monaco-editor/esm/vs/editor/editor.worker.js")
       }));
