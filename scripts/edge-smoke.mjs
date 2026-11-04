@@ -359,10 +359,10 @@ try{
     " const rows=[...host.querySelectorAll('.view-line')];",
     " const spec=rows.find(el=>el.textContent.trim()==='spec:');",
     " const rect=host.getBoundingClientRect(),line=spec?.getBoundingClientRect();",
-    " return {x:rect.x+95,y:line?line.y+line.height/2:rect.y+130,
+    " return {x:rect.x+95,y:line?line.y+line.height/2:rect.y+130,",
     "  policy:host.dataset.yamlSchemaCapability,",
-    "  hit:document.elementFromPoint(rect.x+95,line?line.y+line.height/2:rect.y+130)?.className||null,
-    "  editorCount:host.querySelectorAll('.monaco-editor').length,
+    "  hit:document.elementFromPoint(rect.x+95,line?line.y+line.height/2:rect.y+130)?.className||null,",
+    "  editorCount:host.querySelectorAll('.monaco-editor').length,",
 
     "  width:rect.width,height:rect.height,found:!!spec};",
     "})()"
