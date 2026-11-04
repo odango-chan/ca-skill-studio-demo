@@ -78,3 +78,15 @@ test("D4-A1/A2.1 and read-only A2.2a accepted, broader A2.2b/A3/A4 deferred",()=
   assert.match(trace,/D4-A2\.2a Phase dependency evidence/);
   assert.match(spec,/Runtime\/5GC NOT_RUN/);
 });
+
+test("current owner-pinned CreatedSession Reference example is documented without Runtime claims",()=>{
+  const work=content("docs/WORK.md"),trace=content("docs/TRACEABILITY.md");
+  const docs=content("docs/design/authoring-workbench.md");
+  assert.match(work,/7570b309a998580a6952352e2bf4b1c19e5c710d/);
+  assert.match(trace,/Refreshed CreatedSession optional references/);
+  for(const name of ["3gpp-procedure.md","session-selection.md","failure-handling.md"])
+    assert.ok(work.includes("references/"+name),name);
+  assert.match(docs,/read_reference/);
+  assert.match(work,/cases\//);
+  assert.match(work,/可选业务参考材料/);
+});
