@@ -34,6 +34,8 @@ import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from "./phase-output-refs.mjs";
 import {phaseStepDependencyReport} from "./phase-dataflow.mjs";
 import {phaseConsumerContractReport} from "./phase-consumer-contract.mjs";
+import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
+  applyAdjacentVerifyReorder} from "./phase-step-order.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
@@ -1355,7 +1357,7 @@ function addPhaseDependencyInspector(phase,step,container,report,contracts){
 }
 
 function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
-  lineage=null,contracts=null) {
+  lineage=null,contracts=null,reorderOptions=[]) {
   if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
@@ -1364,7 +1366,20 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
       el("strong","step-value",step.name||step.value));
     if(step.name)meta.append(el("small","",step.value));
     const jump=button("L"+step.line,()=>lineJump(step.line),"source-link");
-    item.append(meta,jump);body.appendChild(item);
+    item.append(meta,jump);
+    const reorder=reorderOptions.find(o=>o.phaseName===phase.name&&
+      o.stepIndex===step.index-1);
+    if(reorder){
+      const move=button("下移",()=>{
+        try{showPreview(previewAdjacentVerifyReorder(source.value,
+          activeProcedureId,selection.id,phase.name,step.index-1));}
+        catch(error){message("Step 顺序调整未应用："+String(error?.message??error));}
+      },"source-link");
+      move.setAttribute("aria-label","预览后移 "+phase.name+" Step "+step.index);
+      move.dataset.phaseReorderStep=phase.name+":"+step.index;
+      item.appendChild(move);
+    }
+    body.appendChild(item);
     addPhaseVerifyEditor(phase,step,body);
     addPhaseInputBindingEditors(phase,step,body,phaseBindings);
     addPhaseOutputReferenceEditors(phase,step,body,phaseOutputs);
@@ -1397,7 +1412,8 @@ function nodeEditorCapabilities(nodeId){
     verify:verifyNodeChoices(nodeId),
     newRoute:addRouteOutcomeOptions(text,activeProcedureId,nodeId),
     phaseBindings:phaseStepBindingOptions(text,activeProcedureId,nodeId),
-    phaseOutputs:phaseOutputReferenceOptions(text,activeProcedureId,nodeId)
+    phaseOutputs:phaseOutputReferenceOptions(text,activeProcedureId,nodeId),
+    phaseOrder:adjacentVerifyReorderOptions(text,activeProcedureId,nodeId)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1423,7 +1439,7 @@ function renderNodeJourney(model,caps) {
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
       {expanded:false});
     renderPhase(model.prepare.phase,body,model.children,
-      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts);
+      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,caps.phaseOrder);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1439,7 +1455,7 @@ function renderNodeJourney(model,caps) {
       model.confirm.phase?.steps.length ? model.confirm.phase.steps.length+" steps" : "",
       {expanded:false});
     renderPhase(model.confirm.phase,body,model.children,
-      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts);
+      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,caps.phaseOrder);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
@@ -1488,7 +1504,7 @@ function renderInspector() {
       packagePredicateSource(),activePackage?.name)))||
     Boolean(model&&((caps.attributes?.operator||caps.attributes?.bindings?.length)||
       caps.deletion||caps.rename||caps.verify.length||caps.newRoute||
-      caps.phaseBindings?.length||caps.phaseOutputs?.length||
+      caps.phaseBindings?.length||caps.phaseOutputs?.length||caps.phaseOrder?.length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -1708,6 +1724,8 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyPhaseInputBinding(source.value,pendingPatch);
     else if(pendingPatch.type==="NormalizePhaseOutputReference")
       nextSource=applyPhaseOutputReference(source.value,pendingPatch);
+    else if(pendingPatch.type==="SwapAdjacentPhaseVerifySteps")
+      nextSource=applyAdjacentVerifyReorder(source.value,pendingPatch);
     else if(pendingPatch.type==="SetCreatedRouteTarget")
       nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
     else if(pendingPatch.type==="RenameNode")

@@ -138,6 +138,43 @@ export async function runD1Interactions(evaluate,command){
     "   dnnStatus:dnn?.dataset.typeRelation,udmStatus:udm?.dataset.typeRelation};"
   ]);
 
+  await check(evaluate,"D4_A3A_VERIFY_STEP_REORDER",[
+    sleepLine,clickLine,
+    " const source=document.getElementById('source'),before=source.value;",
+    " const n=document.querySelector('.react-flow__node[data-id=\\\"nudm-sdm-subscribe\\\"]');",
+    " if(!n)return {ok:false,reason:'owner Node absent'};",
+    " click(n);await sleep(220);",
+    " const stage=[...document.querySelectorAll('#inspector .journey-stage')].find(x=>",
+    "   x.querySelector('summary')?.textContent.includes('准备'));",
+    " if(!stage)return {ok:false,reason:'Phase absent'};",
+    " stage.open=true;",
+    " const btn=stage.querySelector('[data-phase-reorder-step=\\\"preconditions:4\\\"]');",
+    " const choices=stage.querySelectorAll('[data-phase-reorder-step]').length;",
+    " if(!btn)return {ok:false,reason:'Qualified reorder button missing',choices};",
+    " click(btn);await sleep(100);",
+    " const dialog=document.getElementById('patchDialog');",
+    " const diff=document.getElementById('patchDiff').textContent;",
+    " const previewed=!dialog.hidden&&diff.includes('createdsession.ingress.eligible')&&",
+    "   diff.includes('createdsession.lifecycle.ready')&&source.value===before;",
+    " click(document.getElementById('closePatch'));await sleep(80);",
+    " const canceled=dialog.hidden&&source.value===before;",
+    " click(btn);await sleep(95);",
+    " click(document.getElementById('applyPatch'));await sleep(400);",
+    " const changed=source.value;",
+    " const one='            - verify: createdsession.ingress.eligible\\n';",
+    " const two='            - verify: createdsession.lifecycle.ready\\n';",
+    " const applied=changed===before.replace(one+two,two+one)&&",
+    "   document.querySelectorAll('.react-flow__node').length===17;",
+    " click(document.getElementById('undoButton'));await sleep(230);",
+    " const undone=source.value===before;",
+    " click(document.getElementById('redoButton'));await sleep(230);",
+    " const redone=source.value===changed;",
+    " click(document.getElementById('undoButton'));await sleep(220);",
+    " const restored=source.value===before;",
+    " return {ok:choices===1&&previewed&&canceled&&applied&&undone&&redone&&restored,",
+    "   choices,previewed,canceled,applied,undone,redone,restored};"
+  ]);
+
   await check(evaluate,"D4_A1_PHASE_INPUT_BINDING",[
     sleepLine,clickLine,
     " const source=document.getElementById('source'),before=source.value;",

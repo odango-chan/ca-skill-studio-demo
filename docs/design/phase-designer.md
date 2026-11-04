@@ -1,6 +1,6 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1 read-only Accepted; A2.2b2/A3/A4 Proposed · Date: 2026-11-04**  
+**Status: A1/A2.1/A2.2a/A2.2b1 Accepted; A3a bounded Verify swap candidate; A2.2b2/A3b/A4 Proposed · Date: 2026-11-04**  
 **Implementation: A1/A2.1/A2.2a merged; A2.2b1 implemented in PR #19; A2.2b2/A3/A4 NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
@@ -18,7 +18,8 @@ Only authored Procedure business Nodes belong to the React Flow main graph. `pre
 | D4-A2.2a | Read-only evidence for input refs, same-Node prior/future Steps, cross-Node graph dominance, script outputSchema title and package schema field declarations | No Source mutation, no producer change, no inference that graph dominance proves output availability or ABI compatibility |
 | D4-A2.2b1 | Read-only type-evidence comparison: Procedure input/script output declaration × uniquely resolved local script `inputSchema` field | Type equality is **not** compatibility; consumer refinements, call ABIs, Runtime value existence and cross-producer mutation remain unproven |
 | D4-A2.2b2 | Actual cross-producer/field rebind and Step metadata | Requires owner-validated output shape, field/refinement subsumption, consumer ABI, producer availability and versioned Runtime reference semantics; no inferred links |
-| D4-A3 | Step create, delete and reorder | Requires reference/dependency impact analysis for named Steps and `preconditions.<step>.output`, without graph-node inflation |
+| D4-A3a | Swap two physically adjacent, unnamed, single-line verify Steps without bindings, comments or output names | No call/script/procedure reordering, named producer, parameter, comment movement, cross-Phase change, new/deleted Step or Runtime ordering claims |
+| D4-A3b | General Step creation, removal or reordering | Requires dependency impact analysis for named Steps and all output references, no graph-node inflation |
 | D4-A4 | Phase-specific `on` Route authoring | Must separate `preconditions.on` / `postconditions.on` from `operator.on` and use owner Outcome eligibility |
 
 D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, number, boolean, object, array) to build a **conservative editor-only choice set**. This does not mean that a same-type input is semantically appropriate for a specific Tool/Script/Verify consumer. No Runtime qualification is inferred.
@@ -39,7 +40,7 @@ D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, numbe
 - Browser: expand owning Node's 准备 Step, select qualified input, Diff/cancel/Apply/Undo/Redo and verify main graph's Node count unchanged.
 - Gates: unit/negative tests, TypeScript typecheck, build and real Chromium browser interactions. No Runtime/5GC operation or qualification will run.
 
-A2.2b2/A3/A4 remain NOT_STARTED; even equal script input/output `type` with pattern/const/required constraints remains insufficient for Runtime binding qualification.
+A2.2b2/A3b/A4 remain NOT_STARTED; A3a is limited to editor-only independent Verify reorder, not full A3 Step structural authoring or Runtime qualification.
 
 ## A1 actual acceptance
 
@@ -68,3 +69,14 @@ Implementation `site/phase-consumer-contract.mjs` reads only the current Package
 Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_create_inputs.read` do **not** have a complete, package-discoverable versioned output+input ABI binding for this Studio; their fields remain unresolved rather than borrowing a similarly named external JSON Schema. To implement D4-A2.2b2, owner integration must explicitly map each concrete operation identity to versioned consumer input and producer output schemas, define the accepted Phase reference namespace, and validate execution order and source-to-consumer constraint compatibility. The editor must not author guesses.
 
 [PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19) [CI #41769084899](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41769084899) verified 258/258 tests, TypeScript, build and real Chromium. The actual browser checked Script consumer input Schema, `TYPE_ONLY_MATCH`, missing producer and consumer ABI, no write controls, unchanged YAML/Node count. Runtime/5GC qualification remains NOT_RUN. Type evidence does not modify YAML or introduce a second graph state.
+
+## D4-A3a · 受限相邻 Verify Step 换序（候选）
+
+第一阶段只处理一个 Node 内同一 Phase 的两个紧邻 Step：二者必须是不同的、未命名、单行纯标量 Verify，不能有 with、name、额外字段、注释、引用或脚本/调用副作用。只交换两行原始 YAML 字节，不反序列化整份源文件；Phase Route、主 Operator、Node、Child、Route 和其他 Procedure 必须重新投影后结构一致。
+
+- qualification：当前 Procedure/Node/Phase/Step index 必须匹配 YAML AST 和投影；两行缩进相同且物理相邻，引用与注释复杂情形一律 Source-only。
+- transaction：精确 Source 范围 + 源文本 revision + Diff Preview + 显式确认 + Undo/Redo。Apply 重新计算 Patch 并对所有预览字段抗篡改验证；对候选再次重投影检查只有两条 Step 交换位置。
+- 实例：nudm-sdm-subscribe.preconditions 最后两条 ingress.eligible 和 lifecycle.ready；有绑定或命名输出的 Step 不提供移动按钮。
+- 这是编辑期结构操作；即使两个 Verify 没有数据依赖，也不证明它们的失败短路语义、观测顺序或 Runtime 效果等价。A3b 的新增、删除和更通用的安全重排需单独建立引用影响判定。
+
+CI/Chromium 和部署验收在 PR 完成后更新，不提前标为 PASS。

@@ -71,7 +71,8 @@ test("D4 read-only consumer ABI evidence accepted; cross-producer edits still de
   assert.match(work,/\|\s*D4-A2\.1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A2\.2a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A2\.2b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A2\.2b2\/A3\/A4[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
+  assert.match(work,/\|\s*D4-A3a[^\n]*\|\s*PROPOSED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*NOT_RUN/);
+  assert.match(work,/\|\s*D4-A2\.2b2\/A3b\/A4[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
   assert.match(spec,/Runtime\/5GC NOT_RUN/);
   const trace=content("docs/TRACEABILITY.md");
   assert.match(trace,/D4-A1 Phase Step input rebind/);
@@ -110,4 +111,14 @@ test("new Phase consumer contract is checked by the Pages syntax gate",()=>{
   const ci=content(".github/workflows/pages.yml");
   assert.match(ci,/node --check site\/phase-consumer-contract\.mjs/);
   assert.match(ci,/node --check tests\/phase-consumer-contract\.test\.mjs/);
+});
+
+test("D4-A3a bounded Step authoring retains Source authority and a Pages syntax gate",()=>{
+  const docs=content("docs/design/phase-designer.md");
+  const app=content("site/app.mjs"),ci=content(".github/workflows/pages.yml");
+  assert.match(docs,/D4-A3a/);
+  assert.match(docs,/Undo\/Redo/);
+  assert.match(app,/applyAdjacentVerifyReorder/);
+  assert.match(ci,/node --check site\/phase-step-order\.mjs/);
+  assert.match(ci,/node --check tests\/phase-step-order\.test\.mjs/);
 });
