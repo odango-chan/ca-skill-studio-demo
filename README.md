@@ -53,4 +53,4 @@ D4-A3b1（[PR #30](https://github.com/odango-chan/ca-skill-studio-demo/pull/30) 
 
 D4-A3b2a 编辑器级验收通过，提供命名 Phase Step 的 Source 引用影响与同步改名（[PR #32](https://github.com/odango-chan/ca-skill-studio-demo/pull/32)）；未知或歧义引用一律只读。带输出依赖的删除与重排尚未实现，Runtime/5GC NOT_RUN。
 
-D4-A3b2b1（[PR #34](https://github.com/odango-chan/ca-skill-studio-demo/pull/34) 候选）提供无引用的纯 Verify Step 命名及受限删除/相邻排序。具副作用或带输出依赖的 script/call 仍保持 Source-only，不宣称 Runtime 安全。
+D4-A3b2b1（[PR #34](https://github.com/odango-chan/ca-skill-studio-demo/pull/34) 编辑器级验收通过）提供无引用的纯 Verify Step 命名及受限删除/相邻排序。具副作用或带输出依赖的 script/call 仍保持 Source-only，不宣称 Runtime 安全。

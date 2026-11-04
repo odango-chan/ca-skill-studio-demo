@@ -1,7 +1,7 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a Accepted; A3b2b1 named Verify lifecycle candidate; A2.2b2/A3b2b2/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a merged; A3b2b1 PR #34 candidate; A2.2b2/A3b2b2/A4 NOT_STARTED**  
+**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a Accepted; A3b2b1 named Verify lifecycle Accepted; A2.2b2/A3b2b2/A4 Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a merged; A3b2b1 implemented in PR #34; A2.2b2/A3b2b2/A4 NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
@@ -123,3 +123,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 默认样例中可先在 `nudm-sdm-subscribe.preconditions` 的 `createdsession.ingress.eligible` 上使用「命名 Verify」，之后可按上述限制与相邻 `createdsession.lifecycle.ready` 调换位置或删除。此项用于测试 Studio 编辑能力，不代表应对真实 5GC 流程删除或重排这些业务检查。
 
 **安全边界**：无输出引用仅能说明当前 Procedure 内没有被识别的 Source 消费者，不足以判断运行时副作用、故障短路、审计或业务正确性。工具/脚本 Step、带绑定及引用的 Step 删除/换序继续保持只读；Runtime/5GC E2E NOT_RUN。
+
+### D4-A3b2b1 验收证据
+
+[PR #34 集成 CI #41786616595](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41786616595)：289/289 单元测试、TypeScript、Build、真实 Chromium 全部 PASS。浏览器在 `nudm-sdm-subscribe.preconditions` 中完成「命名 Verify → 相邻换序 → 删除」的 Source Diff、取消、应用、Undo/Redo 与原 YAML 完整恢复；命名脚本/工具调用没有获得删除或换序入口。最终文档提交与 Pages 部署还需另外验证；Runtime/5GC E2E NOT_RUN。
