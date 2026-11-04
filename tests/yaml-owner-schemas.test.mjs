@@ -7,8 +7,8 @@ import {OWNER_SCHEMA_PIN,yamlSchemaCapability} from "../site/yaml-schema-policy.
 
 const base=new URL("../site/schemas/connectionagent/v1alpha1/",import.meta.url);
 const sample=new URL("../site/samples/packages/establish-pdu-session/assurance/",import.meta.url);
-const read=(url)=>readFileSync(url,"utf8");
-const parseYaml=(url)=>parse(read(url));
+const read=url=>readFileSync(url,"utf8");
+const parseYaml=url=>parse(read(url));
 
 function gitBlobSha(content){
   const bytes=Buffer.from(content,"utf8");
