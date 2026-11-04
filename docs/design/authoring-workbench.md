@@ -54,3 +54,7 @@ React 19、React Flow 12、ELK 0.12、YAML 2.9、TypeScript 7、esbuild，静态
 Phase Steps 继续是 Node Inspector 内的有序行，**不是**主业务图中的 Node。D4-A1 只更改已经存在的 Step `with.<key>.from`，且源值和候选值必须均为**当前 Procedure 已声明、且类型完全一致的 `input.*`**。原有 Step Operator、Step name、顺序、Phase 路由和 Node/Child 结构不改变。
 
 必须经过精确 YAML Source span、重新解析与语义对比、Diff/确认、Undo/Redo。虽然 input 的 `type` 相同，也不代表工具参数语义或 Runtime 类型完全相容。任何未资格化 Step/引用都仅支持 Source 编辑。详细约束见 [D4 Phase Designer](phase-designer.md)。
+
+## D4-A2.1 已观察的 Phase 输出引用写法
+
+已有 Step `with.<key>.from` 在本 Procedure Source 中同时出现了局部和自身 Node 全限定的**同一个**先行命名 Step 的输出引用时，Inspector 可以提供两种已观察写法的切换。生产者身份、Step 顺序、输出字段后缀都保持不变。精确 Source Span → Diff → 确认 → Undo/Redo；不支持跨 Node 换生产者、凭字段名猜类型或向未来 Step 取值。**两种写法已出现，不等于 Runtime 确认语义等价。** 完整边界和证据见 [D4 设计](phase-designer.md)。
