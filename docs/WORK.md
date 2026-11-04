@@ -26,6 +26,10 @@
 | D4-A2.2a Phase Step 依赖/Schema 证据审查（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（main） | PASS（245 tests + Chromium） | [PR #18 merged](https://github.com/odango-chan/ca-skill-studio-demo/pull/18)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41758229256)、[设计](design/phase-designer.md) |
 | D4-A2.2b1 Script 消费参数 Schema / 生产者类型对照（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（PR #19） | PASS（258 tests + real Chromium；最新 main 整合提交） | [PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19)、[集成 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41769084899)、[设计](design/phase-designer.md) |
 | D4-A2.2b2/A3/A4 跨生产者写入 / Steps 结构 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
+| E1 Monaco Source Editor / 共享事务历史 | ACCEPTED（设计） | NOT_STARTED | NOT_RUN | [E 设计](design/source-editor-workstream.md)、[#23](https://github.com/odango-chan/ca-skill-studio-demo/issues/23) |
+| E2 YAML Schema / 语言智能 | ACCEPTED（方向，技术验证待做） | NOT_STARTED | NOT_RUN | [E 设计](design/source-editor-workstream.md)、[#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24) |
+| E3 Python 编辑与 Script 引用导航 | ACCEPTED（方向，语言服务待评估） | NOT_STARTED | NOT_RUN | [E 设计](design/source-editor-workstream.md)、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) |
+| E4 完整 Package 目录打开/保存/冲突 | PROPOSED（后置） | NOT_STARTED | NOT_RUN | [E 设计](design/source-editor-workstream.md)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
 | 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
@@ -33,6 +37,8 @@
 唯一公开示例名称与 owner 的 SKILL 目录 `establish-pdu-session` 完全一致；Ensure Package 已从选择器、清单和发布资源中移除。旧 Ensure Package 原文与独立 Procedure YAML 仅保留在源码中给单测/浏览器回归使用，发布到 Pages 的 `dist/` 仅包含 `establish-pdu-session` Package。`references/` 在 Explorer 默认展开。[PR #21 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41766617644) 已验证单测、TypeScript、构建和真实 Chromium 交互 PASS；[main Pages #41767797399](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41767797399) 已在 `d5eedb37` 完成所有静态资产检查、Chromium 和 Pages 部署 PASS。
 
 ## Current open work
+
+- **E 与 D4 并行启动（仅立项、未实现）**：[#23](https://github.com/odango-chan/ca-skill-studio-demo/issues/23) Monaco、[#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24) YAML、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) Python、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) Package；共同 Source/History 接线见 [设计](design/source-editor-workstream.md)。
 
 - [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3 有界 operator.on Route 编辑已合入；Runtime Outcome 资格和 Phase-specific Route 仍未覆盖。
 - [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照在 PR #19 集成中；A2.2b2/A3/A4 仍未开始。
