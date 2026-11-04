@@ -22,6 +22,8 @@ import {addRouteOutcomeOptions,previewAddRouteOutcome,applyAddRouteOutcome}
 import {routeOutcomeEditOptions,previewRenameRouteOutcome,
   previewDeleteRouteOutcome,applyRenameRouteOutcome,applyDeleteRouteOutcome}
   from "./route-mutate.mjs";
+import {phaseRouteTargetOptions,previewPhaseRouteTarget,
+  applyPhaseRouteTarget} from "./phase-routes.mjs";
 import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
   from "./route-connect.mjs";
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue,
@@ -1578,6 +1580,57 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
   }
   addPhaseVerifyCreation(phase,body,addOptions);
 }
+function addPhaseRouteTargetEditor(phaseName,routes,container,options=[]){
+  const targets=options.filter(x=>x.phaseName===phaseName&&
+    routes.some(r=>r.id===x.routeId));
+  if(!targets.length||activePackage?.name!=="establish-pdu-session"||
+     activeFilePath!=="assurance/procedure.yaml"||
+     selection?.kind!=="node")return;
+  const details=el("details","step-enum phase-route-target-editor");
+  details.dataset.phaseRouteEditor=phaseName;
+  details.appendChild(el("summary","",
+    "阶段 Route 目标 · "+targets.length+" 项 · D4-A4a"));
+  const body=el("div","step-enum-controls");
+  body.appendChild(el("p","small-edit-note",
+    "仅同一 Procedure、相同 Phase 和失败 Outcome 已出现的目标。" +
+    "重定向可能改变资源收尾行为；必须检查 Diff，不代表 Runtime 资格。"));
+  for(const option of targets){
+    const section=el("div","phase-route-target-choice");
+    section.dataset.phaseRouteId=option.routeId;
+    section.dataset.phaseRouteSource=option.routeSource;
+    section.appendChild(el("label","attribute-label",
+      option.outcome+" · "+option.target+" · "+option.routeSource));
+    const selector=el("select","target-select");
+    selector.setAttribute("aria-label","更改 "+option.routeSource+" "+
+      option.outcome+" 的目标");
+    const current=el("option","",option.target);
+    current.value=option.target;
+    selector.appendChild(current);
+    for(const target of option.targets){
+      const item=el("option","",target);
+      item.value=target;selector.appendChild(item);
+    }
+    selector.value=option.target;
+    const preview=button("预览阶段 Route 目标",()=>{
+      try{
+        showPreview(previewPhaseRouteTarget(source.value,activeProcedureId,
+          option.routeId,selector.value));
+      }catch(error){
+        message("阶段 Route 目标未修改："+String(error?.message??error));
+      }
+    },"preview-button");
+    preview.disabled=true;
+    selector.addEventListener("change",()=>{
+      preview.disabled=selector.value===option.target;
+    });
+    section.append(selector,preview);
+    section.appendChild(button("查看原 Route · L"+option.line,
+      ()=>lineJump(option.line),"source-link"));
+    body.appendChild(section);
+  }
+  details.appendChild(body);
+  container.appendChild(details);
+}
 function routeFriendlySource(routeSource){
   return routeSource==="preconditions.on"?"准备阶段"
     :routeSource==="postconditions.on"?"确认阶段"
@@ -1606,7 +1659,8 @@ function nodeEditorCapabilities(nodeId){
     phaseNamed:namedPhaseStepImpactReport(text,activeProcedureId,nodeId),
     namedVerify:namedVerifyEditOptions(text,activeProcedureId,nodeId),
     phaseEffect:namedStepMutationImpactReport(text,activeProcedureId,nodeId,
-      activePackage?.files)
+      activePackage?.files),
+    phaseRoutes:phaseRouteTargetOptions(text,activeProcedureId,nodeId)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1635,6 +1689,8 @@ function renderNodeJourney(model,caps) {
       caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
       caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed,
       caps.namedVerify,caps.phaseEffect?.steps);
+    addPhaseRouteTargetEditor("preconditions",model.prepare.routes,body,
+      caps.phaseRoutes);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1653,6 +1709,8 @@ function renderNodeJourney(model,caps) {
       caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
       caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed,
       caps.namedVerify,caps.phaseEffect?.steps);
+    addPhaseRouteTargetEditor("postconditions",model.confirm.routes,body,
+      caps.phaseRoutes);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
@@ -1705,7 +1763,7 @@ function renderInspector() {
       caps.phaseAdd?.length||caps.phaseDelete?.length||
       caps.phaseNamed?.some(x=>x.editEligible)||
       caps.namedVerify?.names?.length||caps.namedVerify?.deletions?.length||
-      caps.namedVerify?.swaps?.length||
+      caps.namedVerify?.swaps?.length||caps.phaseRoutes?.length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -1959,6 +2017,8 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyRenameRouteOutcome(source.value,pendingPatch);
     else if(pendingPatch.type==="DeleteRouteOutcome")
       nextSource=applyDeleteRouteOutcome(source.value,pendingPatch);
+    else if(pendingPatch.type==="SetPhaseRouteTarget")
+      nextSource=applyPhaseRouteTarget(source.value,pendingPatch);
     else throw new Error("未知的属性 Patch 类型");
     if(pendingPatch.type==="RenameNode"&&selection?.kind==="node"&&
        activeProcedureId===pendingPatch.procedureId&&selection.id===pendingPatch.nodeId)

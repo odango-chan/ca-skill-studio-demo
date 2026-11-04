@@ -1,7 +1,7 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a effect/dependency impact Accepted (read-only); A2.2b2/A3b2b2b/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 merged; A3b2b2a implemented in PR #36; A2.2b2/A3b2b2b/A4 NOT_STARTED**  
+**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a impact Accepted (read-only); A4a observed Phase Route retarget Accepted; A2.2b2/A3b2b2b/A4b Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1/A3b2b2a merged; A4a implemented in PR #37; A2.2b2/A3b2b2b/A4b NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
@@ -24,7 +24,8 @@ Only authored Procedure business Nodes belong to the React Flow main graph. `pre
 | D4-A3b2b1 | Give existing plain Verify a unique name, or delete/swap an unreferenced named plain Verify | Zero Source-proven references required; no call/script/procedure effects, named outputs, unsafe comments or Runtime claims |
 | D4-A3b2b2a | Read-only delete/reorder verdict for named Steps: output consumers, direct adjacent from edges and effect-contract blockers | No new mutation; do not treat lack of output refs as proof of effect safety |
 | D4-A3b2b2b | General Step creation, deletion or reordering with side effects, named outputs or bindings | Needs owner effect semantics and explicit Runtime contract; no graph-node inflation |
-| D4-A4 | Phase-specific `on` Route authoring | Must separate `preconditions.on` / `postconditions.on` from `operator.on` and use owner Outcome eligibility |
+| D4-A4a | Retarget existing `preconditions.on` / `postconditions.on` failure/unknown Routes to another already-observed same-Procedure, same-Phase, same-Outcome target | No new Phase/Outcome, no `operator.on`, no `postconditions.on.PASS`, no fabricated target or Runtime claim |
+| D4-A4b | Add/rename/delete Phase outcomes or author new Phase Route maps | Needs owner Outcome eligibility and branch completeness semantics; NOT_STARTED |
 
 D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, number, boolean, object, array) to build a **conservative editor-only choice set**. This does not mean that a same-type input is semantically appropriate for a specific Tool/Script/Verify consumer. No Runtime qualification is inferred.
 
@@ -44,7 +45,7 @@ D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, numbe
 - Browser: expand owning Node's 准备 Step, select qualified input, Diff/cancel/Apply/Undo/Redo and verify main graph's Node count unchanged.
 - Gates: unit/negative tests, TypeScript typecheck, build and real Chromium browser interactions. No Runtime/5GC operation or qualification will run.
 
-A2.2b2/A3b2b2b/A4 remain NOT_STARTED; A3b2b2a remains read-only, A3a/A3b1/A3b2a/A3b2b1 are bounded editor-tier Step edits, not general effectful deletion/reorder or Runtime qualification.
+A2.2b2/A3b2b2b/A4b remain NOT_STARTED; A4a only retargets an existing authored failure Phase Route; A3b2b2a remains read-only, A3a/A3b1/A3b2a/A3b2b1 are bounded editor-tier Step edits, not general effectful deletion/reorder or Runtime qualification.
 
 ## A1 actual acceptance
 
@@ -142,3 +143,19 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 ### D4-A3b2b2a 验收证据
 
 [PR #36 代码与文档 CI #41788514319](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41788514319)：298/298 单元测试、TypeScript、Build、真实 Chromium PASS。实际浏览器确认 Script → Call 与 Call → Verify 的直接输出依赖各在已有 Inspector 里显示 Source 行号、阻止原因；没有新写入口；原有命名 Step 的 5 条消费引用列表及 Diff/确认/Undo/Redo 回归 PASS。第一次 CI 在浏览器中发现新增影响行复用 consumer 类导致计数回归，修复为独立 UI 类后同一完整浏览器套件通过。Runtime/5GC E2E NOT_RUN。
+
+## D4-A4a · 已存在 Phase Route 的失败/未知目标重定向（PR #37）
+
+本阶段只提供一项小而有用的 Source 编辑：在 **已有** `preconditions.on` 里改 `FAILED` 或 `UNRESOLVED` 的目标；在 **已有** `postconditions.on` 里改 `FAIL` 或 `UNKNOWN` 的目标。候选必须是 **同一个 Procedure 内另一个 Node 的同一 Phase 与同一 Outcome** 当前 Source 已观察的目标 Node，不能从其他 Phase、operator.on、PASS 或外部 Tool 推断，也不能凭空创建 Phase、Outcome 或目标。
+
+资格来自 YAML 1.2 AST/CST，要求原 Phase 的显式 `'on'` 字符串键、单行普通 Outcome 和 Target、结构清晰无混入注释或空行且 Route.sourceSpan 与该值严格一致。仅替换 **当前目标标量**，重投影全 Procedure/Node/Phase/Child/Route 身份；只有该 Route 的 `target` 允许改变，且该 Procedure 的可达 Node 集合不变。原始 YAML 仍是唯一真源；Inspector「准备 / 确认」内折叠下拉选择 → Diff 预览 → 明确确认 → 同一 History Undo/Redo；整份 Source 修订与 Preview 抗篡改核对。
+
+真实 owner 示例：`nudm-sdm-subscribe.preconditions.FAILED: failed` 可改为同 Procedure 其他准备阶段的 `FAILED: finalize-failed` 目标；但这会把失败流向不同的收尾/资源清理路径。后置条件的 `FAIL` 也使用相同规则；主 Operator.on 和 `postconditions.on.PASS` 都不在写权限范围。此操作不声明这两个目标在业务上等价，也不表示任何 3GPP/Runtime 资格通过。
+
+注意：候选来自**当前 Source 已观察值**。改完后若旧目标已不再由任何其他同 Phase/Outcome 使用，下拉框不会发明一个「回退目标」；要还原原文，应通过现有 Undo，或手工 Source 编辑。允许选择、原始缩进/换行保留和完整结构签名均由测试验证。
+
+负面场景：跨 Phase 引用、主 operator.on、PASS、缺失/猜测目标、重复 key、引号/anchor/alias、注释归属不清、跨行与混用行尾、过期或篡改的 Diff Preview 均拒绝；结构变更会使原来可达 Node 消失时也拒绝。A4b Phase Outcome 新增/重命名/删除及完整 Runtime branch completeness 校验继续 NOT_STARTED；Runtime/5GC E2E NOT_RUN。
+
+### D4-A4a 验收证据
+
+[PR #37 集成 CI #41791294195](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41791294195)：305/305 单元测试、TypeScript、Build、真实 Chromium PASS。浏览器在真实 `nudm-sdm-subscribe` 的准备阶段对 `preconditions.on.FAILED` 执行候选选择、Source Diff、取消、应用、Undo/Redo，原 YAML 完整恢复；主 Operator Route 与其他 Phase 未被修改。单测覆盖后置 `FAIL`、同 Phase/同 Outcome 候选、结构可达性、引号/注释/alias、过期篡改 Preview 及 CRLF。初轮测试错误地要求改名后仍有相同「旧目标观察来源」，已收紧为只允许当前 Source 观察值，要求通过 Undo 恢复；最终整合 CI 通过。Runtime/5GC E2E NOT_RUN。
