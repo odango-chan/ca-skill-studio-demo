@@ -56,3 +56,5 @@ D4-A3b2a 编辑器级验收通过，提供命名 Phase Step 的 Source 引用影
 D4-A3b2b1（[PR #34](https://github.com/odango-chan/ca-skill-studio-demo/pull/34) 编辑器级验收通过）提供无引用的纯 Verify Step 命名及受限删除/相邻排序。具副作用或带输出依赖的 script/call 仍保持 Source-only，不宣称 Runtime 安全。
 
 D4-A3b2b2a（[PR #36](https://github.com/odango-chan/ca-skill-studio-demo/pull/36) 编辑器级验收通过）在现有命名 Step「引用影响」中只读展示删除与相邻换序的依赖/副作用门禁；不新增 Script/Call 的危险写操作，Runtime/5GC NOT_RUN。
+
+D4-A4a（[PR #37](https://github.com/odango-chan/ca-skill-studio-demo/pull/37) 候选）在「准备/确认」阶段允许将现有失败/未知 Route 目标改为同 Procedure、同 Phase、同 Outcome 已观察过的目标；走 Source Diff、确认和 Undo/Redo，不影响主执行 Route，也不声明 Runtime/5GC 安全。

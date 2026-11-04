@@ -87,6 +87,7 @@ jobs:
           node --check site/phase-step-rename.mjs
           node --check site/phase-named-verify.mjs
           node --check site/phase-step-impact.mjs
+          node --check site/phase-routes.mjs
           node --check site/patch.mjs
           node --check site/semantic.mjs
           node --check site/workspace.mjs
@@ -125,6 +126,7 @@ jobs:
           node --check tests/phase-step-rename.test.mjs
           node --check tests/phase-named-verify.test.mjs
           node --check tests/phase-step-impact.test.mjs
+          node --check tests/phase-routes.test.mjs
           node --check tests/graph.test.mjs
           node --check tests/patch.test.mjs
           node --check tests/workspace.test.mjs

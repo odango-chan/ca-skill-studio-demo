@@ -102,3 +102,7 @@ Inspector 在 Source 能证明是两个紧邻、未命名、单行、无 Binding
 ## D4-A3b2b2a · 命名 Step 删除/换序影响审查（只读验收通过）
 
 命名 Step 的已有「引用影响」折叠区域中补充两行只读结论：「删除评估」与「与下一步换序」。显示能够证明的下游输出消费者、跨越的直接 `with.from` 依赖行号，以及 Script/Call 效果契约未证明的阻止原因。没有新编辑按钮，也不声称 0 引用等于 Runtime 安全。参见 [Phase Designer](phase-designer.md)。
+
+## D4-A4a · Phase 失败 Route 目标编辑（PR #37 候选）
+
+Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的现有 Phase Route 上展示折叠「阶段 Route 目标」。只允许从同 Procedure、同 Phase、同失败 Outcome 已存在的目标选择；不允许编辑 `operator.on` 或将 `PASS` 改走失败分支。路径变更走 YAML 精确 Diff、显式确认和 Undo/Redo；改变失败清理路径可能影响 Runtime 行为，不做语义等价保证。参见 [Phase Designer](phase-designer.md)。
