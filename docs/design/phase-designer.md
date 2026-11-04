@@ -1,7 +1,7 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a impact Accepted (read-only); A4a observed Phase Route retarget candidate; A2.2b2/A3b2b2b/A4b Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1/A3b2b2a merged; A4a PR #37 candidate; A2.2b2/A3b2b2b/A4b NOT_STARTED**  
+**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1 Accepted; A3b2b2a impact Accepted (read-only); A4a observed Phase Route retarget Accepted; A2.2b2/A3b2b2b/A4b Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1/A3b2a/A3b2b1/A3b2b2a merged; A4a implemented in PR #37; A2.2b2/A3b2b2b/A4b NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
@@ -155,3 +155,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 注意：候选来自**当前 Source 已观察值**。改完后若旧目标已不再由任何其他同 Phase/Outcome 使用，下拉框不会发明一个「回退目标」；要还原原文，应通过现有 Undo，或手工 Source 编辑。允许选择、原始缩进/换行保留和完整结构签名均由测试验证。
 
 负面场景：跨 Phase 引用、主 operator.on、PASS、缺失/猜测目标、重复 key、引号/anchor/alias、注释归属不清、跨行与混用行尾、过期或篡改的 Diff Preview 均拒绝；结构变更会使原来可达 Node 消失时也拒绝。A4b Phase Outcome 新增/重命名/删除及完整 Runtime branch completeness 校验继续 NOT_STARTED；Runtime/5GC E2E NOT_RUN。
+
+### D4-A4a 验收证据
+
+[PR #37 集成 CI #41791294195](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41791294195)：305/305 单元测试、TypeScript、Build、真实 Chromium PASS。浏览器在真实 `nudm-sdm-subscribe` 的准备阶段对 `preconditions.on.FAILED` 执行候选选择、Source Diff、取消、应用、Undo/Redo，原 YAML 完整恢复；主 Operator Route 与其他 Phase 未被修改。单测覆盖后置 `FAIL`、同 Phase/同 Outcome 候选、结构可达性、引号/注释/alias、过期篡改 Preview 及 CRLF。初轮测试错误地要求改名后仍有相同「旧目标观察来源」，已收紧为只允许当前 Source 观察值，要求通过 Undo 恢复；最终整合 CI 通过。Runtime/5GC E2E NOT_RUN。
