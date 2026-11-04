@@ -2,6 +2,7 @@ import { layoutProcedure } from "./graph.mjs";
 import { layoutProcedureELK,selectGraphScope } from "./layout.mjs";
 import {detailedLayoutAllowed} from "./graph-scale.mjs";
 import {auditPackageWorkspace} from "./package-audit.mjs";
+import {scriptNavigationReport} from "./script-navigation.mjs";
 import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
 import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./workbench.mjs";
@@ -275,13 +276,15 @@ function updatePanelControls(){
   nav.querySelector(".explorer-toggle-icon").replaceChildren(createIcon(document,
     explorerOpen?"panel-left-close":"panel-left-open",{size:17}));
   const detail=$("inspectorVisibility");
-  const available=inspectorOpen||
+  const scriptRefs=Boolean(activePackage&&/^scripts\/[A-Za-z0-9_.-]+\.py$/.test(activeFilePath??""));
+  const available=inspectorOpen||scriptRefs||
     (viewKind==="procedure"&&Boolean(selection))||
     (activeFilePath==="assurance/contract.yaml"&&Boolean(activePackage));
   detail.hidden=!available;
   detail.setAttribute("aria-pressed",String(inspectorOpen));
   setIconLabel(detail,inspectorOpen?"panel-right-close":"panel-right-open",
-    inspectorOpen?"隐藏右侧属性":"显示右侧属性");
+    scriptRefs?(inspectorOpen?"隐藏脚本引用":"显示脚本引用"):
+      (inspectorOpen?"隐藏右侧属性":"显示右侧属性"));
 }
 function setInspectorOpen(open,recenter=true) {
   inspectorOpen=Boolean(open);
@@ -1793,6 +1796,29 @@ function renderInspector() {
     return;
   }
   if(!lastGood){
+    if(activePackage&&/^scripts\/[A-Za-z0-9_.-]+\.py$/.test(activeFilePath??"")){
+      const links=scriptNavigationReport(activePackage.files,activeFilePath);
+      setInspectorContext("Python 脚本引用",
+        "仅根据当前 Package 的源码和工具声明精确定位","只读");
+      $("inspectorState").textContent="REFERENCES";
+      const jump=target=>{
+        if(target.path!==activeFilePath)switchFile(target.path);
+        lineJump(target.line);
+      };
+      inspectorTitle("调用位置");
+      if(!links.callers.length)inspectorNote("当前没有可确认的调用位置。");
+      for(const link of links.callers)
+        inspector.appendChild(button(link.label+" · L"+link.line,
+          ()=>jump(link),"source-link"));
+      inspectorTitle("声明的 Schema");
+      if(!links.schemas.length)inspectorNote("没有可唯一定位的 Schema。");
+      for(const link of links.schemas)
+        inspector.appendChild(button(link.role+" · "+link.title+" · L"+link.line,
+          ()=>jump(link),"source-link"));
+      for(const warning of links.warnings)inspectorNote("⚠ "+warning);
+      inspectorNote("只读引用导航，不推断 Python 类型或 Runtime ABI。");
+      return;
+    }
     if(activeFilePath==="assurance/contract.yaml"&&renderContractAttributes())return;
     setInspectorContext("文件源码","当前文件可直接在 Source 编辑。");
     $("inspectorState").textContent="SOURCE";
