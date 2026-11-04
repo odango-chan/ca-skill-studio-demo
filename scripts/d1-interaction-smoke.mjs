@@ -175,6 +175,42 @@ export async function runD1Interactions(evaluate,command){
     "   choices,previewed,canceled,applied,undone,redone,restored};"
   ]);
 
+  await check(evaluate,"D4_A3B2B2A_EFFECT_IMPACT",[
+    sleepLine,clickLine,
+    "const src=document.getElementById('source'),before=src.value;",
+    "const n=document.querySelector('.react-flow__node[data-id=\"nudm-sdm-subscribe\"]');",
+    "if(!n)return {ok:false,reason:'Missing owner Node'};",
+    "click(n);await sleep(230);",
+    "const stage=[...document.querySelectorAll('#inspector .journey-stage')].find(x=>",
+    "  x.querySelector('summary')?.textContent.includes('准备'));",
+    "if(!stage)return {ok:false,reason:'Missing Phase'};",
+    "stage.open=true;",
+    "const script=stage.querySelector('details[data-phase-named-step=\"preconditions:1\"]');",
+    "const call=stage.querySelector('details[data-phase-named-step=\"preconditions:2\"]');",
+    "if(!script||!call)return {ok:false,reason:'Named Step panels missing'};",
+    "script.open=true;call.open=true;",
+    "const a=script.querySelector('[data-step-mutation-impact=\"preconditions:1\"]');",
+    "const b=call.querySelector('[data-step-mutation-impact=\"preconditions:2\"]');",
+    "if(!a||!b)return {ok:false,reason:'Dependency impact gate missing'};",
+    "const first=a.dataset.deleteVerdict==='OUTPUT_CONSUMERS'&&",
+    "  a.dataset.moveVerdict==='DIRECT_DATA_DEPENDENCY'&&",
+    "  a.textContent.includes('select-subscription-configuration.output')&&",
+    "  a.textContent.includes('调用顺序');",
+    "const second=b.dataset.deleteVerdict==='OUTPUT_CONSUMERS'&&",
+    "  b.dataset.moveVerdict==='DIRECT_DATA_DEPENDENCY'&&",
+    "  b.textContent.includes('resolve-pcf-create-inputs.output');",
+    "const evidence=a.querySelectorAll('button.source-link').length===1&&",
+    "  b.querySelectorAll('button.source-link').length===2;",
+    "const blocked=!stage.querySelector('[data-phase-delete-named-verify=\"preconditions:1\"]')&&",
+    "  !stage.querySelector('[data-phase-move-named-verify=\"preconditions:1\"]')&&",
+    "  !stage.querySelector('[data-phase-delete-named-verify=\"preconditions:2\"]');",
+    "const preserved=src.value===before&&",
+    "  document.querySelectorAll('.react-flow__node').length===17&&",
+    "  document.getElementById('patchDialog').hidden;",
+    "return {ok:first&&second&&evidence&&blocked&&preserved,",
+    "  first,second,evidence,blocked,preserved};",
+  ]);
+
   await check(evaluate,"D4_A3B2B1_NAMED_VERIFY",[
     sleepLine,clickLine,
     "const source=document.getElementById('source'),before=source.value;",

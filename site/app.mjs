@@ -36,6 +36,7 @@ import {phaseStepDependencyReport} from "./phase-dataflow.mjs";
 import {phaseConsumerContractReport} from "./phase-consumer-contract.mjs";
 import {namedPhaseStepImpactReport,previewNamedPhaseStepRename,
   applyNamedPhaseStepRename} from "./phase-step-rename.mjs";
+import {namedStepMutationImpactReport} from "./phase-step-impact.mjs";
 import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
   previewDeleteUnreferencedNamedVerify,applyDeleteUnreferencedNamedVerify,
   previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
@@ -1398,7 +1399,7 @@ function addPhaseVerifyCreation(phase,container,addOptions){
   controls.append(selector,preview);
   disclosure.append(controls);container.appendChild(disclosure);
 }
-function addNamedStepImpact(phase,step,container,impacts){
+function addNamedStepImpact(phase,step,container,impacts,effectImpacts=[]){
   if(!step.name)return;
   const impact=impacts.find(row=>row.phaseName===phase.name&&
     row.stepIndex===step.index-1);
@@ -1416,6 +1417,32 @@ function addNamedStepImpact(phase,step,container,impacts){
       "改名会同时更新已确认的本地/全限定 from；不代表 Runtime 资格。":
       "暂不可改名：存在未知、引用歧义或无法安全归属的 Source 用法。"+
       (impact.reason?" "+impact.reason:"")));
+  const effect=effectImpacts.find(row=>row.phaseName===phase.name&&
+    row.stepIndex===step.index-1);
+  if(effect){
+    const audit=el("div","phase-dependency-item");
+    audit.dataset.stepMutationImpact=phase.name+":"+step.index;
+    audit.dataset.deleteVerdict=effect.deletion.code;
+    audit.dataset.moveVerdict=effect.move.code;
+    audit.appendChild(el("small","",
+      "删除评估："+effect.deletion.reason+
+      (effect.deletion.detail?"（"+effect.deletion.detail+"）":"")));
+    audit.appendChild(el("small","",
+      "与下一步换序："+effect.move.reason+
+      (effect.move.detail?"（"+effect.move.detail+"）":"")));
+    if(effect.nextStepName)audit.appendChild(el("small","",
+      "下一步："+effect.nextStepName));
+    for(const edge of effect.directReferences){
+      audit.appendChild(el("small","",
+        "跨越的显式依赖：L"+edge.line+" · "+edge.bindingKey+
+        " ← "+edge.value));
+      audit.appendChild(button("查看依赖 · L"+edge.line,
+        ()=>lineJump(edge.line),"source-link"));
+    }
+    audit.appendChild(el("small","",
+      "以上仅为编辑期影响审查，不证明 Runtime 调用顺序或副作用等价"));
+    body.appendChild(audit);
+  }
   for(const row of impact.references){
     const info=el("div","phase-dependency-item");
     info.appendChild(el("small","",
@@ -1474,7 +1501,8 @@ function addPlainVerifyNameEditor(phase,step,container,nameOptions){
 }
 function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
   lineage=null,contracts=null,reorderOptions=[],addOptions=[],removeOptions=[],
-  namedImpacts=[],namedVerifyEdits={names:[],deletions:[],swaps:[]}) {
+  namedImpacts=[],namedVerifyEdits={names:[],deletions:[],swaps:[]},
+  effectImpacts=[]) {
   if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
@@ -1539,7 +1567,7 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
     body.appendChild(item);
     addPhaseVerifyEditor(phase,step,body);
     addPlainVerifyNameEditor(phase,step,body,namedVerifyEdits.names);
-    addNamedStepImpact(phase,step,body,namedImpacts);
+    addNamedStepImpact(phase,step,body,namedImpacts,effectImpacts);
     addPhaseInputBindingEditors(phase,step,body,phaseBindings);
     addPhaseOutputReferenceEditors(phase,step,body,phaseOutputs);
     addPhaseDependencyInspector(phase,step,body,lineage,contracts);
@@ -1576,7 +1604,9 @@ function nodeEditorCapabilities(nodeId){
     phaseAdd:phaseVerifyAddOptions(text,activeProcedureId,nodeId,ps,skill),
     phaseDelete:phaseVerifyDeleteOptions(text,activeProcedureId,nodeId),
     phaseNamed:namedPhaseStepImpactReport(text,activeProcedureId,nodeId),
-    namedVerify:namedVerifyEditOptions(text,activeProcedureId,nodeId)
+    namedVerify:namedVerifyEditOptions(text,activeProcedureId,nodeId),
+    phaseEffect:namedStepMutationImpactReport(text,activeProcedureId,nodeId,
+      activePackage?.files)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1604,7 +1634,7 @@ function renderNodeJourney(model,caps) {
     renderPhase(model.prepare.phase,body,model.children,
       caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
       caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed,
-      caps.namedVerify);
+      caps.namedVerify,caps.phaseEffect?.steps);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1622,7 +1652,7 @@ function renderNodeJourney(model,caps) {
     renderPhase(model.confirm.phase,body,model.children,
       caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
       caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed,
-      caps.namedVerify);
+      caps.namedVerify,caps.phaseEffect?.steps);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
