@@ -2149,7 +2149,12 @@ async function initializeMonaco(){
   try{
     // Worker bundled with Pages; no remote CDN.
     self.MonacoEnvironment={
-      getWorker:()=>new Worker(new URL("./editor.worker.js",import.meta.url),{type:"module"})
+      getWorker:(moduleId,label)=>{
+        const yamlWorker=label==="yaml"||moduleId==="monaco-yaml/yaml.worker"||
+          moduleId==="yaml";
+        return new Worker(new URL(yamlWorker?"./yaml.worker.js":"./editor.worker.js",
+          import.meta.url),{type:"module"});
+      }
     };
     const {createMonacoSourceBackend}=await import("./monaco-source-backend.mjs");
     candidate=createMonacoSourceBackend(host,{

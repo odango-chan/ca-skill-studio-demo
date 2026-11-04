@@ -11,6 +11,9 @@ const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
 if(!chrome)throw Error("Chrome unavailable for browser smoke");
 const dist=resolve("dist");
+for(const asset of ["app.js","editor.worker.js","yaml.worker.js"]){
+  if(!existsSync(resolve(dist,asset)))throw Error("Required local Monaco asset missing: "+asset);
+}
 for(const legacy of ["samples/packages/ensure-pdu-session","samples/ensure-pdu-session.procedure.yaml"]){
   if(existsSync(resolve(dist,legacy)))throw Error("Legacy Ensure asset leaked into Pages dist: "+legacy);
 }
@@ -65,7 +68,16 @@ try{
     ws.addEventListener("error",rej,{once:true});});
   ws.addEventListener("message",event=>{
     const msg=JSON.parse(event.data);
-    if(msg.method==="Runtime.exceptionThrown")exceptions.push(msg.params?.exceptionDetails?.text);
+    if(msg.method==="Runtime.exceptionThrown"){
+      const details=msg.params?.exceptionDetails;
+      exceptions.push({
+        text:details?.text,
+        message:details?.exception?.description||details?.exception?.value,
+        stack:details?.stackTrace?.callFrames?.slice(0,6).map(frame=>({
+          url:frame.url,line:frame.lineNumber+1,column:frame.columnNumber+1,function:frame.functionName
+        }))
+      });
+    }
     if(msg.method==="Runtime.consoleAPICalled"&&["warning","error"].includes(msg.params?.type))warnings.push(msg.params.args?.map(a=>a.value||a.description).join(" "));
     if(msg.id&&pending.has(msg.id)){
       const task=pending.get(msg.id);pending.delete(msg.id);
@@ -145,8 +157,6 @@ try{
   if(result?.nodes!==17||result.edges!==48||result.valid!==48||result.markersOk!==48||
      result.attachedPorts!==96||result.maxPortGap>1.5)
     throw Error("CreatedSession visible edges FAIL");
-  if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
-  if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
   console.log("CreatedSession visible paths and aligned React Flow ports PASS: "+
     result.valid+" / "+result.attachedPorts);
 
@@ -282,6 +292,128 @@ try{
     }));
 
   await runD1Interactions(evaluate,command);
+
+  // E2-A2: real Owner schemas, schema diagnostics, completion and hover.
+  const ownerSchemaSmoke=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const host=document.getElementById('monacoHost');",
+    " const source=document.getElementById('source');",
+    " const file=path=>[...document.querySelectorAll('#assetTree button.asset-file')]",
+    "  .find(el=>el.getAttribute('aria-label')===path);",
+    " const markers=()=>host.querySelectorAll('.squiggly-error,.squiggly-warning').length;",
+    " const waitFor=async fn=>{for(let i=0;i<35;i++){if(fn())return true;await sleep(100)}return false};",
+    " const open=async path=>{file(path)?.click();await sleep(1000);return source.value};",
+    " const dispatch=()=>source.dispatchEvent(new Event('input',{bubbles:true}));",
+    " const contract=await open('assurance/contract.yaml');",
+    " const contractPolicy=host.dataset.yamlSchemaCapability;",
+    " await sleep(700);const contractValid=markers()===0;",
+    " source.value=contract.replace('spec:\\n','spec:\\n  studioUnknownProbe: true\\n');dispatch();",
+    " const contractRejectsUnknown=await waitFor(()=>markers()>0);",
+    " source.value=contract;dispatch();",
+    " await sleep(700);const contractRestored=markers()===0;",
+    " const predicates=await open('assurance/predicates.yaml');",
+    " const predicatePolicy=host.dataset.yamlSchemaCapability;",
+    " await sleep(700);const predicateValid=markers()===0;",
+    " source.value=predicates.replace('metadata:\\n  skill:','metadata:\\n  studioUnknownProbe: true\\n  skill:');dispatch();",
+    " const predicateRejectsUnknown=await waitFor(()=>markers()>0);",
+    " source.value=predicates;dispatch();",
+    " await sleep(700);const predicateRestored=markers()===0;",
+    " const procedure=await open('assurance/procedure.yaml');",
+    " const procedurePolicy=host.dataset.yamlSchemaCapability;",
+    " await sleep(900);const procedureValid=markers()===0;",
+    " source.value='procedures: [\\n';dispatch();",
+    " const procedureSyntaxError=await waitFor(()=>markers()>0);",
+    " source.value=procedure;dispatch();",
+    " await sleep(900);const procedureRestored=markers()===0;",
+    " return {ok:host.dataset.yamlSchemaEngine==='monaco-yaml@5.5.1'&&",
+    "  contractPolicy==='owner-schema-v1alpha1'&&predicatePolicy==='owner-schema-v1alpha1'&&",
+    "  procedurePolicy==='procedure-schema-incompatible'&&contractValid&&contractRejectsUnknown&&",
+    "  contractRestored&&predicateValid&&predicateRejectsUnknown&&predicateRestored&&",
+    "  procedureValid&&procedureSyntaxError&&procedureRestored,",
+    "  engine:host.dataset.yamlSchemaEngine,contractPolicy,predicatePolicy,procedurePolicy,",
+    "  contractValid,contractRejectsUnknown,contractRestored,",
+    "  predicateValid,predicateRejectsUnknown,predicateRestored,",
+    "  procedureValid,procedureSyntaxError,procedureRestored};",
+    "})()"
+  ].join("\n"));
+  console.log("E2_OWNER_SCHEMA_VALIDATION",JSON.stringify(ownerSchemaSmoke));
+  if(!ownerSchemaSmoke?.ok)
+    throw Error("E2 Owner schema validation / offline Procedure boundary FAIL: "+JSON.stringify(ownerSchemaSmoke));
+
+  // Exercise schema-based completion and hover through the actual Monaco UI.
+  const completionSetup=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const host=document.getElementById('monacoHost');",
+    " const source=document.getElementById('source');",
+    " const file=path=>[...document.querySelectorAll('#assetTree button.asset-file')]",
+    "  .find(el=>el.getAttribute('aria-label')===path);",
+    " file('assurance/contract.yaml')?.click();await sleep(900);",
+    " document.getElementById('mode-source')?.click();",
+    " const skeleton=['apiVersion: connectionagent.io/v1alpha1','kind: SkillContract',",
+    "  'metadata:','  name: sample','spec:','  '].join('\\n');",
+    " source.value=skeleton;source.dispatchEvent(new Event('input',{bubbles:true}));",
+    " await sleep(350);",
+
+    " const rows=[...host.querySelectorAll('.view-line')];",
+    " const index=rows.findIndex(el=>el.textContent.trim()==='spec:');",
+    " const blank=rows[index+1];",
+    " const rect=host.getBoundingClientRect(),line=blank?.getBoundingClientRect();",
+    " const x=line?line.x+30:rect.x+110,y=line?line.y+line.height/2:rect.y+150;",
+    " return {x,y,policy:host.dataset.yamlSchemaCapability,",
+    "  hit:document.elementFromPoint(x,y)?.className||null,",
+    "  editorCount:host.querySelectorAll('.monaco-editor').length,",
+    "  width:rect.width,height:rect.height,found:index>=0&&!!blank,",
+    "  row:blank?.textContent||'',index};",
+    "})()"
+  ].join("\n"));
+  console.log("E2_COMPLETION_SETUP",JSON.stringify(completionSetup));
+  if(!completionSetup?.found||completionSetup.policy!=="owner-schema-v1alpha1"||completionSetup.width<200||completionSetup.height<120)
+    throw Error("E2 completion editor position unavailable: "+JSON.stringify(completionSetup));
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:completionSetup.x,y:completionSetup.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:completionSetup.x,y:completionSetup.y,button:"left",clickCount:1});
+  await command("Input.dispatchKeyEvent",{type:"rawKeyDown",key:"Control",code:"ControlLeft",modifiers:2,windowsVirtualKeyCode:17,nativeVirtualKeyCode:17});
+  await command("Input.dispatchKeyEvent",{type:"rawKeyDown",key:" ",code:"Space",modifiers:2,windowsVirtualKeyCode:32,nativeVirtualKeyCode:32});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:" ",code:"Space",modifiers:2,windowsVirtualKeyCode:32,nativeVirtualKeyCode:32});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Control",code:"ControlLeft",modifiers:0,windowsVirtualKeyCode:17,nativeVirtualKeyCode:17});
+  console.log("E2_COMPLETION_FOCUS",JSON.stringify(await evaluate("({active:document.activeElement?.className||document.activeElement?.tagName,aria:document.activeElement?.getAttribute?.('aria-label'),input:document.querySelector('.monaco-editor textarea.inputarea')===document.activeElement})")));
+  await sleep(900);
+  const completion=await evaluate([
+    "(()=>{const widget=document.querySelector('.suggest-widget');",
+    " const labels=[...document.querySelectorAll('.suggest-widget .monaco-list-row')]",
+    "  .map(el=>el.innerText||el.textContent||'').join(' ');",
+    " return {visible:!!widget&&getComputedStyle(widget).display!=='none',labels};})()"
+  ].join("\n"));
+  console.log("E2_OWNER_SCHEMA_COMPLETION",JSON.stringify(completion));
+  if(!completion?.visible||!/(skillType|goal|entryProcedure)/.test(completion.labels))
+    throw Error("E2 Owner schema completion did not surface Contract fields: "+JSON.stringify(completion));
+
+  // Hover on the constrained skillType property must expose owner schema values.
+  const hover=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const host=document.getElementById('monacoHost'),source=document.getElementById('source');",
+    " source.value=['apiVersion: connectionagent.io/v1alpha1','kind: SkillContract',",
+    "  'metadata:','  name: sample','spec:','  skillType: executable'].join('\\n');",
+    " source.dispatchEvent(new Event('input',{bubbles:true}));await sleep(500);",
+    " const row=[...host.querySelectorAll('.view-line')].find(el=>el.textContent.includes('skillType:'));",
+    " const rect=row?.getBoundingClientRect();",
+    " return {x:rect?rect.x+105:0,y:rect?rect.y+rect.height/2:0,found:!!rect};",
+    "})()"
+  ].join("\n"));
+  if(!hover?.found)throw Error("E2 schema hover target unavailable");
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:hover.x,y:hover.y});
+  await sleep(900);
+  const hoverText=await evaluate("document.querySelector('.monaco-hover-content')?.innerText||''");
+  console.log("E2_OWNER_SCHEMA_HOVER",JSON.stringify({text:hoverText}));
+  if(!/executable|authoring_assistant/.test(hoverText))
+    throw Error("E2 Owner schema hover did not expose enum: "+hoverText);
+
+  // Evaluate browser diagnostics after all E2 YAML interactions have run.
+  if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
+  if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
+
 
 }finally{
   if(ws)ws.close();

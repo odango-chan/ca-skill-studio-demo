@@ -208,3 +208,19 @@ test("E1 Monaco integration retains Source authority and Pages Worker assets",()
   assert.match(ci,/node --check site\/source-editor-adapter\.mjs/);
   assert.match(ci,/node --check tests\/source-editor-adapter\.test\.mjs/);
 });
+
+test("E2 offline Owner Schema editor hints cannot bind obsolete Phase Procedure schema",()=>{
+  const work=content("docs/WORK.md");
+  const spec=content("docs/design/source-editor-workstream.md");
+  const code=content("site/monaco-source-backend.mjs");
+  const policy=content("site/yaml-schema-policy.mjs");
+  const ci=content(".github/workflows/pages.yml");
+  assert.match(work,/E2-A1\/A2/);
+  assert.match(spec,/PR #42/);
+  assert.match(spec,/Procedure.*Schema/);
+  assert.match(policy,/procedure-schema-incompatible/);
+  assert.match(code,/enableSchemaRequest: false/);
+  assert.match(ci,/yaml\.worker\.js/);
+  assert.match(ci,/node --check site\/yaml-owner-schemas\.mjs/);
+  assert.match(ci,/node --check tests\/yaml-owner-schemas\.test\.mjs/);
+});

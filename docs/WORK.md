@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-04**  
-**Reviewed implementation baseline: main@a5db46eee16357602f72c9464797898b53c8d9dc**（E1 Monaco 已合入且 Pages PASS；E2 堆叠集成待处理）
+**Reviewed implementation baseline: main@07850bf1529f9439046f0768dcc35eba730136e2**（E1 已正式验收；E2 PR #42 代码验收 PASS、最终集成与 Pages 待确认）
 
 ## Overall
 
@@ -33,7 +33,7 @@
 | D4-A4a 现有 Phase 失败 Route 的已观察目标重定向 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #37） | PASS（305 tests + real Chromium；集成候选） | [PR #37](https://github.com/odango-chan/ca-skill-studio-demo/pull/37)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41791294195)、[设计](design/phase-designer.md) |
 | D4-A4b1 Phase Outcome 缺失修复、非核心拼写修正与受限删除 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #39） | PASS（315 tests + real Chromium；代码提交） | [PR #39](https://github.com/odango-chan/ca-skill-studio-demo/pull/39)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41793627245)、[设计](design/phase-designer.md) |
 | E1 Monaco Source Editor 接入最新 D4 主分支 | ACCEPTED（Editor-tier） | IMPLEMENTED（main@a5db46ee；PR #40 MERGED） | PASS（322/322 + real Chromium + resulting-main Pages） | [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40)、[最终 PR CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366)、[main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343)、[设计](design/source-editor-workstream.md) |
-| E2 YAML 语法诊断 / Owner Schema 提示（独立堆叠分支） | PROPOSED | IN_PROGRESS（PR #35/#38 尚未进入 main） | NOT_RUN（集成 / Pages） | [#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24)、[PR #35](https://github.com/odango-chan/ca-skill-studio-demo/pull/35)、[PR #38](https://github.com/odango-chan/ca-skill-studio-demo/pull/38) |
+| E2-A1/A2 YAML 1.2 语法诊断 / 离线 Owner Schema 智能提示 | ACCEPTED（Editor-tier code-head） | IMPLEMENTED（PR #42） | PASS（327/327 + TypeScript + Build + actual Chromium completion/hover；最终 PR/main Pages 待确认） | [PR #42](https://github.com/odango-chan/ca-skill-studio-demo/pull/42)、[代码 CI #41802445121](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41802445121)、[#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24) |
 | D4-A2.2b2/A3b2b2b/A4b2 跨生产者写入 / 带副作用或输出依赖 Step 的写入 / 新 Phase on-map 与 owner Outcome 契约 | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
@@ -43,7 +43,7 @@
 
 ## Current open work
 
-- [#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24)：E2 YAML 诊断与 Owner Schema 提示继续独立开发；PR #35/#38 基于旧 E1 堆叠分支，不视为主分支集成通过。
+- [#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24)：E2 已从最新 E1/D4 主分支重新集成在 PR #42；旧 #35/#38 仅保留历史实现与审计证据，其 #38 Chromium 补全测试失败，不得直接合入或声称 PASS。PR #42 已通过真实 Chromium 的字段补全与枚举 Hover（代码 HEAD），待最终 PR/Pages。
 
 - [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3 有界 operator.on Route 编辑已合入；Runtime Outcome 资格和 Phase-specific Route 仍未覆盖。
 - [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b2b2b 具副作用或带引用 Step 的写入与 A4b1 仅提供已有 Phase on-map 的受限 Outcome 修复（本仓编辑器级验收通过）；A4b2 新 Phase on-map 及 owner Outcome 完整性验证仍未开始；A4a 仅实现已存在失败分支目标的同 Phase/同 Outcome 观察值重定向（本仓编辑器级验收通过）；A3b2b2a 仅提供已验收的执行/引用风险只读审查；A3b2b1 仅允许无输出引用的纯 Verify 命名/删除/相邻换序（本仓编辑器级验收通过）；A3b2a 先审查命名输出引用并受限改名，不能据此宣称 Runtime 兼容。

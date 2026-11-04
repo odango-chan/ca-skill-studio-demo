@@ -4,7 +4,66 @@ import * as monaco from "monaco-editor/editor";
 import "monaco-editor/features/register.all";
 import "monaco-editor/languages/definitions/register.all";
 import {monacoLanguageForPath} from "./monaco-language.mjs";
+import {configureMonacoYaml} from "monaco-yaml";
+import {createOwnerYamlSchemas} from "./yaml-owner-schemas.mjs";
+import {yamlSchemaCapability} from "./yaml-schema-policy.mjs";
 const languageId = monacoLanguageForPath;
+let yamlLanguageService = null;
+let monacoWorkerCompatibilityInstalled = false;
+
+// monaco-yaml 5.x / monaco-worker-manager 2.x still use the legacy
+// {moduleId, label, createData} createWebWorker contract. Monaco's tree-shaken
+// editor API expects {worker, ...}; its full editor.main entry normally wraps
+// this call, but importing that entry would defeat Studio's small Monaco build.
+// Bridge the legacy contract here, following the upstream compatibility fix:
+// microsoft/monaco-editor#5049 and remcohaszing/monaco-yaml#272.
+function ensureMonacoWorkerCompatibility() {
+  if (monacoWorkerCompatibilityInstalled) return;
+  const createWebWorker = monaco.editor.createWebWorker.bind(monaco.editor);
+  monaco.editor.createWebWorker = options => {
+    if (Object.prototype.hasOwnProperty.call(options, "worker")) {
+      return createWebWorker(options);
+    }
+    const getWorker = globalThis.MonacoEnvironment?.getWorker;
+    if (typeof getWorker !== "function") {
+      throw new Error("MonacoEnvironment.getWorker is required for YAML language services");
+    }
+    const workerOrPromise = getWorker(
+      options.moduleId,
+      options.label ?? "monaco-editor-worker"
+    );
+    if (!workerOrPromise) {
+      throw new Error("MonacoEnvironment.getWorker returned no worker for " + options.label);
+    }
+    const worker = Promise.resolve(workerOrPromise).then(instance => {
+      if (!instance || typeof instance.postMessage !== "function") {
+        throw new TypeError("Monaco worker factory must return a Worker");
+      }
+      // The first message boots Monaco's worker host; the second carries
+      // monaco-worker-manager's createData for the YAML worker initializer.
+      instance.postMessage("ignore");
+      instance.postMessage(options.createData);
+      return instance;
+    });
+    return createWebWorker({...options, worker});
+  };
+  monacoWorkerCompatibilityInstalled = true;
+}
+
+function ensureYamlLanguage() {
+  if (!yamlLanguageService) {
+    yamlLanguageService = configureMonacoYaml(monaco, {
+      completion: true,
+      hover: true,
+      validate: true,
+      enableSchemaRequest: false,
+      yamlVersion: "1.2",
+      format: {enable: false},
+      schemas: createOwnerYamlSchemas()
+    });
+  }
+  return yamlLanguageService;
+}
 const ensureText = text => {
   if(typeof text !== "string")throw new TypeError("Source must be text");
   return text;
@@ -35,6 +94,9 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
     model.setValue(text);
   };
   try {
+    ensureMonacoWorkerCompatibility();
+    ensureYamlLanguage();
+    host.dataset.yamlSchemaEngine="monaco-yaml@5.5.1";
     editor=monaco.editor.create(host,{
       model:null,theme:"vs",automaticLayout:true,minimap:{enabled:false},
       fontSize:12,lineHeight:21,tabSize:2,insertSpaces:true,
@@ -82,6 +144,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           const uri=monaco.Uri.from({scheme:"inmemory",path:"/"+path});
           model=monaco.editor.createModel(next,languageId(path),uri);
           host.dataset.language=languageId(path);
+          host.dataset.yamlSchemaCapability=yamlSchemaCapability(path);
           raw=next;
           editor.setModel(model);
           modelChange=model.onDidChangeContent(onModelInput);

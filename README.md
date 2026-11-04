@@ -47,18 +47,8 @@ D4-A2.2a 增加了 Phase Step **只读数据依赖审查**：可以检查上游 
 
 D4-A2.2b1 已补齐当前有界范围内的**消费者输入契约证据**：当前 Package 内本地脚本的 `# inputSchema` 与唯一同名 schema 可用于展示 `with.<key>` 的消费者字段类型，与源输入/脚本输出的声明类型做只读对照；这不会验证 Runtime 数据可用性、`const`/`pattern` 等约束或 `call` ABI，更不授权跨生产者修改。详见 [D4 Phase Designer](docs/design/phase-designer.md)、[PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19)。
 
-D4-A3a 已通过编辑器级测试，提供最小的 Phase Step 顺序编辑：只允许两个物理相邻且未命名、无绑定的单行 Verify 换序；仍走 Source Diff/确认/Undo/Redo。其余 Step 新增、删除及通用重排仍未实现，见 [D4 设计](docs/design/phase-designer.md)。
-
-D4-A3b1（[PR #30](https://github.com/odango-chan/ca-skill-studio-demo/pull/30) 编辑器级验收通过）允许在已存在 Phase 末尾新增来自当前 PredicateSet 的无名 Verify，或删除明确符合资格的单行 Verify；仍走 Source Diff / 确认 / Undo/Redo，未实现命名或带绑定 Step 的增删和通用依赖感知排序。此处会改变业务检查集合，Runtime/5GC 验证未执行。
-
-D4-A3b2a 编辑器级验收通过，提供命名 Phase Step 的 Source 引用影响与同步改名（[PR #32](https://github.com/odango-chan/ca-skill-studio-demo/pull/32)）；未知或歧义引用一律只读。带输出依赖的删除与重排尚未实现，Runtime/5GC NOT_RUN。
-
-D4-A3b2b1（[PR #34](https://github.com/odango-chan/ca-skill-studio-demo/pull/34) 编辑器级验收通过）提供无引用的纯 Verify Step 命名及受限删除/相邻排序。具副作用或带输出依赖的 script/call 仍保持 Source-only，不宣称 Runtime 安全。
-
-D4-A3b2b2a（[PR #36](https://github.com/odango-chan/ca-skill-studio-demo/pull/36) 编辑器级验收通过）在现有命名 Step「引用影响」中只读展示删除与相邻换序的依赖/副作用门禁；不新增 Script/Call 的危险写操作，Runtime/5GC NOT_RUN。
-
-D4-A4a（[PR #37](https://github.com/odango-chan/ca-skill-studio-demo/pull/37) 编辑器级验收通过）在「准备/确认」阶段允许将现有失败/未知 Route 目标改为同 Procedure、同 Phase、同 Outcome 已观察过的目标；走 Source Diff、确认和 Undo/Redo，不影响主执行 Route，也不声明 Runtime/5GC 安全。
-
-D4-A4b1（[PR #39](https://github.com/odango-chan/ca-skill-studio-demo/pull/39) 编辑器级验收通过）支持在现有 Phase `on` map 中补齐已观察的缺失核心 Outcome，以及受限修正/删除无歧义非核心 Outcome；完整的 owner 示例不会添加分支或显示多余按钮。Runtime/5GC NOT_RUN。
+D4 Phase Designer 的 Verify Step 编辑、命名引用影响、失败 Route 重定向和 Outcome 修复均已进入主分支；边界、PR 和证据集中维护在 [D4 设计](docs/design/phase-designer.md)、[WORK](docs/WORK.md) 与 [TRACEABILITY](docs/TRACEABILITY.md)。这些仅是 Source 编辑器级能力，Runtime/5GC NOT_RUN。
 
 E1 Monaco Source Editor 已通过 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 合入最新 D4 主分支：本地 Monaco/Worker，YAML、Python、Markdown、JSON 的 Source 编辑，保留唯一工作副本及 Source/Visual/Split、Diff/确认/Undo/Redo；初始化失败回退原有文本编辑器。[322/322 + real Chromium 集成 CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366)，[resulting-main Pages PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343)，参见 [E 线设计](docs/design/source-editor-workstream.md)。
+
+E2 YAML 1.2 语法诊断和离线 Contract/Predicate Owner Schema 提示已在 [PR #42 代码 CI #41802445121](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41802445121) 通过 327/327 + 真实补全/hover Chromium，正在完成最终 PR/Pages 验收；保留 Procedure syntax-only，避免旧 Procedure Schema 误判新版 Phase。旧堆叠 PR #35/#38 不视为已通过真实补全门禁；Runtime/5GC NOT_RUN。

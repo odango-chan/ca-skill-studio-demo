@@ -23,7 +23,7 @@ await build({
   platform: "browser",
   format: "esm",
   target: ["es2022"],
-  loader: {".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file",".png":"file"},
+  loader: {".tsx":"tsx",".yaml":"text",".yml":"text",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file",".png":"file"},
   assetNames: "assets/[name]-[hash]",
   minify: true,
   legalComments: "eof",
@@ -46,4 +46,31 @@ await build({
 copyFileSync("node_modules/monaco-editor/LICENSE",join(dist,"LICENSE.monaco.txt"));
 copyFileSync("node_modules/monaco-editor/ThirdPartyNotices.txt",
   join(dist,"ThirdPartyNotices.monaco.txt"));
-console.log("Pages build: dist/ (Monaco + local editor.worker.js + static assets)");
+// Monaco YAML is a separate same-origin worker. Schema sources are embedded
+// as local text in app.js; the worker has no remote schema-request capability.
+await build({
+  entryPoints: ["node_modules/monaco-yaml/yaml.worker.js"],
+  outfile: join(dist, "yaml.worker.js"),
+  bundle: true,
+  platform: "browser",
+  format: "esm",
+  target: ["es2022"],
+  minify: true,
+  legalComments: "eof",
+  logLevel: "info",
+  plugins: [{
+    name: "monaco-yaml-editor-worker-alias",
+    setup(build) {
+      // monaco-worker-manager imports this subpath without accounting for
+      // Monaco's "./*.js" export map. Resolve it to the already bundled local
+      // editor worker source instead of the doubled /esm/vs/esm/vs/ path.
+      build.onResolve({
+        filter: /^monaco-editor.*editor\.worker\.js$/
+      }, () => ({
+        path: join(process.cwd(),"node_modules/monaco-editor/esm/vs/editor/editor.worker.js")
+      }));
+    }
+  }]
+});
+// monaco-yaml 5.5.1 declares MIT in its published package metadata.
+console.log("Pages build: dist/ (Monaco + local editor.worker.js + local yaml.worker.js + static assets)");
