@@ -32,6 +32,7 @@ import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding}
   from "./phase-bindings.mjs";
 import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from "./phase-output-refs.mjs";
+import {phaseStepDependencyReport} from "./phase-dataflow.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
@@ -1286,7 +1287,49 @@ function addPhaseOutputReferenceEditors(phase,step,container,references){
   return true;
 }
 
-function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[]) {
+function addPhaseDependencyInspector(phase,step,container,report){
+  const bindings=report?.status==="READY"?report.bindings.filter(b=>
+    b.phaseName===phase.name&&b.stepIndex===step.index-1):[];
+  if(!bindings.length)return false;
+  const details=el("details","step-enum phase-dependency-review");
+  details.dataset.phaseDependencyStep=phase.name+":"+step.index;
+  details.appendChild(el("summary","",
+    "数据依赖 · "+bindings.length+" 项 · D4-A2.2"));
+  const body=el("div","step-enum-controls");
+  body.appendChild(el("p","small-edit-note",
+    "只读 · 按现有 YAML 追溯生产者和执行顺序。生产者可定位不代表输出可用，"+
+    "脚本 schema 存在也不代表消费参数兼容；不开放跨生产者改绑。"));
+  for(const entry of bindings){
+    const item=el("div","phase-dependency-item");
+    item.dataset.bindingKey=entry.bindingKey;
+    item.dataset.producerStatus=entry.status;
+    item.dataset.contractStatus=entry.contractStatus;
+    item.appendChild(el("strong","",entry.bindingKey+" · "+entry.value));
+    item.appendChild(el("small","",
+      (entry.producerNodeId?
+        "生产者 "+entry.producerNodeId+
+        (entry.producerPhase?" / "+entry.producerPhase:"")+
+        (entry.producerStep?" / "+entry.producerStep:""):
+        "Procedure input 或未解析来源")+
+      " · "+entry.reason));
+    if(entry.contractSchema){
+      item.appendChild(el("small","",
+        "输出 schema 证据："+entry.contractSchema+
+        (entry.outputType?" · 声明类型 "+entry.outputType:"")+
+        "；消费参数 ABI 未验证"));
+    }else if(entry.outputType){
+      item.appendChild(el("small","",
+        "输入声明类型："+entry.outputType+"；消费参数 ABI 未验证"));
+    }
+    item.appendChild(button("查看源码 · L"+entry.line,()=>lineJump(entry.line),
+      "source-link"));
+    body.appendChild(item);
+  }
+  details.append(body);container.append(details);
+  return true;
+}
+
+function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],lineage=null) {
   if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
@@ -1299,6 +1342,7 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[]) 
     addPhaseVerifyEditor(phase,step,body);
     addPhaseInputBindingEditors(phase,step,body,phaseBindings);
     addPhaseOutputReferenceEditors(phase,step,body,phaseOutputs);
+    addPhaseDependencyInspector(phase,step,body,lineage);
     const ref=phaseChildren.find(c=>c.via.startsWith(phase.name+".steps[") &&
       c.procedure===step.value && c.line===step.line);
     if(ref)body.appendChild(button("进入子过程 · "+ref.procedure,
@@ -1336,6 +1380,10 @@ function nodeEditorCapabilities(nodeId){
 
 function renderNodeJourney(model,caps) {
   const node=model.node;
+  // Uses the current package files for schema evidence, not a cached graph
+  // snapshot. This analysis is intentionally read-only.
+  const lineage=phaseStepDependencyReport(source.value,
+    activeProcedureId,node.id,activePackage?.files);
   addNodeRenameEditor(model,caps.rename);
   addNodeOperatorEditor(model,caps.attributes);
   addNodeBindingEditors(model,caps.attributes);
@@ -1347,7 +1395,7 @@ function renderNodeJourney(model,caps) {
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
       {expanded:false});
     renderPhase(model.prepare.phase,body,model.children,
-      caps.phaseBindings,caps.phaseOutputs);
+      caps.phaseBindings,caps.phaseOutputs,lineage);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1363,7 +1411,7 @@ function renderNodeJourney(model,caps) {
       model.confirm.phase?.steps.length ? model.confirm.phase.steps.length+" steps" : "",
       {expanded:false});
     renderPhase(model.confirm.phase,body,model.children,
-      caps.phaseBindings,caps.phaseOutputs);
+      caps.phaseBindings,caps.phaseOutputs,lineage);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});

@@ -35,13 +35,7 @@ function dominators(proc){
   for(const route of proc.routes)
     if(ids.has(route.source)&&ids.has(route.target))
       preds.get(route.target).add(route.source);
-  const pending=[...reachable];
-  for(let i=0;i<pending.length;i++)
-    for(const [target,from] of preds)
-      if(!reachable.has(target)&&[...from].some(id=>pending[i]===id)){
-        // Reachability is recomputed below to avoid iteration-order reliance.
-      }
-  const successors=new Map([...ids].map(id=>[id,[]]));
+   const successors=new Map([...ids].map(id=>[id,[]]));
   for(const route of proc.routes)
     if(ids.has(route.source)&&ids.has(route.target))
       successors.get(route.source).push(route.target);

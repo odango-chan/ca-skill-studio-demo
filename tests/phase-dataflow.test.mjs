@@ -68,7 +68,7 @@ test("D4-A2.2 cross-Node order is only structural and cannot qualify output cons
   assert.equal(ref.status,"GRAPH_PREDECESSOR_ONLY");
   assert.equal(ref.contractStatus,"SCRIPT_SCHEMA_FIELD_DECLARED");
   assert.equal(ref.editEligible,false);
-  const changed=fixture.replace("nudm-sdm-subscribe.preconditions.select-subscription-configuration.output",
+  const changed=fixture.replaceAll("nudm-sdm-subscribe.preconditions.select-subscription-configuration.output",
     "namf-communication-n1n2-message-transfer.preconditions.select-subscription-configuration.output");
   const bad=dep("namf-communication-n1n2-message-transfer",changed).bindings.find(x=>
     x.bindingKey==="selection");
