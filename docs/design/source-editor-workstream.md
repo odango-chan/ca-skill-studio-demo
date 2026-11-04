@@ -1,7 +1,7 @@
 # E · Source Editor Workstream（与 D Visual Designer 并行）
 
 **Status: Accepted (development boundary) · Date: 2026-11-04**  
-**Implementation: E1 IMPLEMENTED on PR #33; E2-A1 IMPLEMENTED on PR #35; E2-A2 implemented as candidate PR #36; E3/E4 NOT_STARTED · Acceptance: E1 296 tests + Chromium PASS; E2-A1 301 tests + Chromium PASS; E2-A2 CI PENDING; main/Pages NOT_RUN**  
+**Implementation: E1 IMPLEMENTED on PR #33; E2-A1 IMPLEMENTED on PR #35; E2-A2 implemented as candidate PR #38; E3/E4 NOT_STARTED · Acceptance: E1 296 tests + Chromium PASS; E2-A1 301 tests + Chromium PASS; E2-A2 CI PENDING; main/Pages NOT_RUN**  
 **Current E1 integration**: [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) HEAD `b65b4422` on D4 `main@1291a9c0`, [296 tests + real Chromium PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41787690305). E2-A1 [PR #35](https://github.com/odango-chan/ca-skill-studio-demo/pull/35) [301 tests + real Chromium PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41787833576). Neither has been merged to main or deployed to Pages。
 
 ## 1. 目标和不做的事
@@ -112,7 +112,7 @@ E2-A1 [PR #35](https://github.com/odango-chan/ca-skill-studio-demo/pull/35) 已�
 
 ## 10. E2-A2 · 固定 Owner Schema 与 YAML Language Worker
 
-E2-A2 候选实现位于 [PR #36](https://github.com/odango-chan/ca-skill-studio-demo/pull/36)，堆叠在 E2-A1 #35：
+E2-A2 候选实现位于 [PR #38](https://github.com/odango-chan/ca-skill-studio-demo/pull/38)，堆叠在 E2-A1 #35：
 
 - 精确固定 `monaco-yaml@5.5.1`，`yaml.worker.js` 与 Monaco `editor.worker.js` 一样由 Pages 本地打包；`getWorker` 仅把 YAML 请求路由到该本地 Worker。
 - 从 `ca-agent-demo@7570b309` 的 vendored Toolchain snapshot `03a42764ee2a67e39f57ab550b63c7a5d7966199` 字节级复制 `common.schema.yaml`、`skill-contract.schema.yaml`、`predicate-set.schema.yaml`，记录在 `site/schemas/connectionagent/v1alpha1/manifest.json`，Node 测试重新计算 Git blob SHA 验证未漂移。
