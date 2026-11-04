@@ -348,6 +348,39 @@ try{
      scriptLinks.labels.length<3)
     throw Error("E3 script reference navigation failed: "+JSON.stringify(scriptLinks));
 
+  // E3-A2: actual Chromium clicks the conservative Python symbol outline.
+  const symbolNavigation=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const file=path=>[...document.querySelectorAll('#assetTree button.asset-file')]",
+    "  .find(el=>el.getAttribute('aria-label')===path);",
+    " const names=['evaluate_udm_read.py','evaluate_transfer_start.py','select_establishment_configuration.py'];",
+    " const results=[];",
+    " for(const name of names){",
+    "  file('scripts/'+name)?.click();await sleep(180);",
+    "  const before=document.getElementById('source').value;",
+    "  document.getElementById('inspectorVisibility')?.click();await sleep(70);",
+    "  const links=[...document.querySelectorAll('#inspector button.source-link')];",
+    "  const main=links.find(el=>/^def main · L[0-9]+$/.test(el.textContent||''));",
+    "  const classes=links.filter(el=>(el.textContent||'').startsWith('class '));",
+    "  const line=Number(main?.textContent?.match(/L([0-9]+)$/)?.[1]);",
+    "  main?.click();await sleep(100);",
+    "  const focused=document.getElementById('monacoHost').contains(document.activeElement);",
+    "  const unchanged=document.getElementById('source').value===before;",
+    "  const expected=before.split(/\\r?\\n/)[line-1]||'';",
+    "  results.push({name,line,main:!!main,classes:classes.length,focused,unchanged,",
+    "    language:document.getElementById('monacoHost').dataset.language,expected});",
+    " }",
+    " return results;",
+    "})()"
+  ].join("\n"));
+  console.log("E3_PYTHON_SYMBOL_NAVIGATION",JSON.stringify(symbolNavigation));
+  if(!symbolNavigation||symbolNavigation.length!==3||
+     symbolNavigation.some(x=>!x.main||!x.classes||
+       !x.focused||!x.unchanged||x.language!=="python"||
+       !/^def main\(/.test(x.expected)))
+    throw Error("E3 Python symbol navigation failed: "+JSON.stringify(symbolNavigation));
+
   const ownerSchemaSmoke=await evaluate([
     "(async()=>{",
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
