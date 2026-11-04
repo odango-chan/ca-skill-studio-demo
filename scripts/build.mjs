@@ -72,6 +72,5 @@ await build({
     }
   }]
 });
-copyFileSync("node_modules/monaco-yaml/LICENSE",
-  join(dist,"LICENSE.monaco-yaml.txt"));
+// monaco-yaml 5.5.1 declares MIT in its published package metadata.
 console.log("Pages build: dist/ (Monaco + local editor.worker.js + local yaml.worker.js + static assets)");
