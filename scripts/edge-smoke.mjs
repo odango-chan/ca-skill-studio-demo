@@ -298,21 +298,21 @@ try{
     " const contract=await open('assurance/contract.yaml');",
     " const contractPolicy=host.dataset.yamlSchemaCapability;",
     " const contractValid=await waitFor(()=>markers()===0);",
-    " source.value=contract.replace('spec:\\n','spec:\\n  studioUnknownProbe: true\\n');dispatch();",
+    " source.value=contract.replace('spec:\n','spec:\n  studioUnknownProbe: true\n');dispatch();",
     " const contractRejectsUnknown=await waitFor(()=>markers()>0);",
     " source.value=contract;dispatch();",
     " const contractRestored=await waitFor(()=>markers()===0);",
     " const predicates=await open('assurance/predicates.yaml');",
     " const predicatePolicy=host.dataset.yamlSchemaCapability;",
     " const predicateValid=await waitFor(()=>markers()===0);",
-    " source.value=predicates+'studioUnknownProbe: true\\n';dispatch();",
+    " source.value=predicates+'studioUnknownProbe: true\n';dispatch();",
     " const predicateRejectsUnknown=await waitFor(()=>markers()>0);",
     " source.value=predicates;dispatch();",
     " const predicateRestored=await waitFor(()=>markers()===0);",
     " const procedure=await open('assurance/procedure.yaml');",
     " const procedurePolicy=host.dataset.yamlSchemaCapability;",
     " const procedureValid=await waitFor(()=>markers()===0);",
-    " source.value='procedures: [\\n';dispatch();",
+    " source.value='procedures: [\n';dispatch();",
     " const procedureSyntaxError=await waitFor(()=>markers()>0);",
     " source.value=procedure;dispatch();",
     " const procedureRestored=await waitFor(()=>markers()===0);",
@@ -326,7 +326,7 @@ try{
     "  predicateValid,predicateRejectsUnknown,predicateRestored,",
     "  procedureValid,procedureSyntaxError,procedureRestored};",
     "})()"
-  ].join("\\n"));
+  ].join("\n"));
   console.log("E2_OWNER_SCHEMA_VALIDATION",JSON.stringify(ownerSchemaSmoke));
   if(!ownerSchemaSmoke?.ok)
     throw Error("E2 Owner schema validation / offline Procedure boundary FAIL: "+JSON.stringify(ownerSchemaSmoke));
@@ -339,7 +339,7 @@ try{
     " const source=document.getElementById('source');",
     " document.getElementById('mode-source')?.click();",
     " const skeleton=['apiVersion: connectionagent.io/v1alpha1','kind: SkillContract',",
-    "  'metadata:','  name: sample','spec:','  '].join('\\n');",
+    "  'metadata:','  name: sample','spec:','  '].join('\n');",
     " source.value=skeleton;source.dispatchEvent(new Event('input',{bubbles:true}));",
     " await sleep(350);",
     " const rows=[...host.querySelectorAll('.view-line')];",
@@ -348,7 +348,7 @@ try{
     " return {x:rect.x+95,y:line?line.y+line.height+4:rect.y+130,",
     "  width:rect.width,height:rect.height,found:!!spec};",
     "})()"
-  ].join("\\n"));
+  ].join("\n"));
   if(!completionSetup?.found||completionSetup.width<200||completionSetup.height<120)
     throw Error("E2 completion editor position unavailable: "+JSON.stringify(completionSetup));
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:completionSetup.x,y:completionSetup.y,button:"left",clickCount:1});
@@ -363,7 +363,7 @@ try{
     " const labels=[...document.querySelectorAll('.suggest-widget .monaco-list-row')]",
     "  .map(el=>el.innerText||el.textContent||'').join(' ');",
     " return {visible:!!widget&&getComputedStyle(widget).display!=='none',labels};})()"
-  ].join("\\n"));
+  ].join("\n"));
   console.log("E2_OWNER_SCHEMA_COMPLETION",JSON.stringify(completion));
   if(!completion?.visible||!/(skillType|goal|entryProcedure)/.test(completion.labels))
     throw Error("E2 Owner schema completion did not surface Contract fields: "+JSON.stringify(completion));
@@ -374,13 +374,13 @@ try{
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
     " const host=document.getElementById('monacoHost'),source=document.getElementById('source');",
     " source.value=['apiVersion: connectionagent.io/v1alpha1','kind: SkillContract',",
-    "  'metadata:','  name: sample','spec:','  skillType: executable'].join('\\n');",
+    "  'metadata:','  name: sample','spec:','  skillType: executable'].join('\n');",
     " source.dispatchEvent(new Event('input',{bubbles:true}));await sleep(500);",
     " const row=[...host.querySelectorAll('.view-line')].find(el=>el.textContent.includes('skillType:'));",
     " const rect=row?.getBoundingClientRect();",
     " return {x:rect?rect.x+105:0,y:rect?rect.y+rect.height/2:0,found:!!rect};",
     "})()"
-  ].join("\\n"));
+  ].join("\n"));
   if(!hover?.found)throw Error("E2 schema hover target unavailable");
   await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:hover.x,y:hover.y});
   await sleep(900);
