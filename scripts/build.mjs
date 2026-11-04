@@ -57,7 +57,20 @@ await build({
   target: ["es2022"],
   minify: true,
   legalComments: "eof",
-  logLevel: "info"
+  logLevel: "info",
+  plugins: [{
+    name: "monaco-yaml-editor-worker-alias",
+    setup(build) {
+      // monaco-worker-manager imports this subpath without accounting for
+      // Monaco's "./*.js" export map. Resolve it to the already bundled local
+      // editor worker source instead of the doubled /esm/vs/esm/vs/ path.
+      build.onResolve({
+        filter: /^monaco-editor\\/esm\\/vs\\/editor\\/editor\\.worker\\.js$/
+      }, () => ({
+        path: join(process.cwd(),"node_modules/monaco-editor/esm/vs/editor/editor.worker.js")
+      }));
+    }
+  }]
 });
 copyFileSync("node_modules/monaco-yaml/LICENSE",
   join(dist,"LICENSE.monaco-yaml.txt"));
