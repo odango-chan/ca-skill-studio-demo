@@ -1307,3 +1307,13 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .phase-dependency-review .phase-dependency-item .source-link{
   margin-top:2px;
 }
+
+
+/* D4-A2.2b1 contract evidence is intentionally read-only. */
+.phase-contract-verdict{
+  border-left:2px solid #bccbd5;padding-left:8px;
+  font-size:12px;line-height:1.45;
+}
+.phase-dependency-item[data-type-relation="TYPE_MISMATCH"] .phase-contract-verdict{
+  border-left-color:#d79473;
+}
