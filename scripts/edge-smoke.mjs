@@ -359,8 +359,10 @@ try{
     " const rows=[...host.querySelectorAll('.view-line')];",
     " const spec=rows.find(el=>el.textContent.trim()==='spec:');",
     " const rect=host.getBoundingClientRect(),line=spec?.getBoundingClientRect();",
-    " return {x:rect.x+95,y:line?line.y+line.height+4:rect.y+130,",
+    " return {x:rect.x+95,y:line?line.y+line.height/2:rect.y+130,
     "  policy:host.dataset.yamlSchemaCapability,",
+    "  hit:document.elementFromPoint(rect.x+95,line?line.y+line.height/2:rect.y+130)?.className||null,
+    "  editorCount:host.querySelectorAll('.monaco-editor').length,
 
     "  width:rect.width,height:rect.height,found:!!spec};",
     "})()"
@@ -373,6 +375,7 @@ try{
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:" ",code:"Space",modifiers:2});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:" ",code:"Space",modifiers:2});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Control",code:"ControlLeft",modifiers:0});
+  console.log("E2_COMPLETION_FOCUS",JSON.stringify(await evaluate("({active:document.activeElement?.className||document.activeElement?.tagName,aria:document.activeElement?.getAttribute?.('aria-label'),input:document.querySelector('.monaco-editor textarea.inputarea')===document.activeElement})")));
   await sleep(900);
   const completion=await evaluate([
     "(()=>{const widget=document.querySelector('.suggest-widget');",
