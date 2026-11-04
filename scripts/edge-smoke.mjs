@@ -205,10 +205,14 @@ try{
     " const click=el=>el?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));",
     " click(document.getElementById('mode-source'));",
     " await new Promise(r=>setTimeout(r,250));",
-    " const area=document.querySelector('#monacoHost .monaco-editor textarea.inputarea');",
+    " const host=document.getElementById('monacoHost');",
+    " const area=host.querySelector('.monaco-editor .inputarea')||",
+    "  host.querySelector('.monaco-editor textarea')||",
+    "  host.querySelector('.monaco-editor [contenteditable]');",
     " area?.focus();",
-    " return {focused:!!area&&document.activeElement===area,visible:",
-    "  getComputedStyle(document.getElementById('monacoHost')).display!=='none'};",
+    " return {focused:!!area&&host.contains(document.activeElement),visible:",
+    "  getComputedStyle(host).display!=='none',candidate:area?.outerHTML.slice(0,200),",
+    "  active:document.activeElement?.outerHTML.slice(0,200)};",
     "})()"
   ].join("\n"));
   if(!focused?.focused||!focused?.visible)
