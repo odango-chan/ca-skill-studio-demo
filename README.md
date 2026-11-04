@@ -44,3 +44,5 @@ D4 Phase Designer 的 A1 已实现有界的 Phase Step 编辑；目前只允许�
 D4-A2.1 新增受限的 Phase Step 输出引用编辑：仅在当前 Procedure 原文已经使用过两种写法、且指向同一已执行 Step 和相同输出字段时，提供局部与全限定引用切换；仍不涉及跨生产者重连或 Runtime 输出类型推断。详见 [Phase Designer](docs/design/phase-designer.md) 和 [PR #17](https://github.com/odango-chan/ca-skill-studio-demo/pull/17)。
 
 D4-A2.2a 增加了 Phase Step **只读数据依赖审查**：可以检查上游 Step、执行先后、跨 Node 必经关系，以及本地脚本输出 schema 的声明证据；不会自动修改引用或推断消费参数类型。跨生产者重绑定仍不开放。详见 [D4 设计](docs/design/phase-designer.md) 和 [PR #18](https://github.com/odango-chan/ca-skill-studio-demo/pull/18)。
+
+D4-A2.2b1 正在补齐**消费者输入契约证据**：当前 Package 内本地脚本的 `# inputSchema` 与唯一同名 schema 可用于展示 `with.<key>` 的消费者字段类型，与源输入/脚本输出的声明类型做只读对照；这不会验证 Runtime 数据可用性、`const`/`pattern` 等约束或 `call` ABI，更不授权跨生产者修改。详见 [D4 Phase Designer](docs/design/phase-designer.md)、[PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19)。
