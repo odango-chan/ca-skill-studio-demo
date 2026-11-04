@@ -101,6 +101,43 @@ export async function runD1Interactions(evaluate,command){
     "  schemaStatus:selection?.dataset.contractStatus};"
   ]);
 
+  await check(evaluate,"D4_A2_2B_SCRIPT_CONSUMER_ABI",[
+    sleepLine,clickLine,
+    " const source=document.getElementById('source'),before=source.value;",
+    " const n=document.querySelector('.react-flow__node[data-id=\"nudm-sdm-subscribe\"]');",
+    " if(!n)return {ok:false,reason:'CreatedSession Node missing'};",
+    " click(n);await sleep(220);",
+    " const stage=[...document.querySelectorAll('#inspector .journey-stage')].find(x=>",
+    "   x.querySelector('summary')?.textContent.includes('准备'));",
+    " if(!stage)return {ok:false,reason:'Preparation Stage missing'};",
+    " stage.open=true;",
+    " const first=stage.querySelector('details[data-phase-dependency-step=\"preconditions:1\"]');",
+    " const second=stage.querySelector('details[data-phase-dependency-step=\"preconditions:2\"]');",
+    " if(!first||!second)return {ok:false,reason:'D4 consumer contract rows unavailable'};",
+    " first.open=true;second.open=true;",
+    " const get=(element,name)=>element.querySelector('[data-binding-key=\"'+name+'\"]');",
+    " const dnn=get(first,'dnn'),udm=get(first,'udmResult');",
+    " const requested=get(first,'requestedPduSessionType');",
+    " const selection=get(second,'selection');",
+    " const matching=dnn?.dataset.consumerStatus==='CONSUMER_FIELD_DECLARED'&&",
+    "   dnn?.dataset.typeRelation==='TYPE_ONLY_MATCH'&&",
+    "   dnn.textContent.includes('schemas/selection-input.schema.yaml')&&",
+    "   dnn.textContent.includes('pattern')&&",
+    "   dnn.textContent.includes('不授权重新绑定');",
+    " const narrowed=requested?.dataset.typeRelation==='TYPE_ONLY_MATCH'&&",
+    "   requested.textContent.includes('const');",
+    " const absentProducer=udm?.dataset.typeRelation==='PRODUCER_TYPE_UNAVAILABLE'&&",
+    "   udm?.dataset.consumerStatus==='CONSUMER_FIELD_DECLARED';",
+    " const absentConsumer=selection?.dataset.consumerStatus==='CONSUMER_ABI_UNAVAILABLE'&&",
+    "   selection?.dataset.typeRelation==='CONSUMER_ABI_UNPROVEN';",
+    " const noWrite=!first.querySelector('input,select,textarea')&&",
+    "   !second.querySelector('input,select,textarea');",
+    " const original=source.value===before,graphStable=document.querySelectorAll('.react-flow__node').length===17;",
+    " return {ok:matching&&narrowed&&absentProducer&&absentConsumer&&noWrite&&original&&graphStable,",
+    "   matching,narrowed,absentProducer,absentConsumer,noWrite,original,graphStable,",
+    "   dnnStatus:dnn?.dataset.typeRelation,udmStatus:udm?.dataset.typeRelation};"
+  ]);
+
   await check(evaluate,"D4_A1_PHASE_INPUT_BINDING",[
     sleepLine,clickLine,
     " const source=document.getElementById('source'),before=source.value;",
