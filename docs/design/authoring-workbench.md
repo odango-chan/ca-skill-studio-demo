@@ -58,3 +58,7 @@ Phase Steps 继续是 Node Inspector 内的有序行，**不是**主业务图中
 ## D4-A2.1 已观察的 Phase 输出引用写法
 
 已有 Step `with.<key>.from` 在本 Procedure Source 中同时出现了局部和自身 Node 全限定的**同一个**先行命名 Step 的输出引用时，Inspector 可以提供两种已观察写法的切换。生产者身份、Step 顺序、输出字段后缀都保持不变。精确 Source Span → Diff → 确认 → Undo/Redo；不支持跨 Node 换生产者、凭字段名猜类型或向未来 Step 取值。**两种写法已出现，不等于 Runtime 确认语义等价。** 完整边界和证据见 [D4 设计](phase-designer.md)。
+
+## D4-A2.2a · 数据依赖审查（只读）
+
+每个带 `with.from` 的 Phase Step 可展开「数据依赖」：展示原始来源、输入/命名 Step/主 Operator 的生产者位置、同 Phase 执行先后及跨 Node 图结构的必经关系，并在本地脚本输出元信息可唯一定位对应 schema 时展示输出字段的**声明类型**。所有项均只读，附源码行定位。来源存在并不等于结果一定可用；声明了输出类型也不等于消费者字段 ABI 匹配。正式跨生产者/字段重绑定仍不开放，详见 [D4 设计](phase-designer.md)。

@@ -1289,3 +1289,21 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 @media(max-width:1180px){
   .compact-toolbar .toolbar-axis-fit{margin-left:0}
 }
+
+
+/* D4-A2.2 authored dataflow provenance: disclosure is read-only and does
+   not create nodes or expose a second source of graph truth. */
+.phase-dependency-review .phase-dependency-item{
+  display:flex;flex-direction:column;align-items:flex-start;
+  gap:5px;padding:9px 10px;margin:6px 0;
+  border:1px solid var(--border, #dce5e9);border-radius:8px;
+  min-width:0;
+}
+.phase-dependency-review .phase-dependency-item strong,
+.phase-dependency-review .phase-dependency-item small{
+  overflow-wrap:anywhere;max-width:100%;
+}
+.phase-dependency-review .phase-dependency-item small{opacity:.78}
+.phase-dependency-review .phase-dependency-item .source-link{
+  margin-top:2px;
+}
