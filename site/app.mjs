@@ -33,6 +33,7 @@ import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding}
 import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from "./phase-output-refs.mjs";
 import {phaseStepDependencyReport} from "./phase-dataflow.mjs";
+import {phaseConsumerContractReport} from "./phase-consumer-contract.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
@@ -1287,7 +1288,7 @@ function addPhaseOutputReferenceEditors(phase,step,container,references){
   return true;
 }
 
-function addPhaseDependencyInspector(phase,step,container,report){
+function addPhaseDependencyInspector(phase,step,container,report,contracts){
   const bindings=report?.status==="READY"?report.bindings.filter(b=>
     b.phaseName===phase.name&&b.stepIndex===step.index-1):[];
   if(!bindings.length)return false;
@@ -1300,10 +1301,15 @@ function addPhaseDependencyInspector(phase,step,container,report){
     "只读 · 按现有 YAML 追溯生产者和执行顺序。生产者可定位不代表输出可用，"+
     "脚本 schema 存在也不代表消费参数兼容；不开放跨生产者改绑。"));
   for(const entry of bindings){
+    const abi=contracts?.status==="READY"?contracts.bindings.find(x=>
+      x.phaseName===entry.phaseName&&x.stepIndex===entry.stepIndex&&
+      x.bindingKey===entry.bindingKey):null;
     const item=el("div","phase-dependency-item");
     item.dataset.bindingKey=entry.bindingKey;
     item.dataset.producerStatus=entry.status;
     item.dataset.contractStatus=entry.contractStatus;
+    item.dataset.consumerStatus=abi?.consumerStatus??"CONSUMER_ABI_UNAVAILABLE";
+    item.dataset.typeRelation=abi?.typeRelation??"CONSUMER_ABI_UNPROVEN";
     item.appendChild(el("strong","",entry.bindingKey+" · "+entry.value));
     item.appendChild(el("small","",
       (entry.producerNodeId?
@@ -1321,6 +1327,25 @@ function addPhaseDependencyInspector(phase,step,container,report){
       item.appendChild(el("small","",
         "输入声明类型："+entry.outputType+"；消费参数 ABI 未验证"));
     }
+    if(abi?.consumerSchema){
+      item.appendChild(el("small","",
+        "消费者输入 schema："+abi.consumerSchema+
+        (abi.consumerType?" · 参数类型 "+abi.consumerType:"")+
+        (abi.consumerRequired===true?" · 必填":"")+
+        (abi.consumerConstraints.length?" · 未核验约束 "+
+          abi.consumerConstraints.join(", "):"")));
+    }else{
+      item.appendChild(el("small","",
+        "消费者 ABI："+(abi?.consumerStatus??"未获得声明")+
+        " · 无法从当前 Package 确认"));
+    }
+    const typeText=abi?.typeRelation==="TYPE_ONLY_MATCH"?
+      "仅声明类型一致，未验证字段约束、值含义及 Runtime 可用性":
+      abi?.typeRelation==="TYPE_MISMATCH"?
+        "生产来源与消费参数声明类型不同":
+        "生产者/消费者类型、执行依赖或 ABI 证据不足";
+    item.appendChild(el("small","phase-contract-verdict",
+      "类型对照："+typeText+"；不授权重新绑定"));
     item.appendChild(button("查看源码 · L"+entry.line,()=>lineJump(entry.line),
       "source-link"));
     body.appendChild(item);
@@ -1329,7 +1354,8 @@ function addPhaseDependencyInspector(phase,step,container,report){
   return true;
 }
 
-function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],lineage=null) {
+function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
+  lineage=null,contracts=null) {
   if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
@@ -1342,7 +1368,7 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],l
     addPhaseVerifyEditor(phase,step,body);
     addPhaseInputBindingEditors(phase,step,body,phaseBindings);
     addPhaseOutputReferenceEditors(phase,step,body,phaseOutputs);
-    addPhaseDependencyInspector(phase,step,body,lineage);
+    addPhaseDependencyInspector(phase,step,body,lineage,contracts);
     const ref=phaseChildren.find(c=>c.via.startsWith(phase.name+".steps[") &&
       c.procedure===step.value && c.line===step.line);
     if(ref)body.appendChild(button("进入子过程 · "+ref.procedure,
@@ -1384,6 +1410,8 @@ function renderNodeJourney(model,caps) {
   // snapshot. This analysis is intentionally read-only.
   const lineage=phaseStepDependencyReport(source.value,
     activeProcedureId,node.id,activePackage?.files);
+  const consumerContracts=phaseConsumerContractReport(source.value,
+    activeProcedureId,node.id,activePackage?.files,lineage);
   addNodeRenameEditor(model,caps.rename);
   addNodeOperatorEditor(model,caps.attributes);
   addNodeBindingEditors(model,caps.attributes);
@@ -1395,7 +1423,7 @@ function renderNodeJourney(model,caps) {
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
       {expanded:false});
     renderPhase(model.prepare.phase,body,model.children,
-      caps.phaseBindings,caps.phaseOutputs,lineage);
+      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1411,7 +1439,7 @@ function renderNodeJourney(model,caps) {
       model.confirm.phase?.steps.length ? model.confirm.phase.steps.length+" steps" : "",
       {expanded:false});
     renderPhase(model.confirm.phase,body,model.children,
-      caps.phaseBindings,caps.phaseOutputs,lineage);
+      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});

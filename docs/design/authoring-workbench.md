@@ -63,6 +63,10 @@ Phase Steps 继续是 Node Inspector 内的有序行，**不是**主业务图中
 
 每个带 `with.from` 的 Phase Step 可展开「数据依赖」：展示原始来源、输入/命名 Step/主 Operator 的生产者位置、同 Phase 执行先后及跨 Node 图结构的必经关系，并在本地脚本输出元信息可唯一定位对应 schema 时展示输出字段的**声明类型**。所有项均只读，附源码行定位。来源存在并不等于结果一定可用；声明了输出类型也不等于消费者字段 ABI 匹配。正式跨生产者/字段重绑定仍不开放，详见 [D4 设计](phase-designer.md)。
 
+## D4-A2.2b1 · 消费者 ABI 与生产者声明类型对照（只读）
+
+在现有 Phase Step「数据依赖」展开项中，若消费者是带 `# inputSchema` 的 Package 内本地脚本，展示对应的消费参数声明 Schema、字段类型、是否必填以及尚未验证的 `const`/`pattern` 等约束。同一行与 D4-A2.2a 已解析的上游输入或脚本输出类型对照，明确标记**仅声明类型一致**、**类型不符**、**生产者类型缺失**或**消费者 ABI 缺失**。这是诊断信息，不是候选来源列表，也不授权改写 YAML；`call` 没有已映射 ABI 时保持未知。下一阶段跨生产者编辑必须先取得真实 owner 契约与 Runtime 引用语义，详见 [D4 设计](phase-designer.md)。
+
 ## `establish-pdu-session` 示例同步 · 可选 Reference 文件
 
 示例的最新 owner 基线为 [ca-agent-demo@7570b309](https://github.com/odango-chan/ca-agent-demo/tree/7570b309a998580a6952352e2bf4b1c19e5c710d/skills/establish-pdu-session)。
