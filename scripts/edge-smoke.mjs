@@ -215,13 +215,20 @@ try{
     "  active:document.activeElement?.outerHTML.slice(0,200)};",
     "})()"
   ].join("\n"));
-  if(!focused?.focused||!focused?.visible)
-    throw Error("E1 Monaco keyboard focus FAIL: "+JSON.stringify(focused));
-  await command("Input.insertText",{text:"# E1 Monaco keyboard input\n"});
-  await sleep(180);
+  if(!focused?.visible)
+    throw Error("E1 Monaco Source surface hidden: "+JSON.stringify(focused));
+  // Trusted CDP click activates Monaco's own input controller, unlike DOM focus.
+  const pos=await evaluate("(()=>{const r=document.getElementById('monacoHost').getBoundingClientRect();return {x:r.x+120,y:r.y+60,width:r.width,height:r.height}})()");
+  if(pos.width<200||pos.height<120)throw Error("Monaco canvas has no editable bounds");
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:pos.x,y:pos.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:pos.x,y:pos.y,button:"left",clickCount:1});
+  await command("Input.insertText",{text:"# E1 Monaco keyboard input\\n"});
+  await sleep(250);
   const typedSource=await evaluate("document.getElementById('source').value");
-  if(typedSource===initialSource||!typedSource.includes("# E1 Monaco keyboard input"))
-    throw Error("E1 Monaco typing did not reach shared Source buffer");
+  if(typedSource===initialSource||!typedSource.includes("# E1 Monaco keyboard input")){
+    const debug=await evaluate("(()=>{const h=document.getElementById('monacoHost');return {active:document.activeElement?.outerHTML.slice(0,240),hostContains:h.contains(document.activeElement),mirror:document.getElementById('source').value.slice(0,100),rendered:h.querySelector('.view-lines')?.textContent?.slice(0,160)}})()");
+    throw Error("E1 Monaco typing did not reach shared Source buffer: "+JSON.stringify(debug));
+  }
   await evaluate("document.getElementById('undoButton').click()");
   await sleep(120);
   const undone=await evaluate("document.getElementById('source').value");
