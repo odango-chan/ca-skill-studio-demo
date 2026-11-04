@@ -1,7 +1,7 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1 Accepted; A3a bounded Verify swap Accepted; A2.2b2/A3b/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a merged; A2.2b1 implemented in PR #19; A2.2b2/A3/A4 NOT_STARTED**  
+**Status: A1/A2.1/A2.2a/A2.2b1 Accepted; A3a bounded Verify swap Accepted; A3b1 bounded Verify add/delete Accepted; A2.2b2/A3b2/A4 Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a merged; A3b1 implemented in PR #30; A2.2b2/A3b2/A4 NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
@@ -19,7 +19,8 @@ Only authored Procedure business Nodes belong to the React Flow main graph. `pre
 | D4-A2.2b1 | Read-only type-evidence comparison: Procedure input/script output declaration × uniquely resolved local script `inputSchema` field | Type equality is **not** compatibility; consumer refinements, call ABIs, Runtime value existence and cross-producer mutation remain unproven |
 | D4-A2.2b2 | Actual cross-producer/field rebind and Step metadata | Requires owner-validated output shape, field/refinement subsumption, consumer ABI, producer availability and versioned Runtime reference semantics; no inferred links |
 | D4-A3a | Swap two physically adjacent, unnamed, single-line verify Steps without bindings, comments or output names | No call/script/procedure reordering, named producer, parameter, comment movement, cross-Phase change, new/deleted Step or Runtime ordering claims |
-| D4-A3b | General Step creation, removal or reordering | Requires dependency impact analysis for named Steps and all output references, no graph-node inflation |
+| D4-A3b1 | Append a PredicateSet-declared unnamed/unbound plain Verify to an existing Phase or delete one eligible plain Verify | Never remove the only Step, duplicate a Verify, move comments, delete named/bound producers, create a Phase, or claim runtime equivalence |
+| D4-A3b2 | General Step creation, removal or reordering with named outputs and bindings | Requires dependency impact analysis for named Steps and all output references, no graph-node inflation |
 | D4-A4 | Phase-specific `on` Route authoring | Must separate `preconditions.on` / `postconditions.on` from `operator.on` and use owner Outcome eligibility |
 
 D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, number, boolean, object, array) to build a **conservative editor-only choice set**. This does not mean that a same-type input is semantically appropriate for a specific Tool/Script/Verify consumer. No Runtime qualification is inferred.
@@ -40,7 +41,7 @@ D4-A1 reads the Procedure's authored `inputs.<key>.type` (string, integer, numbe
 - Browser: expand owning Node's 准备 Step, select qualified input, Diff/cancel/Apply/Undo/Redo and verify main graph's Node count unchanged.
 - Gates: unit/negative tests, TypeScript typecheck, build and real Chromium browser interactions. No Runtime/5GC operation or qualification will run.
 
-A2.2b2/A3b/A4 remain NOT_STARTED; A3a is limited to editor-only independent Verify reorder, not full A3 Step structural authoring or Runtime qualification.
+A2.2b2/A3b2/A4 remain NOT_STARTED; A3a and A3b1 are strictly bounded editor-tier Verify edits, not generalized Step authoring or Runtime qualification.
 
 ## A1 actual acceptance
 
@@ -80,3 +81,19 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 - 这是编辑期结构操作；即使两个 Verify 没有数据依赖，也不证明它们的失败短路语义、观测顺序或 Runtime 效果等价。A3b 的新增、删除和更通用的安全重排需单独建立引用影响判定。
 
 首轮 [CI #41770964460](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41770964460)：264/264 单测、TypeScript、Build、Chromium 均 PASS。浏览器确认只有一个可交换入口、Diff、取消、应用、Undo/Redo、原文恢复。最终文档提交与 Pages 部署仍需单独验证；Runtime/5GC NOT_RUN。
+
+## D4-A3b1 · 受限 Verify Step 新增与删除（PR #30，编辑器级验收通过）
+
+新增只允许在已存在的 Phase.steps 序列末尾插入一个单行、未命名、无 with 的 Verify。必须通过当前 Package 的 PredicateSet（kind、metadata.skill 与声明名均匹配）限定候选，当前 Phase 不得已有同一 Verify。只能采用原 YAML 最后一个纯标量 Step 的原始缩进和换行风格；存在注释/空行、尾部嵌套字段、非安全边界、空 Step 序列或达到 80 Step 上限时拒绝。
+
+删除只允许当前序列中唯一出现、未命名、没有参数绑定和多余字段的单行纯标量 Verify；删除后必须保留至少一个 Step。避免绑定的 Verify、脚本、call、带名字的生产 Step、带注释/引号/alias/anchor 的复杂源段及重复声明，拒绝其可视删除资格。
+
+所有变更只作用于原 Source 的精确完整行插入/删除；随后必须重投影并比较完整 Procedure/Node/Phase/Step/Child/Route 语义签名，差异只能是所选 Step 的出现或消失。Inspector 只展示已证明可编辑的入口，新增控件默认折叠；所有操作必须显示包含业务门禁变化警告的 Source Diff，经确认后才进入历史栈；Apply 重算并检测整个源文件和新增时 PredicateSet 的 revision、预览对象抗篡改，支持 Undo/Redo。
+
+**编辑资格不等于业务或 Runtime 资格**：新增/删除 Verify 会改变流程判定条件、故障短路和执行时序。Studio 不会声称能证明该编辑符合 3GPP 或 Runtime/5GC 的业务要求；真实 E2E 仍为 NOT_RUN。后续 A3b2 才扩展到命名输出、带绑定的 Step 以及引用依赖感知的通用增删改序。
+
+### A3b1 验收证据
+
+[PR #30 CI #41777788675](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41777788675) 验证 272/272 单元测试 PASS、TypeScript PASS、Build PASS 和真实 Chromium PASS；浏览器分别检查新增与删除 Verify 的资格门槛、Diff、取消、应用、Undo/Redo、Source 精确恢复，并证明带绑定的 Step 不显示误删入口。首次单测发现重复 Verify 删除资格的边界遗漏，已补充拒绝规则并复验成功。最终证据不代表 Runtime/5GC E2E。
+
+[PR #30 文档集成验收 CI #41778044582](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41778044582) 亦通过单元测试、类型检查、构建和真实 Chromium；Pages 部署需按合并后的精确主分支结果单独确认。

@@ -86,3 +86,7 @@ Studio 本身**不是** Agent Host 的 `read_reference`，不会替模型自行�
 ## D4-A3a · 最小 Phase Step 顺序编辑（编辑器级验收通过）
 
 Inspector 在 Source 能证明是两个紧邻、未命名、单行、无 Binding 的 Verify 时，在前一个 Step 行显示「下移」。操作复用现有 Source Diff、确认和 Undo/Redo；复杂 Step 不出现可点击按钮。此项不创建流程主画布 Node，也不代表 Runtime 验证顺序无关。详见 [Phase Designer](phase-designer.md)。
+
+## D4-A3b1 · Verify Step 受限增删（编辑器级验收通过）
+
+在选中 Node 的「准备 / 确认」Inspector 中，符合条件的单行 Verify 提供「删除」入口；若 Phase 存在可证明的安全末尾插入点，则展开「新增 Verify」后从当前 Package PredicateSet 选一个尚未出现在该 Phase 的 Predicate。所有操作必须先看 YAML Diff，再显式确认并支持撤销/重做。Complex/named/bound/commented Step 保持 Source-only。新增或删除会改变业务门禁，本编辑器不承担 Runtime 合法性判定。参见 [Phase Designer](phase-designer.md)。

@@ -34,6 +34,10 @@ import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from "./phase-output-refs.mjs";
 import {phaseStepDependencyReport} from "./phase-dataflow.mjs";
 import {phaseConsumerContractReport} from "./phase-consumer-contract.mjs";
+import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
+  previewAddPhaseVerify,applyAddPhaseVerify,
+  previewDeletePhaseVerify,applyDeletePhaseVerify}
+  from "./phase-step-structural.mjs";
 import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
   applyAdjacentVerifyReorder} from "./phase-step-order.mjs";
 import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePatch,
@@ -1356,8 +1360,40 @@ function addPhaseDependencyInspector(phase,step,container,report,contracts){
   return true;
 }
 
+function addPhaseVerifyCreation(phase,container,addOptions){
+  const option=addOptions.find(item=>item.phaseName===phase.name);
+  if(!option||activePackage?.name!=="establish-pdu-session"||
+     activeFilePath!=="assurance/procedure.yaml"||
+     selection?.kind!=="node")return;
+  const disclosure=el("details","step-enum phase-step-create");
+  disclosure.dataset.phaseCreate=phase.name;
+  disclosure.appendChild(el("summary","","新增 Verify · D4-A3b1"));
+  const controls=el("div","step-enum-controls");
+  controls.appendChild(el("p","small-edit-note",
+    "仅在已有 Steps 末尾新增无参数 Verify；会改变业务门禁。"+
+    "必须在 Diff 中明确确认；未验证 Runtime 行为。"));
+  const selector=el("select","target-select");
+  selector.setAttribute("aria-label","选择新增 "+phase.name+" Verify");
+  const blank=el("option","","选择已声明的 Predicate");
+  blank.value="";selector.appendChild(blank);
+  for(const name of option.choices){
+    const opt=el("option","",name);opt.value=name;selector.appendChild(opt);
+  }
+  selector.value="";
+  const preview=button("预览新增 Verify",()=>{
+    try{
+      showPreview(previewAddPhaseVerify(source.value,activeProcedureId,
+        selection.id,phase.name,selector.value,packagePredicateSource(),
+        activePackage.name));
+    }catch(error){message("Verify 新增未应用："+String(error?.message??error));}
+  },"preview-button");
+  preview.disabled=true;
+  selector.addEventListener("change",()=>{preview.disabled=!selector.value;});
+  controls.append(selector,preview);
+  disclosure.append(controls);container.appendChild(disclosure);
+}
 function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
-  lineage=null,contracts=null,reorderOptions=[]) {
+  lineage=null,contracts=null,reorderOptions=[],addOptions=[],removeOptions=[]) {
   if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
@@ -1379,6 +1415,20 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
       move.dataset.phaseReorderStep=phase.name+":"+step.index;
       item.appendChild(move);
     }
+    const removable=removeOptions.some(x=>x.phaseName===phase.name&&
+      x.stepIndex===step.index-1);
+    if(removable&&activePackage?.name==="establish-pdu-session"&&
+       activeFilePath==="assurance/procedure.yaml"){
+      const remove=button("删除",()=>{
+        try{
+          showPreview(previewDeletePhaseVerify(source.value,
+            activeProcedureId,selection.id,phase.name,step.index-1));
+        }catch(error){message("Verify 删除未应用："+String(error?.message??error));}
+      },"source-link");
+      remove.setAttribute("aria-label","预览删除 "+phase.name+" Step "+step.index);
+      remove.dataset.phaseDeleteStep=phase.name+":"+step.index;
+      item.appendChild(remove);
+    }
     body.appendChild(item);
     addPhaseVerifyEditor(phase,step,body);
     addPhaseInputBindingEditors(phase,step,body,phaseBindings);
@@ -1389,7 +1439,7 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
     if(ref)body.appendChild(button("进入子过程 · "+ref.procedure,
       ()=>enterProcedure(ref.procedure),"journey-child"));
   }
-
+  addPhaseVerifyCreation(phase,body,addOptions);
 }
 function routeFriendlySource(routeSource){
   return routeSource==="preconditions.on"?"准备阶段"
@@ -1413,7 +1463,9 @@ function nodeEditorCapabilities(nodeId){
     newRoute:addRouteOutcomeOptions(text,activeProcedureId,nodeId),
     phaseBindings:phaseStepBindingOptions(text,activeProcedureId,nodeId),
     phaseOutputs:phaseOutputReferenceOptions(text,activeProcedureId,nodeId),
-    phaseOrder:adjacentVerifyReorderOptions(text,activeProcedureId,nodeId)
+    phaseOrder:adjacentVerifyReorderOptions(text,activeProcedureId,nodeId),
+    phaseAdd:phaseVerifyAddOptions(text,activeProcedureId,nodeId,ps,skill),
+    phaseDelete:phaseVerifyDeleteOptions(text,activeProcedureId,nodeId)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1439,7 +1491,8 @@ function renderNodeJourney(model,caps) {
       model.prepare.phase?.steps.length ? model.prepare.phase.steps.length+" steps" : "",
       {expanded:false});
     renderPhase(model.prepare.phase,body,model.children,
-      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,caps.phaseOrder);
+      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
+      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1455,7 +1508,8 @@ function renderNodeJourney(model,caps) {
       model.confirm.phase?.steps.length ? model.confirm.phase.steps.length+" steps" : "",
       {expanded:false});
     renderPhase(model.confirm.phase,body,model.children,
-      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,caps.phaseOrder);
+      caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
+      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
@@ -1505,6 +1559,7 @@ function renderInspector() {
     Boolean(model&&((caps.attributes?.operator||caps.attributes?.bindings?.length)||
       caps.deletion||caps.rename||caps.verify.length||caps.newRoute||
       caps.phaseBindings?.length||caps.phaseOutputs?.length||caps.phaseOrder?.length||
+      caps.phaseAdd?.length||caps.phaseDelete?.length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -1726,6 +1781,10 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyPhaseOutputReference(source.value,pendingPatch);
     else if(pendingPatch.type==="SwapAdjacentPhaseVerifySteps")
       nextSource=applyAdjacentVerifyReorder(source.value,pendingPatch);
+    else if(pendingPatch.type==="AddPhaseVerifyStep")
+      nextSource=applyAddPhaseVerify(source.value,pendingPatch,packagePredicateSource());
+    else if(pendingPatch.type==="DeletePhaseVerifyStep")
+      nextSource=applyDeletePhaseVerify(source.value,pendingPatch);
     else if(pendingPatch.type==="SetCreatedRouteTarget")
       nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
     else if(pendingPatch.type==="RenameNode")
