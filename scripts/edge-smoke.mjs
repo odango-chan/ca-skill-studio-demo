@@ -88,7 +88,7 @@ try{
     " for(let i=0;i<130;i++){",
     "  if(document.querySelectorAll('.react-flow__node').length===17 &&",
     "    document.querySelectorAll('.react-flow__edge-path').length===48 &&",
-    "    document.querySelectorAll('.react-flow__handle[data-handleid^=\\\"edge-\\\"]').length===96 &&",
+    "    document.querySelectorAll('.react-flow__handle[data-handleid^=edge-]').length===96 &&",
     "    document.getElementById('layoutStatus')?.textContent!=='正在自动布局…')break;",
     "  await sleep(100);",
     " }",
