@@ -794,7 +794,7 @@ export async function runD1Interactions(evaluate,command){
 
   await check(evaluate,"D3_A1_ADD_OUTCOME",[
     sleepLine,clickLine,
-    " const legacy=await (await fetch('./samples/ensure-pdu-session.procedure.yaml',{cache:'no-cache'})).text();",
+    " const legacy=await (await fetch('/__test__/ensure-procedure.yaml',{cache:'no-cache'})).text();",
     " const dt=new DataTransfer();dt.items.add(new File([legacy],'legacy.procedure.yaml',{type:'text/yaml'}));",
     " const picker=document.getElementById('filePicker');picker.files=dt.files;",
     " picker.dispatchEvent(new Event('change',{bubbles:true}));",

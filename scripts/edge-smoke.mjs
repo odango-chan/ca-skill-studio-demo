@@ -11,11 +11,17 @@ const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
 if(!chrome)throw Error("Chrome unavailable for browser smoke");
 const dist=resolve("dist");
+for(const legacy of ["samples/packages/ensure-pdu-session","samples/ensure-pdu-session.procedure.yaml"]){
+  if(existsSync(resolve(dist,legacy)))throw Error("Legacy Ensure asset leaked into Pages dist: "+legacy);
+}
 const types={".html":"text/html",".css":"text/css",".js":"text/javascript",".yaml":"text/yaml",".md":"text/markdown",".json":"application/json"};
 const server=createServer((req,res)=>{
   const path=decodeURIComponent(new URL(req.url,"http://localhost").pathname);
-  const file=resolve(dist,"."+path.replace(/\/$/,"/index.html"));
-  if(file!==dist&&!file.startsWith(dist+sep)){res.writeHead(403).end();return;}
+  // Legacy Ensure YAML stays in source only, served exclusively by this local test server.
+  const testFixture=path==="/__test__/ensure-procedure.yaml";
+  const file=testFixture ? resolve("site/samples/ensure-pdu-session.procedure.yaml")
+    : resolve(dist,"."+path.replace(/\/$/,"/index.html"));
+  if(!testFixture&&file!==dist&&!file.startsWith(dist+sep)){res.writeHead(403).end();return;}
   const stream=createReadStream(file);
   stream.on("error",()=>res.writeHead(404).end());
   stream.on("open",()=>{

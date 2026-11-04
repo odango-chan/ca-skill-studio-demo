@@ -69,7 +69,7 @@ Phase Steps 继续是 Node Inspector 内的有序行，**不是**主业务图中
 Studio 唯一可选的 `establish-pdu-session` Package 只同步实际运行时相关材料（16 个文件），保留原始目录路径：更新的 `SKILL.md`、
 `references/3gpp-procedure.md`、`references/session-selection.md`、`references/failure-handling.md`；
 `assurance/`、`schemas/`、`scripts/` 内容与 owner 当前版本 SHA 一致，因此没有修改。
-示例不复制验证 Case 或内部设计记录。Studio 启动直接加载 `establish-pdu-session`；Explorer 的 `references/` 默认展开。旧 Ensure Package 不再向用户提供；单独保存的旧 Procedure YAML 仅供 D3 回归。
+示例不复制验证 Case 或内部设计记录。Studio 启动直接加载 `establish-pdu-session`；Explorer 的 `references/` 默认展开。旧 Ensure Package 仅在源码中保留为回归测试夹具，不在选择器或 Pages 构建产物中；独立旧 Procedure YAML 由本地浏览器测试服务按需提供。
 
 Explorer 内 `references/` 目录可展开，三个 `.md` 文件使用现有安全 Markdown Visual / Source / Split，
 修改仅作用于当前文件的内存工作副本，Undo/Redo 独立保留；导出 Package ZIP 时文件路径与内容原样保存。

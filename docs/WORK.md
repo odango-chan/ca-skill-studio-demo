@@ -29,7 +29,7 @@
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
 
-唯一公开示例名称与 owner 的 SKILL 目录 `establish-pdu-session` 完全一致；Ensure Package 已从选择器、清单和发布资源中移除。旧 `site/samples/ensure-pdu-session.procedure.yaml` 仅为 D3 浏览器回归夹具，不是可选择的 Package。`references/` 在 Explorer 默认展开。本分支 CI/浏览器验证尚待完成，不将该变更标记为已验收。
+唯一公开示例名称与 owner 的 SKILL 目录 `establish-pdu-session` 完全一致；Ensure Package 已从选择器、清单和发布资源中移除。旧 Ensure Package 原文与独立 Procedure YAML 仅保留在源码中给单测/浏览器回归使用，发布到 Pages 的 `dist/` 仅包含 `establish-pdu-session` Package。`references/` 在 Explorer 默认展开。本分支 CI/浏览器验证尚待完成，不将该变更标记为已验收。
 
 ## Current open work
 
