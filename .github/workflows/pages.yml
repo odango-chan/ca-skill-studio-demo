@@ -84,6 +84,7 @@ jobs:
           node --check site/phase-consumer-contract.mjs
           node --check site/phase-step-order.mjs
           node --check site/phase-step-structural.mjs
+          node --check site/phase-step-rename.mjs
           node --check site/patch.mjs
           node --check site/semantic.mjs
           node --check site/workspace.mjs
@@ -119,6 +120,7 @@ jobs:
           node --check tests/phase-consumer-contract.test.mjs
           node --check tests/phase-step-order.test.mjs
           node --check tests/phase-step-structural.test.mjs
+          node --check tests/phase-step-rename.test.mjs
           node --check tests/graph.test.mjs
           node --check tests/patch.test.mjs
           node --check tests/workspace.test.mjs
