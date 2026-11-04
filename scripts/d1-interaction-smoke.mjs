@@ -1038,4 +1038,68 @@ export async function runD1Interactions(evaluate,command){
   "   proposed,enabled,diffShown,canceled,applied,undone,redone,noGhost};"
 ]);
 
+
+  // Actual browser acceptance for the refreshed owner SKILL Package:
+  // nested references/ folder, three Markdown Visual documents, Source
+  // edits/Undo/Redo, then return to the original Procedure graph.
+  await check(evaluate,"ESTABLISH_REFERENCES_TREE_AND_MARKDOWN",[
+    sleepLine,clickLine,
+    " const source=document.getElementById('source');",
+    " if(document.querySelector('#assetTree .asset-file.active')?.getAttribute('aria-label')==='assurance/procedure.yaml'&&",
+    "   document.getElementById('fileStatus')?.classList.contains('is-dirty')){",
+    "   click(document.getElementById('undoButton'));await sleep(200);",
+    " }",
+    " click(document.getElementById('establishSampleButton'));",
+    " for(let i=0;i<100;i++){",
+    "  if(document.getElementById('fileCount')?.textContent.includes('16 文件')&&",
+    "    document.querySelectorAll('.react-flow__node').length===17)break;",
+    "  await sleep(90);",
+    " }",
+    " const manifest=document.getElementById('fileCount')?.textContent.includes('16 文件');",
+    " const heading=document.querySelector('#assetTree summary.asset-folder-title[title=\"references/\"]');",
+    " if(!heading)return {ok:false,reason:'references folder missing',manifest};",
+    " const folder=heading.closest('details');folder.open=true;await sleep(85);",
+    " const files=[",
+    "  ['references/3gpp-procedure.md','PDU Session Establishment: actors and causal boundaries'],",
+    "  ['references/session-selection.md','Session selection: request, subscription and effective state'],",
+    "  ['references/failure-handling.md','Failure, uncertainty and resource-obligation meaning']",
+    " ];",
+    " const results=[];",
+    " for(const [path,title] of files){",
+    "  const btn=[...document.querySelectorAll('#assetTree button.asset-file')].find(x=>",
+    "    x.getAttribute('aria-label')===path);",
+    "  if(!btn)return {ok:false,reason:'Missing reference file',path};",
+    "  click(btn);await sleep(140);click(document.getElementById('mode-visual'));await sleep(80);",
+    "  const content=source.value;",
+    "  const preview=document.querySelector('#markdownPreview h1')?.textContent;",
+    "  const available=document.getElementById('markdownPane')?.hidden===false;",
+    "  const active=document.querySelector('#assetTree button.asset-file.active')?.getAttribute('aria-label')===path;",
+    "  results.push({path,ok:active&&available&&content.startsWith('# '+title)&&preview===title});",
+    " }",
+    " const editButton=[...document.querySelectorAll('#assetTree button.asset-file')].find(x=>",
+    "    x.getAttribute('aria-label')==='references/session-selection.md');",
+    " click(editButton);await sleep(100);",
+    " const original=source.value,edited=original+'\\n<!-- Reference smoke only -->\\n';",
+    " source.value=edited;source.dispatchEvent(new Event('input',{bubbles:true}));await sleep(140);",
+    " const editTracked=source.value===edited&&document.getElementById('fileStatus')?.classList.contains('is-dirty');",
+    " click(document.getElementById('undoButton'));await sleep(140);",
+    " const undone=source.value===original;",
+    " click(document.getElementById('redoButton'));await sleep(140);",
+    " const redone=source.value===edited;",
+    " click(document.getElementById('undoButton'));await sleep(130);",
+    " const restored=source.value===original;",
+    " const back=[...document.querySelectorAll('#assetTree button.asset-file')].find(x=>",
+    "   x.getAttribute('aria-label')==='assurance/procedure.yaml');",
+    " click(back);",
+    " for(let i=0;i<80;i++){",
+    "  if(document.querySelectorAll('.react-flow__node').length===17)break;",
+    "  await sleep(90);",
+    " }",
+    " const graphRestored=document.querySelectorAll('.react-flow__node').length===17&&",
+    "   document.getElementById('projectionState')?.textContent.includes('就绪');",
+    " const ok=manifest&&results.length===3&&results.every(x=>x.ok)&&",
+    "   editTracked&&undone&&redone&&restored&&graphRestored;",
+    " return {ok,manifest,results,editTracked,undone,redone,restored,graphRestored};"
+  ]);
+
 }
