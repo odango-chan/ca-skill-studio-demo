@@ -352,6 +352,9 @@ try{
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
     " const host=document.getElementById('monacoHost');",
     " const source=document.getElementById('source');",
+    " const file=path=>[...document.querySelectorAll('#assetTree button.asset-file')]",
+    "  .find(el=>el.getAttribute('aria-label')===path);",
+    " file('assurance/contract.yaml')?.click();await sleep(900);",
     " document.getElementById('mode-source')?.click();",
     " const skeleton=['apiVersion: connectionagent.io/v1alpha1','kind: SkillContract',",
     "  'metadata:','  name: sample','spec:','  '].join('\\n');",
@@ -361,10 +364,11 @@ try{
     " const spec=rows.find(el=>el.textContent.trim()==='spec:');",
     " const rect=host.getBoundingClientRect(),line=spec?.getBoundingClientRect();",
     " return {x:rect.x+95,y:line?line.y+line.height+4:rect.y+130,",
+    "  policy:host.dataset.yamlSchemaCapability,",
     "  width:rect.width,height:rect.height,found:!!spec};",
     "})()"
   ].join("\n"));
-  if(!completionSetup?.found||completionSetup.width<200||completionSetup.height<120)
+  if(!completionSetup?.found||completionSetup.policy!=="owner-schema-v1alpha1"||completionSetup.width<200||completionSetup.height<120)
     throw Error("E2 completion editor position unavailable: "+JSON.stringify(completionSetup));
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:completionSetup.x,y:completionSetup.y,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:completionSetup.x,y:completionSetup.y,button:"left",clickCount:1});
