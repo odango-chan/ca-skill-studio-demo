@@ -43,7 +43,7 @@ The occurrence carries the requested DNN, S-NSSAI, PDU Session Type and SSC mode
 with the exact PDU Session ID and PTI. Missing, stale, ambiguous or cross-occurrence
 information is not a usable default.
 
-Preserve the exact SSC mode list returned in `allowedSscModes`; do not truncate or deduplicate it during evaluation or selection. Open5GS may include the default in a three-mode list, while a standards-shaped subscription may list only additional modes. The default mode remains permitted even when it is absent from `allowedSscModes`. The supported request profile still requires SSC mode 1 and must prove that mode 1 is permitted by either the default or the additional-mode list.
+Establish that the requested SSC mode 1 is permitted by the current subscription. Do not treat `allowedSscModes` as a replacement for the subscription default or silently rewrite the returned list. Read `references/session-selection.md` only if more detail is needed.
 
 ## Business progression
 
@@ -61,6 +61,27 @@ Keep the procedure recognizable as UE-requested PDU Session Establishment:
 
 This is business guidance, not a replacement execution graph. The model chooses the next
 business decision from the current Decision Context and Available Actions.
+
+## Optional business references
+
+You may decide whether more domain knowledge would help the current business
+decision. Read only a relevant file using the Host-provided read-only
+`read_reference` tool, if available; none is required at Skill activation:
+
+- `references/3gpp-procedure.md` — 3GPP actors, message responsibilities and
+  the distinction between initiating a transfer and network convergence.
+- `references/session-selection.md` — DNN, S-NSSAI, PDU Session Type, SSC mode,
+  subscription defaults and effective configuration decisions.
+- `references/failure-handling.md` — business rejection, missing evidence,
+  asynchronous waits, mutation uncertainty and resource responsibility.
+
+These references supplement this guide, but are not live evidence, business
+actions, a second execution graph or an alternative authority. Reference reads
+are knowledge-tool interactions **within** a decision, not an `ACT` or
+`OBSERVE` business response. Proceed without reading anything when the
+current guidance and Decision Context suffice. Do not browse the Skill tree or
+guess other paths; if a read is unavailable, never invent its contents or
+bypass safety constraints.
 
 ## Configuration layers
 
@@ -141,27 +162,11 @@ The Skill may:
 Do not drive the Skill from what a temporary SMF happens to request, from what a waiter
 expects to receive, or from a side effect merely being attempted.
 
-## Reference types
+## Opaque context ownership
 
-Two Provider reads produce different opaque handles and must not be substituted for
-each other:
-
-- `ca.session.operation_context.read` returns an operation-context `contextRef`. Use
-  it only for its matching purpose (`nas-and-n2-delivery` for N1/N2 delivery and
-  downstream waits). `purpose=policy-create` never returns `AVAILABLE`.
-- `ca.session.pcf_create_inputs.read` returns `pcfCreateInputsRef`. It is a
-  five-second PCF-create input-readiness handle and never represents operation
-  context, association ownership, creation, sender reservation or callback
-  ownership.
-
-UDM Subscribe obtains DNN/S-NSSAI through the PCF inputs read plus the governed
-selection, with an exact lifecycle/invocation binding, a required match between
-the Provider-bound `ingressRef` and the dispatch `ingressRef`, and a locally
-recomputed selection-digest comparison. Digest equality means both sides
-normalised the same DNN/S-NSSAI/PDU-Session-Type/SSC selection; it does not mean
-the Provider independently verified all five fields, because its SMF-builder
-comparison covers DNN, SST and SD. The initial N4 wait joins on the exact
-`currentSessionInstanceRef` session-instance value, not on either handle.
+Provider input, operation and evidence handles are grounded by the Host/Harness,
+not selected or compared by the model. An available input read does not prove
+creation authorization, resource ownership or downstream convergence.
 
 ## Unsafe inferences
 
