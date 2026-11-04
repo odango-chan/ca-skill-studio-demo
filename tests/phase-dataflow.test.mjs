@@ -43,7 +43,7 @@ test("D4-A2.2 detects an own Node main output before/after execution",()=>{
   const earlier=dep("nudm-sdm-get").bindings.find(x=>x.bindingKey==="udmReadReceipt");
   assert.ok(earlier);
   assert.equal(earlier.status,"OWN_OPERATOR_PRIOR");
-  const changed=fixture.replace("from: input.dnn\n","from: nudm-sdm-subscribe.output.result\n");
+  const changed=fixture.replace("                  from: input.dnn\n","                  from: nudm-sdm-subscribe.output.result\n");
   const future=dep("nudm-sdm-subscribe",changed).bindings.find(x=>
     x.stepIndex===0&&x.bindingKey==="dnn");
   assert.equal(future.status,"FUTURE_OWN_OPERATOR");
@@ -106,7 +106,7 @@ test("D4-A2.2 report is Source read-only, and unavailable/quoted values are expl
     "nudm-sdm-subscribe").status,"UNAVAILABLE");
 });
 test("D4-A2.2 distinguishes missing input and missing Node; never authorizes producer swap",()=>{
-  const changed=fixture.replace("from: input.dnn\n","from: input.no-such-input\n");
+  const changed=fixture.replace("                  from: input.dnn\n","                  from: input.no-such-input\n");
   const missing=dep("nudm-sdm-subscribe",changed).bindings.find(x=>
     x.stepIndex===0&&x.bindingKey==="dnn");
   assert.equal(missing.status,"INPUT_NOT_DECLARED");
