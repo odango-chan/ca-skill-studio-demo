@@ -129,6 +129,10 @@ function ProcedureScene({scene,callbacks,onReady}){
     edgesReconnectable={true}
     elementsSelectable={true}
     deleteKeyCode={null}
+    // Space belongs to the focused Monaco/YAML/Python/Markdown editor.
+    // React Flow's default Space pan hotkey listens globally and steals typing.
+    // Mouse drag panning remains enabled via panOnDrag below.
+    panActivationKeyCode={null}
     selectNodesOnDrag={false}
     panOnDrag
     zoomOnScroll zoomOnPinch zoomOnDoubleClick

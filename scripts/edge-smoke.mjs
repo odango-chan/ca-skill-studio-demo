@@ -232,6 +232,30 @@ try{
   if(pos.width<200||pos.height<120)throw Error("Monaco canvas has no editable bounds");
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:pos.x,y:pos.y,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:pos.x,y:pos.y,button:"left",clickCount:1});
+
+  // Regression: React Flow panActivationKeyCode defaults to Space and can
+  // prevent a REAL physical Space key from reaching Monaco on this same page.
+  // Input.insertText alone cannot detect that keydown interception.
+  await command("Input.dispatchKeyEvent",{type:"keyDown",key:" ",code:"Space",
+    windowsVirtualKeyCode:32,nativeVirtualKeyCode:32,text:" ",unmodifiedText:" "});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:" ",code:"Space",
+    windowsVirtualKeyCode:32,nativeVirtualKeyCode:32});
+  await sleep(200);
+  const spaceSource=await evaluate("document.getElementById('source').value");
+  const spaceInserted=spaceSource.length===initialSource.length+1 &&
+    [...spaceSource].some((char,i)=>char===" "&&
+      spaceSource.slice(0,i)===initialSource.slice(0,i)&&
+      spaceSource.slice(i+1)===initialSource.slice(i));
+  console.log("E1_MONACO_PHYSICAL_SPACE",JSON.stringify({
+    inserted:spaceInserted,sourceLengthBefore:initialSource.length,
+    sourceLengthAfter:spaceSource.length
+  }));
+  if(!spaceInserted)throw Error("Physical Space key was stolen before reaching Monaco");
+  await evaluate("document.getElementById('undoButton').click()");
+  await sleep(100);
+  if(await evaluate("document.getElementById('source').value")!==initialSource)
+    throw Error("Physical Space key did not participate in shared Source Undo");
+  
   await command("Input.insertText",{text:"E1_MONACO_INPUT"});
   await sleep(250);
   const typedSource=await evaluate("document.getElementById('source').value");
