@@ -34,6 +34,18 @@ export function createTextareaSourceBackend(textarea) {
       return () => textarea.removeEventListener("scroll", handler);
     },
     focus() { textarea.focus(); },
+    revealLine(line) {
+      if(!Number.isSafeInteger(line)||line<1)return;
+      const lines=textarea.value.split("\n");
+      const before=lines.slice(0,line-1);
+      const index=before.join("\n").length+(before.length?1:0);
+      textarea.focus();
+      if(typeof textarea.setSelectionRange==="function")
+        textarea.setSelectionRange(index,index+(lines[line-1]||"").length);
+      const height=typeof getComputedStyle==="function"
+        ? Number.parseFloat(getComputedStyle(textarea).lineHeight)||20 : 20;
+      textarea.scrollTop=Math.max(0,(line-4)*height);
+    },
     getScrollTop: () => textarea.scrollTop,
     setScrollTop(value) { textarea.scrollTop = value; },
     getScrollLeft: () => textarea.scrollLeft,
@@ -80,6 +92,8 @@ export function createSourceEditorAdapter(initialBackend) {
     get scrollLeft() { ensureOpen(); return backend.getScrollLeft(); },
     set scrollLeft(value) { ensureOpen(); backend.setScrollLeft(value); },
     focus() { ensureOpen(); backend.focus(); },
+    revealLine(line) { ensureOpen(); backend.revealLine?.(line); },
+    layout() { ensureOpen(); backend.layout?.(); },
     get path() { ensureOpen(); return path; },
     openDocument(nextPath, text) {
       ensureOpen();
