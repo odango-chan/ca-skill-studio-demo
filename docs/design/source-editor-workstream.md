@@ -120,7 +120,7 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 
 ## 11. E3 Python 编辑与导航：有界实施候选（2026-11-04）
 
-**E3-A1:** [PR #45](https://github.com/odango-chan/ca-skill-studio-demo/pull/45) 已合入 `main@fc6c42a`；333 项测试、TypeScript/构建及真实 Chromium 通过；resulting-main Pages 另行核验。**E3-A2:** [PR #46](https://github.com/odango-chan/ca-skill-studio-demo/pull/46) 的源代码在旧 A1 分支上通过 338/338 项单测、TypeScript、构建与真实 Chromium；本次将相同源码树接到已合入 A1 的 main 重新验收，未通过新 HEAD CI / resulting-main Pages 前不宣称最终验收完成。
+**E3-A1:** [PR #45](https://github.com/odango-chan/ca-skill-studio-demo/pull/45) 已合入 `main@fc6c42a`；333/333 项测试、TypeScript/构建、真实 Chromium 和 [resulting-main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41811535041) 均通过。**E3-A2:** [PR #46](https://github.com/odango-chan/ca-skill-studio-demo/pull/46) 已基于 A1 合并后的 main 重新接线并合入 `main@4e88e0a`，338/338 项测试、TypeScript/构建、真实 Chromium 和 [resulting-main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41812070377) 均通过。仅认定 Editor-tier 引用/符号导航，不等于完整 Python 语言服务、Script/Runtime 验证或 5GC E2E。
 
 | 能力 | 实施 / 限制 |
 | --- | --- |
@@ -132,4 +132,4 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 | Ruff / 自动格式化 / 脚本运行 | **未实现且未授权**；不执行用户脚本、不自动改写文件 |
 | 完整本地 Package 打开/保存 | 属于 E4，尚未实现；当前 Download/ZIP 不是原位 Save |
 
-上述可点击跳转走现有 `source.revealLine`、`switchFile`，不建立第二业务真源，不更改 D4 编辑资格或 Source 事务。A2 必须通过全部 Node 单测、TS 类型检查、打包、真实 Chromium（包括三份 Python 的符号点击与 E1/E2/D4 回归），且合并后需独立核对 resulting-main Pages。若词法无法可靠分析，Inspector 必须关闭不确定跳转，而不是制造假语义。
+上述可点击跳转走现有 `source.revealLine`、`switchFile`，不建立第二业务真源，不更改 D4 编辑资格或 Source 事务。A2 必须通过全部 Node 单测、TS 类型检查、打包、真实 Chromium（包括三份 Python 的符号点击与 E1/E2/D4 回归），且合并后需独立核对 resulting-main Pages。若词法无法可靠分析，Inspector 必须关闭不确定跳转，而不是制造假语义。 E3-A2 已按此范围完成并验收，尚未实现 Pyright/LSP/Ruff；是否需要更复杂诊断应先结合真实开发体验再评估。
