@@ -20,7 +20,7 @@ python3 -m http.server 8080 --directory dist
 
 ## 现有能力
 
-- 固定 **Ensure Session / CreatedSession** 示例 Package 的真实 Runtime 相关文件导航、Source 编辑；Markdown 安全预览、文件下载与 ZIP 打包。**Local Open 目前只支持单文件**，不是完整磁盘 Package。
+- 固定 **Ensure Session / CreatedSession** 示例 Package 的真实 Runtime 相关文件导航、Source 编辑；Markdown 安全预览、文件下载与 ZIP 打包。CreatedSession 已对齐 [ca-agent-demo@7570b309](https://github.com/odango-chan/ca-agent-demo/tree/7570b309a998580a6952352e2bf4b1c19e5c710d/skills/establish-pdu-session)：更新 `SKILL.md`，增加可展开的 `references/` 三份 Markdown（共 16 文件）。**Local Open 目前只支持单文件**，不是完整磁盘 Package。
 - 多 Procedure 和 Root/Child 下钻、Node / Phase Step / Outcome / Route 投影；React Flow + ELK 默认垂直布局，完整大图支持保守降级。
 - D2 有界 Node 重命名、在已有 Route 上插入少数 Node、受限删除、编辑已有 Operator 与 `with.<key>.from`，以及既有 Route Target 有界重连；所有 Visual 修改遵循 Source-backed Patch → Diff → Confirm → Undo/Redo。
 - 编辑期 Package 引用提醒、语法失败 Source 恢复，以及一致描边 SVG 图标。**编辑期提示不等于 Runtime qualification。**

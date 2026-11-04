@@ -1,7 +1,11 @@
-// Exact read-only fixture inventory, pinned to ca-agent-demo@bf445ad.
-// This manifest is UI metadata and is not inserted into the exported SKILL Package.
+// Explicit read-only fixture inventories: ensure sample retains its older pin;
+// establish sample mirrors the runtime-used files of ca-agent-demo@7570b309.
+// This UI manifest is not inserted into the exported SKILL Package.
 const core=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml","assurance/predicates.yaml"];
 const establishExtras=[
+  "references/3gpp-procedure.md",
+  "references/session-selection.md",
+  "references/failure-handling.md",
   "schemas/establishment-request.schema.yaml",
   "schemas/predicate-evaluation-result.schema.yaml",
   "schemas/selection-input.schema.yaml",

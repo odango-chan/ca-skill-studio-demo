@@ -17,7 +17,7 @@ const sha=text=>{
 
 test("two pinned real SKILL Package fixtures include real runtime assets",()=>{
   assert.equal(SAMPLE_PACKAGES.ensure.files.length,4);
-  assert.equal(SAMPLE_PACKAGES.establish.files.length,13);
+  assert.equal(SAMPLE_PACKAGES.establish.files.length,16);
   for(const key of ["ensure","establish"]){
     const spec=SAMPLE_PACKAGES[key];
     assert.equal(spec.entry,"assurance/procedure.yaml");
@@ -33,13 +33,23 @@ test("two pinned real SKILL Package fixtures include real runtime assets",()=>{
   }
   assert.deepEqual(SAMPLE_PACKAGES.establish.files.filter(p=>p.startsWith("scripts/")).length,3);
   assert.deepEqual(SAMPLE_PACKAGES.establish.files.filter(p=>p.startsWith("schemas/")).length,6);
+  assert.deepEqual(SAMPLE_PACKAGES.establish.files.filter(p=>p.startsWith("references/")),[
+    "references/3gpp-procedure.md",
+    "references/session-selection.md",
+    "references/failure-handling.md"
+  ]);
+  assert.ok(SAMPLE_PACKAGES.establish.files.every(path=>
+    !path.startsWith("cases/")&&!path.startsWith("design/")));
 });
 test("fixtures are byte-for-byte the pinned ca-agent-demo Git blob sources",()=>{
   assert.equal(sha(read("ensure-pdu-session","SKILL.md")),"aef72afd2ffa2fde9c5c9fd5f52108c3005522b8");
   assert.equal(sha(read("ensure-pdu-session","assurance/contract.yaml")),"f5b7310af240127e943a2f9d64a374fd23d3359d");
   assert.equal(sha(read("ensure-pdu-session","assurance/procedure.yaml")),"1ead0efb0665b7ccb652501bc0075b36079c5017");
   assert.equal(sha(read("ensure-pdu-session","assurance/predicates.yaml")),"2abe20975d709b93a27a215fc8eab1c5a33aaa23");
-  assert.equal(sha(read("establish-pdu-session","SKILL.md")),"29a1c1f5142e320f423dd916448af58859d6f398");
+  assert.equal(sha(read("establish-pdu-session","SKILL.md")),"394027efb3f940490c69fcf6f0593ebf29daca81");
+  assert.equal(sha(read("establish-pdu-session","references/3gpp-procedure.md")),"d70148210dcd6ea7a7ddebbb1ffcba34e2bb33b3");
+  assert.equal(sha(read("establish-pdu-session","references/session-selection.md")),"341a29272ee5b593760b5ee8632ac7c9e7508105");
+  assert.equal(sha(read("establish-pdu-session","references/failure-handling.md")),"02f1d6caf84f1f8dc29684ec07d90a805b9f81e0");
   assert.equal(sha(read("establish-pdu-session","assurance/contract.yaml")),"af4f47c9a9bf21f241e359bba6e4b47951c5d246");
   assert.equal(sha(read("establish-pdu-session","assurance/procedure.yaml")),"cf502fa54363a5302161cc7cccb191ce73e453de");
   assert.equal(sha(read("establish-pdu-session","assurance/predicates.yaml")),"8cc773b2f428274acb40b6460f78df1106bd413d");
@@ -115,4 +125,40 @@ test("ZIP export rejects path traversal and duplicate file identity",()=>{
   assert.throws(()=>zipPackage([{path:"x",text:"a"},{path:"x",text:"b"}]));
   assert.throws(()=>zipPackage([{path:"",text:"x"}]));
   assert.throws(()=>zipPackage([{path:"x",text:"a".repeat(1024*1024+1)}]));
+});
+
+
+test("updated CreatedSession SKILL.md names all optional References in its package",()=>{
+  const skill=read("establish-pdu-session","SKILL.md");
+  assert.match(skill,/## Optional business references/);
+  assert.match(skill,/read_reference/);
+  for(const path of SAMPLE_PACKAGES.establish.files.filter(p=>p.startsWith("references/"))){
+    assert.ok(skill.includes(String.fromCharCode(96)+path+String.fromCharCode(96)),path);
+    const document=read("establish-pdu-session",path);
+    assert.ok(document.startsWith("# "),path);
+    assert.ok(document.length>1000,path);
+    assert.ok(!document.includes("\u0000"),path);
+  }
+  assert.ok(skill.includes("Read "+String.fromCharCode(96)+"references/session-selection.md"));
+});
+test("updated CreatedSession ZIP exports Reference paths with exact authored bytes",()=>{
+  const entries=SAMPLE_PACKAGES.establish.files.map(path=>({
+    path,text:read("establish-pdu-session",path)
+  }));
+  const zip=zipPackage(entries),view=new DataView(zip.buffer,zip.byteOffset,zip.byteLength);
+  const decoder=new TextDecoder();let p=0,seen=[];
+  for(const entry of entries){
+    assert.equal(view.getUint32(p,true),0x04034b50);
+    const nameLen=view.getUint16(p+26,true);
+    const size=view.getUint32(p+18,true);
+    const path=decoder.decode(zip.slice(p+30,p+30+nameLen));
+    const text=decoder.decode(zip.slice(p+30+nameLen,p+30+nameLen+size));
+    assert.equal(path,entry.path);
+    assert.equal(text,entry.text);
+    seen.push(path);p+=30+nameLen+size;
+  }
+  assert.equal(view.getUint16(zip.length-12,true),16);
+  assert.deepEqual(seen.filter(x=>x.startsWith("references/")),
+    SAMPLE_PACKAGES.establish.files.filter(x=>x.startsWith("references/")));
+  assert.equal(view.getUint32(p,true),0x02014b50);
 });

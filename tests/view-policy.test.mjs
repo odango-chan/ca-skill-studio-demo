@@ -6,6 +6,9 @@ const file=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
 test("Markdown Visual is preview independent of Procedure projection",()=>{
   assert.equal(viewKindFor({path:"SKILL.md",projection:{state:"SOURCE_ONLY"}}),"markdown");
   assert.equal(viewKindFor({path:"README.MD",projection:{state:"UNAVAILABLE"}}),"markdown");
+  for(const path of ["references/3gpp-procedure.md","references/session-selection.md",
+    "references/failure-handling.md"])
+    assert.equal(viewKindFor({path,projection:{state:"SOURCE_ONLY"}}),"markdown");
   assert.equal(viewKindFor({path:"SKILL.md",previewAvailable:false}),"source");
   assert.deepEqual(availableModes("markdown"),["visual","source","split"]);
   assert.equal(permittedMode("markdown","visual"),"visual");
