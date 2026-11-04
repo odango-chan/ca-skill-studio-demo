@@ -52,3 +52,5 @@ D4-A3a 已通过编辑器级测试，提供最小的 Phase Step 顺序编辑：�
 D4-A3b1（[PR #30](https://github.com/odango-chan/ca-skill-studio-demo/pull/30) 编辑器级验收通过）允许在已存在 Phase 末尾新增来自当前 PredicateSet 的无名 Verify，或删除明确符合资格的单行 Verify；仍走 Source Diff / 确认 / Undo/Redo，未实现命名或带绑定 Step 的增删和通用依赖感知排序。此处会改变业务检查集合，Runtime/5GC 验证未执行。
 
 D4-A3b2a 编辑器级验收通过，提供命名 Phase Step 的 Source 引用影响与同步改名（[PR #32](https://github.com/odango-chan/ca-skill-studio-demo/pull/32)）；未知或歧义引用一律只读。带输出依赖的删除与重排尚未实现，Runtime/5GC NOT_RUN。
+
+D4-A3b2b1（[PR #34](https://github.com/odango-chan/ca-skill-studio-demo/pull/34) 编辑器级验收通过）提供无引用的纯 Verify Step 命名及受限删除/相邻排序。具副作用或带输出依赖的 script/call 仍保持 Source-only，不宣称 Runtime 安全。

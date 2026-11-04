@@ -37,6 +37,10 @@ import {phaseStepDependencyReport} from "./phase-dataflow.mjs";
 import {phaseConsumerContractReport} from "./phase-consumer-contract.mjs";
 import {namedPhaseStepImpactReport,previewNamedPhaseStepRename,
   applyNamedPhaseStepRename} from "./phase-step-rename.mjs";
+import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
+  previewDeleteUnreferencedNamedVerify,applyDeleteUnreferencedNamedVerify,
+  previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
+  from "./phase-named-verify.mjs";
 import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   previewAddPhaseVerify,applyAddPhaseVerify,
   previewDeletePhaseVerify,applyDeletePhaseVerify}
@@ -1441,9 +1445,37 @@ function addNamedStepImpact(phase,step,container,impacts){
   }
   disclosure.append(body);container.appendChild(disclosure);
 }
+function addPlainVerifyNameEditor(phase,step,container,nameOptions){
+  if(step.name||step.operator!=="verify"||
+     activePackage?.name!=="establish-pdu-session"||
+     activeFilePath!=="assurance/procedure.yaml")return;
+  const entry=nameOptions.find(x=>x.phaseName===phase.name&&
+    x.stepIndex===step.index-1);
+  if(!entry)return;
+  const section=el("details","step-enum phase-verify-name");
+  section.dataset.phaseNameVerify=phase.name+":"+step.index;
+  section.appendChild(el("summary","","命名 Verify · D4-A3b2b1"));
+  const controls=el("div","step-enum-controls");
+  controls.appendChild(el("p","small-edit-note",
+    "只为现有独立 Verify 增加 Step 名称；不会修改 Predicate。"+
+    "Source Diff 确认后可撤销，不代表 Runtime 资格。"));
+  const input=el("input","target-select");
+  input.value="";
+  input.placeholder="例如 check-ingress";
+  input.setAttribute("aria-label","命名 "+phase.name+" Verify Step "+step.index);
+  input.setAttribute("spellcheck","false");
+  const preview=button("预览 Verify 命名",()=>{
+    try{showPreview(previewNamePlainVerify(source.value,activeProcedureId,
+      selection.id,phase.name,step.index-1,input.value));}
+    catch(error){message("Verify 命名被拒绝："+String(error?.message??error));}
+  },"preview-button");
+  preview.disabled=true;
+  input.addEventListener("input",()=>{preview.disabled=!input.value;});
+  controls.append(input,preview);section.append(controls);container.append(section);
+}
 function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
   lineage=null,contracts=null,reorderOptions=[],addOptions=[],removeOptions=[],
-  namedImpacts=[]) {
+  namedImpacts=[],namedVerifyEdits={names:[],deletions:[],swaps:[]}) {
   if(!phase)return;
   for(const step of phase.steps||[]){
     const item=el("div","journey-step");
@@ -1465,6 +1497,32 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
       move.dataset.phaseReorderStep=phase.name+":"+step.index;
       item.appendChild(move);
     }
+    const namedSwap=namedVerifyEdits.swaps.some(x=>x.phaseName===phase.name&&
+      x.stepIndex===step.index-1);
+    if(namedSwap&&activePackage?.name==="establish-pdu-session"&&
+       activeFilePath==="assurance/procedure.yaml"){
+      const move=button("下移",()=>{
+        try{showPreview(previewSwapAdjacentNamedVerify(source.value,
+          activeProcedureId,selection.id,phase.name,step.index-1));}
+        catch(error){message("命名 Verify 排序被拒绝："+String(error?.message??error));}
+      },"source-link");
+      move.setAttribute("aria-label","预览命名 Verify 后移 "+phase.name+" Step "+step.index);
+      move.dataset.phaseMoveNamedVerify=phase.name+":"+step.index;
+      item.appendChild(move);
+    }
+    const namedDelete=namedVerifyEdits.deletions.some(x=>x.phaseName===phase.name&&
+      x.stepIndex===step.index-1);
+    if(namedDelete&&activePackage?.name==="establish-pdu-session"&&
+       activeFilePath==="assurance/procedure.yaml"){
+      const remove=button("删除",()=>{
+        try{showPreview(previewDeleteUnreferencedNamedVerify(source.value,
+          activeProcedureId,selection.id,phase.name,step.index-1));}
+        catch(error){message("命名 Verify 删除被拒绝："+String(error?.message??error));}
+      },"source-link");
+      remove.setAttribute("aria-label","预览删除未引用命名 Verify "+phase.name+" Step "+step.index);
+      remove.dataset.phaseDeleteNamedVerify=phase.name+":"+step.index;
+      item.appendChild(remove);
+    }
     const removable=removeOptions.some(x=>x.phaseName===phase.name&&
       x.stepIndex===step.index-1);
     if(removable&&activePackage?.name==="establish-pdu-session"&&
@@ -1481,6 +1539,7 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
     }
     body.appendChild(item);
     addPhaseVerifyEditor(phase,step,body);
+    addPlainVerifyNameEditor(phase,step,body,namedVerifyEdits.names);
     addNamedStepImpact(phase,step,body,namedImpacts);
     addPhaseInputBindingEditors(phase,step,body,phaseBindings);
     addPhaseOutputReferenceEditors(phase,step,body,phaseOutputs);
@@ -1517,7 +1576,8 @@ function nodeEditorCapabilities(nodeId){
     phaseOrder:adjacentVerifyReorderOptions(text,activeProcedureId,nodeId),
     phaseAdd:phaseVerifyAddOptions(text,activeProcedureId,nodeId,ps,skill),
     phaseDelete:phaseVerifyDeleteOptions(text,activeProcedureId,nodeId),
-    phaseNamed:namedPhaseStepImpactReport(text,activeProcedureId,nodeId)
+    phaseNamed:namedPhaseStepImpactReport(text,activeProcedureId,nodeId),
+    namedVerify:namedVerifyEditOptions(text,activeProcedureId,nodeId)
   };
   nodeEditorCache={text,procedure:activeProcedureId,nodeId,
     predicateSource:ps,skill,value};
@@ -1544,7 +1604,8 @@ function renderNodeJourney(model,caps) {
       {expanded:false});
     renderPhase(model.prepare.phase,body,model.children,
       caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
-      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed);
+      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed,
+      caps.namedVerify);
   }
   const main=journeyStage(2,"执行","");
   const action=el("div","journey-operation");
@@ -1561,7 +1622,8 @@ function renderNodeJourney(model,caps) {
       {expanded:false});
     renderPhase(model.confirm.phase,body,model.children,
       caps.phaseBindings,caps.phaseOutputs,lineage,consumerContracts,
-      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed);
+      caps.phaseOrder,caps.phaseAdd,caps.phaseDelete,caps.phaseNamed,
+      caps.namedVerify);
   }
   if(model.routeCount){
     const branches=journeyStage(4,"路由",model.routeCount+" 条",{expanded:model.routeCount<=3});
@@ -1613,6 +1675,8 @@ function renderInspector() {
       caps.phaseBindings?.length||caps.phaseOutputs?.length||caps.phaseOrder?.length||
       caps.phaseAdd?.length||caps.phaseDelete?.length||
       caps.phaseNamed?.some(x=>x.editEligible)||
+      caps.namedVerify?.names?.length||caps.namedVerify?.deletions?.length||
+      caps.namedVerify?.swaps?.length||
       (activePackage?.name==="establish-pdu-session"&&
        model.node.phases.some(p=>p.steps.some(step=>step.operator==="verify")))));
   $("inspectorState").textContent=editable?"可修改":"只读";
@@ -1840,6 +1904,12 @@ $("applyPatch").addEventListener("click", () => {
       nextSource=applyDeletePhaseVerify(source.value,pendingPatch);
     else if(pendingPatch.type==="RenameNamedPhaseStepAndReferences")
       nextSource=applyNamedPhaseStepRename(source.value,pendingPatch);
+    else if(pendingPatch.type==="NamePlainPhaseVerify")
+      nextSource=applyNamePlainVerify(source.value,pendingPatch);
+    else if(pendingPatch.type==="DeleteUnreferencedNamedVerify")
+      nextSource=applyDeleteUnreferencedNamedVerify(source.value,pendingPatch);
+    else if(pendingPatch.type==="SwapAdjacentNamedVerify")
+      nextSource=applySwapAdjacentNamedVerify(source.value,pendingPatch);
     else if(pendingPatch.type==="SetCreatedRouteTarget")
       nextSource=applyCreatedRoutePatch(source.value,pendingPatch);
     else if(pendingPatch.type==="RenameNode")
