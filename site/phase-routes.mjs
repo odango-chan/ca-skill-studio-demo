@@ -76,6 +76,9 @@ function sourceContext(source,procedureId,routeId){
       keyStart:key.range[0],valStart:val.range[0],valEnd:val.range[1],
       indent:line[1],line:source.slice(0,start).split("\n").length});
   }
+  if(keyRows.some((x,i)=>i>0&&
+       keyRows[i-1].start+keyRows[i-1].raw.length!==x.start))
+    fail("Phase Route map has a blank/comment gap between rows");
   if(new Set(keyRows.map(x=>x.key)).size!==keyRows.length||
      keyRows.some(x=>x.indent!==keyRows[0].indent))
     fail("Ambiguous or mixed Phase Route rows");

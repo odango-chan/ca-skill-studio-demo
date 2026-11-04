@@ -128,7 +128,8 @@ test("D4-A4a keeps CRLF bytes and refuses mixed EOL",()=>{
   const crlf=source.replace(/\n/g,"\r\n");
   const p=previewPhaseRouteTarget(crlf,pid,rid,"finalize-failed");
   const changed=applyPhaseRouteTarget(crlf,p);
-  assert.equal(changed,source.slice(0,p.sourceSpan.start).length>0?changed:changed);
+  assert.equal(changed,crlf.slice(0,p.sourceSpan.start)+"finalize-failed"+
+    crlf.slice(p.sourceSpan.end));
   assert.equal(changed.match(/\r\n/g).length,crlf.match(/\r\n/g).length);
   assert.equal(applyPhaseRouteTarget(changed,
     previewPhaseRouteTarget(changed,pid,rid,"failed")),crlf);
