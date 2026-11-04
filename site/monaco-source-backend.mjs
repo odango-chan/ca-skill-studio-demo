@@ -85,6 +85,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           // existing per-file Package Source buffer, not by Monaco models.
           const uri=monaco.Uri.from({scheme:"inmemory",path:"/"+path});
           model=monaco.editor.createModel(next,languageId(path),uri);
+          host.dataset.language=languageId(path);
           raw=next;
           editor.setModel(model);
           modelChange=model.onDidChangeContent(onModelInput);
