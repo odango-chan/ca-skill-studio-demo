@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-04**  
-**Reviewed implementation baseline: main@95d18cb92a17d6a5726b3a190e6fa87e3fd4b624**（D4-A3b1 已合入且 Pages PASS；D4-A3b2a 编辑器级验收通过）
+**Reviewed implementation baseline: main@a9580749d661a68c4b4554cc2537a01a26ace2ef**（D4-A3b2a 已合入且 Pages PASS；D4-A3b2b1 编辑器级验收通过）
 
 ## Overall
 
@@ -28,7 +28,8 @@
 | D4-A3a 相邻独立 Verify Step 的 Source-backed 换序 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #29） | PASS（264 tests + Chromium；首轮提交） | [PR #29](https://github.com/odango-chan/ca-skill-studio-demo/pull/29)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41770964460)、[设计](design/phase-designer.md) |
 | D4-A3b1 已有 Phase 尾部新增 / 有界删除独立 Verify | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #30） | PASS（272 tests + Chromium；集成文档 CI 已验收） | [PR #30](https://github.com/odango-chan/ca-skill-studio-demo/pull/30)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41778044582)、[设计](design/phase-designer.md) |
 | D4-A3b2a 命名 Step 引用影响审查与原子改名 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #32） | PASS（279 tests + real Chromium；集成提交） | [PR #32](https://github.com/odango-chan/ca-skill-studio-demo/pull/32)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41784309105)、[设计](design/phase-designer.md) |
-| D4-A2.2b2/A3b2b/A4 跨生产者写入 / 命名 Step 增删与依赖排序 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
+| D4-A3b2b1 无引用命名 Verify 的命名、删除和相邻换序 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #34） | PASS（289 tests + Chromium；集成提交） | [PR #34](https://github.com/odango-chan/ca-skill-studio-demo/pull/34)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41786616595)、[设计](design/phase-designer.md) |
+| D4-A2.2b2/A3b2b2/A4 跨生产者写入 / 具副作用或带引用 Step 的结构编辑 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | E1 Monaco Source Editor（仍在 PR，未合主分支） | ACCEPTED | IMPLEMENTED（PR #33） | PASS（286 tests + Chromium，**仅 PR HEAD**） | [设计](design/source-editor-workstream.md)、[PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41785473857)、[#23](https://github.com/odango-chan/ca-skill-studio-demo/issues/23) |
 | E2-A1 YAML 1.2 语法诊断 / Owner Schema 安全边界 | ACCEPTED（严格 Schema 与补全仍在 E2-A2） | IMPLEMENTED（PR #35，未合 main） | PASS（291 tests + Chromium，PR HEAD） | [设计](design/source-editor-workstream.md)、[#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24) |
 | E3 Python Script 智能编辑与导航 | ACCEPTED（方向） | NOT_STARTED | NOT_RUN | [设计](design/source-editor-workstream.md)、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) |
@@ -44,7 +45,7 @@
 - **E Source Editor 与 D4 并行**：E1 Monaco [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) 已通过分支 CI，但未合入 main 或通过 resulting-main Pages；E2-A1 [PR #35](https://github.com/odango-chan/ca-skill-studio-demo/pull/35) 已在候选分支实现并通过 [291 tests + real Chromium CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41786681372)，但未合入 main；[#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24) 的旧 Owner Procedure Schema 与 Phase 结构不兼容，必须拒绝错误 Schema 关联，Schema 补全仍后置；E3/E4 未实施。见 [统一设计](design/source-editor-workstream.md)。
 
 - [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3 有界 operator.on Route 编辑已合入；Runtime Outcome 资格和 Phase-specific Route 仍未覆盖。
-- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b2b 命名 Step 增删及依赖重排和 A4 尚未开始；A3b2a 先审查命名输出引用并受限改名，不能据此宣称 Runtime 兼容。
+- [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b2b2 具副作用或带引用 Step 的结构编辑和 A4 尚未开始；A3b2b1 仅允许无输出引用的纯 Verify 命名/删除/相邻换序（本仓编辑器级验收通过）；A3b2a 先审查命名输出引用并受限改名，不能据此宣称 Runtime 兼容。
 - 早期未合并 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)、[#2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)、[#3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3) 目前只作为历史候选，**不推断可直接合并**。
 
 ## Authority / evidence
