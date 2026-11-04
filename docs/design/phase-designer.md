@@ -1,8 +1,8 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1 Accepted, A2.1 candidate, A2.2/A3/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1 merged; A2.1 PR #17 candidate; A2.2/A3/A4 NOT_STARTED**  
-**Acceptance: A1 230 tests + Chromium PASS; A2.1 final PR Gate pending; Runtime/5GC NOT_RUN**  
+**Status: A1 and bounded A2.1 Accepted (Studio editor only); A2.2/A3/A4 Proposed · Date: 2026-11-04**  
+**Implementation: A1 merged; A2.1 implemented in PR #17; A2.2/A3/A4 NOT_STARTED**  
+**Acceptance: A1 230 tests + Chromium PASS; A2.1 238 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
 ## Model and visual hierarchy
@@ -47,4 +47,4 @@ A2.2/A3/A4 remain NOT_STARTED; neither A1 same-type inputs nor A2.1 observed spe
 
 Only an existing Phase Step `with.<key>.from` referencing a uniquely named **earlier Step of the same Node** is eligible. Both `preconditions.<step>.output[.field]` and `<own-node>.preconditions.<step>.output[.field]` (or a correspondingly earlier postcondition) must already appear as plain `from` values in the **same Procedure's YAML Source**. The selected producer Step, Phase, Node, output field suffix and consumer binding key cannot change. Forward references, self-references, cross-Node/Procedure values, renamed/duplicate producers and unobserved aliases fail closed.
 
-UI keeps the Step in its owning Inspector section, never a main graph node. Exact Source span patch → reparse and graph identity check → original YAML Diff → confirmation → Undo/Redo. The real CreatedSession `nudm-sdm-subscribe.preconditions.steps[1].with.selection.from` is the positive specimen; both local and own-node-qualified forms already occur in that root Procedure. These are **observed syntax alternatives, not proved Runtime aliases**. No field type, consumer ABI or 5GC result is inferred. [PR #17](https://github.com/odango-chan/ca-skill-studio-demo/pull/17) requires a final-head green CI/Chromium before merge. All broader D4-A2.2 cross-producer and A3/A4 authoring remains deferred.
+UI keeps the Step in its owning Inspector section, never a main graph node. Exact Source span patch → reparse and graph identity check → original YAML Diff → confirmation → Undo/Redo. The real CreatedSession `nudm-sdm-subscribe.preconditions.steps[1].with.selection.from` is the positive specimen; both local and own-node-qualified forms already occur in that root Procedure. These are **observed syntax alternatives, not proved Runtime aliases**. No field type, consumer ABI or 5GC result is inferred. [PR #17](https://github.com/odango-chan/ca-skill-studio-demo/pull/17) [CI #41755713730](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41755713730) verified 238/238 tests, TypeScript, build and real Chromium (selection, exact Diff, cancel, Apply, Undo/Redo, Source restoration). Merge requires this final document-only commit to pass too. All broader D4-A2.2 cross-producer and A3/A4 authoring remains deferred.
