@@ -70,6 +70,37 @@ export async function runD1Interactions(evaluate,command){
     "  oldId,next,previewed,cancelled,applied,undone,redone,restored};"
   ]);
 
+  await check(evaluate,"D4_A2_2_READONLY_DEPENDENCIES",[
+    sleepLine,clickLine,
+    " const source=document.getElementById('source'),before=source.value;",
+    " const n=document.querySelector('.react-flow__node[data-id=\"nudm-sdm-subscribe\"]');",
+    " if(!n)return {ok:false,reason:'CreatedSession Node not present'};",
+    " click(n);await sleep(200);",
+    " const stage=[...document.querySelectorAll('#inspector .journey-stage')].find(x=>",
+    "   x.querySelector('summary')?.textContent.includes('准备'));",
+    " if(!stage)return {ok:false,reason:'Preparation Stage unavailable'};",
+    " stage.open=true;",
+    " const findStep=i=>stage.querySelector('details[data-phase-dependency-step=\"preconditions:'+i+'\"]');",
+    " const first=findStep(1),second=findStep(2);",
+    " if(!first||!second)return {ok:false,reason:'Read-only Phase dataflow controls missing'};",
+    " first.open=true;second.open=true;",
+    " const pick=(scope,key)=>scope.querySelector('[data-binding-key=\"'+key+'\"]');",
+    " const selection=pick(second,'selection'),udm=pick(first,'udmResult');",
+    " const local=selection?.dataset.producerStatus==='EARLIER_LOCAL_STEP';",
+    " const owner=udm?.dataset.producerStatus==='GRAPH_PREDECESSOR_ONLY';",
+    " const schema=selection?.dataset.contractStatus==='SCRIPT_SCHEMA_FIELD_DECLARED'&&",
+    "   selection.textContent.includes('schemas/selection.schema.yaml');",
+    " const noEditors=!first.querySelector('input,select,textarea')&&",
+    "   !second.querySelector('input,select,textarea');",
+    " const jump=!!selection?.querySelector('button.source-link');",
+    " const unchanged=source.value===before;",
+    " const graphStable=document.querySelectorAll('.react-flow__node').length===17;",
+    " return {ok:local&&owner&&schema&&noEditors&&jump&&unchanged&&graphStable,",
+    "  local,owner,schema,noEditors,jump,unchanged,graphStable,",
+    "  selectionStatus:selection?.dataset.producerStatus,",
+    "  schemaStatus:selection?.dataset.contractStatus};"
+  ]);
+
   await check(evaluate,"D4_A1_PHASE_INPUT_BINDING",[
     sleepLine,clickLine,
     " const source=document.getElementById('source'),before=source.value;",
