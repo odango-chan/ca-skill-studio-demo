@@ -1,7 +1,7 @@
 # D4 Phase Designer · Runtime-used Step Authoring
 
-**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1 Accepted; A3b2a named Step impact/rename candidate; A2.2b2/A3b2b/A4 Proposed · Date: 2026-11-04**  
-**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1 merged; A3b2a PR #32 candidate; A2.2b2/A3b2b/A4 NOT_STARTED**  
+**Status: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1 Accepted; A3b2a named Step impact/rename Accepted; A2.2b2/A3b2b/A4 Proposed · Date: 2026-11-04**  
+**Implementation: A1/A2.1/A2.2a/A2.2b1/A3a/A3b1 merged; A3b2a implemented in PR #32; A2.2b2/A3b2b/A4 NOT_STARTED**  
 **Acceptance: A2.2a 245 tests + Chromium PASS; A2.2b1 258 tests + real Chromium PASS; Runtime/5GC NOT_RUN**  
 **Tracking: [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)**
 
@@ -99,7 +99,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 
 [PR #30 文档集成验收 CI #41778044582](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41778044582) 亦通过单元测试、类型检查、构建和真实 Chromium；Pages 部署需按合并后的精确主分支结果单独确认。
 
-## D4-A3b2a · 命名 Step 的引用影响与同步改名（PR #32）
+## D4-A3b2a · 命名 Step 的引用影响与同步改名（PR #32，编辑器级验收通过）
 
 真实 owner 示例 nudm-sdm-subscribe.preconditions.select-subscription-configuration 在同 Node 与后续跨 Node 的 with.*.from 中共被引用 5 次。Studio 在对应 Step 下展示当前 Procedure 来源的引用数量、Consumer Node、原文和 Source 行号。
 
@@ -108,3 +108,7 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 改名必须同时替换原 Step 名称和全部已确认 from 引用的精确标量内部字节范围（不 dump 整份 YAML）；Apply 以当前 Source revision 重算完整 Preview，并在修改后重投影所有 Procedure/Node/Phase/Step/Child/Route 结构和重新审计引用个数。Inspector 复用 Diff、显式确认和 Undo/Redo。
 
 本项只提供 editor-tier 的 Source 引用一致性，不证明 Runtime 是否还有额外的跨文件、动态配置或外部消费者，也不保证新的 Step 名称与现有日志、状态或 3GPP 语义等价。命名脚本/调用 Step 的删除和有依赖的排序继续 NOT_STARTED；Runtime/5GC NOT_RUN。
+
+### A3b2a 验收证据
+
+[PR #32 集成 CI #41784309105](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41784309105)：279/279 tests、TypeScript、Build、real Chromium PASS。浏览器选中真实 owner 的命名脚本 Step，确认 Inspector 精确列出 5 个输出消费者，预览 6 处原子修改、取消、应用、Undo/Redo、Source 原文字节恢复；负面测试拒绝引号、注释、未识别引用、重复生产者、冲突名称、过期和篡改 Preview。该 PASS 只涵盖浏览器 Source 编辑，不代表 Runtime/5GC E2E。

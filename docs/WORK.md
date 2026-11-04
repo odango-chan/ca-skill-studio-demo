@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-04**  
-**Reviewed implementation baseline: main@95d18cb92a17d6a5726b3a190e6fa87e3fd4b624**（D4-A3b1 已合入且 Pages PASS；D4-A3b2a 候选审查中）
+**Reviewed implementation baseline: main@95d18cb92a17d6a5726b3a190e6fa87e3fd4b624**（D4-A3b1 已合入且 Pages PASS；D4-A3b2a 编辑器级验收通过）
 
 ## Overall
 
@@ -27,7 +27,7 @@
 | D4-A2.2b1 Script 消费参数 Schema / 生产者类型对照（只读） | ACCEPTED（Read-only editor tier） | IMPLEMENTED（PR #19） | PASS（258 tests + real Chromium；PR #19 已合入） | [PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19)、[最终 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41769318870)、[设计](design/phase-designer.md) |
 | D4-A3a 相邻独立 Verify Step 的 Source-backed 换序 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #29） | PASS（264 tests + Chromium；首轮提交） | [PR #29](https://github.com/odango-chan/ca-skill-studio-demo/pull/29)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41770964460)、[设计](design/phase-designer.md) |
 | D4-A3b1 已有 Phase 尾部新增 / 有界删除独立 Verify | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #30） | PASS（272 tests + Chromium；集成文档 CI 已验收） | [PR #30](https://github.com/odango-chan/ca-skill-studio-demo/pull/30)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41778044582)、[设计](design/phase-designer.md) |
-| D4-A3b2a 命名 Step 引用影响审查与原子改名 | PROPOSED（Editor-tier） | IMPLEMENTED（PR #32 候选） | NOT_RUN（最终 CI 待确认） | [PR #32](https://github.com/odango-chan/ca-skill-studio-demo/pull/32)、[设计](design/phase-designer.md) |
+| D4-A3b2a 命名 Step 引用影响审查与原子改名 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR #32） | PASS（279 tests + real Chromium；集成提交） | [PR #32](https://github.com/odango-chan/ca-skill-studio-demo/pull/32)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41784309105)、[设计](design/phase-designer.md) |
 | D4-A2.2b2/A3b2b/A4 跨生产者写入 / 命名 Step 增删与依赖排序 / Phase Route | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
