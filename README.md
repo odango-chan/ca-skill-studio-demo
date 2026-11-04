@@ -62,3 +62,5 @@ D4-A4a（[PR #37](https://github.com/odango-chan/ca-skill-studio-demo/pull/37) �
 D4-A4b1（[PR #39](https://github.com/odango-chan/ca-skill-studio-demo/pull/39) 编辑器级验收通过）支持在现有 Phase `on` map 中补齐已观察的缺失核心 Outcome，以及受限修正/删除无歧义非核心 Outcome；完整的 owner 示例不会添加分支或显示多余按钮。Runtime/5GC NOT_RUN。
 
 E1 Monaco Source Editor 已通过 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 合入最新 D4 主分支：本地 Monaco/Worker，YAML、Python、Markdown、JSON 的 Source 编辑，保留唯一工作副本及 Source/Visual/Split、Diff/确认/Undo/Redo；初始化失败回退原有文本编辑器。[322/322 + real Chromium 集成 CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366)，[resulting-main Pages PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343)，参见 [E 线设计](docs/design/source-editor-workstream.md)。
+
+E2 YAML 1.2 语法诊断和离线 Contract/Predicate Owner Schema 提示正在 [PR #42](https://github.com/odango-chan/ca-skill-studio-demo/pull/42) 集成验收；保留 Procedure syntax-only，避免旧 Procedure Schema 误判新版 Phase。旧堆叠 PR #35/#38 不视为已通过真实补全门禁；Runtime/5GC NOT_RUN。
