@@ -37,7 +37,7 @@ jobs:
         run: npm run typecheck
       - name: Bundle browser site
         run: npm run build
-      - name: Chromium E2E — CreatedSession visible Route paths
+      - name: Chromium E2E — establish-pdu-session Route paths
         run: node scripts/edge-smoke.mjs
       - name: Check static site and asset references
         run: |
@@ -50,19 +50,21 @@ jobs:
           assert html.lstrip().lower().startswith("<!doctype html>")
           HTMLParser().feed(html)
           for asset in ("./studio.css", "./light.css", "./app.css", "./app.js",
-                        "./samples/ensure-pdu-session.procedure.yaml",
                         "./samples/establish-pdu-session.procedure.yaml",
-                        "./samples/packages/ensure-pdu-session/SKILL.md",
-                        "./samples/packages/ensure-pdu-session/assurance/contract.yaml",
-                        "./samples/packages/ensure-pdu-session/assurance/procedure.yaml",
-                        "./samples/packages/ensure-pdu-session/assurance/predicates.yaml",
                         "./samples/packages/establish-pdu-session/SKILL.md",
                         "./samples/packages/establish-pdu-session/assurance/contract.yaml",
                         "./samples/packages/establish-pdu-session/assurance/procedure.yaml",
                         "./samples/packages/establish-pdu-session/assurance/predicates.yaml",
+                        "./samples/packages/establish-pdu-session/references/3gpp-procedure.md",
+                        "./samples/packages/establish-pdu-session/references/session-selection.md",
+                        "./samples/packages/establish-pdu-session/references/failure-handling.md",
                         "./samples/packages/establish-pdu-session/scripts/evaluate_udm_read.py",
                         "./samples/packages/establish-pdu-session/schemas/establishment-request.schema.yaml"):
               assert Path("dist", asset.removeprefix("./")).is_file(), asset
+          # Legacy fixture sources remain under site/ for tests only, not in published dist/.
+          for legacy in ("samples/ensure-pdu-session.procedure.yaml",
+                         "samples/packages/ensure-pdu-session"):
+              assert not Path("dist", legacy).exists(), legacy
           assert 'src="./app.js"' in html
           assert 'href="./studio.css"' in html
           assert 'href="./light.css"' in html
