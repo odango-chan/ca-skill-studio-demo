@@ -1822,4 +1822,5 @@ async function initializeMonaco(){
     message("Monaco 初始化失败，已保留原始 Source 编辑器："+String(error?.message??error));
   }
 }
-loadSample().then(initializeMonaco);
+initializeMonaco();
+loadSample();
