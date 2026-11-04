@@ -153,7 +153,8 @@ try{
     "   colors:[...svg.querySelectorAll('path')].map(p=>p.getAttribute('stroke'))",
     " }));",
     " const folders=[...document.querySelectorAll('.asset-folder-icon')];",
-    " return {fileCount:files.length,folderCount:folders.length,",
+    " const folderPaths=[...document.querySelectorAll('#assetTree .asset-folder-title')].map(x=>x.title);",
+    " return {fileCount:files.length,folderCount:folders.length,folderPaths,",
     "  kinds:[...new Set(files.map(x=>x.kind))],",
     "  missingAccessible:files.filter(x=>!x.path||x.hidden!=='true').length,",
     "  yaml:files.filter(x=>x.kind==='yaml').length,",
@@ -163,8 +164,9 @@ try{
     "})()"
   ].join("\n"));
   console.log("CREATED_SESSION_FILE_ICON_SMOKE",JSON.stringify(iconResult));
-  if(iconResult?.fileCount!==13||iconResult.folderCount!==3||
-     iconResult.yaml<4||iconResult.markdown<1||iconResult.python<3||
+  if(iconResult?.fileCount!==16||iconResult.folderCount!==4||
+     iconResult.yaml!==9||iconResult.markdown!==4||iconResult.python!==3||
+     !iconResult.folderPaths?.includes("references/")||
      iconResult.missingAccessible!==0){
     throw Error("Explorer themed icons FAIL: "+JSON.stringify(iconResult));
   }
