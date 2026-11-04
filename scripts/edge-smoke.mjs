@@ -11,6 +11,9 @@ const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
 if(!chrome)throw Error("Chrome unavailable for browser smoke");
 const dist=resolve("dist");
+for(const asset of ["app.js","editor.worker.js","yaml.worker.js","LICENSE.monaco-yaml.txt"]){
+  if(!existsSync(resolve(dist,asset)))throw Error("Required local Monaco asset missing: "+asset);
+}
 for(const legacy of ["samples/packages/ensure-pdu-session","samples/ensure-pdu-session.procedure.yaml"]){
   if(existsSync(resolve(dist,legacy)))throw Error("Legacy Ensure asset leaked into Pages dist: "+legacy);
 }
