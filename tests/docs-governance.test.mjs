@@ -73,7 +73,8 @@ test("D4 read-only consumer ABI evidence accepted; cross-producer edits still de
   assert.match(work,/\|\s*D4-A2\.2b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A3a[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
   assert.match(work,/\|\s*D4-A3b1[^\n]*\|\s*ACCEPTED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*PASS/);
-  assert.match(work,/\|\s*D4-A2\.2b2\/A3b2\/A4[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
+  assert.match(work,/\|\s*D4-A3b2a[^\n]*\|\s*PROPOSED[^\n]*\|\s*IMPLEMENTED[^\n]*\|\s*NOT_RUN/);
+  assert.match(work,/\|\s*D4-A2\.2b2\/A3b2b\/A4[^\n]*\|\s*PROPOSED\s*\|\s*NOT_STARTED\s*\|\s*NOT_RUN/);
   assert.match(spec,/Runtime\/5GC NOT_RUN/);
   const trace=content("docs/TRACEABILITY.md");
   assert.match(trace,/D4-A1 Phase Step input rebind/);
@@ -135,4 +136,15 @@ test("D4-A3b1 Verify creation/deletion stays guarded by Source authority",()=>{
   assert.match(app,/applyDeletePhaseVerify/);
   assert.match(ci,/node --check site\/phase-step-structural\.mjs/);
   assert.match(ci,/node --check tests\/phase-step-structural\.test\.mjs/);
+});
+
+test("D4-A3b2a names are source-reconciled before Preview and Pages syntax gated",()=>{
+  const docs=content("docs/design/phase-designer.md");
+  const ci=content(".github/workflows/pages.yml");
+  const app=content("site/app.mjs");
+  assert.match(docs,/D4-A3b2a/);
+  assert.match(docs,/Runtime\/5GC NOT_RUN/);
+  assert.match(app,/applyNamedPhaseStepRename/);
+  assert.match(ci,/node --check site\/phase-step-rename\.mjs/);
+  assert.match(ci,/node --check tests\/phase-step-rename\.test\.mjs/);
 });
