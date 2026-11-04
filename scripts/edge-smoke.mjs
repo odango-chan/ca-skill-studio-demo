@@ -315,7 +315,7 @@ try{
     " const predicates=await open('assurance/predicates.yaml');",
     " const predicatePolicy=host.dataset.yamlSchemaCapability;",
     " await sleep(700);const predicateValid=markers()===0;",
-    " source.value=predicates.replace('metadata:\n  skill:','metadata:\n  studioUnknownProbe: true\n  skill:');dispatch();",
+    " source.value=predicates.replace('metadata:\\n  skill:','metadata:\\n  studioUnknownProbe: true\\n  skill:');dispatch();",
     " const predicateRejectsUnknown=await waitFor(()=>markers()>0);",
     " const predicateDebug=host.__studioYamlDiagnostics?.()||null;",
     " source.value=predicates;dispatch();",
