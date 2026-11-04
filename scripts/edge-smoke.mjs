@@ -157,9 +157,6 @@ try{
   if(result?.nodes!==17||result.edges!==48||result.valid!==48||result.markersOk!==48||
      result.attachedPorts!==96||result.maxPortGap>1.5)
     throw Error("CreatedSession visible edges FAIL");
-  console.log("MONACO_WORKER_CALLS",JSON.stringify(await evaluate("window.__studioWorkerCalls||[]")));
-  if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
-  if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
   console.log("CreatedSession visible paths and aligned React Flow ports PASS: "+
     result.valid+" / "+result.attachedPorts);
 
@@ -401,6 +398,11 @@ try{
   console.log("E2_OWNER_SCHEMA_HOVER",JSON.stringify({text:hoverText}));
   if(!/executable|authoring_assistant/.test(hoverText))
     throw Error("E2 Owner schema hover did not expose enum: "+hoverText);
+
+  // Evaluate browser diagnostics after all E2 YAML interactions have run.
+  console.log("MONACO_WORKER_CALLS",JSON.stringify(await evaluate("window.__studioWorkerCalls||[]")));
+  if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
+  if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
 
 
 }finally{
