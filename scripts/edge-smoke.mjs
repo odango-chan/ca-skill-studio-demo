@@ -360,22 +360,18 @@ try{
     "  'metadata:','  name: sample','spec:','  '].join('\\n');",
     " source.value=skeleton;source.dispatchEvent(new Event('input',{bubbles:true}));",
     " await sleep(350);",
+    " host.__studioSetEditorPosition(6,3);host.__studioTriggerCompletion();await sleep(500);",
     " const rows=[...host.querySelectorAll('.view-line')];",
     " const spec=rows.find(el=>el.textContent.trim()==='spec:');",
     " const rect=host.getBoundingClientRect(),line=spec?.getBoundingClientRect();",
     " return {x:rect.x+95,y:line?line.y+line.height+4:rect.y+130,",
     "  policy:host.dataset.yamlSchemaCapability,",
+    "  editor:host.__studioEditorDebug?.(),",
     "  width:rect.width,height:rect.height,found:!!spec};",
     "})()"
   ].join("\n"));
   if(!completionSetup?.found||completionSetup.policy!=="owner-schema-v1alpha1"||completionSetup.width<200||completionSetup.height<120)
     throw Error("E2 completion editor position unavailable: "+JSON.stringify(completionSetup));
-  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:completionSetup.x,y:completionSetup.y,button:"left",clickCount:1});
-  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:completionSetup.x,y:completionSetup.y,button:"left",clickCount:1});
-  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Control",code:"ControlLeft",modifiers:2});
-  await command("Input.dispatchKeyEvent",{type:"keyDown",key:" ",code:"Space",modifiers:2});
-  await command("Input.dispatchKeyEvent",{type:"keyUp",key:" ",code:"Space",modifiers:2});
-  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Control",code:"ControlLeft",modifiers:0});
   await sleep(900);
   const completion=await evaluate([
     "(()=>{const widget=document.querySelector('.suggest-widget');",
@@ -383,6 +379,7 @@ try{
     "  .map(el=>el.innerText||el.textContent||'').join(' ');",
     " return {visible:!!widget&&getComputedStyle(widget).display!=='none',labels};})()"
   ].join("\n"));
+  console.log("E2_COMPLETION_EDITOR_STATE",JSON.stringify(completionSetup?.editor||null));
   console.log("E2_OWNER_SCHEMA_COMPLETION",JSON.stringify(completion));
   if(!completion?.visible||!/(skillType|goal|entryProcedure)/.test(completion.labels))
     throw Error("E2 Owner schema completion did not surface Contract fields: "+JSON.stringify(completion));
