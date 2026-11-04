@@ -1,8 +1,8 @@
 # E · Source Editor Workstream（与 D Visual Designer 并行）
 
 **Status: Accepted (development boundary) · Date: 2026-11-04**  
-**Implementation: E1 IMPLEMENTED on PR #33; E2-A1 YAML syntax IMPLEMENTED on PR #35, E2-A2/E3/E4 NOT_STARTED · Acceptance: E1 PR CI PASS; E2-A1 PR CI PASS (291 tests + Chromium); main/Pages NOT_RUN**  
-**Baseline initially inspected:** `main@ef40178f81e166aca59ea73fb7dbac42b5ccdeb8`; **integrated implementation**: [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) HEAD `a066a48c` on D4 `main@a9580749`, [286 unit tests + Chromium PR CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41785473857). Not merged or deployed on Pages。本文件为 E 线的唯一 canonical 设计正文；任务与验收追踪在 [E1 #23](https://github.com/odango-chan/ca-skill-studio-demo/issues/23)、[E2 #24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24)、[E3 #25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25)、[E4 #26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)。
+**Implementation: E1 IMPLEMENTED on PR #33; E2-A1 IMPLEMENTED on PR #35; E2-A2 implemented as candidate PR #36; E3/E4 NOT_STARTED · Acceptance: E1 296 tests + Chromium PASS; E2-A1 301 tests + Chromium PASS; E2-A2 CI PENDING; main/Pages NOT_RUN**  
+**Current E1 integration**: [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) HEAD `b65b4422` on D4 `main@1291a9c0`, [296 tests + real Chromium PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41787690305). E2-A1 [PR #35](https://github.com/odango-chan/ca-skill-studio-demo/pull/35) [301 tests + real Chromium PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41787833576). Neither has been merged to main or deployed to Pages。
 
 ## 1. 目标和不做的事
 
@@ -96,16 +96,28 @@ E2/E3 依赖稳定 E1 adapter，但 D4 与 E1 可同时进行。E4 不以静态 
 
 ## 8. E2 重要 Owner Schema 相容性门禁
 
-2026-11-04 核对 [ca-agent-demo@7570b309](https://github.com/odango-chan/ca-agent-demo/tree/7570b309a998580a6952352e2bf4b1c19e5c710d/skills/establish-pdu-session) 与当前 [ca-skill-toolchain 源 Schema](https://github.com/odango-chan/ca-skill-toolchain/blob/main/schemas/v1alpha1/procedure-source.schema.yaml)：前者 Procedure 存在 `preconditions`、`postconditions` Phase Steps、跨 Step output `from`；后者 `$defs.node` 只有旧节点属性且 `additionalProperties: false`，缺少 Phase 结构。因此**E2 禁止直接将该 Procedure Schema 配到当前内置 `assurance/procedure.yaml`**，否则会误报。
+2026-11-04 核对 [ca-agent-demo@7570b309](https://github.com/odango-chan/ca-agent-demo/tree/7570b309a998580a6952352e2bf4b1c19e5c710d) 的内置 SKILL 与其固定 Toolchain Schema snapshot `03a42764ee2a67e39f57ab550b63c7a5d7966199`：`skill-contract.schema.yaml`、`predicate-set.schema.yaml` 与当前 `assurance/contract.yaml`、`assurance/predicates.yaml` 结构相容；`procedure-source.schema.yaml` 的 `$defs.node` 仍未声明 `preconditions` / `postconditions` Phase Steps 且 `additionalProperties: false`，因此**Procedure Schema 继续禁用**，避免误报合法 Source。
 
-- E2-A1 先做 Owner Schema 兼容性审计/路径关联的纯函数与正反测试；仅能对已证实结构一致的 Contract/Predicate 引入严格提示。
-- Schema 不匹配的 Procedure 仍保留 YAML syntax diagnostics 和基础编辑，不自行推断新的可执行 DSL、不能丢弃引用与注释，更不能显示 Runtime qualification PASS。
-- E2-A2 才进行 `monaco-yaml` Worker 集成；禁用远端 Schema 自动请求，保证 static Pages 离线可用、运行期只读，Schema Version/owner 明确固定。
+- E2-A1 完成 Owner Schema 兼容性审计；仅对已证实结构一致的 Contract/Predicate 引入严格提示。
+- Schema 不匹配的 Procedure 仍使用 YAML 1.2 syntax diagnostics 和基础编辑，不自行推断新的可执行 DSL、不能丢弃引用与注释，更不能显示 Runtime qualification PASS。
+- E2-A2 使用本地 `monaco-yaml@5.5.1` Worker；`enableSchemaRequest:false`、`format:false`、YAML 1.2，所有 schema 内容从固定 Owner 快照本地打包，不允许 CDN/远端请求。
 
 ## 9. E2-A1 Grammar-only 实现边界
 
-E2-A1 [PR #35](https://github.com/odango-chan/ca-skill-studio-demo/pull/35) 已通过 [291/291 tests + real Chromium](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41786681372)，在 Monaco 上使用 `site/yaml-source-diagnostics.mjs` 的 YAML 1.2 syntax markers（非 `monaco-yaml` Schema diagnostics）；与现有 Graph 的 `stringKeys`、`uniqueKeys`、`strict` 一致。只诊断语法；对整个 Procedure 的编排是否正确、Reference 解析、Runtime 是否可执行不作结论。
+E2-A1 [PR #35](https://github.com/odango-chan/ca-skill-studio-demo/pull/35) 已通过 [301/301 tests + real Chromium](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41787833576)。其首版独立语法标记已在 E2-A2 收敛为 `monaco-yaml` Worker 的统一 YAML 1.2 syntax diagnostics，避免同一编辑器存在两套 Marker owner。
 
-`yamlSchemaCapability(path)` 对 `assurance/procedure.yaml` 固定返回 `procedure-schema-incompatible`，`contract.yaml` / `predicates.yaml` 仅为 `schema-candidate-not-attached`。不能显示“Owner Schema 验证通过”，也不能将 Toolchain 旧 Procedure Schema 直接绑定至当前示例。
+`yamlSchemaCapability(path)` 对 `assurance/contract.yaml`、`assurance/predicates.yaml` 返回 `owner-schema-v1alpha1`；对 `assurance/procedure.yaml` 返回 `procedure-schema-incompatible`。Procedure 不绑定旧 Schema，但仍保留语法诊断和基础编辑。
 
-E2-A2 待另行评审的 `monaco-yaml` Worker、真正 Owner Schema JSON 配置、补全/hover，以及关闭远端 schema 请求不属于 A1 的交付。
+
+
+## 10. E2-A2 · 固定 Owner Schema 与 YAML Language Worker
+
+E2-A2 候选实现位于 [PR #36](https://github.com/odango-chan/ca-skill-studio-demo/pull/36)，堆叠在 E2-A1 #35：
+
+- 精确固定 `monaco-yaml@5.5.1`，`yaml.worker.js` 与 Monaco `editor.worker.js` 一样由 Pages 本地打包；`getWorker` 仅把 YAML 请求路由到该本地 Worker。
+- 从 `ca-agent-demo@7570b309` 的 vendored Toolchain snapshot `03a42764ee2a67e39f57ab550b63c7a5d7966199` 字节级复制 `common.schema.yaml`、`skill-contract.schema.yaml`、`predicate-set.schema.yaml`，记录在 `site/schemas/connectionagent/v1alpha1/manifest.json`，Node 测试重新计算 Git blob SHA 验证未漂移。
+- 只将 `assurance/contract.yaml` → `SkillContract`、`assurance/predicates.yaml` → `PredicateSet` 绑定固定 Owner Schema。公共 `common.schema.yaml` 仅作为本地 `$ref` 注册，不与编辑文件竞争匹配；内存中只将 `$id` 归一化到固定 Owner URI，原始 vendored Schema 文件不改动。
+- `enableSchemaRequest:false`、`yamlVersion:"1.2"`、`format:{enable:false}`：不访问远端 Schema，不提供自动格式化写回，避免改变用户 Source。Procedure 仍为 syntax-only；不声明 DSL/Runtime qualification。
+- Browser gate 直接检查实际 Owner Contract/Predicate 无误报、注入额外字段时被拒绝、恢复 Source 后标记清除；Procedure 语法错误仍可诊断；并验证 schema completion 与 enum hover。
+
+**E2-A2 Acceptance: PENDING CI。** 该分支尚未合并 `main`，也未通过 resulting-main Pages。
