@@ -3,12 +3,8 @@
 import * as monaco from "monaco-editor/editor";
 import "monaco-editor/features/register.all";
 import "monaco-editor/languages/definitions/register.all";
-import {languageForPath} from "./highlight.mjs";
-
-const languageId = path => {
-  const language = languageForPath(path);
-  return language === "plain" ? "plaintext" : language;
-};
+import {monacoLanguageForPath} from "./monaco-language.mjs";
+const languageId = monacoLanguageForPath;
 const ensureText = text => {
   if(typeof text !== "string")throw new TypeError("Source must be text");
   return text;
