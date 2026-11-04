@@ -2000,9 +2000,12 @@ async function initializeMonaco(){
   try{
     // Created before importing Monaco: workers are emitted as local Pages assets.
     self.MonacoEnvironment={
-      getWorker:(_moduleId,label)=>label==="yaml"
-        ? new Worker(new URL("./yaml.worker.js",import.meta.url),{type:"module"})
-        : new Worker(new URL("./editor.worker.js",import.meta.url),{type:"module"})
+      getWorker:(moduleId,label)=>{
+        // Monaco versions may expose the worker label alongside the module id;
+        // keep the YAML module id as a second exact discriminator.
+        const yamlWorker=label==="yaml"||moduleId==="monaco-yaml/yaml.worker"||moduleId==="yaml";
+        return new Worker(new URL(yamlWorker?"./yaml.worker.js":"./editor.worker.js",import.meta.url),{type:"module"});
+      }
     };
     const {createMonacoSourceBackend}=await import("./monaco-source-backend.mjs");
     candidate=createMonacoSourceBackend(host,{
