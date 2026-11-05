@@ -2001,6 +2001,7 @@ function activateWorkspace(workspace,entry,origin="sample",handle=null) {
   directorySaveEligible=origin==="directory";
   directorySessionHandle=origin==="directory"?handle:null;
   $("saveNotice").hidden=true;
+  $("directoryOpenNotice").hidden=true;
   $("reloadDirectoryButton").hidden=true;
   activePackage=workspace;
   activeFilePath=null;
@@ -2008,6 +2009,13 @@ function activateWorkspace(workspace,entry,origin="sample",handle=null) {
   if(!file||!file.editable)throw new Error("Workspace entry is not editable");
   activeFilePath=entry;
   loadDocument(entry,file.text,origin,{initial:file.initialText,historyState:file.history});
+}
+function showDirectoryOpenStatus(text,status="SUCCESS"){
+  const notice=$("directoryOpenNotice");
+  notice.hidden=false;
+  notice.dataset.status=status;
+  notice.textContent=text;
+  message(text);
 }
 function updateDirectorySaveControl(){
   const button=$("saveDirectoryButton");
@@ -2108,13 +2116,15 @@ $("openDirectoryButton").addEventListener("click",async()=>{
     const handle=await window.showDirectoryPicker({mode:"read"});
     const {workspace,entry,opaqueCount}=await importDirectoryHandle(handle);
     activateWorkspace(workspace,entry,"directory",handle);
-    message("已打开本地目录："+workspace.name+"（"+workspace.files.size+
-      " 文件，"+opaqueCount+" 项只保留字节）。保存时直接申请写权限。");
+    showDirectoryOpenStatus("已打开 "+workspace.name+" · "+workspace.files.size+
+      " 文件。保存时再授权写入。"+(opaqueCount?
+      " "+opaqueCount+" 项原样保留。":""));
   }catch(error){
     if(error?.name==="AbortError"){
-      message("已取消目录选择；工作区没有变化。");
+      showDirectoryOpenStatus("已取消目录选择；工作区没有变化。","CANCELLED");
     }else{
-      message("目录打开失败（当前工作区未变）："+String(error?.message??error));
+      showDirectoryOpenStatus("目录打开失败（当前工作区未变）："+
+        String(error?.message??error),"FAILED");
     }
   }
 });
@@ -2127,10 +2137,12 @@ directoryPicker.addEventListener("change",async()=>{
   try{
     const {workspace,entry,opaqueCount}=await importDirectoryFiles(files);
     activateWorkspace(workspace,entry,"directory");
-    message("已兼容导入 "+workspace.name+" · "+workspace.files.size+
-      " 文件，"+opaqueCount+" 项只保留字节；保存需要重新选目录。");
+    showDirectoryOpenStatus("已兼容导入 "+workspace.name+" · "+workspace.files.size+
+      " 文件；保存时需要重新选目录。"+(opaqueCount?
+        " "+opaqueCount+" 项原样保留。":""));
   }catch(error){
-    message("目录导入失败，现有工作区不变："+String(error?.message??error));
+    showDirectoryOpenStatus("目录导入失败，现有工作区不变："+String(error?.message??error),
+      "FAILED");
   }
 });
 filePicker.addEventListener("change",async()=>{
