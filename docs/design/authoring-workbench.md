@@ -153,3 +153,6 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 - 本地阶段画布只是 UI 派生视图，不复制数据源、业务 Node、Route 或执行步骤；返回完整 Procedure 图后不丢选中状态。Source 修改后若目标 Node 不再存在，自动取消此节点局部视图；禁止把这个新视图当成 Runtime 验收或生成新 YAML。
 
 验收新增：对当前 owner 根图 **17/17 真实节点逐个双击**，核对 PRE/POST 有无、Step/Outcome 来源、只有 OP 的终态、返回整图、PROCEDURE 内部进入 Child、直接 Explorer 子图没有虚构调用者；所有 Source bytes 不变。前一次浏览器双击测试发现 React Flow 自身双击缩放拦截，必须通过 **真实的 Node DOM 事件**验证，不能把单测 PASS 误报为实际交互 PASS。
+
+
+代码检查：[CI #42024171379](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42024171379) 成功（390/390 Unit、TypeScript、Build、Chromium）。浏览器记录显示 17/17 Node 双击 PASS、UDM Subscribe PRE 5/POST 1、终态仅 OP、Procedure 内进入 Child、返回 Root 17/46 和 Source 保持。随后精简了重复的组件事件回调和临时调试字段，最终 HEAD 仍需同样门禁；成功部署到 Pages 之前不声称线上可用。
