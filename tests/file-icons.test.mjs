@@ -117,3 +117,19 @@ test("shared icon registry uses deterministic, stroke-only and accessible SVG",a
   assert.equal(operatorIcon("verify"),"shield-check");
   assert.throws(()=>iconShapes("not-a-real-icon"),/Unknown Studio icon/);
 });
+
+test("every named toolbar icon exists; directory import never breaks startup",async()=>{
+  const {iconShapes}=await import("../site/icons.mjs");
+  const app=read("site/app.mjs"),html=read("site/index.html");
+  const start=app.indexOf("function decorateToolbar()");
+  const end=app.indexOf("\ndecorateToolbar();",start);
+  assert.ok(start>=0&&end>start);
+  const block=app.slice(start,end);
+  const icons=[...block.matchAll(/\["[^"]+","([^"]+)","[^"]+"\]/g)]
+    .map(match=>match[1]);
+  assert.ok(icons.includes("folder-open"));
+  assert.ok(icons.includes("folder-plus"));
+  for(const icon of icons)assert.doesNotThrow(()=>iconShapes(icon),icon);
+  assert.match(html,/id="openDirectoryButton"/);
+  assert.match(html,/id="directoryPicker"[^>]*webkitdirectory/);
+});

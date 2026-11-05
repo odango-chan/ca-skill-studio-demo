@@ -497,6 +497,81 @@ try{
   if(!/executable|authoring_assistant/.test(hoverText))
     throw Error("E2 Owner schema hover did not expose enum: "+hoverText);
 
+  // E4-A1: real Chromium UI receives a directory-shaped FileList, opens a
+  // source-backed multi-file Package and ZIP-exports exact opaque bytes.
+  // This is an in-browser FileList event, not an OS chooser / disk-write test.
+  const directorySmoke=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const sourceUrl='./samples/packages/establish-pdu-session/assurance/procedure.yaml';",
+    " const proc=await (await fetch(sourceUrl)).text();",
+    " const files=[",
+    "  ['local-e4/SKILL.md','# Local E4\\n'],",
+    "  ['local-e4/assurance/procedure.yaml',proc],",
+    "  ['local-e4/references/test.md','# Reference\\n'],",
+    "  ['local-e4/assets/blob.bin',new Uint8Array([0,255,137,80,78,71,0])],",
+    "  ['local-e4/custom/unknown.xyz',new Uint8Array([0,200,201,0])]",
+    " ];",
+    " const dt=new DataTransfer();",
+    " for(const [path,data] of files){",
+    "  const file=new File([data],path.split('/').at(-1));",
+    "  Object.defineProperty(file,'webkitRelativePath',{value:path});",
+    "  dt.items.add(file);",
+    " }",
+    " const inp=document.getElementById('directoryPicker');",
+    " const oldConfirm=window.confirm;",
+    " window.confirm=()=>true;",
+    " inp.files=dt.files;",
+    " const selected=[...inp.files].map(f=>f.webkitRelativePath);",
+    " inp.dispatchEvent(new Event('change',{bubbles:true}));",
+    " for(let i=0;i<80&&!document.getElementById('fileName')?.textContent.includes('local-e4');i++)await sleep(80);",
+    " const name=document.getElementById('fileName').textContent;",
+    " const count=document.getElementById('fileCount').textContent;",
+    " const opaque=[...document.querySelectorAll('#assetTree button.asset-file')].filter(b=>b.disabled);",
+    " const raw=document.getElementById('source').value;",
+    " const source=document.getElementById('source');",
+    " source.value='# E4 edited\\n'+raw;",
+    " source.dispatchEvent(new Event('input',{bubbles:true}));",
+    " await sleep(150);",
+    " let blob=null;",
+    " const objectUrl=URL.createObjectURL;",
+    " URL.createObjectURL=function(value){blob=value;return objectUrl.call(URL,value)};",
+    " document.getElementById('exportPackageButton').click();",
+    " URL.createObjectURL=objectUrl;",
+    " window.confirm=oldConfirm;",
+    " const zip=new Uint8Array(await blob?.arrayBuffer());",
+    " const view=new DataView(zip.buffer),reader=new TextDecoder();",
+    " const entries=new Map();let p=0;",
+    " while(p+30<zip.length&&view.getUint32(p,true)===0x04034b50){",
+    "  const n=view.getUint16(p+26,true),size=view.getUint32(p+18,true);",
+    "  const path=reader.decode(zip.slice(p+30,p+30+n));",
+    "  entries.set(path,zip.slice(p+30+n,p+30+n+size));",
+    "  p+=30+n+size;",
+    " }",
+    " const opaqueBytes=entries.get('assets/blob.bin');",
+    " const unknown=entries.get('custom/unknown.xyz');",
+    " const procZip=entries.get('assurance/procedure.yaml');",
+    " const skillZip=entries.get('SKILL.md');",
+    " return {selected,name,count,disabled:opaque.length,",
+    "  problems:document.getElementById('projectionState').textContent,",
+    "  zipCount:entries.size,zipPaths:[...entries.keys()],",
+    "  rawPreserved:raw===proc,",
+    "  modified:reader.decode(procZip||new Uint8Array()).startsWith('# E4 edited\\n'),",
+    "  skillIntact:reader.decode(skillZip||new Uint8Array())==='# Local E4\\n',",
+    "  opaqueIntact:String(opaqueBytes)==='0,255,137,80,78,71,0',",
+    "  unknownIntact:String(unknown)==='0,200,201,0',",
+    "  message:document.getElementById('hint').textContent};",
+    "})()"
+  ].join("\n"));
+  console.log("E4_LOCAL_DIRECTORY_IMPORT",JSON.stringify(directorySmoke));
+  if(directorySmoke?.selected.length!==5||
+    !directorySmoke.name.includes("local-e4 / assurance/procedure.yaml")||
+    directorySmoke.count!=="5 文件"||directorySmoke.disabled!==2||
+    directorySmoke.zipCount!==5||!directorySmoke.rawPreserved||
+    !directorySmoke.modified||!directorySmoke.skillIntact||
+    !directorySmoke.opaqueIntact||!directorySmoke.unknownIntact)
+    throw Error("E4 directory browser import/ZIP FAIL: "+JSON.stringify(directorySmoke));
+
   // Evaluate browser diagnostics after all E2 YAML interactions have run.
   if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
   if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));

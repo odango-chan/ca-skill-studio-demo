@@ -5,7 +5,7 @@
 
 ## Overall
 
-静态浏览器 Studio 的 D1 React Flow/ELK、D2 Node Designer A1–A5、固定多文件 Package 浏览及图标统一已进入 `main`，并通过了本仓范围内的单测、构建及 Chromium 回归。**尚无**完整磁盘 Package 目录导入/原位保存、完整 Runtime validator 或真实 5GC 验收能力。Pages 的 PASS 不等于 Skill Runtime PASS。
+静态浏览器 Studio 的 D1 React Flow/ELK、D2 Node Designer A1–A5、固定多文件 Package 浏览及图标统一已进入 `main`，并通过了本仓范围内的单测、构建及 Chromium 回归。**E4-A1 浏览器目录导入/ZIP 保真正在 PR 验收中**；仍没有原位磁盘保存、外部文件冲突检测、完整 Runtime validator 或真实 5GC 验收能力。Pages 的 PASS 不等于 Skill Runtime PASS。
 
 ## Current scope matrix
 
@@ -37,13 +37,16 @@
 | E3-A1 Python Script caller/Schema 来源导航（只读） | ACCEPTED（Editor-tier） | IMPLEMENTED（main@fc6c42a；PR #45 MERGED） | PASS（333/333 + Chromium + resulting-main Pages） | [PR #45](https://github.com/odango-chan/ca-skill-studio-demo/pull/45)、[exact-head CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41807700051)、[main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41811535041)、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) |
 | E3-A2 Python 顶层 class/def/async def 符号导航（只读） | ACCEPTED（Editor-tier） | IMPLEMENTED（main@4e88e0a；PR #46 MERGED） | PASS（338/338 + Chromium + resulting-main Pages） | [PR #46](https://github.com/odango-chan/ca-skill-studio-demo/pull/46)、[rebased exact-head CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41811806093)、[main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41812070377)、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) |
 | D4-A2.2b2/A3b2b2b/A4b2 跨生产者写入 / 带副作用或输出依赖 Step 的写入 / 新 Phase on-map 与 owner Outcome 契约 | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
-| 完整本地 Package 目录导入 / 原位保存 / 磁盘 Conflict | PROPOSED | NOT_STARTED | NOT_RUN | — |
+| E4-A1 浏览器所选目录导入、未知文件保留与 ZIP 导出 | ACCEPTED（Editor-tier） | IMPLEMENTED（PR candidate） | PENDING（单测/Chromium/Pages） | [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)、[设计](design/source-editor-workstream.md) |
+| E4-A2 原位保存 / 磁盘 Conflict / 非原子多文件失败恢复 | PROPOSED | NOT_STARTED | NOT_RUN | [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
 
 唯一公开示例名称与 owner 的 SKILL 目录 `establish-pdu-session` 完全一致；Ensure Package 已从选择器、清单和发布资源中移除。旧 Ensure Package 原文与独立 Procedure YAML 仅保留在源码中给单测/浏览器回归使用，发布到 Pages 的 `dist/` 仅包含 `establish-pdu-session` Package。`references/` 在 Explorer 默认展开。[PR #21 CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41766617644) 已验证单测、TypeScript、构建和真实 Chromium 交互 PASS；[main Pages #41771402007](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41771402007) 已在 `f93f1e3f`（重跑 attempt 2）完成静态资产检查、Chromium 和 Pages 部署 PASS。
 
 ## Current open work
+
+- [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)：E4-A1 安全目录导入代码候选待门禁；原位保存/Conflict 尚未实现。
 
 - [#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25)：E3-A1/A2 已合入且部署；Python 语言服务（例如浏览器内 Pyright）仍仅候选，尚无真实语义诊断、类型检查或脚本执行。E4 目录读写仍独立推进。
 

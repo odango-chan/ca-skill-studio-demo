@@ -103,6 +103,8 @@ jobs:
           node --check site/layout.mjs
           node --check site/workbench.mjs
           node --check site/sample-packages.mjs
+          node --check site/directory-import.mjs
+          node --check tests/directory-import.test.mjs
           node --check site/zip.mjs
           node --check site/attribute-patch.mjs
           node --check site/highlight.mjs

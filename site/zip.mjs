@@ -25,11 +25,19 @@ export function zipPackage(entries){
   let bytesTotal=0;
   const names=new Set(),records=[];
   for(const item of entries){
-    if(!item||!pathOK(item.path)||names.has(item.path)||typeof item.text!=="string")
-      throw new Error("Invalid ZIP file path or text");
+    const isText=typeof item?.text==="string";
+    const opaque=item?.bytes instanceof Uint8Array?item.bytes:null;
+    const original=item?.originalBytes instanceof Uint8Array?item.originalBytes:null;
+    if(!item||!pathOK(item.path)||names.has(item.path)||
+       (opaque&&isText)||(!isText&&!opaque))
+      throw new Error("Invalid ZIP file path or content");
     names.add(item.path);
     const name=encoder.encode(item.path);
-    const data=encoder.encode(item.text);
+    // An untouched imported text file must be byte-exact (BOM and any
+    // original UTF-8 encoding are preserved); edited text uses the Source.
+    const data=opaque?opaque.slice():
+      original&&item.text===item.originalText?original.slice():
+      encoder.encode(item.text);
     if(name.length>65535 || data.length>1024*1024)throw new Error("ZIP file too large");
     bytesTotal+=data.length;
     if(bytesTotal>8*1024*1024)throw new Error("ZIP payload too large");
