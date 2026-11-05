@@ -286,7 +286,7 @@ test("E4-A2 final Source edit during last write cannot be reported as all saved"
 
 test("E4-A2 rejects a post-edit Package over 8 MiB before asking for write permission",async()=>{
   const initialLength=928000;
-  const initial="# Skill\\n"+ "x".repeat(initialLength-8);
+  const initial="# Skill\n"+ "x".repeat(initialLength-8);
   const entries=[file("SKILL.md",initial)];
   for(let i=0;i<8;i++)entries.push(file("notes/part"+i+".txt","x".repeat(initialLength)));
   const ws=(await importDirectoryFiles(entries)).workspace;
@@ -303,7 +303,7 @@ test("E4-A2 rejects a post-edit Package over 8 MiB before asking for write permi
 });
 
 test("E4-A2 rejects malformed UTF-16 and NUL instead of silently changing Source bytes",async()=>{
-  for(const invalid of ["# lone-high\\uD800","# lone-low\\uDC00","# embedded\\u0000NUL"]){
+  for(const invalid of ["# lone-high\uD800","# lone-low\uDC00","# embedded\u0000NUL"]){
     const ws=await workspace(),storage=mockDirectory(snapshot(ws));
     edit(ws,"SKILL.md",invalid);
     const response=await saveDirectoryChanges({workspace:ws,handle:storage.handle,
@@ -319,7 +319,7 @@ test("E4-A2 rejects malformed UTF-16 and NUL instead of silently changing Source
 
 test("E4-A2 valid UTF-8 multibyte text remains exact on disk",async()=>{
   const ws=await workspace(),storage=mockDirectory(snapshot(ws));
-  const text="# 你好，世界 🙌\\n";
+  const text="# 你好，世界 🙌\n";
   edit(ws,"SKILL.md",text);
   const outcome=await saveDirectoryChanges({workspace:ws,handle:storage.handle,
     confirmWrite:allow});
