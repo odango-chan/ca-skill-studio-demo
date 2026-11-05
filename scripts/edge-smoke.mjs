@@ -251,6 +251,70 @@ try{
      childPhases.badges.some(x=>x.includes("PRE"))||
      !childPhases.badges.some(x=>x.includes("POST"))||!childPhases.restored)
     throw Error("D1-A1 child Phase semantics or Root return FAIL: "+JSON.stringify(childPhases));
+  // D1-A2: do not clone shared Children or fabricate a caller on direct browse.
+  const subflowNav=await evaluate([
+    "(async()=>{",
+    "  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));",
+    "  const count=()=>document.querySelectorAll('.react-flow__node').length;",
+    "  const wait=async n=>{for(let i=0;i<90&&count()!==n;i++)await sleep(50);};",
+    "  const card=id=>document.querySelector('.react-flow__node[data-id=\"'+id+'\"]');",
+    "  const open=id=>card(id)?.querySelector('button.designer-subflow-enter')?.click();",
+    "  const rootSource=document.getElementById('source').value;",
+    "  const rootCards=document.querySelectorAll('.designer-node.is-subflow-invocation').length;",
+    "  const openButtons=document.querySelectorAll('button.designer-subflow-enter').length;",
+    "  open('n4-session-establishment');await wait(4);",
+    "  const scope=document.getElementById('procedureScope');",
+    "  const pane=document.getElementById('graphPane');",
+    "  const n4={",
+    "    nodes:count(),boundaryVisible:!scope.hidden,",
+    "    name:document.getElementById('procedureScopeName').textContent,",
+    "    context:document.getElementById('procedureScopeContext').textContent,",
+    "    bread:document.getElementById('procedureBread').textContent,",
+    "    paneScope:pane.dataset.procedureScope,",
+    "    border:getComputedStyle(pane,'::before').borderTopStyle,",
+    "    returnText:document.getElementById('procedureScopeReturn').textContent",
+    "  };",
+    "  document.getElementById('procedureScopeReturn').click();await wait(17);",
+    "  await sleep(250);",
+    "  const returnedToN4=count()===17&&",
+    "    card('n4-session-establishment')?.querySelector('.designer-node.is-selected')!==null&&",
+    "    document.getElementById('procedureScope').hidden;",
+    "  open('finalize-failed');await wait(5);",
+    "  const failedCtx=document.getElementById('procedureScopeContext').textContent;",
+    "  document.getElementById('backProcedure').click();await wait(17);",
+    "  open('finalize-success');await wait(5);",
+    "  const successCtx=document.getElementById('procedureScopeContext').textContent;",
+    "  document.getElementById('procedureScopeReturn').click();await wait(17);",
+    "  const tree=[...document.querySelectorAll('#procedureTree button.child')]",
+    "    .find(x=>x.textContent.includes('await-initial-n4-session-establishment'));",
+    "  tree?.click();await wait(4);",
+    "  const directContext=document.getElementById('procedureScopeContext').textContent;",
+    "  const directReturn=document.getElementById('procedureScopeReturn').textContent;",
+    "  const directNoGuess=!directContext.includes('调用位置')&&",
+    "    directContext.includes('直接打开')&&directReturn==='返回 Root';",
+    "  document.getElementById('procedureScopeReturn').click();await wait(17);",
+    "  const sourcePreserved=document.getElementById('source').value===rootSource;",
+    "  const restored=count()===17&&",
+    "    document.querySelectorAll('.react-flow__edge-path').length===46;",
+    "  return {rootCards,openButtons,n4,returnedToN4,failedCtx,successCtx,",
+    "    directContext,directReturn,directNoGuess,sourcePreserved,restored};",
+    "})()",
+  ].join("\n"));
+  console.log("D1_A2_SUBFLOW_CONTEXT",JSON.stringify(subflowNav));
+  if(subflowNav?.rootCards!==6||subflowNav.openButtons!==6||
+     subflowNav.n4?.nodes!==4||!subflowNav.n4.boundaryVisible||
+     subflowNav.n4.name!=="await-initial-n4-session-establishment"||
+     !subflowNav.n4.context.includes("n4-session-establishment")||
+     !subflowNav.n4.bread.includes("n4-session-establishment")||
+     subflowNav.n4.paneScope!=="child"||subflowNav.n4.border!=="dashed"||
+     subflowNav.n4.returnText!=="返回调用节点"||!subflowNav.returnedToN4||
+     !subflowNav.failedCtx.includes("finalize-failed")||
+     !subflowNav.successCtx.includes("finalize-success")||
+     subflowNav.failedCtx===subflowNav.successCtx||
+     !subflowNav.directNoGuess||!subflowNav.sourcePreserved||
+     !subflowNav.restored)
+    throw Error("D1-A2 Child call-site navigation FAIL: "+JSON.stringify(subflowNav));
+
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
     "(()=>{",

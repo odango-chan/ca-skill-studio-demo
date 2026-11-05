@@ -1,5 +1,6 @@
 import { layoutProcedure } from "./graph.mjs";
 import {describeProcedureLegend} from "./react-flow-projection.mjs";
+import {resolveProcedureCall,retainProcedureTrail} from "./procedure-navigation.mjs";
 import { layoutProcedureELK,selectGraphScope } from "./layout.mjs";
 import {detailedLayoutAllowed} from "./graph-scale.mjs";
 import {auditPackageWorkspace} from "./package-audit.mjs";
@@ -108,6 +109,8 @@ let projection = null;
 let lastGood = null;
 let lastWorkspace = null;
 let activeProcedureId = null;
+// Source-backed call-site trail; UI-only navigation, reset when files change.
+let procedureTrail=[];
 let graph = null;
 let selection = null;
 let mode = "visual";
@@ -135,8 +138,11 @@ const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
   onNodeSelect:id=>selectNode(id),
   onNodeDoubleClick:id=>{
     const node=lastGood?.nodes.find(item=>item.id===id);
-    if(node?.children?.length===1)enterProcedure(node.children[0].procedure);
+    if(node?.children?.length===1)
+      enterProcedure(node.children[0].procedure,{callerId:id});
   },
+  onEnterChild:(callerId,childName)=>
+    enterProcedure(childName,{callerId}),
   onEdgeSelect:bundle=>chooseEdgeRoute(bundle),
   onReconnect:(routeId,sourceId,targetId)=>{
     if(projection?.state!=="READY"||!lastGood)return;
@@ -426,6 +432,7 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
   lastGood = null;
   lastWorkspace = null;
   activeProcedureId = null;
+  procedureTrail=[];
   neighborView = false;
   $("neighborsOnly").setAttribute("aria-pressed","false");
   invalidateLayout();
@@ -468,6 +475,7 @@ function refresh(refit = false) {
       selection = null;
     }
     lastGood = parsed.procedures.get(activeProcedureId);
+    procedureTrail=retainProcedureTrail(parsed,procedureTrail,activeProcedureId);
     projectedText = text;
     graph = layoutProcedure(lastGood);
     if (selection && selection.kind === "node" && !lastGood.nodes.some(n => n.id === selection.id)) selection = null;
@@ -482,6 +490,7 @@ function refresh(refit = false) {
     // graph=null all graphic operations are disabled until valid reprojection.
     if(parsed.state==="SOURCE_ONLY"){
       activeProcedureId=null;
+      procedureTrail=[];
       selection=null;
     }
     projectedText=null;
@@ -518,23 +527,56 @@ source.addEventListener("input", () => {
   refresh(false);
 });
 
-function enterProcedure(name) {
-  if (projection?.state !== "READY" || !lastWorkspace?.procedures.has(name)) return;
-  if (activeProcedureId === name) return;
+function enterProcedure(name,{callerId=null,returning=false,focusNode=null}={}) {
+  if(projection?.state!=="READY"||!lastWorkspace?.procedures.has(name))return;
+  if(activeProcedureId===name)return;
+  const original=activeProcedureId;
+  let call=null;
+  if(callerId!==null){
+    call=resolveProcedureCall(lastWorkspace,original,callerId,name);
+    if(!call){message("子流程调用位置已改变；请重新选择调用节点。");return;}
+  }
+  if(returning){
+    const top=procedureTrail.at(-1);
+    if(!top||top.parentProcedure!==name||top.childProcedure!==original){
+      procedureTrail=[];focusNode=null;
+    }else procedureTrail=procedureTrail.slice(0,-1);
+  }else if(call){
+    procedureTrail=[...procedureTrail,call];
+  }else{
+    // Direct Explorer/picker access must not guess a caller. Going to a
+    // known ancestor preserves only the still-relevant prefix.
+    const idx=procedureTrail.findIndex(item=>item.parentProcedure===name);
+    procedureTrail=idx<0?[]:procedureTrail.slice(0,idx);
+  }
   canvasRouteProposal=null;
-  activeProcedureId = name;
-  lastGood = lastWorkspace.procedures.get(name);
-  graph = layoutProcedure(lastGood);
-  selection = null;
-  setInspectorOpen(false,false);
-  neighborView = false;
+  activeProcedureId=name;
+  lastGood=lastWorkspace.procedures.get(name);
+  graph=layoutProcedure(lastGood);
+  const validFocus=focusNode&&lastGood.nodes.some(node=>node.id===focusNode);
+  selection=validFocus?{kind:"node",id:focusNode}:null;
+  setInspectorOpen(Boolean(selection),false);
+  neighborView=false;
   $("neighborsOnly").setAttribute("aria-pressed","false");
   renderProcedureNavigation();
   renderOutline();
   renderInspector();
   renderGraph();
-  scheduleELKLayout(0,true);
-  requestAnimationFrame(fit);
+  // Returning to the exact call site is more useful than fitting the whole
+  // Root; use the existing center path after the final ELK layout.
+  scheduleELKLayout(0,!validFocus);
+  if(validFocus)requestAnimationFrame(()=>centerNode(focusNode));
+  else requestAnimationFrame(fit);
+}
+function returnFromProcedure(){
+  const call=procedureTrail.at(-1);
+  if(call?.childProcedure===activeProcedureId&&
+     resolveProcedureCall(lastWorkspace,call.parentProcedure,
+       call.callerId,call.childProcedure)){
+    enterProcedure(call.parentProcedure,{returning:true,focusNode:call.callerId});
+  }else if(lastWorkspace){
+    enterProcedure(lastWorkspace.entry);
+  }
 }
 function renderAssetNavigation(){
   const tree=$("assetTree");
@@ -678,14 +720,34 @@ function renderProcedureNavigation() {
   if(activeProcedureId)picker.value=activeProcedureId;
   picker.disabled=unavailable;
   const root=Boolean(lastWorkspace&&activeProcedureId===lastWorkspace.entry);
+  const call=procedureTrail.at(-1)?.childProcedure===activeProcedureId?
+    procedureTrail.at(-1):null;
   $("backProcedure").hidden=unavailable||root;
   $("backProcedure").disabled=unavailable||root;
-  setText("procedureBread",unavailable?"当前投影不可用":activeProcedureId||"Procedure");
+  const backLabel=call?"返回调用节点 "+call.callerId:"返回 Root Procedure";
+  $("backProcedure").title=backLabel;
+  $("backProcedure").setAttribute("aria-label",backLabel);
+  const breadcrumb=call?
+    call.parentProcedure+" / "+call.callerId+" / "+activeProcedureId:
+    !root&&lastWorkspace?lastWorkspace.entry+" / "+activeProcedureId:
+    activeProcedureId||"Procedure";
+  setText("procedureBread",unavailable?"当前投影不可用":breadcrumb);
+  const boundary=$("procedureScope");
+  boundary.hidden=unavailable||root;
+  $("graphPane").dataset.procedureScope=!unavailable&&!root?"child":"root";
+  if(!unavailable&&!root){
+    setText("procedureScopeName",activeProcedureId);
+    const context=call?
+      "调用位置 · "+call.parentProcedure+" / "+call.callerId+" · "+call.via:
+      "直接打开 · 未指定调用节点";
+    setText("procedureScopeContext",context);
+    $("procedureScopeReturn").textContent=call?"返回调用节点":"返回 Root";
+    $("procedureScopeReturn").setAttribute("aria-label",backLabel);
+  }
 }
 $("procedurePicker").addEventListener("change", value => enterProcedure(value.target.value));
-$("backProcedure").addEventListener("click", () => {
-  if (lastWorkspace) enterProcedure(lastWorkspace.entry);
-});
+$("backProcedure").addEventListener("click", returnFromProcedure);
+$("procedureScopeReturn").addEventListener("click",returnFromProcedure);
 
 function renderOutline() {
   nodeOutline.replaceChildren();
@@ -1623,7 +1685,7 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
     const ref=phaseChildren.find(c=>c.via.startsWith(phase.name+".steps[") &&
       c.procedure===step.value && c.line===step.line);
     if(ref)body.appendChild(button("进入子过程 · "+ref.procedure,
-      ()=>enterProcedure(ref.procedure),"journey-child"));
+      ()=>enterProcedure(ref.procedure,{callerId:selection?.kind==="node"?selection.id:null}),"journey-child"));
   }
   addPhaseVerifyCreation(phase,body,addOptions);
 }
@@ -1794,7 +1856,7 @@ function renderNodeJourney(model,caps) {
   main.appendChild(button("查看源码 · L"+node.line,()=>lineJump(node.line),"source-link"));
   for(const child of model.execute.children){
     main.appendChild(button("进入 · "+child.procedure,
-      ()=>enterProcedure(child.procedure),"journey-child"));
+      ()=>enterProcedure(child.procedure,{callerId:node.id}),"journey-child"));
   }
   if(model.confirm.phase || model.confirm.routes.length){
     const body=journeyStage(3,"确认",

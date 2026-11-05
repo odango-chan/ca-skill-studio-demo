@@ -97,6 +97,13 @@
       <div id="editorBody" class="editor-body" data-mode="visual">
         <div id="graphPane" class="graph-pane" data-labels="key">
           <div id="reactFlowRoot" class="procedure-flow-root" aria-label="Procedure Designer 交互画布"></div>
+          <div id="procedureScope" class="procedure-scope" role="region"
+            aria-label="当前子流程边界与调用位置" hidden>
+            <div class="procedure-scope-eyebrow"><span class="procedure-scope-dot"></span>SUBFLOW · 独立 Procedure</div>
+            <strong id="procedureScopeName" class="procedure-scope-name"></strong>
+            <div id="procedureScopeContext" class="procedure-scope-context"></div>
+            <button id="procedureScopeReturn" type="button" class="procedure-scope-return">返回调用节点</button>
+          </div>
           <details id="graphLegend" class="graph-legend" aria-label="流程图节点与连线图例">
             <summary>图例</summary>
             <div class="graph-legend-body">
