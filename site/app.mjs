@@ -173,6 +173,19 @@ const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
   },
   onPaneClick:()=>{if(canvasRouteProposal)return;if(selection)clearSelection();}
 });
+// React Flow may consume its own double-click for viewport zoom. Capture a
+// real Node target before that handler; this is the same actual Node id used
+// for all graph selection/patch operations, never a synthetic Stage node.
+$("reactFlowRoot").addEventListener("dblclick",event=>{
+  const target=event.target?.closest?.(".react-flow__node");
+  if(!target||!$("reactFlowRoot").contains(target))return;
+  const nodeId=target.getAttribute("data-id");
+  if(!nodeId)return;
+  event.preventDefault();
+  event.stopPropagation();
+  openNodeFocus(nodeId);
+},true);
+
 
 function invalidateLayout() {
   layoutTicket++;
@@ -2065,8 +2078,10 @@ function chooseEdgeRoute(bundle) {
 // available for every real Node, including CALL/TERMINAL, irrespective of
 // whether the Node invokes an independently declared Child Procedure.
 function openNodeFocus(id){
+  $("nodeFocus").dataset.openAttempt=id+" / "+projection?.state+" / "+viewKind;
   if(projection?.state!=="READY"||viewKind!=="procedure"||
      !lastGood?.nodes.some(node=>node.id===id))return;
+  if(nodeFocusId===id)return;
   selectNode(id);
   nodeFocusId=id;
   renderProcedureNavigation();
