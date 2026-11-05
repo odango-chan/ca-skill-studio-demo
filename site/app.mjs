@@ -2061,6 +2061,131 @@ function chooseEdgeRoute(bundle) {
 }
 
 
+// A2 Node drill-down is a source-backed, read-only local stage view. It is
+// available for every real Node, including CALL/TERMINAL, irrespective of
+// whether the Node invokes an independently declared Child Procedure.
+function openNodeFocus(id){
+  if(projection?.state!=="READY"||viewKind!=="procedure"||
+     !lastGood?.nodes.some(node=>node.id===id))return;
+  selectNode(id);
+  nodeFocusId=id;
+  renderProcedureNavigation();
+  renderNodeFocus();
+  requestAnimationFrame(()=>$("nodeFocus").focus());
+}
+function closeNodeFocus(){
+  if(!nodeFocusId)return;
+  const focusId=nodeFocusId;
+  nodeFocusId=null;
+  renderProcedureNavigation();
+  renderNodeFocus();
+  requestAnimationFrame(()=>centerNode(focusId));
+}
+$("nodeFocusReturn").addEventListener("click",closeNodeFocus);
+function renderNodeFocus(){
+  const model=projection?.state==="READY"&&viewKind==="procedure"&&nodeFocusId
+    ?nodeJourney(lastGood,nodeFocusId):null;
+  const visible=Boolean(model);
+  const host=$("nodeFocus");
+  host.hidden=!visible;
+  $("reactFlowRoot").inert=visible;
+  if(visible)$("reactFlowRoot").setAttribute("aria-hidden","true");
+  else $("reactFlowRoot").removeAttribute("aria-hidden");
+  $("graphPane").dataset.nodeFocus=visible?"node":"graph";
+  $("graphLegend").hidden=visible||viewKind!=="procedure";
+  $("graphViewOptions").hidden=visible||viewKind!=="procedure";
+  $("zoomViewOptions").hidden=visible||viewKind!=="procedure";
+  $("fit").hidden=visible||viewKind!=="procedure";
+  if(visible)$("procedureScope").hidden=true;
+  if(!visible)return;
+  const node=model.node,stages=$("nodeFocusStages");
+  stages.replaceChildren();
+  setText("nodeFocusTitle",node.id);
+  setText("nodeFocusSubtitle",
+    activeProcedureId+" · "+node.operator.toUpperCase()+" · L"+node.line);
+  const call=procedureTrail.at(-1)?.childProcedure===activeProcedureId?
+    procedureTrail.at(-1):null;
+  setText("procedureBread",
+    (call?call.parentProcedure+" / "+call.callerId+" / ":"")+
+    activeProcedureId+" / "+node.id);
+  const stage=(kind,label,description)=>{
+    const card=el("article","node-focus-stage is-"+kind);
+    const head=el("div","node-focus-stage-heading");
+    head.append(el("strong","",label),el("span","",description));
+    card.appendChild(head);
+    stages.appendChild(card);
+    return card;
+  };
+  const addRoutes=(card,routes)=>{
+    if(!routes?.length)return;
+    const list=el("div","node-focus-route-list");
+    list.setAttribute("aria-label","声明的 Outcome 路由");
+    for(const route of routes){
+      const tone=classifyRouteTone([route.outcome]);
+      const chip=el("span","node-focus-route tone-"+tone,
+        route.outcome+" → "+route.target);
+      chip.title=route.routeSource+" · L"+route.line;
+      list.appendChild(chip);
+    }
+    card.appendChild(list);
+  };
+  const childEntry=(card,ref)=>{
+    // A procedure invocation is not an extra Phase/Node. It only navigates
+    // to another *existing* Procedure in the current Source projection.
+    if(!lastWorkspace?.procedures.has(ref.procedure))return;
+    const enter=button("进入子流程 · "+ref.procedure,
+      ()=>enterProcedure(ref.procedure,{callerId:node.id}),"node-focus-subflow");
+    enter.title=ref.via+" · L"+ref.line;
+    card.appendChild(enter);
+  };
+  const drawPhase=(name,label,modelPart,kind)=>{
+    if(!modelPart.phase)return; // No synthetic PRE/POST stages.
+    const steps=modelPart.phase.steps||[];
+    const card=stage(kind,label,steps.length+" Steps");
+    if(steps.length){
+      const list=el("ol","node-focus-steps");
+      for(const step of steps){
+        const row=el("li","node-focus-step");
+        const main=el("div","node-focus-step-main");
+        if(step.name)main.appendChild(el("span","node-focus-step-name",step.name));
+        main.appendChild(el("span","",step.value));
+        const kindLabel=el("span","node-focus-step-kind",step.operator.toUpperCase());
+        row.append(kindLabel,main);
+        const sourceButton=button("L"+step.line,
+          ()=>lineJump(step.line),"node-focus-source-link");
+        sourceButton.title="在 Source 定位本步骤";
+        row.appendChild(sourceButton);
+        list.appendChild(row);
+        const via=name+".steps["+(step.index-1)+"]";
+        const child=model.children.find(ref=>ref.via===via&&ref.procedure===step.value);
+        if(child){
+          const item=el("li","node-focus-step-child");
+          childEntry(item,child);
+          list.appendChild(item);
+        }
+      }
+      card.appendChild(list);
+    }else card.appendChild(el("p","node-focus-empty","此阶段没有 Step"));
+    addRoutes(card,modelPart.routes);
+  };
+  const arrow=()=>{
+    const connector=el("div","node-focus-connector","↓");
+    connector.setAttribute("aria-hidden","true");
+    stages.appendChild(connector);
+  };
+  if(model.prepare.phase){
+    drawPhase("preconditions","PRE · 前置条件",model.prepare,"pre");
+    arrow();
+  }
+  const op=stage("op","OP · "+node.operator.toUpperCase(),node.value);
+  op.appendChild(el("div","node-focus-stage-value",node.value));
+  for(const child of model.execute.children)childEntry(op,child);
+  addRoutes(op,model.execute.routes);
+  if(model.confirm.phase){
+    arrow();
+    drawPhase("postconditions","POST · 后置条件",model.confirm,"post");
+  }
+}
 function renderGraphLegend(){
   const nodeHost=$("graphLegendNodeTypes");
   const stepHost=$("graphLegendStepTypes");
@@ -2088,6 +2213,7 @@ function renderGraph() {
     nodeEditorCapabilities(selection.id).newRoute?.outcomes?.length
     ? selection.id:null;
   flowCanvas.render(graph,lastGood,selection,showAllLabels,sourceId);
+  renderNodeFocus();
 }
 function activateWorkspace(workspace,entry,origin="sample",handle=null) {
   if(directorySaveBusy)throw new Error("本地保存进行中，暂不能替换工作区");
