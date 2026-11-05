@@ -382,6 +382,68 @@ try{
      !nodeDrilldown.sourcePreserved)
     throw Error("D1-A2 every-Node drilldown FAIL: "+JSON.stringify(nodeDrilldown));
 
+  // D1-A3: real predecessor/current/successor topology and multi-hop browsing.
+  const neighborhood=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const card=id=>document.querySelector('.react-flow__node[data-id=\"'+id+'\"]');",
+    " const focus=document.getElementById('nodeFocus');",
+    " const title=document.getElementById('nodeFocusTitle');",
+    " const stages=document.getElementById('nodeFocusStages');",
+    " const prev=document.getElementById('nodeFocusPrevious');",
+    " const next=document.getElementById('nodeFocusNext');",
+    " const source=document.getElementById('source').value;",
+    " const open=id=>card(id)?.querySelector('.designer-node')?.dispatchEvent(",
+    "   new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
+    " const snapshot=lane=>({",
+    "   peers:lane.querySelectorAll('.node-focus-neighbor-card').length,",
+    "   outcomes:[...lane.querySelectorAll('.node-focus-neighbor-route')]",
+    "     .map(x=>({id:x.dataset.routeId,origin:x.dataset.routeSource,text:x.textContent})),",
+    "   labels:[...lane.querySelectorAll('.node-focus-neighbor-id')].map(x=>x.textContent)",
+    " });",
+    " open('nudm-sdm-subscribe');await sleep(100);",
+    " const initial={",
+    "   visible:!focus.hidden,",
+    "   title:title.textContent,",
+    "   previous:snapshot(prev),",
+    "   next:snapshot(next),",
+    "   stages:stages.querySelectorAll('.node-focus-stage').length,",
+    "   grid:getComputedStyle(document.querySelector('.node-focus-neighborhood')).display",
+    " };",
+    " const nextButton=next.querySelector('.node-focus-neighbor-open');",
+    " const target=nextButton?.querySelector('.node-focus-neighbor-id')?.textContent;",
+    " nextButton?.click();await sleep(120);",
+    " const afterNext={title:title.textContent,previous:snapshot(prev)};",
+    " const backToSubscribe=[...prev.querySelectorAll('.node-focus-neighbor-open')]",
+    "   .find(x=>x.querySelector('.node-focus-neighbor-id')?.textContent==='nudm-sdm-subscribe');",
+    " backToSubscribe?.click();await sleep(100);",
+    " const afterBack=title.textContent;",
+    " document.getElementById('nodeFocusReturn').click();await sleep(60);",
+    " open('done');await sleep(80);",
+    " const terminalNext=snapshot(next);",
+    " const terminalEmpty=next.querySelector('.node-focus-neighbor-empty')?.textContent;",
+    " document.getElementById('nodeFocusReturn').click();await sleep(50);",
+    " const restored=focus.hidden&&document.querySelectorAll('.react-flow__node').length===17&&",
+    "   document.querySelectorAll('.react-flow__edge-path').length===46;",
+    " return {initial,target,afterNext,afterBack,terminalNext,terminalEmpty,restored,",
+    "   sourcePreserved:document.getElementById('source').value===source};",
+    "})()",
+  ].join("\n"));
+  console.log("D1_A3_ONE_HOP",JSON.stringify(neighborhood));
+  if(!neighborhood?.initial.visible||
+     neighborhood.initial.title!=="nudm-sdm-subscribe"||
+     neighborhood.initial.previous.peers<1||neighborhood.initial.next.peers<1||
+     neighborhood.initial.grid!=="grid"||
+     neighborhood.initial.previous.outcomes.some(x=>!x.id||!x.origin)||
+     neighborhood.initial.next.outcomes.some(x=>!x.id||!x.origin)||
+     !neighborhood.target||neighborhood.afterNext.title!==neighborhood.target||
+     !neighborhood.afterNext.previous.labels.includes("nudm-sdm-subscribe")||
+     neighborhood.afterBack!=="nudm-sdm-subscribe"||
+     neighborhood.terminalNext.outcomes.length!==0||
+     !neighborhood.terminalEmpty?.includes("TERMINAL")||
+     !neighborhood.restored||!neighborhood.sourcePreserved)
+    throw Error("D1-A3 one-hop neighborhood FAIL: "+JSON.stringify(neighborhood));
+
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
     "(()=>{",
