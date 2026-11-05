@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-05**  
-**Reviewed implementation baseline: main@ef8eae87edc0220223a0c3f280c6132e570d7bae**（E4-A2 已通过 PR #50 合并并完成 resulting-main Pages；上游 SKILL 示例刷新见 PR #51 草稿）
+**Reviewed implementation baseline: main@4d48d37ef40ea13d53880013baf2df1a63ec514d**（E4-A2 PR #50 与上游 SKILL 示例 PR #51 均已合入，resulting-main Pages PASS）
 
 ## Overall
 
@@ -39,7 +39,7 @@
 | D4-A2.2b2/A3b2b2b/A4b2 跨生产者写入 / 带副作用或输出依赖 Step 的写入 / 新 Phase on-map 与 owner Outcome 契约 | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | E4-A1 浏览器所选目录导入、未知文件保留与 ZIP 导出 | ACCEPTED（Editor-tier） | IMPLEMENTED（main@3433e99；PR #48 MERGED） | PASS（345/345 + Chromium FileList UI + resulting-main Pages） | [PR #48](https://github.com/odango-chan/ca-skill-studio-demo/pull/48)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41948794306)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41949134436)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
 | E4-A2 重选目录写入（非原路径证明 / 全目录冲突 / 部分保存报告） | ACCEPTED（Demo best-effort） | IMPLEMENTED（main@ef8eae87；PR #50 MERGED） | PASS（365/365 + Chromium OPFS + Windows fixture 3/3 + resulting-main Pages）；原生 Chrome picker NOT_RUN | [PR #50](https://github.com/odango-chan/ca-skill-studio-demo/pull/50)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41963816684)、[Windows](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41963816623)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41964699713)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
-| 上游 SKILL 示例同步到 ca-agent-demo@eaadf948（16 文件） | ACCEPTED（Source Snapshot） | PR #51 DRAFT（main 尚未更新） | 单测/Chromium 审查进行中；不得用旧夹具冒充新示例 PASS | [PR #51](https://github.com/odango-chan/ca-skill-studio-demo/pull/51) |
+| 上游 SKILL 示例同步到 ca-agent-demo@eaadf948（16 文件） | ACCEPTED（Source Snapshot） | IMPLEMENTED（main@4d48d37e；PR #51 MERGED） | PASS（16/16 Owner blobs + 369/369 单测 + Chromium + resulting-main Pages） | [PR #51](https://github.com/odango-chan/ca-skill-studio-demo/pull/51)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41978928033)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41979268876) |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
 
