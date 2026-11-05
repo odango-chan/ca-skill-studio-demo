@@ -167,3 +167,6 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 - 窄屏三栏改为纵向排列，完整邻居和 Outcome 不被隐藏。高连通节点可分别滚动上/下游列表；不默认假设唯一前驱或唯一后继；按当前原始视图没有定义的跨 Procedure 控制边也不猜测。
 
 验收：`tests/node-neighborhood.test.mjs` 验所有 Owner Root Node 的原始入/出 Route 身份集合完全对应；测试同一目标多个 Outcome、Phase 路由、循环、入口/终态和缺失引用。Chromium 双击实例 Node 后，验证左右邻接和路由来源、向下一跳浏览、再由其上一跳回到原节点、终态无出边、整图恢复为 17 Node/46 bundle 且 Source 不变。仅对应 PR 的 exact-head CI PASS 后称实现验收通过；A3 全局 Root 紧凑图仍待独立设计。
+
+
+实测代码门禁：[CI #42029242711](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42029242711) **PASS**（393/393 Unit、TypeScript、Build、Chromium）。在 Root 示例的 `nudm-sdm-subscribe`，确证上一跳 1 Node / 1 POST Route，下一跳 6 Node / 9 Route（PRE/OP/POST，不同 Outcome 保留）；点击 `npcf-sm-policy-control-create` 后其上一跳指回原节点，再点击返回；终态无下一跳；返回主图 17 Node / 46 bundles、Source 原字节未变。CI 浏览器为窄屏，确认纵向堆叠布局生效；三栏桌面布局由 CSS 控制，但仍需在线目视确认。此项仅候选 PR，还未合入/Pages 部署。
