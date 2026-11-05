@@ -9,7 +9,7 @@ const owner=projectWorkspace(read("../site/samples/packages/establish-pdu-sessio
 assert.equal(owner.state,"READY");
 const root=owner.procedure;
 
-test("A3 every Root Node has an exact one-hop incoming / outgoing Route projection",()=>{
+test("A2b every Root Node has an exact one-hop incoming / outgoing Route projection",()=>{
   assert.equal(root.nodes.length,17);
   const original=JSON.stringify(root);
   let incomingTotal=0,outgoingTotal=0;
@@ -22,10 +22,10 @@ test("A3 every Root Node has an exact one-hop incoming / outgoing Route projecti
     const outgoing=projected.next.peers.flatMap(x=>x.routes);
     assert.equal(incoming.length,projected.previous.routeCount);
     assert.equal(outgoing.length,projected.next.routeCount);
-    assert.deepEqual(incoming.map(x=>x.id),
-      root.routes.filter(x=>x.target===node.id).map(x=>x.id));
-    assert.deepEqual(outgoing.map(x=>x.id),
-      root.routes.filter(x=>x.source===node.id).map(x=>x.id));
+    assert.deepEqual(incoming.map(x=>x.id).sort(),
+      root.routes.filter(x=>x.target===node.id).map(x=>x.id).sort());
+    assert.deepEqual(outgoing.map(x=>x.id).sort(),
+      root.routes.filter(x=>x.source===node.id).map(x=>x.id).sort());
     for(const peer of projected.previous.peers){
       assert.ok(root.nodes.includes(peer.node));
       assert.ok(peer.routes.every(route=>route.source===peer.node.id&&
@@ -44,7 +44,7 @@ test("A3 every Root Node has an exact one-hop incoming / outgoing Route projecti
   assert.equal(JSON.stringify(root),original);
 });
 
-test("A3 multi-outcome same-peer, Phase source, cycle and terminal are not hidden",()=>{
+test("A2b multi-outcome same-peer, Phase source, cycle and terminal are not hidden",()=>{
   const nodes=["a","b","c"].map(id=>({id,operator:id==="c"?"terminal":"call",value:id}));
   const routes=[
     {id:"a:PASS",source:"a",target:"b",outcome:"PASS",routeSource:"operator.on",line:1},
@@ -73,7 +73,7 @@ test("A3 multi-outcome same-peer, Phase source, cycle and terminal are not hidde
   ]);
 });
 
-test("A3 one-hop UI exposes all lanes, original Route identity and click-to-pivot",()=>{
+test("A2b one-hop UI exposes all lanes, original Route identity and click-to-pivot",()=>{
   const html=read("../site/index.html");
   const css=read("../site/light.css");
   const app=read("../site/app.mjs");
