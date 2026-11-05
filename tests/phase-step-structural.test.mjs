@@ -8,7 +8,7 @@ import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   previewDeletePhaseVerify,applyDeletePhaseVerify}
   from "../site/phase-step-structural.mjs";
 
-const root=new URL("../site/samples/packages/establish-pdu-session/",
+const root=new URL("./fixtures/establish-pre-hold/",
   import.meta.url);
 const source=readFileSync(new URL("assurance/procedure.yaml",root),"utf8");
 const predicates=readFileSync(new URL("assurance/predicates.yaml",root),"utf8");
