@@ -7,7 +7,7 @@
 
 静态浏览器 Studio 的 D1 React Flow/ELK、D2 Node Designer A1–A5、固定多文件 Package 浏览及图标统一已进入 `main`，并通过了本仓范围内的单测、构建及 Chromium 回归。**E4-A1 目录导入/ZIP 与 E4-A2 显式原位保存均已合入并部署；原生 Windows Chrome 选择窗口实盘验收尚未进行**；不宣称真实 OS 写盘验收、多文件原子事务、完整 Runtime validator 或真实 5GC 验收能力。Pages 的 PASS 不等于 Skill Runtime PASS。
 
-**2026-11-05 E-line 集成：**`#56` Monaco YAML/Python 右键菜单不透明样式、`#57` 只读目录选择与会话句柄保存、`#59` 宽屏 Python 引用面板默认展开均已进入 `main`。三个 PR 的 exact-head CI 各自 PASS；必须由最终 `main@12bf33be` 的 Pages Gate 独立证明集成通过。#56 的真实桌面菜单目视验收和 #57 的 Windows 原生目录选择/授权/实盘写回均尚未完成；对应 #55、#54、#26 仍开放，不得改称 native PASS。
+**2026-11-05 E-line 集成：**`#56` Monaco YAML/Python 右键菜单不透明样式、`#57` 只读目录选择与会话句柄保存、`#59` 宽屏 Python 引用面板默认展开均已进入 `main`。三个 PR 的 exact-head CI 各自 PASS；最终 `main@12bf33be` 的 Pages Gate 已独立 PASS；这不替代真实 OS 原生交互验收。#56 的真实桌面菜单目视验收和 #57 的 Windows 原生目录选择/授权/实盘写回均尚未完成；对应 #55、#54、#26 仍开放，不得改称 native PASS。
 
 ## Current scope matrix
 
@@ -42,7 +42,7 @@
 | E4-A1 浏览器所选目录导入、未知文件保留与 ZIP 导出 | ACCEPTED（Editor-tier） | IMPLEMENTED（main@3433e99；PR #48 MERGED） | PASS（345/345 + Chromium FileList UI + resulting-main Pages） | [PR #48](https://github.com/odango-chan/ca-skill-studio-demo/pull/48)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41948794306)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41949134436)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
 | E4-A2 重选目录写入（非原路径证明 / 全目录冲突 / 部分保存报告） | ACCEPTED（Demo best-effort） | IMPLEMENTED（main@ef8eae87；PR #50 MERGED） | PASS（365/365 + Chromium OPFS + Windows fixture 3/3 + resulting-main Pages）；原生 Chrome picker NOT_RUN | [PR #50](https://github.com/odango-chan/ca-skill-studio-demo/pull/50)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41963816684)、[Windows](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41963816623)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41964699713)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
 | E1 Monaco 浅色右键菜单不透明背景 | ACCEPTED | IMPLEMENTED（#56 MERGED） | PR exact-head CI PASS（374/374 + Chromium computed-style fallback）；真实桌面右键浮层待目视验收 | [#56](https://github.com/odango-chan/ca-skill-studio-demo/pull/56)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41990206833)、[#55](https://github.com/odango-chan/ca-skill-studio-demo/issues/55) |
-| E3 Python 引用面板宽屏默认展开、手动收起与窄屏行为 | ACCEPTED | IMPLEMENTED（#59 MERGED） | PR exact-head CI PASS（374/374 + Chromium）；resulting-main Pages PENDING | [#59](https://github.com/odango-chan/ca-skill-studio-demo/pull/59)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41993061908)、[#58](https://github.com/odango-chan/ca-skill-studio-demo/issues/58) |
+| E3 Python 引用面板宽屏默认展开、手动收起与窄屏行为 | ACCEPTED | IMPLEMENTED（#59 MERGED） | PR exact-head CI PASS（374/374 + Chromium）；resulting-main Pages PASS（#41994191657） | [#59](https://github.com/odango-chan/ca-skill-studio-demo/pull/59)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41993061908)、[#58](https://github.com/odango-chan/ca-skill-studio-demo/issues/58) |
 | E4-A3 只读目录选择、会话句柄延迟读写权限及 Explorer 状态提示 | ACCEPTED（Demo best-effort） | IMPLEMENTED（#57 MERGED） | PR exact-head CI PASS（378/378 + Chromium mocked picker / OPFS）；原生 Windows Chrome 仍 NOT_RUN | [#57](https://github.com/odango-chan/ca-skill-studio-demo/pull/57)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41990023283)、[#54](https://github.com/odango-chan/ca-skill-studio-demo/issues/54)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
 | 上游 SKILL 示例同步到 ca-agent-demo@eaadf948（16 文件） | ACCEPTED（Source Snapshot） | IMPLEMENTED（main@4d48d37e；PR #51 MERGED） | PASS（16/16 Owner blobs + 369/369 单测 + Chromium + resulting-main Pages） | [PR #51](https://github.com/odango-chan/ca-skill-studio-demo/pull/51)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41978928033)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41979268876) |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
@@ -52,7 +52,7 @@
 
 ## Current open work
 
-- **合并后 Pages 验收待确认：**`main@12bf33be` 的 [Pages #41994191657](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41994191657) 在整理时仍在执行；待最终成功后再更新合并集成证据及 #58 状态。#54/#55 保留用户现场验收，#26 保留真实 Windows 文件权限验收。
+- **合并后 Pages 验收：**`main@12bf33be` 的 [Pages #41994191657](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41994191657) 已 **PASS**（build + deploy success）。#58 的宽屏 Inspector 集成已满足本仓自动验收；#54/#55 保留用户现场验收，#26 保留真实 Windows 文件权限验收。
 
 
 - [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)：E4-A1/A2 均已合入并部署。`npm run test:e4:native` 的随机临时目录与 Windows 文件系统专项已通过，但原生 Chrome 文件选择、授权及真实 OS 句柄写入现场仍 NOT_RUN；保留为 Demo 风险记录。
