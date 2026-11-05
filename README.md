@@ -20,7 +20,7 @@ python3 -m http.server 8080 --directory dist
 
 ## 现有能力
 
-- 唯一可选示例为 **`establish-pdu-session`**（启动默认加载，`references/` 默认展开），使用原始 SKILL 目录名；支持真实 Runtime 相关文件导航、Source 编辑、Markdown 安全预览、文件下载和 ZIP 打包。示例快照来自 [ca-agent-demo@dc0fa0ae](https://github.com/odango-chan/ca-agent-demo/tree/dc0fa0ae330ef818226428e973af0c2863f954ac/skills/establish-pdu-session)，共 16 个运行时相关文件，包含 `references/`、Schema、Script、Contract、Predicate 和 Procedure。支持**完整本地 SKILL 目录导入**、多文件编辑与 ZIP 导出；不引入 Case 或内部 Design 文件。
+- 唯一可选示例为 **`establish-pdu-session`**（启动默认加载，`references/` 默认展开），使用原始 SKILL 目录名；支持真实 Runtime 相关文件导航、Source 编辑、Markdown 安全预览、文件下载和 ZIP 打包。示例快照来自 [ca-agent-demo@eaadf948](https://github.com/odango-chan/ca-agent-demo/tree/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/skills/establish-pdu-session)，共 16 个运行时相关文件，包含 `references/`、Schema、Script、Contract、Predicate 和 Procedure。支持**完整本地 SKILL 目录导入**、多文件编辑与 ZIP 导出；不引入 Case 或内部 Design 文件。
 - 多 Procedure 和 Root/Child 下钻、Node / Phase Step / Outcome / Route 投影；React Flow + ELK 默认垂直布局，完整大图支持保守降级。
 - D2 有界 Node 重命名、在已有 Route 上插入少数 Node、受限删除、编辑已有 Operator 与 `with.<key>.from`，以及既有 Route Target 有界重连；所有 Visual 修改遵循 Source-backed Patch → Diff → Confirm → Undo/Redo。
 - 编辑期 Package 引用提醒、语法失败 Source 恢复，以及一致描边 SVG 图标。**编辑期提示不等于 Runtime qualification。**

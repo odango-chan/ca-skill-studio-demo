@@ -96,7 +96,7 @@ E2/E3 依赖稳定 E1 adapter，但 D4 与 E1 可同时进行。E4 不以静态 
 
 ## 8. E2 重要 Owner Schema 相容性门禁
 
-2026-11-04 核对 [ca-agent-demo@dc0fa0ae](https://github.com/odango-chan/ca-agent-demo/tree/dc0fa0ae330ef818226428e973af0c2863f954ac/skills/establish-pdu-session) 与当前 [ca-skill-toolchain 源 Schema](https://github.com/odango-chan/ca-skill-toolchain/blob/main/schemas/v1alpha1/procedure-source.schema.yaml)：前者 Procedure 存在 `preconditions`、`postconditions` Phase Steps、跨 Step output `from`；后者 `$defs.node` 只有旧节点属性且 `additionalProperties: false`，缺少 Phase 结构。因此**E2 禁止直接将该 Procedure Schema 配到当前内置 `assurance/procedure.yaml`**，否则会误报。
+2026-11-04 核对 [ca-agent-demo@eaadf948](https://github.com/odango-chan/ca-agent-demo/tree/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/skills/establish-pdu-session) 与当前 [ca-skill-toolchain 源 Schema](https://github.com/odango-chan/ca-skill-toolchain/blob/main/schemas/v1alpha1/procedure-source.schema.yaml)：前者 Procedure 存在 `preconditions`、`postconditions` Phase Steps、跨 Step output `from`；后者 `$defs.node` 只有旧节点属性且 `additionalProperties: false`，缺少 Phase 结构。因此**E2 禁止直接将该 Procedure Schema 配到当前内置 `assurance/procedure.yaml`**，否则会误报。
 
 - E2-A1 先做 Owner Schema 兼容性审计/路径关联的纯函数与正反测试；仅能对已证实结构一致的 Contract/Predicate 引入严格提示。
 - Schema 不匹配的 Procedure 仍保留 YAML syntax diagnostics 和基础编辑，不自行推断新的可执行 DSL、不能丢弃引用与注释，更不能显示 Runtime qualification PASS。
@@ -112,7 +112,7 @@ E2 #35/#38 原堆叠分支已关闭（未合并），仅保留历史实现与失
 
 E2 集成从 `main@07850bf1529f9439046f0768dcc35eba730136e2` 出发，选取旧 PR #35 的 YAML 1.2 语法诊断需求和旧 PR #38 已实现的 `monaco-yaml@5.5.1` 统一语言 Worker；独立的首版诊断 Marker 已由该 Worker 取代，避免 Monaco 出现两个错误标记来源。
 
-`site/schemas/connectionagent/v1alpha1/manifest.json` 固定 `ca-agent-demo@dc0fa0ae` 的 Toolchain snapshot `03a42764ee2a67e39f57ab550b63c7a5d7966199`，逐个标记 3 个 vendored Schema 的 Git blob SHA；`tests/yaml-owner-schemas.test.mjs` 验证字节级来源。仅在 `assurance/contract.yaml` 和 `assurance/predicates.yaml` 使用对应 Owner Schema；公共 Schema 仅解析本地 `$ref`。`assurance/procedure.yaml` 继续仅检测 YAML 1.2 语法，**绝不**套用缺少 Phase 定义的旧 Procedure Schema，也不自造新的 Procedure 语义。
+`site/schemas/connectionagent/v1alpha1/manifest.json` 固定 `ca-agent-demo@eaadf948` 的 Toolchain snapshot `03a42764ee2a67e39f57ab550b63c7a5d7966199`，逐个标记 3 个 vendored Schema 的 Git blob SHA；`tests/yaml-owner-schemas.test.mjs` 验证字节级来源。仅在 `assurance/contract.yaml` 和 `assurance/predicates.yaml` 使用对应 Owner Schema；公共 Schema 仅解析本地 `$ref`。`assurance/procedure.yaml` 继续仅检测 YAML 1.2 语法，**绝不**套用缺少 Phase 定义的旧 Procedure Schema，也不自造新的 Procedure 语义。
 
 本地 `yaml.worker.js`、`editor.worker.js` 使用相同 Pages 源域；`enableSchemaRequest:false` 禁止远端 Schema 读取，`format:{enable:false}` 不自动格式化 YAML。Schema 补全与 Hover 必须由真实 Chromium 的 Monaco UI 证明；旧堆叠 [PR #38 CI #41796543903](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796543903) 的语法/约束错误标记通过，但 Ctrl+Space 补全没有弹出，属于 **FAIL**，不可重用为 E2 验收证据。最新 [PR #42 代码 CI #41802445121](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41802445121) **327/327 单测、TypeScript、Build 与真实 Chromium PASS**：确证 YAML 1.2 语法、Contract/Predicate Schema 约束、Procedure schema 不误报、真实 Contract 字段补全弹出 `allowedResources`/`entryProcedure`/`goal` 和 `skillType` 枚举 Hover。[最终 PR CI #41803566642](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41803566642) 328/328 单测、TypeScript、Build、真实 Chromium 全 PASS，[resulting-main Pages #41804005500](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41804005500) 同 SHA `9708528f` 的打包、yaml.worker.js、静态资源/语法、Chromium 和部署均 PASS。
 

@@ -44,7 +44,7 @@ test("fixtures are byte-for-byte the pinned ca-agent-demo Git blob sources",()=>
   assert.equal(sha(read("establish-pdu-session","references/session-selection.md")),"341a29272ee5b593760b5ee8632ac7c9e7508105");
   assert.equal(sha(read("establish-pdu-session","references/failure-handling.md")),"02f1d6caf84f1f8dc29684ec07d90a805b9f81e0");
   assert.equal(sha(read("establish-pdu-session","assurance/contract.yaml")),"fb911dc9f7cb43713a36c5904adefc283c925b6e");
-  assert.equal(sha(read("establish-pdu-session","assurance/procedure.yaml")),"4b717e1f6815a24973a6a0484e72e35bdfedbe21");
+  assert.equal(sha(read("establish-pdu-session","assurance/procedure.yaml")),"3517653309acc5657e1de5b450f84b848b75cbcd");
   assert.equal(sha(read("establish-pdu-session","assurance/predicates.yaml")),"bc9226f64123abf76bae02ca8fd10922078249f9");
   assert.equal(sha(read("establish-pdu-session","schemas/establishment-request.schema.yaml")),"c8027b6f9625949302900fa170ad59fec3b4a8f7");
   assert.equal(sha(read("establish-pdu-session","schemas/predicate-evaluation-result.schema.yaml")),"c34c65ac00dcebb0a306a7cee2224566617fceca");

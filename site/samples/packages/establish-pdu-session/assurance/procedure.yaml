@@ -244,6 +244,10 @@ procedures:
 
         call: sbi.pcf.sm_policy.create
         with:
+          # Explicit business binding; the Runtime cross-checks it against the
+          # trusted ingress subject and the owner Pre-N4 inputs handle below.
+          ueRef:
+            from: input.ue-ref
           pcfCreateInputsRef:
             from: preconditions.resolve-pcf-create-inputs.output.pcfCreateInputsRef
           selection:
@@ -339,10 +343,14 @@ procedures:
                   from: preconditions.resolve-effective-session-configuration.output.contextRef
                 runtimeInvocationRef:
                   from: preconditions.resolve-effective-session-configuration.output.runtimeInvocationRef
+                ueRef:
+                  from: input.ue-ref
                 pduSessionId:
                   from: input.psi
                 pti:
                   from: input.pti
+                lifecycleRef:
+                  from: input.lifecycle-ref
                 selection:
                   from: nudm-sdm-subscribe.preconditions.select-subscription-configuration.output
                 policyResultRef:
@@ -381,6 +389,14 @@ procedures:
             from: preconditions.resolve-effective-session-configuration.output.contextRef
           runtimeInvocationRef:
             from: preconditions.resolve-effective-session-configuration.output.runtimeInvocationRef
+          # Explicit business bindings for this attempt. The Runtime still
+          # cross-checks both against the trusted ingress context and the exact
+          # Fabric hold bound earlier, so a parent-local rename cannot change
+          # which session or subject is sent.
+          ueRef:
+            from: input.ue-ref
+          pduSessionId:
+            from: input.psi
           lifecycleRef:
             from: input.lifecycle-ref
           responseArtifactRef:
