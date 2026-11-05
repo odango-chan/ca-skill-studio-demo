@@ -244,7 +244,7 @@ try{
     "   document.getElementById(\'graphLegendScope\').textContent.includes(\'PRE 3 / POST 4\');",
     " return {nodeCount,kinds,steps,scope,badges,restored};",
     " })()",
-  ].join("\\n"));
+  ].join("\n"));
   console.log("D1_A1_CHILD_PHASE_LEGEND",JSON.stringify(childPhases));
   if(childPhases?.nodeCount!==4||childPhases.kinds!=="CALL,TERMINAL"||
      childPhases.steps!=="VERIFY"||!childPhases.scope.includes("PRE 0 / POST 1")||
