@@ -206,7 +206,7 @@ try{
     "   .every(x=>getComputedStyle(x).stroke!=='rgb(19, 143, 122)');",
     " return {hasStart:!!node,marker:badge?.content,kind,position:pos,",
     "   opened,collapsed,nodeKinds,stepKinds,routeOrigins,preBadges,postBadges,",
-    "   subscribePhases,originPatterns,lineTypes,green,successCount:success.length,"
+    "   subscribePhases,originPatterns,lineTypes,green,successCount:success.length,",
     "   hasNoFalseGreen,sourceNodes:document.querySelectorAll('.react-flow__node').length,",
     "   routePaths:tonePaths.length};",
     "})()"
