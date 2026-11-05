@@ -27,7 +27,7 @@ export function searchPackageText(workspace,query,{
   if(!term||!(workspace?.files instanceof Map))return empty;
   const regex=new RegExp(literalPattern(term),"giu");
   let truncated=false,scannedFiles=0,skippedLarge=0;
-  const files=[...workspace.files.values()].sort((a,b)=>a.path.localeCompare(b.path));
+  const files=[...workspace.files.values()].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
   if(files.length>PACKAGE_SEARCH_LIMITS.files)truncated=true;
   for(const file of files.slice(0,PACKAGE_SEARCH_LIMITS.files)){
     if(!file?.editable)continue; // Opaque bytes cannot be decoded as text.
