@@ -14,7 +14,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f8fa;padding:14px;
 <h1>SKILL Studio · E4-A2 Windows 原生目录验收</h1>
 <p class="notice">本页面仅验收脚本生成、包含随机标记的临时目录。<strong>不要选择任何真实 SKILL 工作目录。</strong>
 标记、完整文件清单和全部原始字节不匹配时，测试会在写入前拒绝操作。</p>
-<p>请点击下方按钮，在 Chrome 原生选择窗口里选择终端输出的测试目录。Chrome 如请求写权限，请按自己的意愿授权；
+<p><strong>仅允许选择：</strong> <code id="fixturePath">加载中…</code></p>
+<p>请点击下方按钮，在 Chrome 原生选择窗口里选择上述测试目录。Chrome 如请求写权限，请按自己的意愿授权；
 之后只需确认一次向测试目录写入。验收工具会自动检查文件缩短覆盖、BOM/CRLF、二进制文件保真、外部修改和新增文件冲突。</p>
 <button id="start" type="button">选择临时测试目录并开始验收</button>
 <p id="state" role="status">尚未启动；本地磁盘没有被本页面修改。</p>
