@@ -1739,7 +1739,7 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
  display:flex;padding-left:12px;margin-top:-3px;
 }
 
-/* D1-A3: the Node-focus canvas is a source-backed ONE-HOP neighborhood,
+/* D1-A2b: the Node-focus canvas is a source-backed ONE-HOP neighborhood,
    not a fabricated linear path. Exact original Route labels remain visible. */
 .node-focus-neighborhood{
   flex:1;min-height:0;min-width:0;
