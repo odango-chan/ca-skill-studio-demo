@@ -10,6 +10,7 @@ import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./w
 import {SAMPLE_PACKAGES,packageFilesForSample,createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState} from "./sample-packages.mjs";
 import {zipPackage} from "./zip.mjs";
 import {importDirectoryFiles,packageZipEntries} from "./directory-import.mjs";
+import {importDirectoryHandle} from "./directory-session.mjs";
 import {saveDirectoryChanges} from "./directory-save.mjs";
 import {highlightSource} from "./highlight.mjs";
 import {createSourceEditorAdapter,createTextareaSourceBackend} from "./source-editor-adapter.mjs";
@@ -99,6 +100,8 @@ let activePackage = null;
 let activeFilePath = null;
 let directorySaveEligible=false;
 let directorySaveBusy=false;
+// Only in this tab, only for an explicitly opened directory. Never persist.
+let directorySessionHandle=null;
 let initialText = "";
 let projection = null;
 let lastGood = null;
@@ -1993,9 +1996,10 @@ function renderGraph() {
     ? selection.id:null;
   flowCanvas.render(graph,lastGood,selection,showAllLabels,sourceId);
 }
-function activateWorkspace(workspace,entry,origin="sample") {
+function activateWorkspace(workspace,entry,origin="sample",handle=null) {
   if(directorySaveBusy)throw new Error("本地保存进行中，暂不能替换工作区");
   directorySaveEligible=origin==="directory";
+  directorySessionHandle=origin==="directory"?handle:null;
   $("saveNotice").hidden=true;
   $("reloadDirectoryButton").hidden=true;
   activePackage=workspace;
@@ -2008,11 +2012,16 @@ function activateWorkspace(workspace,entry,origin="sample") {
 function updateDirectorySaveControl(){
   const button=$("saveDirectoryButton");
   button.hidden=!directorySaveEligible;
-  const compatible=window.isSecureContext&&typeof window.showDirectoryPicker==="function";
+  const compatible=window.isSecureContext&&
+    (directorySessionHandle?
+      typeof directorySessionHandle.requestPermission==="function":
+      typeof window.showDirectoryPicker==="function");
   button.disabled=directorySaveBusy||!compatible||!activePackage||
     !hasUnsavedEdits(activePackage);
   button.title=!compatible?"当前浏览器不支持本地原位保存，请导出 ZIP":
-    "重新选择目标目录；核对目录名与全部文件字节，但无法证明与原导入目录为同一物理路径";
+    directorySessionHandle?
+      "保存到当前会话已打开的目录；需要浏览器读写授权并检查全部文件":
+      "兼容导入未保留目录句柄；保存时需要重新选择目标目录并核对文件";
 }
 function showDirectorySaveStatus(result){
   const notice=$("saveNotice");
@@ -2036,24 +2045,38 @@ function showDirectorySaveStatus(result){
 }
 $("saveDirectoryButton").addEventListener("click",async()=>{
   if(!directorySaveEligible||directorySaveBusy||!activePackage)return;
-  if(!window.isSecureContext||typeof window.showDirectoryPicker!=="function"){
-    message("此浏览器不支持 File System Access 写入，请导出 ZIP。");
+  if(!window.isSecureContext||(!directorySessionHandle&&
+     typeof window.showDirectoryPicker!=="function")){
+    message("此浏览器不支持本地写入，请导出 ZIP。");
     return;
   }
   markFileEdited(activePackage,activeFilePath,source.value,history);
   if(!hasUnsavedEdits(activePackage))return;
   const workspace=activePackage;
+  const sessionHandle=directorySessionHandle;
   directorySaveBusy=true;
   updateDirectorySaveControl();
   try{
-    // Must call this in the user-click handler before any other await.
-    const handle=await window.showDirectoryPicker({mode:"readwrite"});
+    // Acquire permission from this user gesture, before any await.
+    // Only compatible FileList imports still require a second folder picker.
+    const permissionOrPicker=sessionHandle?
+      sessionHandle.requestPermission({mode:"readwrite"}):
+      window.showDirectoryPicker({mode:"readwrite"});
+    let handle;
+    if(sessionHandle){
+      const permission=await permissionOrPicker;
+      if(permission!=="granted")
+        throw new Error("浏览器未授予已打开目录的读写权限；可导出 ZIP 备份");
+      handle=sessionHandle;
+    }else handle=await permissionOrPicker;
     const outcome=await saveDirectoryChanges({
       workspace,handle,confirmWrite:({directory,paths})=>
-        confirm("即将写入重新选定的目录："+directory+
-          "\n注意：只能核对目录名和文件内容，无法证明它是最初导入的同一物理目录。"+
+        confirm((sessionHandle?"即将写入本次会话已打开的目录：":
+          "即将写入重新选定的目录：")+directory+
+          (sessionHandle?"\n目录句柄仅在当前页面会话内保留。":
+           "\n仅核对目录名和文件内容，不能证明是原始物理目录。")+
           "\n待写文件："+paths.join("、")+
-          "\n这是非原子多文件保存。确认写入刚选择的目标目录？")
+          "\n多文件保存不保证原子性，确认写入？")
     });
     if(activePackage===workspace){
       initialText=workspace.files.get(activeFilePath)?.initialText??initialText;
@@ -2064,15 +2087,37 @@ $("saveDirectoryButton").addEventListener("click",async()=>{
     if(error?.name!=="AbortError")
       showDirectorySaveStatus({status:"BLOCKED",saved:[],
         pending:[],uncertain:[],error:String(error?.message??error)});
-    else message("已取消目录选择，没有写入磁盘。");
+    else message("已取消目录授权或选择，没有写入磁盘。");
   }finally{
     directorySaveBusy=false;
     updateDirectorySaveControl();
   }
 });
-$("reloadDirectoryButton").addEventListener("click",()=>directoryPicker.click());
+$("reloadDirectoryButton").addEventListener("click",()=>$("openDirectoryButton").click());
 $("openButton").addEventListener("click",()=>filePicker.click());
-$("openDirectoryButton").addEventListener("click",()=>directoryPicker.click());
+$("openDirectoryButton").addEventListener("click",async()=>{
+  // File System Access is a genuine folder chooser, not an upload control.
+  // It must be called immediately from the user's gesture.
+  if(!window.isSecureContext||typeof window.showDirectoryPicker!=="function"){
+    directoryPicker.click();return;
+  }
+  if(directorySaveBusy)return;
+  if(hasUnsavedEdits(activePackage)&&
+     !confirm("当前 Package 有未导出修改。确定打开其他目录？"))return;
+  try{
+    const handle=await window.showDirectoryPicker({mode:"read"});
+    const {workspace,entry,opaqueCount}=await importDirectoryHandle(handle);
+    activateWorkspace(workspace,entry,"directory",handle);
+    message("已打开本地目录："+workspace.name+"（"+workspace.files.size+
+      " 文件，"+opaqueCount+" 项只保留字节）。保存时直接申请写权限。");
+  }catch(error){
+    if(error?.name==="AbortError"){
+      message("已取消目录选择；工作区没有变化。");
+    }else{
+      message("目录打开失败（当前工作区未变）："+String(error?.message??error));
+    }
+  }
+});
 directoryPicker.addEventListener("change",async()=>{
   const files=[...(directoryPicker.files??[])];
   directoryPicker.value="";
@@ -2082,8 +2127,8 @@ directoryPicker.addEventListener("change",async()=>{
   try{
     const {workspace,entry,opaqueCount}=await importDirectoryFiles(files);
     activateWorkspace(workspace,entry,"directory");
-    message("已加载 "+workspace.name+" · "+workspace.files.size+
-      " 文件，"+opaqueCount+" 项仅原样导出；不会写回本地目录。");
+    message("已兼容导入 "+workspace.name+" · "+workspace.files.size+
+      " 文件，"+opaqueCount+" 项只保留字节；保存需要重新选目录。");
   }catch(error){
     message("目录导入失败，现有工作区不变："+String(error?.message??error));
   }
