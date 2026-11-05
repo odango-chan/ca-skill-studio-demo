@@ -763,14 +763,14 @@ try{
 
   // E4 session handle: true read-only opener + permission-on-save.
   // Picker is stubbed but OPFS reads and writes are real browser operations.
-  const sessionSave=await evaluate(String.raw\`
+  const sessionSave=await evaluate(String.raw`
     (async()=>{
       const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       const store=await navigator.storage.getDirectory();
       const folder=await store.getDirectoryHandle('session-e4',{create:true});
       const skill=await folder.getFileHandle('SKILL.md',{create:true});
       const writer=await skill.createWritable();
-      await writer.write('# Session E4\\n');await writer.close();
+      await writer.write('# Session E4\n');await writer.close();
       const pickerModes=[],permissionModes=[],confirmations=[];
       const session={kind:'directory',name:'session-e4',
         entries:()=>folder.entries(),
@@ -797,7 +797,7 @@ try{
         const visible=!btn.hidden;
         const disabled=btn.disabled;
         const source=document.getElementById('source');
-        source.value='# Session E4 edited\\n';
+        source.value='# Session E4 edited\n';
         source.dispatchEvent(new Event('input',{bubbles:true}));
         await sleep(150);
         const ready=!btn.disabled;
@@ -809,7 +809,7 @@ try{
         const saved=document.getElementById('saveNotice').dataset.status==='SAVED';
         const onDisk=await (await skill.getFile()).text();
         return {imported,openedNotice,visible,disabled,ready,saved,
-          exact:onDisk==='# Session E4 edited\\n',
+          exact:onDisk==='# Session E4 edited\n',
           pickerModes,permissionModes,confirmations:confirmations.length,
           confirmationText:confirmations.at(-1)?.slice(0,190)};
       }finally{
@@ -817,7 +817,7 @@ try{
         window.confirm=oldConfirm;
       }
     })()
-  \`);
+  `);
   console.log("E4_SESSION_DIRECTORY_SAVE",JSON.stringify(sessionSave));
   if(!sessionSave?.imported||!sessionSave.openedNotice||
      !sessionSave.visible||!sessionSave.disabled||!sessionSave.ready||
