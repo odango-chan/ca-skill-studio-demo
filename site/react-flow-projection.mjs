@@ -1,3 +1,5 @@
+import {nodePhaseChips,routeOrigin} from "./graph-phase-view.mjs";
+
 // A one-way, source-preserving view model. No YAML mutation and no editable graph store.
 // This module deliberately has no React or DOM dependency so it can be regression-tested.
 const NODE_WIDTH=238;
@@ -59,6 +61,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         start:node.id===procedure.start,
         terminal:node.operator==="terminal",
         childCount:node.children?.length??0,direction,
+        phaseChips:nodePhaseChips(node),
         canAddRoute:node.operator!=="terminal"&&
           selection?.kind==="node"&&selection.id===node.id&&
           routeCreationSourceId===node.id,
@@ -75,8 +78,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
     const selected=Boolean(selectedRoute&&bundle.routes.some(r=>r.id===selectedRoute));
     const tone=classifyRouteTone(bundle.outcomes);
     const important=tone==="success";
-    const phase=(bundle.routeSource??"operator.on").replace(/\.on$/,"");
-    const label=(phase==="operator"?"":phase+" · ")+bundle.outcomes.join(" / ");
+    const origin=routeOrigin(bundle.routeSource);
+    const label=origin.tag+" · "+bundle.outcomes.join(" / ");
+    const fullLabel=origin.source+" · "+bundle.outcomes.join(" / ");
     return {
       id:"flow-edge-"+i,
       source:bundle.source,target:bundle.target,
@@ -96,7 +100,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       // Only the verified handler may propose a YAML patch on reconnect.
       reconnectable:true,
       data:{
-        bundle,selected,important,tone,label,
+        bundle,selected,important,tone,label,fullLabel,origin:origin.kind,
         displayLabel:showAllLabels||["success","failure","uncertain"].includes(tone)||selected,
         path:bundle.path??null,
         labelPosition:bundle.label??null,direction

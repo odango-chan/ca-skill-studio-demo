@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-05**  
-**Integrated implementation baseline: main@12bf33be0988dd743c60bf23572e7f73f3807421**（#56、#57、#59 已依次合入；resulting-main Pages [#41994191657](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41994191657) 在本记录编写时为 **PENDING**）
+**Integrated implementation baseline: main@38137300ea980ec8ab04510411b1d7e85a173e17**（#62 的 [Pages #41997707337](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997707337) build+deploy PASS；A1 本轮为独立 PR candidate，尚未进入 main）
 
 ## Overall
 
@@ -13,7 +13,8 @@
 
 | Scope | Design | Implementation | Acceptance | Tracking / evidence |
 |---|---|---|---|---|
-| D1 视觉 START 起点 / Outcome 连线配色 / 浮动图例 | ACCEPTED（View-only） | IMPLEMENTED（PR #62 OPEN） | [PR CI #41996736991 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41996736991)（Unit / TypeScript / Build / Chromium）；main/Pages NOT_RUN，真实 Runtime NOT_RUN | [Issue #61](https://github.com/odango-chan/ca-skill-studio-demo/issues/61)、[Workbench](design/authoring-workbench.md) |
+| D1 视觉 START 起点 / Outcome 连线配色 / 浮动图例 | ACCEPTED（View-only） | IMPLEMENTED（PR #62 MERGED，main@3813730） | [PR CI #41997113612 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997113612)，[Pages #41997707337 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997707337)；人工 UX 待反馈 | [#61](https://github.com/odango-chan/ca-skill-studio-demo/issues/61)、[Workbench](design/authoring-workbench.md) |
+| D1-A1 PRE/POST 节点摘要 / 当前类型图例 / Route 来源线型 | ACCEPTED（View-only） | IMPLEMENTED（PR #66 OPEN，尚未合入） | [代码 CI #42005617277 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42005617277)（387/387 Unit、TypeScript、Build、Chromium；Root/Child/卡片不溢出）；文档更新后的最终 PR HEAD CI 需另核，main/Pages NOT_RUN | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[PR #66](https://github.com/odango-chan/ca-skill-studio-demo/pull/66)、[Workbench](design/authoring-workbench.md) |
 | D1 Procedure 投影、图形浏览、现有 Route Target Rewire | ACCEPTED | IMPLEMENTED | PASS（本仓浏览器级） | [D1](D1-procedure-designer.md)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
 | D2 Node Designer A1–A5 有界创建/删除/重命名/属性 Patch | ACCEPTED | IMPLEMENTED | PASS（本仓单测/浏览器） | [D2](D2-node-designer.md)、[PR #4](https://github.com/odango-chan/ca-skill-studio-demo/pull/4)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605140297) |
 | 固定示例多文件 Source / Markdown/ZIP 编辑与下载 | ACCEPTED | IMPLEMENTED | PASS（本仓测试范围） | `site/sample-packages.mjs`、`tests/package.test.mjs`、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |

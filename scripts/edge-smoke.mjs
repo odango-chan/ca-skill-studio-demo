@@ -181,17 +181,36 @@ try{
     " const pos=panel?getComputedStyle(panel).position:'';",
     " const summary=panel?.querySelector('summary');",
     " summary?.click();const opened=panel?.open===true;",
-    " const types=panel?.querySelectorAll('.graph-legend-types code').length;",
+    " const nodeKinds=[...panel.querySelectorAll('#graphLegendNodeTypes code')].map(x=>x.textContent);",
+    " const stepKinds=[...panel.querySelectorAll('#graphLegendStepTypes code')].map(x=>x.textContent);",
+    " const routeOrigins=[...panel.querySelectorAll('.graph-legend-route-origin')].map(x=>x.textContent);",
     " const lineTypes=panel?.querySelectorAll('.graph-legend-line').length;",
     " summary?.click();const collapsed=panel?.open===false;",
     " const tonePaths=[...document.querySelectorAll('.react-flow__edge-path.designer-edge')];",
     " const success=tonePaths.filter(x=>x.classList.contains('tone-success'));",
     " const green=success.length>0&&success.every(x=>getComputedStyle(x).stroke==='rgb(19, 143, 122)');",
+    " const phaseCards=[...document.querySelectorAll('.designer-node.has-phases')];",
+    " const phaseFits=phaseCards.every(card=>[...card.querySelectorAll('.designer-node-phase')].every(chip=>{",
+    "   const a=card.getBoundingClientRect(),b=chip.getBoundingClientRect();",
+    "   return b.top>=a.top-1&&b.bottom<=a.bottom+1;",
+    " }));",
+    " const preBadges=document.querySelectorAll('.designer-node-phase.phase-preconditions').length;",
+    " const postBadges=document.querySelectorAll('.designer-node-phase.phase-postconditions').length;",
+    " const subscribe=[...document.querySelectorAll('.designer-node')].find(x=>x.querySelector('.designer-node-id')?.textContent==='nudm-sdm-subscribe');",
+    " const subscribePhases=subscribe?[...subscribe.querySelectorAll('.designer-node-phase')].map(x=>x.textContent):[];",
+    " const preRoute=document.querySelector('.react-flow__edge-path.origin-preconditions');",
+    " const postRoute=document.querySelector('.react-flow__edge-path.origin-postconditions');",
+    " const opRoute=document.querySelector('.react-flow__edge-path.origin-operator');",
+    " const originPatterns=!!preRoute&&!!postRoute&&!!opRoute&&",
+    "   getComputedStyle(preRoute).strokeDasharray.includes('8')&&",
+    "   getComputedStyle(postRoute).strokeDasharray.includes('2')&&",
+    "   getComputedStyle(opRoute).strokeDasharray==='none';",
     " const hasNoFalseGreen=tonePaths.filter(x=>x.classList.contains('tone-failure')||",
     "   x.classList.contains('tone-uncertain')||x.classList.contains('tone-mixed'))",
     "   .every(x=>getComputedStyle(x).stroke!=='rgb(19, 143, 122)');",
     " return {hasStart:!!node,marker:badge?.content,kind,position:pos,",
-    "   opened,collapsed,types,lineTypes,green,successCount:success.length,",
+    "   opened,collapsed,nodeKinds,stepKinds,routeOrigins,preBadges,postBadges,",
+    "   subscribePhases,phaseFits,originPatterns,lineTypes,green,successCount:success.length,",
     "   hasNoFalseGreen,sourceNodes:document.querySelectorAll('.react-flow__node').length,",
     "   routePaths:tonePaths.length};",
     "})()"
@@ -199,12 +218,73 @@ try{
   console.log("D1_START_LEGEND_OUTCOME_STYLES",JSON.stringify(graphDisplay));
   if(!graphDisplay?.hasStart||!graphDisplay.marker.includes('START')||
      graphDisplay.kind.includes('START')||graphDisplay.position!=='absolute'||
-     !graphDisplay.opened||!graphDisplay.collapsed||graphDisplay.types!==8||
+     !graphDisplay.opened||!graphDisplay.collapsed||
+     graphDisplay.nodeKinds.join(",")!=="CALL,PROCEDURE,RECONCILE,TERMINAL"||
+     graphDisplay.stepKinds.join(",")!=="CALL,SCRIPT,VERIFY"||
+     graphDisplay.routeOrigins.join(",")!=="PRE,OP,POST"||
+     graphDisplay.preBadges!==3||graphDisplay.postBadges!==4||
+     graphDisplay.subscribePhases.join(",")!=="PRE · 5,POST · 1"||
+     !graphDisplay.phaseFits||!graphDisplay.originPatterns||
      graphDisplay.lineTypes!==4||!graphDisplay.green||
      !graphDisplay.hasNoFalseGreen||
      graphDisplay.sourceNodes!==17||graphDisplay.routePaths!==46)
     throw Error("D1 visual START / legend / Route tone FAIL: "+
       JSON.stringify(graphDisplay));
+
+  // The same source-backed legend must follow the selected Child Procedure.
+  // Child has no PRE; never fabricate one to balance the diagram.
+  const childLegend=await evaluate(String.raw`
+    (async()=>{
+      const sleep=t=>new Promise(r=>setTimeout(r,t));
+      const child=[...document.querySelectorAll('#procedureTree button.child')].find(
+        x=>x.textContent.includes('await-initial-n4-session-establishment'));
+      if(!child)return {error:'child procedure navigation absent'};
+      child.click();
+      for(let i=0;i<40;i++){
+        if(document.getElementById('procedureBread').textContent===
+          'await-initial-n4-session-establishment')break;
+        await sleep(75);
+      }
+      // Breadcrumb updates synchronously, React Flow DOM renders one frame later.
+      // Wait for the actual Child cards instead of sampling stale Root nodes.
+      for(let i=0;i<80;i++){
+        const nodes=document.querySelectorAll('.react-flow__node').length;
+        const pre=document.querySelectorAll('.designer-node-phase.phase-preconditions').length;
+        const post=document.querySelectorAll('.designer-node-phase.phase-postconditions').length;
+        if(nodes===4&&pre===0&&post===1)break;
+        await sleep(75);
+      }
+      const nodeKinds=[...document.querySelectorAll('#graphLegendNodeTypes code')]
+        .map(x=>x.textContent);
+      const stepKinds=[...document.querySelectorAll('#graphLegendStepTypes code')]
+        .map(x=>x.textContent);
+      const pre=document.querySelectorAll('.designer-node-phase.phase-preconditions').length;
+      const post=document.querySelectorAll('.designer-node-phase.phase-postconditions').length;
+      const context=document.getElementById('graphLegendContext').textContent;
+      const back=document.getElementById('backProcedure');
+      back.click();
+      for(let i=0;i<80;i++){
+        if(document.getElementById('procedureBread').textContent===
+            'ue-requested-pdu-session-establishment'&&
+          document.querySelectorAll('.react-flow__node').length===17&&
+          document.querySelectorAll('.react-flow__edge-path').length===46)break;
+        await sleep(75);
+      }
+      const restored=document.getElementById('procedureBread').textContent===
+        'ue-requested-pdu-session-establishment'&&
+        document.querySelectorAll('.react-flow__node').length===17&&
+        document.querySelectorAll('.react-flow__edge-path').length===46;
+      return {nodeKinds,stepKinds,pre,post,context,restored};
+    })()
+  `);
+  console.log("D1_PHASE_CHILD_CONTEXTUAL_LEGEND",JSON.stringify(childLegend));
+  if(childLegend?.nodeKinds.join(",")!=="CALL,TERMINAL"||
+     childLegend.stepKinds.join(",")!=="VERIFY"||
+     childLegend.pre!==0||childLegend.post!==1||
+     !childLegend.context.includes("4 Nodes / 1 Steps")||
+     !childLegend.restored)
+    throw Error("D1 child Phase legend / Root restore FAIL: "+
+      JSON.stringify(childLegend));
 
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([

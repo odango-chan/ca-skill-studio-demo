@@ -115,5 +115,19 @@ Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的�
 
 - `procedure.start` 仍然唯一定位第一个真实 Node；画布给该 Node 绘制独立的 START 胶囊和连接线（CSS 视觉装饰），不新增 YAML Node / Route，不改变 Node、Route bundle、Outcome 数量，亦不允许选中虚拟 START 作为业务节点或 Route 编辑目标。真实 Node 仍显示原来的 `CALL` / `TOOL` / `VERIFY` 等 Operator，不再写 `CALL · START`。CALL 是 DSL 的调用型 Operator，不等于 TOOL。
 - 同一个 Route bundle 的所有 Outcome 依照明确标签归类；`PASS/SUCCEEDED/SUCCESS` 绿色，`FAIL/FAILED/ERROR` 红色，`UNKNOWN/OUTCOME_UNKNOWN/UNRESOLVED/TIMEOUT/TIMED_OUT` 琥珀色，混合类别及未知标签中性色。**只要一个 bundle 的 Outcomes 含混，就不可据某一个 PASS 画成绿色。**选中态单独高亮，箭头颜色与线条保持一致。仅显示层，不做 Runtime 资格判断。
-- 画布右上角的原生 `details` 图例默认折叠，可展开查看 START、8 类节点 Operator 与 4 类 Route 色义；图例不占 Inspector，不引入新的工具栏或运行状态。YAML Source、Diff、Undo/Redo、ELK 路由几何、拖动重连保持权威与既有行为。
+- 画布右上角的原生 `details` 图例默认折叠，可展开查看 START、当前真实业务 Node 类型、Phase Step 类型与 Route 色义；A1 不再将未出现的全部 8 类 Operator 当作当前图的节点；图例不占 Inspector，不引入新的工具栏或运行状态。YAML Source、Diff、Undo/Redo、ELK 路由几何、拖动重连保持权威与既有行为。
 - 浏览器验收需核对：真实业务 Node 数与 Route 路径数量未变，START 单独可见、原业务标签无 START，图例可折叠、可展开，PASS 对应的可见线条与箭头同色且混合/失败/不确定边不冒充成功；此项仅是 Studio 展示能力。大图适配边缘空间仍以真实 Node 布局为依据，不应把 CSS 的装饰物冒充额外 Route。
+
+## D1-A1 · 来源可信的节点阶段与动态图例（2026-11-05；PR candidate）
+
+反思：旧图例列出全部八类 Operator，却未区分主图业务节点与内部 Phase Steps。当前根流程实际 17 Node（CALL 4、PROCEDURE 6、RECONCILE 3、TERMINAL 4），Phase Steps 为 CALL 6、SCRIPT 1、VERIFY 14；TOOL 在当前样例没有声明。CALL 与工具能力并非同一概念。Studio 不应据能力来源把 call: 重新标成 tool:。
+
+1. Node 摘要：沿用 238×80 的 ELK 卡片尺寸和 ports。仅在 YAML 实际存在 preconditions/postconditions 时显示 PRE · N / POST · N，N 为真实 Phase Steps 个数。悬停列出具体 Step Operator 数量与 Route 数；仅有 on 而无 Steps 时只显示 PRE/POST，不伪造 Steps。
+2. 图例上下文：浮动图例分当前可见业务 Node、当前可见内部 Phase Steps、Route 来源。按选中 Procedure 和邻居过滤范围计算；没有 TOOL 则不显示 TOOL；切换 Child、Source 解析失败后不会留下假图例。所有数据来自只读投影，不形成权限或 Runtime 声明。
+3. Route 双维度：颜色仅由 Outcome 标签分类，PRE（长虚线）/ OP（实线）/ POST（短虚线）区分 routeSource；文本短标签如 PRE · PASS，hover 显示完整 preconditions.on · PASS，选中 Route 仍使用原始 ID/Source Span。混合结果不标为成功。
+4. 本 PR 不扩展子流程内部、也不改变主图布局，不增加 toolbar、模型业务节点或 YAML 变更。Issue #65 的 A2 Child 边界与 A3 真实主路径/异常摘要概览必须独立开发，任何汇总虚拟边不得授予 Route 编辑。
+
+验收：当前内置 Owner Root 17 业务节点/63 Outcome 条目（当前线上 ELK 46 Bundle）不变；另一份历史测试 Fixture 为 65 Outcome；PRE 3 Node、POST 4 Node；Child await-initial-n4-session-establishment 只有 POST 1，不补不存在的 PRE；显式 TOOL 正例可出现，缺失 TOOL 负例不会出现。Node tests、TypeScript、Build、Chromium 以及合入后 resulting-main Pages 分别验证；不声称 Runtime/5GC E2E。
+
+
+D1-A1 code CI: https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42005617277 (387/387 + Chromium PASS).

@@ -46,6 +46,7 @@ function ProcedureCard({data,selected}){
   },[updateNodeInternals,data.id,data.portSignature,direction]);
   return <div className={
       "designer-node"+(data.terminal?" is-terminal":"")+
+      (data.phaseChips?.length?" has-phases":"")+
       (data.start?" is-start":"")+
       (data.direction==="RIGHT"?" is-horizontal":"")+
       (selected?" is-selected":"")
@@ -73,6 +74,12 @@ function ProcedureCard({data,selected}){
     </span>
     <strong className="designer-node-id" title={data.id}>{data.id}</strong>
     <span className="designer-node-meta" title={data.value}>{data.value}</span>
+    {data.phaseChips?.length>0&&<div className="designer-node-phases"
+      aria-label={data.phaseChips.map(chip=>chip.title).join("；")}>
+      {data.phaseChips.map(chip=><span key={chip.kind}
+        className={"designer-node-phase phase-"+chip.kind}
+        title={chip.title}>{chip.tag}{chip.stepCount?" · "+chip.stepCount:""}</span>)}
+    </div>}
   </div>;
 }
 
@@ -92,12 +99,14 @@ function RouteEdge(props:EdgeProps){
     <BaseEdge id={id} path={d} markerEnd={props.markerEnd}
       interactionWidth={16}
       className={"designer-edge tone-"+(data?.tone||"neutral")+
+        " origin-"+(data?.origin||"unknown")+
         (selected?" is-selected":"")}/>
     {show&&<EdgeLabelRenderer>
       <div className={"designer-route-label tone-"+(data?.tone||"neutral")+
+          " origin-"+(data?.origin||"unknown")+
           (selected?" is-selected":"")}
         style={{transform:"translate(-50%,-50%) translate("+lx+"px,"+ly+"px)"}}
-        title={label}>{label.length>44?label.slice(0,43)+"…":label}</div>
+        title={data?.fullLabel||label}>{label.length>44?label.slice(0,43)+"…":label}</div>
     </EdgeLabelRenderer>}
   </>;
 }

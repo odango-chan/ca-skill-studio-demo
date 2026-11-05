@@ -1480,3 +1480,71 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .graph-legend-line.tone-failure{border-color:#c05a55}
 .graph-legend-line.tone-uncertain{border-color:#b37a27}
 .graph-legend-body p{margin:11px 0 0;color:#8191a2;font-size:10px}
+
+
+/* D1-A1 contextual phases: real Source-backed Steps, never extra Nodes.
+   Keep the 238×80 ELK dimensions and port/edge geometry unchanged. */
+.procedure-flow .designer-node.has-phases{
+  gap:3px;padding-top:6px;padding-bottom:6px;
+}
+.designer-node-phases{
+  display:flex;align-items:center;gap:5px;
+  min-width:0;max-width:100%;overflow:hidden;
+}
+.designer-node-phase{
+  display:inline-flex;align-items:center;flex:0 0 auto;
+  max-width:100%;min-height:13px;
+  padding:1px 5px;border:1px solid #d4dfeb;border-radius:4px;
+  white-space:nowrap;font:700 9px/1.1 ui-monospace,Consolas,monospace;
+  letter-spacing:.01em;
+}
+.designer-node-phase.phase-preconditions{
+  color:#715b9d;border-color:#dcd2ee;background:#f6f2fb;
+}
+.designer-node-phase.phase-postconditions{
+  color:#456c92;border-color:#cbdff0;background:#f0f6fc;
+}
+/* Outcome color (green/red/amber/neutral) is orthogonal to Source origin.
+   PRE uses long dashes, OP solid, POST short dashes. */
+.procedure-flow .react-flow__edge-path.designer-edge.origin-preconditions{
+  stroke-dasharray:8 4;
+}
+.procedure-flow .react-flow__edge-path.designer-edge.origin-postconditions{
+  stroke-dasharray:2 4;
+}
+.graph-legend-context{
+  margin-top:7px;color:#677f92;
+  font:600 10px/1.35 ui-monospace,Consolas,monospace;
+  overflow-wrap:anywhere;
+}
+.graph-legend-types .graph-legend-count{
+  font-variant-numeric:tabular-nums;
+  color:#48697e;font-weight:700;
+}
+.graph-legend-types .graph-legend-type-description{
+  display:block;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.graph-legend-route-origins{
+  display:grid;gap:7px;
+}
+.graph-legend-route-origins>div{
+  display:flex;align-items:center;gap:8px;
+  font-size:10px;color:#617c90;
+}
+.graph-legend-route-origin{
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 34px;min-height:16px;
+  font:700 9px ui-monospace,Consolas,monospace;
+  border:1px solid #d6e3eb;border-radius:4px;
+  color:#4c7084;background:#f6f9fc;
+}
+.graph-legend-route-origin.origin-preconditions{
+  color:#715b9d;background:#f6f2fb;border-color:#dcd2ee;
+}
+.graph-legend-route-origin.origin-postconditions{
+  color:#456c92;background:#f0f6fc;border-color:#cbdff0;
+}
+.graph-legend-route-origin.origin-operator{
+  color:#466e76;
+}

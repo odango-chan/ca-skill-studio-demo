@@ -102,17 +102,13 @@
             <div class="graph-legend-body">
               <strong>流程</strong>
               <div class="graph-legend-entry"><span class="graph-legend-start">START</span><span>统一入口（视觉标记）</span></div>
-              <strong>节点类型</strong>
-              <div class="graph-legend-types">
-                <div><code>CALL</code><span>调用操作</span></div>
-                <div><code>TOOL</code><span>工具操作</span></div>
-                <div><code>SCRIPT</code><span>脚本</span></div>
-                <div><code>VERIFY</code><span>检查</span></div>
-                <div><code>PREDICATE</code><span>谓词</span></div>
-                <div><code>PROCEDURE</code><span>子流程</span></div>
-                <div><code>RECONCILE</code><span>对账</span></div>
-                <div><code>TERMINAL</code><span>结束节点</span></div>
-              </div>
+              <div id="graphLegendContext" class="graph-legend-context" aria-live="polite"></div>
+              <strong>业务节点 · 当前可见</strong>
+              <div id="graphLegendNodeTypes" class="graph-legend-types"></div>
+              <strong>节点内部 Step · 非业务节点</strong>
+              <div id="graphLegendStepTypes" class="graph-legend-types"></div>
+              <strong>Route 来源（线型）</strong>
+              <div id="graphLegendRouteOrigins" class="graph-legend-route-origins"></div>
               <strong>连线结果标签</strong>
               <div class="graph-legend-lines">
                 <div><span class="graph-legend-line tone-success"></span><span>PASS / SUCCEEDED</span></div>
@@ -120,7 +116,7 @@
                 <div><span class="graph-legend-line tone-uncertain"></span><span>UNKNOWN / TIMEOUT</span></div>
                 <div><span class="graph-legend-line tone-neutral"></span><span>混合结果 / 其他标签</span></div>
               </div>
-              <p>颜色按当前 Route 的 Outcome 标签分类，不代表运行时执行结果。混合标签不会标为成功。</p>
+              <p>颜色只区分 Outcome 标签，线型只区分 PRE / OP / POST 来源；都不代表实际执行结果。没有声明的 Operator 不会出现在当前图例。</p>
             </div>
           </details>
           <div id="zoomViewOptions" class="canvas-zoom-tools" role="group" aria-label="缩放流程图">
