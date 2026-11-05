@@ -9,6 +9,7 @@ const spec=await (await fetch("/spec",{cache:"no-store"})).json();
 const enc=new TextEncoder(),dec=new TextDecoder();
 const expected=new Map(Object.entries(spec.files).map(([path,b64])=>
   [path,Uint8Array.from(atob(b64),c=>c.charCodeAt(0))]));
+document.querySelector("#fixturePath").textContent=spec.fixturePath;
 const start=document.querySelector("#start");
 const state=document.querySelector("#state");
 const log=document.querySelector("#log");
