@@ -339,7 +339,7 @@ try{
     "      .map(x=>x.className);",
     "    if(focus.hidden||title.textContent!==id||",
     "       !stages.some(x=>x.includes('is-op'))||!root.inert)",
-    "      failures.push('drilldown '+id);",
+    "      failures.push('drilldown '+id+' · '+focus.dataset.openAttempt);",
     "    if(id==='nudm-sdm-subscribe'){",
     "      samples.subscribe={",
     "        stages,preSteps:stageHost.querySelectorAll('.node-focus-stage.is-pre .node-focus-step').length,",
