@@ -90,6 +90,8 @@ jobs:
           node --check site/node-attributes.mjs
           node --check site/package-audit.mjs
           node --check site/phase-consumer-contract.mjs
+          node --check site/phase-evidence-copy.mjs
+          node --check tests/phase-evidence-copy.test.mjs
           node --check site/phase-step-order.mjs
           node --check site/phase-step-structural.mjs
           node --check site/phase-step-rename.mjs

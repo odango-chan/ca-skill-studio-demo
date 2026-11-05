@@ -1336,3 +1336,16 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 /* E4-A2: explicit, non-modal directory-write feedback in Explorer. */
 .save-status{font-size:12px;line-height:1.5;padding:5px 7px;color:var(--muted);overflow-wrap:anywhere}
 .save-status[data-status="CONFLICT"],.save-status[data-status="PARTIAL"],.save-status[data-status="FAILED"]{color:var(--warning)}
+
+/* D4: compact Source evidence on Step cards; no new edit authorization. */
+.step-evidence-summary{
+  color:#58768b;font-size:10px;line-height:1.5;font-weight:500;
+}
+.phase-dependency-review .phase-evidence-limitation{
+  display:block;border-left:2px solid #8baeb7;padding-left:8px;
+  color:#526a7b;line-height:1.5;
+}
+.phase-dependency-item[data-evidence-code="TYPE_MISMATCH"]
+  .phase-evidence-limitation,
+.phase-dependency-item[data-evidence-code="SOURCE_UNPROVEN"]
+  .phase-evidence-limitation{border-left-color:#bc9378}
