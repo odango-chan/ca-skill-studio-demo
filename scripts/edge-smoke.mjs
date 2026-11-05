@@ -315,6 +315,73 @@ try{
      !subflowNav.restored)
     throw Error("D1-A2 Child call-site navigation FAIL: "+JSON.stringify(subflowNav));
 
+  // D1-A2 revised scope: EVERY Node double-click enters its own PRE/OP/POST.
+  const nodeDrilldown=await evaluate([
+    "(async()=>{",
+    "  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));",
+    "  const card=id=>document.querySelector('.react-flow__node[data-id=\"'+id+'\"]');",
+    "  const focus=document.getElementById('nodeFocus');",
+    "  const title=document.getElementById('nodeFocusTitle');",
+    "  const stageHost=document.getElementById('nodeFocusStages');",
+    "  const back=document.getElementById('nodeFocusReturn');",
+    "  const root=document.getElementById('reactFlowRoot');",
+    "  const source=document.getElementById('source');",
+    "  const original=source.value;",
+    "  const ids=[...document.querySelectorAll('.react-flow__node')]",
+    "    .map(x=>x.getAttribute('data-id'));",
+    "  const failures=[],samples={};",
+    "  for(const id of ids){",
+    "    const target=card(id);",
+    "    if(!target){failures.push('missing '+id);continue;}",
+    "    target.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
+    "    await sleep(50);",
+    "    const stages=[...stageHost.querySelectorAll('.node-focus-stage')]",
+    "      .map(x=>x.className);",
+    "    if(focus.hidden||title.textContent!==id||",
+    "       !stages.some(x=>x.includes('is-op'))||!root.inert)",
+    "      failures.push('drilldown '+id);",
+    "    if(id==='nudm-sdm-subscribe'){",
+    "      samples.subscribe={",
+    "        stages,preSteps:stageHost.querySelectorAll('.node-focus-stage.is-pre .node-focus-step').length,",
+    "        postSteps:stageHost.querySelectorAll('.node-focus-stage.is-post .node-focus-step').length,",
+    "        opValue:stageHost.querySelector('.node-focus-stage.is-op .node-focus-stage-value')?.textContent,",
+    "        routeCount:stageHost.querySelectorAll('.node-focus-route').length",
+    "      };",
+    "    }",
+    "    if(target.textContent.includes('TERMINAL'))samples.terminal={id,stages};",
+    "    if(id==='n4-session-establishment')",
+    "      samples.procedure={stages,childButton:!!stageHost.querySelector('.node-focus-subflow')};",
+    "    back.click();await sleep(35);",
+    "    if(!focus.hidden||root.inert)failures.push('exit '+id);",
+    "  }",
+    "  card('n4-session-establishment')?.dispatchEvent(",
+    "    new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
+    "  await sleep(45);",
+    "  stageHost.querySelector('.node-focus-subflow')?.click();",
+    "  for(let i=0;i<80&&document.querySelectorAll('.react-flow__node').length!==4;i++)",
+    "    await sleep(45);",
+    "  const childOk=focus.hidden&&",
+    "    !document.getElementById('procedureScope').hidden&&",
+    "    document.getElementById('procedureScopeContext').textContent.includes('n4-session-establishment');",
+    "  document.getElementById('procedureScopeReturn').click();",
+    "  for(let i=0;i<80&&document.querySelectorAll('.react-flow__node').length!==17;i++)",
+    "    await sleep(45);",
+    "  const restored=document.querySelectorAll('.react-flow__node').length===17&&",
+    "    document.querySelectorAll('.react-flow__edge-path').length===46;",
+    "  const sourcePreserved=source.value===original;",
+    "  return {count:ids.length,failures,samples,childOk,restored,sourcePreserved};",
+    "})()",
+  ].join("\n"));
+  console.log("D1_A2_ALL_NODES_DRILLDOWN",JSON.stringify(nodeDrilldown));
+  if(nodeDrilldown?.count!==17||nodeDrilldown.failures.length||
+     nodeDrilldown.samples.subscribe?.preSteps!==5||
+     nodeDrilldown.samples.subscribe?.postSteps!==1||
+     !nodeDrilldown.samples.procedure?.childButton||
+     nodeDrilldown.samples.terminal?.stages.length!==1||
+     !nodeDrilldown.childOk||!nodeDrilldown.restored||
+     !nodeDrilldown.sourcePreserved)
+    throw Error("D1-A2 every-Node drilldown FAIL: "+JSON.stringify(nodeDrilldown));
+
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
     "(()=>{",
