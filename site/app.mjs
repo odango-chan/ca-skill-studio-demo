@@ -1,5 +1,5 @@
 import { layoutProcedure } from "./graph.mjs";
-import {describeProcedureLegend} from "./react-flow-projection.mjs";
+import {describeProcedureLegend,classifyRouteTone} from "./react-flow-projection.mjs";
 import {resolveProcedureCall,retainProcedureTrail} from "./procedure-navigation.mjs";
 import { layoutProcedureELK,selectGraphScope } from "./layout.mjs";
 import {detailedLayoutAllowed} from "./graph-scale.mjs";
@@ -111,6 +111,7 @@ let lastWorkspace = null;
 let activeProcedureId = null;
 // Source-backed call-site trail; UI-only navigation, reset when files change.
 let procedureTrail=[];
+let nodeFocusId=null; // UI-only drill-down within the current business Node
 let graph = null;
 let selection = null;
 let mode = "visual";
@@ -136,11 +137,8 @@ let layoutTimer = null;
 // file workspace and Typed Patch remain the only editing/state authority.
 const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
   onNodeSelect:id=>selectNode(id),
-  onNodeDoubleClick:id=>{
-    const node=lastGood?.nodes.find(item=>item.id===id);
-    if(node?.children?.length===1)
-      enterProcedure(node.children[0].procedure,{callerId:id});
-  },
+  // Every real business Node has a local PRE/OP/POST drill-down.
+  onNodeDoubleClick:id=>openNodeFocus(id),
   onEnterChild:(callerId,childName)=>
     enterProcedure(childName,{callerId}),
   onEdgeSelect:bundle=>chooseEdgeRoute(bundle),
@@ -422,6 +420,7 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
   canvasRouteProposal=null;
   fitMode="all";
   selection = null;
+  nodeFocusId=null;
   // Multi-file Python editing is Source-first but benefits from references
   // visible by default on desktop. Manual collapse persists while editing.
   const showScriptRefs=Boolean(activePackage&&
@@ -475,6 +474,7 @@ function refresh(refit = false) {
       selection = null;
     }
     lastGood = parsed.procedures.get(activeProcedureId);
+    if(nodeFocusId&&!lastGood.nodes.some(node=>node.id===nodeFocusId))nodeFocusId=null;
     procedureTrail=retainProcedureTrail(parsed,procedureTrail,activeProcedureId);
     projectedText = text;
     graph = layoutProcedure(lastGood);
@@ -491,6 +491,7 @@ function refresh(refit = false) {
     if(parsed.state==="SOURCE_ONLY"){
       activeProcedureId=null;
       procedureTrail=[];
+      nodeFocusId=null;
       selection=null;
     }
     projectedText=null;
@@ -550,6 +551,7 @@ function enterProcedure(name,{callerId=null,returning=false,focusNode=null}={}) 
     procedureTrail=idx<0?[]:procedureTrail.slice(0,idx);
   }
   canvasRouteProposal=null;
+  nodeFocusId=null;
   activeProcedureId=name;
   lastGood=lastWorkspace.procedures.get(name);
   graph=layoutProcedure(lastGood);
@@ -569,6 +571,7 @@ function enterProcedure(name,{callerId=null,returning=false,focusNode=null}={}) 
   else requestAnimationFrame(fit);
 }
 function returnFromProcedure(){
+  if(nodeFocusId){closeNodeFocus();return;}
   const call=procedureTrail.at(-1);
   if(call?.childProcedure===activeProcedureId&&
      resolveProcedureCall(lastWorkspace,call.parentProcedure,
@@ -2421,6 +2424,7 @@ $("undoButton").addEventListener("click", () => runHistory("undo"));
 $("redoButton").addEventListener("click", () => runHistory("redo"));
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !$("patchDialog").hidden) { closePreview(); return; }
+  if (event.key === "Escape" && nodeFocusId) { closeNodeFocus();return; }
   if (event.key === "Escape" && !["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName)) {
     clearSelection();return;
   }
