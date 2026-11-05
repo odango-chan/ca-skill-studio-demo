@@ -266,3 +266,20 @@ test("E4-A2 final post-save scan detects external drift after the last write",as
   assert.equal(outcome.error.includes("assets/image.png"),true);
   assert.deepEqual(storage.disk.get("assets/image.png"),Uint8Array.from([7,8,9]));
 });
+
+test("E4-A2 final Source edit during last write cannot be reported as all saved",async()=>{
+  const ws=await workspace(),storage=mockDirectory(snapshot(ws),{
+    afterWrite(path){
+      if(path==="SKILL.md")edit(ws,"SKILL.md","# next edit\n");
+    }
+  });
+  edit(ws,"SKILL.md","# saved snapshot\n");
+  const res=await saveDirectoryChanges({workspace:ws,handle:storage.handle,
+    confirmWrite:allow});
+  assert.equal(res.status,"PARTIAL");
+  assert.deepEqual(res.saved,["SKILL.md"]);
+  assert.deepEqual(res.pending,[]);
+  assert.equal(ws.files.get("SKILL.md").initialText,"# saved snapshot\n");
+  assert.equal(ws.files.get("SKILL.md").text,"# next edit\n");
+  assert.equal(hasUnsavedEdits(ws),true);
+});
