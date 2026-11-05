@@ -6,7 +6,7 @@ import {phaseConsumerContractReport} from "../site/phase-consumer-contract.mjs";
 import {phaseStepDependencyReport} from "../site/phase-dataflow.mjs";
 import {projectWorkspace} from "../site/workspace.mjs";
 const proc="ue-requested-pdu-session-establishment",node="nudm-sdm-subscribe";
-const root=new URL("../site/samples/packages/establish-pdu-session/",import.meta.url);
+const root=new URL("./fixtures/establish-pre-hold/",import.meta.url);
 const get=path=>readFileSync(new URL(path,root),"utf8");
 const source=get("assurance/procedure.yaml");
 const files=()=>createFileWorkspace("establish-pdu-session",
@@ -16,7 +16,7 @@ const report=(text=source,fs=files(),who=node)=>
 const row=(data,stepIndex,key)=>data.bindings.find(x=>
   x.phaseName==="preconditions"&&x.stepIndex===stepIndex&&
   x.bindingKey===key);
-test("D4-A2.2b1 real script consumer inputSchema joins concrete typed producer declarations",()=>{
+test("D4-A2.2b1 pinned script consumer inputSchema joins concrete typed producer declarations",()=>{
   const r=report();
   assert.equal(r.status,"READY");
   assert.ok(r.summary.typeOnly>=4);
