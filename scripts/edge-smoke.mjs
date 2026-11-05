@@ -598,7 +598,8 @@ try{
     " const perms=await folder.queryPermission({mode:'readwrite'});",
     " const modes=[];",
     " window.showDirectoryPicker=async opts=>{modes.push(opts?.mode);return folder;};",
-    " window.confirm=()=>true;",
+    " const confirmations=[];",
+    " window.confirm=msg=>{confirmations.push(String(msg));return true;};",
     " const firstSource=document.getElementById('source');",
     " firstSource.value='# E4 short\\n';",
     " firstSource.dispatchEvent(new Event('input',{bubbles:true}));",
@@ -633,6 +634,7 @@ try{
     "  const after=new TextDecoder().decode(await (await (await getFile('assurance/procedure.yaml')).getFile()).arrayBuffer());",
     "  conflicted=document.getElementById('saveNotice').dataset.status==='CONFLICT'&&after===value;",
     "  return {eligible,perms,modes,saved,conflicted,opaqueIntact,unchanged,",
+    "    warned:confirmations.length===1&&confirmations[0].includes('无法证明')&&confirmations[0].includes('同一物理目录'),",
     "    info:document.getElementById('saveNotice').textContent};",
     " }finally{",
     "  window.showDirectoryPicker=originalPicker;window.confirm=originalConfirm;",
@@ -643,7 +645,8 @@ try{
   if(!e4DiskSave?.eligible||e4DiskSave.perms!=="granted"||
      e4DiskSave.modes.join(",")!=="readwrite,readwrite"||
      !e4DiskSave.saved||!e4DiskSave.conflicted||
-     !e4DiskSave.opaqueIntact||!e4DiskSave.unchanged)
+     !e4DiskSave.opaqueIntact||!e4DiskSave.unchanged||
+     !e4DiskSave.warned)
     throw Error("E4-A2 writable-stream / external conflict smoke failed: "+JSON.stringify(e4DiskSave));
 
   // Evaluate browser diagnostics after all E2 YAML interactions have run.
