@@ -4,7 +4,8 @@ import {readFileSync} from "node:fs";
 import {projectWorkspace} from "../site/workspace.mjs";
 import {layoutProcedureELK} from "../site/layout.mjs";
 import {makeFlowElements,resolveReconnectedRoute,FLOW_NODE_SIZE,
-  classifyRouteTone,ROUTE_TONE_COLOR}
+  classifyRouteTone,ROUTE_TONE_COLOR,summarizeNodePhases,
+  describeProcedureLegend,routeOrigin}
   from "../site/react-flow-projection.mjs";
 
 const read=name=>readFileSync(
@@ -237,16 +238,90 @@ test("Route outcome colors never turn mixed success/failure green",async()=>{
   }
 });
 
-test("graph legend is a floating collapsible panel with all supported operator categories",()=>{
+test("legend dynamically separates Node operators from Phase Step operators",()=>{
+  const graph=describeProcedureLegend(created.procedure);
+  assert.deepEqual(Object.fromEntries(graph.nodeKinds.map(x=>[x.kind,x.count])),{
+    CALL:4,PROCEDURE:6,RECONCILE:3,TERMINAL:4
+  });
+  assert.deepEqual(Object.fromEntries(graph.stepKinds.map(x=>[x.kind,x.count])),{
+    VERIFY:14,SCRIPT:1,CALL:6
+  });
+  assert.equal(graph.nodeCount,17);
+  assert.equal(graph.preNodes,3);
+  assert.equal(graph.postNodes,4);
+  assert.equal(graph.nodeKinds.some(x=>x.kind==="TOOL"),false);
+  assert.equal(graph.stepKinds.some(x=>x.kind==="TOOL"),false);
+  const child=created.procedures.get("await-initial-n4-session-establishment");
+  assert.ok(child);
+  const childLegend=describeProcedureLegend(child);
+  assert.equal(childLegend.preNodes,0);
+  assert.equal(childLegend.postNodes,1);
+  assert.deepEqual(childLegend.stepKinds,[{kind:"VERIFY",count:1}]);
+  // A filtered graph must describe only the visible scope, not claim all 17.
+  assert.equal(describeProcedureLegend(created.procedure,created.procedure.nodes.slice(0,1)).nodeCount,1);
+});
+
+test("PRE/POST badges come only from existing Phase Steps, without new graph Nodes",async()=>{
+  const graph=await layoutProcedureELK(created.procedure);
+  const before=JSON.stringify(created.procedure);
+  const flow=makeFlowElements(graph,created.procedure);
+  assert.equal(flow.nodes.length,17);
+  assert.equal(flow.edges.length,48);
+  const subscribe=flow.nodes.find(n=>n.id==="nudm-sdm-subscribe");
+  assert.ok(subscribe);
+  assert.deepEqual(subscribe.data.phaseBadges.map(x=>[x.label,x.count]),[
+    ["PRE",5],["POST",1]
+  ]);
+  assert.deepEqual(Object.fromEntries(subscribe.data.phaseBadges[0].operators.map(x=>[x.kind,x.count])),{
+    SCRIPT:1,CALL:1,VERIFY:3
+  });
+  assert.deepEqual(summarizeNodePhases({phases:[]}),[]);
+  const terminal=flow.nodes.find(x=>x.data.operator==="terminal");
+  assert.deepEqual(terminal.data.phaseBadges,[]);
+  assert.equal(JSON.stringify(created.procedure),before);
+});
+
+test("route origin and outcome color are orthogonal; no Phase source is hidden",async()=>{
+  assert.equal(routeOrigin("preconditions.on"),"PRE");
+  assert.equal(routeOrigin("operator.on"),"OP");
+  assert.equal(routeOrigin("postconditions.on"),"POST");
+  assert.equal(routeOrigin("unknown.on"),"OTHER");
+  const graph=await layoutProcedureELK(created.procedure);
+  const flow=makeFlowElements(graph,created.procedure);
+  assert.ok(flow.edges.some(x=>x.data.origin==="PRE"));
+  assert.ok(flow.edges.some(x=>x.data.origin==="POST"));
+  assert.ok(flow.edges.some(x=>x.data.origin==="OP"));
+  for(const edge of flow.edges){
+    assert.equal(edge.data.label.startsWith(edge.data.origin+" · "),true);
+    assert.equal(edge.data.origin,routeOrigin(edge.data.bundle.routeSource));
+    if(edge.data.origin!=="OP")assert.equal(edge.data.displayLabel,true);
+    assert.equal(edge.markerEnd.color,ROUTE_TONE_COLOR[edge.data.tone]);
+  }
+  // A neutral operator Outcome remains hidden by default, not misrepresented as PASS.
+  assert.equal(flow.edges.some(x=>x.data.origin==="OP"&&
+    x.data.tone==="neutral"&&!x.data.displayLabel),true);
+});
+
+test("graph legend is floating and contextual; Node types differ from Step types",()=>{
   const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
   const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
   const jsx=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
   assert.match(html,/<details id="graphLegend" class="graph-legend"/);
-  for(const type of ["CALL","TOOL","SCRIPT","VERIFY","PREDICATE","PROCEDURE","RECONCILE","TERMINAL"])
-    assert.ok(html.includes("<code>"+type+"</code>"),type);
+  for(const id of ["graphLegendNodeTypes","graphLegendStepTypes","graphLegendScope"])
+    assert.ok(html.includes('id="'+id+'"'));
+  assert.doesNotMatch(html,/<code>TOOL<\/code>/);
+  assert.match(app,/describeProcedureLegend\(lastGood,visible\)/);
+  assert.match(app,/function renderGraphLegend\(\)/);
+  for(const origin of ["PRE","OP","POST"])
+    assert.ok(html.includes("graph-legend-origin origin-"+origin));
   for(const tone of ["success","failure","uncertain","neutral"])
     assert.ok(html.includes("graph-legend-line tone-"+tone),tone);
   assert.match(css,/\.graph-legend\{[^}]*position:absolute/s);
+  assert.match(css,/designer-node\.has-phases/);
+  assert.match(css,/designer-edge\.origin-PRE/);
+  assert.match(css,/designer-edge\.origin-POST/);
+  assert.match(jsx,/designer-phase-badge phase-/);
   assert.match(jsx,/designer-edge tone-/);
   assert.match(jsx,/designer-route-label tone-/);
 });
