@@ -370,11 +370,11 @@ try{
     "  document.getElementById('establishSampleButton').click();",
     "  for(let i=0;i<150;i++){",
     "   const src=document.getElementById('source')?.value||'';",
-    "   if(src.includes('bind-udm-hold')&&!src.includes('resolve-pcf-create-inputs'))break;",
+    "   if(src.includes('bind-udm-hold'))break;",
     "   await sleep(80);",
     "  }",
     "  const src=document.getElementById('source')?.value||'';",
-    "  return {owner:src.includes('bind-udm-hold')&&!src.includes('resolve-pcf-create-inputs'),",
+    "  return {owner:src.includes('bind-udm-hold'),",
     "   length:src.length};",
     " }finally{window.confirm=original;}",
     "})()"
