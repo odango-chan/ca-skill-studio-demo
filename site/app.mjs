@@ -45,6 +45,8 @@ import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from "./phase-output-refs.mjs";
 import {phaseStepDependencyReport} from "./phase-dataflow.mjs";
 import {phaseConsumerContractReport} from "./phase-consumer-contract.mjs";
+import {bindingEvidenceExplanation,phaseStepEvidenceSummary}
+  from "./phase-evidence-copy.mjs";
 import {namedPhaseStepImpactReport,previewNamedPhaseStepRename,
   applyNamedPhaseStepRename} from "./phase-step-rename.mjs";
 import {namedStepMutationImpactReport} from "./phase-step-impact.mjs";
@@ -1349,6 +1351,8 @@ function addPhaseDependencyInspector(phase,step,container,report,contracts){
     item.dataset.contractStatus=entry.contractStatus;
     item.dataset.consumerStatus=abi?.consumerStatus??"CONSUMER_ABI_UNAVAILABLE";
     item.dataset.typeRelation=abi?.typeRelation??"CONSUMER_ABI_UNPROVEN";
+    const explanation=bindingEvidenceExplanation(entry,abi);
+    item.dataset.evidenceCode=explanation.code;
     item.appendChild(el("strong","",entry.bindingKey+" · "+entry.value));
     item.appendChild(el("small","",
       (entry.producerNodeId?
@@ -1385,6 +1389,8 @@ function addPhaseDependencyInspector(phase,step,container,report,contracts){
         "生产者/消费者类型、执行依赖或 ABI 证据不足";
     item.appendChild(el("small","phase-contract-verdict",
       "类型对照："+typeText+"；不授权重新绑定"));
+    item.appendChild(el("small","phase-evidence-limitation",
+      "为何依赖视图只读："+explanation.reason));
     item.appendChild(button("查看源码 · L"+entry.line,()=>lineJump(entry.line),
       "source-link"));
     body.appendChild(item);
@@ -1536,6 +1542,14 @@ function renderPhase(phase,body,phaseChildren,phaseBindings=[],phaseOutputs=[],
     meta.append(el("span","step-op",step.operator.toUpperCase()),
       el("strong","step-value",step.name||step.value));
     if(step.name)meta.append(el("small","",step.value));
+    const evidence=phaseStepEvidenceSummary(phase.name,step.index-1,
+      lineage,contracts);
+    if(evidence){
+      const brief=el("small","step-evidence-summary",evidence.label);
+      brief.dataset.phaseStepEvidence=phase.name+":"+step.index;
+      brief.dataset.evidenceCode=evidence.code;
+      meta.appendChild(brief);
+    }
     const jump=button("L"+step.line,()=>lineJump(step.line),"source-link");
     item.append(meta,jump);
     const reorder=reorderOptions.find(o=>o.phaseName===phase.name&&
