@@ -170,3 +170,11 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 5. 多文件场景人为让第二个文件不可写，确认 UI 显示 `PARTIAL`、已写入与待写入路径，以及不确定目标（如果失败发生在写流创建后）；恢复权限后重新导入或显式重试，核对实际磁盘内容。由于操作系统权限规则可能影响整个目录，无法可靠构造的场景标 `NOT_RUN`，不得编造结果。
 
 验收记录须包含 Chrome 版本、OS、URL/安全上下文、测试目录的可公开脱敏布局、操作和可复查的前后字节/截图、结果与异常。即使这些项目通过，也不等于 kernel CAS、原子目录写入、外部进程锁或 Runtime PASS。
+
+### E4-A2 · Windows 本地原生验收自动化入口（PR candidate；现场 NOT_RUN）
+
+命令：`npm run test:e4:native`，要求 Windows、Node.js 24、Google Chrome，来自本仓当前 PR 分支。命令启动本地 `127.0.0.1` 网页并生成新的 `.agent-tmp/e4-native-*/studio-e4-native-fixture`；只允许选择这个测试目录。它带随机 128-bit 标记和 5 个真实文件（BOM/CRLF、Python、Reference、二进制和标记文件），**标记和全量初始字节不匹配就绝不写盘**。
+
+需用户在 Chrome 点击一次按钮，原生选择这个一次性目录、允许写权限，并确认向该测试目录写入。其后浏览器直接执行 Studio 的 E4-A1 目录导入和 E4-A2 保存代码，自动测试两份文件的实际覆盖/回读、旧文件尾部截断、未修改与二进制文件保真、模拟外部修改以及新增文件冲突。Node **独立从 OS 磁盘读取全部文件并计算 SHA-256**，检查无额外文件；输出 `.agent-tmp/e4-native-*/e4-native-acceptance.json`，不是 Package sidecar。
+
+`tests/e4-native-fixture.test.mjs` 在跨平台 CI 自动检验随机目录、文件字节及错误检测。**此 CI 不会显示 Windows 原生目录选择框，不能冒充 native PASS**。只有真实运行该本地命令并获得 `E4_NATIVE_OS_PASS` 及对应报告才能标记该现场场景 PASS。故意拒绝权限、真实文件 ACL 部分写失败、外部进程竞态和原子写盘不能通过这个单次授权流程自动证实，仍为 NOT_RUN/明确限制。不接触真实项目源文件，不关闭其它 Chrome 进程。10 分钟没有完成则退出、保留本次独立测试目录供审计；清理需仅限那次生成的独立目录。
