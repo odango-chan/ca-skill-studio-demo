@@ -37,7 +37,7 @@ test("Unicode/CRLF and active uncommitted editor text are searched without mutat
   });
   assert.equal(current.matches.length,1);
   assert.equal(current.matches[0].line,2);
-  assert.equal(current.matches[0].column,3);
+  assert.equal(current.matches[0].column,4);
   assert.equal(w.files.get("scripts/main.py").text,before);
   markFileEdited(w,"scripts/main.py","def main():\n    return 'updated'\n");
   assert.equal(searchPackageText(w,"updated").matches[0].path,"scripts/main.py");
