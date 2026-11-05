@@ -16,6 +16,9 @@ spec:
     capabilities:
     - sbi.udm.sm_data.get
     - ca.session.operation_context.read
+    - ca.session.pcf_hold.bind
+    - ca.session.udm_hold.bind
+    - ca.session.n1n2_hold.bind
     - ca.session.pcf_create_inputs.read
     - sbi.udm.sdm_subscription.create
     - sbi.pcf.sm_policy.create
@@ -31,8 +34,6 @@ spec:
   - predicate: createdsession.ran.setup_accepted
     expect: PASS
   - predicate: createdsession.n4.forwarding_ready
-    expect: PASS
-  - predicate: createdsession.ue.configuration_accepted
     expect: PASS
   - predicate: createdsession.resources.managed
     expect: PASS

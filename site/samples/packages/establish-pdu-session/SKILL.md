@@ -43,7 +43,7 @@ The occurrence carries the requested DNN, S-NSSAI, PDU Session Type and SSC mode
 with the exact PDU Session ID and PTI. Missing, stale, ambiguous or cross-occurrence
 information is not a usable default.
 
-Establish that the requested SSC mode 1 is permitted by the current subscription. Do not treat `allowedSscModes` as a replacement for the subscription default or silently rewrite the returned list. Read `references/session-selection.md` only if more detail is needed.
+Preserve the exact SSC mode list returned in `allowedSscModes`; do not truncate or deduplicate it during evaluation or selection. Open5GS may include the default in a three-mode list, while a standards-shaped subscription may list only additional modes. The default mode remains permitted even when it is absent from `allowedSscModes`. The supported request profile still requires SSC mode 1 and must prove that mode 1 is permitted by either the default or the additional-mode list. Read `references/session-selection.md` only if more detail is needed.
 
 ## Business progression
 
@@ -57,7 +57,7 @@ Keep the procedure recognizable as UE-requested PDU Session Establishment:
 6. `Namf_Communication_N1N2MessageTransfer`;
 7. PDU Session Resource Setup convergence;
 8. N4 Session Modification / forwarding convergence;
-9. UE configuration convergence and resource-responsibility finalization.
+9. resource-responsibility finalization.
 
 This is business guidance, not a replacement execution graph. The model chooses the next
 business decision from the current Decision Context and Available Actions.
@@ -112,6 +112,7 @@ does not need to spend a turn asking to verify them before every action.
 | `createdsession.pcf.create_inputs.ready` | the PCF create inputs (current session instance, allocated address, matched selection) are readable for this attempt; this is not create authorization |
 | `createdsession.pcf.create_governed` | resource creation is authorized: the lifecycle is clean and the original SMF's competing create is governed |
 | `createdsession.delivery_context.ready` | the delivery input facts required before N1/N2 transfer are ready; sender uniqueness belongs to the governed transfer mutation, not to this read |
+| `createdsession.n1n2.hold_bound` | the exact Fabric-held original SMF N1/N2 transfer for this attempt is bound (a read: it does not claim, send, or prove RAN setup) |
 
 The Host may expose the current result or a blocking reason in Decision Context or
 Available Actions. If one of these prerequisites is not satisfied, do not try to bypass
@@ -133,7 +134,6 @@ is actually needed and is not already established.
 | `createdsession.amf.transfer_initiated` | the exact AMF N1/N2 transfer for this occurrence was initiated |
 | `createdsession.ran.setup_accepted` | the RAN accepted PDU Session Resource Setup for this occurrence |
 | `createdsession.n4.forwarding_ready` | required forwarding state is ready |
-| `createdsession.ue.configuration_accepted` | the UE accepted the selected session configuration |
 | `createdsession.resources.managed` | created resources and late-result responsibility are durably managed |
 
 A request for one of these facts resolves the current Skill-defined truth through the
@@ -155,18 +155,53 @@ The Skill may:
 - obtain the current operation/allocation context;
 - prepare the deterministic NAS/N2 SM artifacts required for delivery;
 - initiate AMF N1/N2 Message Transfer;
-- wait for or request authoritative N4/RAN/UE business facts;
+- wait for or request authoritative core-network N4/RAN business facts;
 - propose completion when the business goal appears satisfied;
 - stop when safe progression cannot be established.
 
 Do not drive the Skill from what a temporary SMF happens to request, from what a waiter
 expects to receive, or from a side effect merely being attempted.
 
-## Opaque context ownership
+## Opaque context ownership and reference types
 
-Provider input, operation and evidence handles are grounded by the Host/Harness,
-not selected or compared by the model. An available input read does not prove
-creation authorization, resource ownership or downstream convergence.
+Two Provider reads produce different opaque handles and must not be substituted for
+each other:
+
+- `ca.session.operation_context.read` returns an operation-context `contextRef`. Use
+  it only for its matching purpose (`nas-and-n2-delivery` for N1/N2 delivery and
+  downstream waits). `purpose=policy-create` never returns `AVAILABLE`.
+- `ca.session.pcf_create_inputs.read` returns `pcfCreateInputsRef`. It is a
+  five-second PCF-create input-readiness handle and never represents operation
+  context, association ownership, creation, sender reservation or callback
+  ownership.
+
+`ca.session.pcf_hold.bind` returns the Fabric-issued `holdRef` of the original SMF
+PCF sm-policy create this attempt must answer. Fabric issues it only after the SMF
+starts the create, which happens after UDM Subscribe is answered; the binding
+therefore belongs to the PCF create stage and never gates the subscription. The
+Runtime presents that same reference to the Pre-N4 inputs read and to the governed
+create dispatch, and claims the waiter only after the operation identity and
+commitment exist.
+
+`ca.session.n1n2_hold.bind` returns the Fabric-issued `holdRef` of the original SMF
+N1/N2 Message Transfer for this PDU session instance. It is a read: it selects the
+one hold matching this environment, lifecycle, SUPI/PDU-Session and the
+operator-declared AMF target, and it neither claims nor sends. The N1/N2 operation
+instance published by Fabric (`pdu-session:<supi>:psi-<id>`) is not the Provider
+N4/artifact session instance and is never exchanged for it. The
+`sbi.amf.n1n2.transfer` mutation derives the operation identity and the Agent
+commitment, records them durably, claims that hold, and only then dispatches the
+Provider C transfer with the same association. The Agent never decodes the NAS,
+NGAP or multipart payload; Fabric parses the held request and publishes its scope.
+
+UDM Subscribe obtains DNN/S-NSSAI through the UDM read plus the governed selection:
+the Runtime resolves the exact stored Provider UDM record by
+subject/invocation/transaction, requires a matched target-service read, and checks
+the selected DNN/S-NSSAI/PDU-Session-Type/SSC tuple against that record. The
+Provider SMF-builder comparison covers DNN, SST and SD; PDU Session Type and SSC
+Mode come from the governed UE request and matched subscription. The initial N4
+wait joins on the exact Pre-N4 `pcfPolicyAssociationRef`, not on either handle and
+not on the Post-N4 N4 SEID pair.
 
 ## Unsafe inferences
 
@@ -177,10 +212,16 @@ Never make these substitutions:
 - `Npcf_SMPolicyControl_Create` success **does not mean** an unsupported conditional
   Policy Association Modification branch has succeeded.
 - a temporary SMF/PFCP request **does not mean** initial N4 resources are ready.
+- a bound N1/N2 Fabric hold **does not mean** the hold was claimed, that N1/N2 was
+  sent, that the AMF answered, or that RAN setup was accepted.
+- a Fabric sender grant or a Provider transfer result **does not mean** the original
+  SMF waiter received, or consumed, the AMF response.
 - AMF N1/N2 transfer success **does not mean** RAN setup is accepted.
 - RAN setup acceptance **does not mean** N4 forwarding is ready.
 - earlier N4 establishment **does not mean** later forwarding convergence is complete.
-- network delivery **does not mean** UE configuration is accepted.
+- a successful RAN/N4 exchange **does not mean** the UE accepted anything locally;
+  UE-internal state is not an Agent-observable business fact and is never a
+  completion gate for this Skill.
 - successful business operations **do not mean** resource responsibility is finalized.
 - reaching the expected last business stage **does not mean** the Skill Contract passes.
 - missing, stale, ambiguous, wrong-lifecycle or wrong-producer evidence **does not mean**
@@ -204,8 +245,8 @@ producer. In particular:
 
 - UDM read usability belongs to the exact UDM invocation/transaction result;
 - AMF transfer acknowledgement belongs to the exact N1N2 transfer operation;
-- RAN, N4-forwarding and UE convergence belong to the current lifecycle and the causal
-  transfer context;
+- RAN adoption and N4 forwarding convergence belong to the current lifecycle, the
+  causal transfer context and the exact Post-N4 session instance;
 - resource responsibility belongs to the current lifecycle.
 
 Never use latest-per-UE or latest-per-session evidence as a substitute for exact
@@ -235,10 +276,12 @@ Operation success and Skill completion are different things.
 The Skill succeeds only when the Contract independently establishes all required final
 facts, including:
 
-- RAN PDU Session Resource Setup accepted for the current occurrence;
-- required N4 forwarding state ready;
-- UE accepted the selected session configuration;
+- the SMF adopted the RAN PDU Session Resource Setup of the current occurrence;
+- the SMF/UPF downlink forwarding resources of the same N4 session instance are ready;
 - created resources and late-result responsibility durably managed.
+
+UE-internal state (NAS PS-ACTIVE, TUN, ping) is deliberately **not** a completion
+fact: it is not Agent-observable, and the Agent must not claim it.
 
 A model may propose completion, but the Contract is the final authority.
 

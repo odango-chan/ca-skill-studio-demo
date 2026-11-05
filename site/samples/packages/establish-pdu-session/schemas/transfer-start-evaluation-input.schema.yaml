@@ -49,7 +49,12 @@ properties:
             minimum: 200
             maximum: 599
           cause:
-            type: string
+            # The Provider projects an absent AMF cause as an explicit null.
+            # A definite HTTP error without a cause must still classify as FAIL,
+            # so null is the "no cause provided" value, not a schema violation.
+            type:
+            - string
+            - 'null'
             minLength: 1
         allOf:
         - if:
