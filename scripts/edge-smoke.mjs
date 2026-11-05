@@ -609,6 +609,38 @@ try{
   if(!/executable|authoring_assistant/.test(hoverText))
     throw Error("E2 Owner schema hover did not expose enum: "+hoverText);
 
+  // Monaco's right-click context menu is a portal; its surface must not
+  // inherit a transparent background from outside the editor theme.
+  await command("Input.dispatchMouseEvent",{
+    type:"mousePressed",x:hover.x,y:hover.y,button:"right",buttons:2,clickCount:1
+  });
+  await command("Input.dispatchMouseEvent",{
+    type:"mouseReleased",x:hover.x,y:hover.y,button:"right",buttons:0,clickCount:1
+  });
+  await sleep(280);
+  const contextMenu=await evaluate([
+    "(()=>{",
+    " const menu=[...document.querySelectorAll('.context-view.monaco-menu-container')]",
+    "   .find(el=>el.getBoundingClientRect().width>50);",
+    " const surface=menu?.querySelector('.monaco-menu')||menu;",
+    " const bg=surface?getComputedStyle(surface).backgroundColor:'';",
+    " const rect=menu?.getBoundingClientRect();",
+    " const opaque=/^rgb\\(255, 255, 255\\)$/.test(bg);",
+    " return {visible:!!menu&&rect.width>50&&rect.height>30,",
+    "  opaque,bg,hasActions:!!menu?.querySelector('.action-item'),",
+    "  label:menu?.textContent?.trim().slice(0,80)||''};",
+    "})()"
+  ].join("\n"));
+  console.log("MONACO_CONTEXT_MENU_OPAQUE",JSON.stringify(contextMenu));
+  if(!contextMenu?.visible||!contextMenu.opaque||!contextMenu.hasActions)
+    throw Error("Monaco context menu opacity regression: "+JSON.stringify(contextMenu));
+  await command("Input.dispatchKeyEvent",{
+    type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27
+  });
+  await command("Input.dispatchKeyEvent",{
+    type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27
+  });
+
   // E4-A1: real Chromium UI receives a directory-shaped FileList, opens a
   // source-backed multi-file Package and ZIP-exports exact opaque bytes.
   // This is an in-browser FileList event, not an OS chooser / disk-write test.
