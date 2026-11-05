@@ -51,6 +51,10 @@ function mockDirectory(initial,{
                   if(path===state.failWrite)throw Error("write rejected");
                   staged=Uint8Array.from(data);
                 },
+                async truncate(length){
+                  if(!staged)throw Error("truncate before write");
+                  staged=staged.slice(0,length);
+                },
                 async close(){
                   if(path===state.failClose)throw Error("close rejected");
                   if(!staged)throw Error("no data");
@@ -81,6 +85,7 @@ test("E4-A2 only changed Source writes; unchanged/opaque data and history remain
   assert.deepEqual(result.saved,["scripts/one.py"]);
   assert.deepEqual(confirmed.paths,["scripts/one.py"]);
   assert.deepEqual(storage.writes,["scripts/one.py"]);
+  assert.equal(storage.opens[0].opts.keepExistingData,false);
   assert.deepEqual(storage.disk.get("assets/image.png"),binary);
   assert.deepEqual(storage.disk.get("scripts/one.py"),enc.encode("print(42)\n"));
   assert.equal(ws.files.get("scripts/one.py").initialText,"print(42)\n");
@@ -232,4 +237,14 @@ test("E4-A2 rejects writing oversized edited UTF-8 and refuses malformed origins
   }]])};
   assert.equal((await saveDirectoryChanges({workspace:fake,handle:storage.handle,
     confirmWrite:allow})).status,"BLOCKED");
+});
+
+test("E4-A2 replacing longer disk text with a shorter Source has no retained tail",async()=>{
+  const ws=await workspace(),storage=mockDirectory(snapshot(ws));
+  edit(ws,"SKILL.md","#\n");
+  const response=await saveDirectoryChanges({workspace:ws,handle:storage.handle,
+    confirmWrite:allow});
+  assert.equal(response.status,"SAVED");
+  assert.deepEqual(storage.disk.get("SKILL.md"),enc.encode("#\n"));
+  assert.equal(storage.disk.get("SKILL.md").length,2);
 });
