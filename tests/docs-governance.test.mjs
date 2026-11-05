@@ -92,7 +92,7 @@ test("D4 read-only consumer ABI evidence accepted; cross-producer edits still de
 test("current owner-pinned CreatedSession Reference example is documented without Runtime claims",()=>{
   const work=content("docs/WORK.md"),trace=content("docs/TRACEABILITY.md");
   const docs=content("docs/design/authoring-workbench.md");
-  assert.match(work,/7570b309a998580a6952352e2bf4b1c19e5c710d/);
+  assert.match(work,/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/);
   assert.match(trace,/Refreshed establish-pdu-session optional references/);
   for(const name of ["3gpp-procedure.md","session-selection.md","failure-handling.md"])
     assert.ok(work.includes("references/"+name),name);

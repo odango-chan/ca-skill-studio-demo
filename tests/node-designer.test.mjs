@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {projectWorkspace} from "../site/workspace.mjs";
 import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "../site/node-designer.mjs";
 const read=skill=>readFileSync(new URL(
-  "../site/samples/packages/"+skill+"/assurance/procedure.yaml",import.meta.url),"utf8");
+  (skill==="establish-pdu-session"?"./fixtures/establish-pre-hold/assurance/procedure.yaml":"../site/samples/packages/"+skill+"/assurance/procedure.yaml"),import.meta.url),"utf8");
 const ensure=read("ensure-pdu-session");
 const created=read("establish-pdu-session");
 

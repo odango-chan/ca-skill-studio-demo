@@ -18,6 +18,36 @@ predicates:
   # current session instance, allocated address and selected configuration for
   # this attempt. It does not say the PCF association exists, is exclusively
   # owned, has a ready callback route or may be created.
+  # UDM Subscribe safety: the subscription must answer the exact held SMF
+  # request. The UDM operation declares SUPI in its request path and DNN/S-NSSAI
+  # in its body; it declares no PDU Session and no policy association, so this
+  # gate never asks for either.
+  createdsession.udm.hold_bound:
+    observations:
+      state:
+        ref: createdsession.udm_hold
+        scope: '{"ueRef": subject.ueRef, "dnn": request.dnn, "sst": request.sNssai.sst, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.bindingStatus == "CURRENT" && observations.state.operationKind
+        == "UDM_SDM_SUBSCRIPTION_CREATE" && observations.state.holdRef == subject.udmHoldRef &&
+        observations.state.holdRef != "" && observations.state.currentInstanceRef != "" &&
+        observations.state.heldRequestDigest != "" && observations.state.dnn == request.dnn &&
+        observations.state.sst == request.sNssai.sst
+  createdsession.pcf.hold_bound:
+    observations:
+      state:
+        ref: createdsession.pcf_hold
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.bindingStatus == "CURRENT" && observations.state.operationKind
+        == "PCF_SM_POLICY_CREATE" && observations.state.holdRef == subject.pcfHoldRef &&
+        observations.state.holdRef != "" && observations.state.currentInstanceRef ==
+        subject.pcfHoldPolicyAssociationRef && observations.state.heldRequestDigest !=
+        "" && observations.state.policyAssociationRef != ""
   createdsession.pcf.create_inputs.ready:
     observations:
       state:
@@ -27,8 +57,8 @@ predicates:
     evaluator:
       type: cel
       expression: observations.state.bindingStatus == "CURRENT" && observations.state.pcfCreateInputsRef != "" &&
-        observations.state.currentSessionInstanceRef != "" && observations.state.allocatedIPv4 != "" &&
-        observations.state.selectionDigest != ""
+        observations.state.pcfPolicyAssociationRef != "" && observations.state.fabricHoldRef != "" &&
+        observations.state.allocatedIPv4 != "" && observations.state.selectionDigest != ""
   # Create safety, which input readiness cannot supply. A clean resource
   # lifecycle and governance of the original SMF's competing create are owned by
   # the environment/Fabric boundary; no admitted owner source exists yet, so this
@@ -37,7 +67,7 @@ predicates:
     observations:
       state:
         ref: createdsession.pcf_create_governance
-        scope: '{"ueRef": subject.ueRef, "lifecycleRef": facts.createdsession_lifecycle, "ingressRef": facts.createdsession_ingress}'
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "lifecycleRef": facts.createdsession_lifecycle, "ingressRef": facts.createdsession_ingress}'
         freshness: 5s
     evaluator:
       type: cel
@@ -68,16 +98,47 @@ predicates:
       type: cel
       expression: observations.state.creationState == "CREATED" && observations.state.ownership == "AGENT"
         && observations.state.managementState == "DURABLE"
+  # Pre-N4 baseline. This is captured from the real SMF/UPF owner state before
+  # the PCF Create mutation. It accepts only a complete exact read that proved
+  # there is no current N4 pair for this UE/PDU Session. An existing pair, a
+  # partial read or an unavailable source leaves the create blocked.
+  createdsession.n4.baseline_clear:
+    observations:
+      state:
+        ref: createdsession.n4_baseline
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "pti": request.pti, "requestType": request.requestType, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle, "pcfPolicyAssociationRef": subject.pcfPolicyAssociationRef, "fabricHoldRef": subject.fabricHoldRef}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.pairState == "NO_N4_PAIR" && observations.state.baselineRef
+        != ""
   createdsession.n4.initial_resources_ready:
     observations:
       state:
         ref: createdsession.n4_initial_resources
-        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "pti": request.pti, "requestType": request.requestType, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "pti": request.pti, "requestType": request.requestType, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle, "pcfPolicyAssociationRef": subject.pcfPolicyAssociationRef}'
         freshness: 5s
     evaluator:
       type: cel
       expression: observations.state.bindingStatus == "CURRENT" && observations.state.defaultFlowInstalled
         == true && observations.state.uplinkEndpointBound == true
+  # N1/N2 association readiness. Fabric holds the original SMF N1/N2 Message
+  # Transfer and publishes one exact operation scope; this gate proves the Agent
+  # bound that exact live hold for this attempt. It is a read: it does not say
+  # the hold was claimed, that N1/N2 was sent, or that any RAN resource exists.
+  createdsession.n1n2.hold_bound:
+    observations:
+      state:
+        ref: createdsession.n1n2_hold
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.bindingStatus == "CURRENT" && observations.state.operationKind
+        == "N1N2_MESSAGE_TRANSFER" && observations.state.holdRef == subject.n1n2HoldRef
+        && observations.state.holdRef != "" && observations.state.currentInstanceRef != ""
+        && observations.state.heldRequestDigest != "" && observations.state.targetNfInstanceId
+        != "" && observations.state.supi != "" && observations.state.deadline != ""
   createdsession.delivery_context.ready:
     observations:
       state:
@@ -121,16 +182,6 @@ predicates:
       expression: observations.state.bindingStatus == "CURRENT" && observations.state.requiredFlowMatched
         == true && observations.state.downlinkTunnelMatched == true && observations.state.gatesAllowForwarding
         == true
-  createdsession.ue.configuration_accepted:
-    observations:
-      state:
-        ref: createdsession.ue_sm_configuration
-        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "pti": request.pti, "requestType": request.requestType, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
-        freshness: 5s
-    evaluator:
-      type: cel
-      expression: observations.state.smState == "ACTIVE" && observations.state.selectedConfigurationMatched
-        == true && observations.state.currentInstanceBound == true
   createdsession.resources.managed:
     observations:
       state:

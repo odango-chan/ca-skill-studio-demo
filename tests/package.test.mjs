@@ -39,18 +39,18 @@ test("only the owner-named establish-pdu-session is a selectable real SKILL Pack
     !path.startsWith("cases/")&&!path.startsWith("design/")));
 });
 test("fixtures are byte-for-byte the pinned ca-agent-demo Git blob sources",()=>{
-  assert.equal(sha(read("establish-pdu-session","SKILL.md")),"394027efb3f940490c69fcf6f0593ebf29daca81");
+  assert.equal(sha(read("establish-pdu-session","SKILL.md")),"d56174cae48e43f0c041d65f84058d6b8d0cef3e");
   assert.equal(sha(read("establish-pdu-session","references/3gpp-procedure.md")),"d70148210dcd6ea7a7ddebbb1ffcba34e2bb33b3");
   assert.equal(sha(read("establish-pdu-session","references/session-selection.md")),"341a29272ee5b593760b5ee8632ac7c9e7508105");
   assert.equal(sha(read("establish-pdu-session","references/failure-handling.md")),"02f1d6caf84f1f8dc29684ec07d90a805b9f81e0");
-  assert.equal(sha(read("establish-pdu-session","assurance/contract.yaml")),"af4f47c9a9bf21f241e359bba6e4b47951c5d246");
-  assert.equal(sha(read("establish-pdu-session","assurance/procedure.yaml")),"cf502fa54363a5302161cc7cccb191ce73e453de");
-  assert.equal(sha(read("establish-pdu-session","assurance/predicates.yaml")),"8cc773b2f428274acb40b6460f78df1106bd413d");
+  assert.equal(sha(read("establish-pdu-session","assurance/contract.yaml")),"fb911dc9f7cb43713a36c5904adefc283c925b6e");
+  assert.equal(sha(read("establish-pdu-session","assurance/procedure.yaml")),"3517653309acc5657e1de5b450f84b848b75cbcd");
+  assert.equal(sha(read("establish-pdu-session","assurance/predicates.yaml")),"bc9226f64123abf76bae02ca8fd10922078249f9");
   assert.equal(sha(read("establish-pdu-session","schemas/establishment-request.schema.yaml")),"c8027b6f9625949302900fa170ad59fec3b4a8f7");
   assert.equal(sha(read("establish-pdu-session","schemas/predicate-evaluation-result.schema.yaml")),"c34c65ac00dcebb0a306a7cee2224566617fceca");
   assert.equal(sha(read("establish-pdu-session","schemas/selection-input.schema.yaml")),"b3ff6984c693daf7e71758106aacbf8f08cd7487");
   assert.equal(sha(read("establish-pdu-session","schemas/selection.schema.yaml")),"29a3f172be5dc815926ae1288ad4c29b1c052342");
-  assert.equal(sha(read("establish-pdu-session","schemas/transfer-start-evaluation-input.schema.yaml")),"29b78e251f78c2137ddfc8db448e02775ac13af6");
+  assert.equal(sha(read("establish-pdu-session","schemas/transfer-start-evaluation-input.schema.yaml")),"b5523699b627e7a68dfe8fed6daf623738b672c1");
   assert.equal(sha(read("establish-pdu-session","schemas/udm-read-evaluation-input.schema.yaml")),"f26a877d55b4e94c9a1a9487e0eceb702c0778ee");
   assert.equal(sha(read("establish-pdu-session","scripts/evaluate_transfer_start.py")),"f5319a6d9383f7bcb984544325aefc844e8c503d");
   assert.equal(sha(read("establish-pdu-session","scripts/evaluate_udm_read.py")),"c542b0699ff0357b9f7d2a0e10b1f13cd7d62657");
@@ -60,8 +60,8 @@ test("real Procedure files project to the expected Root and Child graph",()=>{
   const establish=projectWorkspace(read("establish-pdu-session","assurance/procedure.yaml"));
   assert.equal(establish.state,"READY");
   assert.equal(establish.procedure.nodes.length,17);
-  assert.equal(establish.procedure.routes.length,65);
-  assert.equal(establish.procedures.size,6);
+  assert.equal(establish.procedure.routes.length,63);
+  assert.equal(establish.procedures.size,5);
 });
 test("file workspace retains per-file source and revision history independently",()=>{
   const ws=createFileWorkspace("establish-pdu-session",[

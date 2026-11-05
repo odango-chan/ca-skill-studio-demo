@@ -7,7 +7,7 @@ import {
  phaseVerifyChoices,previewPhaseVerifyPatch,applyPhaseVerifyPatch,
  createdRouteTargets,previewCreatedRoutePatch,applyCreatedRoutePatch
 } from "../site/extended-attributes.mjs";
-const folder="../site/samples/packages/establish-pdu-session/assurance/";
+const folder="./fixtures/establish-pre-hold/assurance/";
 const read=name=>readFileSync(new URL(folder+name,import.meta.url),"utf8");
 const text=read("procedure.yaml");
 const predicateSource=read("predicates.yaml");
@@ -24,7 +24,7 @@ for(const procedure of model.procedures.values())
           stepChoices.push({procedure,node,phase,step});
 const first=stepChoices[0];
 const target=actualChoices.find(value=>value!==first?.step.value);
-test("real CreatedSession has source-grounded enum choices for phase Verify references",()=>{
+test("pinned predecessor CreatedSession has source-grounded enum choices for phase Verify references",()=>{
   assert.ok(stepChoices.length>=8);
   assert.ok(actualChoices.length>8);
   const choices=phaseVerifyChoices(text,name,first.procedure.name,first.node.id,

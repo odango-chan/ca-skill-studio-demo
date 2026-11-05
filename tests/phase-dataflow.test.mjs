@@ -3,8 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {projectWorkspace} from "../site/workspace.mjs";
 import {phaseStepDependencyReport} from "../site/phase-dataflow.mjs";
-const fixture=readFileSync(new URL("../site/samples/packages/"+
-  "establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
+const fixture=readFileSync(new URL("./fixtures/establish-pre-hold/assurance/procedure.yaml",import.meta.url),"utf8");
 const proc="ue-requested-pdu-session-establishment";
 const readSample=(path)=>readFileSync(new URL("../site/samples/packages/"+
   "establish-pdu-session/"+path,import.meta.url),"utf8");
@@ -14,7 +13,7 @@ const files=new Map([
  ["schemas/selection.schema.yaml",{text:readSample("schemas/selection.schema.yaml")}]
 ]);
 const dep=(node,text=fixture,fs=files)=>phaseStepDependencyReport(text,proc,node,fs);
-test("D4-A2.2 read-only provenance on real CreatedSession resolves earlier local Step and source input",()=>{
+test("D4-A2.2 read-only provenance on pinned predecessor CreatedSession resolves earlier local Step and source input",()=>{
   const r=dep("nudm-sdm-subscribe");
   assert.equal(r.status,"READY");
   assert.ok(r.summary.count>10);

@@ -5,8 +5,7 @@ import {namedStepMutationImpactReport} from "../site/phase-step-impact.mjs";
 import {previewNamePlainVerify,applyNamePlainVerify,
   namedVerifyEditOptions} from "../site/phase-named-verify.mjs";
 
-const source=readFileSync(new URL("../site/samples/packages/"+
-  "establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
+const source=readFileSync(new URL("./fixtures/establish-pre-hold/assurance/procedure.yaml",import.meta.url),"utf8");
 const pid="ue-requested-pdu-session-establishment";
 const node="nudm-sdm-subscribe",phase="preconditions";
 const report=s=>namedStepMutationImpactReport(s,pid,node);
@@ -15,7 +14,7 @@ const row=(s,index)=>report(s).steps.find(x=>x.phaseName===phase&&
 const first="select-subscription-configuration";
 const second="resolve-pcf-create-inputs";
 
-test("D4-A3b2b2a real named Script has five consumers and a direct dependency into next Call",()=>{
+test("D4-A3b2b2a pinned named Script has five consumers and a direct dependency into next Call",()=>{
   const data=report(source);
   assert.equal(data.status,"READY");
   const s=row(source,0);

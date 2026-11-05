@@ -1,11 +1,11 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-05**  
-**Reviewed implementation baseline: main@3433e991006d8be9b41ae455d499ce7f59380b55**（E4-A1 已合入且 resulting-main Pages PASS；E4-A2 原位保存/磁盘冲突仍后置）
+**Reviewed implementation baseline: main@ef8eae87edc0220223a0c3f280c6132e570d7bae**（E4-A2 已通过 PR #50 合并并完成 resulting-main Pages；上游 SKILL 示例刷新见 PR #51 草稿）
 
 ## Overall
 
-静态浏览器 Studio 的 D1 React Flow/ELK、D2 Node Designer A1–A5、固定多文件 Package 浏览及图标统一已进入 `main`，并通过了本仓范围内的单测、构建及 Chromium 回归。**E4-A1 浏览器目录导入和 ZIP 保真已验收，E4-A2 有界原位保存与磁盘冲突保护处于 PR 候选**；不宣称真实 OS 写盘验收、多文件原子事务、完整 Runtime validator 或真实 5GC 验收能力。Pages 的 PASS 不等于 Skill Runtime PASS。
+静态浏览器 Studio 的 D1 React Flow/ELK、D2 Node Designer A1–A5、固定多文件 Package 浏览及图标统一已进入 `main`，并通过了本仓范围内的单测、构建及 Chromium 回归。**E4-A1 目录导入/ZIP 与 E4-A2 显式原位保存均已合入并部署；原生 Windows Chrome 选择窗口实盘验收尚未进行**；不宣称真实 OS 写盘验收、多文件原子事务、完整 Runtime validator 或真实 5GC 验收能力。Pages 的 PASS 不等于 Skill Runtime PASS。
 
 ## Current scope matrix
 
@@ -14,7 +14,7 @@
 | D1 Procedure 投影、图形浏览、现有 Route Target Rewire | ACCEPTED | IMPLEMENTED | PASS（本仓浏览器级） | [D1](D1-procedure-designer.md)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
 | D2 Node Designer A1–A5 有界创建/删除/重命名/属性 Patch | ACCEPTED | IMPLEMENTED | PASS（本仓单测/浏览器） | [D2](D2-node-designer.md)、[PR #4](https://github.com/odango-chan/ca-skill-studio-demo/pull/4)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605140297) |
 | 固定示例多文件 Source / Markdown/ZIP 编辑与下载 | ACCEPTED | IMPLEMENTED | PASS（本仓测试范围） | `site/sample-packages.mjs`、`tests/package.test.mjs`、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
-| `establish-pdu-session` 刷新 SKILL.md + `references/` 三份 Markdown | ACCEPTED（Source Snapshot） | IMPLEMENTED（PR #20） | PASS（249 tests + Chromium；PR #20 合入） | [owner@7570b309](https://github.com/odango-chan/ca-agent-demo/tree/7570b309a998580a6952352e2bf4b1c19e5c710d/skills/establish-pdu-session)、[PR #20](https://github.com/odango-chan/ca-skill-studio-demo/pull/20)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41761998627) |
+| `establish-pdu-session` 刷新 SKILL.md + `references/` 三份 Markdown | ACCEPTED（Source Snapshot） | IMPLEMENTED（PR #20） | PASS（249 tests + Chromium；PR #20 合入） | [owner@7570b309](https://github.com/odango-chan/ca-agent-demo/tree/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/skills/establish-pdu-session)、[PR #20](https://github.com/odango-chan/ca-skill-studio-demo/pull/20)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41761998627) |
 | Root / Child 导航及统一线性图标 | ACCEPTED | IMPLEMENTED | PASS（189 tests + Chromium + Pages） | [PR #5](https://github.com/odango-chan/ca-skill-studio-demo/pull/5)、[Pages CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41608219330) |
 | Canonical 文档整顿 | ACCEPTED | IMPLEMENTED | PASS（193 单测、Typecheck、Build、Chromium、resulting-main Pages） | [PR #8](https://github.com/odango-chan/ca-skill-studio-demo/pull/8)、[PR CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41611856550)、[Pages CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41612728393)、[#6](https://github.com/odango-chan/ca-skill-studio-demo/issues/6) |
 | D3-A1 受限新增 `operator.on` Outcome | ACCEPTED | IMPLEMENTED | PASS（200 单测 + Chromium） | [PR #10](https://github.com/odango-chan/ca-skill-studio-demo/pull/10)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41615104253) |
@@ -38,7 +38,8 @@
 | E3-A2 Python 顶层 class/def/async def 符号导航（只读） | ACCEPTED（Editor-tier） | IMPLEMENTED（main@4e88e0a；PR #46 MERGED） | PASS（338/338 + Chromium + resulting-main Pages） | [PR #46](https://github.com/odango-chan/ca-skill-studio-demo/pull/46)、[rebased exact-head CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41811806093)、[main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41812070377)、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) |
 | D4-A2.2b2/A3b2b2b/A4b2 跨生产者写入 / 带副作用或输出依赖 Step 的写入 / 新 Phase on-map 与 owner Outcome 契约 | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | E4-A1 浏览器所选目录导入、未知文件保留与 ZIP 导出 | ACCEPTED（Editor-tier） | IMPLEMENTED（main@3433e99；PR #48 MERGED） | PASS（345/345 + Chromium FileList UI + resulting-main Pages） | [PR #48](https://github.com/odango-chan/ca-skill-studio-demo/pull/48)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41948794306)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41949134436)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
-| E4-A2 重选目录写入（非原路径证明 / 全目录冲突 / 部分保存报告） | ACCEPTED（best-effort） | IMPLEMENTED（PR #50 candidate） | PASS（362/362 + Chromium OPFS）；原生 Windows NOT_RUN | [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)、[设计](design/source-editor-workstream.md) |
+| E4-A2 重选目录写入（非原路径证明 / 全目录冲突 / 部分保存报告） | ACCEPTED（Demo best-effort） | IMPLEMENTED（main@ef8eae87；PR #50 MERGED） | PASS（365/365 + Chromium OPFS + Windows fixture 3/3 + resulting-main Pages）；原生 Chrome picker NOT_RUN | [PR #50](https://github.com/odango-chan/ca-skill-studio-demo/pull/50)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41963816684)、[Windows](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41963816623)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41964699713)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
+| 上游 SKILL 示例同步到 ca-agent-demo@eaadf948（16 文件） | ACCEPTED（Source Snapshot） | PR #51 DRAFT（main 尚未更新） | 单测/Chromium 审查进行中；不得用旧夹具冒充新示例 PASS | [PR #51](https://github.com/odango-chan/ca-skill-studio-demo/pull/51) |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
 
@@ -46,7 +47,7 @@
 
 ## Current open work
 
-- [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)：E4-A1 已在 main；E4-A2 PR #50 核心在 [CI #41961138893](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41961138893) 获 362/362 + Chromium OPFS PASS；新增 Windows 原生临时目录验收命令（`npm run test:e4:native`）仍待 PR CI 和实机执行，未合入也未部署。
+- [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)：E4-A1/A2 均已合入并部署。`npm run test:e4:native` 的随机临时目录与 Windows 文件系统专项已通过，但原生 Chrome 文件选择、授权及真实 OS 句柄写入现场仍 NOT_RUN；保留为 Demo 风险记录。
 
 - [#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25)：E3-A1/A2 已合入且部署；Python 语言服务（例如浏览器内 Pyright）仍仅候选，尚无真实语义诊断、类型检查或脚本执行。E4 目录读写仍独立推进。
 
@@ -58,4 +59,4 @@
 
 - [TRACEABILITY](TRACEABILITY.md)：当前范围→实现/测试→稳定证据。
 - [文档基线主分支 Pages 成功记录](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41612728393)：仅为本仓浏览器静态站部署。
-- Studio 唯一可选择且默认打开的 Package `establish-pdu-session`，其运行时相关 16 文件来自 [ca-agent-demo@7570b309](https://github.com/odango-chan/ca-agent-demo/tree/7570b309a998580a6952352e2bf4b1c19e5c710d/skills/establish-pdu-session)。`references/3gpp-procedure.md`、`references/session-selection.md`、`references/failure-handling.md` 为可选业务参考材料；Studio 可浏览/编辑/导出，不表示已实现 Host `read_reference` 工具。`cases/` 和内部 `design/` 未纳入此编辑示例。Host/Runtime 可执行性仍由真正 owner 的 Schema/Validator/执行事实决定。
+- Studio 唯一可选择且默认打开的 Package `establish-pdu-session`，其运行时相关 16 文件来自 [ca-agent-demo@eaadf948](https://github.com/odango-chan/ca-agent-demo/tree/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/skills/establish-pdu-session)。`references/3gpp-procedure.md`、`references/session-selection.md`、`references/failure-handling.md` 为可选业务参考材料；Studio 可浏览/编辑/导出，不表示已实现 Host `read_reference` 工具。`cases/` 和内部 `design/` 未纳入此编辑示例。Host/Runtime 可执行性仍由真正 owner 的 Schema/Validator/执行事实决定。

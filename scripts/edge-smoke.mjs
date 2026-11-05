@@ -18,13 +18,23 @@ for(const legacy of ["samples/packages/ensure-pdu-session","samples/ensure-pdu-s
   if(existsSync(resolve(dist,legacy)))throw Error("Legacy Ensure asset leaked into Pages dist: "+legacy);
 }
 const types={".html":"text/html",".css":"text/css",".js":"text/javascript",".yaml":"text/yaml",".md":"text/markdown",".json":"application/json"};
+const predecessorFiles=new Set([
+  "SKILL.md","assurance/contract.yaml","assurance/predicates.yaml",
+  "assurance/procedure.yaml","schemas/transfer-start-evaluation-input.schema.yaml"
+]);
 const server=createServer((req,res)=>{
   const path=decodeURIComponent(new URL(req.url,"http://localhost").pathname);
   // Legacy Ensure YAML stays in source only, served exclusively by this local test server.
   const testFixture=path==="/__test__/ensure-procedure.yaml";
-  const file=testFixture ? resolve("site/samples/ensure-pdu-session.procedure.yaml")
+  const legacy=path.startsWith("/__test__/pre-hold/")
+    ? path.slice("/__test__/pre-hold/".length):null;
+  const testPredecessor=legacy!==null&&predecessorFiles.has(legacy);
+  const file=testPredecessor ? resolve("tests/fixtures/establish-pre-hold",legacy)
+    : testFixture ? resolve("site/samples/ensure-pdu-session.procedure.yaml")
     : resolve(dist,"."+path.replace(/\/$/,"/index.html"));
-  if(!testFixture&&file!==dist&&!file.startsWith(dist+sep)){res.writeHead(403).end();return;}
+  if(!testPredecessor&&!testFixture&&file!==dist&&!file.startsWith(dist+sep)){
+    res.writeHead(403).end();return;
+  }
   const stream=createReadStream(file);
   stream.on("error",()=>res.writeHead(404).end());
   stream.on("open",()=>{
@@ -99,8 +109,8 @@ try{
     " button.click();",
     " for(let i=0;i<130;i++){",
     "  if(document.querySelectorAll('.react-flow__node').length===17 &&",
-    "    document.querySelectorAll('.react-flow__edge-path').length===48 &&",
-    "    document.querySelectorAll('.react-flow__handle[data-handleid^=edge-]').length===96 &&",
+    "    document.querySelectorAll('.react-flow__edge-path').length===46 &&",
+    "    document.querySelectorAll('.react-flow__handle[data-handleid^=edge-]').length===92 &&",
     "    document.getElementById('layoutStatus')?.textContent!=='正在自动布局…')break;",
     "  await sleep(100);",
     " }",
@@ -132,7 +142,7 @@ try{
     "  }",
     " }",
     " const ids=[...document.querySelectorAll('.react-flow__edge')].map(x=>x.getAttribute('data-id'));",
-    " const expected=Array.from({length:48},(_,i)=>'flow-edge-'+i);",
+    " const expected=Array.from({length:46},(_,i)=>'flow-edge-'+i);",
     " return {nodes:document.querySelectorAll('.react-flow__node').length,",
     "  edges:paths.length,edgeIds:ids,missing:expected.filter(x=>!ids.includes(x)),",
     "  handles:document.querySelectorAll('.react-flow__handle').length,",
@@ -154,8 +164,8 @@ try{
   ].join("\n");
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
-  if(result?.nodes!==17||result.edges!==48||result.valid!==48||result.markersOk!==48||
-     result.attachedPorts!==96||result.maxPortGap>1.5)
+  if(result?.nodes!==17||result.edges!==46||result.valid!==46||result.markersOk!==46||
+     result.attachedPorts!==92||result.maxPortGap>1.5)
     throw Error("CreatedSession visible edges FAIL");
   console.log("CreatedSession visible paths and aligned React Flow ports PASS: "+
     result.valid+" / "+result.attachedPorts);
@@ -315,7 +325,67 @@ try{
       originalLength:initialSource.length,actualLength:switched.source?.length
     }));
 
+  // The latest owner Skill is smoke-tested above (17 nodes / 46 bundles).
+  // D1 historical edit cases need the PRE-HOLD authored source because their
+  // precise Step order and qualified AST spans are frozen regression subjects.
+  // Load it only into this browser-test session, NEVER the published sample.
+  const pinnedSource=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const base='./samples/packages/establish-pdu-session/';",
+    " const paths=new Set(['SKILL.md','assurance/contract.yaml',",
+    "   'assurance/predicates.yaml','assurance/procedure.yaml',",
+    "   'schemas/transfer-start-evaluation-input.schema.yaml']);",
+    " const original=window.fetch,oldConfirm=window.confirm;",
+    " window.fetch=function(input,init){",
+    "  const url=String(input);",
+    "  const relative=url.startsWith(base)?url.slice(base.length):null;",
+    "  if(relative&&paths.has(relative))",
+    "    return original.call(window,'/__test__/pre-hold/'+relative,init);",
+    "  return original.call(window,input,init);",
+    " };",
+    " try{",
+    "  window.confirm=()=>true;",
+    "  document.getElementById('establishSampleButton').click();",
+    "  for(let i=0;i<140;i++){",
+    "   const src=document.getElementById('source')?.value||'';",
+    "   if(src.includes('resolve-pcf-create-inputs')&&!src.includes('bind-udm-hold'))break;",
+    "   await sleep(80);",
+    "  }",
+    "  const src=document.getElementById('source')?.value||'';",
+    "  return {old:src.includes('resolve-pcf-create-inputs')&&!src.includes('bind-udm-hold'),",
+    "    length:src.length};",
+    " }finally{window.fetch=original;window.confirm=oldConfirm;}",
+    "})()"
+  ].join("\n"));
+  console.log("D1_FROZEN_FIXTURE_LOADED",JSON.stringify(pinnedSource));
+  if(!pinnedSource?.old)throw Error("Frozen D1 browser fixture not loaded");
   await runD1Interactions(evaluate,command);
+  // A clean page navigation resets Inspector/selection state left by the
+  // historical D1 interaction tests. All subsequent E2/E3/E4 browser checks
+  // execute against the *new* owner sample, not the predecessor fixture.
+  await command("Page.reload",{ignoreCache:true});
+  await sleep(1000);
+  const restoredOwner=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " for(let i=0;i<150;i++){",
+    "  const src=document.getElementById('source')?.value||'';",
+    "  if(src.includes('bind-udm-hold')&&",
+    "    document.querySelectorAll('.react-flow__node').length===17&&",
+    "    document.querySelectorAll('.react-flow__edge-path').length===46)break;",
+    "  await sleep(100);",
+    " }",
+    " const src=document.getElementById('source')?.value||'';",
+    " return {owner:src.includes('bind-udm-hold'),",
+    "  nodes:document.querySelectorAll('.react-flow__node').length,",
+    "  edges:document.querySelectorAll('.react-flow__edge-path').length,",
+    "  length:src.length};",
+    "})()"
+  ].join("\n"));
+  console.log("D1_CURRENT_OWNER_RESTORED",JSON.stringify(restoredOwner));
+  if(!restoredOwner?.owner||restoredOwner.nodes!==17||restoredOwner.edges!==46)
+    throw Error("Current owner sample not cleanly loaded after D1");
 
   // E2-A2: real Owner schemas, schema diagnostics, completion and hover.
   // E3-A1: actual script Inspector links switch Package Source files, without

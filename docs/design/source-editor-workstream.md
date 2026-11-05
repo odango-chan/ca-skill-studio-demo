@@ -1,7 +1,7 @@
 # E · Source Editor Workstream（与 D Visual Designer 并行）
 
 **Status: Accepted (development boundary) · Date: 2026-11-04**  
-**Implementation: E1/E2/E3-A1/A2/E4-A1 ACCEPTED and MERGED. E4-A1 main@3433e99 via PR #48; 345/345 + real Chromium + resulting-main Pages PASS. E4-A2 original disk saving/Conflict NOT_STARTED; Runtime NOT_RUN.**  
+**Implementation: E1/E2/E3-A1/A2/E4-A1/A2 ACCEPTED and MERGED. E4-A2 main@ef8eae87 via PR #50; 365/365 + real Chromium OPFS + Windows filesystem fixture + resulting-main Pages PASS. The interactive native Windows Chrome OS folder picker/write remains NOT_RUN; Runtime NOT_RUN.**  
 **Current accepted main baseline:** `main@3433e991006d8be9b41ae455d499ce7f59380b55`; [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) ports the E1-A1/A2 integration from historical [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) onto current D4-A4b1. [Final PR CI #41796985366](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366) **322/322 + real Chromium PASS** and [resulting-main Pages #41797402343](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343) **PASS** at `main@a5db46ee`. 本文件为 E 线的唯一 canonical 设计正文；追踪在 E1 #23、E2 #24、E3 #25 和 E4 #26。
 
 ## 1. 目标和不做的事
@@ -96,7 +96,7 @@ E2/E3 依赖稳定 E1 adapter，但 D4 与 E1 可同时进行。E4 不以静态 
 
 ## 8. E2 重要 Owner Schema 相容性门禁
 
-2026-11-04 核对 [ca-agent-demo@7570b309](https://github.com/odango-chan/ca-agent-demo/tree/7570b309a998580a6952352e2bf4b1c19e5c710d/skills/establish-pdu-session) 与当前 [ca-skill-toolchain 源 Schema](https://github.com/odango-chan/ca-skill-toolchain/blob/main/schemas/v1alpha1/procedure-source.schema.yaml)：前者 Procedure 存在 `preconditions`、`postconditions` Phase Steps、跨 Step output `from`；后者 `$defs.node` 只有旧节点属性且 `additionalProperties: false`，缺少 Phase 结构。因此**E2 禁止直接将该 Procedure Schema 配到当前内置 `assurance/procedure.yaml`**，否则会误报。
+2026-11-04 核对 [ca-agent-demo@eaadf948](https://github.com/odango-chan/ca-agent-demo/tree/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/skills/establish-pdu-session) 与当前 [ca-skill-toolchain 源 Schema](https://github.com/odango-chan/ca-skill-toolchain/blob/main/schemas/v1alpha1/procedure-source.schema.yaml)：前者 Procedure 存在 `preconditions`、`postconditions` Phase Steps、跨 Step output `from`；后者 `$defs.node` 只有旧节点属性且 `additionalProperties: false`，缺少 Phase 结构。因此**E2 禁止直接将该 Procedure Schema 配到当前内置 `assurance/procedure.yaml`**，否则会误报。
 
 - E2-A1 先做 Owner Schema 兼容性审计/路径关联的纯函数与正反测试；仅能对已证实结构一致的 Contract/Predicate 引入严格提示。
 - Schema 不匹配的 Procedure 仍保留 YAML syntax diagnostics 和基础编辑，不自行推断新的可执行 DSL、不能丢弃引用与注释，更不能显示 Runtime qualification PASS。
@@ -112,7 +112,7 @@ E2 #35/#38 原堆叠分支已关闭（未合并），仅保留历史实现与失
 
 E2 集成从 `main@07850bf1529f9439046f0768dcc35eba730136e2` 出发，选取旧 PR #35 的 YAML 1.2 语法诊断需求和旧 PR #38 已实现的 `monaco-yaml@5.5.1` 统一语言 Worker；独立的首版诊断 Marker 已由该 Worker 取代，避免 Monaco 出现两个错误标记来源。
 
-`site/schemas/connectionagent/v1alpha1/manifest.json` 固定 `ca-agent-demo@7570b309` 的 Toolchain snapshot `03a42764ee2a67e39f57ab550b63c7a5d7966199`，逐个标记 3 个 vendored Schema 的 Git blob SHA；`tests/yaml-owner-schemas.test.mjs` 验证字节级来源。仅在 `assurance/contract.yaml` 和 `assurance/predicates.yaml` 使用对应 Owner Schema；公共 Schema 仅解析本地 `$ref`。`assurance/procedure.yaml` 继续仅检测 YAML 1.2 语法，**绝不**套用缺少 Phase 定义的旧 Procedure Schema，也不自造新的 Procedure 语义。
+`site/schemas/connectionagent/v1alpha1/manifest.json` 固定 `ca-agent-demo@eaadf948` 的 Toolchain snapshot `03a42764ee2a67e39f57ab550b63c7a5d7966199`，逐个标记 3 个 vendored Schema 的 Git blob SHA；`tests/yaml-owner-schemas.test.mjs` 验证字节级来源。仅在 `assurance/contract.yaml` 和 `assurance/predicates.yaml` 使用对应 Owner Schema；公共 Schema 仅解析本地 `$ref`。`assurance/procedure.yaml` 继续仅检测 YAML 1.2 语法，**绝不**套用缺少 Phase 定义的旧 Procedure Schema，也不自造新的 Procedure 语义。
 
 本地 `yaml.worker.js`、`editor.worker.js` 使用相同 Pages 源域；`enableSchemaRequest:false` 禁止远端 Schema 读取，`format:{enable:false}` 不自动格式化 YAML。Schema 补全与 Hover 必须由真实 Chromium 的 Monaco UI 证明；旧堆叠 [PR #38 CI #41796543903](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796543903) 的语法/约束错误标记通过，但 Ctrl+Space 补全没有弹出，属于 **FAIL**，不可重用为 E2 验收证据。最新 [PR #42 代码 CI #41802445121](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41802445121) **327/327 单测、TypeScript、Build 与真实 Chromium PASS**：确证 YAML 1.2 语法、Contract/Predicate Schema 约束、Procedure schema 不误报、真实 Contract 字段补全弹出 `allowedResources`/`entryProcedure`/`goal` 和 `skillType` 枚举 Hover。[最终 PR CI #41803566642](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41803566642) 328/328 单测、TypeScript、Build、真实 Chromium 全 PASS，[resulting-main Pages #41804005500](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41804005500) 同 SHA `9708528f` 的打包、yaml.worker.js、静态资源/语法、Chromium 和部署均 PASS。
 
@@ -145,11 +145,11 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 
 验收要求：单元正反例覆盖 16 文件实际示例、BOM、CRLF、未知文件/二进制、ZIP byte fidelity、路径/大小限制与读失败；真实 Chromium 对目录形状的 FileList 驱动 DOM 导入/Explorer/ZIP 测试。本轮 Chromium FileList 驱动不等价于 OS 原生文件夹对话框选择证据。Node、TypeScript、Build、Chromium 与 resulting-main Pages 必须实际通过才宣称 PASS。
 
-**E4-A2 deferred:** 显式的逐文件磁盘权限与原位保存、外部内容漂移/冲突提示、拒绝静默覆盖、非原子多文件失败恢复，均须独立设计与负面测试。
+**E4-A2 已在 PR #50 合入并部署：** 用户显式选择、全目录原始字节复核、有限原位写盘、文件级结果与冲突提示。真实 Windows Chrome 选择窗口及权限仍是 Issue #26 的独立待验收项。
 
-## 13. E4-A2 原位写盘与冲突保护（2026-11-05；候选 PR）
+## 13. E4-A2 原位写盘与冲突保护（2026-11-05；已合入 Demo）
 
-**状态：IMPLEMENTED（PR candidate），验收待确认。** 使用 E4-A1 内存工作副本为唯一 Source authority。FileList 不授予原位写盘权限；用户必须单独点击「保存回本地目录」，在支持的安全上下文浏览器中重新使用 `showDirectoryPicker({mode:"readwrite"})` 明确选择目录。其它浏览器保留 ZIP 导出，不发起隐式写盘或保留句柄。
+**状态：IMPLEMENTED on main@ef8eae87 / PR #50 MERGED；单测、Chromium OPFS、Windows fixture、resulting-main Pages PASS，原生 Windows Chrome picker NOT_RUN。** 使用 E4-A1 内存工作副本为唯一 Source authority。FileList 不授予原位写盘权限；用户必须单独点击「保存到所选目录」，在支持的安全上下文浏览器中重新使用 `showDirectoryPicker({mode:"readwrite"})` 明确选择目录。其它浏览器保留 ZIP 导出，不发起隐式写盘或保留句柄。
 
 1. 仅在 E4-A1 目录导入的工作区显示写盘功能（示例、单文件不能写盘）；新选择的目录名称必须与 Package 名称一致，浏览器 `queryPermission({mode:"readwrite"})` 必须返回 `granted`；用户还需逐次确认待写入的具体文件清单。**E4-A1 的 FileList 未提供原始物理目录句柄，不能证明二次选择的文件夹是同一个 OS 路径；只保证刚选择的目标目录名与文件路径/字节快照匹配。确认框必须明确提醒这一限制，不能把 basename 相同等同于目录身份。**只写已有且已编辑的文本；未改和二进制文件一律不写。
 2. 确认前完整枚举磁盘相对路径，文件集合必须与原导入的集合完全一致，连同未修改的文本和二进制资源逐字节比对。新增/删除、大小写或 Unicode 名称冲突、读取失败、权限拒绝以及任何外部内容漂移均拒绝，工作副本不丢弃。
@@ -171,7 +171,7 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 
 验收记录须包含 Chrome 版本、OS、URL/安全上下文、测试目录的可公开脱敏布局、操作和可复查的前后字节/截图、结果与异常。即使这些项目通过，也不等于 kernel CAS、原子目录写入、外部进程锁或 Runtime PASS。
 
-### E4-A2 · Windows 本地原生验收自动化入口（PR candidate；现场 NOT_RUN）
+### E4-A2 · Windows 本地原生验收自动化入口（已合入 main；现场 NOT_RUN）
 
 命令：`npm run test:e4:native`，要求 Windows、Node.js 24、Google Chrome，来自本仓当前 PR 分支。命令启动本地 `127.0.0.1` 网页并生成新的 `.agent-tmp/e4-native-*/studio-e4-native-fixture`；只允许选择这个测试目录。它带随机 128-bit 标记和 5 个真实文件（BOM/CRLF、Python、Reference、二进制和标记文件），**标记和全量初始字节不匹配就绝不写盘**。
 

@@ -6,7 +6,7 @@ import {previewNodeInsert,applyNodeInsert} from "../site/node-create.mjs";
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from "../site/node-delete.mjs";
 
 const read=skill=>readFileSync(new URL(
-  "../site/samples/packages/"+skill+"/assurance/procedure.yaml",
+  (skill==="establish-pdu-session"?"./fixtures/establish-pre-hold/assurance/procedure.yaml":"../site/samples/packages/"+skill+"/assurance/procedure.yaml"),
   import.meta.url),"utf8");
 const ensure=read("ensure-pdu-session");
 const created=read("establish-pdu-session");
