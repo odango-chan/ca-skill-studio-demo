@@ -248,3 +248,21 @@ test("E4-A2 replacing longer disk text with a shorter Source has no retained tai
   assert.deepEqual(storage.disk.get("SKILL.md"),enc.encode("#\n"));
   assert.equal(storage.disk.get("SKILL.md").length,2);
 });
+
+test("E4-A2 final post-save scan detects external drift after the last write",async()=>{
+  const ws=await workspace(),storage=mockDirectory(snapshot(ws),{
+    afterWrite(path,disk){
+      if(path==="SKILL.md")
+        disk.set("assets/image.png",Uint8Array.from([7,8,9]));
+    }
+  });
+  edit(ws,"SKILL.md","# replaced\\n");
+  const outcome=await saveDirectoryChanges({workspace:ws,
+    handle:storage.handle,confirmWrite:allow});
+  assert.equal(outcome.status,"PARTIAL");
+  assert.deepEqual(outcome.saved,["SKILL.md"]);
+  assert.deepEqual(outcome.pending,[]);
+  assert.equal(ws.files.get("SKILL.md").initialText,"# replaced\\n");
+  assert.equal(outcome.error.includes("assets/image.png"),true);
+  assert.deepEqual(storage.disk.get("assets/image.png"),Uint8Array.from([7,8,9]));
+});
