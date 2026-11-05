@@ -138,8 +138,10 @@ export async function saveDirectoryChanges({workspace,handle,confirmWrite}={}){
       attempted=change.path;
       let writer,closed=false;
       try{
-        writer=await fileHandle.createWritable({keepExistingData:true});
+        // Full replacement: never retain an old tail if new text is shorter.
+        writer=await fileHandle.createWritable({keepExistingData:false});
         await writer.write(change.bytes);
+        await writer.truncate(change.bytes.length);
         await writer.close();
         closed=true;
       }finally{
