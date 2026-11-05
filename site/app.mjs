@@ -246,7 +246,7 @@ function decorateToolbar(){
     ["downloadButton","download","导出文件"],
     ["openButton","folder-plus","打开本地文件"],
     ["openDirectoryButton","folder-open","打开本地目录"],
-    ["saveDirectoryButton","shield-check","保存回本地目录"],
+    ["saveDirectoryButton","shield-check","保存到所选目录"],
     ["exportPackageButton","archive","导出整个 Package (.zip)"],
     ["mode-source","code-2","Source"],
     ["mode-split","columns-2","Split"],
@@ -1998,7 +1998,7 @@ function updateDirectorySaveControl(){
   button.disabled=directorySaveBusy||!compatible||!activePackage||
     !hasUnsavedEdits(activePackage);
   button.title=!compatible?"当前浏览器不支持本地原位保存，请导出 ZIP":
-    "重新选择同一目录、全量比对后显式确认写盘；多文件不保证原子性";
+    "重新选择目标目录；核对目录名与全部文件字节，但无法证明与原导入目录为同一物理路径";
 }
 function showDirectorySaveStatus(result){
   const notice=$("saveNotice");
@@ -2036,8 +2036,10 @@ $("saveDirectoryButton").addEventListener("click",async()=>{
     const handle=await window.showDirectoryPicker({mode:"readwrite"});
     const outcome=await saveDirectoryChanges({
       workspace,handle,confirmWrite:({directory,paths})=>
-        confirm("即将写入本地目录："+directory+"\n文件："+paths.join("、")+
-          "\n此操作不会原子保存整个 Package。确认覆盖这些已校验的文件？")
+        confirm("即将写入重新选定的目录："+directory+
+          "\n注意：只能核对目录名和文件内容，无法证明它是最初导入的同一物理目录。"+
+          "\n待写文件："+paths.join("、")+
+          "\n这是非原子多文件保存。确认写入刚选择的目标目录？")
     });
     if(activePackage===workspace){
       initialText=workspace.files.get(activeFilePath)?.initialText??initialText;
