@@ -223,6 +223,34 @@ try{
     throw Error("D1 visual START / legend / Route tone FAIL: "+
       JSON.stringify(graphDisplay));
 
+  // D1-A1: actual Child has POST Verify but no PRE, then Root state recovers.
+  const childPhases=await evaluate([
+    " (async()=>{",
+    " const sleep=ms=>new Promise(r=>setTimeout(r,ms));",
+    " const child=[...document.querySelectorAll(\'#procedureTree button.child\')].find(x=>",
+    "   x.textContent.includes(\'await-initial-n4-session-establishment\'));",
+    " if(!child)return {error:\'child navigation missing\'};",
+    " child.click();",
+    " for(let i=0;i<80;i++){if(document.querySelectorAll(\'.react-flow__node\').length===4)break;await sleep(50);}",
+    " const panel=document.getElementById(\'graphLegend\');",
+    " const kinds=[...panel.querySelectorAll(\'#graphLegendNodeTypes code\')].map(x=>x.textContent).sort().join(\',\');",
+    " const steps=[...panel.querySelectorAll(\'#graphLegendStepTypes code\')].map(x=>x.textContent).sort().join(\',\');",
+    " const scope=panel.querySelector(\'#graphLegendScope\').textContent;",
+    " const badges=[...document.querySelectorAll(\'.designer-phase-badge\')].map(x=>x.textContent);",
+    " const nodeCount=document.querySelectorAll(\'.react-flow__node\').length;",
+    " document.getElementById(\'backProcedure\').click();",
+    " for(let i=0;i<80;i++){if(document.querySelectorAll(\'.react-flow__node\').length===17)break;await sleep(50);}",
+    " const restored=document.querySelectorAll(\'.react-flow__node\').length===17&&",
+    "   document.getElementById(\'graphLegendScope\').textContent.includes(\'PRE 3 / POST 4\');",
+    " return {nodeCount,kinds,steps,scope,badges,restored};",
+    " })()",
+  ].join("\\n"));
+  console.log("D1_A1_CHILD_PHASE_LEGEND",JSON.stringify(childPhases));
+  if(childPhases?.nodeCount!==4||childPhases.kinds!=="CALL,TERMINAL"||
+     childPhases.steps!=="VERIFY"||!childPhases.scope.includes("PRE 0 / POST 1")||
+     childPhases.badges.some(x=>x.includes("PRE"))||
+     !childPhases.badges.some(x=>x.includes("POST"))||!childPhases.restored)
+    throw Error("D1-A1 child Phase semantics or Root return FAIL: "+JSON.stringify(childPhases));
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
     "(()=>{",
