@@ -491,7 +491,7 @@ try{
     "  file('scripts/'+name)?.click();await sleep(180);",
     "  const before=document.getElementById('source').value;",
     "  const autoOpened=document.getElementById('workbench').dataset.inspector==='open';",
-    "  const links=[...document.querySelectorAll('#inspector button.source-link')];
+    "  const links=[...document.querySelectorAll('#inspector button.source-link')];",
     "  const main=links.find(el=>/^def main · L[0-9]+$/.test(el.textContent||''));",
     "  const classes=links.filter(el=>(el.textContent||'').startsWith('class '));",
     "  const line=Number(main?.textContent?.match(/L([0-9]+)$/)?.[1]);",
