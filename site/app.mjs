@@ -3,6 +3,7 @@ import { layoutProcedureELK,selectGraphScope } from "./layout.mjs";
 import {detailedLayoutAllowed} from "./graph-scale.mjs";
 import {auditPackageWorkspace} from "./package-audit.mjs";
 import {scriptNavigationReport} from "./script-navigation.mjs";
+import {searchPackageText} from "./package-search.mjs";
 import {pythonTopLevelOutline} from "./python-outline.mjs";
 import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
@@ -102,6 +103,7 @@ let directorySaveEligible=false;
 let directorySaveBusy=false;
 // Only in this tab, only for an explicitly opened directory. Never persist.
 let directorySessionHandle=null;
+let packageSearchRefreshTimer=null;
 let initialText = "";
 let projection = null;
 let lastGood = null;
@@ -502,6 +504,7 @@ function refresh(refit = false) {
   $("graphWarning").hidden=true;
   setText("graphWarning","");
   renderAssetNavigation();
+  queuePackageSearch();
   renderProcedureNavigation();
   renderOutline();
   renderInspector();
@@ -541,6 +544,7 @@ function renderAssetNavigation(){
   const files=activePackage?[...activePackage.files.values()]:[];
   $("fileCount").textContent=files.length+" 文件";
   $("exportPackageButton").hidden=!activePackage||files.length<=1;
+  $("packageSearchDisclosure").hidden=files.length<2;
   if(!files.length)return;
   const folders=new Map();
   for(const file of files){
@@ -632,6 +636,63 @@ function renderAssetNavigation(){
     }
   }
 }
+// E5 is pure Source navigation over the same in-memory Package and currently
+// active editor bytes. It never indexes the disk or changes Source/History.
+function renderPackageSearch(){
+  const panel=$("packageSearchDisclosure");
+  const results=$("packageSearchResults");
+  const hint=$("packageSearchHint");
+  const count=$("packageSearchCount");
+  results.replaceChildren();
+  if(panel.hidden||!panel.open||!activePackage||activePackage.files.size<2){
+    count.textContent="—";return;
+  }
+  const query=$("packageSearchInput").value;
+  if(!query.trim()){
+    count.textContent="—";
+    hint.textContent="输入文本搜索当前文件工作副本";
+    return;
+  }
+  const workspace=activePackage;
+  const report=searchPackageText(workspace,query,{
+    activePath:activeFilePath,activeText:source.value
+  });
+  count.textContent=report.matches.length+(report.truncated?"+":"");
+  hint.textContent=report.matches.length
+    ? "找到 "+report.matches.length+" 条"+(report.truncated?"（结果已截断，请缩小范围）":"")
+    : "没有匹配的文本";
+  if(report.skippedLarge)
+    hint.textContent+=" · "+report.skippedLarge+" 个超大文件未搜索";
+  for(const match of report.matches){
+    const item=el("li");
+    const control=button("",()=>{
+      if(activePackage!==workspace||
+         !activePackage.files.get(match.path)?.editable)return;
+      if(match.path!==activeFilePath)switchFile(match.path);
+      lineJump(match.line);
+    },"package-search-result");
+    control.title=match.path+" · L"+match.line+":"+match.column;
+    control.setAttribute("aria-label","打开 "+match.path+" 第 "+match.line+" 行，第 "+match.column+" 列");
+    control.append(
+      el("span","package-search-result-path",match.path+" · L"+match.line+":"+match.column),
+      el("span","package-search-result-preview",match.preview)
+    );
+    item.appendChild(control);
+    results.appendChild(item);
+  }
+}
+function queuePackageSearch(){
+  if(packageSearchRefreshTimer!==null)clearTimeout(packageSearchRefreshTimer);
+  packageSearchRefreshTimer=null;
+  if(!$("packageSearchDisclosure").open)return;
+  packageSearchRefreshTimer=setTimeout(()=>{
+    packageSearchRefreshTimer=null;
+    renderPackageSearch();
+  },120);
+}
+$("packageSearchInput").addEventListener("input",renderPackageSearch);
+$("packageSearchDisclosure").addEventListener("toggle",renderPackageSearch);
+
 function switchFile(path){
   const file=activePackage?.files.get(path);
   if(!file||!file.editable||path===activeFilePath)return;
@@ -2003,6 +2064,9 @@ function renderGraph() {
 }
 function activateWorkspace(workspace,entry,origin="sample",handle=null) {
   if(directorySaveBusy)throw new Error("本地保存进行中，暂不能替换工作区");
+  $("packageSearchInput").value="";
+  if(packageSearchRefreshTimer!==null)clearTimeout(packageSearchRefreshTimer);
+  packageSearchRefreshTimer=null;
   directorySaveEligible=origin==="directory";
   directorySessionHandle=origin==="directory"?handle:null;
   $("saveNotice").hidden=true;
