@@ -1621,3 +1621,109 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
     padding:8px 9px;
   }
 }
+
+/* D1-A2 Node drill-down: read-only stage view for *every* business Node.
+   PRE/POST are projected only when present; OP is the real existing Node. */
+.graph-pane .node-focus{
+  position:absolute;inset:0;z-index:8;
+  display:flex;flex-direction:column;min-width:0;
+  background:#f8fbfe;color:#314d65;
+}
+.graph-pane .node-focus[hidden]{display:none!important}
+.node-focus-header{
+  flex:none;display:flex;gap:14px;align-items:flex-start;
+  min-height:66px;padding:14px 20px;
+  background:#fff;border-bottom:1px solid #e1eaf2;
+}
+.node-focus-back{
+  flex:none;border:1px solid #d0e2e7;
+  border-radius:6px;background:#f0f9f7;color:#207a75;
+  font-size:11px;font-weight:650;padding:7px 10px;cursor:pointer;
+}
+.node-focus-back:hover{background:#e6f6f1}
+.node-focus-back:focus-visible{outline:2px solid #0b8b7e;outline-offset:2px}
+.node-focus-heading{min-width:0}
+.node-focus-eyebrow{
+  font:700 9px/1.3 system-ui,sans-serif;color:#8294a7;letter-spacing:.08em;
+}
+.node-focus-heading h2{
+  margin:3px 0 2px;white-space:normal;overflow-wrap:anywhere;
+  font:700 15px/1.35 ui-monospace,Consolas,monospace;color:#34506c;
+}
+.node-focus-heading p{
+  margin:0;font:10px/1.4 system-ui,sans-serif;color:#8192a3;
+  overflow-wrap:anywhere;
+}
+.node-focus-stages{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:24px clamp(14px,5vw,56px) 42px;
+  display:flex;flex-direction:column;align-items:center;
+}
+.node-focus-stage{
+  width:100%;max-width:690px;flex:none;
+  background:#fff;border:1px solid #dfe7ef;
+  border-left:3px solid #91b1ca;
+  border-radius:9px;padding:14px 17px 15px;
+  box-shadow:0 4px 16px #3856720b;
+}
+.node-focus-stage.is-pre{border-left-color:#84accc}
+.node-focus-stage.is-op{border-left-color:#4b9588}
+.node-focus-stage.is-post{border-left-color:#7eb9a8}
+.node-focus-stage-heading{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.node-focus-stage-heading strong{
+  font:750 11px/1.3 system-ui,sans-serif;letter-spacing:.03em;color:#39566d;
+}
+.node-focus-stage-heading span{
+  font:700 10px/1.3 ui-monospace,Consolas,monospace;color:#7d96a8;
+}
+.node-focus-stage-value{
+  margin-top:8px;color:#445e77;
+  font:550 12px/1.5 ui-monospace,Consolas,monospace;overflow-wrap:anywhere;
+}
+.node-focus-steps{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:7px}
+.node-focus-step{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:8px 10px;border-radius:6px;background:#f5f8fb;
+  border:1px solid #edf1f6;font-size:11px;
+}
+.node-focus-step-kind{
+  flex:none;font:700 10px/1.5 ui-monospace,Consolas,monospace;color:#5a7c99;
+}
+.node-focus-step-main{min-width:0;flex:1;overflow-wrap:anywhere;color:#3d5971}
+.node-focus-step-name{
+  display:block;font-size:10px;font-weight:600;color:#768ca0;
+}
+.node-focus-connector{
+  height:28px;flex:none;display:flex;align-items:center;justify-content:center;
+  color:#9fb2c3;font-size:18px;
+}
+.node-focus-route-list{
+  display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;
+  padding-top:10px;border-top:1px dashed #e2eaf2;
+}
+.node-focus-route{
+  display:inline-flex;gap:5px;align-items:center;
+  font:600 10px/1.35 ui-monospace,Consolas,monospace;
+  background:#f1f5f9;color:#55748c;
+  border:1px solid #dce6ef;border-radius:5px;
+  padding:4px 7px;overflow-wrap:anywhere;
+}
+.node-focus-route.tone-success{color:#138f7a;border-color:#bde4d9;background:#f0faf6}
+.node-focus-route.tone-failure{color:#b95352;border-color:#f0d7d5;background:#fdf7f7}
+.node-focus-route.tone-uncertain{color:#a2762c;border-color:#f4e1b8;background:#fcf8f0}
+.node-focus-subflow{
+  display:inline-flex;margin-top:10px;padding:6px 9px;
+  color:#3b6f9e;background:#eef3fe;border:1px solid #cedcf6;
+  border-radius:6px;font-size:11px;font-weight:650;cursor:pointer;
+}
+.node-focus-subflow:hover{background:#dfeafb}
+.node-focus-subflow:focus-visible{outline:2px solid #0b8b7e;outline-offset:2px}
+.node-focus-empty{font-size:11px;color:#8595a5}
+@media(max-width:680px){
+ .node-focus-header{padding:11px 12px;gap:8px}
+ .node-focus-stages{padding:16px 10px 24px}
+ .node-focus-stage{padding:12px}
+ .node-focus-heading h2{font-size:12px}
+}
