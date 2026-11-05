@@ -181,7 +181,19 @@ try{
     " const pos=panel?getComputedStyle(panel).position:'';",
     " const summary=panel?.querySelector('summary');",
     " summary?.click();const opened=panel?.open===true;",
-    " const types=panel?.querySelectorAll('.graph-legend-types code').length;",
+    " const types=panel?.querySelectorAll('#graphLegendNodeTypes code').length;",
+    " const steps=panel?.querySelectorAll('#graphLegendStepTypes code').length;",
+    " const nodeKinds=[...panel.querySelectorAll('#graphLegendNodeTypes code')].map(x=>x.textContent).sort().join(',');",
+    " const stepKinds=[...panel.querySelectorAll('#graphLegendStepTypes code')].map(x=>x.textContent).sort().join(',');",
+    " const preBadge=document.querySelector('.designer-node-phases .phase-preconditions');",
+    " const postBadge=document.querySelector('.designer-node-phases .phase-postconditions');",
+    " const preRoutes=[...document.querySelectorAll('.react-flow__edge-path.designer-edge.origin-PRE')];",
+    " const postRoutes=[...document.querySelectorAll('.react-flow__edge-path.designer-edge.origin-POST')];",
+    " const opRoutes=[...document.querySelectorAll('.react-flow__edge-path.designer-edge.origin-OP')];",
+    " const routeSourcesPreserved=preRoutes.length>0&&postRoutes.length>0&&opRoutes.length>0&&",
+    "   preRoutes.every(x=>getComputedStyle(x).strokeDasharray!=='none')&&",
+    "   postRoutes.every(x=>getComputedStyle(x).strokeDasharray!=='none')&&",
+    "   opRoutes.every(x=>getComputedStyle(x).strokeDasharray==='none');",
     " const lineTypes=panel?.querySelectorAll('.graph-legend-line').length;",
     " summary?.click();const collapsed=panel?.open===false;",
     " const tonePaths=[...document.querySelectorAll('.react-flow__edge-path.designer-edge')];",
@@ -191,7 +203,8 @@ try{
     "   x.classList.contains('tone-uncertain')||x.classList.contains('tone-mixed'))",
     "   .every(x=>getComputedStyle(x).stroke!=='rgb(19, 143, 122)');",
     " return {hasStart:!!node,marker:badge?.content,kind,position:pos,",
-    "   opened,collapsed,types,lineTypes,green,successCount:success.length,",
+    "   opened,collapsed,types,steps,nodeKinds,stepKinds,preBadge:preBadge?.textContent,",
+    "   postBadge:postBadge?.textContent,routeSourcesPreserved,lineTypes,green,successCount:success.length,",
     "   hasNoFalseGreen,sourceNodes:document.querySelectorAll('.react-flow__node').length,",
     "   routePaths:tonePaths.length};",
     "})()"
@@ -199,7 +212,11 @@ try{
   console.log("D1_START_LEGEND_OUTCOME_STYLES",JSON.stringify(graphDisplay));
   if(!graphDisplay?.hasStart||!graphDisplay.marker.includes('START')||
      graphDisplay.kind.includes('START')||graphDisplay.position!=='absolute'||
-     !graphDisplay.opened||!graphDisplay.collapsed||graphDisplay.types!==8||
+     !graphDisplay.opened||!graphDisplay.collapsed||graphDisplay.types!==4||
+     graphDisplay.steps!==3||graphDisplay.nodeKinds!=="CALL,PROCEDURE,RECONCILE,TERMINAL"||
+     graphDisplay.stepKinds!=="CALL,SCRIPT,VERIFY"||
+     !graphDisplay.preBadge?.includes("PRE")||!graphDisplay.postBadge?.includes("POST")||
+     !graphDisplay.routeSourcesPreserved||
      graphDisplay.lineTypes!==4||!graphDisplay.green||
      !graphDisplay.hasNoFalseGreen||
      graphDisplay.sourceNodes!==17||graphDisplay.routePaths!==46)
