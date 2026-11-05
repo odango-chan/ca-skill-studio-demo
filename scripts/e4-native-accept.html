@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E4-A2 Windows Chrome 原生文件验收</title>
+<style>
+body{max-width:840px;margin:50px auto;padding:0 20px;font:15px/1.65 system-ui,sans-serif;color:#20314a}
+h1{font-size:24px}code,pre{font-family:Consolas,monospace}
+.notice{padding:12px 16px;background:#f0f5fa;border-radius:8px}
+button{background:#147e72;color:#fff;border:0;padding:12px 18px;border-radius:8px;cursor:pointer;font-weight:600}
+button:disabled{background:#8b9ba9;cursor:default}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f8fa;padding:14px;border-radius:8px;min-height:130px}
+</style>
+<h1>SKILL Studio · E4-A2 Windows 原生目录验收</h1>
+<p class="notice">本页面仅验收脚本生成、包含随机标记的临时目录。<strong>不要选择任何真实 SKILL 工作目录。</strong>
+标记、完整文件清单和全部原始字节不匹配时，测试会在写入前拒绝操作。</p>
+<p>请点击下方按钮，在 Chrome 原生选择窗口里选择终端输出的测试目录。Chrome 如请求写权限，请按自己的意愿授权；
+之后只需确认一次向测试目录写入。验收工具会自动检查文件缩短覆盖、BOM/CRLF、二进制文件保真、外部修改和新增文件冲突。</p>
+<button id="start" type="button">选择临时测试目录并开始验收</button>
+<p id="state" role="status">尚未启动；本地磁盘没有被本页面修改。</p>
+<pre id="log" aria-label="验收进度"></pre>
+<p>说明：此流程使用真实 Windows 文件系统，但不证明多文件原子提交或外部进程竞争下的 kernel CAS；拒绝权限和部分写入错误仍以单元测试覆盖，不会故意修改系统文件 ACL。</p>
+<script type="module" src="/harness.mjs"></script>
+</html>
