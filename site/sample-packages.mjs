@@ -31,24 +31,32 @@ export function packageFilesForSample(key) {
 export function createFileWorkspace(name,entries) {
   if(typeof name!=="string" || !/^[a-zA-Z0-9._-]{1,100}$/.test(name))
     throw new Error("Invalid workspace name");
-  if(!Array.isArray(entries) || !entries.length || entries.length>32)
+  if(!Array.isArray(entries) || !entries.length || entries.length>64)
     throw new Error("Invalid workspace file count");
   const map=new Map();
   for(const item of entries){
-    if(!item||typeof item.path!=="string"||typeof item.text!=="string"||
+    if(!item||typeof item.path!=="string"||
        item.path.length===0||item.path.length>240||item.path.startsWith("/")||
        item.path.split("/").some(part=>!part||part==="."||part===".."||
          /[\\\u0000-\u001f:<>|?*]/.test(part))||map.has(item.path))
       throw new Error("Invalid or duplicated workspace path");
-    if(item.text.length>1024*1024 || item.text.includes("\u0000"))
+    const text=typeof item.text==="string"?item.text:null;
+    const raw=item.bytes instanceof Uint8Array?item.bytes:null;
+    if(text===null&&!raw)throw new Error("Missing file content");
+    if(text!==null&&(text.length>1024*1024||text.includes("\u0000")))
       throw new Error("Invalid text asset");
-    map.set(item.path,{path:item.path,initialText:item.text,text:item.text,history:null});
+    if(raw&&raw.length>1024*1024)throw new Error("Raw asset too large");
+    map.set(item.path,{
+      path:item.path,initialText:text,text,
+      originalBytes:raw?raw.slice():null,
+      editable:text!==null,history:null
+    });
   }
   return {name,files:map};
 }
 export function markFileEdited(workspace,path,text,history) {
   const file=workspace?.files.get(path);
-  if(!file||typeof text!=="string")throw new Error("Unknown workspace file");
+  if(!file||!file.editable||typeof text!=="string")throw new Error("Unknown or opaque workspace file");
   file.text=text;
   if(history)file.history=history;
 }

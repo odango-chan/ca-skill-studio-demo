@@ -9,6 +9,7 @@ import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, creat
 import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./workbench.mjs";
 import {SAMPLE_PACKAGES,packageFilesForSample,createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState} from "./sample-packages.mjs";
 import {zipPackage} from "./zip.mjs";
+import {importDirectoryFiles,packageZipEntries} from "./directory-import.mjs";
 import {highlightSource} from "./highlight.mjs";
 import {createSourceEditorAdapter,createTextareaSourceBackend} from "./source-editor-adapter.mjs";
 import {renderMarkdown} from "./markdown-preview.mjs";
@@ -86,6 +87,7 @@ const nodeOutline = $("nodeOutline");
 const inspector = $("inspector");
 const problems = $("problems");
 const filePicker = $("filePicker");
+const directoryPicker = $("directoryPicker");
 const procedureTree = $("procedureTree");
 let filename = "establish-pdu-session.procedure.yaml";
 let assetOrigin = "sample";
@@ -239,7 +241,8 @@ function decorateToolbar(){
   }))setIconOnly($(id),name);
   for(const [id,name,label] of [
     ["downloadButton","download","导出文件"],
-    ["openButton","folder-plus","打开本地文件"],
+    ["openButton","file-plus","打开本地文件"],
+    ["openDirectoryButton","folder-open","打开本地目录"],
     ["exportPackageButton","archive","导出整个 Package (.zip)"],
     ["mode-source","code-2","Source"],
     ["mode-split","columns-2","Split"],
@@ -337,7 +340,7 @@ function clearSelection() {
   setInspectorOpen(false);
 }
 function onDirtyNavigation(event) {
-  if (source.value !== initialText) {
+  if (source.value !== initialText || hasUnsavedEdits(activePackage)) {
     event.preventDefault();
     event.returnValue = "";
   }
@@ -561,12 +564,19 @@ function renderAssetNavigation(){
         renderProcedureNavigation();
       }else switchFile(file.path);
     },"asset-file"+(current?" active":""));
-    btn.title=file.path+(dirty?" · 修改未导出":"");
-    btn.setAttribute("aria-label",file.path+(dirty?" · 已修改":""));
+    const opaque=!file.editable;
+    btn.disabled=opaque;
+    btn.title=file.path+(opaque?" · 原样保留，仅随 ZIP 导出":dirty?" · 修改未导出":"");
+    btn.setAttribute("aria-label",file.path+(opaque?" · 仅导出":dirty?" · 已修改":""));
     btn.setAttribute("aria-current",current?"page":"false");
     const glyph=createFileIcon(document,file.path);
     const title=el("span","asset-file-label",parts.at(-1));
     btn.append(glyph,title);
+    if(opaque){
+      const mark=el("span","asset-dirty","·");
+      mark.setAttribute("aria-label","不可编辑，原样导出");
+      btn.appendChild(mark);
+    }
     if(dirty){
       const mark=el("span","asset-dirty","●");
       mark.setAttribute("aria-label","有未导出修改");
@@ -609,7 +619,7 @@ function renderAssetNavigation(){
 }
 function switchFile(path){
   const file=activePackage?.files.get(path);
-  if(!file||path===activeFilePath)return;
+  if(!file||!file.editable||path===activeFilePath)return;
   if(activeFilePath)markFileEdited(activePackage,activeFilePath,source.value,history);
   activeFilePath=path;
   loadDocument(path,file.text,"sample",{
@@ -1968,11 +1978,27 @@ function activateWorkspace(workspace,entry,origin="sample") {
   activePackage=workspace;
   activeFilePath=null;
   const file=workspace.files.get(entry);
-  if(!file)throw new Error("Workspace entry not found");
+  if(!file||!file.editable)throw new Error("Workspace entry is not editable");
   activeFilePath=entry;
   loadDocument(entry,file.text,origin,{initial:file.initialText,historyState:file.history});
 }
 $("openButton").addEventListener("click",()=>filePicker.click());
+$("openDirectoryButton").addEventListener("click",()=>directoryPicker.click());
+directoryPicker.addEventListener("change",async()=>{
+  const files=[...(directoryPicker.files??[])];
+  directoryPicker.value="";
+  if(!files.length)return;
+  if(hasUnsavedEdits(activePackage)&&
+     !confirm("当前 Package 还有未导出的修改。确定替换为本地目录？"))return;
+  try{
+    const {workspace,entry,opaqueCount}=await importDirectoryFiles(files);
+    activateWorkspace(workspace,entry,"directory");
+    message("已加载 "+workspace.name+" · "+workspace.files.size+
+      " 文件，"+opaqueCount+" 项仅原样导出；不会写回本地目录。");
+  }catch(error){
+    message("目录导入失败，现有工作区不变："+String(error?.message??error));
+  }
+});
 filePicker.addEventListener("change",async()=>{
   const file=filePicker.files?.[0];
   if(!file)return;
@@ -2022,7 +2048,7 @@ $("exportPackageButton").addEventListener("click",()=>{
   try{
     if(!activePackage||activePackage.files.size<2)return;
     markFileEdited(activePackage,activeFilePath,source.value,history);
-    const entries=[...activePackage.files.values()].map(({path,text})=>({path,text}));
+    const entries=packageZipEntries(activePackage);
     const bytes=zipPackage(entries);
     downloadBlob(bytes,activePackage.name+".zip","application/zip");
     message("已请求下载 Package ZIP（"+entries.length+" 文件）；工作区不变。");
