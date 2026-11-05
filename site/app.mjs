@@ -271,7 +271,10 @@ function decorateToolbar(){
   layout.prepend(createIcon(document,"workflow",{size:15}));
   const search=$("search").parentElement.querySelector("span");
   search.replaceChildren(createIcon(document,"search"));
+  $("packageSearchInput").parentElement.querySelector("span")
+    .replaceChildren(createIcon(document,"search"));
   for(const element of [
+    $("packageSearchDisclosure").querySelector("summary"),
     $("nodeOutlineDisclosure").querySelector("summary"),
     document.querySelector(".sample-picker summary")
   ])element.prepend(createIcon(document,"chevron-right",{
