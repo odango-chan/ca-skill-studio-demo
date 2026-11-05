@@ -146,3 +146,15 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 验收要求：单元正反例覆盖 16 文件实际示例、BOM、CRLF、未知文件/二进制、ZIP byte fidelity、路径/大小限制与读失败；真实 Chromium 对目录形状的 FileList 驱动 DOM 导入/Explorer/ZIP 测试。本轮 Chromium FileList 驱动不等价于 OS 原生文件夹对话框选择证据。Node、TypeScript、Build、Chromium 与 resulting-main Pages 必须实际通过才宣称 PASS。
 
 **E4-A2 deferred:** 显式的逐文件磁盘权限与原位保存、外部内容漂移/冲突提示、拒绝静默覆盖、非原子多文件失败恢复，均须独立设计与负面测试。
+
+## 13. E4-A2 原位写盘与冲突保护（2026-11-05；候选 PR）
+
+**状态：IMPLEMENTED（PR candidate），验收待确认。** 使用 E4-A1 内存工作副本为唯一 Source authority。FileList 不授予原位写盘权限；用户必须单独点击「保存回本地目录」，在支持的安全上下文浏览器中重新使用 `showDirectoryPicker({mode:"readwrite"})` 明确选择目录。其它浏览器保留 ZIP 导出，不发起隐式写盘或保留句柄。
+
+1. 仅在 E4-A1 目录导入的工作区显示写盘功能（示例、单文件不能写盘）；新选择的目录名称必须与 Package 名称一致，浏览器 `queryPermission({mode:"readwrite"})` 必须返回 `granted`；用户还需逐次确认待写入的具体文件清单。只写已有且已编辑的文本；未改和二进制文件一律不写。
+2. 确认前完整枚举磁盘相对路径，文件集合必须与原导入的集合完全一致，连同未修改的文本和二进制资源逐字节比对。新增/删除、大小写或 Unicode 名称冲突、读取失败、权限拒绝以及任何外部内容漂移均拒绝，工作副本不丢弃。
+3. 每写入一个文件前再次校验完整磁盘快照与 Source 文本修订；使用现有 `FileSystemFileHandle.createWritable({keepExistingData:true})`，不创建/删除/改名，不写 sidecar。关闭写入流后再次读取确认字节一致，才更新该文件 `initialText` 与 `originalBytes`；原 Undo/Redo 历史不受影响。
+4. 只要后续某文件失败，立即停止，明确返回 `PARTIAL` 和已成功写入、仍待写入与磁盘结果不确定的文件；冲突时提供 ZIP 备份与重新导入引导。没有多文件原子提交、回滚或持久化恢复协议。
+5. 浏览器检查与 `writer.close()` 之间仍存在 TOCTOU 竞态窗口，**不是 kernel CAS**；不能保证外部进程在最后校验后不会抢先写盘，也不保证突然断电/多文件写盘原子性或可靠 watcher。实际 OS 目录权限/平台竞态仍须单独验收。
+
+验收：`tests/directory-save.test.mjs` 模拟目录句柄覆盖权限拒绝、错误目录、外部漂移、文件增减、确认取消、保存时 Source 改变、后写失败与重试、写后回读不一致。`scripts/edge-smoke.mjs` 真实 Chromium 使用 Origin Private File System (OPFS) 的 `FileSystemWritableFileStream` 验证写入/回读，只有目录选取对话框由测试替代；**此证据不等于真实 OS 目录选择/写入**。CI/Pages 仅能在真实 PASS 后标记。Issue #26 保留 OPEN。
