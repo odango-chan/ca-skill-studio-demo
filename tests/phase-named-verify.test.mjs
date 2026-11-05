@@ -8,8 +8,7 @@ import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
   previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
   from "../site/phase-named-verify.mjs";
 
-const original=readFileSync(new URL("../site/samples/packages/"+
-  "establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
+const original=readFileSync(new URL("./fixtures/establish-pre-hold/assurance/procedure.yaml",import.meta.url),"utf8");
 const procedure="ue-requested-pdu-session-establishment",node="nudm-sdm-subscribe";
 const phase="preconditions",name="check-ingress";
 const a="            - verify: createdsession.ingress.eligible\n";
@@ -20,7 +19,7 @@ const args=(source=original,i=3)=>[source,procedure,node,phase,i];
 const namePreview=src=>previewNamePlainVerify(...args(src),name);
 const named=original.replace(a,namedLine);
 
-test("D4-A3b2b1 owner sample exposes name but blocks effectful named Steps",()=>{
+test("D4-A3b2b1 pinned sample exposes name but blocks effectful named Steps",()=>{
   assert.ok(original.includes(a+b));
   const x=namedVerifyEditOptions(original,procedure,node);
   assert.ok(x.names.some(k=>k.phaseName===phase&&k.stepIndex===3));
