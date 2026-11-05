@@ -5,7 +5,7 @@ import {projectWorkspace} from "../site/workspace.mjs";
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "../site/node-create.mjs";
 
 const read=(skill,file="procedure.yaml")=>readFileSync(new URL(
-  "../site/samples/packages/"+skill+"/assurance/"+file,import.meta.url),"utf8");
+  (skill==="establish-pdu-session"?"./fixtures/establish-pre-hold/assurance/":"../site/samples/packages/"+skill+"/assurance/")+file,import.meta.url),"utf8");
 const ensure=read("ensure-pdu-session"),created=read("establish-pdu-session");
 const ensureProc=projectWorkspace(ensure).procedure;
 const root=projectWorkspace(created).procedure;
@@ -44,7 +44,7 @@ test("insert a call Node on an existing Route with a return edge to old target",
   assert.equal(p.routes.find(r=>r.id===route.id).target,"read-again");
   assert.match(applied,/read-again:\n        call: sbi\.demo\.read\n        'on':\n          COMMITTED: observe-session-absence/);
 });
-test("generic insert works in CreatedSession multi-Procedure and Phase route",()=>{
+test("generic insert works in pinned CreatedSession multi-Procedure and Phase route",()=>{
   const model=projectWorkspace(created);
   const route=root.routes.find(r=>r.routeSource==="postconditions.on"&&r.patchable);
   assert.ok(route,"CreatedSession must have a Phase route");
