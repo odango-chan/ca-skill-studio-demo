@@ -50,6 +50,20 @@ function ensureMonacoWorkerCompatibility() {
   monacoWorkerCompatibilityInstalled = true;
 }
 
+// Monaco may render menus in an overlay or a shadow root. Theme tokens must
+// reach those layers; ordinary site CSS alone cannot reliably paint them.
+function ensureStudioLightTheme(){
+  monaco.editor.defineTheme("studio-light",{
+    base:"vs",inherit:true,rules:[],colors:{
+      "menu.background":"#ffffff",
+      "menu.foreground":"#294259",
+      "menu.selectionBackground":"#e8f4f0",
+      "menu.selectionForeground":"#155a52",
+      "menu.separatorBackground":"#dce7ed",
+      "menu.border":"#d3e1e9"
+    }
+  });
+}
 function ensureYamlLanguage() {
   if (!yamlLanguageService) {
     yamlLanguageService = configureMonacoYaml(monaco, {
@@ -96,9 +110,10 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
   try {
     ensureMonacoWorkerCompatibility();
     ensureYamlLanguage();
+    ensureStudioLightTheme();
     host.dataset.yamlSchemaEngine="monaco-yaml@5.5.1";
     editor=monaco.editor.create(host,{
-      model:null,theme:"vs",automaticLayout:true,minimap:{enabled:false},
+      model:null,theme:"studio-light",automaticLayout:true,minimap:{enabled:false},
       fontSize:12,lineHeight:21,tabSize:2,insertSpaces:true,
       scrollBeyondLastLine:false,renderWhitespace:"selection",
       wordWrap:"off",overviewRulerLanes:0,

@@ -1349,3 +1349,29 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   .phase-evidence-limitation,
 .phase-dependency-item[data-evidence-code="SOURCE_UNPROVEN"]
   .phase-evidence-limitation{border-left-color:#bc9378}
+
+/* Monaco context menus may be portaled beyond the editor's themed root.
+   Explicitly paint the menu and each scrollable action surface opaque. */
+.monaco-menu-container,
+.monaco-menu-container .monaco-menu,
+.monaco-menu-container .monaco-scrollable-element,
+.context-view .monaco-menu{
+  --vscode-menu-background:#fff;
+  --vscode-menu-foreground:#294259;
+  --vscode-menu-selectionBackground:#e8f4f0;
+  --vscode-menu-selectionForeground:#155a52;
+  --vscode-menu-separatorBackground:#dce7ed;
+  background-color:#fff!important;
+  color:#294259;
+}
+.monaco-menu-container,
+.context-view .monaco-menu{
+  border:1px solid #d3e1e9;
+  border-radius:9px;
+  box-shadow:0 10px 28px #263f5530;
+}
+.monaco-menu-container .action-item.focused .action-menu-item,
+.monaco-menu-container .action-item:hover .action-menu-item{
+  background-color:#e8f4f0!important;
+  color:#155a52;
+}

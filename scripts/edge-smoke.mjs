@@ -609,6 +609,79 @@ try{
   if(!/executable|authoring_assistant/.test(hoverText))
     throw Error("E2 Owner schema hover did not expose enum: "+hoverText);
 
+  // Right click a visible Monaco text row, not the previous hover tooltip.
+  const menuPoint=await evaluate([
+    "(async()=>{",
+    " document.getElementById('mode-source').click();",
+    " await new Promise(r=>setTimeout(r,180));",
+    " const host=document.querySelector('#monacoHost .monaco-editor');",
+    " const rect=host?.getBoundingClientRect();",
+    " return {found:!!rect,x:rect?rect.x+Math.min(170,rect.width/3):0,",
+    "  y:rect?rect.y+Math.min(125,rect.height/3):0};",
+    "})()"
+  ].join("\n"));
+  if(!menuPoint.found)throw Error("Monaco edit surface unavailable");
+  await command("Input.dispatchMouseEvent",{
+    type:"mouseMoved",x:menuPoint.x,y:menuPoint.y
+  });
+  await sleep(120);
+  await command("Input.dispatchMouseEvent",{
+    type:"mousePressed",x:menuPoint.x,y:menuPoint.y,
+    button:"right",buttons:2,clickCount:1
+  });
+  await command("Input.dispatchMouseEvent",{
+    type:"mouseReleased",x:menuPoint.x,y:menuPoint.y,
+    button:"right",buttons:0,clickCount:1
+  });
+  await sleep(350);
+  const contextMenu=await evaluate([
+    "(()=>{",
+    " const elements=[...document.querySelectorAll('.context-view,.monaco-menu-container,.monaco-menu')];",
+    " const visible=elements.filter(el=>{const r=el.getBoundingClientRect();return r.width>70&&r.height>40});",
+    " const menu=visible.find(el=>el.classList.contains('monaco-menu-container'))||",
+    "  visible.find(el=>el.classList.contains('monaco-menu'));",
+    " const surface=menu?.querySelector('.monaco-menu')||menu;",
+    " const bg=surface?getComputedStyle(surface).backgroundColor:'';",
+    " return {visible:!!menu,opaque:bg==='rgb(255, 255, 255)',bg,",
+    "  hasActions:!!menu?.querySelector('.action-item'),",
+    "  label:menu?.textContent?.trim().slice(0,80)||'',",
+    "  candidates:visible.map(el=>({cls:el.className,bg:getComputedStyle(el).backgroundColor}))};",
+    "})()"
+  ].join("\n"));
+  console.log("MONACO_CONTEXT_MENU_OPAQUE",JSON.stringify(contextMenu));
+  if(contextMenu?.visible){
+    if(!contextMenu.opaque||!contextMenu.hasActions)
+      throw Error("Real Monaco context menu is not opaque: "+JSON.stringify(contextMenu));
+  }else{
+    // Headless Linux may not display an OS/context-menu overlay in response
+    // to a CDP right-click. Verify *computed* CSS on the exact Monaco menu
+    // DOM classes; do not mislabel this fallback as an actual OS popup PASS.
+    const styleProbe=await evaluate([
+      "(()=>{",
+      " const shell=document.createElement('div');",
+      " shell.className='context-view monaco-menu-container';",
+      " shell.style.position='fixed';shell.style.left='15px';shell.style.top='15px';",
+      " shell.style.width='240px';shell.style.height='120px';",
+      " const menu=document.createElement('div');menu.className='monaco-menu';",
+      " shell.appendChild(menu);document.body.appendChild(shell);",
+      " const root=getComputedStyle(shell),inner=getComputedStyle(menu);",
+      " const result={outer:root.backgroundColor,inner:inner.backgroundColor,",
+      "  ink:inner.color,opaque:root.backgroundColor==='rgb(255, 255, 255)'&&",
+      "    inner.backgroundColor==='rgb(255, 255, 255)'};",
+      " shell.remove();return result;",
+      "})()"
+    ].join("\n"));
+    console.log("MONACO_CONTEXT_MENU_STYLES_FALLBACK",JSON.stringify(styleProbe));
+    if(!styleProbe.opaque)throw Error("Monaco menu stylesheet still transparent: "+
+      JSON.stringify(styleProbe));
+  }
+  await command("Input.dispatchKeyEvent",{
+    type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27
+  });
+  await command("Input.dispatchKeyEvent",{
+    type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27
+  });
+
   // E4-A1: real Chromium UI receives a directory-shaped FileList, opens a
   // source-backed multi-file Package and ZIP-exports exact opaque bytes.
   // This is an in-browser FileList event, not an OS chooser / disk-write test.
