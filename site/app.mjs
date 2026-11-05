@@ -20,6 +20,7 @@ import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./vis
 import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
 import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
 import {createIcon,operatorIcon} from "./icons.mjs";
+import {graphLegendSummary} from "./graph-phase-view.mjs";
 import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "./node-designer.mjs";
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "./node-create.mjs";
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from "./node-delete.mjs";
@@ -1995,7 +1996,52 @@ function chooseEdgeRoute(bundle) {
 }
 
 
+function renderGraphLegend(){
+  const panel=$("graphLegend");
+  const available=projection?.state==="READY"&&lastGood&&graph;
+  panel.hidden=!available;
+  if(!available)return;
+  const summary=graphLegendSummary(lastGood,
+    graph.visibleNodes??null,graph.visibleRoutes??null);
+  setText("graphLegendContext",activeProcedureId+" · "+
+    summary.nodeCount+" Nodes / "+summary.stepCount+" Steps"+
+    (graph.isFiltered?" · 邻居视图":""));
+  function populateTypes(id,kinds,empty){
+    const section=$(id);
+    section.replaceChildren();
+    if(!kinds.length){
+      section.appendChild(el("span","graph-legend-empty",empty));return;
+    }
+    for(const kind of kinds){
+      const entry=el("div");
+      entry.append(
+        el("code","",kind.kind.toUpperCase()),
+        el("span","graph-legend-count","×"+kind.count),
+        el("span","graph-legend-type-description",kind.label)
+      );
+      entry.title=kind.kind.toUpperCase()+" · "+kind.label+" · "+kind.count;
+      section.appendChild(entry);
+    }
+  }
+  populateTypes("graphLegendNodeTypes",summary.nodeKinds,"当前没有业务节点");
+  populateTypes("graphLegendStepTypes",summary.stepKinds,
+    "当前可见节点没有内部 Phase Step");
+  const origins=$("graphLegendRouteOrigins");
+  origins.replaceChildren();
+  for(const source of summary.origins){
+    const entry=el("div");
+    entry.append(
+      el("span","graph-legend-route-origin origin-"+source.kind,source.tag),
+      el("span","",source.label+" · "+source.count+" 条")
+    );
+    origins.appendChild(entry);
+  }
+  if(!summary.origins.length)
+    origins.appendChild(el("span","graph-legend-empty","当前没有可见 Route"));
+}
+
 function renderGraph() {
+  renderGraphLegend();
   const sourceId=selection?.kind==="node"&&
     nodeEditorCapabilities(selection.id).newRoute?.outcomes?.length
     ? selection.id:null;
