@@ -1,4 +1,4 @@
-// The only selectable sample matches the owner Skill path at ca-agent-demo@7570b309.
+// The only selectable sample matches the owner Skill path at ca-agent-demo@dc0fa0ae.
 // Legacy Ensure regression YAML is kept separately, never as a selectable Package.
 // This UI manifest is not inserted into the exported SKILL Package.
 const core=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml","assurance/predicates.yaml"];
