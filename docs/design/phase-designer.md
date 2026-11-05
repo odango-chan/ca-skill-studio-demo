@@ -178,3 +178,13 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 ### D4-A4b1 验收证据
 
 [PR #39 代码 CI #41793627245](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41793627245)：315/315 单元测试、TypeScript、Build、真实 Chromium PASS。浏览器在真实 owner 的临时 Source 工作副本中分别补齐缺失 FAILED、将 MISTYPED 改回 FAILED、删除独立 EXTRA，逐一验证 Diff 预览、取消、应用、Undo/Redo、核心键保护以及原始 YAML 完整恢复。首轮失败的两个边界检查已修正：多余空行的归属拒绝、EOL 报错大小写断言；最终代码 CI PASS。Runtime/5GC E2E NOT_RUN。
+
+## D4-A2 · Phase Source evidence UX 收敛（PR #53）
+
+本切片**只修改证据的呈现，不修改依赖解析器、来源资格或 Visual 写权限**。在现有 Step 卡片显示简短摘要，例如「5 项依赖 · 消费端 ABI 未证明 · 只读证据」；已有「数据依赖」折叠详情针对每条 `from` 显示可追溯的 Source 来源与欠缺的契约证据。
+
+`site/phase-evidence-copy.mjs` 只把现有 `phase-dataflow.mjs` 与 `phase-consumer-contract.mjs` 的状态解释为自然语言，优先说明：来源表达/顺序不完整；类型冲突；当前 Package 未能唯一解析生产者输出 Schema；消费端输入 ABI 不可验证；或仅声明类型相同而业务约束仍未证实。**这些文案绝不授权重新绑定、Call/Script 删除或换序，也不宣称运行时实际有可用输出。**现有 D4-A1 精确 Source Patch 权限规则不变，不能用类型相等冒充业务适配。
+
+当前 owner `ca-agent-demo@eaadf948` 的 `bind-udm-hold` / `bind-pcf-hold` 输入绑定可显示缺少 Call 消费端 ABI；其后 `hold_bound` Verify 的输出引用可显示来源位于同 Node 的前序 Step，但没有由当前 Package 唯一证明的 Tool 输出 Schema。前驱 Node 的引用仅表示 Source 图可追溯，不等于 Runtime 结果已生成。Inspector 始终保留精确 Source 行跳转。
+
+本阶段期望的测试：纯函数针对真实当前 owner 的 UDM/PCF hold、Script 类型对照、unknown/quoted/ambiguous 反例；Chromium 检查真实 Step 行摘要、详情中的限制原因、没有新编辑控件和原始 YAML 未发生变化。最终 PASS/Pages 状态以 PR 精确提交验收为准；正式 Tool ABI owner 契约、Runtime/5GC、Case 和发布工作台均不在本阶段。
