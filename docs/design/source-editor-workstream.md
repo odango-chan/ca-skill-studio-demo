@@ -146,3 +146,35 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 验收要求：单元正反例覆盖 16 文件实际示例、BOM、CRLF、未知文件/二进制、ZIP byte fidelity、路径/大小限制与读失败；真实 Chromium 对目录形状的 FileList 驱动 DOM 导入/Explorer/ZIP 测试。本轮 Chromium FileList 驱动不等价于 OS 原生文件夹对话框选择证据。Node、TypeScript、Build、Chromium 与 resulting-main Pages 必须实际通过才宣称 PASS。
 
 **E4-A2 deferred:** 显式的逐文件磁盘权限与原位保存、外部内容漂移/冲突提示、拒绝静默覆盖、非原子多文件失败恢复，均须独立设计与负面测试。
+
+## 13. E4-A2 原位写盘与冲突保护（2026-11-05；候选 PR）
+
+**状态：IMPLEMENTED（PR candidate），验收待确认。** 使用 E4-A1 内存工作副本为唯一 Source authority。FileList 不授予原位写盘权限；用户必须单独点击「保存回本地目录」，在支持的安全上下文浏览器中重新使用 `showDirectoryPicker({mode:"readwrite"})` 明确选择目录。其它浏览器保留 ZIP 导出，不发起隐式写盘或保留句柄。
+
+1. 仅在 E4-A1 目录导入的工作区显示写盘功能（示例、单文件不能写盘）；新选择的目录名称必须与 Package 名称一致，浏览器 `queryPermission({mode:"readwrite"})` 必须返回 `granted`；用户还需逐次确认待写入的具体文件清单。**E4-A1 的 FileList 未提供原始物理目录句柄，不能证明二次选择的文件夹是同一个 OS 路径；只保证刚选择的目标目录名与文件路径/字节快照匹配。确认框必须明确提醒这一限制，不能把 basename 相同等同于目录身份。**只写已有且已编辑的文本；未改和二进制文件一律不写。
+2. 确认前完整枚举磁盘相对路径，文件集合必须与原导入的集合完全一致，连同未修改的文本和二进制资源逐字节比对。新增/删除、大小写或 Unicode 名称冲突、读取失败、权限拒绝以及任何外部内容漂移均拒绝，工作副本不丢弃。
+3. 每写入一个文件前再次校验完整磁盘快照与 Source 文本修订；使用现有 `FileSystemFileHandle.createWritable({keepExistingData:false})` 全量替换并显式 `truncate` 到目标 UTF-8 字节长度，防止文件缩短后残留旧尾部；不创建/删除/改名，不写 sidecar。关闭写入流后再次读取确认字节一致，才更新该文件 `initialText` 与 `originalBytes`；全部写入结束后再次核对完整磁盘快照，捕获最后一次写入后的非目标文件漂移；原 Undo/Redo 历史不受影响。
+4. 只要后续某文件失败，立即停止，明确返回 `PARTIAL` 和已成功写入、仍待写入与磁盘结果不确定的文件；冲突时提供 ZIP 备份与重新导入引导。没有多文件原子提交、回滚或持久化恢复协议。
+5. 浏览器检查与 `writer.close()` 之间仍存在 TOCTOU 竞态窗口，**不是 kernel CAS**；不能保证外部进程在最后校验后不会抢先写盘，也不保证突然断电/多文件写盘原子性或可靠 watcher。实际 OS 目录权限/平台竞态仍须单独验收。
+
+验收：`tests/directory-save.test.mjs` 模拟目录句柄覆盖权限拒绝、错误目录、外部漂移、文件增减、确认取消、保存时 Source 改变、后写失败与重试、写后回读不一致。`scripts/edge-smoke.mjs` 真实 Chromium 使用 Origin Private File System (OPFS) 的 `FileSystemWritableFileStream` 验证写入/回读，只有目录选取对话框由测试替代；**此证据不等于真实 OS 目录选择/写入**。保存前还必须按照修改后的 UTF-8 字节量核对整个 Package 的 8 MiB 上限，并拒绝孤立 UTF-16 代理项和 NUL，避免 TextEncoder 替换字符后发生无提示内容变更。CI/Pages 仅能在真实 PASS 后标记。Issue #26 保留 OPEN。
+
+### E4-A2 · 原生 Windows Chrome 验收清单（尚未执行）
+
+此清单是 **NOT_RUN** 的现场验收步骤，不是 CI PASS 证据。只能使用一次性复制的测试 Skill 目录，不得拿生产 Skill 或 5GC 环境做写盘试验；先将完整目录复制到独立位置，核对备份和目录内容。
+
+1. 在支持 File System Access 的 Windows Chrome 安全上下文打开 Pages，使用「打开本地 SKILL 目录」导入测试目录。分别修改 `SKILL.md` 和 Python 或 YAML 文件；点击「保存到所选目录」，重新选择目标目录，确认弹窗清楚提示**不能证明原物理路径身份**、列出将被写的文件，人工确认后检查磁盘实际内容与文件长度，特别覆盖长文本改短、BOM/CRLF 和非 ASCII 文本。
+2. 检查未修改的 `references/`、图片/未知文件完全未改动；保存前后目录不应出现 `.studio`、额外 lock、临时或备份文件；刷新网页后重新导入该目录，页面呈现保存后的 Source。
+3. 在导入后、点击保存前用外部编辑器修改一个**未修改的**文件，或新增/删除任意文件。预期显示 `CONFLICT`，本次目标文件不写入，页面保留 Source 与 ZIP 导出能力；恢复测试目录或重新导入。
+4. 模拟取消目录选择、拒绝浏览器写权限或选择同名但文件内容不同的目录。预期无文件写入且保留可导出工作副本。选择同名、全内容相同的克隆目录时，目前只能在确认弹窗提醒身份无法验证，**不能认为目标 OS 目录与原始导入目录相同**。
+5. 多文件场景人为让第二个文件不可写，确认 UI 显示 `PARTIAL`、已写入与待写入路径，以及不确定目标（如果失败发生在写流创建后）；恢复权限后重新导入或显式重试，核对实际磁盘内容。由于操作系统权限规则可能影响整个目录，无法可靠构造的场景标 `NOT_RUN`，不得编造结果。
+
+验收记录须包含 Chrome 版本、OS、URL/安全上下文、测试目录的可公开脱敏布局、操作和可复查的前后字节/截图、结果与异常。即使这些项目通过，也不等于 kernel CAS、原子目录写入、外部进程锁或 Runtime PASS。
+
+### E4-A2 · Windows 本地原生验收自动化入口（PR candidate；现场 NOT_RUN）
+
+命令：`npm run test:e4:native`，要求 Windows、Node.js 24、Google Chrome，来自本仓当前 PR 分支。命令启动本地 `127.0.0.1` 网页并生成新的 `.agent-tmp/e4-native-*/studio-e4-native-fixture`；只允许选择这个测试目录。它带随机 128-bit 标记和 5 个真实文件（BOM/CRLF、Python、Reference、二进制和标记文件），**标记和全量初始字节不匹配就绝不写盘**。
+
+需用户在 Chrome 点击一次按钮，原生选择这个一次性目录、允许写权限，并确认向该测试目录写入。其后浏览器直接执行 Studio 的 E4-A1 目录导入和 E4-A2 保存代码，自动测试两份文件的实际覆盖/回读、旧文件尾部截断、未修改与二进制文件保真、模拟外部修改以及新增文件冲突。Node **独立从 OS 磁盘读取全部文件并计算 SHA-256**，检查无额外文件；输出 `.agent-tmp/e4-native-*/e4-native-acceptance.json`，不是 Package sidecar。
+
+`tests/e4-native-fixture.test.mjs` 在跨平台 CI 自动检验随机目录、文件字节及错误检测。**此 CI 不会显示 Windows 原生目录选择框，不能冒充 native PASS**。只有真实运行该本地命令并获得 `E4_NATIVE_OS_PASS` 及对应报告才能标记该现场场景 PASS。故意拒绝权限、真实文件 ACL 部分写失败、外部进程竞态和原子写盘不能通过这个单次授权流程自动证实，仍为 NOT_RUN/明确限制。不接触真实项目源文件，不关闭其它 Chrome 进程。10 分钟没有完成则退出、保留本次独立测试目录供审计；清理需仅限那次生成的独立目录。

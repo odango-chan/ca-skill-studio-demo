@@ -572,6 +572,83 @@ try{
     !directorySmoke.opaqueIntact||!directorySmoke.unknownIntact)
     throw Error("E4 directory browser import/ZIP FAIL: "+JSON.stringify(directorySmoke));
 
+  // E4-A2: real Chromium FileSystemWritableFileStream in the origin-private
+  // file system, with a picker stub. This never selects/writes an OS directory.
+  const e4DiskSave=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const originalPicker=window.showDirectoryPicker,originalConfirm=window.confirm;",
+    " const root=await navigator.storage.getDirectory();",
+    " const folder=await root.getDirectoryHandle('local-e4',{create:true});",
+    " const original=await (await fetch('./samples/packages/establish-pdu-session/assurance/procedure.yaml')).text();",
+    " const files=[['SKILL.md','# Local E4\\n'],",
+    "  ['assurance/procedure.yaml',original],",
+    "  ['references/test.md','# Reference\\n'],",
+    "  ['assets/blob.bin',new Uint8Array([0,255,137,80,78,71,0])],",
+    "  ['custom/unknown.xyz',new Uint8Array([0,200,201,0])]];",
+    " const getFile=async path=>{",
+    "  const bits=path.split('/'),name=bits.pop();let dir=folder;",
+    "  for(const bit of bits)dir=await dir.getDirectoryHandle(bit,{create:true});",
+    "  return dir.getFileHandle(name,{create:true});",
+    " };",
+    " for(const [path,data] of files){",
+    "  const handle=await getFile(path),writer=await handle.createWritable();",
+    "  await writer.write(data);await writer.close();",
+    " }",
+    " const perms=await folder.queryPermission({mode:'readwrite'});",
+    " const modes=[];",
+    " window.showDirectoryPicker=async opts=>{modes.push(opts?.mode);return folder;};",
+    " const confirmations=[];",
+    " window.confirm=msg=>{confirmations.push(String(msg));return true;};",
+    " const firstSource=document.getElementById('source');",
+    " firstSource.value='# E4 short\\n';",
+    " firstSource.dispatchEvent(new Event('input',{bubbles:true}));",
+    " await sleep(160);",
+    " const btn=document.getElementById('saveDirectoryButton');",
+    " const eligible=!btn.hidden&&!btn.disabled;",
+    " let saved=false,conflicted=false,opaqueIntact=false,unchanged=true;",
+    " try{",
+    "  btn.click();",
+    "  for(let i=0;i<100;i++){",
+    "   if(document.getElementById('saveNotice').dataset.status==='SAVED')break;",
+    "   await sleep(60);",
+    "  }",
+    "  saved=document.getElementById('saveNotice').dataset.status==='SAVED';",
+    "  const value=new TextDecoder().decode(await (await (await getFile('assurance/procedure.yaml')).getFile()).arrayBuffer());",
+    "  const opq=new Uint8Array(await (await (await getFile('assets/blob.bin')).getFile()).arrayBuffer());",
+    "  unchanged=files.length===[...document.querySelectorAll('#assetTree button.asset-file')].length;",
+    "  opaqueIntact=String(opq)==='0,255,137,80,78,71,0';",
+    "  saved=saved&&value==='# E4 short\\n'&&value.length<original.length;",
+    "  // Next save cannot clobber an unrelated external edit in the same Package.",
+    "  const target=await getFile('SKILL.md'),w=await target.createWritable();",
+    "  await w.write('# external change\\n');await w.close();",
+    "  const source=document.getElementById('source');",
+    "  source.value='# E4 second change\\n'+value;",
+    "  source.dispatchEvent(new Event('input',{bubbles:true}));",
+    "  await sleep(140);",
+    "  btn.click();",
+    "  for(let i=0;i<100;i++){",
+    "   if(document.getElementById('saveNotice').dataset.status==='CONFLICT')break;",
+    "   await sleep(60);",
+    "  }",
+    "  const after=new TextDecoder().decode(await (await (await getFile('assurance/procedure.yaml')).getFile()).arrayBuffer());",
+    "  conflicted=document.getElementById('saveNotice').dataset.status==='CONFLICT'&&after===value;",
+    "  return {eligible,perms,modes,saved,conflicted,opaqueIntact,unchanged,",
+    "    warned:confirmations.length===1&&confirmations[0].includes('无法证明')&&confirmations[0].includes('同一物理目录'),",
+    "    info:document.getElementById('saveNotice').textContent};",
+    " }finally{",
+    "  window.showDirectoryPicker=originalPicker;window.confirm=originalConfirm;",
+    " }",
+    "})()"
+  ].join("\n"));
+  console.log("E4_SAFE_ORIGINAL_SAVE",JSON.stringify(e4DiskSave));
+  if(!e4DiskSave?.eligible||e4DiskSave.perms!=="granted"||
+     e4DiskSave.modes.join(",")!=="readwrite,readwrite"||
+     !e4DiskSave.saved||!e4DiskSave.conflicted||
+     !e4DiskSave.opaqueIntact||!e4DiskSave.unchanged||
+     !e4DiskSave.warned)
+    throw Error("E4-A2 writable-stream / external conflict smoke failed: "+JSON.stringify(e4DiskSave));
+
   // Evaluate browser diagnostics after all E2 YAML interactions have run.
   if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
   if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
