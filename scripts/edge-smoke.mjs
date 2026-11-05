@@ -430,6 +430,10 @@ try{
     JSON.stringify(phaseEvidence));
 
   // E2-A2: real Owner schemas, schema diagnostics, completion and hover.
+  // Wide desktop scripts default to the read-only reference panel.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1440,height:900,deviceScaleFactor:1,mobile:false
+  });
   // E3-A1: actual script Inspector links switch Package Source files, without
   // executing Python or applying a Visual mutation.
   const scriptLinks=await evaluate([
@@ -438,26 +442,41 @@ try{
     " const file=path=>[...document.querySelectorAll('#assetTree button.asset-file')]",
     "  .find(el=>el.getAttribute('aria-label')===path);",
     " file('scripts/evaluate_udm_read.py')?.click();await sleep(240);",
-    " const available=!document.getElementById('inspectorVisibility').hidden;",
-    " document.getElementById('inspectorVisibility')?.click();await sleep(90);",
+    " const control=document.getElementById('inspectorVisibility');",
+    " const panel=document.getElementById('inspectorPanel');",
+    " const wide=window.matchMedia('(min-width: 1180px)').matches;",
+    " const defaultOpen=!panel.hidden&&control.getAttribute('aria-pressed')==='true';",
+    " const available=!control.hidden;",
+    " control.click();await sleep(80);",
+    " const collapsed=panel.hidden&&control.getAttribute('aria-pressed')==='false';",
+    " document.getElementById('source').dispatchEvent(new Event('input',{bubbles:true}));",
+    " await sleep(90);",
+    " const staysCollapsed=panel.hidden;",
+    " control.click();await sleep(80);",
+    " const manualReopen=!panel.hidden;",
     " const links=()=>[...document.querySelectorAll('#inspector button.source-link')];",
     " const labels=links().map(b=>b.textContent);",
     " const caller=links().find(b=>b.textContent.includes('Predicate'));",
     " caller?.click();await sleep(240);",
     " const callerOk=document.getElementById('fileName').textContent.includes('assurance/predicates.yaml')&&",
     "  document.getElementById('source').value.includes('ref: skill.evaluate-udm-read');",
+    " const nonScriptClosed=panel.hidden;",
     " file('scripts/evaluate_udm_read.py')?.click();await sleep(200);",
-    " document.getElementById('inspectorVisibility')?.click();await sleep(90);",
+    " const reopenedOnReturn=!panel.hidden;",
     " const schema=links().find(b=>b.textContent.includes('输入'));",
     " schema?.click();await sleep(240);",
     " const schemaOk=document.getElementById('fileName').textContent.includes('schemas/udm-read-evaluation-input.schema.yaml')&&",
     "  document.getElementById('source').value.includes('title: UdmReadEvaluationInput');",
-    " return {available,labels,callerOk,schemaOk};",
+    " return {wide,defaultOpen,available,collapsed,staysCollapsed,manualReopen,",
+    "  reopenedOnReturn,nonScriptClosed,labels,callerOk,schemaOk};",
     "})()"
   ].join("\n"));
   console.log("E3_SCRIPT_REFERENCE_NAVIGATION",JSON.stringify(scriptLinks));
-  if(!scriptLinks?.available||!scriptLinks.callerOk||!scriptLinks.schemaOk||
-     scriptLinks.labels.length<3)
+  if(!scriptLinks?.wide||!scriptLinks.defaultOpen||!scriptLinks.available||
+     !scriptLinks.collapsed||!scriptLinks.staysCollapsed||
+     !scriptLinks.manualReopen||!scriptLinks.reopenedOnReturn||
+     !scriptLinks.nonScriptClosed||!scriptLinks.callerOk||
+     !scriptLinks.schemaOk||scriptLinks.labels.length<3)
     throw Error("E3 script reference navigation failed: "+JSON.stringify(scriptLinks));
 
   // E3-A2: actual Chromium clicks the conservative Python symbol outline.
@@ -471,7 +490,7 @@ try{
     " for(const name of names){",
     "  file('scripts/'+name)?.click();await sleep(180);",
     "  const before=document.getElementById('source').value;",
-    "  document.getElementById('inspectorVisibility')?.click();await sleep(70);",
+    "  const autoOpened=document.getElementById('workbench').dataset.inspector==='open';",
     "  const links=[...document.querySelectorAll('#inspector button.source-link')];",
     "  const main=links.find(el=>/^def main · L[0-9]+$/.test(el.textContent||''));",
     "  const classes=links.filter(el=>(el.textContent||'').startsWith('class '));",
@@ -480,7 +499,7 @@ try{
     "  const focused=document.getElementById('monacoHost').contains(document.activeElement);",
     "  const unchanged=document.getElementById('source').value===before;",
     "  const expected=before.split(/\\r?\\n/)[line-1]||'';",
-    "  results.push({name,line,main:!!main,classes:classes.length,focused,unchanged,",
+    "  results.push({name,line,autoOpened,main:!!main,classes:classes.length,focused,unchanged,",
     "    language:document.getElementById('monacoHost').dataset.language,expected});",
     " }",
     " return results;",
@@ -488,10 +507,37 @@ try{
   ].join("\n"));
   console.log("E3_PYTHON_SYMBOL_NAVIGATION",JSON.stringify(symbolNavigation));
   if(!symbolNavigation||symbolNavigation.length!==3||
-     symbolNavigation.some(x=>!x.main||!x.classes||
+     symbolNavigation.some(x=>!x.autoOpened||!x.main||!x.classes||
        !x.focused||!x.unchanged||x.language!=="python"||
        !/^def main\(/.test(x.expected)))
     throw Error("E3 Python symbol navigation failed: "+JSON.stringify(symbolNavigation));
+
+  // A narrow viewport must not force the Inspector over the editor.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:800,height:850,deviceScaleFactor:1,mobile:false
+  });
+  const narrowScript=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const pick=p=>[...document.querySelectorAll('#assetTree button.asset-file')]",
+    "  .find(el=>el.getAttribute('aria-label')===p);",
+    " pick('assurance/procedure.yaml')?.click();await sleep(150);",
+    " pick('scripts/evaluate_udm_read.py')?.click();await sleep(170);",
+    " const closed=document.getElementById('workbench').dataset.inspector==='closed';",
+    " const available=!document.getElementById('inspectorVisibility').hidden;",
+    " return {width:innerWidth,closed,available};",
+    "})()"
+  ].join("\n"));
+  console.log("E3_NARROW_SCRIPT_INSPECTOR",JSON.stringify(narrowScript));
+  if(!narrowScript?.closed||!narrowScript.available||narrowScript.width>980)
+    throw Error("Narrow Python Inspector unexpectedly auto-opened: "+
+      JSON.stringify(narrowScript));
+  // Restore the desktop viewport for the existing Monaco popup/hover
+  // coordinates; CDP clear reverts to a small headless default viewport.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1440,height:900,deviceScaleFactor:1,mobile:false
+  });
+  await sleep(180);
 
   const ownerSchemaSmoke=await evaluate([
     "(async()=>{",
