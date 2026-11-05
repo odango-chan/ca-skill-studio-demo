@@ -38,7 +38,7 @@
 | E3-A2 Python 顶层 class/def/async def 符号导航（只读） | ACCEPTED（Editor-tier） | IMPLEMENTED（main@4e88e0a；PR #46 MERGED） | PASS（338/338 + Chromium + resulting-main Pages） | [PR #46](https://github.com/odango-chan/ca-skill-studio-demo/pull/46)、[rebased exact-head CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41811806093)、[main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41812070377)、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) |
 | D4-A2.2b2/A3b2b2b/A4b2 跨生产者写入 / 带副作用或输出依赖 Step 的写入 / 新 Phase on-map 与 owner Outcome 契约 | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
 | E4-A1 浏览器所选目录导入、未知文件保留与 ZIP 导出 | ACCEPTED（Editor-tier） | IMPLEMENTED（main@3433e99；PR #48 MERGED） | PASS（345/345 + Chromium FileList UI + resulting-main Pages） | [PR #48](https://github.com/odango-chan/ca-skill-studio-demo/pull/48)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41948794306)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41949134436)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
-| E4-A2 原位保存（权限 / 全目录冲突检测 / 逐文件部分保存报告） | ACCEPTED（best-effort） | IMPLEMENTED（PR candidate） | PENDING（单测/Chromium OPFS/Pages） | [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)、[设计](design/source-editor-workstream.md) |
+| E4-A2 重选目录写入（非原路径证明 / 全目录冲突 / 部分保存报告） | ACCEPTED（best-effort） | IMPLEMENTED（PR candidate） | PENDING（单测/Chromium OPFS/Pages） | [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)、[设计](design/source-editor-workstream.md) |
 | 正式 Runtime Qualification、Case、5GC、发布工作台 | PROPOSED（明确后置） | NOT_STARTED | NOT_RUN | — |
 
 
