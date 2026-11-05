@@ -200,7 +200,9 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 **验收：**单测覆盖真实 owner 16 文件、只读导入无写权限、非法目录/路径/大小/读失败；真实 Chromium 用模拟 picker + OPFS 进行「先选择只读目录 → 修改 → 保存只申请写授权而不二次选择 → 复核字节」及拒绝权限的负例。该证据不等于真实 Windows Chrome 系统文件选择框（Issue #26 仍须现场验收）。Source/Runtime/5GC 皆不改变。
 
 
-## 14. E5 · 当前 Package 跨文件只读查找（2026-11-05；PR candidate）
+## 14. E5 · 当前 Package 跨文件只读查找（2026-11-05；PR #64 OPEN）
+
+实现与验证：[PR #64](https://github.com/odango-chan/ca-skill-studio-demo/pull/64)，代码提交 `f4e10a4` 的 [CI #41999904349 attempt 2](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41999904349) 完成 385/385 单测、TypeScript、打包和 Chromium PASS。首次尝试在测试页未打开前因 Chrome 调试端口未就绪失败，不能计为浏览器 PASS；第二次同提交真实交互测试通过。main/Pages 尚未验收。
 
 当前 Explorer 的「查找节点」只过滤当前 Procedure 的 Node，不支持在多文件 SKILL 中查找任意文本。E5 在同一个 Explorer 增加独立、默认收起的「查找文件内容」，不创建第二 Inspector、第二编辑工作副本或服务器索引。
 
