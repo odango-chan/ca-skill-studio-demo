@@ -206,6 +206,72 @@ try{
     throw Error("D1 visual START / legend / Route tone FAIL: "+
       JSON.stringify(graphDisplay));
 
+  // E5: real owner Package search, unsaved Monaco bytes, cross-file navigation.
+  const packageSearch=await evaluate(String.raw`
+    (async()=>{
+      const sleep=t=>new Promise(r=>setTimeout(r,t));
+      const panel=document.getElementById('packageSearchDisclosure');
+      const input=document.getElementById('packageSearchInput');
+      const results=document.getElementById('packageSearchResults');
+      const nodeFilter=document.getElementById('search');
+      if(panel.hidden)return {error:'Package search is hidden'};
+      panel.open=true;await sleep(90);
+      input.value='def main(';
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      const script=[...results.querySelectorAll('button')].find(
+        b=>b.textContent.includes('scripts/evaluate_udm_read.py'));
+      const scriptCount=results.querySelectorAll('button').length;
+      const line=Number(script?.title.match(/L(\d+):/)?.[1]||0);
+      script?.click();await sleep(260);
+      const source=document.getElementById('source');
+      const original=source.value;
+      const scriptOpened=document.getElementById('fileName').textContent.includes(
+        'scripts/evaluate_udm_read.py');
+      const accurate=line>0&&original.split(/\r?\n/)[line-1]?.includes('def main(');
+      const focused=document.getElementById('monacoHost').contains(document.activeElement);
+      const marker='E5_UNSAVED_FILE_TEXT_CHECK';
+      source.value=original+'\n# '+marker;
+      source.dispatchEvent(new Event('input',{bubbles:true}));
+      input.value=marker;input.dispatchEvent(new Event('input',{bubbles:true}));
+      const unsavedResult=[...results.querySelectorAll('button')].some(
+        b=>b.title.includes('scripts/evaluate_udm_read.py'));
+      source.value=original;source.dispatchEvent(new Event('input',{bubbles:true}));
+      input.value='governed operation capabilities';
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      const ref=[...results.querySelectorAll('button')].find(
+        b=>b.textContent.includes('references/3gpp-procedure.md'));
+      ref?.click();await sleep(250);
+      const referenceOpened=document.getElementById('fileName').textContent.includes(
+        'references/3gpp-procedure.md');
+      const referenceText=source.value.includes('governed operation capabilities');
+      const nodeSearchIntact=nodeFilter.value==='';
+      input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));
+      panel.open=false;
+      const procedure=[...document.querySelectorAll('#assetTree button.asset-file')].find(
+        b=>b.getAttribute('aria-label')==='assurance/procedure.yaml');
+      procedure?.click();
+      for(let i=0;i<80;i++){
+        if(document.querySelectorAll('.react-flow__node').length===17&&
+           document.querySelectorAll('.react-flow__edge-path').length===46)break;
+        await sleep(75);
+      }
+      const restored=document.getElementById('fileName').textContent.includes(
+        'assurance/procedure.yaml')&&
+        document.querySelectorAll('.react-flow__node').length===17&&
+        document.querySelectorAll('.react-flow__edge-path').length===46;
+      return {scriptCount,scriptOpened,accurate,focused,unsavedResult,
+        referenceOpened,referenceText,nodeSearchIntact,restored};
+    })()
+  `);
+  console.log("E5_PACKAGE_TEXT_SEARCH",JSON.stringify(packageSearch));
+  if(packageSearch?.scriptCount<3||!packageSearch.scriptOpened||
+     !packageSearch.accurate||!packageSearch.focused||
+     !packageSearch.unsavedResult||!packageSearch.referenceOpened||
+     !packageSearch.referenceText||!packageSearch.nodeSearchIntact||
+     !packageSearch.restored)
+    throw Error("E5 Package search browser navigation failed: "+
+      JSON.stringify(packageSearch));
+
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
     "(()=>{",
