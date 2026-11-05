@@ -824,7 +824,8 @@ try{
         const afterDenied=await (await skill.getFile()).text();
         return {imported,openedNotice,visible,disabled,ready,saved,denied,
           preserved:afterDenied===onDisk,exact:onDisk==='# Session E4 edited\n',
-          pickerModes,permissionModes,confirmations:confirmations.length,
+          pickerModes,permissionModes,
+          writeConfirmations:confirmations.filter(x=>x.includes('即将写入')).length,
           confirmationText:confirmations.at(-1)?.slice(0,190)};
       }finally{
         window.showDirectoryPicker=oldPicker;
@@ -838,7 +839,8 @@ try{
      !sessionSave.saved||!sessionSave.denied||!sessionSave.preserved||
      !sessionSave.exact||sessionSave.pickerModes.join(",")!=="read"||
      sessionSave.permissionModes.join(",")!=="readwrite,denied:readwrite"||
-     sessionSave.confirmations!==1)
+     sessionSave.writeConfirmations!==1||
+     !sessionSave.confirmationText.includes('本次会话'))
     throw Error("E4 session handle permission/save smoke failed: "+
       JSON.stringify(sessionSave));
 
