@@ -2078,7 +2078,6 @@ function chooseEdgeRoute(bundle) {
 // available for every real Node, including CALL/TERMINAL, irrespective of
 // whether the Node invokes an independently declared Child Procedure.
 function openNodeFocus(id){
-  $("nodeFocus").dataset.openAttempt=id+" / "+projection?.state+" / "+viewKind;
   if(projection?.state!=="READY"||viewKind!=="procedure"||
      !lastGood?.nodes.some(node=>node.id===id))return;
   if(nodeFocusId===id)return;
