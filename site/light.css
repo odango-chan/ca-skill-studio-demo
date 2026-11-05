@@ -1480,3 +1480,48 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .graph-legend-line.tone-failure{border-color:#c05a55}
 .graph-legend-line.tone-uncertain{border-color:#b37a27}
 .graph-legend-body p{margin:11px 0 0;color:#8191a2;font-size:10px}
+
+/* D1-A1: a phase badge belongs to its business Node, never to a fake Node.
+   Keep the ELK 238x80 geometry and all port anchors exactly unchanged. */
+.procedure-flow .designer-node.has-phases{
+  padding-top:6px;padding-bottom:22px;gap:3px;
+}
+.designer-node-phases{
+  position:absolute;bottom:4px;left:11px;right:11px;
+  display:flex;gap:5px;align-items:center;
+  height:16px;pointer-events:none;
+}
+.designer-phase-badge{
+  display:inline-flex;align-items:center;
+  max-width:50%;white-space:nowrap;
+  padding:2px 6px;border-radius:5px;
+  font:700 9px/1.15 ui-monospace,Consolas,monospace;
+  border:1px solid #c9dfeb;background:#f0f6fc;color:#47758f;
+}
+.designer-phase-badge.phase-postconditions{
+  border-color:#c9e3d9;background:#edf8f3;color:#327b68;
+}
+/* Color expresses Outcome, shape expresses the actual Route origin. */
+.procedure-flow .react-flow__edge-path.designer-edge.origin-PRE{
+  stroke-dasharray:7 4;
+}
+.procedure-flow .react-flow__edge-path.designer-edge.origin-POST{
+  stroke-dasharray:2.5 4;
+}
+.designer-route-label.origin-PRE{border-style:dashed}
+.designer-route-label.origin-POST{border-style:dotted}
+.graph-legend-types{grid-template-columns:1fr 1fr}
+.graph-legend-types .legend-empty{
+  color:#8b98a7;font-size:10px;grid-column:1/-1;
+}
+.graph-legend-origins{display:grid;gap:7px}
+.graph-legend-origins>div{display:flex;gap:11px;align-items:center}
+.graph-legend-origin{
+  width:28px;flex:none;border-top:2.5px solid #66899f;
+}
+.graph-legend-origin.origin-PRE{border-top-style:dashed}
+.graph-legend-origin.origin-POST{border-top-style:dotted}
+.graph-legend-scope{
+  color:#7d8fa0;font-size:10px;line-height:1.4;
+  padding-top:5px;
+}
