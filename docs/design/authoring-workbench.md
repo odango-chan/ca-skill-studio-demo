@@ -115,5 +115,14 @@ Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的�
 
 - `procedure.start` 仍然唯一定位第一个真实 Node；画布给该 Node 绘制独立的 START 胶囊和连接线（CSS 视觉装饰），不新增 YAML Node / Route，不改变 Node、Route bundle、Outcome 数量，亦不允许选中虚拟 START 作为业务节点或 Route 编辑目标。真实 Node 仍显示原来的 `CALL` / `TOOL` / `VERIFY` 等 Operator，不再写 `CALL · START`。CALL 是 DSL 的调用型 Operator，不等于 TOOL。
 - 同一个 Route bundle 的所有 Outcome 依照明确标签归类；`PASS/SUCCEEDED/SUCCESS` 绿色，`FAIL/FAILED/ERROR` 红色，`UNKNOWN/OUTCOME_UNKNOWN/UNRESOLVED/TIMEOUT/TIMED_OUT` 琥珀色，混合类别及未知标签中性色。**只要一个 bundle 的 Outcomes 含混，就不可据某一个 PASS 画成绿色。**选中态单独高亮，箭头颜色与线条保持一致。仅显示层，不做 Runtime 资格判断。
-- 画布右上角的原生 `details` 图例默认折叠，可展开查看 START、8 类节点 Operator 与 4 类 Route 色义；图例不占 Inspector，不引入新的工具栏或运行状态。YAML Source、Diff、Undo/Redo、ELK 路由几何、拖动重连保持权威与既有行为。
+- 画布右上角的原生 `details` 图例默认折叠，首版显示 START、8 类支持的 Operator 与 4 类 Route 色义（A1 将其替换为当前实际类型）；图例不占 Inspector，不引入新的工具栏或运行状态。YAML Source、Diff、Undo/Redo、ELK 路由几何、拖动重连保持权威与既有行为。
 - 浏览器验收需核对：真实业务 Node 数与 Route 路径数量未变，START 单独可见、原业务标签无 START，图例可折叠、可展开，PASS 对应的可见线条与箭头同色且混合/失败/不确定边不冒充成功；此项仅是 Studio 展示能力。大图适配边缘空间仍以真实 Node 布局为依据，不应把 CSS 的装饰物冒充额外 Route。
+
+## D1-A1 · 语义可见性第一阶段（2026-11-05，PR candidate）
+
+本阶段只针对 [Issue #65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65) 的已确认问题，不抢先实施 A2 子流程边界/A3 图压缩。主要原则：**一个业务 Node 仍然对应一个 YAML Node**；Phase Step 是该 Node 内部的有序 Step，不能提升成业务 Node；`CALL` 不是 `TOOL` 的别名。
+
+- 从 Source 投影的 `node.phases` 计算真正存在的 `PRE/POST · N` 徽标，`title` 进一步列举内部 `CALL/SCRIPT/VERIFY` 实际数量；Phase 缺失就不渲染，空 Phase 显示 0 而不是捏造 Step。Node 的尺寸和 ELK 港口坐标均维持 238×80。
+- 图例拆为**当前可见业务 Node 类型**、**这些 Node 内部实际 Phase Step 类型**。不会因为 DSL 支持 `TOOL` 就默认显示 TOOL；切 Child Procedure 和邻居视图后只按当前范围重新统计。
+- 对每条 Route，Outcome 色义维持不变；独立把 `preconditions.on` → `PRE` 虚线、`operator.on` → `OP` 实线、`postconditions.on` → `POST` 点线，标签带明示前缀。PRE/POST 标签默认可见，混合 Outcome 不得显示为成功；精确 Outcome 身份和原始 Route Source 仍来自 Source。
+- 所有修改均为只读投影、TSX/UI/CSS，无新增 DSL 语法、业务 Graph Node/Route、Server、Runtime 执行或隐式 Patch。A2 子流程有界卡片与调用上下文、A3 异常分支缩略和概览/全图切换保持后续单独评审，不在 A1 混入新编辑能力。
