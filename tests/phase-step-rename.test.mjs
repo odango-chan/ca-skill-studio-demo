@@ -6,8 +6,7 @@ import {routeProjectionSignature} from "../site/route-create.mjs";
 import {namedPhaseStepImpactReport,previewNamedPhaseStepRename,
   applyNamedPhaseStepRename} from "../site/phase-step-rename.mjs";
 
-const source=readFileSync(new URL("../site/samples/packages/"+
-  "establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
+const source=readFileSync(new URL("./fixtures/establish-pre-hold/assurance/procedure.yaml",import.meta.url),"utf8");
 const pid="ue-requested-pdu-session-establishment";
 const node="nudm-sdm-subscribe";
 const oldName="select-subscription-configuration";
@@ -16,7 +15,7 @@ const phase="preconditions",index=0;
 const args=(src=source,newStepName=nextName)=>
   [src,pid,node,phase,index,newStepName];
 
-test("D4-A3b2a real owner Step impact locates all same-Node and cross-Node consumers",()=>{
+test("D4-A3b2a pinned predecessor Step impact locates all same-Node and cross-Node consumers",()=>{
   const rows=namedPhaseStepImpactReport(source,pid,node);
   const selection=rows.find(x=>x.phaseName===phase&&x.stepIndex===index);
   assert.ok(selection);
