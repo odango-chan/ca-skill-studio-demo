@@ -49,6 +49,9 @@
       <div class="explorer-bottom">
         <button id="openButton" type="button" class="explorer-action">打开本地文件</button>
         <button id="openDirectoryButton" type="button" class="explorer-action" title="只读取所选目录；不申请磁盘写入权限">打开本地 SKILL 目录</button>
+        <button id="saveDirectoryButton" type="button" class="explorer-action" hidden title="重新选择同一目录并校验后写入">保存回本地目录</button>
+        <div id="saveNotice" class="save-status" role="status" aria-live="polite" hidden></div>
+        <button id="reloadDirectoryButton" type="button" class="explorer-action" hidden>重新导入目录（先备份）</button>
         <button id="exportPackageButton" type="button" class="explorer-action" hidden>导出整个 Package (.zip)</button>
         <details class="sample-picker">
           <summary>加载示例</summary>
