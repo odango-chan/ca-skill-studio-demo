@@ -159,6 +159,10 @@ export async function saveDirectoryChanges({workspace,handle,confirmWrite}={}){
       saved.push(change.path);
       attempted=null;
     }
+    // A changed untouched file (including opaque assets) after the final
+    // write must not be reported as a clean whole-Package save. There is
+    // still no kernel-level CAS: this is an additional best-effort check.
+    await verifyDirectory(handle,plan);
     return result("SAVED",paths,saved);
   }catch(error){
     const status=saved.length?"PARTIAL":
