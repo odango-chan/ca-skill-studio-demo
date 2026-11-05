@@ -153,7 +153,7 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 
 1. 仅在 E4-A1 目录导入的工作区显示写盘功能（示例、单文件不能写盘）；新选择的目录名称必须与 Package 名称一致，浏览器 `queryPermission({mode:"readwrite"})` 必须返回 `granted`；用户还需逐次确认待写入的具体文件清单。只写已有且已编辑的文本；未改和二进制文件一律不写。
 2. 确认前完整枚举磁盘相对路径，文件集合必须与原导入的集合完全一致，连同未修改的文本和二进制资源逐字节比对。新增/删除、大小写或 Unicode 名称冲突、读取失败、权限拒绝以及任何外部内容漂移均拒绝，工作副本不丢弃。
-3. 每写入一个文件前再次校验完整磁盘快照与 Source 文本修订；使用现有 `FileSystemFileHandle.createWritable({keepExistingData:true})`，不创建/删除/改名，不写 sidecar。关闭写入流后再次读取确认字节一致，才更新该文件 `initialText` 与 `originalBytes`；原 Undo/Redo 历史不受影响。
+3. 每写入一个文件前再次校验完整磁盘快照与 Source 文本修订；使用现有 `FileSystemFileHandle.createWritable({keepExistingData:false})` 全量替换并显式 `truncate` 到目标 UTF-8 字节长度，防止文件缩短后残留旧尾部；不创建/删除/改名，不写 sidecar。关闭写入流后再次读取确认字节一致，才更新该文件 `initialText` 与 `originalBytes`；原 Undo/Redo 历史不受影响。
 4. 只要后续某文件失败，立即停止，明确返回 `PARTIAL` 和已成功写入、仍待写入与磁盘结果不确定的文件；冲突时提供 ZIP 备份与重新导入引导。没有多文件原子提交、回滚或持久化恢复协议。
 5. 浏览器检查与 `writer.close()` 之间仍存在 TOCTOU 竞态窗口，**不是 kernel CAS**；不能保证外部进程在最后校验后不会抢先写盘，也不保证突然断电/多文件写盘原子性或可靠 watcher。实际 OS 目录权限/平台竞态仍须单独验收。
 
