@@ -1,6 +1,7 @@
 // E4-A2: explicitly approved, best-effort in-place save. This is NOT a
 // filesystem CAS, watcher, lock, or multi-file atomic transaction.
 const enc=new TextEncoder();
+const strictUtf8=new TextDecoder("utf-8",{fatal:true,ignoreBOM:true});
 const LIMIT_FILES=64,LIMIT_BYTES=8*1024*1024,LIMIT_FILE=1024*1024;
 const ROOT=/^[A-Za-z0-9._-]{1,100}$/;
 function validPath(path){
@@ -28,7 +29,7 @@ function workspacePlan(workspace){
      workspace.files.size<1||workspace.files.size>LIMIT_FILES)
     throw failure("BLOCKED","工作区不是有效的有界目录导入");
   const paths=new Map(),seen=new Set(),changes=[];
-  let total=0;
+  let total=0,projectedTotal=0;
   for(const [path,item] of workspace.files){
     const raw=item?.originalBytes;
     if(!validPath(path)||path!==item?.path||seen.has(identity(path))||
@@ -36,16 +37,25 @@ function workspacePlan(workspace){
       throw failure("BLOCKED","工作区存在无来源或不安全的文件："+path);
     seen.add(identity(path));total+=raw.length;
     if(total>LIMIT_BYTES)throw failure("BLOCKED","Package 超出 8 MiB 上限");
+    let plannedSize=raw.length;
     if(item.editable){
       if(typeof item.text!=="string"||typeof item.initialText!=="string")
         throw failure("BLOCKED","工作区文本来源不完整："+path);
       if(item.text!==item.initialText){
         const bytes=enc.encode(item.text);
+        // TextEncoder replaces lone UTF-16 surrogates with U+FFFD.
+        // Never silently store a different Source than the user edited.
+        if(item.text.includes("\u0000")||strictUtf8.decode(bytes)!==item.text)
+          throw failure("BLOCKED","源码包含无法字节无损保存的文本："+path);
         if(bytes.length>LIMIT_FILE)
           throw failure("BLOCKED","待保存文件超出 1 MiB："+path);
+        plannedSize=bytes.length;
         changes.push(Object.freeze({path,text:item.text,bytes}));
       }
     }else if(item.text!==null)throw failure("BLOCKED","资源类型不明确："+path);
+    projectedTotal+=plannedSize;
+    if(projectedTotal>LIMIT_BYTES)
+      throw failure("BLOCKED","修改后的 Package 超出 8 MiB 上限");
     paths.set(path,item);
   }
   if(!paths.has("SKILL.md")||!paths.get("SKILL.md").editable)

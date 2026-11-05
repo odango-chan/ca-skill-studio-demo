@@ -157,7 +157,7 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 4. 只要后续某文件失败，立即停止，明确返回 `PARTIAL` 和已成功写入、仍待写入与磁盘结果不确定的文件；冲突时提供 ZIP 备份与重新导入引导。没有多文件原子提交、回滚或持久化恢复协议。
 5. 浏览器检查与 `writer.close()` 之间仍存在 TOCTOU 竞态窗口，**不是 kernel CAS**；不能保证外部进程在最后校验后不会抢先写盘，也不保证突然断电/多文件写盘原子性或可靠 watcher。实际 OS 目录权限/平台竞态仍须单独验收。
 
-验收：`tests/directory-save.test.mjs` 模拟目录句柄覆盖权限拒绝、错误目录、外部漂移、文件增减、确认取消、保存时 Source 改变、后写失败与重试、写后回读不一致。`scripts/edge-smoke.mjs` 真实 Chromium 使用 Origin Private File System (OPFS) 的 `FileSystemWritableFileStream` 验证写入/回读，只有目录选取对话框由测试替代；**此证据不等于真实 OS 目录选择/写入**。CI/Pages 仅能在真实 PASS 后标记。Issue #26 保留 OPEN。
+验收：`tests/directory-save.test.mjs` 模拟目录句柄覆盖权限拒绝、错误目录、外部漂移、文件增减、确认取消、保存时 Source 改变、后写失败与重试、写后回读不一致。`scripts/edge-smoke.mjs` 真实 Chromium 使用 Origin Private File System (OPFS) 的 `FileSystemWritableFileStream` 验证写入/回读，只有目录选取对话框由测试替代；**此证据不等于真实 OS 目录选择/写入**。保存前还必须按照修改后的 UTF-8 字节量核对整个 Package 的 8 MiB 上限，并拒绝孤立 UTF-16 代理项和 NUL，避免 TextEncoder 替换字符后发生无提示内容变更。CI/Pages 仅能在真实 PASS 后标记。Issue #26 保留 OPEN。
 
 ### E4-A2 · 原生 Windows Chrome 验收清单（尚未执行）
 

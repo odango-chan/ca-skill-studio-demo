@@ -283,3 +283,47 @@ test("E4-A2 final Source edit during last write cannot be reported as all saved"
   assert.equal(ws.files.get("SKILL.md").text,"# next edit\n");
   assert.equal(hasUnsavedEdits(ws),true);
 });
+
+test("E4-A2 rejects a post-edit Package over 8 MiB before asking for write permission",async()=>{
+  const initialLength=928000;
+  const initial="# Skill\\n"+ "x".repeat(initialLength-8);
+  const entries=[file("SKILL.md",initial)];
+  for(let i=0;i<8;i++)entries.push(file("notes/part"+i+".txt","x".repeat(initialLength)));
+  const ws=(await importDirectoryFiles(entries)).workspace;
+  assert.equal(ws.files.size,9);
+  const storage=mockDirectory(snapshot(ws));
+  edit(ws,"SKILL.md","x".repeat(1024*1024));
+  const response=await saveDirectoryChanges({workspace:ws,handle:storage.handle,
+    confirmWrite:allow});
+  assert.equal(response.status,"BLOCKED");
+  assert.match(response.error,/8 MiB/);
+  assert.deepEqual(storage.opens,[]);
+  assert.deepEqual(storage.writes,[]);
+  assert.equal(hasUnsavedEdits(ws),true);
+});
+
+test("E4-A2 rejects malformed UTF-16 and NUL instead of silently changing Source bytes",async()=>{
+  for(const invalid of ["# lone-high\\uD800","# lone-low\\uDC00","# embedded\\u0000NUL"]){
+    const ws=await workspace(),storage=mockDirectory(snapshot(ws));
+    edit(ws,"SKILL.md",invalid);
+    const response=await saveDirectoryChanges({workspace:ws,handle:storage.handle,
+      confirmWrite:allow});
+    assert.equal(response.status,"BLOCKED");
+    assert.match(response.error,/字节无损/);
+    assert.deepEqual(storage.opens,[]);
+    assert.deepEqual(storage.writes,[]);
+    assert.equal(ws.files.get("SKILL.md").text,invalid);
+    assert.equal(hasUnsavedEdits(ws),true);
+  }
+});
+
+test("E4-A2 valid UTF-8 multibyte text remains exact on disk",async()=>{
+  const ws=await workspace(),storage=mockDirectory(snapshot(ws));
+  const text="# 你好，世界 🙌\\n";
+  edit(ws,"SKILL.md",text);
+  const outcome=await saveDirectoryChanges({workspace:ws,handle:storage.handle,
+    confirmWrite:allow});
+  assert.equal(outcome.status,"SAVED");
+  assert.deepEqual(storage.disk.get("SKILL.md"),enc.encode(text));
+  assert.equal(hasUnsavedEdits(ws),false);
+});
