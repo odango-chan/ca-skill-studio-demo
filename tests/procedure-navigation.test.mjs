@@ -4,6 +4,7 @@ import {readFileSync} from "node:fs";
 import {projectWorkspace} from "../site/workspace.mjs";
 import {layoutProcedureELK} from "../site/layout.mjs";
 import {makeFlowElements} from "../site/react-flow-projection.mjs";
+import {nodeJourney} from "../site/workbench.mjs";
 import {resolveProcedureCall,retainProcedureTrail,procedureCallers}
   from "../site/procedure-navigation.mjs";
 
@@ -84,4 +85,51 @@ test("A2 Child invocation CTA and frame remain view-only and keyboard accessible
   assert.match(css,/graph-pane\[data-procedure-scope="child"\]::before/);
   assert.match(css,/\.procedure-scope-return:focus-visible/);
   assert.doesNotMatch(tsx,/nodesDraggable=\{true\}/);
+});
+
+test("A2 every real Node can project a local PRE / OP / POST view",()=>{
+  assert.equal(root.nodes.length,17);
+  for(const node of root.nodes){
+    const model=nodeJourney(root,node.id);
+    assert.equal(model.node.id,node.id);
+    assert.equal(model.execute.operator,node.operator);
+    assert.equal(model.execute.value,node.value);
+    for(const route of model.prepare.routes)
+      assert.equal(route.routeSource,"preconditions.on");
+    for(const route of model.execute.routes)
+      assert.equal(route.routeSource,"operator.on");
+    for(const route of model.confirm.routes)
+      assert.equal(route.routeSource,"postconditions.on");
+  }
+  const subscribe=nodeJourney(root,"nudm-sdm-subscribe");
+  assert.equal(subscribe.prepare.phase.steps.length,5);
+  assert.equal(subscribe.confirm.phase.steps.length,1);
+  const terminal=root.nodes.find(node=>node.operator==="terminal");
+  assert.ok(terminal);
+  const end=nodeJourney(root,terminal.id);
+  assert.equal(end.prepare.phase,null);
+  assert.equal(end.confirm.phase,null);
+  assert.equal(end.execute.operator,"terminal");
+  assert.equal(nodeJourney(root,"missing"),null);
+});
+test("A2 double-click shows Node drill-down; Child navigation is an extra action",()=>{
+  const tsx=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
+  const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
+  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
+  assert.match(tsx,/onNodeDoubleClick=/);
+  assert.match(app,/onNodeDoubleClick:id=>openNodeFocus\(id\)/);
+  assert.match(app,/function renderNodeFocus\(\)/);
+  assert.match(app,/function openNodeFocus\(id\)/);
+  assert.match(app,/function closeNodeFocus\(\)/);
+  assert.match(app,/if\(!modelPart\.phase\)return/);
+  assert.match(app,/nodeJourney\(lastGood,nodeFocusId\)/);
+  assert.match(html,/id="nodeFocus"[^>]*aria-label="节点内部流程"/);
+  assert.match(html,/id="nodeFocusStages"/);
+  assert.match(html,/id="nodeFocusReturn"/);
+  assert.match(css,/\.graph-pane \.node-focus\[hidden\]/);
+  assert.match(css,/\.node-focus-stage\.is-pre/);
+  assert.match(css,/\.node-focus-stage\.is-post/);
+  assert.match(css,/\.node-focus-stage\.is-op/);
+  assert.match(app,/if\(visible\)\$\("reactFlowRoot"\)\.setAttribute\("aria-hidden","true"\)/);
 });
