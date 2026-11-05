@@ -129,6 +129,9 @@ const child=spawn(chrome,[
   "--user-data-dir="+profile,
   "--no-first-run","--no-default-browser-check","--new-window",address
 ],{stdio:"ignore"});
+// Node stays alive only for its local server; no need to close Chrome
+// manually before recording the result. Never kill other Chrome processes.
+child.unref();
 child.on("error",error=>{
   console.error("E4_NATIVE_CHROME_START_FAILED: "+String(error));
   settle({passed:false,error:String(error)});
