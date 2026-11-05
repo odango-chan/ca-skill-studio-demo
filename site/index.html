@@ -104,6 +104,17 @@
             <div id="procedureScopeContext" class="procedure-scope-context"></div>
             <button id="procedureScopeReturn" type="button" class="procedure-scope-return">返回调用节点</button>
           </div>
+          <section id="nodeFocus" class="node-focus" aria-label="节点内部流程" tabindex="-1" hidden>
+            <header class="node-focus-header">
+              <button id="nodeFocusReturn" type="button" class="node-focus-back">返回流程图</button>
+              <div class="node-focus-heading">
+                <span class="node-focus-eyebrow">NODE · 内部阶段</span>
+                <h2 id="nodeFocusTitle"></h2>
+                <p id="nodeFocusSubtitle"></p>
+              </div>
+            </header>
+            <div id="nodeFocusStages" class="node-focus-stages"></div>
+          </section>
           <details id="graphLegend" class="graph-legend" aria-label="流程图节点与连线图例">
             <summary>图例</summary>
             <div class="graph-legend-body">
