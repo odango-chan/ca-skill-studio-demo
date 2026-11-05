@@ -178,3 +178,15 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 需用户在 Chrome 点击一次按钮，原生选择这个一次性目录、允许写权限，并确认向该测试目录写入。其后浏览器直接执行 Studio 的 E4-A1 目录导入和 E4-A2 保存代码，自动测试两份文件的实际覆盖/回读、旧文件尾部截断、未修改与二进制文件保真、模拟外部修改以及新增文件冲突。Node **独立从 OS 磁盘读取全部文件并计算 SHA-256**，检查无额外文件；输出 `.agent-tmp/e4-native-*/e4-native-acceptance.json`，不是 Package sidecar。
 
 `tests/e4-native-fixture.test.mjs` 在跨平台 CI 自动检验随机目录、文件字节及错误检测。**此 CI 不会显示 Windows 原生目录选择框，不能冒充 native PASS**。只有真实运行该本地命令并获得 `E4_NATIVE_OS_PASS` 及对应报告才能标记该现场场景 PASS。故意拒绝权限、真实文件 ACL 部分写失败、外部进程竞态和原子写盘不能通过这个单次授权流程自动证实，仍为 NOT_RUN/明确限制。不接触真实项目源文件，不关闭其它 Chrome 进程。10 分钟没有完成则退出、保留本次独立测试目录供审计；清理需仅限那次生成的独立目录。
+
+## E4-A3 · 会话目录句柄与授权时机（PR candidate，2026-11-05）
+
+现场反馈：浏览器原 `<input type=file webkitdirectory>` 的原生按钮叫「上传」，与 Studio 的「打开目录」意图不一致；原版本只获得 FileList，保存时必须重新选物理目录；导入成功/失败仅显示在被截断的底部提示里。见 [#54](https://github.com/odango-chan/ca-skill-studio-demo/issues/54)。
+
+**本阶段候选方案：**在安全上下文且支持 `showDirectoryPicker` 的 Chrome/Edge，用户点击「打开本地 SKILL 目录」即直接执行 `showDirectoryPicker({mode:"read"})`，只拿本次页面会话内的 directory handle，通过 `entries()/getFile()` 转成原 E4-A1 的严格文件导入。其 FileList 前置限制、根 `SKILL.md`、64 文件 / 1 MiB / 8 MiB、严格 UTF-8 与 opaque 字节保存原则都不变。成功/失败将同时在 Explorer 左侧持久显示，让用户看得到结果；不能静默替换正在编辑的工作区。
+
+**保存授权独立：**仅当工作区已产生修改且用户主动点击保存，才对保留的 handle 执行 `requestPermission({mode:"readwrite"})`。拒绝写权限直接阻止写盘，保留工作副本和 ZIP。获许可后仍进入原 E4-A2 的**全部文件字节/路径比对 → 明确列出待写文件 → 再次确认 → 分文件重验和写回/回读**。保留句柄绝不赋予自动写权限，也不保证文件系统 CAS/原子写入；刷新页面后句柄失效，需要重新打开。
+
+**浏览器兼容：**缺少 File System Access 目录选择接口的浏览器仍用原 `webkitdirectory` 兼容导入、对应原生「上传」文案由浏览器掌控；兼容导入无法获取目录句柄，保存仍需重新选择目标目录。页面文案不得误称所有浏览器会显示「打开」，也不得称已经完成真实 OS 目录授权测试。
+
+**验收：**单测覆盖真实 owner 16 文件、只读导入无写权限、非法目录/路径/大小/读失败；真实 Chromium 用模拟 picker + OPFS 进行「先选择只读目录 → 修改 → 保存只申请写授权而不二次选择 → 复核字节」及拒绝权限的负例。该证据不等于真实 Windows Chrome 系统文件选择框（Issue #26 仍须现场验收）。Source/Runtime/5GC 皆不改变。
