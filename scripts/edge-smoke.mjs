@@ -387,6 +387,48 @@ try{
   if(!restoredOwner?.owner||restoredOwner.nodes!==17||restoredOwner.edges!==46)
     throw Error("Current owner sample not cleanly loaded after D1");
 
+  // D4 UX: check the real, currently selected owner Source without edits.
+  const phaseEvidence=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const before=document.getElementById('source').value;",
+    " const select=async id=>{",
+    "  const el=document.querySelector('.react-flow__node[data-id=\"'+id+'\"]');",
+    "  el?.click();await sleep(170);",
+    "  const stage=[...document.querySelectorAll('#inspector .journey-stage')]",
+    "    .find(x=>x.querySelector('summary')?.textContent.includes('准备'));",
+    "  if(stage)stage.open=true;",
+    "  return stage;",
+    " };",
+    " const udm=await select('nudm-sdm-subscribe');",
+    " const call=udm?.querySelector('[data-phase-step-evidence=\"preconditions:2\"]');",
+    " const verify=udm?.querySelector('[data-phase-step-evidence=\"preconditions:3\"]');",
+    " const details=udm?.querySelector('[data-phase-dependency-step=\"preconditions:3\"]');",
+    " if(details)details.open=true;",
+    " const evidence=details?.querySelector('[data-binding-key=\"udmHoldRef\"]');",
+    " const goodUdm=call?.dataset.evidenceCode==='CONSUMER_ABI_UNPROVEN'&&",
+    "  verify?.dataset.evidenceCode==='PRODUCER_SCHEMA_UNPROVEN'&&",
+    "  evidence?.dataset.evidenceCode==='PRODUCER_SCHEMA_UNPROVEN'&&",
+    "  evidence.textContent.includes('当前 Package')&&",
+    "  evidence.textContent.includes('输出 Schema')&&",
+    "  !details.querySelector('input,select,textarea');",
+    " const pcf=await select('npcf-sm-policy-control-create');",
+    " const pcfVerify=pcf?.querySelector('[data-phase-step-evidence=\"preconditions:2\"]');",
+    " const pcfDetails=pcf?.querySelector('[data-phase-dependency-step=\"preconditions:2\"]');",
+    " if(pcfDetails)pcfDetails.open=true;",
+    " const pcfHold=pcfDetails?.querySelector('[data-binding-key=\"pcfHoldRef\"]');",
+    " const goodPcf=pcfVerify?.dataset.evidenceCode==='PRODUCER_SCHEMA_UNPROVEN'&&",
+    "  pcfHold?.dataset.evidenceCode==='PRODUCER_SCHEMA_UNPROVEN'&&",
+    "  !pcfDetails.querySelector('input,select,textarea');",
+    " const unchanged=document.getElementById('source').value===before;",
+    " return {ok:goodUdm&&goodPcf&&unchanged,goodUdm,goodPcf,unchanged,",
+    "  udm:call?.textContent,pcf:pcfVerify?.textContent};",
+    "})()"
+  ].join("\n"));
+  console.log("D4_CURRENT_OWNER_PHASE_EVIDENCE",JSON.stringify(phaseEvidence));
+  if(!phaseEvidence?.ok)throw Error("D4 evidence UX smoke failed: "+
+    JSON.stringify(phaseEvidence));
+
   // E2-A2: real Owner schemas, schema diagnostics, completion and hover.
   // E3-A1: actual script Inspector links switch Package Source files, without
   // executing Python or applying a Visual mutation.
