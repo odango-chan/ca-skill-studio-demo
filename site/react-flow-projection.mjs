@@ -4,6 +4,28 @@ const NODE_WIDTH=238;
 const NODE_HEIGHT=80;
 export const FLOW_NODE_SIZE=Object.freeze({width:NODE_WIDTH,height:NODE_HEIGHT});
 
+// Route color is a conservative, view-only outcome classification. Never
+// paint a mixed success/failure bundle green just because it contains PASS.
+const ROUTE_OUTCOMES={
+  success:new Set(["PASS","SUCCEEDED","SUCCESS"]),
+  failure:new Set(["FAIL","FAILED","ERROR"]),
+  uncertain:new Set(["UNKNOWN","OUTCOME_UNKNOWN","UNRESOLVED","TIMEOUT","TIMED_OUT"])
+};
+export const ROUTE_TONE_COLOR=Object.freeze({
+  success:"#138f7a",failure:"#c05a55",uncertain:"#b37a27",
+  mixed:"#66899f",neutral:"#66899f"
+});
+export function classifyRouteTone(outcomes){
+  if(!Array.isArray(outcomes)||!outcomes.length)return "neutral";
+  const tones=outcomes.map(outcome=>{
+    const label=String(outcome).toUpperCase();
+    for(const [tone,set] of Object.entries(ROUTE_OUTCOMES))
+      if(set.has(label))return tone;
+    return "neutral";
+  });
+  return tones.every(tone=>tone===tones[0])?tones[0]:"mixed";
+}
+
 export function makeFlowElements(graph,procedure,selection=null,showAllLabels=false,
   routeCreationSourceId=null){
   if(!graph||!procedure)return {nodes:[],edges:[],direction:"DOWN"};
@@ -51,7 +73,8 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       throw new Error("Unresolved flow edge: "+bundle.source+" -> "+bundle.target);
     if(!bundle.routes?.length)throw new Error("Empty Route bundle");
     const selected=Boolean(selectedRoute&&bundle.routes.some(r=>r.id===selectedRoute));
-    const important=bundle.outcomes.some(x=>x==="PASS"||x==="SUCCEEDED");
+    const tone=classifyRouteTone(bundle.outcomes);
+    const important=tone==="success";
     const phase=(bundle.routeSource??"operator.on").replace(/\.on$/,"");
     const label=(phase==="operator"?"":phase+" · ")+bundle.outcomes.join(" / ");
     return {
@@ -65,7 +88,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       // filled 24x24 closed arrow. Its color follows the corresponding edge.
       markerEnd:{
         type:"arrow",
-        color:important?"#138f7a":"#66899f",
+        color:selected?"#087e71":ROUTE_TONE_COLOR[tone],
         width:16,height:16,
         strokeWidth:1.2,
         markerUnits:"userSpaceOnUse"
@@ -73,8 +96,8 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       // Only the verified handler may propose a YAML patch on reconnect.
       reconnectable:true,
       data:{
-        bundle,selected,important,label,
-        displayLabel:showAllLabels||important||selected,
+        bundle,selected,important,tone,label,
+        displayLabel:showAllLabels||["success","failure","uncertain"].includes(tone)||selected,
         path:bundle.path??null,
         labelPosition:bundle.label??null,direction
       }

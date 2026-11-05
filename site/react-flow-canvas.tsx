@@ -46,7 +46,9 @@ function ProcedureCard({data,selected}){
   },[updateNodeInternals,data.id,data.portSignature,direction]);
   return <div className={
       "designer-node"+(data.terminal?" is-terminal":"")+
-      (data.start?" is-start":"")+(selected?" is-selected":"")
+      (data.start?" is-start":"")+
+      (data.direction==="RIGHT"?" is-horizontal":"")+
+      (selected?" is-selected":"")
     }>
     <Handle type="target" id="in" position={inputPosition}
       className="designer-port designer-port-fallback designer-port-target"
@@ -67,7 +69,7 @@ function ProcedureCard({data,selected}){
     <span className="designer-node-kind">
       <OperatorGlyph operator={data.operator}/>
       {String(data.operator).toUpperCase()}
-      {data.start?" · START":""}{data.childCount?" · CHILD":""}
+      {data.childCount?" · CHILD":""}
     </span>
     <strong className="designer-node-id" title={data.id}>{data.id}</strong>
     <span className="designer-node-meta" title={data.value}>{data.value}</span>
@@ -89,10 +91,11 @@ function RouteEdge(props:EdgeProps){
   return <>
     <BaseEdge id={id} path={d} markerEnd={props.markerEnd}
       interactionWidth={16}
-      className={"designer-edge"+(data?.important?" is-primary":"")+
+      className={"designer-edge tone-"+(data?.tone||"neutral")+
         (selected?" is-selected":"")}/>
     {show&&<EdgeLabelRenderer>
-      <div className={"designer-route-label"+(selected?" is-selected":"")}
+      <div className={"designer-route-label tone-"+(data?.tone||"neutral")+
+          (selected?" is-selected":"")}
         style={{transform:"translate(-50%,-50%) translate("+lx+"px,"+ly+"px)"}}
         title={label}>{label.length>44?label.slice(0,43)+"…":label}</div>
     </EdgeLabelRenderer>}

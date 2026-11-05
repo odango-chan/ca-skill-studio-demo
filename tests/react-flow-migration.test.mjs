@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {projectWorkspace} from "../site/workspace.mjs";
 import {layoutProcedureELK} from "../site/layout.mjs";
-import {makeFlowElements,resolveReconnectedRoute,FLOW_NODE_SIZE}
+import {makeFlowElements,resolveReconnectedRoute,FLOW_NODE_SIZE,
+  classifyRouteTone,ROUTE_TONE_COLOR}
   from "../site/react-flow-projection.mjs";
 
 const read=name=>readFileSync(
@@ -51,6 +52,7 @@ test("selection, labels and direction remain UI-only",async()=>{
   assert.ok(flow.nodes.every(n=>n.sourcePosition==="right"&&n.targetPosition==="left"));
   assert.ok(flow.edges.every(e=>e.data.displayLabel));
   assert.equal(flow.edges.filter(e=>e.selected).length,1);
+  assert.equal(flow.edges.find(e=>e.selected).markerEnd.color,"#087e71");
   assert.equal(JSON.stringify(ensure.procedure),source);
 });
 test("multi-outcome edge cannot rewire an arbitrary Outcome without selection",async()=>{
@@ -191,4 +193,60 @@ test("Procedure toolbar keeps full, horizontal and vertical fit controls separat
   assert.match(css,/\.compact-toolbar \.toolbar-axis-fit/);
   assert.match(icons,/"fit-width":\[/);
   assert.match(icons,/"fit-height":\[/);
+});
+
+test("visual START is separate from the business operator, without changing Source or Route counts",async()=>{
+  const graph=await layoutProcedureELK(created.procedure);
+  const before=JSON.stringify(created.procedure);
+  for(const direction of ["DOWN","RIGHT"]){
+    const layout=direction==="DOWN"?graph:
+      await layoutProcedureELK(created.procedure,{direction});
+    const flow=makeFlowElements(layout,created.procedure);
+    const start=flow.nodes.find(node=>node.id===created.procedure.start);
+    assert.ok(start);
+    assert.equal(start.data.start,true);
+    assert.equal(start.data.operator,"call");
+    assert.equal(flow.nodes.length,created.procedure.nodes.length);
+    assert.equal(flow.edges.length,layout.bundles.length);
+  }
+  const jsx=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
+  assert.doesNotMatch(jsx,/ · START/);
+  assert.match(css,/\.designer-node\.is-start::before\{/);
+  assert.match(css,/\.designer-node\.is-start\.is-horizontal::before\{/);
+  assert.equal(JSON.stringify(created.procedure),before);
+});
+
+test("Route outcome colors never turn mixed success/failure green",async()=>{
+  assert.equal(classifyRouteTone(["PASS"]),"success");
+  assert.equal(classifyRouteTone(["SUCCEEDED","SUCCESS"]),"success");
+  assert.equal(classifyRouteTone(["FAIL"]),"failure");
+  assert.equal(classifyRouteTone(["ERROR","FAILED"]),"failure");
+  assert.equal(classifyRouteTone(["UNKNOWN"]),"uncertain");
+  assert.equal(classifyRouteTone(["TIMEOUT"]),"uncertain");
+  assert.equal(classifyRouteTone(["PASS","FAIL"]),"mixed");
+  assert.equal(classifyRouteTone(["PASS","OTHER"]),"mixed");
+  assert.equal(classifyRouteTone(["OTHER"]),"neutral");
+  assert.equal(classifyRouteTone([]),"neutral");
+  const graph=await layoutProcedureELK(created.procedure);
+  const flow=makeFlowElements(graph,created.procedure);
+  assert.equal(flow.edges.length,graph.bundles.length);
+  for(const edge of flow.edges){
+    assert.equal(edge.markerEnd.color,ROUTE_TONE_COLOR[edge.data.tone]);
+    assert.equal(edge.data.tone,classifyRouteTone(edge.data.bundle.outcomes));
+  }
+});
+
+test("graph legend is a floating collapsible panel with all supported operator categories",()=>{
+  const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
+  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
+  const jsx=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  assert.match(html,/<details id="graphLegend" class="graph-legend"/);
+  for(const type of ["CALL","TOOL","SCRIPT","VERIFY","PREDICATE","PROCEDURE","RECONCILE","TERMINAL"])
+    assert.ok(html.includes("<code>"+type+"</code>"),type);
+  for(const tone of ["success","failure","uncertain","neutral"])
+    assert.ok(html.includes("graph-legend-line tone-"+tone),tone);
+  assert.match(css,/\.graph-legend\{[^}]*position:absolute/s);
+  assert.match(jsx,/designer-edge tone-/);
+  assert.match(jsx,/designer-route-label tone-/);
 });

@@ -1375,3 +1375,108 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   background-color:#e8f4f0!important;
   color:#155a52;
 }
+
+/* D1 graph readability: visual START is a separate marker on the actual
+   procedure.start business card. It is not a YAML Node or a React Flow Route. */
+.procedure-flow .designer-node.is-start:not(.is-selected){
+  --port-border-left:1px;
+  border-left:1px solid #cedde9;
+}
+.procedure-flow .designer-node.is-start.is-selected{
+  --port-border-left:2px;
+  border-left:2px solid #0c9785;
+}
+.procedure-flow .designer-node.is-start::before{
+  content:"START";
+  pointer-events:none;
+  position:absolute;
+  box-sizing:border-box;
+  width:98px;height:32px;
+  top:-88px;left:calc(50% - 49px);
+  display:flex;align-items:center;justify-content:center;
+  background:#e6f7f0;
+  border:1.5px solid #65bca6;
+  border-radius:20px;
+  color:#0d7666;
+  font:700 11px/1 ui-monospace,Consolas,monospace;
+  letter-spacing:.11em;
+  box-shadow:0 2px 5px #113f3115;
+}
+.procedure-flow .designer-node.is-start::after{
+  content:"";
+  pointer-events:none;
+  position:absolute;
+  top:-56px;left:calc(50% - 1px);
+  height:55px;width:0;
+  border-left:2px solid #77a9aa;
+}
+.procedure-flow .designer-node.is-start.is-horizontal::before{
+  left:-159px;top:24px;
+}
+.procedure-flow .designer-node.is-start.is-horizontal::after{
+  left:-61px;top:39px;width:60px;height:0;
+  border-left:0;border-top:2px solid #77a9aa;
+}
+/* Route color and arrow colors come from the same conservative Outcome tone.
+   Mixed PASS/FAIL labels remain neutral; selection always has priority. */
+.procedure-flow .react-flow__edge-path.designer-edge.tone-success{stroke:#138f7a}
+.procedure-flow .react-flow__edge-path.designer-edge.tone-failure{stroke:#c05a55}
+.procedure-flow .react-flow__edge-path.designer-edge.tone-uncertain{stroke:#b37a27}
+.procedure-flow .react-flow__edge-path.designer-edge.tone-neutral,
+.procedure-flow .react-flow__edge-path.designer-edge.tone-mixed{stroke:#66899f}
+.procedure-flow .react-flow__edge-path.designer-edge.is-selected{
+  stroke:#087e71;stroke-width:2.8px;
+}
+.designer-route-label.tone-success{color:#117969;border-color:#b2dccc;background:#f0faf5}
+.designer-route-label.tone-failure{color:#a24942;border-color:#e9c5c1;background:#fff6f5}
+.designer-route-label.tone-uncertain{color:#94631d;border-color:#ecd5ad;background:#fff9ec}
+.designer-route-label.is-selected{
+  border-color:#8dcebe;background:#eaf9f2;color:#077f70;
+}
+/* A compact native details panel; no second graph toolbar or modal. */
+.graph-legend{
+  position:absolute;right:13px;top:13px;z-index:8;
+  width:max-content;max-width:min(290px,calc(100% - 26px));
+  background:#ffffffed;border:1px solid #d8e5e8;
+  border-radius:10px;box-shadow:0 5px 20px #263f5520;
+  color:#35526a;font:11px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.graph-legend>summary{
+  list-style:none;cursor:pointer;user-select:none;
+  padding:9px 13px;font-weight:700;color:#3e6472;
+}
+.graph-legend>summary::-webkit-details-marker{display:none}
+.graph-legend>summary::after{content:"⌄";margin-left:12px;color:#77909b}
+.graph-legend[open]>summary::after{content:"⌃"}
+.graph-legend>summary:focus-visible{outline:2px solid #168c7a;outline-offset:2px}
+.graph-legend-body{
+  width:260px;max-height:min(460px,60vh);overflow:auto;
+  box-sizing:border-box;padding:1px 13px 12px;
+  border-top:1px solid #e3ebef;
+}
+.graph-legend-body>strong{
+  display:block;margin:10px 0 6px;
+  font-size:10px;color:#7e91a5;letter-spacing:.05em;
+}
+.graph-legend-entry{display:flex;gap:10px;align-items:center}
+.graph-legend-start{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:68px;padding:5px 7px;border-radius:14px;
+  border:1px solid #65bca6;background:#e6f7f0;color:#0d7666;
+  font:700 10px ui-monospace,Consolas,monospace;
+}
+.graph-legend-types{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
+.graph-legend-types>div{display:flex;align-items:center;gap:6px;min-width:0}
+.graph-legend-types code{
+  flex:none;font:700 9px ui-monospace,Consolas,monospace;
+  background:#f0f5fa;border:1px solid #dae5ec;border-radius:4px;
+  color:#416882;padding:3px 4px;
+}
+.graph-legend-types span{font-size:10px;color:#667d91}
+.graph-legend-lines{display:grid;gap:7px}
+.graph-legend-lines>div{display:flex;gap:11px;align-items:center}
+.graph-legend-line{width:28px;flex:none;border-top:2.5px solid #66899f}
+.graph-legend-line.tone-success{border-color:#138f7a}
+.graph-legend-line.tone-failure{border-color:#c05a55}
+.graph-legend-line.tone-uncertain{border-color:#b37a27}
+.graph-legend-body p{margin:11px 0 0;color:#8191a2;font-size:10px}
