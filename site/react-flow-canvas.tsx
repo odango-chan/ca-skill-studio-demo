@@ -51,10 +51,7 @@ function ProcedureCard({data,selected}){
       (selected?" is-selected":"")+
       (data.phaseBadges?.length?" has-phases":"")+
       (data.childProcedure?" is-subflow-invocation":"")
-    } onDoubleClick={event=>{
-      event.stopPropagation();
-      data.onOpenNode?.();
-    }}>
+    }>
     <Handle type="target" id="in" position={inputPosition}
       className="designer-port designer-port-fallback designer-port-target"
       title="连接到这个 Node"
@@ -138,13 +135,10 @@ function ProcedureScene({scene,callbacks,onReady}){
     [scene.graph,scene.procedure,scene.selection,scene.showAllLabels,
       scene.routeCreationSourceId]);
   const selectionId=scene.selection?.kind==="route"?scene.selection.id:null;
-  const nodes=elements.nodes.map(node=>({
-    ...node,data:{...node.data,
-      onOpenNode:()=>callbacks.onNodeDoubleClick(node.id),
-      ...(node.data.childProcedure?{onEnterChild:()=>
-        callbacks.onEnterChild(node.id,node.data.childProcedure)}:{})
-    }
-  }));
+  const nodes=elements.nodes.map(node=>node.data.childProcedure?{
+    ...node,data:{...node.data,onEnterChild:()=>
+      callbacks.onEnterChild(node.id,node.data.childProcedure)}
+  }:node);
   return <ReactFlow
     nodes={nodes} edges={elements.edges}
     nodeTypes={nodeTypes} edgeTypes={edgeTypes}
