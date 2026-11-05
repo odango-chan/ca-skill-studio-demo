@@ -237,16 +237,25 @@ test("Route outcome colors never turn mixed success/failure green",async()=>{
   }
 });
 
-test("graph legend is a floating collapsible panel with all supported operator categories",()=>{
+test("graph legend is contextual, distinguishes business Node kinds from Phase Steps",()=>{
   const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
   const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
   const jsx=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
+  const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
   assert.match(html,/<details id="graphLegend" class="graph-legend"/);
-  for(const type of ["CALL","TOOL","SCRIPT","VERIFY","PREDICATE","PROCEDURE","RECONCILE","TERMINAL"])
-    assert.ok(html.includes("<code>"+type+"</code>"),type);
+  for(const id of ["graphLegendContext","graphLegendNodeTypes",
+    "graphLegendStepTypes","graphLegendRouteOrigins"])
+    assert.ok(html.includes('id="'+id+'"'),id);
+  assert.doesNotMatch(html,/<code>TOOL<\/code>/);
+  assert.match(app,/graphLegendSummary\(lastGood/);
+  assert.match(app,/renderGraphLegend\(\)/);
   for(const tone of ["success","failure","uncertain","neutral"])
     assert.ok(html.includes("graph-legend-line tone-"+tone),tone);
   assert.match(css,/\.graph-legend\{[^}]*position:absolute/s);
+  assert.match(css,/\.designer-node\.has-phases/);
+  assert.match(css,/\.designer-edge\.origin-preconditions/);
+  assert.match(css,/\.designer-edge\.origin-postconditions/);
+  assert.match(jsx,/designer-node-phases/);
   assert.match(jsx,/designer-edge tone-/);
   assert.match(jsx,/designer-route-label tone-/);
 });
