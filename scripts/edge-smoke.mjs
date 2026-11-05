@@ -227,6 +227,52 @@ try{
     throw Error("D1 visual START / legend / Route tone FAIL: "+
       JSON.stringify(graphDisplay));
 
+  // The same source-backed legend must follow the selected Child Procedure.
+  // Child has no PRE; never fabricate one to balance the diagram.
+  const childLegend=await evaluate(String.raw`
+    (async()=>{
+      const sleep=t=>new Promise(r=>setTimeout(r,t));
+      const child=[...document.querySelectorAll('#procedureTree button.child')].find(
+        x=>x.textContent.includes('await-initial-n4-session-establishment'));
+      if(!child)return {error:'child procedure navigation absent'};
+      child.click();
+      for(let i=0;i<40;i++){
+        if(document.getElementById('procedureBread').textContent===
+          'await-initial-n4-session-establishment')break;
+        await sleep(75);
+      }
+      const nodeKinds=[...document.querySelectorAll('#graphLegendNodeTypes code')]
+        .map(x=>x.textContent);
+      const stepKinds=[...document.querySelectorAll('#graphLegendStepTypes code')]
+        .map(x=>x.textContent);
+      const pre=document.querySelectorAll('.designer-node-phase.phase-preconditions').length;
+      const post=document.querySelectorAll('.designer-node-phase.phase-postconditions').length;
+      const context=document.getElementById('graphLegendContext').textContent;
+      const back=document.getElementById('backProcedure');
+      back.click();
+      for(let i=0;i<80;i++){
+        if(document.getElementById('procedureBread').textContent===
+            'ue-requested-pdu-session-establishment'&&
+          document.querySelectorAll('.react-flow__node').length===17&&
+          document.querySelectorAll('.react-flow__edge-path').length===46)break;
+        await sleep(75);
+      }
+      const restored=document.getElementById('procedureBread').textContent===
+        'ue-requested-pdu-session-establishment'&&
+        document.querySelectorAll('.react-flow__node').length===17&&
+        document.querySelectorAll('.react-flow__edge-path').length===46;
+      return {nodeKinds,stepKinds,pre,post,context,restored};
+    })()
+  `);
+  console.log("D1_PHASE_CHILD_CONTEXTUAL_LEGEND",JSON.stringify(childLegend));
+  if(childLegend?.nodeKinds.join(",")!=="CALL,TERMINAL"||
+     childLegend.stepKinds.join(",")!=="VERIFY"||
+     childLegend.pre!==0||childLegend.post!==1||
+     !childLegend.context.includes("4 Nodes / 1 Steps")||
+     !childLegend.restored)
+    throw Error("D1 child Phase legend / Root restore FAIL: "+
+      JSON.stringify(childLegend));
+
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
     "(()=>{",
