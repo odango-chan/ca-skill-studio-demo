@@ -127,4 +127,4 @@ Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的�
 3. Route 双维度：颜色仅由 Outcome 标签分类，PRE（长虚线）/ OP（实线）/ POST（短虚线）区分 routeSource；文本短标签如 PRE · PASS，hover 显示完整 preconditions.on · PASS，选中 Route 仍使用原始 ID/Source Span。混合结果不标为成功。
 4. 本 PR 不扩展子流程内部、也不改变主图布局，不增加 toolbar、模型业务节点或 YAML 变更。Issue #65 的 A2 Child 边界与 A3 真实主路径/异常摘要概览必须独立开发，任何汇总虚拟边不得授予 Route 编辑。
 
-验收：真实 Root 17 业务节点/65 Outcome 条目（当前线上 ELK 46 Bundle）不变；PRE 3 Node、POST 4 Node；Child await-initial-n4-session-establishment 只有 POST 1，不补不存在的 PRE；显式 TOOL 正例可出现，缺失 TOOL 负例不会出现。Node tests、TypeScript、Build、Chromium 以及合入后 resulting-main Pages 分别验证；不声称 Runtime/5GC E2E。
+验收：当前内置 Owner Root 17 业务节点/63 Outcome 条目（当前线上 ELK 46 Bundle）不变；另一份历史测试 Fixture 为 65 Outcome；PRE 3 Node、POST 4 Node；Child await-initial-n4-session-establishment 只有 POST 1，不补不存在的 PRE；显式 TOOL 正例可出现，缺失 TOOL 负例不会出现。Node tests、TypeScript、Build、Chromium 以及合入后 resulting-main Pages 分别验证；不声称 Runtime/5GC E2E。
