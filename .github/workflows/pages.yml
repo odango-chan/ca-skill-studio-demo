@@ -105,6 +105,10 @@ jobs:
           node --check site/sample-packages.mjs
           node --check site/directory-import.mjs
           node --check site/directory-save.mjs
+          node --check scripts/e4-native-fixture.mjs
+          node --check scripts/e4-native-accept.mjs
+          node --check scripts/e4-native-accept-browser.mjs
+          node --check tests/e4-native-fixture.test.mjs
           node --check tests/directory-save.test.mjs
           node --check tests/directory-import.test.mjs
           node --check site/zip.mjs
