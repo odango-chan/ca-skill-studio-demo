@@ -118,7 +118,9 @@ Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的�
 - 画布右上角的原生 `details` 图例默认折叠，首版显示 START、8 类支持的 Operator 与 4 类 Route 色义（A1 将其替换为当前实际类型）；图例不占 Inspector，不引入新的工具栏或运行状态。YAML Source、Diff、Undo/Redo、ELK 路由几何、拖动重连保持权威与既有行为。
 - 浏览器验收需核对：真实业务 Node 数与 Route 路径数量未变，START 单独可见、原业务标签无 START，图例可折叠、可展开，PASS 对应的可见线条与箭头同色且混合/失败/不确定边不冒充成功；此项仅是 Studio 展示能力。大图适配边缘空间仍以真实 Node 布局为依据，不应把 CSS 的装饰物冒充额外 Route。
 
-## D1-A1 · 语义可见性第一阶段（2026-11-05，PR candidate）
+## D1-A1 · 语义可见性第一阶段（2026-11-05，PR #67 OPEN）
+
+[代码 CI #42017183541](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42017183541) 已 PASS：384/384 Node、TypeScript、Build 和真实 Chromium；Root 17 Node / 46 路径及端口不变，PRE/POST、图例和线型一致；Child 4 Node 只有 POST，返回 Root 恢复。最终文档提交仍需单独 exact-head CI，主分支/Pages 未部署。
 
 本阶段只针对 [Issue #65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65) 的已确认问题，不抢先实施 A2 子流程边界/A3 图压缩。主要原则：**一个业务 Node 仍然对应一个 YAML Node**；Phase Step 是该 Node 内部的有序 Step，不能提升成业务 Node；`CALL` 不是 `TOOL` 的别名。
 
