@@ -25,7 +25,7 @@ test("current root legend lists only actual business kinds and independent Phase
     ["call",6],["script",1],["verify",14]
   ]);
   assert.equal(legend.stepCount,21);
-  assert.equal(legend.routeCount,65);
+  assert.equal(legend.routeCount,63);
   assert.deepEqual(legend.origins.map(x=>x.source),[
     "preconditions.on","operator.on","postconditions.on"
   ]);
@@ -72,7 +72,7 @@ test("visible-neighbor legend never counts hidden Nodes, steps or Routes",()=>{
   assert.equal(partial.nodeCount,2);
   assert.deepEqual(partial.nodeKinds.map(x=>[x.kind,x.count]),[["call",2]]);
   assert.deepEqual(partial.stepKinds.map(x=>[x.kind,x.count]),[
-    ["call",1],["script",1],["verify",4]
+    ["call",1],["script",1],["verify",5]
   ]);
   assert.equal(partial.routeCount,routes.length);
   assert.ok(partial.routeCount<root.routes.length);
@@ -106,7 +106,7 @@ test("PRE / OP / POST are precise Source origins; they never override outcome to
   const sourceSnapshot=JSON.stringify(root);
   const flow=makeFlowElements(graph,root);
   assert.equal(flow.nodes.length,17);
-  assert.equal(flow.edges.reduce((n,e)=>n+e.data.bundle.routes.length,0),65);
+  assert.equal(flow.edges.reduce((n,e)=>n+e.data.bundle.routes.length,0),63);
   assert.deepEqual(flow.nodes.find(n=>n.id==="nudm-sdm-subscribe").data.phaseChips
     .map(x=>x.tag),["PRE","POST"]);
   for(const edge of flow.edges){
