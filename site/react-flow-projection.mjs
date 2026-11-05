@@ -26,6 +26,54 @@ export function classifyRouteTone(outcomes){
   return tones.every(tone=>tone===tones[0])?tones[0]:"mixed";
 }
 
+// The node card and contextual legend are read-only views of existing YAML.
+// A Phase Step's operator is not a new graph Node or an assertion that TOOL
+// and CALL have the same Runtime semantics.
+const PHASE_LABELS=Object.freeze({preconditions:"PRE",postconditions:"POST"});
+export function summarizeNodePhases(node){
+  const phases=[];
+  for(const name of ["preconditions","postconditions"]){
+    const phase=node?.phases?.find(item=>item.name===name);
+    if(!phase)continue;
+    const steps=Array.isArray(phase.steps)?phase.steps:[];
+    const operators=new Map();
+    for(const step of steps){
+      const kind=String(step.operator||"").toUpperCase();
+      operators.set(kind,(operators.get(kind)||0)+1);
+    }
+    phases.push({
+      name,label:PHASE_LABELS[name],count:steps.length,
+      operators:[...operators].map(([kind,count])=>({kind,count})),
+      routeCount:phase.routeCount??0
+    });
+  }
+  return phases;
+}
+export function describeProcedureLegend(procedure,visibleNodes=null){
+  const nodes=visibleNodes??procedure?.nodes??[];
+  const nodeKinds=new Map(),stepKinds=new Map();
+  let preNodes=0,postNodes=0;
+  for(const node of nodes){
+    const kind=String(node.operator||"").toUpperCase();
+    nodeKinds.set(kind,(nodeKinds.get(kind)||0)+1);
+    for(const phase of summarizeNodePhases(node)){
+      if(phase.name==="preconditions")preNodes++;
+      if(phase.name==="postconditions")postNodes++;
+      for(const {kind:stepKind,count} of phase.operators)
+        stepKinds.set(stepKind,(stepKinds.get(stepKind)||0)+count);
+    }
+  }
+  const entries=map=>[...map.entries()].map(([kind,count])=>({kind,count}));
+  return {nodeKinds:entries(nodeKinds),stepKinds:entries(stepKinds),
+    nodeCount:nodes.length,preNodes,postNodes};
+}
+export function routeOrigin(routeSource){
+  if(routeSource==="preconditions.on")return "PRE";
+  if(routeSource==="postconditions.on")return "POST";
+  if(routeSource==="operator.on")return "OP";
+  return "OTHER";
+}
+
 export function makeFlowElements(graph,procedure,selection=null,showAllLabels=false,
   routeCreationSourceId=null){
   if(!graph||!procedure)return {nodes:[],edges:[],direction:"DOWN"};
@@ -59,6 +107,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         start:node.id===procedure.start,
         terminal:node.operator==="terminal",
         childCount:node.children?.length??0,direction,
+        phaseBadges:summarizeNodePhases(node),
         canAddRoute:node.operator!=="terminal"&&
           selection?.kind==="node"&&selection.id===node.id&&
           routeCreationSourceId===node.id,
@@ -75,8 +124,8 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
     const selected=Boolean(selectedRoute&&bundle.routes.some(r=>r.id===selectedRoute));
     const tone=classifyRouteTone(bundle.outcomes);
     const important=tone==="success";
-    const phase=(bundle.routeSource??"operator.on").replace(/\.on$/,"");
-    const label=(phase==="operator"?"":phase+" · ")+bundle.outcomes.join(" / ");
+    const origin=routeOrigin(bundle.routeSource);
+    const label=origin+" · "+bundle.outcomes.join(" / ");
     return {
       id:"flow-edge-"+i,
       source:bundle.source,target:bundle.target,
@@ -96,8 +145,8 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       // Only the verified handler may propose a YAML patch on reconnect.
       reconnectable:true,
       data:{
-        bundle,selected,important,tone,label,
-        displayLabel:showAllLabels||["success","failure","uncertain"].includes(tone)||selected,
+        bundle,selected,important,tone,label,origin,
+        displayLabel:showAllLabels||origin!=="OP"||["success","failure","uncertain"].includes(tone)||selected,
         path:bundle.path??null,
         labelPosition:bundle.label??null,direction
       }
