@@ -52,6 +52,7 @@ test("selection, labels and direction remain UI-only",async()=>{
   assert.ok(flow.nodes.every(n=>n.sourcePosition==="right"&&n.targetPosition==="left"));
   assert.ok(flow.edges.every(e=>e.data.displayLabel));
   assert.equal(flow.edges.filter(e=>e.selected).length,1);
+  assert.equal(flow.edges.find(e=>e.selected).markerEnd.color,"#087e71");
   assert.equal(JSON.stringify(ensure.procedure),source);
 });
 test("multi-outcome edge cannot rewire an arbitrary Outcome without selection",async()=>{
