@@ -10,6 +10,7 @@ import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./w
 import {SAMPLE_PACKAGES,packageFilesForSample,createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState} from "./sample-packages.mjs";
 import {zipPackage} from "./zip.mjs";
 import {importDirectoryFiles,packageZipEntries} from "./directory-import.mjs";
+import {saveDirectoryChanges} from "./directory-save.mjs";
 import {highlightSource} from "./highlight.mjs";
 import {createSourceEditorAdapter,createTextareaSourceBackend} from "./source-editor-adapter.mjs";
 import {renderMarkdown} from "./markdown-preview.mjs";
@@ -94,6 +95,8 @@ let assetOrigin = "sample";
 let localProcedureDocument = false;
 let activePackage = null;
 let activeFilePath = null;
+let directorySaveEligible=false;
+let directorySaveBusy=false;
 let initialText = "";
 let projection = null;
 let lastGood = null;
@@ -243,6 +246,7 @@ function decorateToolbar(){
     ["downloadButton","download","导出文件"],
     ["openButton","folder-plus","打开本地文件"],
     ["openDirectoryButton","folder-open","打开本地目录"],
+    ["saveDirectoryButton","shield-check","保存回本地目录"],
     ["exportPackageButton","archive","导出整个 Package (.zip)"],
     ["mode-source","code-2","Source"],
     ["mode-split","columns-2","Split"],
@@ -435,6 +439,7 @@ function refresh(refit = false) {
   $("redoButton").disabled = !history.canRedo();
   if(activePackage && activeFilePath)
     markFileEdited(activePackage,activeFilePath,text,history);
+  updateDirectorySaveControl();
   nodeEditorCache=null;
   const isProcedure=activeFilePath==="assurance/procedure.yaml" || localProcedureDocument;
   const parsed=isProcedure ? projectWorkspace(text)
@@ -1975,6 +1980,10 @@ function renderGraph() {
   flowCanvas.render(graph,lastGood,selection,showAllLabels,sourceId);
 }
 function activateWorkspace(workspace,entry,origin="sample") {
+  if(directorySaveBusy)throw new Error("本地保存进行中，暂不能替换工作区");
+  directorySaveEligible=origin==="directory";
+  $("saveNotice").hidden=true;
+  $("reloadDirectoryButton").hidden=true;
   activePackage=workspace;
   activeFilePath=null;
   const file=workspace.files.get(entry);
@@ -1982,6 +1991,70 @@ function activateWorkspace(workspace,entry,origin="sample") {
   activeFilePath=entry;
   loadDocument(entry,file.text,origin,{initial:file.initialText,historyState:file.history});
 }
+function updateDirectorySaveControl(){
+  const button=$("saveDirectoryButton");
+  button.hidden=!directorySaveEligible;
+  const compatible=window.isSecureContext&&typeof window.showDirectoryPicker==="function";
+  button.disabled=directorySaveBusy||!compatible||!activePackage||
+    !hasUnsavedEdits(activePackage);
+  button.title=!compatible?"当前浏览器不支持本地原位保存，请导出 ZIP":
+    "重新选择同一目录、全量比对后显式确认写盘；多文件不保证原子性";
+}
+function showDirectorySaveStatus(result){
+  const notice=$("saveNotice");
+  const saved=result.saved.length?result.saved.join("、"):"无";
+  const pending=result.pending.length?result.pending.join("、"):"无";
+  notice.dataset.status=result.status;
+  notice.hidden=false;
+  $("reloadDirectoryButton").hidden=!["CONFLICT","PARTIAL","FAILED"].includes(result.status);
+  if(result.status==="SAVED")
+    notice.textContent="已逐项核对并写入 "+result.saved.length+" 个文件。多文件写盘不保证原子性。";
+  else if(result.status==="NO_CHANGES")
+    notice.textContent="当前没有待写入的文件。";
+  else if(result.status==="CANCELLED")
+    notice.textContent="已取消保存；本地磁盘没有被本次操作修改。";
+  else
+    notice.textContent="保存"+result.status+"。已确认写入："+saved+
+      "；仍待处理："+pending+
+      (result.uncertain.length?"；写入结果不确定："+result.uncertain.join("、"):"")+
+      "。"+result.error+"。请先导出 ZIP 备份，再重新导入/解决冲突；不会自动覆盖。";
+  message(result.status==="SAVED"?"目录已保存并验证":"目录保存："+result.status);
+}
+$("saveDirectoryButton").addEventListener("click",async()=>{
+  if(!directorySaveEligible||directorySaveBusy||!activePackage)return;
+  if(!window.isSecureContext||typeof window.showDirectoryPicker!=="function"){
+    message("此浏览器不支持 File System Access 写入，请导出 ZIP。");
+    return;
+  }
+  markFileEdited(activePackage,activeFilePath,source.value,history);
+  if(!hasUnsavedEdits(activePackage))return;
+  const workspace=activePackage;
+  directorySaveBusy=true;
+  updateDirectorySaveControl();
+  try{
+    // Must call this in the user-click handler before any other await.
+    const handle=await window.showDirectoryPicker({mode:"readwrite"});
+    const outcome=await saveDirectoryChanges({
+      workspace,handle,confirmWrite:({directory,paths})=>
+        confirm("即将写入本地目录："+directory+"\n文件："+paths.join("、")+
+          "\n此操作不会原子保存整个 Package。确认覆盖这些已校验的文件？")
+    });
+    if(activePackage===workspace){
+      initialText=workspace.files.get(activeFilePath)?.initialText??initialText;
+      refresh(false);
+    }
+    showDirectorySaveStatus(outcome);
+  }catch(error){
+    if(error?.name!=="AbortError")
+      showDirectorySaveStatus({status:"BLOCKED",saved:[],
+        pending:[],uncertain:[],error:String(error?.message??error)});
+    else message("已取消目录选择，没有写入磁盘。");
+  }finally{
+    directorySaveBusy=false;
+    updateDirectorySaveControl();
+  }
+});
+$("reloadDirectoryButton").addEventListener("click",()=>directoryPicker.click());
 $("openButton").addEventListener("click",()=>filePicker.click());
 $("openDirectoryButton").addEventListener("click",()=>directoryPicker.click());
 directoryPicker.addEventListener("change",async()=>{
