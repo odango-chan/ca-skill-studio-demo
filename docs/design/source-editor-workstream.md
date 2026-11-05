@@ -133,3 +133,16 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 | 完整本地 Package 打开/保存 | 属于 E4，尚未实现；当前 Download/ZIP 不是原位 Save |
 
 上述可点击跳转走现有 `source.revealLine`、`switchFile`，不建立第二业务真源，不更改 D4 编辑资格或 Source 事务。A2 必须通过全部 Node 单测、TS 类型检查、打包、真实 Chromium（包括三份 Python 的符号点击与 E1/E2/D4 回归），且合并后需独立核对 resulting-main Pages。若词法无法可靠分析，Inspector 必须关闭不确定跳转，而不是制造假语义。 E3-A2 已按此范围完成并验收，尚未实现 Pyright/LSP/Ruff；是否需要更复杂诊断应先结合真实开发体验再评估。
+
+## 12. E4-A1 本地目录导入（2026-11-05；PR 候选）
+
+**Status: IMPLEMENTED (PR candidate), acceptance pending.** 此阶段仅提供浏览器「打开目录 → 内存工作副本 → ZIP 下载」。不使用磁盘 File System Access 写句柄，不申请保存权限，不监视外部目录，不写 sidecar。完整 E4 原位保存和 Conflict 仍在 [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) 后续实现。
+
+- 仅接收浏览器通过 `webkitdirectory` 返回的单一根目录 FileList，要求根目录 `SKILL.md`；拒绝不安全路径、重复或大小写/Unicode 路径冲突、任意读失败、最多 64 个文件、单文件最多 1 MiB、总数据最多 8 MiB。导入在全部读取/校验完成后才替换现有工作区，失败保持原工作区。
+- YAML、Python、Markdown、JSON 等熟悉的文本后缀仅在严格 UTF-8 解码成功后开放 Source 编辑；原有 BOM、CRLF 在未编辑时按原始字节 ZIP 导出。未知后缀、二进制或损坏 UTF-8 作为不可编辑但可见的资源进入工作区，ZIP 导出原始字节，不跳过、不强制转码。
+- 优先打开 `assurance/procedure.yaml`，否则回退 `SKILL.md`；复用 E1 Monaco / D4 Visual 与 per-file Undo/Redo。原 Sample 16 文件和单文件 Open 保持可用。没有任何目录自动写回、文件系统锁、格式化或 Runtime 执行能力。
+- 浏览器/OS 目录选择可能忽略隐藏文件、空文件夹与符号链接；只能保证**浏览器 FileList 实际返回的文件集合保真**，不能保证磁盘目录物理全量。未支持 `webkitdirectory` 的浏览器仍有原 Sample、单文件打开和 ZIP 下载能力，但不提供假冒的写入功能。
+
+验收要求：单元正反例覆盖 16 文件实际示例、BOM、CRLF、未知文件/二进制、ZIP byte fidelity、路径/大小限制与读失败；真实 Chromium 对目录形状的 FileList 驱动 DOM 导入/Explorer/ZIP 测试。本轮 Chromium FileList 驱动不等价于 OS 原生文件夹对话框选择证据。Node、TypeScript、Build、Chromium 与 resulting-main Pages 必须实际通过才宣称 PASS。
+
+**E4-A2 deferred:** 显式的逐文件磁盘权限与原位保存、外部内容漂移/冲突提示、拒绝静默覆盖、非原子多文件失败恢复，均须独立设计与负面测试。
