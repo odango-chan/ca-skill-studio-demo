@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-05**  
-**Integrated implementation baseline: main@12bf33be0988dd743c60bf23572e7f73f3807421**（#56、#57、#59 已依次合入；resulting-main Pages [#41994191657](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41994191657) 在本记录编写时为 **PENDING**）
+**Integrated implementation baseline: main@38137300ea980ec8ab04510411b1d7e85a173e17**（D1 #62 已合入；[Pages #41997707337 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997707337)。E5 #64 与本 A1 分支均未合入）
 
 ## Overall
 
@@ -13,7 +13,8 @@
 
 | Scope | Design | Implementation | Acceptance | Tracking / evidence |
 |---|---|---|---|---|
-| D1 视觉 START 起点 / Outcome 连线配色 / 浮动图例 | ACCEPTED（View-only） | IMPLEMENTED（PR #62 OPEN） | [PR CI #41996736991 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41996736991)（Unit / TypeScript / Build / Chromium）；main/Pages NOT_RUN，真实 Runtime NOT_RUN | [Issue #61](https://github.com/odango-chan/ca-skill-studio-demo/issues/61)、[Workbench](design/authoring-workbench.md) |
+| D1 视觉 START 起点 / Outcome 连线配色 / 浮动图例 | ACCEPTED | IMPLEMENTED（#62 MERGED） | [PR CI #41997113612 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997113612)、[resulting-main Pages #41997707337 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997707337)；目视反馈追踪 #65 | [#61](https://github.com/odango-chan/ca-skill-studio-demo/issues/61)、[Workbench](design/authoring-workbench.md) |
+| D1-A1 真实 Phase PRE/POST 摘要、当前类型图例、Route 来源 | ACCEPTED（仅 View） | IMPLEMENTED（PR candidate，未合入） | CI PENDING；不可宣称 Pages PASS | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[Workbench](design/authoring-workbench.md) |
 | D1 Procedure 投影、图形浏览、现有 Route Target Rewire | ACCEPTED | IMPLEMENTED | PASS（本仓浏览器级） | [D1](D1-procedure-designer.md)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
 | D2 Node Designer A1–A5 有界创建/删除/重命名/属性 Patch | ACCEPTED | IMPLEMENTED | PASS（本仓单测/浏览器） | [D2](D2-node-designer.md)、[PR #4](https://github.com/odango-chan/ca-skill-studio-demo/pull/4)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605140297) |
 | 固定示例多文件 Source / Markdown/ZIP 编辑与下载 | ACCEPTED | IMPLEMENTED | PASS（本仓测试范围） | `site/sample-packages.mjs`、`tests/package.test.mjs`、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
