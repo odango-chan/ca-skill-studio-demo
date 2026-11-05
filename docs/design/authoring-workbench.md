@@ -110,3 +110,10 @@ Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的�
 ## D4-A4b1 · Phase Outcome 补齐与受限修复（编辑器级验收通过）
 
 现有 Phase Inspector 的「准备 / 确认」只在 Source 中确实出现可核对的缺失或独有非核心 Outcome 时，展开一个轻量「阶段 Outcome」编辑区。正常 owner 样例所有核心分支齐全，不额外显示无意义按钮。操作沿用精确 Source Diff、确认、Undo/Redo；核心 Outcome 永远没有删除入口，非核心键也不自动判断为 Runtime 错误。详见 [Phase Designer](phase-designer.md)。
+
+## D1 Visual-only START / Route 颜色与悬浮图例（2026-11-05）
+
+- `procedure.start` 仍然唯一定位第一个真实 Node；画布给该 Node 绘制独立的 START 胶囊和连接线（CSS 视觉装饰），不新增 YAML Node / Route，不改变 Node、Route bundle、Outcome 数量，亦不允许选中虚拟 START 作为业务节点或 Route 编辑目标。真实 Node 仍显示原来的 `CALL` / `TOOL` / `VERIFY` 等 Operator，不再写 `CALL · START`。CALL 是 DSL 的调用型 Operator，不等于 TOOL。
+- 同一个 Route bundle 的所有 Outcome 依照明确标签归类；`PASS/SUCCEEDED/SUCCESS` 绿色，`FAIL/FAILED/ERROR` 红色，`UNKNOWN/OUTCOME_UNKNOWN/UNRESOLVED/TIMEOUT/TIMED_OUT` 琥珀色，混合类别及未知标签中性色。**只要一个 bundle 的 Outcomes 含混，就不可据某一个 PASS 画成绿色。**选中态单独高亮，箭头颜色与线条保持一致。仅显示层，不做 Runtime 资格判断。
+- 画布右上角的原生 `details` 图例默认折叠，可展开查看 START、8 类节点 Operator 与 4 类 Route 色义；图例不占 Inspector，不引入新的工具栏或运行状态。YAML Source、Diff、Undo/Redo、ELK 路由几何、拖动重连保持权威与既有行为。
+- 浏览器验收需核对：真实业务 Node 数与 Route 路径数量未变，START 单独可见、原业务标签无 START，图例可折叠、可展开，PASS 对应的可见线条与箭头同色且混合/失败/不确定边不冒充成功；此项仅是 Studio 展示能力。大图适配边缘空间仍以真实 Node 布局为依据，不应把 CSS 的装饰物冒充额外 Route。
