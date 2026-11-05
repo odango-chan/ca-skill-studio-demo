@@ -1,0 +1,35 @@
+name: E4 Windows Fixture (native picker NOT tested)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/e4-windows-fixture.yml"
+      - "scripts/e4-native-*.mjs"
+      - "tests/e4-native-fixture.test.mjs"
+      - "site/directory-import.mjs"
+      - "site/directory-save.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-fixture:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify native Windows fixture code syntax
+        run: |
+          node --check scripts/e4-native-fixture.mjs
+          node --check scripts/e4-native-accept.mjs
+          node --check scripts/e4-native-accept-browser.mjs
+      - name: Real Windows NTFS fixture, SHA-256 and negative tests
+        run: node --test tests/e4-native-fixture.test.mjs
+      - name: Record scope of acceptance
+        run: echo "E4_WINDOWS_FIXTURE_PASS; NATIVE_CHROME_PICKER_NOT_RUN"
