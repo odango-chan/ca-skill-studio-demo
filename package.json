@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "build": "node scripts/build.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e4:native": "node scripts/e4-native-accept.mjs"
   },
   "dependencies": {
     "@xyflow/react": "12.12.0",
