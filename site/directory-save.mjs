@@ -163,6 +163,11 @@ export async function saveDirectoryChanges({workspace,handle,confirmWrite}={}){
     // write must not be reported as a clean whole-Package save. There is
     // still no kernel-level CAS: this is an additional best-effort check.
     await verifyDirectory(handle,plan);
+    // The editor stays usable while browser writes are in progress.
+    // A new edit during the final file's write is still unsaved; reporting
+    // fully SAVED would conceal that remaining in-memory revision.
+    if(plan.changes.some(c=>plan.paths.get(c.path).text!==c.text))
+      throw failure("CONFLICT","保存过程中 Source 又发生修改，新改动仍未写入磁盘");
     return result("SAVED",paths,saved);
   }catch(error){
     const status=saved.length?"PARTIAL":
