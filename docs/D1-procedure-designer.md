@@ -36,7 +36,7 @@ flowchart TD
 | 场景 | 必要表现 |
 | --- | --- |
 | Root Procedure | 17 Node、65 个原始 Outcome，投影不丢失 |
-| Child Procedure | 左侧导航 / 双击单一 Child 节点可以进入 |
+| Child Procedure | 左侧导航或 `PROCEDURE` 引用进入；2026 A2 让所有业务 Node 双击进入节点自身的 PRE/OP/POST 内部视图，只有真实引用才继续进入 Child |
 | Layout | 默认 DOWN，手动 RIGHT；ELK 失败仍按选定方向显示 |
 | Selection | Node 选中显示 Node Journey；Edge 选中映射原始 Outcome |
 | Route edit | 现有 Route 重连先查候选 target，经 Diff 确认后才改 Source |
@@ -95,3 +95,7 @@ D2 = Node Designer，D3 = Route Designer，D4 = Phase Designer，D5 = 多 Proced
 修复了一个真实 D1 回归：此前为提高线条可见性，错误地把 `.react-flow__edges` 整个连线层设置为 `pointer-events:none`，使得 React Flow 端点 `onReconnect` 事件无法收到鼠标输入。现已移除这个过宽限制，保留非缩放线宽、ELK 正交路径、多 Handle 和箭头渲染。**验收既覆盖通过 Inspector 编辑，也覆盖图上的实际拖拽手势**。
 
 D1 的 UI 迁移与上述浏览器交互验收可以标记 PASS；后续人工视觉审查、屏幕阅读器体验及更大图规模压测未纳入本次自动门禁。D2（节点增删改）及 D3（新建 Route）仍是独立后续工作，不能把其缺失视为 D1 已支持。
+
+## 2026 D1-A2 · 两层下钻补充
+
+根图所有实际业务 Node（当前 owner 示例 17 张）都能双击进入**节点局部阶段视图**：只读 PRE（如有）→ OPERATOR → POST（如有），显示有序 Step 与 Route Outcome，未声明阶段不虚构。局部视图不等于独立 Child Procedure。只有 Node/Phase Step 实际声明 `procedure` 引用时，才有进一步进入独立 Child 的操作；6 次 Root 调用引用 4 份 Child 定义，返回仍绑定真实 call-site。参见 [Workbench A2](design/authoring-workbench.md) 与 [Issue #65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)。这属于纯 View，不新增持久节点或 DSL。
