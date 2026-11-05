@@ -195,7 +195,7 @@ try{
     "   hasNoFalseGreen,sourceNodes:document.querySelectorAll('.react-flow__node').length,",
     "   routePaths:tonePaths.length};",
     "})()"
-  ].join("\\n"));
+  ].join("\n"));
   console.log("D1_START_LEGEND_OUTCOME_STYLES",JSON.stringify(graphDisplay));
   if(!graphDisplay?.hasStart||!graphDisplay.marker.includes('START')||
      graphDisplay.kind.includes('START')||graphDisplay.position!=='absolute'||
