@@ -1,8 +1,8 @@
 # E · Source Editor Workstream（与 D Visual Designer 并行）
 
 **Status: Accepted (development boundary) · Date: 2026-11-04**  
-**Implementation: E1 and E2-A1/A2 ACCEPTED / MERGED; E2 main@9708528f via PR #42, old stacked PR #35/#38 CLOSED as superseded; E3/E4 NOT_STARTED · Acceptance: E2 328/328 tests, real completion/hover Chromium and resulting-main Pages PASS · Runtime NOT_RUN**  
-**Current integration baseline:** `main@ccf17bfe94e150053feeda7db3a3b875d894c7b7`; [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) ports the E1-A1/A2 integration from historical [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) onto current D4-A4b1. [Final PR CI #41796985366](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366) **322/322 + real Chromium PASS** and [resulting-main Pages #41797402343](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343) **PASS** at `main@a5db46ee`. 本文件为 E 线的唯一 canonical 设计正文；追踪在 E1 #23、E2 #24、E3 #25 和 E4 #26。
+**Implementation: E1/E2/E3-A1/A2/E4-A1 ACCEPTED and MERGED. E4-A1 main@3433e99 via PR #48; 345/345 + real Chromium + resulting-main Pages PASS. E4-A2 original disk saving/Conflict NOT_STARTED; Runtime NOT_RUN.**  
+**Current accepted main baseline:** `main@3433e991006d8be9b41ae455d499ce7f59380b55`; [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) ports the E1-A1/A2 integration from historical [PR #33](https://github.com/odango-chan/ca-skill-studio-demo/pull/33) onto current D4-A4b1. [Final PR CI #41796985366](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366) **322/322 + real Chromium PASS** and [resulting-main Pages #41797402343](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343) **PASS** at `main@a5db46ee`. 本文件为 E 线的唯一 canonical 设计正文；追踪在 E1 #23、E2 #24、E3 #25 和 E4 #26。
 
 ## 1. 目标和不做的事
 
@@ -134,9 +134,9 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 
 上述可点击跳转走现有 `source.revealLine`、`switchFile`，不建立第二业务真源，不更改 D4 编辑资格或 Source 事务。A2 必须通过全部 Node 单测、TS 类型检查、打包、真实 Chromium（包括三份 Python 的符号点击与 E1/E2/D4 回归），且合并后需独立核对 resulting-main Pages。若词法无法可靠分析，Inspector 必须关闭不确定跳转，而不是制造假语义。 E3-A2 已按此范围完成并验收，尚未实现 Pyright/LSP/Ruff；是否需要更复杂诊断应先结合真实开发体验再评估。
 
-## 12. E4-A1 本地目录导入（2026-11-05；PR 候选）
+## 12. E4-A1 本地目录导入（2026-11-05；已验收）
 
-**Status: IMPLEMENTED (PR candidate), acceptance pending.** 此阶段仅提供浏览器「打开目录 → 内存工作副本 → ZIP 下载」。不使用磁盘 File System Access 写句柄，不申请保存权限，不监视外部目录，不写 sidecar。完整 E4 原位保存和 Conflict 仍在 [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) 后续实现。
+**Status: ACCEPTED and IMPLEMENTED on main@3433e99 via [PR #48](https://github.com/odango-chan/ca-skill-studio-demo/pull/48).** [Code CI #41948794306](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41948794306) 345/345 单元测试、TypeScript、构建、真实 Chromium FileList UI PASS；[resulting-main Pages #41949134436](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41949134436) 同 SHA 部署通过。 此阶段仅提供浏览器「打开目录 → 内存工作副本 → ZIP 下载」。不使用磁盘 File System Access 写句柄，不申请保存权限，不监视外部目录，不写 sidecar。完整 E4 原位保存和 Conflict 仍在 [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) 后续实现。
 
 - 仅接收浏览器通过 `webkitdirectory` 返回的单一根目录 FileList，要求根目录 `SKILL.md`；拒绝不安全路径、重复或大小写/Unicode 路径冲突、任意读失败、最多 64 个文件、单文件最多 1 MiB、总数据最多 8 MiB。导入在全部读取/校验完成后才替换现有工作区，失败保持原工作区。
 - YAML、Python、Markdown、JSON 等熟悉的文本后缀仅在严格 UTF-8 解码成功后开放 Source 编辑；原有 BOM、CRLF 在未编辑时按原始字节 ZIP 导出。未知后缀、二进制或损坏 UTF-8 作为不可编辑但可见的资源进入工作区，ZIP 导出原始字节，不跳过、不强制转码。
