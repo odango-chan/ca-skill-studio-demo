@@ -13,7 +13,7 @@
 
 | Scope | Design | Implementation | Acceptance | Tracking / evidence |
 |---|---|---|---|---|
-| D1 视觉 START 起点 / Outcome 连线配色 / 浮动图例 | ACCEPTED（View-only） | IMPLEMENTED（PR candidate） | 本仓 Node + Chromium Gate PENDING，真实 Runtime NOT_RUN | [Issue #61](https://github.com/odango-chan/ca-skill-studio-demo/issues/61)、[Workbench](design/authoring-workbench.md) |
+| D1 视觉 START 起点 / Outcome 连线配色 / 浮动图例 | ACCEPTED（View-only） | IMPLEMENTED（PR #62 OPEN） | [PR CI #41996736991 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41996736991)（Unit / TypeScript / Build / Chromium）；main/Pages NOT_RUN，真实 Runtime NOT_RUN | [Issue #61](https://github.com/odango-chan/ca-skill-studio-demo/issues/61)、[Workbench](design/authoring-workbench.md) |
 | D1 Procedure 投影、图形浏览、现有 Route Target Rewire | ACCEPTED | IMPLEMENTED | PASS（本仓浏览器级） | [D1](D1-procedure-designer.md)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
 | D2 Node Designer A1–A5 有界创建/删除/重命名/属性 Patch | ACCEPTED | IMPLEMENTED | PASS（本仓单测/浏览器） | [D2](D2-node-designer.md)、[PR #4](https://github.com/odango-chan/ca-skill-studio-demo/pull/4)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605140297) |
 | 固定示例多文件 Source / Markdown/ZIP 编辑与下载 | ACCEPTED | IMPLEMENTED | PASS（本仓测试范围） | `site/sample-packages.mjs`、`tests/package.test.mjs`、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
