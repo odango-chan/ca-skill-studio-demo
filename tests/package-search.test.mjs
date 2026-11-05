@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import {createFileWorkspace,markFileEdited} from "../site/sample-packages.mjs";
 import {searchPackageText,PACKAGE_SEARCH_LIMITS}
   from "../site/package-search.mjs";
@@ -68,4 +69,15 @@ test("result count and per-file limits prevent runaway output",()=>{
   assert.equal(result.truncated,true);
   assert.equal(result.matches.filter(x=>x.path==="refs/0.md").length,16);
   assert.ok(result.matches.every(x=>x.line>=1&&x.column>=1&&x.preview.length<=160));
+});
+
+test("Package search stays visible above the file tree and separate from NODES filter",()=>{
+  const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
+  const find=id=>html.indexOf('id="'+id+'"');
+  assert.ok(find("packageSearchDisclosure")>0);
+  assert.ok(find("packageSearchDisclosure")<find("assetTree"));
+  assert.ok(find("assetTree")<find("nodeOutlineDisclosure"));
+  assert.ok(html.includes('id="packageSearchDisclosure" hidden'));
+  assert.ok(html.includes('id="packageSearchInput" type="search" maxlength="96"'));
+  assert.ok(html.includes('id="search" type="search"'));
 });
