@@ -142,3 +142,14 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 - 仍只有原来精确的 Node/Route/Outcome 与 Source span、Diff/确认/Undo/Redo；A2 不更改 graph layout、Runtime/5GC、Script 或 Tool 语义。A3 根图异常分支缩略另起阶段，不在本 PR 偷偷删除完整失败链路。
 
 验收：单测复用子流程与无上下文/失效来源负例，Chromium 真实点击调用卡片、验证 Child 边界与 breadcrumb、返回调用点，再进入同定义的不同调用位置、Explorer 直接打开的负例；返回 Root 17 Node / 46 bundle 和 Source bytes 完全不变。此项只可在 exact-head CI 通过后称浏览器 PASS，后续要人工目视宽窄屏可读性。
+
+### A2 需求澄清：所有 Node 都能双击进入（2026-11-05）
+
+用户明确的目标不是「仅有 4 份 Child Procedure 能进入」，而是根图的 **17 张业务节点都能双击进入自己的内部阶段视图**。前述 6 个 `PROCEDURE` 调用 → 4 份 Child 定义只是**第二层导航**，不是唯一的 Node 下钻模型。
+
+- 普通 `CALL`、`RECONCILE`、`TERMINAL` 和 `PROCEDURE` 等真实节点双击都进入该 Node 的只读阶段画布：**PRE（如有）→ OPERATOR → POST（如有）**。它只消费现有 `nodeJourney()` 投影，真实步骤、顺序和按源归属的 Route/Outcome 一致；没有 PRE/POST 就省略阶段（TERMINAL 可能只有 OP）。
+- 内部步骤保留 `SCRIPT`、`CALL`、`VERIFY` 等真实类型和源行号，点击行号跳到当前 Source；Outcome 标签展示路由到的目标业务节点，绝不在局部视图里伪造可执行或可编辑的独立 Step graph。
+- 只有已有 `node.children` 引用时才出现「进入子流程」；点击后才从 Node 内部视图进入真正的独立 Child Procedure。6 次调用/4 个定义的边界和调用点返回仍与 A2 原始设计一致。
+- 本地阶段画布只是 UI 派生视图，不复制数据源、业务 Node、Route 或执行步骤；返回完整 Procedure 图后不丢选中状态。Source 修改后若目标 Node 不再存在，自动取消此节点局部视图；禁止把这个新视图当成 Runtime 验收或生成新 YAML。
+
+验收新增：对当前 owner 根图 **17/17 真实节点逐个双击**，核对 PRE/POST 有无、Step/Outcome 来源、只有 OP 的终态、返回整图、PROCEDURE 内部进入 Child、直接 Explorer 子图没有虚构调用者；所有 Source bytes 不变。前一次浏览器双击测试发现 React Flow 自身双击缩放拦截，必须通过 **真实的 Node DOM 事件**验证，不能把单测 PASS 误报为实际交互 PASS。
