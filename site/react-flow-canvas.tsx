@@ -48,7 +48,8 @@ function ProcedureCard({data,selected}){
       "designer-node"+(data.terminal?" is-terminal":"")+
       (data.start?" is-start":"")+
       (data.direction==="RIGHT"?" is-horizontal":"")+
-      (selected?" is-selected":"")
+      (selected?" is-selected":"")+
+      (data.phaseBadges?.length?" has-phases":"")
     }>
     <Handle type="target" id="in" position={inputPosition}
       className="designer-port designer-port-fallback designer-port-target"
@@ -73,6 +74,15 @@ function ProcedureCard({data,selected}){
     </span>
     <strong className="designer-node-id" title={data.id}>{data.id}</strong>
     <span className="designer-node-meta" title={data.value}>{data.value}</span>
+    {Boolean(data.phaseBadges?.length)&&
+      <span className="designer-node-phases" aria-label="节点内部阶段">
+        {data.phaseBadges.map(phase=><span
+          key={phase.name} className={"designer-phase-badge phase-"+phase.name}
+          title={phase.label+" · "+phase.count+" Steps"+(phase.operators.length
+            ?" · "+phase.operators.map(x=>x.kind+" ×"+x.count).join(" / "):"")}>
+          {phase.label} · {phase.count}
+        </span>)}
+      </span>}
   </div>;
 }
 
@@ -92,9 +102,11 @@ function RouteEdge(props:EdgeProps){
     <BaseEdge id={id} path={d} markerEnd={props.markerEnd}
       interactionWidth={16}
       className={"designer-edge tone-"+(data?.tone||"neutral")+
+        " origin-"+(data?.origin||"OTHER")+
         (selected?" is-selected":"")}/>
     {show&&<EdgeLabelRenderer>
       <div className={"designer-route-label tone-"+(data?.tone||"neutral")+
+          " origin-"+(data?.origin||"OTHER")+
           (selected?" is-selected":"")}
         style={{transform:"translate(-50%,-50%) translate("+lx+"px,"+ly+"px)"}}
         title={label}>{label.length>44?label.slice(0,43)+"…":label}</div>

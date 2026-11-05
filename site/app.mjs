@@ -1,4 +1,5 @@
 import { layoutProcedure } from "./graph.mjs";
+import {describeProcedureLegend} from "./react-flow-projection.mjs";
 import { layoutProcedureELK,selectGraphScope } from "./layout.mjs";
 import {detailedLayoutAllowed} from "./graph-scale.mjs";
 import {auditPackageWorkspace} from "./package-audit.mjs";
@@ -1995,7 +1996,29 @@ function chooseEdgeRoute(bundle) {
 }
 
 
+function renderGraphLegend(){
+  const nodeHost=$("graphLegendNodeTypes");
+  const stepHost=$("graphLegendStepTypes");
+  nodeHost.replaceChildren();
+  stepHost.replaceChildren();
+  const visible=graph?.visibleNodes??lastGood?.nodes??[];
+  const current=describeProcedureLegend(lastGood,visible);
+  const counts=kind=>{
+    const item=el("div");
+    item.append(el("code","",kind.kind),el("span","",String(kind.count)));
+    return item;
+  };
+  for(const kind of current.nodeKinds)nodeHost.appendChild(counts(kind));
+  for(const kind of current.stepKinds)stepHost.appendChild(counts(kind));
+  if(!current.nodeKinds.length)nodeHost.appendChild(el("span","legend-empty","暂无业务节点"));
+  if(!current.stepKinds.length)stepHost.appendChild(el("span","legend-empty","当前流程没有 PRE/POST Steps"));
+  const filtered=Boolean(graph?.isFiltered);
+  $("graphLegendScope").textContent=(activeProcedureId||"当前 Procedure")+
+    " · "+current.nodeCount+" Nodes"+(filtered?" · 邻居视图":"")+
+    " · PRE "+current.preNodes+" / POST "+current.postNodes+" 个节点";
+}
 function renderGraph() {
+  renderGraphLegend();
   const sourceId=selection?.kind==="node"&&
     nodeEditorCapabilities(selection.id).newRoute?.outcomes?.length
     ? selection.id:null;

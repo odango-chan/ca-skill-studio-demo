@@ -181,7 +181,19 @@ try{
     " const pos=panel?getComputedStyle(panel).position:'';",
     " const summary=panel?.querySelector('summary');",
     " summary?.click();const opened=panel?.open===true;",
-    " const types=panel?.querySelectorAll('.graph-legend-types code').length;",
+    " const types=panel?.querySelectorAll('#graphLegendNodeTypes code').length;",
+    " const steps=panel?.querySelectorAll('#graphLegendStepTypes code').length;",
+    " const nodeKinds=[...panel.querySelectorAll('#graphLegendNodeTypes code')].map(x=>x.textContent).sort().join(',');",
+    " const stepKinds=[...panel.querySelectorAll('#graphLegendStepTypes code')].map(x=>x.textContent).sort().join(',');",
+    " const preBadge=document.querySelector('.designer-node-phases .phase-preconditions');",
+    " const postBadge=document.querySelector('.designer-node-phases .phase-postconditions');",
+    " const preRoutes=[...document.querySelectorAll('.react-flow__edge-path.designer-edge.origin-PRE')];",
+    " const postRoutes=[...document.querySelectorAll('.react-flow__edge-path.designer-edge.origin-POST')];",
+    " const opRoutes=[...document.querySelectorAll('.react-flow__edge-path.designer-edge.origin-OP')];",
+    " const routeSourcesPreserved=preRoutes.length>0&&postRoutes.length>0&&opRoutes.length>0&&",
+    "   preRoutes.every(x=>getComputedStyle(x).strokeDasharray!=='none')&&",
+    "   postRoutes.every(x=>getComputedStyle(x).strokeDasharray!=='none')&&",
+    "   opRoutes.every(x=>getComputedStyle(x).strokeDasharray==='none');",
     " const lineTypes=panel?.querySelectorAll('.graph-legend-line').length;",
     " summary?.click();const collapsed=panel?.open===false;",
     " const tonePaths=[...document.querySelectorAll('.react-flow__edge-path.designer-edge')];",
@@ -191,7 +203,8 @@ try{
     "   x.classList.contains('tone-uncertain')||x.classList.contains('tone-mixed'))",
     "   .every(x=>getComputedStyle(x).stroke!=='rgb(19, 143, 122)');",
     " return {hasStart:!!node,marker:badge?.content,kind,position:pos,",
-    "   opened,collapsed,types,lineTypes,green,successCount:success.length,",
+    "   opened,collapsed,types,steps,nodeKinds,stepKinds,preBadge:preBadge?.textContent,",
+    "   postBadge:postBadge?.textContent,routeSourcesPreserved,lineTypes,green,successCount:success.length,",
     "   hasNoFalseGreen,sourceNodes:document.querySelectorAll('.react-flow__node').length,",
     "   routePaths:tonePaths.length};",
     "})()"
@@ -199,13 +212,45 @@ try{
   console.log("D1_START_LEGEND_OUTCOME_STYLES",JSON.stringify(graphDisplay));
   if(!graphDisplay?.hasStart||!graphDisplay.marker.includes('START')||
      graphDisplay.kind.includes('START')||graphDisplay.position!=='absolute'||
-     !graphDisplay.opened||!graphDisplay.collapsed||graphDisplay.types!==8||
+     !graphDisplay.opened||!graphDisplay.collapsed||graphDisplay.types!==4||
+     graphDisplay.steps!==3||graphDisplay.nodeKinds!=="CALL,PROCEDURE,RECONCILE,TERMINAL"||
+     graphDisplay.stepKinds!=="CALL,SCRIPT,VERIFY"||
+     !graphDisplay.preBadge?.includes("PRE")||!graphDisplay.postBadge?.includes("POST")||
+     !graphDisplay.routeSourcesPreserved||
      graphDisplay.lineTypes!==4||!graphDisplay.green||
      !graphDisplay.hasNoFalseGreen||
      graphDisplay.sourceNodes!==17||graphDisplay.routePaths!==46)
     throw Error("D1 visual START / legend / Route tone FAIL: "+
       JSON.stringify(graphDisplay));
 
+  // D1-A1: actual Child has POST Verify but no PRE, then Root state recovers.
+  const childPhases=await evaluate([
+    " (async()=>{",
+    " const sleep=ms=>new Promise(r=>setTimeout(r,ms));",
+    " const child=[...document.querySelectorAll(\'#procedureTree button.child\')].find(x=>",
+    "   x.textContent.includes(\'await-initial-n4-session-establishment\'));",
+    " if(!child)return {error:\'child navigation missing\'};",
+    " child.click();",
+    " for(let i=0;i<80;i++){if(document.querySelectorAll(\'.react-flow__node\').length===4)break;await sleep(50);}",
+    " const panel=document.getElementById(\'graphLegend\');",
+    " const kinds=[...panel.querySelectorAll(\'#graphLegendNodeTypes code\')].map(x=>x.textContent).sort().join(\',\');",
+    " const steps=[...panel.querySelectorAll(\'#graphLegendStepTypes code\')].map(x=>x.textContent).sort().join(\',\');",
+    " const scope=panel.querySelector(\'#graphLegendScope\').textContent;",
+    " const badges=[...document.querySelectorAll(\'.designer-phase-badge\')].map(x=>x.textContent);",
+    " const nodeCount=document.querySelectorAll(\'.react-flow__node\').length;",
+    " document.getElementById(\'backProcedure\').click();",
+    " for(let i=0;i<80;i++){if(document.querySelectorAll(\'.react-flow__node\').length===17)break;await sleep(50);}",
+    " const restored=document.querySelectorAll(\'.react-flow__node\').length===17&&",
+    "   document.getElementById(\'graphLegendScope\').textContent.includes(\'PRE 3 / POST 4\');",
+    " return {nodeCount,kinds,steps,scope,badges,restored};",
+    " })()",
+  ].join("\n"));
+  console.log("D1_A1_CHILD_PHASE_LEGEND",JSON.stringify(childPhases));
+  if(childPhases?.nodeCount!==4||childPhases.kinds!=="CALL,TERMINAL"||
+     childPhases.steps!=="VERIFY"||!childPhases.scope.includes("PRE 0 / POST 1")||
+     childPhases.badges.some(x=>x.includes("PRE"))||
+     !childPhases.badges.some(x=>x.includes("POST"))||!childPhases.restored)
+    throw Error("D1-A1 child Phase semantics or Root return FAIL: "+JSON.stringify(childPhases));
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
     "(()=>{",
