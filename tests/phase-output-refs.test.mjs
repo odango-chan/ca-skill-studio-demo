@@ -5,18 +5,17 @@ import {projectWorkspace} from "../site/workspace.mjs";
 import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from "../site/phase-output-refs.mjs";
 import {routeProjectionSignature} from "../site/route-create.mjs";
-const source=readFileSync(new URL("../site/samples/packages/"+
-  "establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
+const source=readFileSync(new URL("./fixtures/establish-pre-hold/assurance/procedure.yaml",import.meta.url),"utf8");
 const pid="ue-requested-pdu-session-establishment";
 const node="nudm-sdm-subscribe",phase="preconditions",index=1,key="selection";
 const relative="preconditions.select-subscription-configuration.output";
 const qualified="nudm-sdm-subscribe."+relative;
 const args=(text=source,to=qualified)=>[text,pid,node,phase,index,key,to];
-test("D4-A2 real CreatedSession discovers two actually observed forms of same earlier Step",()=>{
+test("D4-A2 pinned predecessor CreatedSession discovers two actually observed forms of same earlier Step",()=>{
   const choices=phaseOutputReferenceOptions(source,pid,node);
   const row=choices.find(x=>x.phaseName===phase&&x.stepIndex===index&&
     x.bindingKey===key);
-  assert.ok(row,"real CreatedSession second precondition Step should be editable");
+  assert.ok(row,"pinned predecessor CreatedSession second precondition Step should be editable");
   assert.equal(row.value,relative);
   assert.equal(row.producerNodeId,node);
   assert.equal(row.producerPhase,phase);
