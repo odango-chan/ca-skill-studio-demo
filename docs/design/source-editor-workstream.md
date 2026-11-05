@@ -134,6 +134,14 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 
 上述可点击跳转走现有 `source.revealLine`、`switchFile`，不建立第二业务真源，不更改 D4 编辑资格或 Source 事务。A2 必须通过全部 Node 单测、TS 类型检查、打包、真实 Chromium（包括三份 Python 的符号点击与 E1/E2/D4 回归），且合并后需独立核对 resulting-main Pages。若词法无法可靠分析，Inspector 必须关闭不确定跳转，而不是制造假语义。 E3-A2 已按此范围完成并验收，尚未实现 Pyright/LSP/Ruff；是否需要更复杂诊断应先结合真实开发体验再评估。
 
+### E3 体验调整：宽屏 Python 脚本引用默认可见（Issue #58；PR candidate）
+
+打开当前多文件 Package 的 `scripts/*.py` 时，在宽屏（`min-width: 1180px`）默认显示既有**只读「Python 脚本引用」Inspector**，包含调用位置、顶层 `def/class` 符号及可确认的 Schema 声明。避免每次打开 Python 文件后再点击「显示脚本引用」；不修改引用推导或 Tool/Runtime 语义。
+
+只在**进入文件**时应用默认展示，之后手动收起应保持收起，普通输入、Undo/Redo、Source 刷新不会反复自动打开。切换到下一个 Python 文件时重新按宽度判断；切到非脚本文件按原规则关闭。小屏幕 `<1180px` 不自动打开，仍可以通过原按钮手工开启，避免占用编辑区域。仅本仓页面布局与 Inspector 状态发生变化，不新增文件操作或脚本执行权限。
+
+验收需 Chromium 在 1440px 验证初次默认展开、手动关闭及源码更新不反弹、重新打开/跳转来源与 Schema、三个实际 Python 文件的符号导航；800px 验证默认收起、按钮仍可用。Code CI 和 resulting-main Pages 不能混用，Runtime/Pyright 与 Windows 原生文件夹验收不属于本改动。
+
 ## 12. E4-A1 本地目录导入（2026-11-05；已验收）
 
 **Status: ACCEPTED and IMPLEMENTED on main@3433e99 via [PR #48](https://github.com/odango-chan/ca-skill-studio-demo/pull/48).** [Code CI #41948794306](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41948794306) 345/345 单元测试、TypeScript、构建、真实 Chromium FileList UI PASS；[resulting-main Pages #41949134436](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41949134436) 同 SHA 部署通过。 此阶段仅提供浏览器「打开目录 → 内存工作副本 → ZIP 下载」。不使用磁盘 File System Access 写句柄，不申请保存权限，不监视外部目录，不写 sidecar。完整 E4 原位保存和 Conflict 仍在 [#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) 后续实现。
