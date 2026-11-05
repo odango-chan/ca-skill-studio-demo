@@ -1727,3 +1727,14 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
  .node-focus-stage{padding:12px}
  .node-focus-heading h2{font-size:12px}
 }
+
+.node-focus-source-link{
+ flex:none;align-self:center;cursor:pointer;border:1px solid #d7e5ef;
+ border-radius:5px;background:#fff;color:#4a7c99;
+ font:650 10px/1.2 ui-monospace,Consolas,monospace;padding:4px 6px;
+}
+.node-focus-source-link:hover{background:#eaf6fb}
+.node-focus-source-link:focus-visible{outline:2px solid #0b8b7e;outline-offset:2px}
+.node-focus-step-child{
+ display:flex;padding-left:12px;margin-top:-3px;
+}
