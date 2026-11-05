@@ -124,7 +124,7 @@ test("A2 double-click shows Node drill-down; Child navigation is an extra action
   assert.match(app,/function closeNodeFocus\(\)/);
   assert.match(app,/if\(!modelPart\.phase\)return/);
   assert.match(app,/nodeJourney\(lastGood,nodeFocusId\)/);
-  assert.match(html,/id="nodeFocus"[^>]*aria-label="节点内部流程"/);
+  assert.match(html,/id="nodeFocus"[^>]*aria-label="节点上下游与内部流程"/);
   assert.match(html,/id="nodeFocusStages"/);
   assert.match(html,/id="nodeFocusReturn"/);
   assert.match(css,/\.graph-pane \.node-focus\[hidden\]/);
