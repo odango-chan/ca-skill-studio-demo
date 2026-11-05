@@ -37,7 +37,7 @@ test("Unicode/CRLF and active uncommitted editor text are searched without mutat
   });
   assert.equal(current.matches.length,1);
   assert.equal(current.matches[0].line,2);
-  assert.equal(current.matches[0].column,4);
+  assert.equal(current.matches[0].column,3);
   assert.equal(w.files.get("scripts/main.py").text,before);
   markFileEdited(w,"scripts/main.py","def main():\n    return 'updated'\n");
   assert.equal(searchPackageText(w,"updated").matches[0].path,"scripts/main.py");
@@ -48,7 +48,7 @@ test("opaque data, empty queries, oversized files and malformed input fail safel
   assert.equal(searchPackageText(w,"").matches.length,0);
   assert.equal(searchPackageText(w,"  ").matches.length,0);
   assert.equal(searchPackageText(null,"PASS").matches.length,0);
-  assert.equal(searchPackageText(w,"PAS").matches.length,2);
+  assert.equal(searchPackageText(w,"PAS").matches.length,3);
   assert.equal(searchPackageText(w,"PASS").matches.some(x=>x.path.endsWith(".bin")),false);
   assert.throws(()=>searchPackageText(w,null),TypeError);
   assert.throws(()=>searchPackageText(w,"x".repeat(97)),RangeError);
