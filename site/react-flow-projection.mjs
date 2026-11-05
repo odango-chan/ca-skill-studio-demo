@@ -107,6 +107,11 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         start:node.id===procedure.start,
         terminal:node.operator==="terminal",
         childCount:node.children?.length??0,direction,
+        // A procedure invocation is a real Node referring to a separate
+        // definition. Never inline or duplicate the child in this graph.
+        childProcedure:node.operator==="procedure"&&
+          node.children?.some(ref=>ref.via==="operator"&&ref.procedure===node.value)
+          ?node.value:null,
         phaseBadges:summarizeNodePhases(node),
         canAddRoute:node.operator!=="terminal"&&
           selection?.kind==="node"&&selection.id===node.id&&

@@ -1525,3 +1525,216 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   color:#7d8fa0;font-size:10px;line-height:1.4;
   padding-top:5px;
 }
+
+/* D1-A2: a PROCEDURE invocation is a contained reference, not an inline
+   expansion or an independent YAML subgraph. Preserve ELK's 238x80 box. */
+.procedure-flow .designer-node.is-subflow-invocation{
+  border:1px dashed #a7b5d7;
+  background:#f7f8fe;
+  box-shadow:inset 3px 0 0 #9aa9db,0 3px 11px #27436013;
+  padding-top:6px;
+  padding-bottom:21px;
+  gap:3px;
+}
+.procedure-flow .designer-node.is-subflow-invocation.is-selected{
+  border:2px solid #0c9785;
+  box-shadow:inset 2px 0 0 #8ea9d5,0 0 0 4px #bbebe040;
+}
+.designer-node.is-subflow-invocation .designer-node-kind{color:#536998}
+.designer-node.is-subflow-invocation .designer-node-meta{color:#607b9e}
+.procedure-flow .designer-subflow-enter{
+  position:absolute;
+  right:9px;bottom:4px;
+  display:inline-flex;align-items:center;gap:4px;
+  width:auto;min-height:16px;
+  border:1px solid transparent;
+  border-radius:5px;
+  background:#eaf0fc;color:#3c6694;
+  font:650 9px/1.2 system-ui,sans-serif;
+  padding:1px 6px;
+  cursor:pointer;
+}
+.procedure-flow .designer-subflow-enter:hover{
+  border-color:#9cb7de;
+  background:#e0ebfc;
+}
+.procedure-flow .designer-subflow-enter:focus-visible{
+  outline:2px solid #168c7a;outline-offset:2px;
+}
+
+/* Child graph boundary belongs to the current VIEW, not to YAML nodes.
+   The overlay is outside the React Flow viewport and never creates edges. */
+.graph-pane[data-procedure-scope="child"]{
+  background-color:#f6f8fd;
+}
+.graph-pane[data-procedure-scope="child"]::before{
+  content:"";position:absolute;inset:8px;
+  z-index:3;pointer-events:none;
+  border:1px dashed #b9c7e1;border-radius:12px;
+}
+.procedure-scope{
+  position:absolute;top:14px;left:14px;z-index:7;
+  box-sizing:border-box;
+  width:max-content;max-width:min(325px,calc(100% - 100px));
+  padding:10px 12px;
+  border:1px solid #d0dbea;
+  border-left:3px solid #849ad2;
+  border-radius:9px;
+  background:#ffffffed;
+  box-shadow:0 4px 17px #344f7720;
+  color:#405775;font:11px/1.35 system-ui,sans-serif;
+}
+.procedure-scope[hidden]{display:none!important}
+.procedure-scope-eyebrow{
+  display:flex;align-items:center;gap:6px;
+  color:#7487b0;font-size:9px;font-weight:750;
+  letter-spacing:.065em;
+}
+.procedure-scope-dot{
+  display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:#859ed9;
+}
+.procedure-scope-name{
+  display:block;
+  margin:5px 0;
+  font:700 11px/1.35 ui-monospace,Consolas,monospace;
+  overflow-wrap:anywhere;
+}
+.procedure-scope-context{
+  font-size:10px;line-height:1.45;
+  color:#687d96;overflow-wrap:anywhere;
+}
+.procedure-scope-return{
+  display:inline-flex;
+  margin-top:7px;padding:4px 7px;
+  font:650 10px/1.25 system-ui,sans-serif;
+  color:#236f84;background:#eff7f8;
+  border:1px solid #d1e5eb;border-radius:5px;
+  cursor:pointer;
+}
+.procedure-scope-return:hover{background:#e5f3f7}
+.procedure-scope-return:focus-visible{outline:2px solid #168c7a;outline-offset:2px}
+@media(max-width:680px){
+  .procedure-scope{
+    left:12px;top:12px;
+    max-width:calc(100% - 112px);
+    padding:8px 9px;
+  }
+}
+
+/* D1-A2 Node drill-down: read-only stage view for *every* business Node.
+   PRE/POST are projected only when present; OP is the real existing Node. */
+.graph-pane .node-focus{
+  position:absolute;inset:0;z-index:8;
+  display:flex;flex-direction:column;min-width:0;
+  background:#f8fbfe;color:#314d65;
+}
+.graph-pane .node-focus[hidden]{display:none!important}
+.node-focus-header{
+  flex:none;display:flex;gap:14px;align-items:flex-start;
+  min-height:66px;padding:14px 20px;
+  background:#fff;border-bottom:1px solid #e1eaf2;
+}
+.node-focus-back{
+  flex:none;border:1px solid #d0e2e7;
+  border-radius:6px;background:#f0f9f7;color:#207a75;
+  font-size:11px;font-weight:650;padding:7px 10px;cursor:pointer;
+}
+.node-focus-back:hover{background:#e6f6f1}
+.node-focus-back:focus-visible{outline:2px solid #0b8b7e;outline-offset:2px}
+.node-focus-heading{min-width:0}
+.node-focus-eyebrow{
+  font:700 9px/1.3 system-ui,sans-serif;color:#8294a7;letter-spacing:.08em;
+}
+.node-focus-heading h2{
+  margin:3px 0 2px;white-space:normal;overflow-wrap:anywhere;
+  font:700 15px/1.35 ui-monospace,Consolas,monospace;color:#34506c;
+}
+.node-focus-heading p{
+  margin:0;font:10px/1.4 system-ui,sans-serif;color:#8192a3;
+  overflow-wrap:anywhere;
+}
+.node-focus-stages{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:24px clamp(14px,5vw,56px) 42px;
+  display:flex;flex-direction:column;align-items:center;
+}
+.node-focus-stage{
+  width:100%;max-width:690px;flex:none;
+  background:#fff;border:1px solid #dfe7ef;
+  border-left:3px solid #91b1ca;
+  border-radius:9px;padding:14px 17px 15px;
+  box-shadow:0 4px 16px #3856720b;
+}
+.node-focus-stage.is-pre{border-left-color:#84accc}
+.node-focus-stage.is-op{border-left-color:#4b9588}
+.node-focus-stage.is-post{border-left-color:#7eb9a8}
+.node-focus-stage-heading{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.node-focus-stage-heading strong{
+  font:750 11px/1.3 system-ui,sans-serif;letter-spacing:.03em;color:#39566d;
+}
+.node-focus-stage-heading span{
+  font:700 10px/1.3 ui-monospace,Consolas,monospace;color:#7d96a8;
+}
+.node-focus-stage-value{
+  margin-top:8px;color:#445e77;
+  font:550 12px/1.5 ui-monospace,Consolas,monospace;overflow-wrap:anywhere;
+}
+.node-focus-steps{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:7px}
+.node-focus-step{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:8px 10px;border-radius:6px;background:#f5f8fb;
+  border:1px solid #edf1f6;font-size:11px;
+}
+.node-focus-step-kind{
+  flex:none;font:700 10px/1.5 ui-monospace,Consolas,monospace;color:#5a7c99;
+}
+.node-focus-step-main{min-width:0;flex:1;overflow-wrap:anywhere;color:#3d5971}
+.node-focus-step-name{
+  display:block;font-size:10px;font-weight:600;color:#768ca0;
+}
+.node-focus-connector{
+  height:28px;flex:none;display:flex;align-items:center;justify-content:center;
+  color:#9fb2c3;font-size:18px;
+}
+.node-focus-route-list{
+  display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;
+  padding-top:10px;border-top:1px dashed #e2eaf2;
+}
+.node-focus-route{
+  display:inline-flex;gap:5px;align-items:center;
+  font:600 10px/1.35 ui-monospace,Consolas,monospace;
+  background:#f1f5f9;color:#55748c;
+  border:1px solid #dce6ef;border-radius:5px;
+  padding:4px 7px;overflow-wrap:anywhere;
+}
+.node-focus-route.tone-success{color:#138f7a;border-color:#bde4d9;background:#f0faf6}
+.node-focus-route.tone-failure{color:#b95352;border-color:#f0d7d5;background:#fdf7f7}
+.node-focus-route.tone-uncertain{color:#a2762c;border-color:#f4e1b8;background:#fcf8f0}
+.node-focus-subflow{
+  display:inline-flex;margin-top:10px;padding:6px 9px;
+  color:#3b6f9e;background:#eef3fe;border:1px solid #cedcf6;
+  border-radius:6px;font-size:11px;font-weight:650;cursor:pointer;
+}
+.node-focus-subflow:hover{background:#dfeafb}
+.node-focus-subflow:focus-visible{outline:2px solid #0b8b7e;outline-offset:2px}
+.node-focus-empty{font-size:11px;color:#8595a5}
+@media(max-width:680px){
+ .node-focus-header{padding:11px 12px;gap:8px}
+ .node-focus-stages{padding:16px 10px 24px}
+ .node-focus-stage{padding:12px}
+ .node-focus-heading h2{font-size:12px}
+}
+
+.node-focus-source-link{
+ flex:none;align-self:center;cursor:pointer;border:1px solid #d7e5ef;
+ border-radius:5px;background:#fff;color:#4a7c99;
+ font:650 10px/1.2 ui-monospace,Consolas,monospace;padding:4px 6px;
+}
+.node-focus-source-link:hover{background:#eaf6fb}
+.node-focus-source-link:focus-visible{outline:2px solid #0b8b7e;outline-offset:2px}
+.node-focus-step-child{
+ display:flex;padding-left:12px;margin-top:-3px;
+}

@@ -49,7 +49,8 @@ function ProcedureCard({data,selected}){
       (data.start?" is-start":"")+
       (data.direction==="RIGHT"?" is-horizontal":"")+
       (selected?" is-selected":"")+
-      (data.phaseBadges?.length?" has-phases":"")
+      (data.phaseBadges?.length?" has-phases":"")+
+      (data.childProcedure?" is-subflow-invocation":"")
     }>
     <Handle type="target" id="in" position={inputPosition}
       className="designer-port designer-port-fallback designer-port-target"
@@ -70,10 +71,21 @@ function ProcedureCard({data,selected}){
     <span className="designer-node-kind">
       <OperatorGlyph operator={data.operator}/>
       {String(data.operator).toUpperCase()}
-      {data.childCount?" · CHILD":""}
+      {data.childProcedure?" · 子流程":data.childCount?" · CHILD":""}
     </span>
     <strong className="designer-node-id" title={data.id}>{data.id}</strong>
-    <span className="designer-node-meta" title={data.value}>{data.value}</span>
+    <span className="designer-node-meta" title={data.value}>
+      {data.childProcedure?"↳ ":""}{data.value}
+    </span>
+    {data.childProcedure&&<button type="button"
+      className="designer-subflow-enter nodrag nopan"
+      aria-label={"进入子流程 "+data.childProcedure}
+      title={"进入 "+data.childProcedure+" · 保留调用节点位置"}
+      onPointerDown={event=>event.stopPropagation()}
+      onClick={event=>{
+        event.stopPropagation();
+        data.onEnterChild?.();
+      }}>进入子流程 <span aria-hidden="true">›</span></button>}
     {Boolean(data.phaseBadges?.length)&&
       <span className="designer-node-phases" aria-label="节点内部阶段">
         {data.phaseBadges.map(phase=><span
@@ -123,8 +135,12 @@ function ProcedureScene({scene,callbacks,onReady}){
     [scene.graph,scene.procedure,scene.selection,scene.showAllLabels,
       scene.routeCreationSourceId]);
   const selectionId=scene.selection?.kind==="route"?scene.selection.id:null;
+  const nodes=elements.nodes.map(node=>node.data.childProcedure?{
+    ...node,data:{...node.data,onEnterChild:()=>
+      callbacks.onEnterChild(node.id,node.data.childProcedure)}
+  }:node);
   return <ReactFlow
-    nodes={elements.nodes} edges={elements.edges}
+    nodes={nodes} edges={elements.edges}
     nodeTypes={nodeTypes} edgeTypes={edgeTypes}
     onInit={onReady}
     onNodeClick={(_event,node)=>callbacks.onNodeSelect(node.id)}

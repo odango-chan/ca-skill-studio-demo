@@ -128,3 +128,31 @@ Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的�
 - 图例拆为**当前可见业务 Node 类型**、**这些 Node 内部实际 Phase Step 类型**。不会因为 DSL 支持 `TOOL` 就默认显示 TOOL；切 Child Procedure 和邻居视图后只按当前范围重新统计。
 - 对每条 Route，Outcome 色义维持不变；独立把 `preconditions.on` → `PRE` 虚线、`operator.on` → `OP` 实线、`postconditions.on` → `POST` 点线，标签带明示前缀。PRE/POST 标签默认可见，混合 Outcome 不得显示为成功；精确 Outcome 身份和原始 Route Source 仍来自 Source。
 - 所有修改均为只读投影、TSX/UI/CSS，无新增 DSL 语法、业务 Graph Node/Route、Server、Runtime 执行或隐式 Patch。A2 子流程有界卡片与调用上下文、A3 异常分支缩略和概览/全图切换保持后续单独评审，不在 A1 混入新编辑能力。
+
+## D1-A2 · 子流程边界与调用位置（2026-11-05；PR #68，堆叠于 #67）
+
+[代码 CI #42019367400](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42019367400) **PASS**：388/388 单测、TS、Build、真实 Chromium。Root 6 张 Procedure 调用卡片、Child 4 Node 边界、Root 原调用节点回跳、3 种复用调用位置、Explorer 直接进入不编造调用关系、Source 字节保持与 17 Node/46 路径恢复均通过。文档最终 HEAD CI 尚待核对；main/Pages 仍未部署。
+
+A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改当前**视图的导航与边界**。它不在 Root 内联 Child，也不引入保存到 YAML 的容器节点：Root 17 个业务 Node 中 6 个 `PROCEDURE` 调用指向 4 份 Child 定义；`finalize-resource-responsibility` 的三个不同调用者是同一份定义的三个**调用位置**，不能在 Child 定义里捏造单一全局父节点。
+
+- Root 的 `PROCEDURE` 节点保持同一 238×80 ELK 尺寸与连接端点，使用有界卡片、显式「进入子流程」动作；双击仍可进入。普通 `CALL` 不显示子流程动作；按钮具备键盘焦点和语义标签。
+- 在 Child 视图的**画布容器**（不是业务图模型）增加轻边界、当前 Procedure 名称、已知调用位置与「返回调用节点」；子图自身仍有独立 START 和真实 4/5 Node。
+- 从真实 Root/Child 调用进入时，`resolveProcedureCall` 依据当前 `workspace.procedures`、调用 Node 与 `children[]` 引用确定 `parentProcedure/callerId/childProcedure/via`，并建立仅 UI 的导航路径。返回时重新核验调用来源、在父图选择并居中原调用 Node。源文件修改后如调用位置失效则取消上下文，不猜测旧身份。
+- **从 Explorer 或 picker 直接打开 Child**：没有已知调用来源时明确显示「直接打开 · 未指定调用节点」，「返回 Root」不会偷偷选择三个可能调用者之一。复用 Child 的任意调用来自哪个节点，返回就应到哪个。
+- 仍只有原来精确的 Node/Route/Outcome 与 Source span、Diff/确认/Undo/Redo；A2 不更改 graph layout、Runtime/5GC、Script 或 Tool 语义。A3 根图异常分支缩略另起阶段，不在本 PR 偷偷删除完整失败链路。
+
+验收：单测复用子流程与无上下文/失效来源负例，Chromium 真实点击调用卡片、验证 Child 边界与 breadcrumb、返回调用点，再进入同定义的不同调用位置、Explorer 直接打开的负例；返回 Root 17 Node / 46 bundle 和 Source bytes 完全不变。此项只可在 exact-head CI 通过后称浏览器 PASS，后续要人工目视宽窄屏可读性。
+
+### A2 需求澄清：所有 Node 都能双击进入（2026-11-05）
+
+用户明确的目标不是「仅有 4 份 Child Procedure 能进入」，而是根图的 **17 张业务节点都能双击进入自己的内部阶段视图**。前述 6 个 `PROCEDURE` 调用 → 4 份 Child 定义只是**第二层导航**，不是唯一的 Node 下钻模型。
+
+- 普通 `CALL`、`RECONCILE`、`TERMINAL` 和 `PROCEDURE` 等真实节点双击都进入该 Node 的只读阶段画布：**PRE（如有）→ OPERATOR → POST（如有）**。它只消费现有 `nodeJourney()` 投影，真实步骤、顺序和按源归属的 Route/Outcome 一致；没有 PRE/POST 就省略阶段（TERMINAL 可能只有 OP）。
+- 内部步骤保留 `SCRIPT`、`CALL`、`VERIFY` 等真实类型和源行号，点击行号跳到当前 Source；Outcome 标签展示路由到的目标业务节点，绝不在局部视图里伪造可执行或可编辑的独立 Step graph。
+- 只有已有 `node.children` 引用时才出现「进入子流程」；点击后才从 Node 内部视图进入真正的独立 Child Procedure。6 次调用/4 个定义的边界和调用点返回仍与 A2 原始设计一致。
+- 本地阶段画布只是 UI 派生视图，不复制数据源、业务 Node、Route 或执行步骤；返回完整 Procedure 图后不丢选中状态。Source 修改后若目标 Node 不再存在，自动取消此节点局部视图；禁止把这个新视图当成 Runtime 验收或生成新 YAML。
+
+验收新增：对当前 owner 根图 **17/17 真实节点逐个双击**，核对 PRE/POST 有无、Step/Outcome 来源、只有 OP 的终态、返回整图、PROCEDURE 内部进入 Child、直接 Explorer 子图没有虚构调用者；所有 Source bytes 不变。前一次浏览器双击测试发现 React Flow 自身双击缩放拦截，必须通过 **真实的 Node DOM 事件**验证，不能把单测 PASS 误报为实际交互 PASS。
+
+
+代码检查：[CI #42024171379](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42024171379) 成功（390/390 Unit、TypeScript、Build、Chromium）。浏览器记录显示 17/17 Node 双击 PASS、UDM Subscribe PRE 5/POST 1、终态仅 OP、Procedure 内进入 Child、返回 Root 17/46 和 Source 保持。随后精简了重复的组件事件回调和临时调试字段，最终 HEAD 仍需同样门禁；成功部署到 Pages 之前不声称线上可用。
