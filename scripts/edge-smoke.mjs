@@ -408,7 +408,8 @@ try{
     "   previous:snapshot(prev),",
     "   next:snapshot(next),",
     "   stages:stages.querySelectorAll('.node-focus-stage').length,",
-    "   grid:getComputedStyle(document.querySelector('.node-focus-neighborhood')).display",
+    "   grid:getComputedStyle(document.querySelector('.node-focus-neighborhood')).display,",
+    "   narrow:matchMedia('(max-width:990px)').matches",
     " };",
     " const nextButton=next.querySelector('.node-focus-neighbor-open');",
     " const target=nextButton?.querySelector('.node-focus-neighbor-id')?.textContent;",
@@ -433,7 +434,7 @@ try{
   if(!neighborhood?.initial.visible||
      neighborhood.initial.title!=="nudm-sdm-subscribe"||
      neighborhood.initial.previous.peers<1||neighborhood.initial.next.peers<1||
-     neighborhood.initial.grid!=="grid"||
+     neighborhood.initial.grid!==(neighborhood.initial.narrow?"flex":"grid")||
      neighborhood.initial.previous.outcomes.some(x=>!x.id||!x.origin)||
      neighborhood.initial.next.outcomes.some(x=>!x.id||!x.origin)||
      !neighborhood.target||neighborhood.afterNext.title!==neighborhood.target||
