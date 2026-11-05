@@ -241,6 +241,15 @@ try{
           'await-initial-n4-session-establishment')break;
         await sleep(75);
       }
+      // Breadcrumb updates synchronously, React Flow DOM renders one frame later.
+      // Wait for the actual Child cards instead of sampling stale Root nodes.
+      for(let i=0;i<80;i++){
+        const nodes=document.querySelectorAll('.react-flow__node').length;
+        const pre=document.querySelectorAll('.designer-node-phase.phase-preconditions').length;
+        const post=document.querySelectorAll('.designer-node-phase.phase-postconditions').length;
+        if(nodes===4&&pre===0&&post===1)break;
+        await sleep(75);
+      }
       const nodeKinds=[...document.querySelectorAll('#graphLegendNodeTypes code')]
         .map(x=>x.textContent);
       const stepKinds=[...document.querySelectorAll('#graphLegendStepTypes code')]
