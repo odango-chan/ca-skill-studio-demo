@@ -8,7 +8,7 @@ import {scriptNavigationReport} from "./script-navigation.mjs";
 import {pythonTopLevelOutline} from "./python-outline.mjs";
 import { projectWorkspace } from "./workspace.mjs";
 import { routeEditTargets, previewRouteTargetPatch, applyRouteTargetPatch, createEditorHistory } from "./patch.mjs";
-import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney} from "./workbench.mjs";
+import {procedureItems,nodeItems,nodeDetails,routeDetails,nodeJourney,nodeNeighborhood} from "./workbench.mjs";
 import {SAMPLE_PACKAGES,packageFilesForSample,createFileWorkspace,markFileEdited,hasUnsavedEdits,fileDirtyState} from "./sample-packages.mjs";
 import {zipPackage} from "./zip.mjs";
 import {importDirectoryFiles,packageZipEntries} from "./directory-import.mjs";
@@ -2081,10 +2081,8 @@ function openNodeFocus(id){
   if(projection?.state!=="READY"||viewKind!=="procedure"||
      !lastGood?.nodes.some(node=>node.id===id))return;
   if(nodeFocusId===id)return;
-  selectNode(id);
   nodeFocusId=id;
-  renderProcedureNavigation();
-  renderNodeFocus();
+  selectNode(id); // Select and redraw with the NEW Node context in one pass.
   requestAnimationFrame(()=>$("nodeFocus").focus());
 }
 function closeNodeFocus(){
@@ -2099,7 +2097,8 @@ $("nodeFocusReturn").addEventListener("click",closeNodeFocus);
 function renderNodeFocus(){
   const model=projection?.state==="READY"&&viewKind==="procedure"&&nodeFocusId
     ?nodeJourney(lastGood,nodeFocusId):null;
-  const visible=Boolean(model);
+  const neighborhood=model?nodeNeighborhood(lastGood,nodeFocusId):null;
+  const visible=Boolean(model&&neighborhood);
   const host=$("nodeFocus");
   host.hidden=!visible;
   $("reactFlowRoot").inert=visible;
@@ -2117,6 +2116,56 @@ function renderNodeFocus(){
   setText("nodeFocusTitle",node.id);
   setText("nodeFocusSubtitle",
     activeProcedureId+" · "+node.operator.toUpperCase()+" · L"+node.line);
+  // Exact source-backed one-hop topology: every declared incoming/outgoing
+  // Route is retained, including duplicates to a peer and cycles.
+  const renderNeighbors=(id,scope,direction)=>{
+    const lane=$(id);
+    lane.replaceChildren();
+    const head=el("div","node-focus-neighbor-heading");
+    head.append(el("strong","",direction==="previous"?"上一跳 · 来自":"下一跳 · 去向"),
+      el("span","",scope.peers.length+" Nodes / "+scope.routeCount+" Routes"));
+    lane.appendChild(head);
+    const intro=el("div","node-focus-neighbor-intro",
+      direction==="previous"?"按当前 Procedure 的真实入向 Route":"按当前 Procedure 的真实出向 Route");
+    lane.appendChild(intro);
+    if(!scope.peers.length){
+      lane.appendChild(el("div","node-focus-neighbor-empty",
+        direction==="previous"?
+          (node.id===lastGood.start?"START · 当前流程入口没有入向 Route":"没有已声明的上一跳"):
+          (node.operator==="terminal"?"TERMINAL · 没有出向 Route":"没有已声明的下一跳")));
+      return;
+    }
+    for(const peer of scope.peers){
+      const card=el("div","node-focus-neighbor-card");
+      const open=button("",()=>openNodeFocus(peer.node.id),"node-focus-neighbor-open");
+      open.setAttribute("aria-label",
+        "查看"+(direction==="previous"?"上一跳":"下一跳")+"节点 "+peer.node.id);
+      open.append(el("span","node-focus-neighbor-kind",peer.node.operator.toUpperCase()),
+        el("span","node-focus-neighbor-id",peer.node.id));
+      card.appendChild(open);
+      const routes=el("div","node-focus-neighbor-routes");
+      routes.setAttribute("aria-label","真实 Route Outcome");
+      for(const route of peer.routes){
+        const tone=classifyRouteTone([route.outcome]);
+        const origin=route.routeSource==="preconditions.on"?"PRE":
+          route.routeSource==="postconditions.on"?"POST":
+          route.routeSource==="operator.on"?"OP":"OTHER";
+        const chip=el("span","node-focus-neighbor-route tone-"+tone,
+          origin+" · "+route.outcome);
+        chip.title=route.id+" · "+route.source+" → "+route.target+
+          " · "+route.routeSource+" · L"+route.line;
+        chip.dataset.routeId=route.id;
+        chip.dataset.routeSource=route.routeSource;
+        routes.appendChild(chip);
+      }
+      card.appendChild(routes);
+      card.appendChild(el("div","node-focus-neighbor-direction",
+        direction==="previous"?"↳ 进入当前节点":"当前节点 → 该节点"));
+      lane.appendChild(card);
+    }
+  };
+  renderNeighbors("nodeFocusPrevious",neighborhood.previous,"previous");
+  renderNeighbors("nodeFocusNext",neighborhood.next,"next");
   const call=procedureTrail.at(-1)?.childProcedure===activeProcedureId?
     procedureTrail.at(-1):null;
   setText("procedureBread",
