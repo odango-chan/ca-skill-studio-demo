@@ -361,26 +361,31 @@ try{
   console.log("D1_FROZEN_FIXTURE_LOADED",JSON.stringify(pinnedSource));
   if(!pinnedSource?.old)throw Error("Frozen D1 browser fixture not loaded");
   await runD1Interactions(evaluate,command);
-  // Return to the actual current owner package before E2/E3/E4 integration.
+  // A clean page navigation resets Inspector/selection state left by the
+  // historical D1 interaction tests. All subsequent E2/E3/E4 browser checks
+  // execute against the *new* owner sample, not the predecessor fixture.
+  await command("Page.reload",{ignoreCache:true});
+  await sleep(1000);
   const restoredOwner=await evaluate([
     "(async()=>{",
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
-    " const original=window.confirm;window.confirm=()=>true;",
-    " try{",
-    "  document.getElementById('establishSampleButton').click();",
-    "  for(let i=0;i<150;i++){",
-    "   const src=document.getElementById('source')?.value||'';",
-    "   if(src.includes('bind-udm-hold'))break;",
-    "   await sleep(80);",
-    "  }",
+    " for(let i=0;i<150;i++){",
     "  const src=document.getElementById('source')?.value||'';",
-    "  return {owner:src.includes('bind-udm-hold'),",
-    "   length:src.length};",
-    " }finally{window.confirm=original;}",
+    "  if(src.includes('bind-udm-hold')&&",
+    "    document.querySelectorAll('.react-flow__node').length===17&&",
+    "    document.querySelectorAll('.react-flow__edge-path').length===46)break;",
+    "  await sleep(100);",
+    " }",
+    " const src=document.getElementById('source')?.value||'';",
+    " return {owner:src.includes('bind-udm-hold'),",
+    "  nodes:document.querySelectorAll('.react-flow__node').length,",
+    "  edges:document.querySelectorAll('.react-flow__edge-path').length,",
+    "  length:src.length};",
     "})()"
   ].join("\n"));
   console.log("D1_CURRENT_OWNER_RESTORED",JSON.stringify(restoredOwner));
-  if(!restoredOwner?.owner)throw Error("Current owner sample not restored after D1");
+  if(!restoredOwner?.owner||restoredOwner.nodes!==17||restoredOwner.edges!==46)
+    throw Error("Current owner sample not cleanly loaded after D1");
 
   // E2-A2: real Owner schemas, schema diagnostics, completion and hover.
   // E3-A1: actual script Inspector links switch Package Source files, without
