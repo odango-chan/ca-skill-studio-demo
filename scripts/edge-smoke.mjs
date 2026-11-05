@@ -382,7 +382,7 @@ try{
      !nodeDrilldown.sourcePreserved)
     throw Error("D1-A2 every-Node drilldown FAIL: "+JSON.stringify(nodeDrilldown));
 
-  // D1-A3: real predecessor/current/successor topology and multi-hop browsing.
+  // D1-A2b: real predecessor/current/successor topology and multi-hop browsing.
   const neighborhood=await evaluate([
     "(async()=>{",
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
@@ -429,7 +429,7 @@ try{
     "   sourcePreserved:document.getElementById('source').value===source};",
     "})()",
   ].join("\n"));
-  console.log("D1_A3_ONE_HOP",JSON.stringify(neighborhood));
+  console.log("D1_A2B_ONE_HOP",JSON.stringify(neighborhood));
   if(!neighborhood?.initial.visible||
      neighborhood.initial.title!=="nudm-sdm-subscribe"||
      neighborhood.initial.previous.peers<1||neighborhood.initial.next.peers<1||
@@ -442,7 +442,7 @@ try{
      neighborhood.terminalNext.outcomes.length!==0||
      !neighborhood.terminalEmpty?.includes("TERMINAL")||
      !neighborhood.restored||!neighborhood.sourcePreserved)
-    throw Error("D1-A3 one-hop neighborhood FAIL: "+JSON.stringify(neighborhood));
+    throw Error("D1-A2b one-hop neighborhood FAIL: "+JSON.stringify(neighborhood));
 
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
