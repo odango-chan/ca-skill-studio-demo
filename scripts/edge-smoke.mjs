@@ -609,26 +609,43 @@ try{
   if(!/executable|authoring_assistant/.test(hoverText))
     throw Error("E2 Owner schema hover did not expose enum: "+hoverText);
 
-  // Monaco's right-click context menu is a portal; its surface must not
-  // inherit a transparent background from outside the editor theme.
+  // Right click a visible Monaco text row, not the previous hover tooltip.
+  const menuPoint=await evaluate([
+    "(async()=>{",
+    " document.getElementById('mode-source').click();",
+    " await new Promise(r=>setTimeout(r,180));",
+    " const host=document.querySelector('#monacoHost .monaco-editor');",
+    " const rect=host?.getBoundingClientRect();",
+    " return {found:!!rect,x:rect?rect.x+Math.min(170,rect.width/3):0,",
+    "  y:rect?rect.y+Math.min(125,rect.height/3):0};",
+    "})()"
+  ].join("\n"));
+  if(!menuPoint.found)throw Error("Monaco edit surface unavailable");
   await command("Input.dispatchMouseEvent",{
-    type:"mousePressed",x:hover.x,y:hover.y,button:"right",buttons:2,clickCount:1
+    type:"mouseMoved",x:menuPoint.x,y:menuPoint.y
+  });
+  await sleep(120);
+  await command("Input.dispatchMouseEvent",{
+    type:"mousePressed",x:menuPoint.x,y:menuPoint.y,
+    button:"right",buttons:2,clickCount:1
   });
   await command("Input.dispatchMouseEvent",{
-    type:"mouseReleased",x:hover.x,y:hover.y,button:"right",buttons:0,clickCount:1
+    type:"mouseReleased",x:menuPoint.x,y:menuPoint.y,
+    button:"right",buttons:0,clickCount:1
   });
-  await sleep(280);
+  await sleep(350);
   const contextMenu=await evaluate([
     "(()=>{",
-    " const menu=[...document.querySelectorAll('.context-view.monaco-menu-container')]",
-    "   .find(el=>el.getBoundingClientRect().width>50);",
+    " const elements=[...document.querySelectorAll('.context-view,.monaco-menu-container,.monaco-menu')];",
+    " const visible=elements.filter(el=>{const r=el.getBoundingClientRect();return r.width>70&&r.height>40});",
+    " const menu=visible.find(el=>el.classList.contains('monaco-menu-container'))||",
+    "  visible.find(el=>el.classList.contains('monaco-menu'));",
     " const surface=menu?.querySelector('.monaco-menu')||menu;",
     " const bg=surface?getComputedStyle(surface).backgroundColor:'';",
-    " const rect=menu?.getBoundingClientRect();",
-    " const opaque=/^rgb\\(255, 255, 255\\)$/.test(bg);",
-    " return {visible:!!menu&&rect.width>50&&rect.height>30,",
-    "  opaque,bg,hasActions:!!menu?.querySelector('.action-item'),",
-    "  label:menu?.textContent?.trim().slice(0,80)||''};",
+    " return {visible:!!menu,opaque:bg==='rgb(255, 255, 255)',bg,",
+    "  hasActions:!!menu?.querySelector('.action-item'),",
+    "  label:menu?.textContent?.trim().slice(0,80)||'',",
+    "  candidates:visible.map(el=>({cls:el.className,bg:getComputedStyle(el).backgroundColor}))};",
     "})()"
   ].join("\n"));
   console.log("MONACO_CONTEXT_MENU_OPAQUE",JSON.stringify(contextMenu));
