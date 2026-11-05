@@ -170,6 +170,42 @@ try{
   console.log("CreatedSession visible paths and aligned React Flow ports PASS: "+
     result.valid+" / "+result.attachedPorts);
 
+  // D1 visual-only START, outcome-colored lines and on-canvas legend.
+  // The 17 real YAML Nodes / 46 current owner Route bundles are unchanged.
+  const graphDisplay=await evaluate([
+    "(()=>{",
+    " const node=document.querySelector('.designer-node.is-start');",
+    " const badge=node?getComputedStyle(node,'::before'):null;",
+    " const kind=node?.querySelector('.designer-node-kind')?.textContent||'';",
+    " const panel=document.getElementById('graphLegend');",
+    " const pos=panel?getComputedStyle(panel).position:'';",
+    " const summary=panel?.querySelector('summary');",
+    " summary?.click();const opened=panel?.open===true;",
+    " const types=panel?.querySelectorAll('.graph-legend-types code').length;",
+    " const lineTypes=panel?.querySelectorAll('.graph-legend-line').length;",
+    " summary?.click();const collapsed=panel?.open===false;",
+    " const tonePaths=[...document.querySelectorAll('.react-flow__edge-path.designer-edge')];",
+    " const success=tonePaths.filter(x=>x.classList.contains('tone-success'));",
+    " const green=success.length>0&&success.every(x=>getComputedStyle(x).stroke==='rgb(19, 143, 122)');",
+    " const hasNoFalseGreen=tonePaths.filter(x=>x.classList.contains('tone-failure')||",
+    "   x.classList.contains('tone-uncertain')||x.classList.contains('tone-mixed'))",
+    "   .every(x=>getComputedStyle(x).stroke!=='rgb(19, 143, 122)');",
+    " return {hasStart:!!node,marker:badge?.content,kind,position:pos,",
+    "   opened,collapsed,types,lineTypes,green,successCount:success.length,",
+    "   hasNoFalseGreen,sourceNodes:document.querySelectorAll('.react-flow__node').length,",
+    "   routePaths:tonePaths.length};",
+    "})()"
+  ].join("\\n"));
+  console.log("D1_START_LEGEND_OUTCOME_STYLES",JSON.stringify(graphDisplay));
+  if(!graphDisplay?.hasStart||!graphDisplay.marker.includes('START')||
+     graphDisplay.kind.includes('START')||graphDisplay.position!=='absolute'||
+     !graphDisplay.opened||!graphDisplay.collapsed||graphDisplay.types!==8||
+     graphDisplay.lineTypes!==4||!graphDisplay.green||
+     !graphDisplay.hasNoFalseGreen||
+     graphDisplay.sourceNodes!==17||graphDisplay.routePaths!==46)
+    throw Error("D1 visual START / legend / Route tone FAIL: "+
+      JSON.stringify(graphDisplay));
+
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
     "(()=>{",
