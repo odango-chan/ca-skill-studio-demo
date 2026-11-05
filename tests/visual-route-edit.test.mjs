@@ -9,7 +9,7 @@ import {
 } from "../site/visual-route-edit.mjs";
 
 const read=(skill,path)=>readFileSync(
-  new URL("../site/samples/packages/"+skill+"/"+path,import.meta.url),"utf8");
+  new URL((skill==="establish-pdu-session"?"./fixtures/establish-pre-hold/":"../site/samples/packages/"+skill+"/")+path,import.meta.url),"utf8");
 const ensureSource=read("ensure-pdu-session","assurance/procedure.yaml");
 const ensure=projectWorkspace(ensureSource);
 const createdSource=read("establish-pdu-session","assurance/procedure.yaml");
