@@ -198,3 +198,13 @@ E2 提示仅为对当前 pinned Owner Contract/Predicate 的**编辑器提示**�
 **浏览器兼容：**缺少 File System Access 目录选择接口的浏览器仍用原 `webkitdirectory` 兼容导入、对应原生「上传」文案由浏览器掌控；兼容导入无法获取目录句柄，保存仍需重新选择目标目录。页面文案不得误称所有浏览器会显示「打开」，也不得称已经完成真实 OS 目录授权测试。
 
 **验收：**单测覆盖真实 owner 16 文件、只读导入无写权限、非法目录/路径/大小/读失败；真实 Chromium 用模拟 picker + OPFS 进行「先选择只读目录 → 修改 → 保存只申请写授权而不二次选择 → 复核字节」及拒绝权限的负例。该证据不等于真实 Windows Chrome 系统文件选择框（Issue #26 仍须现场验收）。Source/Runtime/5GC 皆不改变。
+
+
+## 14. E5 · 当前 Package 跨文件只读查找（2026-11-05；PR candidate）
+
+当前 Explorer 的「查找节点」只过滤当前 Procedure 的 Node，不支持在多文件 SKILL 中查找任意文本。E5 在同一个 Explorer 增加独立、默认收起的「查找文件内容」，不创建第二 Inspector、第二编辑工作副本或服务器索引。
+
+- **Source authority：**搜索当前内存 Package 的可编辑文本，当前文件以编辑器实时内容为准；包括尚未导出的改动。未知/二进制 opaque 文件不解码、不搜索。重新打开其他 Package 时清空查询；单文件不显示跨文件入口。
+- **匹配语义：**大小写不敏感的字面文本搜索，**不是用户正则表达式**，返回路径、行、列与短摘录，按路径和文件内顺序排序。搜索输入最长 96 字符；上限 64 文件、单文件 1 MiB、总计 80 条/单文件 16 条。超限与结果截断要明示，不应暗称穷尽。
+- **导航：**点击命中项复用现有 `switchFile` 和 `lineJump`，自动打开文件与 Source 定位；Procedure 图形能力、脚本引用面板及 Editor History 不因搜索而更改。保留原有「查找节点」，搜索结果只读且 DOM 由 `textContent` 创建。
+- **验证边界：**Node 单测覆盖 Unicode/CRLF、大小写、字面特殊符号、未保存工作副本、opaque、超限；Chromium 真实 Owner Package 覆盖 Python 与 Reference 跨文件点击和返回 Procedure。未引入 Python LSP/Runtime Validator/磁盘监控，也不声称搜索未知的 OS 文件。
