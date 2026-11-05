@@ -190,6 +190,10 @@ try{
     " const success=tonePaths.filter(x=>x.classList.contains('tone-success'));",
     " const green=success.length>0&&success.every(x=>getComputedStyle(x).stroke==='rgb(19, 143, 122)');",
     " const phaseCards=[...document.querySelectorAll('.designer-node.has-phases')];",
+    " const phaseFits=phaseCards.every(card=>[...card.querySelectorAll('.designer-node-phase')].every(chip=>{",
+    "   const a=card.getBoundingClientRect(),b=chip.getBoundingClientRect();",
+    "   return b.top>=a.top-1&&b.bottom<=a.bottom+1;",
+    " }));",
     " const preBadges=document.querySelectorAll('.designer-node-phase.phase-preconditions').length;",
     " const postBadges=document.querySelectorAll('.designer-node-phase.phase-postconditions').length;",
     " const subscribe=[...document.querySelectorAll('.designer-node')].find(x=>x.querySelector('.designer-node-id')?.textContent==='nudm-sdm-subscribe');",
@@ -206,7 +210,7 @@ try{
     "   .every(x=>getComputedStyle(x).stroke!=='rgb(19, 143, 122)');",
     " return {hasStart:!!node,marker:badge?.content,kind,position:pos,",
     "   opened,collapsed,nodeKinds,stepKinds,routeOrigins,preBadges,postBadges,",
-    "   subscribePhases,originPatterns,lineTypes,green,successCount:success.length,",
+    "   subscribePhases,phaseFits,originPatterns,lineTypes,green,successCount:success.length,",
     "   hasNoFalseGreen,sourceNodes:document.querySelectorAll('.react-flow__node').length,",
     "   routePaths:tonePaths.length};",
     "})()"
@@ -220,7 +224,7 @@ try{
      graphDisplay.routeOrigins.join(",")!=="PRE,OP,POST"||
      graphDisplay.preBadges!==3||graphDisplay.postBadges!==4||
      graphDisplay.subscribePhases.join(",")!=="PRE · 5,POST · 1"||
-     !graphDisplay.originPatterns||
+     !graphDisplay.phaseFits||!graphDisplay.originPatterns||
      graphDisplay.lineTypes!==4||!graphDisplay.green||
      !graphDisplay.hasNoFalseGreen||
      graphDisplay.sourceNodes!==17||graphDisplay.routePaths!==46)
