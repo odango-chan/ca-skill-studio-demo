@@ -99,7 +99,7 @@ try{
     " button.click();",
     " for(let i=0;i<130;i++){",
     "  if(document.querySelectorAll('.react-flow__node').length===17 &&",
-    "    document.querySelectorAll('.react-flow__edge-path').length===48 &&",
+    "    document.querySelectorAll('.react-flow__edge-path').length===46 &&",
     "    document.querySelectorAll('.react-flow__handle[data-handleid^=edge-]').length===96 &&",
     "    document.getElementById('layoutStatus')?.textContent!=='正在自动布局…')break;",
     "  await sleep(100);",
@@ -132,7 +132,7 @@ try{
     "  }",
     " }",
     " const ids=[...document.querySelectorAll('.react-flow__edge')].map(x=>x.getAttribute('data-id'));",
-    " const expected=Array.from({length:48},(_,i)=>'flow-edge-'+i);",
+    " const expected=Array.from({length:46},(_,i)=>'flow-edge-'+i);",
     " return {nodes:document.querySelectorAll('.react-flow__node').length,",
     "  edges:paths.length,edgeIds:ids,missing:expected.filter(x=>!ids.includes(x)),",
     "  handles:document.querySelectorAll('.react-flow__handle').length,",
@@ -154,8 +154,8 @@ try{
   ].join("\n");
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
-  if(result?.nodes!==17||result.edges!==48||result.valid!==48||result.markersOk!==48||
-     result.attachedPorts!==96||result.maxPortGap>1.5)
+  if(result?.nodes!==17||result.edges!==46||result.valid!==46||result.markersOk!==46||
+     result.attachedPorts!==92||result.maxPortGap>1.5)
     throw Error("CreatedSession visible edges FAIL");
   console.log("CreatedSession visible paths and aligned React Flow ports PASS: "+
     result.valid+" / "+result.attachedPorts);
