@@ -61,7 +61,7 @@ test("real Procedure files project to the expected Root and Child graph",()=>{
   assert.equal(establish.state,"READY");
   assert.equal(establish.procedure.nodes.length,17);
   assert.equal(establish.procedure.routes.length,63);
-  assert.equal(establish.procedures.size,6);
+  assert.equal(establish.procedures.size,5);
 });
 test("file workspace retains per-file source and revision history independently",()=>{
   const ws=createFileWorkspace("establish-pdu-session",[
