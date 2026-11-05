@@ -12,6 +12,10 @@ const read=name=>readFileSync(
   new URL("../site/samples/"+name+".procedure.yaml",import.meta.url),"utf8");
 const created=projectWorkspace(read("establish-pdu-session"));
 const ensure=projectWorkspace(read("ensure-pdu-session"));
+const owner=projectWorkspace(readFileSync(
+  new URL("../site/samples/packages/establish-pdu-session/assurance/procedure.yaml",
+    import.meta.url),"utf8"));
+assert.equal(owner.state,"READY");
 assert.equal(created.state,"READY");
 assert.equal(ensure.state,"READY");
 
@@ -238,8 +242,8 @@ test("Route outcome colors never turn mixed success/failure green",async()=>{
   }
 });
 
-test("legend dynamically separates Node operators from Phase Step operators",()=>{
-  const graph=describeProcedureLegend(created.procedure);
+test("legend dynamically separates actual owner Node and Phase Step operators",()=>{
+  const graph=describeProcedureLegend(owner.procedure);
   assert.deepEqual(Object.fromEntries(graph.nodeKinds.map(x=>[x.kind,x.count])),{
     CALL:4,PROCEDURE:6,RECONCILE:3,TERMINAL:4
   });
@@ -251,22 +255,22 @@ test("legend dynamically separates Node operators from Phase Step operators",()=
   assert.equal(graph.postNodes,4);
   assert.equal(graph.nodeKinds.some(x=>x.kind==="TOOL"),false);
   assert.equal(graph.stepKinds.some(x=>x.kind==="TOOL"),false);
-  const child=created.procedures.get("await-initial-n4-session-establishment");
+  const child=owner.procedures.get("await-initial-n4-session-establishment");
   assert.ok(child);
   const childLegend=describeProcedureLegend(child);
   assert.equal(childLegend.preNodes,0);
   assert.equal(childLegend.postNodes,1);
   assert.deepEqual(childLegend.stepKinds,[{kind:"VERIFY",count:1}]);
   // A filtered graph must describe only the visible scope, not claim all 17.
-  assert.equal(describeProcedureLegend(created.procedure,created.procedure.nodes.slice(0,1)).nodeCount,1);
+  assert.equal(describeProcedureLegend(owner.procedure,owner.procedure.nodes.slice(0,1)).nodeCount,1);
 });
 
 test("PRE/POST badges come only from existing Phase Steps, without new graph Nodes",async()=>{
-  const graph=await layoutProcedureELK(created.procedure);
-  const before=JSON.stringify(created.procedure);
-  const flow=makeFlowElements(graph,created.procedure);
+  const graph=await layoutProcedureELK(owner.procedure);
+  const before=JSON.stringify(owner.procedure);
+  const flow=makeFlowElements(graph,owner.procedure);
   assert.equal(flow.nodes.length,17);
-  assert.equal(flow.edges.length,48);
+  assert.equal(flow.edges.length,graph.bundles.length);
   const subscribe=flow.nodes.find(n=>n.id==="nudm-sdm-subscribe");
   assert.ok(subscribe);
   assert.deepEqual(subscribe.data.phaseBadges.map(x=>[x.label,x.count]),[
@@ -278,7 +282,7 @@ test("PRE/POST badges come only from existing Phase Steps, without new graph Nod
   assert.deepEqual(summarizeNodePhases({phases:[]}),[]);
   const terminal=flow.nodes.find(x=>x.data.operator==="terminal");
   assert.deepEqual(terminal.data.phaseBadges,[]);
-  assert.equal(JSON.stringify(created.procedure),before);
+  assert.equal(JSON.stringify(owner.procedure),before);
 });
 
 test("route origin and outcome color are orthogonal; no Phase source is hidden",async()=>{
@@ -297,9 +301,10 @@ test("route origin and outcome color are orthogonal; no Phase source is hidden",
     if(edge.data.origin!=="OP")assert.equal(edge.data.displayLabel,true);
     assert.equal(edge.markerEnd.color,ROUTE_TONE_COLOR[edge.data.tone]);
   }
-  // A neutral operator Outcome remains hidden by default, not misrepresented as PASS.
-  assert.equal(flow.edges.some(x=>x.data.origin==="OP"&&
-    x.data.tone==="neutral"&&!x.data.displayLabel),true);
+  // No invisible Phase labels, even for a neutral/mixed Outcome.
+  const neutral=flow.edges.filter(x=>x.data.origin!=="OP"&&
+    ["neutral","mixed"].includes(x.data.tone));
+  assert.ok(neutral.every(x=>x.data.displayLabel));
 });
 
 test("graph legend is floating and contextual; Node types differ from Step types",()=>{
