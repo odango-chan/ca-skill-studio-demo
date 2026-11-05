@@ -187,4 +187,4 @@ Current `call` operations such as `sbi.udm.sm_data.get` and `ca.session.pcf_crea
 
 当前 owner `ca-agent-demo@eaadf948` 的 `bind-udm-hold` / `bind-pcf-hold` 输入绑定可显示缺少 Call 消费端 ABI；其后 `hold_bound` Verify 的输出引用可显示来源位于同 Node 的前序 Step，但没有由当前 Package 唯一证明的 Tool 输出 Schema。前驱 Node 的引用仅表示 Source 图可追溯，不等于 Runtime 结果已生成。Inspector 始终保留精确 Source 行跳转。
 
-本阶段期望的测试：纯函数针对真实当前 owner 的 UDM/PCF hold、Script 类型对照、unknown/quoted/ambiguous 反例；Chromium 检查真实 Step 行摘要、详情中的限制原因、没有新编辑控件和原始 YAML 未发生变化。最终 PASS/Pages 状态以 PR 精确提交验收为准；正式 Tool ABI owner 契约、Runtime/5GC、Case 和发布工作台均不在本阶段。
+本阶段期望的测试：纯函数针对真实当前 owner 的 UDM/PCF hold、Script 类型对照、unknown/quoted/ambiguous 反例；Chromium 检查真实 Step 行摘要、详情中的限制原因、没有新编辑控件和原始 YAML 未发生变化。[PR #53 CI #41983285953](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41983285953) 在代码提交 `71baff57` 上通过 374/374 单测、TypeScript、Build、真实 Chromium（UDM/PCF hold 来源文案、只读控件、Source 原文不变）PASS。若此文档提交产生新的 PR HEAD，必须再核对该 HEAD 的验收结果；resulting-main Pages 在合并前 NOT_RUN。正式 Tool ABI owner 契约、Runtime/5GC、Case 和发布工作台均不在本阶段。
