@@ -808,8 +808,22 @@ try{
         }
         const saved=document.getElementById('saveNotice').dataset.status==='SAVED';
         const onDisk=await (await skill.getFile()).text();
-        return {imported,openedNotice,visible,disabled,ready,saved,
-          exact:onDisk==='# Session E4 edited\n',
+        // A denied second write grant must preserve bytes and the open handle.
+        session.requestPermission=async({mode})=>{
+          permissionModes.push('denied:'+mode);return 'denied';
+        };
+        source.value='# Denied subsequent save\n';
+        source.dispatchEvent(new Event('input',{bubbles:true}));
+        await sleep(130);
+        btn.click();
+        for(let i=0;i<50;i++){
+          if(document.getElementById('saveNotice').dataset.status==='BLOCKED')break;
+          await sleep(55);
+        }
+        const denied=document.getElementById('saveNotice').dataset.status==='BLOCKED';
+        const afterDenied=await (await skill.getFile()).text();
+        return {imported,openedNotice,visible,disabled,ready,saved,denied,
+          preserved:afterDenied===onDisk,exact:onDisk==='# Session E4 edited\n',
           pickerModes,permissionModes,confirmations:confirmations.length,
           confirmationText:confirmations.at(-1)?.slice(0,190)};
       }finally{
@@ -821,9 +835,9 @@ try{
   console.log("E4_SESSION_DIRECTORY_SAVE",JSON.stringify(sessionSave));
   if(!sessionSave?.imported||!sessionSave.openedNotice||
      !sessionSave.visible||!sessionSave.disabled||!sessionSave.ready||
-     !sessionSave.saved||!sessionSave.exact||
-     sessionSave.pickerModes.join(",")!=="read"||
-     sessionSave.permissionModes.join(",")!=="readwrite"||
+     !sessionSave.saved||!sessionSave.denied||!sessionSave.preserved||
+     !sessionSave.exact||sessionSave.pickerModes.join(",")!=="read"||
+     sessionSave.permissionModes.join(",")!=="readwrite,denied:readwrite"||
      sessionSave.confirmations!==1)
     throw Error("E4 session handle permission/save smoke failed: "+
       JSON.stringify(sessionSave));
