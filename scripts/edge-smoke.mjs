@@ -532,7 +532,12 @@ try{
   if(!narrowScript?.closed||!narrowScript.available||narrowScript.width>980)
     throw Error("Narrow Python Inspector unexpectedly auto-opened: "+
       JSON.stringify(narrowScript));
-  await command("Emulation.clearDeviceMetricsOverride");
+  // Restore the desktop viewport for the existing Monaco popup/hover
+  // coordinates; CDP clear reverts to a small headless default viewport.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1440,height:900,deviceScaleFactor:1,mobile:false
+  });
+  await sleep(180);
 
   const ownerSchemaSmoke=await evaluate([
     "(async()=>{",
