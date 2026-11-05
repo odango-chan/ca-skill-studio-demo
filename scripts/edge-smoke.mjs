@@ -761,6 +761,73 @@ try{
      !e4DiskSave.warned)
     throw Error("E4-A2 writable-stream / external conflict smoke failed: "+JSON.stringify(e4DiskSave));
 
+  // E4 session handle: true read-only opener + permission-on-save.
+  // Picker is stubbed but OPFS reads and writes are real browser operations.
+  const sessionSave=await evaluate(String.raw\`
+    (async()=>{
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      const store=await navigator.storage.getDirectory();
+      const folder=await store.getDirectoryHandle('session-e4',{create:true});
+      const skill=await folder.getFileHandle('SKILL.md',{create:true});
+      const writer=await skill.createWritable();
+      await writer.write('# Session E4\\n');await writer.close();
+      const pickerModes=[],permissionModes=[],confirmations=[];
+      const session={kind:'directory',name:'session-e4',
+        entries:()=>folder.entries(),
+        queryPermission:async()=> 'granted',
+        requestPermission:async({mode})=>{
+          permissionModes.push(mode);return 'granted';
+        }};
+      const oldPicker=window.showDirectoryPicker,oldConfirm=window.confirm;
+      window.showDirectoryPicker=async opts=>{
+        pickerModes.push(opts?.mode);return session;
+      };
+      window.confirm=msg=>{confirmations.push(String(msg));return true};
+      try{
+        document.getElementById('openDirectoryButton').click();
+        for(let i=0;i<80;i++){
+          if(document.getElementById('fileName').textContent.includes('session-e4'))break;
+          await sleep(75);
+        }
+        const imported=document.getElementById('fileName').textContent.includes('session-e4')&&
+          document.getElementById('fileCount').textContent==='1 文件';
+        const notice=document.getElementById('directoryOpenNotice');
+        const openedNotice=!notice.hidden&&notice.textContent.includes('已打开');
+        const btn=document.getElementById('saveDirectoryButton');
+        const visible=!btn.hidden;
+        const disabled=btn.disabled;
+        const source=document.getElementById('source');
+        source.value='# Session E4 edited\\n';
+        source.dispatchEvent(new Event('input',{bubbles:true}));
+        await sleep(150);
+        const ready=!btn.disabled;
+        btn.click();
+        for(let i=0;i<100;i++){
+          if(document.getElementById('saveNotice').dataset.status==='SAVED')break;
+          await sleep(65);
+        }
+        const saved=document.getElementById('saveNotice').dataset.status==='SAVED';
+        const onDisk=await (await skill.getFile()).text();
+        return {imported,openedNotice,visible,disabled,ready,saved,
+          exact:onDisk==='# Session E4 edited\\n',
+          pickerModes,permissionModes,confirmations:confirmations.length,
+          confirmationText:confirmations.at(-1)?.slice(0,190)};
+      }finally{
+        window.showDirectoryPicker=oldPicker;
+        window.confirm=oldConfirm;
+      }
+    })()
+  \`);
+  console.log("E4_SESSION_DIRECTORY_SAVE",JSON.stringify(sessionSave));
+  if(!sessionSave?.imported||!sessionSave.openedNotice||
+     !sessionSave.visible||!sessionSave.disabled||!sessionSave.ready||
+     !sessionSave.saved||!sessionSave.exact||
+     sessionSave.pickerModes.join(",")!=="read"||
+     sessionSave.permissionModes.join(",")!=="readwrite"||
+     sessionSave.confirmations!==1)
+    throw Error("E4 session handle permission/save smoke failed: "+
+      JSON.stringify(sessionSave));
+
   // Evaluate browser diagnostics after all E2 YAML interactions have run.
   if(warnings.length)console.log("BROWSER_WARNINGS",JSON.stringify(warnings));
   if(exceptions.length)throw Error("Browser JS exceptions: "+JSON.stringify(exceptions));
