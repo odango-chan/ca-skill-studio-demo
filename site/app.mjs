@@ -412,7 +412,12 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
   canvasRouteProposal=null;
   fitMode="all";
   selection = null;
-  setInspectorOpen(false,false);
+  // Multi-file Python editing is Source-first but benefits from references
+  // visible by default on desktop. Manual collapse persists while editing.
+  const showScriptRefs=Boolean(activePackage&&
+    /^scripts\/[A-Za-z0-9_.-]+\.py$/.test(name)&&
+    window.matchMedia("(min-width: 1180px)").matches);
+  setInspectorOpen(showScriptRefs,false);
   $("search").value = "";
   lastGood = null;
   lastWorkspace = null;
