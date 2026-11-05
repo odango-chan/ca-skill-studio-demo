@@ -88,7 +88,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       // filled 24x24 closed arrow. Its color follows the corresponding edge.
       markerEnd:{
         type:"arrow",
-        color:ROUTE_TONE_COLOR[tone],
+        color:selected?"#087e71":ROUTE_TONE_COLOR[tone],
         width:16,height:16,
         strokeWidth:1.2,
         markerUnits:"userSpaceOnUse"
