@@ -241,7 +241,7 @@ function decorateToolbar(){
   }))setIconOnly($(id),name);
   for(const [id,name,label] of [
     ["downloadButton","download","导出文件"],
-    ["openButton","file-plus","打开本地文件"],
+    ["openButton","folder-plus","打开本地文件"],
     ["openDirectoryButton","folder-open","打开本地目录"],
     ["exportPackageButton","archive","导出整个 Package (.zip)"],
     ["mode-source","code-2","Source"],
