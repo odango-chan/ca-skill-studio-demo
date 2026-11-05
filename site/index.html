@@ -40,6 +40,13 @@
         <span id="procedureCount" class="sr-only"></span>
         <select id="procedurePicker" class="sr-only" aria-label="切换 Procedure"></select>
       </section>
+      <details class="explorer-section package-search" id="packageSearchDisclosure" hidden>
+        <summary class="section-heading">查找文件内容 <span id="packageSearchCount" class="count">—</span></summary>
+        <label class="sr-only" for="packageSearchInput">搜索当前 SKILL Package 文件内容</label>
+        <div class="search-wrap"><span aria-hidden="true"></span><input id="packageSearchInput" type="search" maxlength="96" placeholder="搜索整个 Package" autocomplete="off"></div>
+        <p id="packageSearchHint" class="package-search-hint" role="status" aria-live="polite">输入文本搜索当前文件工作副本</p>
+        <ol id="packageSearchResults" class="package-search-results" aria-label="跨文件搜索结果"></ol>
+      </details>
       <details class="explorer-section explorer-nodes" id="nodeOutlineDisclosure">
         <summary class="section-heading node-disclosure-heading"><span>NODES · 当前 Procedure</span><span id="outlineCount" class="count">—</span></summary>
         <label for="search" class="sr-only">搜索当前 Procedure 的节点</label>
