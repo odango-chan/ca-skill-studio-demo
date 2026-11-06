@@ -12,7 +12,8 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 6. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
 7. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
 8. [E Source Editor](design/source-editor-workstream.md) — Monaco / shared D4 history and E2–E4 scope
-9. [Documentation Governance](DOCUMENTATION.md) — canonical source map
+9. [Application Shell](design/application-shell.md) — Web/Local 共用菜单命令与未来本地执行边界
+10. [Documentation Governance](DOCUMENTATION.md) — canonical source map
 
 ## 已完成阶段技术记录
 
@@ -30,6 +31,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | Phase Step 输入绑定与后续结构编辑 | [D4 Phase Designer](design/phase-designer.md) |
 | 为何采用 Source-first | [ADR-0001](decisions/0001-source-first-visual.md) |
 | E1 Monaco Source Editor / E2–E4 boundaries | [E Source Editor](design/source-editor-workstream.md) |
+| 当前应用菜单 / 本地宿主边界 | [Application Shell](design/application-shell.md) |
 | 当前状态 | [WORK](WORK.md) |
 | 实施、测试与证据 locator | [TRACEABILITY](TRACEABILITY.md) |
 | 文档治理 | [DOCUMENTATION](DOCUMENTATION.md) |
