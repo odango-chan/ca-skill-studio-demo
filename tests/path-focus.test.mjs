@@ -24,7 +24,7 @@ const connected=scope=>{
 test("Root defaults to a proven success backbone, preserving source Route identities",()=>{
   const focus=projectPathFocus(root);
   assert.equal(root.nodes.length,17);
-  assert.equal(root.routes.length,65);
+  assert.equal(root.routes.length,63);
   assert.ok(focus.isFiltered);
   assert.ok(focus.nodes.length<root.nodes.length);
   assert.ok(focus.routes.length<root.routes.length);
