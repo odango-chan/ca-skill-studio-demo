@@ -1,7 +1,15 @@
 # Skill Studio 当前工作状态
 
-**Updated: 2026-11-05**  
-**Integrated implementation baseline: main@c28687a02ba638a7d8ad1f54b5ac72478974abbb**（D1-A1 #67、A2 #68、A2b #69 均已合入；[resulting-main Pages #42141895846 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42141895846)。D1-A2c #70 和 E5 #64 仍是独立 PR，未合入。）
+**Updated: 2026-11-06**  
+**Integration baseline before menu UX PR #79: main@4a4ba937222740299eadf5aff26ef8e1522be19b**（Root 主路径 #73、分支收起 / 显式查看 #75、点击位置锚定 #77 已合入；[对应 Pages #42177776582 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42177776582)。此前 D1-A2c #70 也已合入，旧 #70 未合入描述是历史快照。）
+
+## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
+
+**范围：** `site/application-menu.mjs` 提供全局「菜单」中的文件、编辑、视图真实命令入口；委托现有处理器，不实现另一套 Source Save / Undo / Runtime。主图及局部图移除双击进入，卡片「查看」为明确的节点局部图入口，`进入子流程` 仅进入真实 Child Procedure。
+
+**Web/Local 统一：** 同一浏览器 UI、命令 ID、编辑模型；宿主能力不同。Node.js `http.server dist/` 只启动编辑器，**并不执行 SKILL**。本地执行宿主与实际 `Run/Debug/Trace` 功能仍未实现，不能展示假的可操作命令。详细决策见 [Application Shell](design/application-shell.md)。
+
+**证据门槛：** [PR #79](https://github.com/odango-chan/ca-skill-studio-demo/pull/79) 中的单测、TypeScript、Build、真实 Chromium（菜单、禁用状态、ESC / 外部点击、Visual↔Source、双击不进入、17 个节点显式查看）；合入后单独核对 Pages。此段只描述源码及验收路径，不代替实际 CI / Native OS / Runtime PASS。
 
 ## Overall
 
