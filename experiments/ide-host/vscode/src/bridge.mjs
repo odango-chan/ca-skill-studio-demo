@@ -1,7 +1,7 @@
 // Shared source authority: host revalidates every webview patch proposal.
 // Never trust a candidate Source string supplied by the Webview.
 import {projectWorkspace} from "../../../../site/workspace.mjs";
-import {previewVisualRouteEdit} from "../../../../site/visual-route-edit.mjs";
+import {previewTargetPatch} from "./route-target.mjs";
 
 export const MAX_SOURCE_BYTES=1024*1024;
 const SOURCE_PATH="assurance/procedure.yaml";
@@ -28,9 +28,7 @@ export function validateRouteProposal(source,currentVersion,proposal){
   if(projection.state!=="READY")throw new Error("Current Source cannot be projected");
   const procedure=projection.procedures.get(procedureId);
   if(!procedure)throw new Error("Unknown Procedure");
-  const preview=previewVisualRouteEdit({
-    source,procedure,procedureId,routeId,packageName:"establish-pdu-session"
-  },newTarget);
+  const preview=previewTargetPatch(source,procedureId,routeId,newTarget);
   if(preview.candidateSource!==candidateSource)
     throw new Error("Webview patch does not match host-recomputed CST change");
   const {start,end}=preview.sourceSpan??{};
