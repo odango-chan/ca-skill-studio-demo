@@ -101,13 +101,33 @@ try{
     "(async()=>{",
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
     " for(let i=0;i<110;i++){",
-    "  if(document.querySelectorAll('.react-flow__node').length>=11)break;",
+    "  if(document.querySelectorAll('.react-flow__node').length>0)break;",
     "  await sleep(100);",
     " }",
     " const button=document.getElementById('establishSampleButton');",
     " if(!button)return {error:'CreatedSession sample button missing'};",
     " button.click();",
     " for(let i=0;i<130;i++){",
+    "  if(document.getElementById('layoutStatus')?.textContent.includes('路径聚焦'))break;",
+    "  await sleep(100);",
+    " }",
+    " const mode=document.getElementById('rootPathMode');",
+    " const before=document.getElementById('source').value;",
+    " const focusNodes=document.querySelectorAll('.react-flow__node').length;",
+    " const focusEdges=document.querySelectorAll('.react-flow__edge-path').length;",
+    " const rootDefault=mode?.value==='normal'&&focusNodes>0&&focusNodes<17&&focusEdges<46;",
+    " mode.value='custom';mode.dispatchEvent(new Event('change',{bubbles:true}));",
+    " await sleep(450);",
+    " document.getElementById('pathFailure').click();",
+    " for(let i=0;i<90;i++){",
+    "  if(document.querySelectorAll('.react-flow__node').length>focusNodes&&",
+    "    document.getElementById('layoutStatus')?.textContent.includes('路径聚焦'))break;",
+    "  await sleep(90);",
+    " }",
+    " const customNodes=document.querySelectorAll('.react-flow__node').length;",
+    " const branchShown=customNodes>focusNodes;",
+    " mode.value='all';mode.dispatchEvent(new Event('change',{bubbles:true}));",
+    " for(let i=0;i<130;i++){"
     "  if(document.querySelectorAll('.react-flow__node').length===17 &&",
     "    document.querySelectorAll('.react-flow__edge-path').length===46 &&",
     "    document.querySelectorAll('.react-flow__handle[data-handleid^=edge-]').length===92 &&",
@@ -143,7 +163,9 @@ try{
     " }",
     " const ids=[...document.querySelectorAll('.react-flow__edge')].map(x=>x.getAttribute('data-id'));",
     " const expected=Array.from({length:46},(_,i)=>'flow-edge-'+i);",
-    " return {nodes:document.querySelectorAll('.react-flow__node').length,",
+    " return {rootFocus:{rootDefault,branchShown,focusNodes,focusEdges,customNodes,",
+    "   sourcePreserved:document.getElementById('source').value===before},",
+    "  nodes:document.querySelectorAll('.react-flow__node').length,"
     "  edges:paths.length,edgeIds:ids,missing:expected.filter(x=>!ids.includes(x)),",
     "  handles:document.querySelectorAll('.react-flow__handle').length,",
     "  attachedPorts:portGaps.length,maxPortGap:Math.max(0,...portGaps.map(p=>p.dist)),",
@@ -164,7 +186,9 @@ try{
   ].join("\n");
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
-  if(result?.nodes!==17||result.edges!==46||result.valid!==46||result.markersOk!==46||
+  if(!result?.rootFocus?.rootDefault||!result.rootFocus.branchShown||
+     !result.rootFocus.sourcePreserved||
+     result?.nodes!==17||result.edges!==46||result.valid!==46||result.markersOk!==46||
      result.attachedPorts!==92||result.maxPortGap>1.5)
     throw Error("CreatedSession visible edges FAIL");
   console.log("CreatedSession visible paths and aligned React Flow ports PASS: "+
