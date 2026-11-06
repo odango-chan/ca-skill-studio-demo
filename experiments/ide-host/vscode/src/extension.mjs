@@ -33,7 +33,7 @@ export function activate(context){
           <button id="openSource">打开原生 YAML 编辑器</button>
           <span id="revision"></span></div>
           <div id="message" role="status">等待当前文档…</div>
-          <div id="reactFlowRoot" class="spike-flow"></div>
+          <div class="graph-pane spike-pane"><div id="reactFlowRoot" class="spike-flow"></div></div>
           <div id="patch" class="spike-patch" hidden>
             <strong>现有 Route 的 Source-backed Patch 预览</strong>
             <label>Route <select id="routeList"></select></label>
