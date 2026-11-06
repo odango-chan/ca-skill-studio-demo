@@ -58,6 +58,7 @@ export function mountApplicationMenu(menu,root=document){
   const keydown=event=>{
     if(menu.open&&event.key==="Escape"){
       event.preventDefault();
+      event.stopImmediatePropagation();
       menu.open=false;
       trigger?.focus();
     }
