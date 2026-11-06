@@ -1,3 +1,4 @@
+import {readFileSync} from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {STUDIO_COMMAND_TARGETS,studioCommandTarget} from "../site/application-menu.mjs";
@@ -47,4 +48,17 @@ test("CSS-concealed action bridge retains real command eligibility",()=>{
   assert.equal(studioCommandTarget(root(map),"file.exportPackage"),zip);
   zip.hidden=true;
   assert.equal(studioCommandTarget(root(map),"file.exportPackage"),null);
+});
+
+test("Top-level File/Edit/View/Help menus share one dispatcher and real commands",()=>{
+  const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
+  const js=readFileSync(new URL("../site/application-menu.mjs",import.meta.url),"utf8");
+  for(const name of ["file","edit","view","help"])
+    assert.match(html,new RegExp('data-app-menu="'+name+'"'));
+  assert.match(html,/id="applicationMenu" class="application-menubar"/);
+  assert.equal((html.match(/class="application-menu" data-app-menu="/g)||[]).length,4);
+  assert.match(js,/closeMenus\(menu\)/);
+  assert.match(js,/event\.key==="Escape"/);
+  assert.match(js,/event\.key==="ArrowRight"/);
+  assert.doesNotMatch(html,/class="application-menu-trigger">菜单/);
 });
