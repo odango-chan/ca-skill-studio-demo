@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-06**  
-**Integrated baseline before Explorer consolidation: main@a43d3a82867aba484c40ca963bedebcc87cf3eac**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
+**Integrated baseline before top-level menu UX: main@80cc153fc043cf3d6e7e6449fb9197adc7419eb6**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
 
 ## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
 
@@ -10,6 +10,12 @@
 **Web/Local 统一：** 同一浏览器 UI、命令 ID、编辑模型；宿主能力不同。Node.js `http.server dist/` 只启动编辑器，**并不执行 SKILL**。本地执行宿主与实际 `Run/Debug/Trace` 功能仍未实现，不能展示假的可操作命令。详细决策见 [Application Shell](design/application-shell.md)。
 
 **证据：** [PR #79](https://github.com/odango-chan/ca-skill-studio-demo/pull/79) 已合入；[exact-head PR CI #42180901569 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42180901569)（407 tests、TS、Build、Chromium 菜单/显式查看）；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。这不是 Native OS / Runtime PASS。
+
+## 2026-11-06 · 顶层菜单显露与当前文件居中（Issue #82）
+
+**本轮范围：** 旧版「菜单」中嵌套三个分组占用了过多横向留白。现在顶栏并列展示**文件、编辑、视图、帮助**；中间为当前文件的可伸缩路径栏，右侧状态和高频操作不变。仍是 54px 头部，小屏不引入第二套命令模型。
+
+**交互：** Native details 菜单四组共用原来的命令目标，不修改文件授权、保存确认、Source 或 SKILL；同一时刻只允许展开一个一级菜单，支持 Esc/点击外部和方向键切换标题。Chromium 要验四菜单、中央路径、小屏可见性、原有编辑/示例/子流程回归。追踪 [#82](https://github.com/odango-chan/ca-skill-studio-demo/issues/82)。当前只记录 PR 范围，验收证据以 exact-head CI 和合入后 Pages 为准。
 
 ## 2026-11-06 · Explorer 低频入口收敛（Issue #80）
 
