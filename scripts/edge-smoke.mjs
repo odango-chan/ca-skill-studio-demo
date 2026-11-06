@@ -713,7 +713,7 @@ try{
     "  window.confirm=()=>true;",
     "  const menu=document.getElementById('applicationMenu');",
     "  menu.querySelector('summary').click();",
-    "  menu.querySelector('[data-studio-command=file.loadSample]').click();",
+    "  [...menu.querySelectorAll('[data-studio-command]')].find(x=>x.dataset.studioCommand==='file.loadSample')?.click();",
     "  for(let i=0;i<140;i++){",
     "   const src=document.getElementById('source')?.value||'';",
     "   if(src.includes('resolve-pcf-create-inputs')&&!src.includes('bind-udm-hold'))break;",
