@@ -14,6 +14,15 @@ await build({
   bundle:true,format:"cjs",platform:"node",target:"node20",
   external:["vscode"],logLevel:"info"
 });
+// The same source also builds as a VS Code Web extension: no Node APIs.
+// "browser" in extension package.json selects this entry for vscode.dev and
+// browser-only Theia; real host activation/CustomEditor remains unverified.
+await build({
+  entryPoints:[join(root,"src/extension.mjs")],
+  outfile:join(root,"dist/extension-web.cjs"),
+  bundle:true,format:"cjs",platform:"browser",target:"es2022",
+  external:["vscode"],logLevel:"info"
+});
 await build({
   entryPoints:[join(root,"src/webview.mjs")],
   outfile:join(root,"media/procedure.js"),
@@ -21,4 +30,4 @@ await build({
   loader:{".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file"},
   assetNames:"assets/[name]-[hash]",logLevel:"info"
 });
-console.log("IDE spike: built VS Code extension and local ReactFlow webview (not installed or run)");
+console.log("IDE spike: built Node + browser extension entries and local ReactFlow webview (not installed or run)");
