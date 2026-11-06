@@ -252,12 +252,20 @@ try{
     "(async()=>{",
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
     " const menu=document.getElementById('applicationMenu');",
-    " const summary=menu?.querySelector('summary');",
+    " const menus=[...menu.querySelectorAll('details.application-menu')];",
+    " const group=name=>menu.querySelector('details[data-app-menu='+name+']');",
+    " const file=group('file'),edit=group('edit'),view=group('view'),help=group('help');",
+    " const summary=d=>d.querySelector('summary');",
     " const item=id=>[...menu.querySelectorAll('[data-studio-command]')].find(b=>b.dataset.studioCommand===id);",
     " const before=document.getElementById('source').value;",
-    " summary?.click();await sleep(70);",
-    " const opened=menu?.open===true;",
-    " const groups=menu?.querySelectorAll('.application-menu-group').length;",
+    " const labels=menus.map(d=>summary(d).textContent.trim());",
+    " const context=document.querySelector('.top-context');",
+    " const contextWidth=context.getBoundingClientRect().width;",
+    " const contextVisible=contextWidth>160&&getComputedStyle(context).display!=='none'&&",
+    "  document.getElementById('fileName').textContent.trim().length>0;",
+    " summary(file).click();await sleep(70);",
+    " const opened=file.open===true;",
+    " const groups=menu.querySelectorAll('.application-menu-group').length;",
     " const disabledSave=item('file.saveDirectory')?.disabled===true;",
     " const openFileAvailable=item('file.open')?.disabled===false;",
     " const openDirectoryAvailable=item('file.openDirectory')?.disabled===false;",
@@ -268,37 +276,47 @@ try{
     " const bridgeHidden=getComputedStyle(bridge).display==='none';",
     " const visibleExplorerActions=[...document.querySelectorAll('.explorer-bottom>.explorer-action')].filter(x=>!x.hidden).map(x=>x.id);",
     " const compactExplorer=bridgeHidden&&visibleExplorerActions.length===1&&",
-    "   visibleExplorerActions[0]==='openDirectoryButton';",
+    "  visibleExplorerActions[0]==='openDirectoryButton';",
+    " summary(view).click();await sleep(70);",
+    " const exclusiveView=view.open&&menus.filter(x=>x.open).length===1;",
     " const disabledUndo=item('edit.undo')?.disabled===true;",
     " item('view.source')?.click();await sleep(50);",
-    " const sourceMode=document.getElementById('editorBody').dataset.mode==='source'&&!menu.open;",
-    " summary?.click();await sleep(50);",
+    " const sourceMode=document.getElementById('editorBody').dataset.mode==='source'&&!view.open;",
+    " summary(view).click();await sleep(50);",
     " item('view.visual')?.click();await sleep(70);",
     " const visualMode=document.getElementById('editorBody').dataset.mode==='visual';",
     " const card=document.querySelector('.react-flow__node[data-id=nudm-sdm-get] .designer-node');",
     " card?.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
     " await sleep(70);",
     " const doubleClickInert=document.getElementById('nodeFocus').hidden;",
-    " summary?.click();await sleep(30);",
+    " summary(file).click();await sleep(50);",
+    " summary(file).dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));",
+    " await sleep(50);",
+    " const arrowSwitch=edit.open&&menus.filter(x=>x.open).length===1&&",
+    "  document.activeElement===summary(edit);",
     " document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));",
-    " const escapeClosed=menu.open===false;",
-    " summary?.click();await sleep(30);",
+    " const escapeClosed=menus.every(x=>!x.open);",
+    " summary(help).click();await sleep(50);",
+    " const helpLinks=help.querySelectorAll('a').length;",
     " document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));",
-    " const outsideClosed=menu.open===false;",
-    " return {opened,groups,disabledSave,openFileAvailable,openDirectoryAvailable,",
-    "  sampleAvailable,zipAvailable,compactExplorer,visibleExplorerActions,",
-    "  exportAvailable,disabledUndo,sourceMode,visualMode,doubleClickInert,",
-    "  escapeClosed,outsideClosed,sourcePreserved:before===document.getElementById('source').value};",
+    " const outsideClosed=menus.every(x=>!x.open);",
+    " return {opened,groups,labels,contextVisible,contextWidth,exclusiveView,arrowSwitch,",
+    "  disabledSave,openFileAvailable,openDirectoryAvailable,sampleAvailable,zipAvailable,",
+    "  compactExplorer,visibleExplorerActions,exportAvailable,disabledUndo,",
+    "  sourceMode,visualMode,doubleClickInert,helpLinks,escapeClosed,outsideClosed,",
+    "  sourcePreserved:before===document.getElementById('source').value};",
     "})()"
   ].join("\n"));
   console.log("STUDIO_APP_MENU_SMOKE",JSON.stringify(menuUX));
-  if(!menuUX?.opened||menuUX.groups!==3||!menuUX.disabledSave||
-     !menuUX.openFileAvailable||!menuUX.openDirectoryAvailable||
+  if(!menuUX?.opened||menuUX.groups!==3||
+     menuUX.labels?.join("/")!=="文件/编辑/视图/帮助"||
+     !menuUX.contextVisible||!menuUX.exclusiveView||!menuUX.arrowSwitch||
+     !menuUX.disabledSave||!menuUX.openFileAvailable||!menuUX.openDirectoryAvailable||
      !menuUX.sampleAvailable||!menuUX.zipAvailable||!menuUX.compactExplorer||
      !menuUX.exportAvailable||!menuUX.disabledUndo||!menuUX.sourceMode||
-     !menuUX.visualMode||!menuUX.doubleClickInert||
+     !menuUX.visualMode||!menuUX.doubleClickInert||menuUX.helpLinks!==2||
      !menuUX.escapeClosed||!menuUX.outsideClosed||!menuUX.sourcePreserved)
-    throw Error("Studio application menu and no-double-click FAIL: "+JSON.stringify(menuUX));
+    throw Error("Studio top-level menus and context FAIL: "+JSON.stringify(menuUX));
 
   // D1 visual-only START, outcome-colored lines and on-canvas legend.
   // The 17 real YAML Nodes / 46 current owner Route bundles are unchanged.
