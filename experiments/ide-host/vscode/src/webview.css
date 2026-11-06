@@ -1,0 +1,36 @@
+/* The original Procedure Designer styles are imported from site/.
+   Only IDE-host placement and extra native-document toolbar live here. */
+html,body{height:100%;width:100%;margin:0;padding:0;overflow:hidden;background:#f7f9fc;color:#29465c}
+body{display:flex;flex-direction:column;font:12px system-ui,-apple-system,sans-serif}
+.spike-head{display:flex;align-items:center;gap:10px;min-height:47px;
+  padding:8px 14px;box-sizing:border-box;background:#fff;border-bottom:1px solid #dfe8ef}
+.spike-head strong{flex:none;color:#196c62}
+.spike-head select{min-width:0;max-width:45%;overflow:hidden;text-overflow:ellipsis}
+.spike-head button{flex:none}
+.spike-head #revision{margin-left:auto;color:#788ca1;white-space:nowrap;font-size:10px}
+.spike-head button,.spike-head select,.spike-patch button,.spike-patch select{
+  border:1px solid #d6e3eb;background:#fff;border-radius:6px;padding:6px 8px;
+  color:#31556a;font-size:11px}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.45}
+#message{font-size:11px;padding:8px 14px;background:#eef7f5;color:#386d65;
+  border-bottom:1px solid #dcebe5;min-height:14px}
+.spike-pane{flex:1;min-height:130px;width:100%;display:flex;position:relative;overflow:hidden}
+.spike-flow{flex:1;min-height:130px;width:100%;position:relative;background-color:#f7f9fc;
+  background-image:radial-gradient(#cfdae7 .85px,transparent .85px);background-size:22px 22px}
+.spike-flow .react-flow{height:100%;width:100%}
+.spike-flow .designer-node{background:#fff}
+.spike-patch{flex:none;padding:9px 13px;background:#fff;border-top:1px solid #dce7ec;
+  display:flex;align-items:center;flex-wrap:wrap;gap:9px;max-height:230px;overflow:auto}
+.spike-patch[hidden]{display:none}
+.spike-patch strong{font-size:11px;flex:1 0 100%}
+.spike-patch label{display:flex;align-items:center;gap:5px;font-size:11px}
+.spike-patch #routeList{max-width:320px}
+.spike-patch #targetList{max-width:170px}
+.spike-patch pre{flex:1 0 100%;white-space:pre-wrap;word-break:break-all;
+  max-height:100px;overflow:auto;padding:7px;background:#f5f8fa;font:10px/1.4 monospace;margin:0}
+.spike-patch pre:empty{display:none}
+@media(max-width:650px){
+  .spike-head{flex-wrap:wrap}.spike-head select{max-width:100%}
+  .spike-patch #routeList{max-width:210px}
+}

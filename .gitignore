@@ -3,3 +3,7 @@
 node_modules/
 dist/
 *.log
+
+# IDE hosting spike: generated webview bundles and extension packages
+experiments/ide-host/vscode/media/
+experiments/ide-host/vscode/*.vsix
