@@ -121,6 +121,8 @@ export function RouteEdge(props:EdgeProps){
           " origin-"+(data?.origin||"OTHER")+
           (selected?" is-selected":"")}
         style={{transform:"translate(-50%,-50%) translate("+lx+"px,"+ly+"px)"}}
+        data-route-ids={data?.sourceRouteIds?.join(",")??undefined}
+        data-route-source={data?.bundle?.routeSource??undefined}
         title={data?.sourceRouteIds?.length?data.sourceRouteIds.join(" · "):label}>{label.length>44?label.slice(0,43)+"…":label}</div>
     </EdgeLabelRenderer>}
   </>;
