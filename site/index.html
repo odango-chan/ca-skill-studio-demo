@@ -24,6 +24,7 @@
           <strong>文件</strong>
           <button type="button" data-studio-command="file.open">打开文件</button>
           <button type="button" data-studio-command="file.openDirectory">打开 SKILL 目录</button>
+          <button type="button" data-studio-command="file.loadSample">加载示例 · establish-pdu-session</button>
           <button type="button" data-studio-command="file.saveDirectory">保存到所选目录</button>
           <button type="button" data-studio-command="file.export">导出当前文件</button>
           <button type="button" data-studio-command="file.exportPackage">导出 Package ZIP</button>
@@ -77,17 +78,19 @@
         <ol id="nodeOutline" class="outline"></ol>
       </details>
       <div class="explorer-bottom">
-        <button id="openButton" type="button" class="explorer-action">打开本地文件</button>
-        <button id="openDirectoryButton" type="button" class="explorer-action" title="选择目录（仅读取；保存时另申请写权限）">打开本地 SKILL 目录</button>
+        <button id="openDirectoryButton" type="button" class="explorer-action" title="选择目录（仅读取；保存时另申请写权限）">打开 SKILL 目录</button>
         <div id="directoryOpenNotice" class="save-status" role="status" aria-live="polite" hidden></div>
         <button id="saveDirectoryButton" type="button" class="explorer-action" hidden title="写入新选定且快照匹配的目录；不能证明是原始物理路径">保存到所选目录</button>
         <div id="saveNotice" class="save-status" role="status" aria-live="polite" hidden></div>
         <button id="reloadDirectoryButton" type="button" class="explorer-action" hidden>重新导入目录（先备份）</button>
-        <button id="exportPackageButton" type="button" class="explorer-action" hidden>导出整个 Package (.zip)</button>
-        <details class="sample-picker">
-          <summary>加载示例</summary>
-          <button id="establishSampleButton" type="button" class="explorer-action">establish-pdu-session</button>
-        </details>
+        <!-- Action owners remain mounted for the single shared command path.
+             CSS hides only these low-frequency duplicates; their JS disabled/hidden
+             states still determine menu availability and permissions. -->
+        <div class="explorer-command-bridge" aria-hidden="true">
+          <button id="openButton" type="button">打开本地文件</button>
+          <button id="exportPackageButton" type="button" hidden>导出整个 Package (.zip)</button>
+          <button id="establishSampleButton" type="button">establish-pdu-session</button>
+        </div>
         <input id="filePicker" type="file" hidden accept=".yaml,.yml,.md,.json,.txt,.py,.js,.ts,.sh,text/plain">
         <input id="directoryPicker" type="file" hidden webkitdirectory multiple aria-label="选择完整 SKILL 目录">
       </div>

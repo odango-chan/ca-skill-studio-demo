@@ -261,7 +261,14 @@ try{
     " const disabledSave=item('file.saveDirectory')?.disabled===true;",
     " const openFileAvailable=item('file.open')?.disabled===false;",
     " const openDirectoryAvailable=item('file.openDirectory')?.disabled===false;",
+    " const sampleAvailable=item('file.loadSample')?.disabled===false;",
+    " const zipAvailable=item('file.exportPackage')?.disabled===false;",
     " const exportAvailable=item('file.export')?.disabled===false;",
+    " const bridge=document.querySelector('.explorer-command-bridge');",
+    " const bridgeHidden=getComputedStyle(bridge).display==='none';",
+    " const visibleExplorerActions=[...document.querySelectorAll('.explorer-bottom>.explorer-action')].filter(x=>!x.hidden).map(x=>x.id);",
+    " const compactExplorer=bridgeHidden&&visibleExplorerActions.length===1&&",
+    "   visibleExplorerActions[0]==='openDirectoryButton';",
     " const disabledUndo=item('edit.undo')?.disabled===true;",
     " item('view.source')?.click();await sleep(50);",
     " const sourceMode=document.getElementById('editorBody').dataset.mode==='source'&&!menu.open;",
@@ -279,6 +286,7 @@ try{
     " document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));",
     " const outsideClosed=menu.open===false;",
     " return {opened,groups,disabledSave,openFileAvailable,openDirectoryAvailable,",
+    "  sampleAvailable,zipAvailable,compactExplorer,visibleExplorerActions,",
     "  exportAvailable,disabledUndo,sourceMode,visualMode,doubleClickInert,",
     "  escapeClosed,outsideClosed,sourcePreserved:before===document.getElementById('source').value};",
     "})()"
@@ -286,6 +294,7 @@ try{
   console.log("STUDIO_APP_MENU_SMOKE",JSON.stringify(menuUX));
   if(!menuUX?.opened||menuUX.groups!==3||!menuUX.disabledSave||
      !menuUX.openFileAvailable||!menuUX.openDirectoryAvailable||
+     !menuUX.sampleAvailable||!menuUX.zipAvailable||!menuUX.compactExplorer||
      !menuUX.exportAvailable||!menuUX.disabledUndo||!menuUX.sourceMode||
      !menuUX.visualMode||!menuUX.doubleClickInert||
      !menuUX.escapeClosed||!menuUX.outsideClosed||!menuUX.sourcePreserved)
@@ -702,7 +711,9 @@ try{
     " };",
     " try{",
     "  window.confirm=()=>true;",
-    "  document.getElementById('establishSampleButton').click();",
+    "  const menu=document.getElementById('applicationMenu');",
+    "  menu.querySelector('summary').click();",
+    "  [...menu.querySelectorAll('[data-studio-command]')].find(x=>x.dataset.studioCommand==='file.loadSample')?.click();",
     "  for(let i=0;i<140;i++){",
     "   const src=document.getElementById('source')?.value||'';",
     "   if(src.includes('resolve-pcf-create-inputs')&&!src.includes('bind-udm-hold'))break;",

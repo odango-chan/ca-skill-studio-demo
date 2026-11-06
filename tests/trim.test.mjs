@@ -18,7 +18,9 @@ test("one file identity, one edit status, one compact editor toolbar",()=>{
 });
 test("editor uses progressive disclosure without duplicating object panels",()=>{
   assert.match(html,/id="nodeOutlineDisclosure"/);
-  assert.match(html,/class="sample-picker"/);
+  assert.doesNotMatch(html,/class="sample-picker"/);
+  assert.match(html,/class="explorer-command-bridge"/);
+  assert.match(html,/data-studio-command="file.loadSample"/);
   assert.doesNotMatch(html,/id="viewMenu"/);
   assert.match(html,/id="toggleExplorer"/);
   assert.doesNotMatch(html,/id="explorerRail"|id="reopenExplorer"/);
@@ -26,6 +28,7 @@ test("editor uses progressive disclosure without duplicating object panels",()=>
   assert.doesNotMatch(html,/id="nodeQuickCard"|id="toggleInspector"/);
   assert.doesNotMatch(html,/class="inspector-footer"|class="inspector-sequence"/);
   assert.match(css,/\.compact-toolbar/);
+  assert.match(css,/\.explorer-command-bridge\{display:none\}/);
 });
 test("actual Package example files are navigable without an invented disk workspace",()=>{
   assert.match(html,/id="assetTree"/);

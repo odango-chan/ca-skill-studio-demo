@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-06**  
-**Integration baseline before menu UX PR #79: main@4a4ba937222740299eadf5aff26ef8e1522be19b**（Root 主路径 #73、分支收起 / 显式查看 #75、点击位置锚定 #77 已合入；[对应 Pages #42177776582 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42177776582)。此前 D1-A2c #70 也已合入，旧 #70 未合入描述是历史快照。）
+**Integrated baseline before Explorer consolidation: main@a43d3a82867aba484c40ca963bedebcc87cf3eac**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
 
 ## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
 
@@ -9,7 +9,13 @@
 
 **Web/Local 统一：** 同一浏览器 UI、命令 ID、编辑模型；宿主能力不同。Node.js `http.server dist/` 只启动编辑器，**并不执行 SKILL**。本地执行宿主与实际 `Run/Debug/Trace` 功能仍未实现，不能展示假的可操作命令。详细决策见 [Application Shell](design/application-shell.md)。
 
-**证据门槛：** [PR #79](https://github.com/odango-chan/ca-skill-studio-demo/pull/79) 中的单测、TypeScript、Build、真实 Chromium（菜单、禁用状态、ESC / 外部点击、Visual↔Source、双击不进入、17 个节点显式查看）；合入后单独核对 Pages。此段只描述源码及验收路径，不代替实际 CI / Native OS / Runtime PASS。
+**证据：** [PR #79](https://github.com/odango-chan/ca-skill-studio-demo/pull/79) 已合入；[exact-head PR CI #42180901569 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42180901569)（407 tests、TS、Build、Chromium 菜单/显式查看）；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。这不是 Native OS / Runtime PASS。
+
+## 2026-11-06 · Explorer 低频入口收敛（Issue #80）
+
+**本轮代码：** 左侧文件导航不再堆叠“打开单文件 / 导出 ZIP / 加载示例”三套入口，它们归并到顶部「菜单 → 文件」。Explorer 保留高频目录打开、资格成立才出现的目录保存、确有冲突才出现的重新导入和真实状态提示。顶部快捷导出和撤销/重做暂不动，避免失去操作效率。
+
+**一致性：** 原文件按钮与 handler 仍为命令所有者，低频重复按钮仅在视觉上隐藏；不可用与权限仍由 JS `hidden`/`disabled`、现有 Picker 和 Diff/Confirm 保护。浏览器回归要证明文件菜单可以访问示例/ZIP，真实样本加载确实经过菜单，Source 和导航不变。追踪 [#80](https://github.com/odango-chan/ca-skill-studio-demo/issues/80)。PR CI、Pages 待实际成功后补证据；不得把部署前的 UI 声称已上线。
 
 ## Overall
 
@@ -25,8 +31,8 @@
 | D1-A1 真实 Phase PRE/POST 摘要、当前类型图例、Route 来源 | ACCEPTED（仅 View） | IMPLEMENTED（PR #67 MERGED） | [PR CI #42017654738 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42017654738)；[resulting-main Pages #42021101176 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42021101176) | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[Workbench](design/authoring-workbench.md) |
 | D1-A2 所有业务节点双击下钻、子流程边界、精确调用位置往返 | ACCEPTED（仅 View） | IMPLEMENTED（PR #68 MERGED） | [PR CI #42024995449 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42024995449)：390/390 Unit + 17/17 Node Chromium；[resulting-main Pages #42025465770 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42025465770) | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[PR #68](https://github.com/odango-chan/ca-skill-studio-demo/pull/68) |
 | D1-A2b 每个 Node 的真实上一跳 / 内部阶段 / 下一跳（原三栏展示） | ACCEPTED（View） | IMPLEMENTED（PR #69 MERGED） | [PR CI #42029774314 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42029774314)；[Pages #42141895846 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42141895846) | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[PR #69](https://github.com/odango-chan/ca-skill-studio-demo/pull/69) |
-| D1-A3 Root 路径聚焦（主路径／选择路径／全部路径） | ACCEPTED（仅 View） | IMPLEMENTED（PR #73 OPEN） | exact-head PR CI 待验；main/Pages NOT_RUN；Runtime NOT_RUN | [#72](https://github.com/odango-chan/ca-skill-studio-demo/issues/72)、[PR #73](https://github.com/odango-chan/ca-skill-studio-demo/pull/73)、[Workbench](design/authoring-workbench.md) |
-| D1-A2c 每节点真实一跳 React Flow 局部图（替换三栏详情） | ACCEPTED（View-only） | IMPLEMENTED（PR #70 OPEN） | [代码 CI #42144801067 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42144801067)：397 Unit、TS、Build、Chromium；最终文档 HEAD 待复核，main/Pages NOT_RUN | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[PR #70](https://github.com/odango-chan/ca-skill-studio-demo/pull/70)、[Workbench](design/authoring-workbench.md) |
+| D1-A3 Root 路径聚焦（主路径／选择路径／全部路径） | ACCEPTED（仅 View） | IMPLEMENTED（PR #73 MERGED、#75/#77 改进） | [resulting-main Pages #42177776582 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42177776582)（Root 9 默认 / 全图 17，分支可收起，锚点偏移 0px）；Runtime NOT_RUN | [#72](https://github.com/odango-chan/ca-skill-studio-demo/issues/72)、[PR #73](https://github.com/odango-chan/ca-skill-studio-demo/pull/73)、[Workbench](design/authoring-workbench.md) |
+| D1-A2c 每节点真实一跳 React Flow 局部图（替换三栏详情） | ACCEPTED（View-only） | IMPLEMENTED（PR #70 MERGED，#79 移除双击） | [resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)（显式「查看」17/17，局部图、返回、Source 不变） | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[PR #70](https://github.com/odango-chan/ca-skill-studio-demo/pull/70)、[Workbench](design/authoring-workbench.md) |
 | D1 Procedure 投影、图形浏览、现有 Route Target Rewire | ACCEPTED | IMPLEMENTED | PASS（本仓浏览器级） | [D1](D1-procedure-designer.md)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
 | D2 Node Designer A1–A5 有界创建/删除/重命名/属性 Patch | ACCEPTED | IMPLEMENTED | PASS（本仓单测/浏览器） | [D2](D2-node-designer.md)、[PR #4](https://github.com/odango-chan/ca-skill-studio-demo/pull/4)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605140297) |
 | 固定示例多文件 Source / Markdown/ZIP 编辑与下载 | ACCEPTED | IMPLEMENTED | PASS（本仓测试范围） | `site/sample-packages.mjs`、`tests/package.test.mjs`、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
