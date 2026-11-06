@@ -122,14 +122,13 @@ test("A2 double-click shows Node drill-down; Child navigation is an extra action
   assert.match(app,/function renderNodeFocus\(\)/);
   assert.match(app,/function openNodeFocus\(id\)/);
   assert.match(app,/function closeNodeFocus\(\)/);
-  assert.match(app,/if\(!modelPart\.phase\)return/);
+  assert.match(app,/projectNodeFocusFlow\(lastGood,nodeFocusId\)/);
   assert.match(app,/nodeJourney\(lastGood,nodeFocusId\)/);
   assert.match(html,/id="nodeFocus"[^>]*aria-label="节点上下游与内部流程"/);
-  assert.match(html,/id="nodeFocusStages"/);
+  assert.match(html,/id="nodeFocusFlow"/);
   assert.match(html,/id="nodeFocusReturn"/);
   assert.match(css,/\.graph-pane \.node-focus\[hidden\]/);
-  assert.match(css,/\.node-focus-stage\.is-pre/);
-  assert.match(css,/\.node-focus-stage\.is-post/);
-  assert.match(css,/\.node-focus-stage\.is-op/);
+  assert.match(css,/\.focus-graph-card\.is-stage/);
+  assert.match(css,/\.node-focus-flow-host/);
   assert.match(app,/if\(visible\)\$\("reactFlowRoot"\)\.setAttribute\("aria-hidden","true"\)/);
 });

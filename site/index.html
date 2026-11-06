@@ -108,16 +108,17 @@
             <header class="node-focus-header">
               <button id="nodeFocusReturn" type="button" class="node-focus-back">返回流程图</button>
               <div class="node-focus-heading">
-                <span class="node-focus-eyebrow">NODE · 上一跳 / 内部阶段 / 下一跳</span>
+                <span class="node-focus-eyebrow">NODE · 局部流程图（真实 Route / 阶段顺序）</span>
                 <h2 id="nodeFocusTitle"></h2>
                 <p id="nodeFocusSubtitle"></p>
               </div>
             </header>
-            <div class="node-focus-neighborhood">
-              <aside id="nodeFocusPrevious" class="node-focus-neighbor-lane" aria-label="当前节点的上一跳"></aside>
-              <div id="nodeFocusStages" class="node-focus-stages" aria-label="当前节点内部阶段"></div>
-              <aside id="nodeFocusNext" class="node-focus-neighbor-lane" aria-label="当前节点的下一跳"></aside>
+            <div class="node-focus-toolbar">
+              <span id="nodeFocusStats"></span>
+              <div id="nodeFocusChildren"></div>
+              <button id="nodeFocusFit" type="button" class="node-focus-back">适配局部图</button>
             </div>
+            <div id="nodeFocusFlow" class="node-focus-flow-host" aria-label="当前节点一跳局部 React Flow 流程图"></div>
           </section>
           <details id="graphLegend" class="graph-legend" aria-label="流程图节点与连线图例">
             <summary>图例</summary>

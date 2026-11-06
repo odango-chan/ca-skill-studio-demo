@@ -73,19 +73,17 @@ test("A2b multi-outcome same-peer, Phase source, cycle and terminal are not hidd
   ]);
 });
 
-test("A2b one-hop UI exposes all lanes, original Route identity and click-to-pivot",()=>{
+test("A2c local React Flow replaces static neighbor panels without losing Source",()=>{
   const html=read("../site/index.html");
   const css=read("../site/light.css");
   const app=read("../site/app.mjs");
-  for(const id of ["nodeFocusPrevious","nodeFocusStages","nodeFocusNext"])
+  for(const id of ["nodeFocusFlow","nodeFocusStats","nodeFocusChildren","nodeFocusFit"])
     assert.ok(html.includes('id="'+id+'"'),id);
-  assert.match(app,/nodeNeighborhood\(lastGood,nodeFocusId\)/);
-  assert.match(app,/renderNeighbors\("nodeFocusPrevious",neighborhood.previous,"previous"\)/);
-  assert.match(app,/renderNeighbors\("nodeFocusNext",neighborhood.next,"next"\)/);
-  assert.match(app,/chip\.dataset\.routeId=route\.id/);
-  assert.match(app,/chip\.dataset\.routeSource=route\.routeSource/);
-  assert.match(app,/\(\)=>openNodeFocus\(peer\.node\.id\)/);
-  assert.match(css,/\.node-focus-neighborhood\{/);
-  assert.match(css,/@media\(max-width:990px\)/);
-  assert.match(css,/\.node-focus-neighbor-empty\{/);
+  assert.doesNotMatch(html,/id="nodeFocusPrevious"/);
+  assert.match(app,/projectNodeFocusFlow\(lastGood,nodeFocusId\)/);
+  assert.match(app,/layoutProcedureELK\(local,\{direction:"RIGHT",dimensions:local.dimensions\}\)/);
+  assert.match(app,/onPivot:id=>openNodeFocus\(id\)/);
+  assert.match(app,/nodeFocusCanvas\.render\(local,layout\)/);
+  assert.match(css,/\.node-focus-flow-host/);
+  assert.match(css,/\.focus-graph-card\.is-stage/);
 });

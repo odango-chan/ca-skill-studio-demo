@@ -1654,176 +1654,118 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   margin:0;font:10px/1.4 system-ui,sans-serif;color:#8192a3;
   overflow-wrap:anywhere;
 }
-.node-focus-stages{
-  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
-  padding:24px clamp(14px,5vw,56px) 42px;
-  display:flex;flex-direction:column;align-items:center;
+
+/* Variable-height stage geometry must override the main 238×80 wrapper. */
+.focus-procedure-flow .react-flow__node{width:auto;height:auto}
+/* D1-A2c: the drilled-down Node is an actual read-only React Flow + ELK
+   subgraph, not an Inspector with three card columns. */
+.node-focus-toolbar{
+  flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  padding:8px 16px;background:#f8fbfd;
+  border-bottom:1px solid #e1eaf2;
+  color:#647f94;font:600 10px/1.45 system-ui,sans-serif;
 }
-.node-focus-stage{
-  width:100%;max-width:690px;flex:none;
-  background:#fff;border:1px solid #dfe7ef;
-  border-left:3px solid #91b1ca;
-  border-radius:9px;padding:14px 17px 15px;
-  box-shadow:0 4px 16px #3856720b;
-}
-.node-focus-stage.is-pre{border-left-color:#84accc}
-.node-focus-stage.is-op{border-left-color:#4b9588}
-.node-focus-stage.is-post{border-left-color:#7eb9a8}
-.node-focus-stage-heading{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-}
-.node-focus-stage-heading strong{
-  font:750 11px/1.3 system-ui,sans-serif;letter-spacing:.03em;color:#39566d;
-}
-.node-focus-stage-heading span{
-  font:700 10px/1.3 ui-monospace,Consolas,monospace;color:#7d96a8;
-}
-.node-focus-stage-value{
-  margin-top:8px;color:#445e77;
-  font:550 12px/1.5 ui-monospace,Consolas,monospace;overflow-wrap:anywhere;
-}
-.node-focus-steps{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:7px}
-.node-focus-step{
-  display:flex;gap:10px;align-items:flex-start;
-  padding:8px 10px;border-radius:6px;background:#f5f8fb;
-  border:1px solid #edf1f6;font-size:11px;
-}
-.node-focus-step-kind{
-  flex:none;font:700 10px/1.5 ui-monospace,Consolas,monospace;color:#5a7c99;
-}
-.node-focus-step-main{min-width:0;flex:1;overflow-wrap:anywhere;color:#3d5971}
-.node-focus-step-name{
-  display:block;font-size:10px;font-weight:600;color:#768ca0;
-}
-.node-focus-connector{
-  height:28px;flex:none;display:flex;align-items:center;justify-content:center;
-  color:#9fb2c3;font-size:18px;
-}
-.node-focus-route-list{
-  display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;
-  padding-top:10px;border-top:1px dashed #e2eaf2;
-}
-.node-focus-route{
-  display:inline-flex;gap:5px;align-items:center;
-  font:600 10px/1.35 ui-monospace,Consolas,monospace;
-  background:#f1f5f9;color:#55748c;
-  border:1px solid #dce6ef;border-radius:5px;
-  padding:4px 7px;overflow-wrap:anywhere;
-}
-.node-focus-route.tone-success{color:#138f7a;border-color:#bde4d9;background:#f0faf6}
-.node-focus-route.tone-failure{color:#b95352;border-color:#f0d7d5;background:#fdf7f7}
-.node-focus-route.tone-uncertain{color:#a2762c;border-color:#f4e1b8;background:#fcf8f0}
+#nodeFocusStats{flex:1;min-width:180px}
+#nodeFocusChildren{display:flex;gap:7px;flex-wrap:wrap}
 .node-focus-subflow{
-  display:inline-flex;margin-top:10px;padding:6px 9px;
-  color:#3b6f9e;background:#eef3fe;border:1px solid #cedcf6;
-  border-radius:6px;font-size:11px;font-weight:650;cursor:pointer;
+  border:1px solid #d0dff4;border-radius:6px;
+  background:#eff5fe;color:#386b9a;
+  font:650 10px/1.25 system-ui,sans-serif;padding:5px 8px;
+  cursor:pointer;
 }
-.node-focus-subflow:hover{background:#dfeafb}
-.node-focus-subflow:focus-visible{outline:2px solid #0b8b7e;outline-offset:2px}
-.node-focus-empty{font-size:11px;color:#8595a5}
+.node-focus-subflow:hover{background:#e1edfc}
+.node-focus-subflow:focus-visible{outline:2px solid #168c7a;outline-offset:2px}
+.node-focus-flow-host{
+  flex:1;min-height:0;min-width:0;position:relative;
+  background:#f9fbfd;
+}
+.node-focus-flow-host .react-flow{height:100%;width:100%}
+.focus-graph-card{
+  --port-border-left:1px;--port-border-right:1px;
+  --port-border-top:1px;--port-border-bottom:1px;
+  position:relative;box-sizing:border-box;min-width:0;
+  border:1px solid #becfdd;border-radius:9px;
+  background:#fff;box-shadow:0 4px 14px #30577413;
+  padding:10px 11px;color:#35536d;
+  display:flex;flex-direction:column;gap:7px;
+}
+.focus-graph-card.is-stage{
+  background:#f7fcfa;border:1.5px solid #7ea99c;
+  box-shadow:0 4px 16px #276c591a;
+}
+.focus-graph-card.stage-preconditions,
+.focus-graph-card.stage-postconditions{
+  background:#f4f9ff;border-color:#9dbbd2;
+}
+.focus-graph-card.is-neighbor.role-previous{border-left:3px solid #96acbf}
+.focus-graph-card.is-neighbor.role-next{border-right:3px solid #96acbf}
+.focus-graph-card-title{
+  display:flex;justify-content:space-between;align-items:baseline;
+  gap:7px;font:750 11px/1.3 system-ui,sans-serif;
+  color:#42627d;
+}
+.focus-graph-card-title span{
+  font:650 9px/1.2 ui-monospace,Consolas,monospace;
+  color:#899cac;
+}
+.focus-graph-neighbor-name{
+  font:700 12px/1.35 ui-monospace,Consolas,monospace;
+  color:#365870;overflow-wrap:anywhere;
+}
+.focus-graph-pivot{
+  margin-top:auto;align-self:flex-start;
+  border:1px solid #d2e2e9;border-radius:5px;
+  padding:4px 7px;background:#f0f9fa;color:#2d7788;
+  font:650 10px/1.2 system-ui,sans-serif;cursor:pointer;
+}
+.focus-graph-pivot:hover{background:#e0f4f5}
+.focus-graph-pivot:focus-visible,
+.focus-graph-source:focus-visible{
+  outline:2px solid #168c7a;outline-offset:2px;
+}
+.focus-graph-op{
+  display:flex;flex-direction:column;gap:7px;
+  font:11px/1.4 ui-monospace,Consolas,monospace;
+  overflow-wrap:anywhere;
+}
+.focus-graph-op strong{color:#286e61}
+.focus-graph-op span{color:#587f73}
+.focus-graph-steps{
+  display:flex;flex-direction:column;gap:4px;
+  flex:1;min-height:0;overflow-y:auto;
+}
+.focus-graph-step{
+  display:flex;align-items:flex-start;gap:5px;
+  padding:4px 5px;border-radius:4px;
+  background:#fff;border:1px solid #e0e9f1;
+  color:#50687d;font:10px/1.25 system-ui,sans-serif;
+}
+.focus-graph-step>strong{
+  flex:none;color:#547b9b;
+  font:700 9px/1.4 ui-monospace,Consolas,monospace;
+}
+.focus-graph-step>span{
+  flex:1;min-width:0;
+  overflow-wrap:anywhere;max-height:32px;overflow:hidden;
+}
+.focus-graph-source{
+  flex:none;border:0;border-radius:4px;
+  background:#eaf4fc;color:#48799a;
+  font:600 9px/1.3 ui-monospace,Consolas,monospace;
+  padding:2px 3px;cursor:pointer;
+}
+.focus-graph-no-steps{font:11px/1.4 system-ui,sans-serif;color:#8a9fac}
+.focus-procedure-flow .react-flow__edge-path.focus-graph-phase-link{
+  stroke:#9baebd;stroke-width:1.7;
+  stroke-dasharray:4 5;
+}
+.focus-procedure-flow .designer-route-label{
+  max-width:180px;white-space:normal;
+  font-size:10px;pointer-events:none;
+}
+.focus-procedure-flow .react-flow__node{cursor:default}
 @media(max-width:680px){
- .node-focus-header{padding:11px 12px;gap:8px}
- .node-focus-stages{padding:16px 10px 24px}
- .node-focus-stage{padding:12px}
- .node-focus-heading h2{font-size:12px}
-}
-
-.node-focus-source-link{
- flex:none;align-self:center;cursor:pointer;border:1px solid #d7e5ef;
- border-radius:5px;background:#fff;color:#4a7c99;
- font:650 10px/1.2 ui-monospace,Consolas,monospace;padding:4px 6px;
-}
-.node-focus-source-link:hover{background:#eaf6fb}
-.node-focus-source-link:focus-visible{outline:2px solid #0b8b7e;outline-offset:2px}
-.node-focus-step-child{
- display:flex;padding-left:12px;margin-top:-3px;
-}
-
-/* D1-A2b: the Node-focus canvas is a source-backed ONE-HOP neighborhood,
-   not a fabricated linear path. Exact original Route labels remain visible. */
-.node-focus-neighborhood{
-  flex:1;min-height:0;min-width:0;
-  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.25fr) minmax(0,1fr);
-  gap:14px;padding:16px clamp(12px,2.5vw,32px) 20px;
-  overflow:hidden;align-items:stretch;
-}
-.node-focus-neighborhood .node-focus-stages{
-  min-width:0;width:100%;height:100%;
-  padding:8px 4px 22px;overflow-y:auto;
-}
-.node-focus-neighborhood .node-focus-stage{
-  max-width:unset;box-sizing:border-box;
-}
-.node-focus-neighbor-lane{
-  min-width:0;min-height:0;
-  overflow-y:auto;overscroll-behavior:contain;
-  display:flex;flex-direction:column;gap:9px;
-  padding:8px 1px 22px;
-}
-.node-focus-neighbor-heading{
-  display:flex;justify-content:space-between;align-items:center;
-  gap:8px;padding:0 2px 5px;
-  color:#567086;font:700 11px/1.35 system-ui,sans-serif;
-  border-bottom:1px solid #dce6ef;
-}
-.node-focus-neighbor-heading span:last-child{
-  color:#8498aa;font:600 10px/1.2 ui-monospace,Consolas,monospace;
-}
-.node-focus-neighbor-card{
-  background:#fff;border:1px solid #dce6ee;
-  border-radius:8px;padding:10px;
-  box-shadow:0 2px 8px #3155750b;
-}
-.node-focus-neighbor-open{
-  display:block;text-align:left;width:100%;
-  background:transparent;border:0;padding:0;
-  color:#365b75;cursor:pointer;
-}
-.node-focus-neighbor-open:hover .node-focus-neighbor-id{text-decoration:underline}
-.node-focus-neighbor-open:focus-visible{outline:2px solid #098f7f;outline-offset:3px}
-.node-focus-neighbor-kind{
-  display:block;color:#7c91a4;
-  font:750 9px/1.3 system-ui,sans-serif;
-}
-.node-focus-neighbor-id{
-  display:block;margin-top:4px;overflow-wrap:anywhere;
-  font:700 11px/1.35 ui-monospace,Consolas,monospace;
-}
-.node-focus-neighbor-routes{
-  display:flex;flex-wrap:wrap;gap:5px;
-  margin-top:9px;padding-top:8px;border-top:1px dashed #e7edf3;
-}
-.node-focus-neighbor-route{
-  display:inline-flex;align-items:center;
-  font:600 10px/1.35 ui-monospace,Consolas,monospace;
-  color:#647d92;background:#f0f5f8;
-  border:1px solid #dbe5ed;border-radius:5px;
-  padding:3px 6px;overflow-wrap:anywhere;
-}
-.node-focus-neighbor-route.tone-success{color:#138f7a;border-color:#c4e6dc;background:#f1f9f5}
-.node-focus-neighbor-route.tone-failure{color:#bb5855;border-color:#ebd3d1;background:#fcf5f5}
-.node-focus-neighbor-route.tone-uncertain{color:#a57a2e;border-color:#f0dfb7;background:#fcf9ee}
-.node-focus-neighbor-direction{
-  margin-top:7px;color:#9cadbb;font:600 10px/1.35 system-ui,sans-serif;
-}
-.node-focus-neighbor-empty{
-  padding:14px 10px;color:#8095a6;
-  border:1px dashed #cbd9e6;border-radius:8px;
-  background:#f9fbfd;font:11px/1.5 system-ui,sans-serif;
-}
-.node-focus-neighbor-intro{
-  color:#91a2b0;font:10px/1.35 system-ui,sans-serif;
-}
-/* On narrow widths retain all neighbors, stacking them rather than hiding
-   failure branches or shrinking Source-backed outcomes into icons. */
-@media(max-width:990px){
-  .node-focus-neighborhood{
-    display:flex;flex-direction:column;
-    overflow-y:auto;gap:12px;padding:12px;
-  }
-  .node-focus-neighbor-lane{flex:none;min-height:auto;overflow:visible}
-  .node-focus-neighborhood .node-focus-stages{
-    flex:none;min-height:auto;height:auto;overflow:visible;
-    padding:0 0 6px;
-  }
+  .node-focus-header{padding:10px;gap:8px}
+  .node-focus-heading h2{font-size:12px}
+  .node-focus-toolbar{padding:7px 10px}
 }

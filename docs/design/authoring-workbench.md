@@ -118,7 +118,7 @@ Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的�
 - 画布右上角的原生 `details` 图例默认折叠，首版显示 START、8 类支持的 Operator 与 4 类 Route 色义（A1 将其替换为当前实际类型）；图例不占 Inspector，不引入新的工具栏或运行状态。YAML Source、Diff、Undo/Redo、ELK 路由几何、拖动重连保持权威与既有行为。
 - 浏览器验收需核对：真实业务 Node 数与 Route 路径数量未变，START 单独可见、原业务标签无 START，图例可折叠、可展开，PASS 对应的可见线条与箭头同色且混合/失败/不确定边不冒充成功；此项仅是 Studio 展示能力。大图适配边缘空间仍以真实 Node 布局为依据，不应把 CSS 的装饰物冒充额外 Route。
 
-## D1-A1 · 语义可见性第一阶段（2026-11-05，PR #67 OPEN）
+## D1-A1 · 语义可见性第一阶段（2026-11-05，PR #67 MERGED）
 
 [代码 CI #42017183541](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42017183541) 已 PASS：384/384 Node、TypeScript、Build 和真实 Chromium；Root 17 Node / 46 路径及端口不变，PRE/POST、图例和线型一致；Child 4 Node 只有 POST，返回 Root 恢复。最终文档提交仍需单独 exact-head CI，主分支/Pages 未部署。
 
@@ -157,7 +157,7 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 
 代码检查：[CI #42024171379](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42024171379) 成功（390/390 Unit、TypeScript、Build、Chromium）。浏览器记录显示 17/17 Node 双击 PASS、UDM Subscribe PRE 5/POST 1、终态仅 OP、Procedure 内进入 Child、返回 Root 17/46 和 Source 保持。随后精简了重复的组件事件回调和临时调试字段，最终 HEAD 仍需同样门禁；成功部署到 Pages 之前不声称线上可用。
 
-## D1-A2b · Node 上下游一跳视图（2026-11-05 · PR #69 OPEN）
+## D1-A2b · Node 上下游一跳视图（2026-11-05 · PR #69 MERGED；历史三栏）
 
 用户进一步明确：双击任何业务 Node 后，**不仅查看它的 PRE/OP/POST 内部阶段，还必须看到与它有真实 Route 相连的上一跳和下一跳**。这是现有 A2 局部 Node 详情的补充，不等于 A3 的「整个 Root 流程紧凑概览」。
 
@@ -170,3 +170,15 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 
 
 实测代码门禁：[CI #42029242711](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42029242711) **PASS**（393/393 Unit、TypeScript、Build、Chromium）。在 Root 示例的 `nudm-sdm-subscribe`，确证上一跳 1 Node / 1 POST Route，下一跳 6 Node / 9 Route（PRE/OP/POST，不同 Outcome 保留）；点击 `npcf-sm-policy-control-create` 后其上一跳指回原节点，再点击返回；终态无下一跳；返回主图 17 Node / 46 bundles、Source 原字节未变。CI 浏览器为窄屏，确认纵向堆叠布局生效；三栏桌面布局由 CSS 控制，但仍需在线目视确认。此项仅候选 PR，还未合入/Pages 部署。
+
+## D1-A2c · 真正的局部流程图（2026-11-06 · PR #70 OPEN）
+
+用户指出 A2b 三栏卡片没有箭头，实质仍是 Inspector，而不是 Procedure Designer 的流程图。A2c **只替换双击 Node 后的显示方式**，复用主流程的 React Flow / ELK / Route Edge / 精确端口。保留 A2b 已建立的 Source-backed 一跳拓扑数据、A2 Child 返回调用节点和原始 Root 图（Owner 17 Node / 46 bundle）。
+
+- `projectNodeFocusFlow()` 将真实上一跳 / 下一跳作为邻接业务 Node 的**视图副本**，当前业务 Node 根据 Source 声明实际存在的 Phase 展开成 PRE（若有）、OP、POST（若有）。拆出的 Stage 是 UI 节点，不得存回 YAML、不能赋予 Runtime operator 资格。
+- 原始 Route 保留 `id`、`outcome`、`routeSource`、`line` 和 `originalRoute` 引用。入向连向当前 Node 第一个真实 Stage；出向从其声明源的 PRE/OP/POST Stage 发出。颜色和标签基于真实 Outcome / 来源；同起止点同来源可汇聚多 Outcome，但不能丢失或复制原始 ID。
+- PRE → OP → POST 连线统一标 `view.phase` / `viewOnly`，仅说明局部视图的阶段**展示顺序**。它不是新 Route、不是执行保证，也不可用于产生编辑权。主图和局部图共用绘图库，局部图允许阶段节点可变高度；主图仍用 238×80 原几何。
+- 点击邻接 Node 可继续局部下钻；当前节点阶段内可查看原始 Step 名称、类型及 Source 行号，已有 Child Procedure 引用仍通过独立按钮进入。没有 PRE/POST 的终态显示 OP-only；无前驱/后继通过统计文字说明，不伪造 START/END 节点。
+- 同一业务 Node 若既为前驱又为后继，局部图可展示两个不同视觉角色，不会改变业务 Node 数量；self-loop 直接接入实际阶段，保持 Route 身份。ELK 对每条连线做布局并与 React Flow 的 port handle 定位对齐，不能为了美观把 PRE 的失败边挂在 POST。
+
+验收需包括全 Owner Root 17/17 Node 的真实 Local React Flow、UDM Subscribe PRE 5/OP/POST 1 和一入九出 Route 原 ID（含 PRE/OP/POST）、多个 Outcome/同一邻接、循环、终态、Child 往返、主图 17/46、Source bytes 不变。源码修改不对应 Runtime/5GC E2E；真正的根流程全局紧凑概览 A3 仍独立进行。代码级 CI #42144801067 已 PASS；最终文档提交后 exact-head CI 和 Pages 仍需单独核对。
