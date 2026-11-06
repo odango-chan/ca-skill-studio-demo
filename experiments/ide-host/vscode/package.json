@@ -55,5 +55,9 @@
     "media/**",
     "README.md"
   ],
-  "browser": "./dist/extension-web.cjs"
+  "browser": "./dist/extension-web.cjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/odango-chan/ca-skill-studio-demo.git"
+  }
 }
