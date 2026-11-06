@@ -1,5 +1,13 @@
 import * as vscode from "vscode";
-import {randomBytes} from "node:crypto";
+// Web Crypto is available in both modern Node extension hosts and browser
+// workers. Do not import node:crypto: the online host has no Node APIs.
+function newNonce(){
+  const bytes=new Uint8Array(20);
+  if(!globalThis.crypto?.getRandomValues)
+    throw new Error("Secure randomness unavailable: refusing to render Webview");
+  globalThis.crypto.getRandomValues(bytes);
+  return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
+}
 import {isProcedurePath,validateRouteProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
 
 const VIEW="skillStudio.procedurePreview";
@@ -18,7 +26,7 @@ export function activate(context){
       const webview=panel.webview;
       const media=vscode.Uri.joinPath(context.extensionUri,"media");
       webview.options={enableScripts:true,localResourceRoots:[media]};
-      const nonce=randomBytes(20).toString("hex");
+      const nonce=newNonce();
       const script=webview.asWebviewUri(vscode.Uri.joinPath(media,"procedure.js"));
       const style=webview.asWebviewUri(vscode.Uri.joinPath(media,"procedure.css"));
       const csp="default-src 'none'; img-src "+webview.cspSource+" data:; "+
