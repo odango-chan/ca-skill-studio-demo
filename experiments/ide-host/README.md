@@ -59,14 +59,16 @@ Official sources:
 - https://theia-ide.org/docs/authoring_vscode_extensions/
 - https://theia-ide.org/docs/user_install_vscode_extensions/
 
+**Verified CI:** [ide-host-spike #42191440251](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42191440251) — 6/6 spike tests, 409/409 existing tests, bundled extension and VSIX artifact PASS. The simulated host verifies real WorkspaceEdit message handling, but not the real VS Code or Theia GUI. Download `ca-skill-studio-ide-spike-vsix` from the workflow **Artifacts** section.
+
 ## What is and is not proven
 
-| Test | Acceptance | Status before CI/native trials |
+| Test | Acceptance | Status at verified build d528ba73 |
 |---|---|---|
-| Existing CreatedSession YAML projection | five procedures, Root 17 nodes, 63 Outcome routes | test added, pending CI |
-| Native TextDocument + WorkspaceEdit boundary | IDE owns file IO, undo, save; Webview never does | implemented in spike, **native NOT_RUN** |
-| Patch isolation / stale rejection | host reprojects, checks version and exact scalar span | test added, pending CI |
-| ReactFlow + ELK bundling | Webview bundle with local CSS and scripts | pending CI |
+| Existing CreatedSession YAML projection | five procedures, Root 17 nodes, 63 Outcome routes | **PASS** (unit) |
+| Native TextDocument + WorkspaceEdit boundary | IDE owns file IO, undo, save; Webview never does | **PASS** (bundled extension / simulated host); real native host **NOT_RUN** |
+| Patch isolation / stale rejection | host reprojects, checks version and exact scalar span | **PASS** (unit + mock-host) |
+| ReactFlow + ELK bundling | Webview bundle with local CSS and scripts | **PASS** (bundle/VSIX; actual render **NOT_RUN**) |
 | VS Code Explorer/new file | native integration works | **NOT_RUN** |
 | VS Code editor open/edit/undo | graph refresh and single-scalar patch | **NOT_RUN** |
 | Theia same VSIX | custom editor and Webview API compatibility | **NOT_RUN** |
