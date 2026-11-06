@@ -63,8 +63,27 @@ test("per-node expansion reveals only that node's detours and their downstream c
   assert.ok(names(expanded).has("unresolved"));
   assert.ok(expanded.routes.length>base.routes.length);
   assert.equal(expanded.hiddenByNode.get(root.start),undefined);
+  assert.equal(expanded.expandedNodeIds.has(root.start),true);
   assert.ok(expanded.hiddenByNode.size>0);
+  // A second click removes this node from expandedNodes, returning exactly
+  // to the previous happy-path projection without modifying Source.
+  const collapsed=projectPathFocus(root,{mode:"custom",expandedNodes:[]});
+  assert.equal(collapsed.expandedNodeIds.has(root.start),false);
+  assert.deepEqual([...ids(collapsed)].sort(),[...ids(base)].sort());
+  assert.equal(collapsed.hiddenByNode.get(root.start),base.hiddenByNode.get(root.start));
+  // Category filters remain active after the per-node manual expansion closes.
+  const withFilter=projectPathFocus(root,{mode:"custom",
+    categories:["failure"],expandedNodes:[root.start]});
+  const withoutManual=projectPathFocus(root,{mode:"custom",
+    categories:["failure"],expandedNodes:[]});
+  assert.equal(withFilter.expandedNodeIds.has(root.start),true);
+  assert.equal(withoutManual.expandedNodeIds.has(root.start),false);
+  assert.ok([...ids(withoutManual)].every(id=>ids(withFilter).has(id)));
+  assert.ok(names(withoutManual).has("failed"));
   connected(expanded);
+  connected(collapsed);
+  connected(withoutManual);
+  assert.equal(JSON.stringify(root),snapshot);
 });
 
 test("full scope and neighbor override remain independent",()=>{
@@ -150,6 +169,12 @@ test("ELK and React Flow remain exact on the focused subset",async()=>{
   assert.equal(flow.edges.reduce((n,e)=>n+e.data.bundle.routes.length,0),focused.routes.length);
   assert.equal(flow.nodes.find(n=>n.id===root.start).data.hiddenBranchCount,
     focused.hiddenByNode.get(root.start));
+  const expanded=await layoutProcedureELK(root,{pathFocus:{mode:"custom",
+    expandedNodes:[root.start]}});
+  const start=makeFlowElements(expanded,root).nodes.find(n=>n.id===root.start);
+  assert.equal(start.data.hiddenBranchCount,0);
+  assert.equal(start.data.branchesExpanded,true,
+    "Collapse button must persist even when every outgoing Route is visible");
   assert.ok(flow.edges.every(e=>e.markerEnd.type==="arrow"));
   assert.equal(JSON.stringify(root),snapshot);
 });
