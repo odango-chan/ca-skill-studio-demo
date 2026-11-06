@@ -1,7 +1,7 @@
 {
   "name": "ca-skill-studio-ide-spike",
   "displayName": "SKILL Studio IDE Host Spike",
-  "description": "Experimental Source-authoritative Procedure visual editor for VS Code and Theia",
+  "description": "Experimental Procedure visual editor for VS Code desktop/web and Theia host variants",
   "version": "0.0.1",
   "publisher": "odango-chan",
   "private": true,
@@ -54,5 +54,6 @@
     "dist/**",
     "media/**",
     "README.md"
-  ]
+  ],
+  "browser": "./dist/extension-web.cjs"
 }
