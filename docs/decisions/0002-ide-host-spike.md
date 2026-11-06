@@ -35,12 +35,47 @@ changes, then applies a single `WorkspaceEdit.replace` to native document.
 Changes trigger the native undo/save/dirty state and a new projection. No
 automatic execution, no alternate YAML serializer, no custom host disk API.
 
+## Hard product requirement: browser IDE is first-class
+
+The Studio must remain usable **online**, including Explorer file creation,
+YAML/Python text editing, tabs and Procedure graph editing. A desktop-only
+VS Code plugin does not meet the product goal. The existing Pages application
+remains available and unchanged during the trial.
+
+A promising common shell is **Eclipse Theia browser-only** (>=1.76): it
+requires no Node backend for editing, uses the browser Origin Private File
+System (OPFS), and can execute **build-time bundled Web extensions**. That
+supports a static hosting candidate (including GitHub Pages) for an editor,
+not for arbitrary Python/Skill execution. Runtime extension installation and
+terminals are not available in browser-only mode.
+
+The current extension was previously Node-only. The spike now builds *two*
+entries from one extension source:
+- `main: dist/extension.cjs` for Node desktop/server-hosted extension hosts;
+- `browser: dist/extension-web.cjs` for browser workers (VS Code Web /
+  Theia browser-only once actually integrated).
+
+This is **build capability**, not an online working deployment. Browser-only
+Theia must bundle the Web extension during its own build (installing the Node
+VSIX from the Extensions UI at runtime is not sufficient). Webview resource
+URIs, the CustomTextEditor API, extension activation, OPFS file create/save,
+and deployment under a GitHub Pages subpath remain **NOT_RUN**.
+
+For later **online execution** (not editing), a separate consented backend
+service or local runner is needed. Never pretend browser-only OPFS can run
+Python or 5GC.
+
+Reference: https://theia-ide.org/docs/composing_applications/ (Browser-Only
+Applications), https://code.visualstudio.com/api/extension-guides/web-extensions,
+https://eclipsesource.com/blogs/2024/01/29/running-eclipse-theia-without-a-backend/
+
 ## Host candidates and boundary
 
 | Host | What it supplies | What is actually tested |
 |---|---|---|
 | VS Code | Explorer, New File/Folder, search, tabs, native text editing, undo/save | Build/API/AST/Patch unit tests in CI; desktop host visual acceptance must be observed |
-| Eclipse Theia | Comparable IDE shell and a substantial subset of VS Code extension API | The same VSIX installation is a compatibility probe; CustomTextEditor/Webview support remains unproven until a real Theia run |
+| Eclipse Theia desktop / browser+backend | Native IDE shell and VS Code extension host | Node VSIX compatibility unproven until real host |
+| Theia browser-only (>=1.76) | **First-class online editor candidate**, OPFS, prebundled Web extensions | Web entry builds; Theia static app, CustomEditor activation, OPFS, deploy **NOT_RUN** |
 | Existing Pages demo | Static and shareable standalone preview | Remains unchanged; it is a different host implementation, not yet a shared extension |
 
 Theia may implement/stub distinct VS Code API features; it is wrong to
@@ -60,14 +95,15 @@ Official API sources: [VS Code Custom Editor](https://code.visualstudio.com/api/
 - **UX integration:** native Explorer create/rename/delete, native YAML/Python
   source and tabs; open optional Procedure view and switch to native Source;
   graph and Source synchronize after native undo/redo and save.
-- **Cross-host:** install exactly the same VSIX into Theia and repeat the
+- **Cross-host:** install the Node VSIX into desktop/server Theia and bundle the web extension into browser-only Theia; repeat the
   above; document any CustomEditor/Webview limitations explicitly.
 - **Security:** local CSP, no remote downloads in Webview, no Script execution,
   no 5GC network operations, no file writes outside IDE `WorkspaceEdit`.
 
 A green Node build does **not** satisfy the native UX or Theia gate. Keep the
-spike draft/open until one interactive VS Code acceptance and one real Theia
-acceptance (or a recorded incompatibility) exist.
+spike draft/open until VS Code desktop, Theia browser-only online, and any
+optional Theia desktop host have independently verified acceptance (or an
+explicitly documented incompatibility). Do not ship a desktop-only migration.
 
 ## Follow-up, not yet authorized
 
