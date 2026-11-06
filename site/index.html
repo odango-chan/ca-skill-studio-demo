@@ -76,6 +76,13 @@
         </div>
         <span class="mode-spacer"></span>
         <div id="graphViewOptions" class="toolbar-graph-controls" role="group" aria-label="流程图显示选项">
+          <label id="rootPathToolbar" class="toolbar-layout toolbar-path-mode" for="rootPathMode" hidden><span>路径</span>
+            <select id="rootPathMode" aria-label="Root Procedure 路径显示">
+              <option value="normal" selected>主路径</option>
+              <option value="custom">选择路径</option>
+              <option value="all">全部路径</option>
+            </select>
+          </label>
           <label class="toolbar-layout" for="layoutDirection"><span>布局</span>
             <select id="layoutDirection" aria-label="自动布局方向">
               <option value="RIGHT">水平</option>
@@ -97,6 +104,13 @@
       <div id="editorBody" class="editor-body" data-mode="visual">
         <div id="graphPane" class="graph-pane" data-labels="key">
           <div id="reactFlowRoot" class="procedure-flow-root" aria-label="Procedure Designer 交互画布"></div>
+          <div id="rootPathFilters" class="root-path-filters" role="group" aria-label="按需显示 Root 分支" hidden>
+            <span>叠加分支</span>
+            <label><input id="pathFailure" type="checkbox"> 失败</label>
+            <label><input id="pathUncertain" type="checkbox"> 未决</label>
+            <label><input id="pathRecovery" type="checkbox"> 恢复 / 其他</label>
+            <small>节点上的 +N 可单独展开</small>
+          </div>
           <div id="procedureScope" class="procedure-scope" role="region"
             aria-label="当前子流程边界与调用位置" hidden>
             <div class="procedure-scope-eyebrow"><span class="procedure-scope-dot"></span>SUBFLOW · 独立 Procedure</div>

@@ -1,4 +1,5 @@
 import ELK from "elkjs/lib/elk.bundled.js";
+import {projectPathFocus} from "./path-focus.mjs";
 
 // Visual-only graph extraction. The original Procedure route list and source
 // locations remain untouched; grouping never merges distinct Source origins.
@@ -8,11 +9,12 @@ const MAX_NODE_COUNT = 300;
 const MAX_ROUTE_COUNT = 1600;
 const elk = new ELK();
 
-export function selectGraphScope(procedure, centerId = null, neighborsOnly = false) {
+export function selectGraphScope(procedure, centerId = null, neighborsOnly = false, pathFocus = null) {
   const nodes = procedure.nodes;
   const routes = procedure.routes;
   if (!neighborsOnly || !centerId || !nodes.some(n => n.id === centerId)) {
-    return { nodes, routes, isFiltered: false };
+    return pathFocus ? projectPathFocus(procedure,pathFocus) :
+      { nodes, routes, isFiltered: false };
   }
   const ids = new Set([centerId]);
   for (const r of routes) {
@@ -117,9 +119,10 @@ function labelPoint(sections, source, target, positions) {
 }
 
 export async function layoutProcedureELK(procedure, {
-  direction = "DOWN", focus = null, neighborsOnly = false, dimensions = null
+  direction = "DOWN", focus = null, neighborsOnly = false, dimensions = null,
+  pathFocus = null
 } = {}) {
-  const scope = selectGraphScope(procedure, focus, neighborsOnly);
+  const scope = selectGraphScope(procedure, focus, neighborsOnly, pathFocus);
   validate(procedure, scope, direction);
   if(dimensions){
     for(const node of scope.nodes){
@@ -172,5 +175,6 @@ export async function layoutProcedureELK(procedure, {
   if (!Number.isFinite(width) || !Number.isFinite(height)) throw Error("ELK invalid graph dimensions");
   return { positions, bundles, width, height,
     visibleNodes: scope.nodes, visibleRoutes: scope.routes,
-    isFiltered: scope.isFiltered, direction, engine: "ELK layered" };
+    isFiltered: scope.isFiltered, hiddenByNode:scope.hiddenByNode??new Map(),
+    filterReason:scope.reason??null, direction, engine: "ELK layered" };
 }
