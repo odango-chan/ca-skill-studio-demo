@@ -111,5 +111,10 @@ export function projectPathFocus(procedure,{
   }
   return {nodes:resultNodes,routes:resultRoutes,
     isFiltered:resultRoutes.length!==routes.length||resultNodes.length!==nodes.length,
-    hiddenByNode,reason:null};
+    hiddenByNode,
+    // Visibility metadata only. Keep a collapse control after expansion has
+    // exposed every outgoing Route (when hiddenByNode reaches zero).
+    expandedNodeIds:mode==="custom"
+      ?new Set(expandedNodes.filter(id=>visibleNodes.has(id))):new Set(),
+    reason:null};
 }
