@@ -23,7 +23,7 @@ workspace file manager.
 
 The Webview imports the current `site/workspace.mjs` projection,
 `site/layout.mjs` ELK layout, `site/react-flow-canvas.tsx` React Flow canvas,
-and `site/visual-route-edit.mjs` bounded patch preview. The true Source is
+and an isolated source-stable `operator.on` Route target preview in `experiments/ide-host/vscode/src/route-target.mjs` (not production DSL or Runtime semantics). The true Source is
 the host's `TextDocument`, updated by `onDidChangeTextDocument`; the visual
 viewer holds only a disposable projection snapshot. It cannot write files.
 
@@ -55,7 +55,7 @@ Official API sources: [VS Code Custom Editor](https://code.visualstudio.com/api/
 - **Source authority:** exact content/version; preview no write; host
   revalidation and diff; one scalar native workspace edit; stale/forged
   proposals rejected.
-- **Model fidelity:** pinned `establish-pdu-session` six procedures,
+- **Model fidelity:** pinned `establish-pdu-session` five procedures,
   Root 17 Nodes and 63 Routes; all bundle origins retained.
 - **UX integration:** native Explorer create/rename/delete, native YAML/Python
   source and tabs; open optional Procedure view and switch to native Source;
@@ -76,3 +76,14 @@ library before considering retirement of the hand-built Explorer. If Theia
 fails, do not patch around it in the DSL owner or introduce duplicate Runtime
 contracts. Continue to ship Pages as before until a separate migration
 decision explicitly approves replacement.
+
+## First CI finding: old profile pin vs current sample
+
+The current actual sample contains **5 Procedure definitions**, not the 6
+required by the historical `site/extended-attributes.mjs`
+`createdRouteTargets` profile. Therefore reusing that specialized qualification
+returned zero editable Routes. The spike uses a narrowly scoped **generic**
+plain-scalar `operator.on` target preview, with exact Source Span, full
+reprojection and non-target Route equality. This must **not** silently relax
+production Studio policy. If adopted, separately review the production
+qualification contracts and re-establish their owner-approved rules.
