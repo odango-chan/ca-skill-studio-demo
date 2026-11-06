@@ -69,17 +69,18 @@ function serializePath(sections, offset = 30) {
 // single centered handle cannot represent those points: custom edge SVG paths
 // then visibly diverge from their reconnect/preview handles.
 // Map the ELK endpoints into source/target node-local handle coordinates.
-function portAnchor(point, nodeId, positions, offset) {
+function portAnchor(point, nodeId, positions, offset, dimensions) {
   if(!point)return null;
   const position=positions.get(nodeId);
   if(!position)return null;
   const x=point.x+offset-position.x,y=point.y+offset-position.y;
   if(!Number.isFinite(x)||!Number.isFinite(y))return null;
+  const size=dimensions?.get(nodeId)??DIMENSION;
   const candidates=[
-    {side:"top",distance:Math.abs(y),offset:x,length:DIMENSION.width},
-    {side:"bottom",distance:Math.abs(y-DIMENSION.height),offset:x,length:DIMENSION.width},
-    {side:"left",distance:Math.abs(x),offset:y,length:DIMENSION.height},
-    {side:"right",distance:Math.abs(x-DIMENSION.width),offset:y,length:DIMENSION.height}
+    {side:"top",distance:Math.abs(y),offset:x,length:size.width},
+    {side:"bottom",distance:Math.abs(y-size.height),offset:x,length:size.width},
+    {side:"left",distance:Math.abs(x),offset:y,length:size.height},
+    {side:"right",distance:Math.abs(x-size.width),offset:y,length:size.height}
   ].sort((a,b)=>a.distance-b.distance);
   const chosen=candidates[0];
   if(chosen.distance>3||chosen.offset < -2||chosen.offset>chosen.length+2)
@@ -87,13 +88,13 @@ function portAnchor(point, nodeId, positions, offset) {
   return {side:chosen.side,offset:Math.max(0,Math.min(chosen.length,
     Math.round(chosen.offset*100)/100))};
 }
-function bundleAnchors(sections, source, target, positions, offset) {
+function bundleAnchors(sections, source, target, positions, offset, dimensions) {
   if(!Array.isArray(sections)||!sections.length)return null;
   const first=sections.find(section=>section.startPoint&&section.endPoint);
   const last=[...sections].reverse().find(section=>section.startPoint&&section.endPoint);
   if(!first||!last)return null;
-  const from=portAnchor(first.startPoint,source,positions,offset);
-  const to=portAnchor(last.endPoint,target,positions,offset);
+  const from=portAnchor(first.startPoint,source,positions,offset,dimensions);
+  const to=portAnchor(last.endPoint,target,positions,offset,dimensions);
   return from&&to?{source:from,target:to}:null;
 }
 function labelPoint(sections, source, target, positions) {
@@ -116,10 +117,18 @@ function labelPoint(sections, source, target, positions) {
 }
 
 export async function layoutProcedureELK(procedure, {
-  direction = "DOWN", focus = null, neighborsOnly = false
+  direction = "DOWN", focus = null, neighborsOnly = false, dimensions = null
 } = {}) {
   const scope = selectGraphScope(procedure, focus, neighborsOnly);
   validate(procedure, scope, direction);
+  if(dimensions){
+    for(const node of scope.nodes){
+      const size=dimensions.get(node.id);
+      if(!size||!Number.isFinite(size.width)||!Number.isFinite(size.height)||
+         size.width<80||size.height<60||size.width>1000||size.height>1000)
+        throw Error("Invalid visual-only node dimensions: "+node.id);
+    }
+  }
   const bundles = groupRouteEntries(scope.routes);
   const edges = bundles.map((b,i) => ({
     id: "bundle-" + i, sources: [b.source], targets: [b.target]
@@ -136,7 +145,7 @@ export async function layoutProcedureELK(procedure, {
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
       "elk.padding": "[left=35, top=35, right=35, bottom=35]"
     },
-    children: scope.nodes.map(n => ({id: n.id, ...DIMENSION})),
+    children: scope.nodes.map(n => ({id: n.id, ...(dimensions?.get(n.id)??DIMENSION)})),
     edges
   };
   const output = await elk.layout(input);
@@ -153,7 +162,7 @@ export async function layoutProcedureELK(procedure, {
     const e=edgeMap.get("bundle-"+i);
     bundles[i].path=serializePath(e?.sections, offset);
     bundles[i].anchors=bundleAnchors(e?.sections,bundles[i].source,
-      bundles[i].target,positions,offset);
+      bundles[i].target,positions,offset,dimensions);
     bundles[i].label=labelPoint(e?.sections,bundles[i].source,bundles[i].target,positions);
   }
   if (!bundles.every(b => b.routes.length > 0)) throw Error("ELK empty route bundle");
