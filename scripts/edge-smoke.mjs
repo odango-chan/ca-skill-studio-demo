@@ -342,7 +342,7 @@ try{
     "    const stages=nodes().filter(x=>x.getAttribute('data-id').startsWith('stage:'))",
     "      .map(x=>x.getAttribute('data-id'));",
     "    if(!stages.includes('stage:operator'))failures.push('no OP '+id);",
-    "    const boundary=host.querySelector('.react-flow__node[data-id=\\\"view:current-node-boundary\\\"]');",
+    "    const boundary=nodes().find(n=>n.getAttribute('data-id')==='view:current-node-boundary');",
     "    const frame=boundary?.querySelector('.focus-current-boundary');",
     "    if(!frame||getComputedStyle(frame).borderTopStyle!=='dashed'||",
     "       !frame.textContent.includes(id))failures.push('current Node boundary '+id);",
