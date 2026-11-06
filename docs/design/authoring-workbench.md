@@ -193,8 +193,10 @@ Runtime 实际运行轨迹、覆盖率或资格判定。
 Root 工具栏增加「主路径 / 选择路径 / 全部路径」。Root 默认「主路径」；
 Child Procedure 默认完整显示，原有「邻居」临时查看优先于 Root 路径筛选。
 切换为「选择路径」后可叠加失败、未决、恢复／其他分支；节点上的
-`+N 分支` 仅展开此节点隐藏的原始 Route 及其下游，直到汇合主干或终态。
-隐藏条数按**原始 Outcome Route** 计算，不按视觉 bundle 计算。
+`+N 条` 表示该 Node 还有 N 条未显示的 **Outcome Route**（不是 N 条完整流程）；
+点击后切为「收起」，再次点击只撤销该 Node 的手动展开，已勾选的其他分支类别仍然生效。
+展开显示该 Route 的下游，直到汇合主干或终态；按原始 Outcome Route 计数，
+不按视觉 bundle 计数。
 
 「主路径」是所有满足以下条件的 Route 的**并集**（不是任选一条最短路径）：
 
@@ -207,8 +209,13 @@ Child Procedure 默认完整显示，原有「邻居」临时查看优先于 Roo
 恢复分支只使用现有 `reconcile` Operator 作为显式参考，其他未归类分支归
 「恢复／其他」；该分类只控制可见性。选中被隐藏的 Node/Route 时自动展开全图。
 所有可见 Route 必须保持真实 source、target、`routeSource`、Outcome ID、
-Source Span 和 ELK 端点，不能生成虚拟 Runtime Route。双击 Node Focus 继续显示其
-完整一跳上下游，不受 Root 聚焦过滤影响。
+Source Span 和 ELK 端点，不能生成虚拟 Runtime Route。每个业务 Node 卡片现在始终有「查看」：
+单击进入真实上一跳 / PRE-OP-POST / 下一跳局部视图；双击仍可快捷进入，
+但不再是唯一操作；「进入子流程」只用于实际 Child Procedure。
+普通单击卡片仍选中并显示 Inspector（可在其支持范围内编辑），
+不再触发自动居中，以免首次点击后的移动导致双击漏判。
+空白画布双击不再触发缩放；画布缩放仍可使用现有控件和滚轮。
+所有路径筛选都不改变 Node Focus 的完整上下游投影。
 
 该功能的可见性变化与 Source 修改严格隔离。验证分层：
 `tests/path-focus.test.mjs` 检查成功/异常/未知结果/循环/汇合与 ELK 记账；

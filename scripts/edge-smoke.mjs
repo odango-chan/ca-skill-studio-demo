@@ -112,6 +112,41 @@ try{
     " const focusNodes=document.querySelectorAll('.react-flow__node').length;",
     " const focusEdges=document.querySelectorAll('.react-flow__edge-path').length;",
     " const rootDefault=mode?.value==='normal'&&focusNodes>0&&focusNodes<17&&focusEdges<46;",
+    " const start=()=>document.querySelector('.react-flow__node[data-id=\\\"nudm-sdm-get\\\"]');",
+    " const toggle=()=>start()?.querySelector('.designer-hidden-branches');",
+    " const view=()=>start()?.querySelector('.designer-view-node');",
+    " const viewCount=document.querySelectorAll('#reactFlowRoot .designer-view-node').length;",
+    " const badgeBefore=toggle()?.textContent||'';",
+    " toggle()?.click();",
+    " for(let i=0;i<110;i++){",
+    "  if(toggle()?.getAttribute('aria-pressed')==='true'&&",
+    "    document.querySelectorAll('.react-flow__node').length>focusNodes&&",
+    "    document.getElementById('layoutStatus')?.textContent.includes('路径聚焦'))break;",
+    "  await sleep(90);",
+    " }",
+    " const expanded=toggle()?.textContent==='收起';",
+    " const expandedNodes=document.querySelectorAll('.react-flow__node').length;",
+    " toggle()?.click();",
+    " for(let i=0;i<110;i++){",
+    "  if(toggle()?.getAttribute('aria-pressed')==='false'&&",
+    "    document.querySelectorAll('.react-flow__node').length===focusNodes&&",
+    "    document.getElementById('layoutStatus')?.textContent.includes('路径聚焦'))break;",
+    "  await sleep(90);",
+    " }",
+    " const collapsed=toggle()?.textContent===badgeBefore&&",
+    "   document.querySelectorAll('.react-flow__node').length===focusNodes;",
+    " view()?.click();",
+    " for(let i=0;i<80;i++){",
+    "  if(document.getElementById('nodeFocus')?.hidden===false&&",
+    "    document.getElementById('nodeFocusTitle')?.textContent==='nudm-sdm-get')break;",
+    "  await sleep(60);",
+    " }",
+    " const viewOpened=document.getElementById('nodeFocus')?.hidden===false;",
+    " document.getElementById('nodeFocusReturn')?.click();",
+    " await sleep(100);",
+    " const viewReturned=document.getElementById('nodeFocus')?.hidden===true;",
+    " document.getElementById('closeInspector')?.click();",
+    " const viewStable=viewCount===focusNodes&&viewOpened&&viewReturned;",
     " mode.value='custom';mode.dispatchEvent(new Event('change',{bubbles:true}));",
     " for(let i=0;i<45;i++){",
     "  if(!document.getElementById('rootPathFilters').hidden)break;",
@@ -163,6 +198,7 @@ try{
     " const ids=[...document.querySelectorAll('.react-flow__edge')].map(x=>x.getAttribute('data-id'));",
     " const expected=Array.from({length:46},(_,i)=>'flow-edge-'+i);",
     " return {rootFocus:{rootDefault,branchShown,focusNodes,focusEdges,customNodes,",
+    "   badgeBefore,expanded,expandedNodes,collapsed,viewStable,viewCount,",
     "   sourcePreserved:document.getElementById('source').value===before},",
     "  nodes:document.querySelectorAll('.react-flow__node').length,",
     "  edges:paths.length,edgeIds:ids,missing:expected.filter(x=>!ids.includes(x)),",
@@ -186,6 +222,8 @@ try{
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
   if(!result?.rootFocus?.rootDefault||!result.rootFocus.branchShown||
+     !result.rootFocus.expanded||!result.rootFocus.collapsed||
+     !result.rootFocus.viewStable||
      !result.rootFocus.sourcePreserved||
      result?.nodes!==17||result.edges!==46||result.valid!==46||result.markersOk!==46||
      result.attachedPorts!==92||result.maxPortGap>1.5)

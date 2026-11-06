@@ -86,15 +86,31 @@ function ProcedureCard({data,selected}){
         event.stopPropagation();
         data.onEnterChild?.();
       }}>进入子流程 <span aria-hidden="true">›</span></button>}
-    {data.hiddenBranchCount>0&&<button type="button"
-      className="designer-hidden-branches nodrag nopan"
-      aria-label={"展开 "+data.id+" 的 "+data.hiddenBranchCount+" 条隐藏 Route"}
-      title={"展开此节点的 "+data.hiddenBranchCount+" 条隐藏 Route"}
-      onPointerDown={event=>event.stopPropagation()}
-      onClick={event=>{
-        event.stopPropagation();
-        data.onExpandBranches?.();
-      }}>+{data.hiddenBranchCount} 分支</button>}
+    <div className="designer-card-actions nodrag nopan">
+      {(data.hiddenBranchCount>0||data.branchesExpanded)&&<button type="button"
+        className="designer-hidden-branches nodrag nopan"
+        aria-pressed={Boolean(data.branchesExpanded)}
+        aria-label={data.branchesExpanded
+          ?"收起 "+data.id+" 手动展开的 Route"
+          :"展开 "+data.id+" 的 "+data.hiddenBranchCount+" 条隐藏 Outcome Route"}
+        title={data.branchesExpanded
+          ?"取消此节点的手动展开（其它路径筛选仍保留）"
+          :"展开 "+data.hiddenBranchCount+" 条隐藏 Outcome Route（不代表独立的完整流程）"}
+        onPointerDown={event=>event.stopPropagation()}
+        onDoubleClick={event=>event.stopPropagation()}
+        onClick={event=>{
+          event.stopPropagation();
+          data.onToggleBranches?.();
+        }}>{data.branchesExpanded?"收起":"+"+data.hiddenBranchCount+" 条"}</button>}
+      <button type="button" className="designer-view-node nodrag nopan"
+        aria-label={"查看 "+data.id+" 的节点详情、前后连接及内部步骤"}
+        title={"查看 "+data.id+" · 上一跳 / 内部步骤 / 下一跳"}
+        onPointerDown={event=>event.stopPropagation()}
+        onDoubleClick={event=>event.stopPropagation()}
+        onClick={event=>{event.stopPropagation();data.onViewDetails?.();}}>
+        查看 <span aria-hidden="true">›</span>
+      </button>
+    </div>
     {Boolean(data.phaseBadges?.length)&&
       <span className="designer-node-phases" aria-label="节点内部阶段">
         {data.phaseBadges.map(phase=><span
@@ -150,8 +166,9 @@ function ProcedureScene({scene,callbacks,onReady}){
     ...node,data:{...node.data,
       ...(node.data.childProcedure?{onEnterChild:()=>
         callbacks.onEnterChild(node.id,node.data.childProcedure)}:{}),
-      ...(node.data.hiddenBranchCount?{onExpandBranches:()=>
-        callbacks.onExpandBranches(node.id)}:{})
+      onViewDetails:()=>callbacks.onViewDetails(node.id),
+      ...(node.data.hiddenBranchCount||node.data.branchesExpanded?{onToggleBranches:()=>
+        callbacks.onToggleBranches(node.id)}:{})
     }
   }));
   return <ReactFlow
@@ -181,7 +198,7 @@ function ProcedureScene({scene,callbacks,onReady}){
     panActivationKeyCode={null}
     selectNodesOnDrag={false}
     panOnDrag
-    zoomOnScroll zoomOnPinch zoomOnDoubleClick
+    zoomOnScroll zoomOnPinch zoomOnDoubleClick={false}
     minZoom={0.05} maxZoom={2.5}
     fitView fitViewOptions={{padding:0.18,minZoom:0.05,maxZoom:1.25}}
     attributionPosition="bottom-right"
