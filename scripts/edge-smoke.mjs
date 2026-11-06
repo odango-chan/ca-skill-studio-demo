@@ -619,6 +619,24 @@ try{
   ].join("\n"));
   console.log("D1_FROZEN_FIXTURE_LOADED",JSON.stringify(pinnedSource));
   if(!pinnedSource?.old)throw Error("Frozen D1 browser fixture not loaded");
+  // Historical D1 authoring cases assert the complete frozen graph. Explicitly
+  // restore Full here; the public Root default remains Main Path.
+  const frozenFull=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const mode=document.getElementById('rootPathMode');",
+    " mode.value='all';mode.dispatchEvent(new Event('change',{bubbles:true}));",
+    " for(let i=0;i<150;i++){",
+    "  if(document.querySelectorAll('.react-flow__node').length===17&&",
+    "    document.querySelectorAll('.react-flow__edge-path').length===48)break;",
+    "  await sleep(100);",
+    " }",
+    " return {nodes:document.querySelectorAll('.react-flow__node').length,",
+    "  edges:document.querySelectorAll('.react-flow__edge-path').length};",
+    "})()"
+  ].join("\n"));
+  if(frozenFull.nodes!==17||frozenFull.edges!==48)
+    throw Error("Frozen full-graph acceptance setup FAIL: "+JSON.stringify(frozenFull));
   await runD1Interactions(evaluate,command);
   // A clean page navigation resets Inspector/selection state left by the
   // historical D1 interaction tests. All subsequent E2/E3/E4 browser checks
@@ -630,6 +648,10 @@ try{
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
     " for(let i=0;i<150;i++){",
     "  const src=document.getElementById('source')?.value||'';",
+    "  if(src.includes('bind-udm-hold')){",
+    "   const mode=document.getElementById('rootPathMode');",
+    "   if(mode.value!=='all'){mode.value='all';mode.dispatchEvent(new Event('change',{bubbles:true}));}",
+    "  }",
     "  if(src.includes('bind-udm-hold')&&",
     "    document.querySelectorAll('.react-flow__node').length===17&&",
     "    document.querySelectorAll('.react-flow__edge-path').length===46)break;",
