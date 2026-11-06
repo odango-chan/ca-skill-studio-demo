@@ -6,7 +6,7 @@ import "./webview.css";
 import {projectWorkspace} from "../../../../site/workspace.mjs";
 import {layoutProcedureELK} from "../../../../site/layout.mjs";
 import {mountProcedureCanvas} from "../../../../site/react-flow-canvas.tsx";
-import {visualRouteTargets,previewVisualRouteEdit} from "../../../../site/visual-route-edit.mjs";
+import {routeTargetChoices,previewTargetPatch} from "./route-target.mjs";
 
 const vscode=acquireVsCodeApi();
 const $=id=>document.getElementById(id);
@@ -49,8 +49,7 @@ function getProcedure(){return state.procedures?.get(state.procedureId)??null;}
 function routeChoices(routeId){
   const procedure=getProcedure();
   if(!procedure)return [];
-  return visualRouteTargets({source:state.text,procedure,
-    procedureId:state.procedureId,routeId,packageName:"establish-pdu-session"});
+  return routeTargetChoices(procedure,routeId);
 }
 function refreshTargets(){
   state.pending=null;$("commit").disabled=true;$("diff").textContent="";
@@ -126,10 +125,8 @@ $("preview").addEventListener("click",()=>{
   const procedure=getProcedure();
   if(!procedure)return;
   try{
-    const preview=previewVisualRouteEdit({
-      source:state.text,procedure,procedureId:state.procedureId,
-      routeId:$("routeList").value,packageName:"establish-pdu-session"
-    },$("targetList").value);
+    const preview=previewTargetPatch(state.text,state.procedureId,
+      $("routeList").value,$("targetList").value);
     state.pending=preview;
     $("diff").textContent=preview.diff;
     $("commit").disabled=false;
