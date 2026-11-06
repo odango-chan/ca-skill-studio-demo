@@ -14,7 +14,7 @@ import {iconShapes,operatorIcon} from "./icons.mjs";
 // All gestures delegate to the existing source-backed Inspector and Typed Patch.
 const sidePositions={top:Position.Top,bottom:Position.Bottom,
   left:Position.Left,right:Position.Right};
-function portStyle(port){
+export function portStyle(port){
   const offset=port.offset+"px";
   const left="calc("+offset+" - var(--port-border-left))";
   const top="calc("+offset+" - var(--port-border-top))";
@@ -98,7 +98,7 @@ function ProcedureCard({data,selected}){
   </div>;
 }
 
-function RouteEdge(props:EdgeProps){
+export function RouteEdge(props:EdgeProps){
   const {id,sourceX,sourceY,targetX,targetY,sourcePosition,targetPosition,selected}=props;
   const data:any=props.data;
   const [fallback,fx,fy]=getSmoothStepPath({
@@ -121,7 +121,7 @@ function RouteEdge(props:EdgeProps){
           " origin-"+(data?.origin||"OTHER")+
           (selected?" is-selected":"")}
         style={{transform:"translate(-50%,-50%) translate("+lx+"px,"+ly+"px)"}}
-        title={label}>{label.length>44?label.slice(0,43)+"…":label}</div>
+        title={data?.sourceRouteIds?.length?data.sourceRouteIds.join(" · "):label}>{label.length>44?label.slice(0,43)+"…":label}</div>
     </EdgeLabelRenderer>}
   </>;
 }
