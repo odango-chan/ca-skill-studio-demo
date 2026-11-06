@@ -86,7 +86,18 @@ function PhaseLink(props:EdgeProps){
     markerEnd={props.markerEnd}
     className="focus-graph-phase-link" interactionWidth={0}/>;
 }
-const nodeTypes={"focus-node":FocusNode};
+// Visual-only expanded Node container: PRE/OP/POST stay independently
+// positioned by ELK and source-backed edges retain their own identities.
+function FocusBoundary({data}){
+  return <div className="focus-current-boundary"
+    style={{width:data.width,height:data.height}}
+    aria-label={"当前业务节点 "+data.centerId+" 的内部阶段边界"}>
+    <span className="focus-current-boundary-label">
+      当前 Node · {data.centerId}
+    </span>
+  </div>;
+}
+const nodeTypes={"focus-node":FocusNode,"focus-boundary":FocusBoundary};
 const edgeTypes={"procedure-route":RouteEdge,"focus-phase-link":PhaseLink};
 function NodeFocusScene({local,layout,callbacks,onReady}){
   const elements=useMemo(()=>makeNodeFocusElements(local,layout),[local,layout]);
