@@ -117,6 +117,13 @@ try{
     " const view=()=>start()?.querySelector('.designer-view-node');",
     " const viewCount=document.querySelectorAll('#reactFlowRoot .designer-view-node').length;",
     " const badgeBefore=toggle()?.textContent||'';",
+    " const center=()=>{const r=start()?.getBoundingClientRect();",
+    "  return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;};",
+    " const zoom=()=>new DOMMatrix(getComputedStyle(",
+    "  document.querySelector('.react-flow__viewport')).transform).a;",
+    " const distance=(a,b)=>a&&b?Math.hypot(a.x-b.x,a.y-b.y):Infinity;",
+    " await sleep(240);",
+    " const atStart=center(),zoomAtStart=zoom();",
     " toggle()?.click();",
     " for(let i=0;i<110;i++){",
     "  if(toggle()?.getAttribute('aria-pressed')==='true'&&",
@@ -126,6 +133,7 @@ try{
     " }",
     " const expanded=toggle()?.textContent==='收起';",
     " const expandedNodes=document.querySelectorAll('.react-flow__node').length;",
+    " const atExpanded=center(),zoomAtExpanded=zoom();",
     " toggle()?.click();",
     " for(let i=0;i<110;i++){",
     "  if(toggle()?.getAttribute('aria-pressed')==='false'&&",
@@ -135,6 +143,11 @@ try{
     " }",
     " const collapsed=toggle()?.textContent===badgeBefore&&",
     "   document.querySelectorAll('.react-flow__node').length===focusNodes;",
+    " const atCollapsed=center(),zoomAtCollapsed=zoom();",
+    " const anchorError=Math.max(distance(atStart,atExpanded),",
+    "   distance(atStart,atCollapsed));",
+    " const zoomPreserved=Math.abs(zoomAtStart-zoomAtExpanded)<0.001&&",
+    "   Math.abs(zoomAtStart-zoomAtCollapsed)<0.001;",
     " view()?.click();",
     " for(let i=0;i<80;i++){",
     "  if(document.getElementById('nodeFocus')?.hidden===false&&",
@@ -199,6 +212,7 @@ try{
     " const expected=Array.from({length:46},(_,i)=>'flow-edge-'+i);",
     " return {rootFocus:{rootDefault,branchShown,focusNodes,focusEdges,customNodes,",
     "   badgeBefore,expanded,expandedNodes,collapsed,viewStable,viewCount,",
+    "   anchorError,zoomPreserved,zoomAtStart,zoomAtExpanded,zoomAtCollapsed,",
     "   sourcePreserved:document.getElementById('source').value===before},",
     "  nodes:document.querySelectorAll('.react-flow__node').length,",
     "  edges:paths.length,edgeIds:ids,missing:expected.filter(x=>!ids.includes(x)),",
@@ -223,6 +237,7 @@ try{
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
   if(!result?.rootFocus?.rootDefault||!result.rootFocus.branchShown||
      !result.rootFocus.expanded||!result.rootFocus.collapsed||
+     result.rootFocus.anchorError>2||!result.rootFocus.zoomPreserved||
      !result.rootFocus.viewStable||
      !result.rootFocus.sourcePreserved||
      result?.nodes!==17||result.edges!==46||result.valid!==46||result.markersOk!==46||
