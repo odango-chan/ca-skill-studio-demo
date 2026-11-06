@@ -436,6 +436,25 @@ function setMode(next) {
 }
 function updateViewAvailability(nextKind) {
   viewKind=nextKind;
+  const isSourceOnly=viewKind==="source";
+  const path=activeFilePath||filename;
+  const context=$("sourceContext");
+  context.hidden=!isSourceOnly;
+  $("editorToolbar").dataset.fileKind=viewKind;
+  if(isSourceOnly){
+    const glyph=$("sourceContextIcon");
+    if(glyph.dataset.filePath!==path){
+      glyph.replaceChildren(createFileIcon(document,path));
+      glyph.dataset.filePath=path;
+    }
+    setText("sourceContextName",path.split("/").at(-1));
+    $("sourceContextName").title=path;
+    setText("sourceContextMeta",languageForMonaco(path)+" · "+
+      source.value.split("\n").length+" 行");
+  }
+  const procedureFile=activePackage?.files.get("assurance/procedure.yaml");
+  $("backToProcedure").hidden=!isSourceOnly||
+    path==="assurance/procedure.yaml"||!procedureFile?.editable;
   const isGraph=graphControlsAvailable(viewKind);
   const hasVisual=viewKind!=="source";
   $("editorModes").hidden=!hasVisual;
@@ -467,6 +486,11 @@ function updateMarkdownPreview(text) {
   return false;
 }
 for (const id of ["visual", "source", "split"]) $("mode-" + id).addEventListener("click", () => setMode(id));
+$("backToProcedure").addEventListener("click",()=>{
+  // Route through the same Source-authoritative file switch and history owner.
+  if(activePackage?.files.get("assurance/procedure.yaml")?.editable)
+    switchFile("assurance/procedure.yaml");
+});
 
 function loadDocument(name,text,origin="local",{initial=text,historyState=null}={}) {
   filename=name.split("/").at(-1);
