@@ -1,0 +1,58 @@
+{
+  "name": "ca-skill-studio-ide-spike",
+  "displayName": "SKILL Studio IDE Host Spike",
+  "description": "Experimental Source-authoritative Procedure visual editor for VS Code and Theia",
+  "version": "0.0.1",
+  "publisher": "odango-chan",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onCommand:skillStudio.openProcedure",
+    "onCustomEditor:skillStudio.procedurePreview"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "skillStudio.openProcedure",
+        "title": "SKILL Studio: Open Procedure Visual"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "skillStudio.openProcedure",
+          "when": "resourceFilename == procedure.yaml",
+          "group": "navigation"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "skillStudio.procedurePreview",
+        "displayName": "SKILL Procedure Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/assurance/procedure.yaml"
+          }
+        ],
+        "priority": "option"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-ide-spike.mjs",
+    "package": "npm run build && npx --yes @vscode/vsce package --no-dependencies"
+  },
+  "files": [
+    "dist/**",
+    "media/**",
+    "README.md"
+  ]
+}
