@@ -65,7 +65,20 @@ test("Host rejects stale versions, wrong base, substituted candidate and forged 
 });
 test("Build emits a bundled Node extension and a local script/style Webview",()=>{
   for(const path of ["experiments/ide-host/vscode/dist/extension.cjs",
+    "experiments/ide-host/vscode/dist/extension-web.cjs",
     "experiments/ide-host/vscode/media/procedure.js",
     "experiments/ide-host/vscode/media/procedure.css"])
     assert.ok(statSync(path).size>1000,path);
+});
+
+test("Web host entry is declared and excludes Node-only imports",()=>{
+  const manifest=JSON.parse(readFileSync("experiments/ide-host/vscode/package.json","utf8"));
+  assert.equal(manifest.browser,"./dist/extension-web.cjs");
+  assert.equal(manifest.main,"./dist/extension.cjs");
+  const source=readFileSync("experiments/ide-host/vscode/src/extension.mjs","utf8");
+  const web=readFileSync("experiments/ide-host/vscode/dist/extension-web.cjs","utf8");
+  assert.doesNotMatch(source,/from ["']node:/);
+  assert.match(source,/globalThis\.crypto\.getRandomValues/);
+  assert.doesNotMatch(web,/require\(["']node:/);
+  assert.match(web,/skillStudio\.procedurePreview/);
 });
