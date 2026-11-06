@@ -247,7 +247,7 @@ function scheduleELKLayout(wait=0, autoFit=false) {
   const pathFocus=rootPathOptions();
   const scope=selectGraphScope(proc,focus,filtered,pathFocus);
   const basic=scope.isFiltered
-    ? {...proc,start:focus,nodes:scope.nodes,routes:scope.routes}
+    ? {...proc,start:focus??proc.start,nodes:scope.nodes,routes:scope.routes}
     : proc;
   const fallback=layoutProcedure(basic,direction);
   graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
