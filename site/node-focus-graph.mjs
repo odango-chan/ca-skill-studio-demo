@@ -1,6 +1,7 @@
 // D1-A2c view-only one-hop Procedure graph. The original Procedure/Routes
 // remain the ONLY authority; Stage links are explicitly presentation-only.
 import {nodeNeighborhood} from "./workbench.mjs";
+import {classifyRouteTone,ROUTE_TONE_COLOR,routeOrigin} from "./react-flow-projection.mjs";
 
 const BASE={width:238,height:80};
 const stageId=name=>"stage:"+name;
@@ -72,4 +73,54 @@ export function projectNodeFocusFlow(procedure,centerId){
     previousCount:neighbors.previous.peers.length,
     nextCount:neighbors.next.peers.length
   };
+}
+
+export function makeNodeFocusElements(local,layout){
+  if(!local||!layout)return {nodes:[],edges:[]};
+  const ports=new Map(local.nodes.map(node=>[node.id,[]]));
+  for(const [i,b] of layout.bundles.entries()){
+    if(!b.path||!b.anchors)continue;
+    ports.get(b.source)?.push({id:"focus-edge-"+i+"-out",type:"source",
+      ...b.anchors.source});
+    ports.get(b.target)?.push({id:"focus-edge-"+i+"-in",type:"target",
+      ...b.anchors.target});
+  }
+  const nodes=local.nodes.map(node=>{
+    const position=layout.positions.get(node.id),dimensions=local.dimensions.get(node.id);
+    if(!position||!dimensions)throw Error("Missing positioned local flow Node: "+node.id);
+    const nodePorts=ports.get(node.id);
+    return {id:node.id,type:"focus-node",position,draggable:false,
+      selectable:false,
+      data:{...node,dimensions,ports:nodePorts,direction:"RIGHT",
+        portSignature:nodePorts.map(p=>p.id+":"+p.side+":"+p.offset).join("|")}};
+  });
+  const edges=layout.bundles.map((b,i)=>{
+    const internal=b.routeSource==="view.phase";
+    if(internal!==b.routes.every(route=>Boolean(route.viewOnly)))
+      throw Error("Mixed view-only and real Routes in local graph");
+    const tone=internal?"neutral":classifyRouteTone(b.outcomes);
+    const origin=internal?"VIEW":routeOrigin(b.routeSource);
+    const hasAnchors=Boolean(b.path&&b.anchors);
+    return {id:"focus-edge-"+i,source:b.source,target:b.target,
+      type:internal?"focus-phase-link":"procedure-route",
+      sourceHandle:hasAnchors?"focus-edge-"+i+"-out":"out",
+      targetHandle:hasAnchors?"focus-edge-"+i+"-in":"in",
+      selectable:false,reconnectable:false,
+      markerEnd:{type:"arrow",width:15,height:15,strokeWidth:1.2,
+        markerUnits:"userSpaceOnUse",
+        color:internal?"#a7b7c7":ROUTE_TONE_COLOR[tone]},
+      data:{bundle:b,tone,origin,selected:false,
+        path:b.path??null,labelPosition:b.label??null,
+        displayLabel:!internal,
+        label:internal?"阶段顺序":origin+" · "+b.outcomes.join(" / "),
+        sourceRouteIds:internal?[]:b.routes.map(r=>r.originalRoute.id)}};
+  });
+  const accounted=edges.flatMap(e=>e.data.sourceRouteIds);
+  const expected=local.routes.filter(r=>!r.viewOnly).map(r=>r.originalRoute.id);
+  if(accounted.length!==local.originalRouteCount||
+     accounted.length!==expected.length||
+     accounted.some((id,i)=>!expected.includes(id))||
+     new Set(accounted).size!==accounted.length)
+    throw Error("Local flow silently lost or duplicated an original Route");
+  return {nodes,edges};
 }
