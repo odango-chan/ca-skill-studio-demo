@@ -132,6 +132,9 @@ let showAllLabels = false;
 let layoutDirection = "DOWN";
 let fitMode = "all"; // a chosen axis survives layout and window resize
 let neighborView = false;
+let rootPathMode = "normal";
+const rootPathCategories = new Set();
+const rootPathExpandedNodes = new Set();
 let layoutTicket = 0;
 let layoutTimer = null;
 
@@ -173,7 +176,13 @@ const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
       message("新建 Route 未应用："+String(error?.message??error));
     }
   },
-  onPaneClick:()=>{if(canvasRouteProposal)return;if(selection)clearSelection();}
+  onPaneClick:()=>{if(canvasRouteProposal)return;if(selection)clearSelection();},
+  onExpandBranches:id=>{
+    if(!lastWorkspace||activeProcedureId!==lastWorkspace.entry)return;
+    rootPathMode="custom";
+    rootPathExpandedNodes.add(id);
+    scheduleELKLayout(0,true);
+  }
 });
 const nodeFocusCanvas=mountNodeFocusCanvas($("nodeFocusFlow"),{
   onPivot:id=>openNodeFocus(id),
@@ -203,6 +212,28 @@ function invalidateLayout() {
   }
 }
 function centerNode(id) { flowCanvas.center(id); }
+function rootPathOptions(){
+  return lastWorkspace&&activeProcedureId===lastWorkspace.entry&&!neighborView
+    ? {mode:rootPathMode,categories:[...rootPathCategories],
+        expandedNodes:[...rootPathExpandedNodes]}:null;
+}
+function renderRootPathControls(){
+  const root=projection?.state==="READY"&&viewKind==="procedure"&&
+    lastWorkspace&&activeProcedureId===lastWorkspace.entry&&!neighborView;
+  $("rootPathToolbar").hidden=!root;
+  $("rootPathMode").value=rootPathMode;
+  $("rootPathFilters").hidden=!root||rootPathMode!=="custom"||Boolean(nodeFocusId);
+  for(const [id,key] of [["pathFailure","failure"],["pathUncertain","uncertain"],
+    ["pathRecovery","recovery"]])
+    $(id).checked=rootPathCategories.has(key);
+}
+function rootPathStatus(scope){
+  if(scope.reason||scope.filterReason)return scope.reason||scope.filterReason;
+  if(neighborView&&selection?.kind==="node")return "邻居视图";
+  if(rootPathOptions()&&rootPathMode!=="all"&&scope.isFiltered)
+    return "路径聚焦 · 已隐藏 "+(lastGood.routes.length-scope.routes.length)+" 条 Route";
+  return "";
+}
 function scheduleELKLayout(wait=0, autoFit=false) {
   invalidateLayout();
   if (projection?.state!=="READY" || !lastGood) return;
@@ -211,16 +242,18 @@ function scheduleELKLayout(wait=0, autoFit=false) {
   const direction=layoutDirection;
   const focus=neighborView && selection?.kind==="node" ? selection.id : null;
   const filtered=Boolean(focus);
-  const scope=selectGraphScope(proc,focus,filtered);
+  const pathFocus=rootPathOptions();
+  const scope=selectGraphScope(proc,focus,filtered,pathFocus);
   const basic=scope.isFiltered
     ? {...proc,start:focus,nodes:scope.nodes,routes:scope.routes}
     : proc;
   const fallback=layoutProcedure(basic,direction);
   graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
-    isFiltered:scope.isFiltered};
+    isFiltered:scope.isFiltered,hiddenByNode:scope.hiddenByNode??new Map(),
+    filterReason:scope.reason??null};
   renderGraph();
   if(!detailedLayoutAllowed(scope)){
-    setText("layoutStatus","大型流程 · 基础布局（可使用邻居视图）");
+    setText("layoutStatus","大型流程 · 基础布局（可使用邻居视图） · "+rootPathStatus(scope));
     if(autoFit || scope.isFiltered)requestAnimationFrame(fit);
     return;
   }
@@ -229,19 +262,20 @@ function scheduleELKLayout(wait=0, autoFit=false) {
     layoutTimer=null;
     try{
       const result=await layoutProcedureELK(proc,{
-        direction,focus,neighborsOnly:filtered
+        direction,focus,neighborsOnly:filtered,pathFocus
       });
       if(ticket!==layoutTicket || revision!==projectedText ||
         procId!==activeProcedureId || projection?.state!=="READY")return;
       graph=result;
       renderGraph();
-      setText("layoutStatus",result.isFiltered?"邻居视图":"");
+      setText("layoutStatus",rootPathStatus(result));
       if(autoFit || result.isFiltered)fit();
       else if(selection?.kind==="node")centerNode(selection.id);
     }catch(error){
       if(ticket!==layoutTicket)return;
       graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
-        isFiltered:scope.isFiltered};
+        isFiltered:scope.isFiltered,hiddenByNode:scope.hiddenByNode??new Map(),
+        filterReason:scope.reason??null};
       renderGraph();
       setText("layoutStatus","自动布局失败 · 使用基础布局");
       message("自动布局失败，已使用基础画布："+String(error?.message??error));
@@ -440,6 +474,9 @@ function loadDocument(name,text,origin="local",{initial=text,historyState=null}=
   closePreview();
   canvasRouteProposal=null;
   fitMode="all";
+  rootPathMode="normal";
+  rootPathCategories.clear();
+  rootPathExpandedNodes.clear();
   selection = null;
   nodeFocusId=null;
   // Multi-file Python editing is Source-first but benefits from references
@@ -2035,7 +2072,11 @@ function selectNode(id) {
   renderProcedureNavigation();
   renderInspector();
   if(neighborView)scheduleELKLayout(0,true);
-  else{
+  else if(rootPathOptions()&&graph?.visibleNodes&&
+      !graph.visibleNodes.some(node=>node.id===id)){
+    rootPathMode="all";
+    scheduleELKLayout(0,false);
+  }else{
     renderGraph();
     requestAnimationFrame(()=>centerNode(id));
   }
@@ -2048,7 +2089,11 @@ function selectRoute(id) {
   renderOutline();
   renderProcedureNavigation();
   renderInspector();
-  renderGraph();
+  if(rootPathOptions()&&graph?.visibleRoutes&&
+      !graph.visibleRoutes.some(route=>route.id===id)){
+    rootPathMode="all";
+    scheduleELKLayout(0,false);
+  }else renderGraph();
 }
 function fit(){
   if(!graph||!lastGood)return;
@@ -2072,6 +2117,20 @@ $("neighborsOnly").addEventListener("click",()=>{
   $("neighborsOnly").setAttribute("aria-pressed",String(neighborView));
   scheduleELKLayout(0,true);
 });
+$("rootPathMode").addEventListener("change",event=>{
+  const next=event.currentTarget.value;
+  if(!["normal","custom","all"].includes(next))return;
+  rootPathMode=next;
+  scheduleELKLayout(0,true);
+});
+for(const [id,key] of [["pathFailure","failure"],["pathUncertain","uncertain"],
+  ["pathRecovery","recovery"]]){
+  $(id).addEventListener("change",event=>{
+    if(event.currentTarget.checked)rootPathCategories.add(key);
+    else rootPathCategories.delete(key);
+    scheduleELKLayout(0,true);
+  });
+}
 $("centerSelection").addEventListener("click",()=>{
   if(selection?.kind==="node")centerNode(selection.id);
   else fit();
@@ -2176,10 +2235,11 @@ function renderGraphLegend(){
   if(!current.stepKinds.length)stepHost.appendChild(el("span","legend-empty","当前流程没有 PRE/POST Steps"));
   const filtered=Boolean(graph?.isFiltered);
   $("graphLegendScope").textContent=(activeProcedureId||"当前 Procedure")+
-    " · "+current.nodeCount+" Nodes"+(filtered?" · 邻居视图":"")+
+    " · "+current.nodeCount+" Nodes"+(filtered?" · 筛选视图":"")+
     " · PRE "+current.preNodes+" / POST "+current.postNodes+" 个节点";
 }
 function renderGraph() {
+  renderRootPathControls();
   renderGraphLegend();
   const sourceId=selection?.kind==="node"&&
     nodeEditorCapabilities(selection.id).newRoute?.outcomes?.length
