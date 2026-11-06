@@ -112,13 +112,17 @@ test("A2 every real Node can project a local PRE / OP / POST view",()=>{
   assert.equal(end.execute.operator,"terminal");
   assert.equal(nodeJourney(root,"missing"),null);
 });
-test("A2 double-click shows Node drill-down; Child navigation is an extra action",()=>{
+test("A2 Node View is explicit; real Child navigation remains independent",()=>{
   const tsx=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
   const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
   const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
   const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
-  assert.match(tsx,/onNodeDoubleClick=/);
-  assert.match(app,/onNodeDoubleClick:id=>openNodeFocus\(id\)/);
+  assert.doesNotMatch(tsx,/onNodeDoubleClick=/);
+  assert.doesNotMatch(app,/onNodeDoubleClick:id=>openNodeFocus\(id\)/);
+  assert.match(tsx,/className="designer-view-node/);
+  assert.match(tsx,/callbacks.onViewDetails\(node.id\)/);
+  assert.match(app,/onViewDetails:id=>openNodeFocus\(id\)/);
+  assert.match(tsx,/data.onEnterChild\?\.\(\)/);
   assert.match(app,/function renderNodeFocus\(\)/);
   assert.match(app,/function openNodeFocus\(id\)/);
   assert.match(app,/function closeNodeFocus\(\)/);
