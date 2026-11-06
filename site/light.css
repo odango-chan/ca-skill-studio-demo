@@ -1769,3 +1769,27 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   .node-focus-heading h2{font-size:12px}
   .node-focus-toolbar{padding:7px 10px}
 }
+
+/* D1 Root Path Focus: compact toolbar and an optional, readable branch panel.
+   These controls never alter the YAML source or the visual node geometry. */
+.compact-toolbar .toolbar-path-mode[hidden],.root-path-filters[hidden]{display:none!important}
+.compact-toolbar .toolbar-path-mode select{max-width:96px;font-weight:600;color:#176f66}
+.root-path-filters{
+  position:absolute;top:12px;left:14px;z-index:9;
+  display:flex;align-items:center;flex-wrap:wrap;gap:9px;
+  padding:7px 10px;max-width:min(95%,500px);
+  background:#fffffff2;border:1px solid #dce6eb;border-radius:9px;
+  box-shadow:0 2px 9px #24425812;color:#506778;font-size:11px;
+}
+.root-path-filters>span{color:#376f68;font-weight:700}
+.root-path-filters label{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;cursor:pointer}
+.root-path-filters input{accent-color:#087e72;margin:0}
+.root-path-filters small{color:#77899d;font-size:10px}
+.procedure-flow .designer-hidden-branches{
+  position:absolute;right:6px;top:4px;z-index:3;
+  width:auto;min-height:18px;padding:1px 5px;border:1px solid #b6dcd2;
+  border-radius:5px;background:#eefaf5;color:#186b5d;
+  font:600 9px/1.35 system-ui,sans-serif;cursor:pointer;
+}
+.procedure-flow .designer-hidden-branches:hover{background:#d8f3e9;border-color:#5dab97}
+.procedure-flow .designer-hidden-branches:focus-visible{outline:2px solid #168c7a;outline-offset:2px}
