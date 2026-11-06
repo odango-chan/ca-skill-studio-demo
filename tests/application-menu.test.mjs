@@ -12,6 +12,8 @@ const target=options=>({
 test("Shared app menu exposes only implemented editor actions",()=>{
   const commands=Object.keys(STUDIO_COMMAND_TARGETS);
   assert.ok(commands.includes("file.openDirectory"));
+  assert.equal(STUDIO_COMMAND_TARGETS["file.loadSample"],"establishSampleButton");
+  assert.equal(STUDIO_COMMAND_TARGETS["file.exportPackage"],"exportPackageButton");
   assert.ok(commands.includes("edit.undo"));
   assert.ok(commands.includes("view.visual"));
   assert.equal(new Set(Object.values(STUDIO_COMMAND_TARGETS)).size,commands.length);
@@ -30,4 +32,19 @@ test("Menu must respect real command state and cannot bypass hidden/disabled act
   assert.equal(studioCommandTarget(root(new Map([[name,parentHidden]])),"file.saveDirectory"),null);
   assert.equal(studioCommandTarget(root(new Map()),"file.saveDirectory"),null);
   assert.equal(studioCommandTarget(root(new Map()),"run.start"),null);
+});
+
+test("CSS-concealed action bridge retains real command eligibility",()=>{
+  // A transport button is not [hidden] or disabled; only its visible duplicate
+  // is removed from Explorer. The menu remains the accessible entry.
+  const sample=target();
+  const zip=target();
+  const map=new Map([
+    ["establishSampleButton",sample],
+    ["exportPackageButton",zip]
+  ]);
+  assert.equal(studioCommandTarget(root(map),"file.loadSample"),sample);
+  assert.equal(studioCommandTarget(root(map),"file.exportPackage"),zip);
+  zip.hidden=true;
+  assert.equal(studioCommandTarget(root(map),"file.exportPackage"),null);
 });
