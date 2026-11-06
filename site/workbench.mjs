@@ -92,3 +92,36 @@ export function nodeJourney(procedure, nodeId) {
     routeCount:detail.routeCount
   };
 }
+
+// Read-only one-hop topology around a real business Node. Keep every Route
+// object and its exact id/outcome/routeSource rather than replacing it with a
+// synthetic happy-path edge. The same neighbor can carry many distinct Routes.
+export function nodeNeighborhood(procedure,nodeId){
+  const nodes=procedure?.nodes;
+  if(!Array.isArray(nodes)||!Array.isArray(procedure?.routes))return null;
+  const byId=new Map(nodes.map((node,index)=>[node.id,{node,index}]));
+  const focus=byId.get(nodeId);
+  if(!focus)return null;
+  const gather=(direction)=>{
+    const peers=new Map();
+    let routeCount=0;
+    for(const route of procedure.routes){
+      if((direction==="previous"?route.target:route.source)!==nodeId)continue;
+      const id=direction==="previous"?route.source:route.target;
+      const peer=byId.get(id);
+      if(!peer)continue; // An invalid/stale target never becomes a fake Node.
+      if(!peers.has(id))peers.set(id,{
+        node:peer.node,index:peer.index,routes:[]
+      });
+      peers.get(id).routes.push(route); // Original source-backed identities.
+      routeCount++;
+    }
+    return {
+      peers:[...peers.values()].sort((a,b)=>a.index-b.index)
+        .map(({node,routes})=>({node,routes})),
+      routeCount
+    };
+  };
+  return {node:focus.node,
+    previous:gather("previous"),next:gather("next")};
+}

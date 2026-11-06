@@ -156,3 +156,17 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 
 
 代码检查：[CI #42024171379](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42024171379) 成功（390/390 Unit、TypeScript、Build、Chromium）。浏览器记录显示 17/17 Node 双击 PASS、UDM Subscribe PRE 5/POST 1、终态仅 OP、Procedure 内进入 Child、返回 Root 17/46 和 Source 保持。随后精简了重复的组件事件回调和临时调试字段，最终 HEAD 仍需同样门禁；成功部署到 Pages 之前不声称线上可用。
+
+## D1-A2b · Node 上下游一跳视图（2026-11-05 · PR #69 OPEN）
+
+用户进一步明确：双击任何业务 Node 后，**不仅查看它的 PRE/OP/POST 内部阶段，还必须看到与它有真实 Route 相连的上一跳和下一跳**。这是现有 A2 局部 Node 详情的补充，不等于 A3 的「整个 Root 流程紧凑概览」。
+
+- 视图：左侧为「上一跳：真实入向 Route 的 source Node」，中间为 Node 的 PRE（若有）/OP/POST（若有）有序步骤，右侧为「下一跳：真实出向 Route 的 target Node」。三个区域都在同一 Procedure 内；真正调用 Child Procedure 仍沿 A2 已实现的第二层导航。
+- 唯一语义来源是当前 `procedure.nodes` 和 `procedure.routes`：本仓 `nodeNeighborhood()` 只做一次索引、按邻居 Node 分组展示，不转换为全局 success spine。每条原始 `route.id`、`outcome`、`routeSource`、`line` 必须完整保留，包括同一目标的 PASS/FAIL 等多个 Outcome、循环/self-loop、PRE/OP/POST Route。Route 颜色只反映 Outcome 静态类别，不能当真实执行结果。
+- 点击上一跳/下一跳节点，以其为新焦点继续一跳浏览；不添加或执行业务 Node，不改变源 YAML；从局部视图返回仍定位原选中的业务节点。START 可能没有上一跳、TERMINAL 没有下一跳，这应呈现有明确解释的空态，而非伪造一条边。
+- 窄屏三栏改为纵向排列，完整邻居和 Outcome 不被隐藏。高连通节点可分别滚动上/下游列表；不默认假设唯一前驱或唯一后继；按当前原始视图没有定义的跨 Procedure 控制边也不猜测。
+
+验收：`tests/node-neighborhood.test.mjs` 验所有 Owner Root Node 的原始入/出 Route 身份集合完全对应；测试同一目标多个 Outcome、Phase 路由、循环、入口/终态和缺失引用。Chromium 双击实例 Node 后，验证左右邻接和路由来源、向下一跳浏览、再由其上一跳回到原节点、终态无出边、整图恢复为 17 Node/46 bundle 且 Source 不变。仅对应 PR 的 exact-head CI PASS 后称实现验收通过；A3 全局 Root 紧凑图仍待独立设计。
+
+
+实测代码门禁：[CI #42029242711](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42029242711) **PASS**（393/393 Unit、TypeScript、Build、Chromium）。在 Root 示例的 `nudm-sdm-subscribe`，确证上一跳 1 Node / 1 POST Route，下一跳 6 Node / 9 Route（PRE/OP/POST，不同 Outcome 保留）；点击 `npcf-sm-policy-control-create` 后其上一跳指回原节点，再点击返回；终态无下一跳；返回主图 17 Node / 46 bundles、Source 原字节未变。CI 浏览器为窄屏，确认纵向堆叠布局生效；三栏桌面布局由 CSS 控制，但仍需在线目视确认。此项仅候选 PR，还未合入/Pages 部署。

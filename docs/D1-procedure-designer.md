@@ -99,3 +99,7 @@ D1 的 UI 迁移与上述浏览器交互验收可以标记 PASS；后续人工�
 ## 2026 D1-A2 · 两层下钻补充
 
 根图所有实际业务 Node（当前 owner 示例 17 张）都能双击进入**节点局部阶段视图**：只读 PRE（如有）→ OPERATOR → POST（如有），显示有序 Step 与 Route Outcome，未声明阶段不虚构。局部视图不等于独立 Child Procedure。只有 Node/Phase Step 实际声明 `procedure` 引用时，才有进一步进入独立 Child 的操作；6 次 Root 调用引用 4 份 Child 定义，返回仍绑定真实 call-site。参见 [Workbench A2](design/authoring-workbench.md) 与 [Issue #65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)。这属于纯 View，不新增持久节点或 DSL。
+
+## 2026 D1-A2b · 从局部内部阶段扩展为一跳邻接图
+
+在已部署 A2 的 17/17 Node 双击基础上，Node Focus 变为「上一跳（入向 Route）｜当前 Node 的 PRE/OP/POST｜下一跳（出向 Route）」；保持原始 Route ID、outcome、PRE/OP/POST 来源和行号。邻接节点可点击继续以其为中心查看，空态明确，不造独立业务节点/结果或跨 Procedure 的连线。本功能与未来 A3 的全局 Root 压缩视图不同，详见 [Workbench](design/authoring-workbench.md)。

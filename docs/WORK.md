@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-05**  
-**Integrated implementation baseline: main@38137300ea980ec8ab04510411b1d7e85a173e17**（D1 #62 已合入；[Pages #41997707337 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997707337)。E5 #64 与本 A1 分支均未合入）
+**Integrated implementation baseline: main@23f8829313ba7a1cf9611b817cc69efd69882a45**（D1-A1 #67 与 A2 #68 均已合入；[resulting-main Pages #42025465770 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42025465770)。D1-A2b #69 与 E5 #64 均未合入。）
 
 ## Overall
 
@@ -14,8 +14,9 @@
 | Scope | Design | Implementation | Acceptance | Tracking / evidence |
 |---|---|---|---|---|
 | D1 视觉 START 起点 / Outcome 连线配色 / 浮动图例 | ACCEPTED | IMPLEMENTED（#62 MERGED） | [PR CI #41997113612 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997113612)、[resulting-main Pages #41997707337 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997707337)；目视反馈追踪 #65 | [#61](https://github.com/odango-chan/ca-skill-studio-demo/issues/61)、[Workbench](design/authoring-workbench.md) |
-| D1-A1 真实 Phase PRE/POST 摘要、当前类型图例、Route 来源 | ACCEPTED（仅 View） | IMPLEMENTED（PR #67 OPEN） | [代码 CI #42017183541 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42017183541)：384/384 Unit、TS、Build、Chromium（Root/Child 往返）；main/Pages NOT_RUN | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[Workbench](design/authoring-workbench.md) |
-| D1-A2 所有业务节点双击下钻、子流程边界、精确调用位置往返 | ACCEPTED（仅 View） | IMPLEMENTED（PR #68 OPEN；堆叠于 #67） | [子流程代码 CI #42019367400 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42019367400)；[节点双击代码 CI #42024171379 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42024171379)：390/390 Unit、TS、Build、Chromium 17/17；最终精简提交 exact-head CI 待核对；main/Pages NOT_RUN | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[PR #68](https://github.com/odango-chan/ca-skill-studio-demo/pull/68)、[Workbench](design/authoring-workbench.md) |
+| D1-A1 真实 Phase PRE/POST 摘要、当前类型图例、Route 来源 | ACCEPTED（仅 View） | IMPLEMENTED（PR #67 MERGED） | [PR CI #42017654738 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42017654738)；[resulting-main Pages #42021101176 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42021101176) | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[Workbench](design/authoring-workbench.md) |
+| D1-A2 所有业务节点双击下钻、子流程边界、精确调用位置往返 | ACCEPTED（仅 View） | IMPLEMENTED（PR #68 MERGED） | [PR CI #42024995449 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42024995449)：390/390 Unit + 17/17 Node Chromium；[resulting-main Pages #42025465770 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42025465770) | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[PR #68](https://github.com/odango-chan/ca-skill-studio-demo/pull/68) |
+| D1-A2b 每个 Node 的真实上一跳 / 内部阶段 / 下一跳 | ACCEPTED（仅 View） | IMPLEMENTED（PR #69 OPEN，未合入） | [代码 CI #42029242711 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42029242711)：393/393 Unit、TS、Build、Chromium 一跳回访；main/Pages NOT_RUN | [#65](https://github.com/odango-chan/ca-skill-studio-demo/issues/65)、[PR #69](https://github.com/odango-chan/ca-skill-studio-demo/pull/69)、[Workbench](design/authoring-workbench.md) |
 | D1 Procedure 投影、图形浏览、现有 Route Target Rewire | ACCEPTED | IMPLEMENTED | PASS（本仓浏览器级） | [D1](D1-procedure-designer.md)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
 | D2 Node Designer A1–A5 有界创建/删除/重命名/属性 Patch | ACCEPTED | IMPLEMENTED | PASS（本仓单测/浏览器） | [D2](D2-node-designer.md)、[PR #4](https://github.com/odango-chan/ca-skill-studio-demo/pull/4)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605140297) |
 | 固定示例多文件 Source / Markdown/ZIP 编辑与下载 | ACCEPTED | IMPLEMENTED | PASS（本仓测试范围） | `site/sample-packages.mjs`、`tests/package.test.mjs`、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41605377069) |
