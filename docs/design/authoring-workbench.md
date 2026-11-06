@@ -182,3 +182,35 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 - 同一业务 Node 若既为前驱又为后继，局部图可展示两个不同视觉角色，不会改变业务 Node 数量；self-loop 直接接入实际阶段，保持 Route 身份。ELK 对每条连线做布局并与 React Flow 的 port handle 定位对齐，不能为了美观把 PRE 的失败边挂在 POST。
 
 验收需包括全 Owner Root 17/17 Node 的真实 Local React Flow、UDM Subscribe PRE 5/OP/POST 1 和一入九出 Route 原 ID（含 PRE/OP/POST）、多个 Outcome/同一邻接、循环、终态、Child 往返、主图 17/46、Source bytes 不变。源码修改不对应 Runtime/5GC E2E；真正的根流程全局紧凑概览 A3 仍独立进行。代码级 CI #42144801067 已 PASS；最终文档提交后 exact-head CI 和 Pages 仍需单独核对。
+
+
+## D1-A3 · Root 路径聚焦（2026-11-06）
+
+**Owner / authority:** Skill Studio 只读 Projection + React Flow / ELK。原始
+`assurance/procedure.yaml` 的 Node、Route、Route Source 与 Source Span 不变；不是
+Runtime 实际运行轨迹、覆盖率或资格判定。
+
+Root 工具栏增加「主路径 / 选择路径 / 全部路径」。Root 默认「主路径」；
+Child Procedure 默认完整显示，原有「邻居」临时查看优先于 Root 路径筛选。
+切换为「选择路径」后可叠加失败、未决、恢复／其他分支；节点上的
+`+N 分支` 仅展开此节点隐藏的原始 Route 及其下游，直到汇合主干或终态。
+隐藏条数按**原始 Outcome Route** 计算，不按视觉 bundle 计算。
+
+「主路径」是所有满足以下条件的 Route 的**并集**（不是任选一条最短路径）：
+
+1. Outcome 明确属于 `PASS` / `SUCCEEDED` / `SUCCESS` / `COMMITTED`；
+2. 沿这些 Outcome 从显式 `start` 可达；
+3. 沿这些 Outcome 可到达 `terminal: PASS|SUCCESS|SUCCEEDED`。
+
+若没有完整证据链、成功终态或存在未识别 Outcome，**显示全部路径并在状态栏解释**；
+不根据 `done`、`finalize-*`、`retry-*` 等节点名称推断成功或恢复。
+恢复分支只使用现有 `reconcile` Operator 作为显式参考，其他未归类分支归
+「恢复／其他」；该分类只控制可见性。选中被隐藏的 Node/Route 时自动展开全图。
+所有可见 Route 必须保持真实 source、target、`routeSource`、Outcome ID、
+Source Span 和 ELK 端点，不能生成虚拟 Runtime Route。双击 Node Focus 继续显示其
+完整一跳上下游，不受 Root 聚焦过滤影响。
+
+该功能的可见性变化与 Source 修改严格隔离。验证分层：
+`tests/path-focus.test.mjs` 检查成功/异常/未知结果/循环/汇合与 ELK 记账；
+`scripts/edge-smoke.mjs` 验证真实 DOM 的默认聚焦、按需添加分支、
+切换全部路径及旧 17 Node / 46 Bundle 回归。未运行的门禁不得称为 PASS。
