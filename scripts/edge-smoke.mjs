@@ -232,7 +232,7 @@ try{
     "  graph:document.getElementById('graphPane')?.getBoundingClientRect().toJSON(),",
     "  styles:[...document.styleSheets].map(x=>x.href).filter(Boolean)};",
     "})()"
-  ].join("\n"));
+  ].join("\n");
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
   if(!result?.rootFocus?.rootDefault||!result.rootFocus.branchShown||
