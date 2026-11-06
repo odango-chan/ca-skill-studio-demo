@@ -165,7 +165,7 @@ try{
     " const expected=Array.from({length:46},(_,i)=>'flow-edge-'+i);",
     " return {rootFocus:{rootDefault,branchShown,focusNodes,focusEdges,customNodes,",
     "   sourcePreserved:document.getElementById('source').value===before},",
-    "  nodes:document.querySelectorAll('.react-flow__node').length,"
+    "  nodes:document.querySelectorAll('.react-flow__node').length,",
     "  edges:paths.length,edgeIds:ids,missing:expected.filter(x=>!ids.includes(x)),",
     "  handles:document.querySelectorAll('.react-flow__handle').length,",
     "  attachedPorts:portGaps.length,maxPortGap:Math.max(0,...portGaps.map(p=>p.dist)),",
