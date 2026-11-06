@@ -23,6 +23,12 @@
 
 **一致性：** 原文件按钮与 handler 仍为命令所有者，低频重复按钮仅在视觉上隐藏；不可用与权限仍由 JS `hidden`/`disabled`、现有 Picker 和 Diff/Confirm 保护。浏览器回归要证明文件菜单可以访问示例/ZIP，真实样本加载确实经过菜单，Source 和导航不变。追踪 [#80](https://github.com/odango-chan/ca-skill-studio-demo/issues/80)。PR CI、Pages 待实际成功后补证据；不得把部署前的 UI 声称已上线。
 
+## 2026-11-06 · IDE Host Spike (Issue #85; 不影响已部署 Pages)
+
+**本轮为独立试验分支** `spike/ide-extension-theia-host`：标准 VS Code `CustomTextEditorProvider` / `TextDocument` / `WorkspaceEdit`，将现有 Procedure 投影、ELK、ReactFlow 复用到 Webview；普通 YAML/Python、文件树、新建/删除、Undo/Redo 交给宿主。另通过同一 VSIX 试验 Theia 的 VS Code API 兼容性。详细见 [ADR-0002](decisions/0002-ide-host-spike.md) 和 [试验说明](../experiments/ide-host/README.md)。
+
+**证据边界：** 独立 CI 先验 Node 构建/AST/负例与 VSIX 打包；VS Code 真 GUI、Theia 安装/交互、真实 Native File ops 均待专门验收，不得称 PASS。此前 Source-only YAML/Python 工具栏的 WIP 分支不合并，主站仍以当前 main 为准；本次不修改 Runtime/5GC。
+
 ## Overall
 
 静态浏览器 Studio 的 D1 React Flow/ELK、D2 Node Designer A1–A5、固定多文件 Package 浏览及图标统一已进入 `main`，并通过了本仓范围内的单测、构建及 Chromium 回归。**E4-A1 目录导入/ZIP 与 E4-A2 显式原位保存均已合入并部署；原生 Windows Chrome 选择窗口实盘验收尚未进行**；不宣称真实 OS 写盘验收、多文件原子事务、完整 Runtime validator 或真实 5GC 验收能力。Pages 的 PASS 不等于 Skill Runtime PASS。
