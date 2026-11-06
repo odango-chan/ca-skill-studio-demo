@@ -1793,3 +1793,30 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 }
 .procedure-flow .designer-hidden-branches:hover{background:#d8f3e9;border-color:#5dab97}
 .procedure-flow .designer-hidden-branches:focus-visible{outline:2px solid #168c7a;outline-offset:2px}
+
+/* D1 node actions: visible on every real Node, with an explicit View target.
+   Preserve ELK's 238 × 80 card geometry and existing subflow entry button. */
+.procedure-flow .designer-card-actions{
+  position:absolute;top:5px;right:6px;z-index:4;
+  display:flex;align-items:center;gap:4px;white-space:nowrap;
+}
+.procedure-flow .designer-card-actions button{
+  position:static;display:inline-flex;align-items:center;gap:3px;
+  min-height:20px;width:auto;padding:2px 5px;
+  border:1px solid #d2e2eb;border-radius:5px;
+  background:#f5f9fd;color:#536d84;
+  font:650 9px/1.25 system-ui,sans-serif;cursor:pointer;
+}
+.procedure-flow .designer-card-actions .designer-hidden-branches{
+  border-color:#b6dcd2;background:#eefaf5;color:#186b5d;
+}
+.procedure-flow .designer-card-actions .designer-hidden-branches[aria-pressed="true"]{
+  background:#e7f0fc;border-color:#b5cbe5;color:#44668e;
+}
+.procedure-flow .designer-card-actions button:hover{
+  background:#e8f1fc;border-color:#95bdd5;color:#236c89;
+}
+.procedure-flow .designer-card-actions button:focus-visible{
+  outline:2px solid #168c7a;outline-offset:2px;
+}
+.procedure-flow .designer-node-kind{max-width:calc(100% - 96px)}
