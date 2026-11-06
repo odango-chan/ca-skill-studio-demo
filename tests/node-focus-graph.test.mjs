@@ -94,7 +94,7 @@ test("A2c multiple outcomes, cycles, and missing PRE/POST do not invent Route ID
   assert.equal(terminal.routes.filter(r=>r.viewOnly).length,0);
   assert.equal(terminal.outgoingCount,0);
   assert.equal(projectNodeFocusFlow(procedure,"missing"),null);
-  assert.throws(()=>layoutProcedureELK(local,{
+  await assert.rejects(()=>layoutProcedureELK(local,{
     direction:"RIGHT",dimensions:new Map()
   }),/Invalid visual-only node dimensions/);
 });
