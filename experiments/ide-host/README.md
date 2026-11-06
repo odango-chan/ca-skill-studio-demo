@@ -13,7 +13,7 @@ workspace editing, undo/redo, and extension lifecycle.
 
 Only SKILL-specific functionality belongs to Studio:
 `site/workspace.mjs` Source projection, ELK layout, ReactFlow graph,
-qualified AST/CST patch preview and exact revision guard. The extension
+qualified AST/CST patch preview and exact revision guard (a spike-only, operator.on target edit; **not** runtime qualification). The extension
 runs a **CustomTextEditorProvider** that takes an IDE `TextDocument` as its
 sole source; it does not open another Monaco Source buffer or own file IO.
 
@@ -63,7 +63,7 @@ Official sources:
 
 | Test | Acceptance | Status before CI/native trials |
 |---|---|---|
-| Existing CreatedSession YAML projection | six procedures, Root 17 nodes, 63 Outcome routes | test added, pending CI |
+| Existing CreatedSession YAML projection | five procedures, Root 17 nodes, 63 Outcome routes | test added, pending CI |
 | Native TextDocument + WorkspaceEdit boundary | IDE owns file IO, undo, save; Webview never does | implemented in spike, **native NOT_RUN** |
 | Patch isolation / stale rejection | host reprojects, checks version and exact scalar span | test added, pending CI |
 | ReactFlow + ELK bundling | Webview bundle with local CSS and scripts | pending CI |
