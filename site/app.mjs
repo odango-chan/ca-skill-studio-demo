@@ -141,9 +141,10 @@ let layoutTimer = null;
 // React Flow is confined to the Procedure canvas. The existing Source, Inspector,
 // file workspace and Typed Patch remain the only editing/state authority.
 const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
-  onNodeSelect:id=>selectNode(id),
+  onNodeSelect:id=>selectNode(id,false),
   // Every real business Node has a local PRE/OP/POST drill-down.
   onNodeDoubleClick:id=>openNodeFocus(id),
+  onViewDetails:id=>openNodeFocus(id),
   onEnterChild:(callerId,childName)=>
     enterProcedure(childName,{callerId}),
   onEdgeSelect:bundle=>chooseEdgeRoute(bundle),
@@ -177,10 +178,11 @@ const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
     }
   },
   onPaneClick:()=>{if(canvasRouteProposal)return;if(selection)clearSelection();},
-  onExpandBranches:id=>{
+  onToggleBranches:id=>{
     if(!lastWorkspace||activeProcedureId!==lastWorkspace.entry)return;
     rootPathMode="custom";
-    rootPathExpandedNodes.add(id);
+    if(rootPathExpandedNodes.has(id))rootPathExpandedNodes.delete(id);
+    else rootPathExpandedNodes.add(id);
     scheduleELKLayout(0,true);
   }
 });
@@ -190,19 +192,8 @@ const nodeFocusCanvas=mountNodeFocusCanvas($("nodeFocusFlow"),{
 });
 let nodeFocusTicket=0;
 $("nodeFocusFit").addEventListener("click",()=>nodeFocusCanvas.fit());
-// React Flow may consume its own double-click for viewport zoom. Capture a
-// real Node target before that handler; this is the same actual Node id used
-// for all graph selection/patch operations, never a synthetic Stage node.
-$("reactFlowRoot").addEventListener("dblclick",event=>{
-  const target=event.target?.closest?.(".react-flow__node");
-  if(!target||!$("reactFlowRoot").contains(target))return;
-  const nodeId=target.getAttribute("data-id");
-  if(!nodeId)return;
-  event.preventDefault();
-  event.stopPropagation();
-  openNodeFocus(nodeId);
-},true);
-
+// Double-click is a secondary shortcut handled once by React Flow.
+// The always-visible "查看" button is the primary way to enter Node Focus.
 
 function invalidateLayout() {
   layoutTicket++;
@@ -252,6 +243,7 @@ function scheduleELKLayout(wait=0, autoFit=false) {
   const fallback=layoutProcedure(basic,direction);
   graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
     isFiltered:scope.isFiltered,hiddenByNode:scope.hiddenByNode??new Map(),
+    expandedNodeIds:scope.expandedNodeIds??new Set(),
     filterReason:scope.reason??null};
   renderGraph();
   if(!detailedLayoutAllowed(scope)){
@@ -277,6 +269,7 @@ function scheduleELKLayout(wait=0, autoFit=false) {
       if(ticket!==layoutTicket)return;
       graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
         isFiltered:scope.isFiltered,hiddenByNode:scope.hiddenByNode??new Map(),
+        expandedNodeIds:scope.expandedNodeIds??new Set(),
         filterReason:scope.reason??null};
       renderGraph();
       setText("layoutStatus","自动布局失败 · 使用基础布局");
@@ -2064,7 +2057,7 @@ function renderProblems() {
     }));
   }
 }
-function selectNode(id) {
+function selectNode(id,reveal=true) {
   if(projection?.state!=="READY")return;
   if(canvasRouteProposal&&canvasRouteProposal.sourceId!==id)
     canvasRouteProposal=null;
@@ -2080,7 +2073,10 @@ function selectNode(id) {
     scheduleELKLayout(0,false);
   }else{
     renderGraph();
-    requestAnimationFrame(()=>centerNode(id));
+    // Do not move the canvas on the first card click: the resulting 150ms
+    // pan makes a user's second click miss the Node's dblclick target.
+    // Explorer/Inspector navigation can still explicitly reveal the target.
+    if(reveal)requestAnimationFrame(()=>centerNode(id));
   }
 }
 function selectRoute(id) {
@@ -2151,7 +2147,7 @@ function openNodeFocus(id){
      !lastGood?.nodes.some(node=>node.id===id))return;
   if(nodeFocusId===id)return;
   nodeFocusId=id;
-  selectNode(id); // Select and redraw with the NEW Node context in one pass.
+  selectNode(id,false); // Select without moving the viewport before Node Focus opens.
   requestAnimationFrame(()=>$("nodeFocus").focus());
 }
 function closeNodeFocus(){
