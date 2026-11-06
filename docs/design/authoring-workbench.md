@@ -135,7 +135,7 @@ Node 的「准备 / 确认」阶段底部，在当前 Source 可严格限定的�
 
 A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改当前**视图的导航与边界**。它不在 Root 内联 Child，也不引入保存到 YAML 的容器节点：Root 17 个业务 Node 中 6 个 `PROCEDURE` 调用指向 4 份 Child 定义；`finalize-resource-responsibility` 的三个不同调用者是同一份定义的三个**调用位置**，不能在 Child 定义里捏造单一全局父节点。
 
-- Root 的 `PROCEDURE` 节点保持同一 238×80 ELK 尺寸与连接端点，使用有界卡片、显式「进入子流程」动作；双击仍可进入。普通 `CALL` 不显示子流程动作；按钮具备键盘焦点和语义标签。
+- Root 的 `PROCEDURE` 节点保持同一 238×80 ELK 尺寸与连接端点，使用有界卡片、显式「进入子流程」动作；当前版本不再使用双击导航。普通 `CALL` 不显示子流程动作；按钮具备键盘焦点和语义标签。
 - 在 Child 视图的**画布容器**（不是业务图模型）增加轻边界、当前 Procedure 名称、已知调用位置与「返回调用节点」；子图自身仍有独立 START 和真实 4/5 Node。
 - 从真实 Root/Child 调用进入时，`resolveProcedureCall` 依据当前 `workspace.procedures`、调用 Node 与 `children[]` 引用确定 `parentProcedure/callerId/childProcedure/via`，并建立仅 UI 的导航路径。返回时重新核验调用来源、在父图选择并居中原调用 Node。源文件修改后如调用位置失效则取消上下文，不猜测旧身份。
 - **从 Explorer 或 picker 直接打开 Child**：没有已知调用来源时明确显示「直接打开 · 未指定调用节点」，「返回 Root」不会偷偷选择三个可能调用者之一。复用 Child 的任意调用来自哪个节点，返回就应到哪个。
@@ -143,7 +143,9 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 
 验收：单测复用子流程与无上下文/失效来源负例，Chromium 真实点击调用卡片、验证 Child 边界与 breadcrumb、返回调用点，再进入同定义的不同调用位置、Explorer 直接打开的负例；返回 Root 17 Node / 46 bundle 和 Source bytes 完全不变。此项只可在 exact-head CI 通过后称浏览器 PASS，后续要人工目视宽窄屏可读性。
 
-### A2 需求澄清：所有 Node 都能双击进入（2026-11-05）
+### A2 历史验收：所有 Node 都能双击进入（2026-11-05）
+
+> **历史记录（已被 2026-11-06 的菜单与显式「查看」交互取代）**：下文所述双击是当时的实现与验收，不是当前需要恢复的操作手势。
 
 用户明确的目标不是「仅有 4 份 Child Procedure 能进入」，而是根图的 **17 张业务节点都能双击进入自己的内部阶段视图**。前述 6 个 `PROCEDURE` 调用 → 4 份 Child 定义只是**第二层导航**，不是唯一的 Node 下钻模型。
 
@@ -214,10 +216,10 @@ ELK 仍可重新排布其他节点，不能把新增分支伪装成固定布局�
 「恢复／其他」；该分类只控制可见性。选中被隐藏的 Node/Route 时自动展开全图。
 所有可见 Route 必须保持真实 source、target、`routeSource`、Outcome ID、
 Source Span 和 ELK 端点，不能生成虚拟 Runtime Route。每个业务 Node 卡片现在始终有「查看」：
-单击进入真实上一跳 / PRE-OP-POST / 下一跳局部视图；双击仍可快捷进入，
+单击进入真实上一跳 / PRE-OP-POST / 下一跳局部视图；双击导航已移除，
 但不再是唯一操作；「进入子流程」只用于实际 Child Procedure。
 普通单击卡片仍选中并显示 Inspector（可在其支持范围内编辑），
-不再触发自动居中，以免首次点击后的移动导致双击漏判。
+不再触发自动居中；查看必须通过显式按钮进入。
 空白画布双击不再触发缩放；画布缩放仍可使用现有控件和滚轮。
 所有路径筛选都不改变 Node Focus 的完整上下游投影。
 
@@ -225,3 +227,13 @@ Source Span 和 ELK 端点，不能生成虚拟 Runtime Route。每个业务 Nod
 `tests/path-focus.test.mjs` 检查成功/异常/未知结果/循环/汇合与 ELK 记账；
 `scripts/edge-smoke.mjs` 验证真实 DOM 的默认聚焦、按需添加分支、
 切换全部路径及旧 17 Node / 46 Bundle 回归。未运行的门禁不得称为 PASS。
+
+
+## 应用菜单与本地宿主统一（2026-11-06）
+
+- 顶栏新增一个紧凑「菜单」，包含**文件 / 编辑 / 视图**分组和可直达的真实使用说明。所有选项复用当前 File / Undo / View / Inspector / Fit 处理路径；不能形成第二套文件保存或 Source History。
+- 不存在或当前不可使用的命令呈不可点击状态；浏览器目录权限提示必须来自用户直接操作。已有工具栏及 Explorer 的高频入口暂时保留，后续 UX 收敛再删除重复的低频入口。
+- Node 卡片单击仅选中 Inspector；**只有「查看」才能打开局部节点图**，真正的 Child Procedure 用「进入子流程」。主图和局部图的双击导航已移除；空白画布双击缩放继续禁用。
+- 所有菜单分组与 `data-studio-command` 命令 ID 既用于 GitHub Pages 也用于将来的本地应用。**本地 Node.js 静态服务器不是 Skill 执行宿主**；运行/调试/Trace 等项待真实有权限且可验证的执行能力出现才新增，不使用灰色假的 Run 菜单。
+
+设计与宿主边界详见 [Application Shell](application-shell.md)。本轮仅是编辑器交互和信息架构优化，不改变 Source、Runtime、5GC。
