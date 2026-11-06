@@ -86,6 +86,15 @@ function ProcedureCard({data,selected}){
         event.stopPropagation();
         data.onEnterChild?.();
       }}>进入子流程 <span aria-hidden="true">›</span></button>}
+    {data.hiddenBranchCount>0&&<button type="button"
+      className="designer-hidden-branches nodrag nopan"
+      aria-label={"展开 "+data.id+" 的 "+data.hiddenBranchCount+" 条隐藏 Route"}
+      title={"展开此节点的 "+data.hiddenBranchCount+" 条隐藏 Route"}
+      onPointerDown={event=>event.stopPropagation()}
+      onClick={event=>{
+        event.stopPropagation();
+        data.onExpandBranches?.();
+      }}>+{data.hiddenBranchCount} 分支</button>}
     {Boolean(data.phaseBadges?.length)&&
       <span className="designer-node-phases" aria-label="节点内部阶段">
         {data.phaseBadges.map(phase=><span
@@ -137,10 +146,14 @@ function ProcedureScene({scene,callbacks,onReady}){
     [scene.graph,scene.procedure,scene.selection,scene.showAllLabels,
       scene.routeCreationSourceId]);
   const selectionId=scene.selection?.kind==="route"?scene.selection.id:null;
-  const nodes=elements.nodes.map(node=>node.data.childProcedure?{
-    ...node,data:{...node.data,onEnterChild:()=>
-      callbacks.onEnterChild(node.id,node.data.childProcedure)}
-  }:node);
+  const nodes=elements.nodes.map(node=>({
+    ...node,data:{...node.data,
+      ...(node.data.childProcedure?{onEnterChild:()=>
+        callbacks.onEnterChild(node.id,node.data.childProcedure)}:{}),
+      ...(node.data.hiddenBranchCount?{onExpandBranches:()=>
+        callbacks.onExpandBranches(node.id)}:{})
+    }
+  }));
   return <ReactFlow
     nodes={nodes} edges={elements.edges}
     nodeTypes={nodeTypes} edgeTypes={edgeTypes}
