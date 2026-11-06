@@ -1769,3 +1769,25 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   .node-focus-heading h2{font-size:12px}
   .node-focus-toolbar{padding:7px 10px}
 }
+
+/* D1-A2d: one dashed visual boundary groups the current real Node's
+   PRE/OP/POST stages. It is not another business Node or a Route target. */
+.focus-procedure-flow .react-flow__node-focus-boundary{
+  pointer-events:none!important;
+}
+.focus-current-boundary{
+  position:relative;
+  box-sizing:border-box;
+  border:1.5px dashed #94b2c2;
+  background:rgba(232,241,249,.35);
+  border-radius:14px;
+  box-shadow:0 0 0 3px rgba(234,243,249,.4);
+  pointer-events:none;
+}
+.focus-current-boundary-label{
+  display:block;position:absolute;
+  left:14px;top:10px;max-width:calc(100% - 28px);
+  color:#50768b;letter-spacing:.025em;
+  font:700 10px/1.35 system-ui,sans-serif;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
