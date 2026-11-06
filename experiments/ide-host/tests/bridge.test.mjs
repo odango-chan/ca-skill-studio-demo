@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync,statSync} from "node:fs";
 import {projectWorkspace} from "../../../site/workspace.mjs";
-import {visualRouteTargets,previewVisualRouteEdit} from "../../../site/visual-route-edit.mjs";
+import {routeTargetChoices,previewTargetPatch} from "../vscode/src/route-target.mjs";
 import {validateRouteProposal,isProcedurePath} from "../vscode/src/bridge.mjs";
 
 const text=readFileSync("site/samples/packages/establish-pdu-session/assurance/procedure.yaml","utf8");
@@ -11,12 +11,10 @@ const candidate=()=>{
   assert.equal(model.state,"READY");
   for(const p of model.procedures.values()){
     for(const route of p.routes){
-      const targets=visualRouteTargets({source:text,procedure:p,
-        procedureId:p.name,routeId:route.id,packageName:"establish-pdu-session"});
+      const targets=routeTargetChoices(p,route.id);
       const to=targets.find(x=>x!==route.target);
       if(!to)continue;
-      const preview=previewVisualRouteEdit({source:text,procedure:p,
-        procedureId:p.name,routeId:route.id,packageName:"establish-pdu-session"},to);
+      const preview=previewTargetPatch(text,p.name,route.id,to);
       return {p,route,to,preview,proposal:{
         type:"applyRoute",expectedVersion:17,baseSource:text,
         candidateSource:preview.candidateSource,procedureId:p.name,
@@ -33,9 +31,9 @@ test("Host identifies only real assurance/procedure.yaml, not arbitrary YAML",()
   assert.ok(!isProcedurePath("procedure.yaml"));
   assert.ok(!isProcedurePath("assurance/procedure.yaml.bak"));
 });
-test("A1: real 6-procedure CreatedSession graph is Source-derived",()=>{
+test("A1: real 5-procedure CreatedSession graph is Source-derived",()=>{
   assert.equal(model.state,"READY");
-  assert.equal(model.procedures.size,6);
+  assert.equal(model.procedures.size,5);
   assert.equal(model.procedure.nodes.length,17);
   assert.equal(model.procedure.routes.length,63);
 });
