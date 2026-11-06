@@ -103,3 +103,7 @@ D1 的 UI 迁移与上述浏览器交互验收可以标记 PASS；后续人工�
 ## 2026 D1-A2b · 从局部内部阶段扩展为一跳邻接图
 
 在已部署 A2 的 17/17 Node 双击基础上，Node Focus 变为「上一跳（入向 Route）｜当前 Node 的 PRE/OP/POST｜下一跳（出向 Route）」；保持原始 Route ID、outcome、PRE/OP/POST 来源和行号。邻接节点可点击继续以其为中心查看，空态明确，不造独立业务节点/结果或跨 Procedure 的连线。本功能与未来 A3 的全局 Root 压缩视图不同，详见 [Workbench](design/authoring-workbench.md)。
+
+## 2026 D1-A2c · 局部 Node Focus 使用真实 React Flow
+
+替代 A2b 没有连线的上下游三栏卡片。可见模型为：原始前驱业务 Node → 当前业务 Node 展开的真实 PRE/OP/POST 阶段 → 原始后继业务 Node；使用同一 React Flow Route Edge / ELK，准确保留源 Route ID、Outcome、Route Source，阶段间连线仅是 `viewOnly` UI 序列。支持邻居点击换焦点、真实 Step 源行跳转与 Child Procedure 继续下钻；不会改 Source YAML 或在 Runtime 注册新 Node。详见 [Workbench](design/authoring-workbench.md)、[#70](https://github.com/odango-chan/ca-skill-studio-demo/pull/70)。
