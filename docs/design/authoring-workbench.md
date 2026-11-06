@@ -194,3 +194,6 @@ A2c 已实际把 Node 下钻改为 React Flow/ELK，上一跳与下一跳通过�
 - 测试应覆盖所有 Root Node 的边界包围实际 Stage、无边界 Route、没有第二业务 Node，Chromium 核对 17/17 下钻虚线边界、来源 Route 标签与主图及 Source 完整恢复。未通过 exact-head CI 前不宣称 PR PASS；未合入前不宣称 Pages 上线。
 
 这轮是很小的 D1 展示修补，不启动新的布局方案、自动拆解 DSL、Runtime 验证或 A3 的全局 Root 缩略。
+
+
+A2d 代码门禁 [CI #42158013467](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42158013467) **PASS**：398/398 Unit、TypeScript、Build、真实 Chromium；17/17 Node 局部图均检查虚线边界存在、标题匹配当前业务 Node，保留 UDM Subscribe PRE 5 / POST 1、一入九出 10 个原始 Route ID、Child 往返、Root 17 Node / 46 bundle 和 Source 原文。最终文档 HEAD 还需自动门禁复查；PR #71 保持 OPEN，未合入 main，未部署 Pages。
