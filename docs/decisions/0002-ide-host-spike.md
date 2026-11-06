@@ -87,3 +87,15 @@ plain-scalar `operator.on` target preview, with exact Source Span, full
 reprojection and non-target Route equality. This must **not** silently relax
 production Studio policy. If adopted, separately review the production
 qualification contracts and re-establish their owner-approved rules.
+
+## Verified code-level result (2026-11-06)
+
+[Draft PR #86](https://github.com/odango-chan/ca-skill-studio-demo/pull/86),
+[exact-head CI #42191440251](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42191440251): **PASS**.
+The isolated build produces a VSIX; six focused tests pass, including a
+mocked VS Code `CustomTextEditorProvider` message round-trip, one guarded
+`WorkspaceEdit` scalar replacement, duplicate/stale rejection and actual
+5-Procedure 17-Node/63-Outcome source projection. The pre-existing 409
+repo tests also pass. These are build / mock-host / unit results only:
+**VS Code GUI and Theia GUI remain NOT_RUN**. The draft is intentionally not
+merged into `main`.
