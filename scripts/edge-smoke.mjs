@@ -147,7 +147,7 @@ try{
     " const viewReturned=document.getElementById('nodeFocus')?.hidden===true;",
     " document.getElementById('closeInspector')?.click();",
     " const viewStable=viewCount===focusNodes&&viewOpened&&viewReturned;",
-    " mode.value='custom';mode.dispatchEvent(new Event('change',{bubbles:true}));
+    " mode.value='custom';mode.dispatchEvent(new Event('change',{bubbles:true}));",
     " for(let i=0;i<45;i++){",
     "  if(!document.getElementById('rootPathFilters').hidden)break;",
     "  await sleep(100);",
