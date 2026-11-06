@@ -1,7 +1,11 @@
-# IDE host experiment · VS Code extension → Theia compatibility
+# IDE host experiment · online Theia + VS Code desktop/web
 
 **Spike, not a migration.** Repo owner: `ca-skill-studio-demo`; original
 browser Demo / GitHub Pages is untouched. Tracks #85.
+
+**Online is mandatory.** The target product is a browser-accessible SKILL
+Studio plus optional local/VS Code entry points; this spike must never
+replace the existing GitHub Pages site with a desktop-only tool.
 
 ## Decision being tested
 
@@ -61,6 +65,28 @@ Official sources:
 
 **Verified CI:** [ide-host-spike #42191440251](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42191440251) — 6/6 spike tests, 409/409 existing tests, bundled extension and VSIX artifact PASS. The simulated host verifies real WorkspaceEdit message handling, but not the real VS Code or Theia GUI. Download `ca-skill-studio-ide-spike-vsix` from the workflow **Artifacts** section.
 
+## Online host trial (still NOT_RUN)
+
+**Target:** build an independent Theia `browser-only` app (>=1.76), bundle
+the browser extension entry `dist/extension-web.cjs` at **build time**, and
+host the resulting static frontend at a separate preview path. Existing
+`https://odango-chan.github.io/ca-skill-studio-demo/` continues unchanged.
+
+The online host must supply Explorer New File/Folder/Rename/Delete,
+YAML/Python tabs and Source, real Procedure graph and Source-backed Patch
+through `TextDocument/WorkspaceEdit`. Its filesystem uses browser OPFS;
+this is **not** a native disk mount nor automatic synchronization to GitHub.
+Explicit import/export and persistence acceptance are separate gates.
+
+This spike builds the browser entry but does **not yet build/host the Theia
+browser-only shell**. Chrome/webview and `CustomTextEditorProvider` actual
+runtime support remain unverified. The Node VSIX is for desktop/server Theia;
+in a browser-only host the web extension must be bundled during Theia build.
+
+References:
+- https://theia-ide.org/docs/composing_applications/
+- https://code.visualstudio.com/api/extension-guides/web-extensions
+
 ## What is and is not proven
 
 | Test | Acceptance | Status at verified build d528ba73 |
@@ -72,6 +98,7 @@ Official sources:
 | VS Code Explorer/new file | native integration works | **NOT_RUN** |
 | VS Code editor open/edit/undo | graph refresh and single-scalar patch | **NOT_RUN** |
 | Theia same VSIX | custom editor and Webview API compatibility | **NOT_RUN** |
+| Online Theia browser-only with Web extension | Build-time bundled extension, OPFS create/edit, Procedure CustomEditor | Web entry built; full host **NOT_RUN** |
 | Local Runtime / 5GC | deliberately out of scope | **NOT_RUN** |
 
 No Theia backend/framework dependency is introduced into the existing Pages
@@ -82,8 +109,9 @@ application. This is an architectural trial, not a release.
 - If VS Code extension works but Theia CustomTextEditorProvider does not:
   keep a VS Code extension and evaluate a small Theia-specific wrapper around
   the same graph adapter. Do not fork YAML semantics.
-- If both work: prefer **one VS Code-compatible extension** and use Theia
-  only when a branded independent SKILL Studio shell is required.
+- If online Theia browser-only and desktop work: prefer **one shared
+  Studio extension and core** with Theia as branded browser shell and
+  VS Code as an optional local host.
 - If neither is reliable, isolate the existing browser Studio's workspace
   adapter rather than continuing to grow a hand-built IDE.
 
