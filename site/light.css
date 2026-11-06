@@ -1899,3 +1899,41 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   color:#0d7466;background:#edf8f3;border:1px solid #bfdfd3;
   border-radius:7px;font-weight:650;
 }
+
+/* Source-only files get a real file editor toolbar instead of a mostly-empty
+   Procedure toolbar. File identity and line count come from the active Source,
+   not from a second parsed document or synthetic Visual projection. */
+#editorToolbar[data-file-kind="source"]{gap:10px;min-height:51px}
+#editorToolbar[data-file-kind="source"] .mode-spacer{display:none}
+.source-context{display:flex;flex:1;align-items:center;gap:9px;min-width:0}
+.source-context-icon{
+  display:flex;align-items:center;justify-content:center;flex:none;
+  width:31px;height:31px;background:#f0f5f9;border:1px solid #e2eaf1;
+  border-radius:7px;color:#3e8090;
+}
+.source-context-icon svg{display:block;width:17px;height:17px;flex:none}
+.source-context-text{
+  display:flex;flex-direction:column;gap:2px;min-width:0;
+}
+.source-context-text strong{
+  display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:#29445f;font:650 12px/1.4 system-ui,sans-serif;
+}
+.source-context-text span{
+  color:#7f91a2;font:10px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace;
+}
+#editorToolbar .source-return{
+  flex:none;border:1px solid #e2e9ef;border-radius:6px;
+  padding:7px 10px;background:#f7fafc;color:#43687a;
+  font-size:11px;font-weight:600;white-space:nowrap;
+}
+#editorToolbar .source-return:hover:not(:disabled){
+  background:#edf6f2;border-color:#bedfd3;color:#087f72;
+}
+#editorBody[data-mode="source"] .source-pane{flex:1 1 100%;width:100%;min-width:0}
+@media(max-width:680px){
+  #editorToolbar[data-file-kind="source"]{min-height:48px;flex-wrap:nowrap;padding:6px 9px}
+  #editorToolbar .source-return{padding:6px 7px;font-size:10px}
+  .source-context-icon{width:27px;height:27px}
+  .source-context-text span{font-size:9px}
+}
