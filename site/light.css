@@ -1655,6 +1655,8 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   overflow-wrap:anywhere;
 }
 
+/* Variable-height stage geometry must override the main 238×80 wrapper. */
+.focus-procedure-flow .react-flow__node{width:auto;height:auto}
 /* D1-A2c: the drilled-down Node is an actual read-only React Flow + ELK
    subgraph, not an Inspector with three card columns. */
 .node-focus-toolbar{
@@ -1679,6 +1681,8 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 }
 .node-focus-flow-host .react-flow{height:100%;width:100%}
 .focus-graph-card{
+  --port-border-left:1px;--port-border-right:1px;
+  --port-border-top:1px;--port-border-bottom:1px;
   position:relative;box-sizing:border-box;min-width:0;
   border:1px solid #becfdd;border-radius:9px;
   background:#fff;box-shadow:0 4px 14px #30577413;
