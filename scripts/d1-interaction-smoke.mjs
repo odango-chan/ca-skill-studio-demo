@@ -1007,7 +1007,8 @@ export async function runD1Interactions(evaluate,command){
     " const outlineIcons=outline.length===17;",
     " const folderChevron=!!q('#assetTree .asset-folder-title .disclosure-chevron[data-icon=\"chevron-right\"]');",
     " const nodeChevron=!!q('#nodeOutlineDisclosure summary .disclosure-chevron[data-icon=\"chevron-right\"]');",
-    " const sampleChevron=!!q('.sample-picker summary .disclosure-chevron[data-icon=\"chevron-right\"]');",
+    " const sampleInMenu=!!q('#applicationMenu [data-studio-command=file.loadSample]');",
+    " const noOldSamplePicker=!q('.sample-picker');",
     " click(child);",
     " for(let i=0;i<60;i++){",
     "  if(document.querySelectorAll('.react-flow__node').length!==17)break;",
@@ -1016,12 +1017,12 @@ export async function runD1Interactions(evaluate,command){
     " const childStill=!!q('#procedureTree button.child .tree-icon-child svg[data-icon=\"git-branch\"]');",
     " click(document.getElementById('backProcedure'));await sleep(450);",
     " return {ok:!!rootIcon&&!!childIcon&&noLegacy&&oneStyle&&controls&&",
-    "   cardIcons&&outlineIcons&&folderChevron&&nodeChevron&&sampleChevron&&",
+    "   cardIcons&&outlineIcons&&folderChevron&&nodeChevron&&sampleInMenu&&noOldSamplePicker&&",
     "   childStill&&!!q('#procedureTree .tree-icon-root svg[data-icon=\"workflow\"]'),",
     "   rootIcon:!!rootIcon,childIcon:!!childIcon,noLegacy,oneStyle,",
     "   fileIconCount:fileIcons.length,controls,cardCount:cards.length,",
     "   outlineCount:outline.length,outlineIcons,folderChevron,nodeChevron,",
-    "   sampleChevron,childStill};"
+    "   sampleInMenu,noOldSamplePicker,childStill};"
   ]);
 
   await check(evaluate,"CHILD_NAVIGATION",[
