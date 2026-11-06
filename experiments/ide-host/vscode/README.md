@@ -48,7 +48,7 @@ Theia cannot install a VSIX dynamically through the Extensions UI. Its
 filesystem is OPFS, not a local disk or automatic GitHub sync. A separate
 online Theia shell build, CustomEditor activation, persistence and static
 hosting are still **NOT_RUN**. See
-[online-first host decision](../../../docs/decisions/0002-ide-host-spike.md).
+[online-first host decision](https://github.com/odango-chan/ca-skill-studio-demo/blob/spike/ide-extension-theia-host/docs/decisions/0002-ide-host-spike.md).
 
 No run/debug/Skill execution is performed and no existing GitHub Pages
 assets are modified.
