@@ -20,6 +20,8 @@ import {renderMarkdown} from "./markdown-preview.mjs";
 import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from "./view-policy.mjs";
 import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
 import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
+import {mountNodeFocusCanvas} from "./node-focus-flow.tsx";
+import {projectNodeFocusFlow} from "./node-focus-graph.mjs";
 import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
 import {createIcon,operatorIcon} from "./icons.mjs";
 import {nodeRenameAvailable,previewNodeRename,applyNodeRename} from "./node-designer.mjs";
@@ -173,6 +175,12 @@ const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
   },
   onPaneClick:()=>{if(canvasRouteProposal)return;if(selection)clearSelection();}
 });
+const nodeFocusCanvas=mountNodeFocusCanvas($("nodeFocusFlow"),{
+  onPivot:id=>openNodeFocus(id),
+  onSource:line=>lineJump(line)
+});
+let nodeFocusTicket=0;
+$("nodeFocusFit").addEventListener("click",()=>nodeFocusCanvas.fit());
 // React Flow may consume its own double-click for viewport zoom. Capture a
 // real Node target before that handler; this is the same actual Node id used
 // for all graph selection/patch operations, never a synthetic Stage node.
@@ -2097,8 +2105,8 @@ $("nodeFocusReturn").addEventListener("click",closeNodeFocus);
 function renderNodeFocus(){
   const model=projection?.state==="READY"&&viewKind==="procedure"&&nodeFocusId
     ?nodeJourney(lastGood,nodeFocusId):null;
-  const neighborhood=model?nodeNeighborhood(lastGood,nodeFocusId):null;
-  const visible=Boolean(model&&neighborhood);
+  const local=model?projectNodeFocusFlow(lastGood,nodeFocusId):null;
+  const visible=Boolean(local&&model);
   const host=$("nodeFocus");
   host.hidden=!visible;
   $("reactFlowRoot").inert=visible;
@@ -2110,144 +2118,45 @@ function renderNodeFocus(){
   $("zoomViewOptions").hidden=visible||viewKind!=="procedure";
   $("fit").hidden=visible||viewKind!=="procedure";
   if(visible)$("procedureScope").hidden=true;
-  if(!visible)return;
-  const node=model.node,stages=$("nodeFocusStages");
-  stages.replaceChildren();
+  const ticket=++nodeFocusTicket;
+  if(!visible){nodeFocusCanvas.clear();return;}
+  const node=model.node;
   setText("nodeFocusTitle",node.id);
   setText("nodeFocusSubtitle",
     activeProcedureId+" · "+node.operator.toUpperCase()+" · L"+node.line);
-  // Exact source-backed one-hop topology: every declared incoming/outgoing
-  // Route is retained, including duplicates to a peer and cycles.
-  const renderNeighbors=(id,scope,direction)=>{
-    const lane=$(id);
-    lane.replaceChildren();
-    const head=el("div","node-focus-neighbor-heading");
-    head.append(el("strong","",direction==="previous"?"上一跳 · 来自":"下一跳 · 去向"),
-      el("span","",scope.peers.length+" Nodes / "+scope.routeCount+" Routes"));
-    lane.appendChild(head);
-    const intro=el("div","node-focus-neighbor-intro",
-      direction==="previous"?"按当前 Procedure 的真实入向 Route":"按当前 Procedure 的真实出向 Route");
-    lane.appendChild(intro);
-    if(!scope.peers.length){
-      lane.appendChild(el("div","node-focus-neighbor-empty",
-        direction==="previous"?
-          (node.id===lastGood.start?"START · 当前流程入口没有入向 Route":"没有已声明的上一跳"):
-          (node.operator==="terminal"?"TERMINAL · 没有出向 Route":"没有已声明的下一跳")));
-      return;
-    }
-    for(const peer of scope.peers){
-      const card=el("div","node-focus-neighbor-card");
-      const open=button("",()=>openNodeFocus(peer.node.id),"node-focus-neighbor-open");
-      open.setAttribute("aria-label",
-        "查看"+(direction==="previous"?"上一跳":"下一跳")+"节点 "+peer.node.id);
-      open.append(el("span","node-focus-neighbor-kind",peer.node.operator.toUpperCase()),
-        el("span","node-focus-neighbor-id",peer.node.id));
-      card.appendChild(open);
-      const routes=el("div","node-focus-neighbor-routes");
-      routes.setAttribute("aria-label","真实 Route Outcome");
-      for(const route of peer.routes){
-        const tone=classifyRouteTone([route.outcome]);
-        const origin=route.routeSource==="preconditions.on"?"PRE":
-          route.routeSource==="postconditions.on"?"POST":
-          route.routeSource==="operator.on"?"OP":"OTHER";
-        const chip=el("span","node-focus-neighbor-route tone-"+tone,
-          origin+" · "+route.outcome);
-        chip.title=route.id+" · "+route.source+" → "+route.target+
-          " · "+route.routeSource+" · L"+route.line;
-        chip.dataset.routeId=route.id;
-        chip.dataset.routeSource=route.routeSource;
-        routes.appendChild(chip);
-      }
-      card.appendChild(routes);
-      card.appendChild(el("div","node-focus-neighbor-direction",
-        direction==="previous"?"↳ 进入当前节点":"当前节点 → 该节点"));
-      lane.appendChild(card);
-    }
-  };
-  renderNeighbors("nodeFocusPrevious",neighborhood.previous,"previous");
-  renderNeighbors("nodeFocusNext",neighborhood.next,"next");
+  setText("nodeFocusStats",local.previousCount+" 上一跳 / "+
+    local.nextCount+" 下一跳 · "+local.originalRouteCount+
+    " 条真实 Route（灰线仅表示内部阶段顺序）"+
+    (!local.previousCount?" · 无上一跳":"")+
+    (!local.nextCount?" · 无下一跳":""));
+  const children=$("nodeFocusChildren");
+  children.replaceChildren();
+  for(const ref of model.children){
+    if(!lastWorkspace?.procedures.has(ref.procedure))continue;
+    const open=button("进入子流程 · "+ref.procedure,
+      ()=>enterProcedure(ref.procedure,{callerId:node.id}),"node-focus-subflow");
+    open.title=ref.via+" · L"+ref.line;
+    children.appendChild(open);
+  }
   const call=procedureTrail.at(-1)?.childProcedure===activeProcedureId?
     procedureTrail.at(-1):null;
   setText("procedureBread",
     (call?call.parentProcedure+" / "+call.callerId+" / ":"")+
     activeProcedureId+" / "+node.id);
-  const stage=(kind,label,description)=>{
-    const card=el("article","node-focus-stage is-"+kind);
-    const head=el("div","node-focus-stage-heading");
-    head.append(el("strong","",label),el("span","",description));
-    card.appendChild(head);
-    stages.appendChild(card);
-    return card;
-  };
-  const addRoutes=(card,routes)=>{
-    if(!routes?.length)return;
-    const list=el("div","node-focus-route-list");
-    list.setAttribute("aria-label","声明的 Outcome 路由");
-    for(const route of routes){
-      const tone=classifyRouteTone([route.outcome]);
-      const chip=el("span","node-focus-route tone-"+tone,
-        route.outcome+" → "+route.target);
-      chip.title=route.routeSource+" · L"+route.line;
-      list.appendChild(chip);
-    }
-    card.appendChild(list);
-  };
-  const childEntry=(card,ref)=>{
-    // A procedure invocation is not an extra Phase/Node. It only navigates
-    // to another *existing* Procedure in the current Source projection.
-    if(!lastWorkspace?.procedures.has(ref.procedure))return;
-    const enter=button("进入子流程 · "+ref.procedure,
-      ()=>enterProcedure(ref.procedure,{callerId:node.id}),"node-focus-subflow");
-    enter.title=ref.via+" · L"+ref.line;
-    card.appendChild(enter);
-  };
-  const drawPhase=(name,label,modelPart,kind)=>{
-    if(!modelPart.phase)return; // No synthetic PRE/POST stages.
-    const steps=modelPart.phase.steps||[];
-    const card=stage(kind,label,steps.length+" Steps");
-    if(steps.length){
-      const list=el("ol","node-focus-steps");
-      for(const step of steps){
-        const row=el("li","node-focus-step");
-        const main=el("div","node-focus-step-main");
-        if(step.name)main.appendChild(el("span","node-focus-step-name",step.name));
-        main.appendChild(el("span","",step.value));
-        const kindLabel=el("span","node-focus-step-kind",step.operator.toUpperCase());
-        row.append(kindLabel,main);
-        const sourceButton=button("L"+step.line,
-          ()=>lineJump(step.line),"node-focus-source-link");
-        sourceButton.title="在 Source 定位本步骤";
-        row.appendChild(sourceButton);
-        list.appendChild(row);
-        const via=name+".steps["+(step.index-1)+"]";
-        const child=model.children.find(ref=>ref.via===via&&ref.procedure===step.value);
-        if(child){
-          const item=el("li","node-focus-step-child");
-          childEntry(item,child);
-          list.appendChild(item);
-        }
-      }
-      card.appendChild(list);
-    }else card.appendChild(el("p","node-focus-empty","此阶段没有 Step"));
-    addRoutes(card,modelPart.routes);
-  };
-  const arrow=()=>{
-    const connector=el("div","node-focus-connector","↓");
-    connector.setAttribute("aria-hidden","true");
-    stages.appendChild(connector);
-  };
-  if(model.prepare.phase){
-    drawPhase("preconditions","PRE · 前置条件",model.prepare,"pre");
-    arrow();
-  }
-  const op=stage("op","OP · "+node.operator.toUpperCase(),node.value);
-  op.appendChild(el("div","node-focus-stage-value",node.value));
-  for(const child of model.execute.children)childEntry(op,child);
-  addRoutes(op,model.execute.routes);
-  if(model.confirm.phase){
-    arrow();
-    drawPhase("postconditions","POST · 后置条件",model.confirm,"post");
-  }
+  // Every new source revision or pivot invalidates the old async ELK result.
+  // Local graph nodes and view-only stage links must NEVER become YAML data.
+  nodeFocusCanvas.clear();
+  layoutProcedureELK(local,{direction:"RIGHT",dimensions:local.dimensions})
+    .then(layout=>{
+      if(ticket!==nodeFocusTicket||nodeFocusId!==local.focusId||
+         lastGood!==local.sourceProcedure||host.hidden)return;
+      nodeFocusCanvas.render(local,layout);
+    })
+    .catch(error=>{
+      if(ticket!==nodeFocusTicket)return;
+      nodeFocusCanvas.clear();
+      setText("nodeFocusStats","局部图布局不可用："+String(error?.message??error));
+    });
 }
 function renderGraphLegend(){
   const nodeHost=$("graphLegendNodeTypes");
