@@ -127,7 +127,7 @@ try{
     " const customNodes=document.querySelectorAll('.react-flow__node').length;",
     " const branchShown=customNodes>focusNodes;",
     " mode.value='all';mode.dispatchEvent(new Event('change',{bubbles:true}));",
-    " for(let i=0;i<130;i++){"
+    " for(let i=0;i<130;i++){",
     "  if(document.querySelectorAll('.react-flow__node').length===17 &&",
     "    document.querySelectorAll('.react-flow__edge-path').length===46 &&",
     "    document.querySelectorAll('.react-flow__handle[data-handleid^=edge-]').length===92 &&",
