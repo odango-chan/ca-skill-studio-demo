@@ -4,6 +4,7 @@
 export const STUDIO_COMMAND_TARGETS=Object.freeze({
   "file.open":"openButton",
   "file.openDirectory":"openDirectoryButton",
+  "file.loadSample":"establishSampleButton",
   "file.saveDirectory":"saveDirectoryButton",
   "file.export":"downloadButton",
   "file.exportPackage":"exportPackageButton",
