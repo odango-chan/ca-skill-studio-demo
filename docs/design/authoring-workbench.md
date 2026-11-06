@@ -171,7 +171,7 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 
 实测代码门禁：[CI #42029242711](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42029242711) **PASS**（393/393 Unit、TypeScript、Build、Chromium）。在 Root 示例的 `nudm-sdm-subscribe`，确证上一跳 1 Node / 1 POST Route，下一跳 6 Node / 9 Route（PRE/OP/POST，不同 Outcome 保留）；点击 `npcf-sm-policy-control-create` 后其上一跳指回原节点，再点击返回；终态无下一跳；返回主图 17 Node / 46 bundles、Source 原字节未变。CI 浏览器为窄屏，确认纵向堆叠布局生效；三栏桌面布局由 CSS 控制，但仍需在线目视确认。此项仅候选 PR，还未合入/Pages 部署。
 
-## D1-A2c · 真正的局部流程图（2026-11-06 · PR #70 OPEN）
+## D1-A2c · 真正的局部流程图（2026-11-06 · PR #70 MERGED / Pages PASS）
 
 用户指出 A2b 三栏卡片没有箭头，实质仍是 Inspector，而不是 Procedure Designer 的流程图。A2c **只替换双击 Node 后的显示方式**，复用主流程的 React Flow / ELK / Route Edge / 精确端口。保留 A2b 已建立的 Source-backed 一跳拓扑数据、A2 Child 返回调用节点和原始 Root 图（Owner 17 Node / 46 bundle）。
 
@@ -181,4 +181,16 @@ A2 建立在 A1 的 Source-backed Node/Phase/Route 语义展示之上，只改�
 - 点击邻接 Node 可继续局部下钻；当前节点阶段内可查看原始 Step 名称、类型及 Source 行号，已有 Child Procedure 引用仍通过独立按钮进入。没有 PRE/POST 的终态显示 OP-only；无前驱/后继通过统计文字说明，不伪造 START/END 节点。
 - 同一业务 Node 若既为前驱又为后继，局部图可展示两个不同视觉角色，不会改变业务 Node 数量；self-loop 直接接入实际阶段，保持 Route 身份。ELK 对每条连线做布局并与 React Flow 的 port handle 定位对齐，不能为了美观把 PRE 的失败边挂在 POST。
 
-验收需包括全 Owner Root 17/17 Node 的真实 Local React Flow、UDM Subscribe PRE 5/OP/POST 1 和一入九出 Route 原 ID（含 PRE/OP/POST）、多个 Outcome/同一邻接、循环、终态、Child 往返、主图 17/46、Source bytes 不变。源码修改不对应 Runtime/5GC E2E；真正的根流程全局紧凑概览 A3 仍独立进行。代码级 CI #42144801067 已 PASS；最终文档提交后 exact-head CI 和 Pages 仍需单独核对。
+验收需包括全 Owner Root 17/17 Node 的真实 Local React Flow、UDM Subscribe PRE 5/OP/POST 1 和一入九出 Route 原 ID（含 PRE/OP/POST）、多个 Outcome/同一邻接、循环、终态、Child 往返、主图 17/46、Source bytes 不变。源码修改不对应 Runtime/5GC E2E；真正的根流程全局紧凑概览 A3 仍独立进行。[PR 最终 CI #42145234247](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42145234247) PASS：397/397 Unit + TypeScript + Build + Chromium；[resulting-main Pages #42146056391](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42146056391) PASS。
+
+
+## D1-A2d · 当前业务 Node 的可视组合边界（2026-11-06 · PR #71 OPEN）
+
+A2c 已实际把 Node 下钻改为 React Flow/ELK，上一跳与下一跳通过真实 Outcome Route 连线，并将当前真实 Node 展开为若干 **UI Stage**（PRE/OP/POST）。但这些 Stage 看上去仍容易被误读为多个同级业务 Node。A2d 为当前 Node 的阶段添加一层**虚线组合边界**，不创建新的业务 Node、Route 或 DSL。
+
+- `currentNodeBoundary(local,layout)` 只读取现成 ELK 各 Stage 的最终位置与动态尺寸，加少量视觉留白，产生 React Flow 只读背板。
+- 组合背板没有 Handle，不参与 Route、Step、执行、选中或写操作。它的 ID 为 `view:current-node-boundary`，只能作为 UI 呈现，不应被任何 Source / Runtime 身份引用。
+- 所有原始 PRE/OP/POST 出向 Route 仍从对应 Stage 节点发出，入向仍连至第一个实际阶段，灰色 `view.phase` 仍仅代表展示顺序而不构成执行承诺。前驱/后继节点仍可下钻。
+- 测试应覆盖所有 Root Node 的边界包围实际 Stage、无边界 Route、没有第二业务 Node，Chromium 核对 17/17 下钻虚线边界、来源 Route 标签与主图及 Source 完整恢复。未通过 exact-head CI 前不宣称 PR PASS；未合入前不宣称 Pages 上线。
+
+这轮是很小的 D1 展示修补，不启动新的布局方案、自动拆解 DSL、Runtime 验证或 A3 的全局 Root 缩略。
