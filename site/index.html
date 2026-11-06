@@ -115,7 +115,14 @@
     </aside>
 
     <section class="editor" aria-label="Procedure authoring editor">
-      <div class="editorbar compact-toolbar">
+      <div class="editorbar compact-toolbar" id="editorToolbar" data-file-kind="procedure">
+        <div id="sourceContext" class="source-context" aria-label="当前源码文件" hidden>
+          <span id="sourceContextIcon" class="source-context-icon" aria-hidden="true"></span>
+          <div class="source-context-text">
+            <strong id="sourceContextName">当前文件</strong>
+            <span id="sourceContextMeta">源码编辑</span>
+          </div>
+        </div>
         <div class="breadcrumbs" id="procedureBreadcrumbs">
           <button id="backProcedure" type="button" title="返回 Root Procedure" aria-label="返回 Root Procedure"></button>
           <span id="procedureBread">Procedure</span>
@@ -149,6 +156,7 @@
             <button id="fitHeight" type="button" title="纵向铺满：让流程图高度尽量占满画布（宽度可能溢出）" aria-label="纵向铺满流程图">纵向</button>
           </div>
         </div>
+        <button id="backToProcedure" class="toolbar-minor-action source-return" type="button" title="返回当前 SKILL 的 Procedure 流程图" hidden>返回流程图</button>
         <button id="inspectorVisibility" class="toolbar-minor-action" type="button" aria-controls="inspectorPanel" aria-pressed="false" hidden>属性</button>
         <button id="resetButton" class="toolbar-minor-action" type="button" title="恢复当前文件的初始文本（需要确认）">恢复</button>
       </div>
