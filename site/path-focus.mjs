@@ -4,7 +4,8 @@
 const GOOD=new Set(["PASS","SUCCEEDED","SUCCESS","COMMITTED"]);
 const BAD=new Set(["FAIL","FAILED","ERROR","NOT_COMMITTED","DENIED"]);
 const UNCERTAIN=new Set(["UNKNOWN","UNRESOLVED","OUTCOME_UNKNOWN","TIMEOUT","TIMED_OUT"]);
-const KNOWN=new Set([...GOOD,...BAD,...UNCERTAIN]);
+// SAFE_STOPPED is a declared stopped disposition, never a successful path.
+const KNOWN=new Set([...GOOD,...BAD,...UNCERTAIN,"SAFE_STOPPED"]);
 const SUCCESS_TERMINAL=new Set(["PASS","SUCCESS","SUCCEEDED"]);
 
 export function branchCategory(route,nodeById){
