@@ -230,8 +230,10 @@ function renderRootPathControls(){
 function rootPathStatus(scope){
   if(scope.reason||scope.filterReason)return scope.reason||scope.filterReason;
   if(neighborView&&selection?.kind==="node")return "邻居视图";
-  if(rootPathOptions()&&rootPathMode!=="all"&&scope.isFiltered)
-    return "路径聚焦 · 已隐藏 "+(lastGood.routes.length-scope.routes.length)+" 条 Route";
+  if(rootPathOptions()&&rootPathMode!=="all"&&scope.isFiltered){
+    const visible=scope.routes??scope.visibleRoutes??[];
+    return "路径聚焦 · 已隐藏 "+(lastGood.routes.length-visible.length)+" 条 Route";
+  }
   return "";
 }
 function scheduleELKLayout(wait=0, autoFit=false) {
