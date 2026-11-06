@@ -231,9 +231,12 @@ Source Span 和 ELK 端点，不能生成虚拟 Runtime Route。每个业务 Nod
 
 ## 应用菜单与本地宿主统一（2026-11-06）
 
-- 顶栏新增一个紧凑「菜单」，包含**文件 / 编辑 / 视图**分组和可直达的真实使用说明。所有选项复用当前 File / Undo / View / Inspector / Fit 处理路径；不能形成第二套文件保存或 Source History。
+- 顶栏直接展示**文件 / 编辑 / 视图 / 帮助**四个一级菜单；中间弹性区域展示当前文件路径，右侧保留修改状态、撤销/重做、导出。所有选项复用当前 File / Undo / View / Inspector / Fit 处理路径；不能形成第二套文件保存或 Source History。
 - 不存在或当前不可使用的命令呈不可点击状态；浏览器目录权限提示必须来自用户直接操作。已有工具栏及 Explorer 的高频入口暂时保留，后续 UX 收敛再删除重复的低频入口。
 - Node 卡片单击仅选中 Inspector；**只有「查看」才能打开局部节点图**，真正的 Child Procedure 用「进入子流程」。主图和局部图的双击导航已移除；空白画布双击缩放继续禁用。
 - 所有菜单分组与 `data-studio-command` 命令 ID 既用于 GitHub Pages 也用于将来的本地应用。**本地 Node.js 静态服务器不是 Skill 执行宿主**；运行/调试/Trace 等项待真实有权限且可验证的执行能力出现才新增，不使用灰色假的 Run 菜单。
+
+
+- 宽屏四个菜单并列，仅展开一个；键盘 Tab/Enter/Space 及 ←/→（在菜单标题上）可导航，Esc 和点击外部关闭。小屏幕隐藏中间文件路径而不是挤掉菜单；不提供虚假的本地运行项。
 
 设计与宿主边界详见 [Application Shell](application-shell.md)。本轮仅是编辑器交互和信息架构优化，不改变 Source、Runtime、5GC。

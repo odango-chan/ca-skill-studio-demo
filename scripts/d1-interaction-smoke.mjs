@@ -1212,11 +1212,16 @@ export async function runD1Interactions(evaluate,command){
       " const rect=toggle.getBoundingClientRect();",
       " const visible=workbench.dataset.explorer==='closed'&&",
       "  rect.width>20&&rect.height>20&&rect.left>=0&&rect.right<=window.innerWidth;",
+      " const menus=[...document.querySelectorAll('#applicationMenu summary')];",
+      " const menuVisible=menus.length===4&&menus.every(x=>{",
+      "  const r=x.getBoundingClientRect();",
+      "  return r.width>24&&r.left>=0&&r.right<=window.innerWidth;});",
+      " const contextHidden=getComputedStyle(document.querySelector('.top-context')).display==='none';",
       " const caption=toggle.querySelector('.explorer-toggle-caption');",
       " const text=caption?.textContent;",
       " click(toggle);await sleep(200);",
-      " return {ok:visible&&workbench.dataset.explorer==='open',",
-      "  width:window.innerWidth,visible,text,toggleRect:rect.toJSON(),",
+      " return {ok:visible&&menuVisible&&contextHidden&&workbench.dataset.explorer==='open',",
+      "  width:window.innerWidth,visible,menuVisible,contextHidden,text,toggleRect:rect.toJSON(),",
       "  reopened:workbench.dataset.explorer==='open'};"
     ]);
   }finally{

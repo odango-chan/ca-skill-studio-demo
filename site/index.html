@@ -17,38 +17,56 @@
       <span class="brand-logo" aria-hidden="true"><span></span><span></span><span></span></span>
       <div class="brand-title"><strong>SKILL Studio</strong></div>
     </div>
-    <details id="applicationMenu" class="application-menu" aria-label="应用菜单">
-      <summary class="application-menu-trigger">菜单 <span aria-hidden="true">⌄</span></summary>
-      <div class="application-menu-popup" aria-label="SKILL Studio 命令">
-        <section class="application-menu-group" aria-label="文件操作">
-          <strong>文件</strong>
-          <button type="button" data-studio-command="file.open">打开文件</button>
-          <button type="button" data-studio-command="file.openDirectory">打开 SKILL 目录</button>
-          <button type="button" data-studio-command="file.loadSample">加载示例 · establish-pdu-session</button>
-          <button type="button" data-studio-command="file.saveDirectory">保存到所选目录</button>
-          <button type="button" data-studio-command="file.export">导出当前文件</button>
-          <button type="button" data-studio-command="file.exportPackage">导出 Package ZIP</button>
-        </section>
-        <section class="application-menu-group" aria-label="编辑操作">
-          <strong>编辑</strong>
-          <button type="button" data-studio-command="edit.undo">撤销</button>
-          <button type="button" data-studio-command="edit.redo">重做</button>
-          <button type="button" data-studio-command="edit.reset">恢复当前文件初始文本</button>
-        </section>
-        <section class="application-menu-group" aria-label="视图操作">
-          <strong>视图</strong>
-          <button type="button" data-studio-command="view.visual">Visual</button>
-          <button type="button" data-studio-command="view.source">Source</button>
-          <button type="button" data-studio-command="view.split">Split</button>
-          <button type="button" data-studio-command="view.inspector">显示 / 隐藏属性</button>
-          <button type="button" data-studio-command="view.fit">适配流程图</button>
-        </section>
-        <div class="application-menu-help">
-          <a href="https://github.com/odango-chan/ca-skill-studio-demo/blob/main/docs/design/authoring-workbench.md" target="_blank" rel="noopener noreferrer">使用说明</a>
+    <nav id="applicationMenu" class="application-menubar" aria-label="应用菜单">
+      <details class="application-menu" data-app-menu="file">
+        <summary class="application-menu-trigger">文件</summary>
+        <div class="application-menu-popup" aria-label="文件操作">
+          <section class="application-menu-group">
+            <button type="button" data-studio-command="file.open">打开文件</button>
+            <button type="button" data-studio-command="file.openDirectory">打开 SKILL 目录</button>
+            <button type="button" data-studio-command="file.loadSample">加载示例 · establish-pdu-session</button>
+            <button type="button" data-studio-command="file.saveDirectory">保存到所选目录</button>
+            <button type="button" data-studio-command="file.export">导出当前文件</button>
+            <button type="button" data-studio-command="file.exportPackage">导出 Package ZIP</button>
+          </section>
         </div>
-      </div>
-    </details>
-    <span id="fileName" class="top-file" title="当前工作文件">正在载入…</span>
+      </details>
+      <details class="application-menu" data-app-menu="edit">
+        <summary class="application-menu-trigger">编辑</summary>
+        <div class="application-menu-popup" aria-label="编辑操作">
+          <section class="application-menu-group">
+            <button type="button" data-studio-command="edit.undo">撤销</button>
+            <button type="button" data-studio-command="edit.redo">重做</button>
+            <button type="button" data-studio-command="edit.reset">恢复当前文件初始文本</button>
+          </section>
+        </div>
+      </details>
+      <details class="application-menu" data-app-menu="view">
+        <summary class="application-menu-trigger">视图</summary>
+        <div class="application-menu-popup" aria-label="视图操作">
+          <section class="application-menu-group">
+            <button type="button" data-studio-command="view.visual">Visual</button>
+            <button type="button" data-studio-command="view.source">Source</button>
+            <button type="button" data-studio-command="view.split">Split</button>
+            <button type="button" data-studio-command="view.inspector">显示 / 隐藏属性</button>
+            <button type="button" data-studio-command="view.fit">适配流程图</button>
+          </section>
+        </div>
+      </details>
+      <details class="application-menu" data-app-menu="help">
+        <summary class="application-menu-trigger">帮助</summary>
+        <div class="application-menu-popup" aria-label="帮助资源">
+          <div class="application-menu-help">
+            <a href="https://github.com/odango-chan/ca-skill-studio-demo/blob/main/docs/design/authoring-workbench.md" target="_blank" rel="noopener noreferrer">使用说明</a>
+            <a href="https://github.com/odango-chan/ca-skill-studio-demo/blob/main/docs/design/application-shell.md" target="_blank" rel="noopener noreferrer">Web / 本地统一设计</a>
+          </div>
+        </div>
+      </details>
+    </nav>
+    <div class="top-context" title="当前工作文件">
+      <span class="top-context-label">当前文件</span>
+      <span id="fileName" class="top-file">正在载入…</span>
+    </div>
     <div class="topbar-actions">
       <span class="workspace-status" id="fileStatus" role="status"><span class="status-dot"></span>未修改</span>
       <button id="undoButton" class="icon-button" type="button" title="撤销 · Ctrl/Cmd + Z" disabled aria-label="撤销"></button>

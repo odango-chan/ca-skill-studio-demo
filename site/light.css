@@ -1812,18 +1812,18 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 }
 .procedure-flow .designer-node-kind{max-width:calc(100% - 96px)}
 
-/* Shared app menu: one low-noise command entry in Pages and a future local host.
-   Every item invokes an existing action; no unsupported Run/Debug controls. */
-.topbar{position:relative;z-index:20}
+/* Desktop-editor app header: always-visible File / Edit / View / Help.
+   A central, non-editable file context uses real header width. */
+.topbar{position:relative;z-index:20;gap:10px}
+.application-menubar{display:flex;align-items:center;gap:2px;flex:none;min-width:0}
 .application-menu{position:relative;flex:none;color:#4b6379}
 .application-menu>.application-menu-trigger{
-  display:flex;align-items:center;gap:5px;padding:6px 9px;
+  display:flex;align-items:center;gap:4px;padding:7px 10px;
   border:1px solid transparent;border-radius:6px;
   background:transparent;list-style:none;cursor:pointer;
   font:600 11px/1.3 system-ui,sans-serif;user-select:none;
 }
 .application-menu>.application-menu-trigger::-webkit-details-marker{display:none}
-.application-menu>.application-menu-trigger span{font-size:12px;color:#90a1b2}
 .application-menu>.application-menu-trigger:hover,
 .application-menu[open]>.application-menu-trigger{
   border-color:#dae6e9;background:#edf7f4;color:#0a796c;
@@ -1833,20 +1833,13 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 }
 .application-menu-popup{
   position:absolute;top:calc(100% + 7px);left:0;z-index:45;
-  width:244px;max-width:calc(100vw - 22px);
+  width:228px;max-width:calc(100vw - 20px);
   max-height:calc(100dvh - 75px);overflow-y:auto;
   padding:7px;background:#fff;color:#344e65;
-  border:1px solid #dce6ee;border-radius:10px;
+  border:1px solid #dce6ee;border-radius:9px;
   box-shadow:0 14px 32px #29486223;
 }
-.application-menu-group{
-  display:flex;flex-direction:column;gap:1px;
-  padding:4px 0 6px;border-bottom:1px solid #e8eff3;
-}
-.application-menu-group strong{
-  display:block;padding:6px 9px 4px;
-  color:#8395a6;font:700 10px/1.3 system-ui,sans-serif;
-}
+.application-menu-group{display:flex;flex-direction:column;gap:1px;padding:2px 0}
 .application-menu-group button,
 .application-menu-help a{
   display:block;width:100%;border:0;border-radius:6px;
@@ -1857,11 +1850,36 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .application-menu-group button:hover:not(:disabled),
 .application-menu-help a:hover{background:#eaf5f2;color:#0a786a}
 .application-menu-group button:disabled{opacity:.45;background:transparent}
-.application-menu-help{padding:5px 0 2px}
-@media(max-width:680px){
-  .topbar .top-file{display:none}
-  .topbar .application-menu-trigger{padding:6px 5px}
-  .topbar .application-menu-popup{left:-6px}
+.application-menu-help{padding:2px 0}
+.top-context{
+  min-width:0;flex:1;display:flex;align-items:center;justify-content:center;
+  gap:9px;padding:7px 12px;border:1px solid #e5edf3;border-radius:7px;
+  background:#f8fafc;color:#415b73;
+}
+.top-context-label{flex:none;color:#8395a7;font:550 10px system-ui,sans-serif}
+.topbar .top-file{
+  min-width:0;max-width:100%;padding-left:0;border-left:0;
+  color:#3d5c75;font:500 11px ui-monospace,SFMono-Regular,Consolas,monospace;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.topbar .topbar-actions{flex:none;margin-left:0}
+@media(max-width:1050px){
+  .topbar .top-context-label{display:none}
+  .topbar .application-menu>.application-menu-trigger{padding-inline:8px}
+  .topbar .topbar-actions .workspace-status{margin-right:0}
+}
+@media(max-width:760px){
+  .topbar .top-context{display:none}
+  .topbar .topbar-actions{margin-left:auto}
+  .topbar .topbar-actions .workspace-status{display:none}
+  .topbar .application-menu>.application-menu-trigger{padding-inline:7px}
+}
+@media(max-width:500px){
+  .topbar{gap:4px;padding-inline:8px}
+  .topbar .brand-title{display:none}
+  .topbar .application-menu>.application-menu-trigger{padding-inline:6px}
+  .topbar .application-menu-popup{left:auto;right:-8px}
+  .topbar .application-menu:first-child .application-menu-popup{left:-8px;right:auto}
   .topbar-actions #downloadButton{display:none}
 }
 

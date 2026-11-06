@@ -9,6 +9,10 @@ const css=read("site/light.css");
 
 test("one file identity, one edit status, one compact editor toolbar",()=>{
   assert.equal((html.match(/\bid="fileName"/g)||[]).length,1);
+  assert.match(html,/class="top-context"/);
+  assert.match(html,/class="top-context-label">当前文件/);
+  assert.match(html,/id="applicationMenu" class="application-menubar"/);
+  assert.equal((html.match(/class="application-menu" data-app-menu="/g)||[]).length,4);
   assert.equal((html.match(/\bid="fileStatus"/g)||[]).length,1);
   assert.equal((html.match(/class="editorbar compact-toolbar"/g)||[]).length,1);
   assert.doesNotMatch(html,/class="procedure-navigation"/);

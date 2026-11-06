@@ -29,48 +29,75 @@ export function studioCommandTarget(root,command){
   return node;
 }
 
-export function mountApplicationMenu(menu,root=document){
-  if(!menu)return {dispose(){}};
-  const trigger=menu.querySelector("summary");
-  const commands=[...menu.querySelectorAll("[data-studio-command]")];
-  const refresh=()=>{
-    for(const button of commands){
-      const command=button.dataset.studioCommand;
-      button.disabled=!studioCommandTarget(root,command);
-    }
+export function mountApplicationMenu(host,root=document){
+  if(!host)return {dispose(){}};
+  const menus=[...host.querySelectorAll("details.application-menu")];
+  const commands=[...host.querySelectorAll("[data-studio-command]")];
+  const openMenu=()=>menus.find(menu=>menu.open);
+  const closeMenus=except=>{
+    for(const menu of menus)if(menu!==except)menu.open=false;
   };
-  const onToggle=()=>{if(menu.open)refresh();};
+  const refresh=()=>{
+    for(const button of commands)
+      button.disabled=!studioCommandTarget(root,button.dataset.studioCommand);
+  };
+  // Native details implements Tab, Enter and Space. Only one top-level
+  // dropdown may be open; the menu bar has a single shared command owner.
+  const toggles=menus.map(menu=>{
+    const handler=()=>{
+      if(menu.open){
+        closeMenus(menu);
+        refresh();
+      }
+    };
+    menu.addEventListener("toggle",handler);
+    return handler;
+  });
   const onClick=event=>{
     const button=event.target.closest?.("[data-studio-command]");
-    if(!button||!menu.contains(button))return;
-    const target=studioCommandTarget(root,button.dataset.studioCommand);
-    if(!target){
-      refresh();
+    if(button&&host.contains(button)){
+      const target=studioCommandTarget(root,button.dataset.studioCommand);
+      if(!target){refresh();return;}
+      // Preserve the originating click's browser user activation so native
+      // file/directory picker permissions are not lost.
+      closeMenus();
+      target.click();
       return;
     }
-    // Deliberately synchronous within the user's click for browser
-    // file/directory picker permissions. Existing handlers remain the owner.
-    menu.open=false;
-    target.click();
+    if(event.target.closest?.(".application-menu-help a"))closeMenus();
   };
   const outside=event=>{
-    if(menu.open&&!menu.contains(event.target))menu.open=false;
+    if(openMenu()&&!host.contains(event.target))closeMenus();
   };
   const keydown=event=>{
-    if(menu.open&&event.key==="Escape"){
+    const active=openMenu();
+    if(event.key==="Escape"&&active){
       event.preventDefault();
-      event.stopImmediatePropagation();
-      menu.open=false;
-      trigger?.focus();
+      event.stopImmediatePropagation(); // Don't clear the editor selection.
+      closeMenus();
+      active.querySelector("summary")?.focus();
+      return;
     }
+    // Familiar top-menu keyboard navigation, without stealing arrows from
+    // the actual menu items or Monaco.
+    if(event.key!=="ArrowLeft"&&event.key!=="ArrowRight")return;
+    const summary=event.target.closest?.("summary");
+    const current=summary?.closest?.("details.application-menu");
+    const i=menus.indexOf(current);
+    if(i<0)return;
+    event.preventDefault();
+    const next=menus[(i+(event.key==="ArrowRight"?1:-1)+menus.length)%menus.length];
+    const wasOpen=current.open;
+    closeMenus();
+    if(wasOpen)next.open=true;
+    next.querySelector("summary")?.focus();
   };
-  menu.addEventListener("toggle",onToggle);
-  menu.addEventListener("click",onClick);
+  host.addEventListener("click",onClick);
   root.addEventListener("pointerdown",outside);
   root.addEventListener("keydown",keydown);
   return {refresh,dispose(){
-    menu.removeEventListener("toggle",onToggle);
-    menu.removeEventListener("click",onClick);
+    menus.forEach((menu,i)=>menu.removeEventListener("toggle",toggles[i]));
+    host.removeEventListener("click",onClick);
     root.removeEventListener("pointerdown",outside);
     root.removeEventListener("keydown",keydown);
   }};
