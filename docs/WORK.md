@@ -27,7 +27,7 @@
 
 **本轮为独立试验分支** `spike/ide-extension-theia-host`：标准 VS Code `CustomTextEditorProvider` / `TextDocument` / `WorkspaceEdit`，将现有 Procedure 投影、ELK、ReactFlow 复用到 Webview；普通 YAML/Python、文件树、新建/删除、Undo/Redo 交给宿主。另通过同一 VSIX 试验 Theia 的 VS Code API 兼容性。详细见 [ADR-0002](decisions/0002-ide-host-spike.md) 和 [试验说明](../experiments/ide-host/README.md)。
 
-**证据边界：** 独立 CI 先验 Node 构建/AST/负例与 VSIX 打包；VS Code 真 GUI、Theia 安装/交互、真实 Native File ops 均待专门验收，不得称 PASS。此前 Source-only YAML/Python 工具栏的 WIP 分支不合并，主站仍以当前 main 为准；本次不修改 Runtime/5GC。
+**代码证据：** [独立 IDE Spike CI #42191440251 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42191440251)（6/6：实际 5-Procedure CreatedSession 投影、精确 Route Target Patch、旧版本/伪造负例、打包扩展的模拟 TextDocument/WorkspaceEdit 测试；409/409 现有回归；VSIX Artifacts 生成）。[Draft PR #86](https://github.com/odango-chan/ca-skill-studio-demo/pull/86) 保持 OPEN，未合入 main。**真实 VS Code 图形界面、Theia 安装/交互、Native Explorer 新建/删除/Undo 仍 NOT_RUN**；模拟宿主的 PASS 不代表真实 IDE 通过。此前 Source-only YAML/Python 工具栏的 WIP 分支不合并，主站仍以当前 main 为准；本次不修改 Runtime/5GC。
 
 ## Overall
 
