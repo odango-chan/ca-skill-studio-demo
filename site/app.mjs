@@ -20,6 +20,7 @@ import {renderMarkdown} from "./markdown-preview.mjs";
 import {viewKindFor,permittedMode,graphControlsAvailable,isMarkdownFile} from "./view-policy.mjs";
 import {visualRouteTargets,previewVisualRouteEdit,dropTargetAllowed} from "./visual-route-edit.mjs";
 import {mountProcedureCanvas} from "./react-flow-canvas.tsx";
+import {mountApplicationMenu} from "./application-menu.mjs";
 import {mountNodeFocusCanvas} from "./node-focus-flow.tsx";
 import {projectNodeFocusFlow} from "./node-focus-graph.mjs";
 import {createFileIcon,createFolderIcon} from "./file-icons.mjs";
@@ -69,6 +70,8 @@ import {nodeVerifyEditChoices,previewVerifyPredicatePatch,applyVerifyPredicatePa
   contractMaxActions,previewContractMaxActionsPatch,applyContractMaxActionsPatch} from "./attribute-patch.mjs";
 
 const $ = (id) => document.getElementById(id);
+// Register menu Escape handling before generic editor Escape behavior.
+mountApplicationMenu($("applicationMenu"));
 const source = createSourceEditorAdapter(createTextareaSourceBackend($("source")));
 const sourceHighlight=$("sourceHighlight");
 const sourceEditor=$("sourceEditor");
@@ -142,8 +145,7 @@ let layoutTimer = null;
 // file workspace and Typed Patch remain the only editing/state authority.
 const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
   onNodeSelect:id=>selectNode(id,false),
-  // Every real business Node has a local PRE/OP/POST drill-down.
-  onNodeDoubleClick:id=>openNodeFocus(id),
+  // Explicit "查看" is the only entry to PRE/OP/POST drill-down.
   onViewDetails:id=>openNodeFocus(id),
   onEnterChild:(callerId,childName)=>
     enterProcedure(childName,{callerId}),
@@ -192,8 +194,7 @@ const nodeFocusCanvas=mountNodeFocusCanvas($("nodeFocusFlow"),{
 });
 let nodeFocusTicket=0;
 $("nodeFocusFit").addEventListener("click",()=>nodeFocusCanvas.fit());
-// Double-click is a secondary shortcut handled once by React Flow.
-// The always-visible "查看" button is the primary way to enter Node Focus.
+// Node entry is explicit; no hidden double-click gesture.
 
 function invalidateLayout() {
   layoutTicket++;
@@ -2085,9 +2086,8 @@ function selectNode(id,reveal=true) {
     scheduleELKLayout(0,false);
   }else{
     renderGraph();
-    // Do not move the canvas on the first card click: the resulting 150ms
-    // pan makes a user's second click miss the Node's dblclick target.
-    // Explorer/Inspector navigation can still explicitly reveal the target.
+    // A card click selects without moving the canvas. The "查看" button
+    // navigates inside the Node; Explorer/Inspector may explicitly reveal it.
     if(reveal)requestAnimationFrame(()=>centerNode(id));
   }
 }

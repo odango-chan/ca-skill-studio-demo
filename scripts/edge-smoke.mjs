@@ -246,6 +246,51 @@ try{
   console.log("CreatedSession visible paths and aligned React Flow ports PASS: "+
     result.valid+" / "+result.attachedPorts);
 
+  // A single app menu delegates to real actions; double-click no longer
+  // navigates to Node Focus now that every card has an explicit View button.
+  const menuUX=await evaluate([
+    "(async()=>{",
+    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
+    " const menu=document.getElementById('applicationMenu');",
+    " const summary=menu?.querySelector('summary');",
+    " const item=id=>[...menu.querySelectorAll('[data-studio-command]')].find(b=>b.dataset.studioCommand===id);",
+    " const before=document.getElementById('source').value;",
+    " summary?.click();await sleep(70);",
+    " const opened=menu?.open===true;",
+    " const groups=menu?.querySelectorAll('.application-menu-group').length;",
+    " const disabledSave=item('file.saveDirectory')?.disabled===true;",
+    " const openFileAvailable=item('file.open')?.disabled===false;",
+    " const openDirectoryAvailable=item('file.openDirectory')?.disabled===false;",
+    " const exportAvailable=item('file.export')?.disabled===false;",
+    " const disabledUndo=item('edit.undo')?.disabled===true;",
+    " item('view.source')?.click();await sleep(50);",
+    " const sourceMode=document.getElementById('editorBody').dataset.mode==='source'&&!menu.open;",
+    " summary?.click();await sleep(50);",
+    " item('view.visual')?.click();await sleep(70);",
+    " const visualMode=document.getElementById('editorBody').dataset.mode==='visual';",
+    " const card=document.querySelector('.react-flow__node[data-id=nudm-sdm-get] .designer-node');",
+    " card?.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
+    " await sleep(70);",
+    " const doubleClickInert=document.getElementById('nodeFocus').hidden;",
+    " summary?.click();await sleep(30);",
+    " document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));",
+    " const escapeClosed=menu.open===false;",
+    " summary?.click();await sleep(30);",
+    " document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));",
+    " const outsideClosed=menu.open===false;",
+    " return {opened,groups,disabledSave,openFileAvailable,openDirectoryAvailable,",
+    "  exportAvailable,disabledUndo,sourceMode,visualMode,doubleClickInert,",
+    "  escapeClosed,outsideClosed,sourcePreserved:before===document.getElementById('source').value};",
+    "})()"
+  ].join("\n"));
+  console.log("STUDIO_APP_MENU_SMOKE",JSON.stringify(menuUX));
+  if(!menuUX?.opened||menuUX.groups!==3||!menuUX.disabledSave||
+     !menuUX.openFileAvailable||!menuUX.openDirectoryAvailable||
+     !menuUX.exportAvailable||!menuUX.disabledUndo||!menuUX.sourceMode||
+     !menuUX.visualMode||!menuUX.doubleClickInert||
+     !menuUX.escapeClosed||!menuUX.outsideClosed||!menuUX.sourcePreserved)
+    throw Error("Studio application menu and no-double-click FAIL: "+JSON.stringify(menuUX));
+
   // D1 visual-only START, outcome-colored lines and on-canvas legend.
   // The 17 real YAML Nodes / 46 current owner Route bundles are unchanged.
   const graphDisplay=await evaluate([
@@ -404,8 +449,7 @@ try{
     "  const back=document.getElementById('nodeFocusReturn');",
     "  const src=document.getElementById('source').value;",
     "  const ids=[...main.querySelectorAll('.react-flow__node')].map(x=>x.getAttribute('data-id'));",
-    "  const open=id=>main.querySelector('.react-flow__node[data-id=\"'+id+'\"] .designer-node')",
-    "    ?.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
+    "  const open=id=>[...main.querySelectorAll('.react-flow__node')].find(n=>n.dataset.id===id)?.querySelector('.designer-view-node')?.click();",
     "  const nodes=()=>[...host.querySelectorAll('.react-flow__node')];",
     "  const labels=()=>[...host.querySelectorAll('.designer-route-label[data-route-ids]')];",
     "  const realIds=()=>labels().flatMap(x=>x.dataset.routeIds.split(',').filter(Boolean));",

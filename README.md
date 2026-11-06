@@ -18,6 +18,9 @@ python3 -m http.server 8080 --directory dist
 
 浏览器打开 http://localhost:8080。请使用已打包的 `dist/`，不要将 `site/index.html` 直接当成可运行的 TSX 原生页面。
 
+**注意：这是本地启动 Studio 编辑器，不是运行 SKILL 或 Python / Runtime。**
+Pages 和本地静态站共用一个应用菜单及 Source 编辑逻辑；只有未来接入明确授权的本地执行宿主，才会增加真实 Run / Trace 操作。设计见 [应用菜单与本地宿主](docs/design/application-shell.md)。
+
 ## 现有能力
 
 - 唯一可选示例为 **`establish-pdu-session`**（启动默认加载，`references/` 默认展开），使用原始 SKILL 目录名；支持真实 Runtime 相关文件导航、Source 编辑、Markdown 安全预览、文件下载和 ZIP 打包。示例快照来自 [ca-agent-demo@eaadf948](https://github.com/odango-chan/ca-agent-demo/tree/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/skills/establish-pdu-session)，共 16 个运行时相关文件，包含 `references/`、Schema、Script、Contract、Predicate 和 Procedure。支持**完整本地 SKILL 目录导入**、多文件编辑与 ZIP 导出；不引入 Case 或内部 Design 文件。

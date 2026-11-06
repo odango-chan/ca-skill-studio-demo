@@ -176,7 +176,6 @@ function ProcedureScene({scene,callbacks,onReady}){
     nodeTypes={nodeTypes} edgeTypes={edgeTypes}
     onInit={onReady}
     onNodeClick={(_event,node)=>callbacks.onNodeSelect(node.id)}
-    onNodeDoubleClick={(_event,node)=>callbacks.onNodeDoubleClick(node.id)}
     onEdgeClick={(_event,edge)=>callbacks.onEdgeSelect(edge.data.bundle)}
     onReconnect={(edge,connection)=>{
       const route=resolveReconnectedRoute(edge.data?.bundle,selectionId);
