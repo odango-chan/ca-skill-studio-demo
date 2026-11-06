@@ -176,5 +176,6 @@ export async function layoutProcedureELK(procedure, {
   return { positions, bundles, width, height,
     visibleNodes: scope.nodes, visibleRoutes: scope.routes,
     isFiltered: scope.isFiltered, hiddenByNode:scope.hiddenByNode??new Map(),
+    expandedNodeIds:scope.expandedNodeIds??new Set(),
     filterReason:scope.reason??null, direction, engine: "ELK layered" };
 }
