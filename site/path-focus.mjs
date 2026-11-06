@@ -85,7 +85,8 @@ export function projectPathFocus(procedure,{
     const wanted=new Set(categories);
     for(const route of routes)
       if(primaryNodes.has(route.source)&&!selected.has(route.id)&&
-         wanted.has(branchCategory(route,byId)))addDetour(route);
+         (wanted.has(branchCategory(route,byId))||
+          (wanted.has("recovery")&&branchCategory(route,byId)==="other")))addDetour(route);
     const expanded=new Set(expandedNodes);
     // A newly revealed non-primary node may itself be expanded. Each node is
     // visited once, and Route identities are never copied or synthesized.
