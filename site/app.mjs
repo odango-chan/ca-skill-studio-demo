@@ -183,7 +183,7 @@ const flowCanvas=mountProcedureCanvas($("reactFlowRoot"),{
     rootPathMode="custom";
     if(rootPathExpandedNodes.has(id))rootPathExpandedNodes.delete(id);
     else rootPathExpandedNodes.add(id);
-    scheduleELKLayout(0,true);
+    scheduleELKLayout(0,false,id);
   }
 });
 const nodeFocusCanvas=mountNodeFocusCanvas($("nodeFocusFlow"),{
@@ -227,7 +227,10 @@ function rootPathStatus(scope){
   }
   return "";
 }
-function scheduleELKLayout(wait=0, autoFit=false) {
+function scheduleELKLayout(wait=0, autoFit=false, anchorId=null) {
+  // Manual branch disclosure must not re-fit the entire Root graph.
+  // Snapshot the clicked Node BEFORE any fallback/ELK positions change.
+  const anchor=anchorId?flowCanvas.captureNodeAnchor(anchorId):null;
   invalidateLayout();
   if (projection?.state!=="READY" || !lastGood) return;
   const ticket=layoutTicket;
@@ -241,14 +244,22 @@ function scheduleELKLayout(wait=0, autoFit=false) {
     ? {...proc,start:focus??proc.start,nodes:scope.nodes,routes:scope.routes}
     : proc;
   const fallback=layoutProcedure(basic,direction);
-  graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
+  const fallbackGraph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
     isFiltered:scope.isFiltered,hiddenByNode:scope.hiddenByNode??new Map(),
     expandedNodeIds:scope.expandedNodeIds??new Set(),
     filterReason:scope.reason??null};
-  renderGraph();
+  // For an anchored disclosure keep the old canvas in place while ELK
+  // computes. Showing fallback first would cause a visible extra jump.
+  if(!anchor){
+    graph=fallbackGraph;
+    renderGraph();
+  }
   if(!detailedLayoutAllowed(scope)){
+    graph=fallbackGraph;
+    if(anchor)flowCanvas.restoreNodeAnchor(anchor,graph);
+    renderGraph();
     setText("layoutStatus","大型流程 · 基础布局（可使用邻居视图） · "+rootPathStatus(scope));
-    if(autoFit || scope.isFiltered)requestAnimationFrame(fit);
+    if(!anchor&&(autoFit || scope.isFiltered))requestAnimationFrame(fit);
     return;
   }
   setText("layoutStatus","正在自动布局…");
@@ -261,20 +272,21 @@ function scheduleELKLayout(wait=0, autoFit=false) {
       if(ticket!==layoutTicket || revision!==projectedText ||
         procId!==activeProcedureId || projection?.state!=="READY")return;
       graph=result;
+      if(anchor)flowCanvas.restoreNodeAnchor(anchor,graph);
       renderGraph();
       setText("layoutStatus",rootPathStatus(result));
-      if(autoFit || result.isFiltered)fit();
-      else if(selection?.kind==="node")centerNode(selection.id);
+      if(!anchor){
+        if(autoFit || result.isFiltered)fit();
+        else if(selection?.kind==="node")centerNode(selection.id);
+      }
     }catch(error){
       if(ticket!==layoutTicket)return;
-      graph={...fallback,visibleNodes:scope.nodes,visibleRoutes:scope.routes,
-        isFiltered:scope.isFiltered,hiddenByNode:scope.hiddenByNode??new Map(),
-        expandedNodeIds:scope.expandedNodeIds??new Set(),
-        filterReason:scope.reason??null};
+      graph=fallbackGraph;
+      if(anchor)flowCanvas.restoreNodeAnchor(anchor,graph);
       renderGraph();
       setText("layoutStatus","自动布局失败 · 使用基础布局");
       message("自动布局失败，已使用基础画布："+String(error?.message??error));
-      if(autoFit)fit();
+      if(!anchor&&autoFit)fit();
     }
   },wait);
 }

@@ -238,6 +238,25 @@ export function mountProcedureCanvas(host,callbacks){
       requestAnimationFrame(()=>instance?.setViewport(viewport,{duration:150}));
       return true;
     },
+    captureNodeAnchor(id){
+      const p=scene.graph?.positions.get(id);
+      if(!p||!instance)return null;
+      const viewport=instance.getViewport();
+      return {id,position:{x:p.x,y:p.y},viewport:{...viewport}};
+    },
+    restoreNodeAnchor(anchor,nextGraph){
+      const p=anchor&&nextGraph?.positions?.get(anchor.id);
+      if(!p||!instance)return false;
+      const {viewport,position}=anchor;
+      // ELK repositions graph-world nodes; compensate only the translation.
+      // Keep the clicked card's screen position AND the user's current zoom.
+      instance.setViewport({
+        x:viewport.x+(position.x-p.x)*viewport.zoom,
+        y:viewport.y+(position.y-p.y)*viewport.zoom,
+        zoom:viewport.zoom
+      },{duration:0});
+      return true;
+    },
     center(id){
       const p=scene.graph?.positions.get(id);
       if(!p||!instance)return;
