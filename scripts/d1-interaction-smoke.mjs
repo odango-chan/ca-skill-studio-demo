@@ -1007,7 +1007,7 @@ export async function runD1Interactions(evaluate,command){
     " const outlineIcons=outline.length===17;",
     " const folderChevron=!!q('#assetTree .asset-folder-title .disclosure-chevron[data-icon=\"chevron-right\"]');",
     " const nodeChevron=!!q('#nodeOutlineDisclosure summary .disclosure-chevron[data-icon=\"chevron-right\"]');",
-    " const sampleInMenu=!!q('#applicationMenu [data-studio-command=file.loadSample]');",
+    " const sampleInMenu=all('#applicationMenu [data-studio-command]').some(x=>x.dataset.studioCommand==='file.loadSample');",
     " const noOldSamplePicker=!q('.sample-picker');",
     " click(child);",
     " for(let i=0;i<60;i++){",
