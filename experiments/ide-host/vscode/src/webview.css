@@ -15,6 +15,7 @@ button{cursor:pointer}
 button:disabled{cursor:not-allowed;opacity:.45}
 #message{font-size:11px;padding:8px 14px;background:#eef7f5;color:#386d65;
   border-bottom:1px solid #dcebe5;min-height:14px}
+.spike-pane{flex:1;min-height:130px;width:100%;display:flex;position:relative;overflow:hidden}
 .spike-flow{flex:1;min-height:130px;width:100%;position:relative;background-color:#f7f9fc;
   background-image:radial-gradient(#cfdae7 .85px,transparent .85px);background-size:22px 22px}
 .spike-flow .react-flow{height:100%;width:100%}
