@@ -315,135 +315,96 @@ try{
      !subflowNav.restored)
     throw Error("D1-A2 Child call-site navigation FAIL: "+JSON.stringify(subflowNav));
 
-  // D1-A2 revised scope: EVERY Node double-click enters its own PRE/OP/POST.
-  const nodeDrilldown=await evaluate([
+  // D1-A2c: real React Flow + ELK local diagram, not disconnected details.
+  const focusGraph=await evaluate([
     "(async()=>{",
-    "  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));",
-    "  const card=id=>document.querySelector('.react-flow__node[data-id=\"'+id+'\"]');",
+    "  const sleep=ms=>new Promise(r=>setTimeout(r,ms));",
+    "  const wait=async test=>{for(let i=0;i<100;i++){if(test())return true;await sleep(40);}return false;};",
+    "  const main=document.getElementById('reactFlowRoot');",
+    "  const host=document.getElementById('nodeFocusFlow');",
     "  const focus=document.getElementById('nodeFocus');",
     "  const title=document.getElementById('nodeFocusTitle');",
-    "  const stageHost=document.getElementById('nodeFocusStages');",
+    "  const stats=document.getElementById('nodeFocusStats');",
     "  const back=document.getElementById('nodeFocusReturn');",
-    "  const root=document.getElementById('reactFlowRoot');",
-    "  const source=document.getElementById('source');",
-    "  const original=source.value;",
-    "  const ids=[...document.querySelectorAll('.react-flow__node')]",
-    "    .map(x=>x.getAttribute('data-id'));",
+    "  const src=document.getElementById('source').value;",
+    "  const ids=[...main.querySelectorAll('.react-flow__node')].map(x=>x.getAttribute('data-id'));",
+    "  const open=id=>main.querySelector('.react-flow__node[data-id=\"'+id+'\"] .designer-node')",
+    "    ?.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
+    "  const nodes=()=>[...host.querySelectorAll('.react-flow__node')];",
+    "  const labels=()=>[...host.querySelectorAll('.designer-route-label[data-route-ids]')];",
+    "  const realIds=()=>labels().flatMap(x=>x.dataset.routeIds.split(',').filter(Boolean));",
     "  const failures=[],samples={};",
     "  for(const id of ids){",
-    "    const target=card(id);",
-    "    if(!target){failures.push('missing '+id);continue;}",
-    "    target.querySelector('.designer-node')?.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
-    "    await sleep(50);",
-    "    const stages=[...stageHost.querySelectorAll('.node-focus-stage')]",
-    "      .map(x=>x.className);",
-    "    if(focus.hidden||title.textContent!==id||",
-    "       !stages.some(x=>x.includes('is-op'))||!root.inert)",
-    "      failures.push('drilldown '+id);",
+    "    open(id);",
+    "    const ok=await wait(()=>!focus.hidden&&title.textContent===id&&",
+    "      !!host.querySelector('.react-flow__node[data-id=\"stage:operator\"]'));",
+    "    if(!ok){failures.push('not rendered '+id+': '+stats.textContent);back.click();continue;}",
+    "    const stages=nodes().filter(x=>x.getAttribute('data-id').startsWith('stage:'))",
+    "      .map(x=>x.getAttribute('data-id'));",
+    "    if(!stages.includes('stage:operator'))failures.push('no OP '+id);",
     "    if(id==='nudm-sdm-subscribe'){",
+    "      await wait(()=>labels().length>0);",
     "      samples.subscribe={",
-    "        stages,preSteps:stageHost.querySelectorAll('.node-focus-stage.is-pre .node-focus-step').length,",
-    "        postSteps:stageHost.querySelectorAll('.node-focus-stage.is-post .node-focus-step').length,",
-    "        opValue:stageHost.querySelector('.node-focus-stage.is-op .node-focus-stage-value')?.textContent,",
-    "        routeCount:stageHost.querySelectorAll('.node-focus-route').length",
+    "        stages,",
+    "        preSteps:host.querySelectorAll('.react-flow__node[data-id=\"stage:preconditions\"] .focus-graph-step').length,",
+    "        postSteps:host.querySelectorAll('.react-flow__node[data-id=\"stage:postconditions\"] .focus-graph-step').length,",
+    "        before:nodes().filter(x=>x.getAttribute('data-id').startsWith('before:')).length,",
+    "        after:nodes().filter(x=>x.getAttribute('data-id').startsWith('after:')).length,",
+    "        realRouteIds:realIds(),",
+    "        origins:[...new Set(labels().map(x=>x.dataset.routeSource))],",
+    "        phaseLinks:host.querySelectorAll('.react-flow__edge-path.focus-graph-phase-link').length",
     "      };",
     "    }",
-    "    if(target.textContent.includes('TERMINAL'))samples.terminal={id,stages};",
+    "    if(id==='safe-stopped')samples.terminal={stages,realRouteIds:realIds()};",
     "    if(id==='n4-session-establishment')",
-    "      samples.procedure={stages,childButton:!!stageHost.querySelector('.node-focus-subflow')};",
-    "    back.click();await sleep(35);",
-    "    if(!focus.hidden||root.inert)failures.push('exit '+id);",
+    "      samples.procedure={stages,childButton:!!document.querySelector('#nodeFocusChildren .node-focus-subflow')};",
+    "    back.click();",
+    "    if(!(await wait(()=>focus.hidden)))failures.push('return '+id);",
     "  }",
-    "  card('n4-session-establishment')?.querySelector('.designer-node')?.dispatchEvent(",
-    "    new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
-    "  await sleep(45);",
-    "  stageHost.querySelector('.node-focus-subflow')?.click();",
-    "  for(let i=0;i<80&&document.querySelectorAll('.react-flow__node').length!==4;i++)",
-    "    await sleep(45);",
-    "  const childOk=focus.hidden&&",
-    "    !document.getElementById('procedureScope').hidden&&",
-    "    document.getElementById('procedureScopeContext').textContent.includes('n4-session-establishment');",
+    "  open('nudm-sdm-subscribe');",
+    "  await wait(()=>title.textContent==='nudm-sdm-subscribe'&&",
+    "    !!host.querySelector('.react-flow__node[data-id=\"after:npcf-sm-policy-control-create\"]'));",
+    "  host.querySelector('.react-flow__node[data-id=\"after:npcf-sm-policy-control-create\"] .focus-graph-pivot')?.click();",
+    "  await wait(()=>title.textContent==='npcf-sm-policy-control-create'&&",
+    "    !!host.querySelector('.react-flow__node[data-id=\"before:nudm-sdm-subscribe\"]'));",
+    "  const forward={title:title.textContent,backLink:!!host.querySelector(",
+    "    '.react-flow__node[data-id=\"before:nudm-sdm-subscribe\"]')};",
+    "  host.querySelector('.react-flow__node[data-id=\"before:nudm-sdm-subscribe\"] .focus-graph-pivot')?.click();",
+    "  await wait(()=>title.textContent==='nudm-sdm-subscribe');",
+    "  const returned=title.textContent;",
+    "  back.click();await wait(()=>focus.hidden);",
+    "  open('n4-session-establishment');",
+    "  await wait(()=>!!document.querySelector('#nodeFocusChildren .node-focus-subflow'));",
+    "  document.querySelector('#nodeFocusChildren .node-focus-subflow')?.click();",
+    "  const childOk=await wait(()=>focus.hidden&&document.querySelectorAll('#reactFlowRoot .react-flow__node').length===4&&",
+    "    !document.getElementById('procedureScope').hidden);",
     "  document.getElementById('procedureScopeReturn').click();",
-    "  for(let i=0;i<80&&document.querySelectorAll('.react-flow__node').length!==17;i++)",
-    "    await sleep(45);",
-    "  const restored=document.querySelectorAll('.react-flow__node').length===17&&",
-    "    document.querySelectorAll('.react-flow__edge-path').length===46;",
-    "  const sourcePreserved=source.value===original;",
-    "  return {count:ids.length,failures,samples,childOk,restored,sourcePreserved};",
+    "  await wait(()=>document.querySelectorAll('#reactFlowRoot .react-flow__node').length===17);",
+    "  return {count:ids.length,failures,samples,forward,returned,childOk,",
+    "    rootRestored:document.querySelectorAll('#reactFlowRoot .react-flow__node').length===17&&",
+    "      document.querySelectorAll('#reactFlowRoot .react-flow__edge-path.designer-edge').length===46,",
+    "    sourceUnchanged:document.getElementById('source').value===src};",
     "})()",
   ].join("\n"));
-  console.log("D1_A2_ALL_NODES_DRILLDOWN",JSON.stringify(nodeDrilldown));
-  if(nodeDrilldown?.count!==17||nodeDrilldown.failures.length||
-     nodeDrilldown.samples.subscribe?.preSteps!==5||
-     nodeDrilldown.samples.subscribe?.postSteps!==1||
-     !nodeDrilldown.samples.procedure?.childButton||
-     nodeDrilldown.samples.terminal?.stages.length!==1||
-     !nodeDrilldown.childOk||!nodeDrilldown.restored||
-     !nodeDrilldown.sourcePreserved)
-    throw Error("D1-A2 every-Node drilldown FAIL: "+JSON.stringify(nodeDrilldown));
-
-  // D1-A2b: real predecessor/current/successor topology and multi-hop browsing.
-  const neighborhood=await evaluate([
-    "(async()=>{",
-    " const sleep=t=>new Promise(r=>setTimeout(r,t));",
-    " const card=id=>document.querySelector('.react-flow__node[data-id=\"'+id+'\"]');",
-    " const focus=document.getElementById('nodeFocus');",
-    " const title=document.getElementById('nodeFocusTitle');",
-    " const stages=document.getElementById('nodeFocusStages');",
-    " const prev=document.getElementById('nodeFocusPrevious');",
-    " const next=document.getElementById('nodeFocusNext');",
-    " const source=document.getElementById('source').value;",
-    " const open=id=>card(id)?.querySelector('.designer-node')?.dispatchEvent(",
-    "   new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
-    " const snapshot=lane=>({",
-    "   peers:lane.querySelectorAll('.node-focus-neighbor-card').length,",
-    "   outcomes:[...lane.querySelectorAll('.node-focus-neighbor-route')]",
-    "     .map(x=>({id:x.dataset.routeId,origin:x.dataset.routeSource,text:x.textContent})),",
-    "   labels:[...lane.querySelectorAll('.node-focus-neighbor-id')].map(x=>x.textContent)",
-    " });",
-    " open('nudm-sdm-subscribe');await sleep(100);",
-    " const initial={",
-    "   visible:!focus.hidden,",
-    "   title:title.textContent,",
-    "   previous:snapshot(prev),",
-    "   next:snapshot(next),",
-    "   stages:stages.querySelectorAll('.node-focus-stage').length,",
-    "   grid:getComputedStyle(document.querySelector('.node-focus-neighborhood')).display,",
-    "   narrow:matchMedia('(max-width:990px)').matches",
-    " };",
-    " const nextButton=next.querySelector('.node-focus-neighbor-open');",
-    " const target=nextButton?.querySelector('.node-focus-neighbor-id')?.textContent;",
-    " nextButton?.click();await sleep(120);",
-    " const afterNext={title:title.textContent,previous:snapshot(prev)};",
-    " const backToSubscribe=[...prev.querySelectorAll('.node-focus-neighbor-open')]",
-    "   .find(x=>x.querySelector('.node-focus-neighbor-id')?.textContent==='nudm-sdm-subscribe');",
-    " backToSubscribe?.click();await sleep(100);",
-    " const afterBack=title.textContent;",
-    " document.getElementById('nodeFocusReturn').click();await sleep(60);",
-    " open('done');await sleep(80);",
-    " const terminalNext=snapshot(next);",
-    " const terminalEmpty=next.querySelector('.node-focus-neighbor-empty')?.textContent;",
-    " document.getElementById('nodeFocusReturn').click();await sleep(50);",
-    " const restored=focus.hidden&&document.querySelectorAll('.react-flow__node').length===17&&",
-    "   document.querySelectorAll('.react-flow__edge-path').length===46;",
-    " return {initial,target,afterNext,afterBack,terminalNext,terminalEmpty,restored,",
-    "   sourcePreserved:document.getElementById('source').value===source};",
-    "})()",
-  ].join("\n"));
-  console.log("D1_A2B_ONE_HOP",JSON.stringify(neighborhood));
-  if(!neighborhood?.initial.visible||
-     neighborhood.initial.title!=="nudm-sdm-subscribe"||
-     neighborhood.initial.previous.peers<1||neighborhood.initial.next.peers<1||
-     neighborhood.initial.grid!==(neighborhood.initial.narrow?"flex":"grid")||
-     neighborhood.initial.previous.outcomes.some(x=>!x.id||!x.origin)||
-     neighborhood.initial.next.outcomes.some(x=>!x.id||!x.origin)||
-     !neighborhood.target||neighborhood.afterNext.title!==neighborhood.target||
-     !neighborhood.afterNext.previous.labels.includes("nudm-sdm-subscribe")||
-     neighborhood.afterBack!=="nudm-sdm-subscribe"||
-     neighborhood.terminalNext.outcomes.length!==0||
-     !neighborhood.terminalEmpty?.includes("TERMINAL")||
-     !neighborhood.restored||!neighborhood.sourcePreserved)
-    throw Error("D1-A2b one-hop neighborhood FAIL: "+JSON.stringify(neighborhood));
+  console.log("D1_A2C_LOCAL_FLOW",JSON.stringify(focusGraph));
+  const subscribe=focusGraph?.samples.subscribe;
+  if(focusGraph?.count!==17||focusGraph.failures.length||
+     subscribe?.preSteps!==5||subscribe.postSteps!==1||
+     subscribe.before!==1||subscribe.after!==6||
+     subscribe.realRouteIds.length!==10||
+     new Set(subscribe.realRouteIds).size!==10||
+     !subscribe.origins.includes("preconditions.on")||
+     !subscribe.origins.includes("postconditions.on")||
+     !subscribe.origins.includes("operator.on")||
+     subscribe.phaseLinks!==2||
+     focusGraph.samples.terminal?.stages.length!==1||
+     !focusGraph.samples.procedure?.childButton||
+     focusGraph.forward.title!=="npcf-sm-policy-control-create"||
+     !focusGraph.forward.backLink||
+     focusGraph.returned!=="nudm-sdm-subscribe"||
+     !focusGraph.childOk||!focusGraph.rootRestored||
+     !focusGraph.sourceUnchanged)
+    throw Error("D1-A2c local flow diagram FAIL: "+JSON.stringify(focusGraph));
 
   // The same real browser also validates the Explorer's suffix theme.
   const iconResult=await evaluate([
