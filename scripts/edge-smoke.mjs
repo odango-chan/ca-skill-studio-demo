@@ -232,7 +232,7 @@ try{
     "  graph:document.getElementById('graphPane')?.getBoundingClientRect().toJSON(),",
     "  styles:[...document.styleSheets].map(x=>x.href).filter(Boolean)};",
     "})()"
-  ].join("\n");
+  ].join("\n"));
   const result=await evaluate(expr);
   console.log("CREATED_SESSION_EDGE_SMOKE",JSON.stringify(result));
   if(!result?.rootFocus?.rootDefault||!result.rootFocus.branchShown||
@@ -253,7 +253,7 @@ try{
     " const sleep=t=>new Promise(r=>setTimeout(r,t));",
     " const menu=document.getElementById('applicationMenu');",
     " const summary=menu?.querySelector('summary');",
-    " const item=id=>menu?.querySelector('[data-studio-command=\\\"'+id+'\\\"]');",
+    " const item=id=>[...menu.querySelectorAll('[data-studio-command]')].find(b=>b.dataset.studioCommand===id);",
     " const before=document.getElementById('source').value;",
     " summary?.click();await sleep(70);",
     " const opened=menu?.open===true;",
@@ -268,7 +268,7 @@ try{
     " summary?.click();await sleep(50);",
     " item('view.visual')?.click();await sleep(70);",
     " const visualMode=document.getElementById('editorBody').dataset.mode==='visual';",
-    " const card=document.querySelector('.react-flow__node[data-id=\\\"nudm-sdm-get\\\"] .designer-node');",
+    " const card=document.querySelector('.react-flow__node[data-id=nudm-sdm-get] .designer-node');",
     " card?.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));",
     " await sleep(70);",
     " const doubleClickInert=document.getElementById('nodeFocus').hidden;",
@@ -282,7 +282,7 @@ try{
     "  exportAvailable,disabledUndo,sourceMode,visualMode,doubleClickInert,",
     "  escapeClosed,outsideClosed,sourcePreserved:before===document.getElementById('source').value};",
     "})()"
-  ].join("\\n"));
+  ].join("\n"));
   console.log("STUDIO_APP_MENU_SMOKE",JSON.stringify(menuUX));
   if(!menuUX?.opened||menuUX.groups!==3||!menuUX.disabledSave||
      !menuUX.openFileAvailable||!menuUX.openDirectoryAvailable||
@@ -449,7 +449,7 @@ try{
     "  const back=document.getElementById('nodeFocusReturn');",
     "  const src=document.getElementById('source').value;",
     "  const ids=[...main.querySelectorAll('.react-flow__node')].map(x=>x.getAttribute('data-id'));",
-    "  const open=id=>main.querySelector('.react-flow__node[data-id=\"'+id+'\"] .designer-view-node')?.click();",
+    "  const open=id=>[...main.querySelectorAll('.react-flow__node')].find(n=>n.dataset.id===id)?.querySelector('.designer-view-node')?.click();",
     "  const nodes=()=>[...host.querySelectorAll('.react-flow__node')];",
     "  const labels=()=>[...host.querySelectorAll('.designer-route-label[data-route-ids]')];",
     "  const realIds=()=>labels().flatMap(x=>x.dataset.routeIds.split(',').filter(Boolean));",
