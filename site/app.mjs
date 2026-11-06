@@ -2160,6 +2160,7 @@ function closeNodeFocus(){
   nodeFocusId=null;
   renderProcedureNavigation();
   renderNodeFocus();
+  renderRootPathControls();
   requestAnimationFrame(()=>centerNode(focusId));
 }
 $("nodeFocusReturn").addEventListener("click",closeNodeFocus);
