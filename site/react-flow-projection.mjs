@@ -114,6 +114,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
           ?node.value:null,
         phaseBadges:summarizeNodePhases(node),
         hiddenBranchCount:graph.hiddenByNode?.get(node.id)??0,
+        branchesExpanded:graph.expandedNodeIds?.has(node.id)??false,
         canAddRoute:node.operator!=="terminal"&&
           selection?.kind==="node"&&selection.id===node.id&&
           routeCreationSourceId===node.id,
