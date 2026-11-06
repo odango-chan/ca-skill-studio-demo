@@ -98,7 +98,8 @@ function NodeFocusScene({local,layout,callbacks,onReady}){
     nodes={nodes} edges={elements.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
     onInit={onReady}
     onNodeClick={(_event,node)=>{
-      if(node.data.kind==="neighbor")callbacks.onPivot(node.data.original.id);
+      const data:any=node.data;
+      if(data.kind==="neighbor")callbacks.onPivot(data.original.id);
     }}
     onNodeDoubleClick={(_event,node)=>{
       if(node.data.kind==="neighbor")callbacks.onPivot(node.data.original.id);
