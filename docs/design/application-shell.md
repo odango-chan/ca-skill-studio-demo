@@ -17,14 +17,14 @@ The same Editor / Explorer / Inspector / Procedure Designer / Monaco / menus are
 
 ## Menu v1 (implemented in browser)
 
-One compact `菜单` disclosure in the app header, grouped by:
+One horizontal menu bar in the desktop editor header displays **文件 / 编辑 / 视图 / 帮助** directly, rather than burying them in one generic `菜单` dropdown. Each item opens its own small popup; exactly one can remain open. The flexible center of the 54px header shows the current actual file identity, while dirty status/Undo/Redo/Export remain to the right. On narrow/mobile screens the current-file context hides so all four real menu headings stay reachable without increasing toolbar height. The menus are grouped as follows:
 
 - **文件:** Open file, open Skill directory, load the `establish-pdu-session` sample, save to selected directory (unavailable if not eligible), export current file, export Package ZIP.
 - **编辑:** Undo, Redo, reset current file (with existing confirmations).
 - **视图:** Visual, Source, Split, Inspector toggle, graph Fit.
 - **帮助:** Open actual Workbench user notes.
 
-The existing high-frequency actions stay where users already know them (toolbar and Explorer). Subsequent Explorer consolidation leaves `打开 SKILL 目录` visible and shows `保存到所选目录` only when eligible; file-only open, sample reload and Package ZIP export live in the File menu. Conflict recovery and the real directory/save status messages stay in Explorer. Header export and Undo/Redo remain available as high-frequency controls. No duplicate save, history, source change or permissions handler is created. The menu uses native keyboard focus/disclosure, Escape, click-outside close and disabled state derived from existing controls.
+The existing high-frequency actions stay where users already know them (toolbar and Explorer). Subsequent Explorer consolidation leaves `打开 SKILL 目录` visible and shows `保存到所选目录` only when eligible; file-only open, sample reload and Package ZIP export live in the File menu. Conflict recovery and the real directory/save status messages stay in Explorer. Header export and Undo/Redo remain available as high-frequency controls. No duplicate save, history, source change or permissions handler is created. The menu uses native keyboard focus/disclosure, Escape, click-outside close, left/right navigation between top menu headings, and disabled state derived from existing controls.
 
 `site/application-menu.mjs` is the current command map and sole menu wiring. Menu item `data-studio-command` values are stable IDs, and each invokes one existing button's handler **synchronously** within the user's gesture; this matters for browser file/directory permission prompts. The menu cannot bypass `disabled`, `hidden`, Source guards or confirmation dialogs. It never reports a write or execution completed merely because a menu item was clicked.
 
@@ -44,8 +44,8 @@ Native shell/framework decision is deferred until local execution requirements a
 
 ## Next UI refinements (not claimed implemented)
 
-1. **Explorer low-frequency command consolidation:** implemented by [Issue #80](https://github.com/odango-chan/ca-skill-studio-demo/issues/80) / pending PR gate. UI duplicates are CSS-concealed, not moved into a hidden DOM subtree; the exact existing click handlers remain mounted and their `hidden`/`disabled` state still determines menu eligibility. This is a browser-only action bridge, not a new filesystem abstraction.
-2. Compact the top-level header spacing and show the current workspace state consistently, including read-only/dirty/saved distinctions; do not advertise browser download as Save.
+1. **Explorer low-frequency command consolidation:** implemented by [Issue #80](https://github.com/odango-chan/ca-skill-studio-demo/issues/80) / [PR #81 merged](https://github.com/odango-chan/ca-skill-studio-demo/pull/81), [Pages #42183332724 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42183332724). UI duplicates are CSS-concealed, not moved into a hidden DOM subtree; the exact existing click handlers remain mounted and their `hidden`/`disabled` state still determines menu eligibility. This is a browser-only action bridge, not a new filesystem abstraction.
+2. **Top-level menus and center file identity:** [Issue #82](https://github.com/odango-chan/ca-skill-studio-demo/issues/82), pending final PR/Pages acceptance. Keep file path display separate from actual write status. Remaining work: richer read-only/dirty/saved distinctions; do not advertise browser download as Save.
 3. Define local execution's actual owner interface, authorization model and real trace inputs **before** exposing Run/Debug. Do not introduce a fake Runtime in Studio.
 4. Test real Windows/macOS native filesystem authorization separately; Chromium CI cannot replace physical folder-picker acceptance.
 
