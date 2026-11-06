@@ -312,12 +312,6 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .explorer-nodes{padding-bottom:5px}
 .explorer-bottom{padding:10px 11px 12px}
 .explorer-bottom .explorer-action{background:transparent;border:0;padding:8px 10px;color:#4d6983}
-.sample-picker{margin-top:2px}
-.sample-picker summary{font-size:11px;cursor:pointer;color:#70869b;padding:7px 10px;list-style:none}
-.sample-picker summary::-webkit-details-marker{display:none}
-.sample-picker summary:before{content:"▸";color:#95a5b6;margin-right:7px;font-size:9px}
-.sample-picker[open] summary:before{content:"▾"}
-.sample-picker .explorer-action{margin-left:9px;width:calc(100% - 9px);font-size:10px}
 .compact-toolbar{min-height:49px;gap:10px;padding:7px 13px;border-bottom:1px solid #e4eaf1;flex-wrap:nowrap}
 .compact-toolbar #toggleExplorer{flex:none;font-size:15px;padding:4px 10px;border-color:transparent;background:transparent}
 .compact-toolbar .breadcrumbs{min-width:0;max-width:min(34vw,430px);flex:0 1 auto;gap:3px}
@@ -391,7 +385,6 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 .asset-tree .asset-file.active{background:#e6f5ee;color:#0a7768;font-weight:700}
 .asset-tree .asset-file[aria-current="page"]{outline-offset:-2px}
 .asset-section .scope-tag{font-size:10px;font-variant-numeric:tabular-nums}
-.explorer-bottom #exportPackageButton{color:#168474;background:#ebf8f2;border:1px solid #c9e9db}
 .attribute-label{display:block;color:#5f758a;font-size:11px;line-height:1.5;margin-bottom:8px}
 .attribute-input{display:block;width:100%;margin-top:7px;background:#fff;
  border:1px solid #d5e2ea;border-radius:7px;padding:9px 10px;
@@ -1253,17 +1246,15 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
 /* The disclosure hierarchy uses the same SVG chevron, not font arrows.
    Native <summary> keyboard activation and expanded state are unchanged. */
 .asset-folder-title::before,.asset-folder-group[open]>.asset-folder-title::before,
-.node-disclosure-heading::before,.explorer-nodes[open] .node-disclosure-heading::before,
-.sample-picker summary::before,.sample-picker[open] summary::before{
+.node-disclosure-heading::before,.explorer-nodes[open] .node-disclosure-heading::before{
   content:none!important;display:none!important}
-.asset-folder-title,.node-disclosure-heading,.sample-picker summary{
+.asset-folder-title,.node-disclosure-heading{
   display:flex;align-items:center;gap:6px}
 .disclosure-chevron{
   flex:0 0 13px;width:13px;height:13px;color:#899aab;
   transform:rotate(0deg);transition:transform .12s ease}
 .asset-folder-group[open]>.asset-folder-title>.disclosure-chevron,
-.explorer-nodes[open] .node-disclosure-heading>.disclosure-chevron,
-.sample-picker[open] summary>.disclosure-chevron{transform:rotate(90deg)}
+.explorer-nodes[open] .node-disclosure-heading>.disclosure-chevron{transform:rotate(90deg)}
 .node-disclosure-heading .count{margin-left:auto}
 
 
@@ -1872,4 +1863,21 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   .topbar .application-menu-trigger{padding:6px 5px}
   .topbar .application-menu-popup{left:-6px}
   .topbar-actions #downloadButton{display:none}
+}
+
+/* Consolidated Explorer actions: file tree is for navigation, not a second
+   File menu. Low-frequency button handlers remain mounted for the same
+   user-gesture, permission and Source command path. Do not add [hidden]:
+   the existing JS hidden/disabled state still gates menu availability. */
+.explorer-bottom .explorer-command-bridge{display:none}
+.explorer-bottom #openDirectoryButton{
+  font-weight:650;background:#f0f7f8;border:1px solid #dcebe9;
+  color:#285c67;border-radius:7px;
+}
+.explorer-bottom #openDirectoryButton:hover:not(:disabled){
+  background:#e7f3ef;border-color:#add7cb;color:#0b7969
+}
+.explorer-bottom #saveDirectoryButton:not([hidden]){
+  color:#0d7466;background:#edf8f3;border:1px solid #bfdfd3;
+  border-radius:7px;font-weight:650;
 }
