@@ -318,7 +318,7 @@ function decorateToolbar(){
   for(const [id,name,label] of [
     ["downloadButton","download","导出文件"],
     ["openButton","folder-plus","打开本地文件"],
-    ["openDirectoryButton","folder-open","打开本地目录"],
+    ["openDirectoryButton","folder-open","打开 SKILL 目录"],
     ["saveDirectoryButton","shield-check","保存到所选目录"],
     ["exportPackageButton","archive","导出整个 Package (.zip)"],
     ["mode-source","code-2","Source"],
@@ -337,12 +337,10 @@ function decorateToolbar(){
   layout.prepend(createIcon(document,"workflow",{size:15}));
   const search=$("search").parentElement.querySelector("span");
   search.replaceChildren(createIcon(document,"search"));
-  for(const element of [
-    $("nodeOutlineDisclosure").querySelector("summary"),
-    document.querySelector(".sample-picker summary")
-  ])element.prepend(createIcon(document,"chevron-right",{
-    size:13,className:"disclosure-chevron"
-  }));
+  $("nodeOutlineDisclosure").querySelector("summary").prepend(
+    createIcon(document,"chevron-right",{
+      size:13,className:"disclosure-chevron"
+    }));
 }
 decorateToolbar();
 function setText(id, text) { $(id).textContent = text; }
