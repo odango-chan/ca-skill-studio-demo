@@ -29,12 +29,12 @@ jobs:
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Test host Source authority and real CreatedSession projection
         run: node --test experiments/ide-host/tests/*.test.mjs
-      - name: Regression: existing Source / Procedure contract
+      - name: "Regression: existing Source / Procedure contract"
         run: npm test
       - name: Package experimental VSIX
         working-directory: experiments/ide-host/vscode
         run: |
-          npx --yes @vscode/vsce package --no-dependencies             --out ca-skill-studio-ide-spike.vsix
+          npx --yes @vscode/vsce package --no-dependencies --out ca-skill-studio-ide-spike.vsix
           test -s ca-skill-studio-ide-spike.vsix
       - name: Publish experimental VSIX artifact
         uses: actions/upload-artifact@v4
