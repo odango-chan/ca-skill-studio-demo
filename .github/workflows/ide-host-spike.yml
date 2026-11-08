@@ -27,6 +27,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Build standalone VS Code extension + bundled graph webview
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
+      - name: Stage optional online Web extension for shared tests
+        run: node experiments/ide-host/scripts/prepare-theia-online.mjs
       - name: Test host Source authority and real CreatedSession projection
         run: node --test experiments/ide-host/tests/*.test.mjs
       - name: "Regression: existing Source / Procedure contract"
