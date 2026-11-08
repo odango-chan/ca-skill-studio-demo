@@ -50,8 +50,8 @@ await build({
 // Theia explicitly sets frontendModuleName just before importScripts; the
 // resulting activation exports are discovered by this exact lookup.
 await appendFile(theiaWorkerEntry,
-  "\\n;if(typeof self !== 'undefined' && self.frontendModuleName) "+
-  "self[self.frontendModuleName] = __skillStudioTheiaModule;\\n");
+  String.fromCharCode(10)+";if(typeof self !== 'undefined' && self.frontendModuleName) "+
+  "self[self.frontendModuleName] = __skillStudioTheiaModule;"+String.fromCharCode(10));
 await build({
   entryPoints:[join(root,"src/webview.mjs")],
   outfile:join(root,"media/procedure.js"),
