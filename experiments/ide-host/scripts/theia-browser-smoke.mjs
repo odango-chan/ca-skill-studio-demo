@@ -1,0 +1,107 @@
+// A real Chromium smoke against the generated backend-free Theia frontend.
+// This is a startup + prepared plugin test; OPFS workflow and custom Webview
+// editing have their own acceptance gate. No GitHub Pages deployment.
+import {createServer} from "node:http";
+import {createReadStream,existsSync} from "node:fs";
+import {mkdtemp,readFile,rm} from "node:fs/promises";
+import {spawn} from "node:child_process";
+import {tmpdir} from "node:os";
+import {extname,join,resolve,sep} from "node:path";
+
+const root=resolve("experiments/ide-host/theia-online/lib/frontend");
+const chrome=process.env.CHROME_BIN||
+  ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
+if(!existsSync(join(root,"index.html")))throw Error("Theia frontend missing");
+if(!chrome)throw Error("Chrome unavailable; browser acceptance NOT_RUN");
+const types={".html":"text/html",".js":"text/javascript",".css":"text/css",
+  ".json":"application/json",".svg":"image/svg+xml",".wasm":"application/wasm",
+  ".ttf":"font/ttf",".woff":"font/woff",".woff2":"font/woff2",".png":"image/png",
+  ".ico":"image/x-icon",".map":"application/json"};
+const requests=new Set(),notFound=new Set();
+const server=createServer((req,res)=>{
+  const url=new URL(req.url,"http://localhost");
+  let name;
+  try{name=decodeURIComponent(url.pathname);}catch{res.writeHead(400).end();return;}
+  requests.add(name);
+  const file=resolve(root,"."+name.replace(/\/$/,"/index.html"));
+  if(file!==root&&!file.startsWith(root+sep)){res.writeHead(403).end();return;}
+  const stream=createReadStream(file);
+  stream.on("error",()=>{notFound.add(name);if(!res.headersSent)res.writeHead(404);res.end();});
+  stream.on("open",()=>{
+    res.writeHead(200,{"Content-Type":types[extname(file)]||"application/octet-stream",
+      "Cache-Control":"no-store"});stream.pipe(res);
+  });
+});
+await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
+const url="http://127.0.0.1:"+server.address().port+"/";
+const profile=await mkdtemp(join(tmpdir(),"theia-online-chrome-"));
+const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",
+  "--disable-dev-shm-usage","--no-first-run","--no-default-browser-check",
+  "--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],{stdio:"ignore"});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[];
+const command=(method,params={})=>new Promise((resolve,reject)=>{
+  const id=++seq;pending.set(id,{resolve,reject});
+  ws.send(JSON.stringify({id,method,params}));
+});
+const evalJS=async expression=>{
+  const data=await command("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});
+  if(data.exceptionDetails)throw Error("Chromium evaluate: "+data.exceptionDetails.text);
+  return data.result?.value;
+};
+try{
+  let port=null;
+  for(let i=0;i<250;i++){
+    try{port=Number((await readFile(join(profile,"DevToolsActivePort"),"utf8")).split("\n")[0]);break;}
+    catch{if(child.exitCode!==null)throw Error("Chrome exited "+child.exitCode);}
+    await sleep(100);
+  }
+  if(!port)throw Error("Chrome DevTools debugging port unavailable");
+  const tabs=await(await fetch("http://127.0.0.1:"+port+"/json")).json();
+  const page=tabs.find(t=>t.type==="page");
+  if(!page)throw Error("Chromium page target absent");
+  ws=new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((ok,fail)=>{ws.addEventListener("open",ok,{once:true});
+    ws.addEventListener("error",fail,{once:true});});
+  ws.addEventListener("message",event=>{
+    const msg=JSON.parse(event.data);
+    if(msg.method==="Runtime.exceptionThrown")
+      exceptions.push(msg.params?.exceptionDetails?.exception?.description||msg.params?.exceptionDetails?.text);
+    if(msg.method==="Runtime.consoleAPICalled"&&msg.params?.type==="error")
+      consoleErrors.push(msg.params.args?.map(x=>x.value||x.description).join(" "));
+    if(msg.id&&pending.has(msg.id)){
+      const call=pending.get(msg.id);pending.delete(msg.id);
+      if(msg.error)call.reject(Error(msg.error.message));else call.resolve(msg.result);
+    }
+  });
+  await command("Page.enable");
+  await command("Runtime.enable");
+  await command("Page.navigate",{url});
+  let view=null;
+  for(let i=0;i<250;i++){
+    view=await evalJS(`({
+      readyState:document.readyState,title:document.title,
+      text:document.body?.innerText?.slice(0,950)||"",
+      appShell:!!document.querySelector("#theia-app-shell"),
+      widgets:document.querySelectorAll(".lm-Widget").length,
+      menus:document.querySelectorAll(".p-MenuBar-item,.lm-MenuBar-item").length,
+      editor:document.querySelectorAll(".monaco-editor").length,
+      bodyLength:document.body?.innerText?.length||0,
+      errors:document.querySelectorAll(".theia-error").length
+    })`);
+    if(view?.appShell&&view.widgets>4)break;
+    await sleep(150);
+  }
+  const listing=await(await fetch(url+"hostedPlugin/list.json")).text();
+  const evidence={view,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
+    requested:requests.size,notFound:[...notFound].slice(0,15),
+    consoleErrors:consoleErrors.slice(0,8),exceptions:exceptions.slice(0,6)};
+  console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
+  if(!evidence.extensionListPresent||!view?.appShell||view.widgets<5)
+    throw Error("Theia browser-only shell/plugin activation failed: "+JSON.stringify(evidence).slice(0,2200));
+  console.log("THEIA_BROWSER_ONLY_SHELL_PASS; CUSTOM_EDITOR_AND_OPFS_GUI_NOT_RUN");
+}finally{
+  ws?.close();child.kill("SIGKILL");
+  await new Promise(ok=>server.close(ok));
+  await rm(profile,{recursive:true,force:true,maxRetries:4,retryDelay:200});
+}
