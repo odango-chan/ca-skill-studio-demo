@@ -175,8 +175,37 @@ try{
     items:[...document.querySelectorAll('.monaco-list-row,.quick-input-list .monaco-list-row')].map(x=>x.innerText).filter(Boolean).slice(0,20),
     text:document.body.innerText.slice(-1050)
   })`);
+  const loadExampleRow=await evalJS(`(()=>{
+    const node=[...document.querySelectorAll('.monaco-list-row')].find(x=>x.innerText.includes('SKILL Studio: Load Example'));
+    if(!node)return null;const r=node.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2,text:node.innerText};
+  })()`);
+  if(loadExampleRow){
+    await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:loadExampleRow.x,y:loadExampleRow.y});
+    await command("Input.dispatchMouseEvent",{type:"mousePressed",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
+    await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
+    await sleep(3400);
+  }
+  const afterImport=await evalJS(`(async()=>{
+    const names=[];let opfsError=null;
+    try{
+      const dir=await navigator.storage.getDirectory();
+      for await(const [name,handle] of dir.entries())
+        names.push({name,kind:handle.kind});
+    }catch(error){opfsError=String(error);}
+    return {
+      folders:names,opfsError,
+      bodyText:document.body.innerText.slice(-1400),
+      notificationText:[...document.querySelectorAll('.theia-notification-list-item,.theia-notification-message')]
+        .map(x=>x.innerText).filter(Boolean).slice(0,7),
+      visibleEditors:document.querySelectorAll('.monaco-editor').length,
+      iframeSrcs:[...document.querySelectorAll('iframe')].map(x=>x.getAttribute('src')).slice(0,7),
+      explorerItems:[...document.querySelectorAll('.theia-TreeNode,.theia-FileTreeNode')]
+        .map(x=>x.innerText).filter(Boolean).slice(0,14)
+    };
+  })()`);
   const listing=await(await fetch(url+"hostedPlugin/list.json")).text();
-  const evidence={view,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
+  const evidence={view,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
     consoleErrors:consoleErrors.slice(0,8),exceptions:exceptions.slice(0,6)};
   console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
