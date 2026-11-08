@@ -66,12 +66,19 @@ test("Host rejects stale versions, wrong base, substituted candidate and forged 
 test("Build emits a bundled Node extension and a local script/style Webview",()=>{
   for(const path of ["experiments/ide-host/vscode/dist/extension.cjs",
     "experiments/ide-host/vscode/dist/extension-web.cjs",
+    "experiments/ide-host/vscode/dist/extension-theia.js",
     "experiments/ide-host/vscode/media/procedure.js",
     "experiments/ide-host/vscode/media/procedure.css",
     "experiments/ide-host/vscode/samples/establish-pdu-session/files.json"])
     assert.ok(statSync(path).size>(path.endsWith("files.json")?50:1000),path);
 });
 
+test("Theia worker bridge exports activation module via frontendModuleName",()=>{
+  const bundle=readFileSync("experiments/ide-host/vscode/dist/extension-theia.js","utf8");
+  assert.match(bundle,/__skillStudioTheiaModule/);
+  assert.match(bundle,/self\[self\.frontendModuleName\] = __skillStudioTheiaModule/);
+  assert.match(bundle,/globalThis\.theia\[globalThis\.frontendModuleName\]/);
+});
 test("Web host entry is declared and excludes Node-only imports",()=>{
   const manifest=JSON.parse(readFileSync("experiments/ide-host/vscode/package.json","utf8"));
   assert.equal(manifest.browser,"./dist/extension-web.cjs");
