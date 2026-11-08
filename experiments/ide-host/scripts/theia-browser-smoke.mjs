@@ -89,15 +89,31 @@ try{
       bodyLength:document.body?.innerText?.length||0,
       errors:document.querySelectorAll(".theia-error").length
     })`);
-    if(view?.appShell&&view.widgets>4)break;
+    if(view?.appShell&&view.widgets>4&&view.bodyLength>15)break;
     await sleep(150);
   }
+  const diagnostics=await evalJS(`({
+    htmlClass:document.documentElement.className,
+    bodyStyle:document.body?.getAttribute('style'),
+    bodyDisplay:getComputedStyle(document.body).display,
+    bodyVisibility:getComputedStyle(document.body).visibility,
+    bodyChildren:[...document.body.children].map(x=>({
+      tag:x.tagName,id:x.id,className:String(x.className).slice(0,180),
+      text:x.innerText?.slice(0,110)||"",
+      display:getComputedStyle(x).display,
+      visibility:getComputedStyle(x).visibility
+    })).slice(0,14),
+    shellHtml:document.querySelector('#theia-app-shell')?.outerHTML.slice(0,2300),
+    menuItems:[...document.querySelectorAll('[role="menuitem"]')].slice(0,10).map(x=>x.textContent),
+    ariaLabels:[...document.querySelectorAll('[aria-label]')].slice(0,25).map(x=>x.getAttribute('aria-label')),
+    title:document.title
+  })`);
   const listing=await(await fetch(url+"hostedPlugin/list.json")).text();
-  const evidence={view,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
+  const evidence={view,diagnostics,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
     consoleErrors:consoleErrors.slice(0,8),exceptions:exceptions.slice(0,6)};
   console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
-  if(!evidence.extensionListPresent||!view?.appShell||view.widgets<5)
+  if(!evidence.extensionListPresent||!view?.appShell||view.widgets<5||view.bodyLength<15)
     throw Error("Theia browser-only shell/plugin activation failed: "+JSON.stringify(evidence).slice(0,2200));
   console.log("THEIA_BROWSER_ONLY_SHELL_PASS; CUSTOM_EDITOR_AND_OPFS_GUI_NOT_RUN");
 }finally{
