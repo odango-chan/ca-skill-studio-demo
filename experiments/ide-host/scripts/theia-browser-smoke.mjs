@@ -108,20 +108,24 @@ try{
     ariaLabels:[...document.querySelectorAll('[aria-label]')].slice(0,25).map(x=>x.getAttribute('aria-label')),
     title:document.title
   })`);
-  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"p",code:"KeyP",windowsVirtualKeyCode:80,modifiers:10});
-  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"p",code:"KeyP",windowsVirtualKeyCode:80,modifiers:10});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:390,y:270,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:390,y:270,button:"left",clickCount:1});
+  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"F1",code:"F1",windowsVirtualKeyCode:112});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"F1",code:"F1",windowsVirtualKeyCode:112});
   await sleep(350);
   const paletteBefore=await evalJS(`({
     inputs:[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).map(x=>({className:x.className,placeholder:x.placeholder,value:x.value})).slice(0,8),
     quickHtml:document.querySelector('.quick-input-widget')?.outerHTML.slice(0,850),
-    bodyText:document.body.innerText.slice(-650)
+    bodyText:document.body.innerText.slice(-650),
+    active:document.activeElement?.outerHTML.slice(0,450)
   })`);
   await command("Input.insertText",{text:"SKILL Studio"});
   await sleep(1000);
   const paletteAfter=await evalJS(`({
     inputs:[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).map(x=>({className:x.className,placeholder:x.placeholder,value:x.value})).slice(0,8),
     commands:[...document.querySelectorAll('.monaco-list-row,.quick-input-list .monaco-list-row')].map(x=>x.innerText).filter(Boolean).slice(0,12),
-    bodyText:document.body.innerText.slice(-900)
+    bodyText:document.body.innerText.slice(-900),
+    active:document.activeElement?.outerHTML.slice(0,450)
   })`);
   const listing=await(await fetch(url+"hostedPlugin/list.json")).text();
   const evidence={view,diagnostics,paletteBefore,paletteAfter,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
