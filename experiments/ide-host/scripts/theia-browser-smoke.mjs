@@ -148,8 +148,35 @@ try{
     bodyText:document.body?.innerText.slice(-850),
     focus:document.activeElement?.outerHTML.slice(0,350)
   })`);
+  const paletteItemPos=await evalJS(`(()=>{
+    const el=[...document.querySelectorAll('.lm-Menu-item')].find(x=>x.innerText.includes('Command Palette'));
+    if(!el)return null;const r=el.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  if(paletteItemPos){
+    await command("Input.dispatchMouseEvent",{type:"mouseMoved",...paletteItemPos});
+    await command("Input.dispatchMouseEvent",{type:"mousePressed",...paletteItemPos,button:"left",clickCount:1});
+    await command("Input.dispatchMouseEvent",{type:"mouseReleased",...paletteItemPos,button:"left",clickCount:1});
+    await sleep(400);
+  }
+  const paletteMenuOpened=await evalJS(`({
+    inputs:[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).map(x=>({
+      value:x.value,placeholder:x.placeholder,html:x.outerHTML.slice(0,300)
+    })).slice(0,10),
+    active:document.activeElement?.outerHTML.slice(0,400),
+    text:document.body.innerText.slice(-800)
+  })`);
+  if(paletteMenuOpened.inputs.length){
+    await command("Input.insertText",{text:"SKILL Studio"});
+    await sleep(850);
+  }
+  const registeredCommands=await evalJS(`({
+    inputs:[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).map(x=>x.value),
+    items:[...document.querySelectorAll('.monaco-list-row,.quick-input-list .monaco-list-row')].map(x=>x.innerText).filter(Boolean).slice(0,20),
+    text:document.body.innerText.slice(-1050)
+  })`);
   const listing=await(await fetch(url+"hostedPlugin/list.json")).text();
-  const evidence={view,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
+  const evidence={view,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
     consoleErrors:consoleErrors.slice(0,8),exceptions:exceptions.slice(0,6)};
   console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
