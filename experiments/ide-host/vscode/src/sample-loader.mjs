@@ -19,17 +19,22 @@ function validate(files){
   return files;
 }
 export async function seedExampleWorkspace(vscode,extensionUri){
+  let phase="initial";
+  try{
   if(!vscode?.workspace?.fs||!vscode.Uri?.file||!vscode.Uri.joinPath)
     fail("Host file system unavailable");
   const fileSystem=vscode.workspace.fs;
   const manifestUri=vscode.Uri.joinPath(extensionUri,...SRC,"files.json");
+  phase="read-bundled-manifest";
   const files=validate(JSON.parse(decoder.decode(await fileSystem.readFile(manifestUri))));
   const root=vscode.Uri.file(BASE);
   let created=0,skipped=0;
+  phase="create-workspace-root";
   await fileSystem.createDirectory(root);
   for(const file of files){
     const segments=file.split("/");
     const destination=vscode.Uri.joinPath(root,...segments);
+    phase="stat-existing:"+file;
     let exists=false;
     try{await fileSystem.stat(destination);exists=true;}
     catch(error){
@@ -37,17 +42,21 @@ export async function seedExampleWorkspace(vscode,extensionUri){
     }
     if(exists){skipped++;continue;}
     const source=vscode.Uri.joinPath(extensionUri,...SRC,...segments);
+    phase="read-bundled-file:"+file;
     const bytes=await fileSystem.readFile(source);
     if(!(bytes instanceof Uint8Array))fail("Unrecognized sample file");
+    phase="create-parent:"+file;
     if(segments.length>1)
       await fileSystem.createDirectory(vscode.Uri.joinPath(root,...segments.slice(0,-1)));
     // writeFile with create-only intent; a racing external write is guarded
     // by the second stat. The spike does not claim atomic multi-file import.
     try{await fileSystem.stat(destination);fail("Sample file changed during import");}
     catch(error){if(error?.code!=="FileNotFound")throw error;}
+    phase="write-file:"+file;
     await fileSystem.writeFile(destination,bytes);
     created++;
   }
+  phase="workspace-update";
   let workspaceUpdated=false;
   const current=vscode.workspace.workspaceFolders??[];
   if(!current.some(f=>f.uri.toString()===root.toString())){
@@ -57,4 +66,7 @@ export async function seedExampleWorkspace(vscode,extensionUri){
   }
   return {root,procedure:vscode.Uri.joinPath(root,"assurance","procedure.yaml"),
     files:files.length,created,skipped,workspaceUpdated};
+  }catch(error){
+    throw Error(phase+": "+String(error?.message??error));
+  }
 }
