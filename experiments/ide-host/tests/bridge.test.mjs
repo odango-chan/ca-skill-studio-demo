@@ -67,7 +67,8 @@ test("Build emits a bundled Node extension and a local script/style Webview",()=
   for(const path of ["experiments/ide-host/vscode/dist/extension.cjs",
     "experiments/ide-host/vscode/dist/extension-web.cjs",
     "experiments/ide-host/vscode/media/procedure.js",
-    "experiments/ide-host/vscode/media/procedure.css"])
+    "experiments/ide-host/vscode/media/procedure.css",
+    "experiments/ide-host/vscode/samples/establish-pdu-session/files.json"])
     assert.ok(statSync(path).size>1000,path);
 });
 
