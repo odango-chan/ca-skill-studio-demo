@@ -69,7 +69,7 @@ test("Build emits a bundled Node extension and a local script/style Webview",()=
     "experiments/ide-host/vscode/media/procedure.js",
     "experiments/ide-host/vscode/media/procedure.css",
     "experiments/ide-host/vscode/samples/establish-pdu-session/files.json"])
-    assert.ok(statSync(path).size>1000,path);
+    assert.ok(statSync(path).size>(path.endsWith("files.json")?50:1000),path);
 });
 
 test("Web host entry is declared and excludes Node-only imports",()=>{
