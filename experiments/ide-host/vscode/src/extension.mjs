@@ -9,6 +9,7 @@ function newNonce(){
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
 import {isProcedurePath,validateRouteProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
+import {seedExampleWorkspace} from "./sample-loader.mjs";
 
 const VIEW="skillStudio.procedurePreview";
 function escaped(value){
@@ -98,6 +99,19 @@ export function activate(context){
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
     webviewOptions:{retainContextWhenHidden:false}
   }));
+  context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
+    async()=>{
+      try{
+        const result=await seedExampleWorkspace(vscode,context.extensionUri);
+        await vscode.window.showInformationMessage(
+          "示例 SKILL 已载入浏览器工作区："+result.created+" 新文件，"+
+          result.skipped+" 个已存在文件保持不变");
+        await vscode.commands.executeCommand("vscode.openWith",result.procedure,VIEW);
+      }catch(error){
+        await vscode.window.showErrorMessage(
+          "SKILL 示例载入失败："+String(error?.message??error));
+      }
+    }));
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.openProcedure",
     async uri=>{
       let target=uri;
