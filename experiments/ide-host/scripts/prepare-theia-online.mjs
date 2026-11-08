@@ -17,6 +17,7 @@ await mkdir(target,{recursive:true});
 await writeFile(join(target,"package.json"),JSON.stringify(manifest,null,2)+"\n");
 await cp(join(ext,"dist"),join(target,"dist"),{recursive:true});
 await cp(join(ext,"media"),join(target,"media"),{recursive:true});
+await cp(join(ext,"samples"),join(target,"samples"),{recursive:true});
 console.log("STUDIO_THEIA_PREPARED_WEB_EXTENSION",JSON.stringify({
   app,target,name:manifest.name,browser:manifest.browser,
   customEditors:manifest.contributes.customEditors.map(x=>x.viewType)
