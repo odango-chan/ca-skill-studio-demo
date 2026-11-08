@@ -101,15 +101,17 @@ export function activate(context){
   }));
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
     async()=>{
+      let stage="seed-example";
       try{
         const result=await seedExampleWorkspace(vscode,context.extensionUri);
-        await vscode.window.showInformationMessage(
+        stage="open-procedure";
+        await vscode.commands.executeCommand("vscode.openWith",result.procedure,VIEW);
+        void vscode.window.showInformationMessage(
           "示例 SKILL 已载入浏览器工作区："+result.created+" 新文件，"+
           result.skipped+" 个已存在文件保持不变");
-        await vscode.commands.executeCommand("vscode.openWith",result.procedure,VIEW);
       }catch(error){
         await vscode.window.showErrorMessage(
-          "SKILL 示例载入失败："+String(error?.message??error));
+          "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
       }
     }));
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.openProcedure",
