@@ -127,8 +127,29 @@ try{
     bodyText:document.body.innerText.slice(-900),
     active:document.activeElement?.outerHTML.slice(0,450)
   })`);
+  await command("Page.bringToFront");
+  const viewPosition=await evalJS(`(()=>{
+    const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='View');
+    if(!item)return null;
+    const r=item.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  if(viewPosition){
+    await command("Input.dispatchMouseEvent",{type:"mouseMoved",...viewPosition});
+    await command("Input.dispatchMouseEvent",{type:"mousePressed",...viewPosition,button:"left",clickCount:1});
+    await command("Input.dispatchMouseEvent",{type:"mouseReleased",...viewPosition,button:"left",clickCount:1});
+    await sleep(550);
+  }
+  const viewMenu=await evalJS(`({
+    menus:[...document.querySelectorAll('.lm-Menu')].map(x=>({
+      visible:getComputedStyle(x).display!=='none',
+      text:x.innerText.slice(0,1400)
+    })).slice(0,6),
+    bodyText:document.body?.innerText.slice(-850),
+    focus:document.activeElement?.outerHTML.slice(0,350)
+  })`);
   const listing=await(await fetch(url+"hostedPlugin/list.json")).text();
-  const evidence={view,diagnostics,paletteBefore,paletteAfter,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
+  const evidence={view,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
     consoleErrors:consoleErrors.slice(0,8),exceptions:exceptions.slice(0,6)};
   console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
