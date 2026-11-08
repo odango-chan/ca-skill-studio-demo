@@ -42,6 +42,8 @@ jobs:
         run: |
           find experiments/ide-host/theia-online/lib -maxdepth 5 -type f -name 'index.html' -o -name 'list.json' | head -40
           node experiments/ide-host/scripts/check-theia-online.mjs
+      - name: Launch generated browser-only shell in real headless Chromium
+        run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       - name: Upload isolated online frontend preview artifact
         uses: actions/upload-artifact@v4
         with:
