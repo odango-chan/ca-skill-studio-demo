@@ -1,0 +1,51 @@
+name: Verify Theia Browser-Only Online Spike
+
+on:
+  pull_request:
+    paths:
+      - "experiments/ide-host/**"
+      - ".github/workflows/theia-online-spike.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  theia-browser-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      npm_config_audit: "false"
+      npm_config_fund: "false"
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+      - name: Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install pinned Studio dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build Node and browser Procedure extensions
+        run: node experiments/ide-host/scripts/build-ide-spike.mjs
+      - name: Stage web plugin for browser-only Theia
+        run: node experiments/ide-host/scripts/prepare-theia-online.mjs
+      - name: Validate trial package manifest and prepared plugin
+        run: node --test experiments/ide-host/tests/online-host.test.mjs
+      - name: Install isolated pinned Theia 1.76 dependencies
+        run: npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
+      - name: Build real Theia browser-only app
+        run: npm run build --prefix experiments/ide-host/theia-online
+      - name: Inventory generated frontend and bundled web plugin
+        run: |
+          find experiments/ide-host/theia-online/lib -maxdepth 5 -type f -name 'index.html' -o -name 'list.json' | head -40
+          node experiments/ide-host/scripts/check-theia-online.mjs
+      - name: Upload isolated online frontend preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: skill-studio-theia-online-spike
+          path: experiments/ide-host/theia-online/lib/frontend/
+          if-no-files-found: error
+          retention-days: 7
