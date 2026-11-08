@@ -8,17 +8,18 @@ const target=join(app,"plugins","odango-chan.ca-skill-studio-ide-spike");
 const manifest=JSON.parse(await readFile(join(ext,"package.json"),"utf8"));
 if(!manifest.browser||!manifest.contributes?.customEditors?.length)
   throw Error("VS Code Web extension entry or CustomEditor missing");
-for(const source of [manifest.browser,join("media","procedure.js"),join("media","procedure.css")]){
+for(const source of [manifest.browser,"./dist/extension-theia.js",join("media","procedure.js"),join("media","procedure.css")]){
   const info=await stat(join(ext,source));
   if(!info.isFile()||info.size<1000)throw Error("Missing built Web extension file: "+source);
 }
 await rm(target,{recursive:true,force:true});
 await mkdir(target,{recursive:true});
-await writeFile(join(target,"package.json"),JSON.stringify(manifest,null,2)+"\n");
+const prepared={...manifest,browser:"./dist/extension-theia.js"};
+await writeFile(join(target,"package.json"),JSON.stringify(prepared,null,2)+"\n");
 await cp(join(ext,"dist"),join(target,"dist"),{recursive:true});
 await cp(join(ext,"media"),join(target,"media"),{recursive:true});
 await cp(join(ext,"samples"),join(target,"samples"),{recursive:true});
 console.log("STUDIO_THEIA_PREPARED_WEB_EXTENSION",JSON.stringify({
-  app,target,name:manifest.name,browser:manifest.browser,
+  app,target,name:manifest.name,browser:prepared.browser,
   customEditors:manifest.contributes.customEditors.map(x=>x.viewType)
 }));
