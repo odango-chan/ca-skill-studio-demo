@@ -15,13 +15,18 @@
   "main": "./dist/extension.cjs",
   "activationEvents": [
     "onCommand:skillStudio.openProcedure",
-    "onCustomEditor:skillStudio.procedurePreview"
+    "onCustomEditor:skillStudio.procedurePreview",
+    "onCommand:skillStudio.loadExample"
   ],
   "contributes": {
     "commands": [
       {
         "command": "skillStudio.openProcedure",
         "title": "SKILL Studio: Open Procedure Visual"
+      },
+      {
+        "command": "skillStudio.loadExample",
+        "title": "SKILL Studio: Load Example Package (browser workspace)"
       }
     ],
     "menus": {
@@ -53,7 +58,8 @@
   "files": [
     "dist/**",
     "media/**",
-    "README.md"
+    "README.md",
+    "samples/**"
   ],
   "browser": "./dist/extension-web.cjs",
   "repository": {
