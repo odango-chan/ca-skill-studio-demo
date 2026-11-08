@@ -1,7 +1,7 @@
 // Run from repository root after npm ci. Experimental artifact only.
 // No change to the existing Pages app or its dist/ output.
 import {build} from "esbuild";
-import {mkdir,rm,cp,readdir,writeFile} from "node:fs/promises";
+import {mkdir,rm,cp,readdir,writeFile,appendFile} from "node:fs/promises";
 import {join} from "node:path";
 const root="experiments/ide-host/vscode";
 await rm(join(root,"dist"),{recursive:true,force:true});
@@ -23,6 +23,35 @@ await build({
   bundle:true,format:"cjs",platform:"browser",target:"es2022",
   external:["vscode"],logLevel:"info"
 });
+// Theia 1.76's browser-only PluginWorker calls importScripts(), then reads
+// self[self.frontendModuleName]. A plain CJS browser bundle is insufficient:
+ // it expects a module/require that the worker has not provided.
+ // Build a thin Theia worker adapter from the SAME extension source. The
+ // original Node CJS and VS Code Web CJS remain unchanged.
+const theiaWorkerEntry=join(root,"dist/extension-theia.js");
+await build({
+  entryPoints:[join(root,"src/extension.mjs")],
+  outfile:theiaWorkerEntry,
+  bundle:true,format:"iife",globalName:"__skillStudioTheiaModule",
+  platform:"browser",target:"es2022",logLevel:"info",
+  plugins:[{
+    name:"theia-worker-vscode-api",
+    setup(build){
+      build.onResolve({filter:/^vscode$/},()=>({
+        path:"vscode",namespace:"theia-worker-vscode"
+      }));
+      build.onLoad({filter:/^vscode$/,namespace:"theia-worker-vscode"},()=>({
+        contents:"module.exports = globalThis.theia[globalThis.frontendModuleName];",
+        loader:"js"
+      }));
+    }
+  }]
+});
+// Theia explicitly sets frontendModuleName just before importScripts; the
+// resulting activation exports are discovered by this exact lookup.
+await appendFile(theiaWorkerEntry,
+  "\\n;if(typeof self !== 'undefined' && self.frontendModuleName) "+
+  "self[self.frontendModuleName] = __skillStudioTheiaModule;\\n");
 await build({
   entryPoints:[join(root,"src/webview.mjs")],
   outfile:join(root,"media/procedure.js"),
