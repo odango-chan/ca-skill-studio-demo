@@ -68,7 +68,11 @@ operations to create, rename, delete a test file; open a `.py` in the native
 editor. Then **SKILL Studio: Open Procedure Visual** opens the original
 `assurance/procedure.yaml` graph. Check Root/Child selection, the 17 Node
 and 63 Outcome model, native YAML source beside the graph, a qualified
-Route Patch Diff, confirm, native undo and native save.
+Route Patch Diff, confirm, native undo and native save. Select a Node's
+**查看** action to open the one-hop Node Focus graph (previous / PRE-OP-POST /
+next); click a Phase Step's line badge to reveal that exact line in the same
+native YAML editor, then return to the complete Procedure graph. Node Focus
+is read-only and does not modify Source.
 
 The optional [GitHub Actions VSIX artifact](../../actions) is a prebuilt
 extension from the experimental PR workflow; download and install manually in
@@ -87,7 +91,7 @@ Official sources:
 - https://theia-ide.org/docs/authoring_vscode_extensions/
 - https://theia-ide.org/docs/user_install_vscode_extensions/
 
-**Verified CI:** [ide-host-spike #42191440251](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42191440251) — 6/6 spike tests, 409/409 existing tests, bundled extension and VSIX artifact PASS. The simulated host verifies real WorkspaceEdit message handling, but not the real VS Code or Theia GUI. Download `ca-skill-studio-ide-spike-vsix` from the workflow **Artifacts** section.
+**Verified CI:** Theia browser-only [#42584800342](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800342), Theia backend Chromium [#42584800599](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800599), and IDE Host / VSIX [#42584800417](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800417) all PASS on the merged-base head. Real Chromium acceptance covers sample import, CustomEditor, Source-backed Patch, native Source/Undo, Node Focus PRE/OP/POST and Source line reveal. Resulting-main Pages [#42585232727](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727) PASS. The VSIX is an optional desktop artifact; desktop VS Code GUI remains separately unverified.
 
 ## Online Theia host and deployment
 
@@ -118,19 +122,19 @@ References:
 
 ## What is and is not proven
 
-| Test | Acceptance | Status at verified build d528ba73 |
+| Test | Acceptance | Status at main b9c1c38 |
 |---|---|---|
 | Existing CreatedSession YAML projection | five procedures, Root 17 nodes, 63 Outcome routes | **PASS** (unit) |
-| Native TextDocument + WorkspaceEdit boundary | IDE owns file IO, undo, save; Webview never does | **PASS** (bundled extension / simulated host); real native host **NOT_RUN** |
+| Native TextDocument + WorkspaceEdit boundary | IDE owns file IO, undo, save; Webview never does | **PASS** in real Theia browser-only and backend Chromium CustomEditor acceptance; desktop VS Code GUI **NOT_RUN** |
 | Patch isolation / stale rejection | host reprojects, checks version and exact scalar span | **PASS** (unit + mock-host) |
-| ReactFlow + ELK bundling | Webview bundle with local CSS and scripts | **PASS** (bundle/VSIX; actual render **NOT_RUN**) |
+| ReactFlow + ELK bundling | Webview bundle with local CSS and scripts | **PASS** (real Theia Chromium render, including Node Focus) |
 | VS Code Explorer/new file | native integration works | **NOT_RUN** |
 | VS Code editor open/edit/undo | graph refresh and single-scalar patch | **NOT_RUN** |
 | Theia same VSIX | custom editor and Webview API compatibility | **NOT_RUN** |
-| Online Theia browser-only with Web extension | Build-time bundled extension, OPFS sample import, Procedure CustomEditor, Patch, native Source and Undo | **PASS** in real Chromium at the previous `/ide-preview/` subpath; new default-root revalidation pending |
+| Theia browser-only with Web extension | Build-time bundled extension, sample import, Procedure CustomEditor, Patch, native Source/Undo, Node Focus and Source line reveal | **PASS** in real Chromium at the default Pages root; Classic composition and Pages deployment also PASS |
 | Local Runtime / 5GC | deliberately out of scope | **NOT_RUN** |
 
-The Pages host is now Theia browser-only. Its GitHub Pages adapter changes
+The Pages host is now Theia browser-only. The Node Focus view is migrated; Route creation/reconnect, Phase Designer, full Inspector, Package Audit and Markdown preview remain Classic-only. Its GitHub Pages adapter changes
 Theia's default per-Webview subdomain pattern to same-origin because Pages
 cannot provide wildcard Webview DNS/TLS. A persistent warning is shown:
 **do not open sensitive files or untrusted workspaces**. OPFS data stays in
