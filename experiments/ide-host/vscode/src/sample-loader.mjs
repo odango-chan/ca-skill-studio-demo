@@ -24,9 +24,18 @@ async function readBundledResource(vscode,uri){
     const origin=globalThis.location?.origin;
     if(!origin||url.origin!==origin)
       fail("Refusing cross-origin extension resource: "+url.origin);
-    const response=await fetch(url.href,{credentials:"same-origin"});
+    // Browser-only Theia may expose extensionUri without the deployment
+    // subpath even though the worker bundle itself was loaded beneath it.
+    // Recover only that same-origin app prefix from the worker's own URL.
+    const workerPath=globalThis.location?.pathname??"";
+    const hostedMarker="/hostedPlugin/";
+    const markerAt=workerPath.indexOf(hostedMarker);
+    const appPrefix=markerAt>=0?workerPath.slice(0,markerAt):"";
+    const resourcePath=appPrefix+url.pathname;
+    const resourceUrl=new URL(resourcePath+url.search,origin);
+    const response=await fetch(resourceUrl.href,{credentials:"same-origin"});
     if(!response.ok)
-      fail("Extension resource HTTP "+response.status+": "+url.pathname);
+      fail("Extension resource HTTP "+response.status+": "+resourceUrl.pathname);
     return new Uint8Array(await response.arrayBuffer());
   }
   return vscode.workspace.fs.readFile(uri);
