@@ -28,3 +28,18 @@ not online acceptance. Missing plugin metadata or a CSP/URI failure is BLOCKED.
 Existing production Pages at
 https://odango-chan.github.io/ca-skill-studio-demo/ is **never overwritten**
 by this build. See [ADR-0002](../../../docs/decisions/0002-ide-host-spike.md).
+
+## Static Pages preview adapter (demo only)
+
+After the pinned Theia 1.76 browser-only build, run
+`node experiments/ide-host/scripts/prepare-theia-static-preview.mjs`.
+It copies Theia's own webview bootstrap assets to `lib/frontend/webview/`
+and changes the generated browser bundle's default webview host pattern from
+per-webview subdomains to same-origin `{{hostname}}`.
+
+This exists only to make a disposable GitHub Pages preview possible without
+wildcard DNS/TLS. It deliberately weakens webview origin isolation. Do not use
+this static adapter for sensitive workspaces, untrusted extensions, or
+production. The full backend-backed Theia host keeps the normal isolated
+webview host pattern and is the architecture candidate for a secured online
+deployment.
