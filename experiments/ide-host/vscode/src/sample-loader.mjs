@@ -1,6 +1,5 @@
 // Explicit user-triggered Sample Package import for VS Code desktop/web or
 // Theia browser-only OPFS. Never overwrite existing workspace files.
-const BASE="/skill-studio-examples/establish-pdu-session";
 const SRC=["samples","establish-pdu-session"];
 const decoder=new TextDecoder();
 const fail=reason=>{throw Error(reason);};
@@ -46,7 +45,7 @@ function validate(files){
   }
   return files;
 }
-export async function seedExampleWorkspace(vscode,extensionUri){
+export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   let phase="initial";
   try{
   if(!vscode?.workspace?.fs||!vscode.Uri?.file||!vscode.Uri.joinPath)
@@ -65,7 +64,16 @@ export async function seedExampleWorkspace(vscode,extensionUri){
       "; resourceRead="+JSON.stringify(describeError(error)));
   }
   const files=validate(JSON.parse(decoder.decode(manifestBytes)));
-  const root=vscode.Uri.file(BASE);
+  // Do not write at file:/// root: browser-only Theia's OPFS provider grants
+  // extension workers access to workspace/storage mounts, not the filesystem
+  // root. With no opened workspace, seed into this extension's persistent
+  // global storage and then expose that directory as the active workspace.
+  const current=vscode.workspace.workspaceFolders??[];
+  const parent=current[0]?.uri??storageUri;
+  if(!parent)fail("No writable workspace or extension storage URI is available");
+  const root=vscode.Uri.joinPath(parent,
+    ...(current.length?["skill-studio-examples"]:["workspaces"]),
+    "establish-pdu-session");
   let created=0,skipped=0;
   phase="create-workspace-root";
   await fileSystem.createDirectory(root);
@@ -96,8 +104,8 @@ export async function seedExampleWorkspace(vscode,extensionUri){
   }
   phase="workspace-update";
   let workspaceUpdated=false;
-  const current=vscode.workspace.workspaceFolders??[];
-  if(!current.some(f=>f.uri.toString()===root.toString())){
+  if(!current.some(f=>f.uri.toString()===root.toString())&&!current.some(f=>
+      f.uri.toString()===parent.toString())){
     workspaceUpdated=Boolean(vscode.workspace.updateWorkspaceFolders?.(
       current.length,0,{uri:root,name:"establish-pdu-session"
     }));
