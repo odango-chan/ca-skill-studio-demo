@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {projectWorkspace} from "../site/workspace.mjs";
 import {layoutProcedureELK} from "../site/layout.mjs";
-import {makeFlowElements,resolveReconnectedRoute,FLOW_NODE_SIZE,
+import {makeFlowElements,resolveReconnectedRoute,flowBundleSelectionId,FLOW_NODE_SIZE,
   classifyRouteTone,ROUTE_TONE_COLOR,summarizeNodePhases,
   describeProcedureLegend,routeOrigin}
   from "../site/react-flow-projection.mjs";
@@ -65,7 +65,7 @@ test("ambiguous Route bundle remains visibly selected without choosing an Outcom
   const bundle=graph.bundles.find(item=>item.routes.length>1);
   assert.ok(bundle);
   const flow=makeFlowElements(graph,created.procedure,{
-    kind:"bundle",id:bundle.source+"->"+bundle.target
+    kind:"bundle",id:flowBundleSelectionId(bundle)
   });
   const selected=flow.edges.filter(edge=>edge.selected);
   assert.equal(selected.length,1);
