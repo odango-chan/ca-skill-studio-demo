@@ -38,11 +38,15 @@ jobs:
         run: npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
       - name: Build real Theia browser-only app
         run: npm run build --prefix experiments/ide-host/theia-online
+      - name: Prepare same-origin Webview assets for static demo preview
+        run: node experiments/ide-host/scripts/prepare-theia-static-preview.mjs
       - name: Inventory generated frontend and bundled web plugin
         run: |
           find experiments/ide-host/theia-online/lib -maxdepth 5 -type f -name 'index.html' -o -name 'list.json' | head -40
           node experiments/ide-host/scripts/check-theia-online.mjs
       - name: Launch generated browser-only shell in real headless Chromium
+        env:
+          THEIA_REQUIRE_WEBVIEW: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       - name: Upload isolated online frontend preview artifact
         uses: actions/upload-artifact@v4
