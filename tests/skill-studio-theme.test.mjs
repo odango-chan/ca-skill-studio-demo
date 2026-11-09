@@ -46,7 +46,11 @@ test("file icon theme maps SKILL assets and local SVGs",()=>{
     assert.match(svg,/<svg\b/);
     assert.match(svg,/stroke-linecap="round"/);
     assert.match(svg,/stroke-linejoin="round"/);
-    assert.ok(!svg.includes("http://")&&!svg.includes("https://"));
+    // SVG's mandatory xmlns URI is an identifier, not a network request.
+    // Only actual external resource references are forbidden.
+    assert.doesNotMatch(svg,/(?:href|src)\s*=\s*["']https?:\/\//i);
+    assert.doesNotMatch(svg,/url\(\s*["']?https?:\/\//i);
+    assert.doesNotMatch(svg,/<(?:image|script)\b/i);
   }
 });
 test("native Codicons remain the single product-icon family",()=>{
