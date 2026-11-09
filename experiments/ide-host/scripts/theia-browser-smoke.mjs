@@ -98,6 +98,14 @@ try{
       readyState:document.readyState,title:document.title,
       text:document.body?.innerText?.slice(0,950)||"",
       appShell:!!document.querySelector("#theia-app-shell"),
+      classicIcons:(()=>{
+        const link=document.querySelector("#skill-studio-classic-icon-theme");
+        const icons=[...document.querySelectorAll(".theia-app-sides .codicon")];
+        const mapped=icons.filter(icon=>
+          getComputedStyle(icon,"::before").maskImage.includes("data:image/svg+xml")
+        ).length;
+        return {loaded:Boolean(link?.sheet),activityIcons:icons.length,mapped};
+      })(),
       widgets:document.querySelectorAll(".lm-Widget").length,
       menus:document.querySelectorAll(".p-MenuBar-item,.lm-MenuBar-item").length,
       editor:document.querySelectorAll(".monaco-editor").length,
@@ -440,6 +448,9 @@ try{
   console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
   if(!view?.appShell||view.widgets<5||view.bodyLength<15)
     throw Error("Theia browser shell failed to start: "+JSON.stringify(evidence).slice(0,2200));
+  if(!view?.classicIcons?.loaded||view.classicIcons.mapped<1)
+    throw Error("Classic icon artwork was not applied to Theia shell controls: "+
+      JSON.stringify(view?.classicIcons).slice(0,1200));
   if(!afterImport.notificationText.some(message=>message.includes("示例 SKILL 已载入浏览器工作区"))||
      !afterImport.bodyText.includes("establish-pdu-session")||
      !afterImport.bodyText.includes("procedure.yaml"))
@@ -472,9 +483,9 @@ try{
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify(patchEvidence.nodeFocus).slice(0,3500));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS");
   else
-    console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
+    console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
   ws?.close();child.kill("SIGKILL");
   if(server?.listening)await new Promise(ok=>server.close(ok));

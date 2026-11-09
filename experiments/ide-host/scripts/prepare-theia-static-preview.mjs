@@ -5,8 +5,11 @@
 // or production. The full backend host keeps the normal isolated host pattern.
 import {copyFile,cp,mkdir,readdir,readFile,stat,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
+import {buildClassicIconsCss} from "./classic-icons-css.mjs";
 
 const root=resolve("experiments/ide-host/theia-online/lib/frontend");
+const classicIconsCss=buildClassicIconsCss();
+await writeFile(join(root,"classic-icons.css"),classicIconsCss);
 const bundlePath=join(root,"bundle.js");
 let bundle=await readFile(bundlePath,"utf8");
 const from='defaultPattern="{{uuid}}.webview.{{hostname}}"';
@@ -32,13 +35,19 @@ for(const required of ["index.html","fake.html","main.js"]){
 }
 const indexPath=join(root,"index.html");
 let indexHtml=await readFile(indexPath,"utf8");
+const iconStylesheet='<link id="skill-studio-classic-icon-theme" rel="stylesheet" href="./classic-icons.css">';
+if(!indexHtml.includes('id="skill-studio-classic-icon-theme"')){
+  const head=indexHtml.match(/<\/head>/i);
+  if(!head)throw Error("Theia frontend index has no head element for the Classic icon stylesheet");
+  indexHtml=indexHtml.replace(head[0],iconStylesheet+head[0]);
+}
 const warning='<div id="skill-studio-preview-warning" role="note" style="position:fixed;right:12px;bottom:12px;z-index:2147483000;display:flex;gap:10px;align-items:center;padding:7px 11px;border:1px solid #d6a84b;border-radius:7px;background:#fff4d6;color:#614600;box-shadow:0 2px 12px #0002;font:12px/1.4 system-ui,sans-serif"><span>在线演示 · Webview 使用同源模式 · 请勿打开敏感文件</span><a href="./classic/" aria-label="打开原版完整工作台" style="color:#704c00;font-weight:600">打开原版工作台</a></div>';
 if(!indexHtml.includes('id="skill-studio-preview-warning"')){
   const body=indexHtml.match(/<body(?:\s[^>]*)?>/i);
   if(!body)throw Error("Theia frontend index has no body element for the required safety/navigation banner");
   indexHtml=indexHtml.replace(body[0],body[0]+warning);
-  await writeFile(indexPath,indexHtml);
 }
+await writeFile(indexPath,indexHtml);
 // Theia's browser-only static build emits the extension worker bundle but
 // does not carry arbitrary package assets through its hostedPlugin copier.
 // Explicitly stage the read-only sample package and Webview media beside it.
@@ -73,7 +82,7 @@ for(const required of [
   join(themePluginTarget,"package.json"),
   join(themePluginTarget,"themes","skill-studio-light-color-theme.json"),
   join(themePluginTarget,"icons","skill-studio-file-icon-theme.json"),
-  ...["skill","yaml","markdown","python","file","folder","folder-open","code"]
+  ...["skill","yaml","markdown","python","json","shell","text","file","folder","folder-open","code"]
     .map(name=>join(themePluginTarget,"icons",name+".svg"))
 ]){
   const info=await stat(required);
@@ -81,7 +90,8 @@ for(const required of [
     throw Error("Static hosted Skill Studio theme asset missing or empty: "+required);
 }
 console.log("STUDIO_THEIA_STATIC_THEME_ASSETS",JSON.stringify({
-  themePluginTarget,assets:["package.json","themes/**","icons/**"],offlinePackage:true
+  themePluginTarget,assets:["package.json","themes/**","icons/**"],offlinePackage:true,
+  classicShellIconCss:classicIconsCss.length
 }));
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,

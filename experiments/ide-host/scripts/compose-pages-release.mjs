@@ -32,7 +32,7 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
     await requireFile(classic,asset);
   const theiaIndexPath=await requireFile(theia,"index.html");
   for(const asset of [
-    "bundle.js","hostedPlugin/list.json","webview/index.html",
+    "bundle.js","classic-icons.css","hostedPlugin/list.json","webview/index.html",
     "hostedPlugin/odango_chan_skill_studio_theme/package.json",
     "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
     "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
@@ -44,7 +44,9 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
     throw new Error("Theia hostedPlugin list does not include the shared Skill Studio theme");
   const theiaHtml=await readFile(theiaIndexPath,"utf8");
   if(!theiaHtml.includes('id="skill-studio-preview-warning"')||
-     !theiaHtml.includes('href="./classic/"'))
+     !theiaHtml.includes('href="./classic/"')||
+     !theiaHtml.includes('id="skill-studio-classic-icon-theme"')||
+     !theiaHtml.includes('href="./classic-icons.css"'))
     throw new Error("Theia index must display the same-origin warning and Classic navigation link");
 
   const stage=await mkdtemp(join(dirname(output),".skill-studio-classic-"));
@@ -84,6 +86,7 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
     // Final artifact assertions: Theia is at root; Classic remains complete.
     await requireFile(output,"index.html");
     await requireFile(output,"bundle.js");
+    await requireFile(output,"classic-icons.css");
     await requireFile(output,"hostedPlugin/list.json");
     await requireFile(output,"webview/index.html");
     await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/package.json");
@@ -97,6 +100,7 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
     const rootHtml=await readFile(join(output,"index.html"),"utf8");
     const classicHtml=await readFile(join(output,"classic","index.html"),"utf8");
     if(!rootHtml.includes('href="./classic/"')||
+       !rootHtml.includes('href="./classic-icons.css"')||
        !classicHtml.includes('href="../"'))
       throw new Error("Published root/Classic navigation is incomplete");
     return Object.freeze({

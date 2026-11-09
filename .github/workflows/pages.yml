@@ -203,6 +203,7 @@ jobs:
         run: |
           node ../ide-source/experiments/ide-host/scripts/compose-pages-release.mjs --classic dist --theia ../ide-source/experiments/ide-host/theia-online/lib/frontend --output dist
           test -s dist/index.html
+          test -s dist/classic-icons.css
           test -s dist/bundle.js
           test -s dist/hostedPlugin/list.json
           test -s dist/hostedPlugin/odango_chan_skill_studio_theme/package.json

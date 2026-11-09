@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {existsSync,readFileSync} from "node:fs";
 import {join} from "node:path";
+import {fileIconSpec} from "../site/file-icons.mjs";
+import {buildClassicIconsCss,CLASSIC_FILE_ICON_ASSETS,renderClassicSvg,
+  THEIA_CLASSIC_ICON_MAP} from "../experiments/ide-host/scripts/classic-icons-css.mjs";
 const root="extensions/skill-studio-theme";
 const read=path=>readFileSync(join(root,path),"utf8");
 const manifest=JSON.parse(read("package.json"));
@@ -53,7 +56,34 @@ test("file icon theme maps SKILL assets and local SVGs",()=>{
     assert.doesNotMatch(svg,/<(?:image|script)\b/i);
   }
 });
-test("native Codicons remain the single product-icon family",()=>{
-  assert.match(read("README.md"),/Native Codicons remain intact/);
+test("Theia shell controls use Classic SVG geometry without changing native commands",()=>{
+  const css=buildClassicIconsCss();
+  for(const name of ["files","search","source-control","debug-alt","extensions",
+    "settings-gear","account","new-file","new-folder","undo","redo","save",
+    "refresh","close","menu","chevron-down","collapse-all"])
+    assert.ok(THEIA_CLASSIC_ICON_MAP[name],name);
+  assert.match(css,/\.theia-app-sides \.codicon-files::before/);
+  assert.match(css,/\.theia-navigator \.codicon-new-file::before/);
+  assert.match(css,/\.lm-MenuBar \.codicon-menu::before/);
+  assert.match(css,/mask-image:url\("data:image\/svg\+xml,/);
+  assert.match(read("README.md"),/generated\s+from `site\/icons\.mjs`/);
   assert.equal(manifest.contributes.productIconThemes,undefined);
+});
+test("Theia file icon SVGs are generated from the exact Classic file-icon shapes",()=>{
+  const expected={
+    "file.svg":{icon:fileIconSpec("unknown.bin").icon,color:"#71889c"},
+    "folder.svg":{icon:"folder",color:"#6c8198"},
+    "folder-open.svg":{icon:"folder-open",color:"#6c8198"},
+    "skill.svg":{icon:"file-text",color:"#7483a0"},
+    "yaml.svg":{icon:fileIconSpec("procedure.yaml").icon,color:"#678a9a"},
+    "markdown.svg":{icon:fileIconSpec("SKILL.md").icon,color:"#7483a0"},
+    "python.svg":{icon:fileIconSpec("scripts/run.py").icon,color:"#638798"},
+    "json.svg":{icon:fileIconSpec("package.json").icon,color:"#927f9b"},
+    "shell.svg":{icon:fileIconSpec("scripts/run.sh").icon,color:"#638798"},
+    "text.svg":{icon:fileIconSpec("notes.txt").icon,color:"#7483a0"},
+    "code.svg":{icon:fileIconSpec("app.ts").icon,color:"#638798"}
+  };
+  assert.deepEqual(Object.keys(CLASSIC_FILE_ICON_ASSETS).sort(),Object.keys(expected).sort());
+  for(const [filename,{icon,color}] of Object.entries(expected))
+    assert.equal(read("icons/"+filename),renderClassicSvg(icon,color),filename);
 });
