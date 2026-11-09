@@ -161,7 +161,8 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       // Only the verified handler may propose a YAML patch on reconnect.
       reconnectable:true,
       data:{
-        bundle,selected,important,tone,label,origin,
+        bundle,sourceRouteIds:bundle.routes.map(route=>route.id),
+        selected,important,tone,label,origin,
         displayLabel:showAllLabels||origin!=="OP"||["success","failure","uncertain"].includes(tone)||selected,
         path:bundle.path??null,
         labelPosition:bundle.label??null,direction
