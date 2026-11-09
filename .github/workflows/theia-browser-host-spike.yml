@@ -34,7 +34,7 @@ jobs:
       - name: Stage same Web extension for Theia
         run: node experiments/ide-host/scripts/prepare-theia-online.mjs
       - name: Install isolated Theia 1.76 browser app
-        run: npm install --prefix experiments/ide-host/theia-browser --no-audit --no-fund --ignore-scripts
+        run: npm install --prefix experiments/ide-host/theia-browser --no-audit --no-fund
       - name: Build normal Theia browser app with backend
         run: npm run build --prefix experiments/ide-host/theia-browser
       - name: Start Theia backend for Webview endpoint
