@@ -22,7 +22,7 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
   onNodeSelect(id){
     state.routeProposal=null;state.pending=null;state.pendingKind=null;
     state.selection={kind:"node",id};
-    repaint();renderRoutes();
+    renderRoutes({preserveSelection:true});repaint();
     const options=addRouteOutcomeOptions(state.text,state.procedureId,id);
     status(options?.outcomes?.length
       ?"已选择 "+id+" · 可从节点专用添加端口提出新 Route"
@@ -162,7 +162,8 @@ function refreshTargets(){
   if(route)state.selection={kind:"route",id:route.id};
   repaint();
 }
-function renderRoutes(){
+function renderRoutes({preserveSelection=false}={}){
+  const previousSelection=state.selection;
   const procedure=getProcedure(),list=$("routeList");
   list.replaceChildren();
   for(const route of procedure?.routes??[]){
@@ -188,6 +189,10 @@ function renderRoutes(){
     $("commit").disabled=true;$("diff").textContent="";
   }else if(list.options.length){
     refreshTargets();
+    if(preserveSelection&&previousSelection?.kind==="node"){
+      state.selection=previousSelection;
+      repaint();
+    }
   }else{
     state.pending=null;state.pendingKind=null;
     $("commit").disabled=true;$("diff").textContent="";
@@ -310,7 +315,7 @@ $("newRoutePreview").addEventListener("click",()=>{
 });
 $("newRouteCancel").addEventListener("click",()=>{
   state.routeProposal=null;state.pending=null;state.pendingKind=null;
-  renderRoutes();repaint();
+  renderRoutes({preserveSelection:true});repaint();
   status("已放弃新 Route 提案；YAML 未变化。");
 });
 $("openSource").addEventListener("click",()=>vscode.postMessage({type:"openSource"}));
