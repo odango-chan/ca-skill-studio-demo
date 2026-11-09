@@ -13,18 +13,23 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   const uri={path:"/workspace/assurance/procedure.yaml",toString(){return "file://"+this.path;}};
   const document={uri,text:source,version:21,
     getText(){return this.text;},
+    get lineCount(){return this.text.split(/\\r?\\n/).length;},
     positionAt(offset){return {offset};}
   };
-  const listeners=new Set(),commands=new Map(),posted=[],writes=[],opened=[],registered=[];
+  const listeners=new Set(),commands=new Map(),posted=[],writes=[],opened=[],registered=[],revealed=[];
+  const textEditor={selection:null,revealRange(range,kind){revealed.push({range,kind});}};
   let provider=null,onMessage=null;
   class WorkspaceEdit{
     replace(file,range,value){this.change={file,range,value};}
   }
   class Range{constructor(start,end){this.start=start;this.end=end;}}
+  class Position{constructor(line,character){this.line=line;this.character=character;}}
+  class Selection{constructor(anchor,active){this.anchor=anchor;this.active=active;}}
   const fake={
     ViewColumn:{Beside:2},
     Uri:{joinPath(base,...parts){return {path:base.path+"/"+parts.join("/")};}},
-    Range,WorkspaceEdit,
+    Range,Position,Selection,WorkspaceEdit,
+    TextEditorRevealType:{InCenter:1},
     workspace:{
       onDidChangeTextDocument(cb){listeners.add(cb);return {dispose(){listeners.delete(cb);}};},
       async applyEdit(edit){
@@ -45,7 +50,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       registerCustomEditorProvider(_name,p){provider=p;return{dispose(){}};},
       showWarningMessage:()=>{},
       showInformationMessage:()=>{},
-      showTextDocument:async(doc,opts)=>{opened.push({doc,opts});},
+      showTextDocument:async(doc,opts)=>{opened.push({doc,opts});return textEditor;},
       showQuickPick:async items=>items[0]
     },
     commands:{
@@ -91,6 +96,19 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   await onMessage({type:"openSource"});
   assert.equal(opened.at(-1).doc,document);
   assert.equal(opened.at(-1).opts.viewColumn,2);
+
+  const sourceLine=source.split(/\\r?\\n/).findIndex(line=>line.includes("nudm-sdm-subscribe"))+1;
+  assert.ok(sourceLine>0);
+  await onMessage({type:"revealSourceLine",line:sourceLine});
+  assert.equal(opened.at(-1).doc,document);
+  assert.equal(textEditor.selection.anchor.line,sourceLine-1);
+  assert.equal(textEditor.selection.active.line,sourceLine-1);
+  assert.equal(revealed.at(-1).range.start.line,sourceLine-1);
+  assert.equal(revealed.at(-1).kind,1);
+  const revealCount=revealed.length;
+  await onMessage({type:"revealSourceLine",line:0});
+  assert.equal(revealed.length,revealCount,"invalid line must not move the Source editor");
+  assert.equal(posted.at(-1).type,"error");
 
   const model=projectWorkspace(source);
   let trial=null;
