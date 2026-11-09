@@ -8,7 +8,8 @@ function newNonce(){
   globalThis.crypto.getRandomValues(bytes);
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
-import {isProcedurePath,validateRouteProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
+import {isProcedurePath,validateRouteProposal,
+  validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
 import {seedExampleWorkspace} from "./sample-loader.mjs";
 
 const VIEW="skillStudio.procedurePreview";
@@ -134,15 +135,20 @@ export function activate(context){
           editor.revealRange(selection,vscode.TextEditorRevealType.InCenter);
           return;
         }
-        if(message.type!=="applyRoute")return;
+        if(message.type!=="applyRoute"&&message.type!=="applyRouteCreation")return;
         try{
           const source=document.getText();
-          const edit=validateRouteProposal(source,document.version,message);
-          // A single scalar replacement: native TextDocument owns undo/redo,
-          // save, backup and external file changes. No second editor buffer.
+          const creating=message.type==="applyRouteCreation";
+          const edit=creating
+            ?validateCanvasRouteCreationProposal(source,document.version,message)
+            :validateRouteProposal(source,document.version,message);
+          // Native TextDocument remains the only write owner. Existing Route
+          // edits replace one scalar; new Route creation inserts one exact
+          // source line at a zero-length CST span. Both use native Undo/Save.
           const patch=new vscode.WorkspaceEdit();
           patch.replace(document.uri,new vscode.Range(
-            document.positionAt(edit.start),document.positionAt(edit.end)),edit.newTarget);
+            document.positionAt(edit.start),document.positionAt(edit.end)),
+            creating?edit.newText:edit.newTarget);
           const applied=await vscode.workspace.applyEdit(patch);
           if(!applied)throw Error("Host rejected WorkspaceEdit");
           void webview.postMessage({type:"applied",routeId:edit.routeId});
