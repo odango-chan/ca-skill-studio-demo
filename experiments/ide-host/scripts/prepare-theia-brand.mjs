@@ -76,7 +76,8 @@ export function buildSkillStudioBrandCss(){
 export function buildSkillStudioBrandScript(){
   return `// Presentation-only insertion. Do not add a fake menu item or intercept events.
 (() => {
-  const BAR_SELECTOR = ".lm-MenuBar";
+  // Theia 1.76 assigns this stable ID to BrowserMainMenuFactory's native bar.
+  const BAR_SELECTOR = '[id="theia:menubar"].lm-MenuBar';
   const CONTENT_CLASS = "lm-MenuBar-content";
   const BRAND_CLASS = "skill-studio-brand";
 

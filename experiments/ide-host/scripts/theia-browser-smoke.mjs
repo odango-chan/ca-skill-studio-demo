@@ -107,15 +107,14 @@ try{
         return {loaded:Boolean(link?.sheet),activityIcons:icons.length,mapped};
       })(),
       brand:(()=>{
-        const brand=document.querySelector(".lm-MenuBar > .skill-studio-brand");
+        const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
         const bar=brand?.parentElement;
         const content=bar&&Array.from(bar.children).find(child=>
           child.classList.contains("lm-MenuBar-content")
         );
         const a=brand?.getBoundingClientRect();
         const b=content?.getBoundingClientRect();
-        const nativeMenus=content?[...content.querySelectorAll(".lm-MenuBar-item")]
-          .map(item=>item.textContent.trim()).filter(Boolean):[];
+        const nativeMenus=content?(content.textContent||"").replace(/\\s+/g," ").trim():"";
         return {
           present:Boolean(brand),
           label:brand?.querySelector(".skill-studio-brand-label")?.textContent.trim()||"",
@@ -131,7 +130,9 @@ try{
       bodyLength:document.body?.innerText?.length||0,
       errors:document.querySelectorAll(".theia-error").length
     })`);
-    if(view?.appShell&&view.widgets>4&&view.bodyLength>15&&view.brand?.present)break;
+    if(view?.appShell&&view.widgets>4&&view.bodyLength>15&&
+       view.brand?.present&&view.brand.nativeMenus.includes("File")&&
+       view.brand.nativeMenus.includes("Edit"))break;
     await sleep(150);
   }
   if(!view?.brand?.present||!view.brand.stylesheet||
@@ -145,7 +146,7 @@ try{
     width:640,height:900,deviceScaleFactor:1,mobile:false
   });
   const narrowBrand=await evalJS(`(()=>{
-    const brand=document.querySelector(".lm-MenuBar > .skill-studio-brand");
+    const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
     const label=brand?.querySelector(".skill-studio-brand-label");
     const mark=brand?.querySelector(".skill-studio-brand-mark");
     return {
