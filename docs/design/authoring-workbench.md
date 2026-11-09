@@ -240,3 +240,8 @@ Source Span 和 ELK 端点，不能生成虚拟 Runtime Route。每个业务 Nod
 - 宽屏四个菜单并列，仅展开一个；键盘 Tab/Enter/Space 及 ←/→（在菜单标题上）可导航，Esc 和点击外部关闭。小屏幕隐藏中间文件路径而不是挤掉菜单；不提供虚假的本地运行项。
 
 设计与宿主边界详见 [Application Shell](application-shell.md)。本轮仅是编辑器交互和信息架构优化，不改变 Source、Runtime、5GC。
+
+
+## D1-A2d · 当前业务 Node 的可视组合边界（IDE preview integration）
+
+The local Node-focus graph draws a dashed, non-interactive backdrop around the current business Node's actual PRE/OP/POST stage cards. Geometry is derived from final ELK positions and measured stage dimensions. The backdrop has no handles, Routes, selection, editing actions, Source identity or Runtime meaning. Original source-backed Routes continue to connect to their exact stages; the PRE/OP/POST sequence remains explicitly view-only. Unit and Chromium regression coverage is carried by `tests/node-focus-graph.test.mjs` and `scripts/edge-smoke.mjs`.

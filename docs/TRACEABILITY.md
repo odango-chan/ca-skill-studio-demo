@@ -53,3 +53,4 @@
 | D4-A2.2b2/A3b2b2b/A4b2 remaining Phase authoring | [Phase design](design/phase-designer.md) | **NOT_STARTED** | **NOT_RUN** | [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15) |
 
 任何 `IMPLEMENTED` 必须能够从该表定位到当前代码和测试；`PASS` 还需要有对应真实 Gate 与稳定证据 URL/仓内 Artifact。不得用 `/tmp` 或个人绝对路径作为唯一 durable locator。Code/Schema/Focused test/Acceptance 变化时，WORK 和 TRACEABILITY 在同 PR 内同步更新。
+| D1-A2d current Node PRE/OP/POST visual boundary | [Workbench](design/authoring-workbench.md) | `site/node-focus-graph.mjs`, `site/node-focus-flow.tsx`, `site/light.css` | `tests/node-focus-graph.test.mjs`, `scripts/edge-smoke.mjs` | Integrated into IDE preview branch from reviewed #71 patch at `9d3f639`; exact-head CI pending; view-only boundary, no Source/Route/Runtime changes |

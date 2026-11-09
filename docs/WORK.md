@@ -104,3 +104,9 @@
 - [TRACEABILITY](TRACEABILITY.md)：当前范围→实现/测试→稳定证据。
 - [文档基线主分支 Pages 成功记录](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41612728393)：仅为本仓浏览器静态站部署。
 - Studio 唯一可选择且默认打开的 Package `establish-pdu-session`，其运行时相关 16 文件来自 [ca-agent-demo@eaadf948](https://github.com/odango-chan/ca-agent-demo/tree/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/skills/establish-pdu-session)。`references/3gpp-procedure.md`、`references/session-selection.md`、`references/failure-handling.md` 为可选业务参考材料；Studio 可浏览/编辑/导出，不表示已实现 Host `read_reference` 工具。`cases/` 和内部 `design/` 未纳入此编辑示例。Host/Runtime 可执行性仍由真正 owner 的 Schema/Validator/执行事实决定。
+
+## IDE preview integration follow-up (2026-11-09)
+
+- The continuing online IDE preview is based on `spike/ide-extension-theia-host` / PR #86; `main` remains the stable published baseline and is not changed by this integration.
+- The branch inherits the already-merged Root path-focus work: default proven success path, selectable/complete path modes, per-card `+N 条` expand / `收起`, explicit `查看`, and anchor-preserving expand/collapse (#73/#75/#77).
+- Added the view-only dashed boundary grouping the current Node's PRE/OP/POST stages, adapted from #71. It adds no business Node, Route, Source mutation or Runtime meaning. Exact-head verification is pending.
