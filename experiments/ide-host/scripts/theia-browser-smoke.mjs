@@ -247,7 +247,11 @@ try{
           procedureValue:document.querySelector("#procedureList")?.value||"",
           routeOptions:document.querySelector("#routeList")?.options?.length||0,
           message:document.querySelector("#message")?.textContent||"",
-          patchVisible:!document.querySelector("#patch")?.hidden
+          patchVisible:!document.querySelector("#patch")?.hidden,
+          html:document.documentElement?.outerHTML?.slice(0,5000)||"",
+          nestedFrames:[...document.querySelectorAll("iframe")].map(frame=>({
+            src:frame.getAttribute("src"),title:frame.title,html:frame.outerHTML.slice(0,500)
+          }))
         })`
       });
       webviewView=evaluated.result?.value??null;
@@ -256,7 +260,7 @@ try{
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
-    frameCount:frames.length,webviewFrame,webviewView,webviewFrameError,
+    frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrame,webviewView,webviewFrameError,
     extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500),
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
