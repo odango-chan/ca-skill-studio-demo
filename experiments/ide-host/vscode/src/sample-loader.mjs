@@ -4,6 +4,17 @@ const BASE="/skill-studio-examples/establish-pdu-session";
 const SRC=["samples","establish-pdu-session"];
 const decoder=new TextDecoder();
 const fail=reason=>{throw Error(reason);};
+const describeUri=uri=>({
+  scheme:uri?.scheme??null,
+  authority:uri?.authority??null,
+  path:uri?.path??null,
+  text:uri?.toString?.()??String(uri)
+});
+const describeError=error=>({
+  name:error?.name??null,
+  code:error?.code??null,
+  message:String(error?.message??error)
+});
 function validate(files){
   if(!Array.isArray(files)||files.length<3||files.length>100||
      !files.includes("SKILL.md")||!files.includes("assurance/procedure.yaml"))
@@ -25,8 +36,26 @@ export async function seedExampleWorkspace(vscode,extensionUri){
     fail("Host file system unavailable");
   const fileSystem=vscode.workspace.fs;
   const manifestUri=vscode.Uri.joinPath(extensionUri,...SRC,"files.json");
+  const extensionInfo=describeUri(extensionUri);
+  const manifestInfo=describeUri(manifestUri);
+  phase="stat-bundled-manifest";
+  try{
+    await fileSystem.stat(manifestUri);
+  }catch(error){
+    fail("Cannot stat bundled manifest; extensionUri="+JSON.stringify(extensionInfo)+
+      "; manifestUri="+JSON.stringify(manifestInfo)+
+      "; fs.stat="+JSON.stringify(describeError(error)));
+  }
   phase="read-bundled-manifest";
-  const files=validate(JSON.parse(decoder.decode(await fileSystem.readFile(manifestUri))));
+  let manifestBytes;
+  try{
+    manifestBytes=await fileSystem.readFile(manifestUri);
+  }catch(error){
+    fail("Cannot read bundled manifest; extensionUri="+JSON.stringify(extensionInfo)+
+      "; manifestUri="+JSON.stringify(manifestInfo)+
+      "; fs.readFile="+JSON.stringify(describeError(error)));
+  }
+  const files=validate(JSON.parse(decoder.decode(manifestBytes)));
   const root=vscode.Uri.file(BASE);
   let created=0,skipped=0;
   phase="create-workspace-root";
