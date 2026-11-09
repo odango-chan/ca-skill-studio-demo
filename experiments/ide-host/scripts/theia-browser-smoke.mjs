@@ -1016,7 +1016,9 @@ try{
       patchEvidence={preview:previewEvidence,applied:null};
     }
   }
-  const workbenchEvidence=await runWorkbenchAcceptance({command,evalJS,sleep,requireEditor});
+  let workbenchEvidence;
+  try{workbenchEvidence=await runWorkbenchAcceptance({command,evalJS,sleep,requireEditor});}
+  catch(error){console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={shellReadyMs,workbenchEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,

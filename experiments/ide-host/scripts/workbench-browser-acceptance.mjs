@@ -22,8 +22,9 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   const audit=await evalJS(`document.body.innerText`);
   if(audit.includes('Audit unavailable'))throw Error('Package Audit did not run: '+audit.slice(-1000));
   // Re-open through Explorer rather than extension openWith command.
+  await palette('Save All');
   await palette('Close All Editors');
-  await palette('View: Show Explorer');
+  await palette('Focus on Files Explorer');
   let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml');const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file not available in native Explorer');
   const start=performance.now();await click(file.x,file.y);await sleep(800);
