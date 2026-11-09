@@ -19,7 +19,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     positionAt(offset){return {offset};}
   };
   const listeners=new Set(),commands=new Map(),posted=[],writes=[],opened=[],registered=[],revealed=[];
-  const textEditor={selection:null,revealRange(range,kind){revealed.push({range,kind});}};
+  const textEditor={document,selection:null,revealRange(range,kind){revealed.push({range,kind});}};
   let provider=null,onMessage=null;
   class WorkspaceEdit{
     replace(file,range,value){this.change={file,range,value};}
@@ -52,6 +52,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       asRelativePath:file=>file.path
     },
     window:{
+      visibleTextEditors:[textEditor],
       registerTreeDataProvider:()=>({dispose(){}}),
       onDidChangeActiveTextEditor:()=>({dispose(){}}),
       activeTextEditor:{document},
@@ -63,7 +64,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     },
     commands:{
       registerCommand(name,cb){commands.set(name,cb);return{dispose(){}};},
-      async executeCommand(...args){registered.push(args);}
+      async executeCommand(...args){registered.push(args);if(args[0]==="vscode.openWith"&&args[2]==="default")opened.push({doc:document,opts:args[3]});}
     }
   };
   const original=Module._load;

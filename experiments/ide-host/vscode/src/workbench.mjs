@@ -28,7 +28,7 @@ export function registerWorkbench(vscode,context){
     if(!isProcedurePath(doc?.uri.path))return;
     const same=document?.uri.toString()===doc.uri.toString();
     const text=doc.getText(),projected=same&&snapshot?.text===text?snapshot.model:null;
-    if(!same){selection={};audit=[];diagnostics.clear();}
+    if(!same){generation++;selection={};audit=[];diagnostics.clear();}
     document=doc;selection=same?choice:{};
     snapshot={...inspectionSnapshot(text,selection,projected),text};fire();
   }
@@ -73,7 +73,7 @@ export function registerWorkbench(vscode,context){
       if(item.nodeId){selection={procedureId:item.procedureId,nodeId:item.nodeId};update(document);sessions.get(document.uri.toString())?.({type:'focusNode',...selection,version:document.version});}
       const doc=await vscode.workspace.openTextDocument(item.uri);
       const line=Math.min(Math.max(0,item.line-1),doc.lineCount-1);
-      await vscode.window.showTextDocument(doc,{preview:true,selection:new vscode.Range(line,0,line,0)});
+      await vscode.commands.executeCommand("vscode.openWith",doc.uri,"default",{preview:true,selection:new vscode.Range(line,0,line,0)});
     }),
     vscode.commands.registerCommand('skillStudio.auditPackage',auditCurrent),
     vscode.commands.registerCommand('skillStudio.refreshInspection',()=>{if(document){update(document);scheduleAudit();}}),

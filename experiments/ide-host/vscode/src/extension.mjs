@@ -130,7 +130,7 @@ export function activate(context){
         }
         if(message.type==="ready"){ready=true;push();return;}
         if(message.type==="openSource"){
-          await vscode.window.showTextDocument(document,{viewColumn:vscode.ViewColumn.Beside,
+          await vscode.commands.executeCommand("vscode.openWith",document.uri,"default",{viewColumn:vscode.ViewColumn.Beside,
             preserveFocus:false,preview:false});
           return;
         }
@@ -145,12 +145,14 @@ export function activate(context){
           // Pass the selection as part of the document-open request as well as
           // setting it on the returned editor. This is important for browser
           // hosts whose editor widget is created asynchronously by showTextDocument.
-          const editor=await vscode.window.showTextDocument(document,{
+          await vscode.commands.executeCommand("vscode.openWith",document.uri,"default",{
             viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false,
             selection
           });
-          editor.selection=new vscode.Selection(position,position);
-          editor.revealRange(selection,vscode.TextEditorRevealType.InCenter);
+          const editor=vscode.window.visibleTextEditors.find(editor=>editor.document.uri.toString()===document.uri.toString());
+          if(editor){editor.selection=new vscode.Selection(position,position);
+            editor.revealRange(selection,vscode.TextEditorRevealType.InCenter);
+          }
           return;
         }
         if(message.type!=="applyRoute"&&message.type!=="applyRouteCreation")return;

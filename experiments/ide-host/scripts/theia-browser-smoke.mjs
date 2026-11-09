@@ -283,6 +283,7 @@ try{
         expression:`({
           readyState:document.readyState,title:document.title,
           bodyText:document.body?.innerText?.slice(0,1200)||"",
+          timing:document.querySelector("#reactFlowRoot")?.dataset.studioTiming,
           procedureRoot:!!document.querySelector("#reactFlowRoot"),
           graphNodes:document.querySelectorAll(".react-flow__node").length,
           graphEdges:document.querySelectorAll(".react-flow__edge").length,

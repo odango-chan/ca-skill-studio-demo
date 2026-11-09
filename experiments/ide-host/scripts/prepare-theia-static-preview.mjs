@@ -46,7 +46,7 @@ await writeFile(indexPath,indexHtml);
 // Explicitly stage the read-only sample package and Webview media beside it.
 const pluginSource=resolve("experiments/ide-host/theia-online/plugins/odango-chan.ca-skill-studio-ide-spike");
 const pluginTarget=join(root,"hostedPlugin","odango_chan_ca_skill_studio_ide_spike");
-for(const name of ["samples","media"]){
+for(const name of ["samples","media","icons"]){
   await cp(join(pluginSource,name),join(pluginTarget,name),{recursive:true,force:true});
 }
 for(const required of [
@@ -60,7 +60,7 @@ for(const required of [
     throw Error("Static hosted plugin asset missing or empty: "+required);
 }
 console.log("STUDIO_THEIA_STATIC_PLUGIN_ASSETS",JSON.stringify({
-  pluginTarget,assets:["samples/**","media/**"],sameOriginOnly:true
+  pluginTarget,assets:["samples/**","media/**","icons/**"],sameOriginOnly:true
 }));
 // Theia does not copy arbitrary extension assets into hostedPlugin.
 // Preserve the exact theme package paths referenced by its contribution JSON.

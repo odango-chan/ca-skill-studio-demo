@@ -301,7 +301,11 @@ async function showProcedure(id){
     if(layouts.size>=32)layouts.delete(layouts.keys().next().value);
     layouts.set(key,graph);
     state.graph=graph;repaint();renderRoutes();canvas.fit();
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ticket===epoch)vscode.postMessage({type:"rendered",version:state.version,projectionMs,layoutMs:performance.now()-started,cacheHit});}));
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ticket===epoch){
+      const timing={type:"rendered",version:state.version,projectionMs,layoutMs:performance.now()-started,cacheHit};
+      $("reactFlowRoot").dataset.studioTiming=JSON.stringify(timing);
+      vscode.postMessage(timing);
+    }}));
     status(id+" · "+procedure.nodes.length+" Nodes / "+procedure.routes.length+
       " Outcomes / "+graph.bundles.length+" Bundles · YAML Source 由 IDE 管理");
   }catch(error){

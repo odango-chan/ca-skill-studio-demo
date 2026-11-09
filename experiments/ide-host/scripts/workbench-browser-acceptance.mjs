@@ -42,7 +42,11 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   for(let i=0;i<100&&!opened;i++){opened=await graph();if(!opened)await sleep(100);}
   if(!opened)throw Error('Explorer single-click did not open native associated CustomEditor');
   const openMs=performance.now()-start;
+  const preview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
+  if(!preview)throw Error("Single-click CustomEditor was not a native preview tab");
   await click(file.x,file.y,2);await sleep(250);
+  const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
+  if(stillPreview)throw Error("Double-click did not pin native preview tab");
   const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
   console.log('STUDIO_WORKBENCH_CHROMIUM',JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
   return {views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs};

@@ -34,7 +34,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
     ViewColumn:{Beside:2},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
-    commands:{registerCommand(name,cb){commands.set(name,cb);return disposable();}},
+    commands:{executeCommand:async()=>{},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
     workspace:{textDocuments:[doc],
       findFiles:async()=>['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md'].map(p=>uri('/workspace/establish-pdu-session/'+p)),
       fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8'))},

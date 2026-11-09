@@ -12,7 +12,9 @@
           "files.enableTrash": false,
           "security.workspace.trust.enabled": false,
           "workbench.colorTheme": "SKILL Studio Light",
-          "workbench.iconTheme": "skill-studio-file-icons"
+          "workbench.iconTheme": "skill-studio-file-icons",
+          "workbench.list.openMode": "singleClick",
+          "editor.enablePreview": true
         },
         "warnOnPotentiallyInsecureHostPattern": false
       }
