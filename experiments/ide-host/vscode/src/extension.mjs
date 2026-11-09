@@ -121,13 +121,17 @@ export function activate(context){
             void webview.postMessage({type:"error",message:"Source 行号无效或已过期"});
             return;
           }
-          const editor=await vscode.window.showTextDocument(document,{
-            viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false
-          });
           const position=new vscode.Position(line-1,0);
+          const selection=new vscode.Range(position,position);
+          // Pass the selection as part of the document-open request as well as
+          // setting it on the returned editor. This is important for browser
+          // hosts whose editor widget is created asynchronously by showTextDocument.
+          const editor=await vscode.window.showTextDocument(document,{
+            viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false,
+            selection
+          });
           editor.selection=new vscode.Selection(position,position);
-          editor.revealRange(new vscode.Range(position,position),
-            vscode.TextEditorRevealType.InCenter);
+          editor.revealRange(selection,vscode.TextEditorRevealType.InCenter);
           return;
         }
         if(message.type!=="applyRoute")return;
