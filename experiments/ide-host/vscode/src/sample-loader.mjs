@@ -71,7 +71,8 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   const current=vscode.workspace.workspaceFolders??[];
   const existingSample=current.find(folder=>
     folder.name==="establish-pdu-session"||
-    /(?:^|\\/)establish-pdu-session$/.test(folder.uri.path));
+    folder.uri.path.endsWith("/establish-pdu-session")||
+    folder.uri.path==="establish-pdu-session");
   const parent=current[0]?.uri??storageUri;
   if(!existingSample&&!parent)
     fail("No writable workspace or extension storage URI is available");
