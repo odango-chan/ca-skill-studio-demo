@@ -17,7 +17,10 @@
     "onCommand:skillStudio.openProcedure",
     "onCustomEditor:skillStudio.procedurePreview",
     "onCommand:skillStudio.loadExample",
-    "onStartupFinished"
+    "onStartupFinished",
+    "onCommand:skillStudio.auditPackage",
+    "onCommand:skillStudio.previewMarkdown",
+    "onCommand:skillStudio.refreshInspection"
   ],
   "contributes": {
     "commands": [
@@ -28,6 +31,18 @@
       {
         "command": "skillStudio.loadExample",
         "title": "SKILL Studio: Load Example Package (browser workspace)"
+      },
+      {
+        "command": "skillStudio.auditPackage",
+        "title": "SKILL Studio: Audit Current Package"
+      },
+      {
+        "command": "skillStudio.previewMarkdown",
+        "title": "SKILL Studio: Preview Markdown"
+      },
+      {
+        "command": "skillStudio.refreshInspection",
+        "title": "SKILL Studio: Refresh Inspection"
       }
     ],
     "menus": {
@@ -36,12 +51,27 @@
           "command": "skillStudio.openProcedure",
           "when": "resourceFilename == procedure.yaml",
           "group": "navigation"
+        },
+        {
+          "command": "skillStudio.previewMarkdown",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
         }
       ],
       "view/title": [
         {
           "command": "skillStudio.loadExample",
           "when": "view == workbench.explorer.fileView",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.auditPackage",
+          "when": "view == skillStudio.problems",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.refreshInspection",
+          "when": "view == skillStudio.inspection",
           "group": "navigation"
         }
       ]
@@ -55,7 +85,7 @@
             "filenamePattern": "**/assurance/procedure.yaml"
           }
         ],
-        "priority": "option"
+        "priority": "default"
       }
     ],
     "viewsWelcome": [
@@ -63,7 +93,36 @@
         "view": "workbench.explorer.fileView",
         "contents": "**欢迎使用 SKILL Studio**\\n\\n还没有打开项目？可以先载入内置演示项目，体验 SKILL 文件树、YAML / Python 编辑，以及 Procedure 可视化。\\n\\n[载入演示 SKILL 项目](command:skillStudio.loadExample)\\n\\n演示项目会复制到浏览器工作区，不会覆盖已有文件。"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "skillStudio",
+          "title": "Skill Studio",
+          "icon": "icons/skill-studio.svg"
+        }
+      ]
+    },
+    "views": {
+      "skillStudio": [
+        {
+          "id": "skillStudio.inspection",
+          "name": "Inspection / Inspector"
+        },
+        {
+          "id": "skillStudio.outline",
+          "name": "Outline"
+        },
+        {
+          "id": "skillStudio.evidence",
+          "name": "Evidence"
+        },
+        {
+          "id": "skillStudio.problems",
+          "name": "Problems"
+        }
+      ]
+    }
   },
   "scripts": {
     "build": "node ../scripts/build-ide-spike.mjs",
@@ -73,7 +132,8 @@
     "dist/**",
     "media/**",
     "README.md",
-    "samples/**"
+    "samples/**",
+    "icons/**"
   ],
   "browser": "./dist/extension-web.cjs",
   "repository": {

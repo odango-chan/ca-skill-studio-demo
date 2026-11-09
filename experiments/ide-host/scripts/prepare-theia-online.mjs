@@ -18,6 +18,7 @@ const prepared={...manifest,browser:"./dist/extension-theia.js"};
 await writeFile(join(target,"package.json"),JSON.stringify(prepared,null,2)+"\n");
 await cp(join(ext,"dist"),join(target,"dist"),{recursive:true});
 await cp(join(ext,"media"),join(target,"media"),{recursive:true});
+await cp(join(ext,"icons"),join(target,"icons"),{recursive:true});
 await cp(join(ext,"samples"),join(target,"samples"),{recursive:true});
 console.log("STUDIO_THEIA_PREPARED_WEB_EXTENSION",JSON.stringify({
   app,target,name:manifest.name,browser:prepared.browser,

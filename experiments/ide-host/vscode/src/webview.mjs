@@ -18,6 +18,9 @@ const vscode=acquireVsCodeApi();
 const $=id=>document.getElementById(id);
 let state={text:"",version:0,procedures:null,procedureId:null,graph:null,
   selection:null,pending:null,pendingKind:null,routeProposal:null,nodeFocusId:null},epoch=0,focusTicket=0;
+const layouts=new Map();
+let projectionMs=0;
+function publishSelection(){vscode.postMessage({type:"selection",version:state.version,procedureId:state.procedureId,nodeId:state.selection?.kind==="node"?state.selection.id:null});}
 const status=text=>{$("message").textContent=text;};
 const canvas=mountProcedureCanvas($("reactFlowRoot"),{
   onNodeSelect(id){
@@ -74,6 +77,7 @@ const nodeFocusCanvas=mountNodeFocusCanvas($("nodeFocusFlow"),{
   }
 });
 function repaint(){
+  publishSelection();
   if(state.graph&&!state.nodeFocusId){
     const selected=state.selection?.kind==="node"?state.selection.id:null;
     const options=selected&&!state.routeProposal
@@ -117,6 +121,7 @@ function openNodeFocus(id){
   const ticket=++focusTicket;
   state.nodeFocusId=id;
   state.selection={kind:"node",id};
+  publishSelection();
   state.pending=null;state.pendingKind=null;state.routeProposal=null;
   $("reactFlowRoot").hidden=true;
   $("nodeFocus").hidden=false;
@@ -288,9 +293,15 @@ async function showProcedure(id){
   $("patch").hidden=true;
   status("ELK 正在布局 "+id+"（不修改 YAML）…");
   try{
-    const graph=await layoutProcedureELK(procedure,{direction:"DOWN"});
+    const started=performance.now();
+    const key=state.version+":"+id;
+    const cacheHit=layouts.has(key);
+    const graph=cacheHit?layouts.get(key):await layoutProcedureELK(procedure,{direction:"DOWN"});
     if(ticket!==epoch)return;
+    if(layouts.size>=32)layouts.delete(layouts.keys().next().value);
+    layouts.set(key,graph);
     state.graph=graph;repaint();renderRoutes();canvas.fit();
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ticket===epoch)vscode.postMessage({type:"rendered",version:state.version,projectionMs,layoutMs:performance.now()-started,cacheHit});}));
     status(id+" · "+procedure.nodes.length+" Nodes / "+procedure.routes.length+
       " Outcomes / "+graph.bundles.length+" Bundles · YAML Source 由 IDE 管理");
   }catch(error){
@@ -301,13 +312,17 @@ async function showProcedure(id){
 function receiveSnapshot(data){
   if(typeof data.text!=="string"||data.text.length>1024*1024||
      !Number.isSafeInteger(data.version))return;
+  if(data.version===state.version&&data.text===state.text)return;
+  layouts.clear();
   ++epoch;
   clearNodeFocus();
   state={...state,text:data.text,version:data.version,graph:null,selection:null,
     pending:null,pendingKind:null,routeProposal:null};
   $("revision").textContent="TextDocument v"+data.version;
   $("patch").hidden=true;
+  const started=performance.now();
   const model=projectWorkspace(data.text);
+  projectionMs=performance.now()-started;
   if(model.state!=="READY"){
     state.procedures=null;
     canvas.render(null,null,null,false);
@@ -397,7 +412,10 @@ $("commit").addEventListener("click",()=>{
 window.addEventListener("message",event=>{
   const data=event.data;
   if(!data||typeof data!=="object")return;
-  if(data.type==="snapshot")receiveSnapshot(data);
+  if(data.type==="focusNode"&&data.version===state.version&&state.procedures?.has(data.procedureId)){
+    void showProcedure(data.procedureId).then(()=>openNodeFocus(data.nodeId));
+  }
+  else if(data.type==="snapshot")receiveSnapshot(data);
   else if(data.type==="error")status("操作失败："+data.message);
   else if(data.type==="applied")status("WorkspaceEdit 已应用；IDE 负责撤销、保存和文件事件");
 });

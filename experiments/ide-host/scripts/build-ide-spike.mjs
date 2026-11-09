@@ -55,6 +55,7 @@ await appendFile(theiaWorkerEntry,
 await build({
   entryPoints:[join(root,"src/webview.mjs")],
   outfile:join(root,"media/procedure.js"),
+  minify:true,
   bundle:true,format:"iife",platform:"browser",target:"es2022",
   loader:{".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file"},
   assetNames:"assets/[name]-[hash]",logLevel:"info"

@@ -43,6 +43,11 @@
 
 ## Current scope matrix
 
+| Scope | Implementation | Acceptance | Tracking |
+|---|---|---|---|
+| Theia 工作台第一阶段：默认打开、原生只读 Inspection/Outline/Evidence/Problems、Package Audit、Markdown Preview、布局缓存与计时 | IMPLEMENTED | NOT_RUN（exact-head Chromium / Pages 待执行） | [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)、[范围与缺口](architecture/theia-workbench.md) |
+
+
 | Scope | Design | Implementation | Acceptance | Tracking / evidence |
 |---|---|---|---|---|
 | D1 视觉 START 起点 / Outcome 连线配色 / 浮动图例 | ACCEPTED | IMPLEMENTED（#62 MERGED） | [PR CI #41997113612 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997113612)、[resulting-main Pages #41997707337 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41997707337)；目视反馈追踪 #65 | [#61](https://github.com/odango-chan/ca-skill-studio-demo/issues/61)、[Workbench](design/authoring-workbench.md) |

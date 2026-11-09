@@ -28,11 +28,15 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   class Position{constructor(line,character){this.line=line;this.character=character;}}
   class Selection{constructor(anchor,active){this.anchor=anchor;this.active=active;}}
   const fake={
+    EventEmitter:class {event=()=>({dispose(){}});fire(){}dispose(){}},
+    languages:{createDiagnosticCollection:()=>({dispose(){},clear(){},set(){}})},
+    TreeItem:class {},TreeItemCollapsibleState:{None:0,Collapsed:1},
     ViewColumn:{Beside:2},
     Uri:{joinPath(base,...parts){return {path:base.path+"/"+parts.join("/")};}},
     Range,Position,Selection,WorkspaceEdit,
     TextEditorRevealType:{InCenter:1},
     workspace:{
+      textDocuments:[document],
       onDidChangeTextDocument(cb){listeners.add(cb);return {dispose(){listeners.delete(cb);}};},
       async applyEdit(edit){
         const {file,range,value}=edit.change;
@@ -48,6 +52,8 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       asRelativePath:file=>file.path
     },
     window:{
+      registerTreeDataProvider:()=>({dispose(){}}),
+      onDidChangeActiveTextEditor:()=>({dispose(){}}),
       activeTextEditor:{document},
       registerCustomEditorProvider(_name,p){provider=p;return{dispose(){}};},
       showWarningMessage:()=>{},
@@ -82,7 +88,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     postMessage:async data=>{posted.push(data);return true;},
     onDidReceiveMessage:cb=>{onMessage=cb;return{dispose(){}};}
   };
-  const panel={webview,onDidDispose:()=>({dispose(){}})};
+  const panel={webview,onDidChangeViewState:()=>({dispose(){}}),onDidDispose:()=>({dispose(){}})};
   await provider.resolveCustomTextEditor(document,panel);
   assert.match(webview.html,/Content-Security-Policy/);
   assert.match(webview.html,/procedure\.js/);

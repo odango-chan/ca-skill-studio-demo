@@ -1,0 +1,67 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {inspectionSnapshot} from '../vscode/src/inspection.mjs';
+import {registerWorkbench} from '../vscode/src/workbench.mjs';
+const root='site/samples/packages/establish-pdu-session/';
+const source=readFileSync(root+'assurance/procedure.yaml','utf8');
+test('Inspection preserves Classic node/phase/route source identity; unknown syntax fails closed',()=>{
+  const result=inspectionSnapshot(source,{procedureId:'establish-session',nodeId:'nudm-sdm-subscribe'});
+  assert.equal(result.model.state,'READY');
+  assert.equal(result.outline.length,5);
+  const proc=[...result.model.procedures.values()].find(p=>p.nodes.some(n=>n.id==='nudm-sdm-subscribe'));
+  const selected=inspectionSnapshot(source,{procedureId:proc.name,nodeId:'nudm-sdm-subscribe'});
+  assert.ok(selected.inspection.some(x=>x.label==='preconditions'&&x.children.length===5));
+  assert.ok(selected.evidence.some(x=>x.label.includes('Runtime NOT_RUN')));
+  assert.ok(selected.inspection.every(x=>x.line>0));
+  const invalid=inspectionSnapshot('procedures: [invalid]');
+  assert.equal(invalid.model.state,'UNAVAILABLE');assert.equal(invalid.outline.length,0);assert.ok(invalid.problems.length);
+});
+
+test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
+  const commands=new Map(),providers=new Map(),changes=[],panels=[],diagnosticSets=[];
+  const disposable=()=>({dispose(){}});
+  function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
+  const file=uri('/workspace/establish-pdu-session/assurance/procedure.yaml');
+  const doc={uri:file,version:1,text:source,getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
+  let changed;
+  const vscode={
+    EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
+    TreeItem:class {constructor(label,state){this.label=label;this.collapsibleState=state;}},
+    TreeItemCollapsibleState:{None:0,Collapsed:1},
+    Range:class {constructor(...args){this.args=args;}},
+    Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
+    RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
+    ViewColumn:{Beside:2},
+    languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
+    commands:{registerCommand(name,cb){commands.set(name,cb);return disposable();}},
+    workspace:{textDocuments:[doc],
+      findFiles:async()=>['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md'].map(p=>uri('/workspace/establish-pdu-session/'+p)),
+      fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8'))},
+      onDidChangeTextDocument(cb){changed=cb;return disposable();},openTextDocument:async()=>doc},
+    window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
+      onDidChangeActiveTextEditor:()=>disposable(),showTextDocument:async()=>{},
+      createWebviewPanel(){const p={webview:{html:''},onDidDispose:()=>disposable()};panels.push(p);return p;}}
+  };
+  const context={subscriptions:[]},workbench=registerWorkbench(vscode,context),posted=[];
+  workbench.attach(doc,m=>posted.push(m));
+  assert.equal(providers.size,4);
+  const outline=providers.get('skillStudio.outline');
+  const node=outline.getChildren()[0].children[0];
+  const item=outline.getTreeItem(node);
+  await commands.get(item.command.command)(...item.command.arguments);
+  assert.equal(posted.at(-1).type,'focusNode');
+  doc.version++;doc.text='procedures: [broken]';changed({document:doc});
+  await commands.get(item.command.command)(...item.command.arguments);
+  assert.equal(posted.length,1,'stale tree command cannot navigate');
+  assert.equal(outline.getChildren().length,0);
+  assert.ok(providers.get('skillStudio.problems').getChildren().length);
+  doc.version++;doc.text=source;changed({document:doc});
+  await commands.get('skillStudio.auditPackage')();
+  assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
+  await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));
+  assert.match(panels[0].webview.html,/Content-Security-Policy/);
+  assert.doesNotMatch(panels[0].webview.html,/<script/i);
+  for(const sub of context.subscriptions)sub.dispose();
+  assert.ok(changes.length>3);
+});

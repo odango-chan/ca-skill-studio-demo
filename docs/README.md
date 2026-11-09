@@ -39,3 +39,5 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | 文档治理 | [DOCUMENTATION](DOCUMENTATION.md) |
 
 早期 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1) 的架构、[PR #2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2) 的 Python POC、[PR #3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3) 的浏览器草稿仍未合并。可作为引用材料，但不直接合并其旧实现。
+
+- [Theia 工作台与 Classic 对照](architecture/theia-workbench.md) — 原生视图、共享逻辑、性能测量及保留缺口。

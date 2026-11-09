@@ -1,3 +1,4 @@
+import {runWorkbenchAcceptance} from "./workbench-browser-acceptance.mjs";
 // Real Chromium smoke for both Theia browser-only static preview and the
 // normal backend-backed browser host. Static mode uses an explicitly isolated
 // same-origin demo-only webview adapter; backend mode uses Theia's normal host.
@@ -96,6 +97,7 @@ try{
   await command("Emulation.setDeviceMetricsOverride",{
     width:1440,height:1000,deviceScaleFactor:1,mobile:false
   });
+  const navigatedAt=performance.now();
   await command("Page.navigate",{url});
   let view=null;
   for(let i=0;i<250;i++){
@@ -140,6 +142,7 @@ try{
        view.brand.nativeMenus.includes("Edit"))break;
     await sleep(150);
   }
+  const shellReadyMs=performance.now()-navigatedAt;
   const warningDismissed=await evalJS(`(()=>{
     const candidates=[...document.querySelectorAll('button,[role="button"]')];
     const ok=candidates.find(x=>x.innerText.trim()==="OK");
@@ -1012,9 +1015,10 @@ try{
       patchEvidence={preview:previewEvidence,applied:null};
     }
   }
+  const workbenchEvidence=await runWorkbenchAcceptance({command,evalJS,sleep,requireEditor});
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
-  const evidence={view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
+  const evidence={shellReadyMs,workbenchEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
     frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrames,webviewFrame,webviewView,webviewFrameError,patchEvidence,
     extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500),
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
