@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import {readFileSync,statSync} from "node:fs";
 import {projectWorkspace} from "../../../site/workspace.mjs";
 import {routeTargetChoices,previewTargetPatch} from "../vscode/src/route-target.mjs";
-import {validateRouteProposal,isProcedurePath} from "../vscode/src/bridge.mjs";
+import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
+  from "../../../site/route-connect.mjs";
+import {validateRouteProposal,validateCanvasRouteCreationProposal,isProcedurePath}
+  from "../vscode/src/bridge.mjs";
 
 const text=readFileSync("site/samples/packages/establish-pdu-session/assurance/procedure.yaml","utf8");
 const model=projectWorkspace(text);
@@ -62,6 +65,67 @@ test("Host rejects stale versions, wrong base, substituted candidate and forged 
   reject({...proposal,newTarget:"not_in_procedure"});
   reject({...proposal,type:"overwriteFile"});
   assert.throws(()=>validateRouteProposal(text+"\n",17,proposal));
+});
+const ensureSource=readFileSync(
+  "site/samples/packages/ensure-pdu-session/assurance/procedure.yaml","utf8");
+function removeOutcome(source,procedureId,nodeId,outcome){
+  const p=projectWorkspace(source).procedures.get(procedureId);
+  const route=p?.routes.find(r=>r.id===nodeId+":"+outcome&&r.routeSource==="operator.on");
+  assert.ok(route,"fixture must contain the exact existing Route");
+  const lineStart=source.lastIndexOf("\n",route.sourceSpan.start-1)+1;
+  const lineEnd=source.indexOf("\n",route.sourceSpan.end);
+  assert.ok(lineEnd>=0);
+  return source.slice(0,lineStart)+source.slice(lineEnd+1);
+}
+test("D3-A3 host revalidates a dedicated canvas Route proposal and inserts one exact line",()=>{
+  const source=removeOutcome(ensureSource,"ensure-session","observe-target-session","UNKNOWN");
+  assert.equal(projectWorkspace(source).state,"READY");
+  const intent=proposeCanvasRouteConnection({
+    source,procedureId:"ensure-session",sourceId:"observe-target-session",
+    targetId:"unresolved",sourceHandle:"new-route-out",targetHandle:"in"
+  });
+  const preview=previewCanvasRouteConnection(source,intent,"UNKNOWN");
+  const proposal={
+    type:"applyRouteCreation",expectedVersion:18,baseSource:source,
+    candidateSource:preview.candidateSource,diff:preview.diff,
+    procedureId:"ensure-session",sourceId:"observe-target-session",
+    targetId:"unresolved",sourceHandle:"new-route-out",targetHandle:"in",
+    outcome:"UNKNOWN"
+  };
+  const edit=validateCanvasRouteCreationProposal(source,18,proposal);
+  assert.equal(edit.start,preview.sourceSpan.start);
+  assert.equal(edit.end,edit.start,"Route creation is a zero-length source insertion");
+  assert.ok(edit.newText.includes("UNKNOWN: unresolved"));
+  assert.equal(source.slice(0,edit.start)+edit.newText+source.slice(edit.end),
+    preview.candidateSource);
+  assert.equal(projectWorkspace(edit.candidateSource).state,"READY");
+  assert.equal(projectWorkspace(edit.candidateSource).procedures
+    .get("ensure-session").routes.some(r=>
+      r.id==="observe-target-session:UNKNOWN"&&r.target==="unresolved"),true);
+});
+test("D3-A3 host rejects stale, forged, unsupported-handle and unobserved Route proposals",()=>{
+  const source=removeOutcome(ensureSource,"ensure-session","observe-target-session","UNKNOWN");
+  const intent=proposeCanvasRouteConnection({
+    source,procedureId:"ensure-session",sourceId:"observe-target-session",
+    targetId:"unresolved",sourceHandle:"new-route-out",targetHandle:"in"
+  });
+  const preview=previewCanvasRouteConnection(source,intent,"UNKNOWN");
+  const proposal={
+    type:"applyRouteCreation",expectedVersion:18,baseSource:source,
+    candidateSource:preview.candidateSource,diff:preview.diff,
+    procedureId:"ensure-session",sourceId:"observe-target-session",
+    targetId:"unresolved",sourceHandle:"new-route-out",targetHandle:"in",
+    outcome:"UNKNOWN"
+  };
+  const reject=value=>assert.throws(()=>validateCanvasRouteCreationProposal(source,18,value));
+  reject({...proposal,expectedVersion:17});
+  reject({...proposal,baseSource:source+"\n"});
+  reject({...proposal,candidateSource:proposal.candidateSource+"\n"});
+  reject({...proposal,sourceHandle:"edge-0-out"});
+  reject({...proposal,targetId:"missing-node"});
+  reject({...proposal,outcome:"INVENTED"});
+  reject({...proposal,type:"applyRoute"});
+  assert.throws(()=>validateCanvasRouteCreationProposal(source+"\n",18,proposal));
 });
 test("Build emits a bundled Node extension and a local script/style Webview",()=>{
   for(const path of ["experiments/ide-host/vscode/dist/extension.cjs",

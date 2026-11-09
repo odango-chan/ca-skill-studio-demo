@@ -8,7 +8,8 @@ function newNonce(){
   globalThis.crypto.getRandomValues(bytes);
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
-import {isProcedurePath,validateRouteProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
+import {isProcedurePath,validateRouteProposal,
+  validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
 import {seedExampleWorkspace} from "./sample-loader.mjs";
 
 const VIEW="skillStudio.procedurePreview";
@@ -85,10 +86,18 @@ export function activate(context){
             </section>
           </div>
           <div id="patch" class="spike-patch" hidden>
-            <strong>现有 Route 的 Source-backed Patch 预览</strong>
-            <label>Route <select id="routeList"></select></label>
-            <label>新目标 <select id="targetList"></select></label>
-            <button id="preview">生成 Diff</button>
+            <strong>Source-backed Route Patch · 预览后显式确认</strong>
+            <div id="existingRouteEditor" class="spike-route-editor">
+              <label>现有 Route <select id="routeList"></select></label>
+              <label>新目标 <select id="targetList"></select></label>
+              <button id="preview">预览目标变更</button>
+            </div>
+            <div id="newRouteEditor" class="spike-route-editor spike-route-create" hidden>
+              <span id="newRouteSummary"></span>
+              <label>Outcome <select id="newRouteOutcome"></select></label>
+              <button id="newRoutePreview" disabled>预览新增 Route</button>
+              <button id="newRouteCancel">放弃提案</button>
+            </div>
             <pre id="diff"></pre>
             <button id="commit" disabled>确认并修改当前文档</button>
           </div>
@@ -134,15 +143,20 @@ export function activate(context){
           editor.revealRange(selection,vscode.TextEditorRevealType.InCenter);
           return;
         }
-        if(message.type!=="applyRoute")return;
+        if(message.type!=="applyRoute"&&message.type!=="applyRouteCreation")return;
         try{
           const source=document.getText();
-          const edit=validateRouteProposal(source,document.version,message);
-          // A single scalar replacement: native TextDocument owns undo/redo,
-          // save, backup and external file changes. No second editor buffer.
+          const creating=message.type==="applyRouteCreation";
+          const edit=creating
+            ?validateCanvasRouteCreationProposal(source,document.version,message)
+            :validateRouteProposal(source,document.version,message);
+          // Native TextDocument remains the only write owner. Existing Route
+          // edits replace one scalar; new Route creation inserts one exact
+          // source line at a zero-length CST span. Both use native Undo/Save.
           const patch=new vscode.WorkspaceEdit();
           patch.replace(document.uri,new vscode.Range(
-            document.positionAt(edit.start),document.positionAt(edit.end)),edit.newTarget);
+            document.positionAt(edit.start),document.positionAt(edit.end)),
+            creating?edit.newText:edit.newTarget);
           const applied=await vscode.workspace.applyEdit(patch);
           if(!applied)throw Error("Host rejected WorkspaceEdit");
           void webview.postMessage({type:"applied",routeId:edit.routeId});

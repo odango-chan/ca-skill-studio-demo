@@ -91,6 +91,11 @@ try{
   await command("Page.enable");
   await command("Runtime.enable");
   await command("Network.enable");
+  // Use a realistic desktop workbench viewport; the default headless size can
+  // collapse Theia's editor groups and make native Source interactions invalid.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1440,height:1000,deviceScaleFactor:1,mobile:false
+  });
   await command("Page.navigate",{url});
   let view=null;
   for(let i=0;i<250;i++){
@@ -109,17 +114,17 @@ try{
       brand:(()=>{
         const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
         const bar=brand?.parentElement;
-        const content=bar&&Array.from(bar.children).find(child=>
+        const menuContent=bar&&Array.from(bar.children).find(child=>
           child.classList.contains("lm-MenuBar-content")
         );
         const a=brand?.getBoundingClientRect();
-        const b=content?.getBoundingClientRect();
-        const nativeMenus=content?(content.textContent||"").replace(/\s+/g," ").trim():"";
+        const b=menuContent?.getBoundingClientRect();
+        const nativeMenus=menuContent?(menuContent.textContent||"").replace(/\\s+/g," ").trim():"";
         return {
           present:Boolean(brand),
           label:brand?.querySelector(".skill-studio-brand-label")?.textContent.trim()||"",
           stylesheet:Boolean(document.querySelector("#skill-studio-brand-theme")?.sheet),
-          beforeNativeMenus:Boolean(brand&&content&&brand.nextElementSibling===content),
+          beforeNativeMenus:Boolean(brand&&menuContent&&brand.nextElementSibling===menuContent),
           sameRow:Boolean(a&&b)&&Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2)<3,
           nativeMenus
         };
@@ -135,30 +140,6 @@ try{
        view.brand.nativeMenus.includes("Edit"))break;
     await sleep(150);
   }
-  if(!view?.brand?.present||!view.brand.stylesheet||
-     !view.brand.beforeNativeMenus||!view.brand.sameRow||
-     view.brand.label!=="SKILL Studio"||
-     !view.brand.nativeMenus.includes("File")||
-     !view.brand.nativeMenus.includes("Edit"))
-    throw Error("SKILL Studio brand must share the native File/Edit menu row: "+
-      JSON.stringify(view?.brand));
-  await command("Emulation.setDeviceMetricsOverride",{
-    width:640,height:900,deviceScaleFactor:1,mobile:false
-  });
-  const narrowBrand=await evalJS(`(()=>{
-    const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
-    const label=brand?.querySelector(".skill-studio-brand-label");
-    const mark=brand?.querySelector(".skill-studio-brand-mark");
-    return {
-      present:Boolean(brand),
-      labelDisplay:label?getComputedStyle(label).display:"missing",
-      markVisible:Boolean(mark)&&getComputedStyle(mark).display!=="none"&&mark.getBoundingClientRect().width>0
-    };
-  })()`);
-  await command("Emulation.clearDeviceMetricsOverride");
-  if(!narrowBrand.present||narrowBrand.labelDisplay!=="none"||!narrowBrand.markVisible)
-    throw Error("SKILL Studio brand did not compact cleanly on narrow screens: "+
-      JSON.stringify(narrowBrand));
   const warningDismissed=await evalJS(`(()=>{
     const candidates=[...document.querySelectorAll('button,[role="button"]')];
     const ok=candidates.find(x=>x.innerText.trim()==="OK");
@@ -331,9 +312,10 @@ try{
       expression:`(()=>{
         const routes=document.querySelector("#routeList");
         const targets=document.querySelector("#targetList");
-        if(!routes||!targets||routes.options.length<1)
+        if(!routes||!targets||routes.options.length<2)
           return {ready:false,reason:"No source-qualified Route choices",routeOptions:routes?.options.length??0};
-        routes.selectedIndex=0;
+        // Index 0 is the explicit "choose a Route" placeholder.
+        routes.selectedIndex=1;
         routes.dispatchEvent(new Event("change",{bubbles:true}));
         if(targets.options.length<1)
           return {ready:false,reason:"No qualified target choices",routeOptions:routes.options.length};
@@ -476,6 +458,556 @@ try{
         sourceJumpView,
         returned:focusReturn.result?.value??null
       };
+
+      const routeOriginalMode=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const select=document.querySelector("#procedureList");
+          if(!select)return {ready:false,reason:"Procedure selector missing"};
+          select.value="await-initial-n4-session-establishment";
+          select.dispatchEvent(new Event("change",{bubbles:true}));
+          return {ready:true,value:select.value};
+        })()`
+      });
+      await sleep(1500);
+      const routeOriginalView=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent||"",
+          procedure:document.querySelector("#procedureList")?.value||"",
+          graphNodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length,
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
+        })`
+      });
+      if(!routeOriginalMode.result?.value?.ready||
+         routeOriginalView.result?.value?.procedure!=="await-initial-n4-session-establishment"||
+         !(routeOriginalView.result?.value?.graphEdges>0))
+        throw Error("The original Route fixture Procedure did not render: "+
+          JSON.stringify({mode:routeOriginalMode.result?.value,view:routeOriginalView.result?.value}));
+      // Prepare a real browser fixture through the native Theia text editor.
+      // Monaco's AMD module is not exposed as window.monaco in Theia, so this
+      // deliberately uses the public editor UI and keyboard instead of
+      // reaching into private editor models.
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#openSource")?.click(); true`
+      });
+      await sleep(700);
+      const editorTarget=await evalJS(`(()=> {
+        const editors=[...document.querySelectorAll(".monaco-editor")];
+        const candidates=editors.map((editor,index)=>{
+          const root=editor.getBoundingClientRect();
+          // Monaco's view-lines rectangle spans the whole document. The
+          // scrollable element is the actual clipped editor viewport.
+          const viewport=editor.querySelector(".monaco-scrollable-element")??editor;
+          const rect=viewport.getBoundingClientRect();
+          const lines=editor.querySelector(".view-lines");
+          const text=(lines?.innerText??"").replace(/\u00a0/g," ");
+          const visible=rect.width>30&&rect.height>100&&
+            rect.bottom>0&&rect.top<window.innerHeight&&
+            rect.right>0&&rect.left<window.innerWidth;
+          // The active Source editor initially shows the first Procedure;
+          // Go to Line below moves it to the isolated N4 fixture.
+          const hasFixture=text.includes("FAILED: failed")&&
+            text.includes("DENIED: failed");
+          return {index,visible,hasFixture,
+            rect:{x:rect.left,y:rect.top,width:rect.width,height:rect.height},
+            rootRect:{x:root.left,y:root.top,width:root.width,height:root.height},
+            text:text.slice(0,700)};
+        });
+        const chosen=candidates.find(item=>item.visible&&item.hasFixture);
+        return {ready:Boolean(chosen),editorCount:editors.length,chosen,candidates,
+          viewport:{width:window.innerWidth,height:window.innerHeight}};
+      })()`);
+      if(!editorTarget?.ready)
+        throw Error("Native Theia Source editor viewport not found: "+JSON.stringify(editorTarget));
+      const key=async(key,code,modifiers=0,virtualKeyCode)=>{
+        await command("Input.dispatchKeyEvent",{
+          type:"keyDown",key,code,modifiers,
+          windowsVirtualKeyCode:virtualKeyCode,nativeVirtualKeyCode:virtualKeyCode
+        });
+        await command("Input.dispatchKeyEvent",{
+          type:"keyUp",key,code,modifiers,
+          windowsVirtualKeyCode:virtualKeyCode,nativeVirtualKeyCode:virtualKeyCode
+        });
+      };
+      const clickX=editorTarget.chosen.rect.x+Math.min(90,editorTarget.chosen.rect.width/2);
+      const clickY=editorTarget.chosen.rect.y+Math.min(24,editorTarget.chosen.rect.height/2);
+      await command("Input.dispatchMouseEvent",{
+        type:"mousePressed",x:clickX,y:clickY,button:"left",clickCount:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:clickX,y:clickY,button:"left",clickCount:1
+      });
+      // Go to the known DENIED Route in await-initial-n4-session-establishment.
+      // This uses the native editor's public keyboard UI, not Monaco internals.
+      await key("g","KeyG",2,71);
+      await sleep(150);
+      const gotoState=await evalJS(`({
+        activeTag:document.activeElement?.tagName??"",
+        activeClass:document.activeElement?.className??"",
+        activeValue:document.activeElement?.value??"",
+        ariaLabel:document.activeElement?.getAttribute("aria-label")??"",
+        visibleWidgets:[...document.querySelectorAll(".monaco-editor .zone-widget,.quick-input-widget,.quick-input-box,.goto-line-widget")]
+          .map(item=>({className:item.className,text:item.innerText?.slice(0,120)}))
+      })`);
+      await command("Input.insertText",{text:"637"});
+      await sleep(100);
+      const gotoTyped=await evalJS(`({
+        activeValue:document.activeElement?.value??"",
+        ariaLabel:document.activeElement?.getAttribute("aria-label")??""
+      })`);
+      if(!String(gotoTyped.activeValue??"").includes("637"))
+        throw Error("Native editor Go to Line did not receive line 637: "+
+          JSON.stringify({gotoState,gotoTyped}));
+      await key("Enter","Enter",0,13);
+      await sleep(200);
+      const gotoLineView=await evalJS(`(()=> {
+        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
+        const lines=editor?.querySelector(".view-lines");
+        return {text:(lines?.innerText??"").replace(/\u00a0/g," "),editorVisible:Boolean(editor)};
+      })()`);
+      if(!gotoLineView.editorVisible||
+         !gotoLineView.text.includes("FAILED: unresolved")||
+         !gotoLineView.text.includes("UNKNOWN: unresolved")||
+         !gotoLineView.text.includes("DENIED: failed"))
+        throw Error("Go to Line did not land on the intended Route fixture: "+
+          JSON.stringify({gotoState,gotoTyped,gotoLineView}).slice(0,2200));
+      // Home twice is Monaco's stable route to column zero (first
+      // non-whitespace, then physical line start); replace the whole line.
+      await key("Home","Home",0,36);
+      await key("Home","Home",0,36);
+      await key("End","End",8,35);
+      // Remove this one existing Route so DENIED becomes an observed,
+      // currently-unmapped Outcome eligible for the create-Route proposal.
+      await key("Backspace","Backspace",0,8);
+      await sleep(1500);
+      const routeFixtureView=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent||"",
+          procedure:document.querySelector("#procedureList")?.value||"",
+          graphNodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length,
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
+        })`
+      });
+      const routeFixtureEditor=await evalJS(`(()=> {
+        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
+        return {
+          editorCount:document.querySelectorAll(".monaco-editor").length,
+          activeTag:document.activeElement?.tagName??"",
+          activeClass:document.activeElement?.className??"",
+          visibleText:[...(editor?.querySelectorAll(".view-line")??[])]
+            .map(line=>line.innerText.replace(/\u00a0/g," ")).join("\\n").slice(0,1800)
+        };
+      })()`);
+      const routeFixture={
+        ready:routeFixtureEditor.editorCount>0&&
+          /TextDocument v\d+/.test(routeFixtureView.result?.value?.revision??"")&&
+          routeFixtureView.result?.value?.procedure==="await-initial-n4-session-establishment"&&
+          routeFixtureView.result?.value?.graphEdges===routeOriginalView.result?.value?.graphEdges-1&&
+          routeFixtureEditor.visibleText.includes("UNKNOWN: unresolved")&&
+          !routeFixtureEditor.visibleText.includes("DENIED: failed"),
+        editor:editorTarget,goto:gotoState,gotoTyped,gotoLineView,
+        original:routeOriginalView.result?.value??null,
+        view:routeFixtureView.result?.value??null,after:routeFixtureEditor
+      };
+      if(!routeFixture.ready)
+        throw Error("Could not prepare the isolated Route-creation fixture using the native editor: "+
+          JSON.stringify(routeFixture).slice(0,9000));
+      const routeMode=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const select=document.querySelector("#procedureList");
+          if(!select)return {ready:false,reason:"Procedure selector missing"};
+          select.value="await-initial-n4-session-establishment";
+          select.dispatchEvent(new Event("change",{bubbles:true}));
+          return {ready:true,value:select.value};
+        })()`
+      });
+      await sleep(1500);
+      const selectRouteSource=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const node=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
+          if(!node)return {ready:false,reason:"Source Node missing"};
+          node.dispatchEvent(new MouseEvent("click",{bubbles:true}));
+          return {ready:true,nodeId:node.getAttribute("data-id")};
+        })()`
+      });
+      await sleep(350);
+      const routeGestureInfo=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const node=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
+          const targetNode=document.querySelector('#reactFlowRoot .react-flow__node[data-id="failed"]');
+          if(!node||!targetNode)return {ready:false,reason:"Source/target Node missing"};
+          const source=node.querySelector('.react-flow__handle[data-handleid="new-route-out"]');
+          const target=targetNode.querySelector('.react-flow__handle[data-handleid="in"]');
+          if(!source||!target)return {ready:false,reason:"Dedicated add-Route or target handle missing",
+            source:Boolean(source),target:Boolean(target)};
+          const center=element=>{const r=element.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};};
+          return {ready:true,source:center(source),target:center(target),
+            width:window.innerWidth,height:window.innerHeight,
+            sourceHandle:source.getAttribute("data-handleid"),targetHandle:target.getAttribute("data-handleid")};
+        })()`
+      });
+      const routeGesture=routeGestureInfo.result?.value??null;
+      if(!routeGesture?.ready)
+        throw Error("Dedicated Route handles are not rendered: "+JSON.stringify(routeGesture));
+      await command("DOM.enable");
+      const frameOwner=await command("DOM.getFrameOwner",{frameId:graphFrame.frame.id});
+      const frameBox=await command("DOM.getBoxModel",{backendNodeId:frameOwner.backendNodeId});
+      const quad=frameBox.model.content;
+      const scaleX=(quad[2]-quad[0])/routeGesture.width;
+      const scaleY=(quad[5]-quad[1])/routeGesture.height;
+      const toPage=point=>({x:quad[0]+point.x*scaleX,y:quad[1]+point.y*scaleY});
+      const fromPage=toPage(routeGesture.source),toPagePoint=toPage(routeGesture.target);
+      const midPage={x:(fromPage.x+toPagePoint.x)/2,y:(fromPage.y+toPagePoint.y)/2};
+      await command("Input.dispatchMouseEvent",{
+        type:"mousePressed",x:fromPage.x,y:fromPage.y,button:"left",buttons:1,clickCount:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseMoved",x:midPage.x,y:midPage.y,button:"left",buttons:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseMoved",x:toPagePoint.x,y:toPagePoint.y,button:"left",buttons:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:toPagePoint.x,y:toPagePoint.y,button:"left",buttons:0,clickCount:1
+      });
+      await sleep(800);
+      const routeProposal=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          visible:!document.querySelector("#newRouteEditor")?.hidden,
+          summary:document.querySelector("#newRouteSummary")?.textContent||"",
+          outcomes:[...(document.querySelector("#newRouteOutcome")?.options??[])].map(x=>x.value),
+          message:document.querySelector("#message")?.textContent||""
+        })`
+      });
+      const routeProposalValue=routeProposal.result?.value??null;
+      if(!selectRouteSource.result?.value?.ready||!routeGesture?.ready||!routeProposalValue?.visible||
+         !routeProposalValue.outcomes.includes("DENIED"))
+        throw Error("Canvas Route proposal did not expose the observed DENIED Outcome: "+
+          JSON.stringify({routeFixture,routeMode:routeMode.result?.value,
+            selectRouteSource:selectRouteSource.result?.value,
+            routeGesture,routeProposal:routeProposalValue}));
+      const routePreview=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const outcome=document.querySelector("#newRouteOutcome");
+          outcome.value="DENIED";outcome.dispatchEvent(new Event("change",{bubbles:true}));
+          document.querySelector("#newRoutePreview")?.click();
+          return {ready:!document.querySelector("#commit")?.disabled,
+            diff:document.querySelector("#diff")?.textContent||"",
+            summary:document.querySelector("#newRouteSummary")?.textContent||""};
+        })()`
+      });
+      const routePreviewValue=routePreview.result?.value??null;
+      if(!routePreviewValue?.ready||!routePreviewValue.diff.includes("+")||
+         !routePreviewValue.diff.includes("DENIED: failed"))
+        throw Error("Canvas Route Diff preview did not qualify the selected Outcome: "+
+          JSON.stringify(routePreviewValue));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#commit")?.click(); true`
+      });
+      await sleep(1800);
+      const routeApplied=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent||"",
+          message:document.querySelector("#message")?.textContent||"",
+          procedure:document.querySelector("#procedureList")?.value||"",
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length,
+          patchVisible:!document.querySelector("#patch")?.hidden
+        })`
+      });
+      const routeAppliedSource={
+        ready:/TextDocument v\d+/.test(routeApplied.result?.value?.revision??""),
+        revision:routeApplied.result?.value?.revision??"",
+        graphEdges:routeApplied.result?.value?.graphEdges??0
+      };
+      if(!routeAppliedSource.ready||
+         routeAppliedSource.graphEdges!==routeFixture.view.graphEdges+1)
+        throw Error("Host Source snapshot did not add exactly one projected Route: "+
+          JSON.stringify({fixture:routeFixture.view,applied:routeApplied.result?.value}));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#openSource")?.click(); true`
+      });
+      await sleep(700);
+      await command("Input.dispatchKeyEvent",{
+        type:"keyDown",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
+      });
+      await command("Input.dispatchKeyEvent",{
+        type:"keyUp",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
+      });
+      await sleep(1800);
+      const routeUndo=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent||"",
+          message:document.querySelector("#message")?.textContent||"",
+          procedure:document.querySelector("#procedureList")?.value||"",
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
+        })`
+      });
+      const routeUndoSource={
+        ready:/TextDocument v\d+/.test(routeUndo.result?.value?.revision??""),
+        revision:routeUndo.result?.value?.revision??"",
+        graphEdges:routeUndo.result?.value?.graphEdges??0
+      };
+
+      // Reconnect a specific member of a multi-Outcome edge bundle. Clicking
+      // the bundle must not silently pick its first Route; the Route selector
+      // is the explicit disambiguation step before the target endpoint drag.
+      const reconnectEdgeInfo=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const source=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
+          const oldTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="unresolved"]');
+          const newTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="failed"]');
+          if(!source||!oldTarget||!newTarget)return {ready:false,reason:"Reconnect Nodes missing"};
+          const pairs=[...source.querySelectorAll('.react-flow__handle[data-handleid^="edge-"][data-handleid$="-out"]')]
+            .map(handle=>{
+              const match=handle.getAttribute("data-handleid")?.match(/^edge-(\\d+)-out$/);
+              if(!match)return null;
+              const index=Number(match[1]),targetHandle=oldTarget.querySelector(
+                '.react-flow__handle[data-handleid="edge-'+index+'-in"]');
+              if(!targetHandle)return null;
+              const edge=document.querySelector('#reactFlowRoot .react-flow__edge[data-id="flow-edge-'+index+'"]');
+              const path=edge?.querySelector(".react-flow__edge-path");
+              const target=newTarget.querySelector('.react-flow__handle[data-handleid="in"]');
+              if(!path||!target)return null;
+              const point=path.ownerSVGElement.createSVGPoint();
+              const middle=path.getPointAtLength(path.getTotalLength()/2);
+              point.x=middle.x;point.y=middle.y;
+              const screenPoint=point.matrixTransform(path.getScreenCTM());
+              const oldRect=targetHandle.getBoundingClientRect();
+              const newRect=target.getBoundingClientRect();
+              return {index,edgeId:edge.getAttribute("data-id"),
+                pathPoint:{x:screenPoint.x,y:screenPoint.y},
+                oldTargetPoint:{x:oldRect.left+oldRect.width/2,y:oldRect.top+oldRect.height/2},
+                newTargetPoint:{x:newRect.left+newRect.width/2,y:newRect.top+newRect.height/2},
+                sourceHandle:handle.getAttribute("data-handleid"),
+                targetHandle:targetHandle.getAttribute("data-handleid")};
+            }).filter(Boolean);
+          return {ready:pairs.length>0,candidates:pairs,
+            width:window.innerWidth,height:window.innerHeight};
+        })()`
+      });
+      const reconnectCandidates=reconnectEdgeInfo.result?.value?.candidates??[];
+      if(!reconnectEdgeInfo.result?.value?.ready||!reconnectCandidates.length)
+        throw Error("Could not locate an existing Route bundle to unresolved: "+
+          JSON.stringify(reconnectEdgeInfo.result?.value));
+      let reconnectEdge=null,ambiguousValue=null,lastBundleValue=null;
+      for(const candidate of reconnectCandidates){
+        const edgeClick=toPage(candidate.pathPoint);
+        await command("Input.dispatchMouseEvent",{
+          type:"mousePressed",x:edgeClick.x,y:edgeClick.y,button:"left",clickCount:1
+        });
+        await command("Input.dispatchMouseEvent",{
+          type:"mouseReleased",x:edgeClick.x,y:edgeClick.y,button:"left",clickCount:1
+        });
+        await sleep(350);
+        const selectedBundle=await command("Runtime.evaluate",{
+          contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+          expression:`({
+            selectedRoute:document.querySelector("#routeList")?.value??"",
+            message:document.querySelector("#message")?.textContent??"",
+            selectedLabels:[...document.querySelectorAll(".designer-route-label.is-selected")]
+              .map(label=>({
+                routeSource:label.getAttribute("data-route-source")??"",
+                routeIds:(label.getAttribute("data-route-ids")??"").split(",").filter(Boolean)
+              }))
+          })`
+        });
+        const value=selectedBundle.result?.value??null;
+        lastBundleValue=value;
+        const exactBundle=value?.selectedLabels?.some(label=>
+          label.routeSource==="operator.on"&&
+          label.routeIds.includes("await-initial-resources:FAILED")&&
+          label.routeIds.includes("await-initial-resources:UNKNOWN")
+        );
+        if(value?.selectedRoute===""&&
+           String(value?.message??"").includes("多个 Outcome")&&exactBundle){
+          reconnectEdge=candidate;
+          ambiguousValue=value;
+          break;
+        }
+      }
+      if(!reconnectEdge||!ambiguousValue)
+        throw Error("Could not select the ambiguous operator.on Route bundle without selecting an Outcome: "+
+          JSON.stringify({candidates:reconnectCandidates,selection:lastBundleValue,
+            lastMessage:lastBundleValue?.message??""}));
+      const chooseReconnectRoute=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const select=document.querySelector("#routeList");
+          const routeId="await-initial-resources:FAILED";
+          if(!select||![...select.options].some(item=>item.value===routeId))
+            return {ready:false,reason:"Specific FAILED Route is not selectable",
+              options:[...(select?.options??[])].map(x=>({value:x.value,label:x.textContent}))};
+          select.value=routeId;select.dispatchEvent(new Event("change",{bubbles:true}));
+          const targets=document.querySelector("#targetList");
+          return {ready:true,route:select.value,targetOptions:[...(targets?.options??[])].map(x=>x.value)};
+        })()`
+      });
+      const chooseReconnectValue=chooseReconnectRoute.result?.value??null;
+      if(!chooseReconnectValue?.ready||!chooseReconnectValue.targetOptions.includes("failed"))
+        throw Error("Could not explicitly qualify the Route target change: "+JSON.stringify(chooseReconnectValue));
+      await sleep(350);
+      const updaterInfo=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const routeId="await-initial-resources:FAILED";
+          const source=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
+          const oldTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="unresolved"]');
+          const newTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="failed"]');
+          const labels=[...document.querySelectorAll(".designer-route-label.is-selected")];
+          const label=labels.find(item=>item.getAttribute("data-route-source")==="operator.on"&&
+            (item.getAttribute("data-route-ids")??"").split(",").includes(routeId));
+          const edges=[...document.querySelectorAll("#reactFlowRoot .react-flow__edge")];
+          const selectedEdges=edges.filter(item=>item.querySelector(".designer-edge.is-selected"));
+          const edge=selectedEdges.find(item=>{
+            const index=item.getAttribute("data-id")?.match(/^flow-edge-(\\d+)$/)?.[1];
+            return index&&oldTarget?.querySelector(
+              '.react-flow__handle[data-handleid="edge-'+index+'-in"]');
+          });
+          const index=Number(edge?.getAttribute("data-id")?.match(/^flow-edge-(\\d+)$/)?.[1]??-1);
+          const oldHandle=index>=0?oldTarget?.querySelector(
+            '.react-flow__handle[data-handleid="edge-'+index+'-in"]'):null;
+          const target=newTarget?.querySelector('.react-flow__handle[data-handleid="in"]');
+          const rect=element=>{const r=element.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};};
+          const updaters=[...(edge?.querySelectorAll(".react-flow__edgeupdater")??[])];
+          const oldPoint=oldHandle?rect(oldHandle):null;
+          const chosen=oldPoint?updaters.map(element=>({element,point:rect(element)}))
+            .sort((a,b)=>Math.hypot(a.point.x-oldPoint.x,a.point.y-oldPoint.y)-
+              Math.hypot(b.point.x-oldPoint.x,b.point.y-oldPoint.y))[0]:null;
+          return {ready:Boolean(label&&edge&&chosen&&target),updaterCount:updaters.length,index,
+            label:label?{source:label.getAttribute("data-route-source"),ids:label.getAttribute("data-route-ids")} :null,
+            selectedEdgeCount:selectedEdges.length,
+            updater:chosen?.point??null,target:target?rect(target):null,
+            oldPoint,updaterHtml:chosen?.element?.outerHTML??"",
+            edgeHtml:edge?.outerHTML?.slice(0,1800)??""};
+        })()`
+      });
+      const updaterValue=updaterInfo.result?.value??null;
+      if(!updaterValue?.ready)
+        throw Error("Selected edge did not expose a reconnect target handle: "+
+          JSON.stringify({ambiguous:ambiguousValue,selected:chooseReconnectValue,updater:updaterValue}));
+      const reconnectFromPage=toPage(updaterValue.updater);
+      const reconnectToPage=toPage(updaterValue.target);
+      const reconnectMidPage={x:(reconnectFromPage.x+reconnectToPage.x)/2,
+        y:(reconnectFromPage.y+reconnectToPage.y)/2};
+      await command("Input.dispatchMouseEvent",{
+        type:"mousePressed",x:reconnectFromPage.x,y:reconnectFromPage.y,
+        button:"left",buttons:1,clickCount:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseMoved",x:reconnectMidPage.x,y:reconnectMidPage.y,
+        button:"left",buttons:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseMoved",x:reconnectToPage.x,y:reconnectToPage.y,
+        button:"left",buttons:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:reconnectToPage.x,y:reconnectToPage.y,
+        button:"left",buttons:0,clickCount:1
+      });
+      await sleep(600);
+      const reconnectProposal=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          route:document.querySelector("#routeList")?.value??"",
+          target:document.querySelector("#targetList")?.value??"",
+          targets:[...(document.querySelector("#targetList")?.options??[])].map(x=>x.value),
+          previewDisabled:Boolean(document.querySelector("#preview")?.disabled),
+          message:document.querySelector("#message")?.textContent??""
+        })`
+      });
+      const reconnectProposalValue=reconnectProposal.result?.value??null;
+      if(reconnectProposalValue?.route!=="await-initial-resources:FAILED"||
+         reconnectProposalValue?.target!=="failed")
+        throw Error("Canvas reconnect did not propose the selected Route's target: "+
+          JSON.stringify({edge:reconnectEdge,updater:updaterValue,proposal:reconnectProposalValue}));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#preview")?.click(); true`
+      });
+      await sleep(250);
+      const reconnectDiff=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          ready:!document.querySelector("#commit")?.disabled,
+          diff:document.querySelector("#diff")?.textContent??""
+        })`
+      });
+      const reconnectDiffValue=reconnectDiff.result?.value??null;
+      if(!reconnectDiffValue?.ready||
+         !reconnectDiffValue.diff.includes("unresolved")||
+         !reconnectDiffValue.diff.includes("failed"))
+        throw Error("Reconnect Diff did not qualify the exact target replacement: "+JSON.stringify(reconnectDiffValue));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#commit")?.click(); true`
+      });
+      await sleep(1800);
+      const reconnectApplied=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent??"",
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length,
+          routeOption:[...(document.querySelector("#routeList")?.options??[])]
+            .find(x=>x.value==="await-initial-resources:FAILED")?.textContent??"",
+          message:document.querySelector("#message")?.textContent??""
+        })`
+      });
+      const reconnectAppliedValue=reconnectApplied.result?.value??null;
+      // Moving FAILED out of the shared operator.on -> unresolved Bundle
+      // splits that visual Bundle into two. Route count is stable; edge count
+      // correctly increases by one until native Undo restores the original Bundle.
+      if(!/TextDocument v\d+/.test(reconnectAppliedValue?.revision??"")||
+         !String(reconnectAppliedValue?.routeOption??"").includes("→ failed")||
+         reconnectAppliedValue?.graphEdges!==routeFixture.view.graphEdges+1)
+        throw Error("Native TextDocument did not apply the reconnect Patch: "+
+          JSON.stringify({fixture:routeFixture.view,applied:reconnectAppliedValue}));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#openSource")?.click(); true`
+      });
+      await sleep(500);
+      await key("z","KeyZ",2,90);
+      await sleep(1700);
+      const reconnectUndo=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent??"",
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length,
+          routeOption:[...(document.querySelector("#routeList")?.options??[])]
+            .find(x=>x.value==="await-initial-resources:FAILED")?.textContent??""
+        })`
+      });
+      const reconnectUndoValue=reconnectUndo.result?.value??null;
+      if(!/TextDocument v\d+/.test(reconnectUndoValue?.revision??"")||
+         !String(reconnectUndoValue?.routeOption??"").includes("→ unresolved")||
+         reconnectUndoValue?.graphEdges!==routeFixture.view.graphEdges)
+        throw Error("Native Undo did not restore the original Route target: "+JSON.stringify(reconnectUndoValue));
+      const routeReconnect={
+        edge:reconnectEdge,ambiguous:ambiguousValue,selected:chooseReconnectValue,
+        updater:updaterValue,proposal:reconnectProposalValue,diff:reconnectDiffValue,
+        applied:reconnectAppliedValue,undo:reconnectUndoValue
+      };
+      patchEvidence.routeCreate={
+        fixture:routeFixture,gesture:routeGesture,
+        proposal:routeProposalValue,preview:routePreviewValue,
+        applied:routeApplied.result?.value??null,appliedSource:routeAppliedSource,
+        undo:routeUndo.result?.value??null,undoSource:routeUndoSource,
+        reconnect:routeReconnect
+      };
     }else{
       patchEvidence={preview:previewEvidence,applied:null};
     }
@@ -495,6 +1027,30 @@ try{
   if(!view?.classicIcons?.loaded||view.classicIcons.mapped<1)
     throw Error("Classic icon artwork was not applied to Theia shell controls: "+
       JSON.stringify(view?.classicIcons).slice(0,1200));
+  if(!view?.brand?.present||!view.brand.stylesheet||
+     !view.brand.beforeNativeMenus||!view.brand.sameRow||
+     view.brand.label!=="SKILL Studio"||
+     !view.brand.nativeMenus.includes("File")||
+     !view.brand.nativeMenus.includes("Edit"))
+    throw Error("SKILL Studio brand must share the native File/Edit menu row: "+
+      JSON.stringify(view?.brand));
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:640,height:900,deviceScaleFactor:1,mobile:false
+  });
+  const narrowBrand=await evalJS(`(()=>{
+    const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
+    const label=brand?.querySelector(".skill-studio-brand-label");
+    const mark=brand?.querySelector(".skill-studio-brand-mark");
+    return {
+      present:Boolean(brand),
+      labelDisplay:label?getComputedStyle(label).display:"missing",
+      markVisible:Boolean(mark)&&getComputedStyle(mark).display!=="none"&&mark.getBoundingClientRect().width>0
+    };
+  })()`);
+  await command("Emulation.clearDeviceMetricsOverride");
+  if(!narrowBrand.present||narrowBrand.labelDisplay!=="none"||!narrowBrand.markVisible)
+    throw Error("SKILL Studio brand did not compact cleanly on narrow screens: "+
+      JSON.stringify(narrowBrand));
   if(!afterImport.notificationText.some(message=>message.includes("示例 SKILL 已载入浏览器工作区"))||
      !afterImport.bodyText.includes("establish-pdu-session")||
      !afterImport.bodyText.includes("procedure.yaml"))
@@ -523,11 +1079,26 @@ try{
       !patchEvidence.nodeFocus?.sourceJump?.ready||
       !(patchEvidence.nodeFocus?.sourceJumpView?.monacoEditors>0)||
       !patchEvidence.nodeFocus?.returned?.returned||
-      !patchEvidence.nodeFocus?.returned?.mainGraphVisible))
+      !patchEvidence.nodeFocus?.returned?.mainGraphVisible||
+      !patchEvidence.routeCreate?.fixture?.ready||
+      !patchEvidence.routeCreate?.gesture?.ready||
+      !patchEvidence.routeCreate?.proposal?.visible||
+      !patchEvidence.routeCreate?.preview?.ready||
+      !patchEvidence.routeCreate?.appliedSource?.ready||
+      !patchEvidence.routeCreate?.undoSource?.ready||
+      patchEvidence.routeCreate?.undoSource?.graphEdges!==
+        patchEvidence.routeCreate?.fixture?.view?.graphEdges||
+      !patchEvidence.routeCreate?.reconnect?.ambiguous||
+      !patchEvidence.routeCreate?.reconnect?.selected?.ready||
+      !patchEvidence.routeCreate?.reconnect?.updater?.ready||
+      patchEvidence.routeCreate?.reconnect?.proposal?.target!=="failed"||
+      !patchEvidence.routeCreate?.reconnect?.diff?.ready||
+      !String(patchEvidence.routeCreate?.reconnect?.applied?.routeOption??"").includes("→ failed")||
+      !String(patchEvidence.routeCreate?.reconnect?.undo?.routeOption??"").includes("→ unresolved")))
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
-      JSON.stringify(patchEvidence.nodeFocus).slice(0,3500));
+      JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{

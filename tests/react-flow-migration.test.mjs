@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {projectWorkspace} from "../site/workspace.mjs";
 import {layoutProcedureELK} from "../site/layout.mjs";
-import {makeFlowElements,resolveReconnectedRoute,FLOW_NODE_SIZE,
+import {makeFlowElements,resolveReconnectedRoute,flowBundleSelectionId,FLOW_NODE_SIZE,
   classifyRouteTone,ROUTE_TONE_COLOR,summarizeNodePhases,
   describeProcedureLegend,routeOrigin}
   from "../site/react-flow-projection.mjs";
@@ -45,6 +45,10 @@ test("routeSource and all exact Outcome ids survive React Flow projection",async
   const fromEdges=flow.edges.flatMap(e=>e.data.bundle.routes.map(r=>r.id)).sort();
   const fromSource=created.procedure.routes.map(r=>r.id).sort();
   assert.deepEqual(fromEdges,fromSource);
+  for(const edge of flow.edges){
+    assert.deepEqual(edge.data.sourceRouteIds,
+      edge.data.bundle.routes.map(route=>route.id));
+  }
   assert.ok(flow.edges.some(e=>e.data.bundle.routeSource==="postconditions.on"));
   assert.ok(flow.edges.some(e=>e.data.bundle.routeSource==="operator.on"));
 });
@@ -59,6 +63,20 @@ test("selection, labels and direction remain UI-only",async()=>{
   assert.equal(flow.edges.filter(e=>e.selected).length,1);
   assert.equal(flow.edges.find(e=>e.selected).markerEnd.color,"#087e71");
   assert.equal(JSON.stringify(ensure.procedure),source);
+});
+test("ambiguous Route bundle remains visibly selected without choosing an Outcome",async()=>{
+  const graph=await layoutProcedureELK(created.procedure);
+  const bundle=graph.bundles.find(item=>item.routes.length>1);
+  assert.ok(bundle);
+  const flow=makeFlowElements(graph,created.procedure,{
+    kind:"bundle",id:flowBundleSelectionId(bundle)
+  });
+  const selected=flow.edges.filter(edge=>edge.selected);
+  assert.equal(selected.length,1);
+  assert.equal(selected[0].data.bundle.source,bundle.source);
+  assert.equal(selected[0].data.bundle.target,bundle.target);
+  assert.equal(resolveReconnectedRoute(bundle,null),null,
+    "visual bundle selection is not a semantic Route selection");
 });
 test("multi-outcome edge cannot rewire an arbitrary Outcome without selection",async()=>{
   const graph=await layoutProcedureELK(created.procedure);

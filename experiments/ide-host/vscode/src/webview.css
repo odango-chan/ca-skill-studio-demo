@@ -24,6 +24,11 @@ button:disabled{cursor:not-allowed;opacity:.45}
   display:flex;align-items:center;flex-wrap:wrap;gap:9px;max-height:230px;overflow:auto}
 .spike-patch[hidden]{display:none}
 .spike-patch strong{font-size:11px;flex:1 0 100%}
+.spike-route-editor{display:flex;align-items:center;flex-wrap:wrap;gap:9px;min-width:0}
+.spike-route-editor[hidden]{display:none}
+.spike-route-create{flex:1 1 100%;padding:7px 9px;border:1px solid #dce7ec;
+  border-radius:7px;background:#f7fafb}
+#newRouteSummary{flex:1 1 100%;font-size:10px;color:#597184}
 .spike-patch label{display:flex;align-items:center;gap:5px;font-size:11px}
 .spike-patch #routeList{max-width:320px}
 .spike-patch #targetList{max-width:170px}
