@@ -43,7 +43,8 @@ test("file icon theme maps SKILL assets and local SVGs",()=>{
   assert.equal(icons.fileExtensions.md,"_markdown");
   assert.equal(icons.fileExtensions.markdown,"_markdown");
   assert.equal(icons.fileExtensions.bash,"_shell");
-  assert.equal(icons.fileExtensions.jsx,"_code");
+  assert.equal(icons.fileExtensions.jsx,undefined);
+  assert.equal(fileIconSpec("component.jsx").icon,"file");
   assert.equal(icons.fileExtensions.toml,undefined);
   assert.equal(fileIconSpec("config.toml").icon,"file");
   for(const [id,definition] of Object.entries(icons.iconDefinitions)){
