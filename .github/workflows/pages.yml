@@ -218,6 +218,10 @@ jobs:
           test -s dist/classic/app.js
           test -s dist/classic/samples/packages/establish-pdu-session/assurance/procedure.yaml
           test -s dist/ide-preview/index.html
+      - name: Record and verify exact deployed source identity
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: main-source
+        run: node ../ide-source/experiments/ide-host/scripts/write-pages-build-info.mjs --classic-source . --theia-source ../ide-source --output dist/build-info.json
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site

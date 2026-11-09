@@ -27,7 +27,7 @@
 
 Package Audit 限于当前 procedure 所属 Package，最多 500 文件 / 4 MiB 文本，350 ms 合并事件后异步执行。引用规则只来自 Classic `package-audit.mjs`，不创造 Runtime qualification。缺文件、超限或读取失败不能报告“无问题”。更新、切换和销毁使过期任务失效；审计不会阻塞 CustomEditor 首次渲染。
 
-Theia 1.76 的文本预览宿主使用 `editor-preview-widget` opener，显式 Source 命令通过专用构建适配选择它；VS Code 仍使用 `default`。Native editor association 使用 basename 配置，CustomEditor selector 继续限定 assurance 路径；selector 的 `[p]` 是等价字面匹配，避免 Theia Windows glob 的多段路径快捷分支错误，不扩大文件范围。
+Theia 1.76 的文本预览宿主使用 `editor-preview-widget` opener，显式 Source 命令通过专用构建适配选择它；backend-backed Theia 的 Node 扩展入口通过原生 `env.uriScheme` 识别宿主；无 preview 模块时仅在 opener 不存在的错误上回退 `code-editor-opener`。VS Code 仍使用 `default`。Native editor association 使用 basename 配置，CustomEditor selector 继续限定 assurance 路径；selector 的 `[p]` 是等价字面匹配，避免 Theia Windows glob 的多段路径快捷分支错误，不扩大文件范围。
 
 ## 延迟诊断与优化
 
@@ -43,3 +43,7 @@ Theia 1.76 的文本预览宿主使用 `editor-preview-widget` opener，显式 S
 不声称消除全部首次打开延迟；首次 ELK、Theia 框架下载及多文档内存成本仍需持续测量。真实桌面 VS Code GUI、操作系统原生文件授权和 Runtime 验收不包含在浏览器 CI 中。
 
 跨文件审计会合并 TextDocument 变化；未打开文件的外部创建/删除后使用原生 Audit / Refresh 命令重新检查。首阶段不宣称完整文件监听或完整 Classic 对等。
+
+## Pages 源码身份
+
+Pages 在发布前读取 Classic / Theia 两个 checkout 的完整 SHA；main 发布要求两者都等于工作流 `GITHUB_SHA`，否则拒绝发布。产物 `build-info.json` 保留 `sourceSha`、`classicSourceSha`、`workflowSha` 和 workflow run identity。发布后核对该文件及对应成功工作流，避免将较旧页面或 checkout 漂移误判为当前 main 已上线。

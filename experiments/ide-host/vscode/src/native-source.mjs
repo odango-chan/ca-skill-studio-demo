@@ -1,9 +1,14 @@
-// Theia 1.76 maps vscode.openWith(..., 'default') back through the default
-// association. Its dedicated text opener is required for explicit Source UI.
-// Only the Theia worker build defines this flag; VS Code keeps its public ID.
+// Theia maps 'default' back through the visual association. Browser-only uses
+// a build flag; backend-backed Theia may select this extension's Node entry.
 export async function openNativeSource(vscode,uri,options){
-  const view=typeof STUDIO_THEIA_HOST!=='undefined'&&STUDIO_THEIA_HOST
-    ?'editor-preview-widget':'default';
-  try{return await vscode.commands.executeCommand('vscode.openWith',uri,view,options);}
-  catch(error){await vscode.window.showErrorMessage('Source editor failed: '+String(error?.message??error));throw error;}
+  const theia=(typeof STUDIO_THEIA_HOST!=='undefined'&&STUDIO_THEIA_HOST)||vscode.env?.uriScheme==='theia';
+  const views=theia?['editor-preview-widget','code-editor-opener']:['default'];
+  for(let index=0;index<views.length;index++){
+    try{return await vscode.commands.executeCommand('vscode.openWith',uri,views[index],options);}
+    catch(error){
+      if(index+1<views.length&&/Could not find an editor/.test(String(error?.message)))continue;
+      await vscode.window.showErrorMessage('Source editor failed: '+String(error?.message??error));
+      throw error;
+    }
+  }
 }
