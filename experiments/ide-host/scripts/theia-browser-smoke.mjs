@@ -779,58 +779,68 @@ try{
               if(!targetHandle)return null;
               const edge=document.querySelector('#reactFlowRoot .react-flow__edge[data-id="flow-edge-'+index+'"]');
               const path=edge?.querySelector(".react-flow__edge-path");
-              if(!path)return null;
+              const target=newTarget.querySelector('.react-flow__handle[data-handleid="in"]');
+              if(!path||!target)return null;
               const point=path.ownerSVGElement.createSVGPoint();
               const middle=path.getPointAtLength(path.getTotalLength()/2);
               point.x=middle.x;point.y=middle.y;
               const screenPoint=point.matrixTransform(path.getScreenCTM());
-              return {index,sourceHandle:handle.getAttribute("data-handleid"),
-                targetHandle:targetHandle.getAttribute("data-handleid"),
-                edgeId:edge.getAttribute("data-id"),
+              const oldRect=targetHandle.getBoundingClientRect();
+              const newRect=target.getBoundingClientRect();
+              return {index,edgeId:edge.getAttribute("data-id"),
                 pathPoint:{x:screenPoint.x,y:screenPoint.y},
-                oldTarget:targetHandle.getBoundingClientRect(),
-                newTarget:newTarget.querySelector('.react-flow__handle[data-handleid="in"]')
-              };
+                oldTargetPoint:{x:oldRect.left+oldRect.width/2,y:oldRect.top+oldRect.height/2},
+                newTargetPoint:{x:newRect.left+newRect.width/2,y:newRect.top+newRect.height/2},
+                sourceHandle:handle.getAttribute("data-handleid"),
+                targetHandle:targetHandle.getAttribute("data-handleid")};
             }).filter(Boolean);
-          const pair=pairs[0];
-          if(!pair)return {ready:false,reason:"No anchored edge from the selected Node to unresolved",
-            sourceHandles:[...source.querySelectorAll(".react-flow__handle")].map(x=>x.getAttribute("data-handleid")),
-            targetHandles:[...oldTarget.querySelectorAll(".react-flow__handle")].map(x=>x.getAttribute("data-handleid")),
-            edges:[...document.querySelectorAll("#reactFlowRoot .react-flow__edge")].map(x=>x.getAttribute("data-id"))};
-          const rect=pair.newTarget?.getBoundingClientRect();
-          if(!rect)return {ready:false,reason:"New target input handle missing",pair};
-          return {ready:true,index:pair.index,edgeId:pair.edgeId,
-            pathPoint:pair.pathPoint,
-            oldTargetPoint:{x:pair.oldTarget.left+pair.oldTarget.width/2,
-              y:pair.oldTarget.top+pair.oldTarget.height/2},
-            newTargetPoint:{x:rect.left+rect.width/2,y:rect.top+rect.height/2},
-            width:window.innerWidth,height:window.innerHeight,
-            sourceHandle:pair.sourceHandle,targetHandle:pair.targetHandle};
+          return {ready:pairs.length>0,candidates:pairs,
+            width:window.innerWidth,height:window.innerHeight};
         })()`
       });
-      const reconnectEdge=reconnectEdgeInfo.result?.value??null;
-      if(!reconnectEdge?.ready)
-        throw Error("Could not locate the existing multi-Outcome Route bundle: "+JSON.stringify(reconnectEdge));
-      const edgeClick=toPage(reconnectEdge.pathPoint);
-      await command("Input.dispatchMouseEvent",{
-        type:"mousePressed",x:edgeClick.x,y:edgeClick.y,button:"left",clickCount:1
-      });
-      await command("Input.dispatchMouseEvent",{
-        type:"mouseReleased",x:edgeClick.x,y:edgeClick.y,button:"left",clickCount:1
-      });
-      await sleep(350);
-      const ambiguousReconnect=await command("Runtime.evaluate",{
-        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
-        expression:`({
-          selectedRoute:document.querySelector("#routeList")?.value??"",
-          message:document.querySelector("#message")?.textContent??"",
-          options:[...(document.querySelector("#routeList")?.options??[])].map(x=>({value:x.value,label:x.textContent}))
-        })`
-      });
-      const ambiguousValue=ambiguousReconnect.result?.value??null;
-      if(ambiguousValue?.selectedRoute!==""||
-         !String(ambiguousValue?.message??"").includes("多个 Outcome"))
-        throw Error("A multi-Outcome bundle was not left ambiguous: "+JSON.stringify(ambiguousValue));
+      const reconnectCandidates=reconnectEdgeInfo.result?.value?.candidates??[];
+      if(!reconnectEdgeInfo.result?.value?.ready||!reconnectCandidates.length)
+        throw Error("Could not locate an existing Route bundle to unresolved: "+
+          JSON.stringify(reconnectEdgeInfo.result?.value));
+      let reconnectEdge=null,ambiguousValue=null;
+      for(const candidate of reconnectCandidates){
+        const edgeClick=toPage(candidate.pathPoint);
+        await command("Input.dispatchMouseEvent",{
+          type:"mousePressed",x:edgeClick.x,y:edgeClick.y,button:"left",clickCount:1
+        });
+        await command("Input.dispatchMouseEvent",{
+          type:"mouseReleased",x:edgeClick.x,y:edgeClick.y,button:"left",clickCount:1
+        });
+        await sleep(350);
+        const selectedBundle=await command("Runtime.evaluate",{
+          contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+          expression:`({
+            selectedRoute:document.querySelector("#routeList")?.value??"",
+            message:document.querySelector("#message")?.textContent??"",
+            selectedLabels:[...document.querySelectorAll(".designer-route-label.is-selected")]
+              .map(label=>({
+                routeSource:label.getAttribute("data-route-source")??"",
+                routeIds:(label.getAttribute("data-route-ids")??"").split(",").filter(Boolean)
+              }))
+          })`
+        });
+        const value=selectedBundle.result?.value??null;
+        const exactBundle=value?.selectedLabels?.some(label=>
+          label.routeSource==="operator.on"&&
+          label.routeIds.includes("await-initial-resources:FAILED")&&
+          label.routeIds.includes("await-initial-resources:UNKNOWN")
+        );
+        if(value?.selectedRoute===""&&
+           String(value?.message??"").includes("多个 Outcome")&&exactBundle){
+          reconnectEdge=candidate;
+          ambiguousValue=value;
+          break;
+        }
+      }
+      if(!reconnectEdge||!ambiguousValue)
+        throw Error("Could not select the ambiguous operator.on Route bundle without selecting an Outcome: "+
+          JSON.stringify({candidates:reconnectCandidates,selection:ambiguousValue,
+            lastMessage:document.querySelector("#message")?.textContent??""}));
       const chooseReconnectRoute=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
