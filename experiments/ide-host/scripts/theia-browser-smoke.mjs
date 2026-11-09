@@ -265,9 +265,10 @@ try{
   console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
   if(!view?.appShell||view.widgets<5||view.bodyLength<15)
     throw Error("Theia browser shell failed to start: "+JSON.stringify(evidence).slice(0,2200));
-  if(!afterImport.bodyText.includes("示例 SKILL 已载入浏览器工作区")||
-     !afterImport.folders.some(folder=>folder.name==="skill-studio-examples"))
-    throw Error("Theia sample import into OPFS failed: "+JSON.stringify({afterImport,registeredCommands,extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500)}).slice(0,3000));
+  if(!afterImport.notificationText.some(message=>message.includes("示例 SKILL 已载入浏览器工作区"))||
+     !afterImport.bodyText.includes("establish-pdu-session")||
+     !afterImport.bodyText.includes("procedure.yaml"))
+    throw Error("Theia sample import into browser workspace failed: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3000));
   if(externalUrl&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
