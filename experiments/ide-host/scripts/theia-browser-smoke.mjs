@@ -425,6 +425,31 @@ try{
         returned:focusReturn.result?.value??null
       };
 
+      const routeOriginalMode=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const select=document.querySelector("#procedureList");
+          if(!select)return {ready:false,reason:"Procedure selector missing"};
+          select.value="await-initial-n4-session-establishment";
+          select.dispatchEvent(new Event("change",{bubbles:true}));
+          return {ready:true,value:select.value};
+        })()`
+      });
+      await sleep(1500);
+      const routeOriginalView=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent||"",
+          procedure:document.querySelector("#procedureList")?.value||"",
+          graphNodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length,
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
+        })`
+      });
+      if(!routeOriginalMode.result?.value?.ready||
+         routeOriginalView.result?.value?.procedure!=="await-initial-n4-session-establishment"||
+         !(routeOriginalView.result?.value?.graphEdges>0))
+        throw Error("The original Route fixture Procedure did not render: "+
+          JSON.stringify({mode:routeOriginalMode.result?.value,view:routeOriginalView.result?.value}));
       // Prepare a real browser fixture through the native Theia text editor.
       // Monaco's AMD module is not exposed as window.monaco in Theia, so this
       // deliberately uses the public editor UI and keyboard instead of
@@ -476,11 +501,16 @@ try{
       const findState=await evalJS(`({
         active:document.activeElement?.outerHTML?.slice(0,500)??"",
         value:document.activeElement?.value??"",
-        findWidgets:document.querySelectorAll(".find-widget").length
+        findWidgets:document.querySelectorAll(".find-widget").length,
+        matchCount:document.querySelector(".find-widget .matchesCount")?.textContent??""
       })`);
-      if(findState.value!=="DENIED: failed")
+      if(findState.value!=="DENIED: failed"||findState.findWidgets<1)
         throw Error("Native editor Find did not receive the exact fixture query: "+JSON.stringify(findState));
       await key("Enter","Enter",0,13);
+      const secondMatch=await evalJS(`({
+        value:document.activeElement?.value??"",
+        matchCount:document.querySelector(".find-widget .matchesCount")?.textContent??""
+      })`);
       await key("Escape","Escape",0,27);
       await key("Backspace","Backspace",0,8);
       await sleep(1500);
@@ -499,9 +529,12 @@ try{
           .map(line=>line.innerText).join("\\n").slice(0,1400)
       })`);
       const routeFixture={
-        ready:routeFixtureEditor.editorCount>0&&/TextDocument v\\d+/.test(
-          routeFixtureView.result?.value?.revision??""),
-        editor:editorTarget,find:findState,
+        ready:routeFixtureEditor.editorCount>0&&
+          /TextDocument v\\d+/.test(routeFixtureView.result?.value?.revision??"")&&
+          routeFixtureView.result?.value?.procedure==="await-initial-n4-session-establishment"&&
+          routeFixtureView.result?.value?.graphEdges===routeOriginalView.result?.value?.graphEdges-1,
+        editor:editorTarget,find:findState,secondMatch,
+        original:routeOriginalView.result?.value??null,
         view:routeFixtureView.result?.value??null,after:routeFixtureEditor
       };
       if(!routeFixture.ready)
