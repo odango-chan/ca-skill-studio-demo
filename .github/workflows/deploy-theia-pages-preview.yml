@@ -1,6 +1,12 @@
 name: Deploy temporary Theia Pages preview
 
 on:
+  push:
+    branches:
+      - spike/ide-extension-theia-host
+    paths:
+      - "experiments/ide-host/**"
+      - ".github/workflows/deploy-theia-pages-preview.yml"
   workflow_dispatch:
 
 permissions:
