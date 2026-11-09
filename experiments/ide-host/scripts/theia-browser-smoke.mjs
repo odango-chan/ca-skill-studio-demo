@@ -359,6 +359,71 @@ try{
       }
       patchEvidence.sourceEditor=sourceEditor;
       patchEvidence.undo=undoFrames[0]??null;
+
+      // The Classic one-hop Node view is reused inside the host CustomEditor:
+      // real neighbor Nodes/Routes plus read-only PRE/OP/POST stages.
+      const focusWorld=await command("Page.createIsolatedWorld",{
+        frameId:graphFrame.frame.id,worldName:"skill-studio-node-focus-acceptance",grantUniveralAccess:true
+      });
+      const focusOpen=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const node=document.querySelector('#reactFlowRoot .react-flow__node[data-id="nudm-sdm-subscribe"]');
+          const button=node?.querySelector(".designer-view-node");
+          if(!button)return {clicked:false,reason:"Node View action missing"};
+          button.click();
+          return {clicked:true,nodeId:node.getAttribute("data-id")};
+        })()`
+      });
+      await sleep(1800);
+      const focusView=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          visible:!document.querySelector("#nodeFocus")?.hidden,
+          title:document.querySelector("#nodeFocusTitle")?.textContent||"",
+          stats:document.querySelector("#nodeFocusStats")?.textContent||"",
+          preSteps:document.querySelectorAll("#nodeFocusFlow .stage-preconditions .focus-graph-step").length,
+          postSteps:document.querySelectorAll("#nodeFocusFlow .stage-postconditions .focus-graph-step").length,
+          neighbors:document.querySelectorAll("#nodeFocusFlow .is-neighbor").length,
+          graphNodes:document.querySelectorAll("#nodeFocusFlow .react-flow__node").length,
+          graphEdges:document.querySelectorAll("#nodeFocusFlow .react-flow__edge").length
+        })`
+      });
+      const sourceJump=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const button=document.querySelector("#nodeFocusFlow .focus-graph-source");
+          if(!button)return {ready:false,reason:"Source line action missing"};
+          const line=button.textContent.trim();
+          button.click();
+          return {ready:true,line};
+        })()`
+      });
+      await sleep(900);
+      const sourceJumpView=await evalJS(`({
+        monacoEditors:document.querySelectorAll(".monaco-editor").length,
+        activeElement:document.activeElement?.className||"",
+        bodyText:document.body.innerText.slice(-650)
+      })`);
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#nodeFocusReturn")?.click(); true`
+      });
+      await sleep(300);
+      const focusReturn=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          returned:Boolean(document.querySelector("#nodeFocus")?.hidden),
+          mainGraphVisible:!document.querySelector("#reactFlowRoot")?.hidden
+        })`
+      });
+      patchEvidence.nodeFocus={
+        open:focusOpen.result?.value??null,
+        view:focusView.result?.value??null,
+        sourceJump:sourceJump.result?.value??null,
+        sourceJumpView,
+        returned:focusReturn.result?.value??null
+      };
     }else{
       patchEvidence={preview:previewEvidence,applied:null};
     }
@@ -393,8 +458,21 @@ try{
       patchEvidence.undo?.graphEdges!==46))
     throw Error("Native Source editor/undo did not restore the original Procedure projection: "+
       JSON.stringify(patchEvidence).slice(0,3000));
+  if(requireEditor&&(!patchEvidence.nodeFocus?.open?.clicked||
+      !patchEvidence.nodeFocus?.view?.visible||
+      patchEvidence.nodeFocus.view.title!=="nudm-sdm-subscribe"||
+      patchEvidence.nodeFocus.view.preSteps!==5||
+      patchEvidence.nodeFocus.view.postSteps!==1||
+      patchEvidence.nodeFocus.view.neighbors<1||
+      patchEvidence.nodeFocus.view.graphNodes<4||
+      !patchEvidence.nodeFocus?.sourceJump?.ready||
+      !(patchEvidence.nodeFocus?.sourceJumpView?.monacoEditors>0)||
+      !patchEvidence.nodeFocus?.returned?.returned||
+      !patchEvidence.nodeFocus?.returned?.mainGraphVisible))
+    throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
+      JSON.stringify(patchEvidence.nodeFocus).slice(0,3500));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
