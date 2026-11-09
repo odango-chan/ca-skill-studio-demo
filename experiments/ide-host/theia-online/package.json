@@ -11,7 +11,8 @@
         "preferences": {
           "files.enableTrash": false,
           "security.workspace.trust.enabled": false
-        }
+        },
+        "warnOnPotentiallyInsecureHostPattern": false
       }
     }
   },
