@@ -3,7 +3,7 @@
 // provision wildcard webview DNS/certificates, so this isolated preview uses
 // same-origin sandboxed webviews. Do not use this build for sensitive files
 // or production. The full backend host keeps the normal isolated host pattern.
-import {copyFile,mkdir,readdir,readFile,writeFile} from "node:fs/promises";
+import {copyFile,cp,mkdir,readdir,readFile,stat,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 
 const root=resolve("experiments/ide-host/theia-online/lib/frontend");
@@ -37,6 +37,27 @@ if(!indexHtml.includes('id="skill-studio-preview-warning"')){
   indexHtml=indexHtml.replace("<body>","<body>"+warning);
   await writeFile(indexPath,indexHtml);
 }
+// Theia's browser-only static build emits the extension worker bundle but
+// does not carry arbitrary package assets through its hostedPlugin copier.
+// Explicitly stage the read-only sample package and Webview media beside it.
+const pluginSource=resolve("experiments/ide-host/theia-online/plugins/odango-chan.ca-skill-studio-ide-spike");
+const pluginTarget=join(root,"hostedPlugin","odango_chan_ca_skill_studio_ide_spike");
+for(const name of ["samples","media"]){
+  await cp(join(pluginSource,name),join(pluginTarget,name),{recursive:true,force:true});
+}
+for(const required of [
+  join(pluginTarget,"samples","establish-pdu-session","files.json"),
+  join(pluginTarget,"samples","establish-pdu-session","assurance","procedure.yaml"),
+  join(pluginTarget,"media","procedure.js"),
+  join(pluginTarget,"media","procedure.css")
+]){
+  const info=await stat(required);
+  if(!info.isFile()||info.size<100)
+    throw Error("Static hosted plugin asset missing or empty: "+required);
+}
+console.log("STUDIO_THEIA_STATIC_PLUGIN_ASSETS",JSON.stringify({
+  pluginTarget,assets:["samples/**","media/**"],sameOriginOnly:true
+}));
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,
   webviewAssets:copied,target
