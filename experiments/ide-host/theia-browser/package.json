@@ -14,6 +14,11 @@
         },
         "warnOnPotentiallyInsecureHostPattern": false
       }
+    },
+    "backend": {
+      "config": {
+        "warnOnPotentiallyInsecureHostPattern": false
+      }
     }
   },
   "theiaPluginsDir": "../theia-online/plugins",
