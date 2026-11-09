@@ -109,7 +109,7 @@ https://eclipsesource.com/blogs/2024/01/29/running-eclipse-theia-without-a-backe
 |---|---|---|
 | VS Code | Explorer, New File/Folder, search, tabs, native text editing, undo/save | Build/API/AST/Patch unit tests in CI; desktop host visual acceptance must be observed |
 | Eclipse Theia desktop / browser+backend | Native IDE shell and VS Code extension host | Node VSIX compatibility unproven until real host |
-| Theia browser-only (>=1.76) | Default online demo shell, OPFS, prebundled Web extensions | Real Chromium shell, sample import, CustomEditor, Patch, Source and Undo passed at `/ide-preview/`; default-root revalidation pending |
+| Theia browser-only (>=1.76) | Default online demo shell, OPFS, prebundled Web extensions | Real Chromium shell, sample import, CustomEditor, Patch, Source/Undo, Node Focus PRE/OP/POST and Source line reveal PASS at the default Pages root; Pages deploy #42585232727 PASS |
 | Classic Pages demo | Full previous browser Studio at `/classic/` | Preserved from the main-source build; link back to Theia root |
 
 Theia may implement/stub distinct VS Code API features; it is wrong to
@@ -135,17 +135,18 @@ Official API sources: [VS Code Custom Editor](https://code.visualstudio.com/api/
   no 5GC network operations, no file writes outside IDE `WorkspaceEdit`.
 
 A green Node build alone does **not** satisfy the online host gate. The
-Theia browser-only online gate has real Chromium evidence at the former
-preview path; the new root-path and Classic-composition checks must pass
-before the default deployment is called accepted. VS Code desktop and
-Theia desktop are optional hosts and remain independently unverified.
+Theia browser-only root-path and Classic-composition checks passed in
+resulting-main Pages deployment #42585232727. VS Code desktop and Theia
+desktop are optional hosts and remain independently unverified.
 
 ## Remaining migration work
 
-Continue moving the Studio-specific graph, Node/Route/Phase editing and
-Inspector capabilities into the shared extension without duplicating Source
-or Runtime semantics. Keep `/classic/` until functional parity and security
-review are complete. If Theia compatibility fails for a capability, add a
+Node Focus (read-only previous/current/next, PRE/OP/POST and native Source
+line reveal) migrated in PR #89 and is available in the shared CustomEditor.
+Next migrate Route creation/reconnect, then Phase Designer and the remaining
+Inspector / Package Audit / Markdown preview capabilities without duplicating
+Source or Runtime semantics. Keep `/classic/` until functional parity and
+security review are complete. If Theia compatibility fails for a capability, add a
 thin host adapter around the same Source projection/Patch contract; do not
 patch around it in the DSL owner or introduce duplicate Runtime contracts.
 
@@ -207,3 +208,10 @@ and selects both themes in its default preferences. The IDE Host workflow
 packages a separate `skill-studio-theme-vsix` artifact. A user can copy that
 VSIX to an offline machine and install it with `code --install-extension`;
 the package has no runtime dependencies, remote fonts or network requests.
+
+
+## 2026-11-09 · Node Focus in the IDE-host CustomEditor
+
+PR #89 reuses the existing one-hop Node Focus projection inside the IDE-host CustomEditor. The local graph retains original Route IDs and outcomes, while PRE → OP → POST stage-order links and the dashed current-Node boundary remain explicitly view-only. Clicking a Phase Step asks the host to validate its 1-based Source line and reveal it in the same native TextDocument; the view itself does not mutate YAML.
+
+Exact merged-base acceptance: IDE Host [#42584800417 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800417), Theia browser-only [#42584800342 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800342), Theia backend Chromium [#42584800599 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800599). PR #89 merged at `main@b9c1c38`; resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727).
