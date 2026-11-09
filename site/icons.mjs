@@ -82,7 +82,7 @@ const defs={
     poly("13 3 13 10 20 10"),line(8,14,16,14),line(12,11,12,17)],
   plus:[line(12,5,12,19),line(5,12,19,12)],
   minus:[line(5,12,19,12)],
-  x:[line(18,6,6,18),line(6,6,18,6)],
+  x:[line(18,6,6,18),line(6,6,18,18)],
   menu:[line(4,7,20,7),line(4,12,20,12),line(4,17,20,17)],
   "more-horizontal":[circle(5,12,1),circle(12,12,1),circle(19,12,1)],
   "chevron-up":[poly("6 15 12 9 18 15")],
