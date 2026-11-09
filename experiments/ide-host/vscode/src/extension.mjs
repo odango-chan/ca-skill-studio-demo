@@ -65,7 +65,25 @@ export function activate(context){
           <button id="openSource">打开原生 YAML 编辑器</button>
           <span id="revision"></span></div>
           <div id="message" role="status">等待当前文档…</div>
-          <div class="graph-pane spike-pane"><div id="reactFlowRoot" class="spike-flow"></div></div>
+          <div id="graphPane" class="graph-pane spike-pane">
+            <div id="reactFlowRoot" class="spike-flow"></div>
+            <section id="nodeFocus" class="node-focus" aria-label="节点上下游与内部流程" tabindex="-1" hidden>
+              <header class="node-focus-header">
+                <button id="nodeFocusReturn" type="button" class="node-focus-back">返回流程图</button>
+                <div class="node-focus-heading">
+                  <span class="node-focus-eyebrow">NODE · 局部流程图（真实 Route / 阶段顺序）</span>
+                  <h2 id="nodeFocusTitle"></h2>
+                  <p id="nodeFocusSubtitle"></p>
+                </div>
+              </header>
+              <div class="node-focus-toolbar">
+                <span id="nodeFocusStats"></span>
+                <div id="nodeFocusChildren"></div>
+                <button id="nodeFocusFit" type="button" class="node-focus-back">适配局部图</button>
+              </div>
+              <div id="nodeFocusFlow" class="node-focus-flow-host" aria-label="当前节点一跳局部 React Flow 流程图"></div>
+            </section>
+          </div>
           <div id="patch" class="spike-patch" hidden>
             <strong>现有 Route 的 Source-backed Patch 预览</strong>
             <label>Route <select id="routeList"></select></label>
@@ -95,6 +113,21 @@ export function activate(context){
         if(message.type==="openSource"){
           await vscode.window.showTextDocument(document,{viewColumn:vscode.ViewColumn.Beside,
             preserveFocus:false,preview:false});
+          return;
+        }
+        if(message.type==="revealSourceLine"){
+          const line=message.line;
+          if(!Number.isSafeInteger(line)||line<1||line>document.lineCount){
+            void webview.postMessage({type:"error",message:"Source 行号无效或已过期"});
+            return;
+          }
+          const editor=await vscode.window.showTextDocument(document,{
+            viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false
+          });
+          const position=new vscode.Position(line-1,0);
+          editor.selection=new vscode.Selection(position,position);
+          editor.revealRange(new vscode.Range(position,position),
+            vscode.TextEditorRevealType.InCenter);
           return;
         }
         if(message.type!=="applyRoute")return;
