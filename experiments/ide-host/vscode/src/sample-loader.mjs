@@ -35,8 +35,12 @@ async function readBundledResource(vscode,uri){
     // app-prefixed and provides the same trusted base without hardcoding it.
     const contextMarker="/context/";
     const contextAt=workerPath.indexOf(contextMarker);
+    const workerFile="/plugin-worker.js";
+    const rootWorkerAt=workerPath.endsWith(workerFile)
+      ?workerPath.length-workerFile.length:-1;
     const appPrefix=markerAt>=0?workerPath.slice(0,markerAt)
-      :contextAt>=0?workerPath.slice(0,contextAt):"";
+      :contextAt>=0?workerPath.slice(0,contextAt)
+      :rootWorkerAt>=0?workerPath.slice(0,rootWorkerAt):"";
     const resourcePath=appPrefix+url.pathname;
     const resourceUrl=new URL(resourcePath+url.search,origin);
     const response=await fetch(resourceUrl.href,{credentials:"same-origin"});
