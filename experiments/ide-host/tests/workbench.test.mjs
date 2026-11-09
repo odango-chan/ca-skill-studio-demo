@@ -59,8 +59,13 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   doc.version++;doc.text=source;changed({document:doc});
   await commands.get('skillStudio.auditPackage')();
   assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
+  doc.text='# Preview title\n<script>alert(1)</script>';
   await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));
   assert.match(panels[0].webview.html,/Content-Security-Policy/);
+  assert.match(panels[0].webview.html,/<h1>Preview title<\/h1>/);
+  assert.match(panels[0].webview.html,/&lt;script&gt;/);
+  doc.text='x'.repeat(300001);changed({document:{...doc,uri:uri('/workspace/SKILL.md')}});
+  assert.match(panels[0].webview.html,/预览不可用/);
   assert.doesNotMatch(panels[0].webview.html,/<script/i);
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);

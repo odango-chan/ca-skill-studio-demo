@@ -87,7 +87,7 @@ export function registerWorkbench(vscode,context){
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
     const panel=vscode.window.createWebviewPanel('skillStudio.markdown','Preview · '+uri.path.split('/').at(-1),vscode.ViewColumn.Beside,{enableScripts:false});
-    const render=()=>{panel.webview.html='<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;none&#39;;"></head><body><article>'+renderMarkdown(doc.getText())+'</article></body></html>';};
+    const render=()=>{const preview=renderMarkdown(doc.getText());panel.webview.html='<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;none&#39;;"></head><body><article>'+(preview.available?preview.html:'<p>预览不可用，请使用源码编辑器。</p>')+'</article></body></html>';};
     render();const changed=vscode.workspace.onDidChangeTextDocument(e=>{if(e.document.uri.toString()===uri.toString())render();});panel.onDidDispose(()=>changed.dispose());
   }));
   return {attach(doc,post){sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();return ()=>{sessions.delete(doc.uri.toString());};},select(doc,message){
