@@ -1,5 +1,5 @@
-// Stages the exact same prebuilt VS Code Web extension into an isolated
-// Theia browser-only application. No changes to Pages dist/ or source files.
+// Stage the Procedure Web extension and standalone theme extension into
+// the isolated Theia browser-only application. Both are built-in plugins.
 import {cp,mkdir,readFile,rm,stat,writeFile} from "node:fs/promises";
 import {join} from "node:path";
 const app="experiments/ide-host/theia-online";
@@ -22,4 +22,29 @@ await cp(join(ext,"samples"),join(target,"samples"),{recursive:true});
 console.log("STUDIO_THEIA_PREPARED_WEB_EXTENSION",JSON.stringify({
   app,target,name:manifest.name,browser:prepared.browser,
   customEditors:manifest.contributes.customEditors.map(x=>x.viewType)
+}));
+
+const themeSource="extensions/skill-studio-theme";
+const themeTarget=join(app,"plugins","odango-chan.skill-studio-theme");
+const themeManifest=JSON.parse(await readFile(join(themeSource,"package.json"),"utf8"));
+if(!themeManifest.contributes?.themes?.some(x=>x.label==="SKILL Studio Light")||
+   !themeManifest.contributes?.iconThemes?.some(x=>x.id==="skill-studio-file-icons"))
+  throw Error("Standalone Skill Studio color/file icon themes are missing");
+for(const source of [
+  join(themeSource,"themes","skill-studio-light-color-theme.json"),
+  join(themeSource,"icons","skill-studio-file-icon-theme.json"),
+  ...["skill","yaml","markdown","python","file","folder","folder-open","code"]
+    .map(name=>join(themeSource,"icons",name+".svg"))
+]){
+  const info=await stat(source);
+  if(!info.isFile()||info.size<80)throw Error("Missing Skill Studio theme asset: "+source);
+}
+await rm(themeTarget,{recursive:true,force:true});
+await mkdir(themeTarget,{recursive:true});
+await cp(themeSource,themeTarget,{recursive:true});
+console.log("STUDIO_THEIA_PREPARED_THEME_EXTENSION",JSON.stringify({
+  target:themeTarget,name:themeManifest.name,
+  themes:themeManifest.contributes.themes.map(x=>x.label),
+  iconThemes:themeManifest.contributes.iconThemes.map(x=>x.id),
+  runtimeDependencies:Object.keys(themeManifest.dependencies??{}).length
 }));

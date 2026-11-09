@@ -17,12 +17,24 @@ const index=files.find(p=>p.endsWith("/index.html"));
 if(!index)throw Error("Browser-only frontend index.html was not emitted");
 if(statSync(index).size<200)throw Error("Empty HTML");
 const pluginLists=files.filter(p=>p.endsWith("/hostedPlugin/list.json"));
-const pluginListEvidence=pluginLists.map(p=>({path:p,text:readFileSync(p,"utf8").slice(0,1000)}));
-const pluginName="ca-skill-studio-ide-spike";
-const hasPlugin=files.some(p=>p.includes(pluginName))||
-  pluginListEvidence.some(p=>p.text.includes(pluginName));
+const pluginListEvidence=pluginLists.map(p=>({path:p,text:readFileSync(p,"utf8").slice(0,3000)}));
+const hasProcedurePlugin=files.some(p=>p.includes("odango_chan_ca_skill_studio_ide_spike"))||
+  pluginListEvidence.some(p=>p.text.includes("ca-skill-studio-ide-spike"));
+const hasThemePlugin=files.some(p=>p.includes("odango_chan_skill_studio_theme"))||
+  pluginListEvidence.some(p=>p.text.includes("skill-studio-theme"));
+const themeAssets=[
+  "hostedPlugin/odango_chan_skill_studio_theme/package.json",
+  "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
+  "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
+  "hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg",
+  "hostedPlugin/odango_chan_skill_studio_theme/icons/yaml.svg"
+].map(p=>join(root,p));
+const missingThemeAssets=themeAssets.filter(p=>!existsSync(p));
 console.log("STUDIO_THEIA_FRONTEND_ARTIFACT",JSON.stringify({
   index,files:files.length,pluginLists:pluginLists.map(p=>p.path),
-  pluginEntries:hasPlugin,sample:files.slice(0,12)
+  procedurePlugin:hasProcedurePlugin,themePlugin:hasThemePlugin,
+  themeAssets:themeAssets.filter(existsSync),missingThemeAssets
 }));
-if(!hasPlugin)throw Error("Theia browser-only build lacks prepared SKILL Studio Web extension");
+if(!hasProcedurePlugin)throw Error("Theia browser-only build lacks prepared SKILL Studio Web extension");
+if(!hasThemePlugin)throw Error("Theia browser-only build lacks the built-in Skill Studio theme extension");
+if(missingThemeAssets.length)throw Error("Theia static preview is missing theme assets: "+missingThemeAssets.join(", "));

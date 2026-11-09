@@ -10,7 +10,9 @@
         "applicationName": "SKILL Studio · Online Workbench",
         "preferences": {
           "files.enableTrash": false,
-          "security.workspace.trust.enabled": false
+          "security.workspace.trust.enabled": false,
+          "workbench.colorTheme": "SKILL Studio Light",
+          "workbench.iconTheme": "skill-studio-file-icons"
         },
         "warnOnPotentiallyInsecureHostPattern": false
       }

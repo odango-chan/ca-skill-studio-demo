@@ -30,6 +30,27 @@ custom visual editor on `**/assurance/procedure.yaml`. Ordinary YAML/Python
 stay in the host's default editors. New/rename/delete files work through
 the **host's Explorer**, not through separate Studio code.
 
+## Shared theme · offline VS Code and online Theia
+
+The visual system is a separate, dependency-free VS Code theme extension at
+[`extensions/skill-studio-theme`](../../extensions/skill-studio-theme).
+It contributes **SKILL Studio Light** (workbench + editor token colors) and
+**SKILL Studio File Icons** (SKILL/YAML/Markdown/Python/common source files).
+Native Codicons remain the single-color IDE product-icon family; the color
+theme sets their shared foreground instead of replacing every host glyph.
+
+The same package is staged as a built-in Theia plugin and selected by the
+browser-only app's default preferences. IDE Host CI publishes a separate
+`skill-studio-theme-vsix` artifact. Copy that VSIX to an offline machine:
+
+```sh
+code --install-extension skill-studio-theme.vsix
+```
+
+Then choose **Preferences: Color Theme → SKILL Studio Light** and
+**Preferences: File Icon Theme → SKILL Studio File Icons**. The VSIX contains
+all theme JSON and SVG assets and has no runtime/network dependency.
+
 ## How to try it
 
 From repository root with Node 24:

@@ -185,3 +185,25 @@ persistent same-origin safety warning.
 The exact-main run [#42579544196](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42579544196)
 passed the root smoke, composition assertions and GitHub Pages deployment.
 The earlier unit/mock build alone was not used as the release gate.
+
+
+## 2026-11-09 · Shared Skill Studio Theme
+
+The host UI uses one independently packaged visual system rather than
+host-specific CSS forks. `extensions/skill-studio-theme` is a standalone,
+dependency-free VS Code theme extension shared by online Theia and offline
+VS Code. It contributes **SKILL Studio Light** for workbench/editor surfaces
+and syntax, plus **SKILL Studio File Icons** with local SVG assets for SKILL,
+YAML, Markdown, Python and common source files.
+
+The palette reuses the established `site/light.css` tokens. Native Codicons
+remain the host's monochrome product-icon family; the theme sets their common
+foreground and selected/hover states rather than introducing a competing
+glyph font. Procedure graph PASS/FAIL/UNKNOWN semantics remain owned by the
+existing graph CSS and are not recolored by generic editor syntax rules.
+
+The Theia browser-only application preloads this exact package at build time
+and selects both themes in its default preferences. The IDE Host workflow
+packages a separate `skill-studio-theme-vsix` artifact. A user can copy that
+VSIX to an offline machine and install it with `code --install-extension`;
+the package has no runtime dependencies, remote fonts or network requests.

@@ -40,3 +40,21 @@ test("Trial is isolated from existing Pages distribution",()=>{
   assert.doesNotMatch(workflow,/publish-gh-pages/);
   assert.doesNotMatch(workflow,/branches:\s*\[main\]/);
 });
+
+test("Theia preloads the shared offline Skill Studio color and file icon theme",()=>{
+  const app=JSON.parse(readFileSync(join(root,"package.json"),"utf8"));
+  const preferences=app.theia.frontend.config.preferences;
+  assert.equal(preferences["workbench.colorTheme"],"SKILL Studio Light");
+  assert.equal(preferences["workbench.iconTheme"],"skill-studio-file-icons");
+  const themeRoot=join(root,"plugins/odango-chan.skill-studio-theme");
+  const manifest=JSON.parse(readFileSync(join(themeRoot,"package.json"),"utf8"));
+  assert.equal(manifest.name,"skill-studio-theme");
+  assert.equal(manifest.publisher,"odango-chan");
+  assert.equal(manifest.contributes.themes[0].label,"SKILL Studio Light");
+  assert.equal(manifest.contributes.iconThemes[0].id,"skill-studio-file-icons");
+  for(const path of [
+    "themes/skill-studio-light-color-theme.json","icons/skill-studio-file-icon-theme.json",
+    "icons/skill.svg","icons/yaml.svg","icons/markdown.svg","icons/python.svg",
+    "icons/file.svg","icons/folder.svg","icons/folder-open.svg","icons/code.svg"
+  ])assert.ok(statSync(join(themeRoot,path)).size>80,path);
+});
