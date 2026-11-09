@@ -96,6 +96,9 @@ try{
   });
   await command("Page.enable");
   await command("Runtime.enable");
+  // The desktop menu assertions require a desktop viewport; do not inherit
+  // platform-specific headless window defaults (800px on Windows Chrome).
+  await command("Emulation.setDeviceMetricsOverride",{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await command("Page.navigate",{url});
   const expr=[
     "(async()=>{",

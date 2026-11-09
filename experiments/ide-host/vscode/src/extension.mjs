@@ -50,7 +50,11 @@ export function activate(context){
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
-      const viewState=panel.onDidChangeViewState(()=>{if(panel.active){workbench.activate(document);void webview.postMessage({type:"requestSelection"});}});
+      let wasActive=panel.active;
+      const viewState=panel.onDidChangeViewState(()=>{
+        const becameActive=panel.active&&!wasActive;wasActive=panel.active;
+        if(becameActive)workbench.activate(document);
+      });
       const media=vscode.Uri.joinPath(context.extensionUri,"media");
       webview.options={enableScripts:true,localResourceRoots:[media]};
       const nonce=newNonce();

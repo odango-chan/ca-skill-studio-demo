@@ -50,7 +50,9 @@ const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[];
 const command=(method,params={})=>new Promise((resolve,reject)=>{
-  const id=++seq;pending.set(id,{resolve,reject});
+  const id=++seq;
+  const timer=setTimeout(()=>{pending.delete(id);reject(Error("Chromium command timed out: "+method+" "+String(params.expression??"").slice(0,200)));},30000);
+  pending.set(id,{resolve,reject,timer});
   ws.send(JSON.stringify({id,method,params}));
 });
 const evalJS=async expression=>{
@@ -62,7 +64,7 @@ try{
   let port=null;
   for(let i=0;i<250;i++){
     try{port=Number((await readFile(join(profile,"DevToolsActivePort"),"utf8")).split("\n")[0]);break;}
-    catch{if(child.exitCode!==null)throw Error("Chrome exited "+child.exitCode);}
+    catch{if(child.exitCode!==null&&child.exitCode!==0)throw Error("Chrome exited "+child.exitCode);}
     await sleep(100);
   }
   if(!port)throw Error("Chrome DevTools debugging port unavailable");
@@ -85,7 +87,7 @@ try{
     if(msg.method==="Runtime.consoleAPICalled"&&msg.params?.type==="error")
       consoleErrors.push(msg.params.args?.map(x=>x.value||x.description).join(" "));
     if(msg.id&&pending.has(msg.id)){
-      const call=pending.get(msg.id);pending.delete(msg.id);
+      const call=pending.get(msg.id);pending.delete(msg.id);clearTimeout(call.timer);
       if(msg.error)call.reject(Error(msg.error.message));else call.resolve(msg.result);
     }
   });
@@ -302,6 +304,7 @@ try{
       webviewFrames.push({frame,error:String(error)});
     }
   }
+  console.log("STUDIO_THEIA_STAGE","initial-graph");
   const graphFrame=webviewFrames.find(item=>item.view?.procedureRoot&&item.view.graphNodes>0);
   const webviewFrame=graphFrame?.frame??webviewFrames[0]?.frame??null;
   let webviewView=graphFrame?.view??webviewFrames[0]?.view??null;
@@ -366,7 +369,6 @@ try{
         bodyText:document.body.innerText.slice(-900),
         editorTabs:[...document.querySelectorAll(".theia-tab,.lm-TabBar-tab")].map(x=>x.innerText).filter(Boolean).slice(-8)
       })`);
-      console.log("STUDIO_NATIVE_SOURCE",JSON.stringify({sourceEditor,consoleErrors,exceptions}));
       await command("Input.dispatchKeyEvent",{
         type:"keyDown",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
       });
@@ -396,11 +398,13 @@ try{
           if(undone.result?.value?.procedureRoot)undoFrames.push(undone.result.value);
         }catch{}
       }
+      console.log("STUDIO_THEIA_STAGE","native-source-undo");
       patchEvidence.sourceEditor=sourceEditor;
       patchEvidence.undo=undoFrames[0]??null;
 
       // The Classic one-hop Node view is reused inside the host CustomEditor:
       // real neighbor Nodes/Routes plus read-only PRE/OP/POST stages.
+      console.log("STUDIO_THEIA_STAGE","node-focus");
       const focusWorld=await command("Page.createIsolatedWorld",{
         frameId:graphFrame.frame.id,worldName:"skill-studio-node-focus-acceptance",grantUniveralAccess:true
       });
@@ -1017,9 +1021,10 @@ try{
       patchEvidence={preview:previewEvidence,applied:null};
     }
   }
+  console.log("STUDIO_THEIA_STAGE","native-workbench");
   let workbenchEvidence;
   try{workbenchEvidence=await runWorkbenchAcceptance({command,evalJS,sleep,requireEditor});}
-  catch(error){console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
+  catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={shellReadyMs,workbenchEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
@@ -1110,7 +1115,10 @@ try{
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
+  // Windows Edge launchers can hand off to the browser process and exit 0.
+  // Close the actual browser over CDP before removing its isolated profile.
+  if(ws?.readyState===1){void command("Browser.close").catch(()=>{});await sleep(700);}
   ws?.close();child.kill("SIGKILL");
-  if(server?.listening)await new Promise(ok=>server.close(ok));
+  if(server?.listening){server.closeAllConnections();await new Promise(ok=>server.close(ok));}
   await rm(profile,{recursive:true,force:true,maxRetries:4,retryDelay:200});
 }

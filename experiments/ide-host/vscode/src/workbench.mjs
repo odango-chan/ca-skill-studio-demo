@@ -6,7 +6,7 @@ import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
-  const providers=new Map(),sessions=new Map();
+  const providers=new Map(),sessions=new Map(),selections=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   context.subscriptions.push(diagnostics);
   for(const id of ['inspection','outline','evidence','problems']){
@@ -18,20 +18,22 @@ export function registerWorkbench(vscode,context){
       getTreeItem(item){
         const tree=new vscode.TreeItem(item.label,item.children?.length?vscode.TreeItemCollapsibleState.Collapsed:vscode.TreeItemCollapsibleState.None);
         tree.description=item.description;tree.tooltip=item.label+(item.line?' · L'+item.line:'');
-        if(document&&item.line)tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',arguments:[{...item,uri:item.uri??document.uri,version:document.version}]};
+        if(document&&item.line)tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',arguments:[{...item,uri:item.uri??document.uri,version:document.version,...(item.uri?{auditGeneration:generation}:{})}]};
         return tree;
       }};
     providers.set(id,emitter);
     context.subscriptions.push(emitter,vscode.window.registerTreeDataProvider('skillStudio.'+id,provider));
   }
   const fire=()=>{for(const p of providers.values())p.fire();};
-  function update(doc,choice=selection){
+  function update(doc,choice){
     if(!isProcedurePath(doc?.uri.path))return;
-    const same=document?.uri.toString()===doc.uri.toString();
+    const key=doc.uri.toString(),same=document?.uri.toString()===key;
     const text=doc.getText(),projected=same&&snapshot?.text===text?snapshot.model:null;
-    if(!same){generation++;selection={};audit=[];diagnostics.clear();}
-    document=doc;selection=same?choice:{};
-    snapshot={...inspectionSnapshot(text,selection,projected),text};fire();
+    const next=choice??(same?selection:selections.get(key)??{});
+    const changed=!same||snapshot?.text!==text||next.procedureId!==selection.procedureId||next.nodeId!==selection.nodeId;
+    if(!same){generation++;audit=[];diagnostics.clear();}
+    document=doc;selection=next;selections.set(key,next);
+    if(changed){snapshot={...inspectionSnapshot(text,selection,projected),text};fire();}
   }
   async function auditCurrent(){
     if(!document)return;
@@ -70,9 +72,10 @@ export function registerWorkbench(vscode,context){
     }catch(error){if(ticket!==generation)return;auditStatus='Package Audit · unavailable';audit=[{message:'Audit unavailable: '+error.message,line:1,uri:doc.uri}];diagnostics.clear();fire();}
   }
   function scheduleAudit(){generation++;clearTimeout(timer);auditStatus="Package Audit · pending";audit=[];diagnostics.clear();timer=setTimeout(()=>void auditCurrent(),350);fire();}
-  context.subscriptions.push({dispose(){clearTimeout(timer);generation++;sessions.clear();}},
+  context.subscriptions.push({dispose(){clearTimeout(timer);generation++;sessions.clear();selections.clear();}},
     vscode.commands.registerCommand('skillStudio.revealInspection',async item=>{
-      if(!document||item.version!==document.version)return;
+      if(!document||item.version!==document.version||
+         (item.auditGeneration!==undefined&&item.auditGeneration!==generation))return;
       if(item.nodeId){selection={procedureId:item.procedureId,nodeId:item.nodeId};update(document);sessions.get(document.uri.toString())?.({type:'focusNode',...selection,version:document.version});}
       const doc=await vscode.workspace.openTextDocument(item.uri);
       const line=Math.min(Math.max(0,item.line-1),doc.lineCount-1);
@@ -96,5 +99,5 @@ export function registerWorkbench(vscode,context){
   return {attach(doc,post){sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();return ()=>{sessions.delete(doc.uri.toString());};},select(doc,message){
     if(message.version!==doc.version||typeof message.procedureId!=='string')return;
     update(doc,{procedureId:message.procedureId,nodeId:typeof message.nodeId==='string'?message.nodeId:null});
-  },activate(doc){update(doc);scheduleAudit();}};
+  },activate(doc){const changed=document?.uri.toString()!==doc.uri.toString()||snapshot?.text!==doc.getText();update(doc);if(changed)scheduleAudit();}};
 }

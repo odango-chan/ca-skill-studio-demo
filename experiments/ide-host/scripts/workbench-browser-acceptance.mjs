@@ -3,34 +3,34 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
+    await sleep(100);
     await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:count});
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:count});
   };
-  async function palette(text){
-    const view=await evalJS(`(()=>{const e=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='View'&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0);const r=e?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-    if(!view)throw Error('Native View menu missing');await click(view.x,view.y);await sleep(150);
-    const entry=await evalJS(`(()=>{const e=[...document.querySelectorAll('.lm-Menu-item')].find(x=>x.innerText.includes('Command Palette')&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=e?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-    if(!entry)throw Error('Native Command Palette menu missing');await click(entry.x,entry.y);await sleep(200);
-    await command('Input.dispatchKeyEvent',{type:'keyDown',key:'a',code:'KeyA',modifiers:2,windowsVirtualKeyCode:65});
-    await command('Input.dispatchKeyEvent',{type:'keyUp',key:'a',code:'KeyA',modifiers:2,windowsVirtualKeyCode:65});
-    await command('Input.insertText',{text:'>'+text});await sleep(300);
-    const pos=await evalJS(`(()=>{const el=[...document.querySelectorAll('.quick-input-widget .monaco-list-row')].find(x=>x.innerText.toLowerCase().includes(${JSON.stringify(text.toLowerCase())})&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-    if(!pos)throw Error('Command missing: '+text+' '+JSON.stringify(await evalJS(`({inputs:[...document.querySelectorAll('input')].map(x=>({value:x.value,rect:x.getBoundingClientRect().toJSON()})),rows:[...document.querySelectorAll('.monaco-list-row')].map(x=>({text:x.innerText,rect:x.getBoundingClientRect().toJSON()})).slice(-15),active:document.activeElement?.outerHTML,text:document.body.innerText.slice(-1200)})`)));await click(pos.x,pos.y);await sleep(500);
+  // Use the real native command registry for setup/actions. Explorer gestures
+  // below remain actual Chromium input; no host or TextDocument is mocked.
+  async function invoke(id){
+    console.log("STUDIO_NATIVE_ACTION",id);
+    try{await evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key),id=${JSON.stringify(id)};if(id==="navigator.reveal"){const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==="Symbol(OpenerService)");const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;if(!resource)throw Error("Procedure native resource missing");await registry.executeCommand(id,resource);}else await registry.executeCommand(id);})()`);}
+    catch(error){throw Error("Native command "+id+": "+error.message);}
+    await sleep(300);
   }
-  await palette('Skill Studio: Refresh Inspection');
+  await invoke('skillStudio.refreshInspection');
   const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
   await click(activity.x,activity.y);await sleep(500);
   const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
   for(const name of ['Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
-  await palette('Skill Studio: Audit Current Package');
+  const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.closest('.part')?.classList.contains('collapsed'));const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  if(problemsHeader){await click(problemsHeader.x,problemsHeader.y);await sleep(200);}
+  await invoke('skillStudio.auditPackage');
   const audit=await evalJS(`document.body.innerText`);
-  if(audit.includes('Audit unavailable'))throw Error('Package Audit did not run: '+audit.slice(-1000));
+  if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not run: '+audit.slice(-1000));
   // Re-open through Explorer rather than extension openWith command.
-  await palette('Reveal in Explorer');
-  await palette('Save All');
-  await palette('Close All Editors');
-  await palette('Focus on Files Explorer');
+  await invoke('navigator.reveal');
+  await invoke('core.saveAll');
+  await invoke('core.close.all.main.tabs');
+  await invoke('workbench.files.action.focusFilesExplorer');
   let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file not available in native Explorer');
   const start=performance.now();await click(file.x,file.y);await sleep(800);
@@ -68,7 +68,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
   await click(markdownFile.x,markdownFile.y,2);await sleep(400);
-  await palette('Skill Studio: Preview Markdown');
+  await invoke('skillStudio.previewMarkdown');
   const tree=await command('Page.getFrameTree');let markdown=false;
   async function inspect(n){
     try{const w=await command('Page.createIsolatedWorld',{frameId:n.frame.id,worldName:'markdown-acceptance',grantUniveralAccess:true});
@@ -78,7 +78,17 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     for(const c of n.childFrames??[])await inspect(c);
   }
   await inspect(tree.frameTree);if(!markdown)throw Error('Shared safe Markdown Preview did not render');
+  // Native layout restoration must retain the CustomEditor across a reload.
+  console.log("STUDIO_NATIVE_ACTION","reload");
+  await sleep(1200);await command('Page.reload');
+  let restored=null;
+  for(let i=0;i<120&&!restored;i++){
+    const tab=await evalJS(`(()=>{const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>x.textContent.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+    if(tab){await click(tab.x,tab.y);restored=await graph();}
+    if(!restored)await sleep(150);
+  }
+  if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,markdown:true,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs};
+  return {views:true,packageAudit:true,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs};
 }

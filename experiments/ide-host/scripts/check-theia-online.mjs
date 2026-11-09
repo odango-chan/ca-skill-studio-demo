@@ -14,10 +14,10 @@ function scan(dir,depth=0){
   return files;
 }
 const files=scan(root);
-const index=files.find(p=>p.endsWith("/index.html"));
+const index=files.find(p=>p===join(root,"index.html"));
 if(!index)throw Error("Browser-only frontend index.html was not emitted");
 if(statSync(index).size<200)throw Error("Empty HTML");
-const pluginLists=files.filter(p=>p.endsWith("/hostedPlugin/list.json"));
+const pluginLists=files.filter(p=>p.endsWith(join("hostedPlugin","list.json")));
 const pluginListEvidence=pluginLists.map(p=>({path:p,text:readFileSync(p,"utf8").slice(0,3000)}));
 const hasProcedurePlugin=files.some(p=>p.includes("odango_chan_ca_skill_studio_ide_spike"))||
   pluginListEvidence.some(p=>p.text.includes("ca-skill-studio-ide-spike"));
@@ -32,7 +32,7 @@ const themeAssets=[
 ].map(p=>join(root,p));
 const missingThemeAssets=themeAssets.filter(p=>!existsSync(p));
 console.log("STUDIO_THEIA_FRONTEND_ARTIFACT",JSON.stringify({
-  index,files:files.length,pluginLists:pluginLists.map(p=>p.path),
+  index,files:files.length,pluginLists,
   procedurePlugin:hasProcedurePlugin,themePlugin:hasThemePlugin,
   themeAssets:themeAssets.filter(existsSync),missingThemeAssets
 }));

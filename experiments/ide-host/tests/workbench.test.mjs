@@ -46,6 +46,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const context={subscriptions:[]},workbench=registerWorkbench(vscode,context),posted=[];
   workbench.attach(doc,m=>posted.push(m));
   assert.equal(providers.size,4);
+  const beforeActivation=changes.length;workbench.activate(doc);workbench.activate(doc);
+  assert.equal(changes.length,beforeActivation,"unchanged activation must not refresh the native trees");
   const outline=providers.get('skillStudio.outline');
   const node=outline.getChildren()[0].children[0];
   const item=outline.getTreeItem(node);
