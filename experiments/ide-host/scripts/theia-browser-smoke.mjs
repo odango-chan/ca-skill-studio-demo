@@ -552,9 +552,15 @@ try{
           patchVisible:!document.querySelector("#patch")?.hidden
         })`
       });
-      if(!String(routeApplied.result?.value?.message??"").includes("WorkspaceEdit 已应用"))
-        throw Error("Native host did not apply the new Route insertion: "+
-          JSON.stringify(routeApplied.result?.value));
+      const routeAppliedSource=await evalJS(`(()=> {
+        const model=window.monaco?.editor?.getModels?.().find(item=>
+          item.uri?.path?.endsWith("/assurance/procedure.yaml"));
+        return {ready:Boolean(model),hasDenied:Boolean(model?.getValue().split(/\\r?\\n/)
+          .some(line=>line.trim()==="DENIED: failed"))};
+      })()`);
+      if(!routeAppliedSource?.ready||!routeAppliedSource.hasDenied)
+        throw Error("Native host did not insert the new Route into Source: "+
+          JSON.stringify({applied:routeApplied.result?.value,source:routeAppliedSource}));
       await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`document.querySelector("#openSource")?.click(); true`
@@ -576,10 +582,17 @@ try{
           graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
         })`
       });
+      const routeUndoSource=await evalJS(`(()=> {
+        const model=window.monaco?.editor?.getModels?.().find(item=>
+          item.uri?.path?.endsWith("/assurance/procedure.yaml"));
+        return {ready:Boolean(model),hasDenied:Boolean(model?.getValue().split(/\\r?\\n/)
+          .some(line=>line.trim()==="DENIED: failed"))};
+      })()`);
       patchEvidence.routeCreate={
         fixture:routeFixture,gesture:routeGesture,
         proposal:routeProposalValue,preview:routePreviewValue,
-        applied:routeApplied.result?.value??null,undo:routeUndo.result?.value??null
+        applied:routeApplied.result?.value??null,appliedSource:routeAppliedSource,
+        undo:routeUndo.result?.value??null,undoSource:routeUndoSource
       };
     }else{
       patchEvidence={preview:previewEvidence,applied:null};
@@ -630,8 +643,10 @@ try{
       !patchEvidence.routeCreate?.gesture?.ready||
       !patchEvidence.routeCreate?.proposal?.visible||
       !patchEvidence.routeCreate?.preview?.ready||
-      !String(patchEvidence.routeCreate?.applied?.message??"").includes("WorkspaceEdit 已应用")||
-      !(patchEvidence.routeCreate?.applied?.graphEdges>patchEvidence.routeCreate?.undo?.graphEdges)))
+      !patchEvidence.routeCreate?.appliedSource?.ready||
+      !patchEvidence.routeCreate?.appliedSource?.hasDenied||
+      !patchEvidence.routeCreate?.undoSource?.ready||
+      patchEvidence.routeCreate?.undoSource?.hasDenied))
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
   if(requireEditor)
