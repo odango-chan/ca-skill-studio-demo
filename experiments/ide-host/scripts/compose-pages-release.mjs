@@ -15,7 +15,7 @@ async function requireFile(root,relative){
 
 function injectBeforeBody(html,markup,id){
   if(html.includes('id="'+id+'"'))return html;
-  const match=html.match(/<body(?:\\s[^>]*)?>/i);
+  const match=html.match(/<body(?:\s[^>]*)?>/i);
   if(!match)throw new Error("Cannot add navigation banner: HTML has no body element");
   return html.replace(match[0],match[0]+markup);
 }
