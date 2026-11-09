@@ -1,6 +1,6 @@
 # Skill Studio 实施证据追溯
 
-**Status: Accepted · Date: 2026-11-05**
+**Status: Accepted · Date: 2026-11-09**
 
 `WORK` 回答 **现在到哪**；本页回答 **规范→代码→测试→何种证据**。下表不复制 owner Runtime 契约，也不把静态/Mock 宣告为 Live PASS。
 
@@ -54,3 +54,5 @@
 
 任何 `IMPLEMENTED` 必须能够从该表定位到当前代码和测试；`PASS` 还需要有对应真实 Gate 与稳定证据 URL/仓内 Artifact。不得用 `/tmp` 或个人绝对路径作为唯一 durable locator。Code/Schema/Focused test/Acceptance 变化时，WORK 和 TRACEABILITY 在同 PR 内同步更新。
 | D1-A2d current Node PRE/OP/POST visual boundary | [Workbench](design/authoring-workbench.md) | `site/node-focus-graph.mjs`, `site/node-focus-flow.tsx`, `site/light.css` | `tests/node-focus-graph.test.mjs`, `scripts/edge-smoke.mjs` | Integrated into IDE preview branch from reviewed #71 patch at `9d3f639`; exact-head CI pending; view-only boundary, no Source/Route/Runtime changes |
+
+| Default Theia Pages host + preserved Classic Studio (2026-11-09) | [ADR-0002](decisions/0002-ide-host-spike.md), [online host guide](../experiments/ide-host/README.md) | `.github/workflows/pages.yml`, `experiments/ide-host/scripts/compose-pages-release.mjs`, `prepare-theia-static-preview.mjs`, Theia browser extension | `experiments/ide-host/tests/pages-compose.test.mjs`, `theia-browser-smoke.mjs`, exact-head Pages workflow | Theia root is intended at `/ca-skill-studio-demo/`; full previous Studio at `/classic/`; former `/ide-preview/` redirects to root. Prior Theia browser smoke passed at old subpath (#42575346100); new root smoke, composition and deployment are pending exact-head CI. Same-origin static Webview warning applies; no sensitive workspaces, Runtime or 5GC. |
