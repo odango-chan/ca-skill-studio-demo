@@ -6,6 +6,7 @@ on:
     paths:
       - "site/**"
       - "experiments/ide-host/**"
+      - "extensions/skill-studio-theme/**"
       - "tests/**"
       - "scripts/**"
       - "package.json"
@@ -204,6 +205,10 @@ jobs:
           test -s dist/index.html
           test -s dist/bundle.js
           test -s dist/hostedPlugin/list.json
+          test -s dist/hostedPlugin/odango_chan_skill_studio_theme/package.json
+          test -s dist/hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json
+          test -s dist/hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json
+          test -s dist/hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg
           test -s dist/webview/index.html
           test -s dist/classic/index.html
           test -s dist/classic/app.js

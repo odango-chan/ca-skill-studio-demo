@@ -23,7 +23,12 @@ test("Pages root is Theia, complete previous Studio remains at /classic/",async(
     await put(classic,"samples/establish-pdu-session/SKILL.md","# Sample");
     await put(theia,"index.html",'<!doctype html><html><body><div id="skill-studio-preview-warning"><a href="./classic/">Classic</a></div><div id="theia-app-shell"></div></body></html>');
     await put(theia,"bundle.js","window.theia=true;");
-    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike"]');
+    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","odango-chan.skill-studio-theme"]');
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/package.json",'{"name":"skill-studio-theme"}');
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",'{"name":"SKILL Studio Light"}');
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",'{"iconDefinitions":{}}');
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg",'<svg></svg>');
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/yaml.svg",'<svg></svg>');
     await put(theia,"webview/index.html","<html>webview</html>");
 
     const result=await composePagesRelease({
@@ -39,6 +44,9 @@ test("Pages root is Theia, complete previous Studio remains at /classic/",async(
     assert.equal(await readFile(join(classic,"classic","samples/establish-pdu-session/SKILL.md"),"utf8"),"# Sample");
     assert.equal(await readFile(join(classic,"bundle.js"),"utf8"),"window.theia=true;");
     assert.match(await readFile(join(classic,"hostedPlugin/list.json"),"utf8"),/ca-skill-studio-ide-spike/);
+    assert.match(await readFile(join(classic,"hostedPlugin/list.json"),"utf8"),/skill-studio-theme/);
+    assert.equal(await readFile(join(classic,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json"),"utf8"),'{"name":"SKILL Studio Light"}');
+    assert.equal(await readFile(join(classic,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg"),"utf8"),'<svg></svg>');
     assert.equal(await readFile(join(classic,".nojekyll"),"utf8"),"");
     assert.match(await readFile(join(classic,"ide-preview","index.html"),"utf8"),/url=\.\.\//);
     await assert.rejects(stat(join(classic,"app.js")));

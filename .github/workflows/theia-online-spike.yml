@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "experiments/ide-host/**"
+      - "extensions/skill-studio-theme/**"
       - ".github/workflows/theia-online-spike.yml"
   workflow_dispatch:
 

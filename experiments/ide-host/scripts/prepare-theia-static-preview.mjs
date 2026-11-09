@@ -60,6 +60,29 @@ for(const required of [
 console.log("STUDIO_THEIA_STATIC_PLUGIN_ASSETS",JSON.stringify({
   pluginTarget,assets:["samples/**","media/**"],sameOriginOnly:true
 }));
+// Theia does not copy arbitrary extension assets into hostedPlugin.
+// Preserve the exact theme package paths referenced by its contribution JSON.
+const themePluginSource=resolve("experiments/ide-host/theia-online/plugins/odango-chan.skill-studio-theme");
+const themePluginTarget=join(root,"hostedPlugin","odango_chan_skill_studio_theme");
+await mkdir(themePluginTarget,{recursive:true});
+await cp(join(themePluginSource,"package.json"),join(themePluginTarget,"package.json"),{force:true});
+for(const name of ["themes","icons"]){
+  await cp(join(themePluginSource,name),join(themePluginTarget,name),{recursive:true,force:true});
+}
+for(const required of [
+  join(themePluginTarget,"package.json"),
+  join(themePluginTarget,"themes","skill-studio-light-color-theme.json"),
+  join(themePluginTarget,"icons","skill-studio-file-icon-theme.json"),
+  ...["skill","yaml","markdown","python","file","folder","folder-open","code"]
+    .map(name=>join(themePluginTarget,"icons",name+".svg"))
+]){
+  const info=await stat(required);
+  if(!info.isFile()||info.size<80)
+    throw Error("Static hosted Skill Studio theme asset missing or empty: "+required);
+}
+console.log("STUDIO_THEIA_STATIC_THEME_ASSETS",JSON.stringify({
+  themePluginTarget,assets:["package.json","themes/**","icons/**"],offlinePackage:true
+}));
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,
   webviewAssets:copied,target

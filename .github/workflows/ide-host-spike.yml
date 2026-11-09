@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "experiments/ide-host/**"
+      - "extensions/skill-studio-theme/**"
+      - "tests/skill-studio-theme.test.mjs"
       - ".github/workflows/ide-host-spike.yml"
       - "site/workspace.mjs"
       - "site/layout.mjs"
@@ -44,3 +46,16 @@ jobs:
           name: ca-skill-studio-ide-spike-vsix
           path: experiments/ide-host/vscode/ca-skill-studio-ide-spike.vsix
           if-no-files-found: error
+
+      - name: Package offline Skill Studio theme VSIX
+        working-directory: extensions/skill-studio-theme
+        run: |
+          npx --yes @vscode/vsce package --no-dependencies --out skill-studio-theme.vsix
+          test -s skill-studio-theme.vsix
+      - name: Publish offline Skill Studio theme VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: skill-studio-theme-vsix
+          path: extensions/skill-studio-theme/skill-studio-theme.vsix
+          if-no-files-found: error
+          retention-days: 30
