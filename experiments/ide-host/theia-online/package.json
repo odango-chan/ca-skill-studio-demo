@@ -7,7 +7,7 @@
     "target": "browser-only",
     "frontend": {
       "config": {
-        "applicationName": "SKILL Studio · Temporary Pages Preview (Demo Only)",
+        "applicationName": "SKILL Studio · Online Workbench",
         "preferences": {
           "files.enableTrash": false,
           "security.workspace.trust.enabled": false
