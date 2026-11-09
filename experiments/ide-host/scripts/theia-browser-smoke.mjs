@@ -106,15 +106,58 @@ try{
         ).length;
         return {loaded:Boolean(link?.sheet),activityIcons:icons.length,mapped};
       })(),
+      brand:(()=>{
+        const brand=document.querySelector(".lm-MenuBar > .skill-studio-brand");
+        const bar=brand?.parentElement;
+        const content=bar&&Array.from(bar.children).find(child=>
+          child.classList.contains("lm-MenuBar-content")
+        );
+        const a=brand?.getBoundingClientRect();
+        const b=content?.getBoundingClientRect();
+        const nativeMenus=content?[...content.querySelectorAll(".lm-MenuBar-item")]
+          .map(item=>item.textContent.trim()).filter(Boolean):[];
+        return {
+          present:Boolean(brand),
+          label:brand?.querySelector(".skill-studio-brand-label")?.textContent.trim()||"",
+          stylesheet:Boolean(document.querySelector("#skill-studio-brand-theme")?.sheet),
+          beforeNativeMenus:Boolean(brand&&content&&brand.nextElementSibling===content),
+          sameRow:Boolean(a&&b)&&Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2)<3,
+          nativeMenus
+        };
+      })(),
       widgets:document.querySelectorAll(".lm-Widget").length,
       menus:document.querySelectorAll(".p-MenuBar-item,.lm-MenuBar-item").length,
       editor:document.querySelectorAll(".monaco-editor").length,
       bodyLength:document.body?.innerText?.length||0,
       errors:document.querySelectorAll(".theia-error").length
     })`);
-    if(view?.appShell&&view.widgets>4&&view.bodyLength>15)break;
+    if(view?.appShell&&view.widgets>4&&view.bodyLength>15&&view.brand?.present)break;
     await sleep(150);
   }
+  if(!view?.brand?.present||!view.brand.stylesheet||
+     !view.brand.beforeNativeMenus||!view.brand.sameRow||
+     view.brand.label!=="SKILL Studio"||
+     !view.brand.nativeMenus.includes("File")||
+     !view.brand.nativeMenus.includes("Edit"))
+    throw Error("SKILL Studio brand must share the native File/Edit menu row: "+
+      JSON.stringify(view?.brand));
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:640,height:900,deviceScaleFactor:1,mobile:false
+  });
+  const narrowBrand=await evalJS(`(()=>{
+    const brand=document.querySelector(".lm-MenuBar > .skill-studio-brand");
+    const label=brand?.querySelector(".skill-studio-brand-label");
+    const mark=brand?.querySelector(".skill-studio-brand-mark");
+    return {
+      present:Boolean(brand),
+      labelDisplay:label?getComputedStyle(label).display:"missing",
+      markVisible:Boolean(mark)&&getComputedStyle(mark).display!=="none"&&mark.getBoundingClientRect().width>0
+    };
+  })()`);
+  await command("Emulation.clearDeviceMetricsOverride");
+  if(!narrowBrand.present||narrowBrand.labelDisplay!=="none"||!narrowBrand.markVisible)
+    throw Error("SKILL Studio brand did not compact cleanly on narrow screens: "+
+      JSON.stringify(narrowBrand));
   const warningDismissed=await evalJS(`(()=>{
     const candidates=[...document.querySelectorAll('button,[role="button"]')];
     const ok=candidates.find(x=>x.innerText.trim()==="OK");
@@ -483,9 +526,9 @@ try{
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify(patchEvidence.nodeFocus).slice(0,3500));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS");
   else
-    console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
+    console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
   ws?.close();child.kill("SIGKILL");
   if(server?.listening)await new Promise(ok=>server.close(ok));
