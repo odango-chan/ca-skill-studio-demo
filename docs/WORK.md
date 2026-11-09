@@ -24,15 +24,15 @@
 
 **一致性：** 原文件按钮与 handler 仍为命令所有者，低频重复按钮仅在视觉上隐藏；不可用与权限仍由 JS `hidden`/`disabled`、现有 Picker 和 Diff/Confirm 保护。浏览器回归要证明文件菜单可以访问示例/ZIP，真实样本加载确实经过菜单，Source 和导航不变。追踪 [#80](https://github.com/odango-chan/ca-skill-studio-demo/issues/80)。PR CI、Pages 待实际成功后补证据；不得把部署前的 UI 声称已上线。
 
-## 2026-11-06 · IDE Host Spike (Issue #85; 不影响已部署 Pages)
+## 2026-11-06 · IDE Host Spike（历史起点；已由 2026-11-09 默认宿主决策取代）
 
 **本轮为独立试验分支** `spike/ide-extension-theia-host`：标准 VS Code `CustomTextEditorProvider` / `TextDocument` / `WorkspaceEdit`，将现有 Procedure 投影、ELK、ReactFlow 复用到 Webview；普通 YAML/Python、文件树、新建/删除、Undo/Redo 交给宿主。另通过同一 VSIX 试验 Theia 的 VS Code API 兼容性。详细见 [ADR-0002](decisions/0002-ide-host-spike.md) 和 [试验说明](../experiments/ide-host/README.md)。
 
-**代码证据：** [独立 IDE Spike CI #42191440251 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42191440251)（6/6：实际 5-Procedure CreatedSession 投影、精确 Route Target Patch、旧版本/伪造负例、打包扩展的模拟 TextDocument/WorkspaceEdit 测试；409/409 现有回归；VSIX Artifacts 生成）。[Draft PR #86](https://github.com/odango-chan/ca-skill-studio-demo/pull/86) 保持 OPEN，未合入 main。**真实 VS Code 图形界面、Theia 安装/交互、Native Explorer 新建/删除/Undo 仍 NOT_RUN**；模拟宿主的 PASS 不代表真实 IDE 通过。此前 Source-only YAML/Python 工具栏的 WIP 分支不合并，主站仍以当前 main 为准；本次不修改 Runtime/5GC。
+**当时证据：** [独立 IDE Spike CI #42191440251 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42191440251)（6/6 focused tests、409/409 旧回归、VSIX 生成）。当时 PR #86 为 Draft/OPEN；**现已于 2026-11-09 通过 Squash Merge 合入 `main@b2f4e991`**。Theia browser-only 在线宿主已通过真实 Chromium 和 Pages 根路径部署；VS Code 桌面 GUI / Node Theia 桌面宿主仍未验收。模拟宿主 PASS 不代表桌面 IDE PASS；本仓不修改 Runtime/5GC。
 
-## 2026-11-06 · 在线版必须保留（IDE Spike 修订）
+## 2026-11-06 · 在线版必须保留（历史约束；后续宿主决策见 2026-11-09）
 
-**产品约束更新：** 浏览器在线 Studio 是必需能力，而非 VS Code 桌面扩展的替代品。现有 GitHub Pages 保留；新方案评估 Theia 1.76+ 的 `browser-only` 静态应用与构建时内置 Web 扩展，文件树/新增/删除/标签页由宿主负责，Procedure/Source-backed Patch 复用核心。当前分支只新增双入口构建（Node + browser）；**完整 Theia Online、静态部署、OPFS 持久化、Native VS Code GUI 均 NOT_RUN**，不能据此替换 Pages。参见 [ADR-0002](decisions/0002-ide-host-spike.md)。
+**当时产品约束：** 浏览器在线 Studio 是必需能力；当时 Theia 1.76+ 仍处于候选评估，完整在线构建/部署/OPFS/Native GUI 尚未验收。该状态已由 2026-11-09 的决策更新：Theia browser-only 成为默认 Pages 宿主，旧版完整工作台保留在 `/classic/`；当前验收证据见本文件末尾和 [ADR-0002](decisions/0002-ide-host-spike.md)。
 
 ## Overall
 
