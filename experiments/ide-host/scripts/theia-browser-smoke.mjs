@@ -228,13 +228,12 @@ try{
     for(const child of node.childFrames??[])walkFrames(child);
   };
   walkFrames(frameTree.frameTree);
-  const webviewFrame=frames.find(frame=>frame.url.includes("/webview/index.html")||
-    frame.url.includes(".webview."));
-  let webviewView=null,webviewFrameError=null;
-  if(webviewFrame){
+  const webviewFrames=[];
+  for(const frame of frames.filter(item=>item.url.includes("/webview/index.html")||
+      item.url.includes(".webview."))){
     try{
       const world=await command("Page.createIsolatedWorld",{
-        frameId:webviewFrame.id,worldName:"skill-studio-acceptance",grantUniveralAccess:true
+        frameId:frame.id,worldName:"skill-studio-acceptance",grantUniveralAccess:true
       });
       const evaluated=await command("Runtime.evaluate",{
         contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
@@ -249,18 +248,24 @@ try{
           message:document.querySelector("#message")?.textContent||"",
           patchVisible:!document.querySelector("#patch")?.hidden,
           html:document.documentElement?.outerHTML?.slice(0,5000)||"",
-          nestedFrames:[...document.querySelectorAll("iframe")].map(frame=>({
-            src:frame.getAttribute("src"),title:frame.title,html:frame.outerHTML.slice(0,500)
+          nestedFrames:[...document.querySelectorAll("iframe")].map(child=>({
+            src:child.getAttribute("src"),title:child.title,html:child.outerHTML.slice(0,500)
           }))
         })`
       });
-      webviewView=evaluated.result?.value??null;
-    }catch(error){webviewFrameError=String(error);}
+      webviewFrames.push({frame,view:evaluated.result?.value??null});
+    }catch(error){
+      webviewFrames.push({frame,error:String(error)});
+    }
   }
+  const graphFrame=webviewFrames.find(item=>item.view?.procedureRoot&&item.view.graphNodes>0);
+  const webviewFrame=graphFrame?.frame??webviewFrames[0]?.frame??null;
+  const webviewView=graphFrame?.view??webviewFrames[0]?.view??null;
+  const webviewFrameError=webviewFrames.find(item=>item.error)?.error??null;
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
-    frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrame,webviewView,webviewFrameError,
+    frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrames,webviewFrame,webviewView,webviewFrameError,
     extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500),
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
