@@ -861,19 +861,21 @@ try{
       const updaterInfo=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
+          const routeId="await-initial-resources:FAILED";
           const source=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
           const oldTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="unresolved"]');
           const newTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="failed"]');
-          const handle=[...(source?.querySelectorAll('.react-flow__handle[data-handleid^="edge-"][data-handleid$="-out"]')??[])]
-            .find(item=>{
-              const match=item.getAttribute("data-handleid")?.match(/^edge-(\\d+)-out$/);
-              return match&&oldTarget?.querySelector(
-                '.react-flow__handle[data-handleid="edge-'+match[1]+'-in"]');
-            });
-          const match=handle?.getAttribute("data-handleid")?.match(/^edge-(\\d+)-out$/);
-          const index=match?Number(match[1]):-1;
-          const edge=index>=0?document.querySelector(
-            '#reactFlowRoot .react-flow__edge[data-id="flow-edge-'+index+'"]'):null;
+          const labels=[...document.querySelectorAll(".designer-route-label.is-selected")];
+          const label=labels.find(item=>item.getAttribute("data-route-source")==="operator.on"&&
+            (item.getAttribute("data-route-ids")??"").split(",").includes(routeId));
+          const edges=[...document.querySelectorAll("#reactFlowRoot .react-flow__edge")];
+          const selectedEdges=edges.filter(item=>item.querySelector(".designer-edge.is-selected"));
+          const edge=selectedEdges.find(item=>{
+            const index=item.getAttribute("data-id")?.match(/^flow-edge-(\\d+)$/)?.[1];
+            return index&&oldTarget?.querySelector(
+              '.react-flow__handle[data-handleid="edge-'+index+'-in"]');
+          });
+          const index=Number(edge?.getAttribute("data-id")?.match(/^flow-edge-(\\d+)$/)?.[1]??-1);
           const oldHandle=index>=0?oldTarget?.querySelector(
             '.react-flow__handle[data-handleid="edge-'+index+'-in"]'):null;
           const target=newTarget?.querySelector('.react-flow__handle[data-handleid="in"]');
@@ -883,7 +885,9 @@ try{
           const chosen=oldPoint?updaters.map(element=>({element,point:rect(element)}))
             .sort((a,b)=>Math.hypot(a.point.x-oldPoint.x,a.point.y-oldPoint.y)-
               Math.hypot(b.point.x-oldPoint.x,b.point.y-oldPoint.y))[0]:null;
-          return {ready:Boolean(chosen&&target),updaterCount:updaters.length,index,
+          return {ready:Boolean(label&&edge&&chosen&&target),updaterCount:updaters.length,index,
+            label:label?{source:label.getAttribute("data-route-source"),ids:label.getAttribute("data-route-ids")} :null,
+            selectedEdgeCount:selectedEdges.length,
             updater:chosen?.point??null,target:target?rect(target):null,
             oldPoint,updaterHtml:chosen?.element?.outerHTML??"",
             edgeHtml:edge?.outerHTML?.slice(0,1800)??""};
