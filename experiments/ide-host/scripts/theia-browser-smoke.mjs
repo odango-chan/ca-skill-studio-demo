@@ -279,9 +279,10 @@ try{
       expression:`(()=>{
         const routes=document.querySelector("#routeList");
         const targets=document.querySelector("#targetList");
-        if(!routes||!targets||routes.options.length<1)
+        if(!routes||!targets||routes.options.length<2)
           return {ready:false,reason:"No source-qualified Route choices",routeOptions:routes?.options.length??0};
-        routes.selectedIndex=0;
+        // Index 0 is the explicit "choose a Route" placeholder.
+        routes.selectedIndex=1;
         routes.dispatchEvent(new Event("change",{bubbles:true}));
         if(targets.options.length<1)
           return {ready:false,reason:"No qualified target choices",routeOptions:routes.options.length};
