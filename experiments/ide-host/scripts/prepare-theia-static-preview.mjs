@@ -30,6 +30,13 @@ for(const required of ["index.html","fake.html","main.js"]){
   if(!files.some(entry=>entry.isFile()&&entry.name===required))
     throw Error("Missing pinned Theia webview asset: "+required);
 }
+const indexPath=join(root,"index.html");
+let indexHtml=await readFile(indexPath,"utf8");
+const warning='<div id="skill-studio-preview-warning" role="note" style="position:fixed;right:12px;bottom:12px;z-index:2147483000;padding:6px 10px;border:1px solid #d6a84b;border-radius:6px;background:#fff4d6;color:#614600;font:12px/1.4 system-ui,sans-serif;pointer-events:none">临时 Demo 预览 · Webview 使用同源模式 · 请勿打开敏感文件</div>';
+if(!indexHtml.includes('id="skill-studio-preview-warning"')){
+  indexHtml=indexHtml.replace("<body>","<body>"+warning);
+  await writeFile(indexPath,indexHtml);
+}
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,
   webviewAssets:copied,target
