@@ -39,6 +39,7 @@ test("Pages root is Theia, complete previous Studio remains at /classic/",async(
     assert.equal(await readFile(join(classic,"classic","samples/establish-pdu-session/SKILL.md"),"utf8"),"# Sample");
     assert.equal(await readFile(join(classic,"bundle.js"),"utf8"),"window.theia=true;");
     assert.match(await readFile(join(classic,"hostedPlugin/list.json"),"utf8"),/ca-skill-studio-ide-spike/);
+    assert.equal(await readFile(join(classic,".nojekyll"),"utf8"),"");
     assert.match(await readFile(join(classic,"ide-preview","index.html"),"utf8"),/url=\.\.\//);
     await assert.rejects(stat(join(classic,"app.js")));
   }finally{
