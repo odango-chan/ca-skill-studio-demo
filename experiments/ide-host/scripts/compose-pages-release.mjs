@@ -3,6 +3,7 @@
 // The caller must build and smoke-test both inputs before invoking this step.
 import {cp,mkdtemp,mkdir,readdir,readFile,rm,stat,writeFile} from "node:fs/promises";
 import {dirname,join,resolve} from "node:path";
+import {fileURLToPath} from "node:url";
 
 async function requireFile(root,relative){
   const path=join(root,relative);
@@ -93,7 +94,7 @@ function arg(name){
   return process.argv[index+1];
 }
 
-if(process.argv[1]&&resolve(process.argv[1])===resolve(new URL(import.meta.url).pathname)){
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const result=await composePagesRelease({
     classicDist:arg("--classic"),
     theiaFrontend:arg("--theia"),
