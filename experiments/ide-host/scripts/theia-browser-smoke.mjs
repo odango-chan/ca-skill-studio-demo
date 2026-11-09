@@ -9,6 +9,7 @@ import {tmpdir} from "node:os";
 import {extname,join,resolve,sep} from "node:path";
 
 const root=resolve("experiments/ide-host/theia-online/lib/frontend");
+const externalUrl=process.env.THEIA_URL;
 const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
 if(!existsSync(join(root,"index.html")))throw Error("Theia frontend missing");
@@ -18,7 +19,7 @@ const types={".html":"text/html",".js":"text/javascript",".css":"text/css",
   ".ttf":"font/ttf",".woff":"font/woff",".woff2":"font/woff2",".png":"image/png",
   ".ico":"image/x-icon",".map":"application/json"};
 const requests=new Set(),notFound=new Set(),networkFailures=[],networkResponses=[];
-const server=createServer((req,res)=>{
+const server=externalUrl?null:createServer((req,res)=>{
   const url=new URL(req.url,"http://localhost");
   let name;
   try{name=decodeURIComponent(url.pathname);}catch{res.writeHead(400).end();return;}
@@ -32,8 +33,8 @@ const server=createServer((req,res)=>{
       "Cache-Control":"no-store"});stream.pipe(res);
   });
 });
-await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
-const url="http://127.0.0.1:"+server.address().port+"/";
+if(server)await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
+const url=externalUrl||("http://127.0.0.1:"+server.address().port+"/");
 const profile=await mkdtemp(join(tmpdir(),"theia-online-chrome-"));
 const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",
   "--disable-dev-shm-usage","--no-first-run","--no-default-browser-check",
@@ -257,12 +258,15 @@ try{
   if(!afterImport.bodyText.includes("示例 SKILL 已载入浏览器工作区")||
      !afterImport.folders.some(folder=>folder.name==="skill-studio-examples"))
     throw Error("Theia sample import into OPFS failed: "+JSON.stringify(afterImport).slice(0,2400));
-  if(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1)
+  if(externalUrl&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
-  console.log("THEIA_SAMPLE_OPFS_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS");
+  if(externalUrl)
+    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS");
+  else
+    console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; WEBVIEW_CUSTOM_EDITOR_REQUIRES_BACKEND_HOST");
 }finally{
   ws?.close();child.kill("SIGKILL");
-  await new Promise(ok=>server.close(ok));
+  if(server?.listening)await new Promise(ok=>server.close(ok));
   await rm(profile,{recursive:true,force:true,maxRetries:4,retryDelay:200});
 }
