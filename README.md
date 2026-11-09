@@ -46,16 +46,6 @@ React 19 / React Flow 12 / ELK / TypeScript 7 / YAML 2.9.1 / Node 24 / esbuild�
 
 画布缩放提供三个并列按钮：**适配**（完整流程）、**横向**（宽度铺满）、**纵向**（高度铺满）。它们只改变当前流程图的视口，不会修改 Source，更多细节见 [Workbench](docs/design/authoring-workbench.md)。
 
-D4 Phase Designer 的 A1 已实现有界的 Phase Step 编辑；目前只允许在 Inspector 中将已有 `with.<key>.from` 更换为当前 Procedure 中声明、且类型相同的 `input.*`，不增加流程图节点或改变步骤顺序。见 [D4 设计](docs/design/phase-designer.md) 与 [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)。
-
-D4-A2.1 新增受限的 Phase Step 输出引用编辑：仅在当前 Procedure 原文已经使用过两种写法、且指向同一已执行 Step 和相同输出字段时，提供局部与全限定引用切换；仍不涉及跨生产者重连或 Runtime 输出类型推断。详见 [Phase Designer](docs/design/phase-designer.md) 和 [PR #17](https://github.com/odango-chan/ca-skill-studio-demo/pull/17)。
-
-D4-A2.2a 增加了 Phase Step **只读数据依赖审查**：可以检查上游 Step、执行先后、跨 Node 必经关系，以及本地脚本输出 schema 的声明证据；不会自动修改引用或推断消费参数类型。跨生产者重绑定仍不开放。详见 [D4 设计](docs/design/phase-designer.md) 和 [PR #18](https://github.com/odango-chan/ca-skill-studio-demo/pull/18)。
-
-D4-A2.2b1 已补齐当前有界范围内的**消费者输入契约证据**：当前 Package 内本地脚本的 `# inputSchema` 与唯一同名 schema 可用于展示 `with.<key>` 的消费者字段类型，与源输入/脚本输出的声明类型做只读对照；这不会验证 Runtime 数据可用性、`const`/`pattern` 等约束或 `call` ABI，更不授权跨生产者修改。详见 [D4 Phase Designer](docs/design/phase-designer.md)、[PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19)。
-
-D4 Phase Designer 的 Verify Step 编辑、命名引用影响、失败 Route 重定向和 Outcome 修复均已进入主分支；边界、PR 和证据集中维护在 [D4 设计](docs/design/phase-designer.md)、[WORK](docs/WORK.md) 与 [TRACEABILITY](docs/TRACEABILITY.md)。这些仅是 Source 编辑器级能力，Runtime/5GC NOT_RUN。
-
-E1 Monaco Source Editor 已通过 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 合入最新 D4 主分支：本地 Monaco/Worker，YAML、Python、Markdown、JSON 的 Source 编辑，保留唯一工作副本及 Source/Visual/Split、Diff/确认/Undo/Redo；初始化失败回退原有文本编辑器。[322/322 + real Chromium 集成 CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366)，[resulting-main Pages PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343)，参见 [E 线设计](docs/design/source-editor-workstream.md)。
+D4 Phase Designer 已实现有界 Step 编辑、输出引用切换、只读依赖/消费者契约证据，以及 Verify Step、失败 Route 和 Outcome 编辑。所有操作仍受 Source Patch 与类型/来源约束；跨生产者重绑定和 Runtime/5GC 验证不在范围内。详见 [D4 设计](docs/design/phase-designer.md)、[WORK](docs/WORK.md) 与 [TRACEABILITY](docs/TRACEABILITY.md)。\n\nE1 Monaco Source Editor 已通过 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 合入最新 D4 主分支：本地 Monaco/Worker，YAML、Python、Markdown、JSON 的 Source 编辑，保留唯一工作副本及 Source/Visual/Split、Diff/确认/Undo/Redo；初始化失败回退原有文本编辑器。[322/322 + real Chromium 集成 CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366)，[resulting-main Pages PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343)，参见 [E 线设计](docs/design/source-editor-workstream.md)。
 
 E2 YAML 1.2 语法诊断和离线 Contract/Predicate Owner Schema 提示已由 [PR #42](https://github.com/odango-chan/ca-skill-studio-demo/pull/42) 合入主分支，通过 [328/328 + 真实补全/hover Chromium](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41803566642) 和 [Pages 部署验收](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41804005500)。Procedure 保持 syntax-only，避免旧 Schema 误报；Runtime/5GC NOT_RUN。
