@@ -19,6 +19,15 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   assert.ok(plugin.browser?.endsWith("extension-theia.js"));
   assert.equal(plugin.contributes.customEditors[0].viewType,"skillStudio.procedurePreview");
   assert.equal(plugin.contributes.customEditors[0].priority,"option");
+  assert.ok(plugin.activationEvents.includes("onStartupFinished"),
+    "first-run demo discovery must activate on startup");
+  assert.ok(plugin.contributes.viewsWelcome?.some(x=>
+    x.view==="workbench.explorer.fileView"&&
+    x.contents.includes("command:skillStudio.loadExample")),
+    "Explorer empty state must offer the demo project");
+  assert.ok(plugin.contributes.menus?.["view/title"]?.some(x=>
+    x.command==="skillStudio.loadExample"),
+    "Explorer title toolbar must expose the demo project");
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","media/procedure.js","media/procedure.css",
     "samples/establish-pdu-session/files.json",
     "samples/establish-pdu-session/assurance/procedure.yaml"])
