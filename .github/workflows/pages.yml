@@ -221,13 +221,16 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # The only non-production deployment ref is the reviewed IDE spike branch.
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
     permissions:
       contents: read
       pages: write
       id-token: write
+    # Keep production Pages protection on main; isolate the experimental
+    # preview in its own environment so it does not need to weaken github-pages.
     environment:
-      name: github-pages
+      name: ${{ github.ref == 'refs/heads/spike/ide-extension-theia-host' && 'skill-studio-preview' || 'github-pages' }}
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy artifact to Pages
