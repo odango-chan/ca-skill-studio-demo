@@ -8,6 +8,7 @@ import {layoutProcedureELK} from "../../../../site/layout.mjs";
 import {mountProcedureCanvas} from "../../../../site/react-flow-canvas.tsx";
 import {mountNodeFocusCanvas} from "../../../../site/node-focus-flow.tsx";
 import {projectNodeFocusFlow} from "../../../../site/node-focus-graph.mjs";
+import {flowBundleSelectionId} from "../../../../site/react-flow-projection.mjs";
 import {routeTargetChoices,previewTargetPatch} from "./route-target.mjs";
 import {addRouteOutcomeOptions} from "../../../../site/route-create.mjs";
 import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
@@ -39,7 +40,7 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
       ?candidate.id:null;
     state.routeProposal=null;state.pending=null;state.pendingKind=null;
     state.selection=selected?{kind:"route",id:selected}:{
-      kind:"bundle",id:bundle.source+"->"+bundle.target
+      kind:"bundle",id:flowBundleSelectionId(bundle)
     };
     renderRoutes();
     if(selected){
