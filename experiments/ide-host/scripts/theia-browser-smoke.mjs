@@ -686,11 +686,222 @@ try{
         revision:routeUndo.result?.value?.revision??"",
         graphEdges:routeUndo.result?.value?.graphEdges??0
       };
+
+      // Reconnect a specific member of a multi-Outcome edge bundle. Clicking
+      // the bundle must not silently pick its first Route; the Route selector
+      // is the explicit disambiguation step before the target endpoint drag.
+      const reconnectEdgeInfo=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const source=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
+          const oldTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="unresolved"]');
+          const newTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="failed"]');
+          if(!source||!oldTarget||!newTarget)return {ready:false,reason:"Reconnect Nodes missing"};
+          const pairs=[...source.querySelectorAll('.react-flow__handle[data-handleid^="edge-"][data-handleid$="-out"]')]
+            .map(handle=>{
+              const match=handle.getAttribute("data-handleid")?.match(/^edge-(\\d+)-out$/);
+              if(!match)return null;
+              const index=Number(match[1]),targetHandle=oldTarget.querySelector(
+                '.react-flow__handle[data-handleid="edge-'+index+'-in"]');
+              if(!targetHandle)return null;
+              const edge=document.querySelector('#reactFlowRoot .react-flow__edge[data-id="flow-edge-'+index+'"]');
+              const path=edge?.querySelector(".react-flow__edge-path");
+              if(!path)return null;
+              const rect=path.getBoundingClientRect();
+              return {index,sourceHandle:handle.getAttribute("data-handleid"),
+                targetHandle:targetHandle.getAttribute("data-handleid"),
+                edgeId:edge.getAttribute("data-id"),
+                pathPoint:{x:rect.left+rect.width/2,y:rect.top+rect.height/2},
+                oldTarget:targetHandle.getBoundingClientRect(),
+                newTarget:newTarget.querySelector('.react-flow__handle[data-handleid="in"]')
+              };
+            }).filter(Boolean);
+          const pair=pairs[0];
+          if(!pair)return {ready:false,reason:"No anchored edge from the selected Node to unresolved",
+            sourceHandles:[...source.querySelectorAll(".react-flow__handle")].map(x=>x.getAttribute("data-handleid")),
+            targetHandles:[...oldTarget.querySelectorAll(".react-flow__handle")].map(x=>x.getAttribute("data-handleid")),
+            edges:[...document.querySelectorAll("#reactFlowRoot .react-flow__edge")].map(x=>x.getAttribute("data-id"))};
+          const rect=pair.newTarget?.getBoundingClientRect();
+          if(!rect)return {ready:false,reason:"New target input handle missing",pair};
+          return {ready:true,index:pair.index,edgeId:pair.edgeId,
+            pathPoint:pair.pathPoint,
+            oldTargetPoint:{x:pair.oldTarget.left+pair.oldTarget.width/2,
+              y:pair.oldTarget.top+pair.oldTarget.height/2},
+            newTargetPoint:{x:rect.left+rect.width/2,y:rect.top+rect.height/2},
+            width:window.innerWidth,height:window.innerHeight,
+            sourceHandle:pair.sourceHandle,targetHandle:pair.targetHandle};
+        })()`
+      });
+      const reconnectEdge=reconnectEdgeInfo.result?.value??null;
+      if(!reconnectEdge?.ready)
+        throw Error("Could not locate the existing multi-Outcome Route bundle: "+JSON.stringify(reconnectEdge));
+      const edgeClick=toPage(reconnectEdge.pathPoint);
+      await command("Input.dispatchMouseEvent",{
+        type:"mousePressed",x:edgeClick.x,y:edgeClick.y,button:"left",clickCount:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:edgeClick.x,y:edgeClick.y,button:"left",clickCount:1
+      });
+      await sleep(350);
+      const ambiguousReconnect=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          selectedRoute:document.querySelector("#routeList")?.value??"",
+          message:document.querySelector("#message")?.textContent??"",
+          options:[...(document.querySelector("#routeList")?.options??[])].map(x=>({value:x.value,label:x.textContent}))
+        })`
+      });
+      const ambiguousValue=ambiguousReconnect.result?.value??null;
+      if(ambiguousValue?.selectedRoute!==""||
+         !String(ambiguousValue?.message??"").includes("多个 Outcome"))
+        throw Error("A multi-Outcome bundle was not left ambiguous: "+JSON.stringify(ambiguousValue));
+      const chooseReconnectRoute=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const select=document.querySelector("#routeList");
+          const routeId="await-initial-resources:FAILED";
+          if(!select||![...select.options].some(item=>item.value===routeId))
+            return {ready:false,reason:"Specific FAILED Route is not selectable",
+              options:[...(select?.options??[])].map(x=>({value:x.value,label:x.textContent}))};
+          select.value=routeId;select.dispatchEvent(new Event("change",{bubbles:true}));
+          const targets=document.querySelector("#targetList");
+          return {ready:true,route:select.value,targetOptions:[...(targets?.options??[])].map(x=>x.value)};
+        })()`
+      });
+      const chooseReconnectValue=chooseReconnectRoute.result?.value??null;
+      if(!chooseReconnectValue?.ready||!chooseReconnectValue.targetOptions.includes("failed"))
+        throw Error("Could not explicitly qualify the Route target change: "+JSON.stringify(chooseReconnectValue));
+      await sleep(350);
+      const updaterInfo=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const oldTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="unresolved"]');
+          const newTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="failed"]');
+          const oldHandle=oldTarget?.querySelector('.react-flow__handle[data-handleid="edge-'+reconnectEdge.index+'-in"]');
+          const target=newTarget?.querySelector('.react-flow__handle[data-handleid="in"]');
+          const rect=element=>{const r=element.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};};
+          const updaters=[...document.querySelectorAll("#reactFlowRoot .react-flow__edgeupdater")];
+          const oldPoint=oldHandle?rect(oldHandle):null;
+          const chosen=oldPoint?updaters.map(element=>({element,point:rect(element)}))
+            .sort((a,b)=>Math.hypot(a.point.x-oldPoint.x,a.point.y-oldPoint.y)-
+              Math.hypot(b.point.x-oldPoint.x,b.point.y-oldPoint.y))[0]:null;
+          return {ready:Boolean(chosen&&target),updaterCount:updaters.length,
+            updater:chosen?.point??null,target:target?rect(target):null,
+            oldPoint,updaterHtml:chosen?.element?.outerHTML??"",
+            edgeHtml:document.querySelector('#reactFlowRoot .react-flow__edge[data-id="flow-edge-'+reconnectEdge.index+'"]')?.outerHTML?.slice(0,1800)??""};
+        })()`
+      });
+      const updater=reconnectEdge.index;
+      const updaterValue=updaterInfo.result?.value??null;
+      if(!updaterValue?.ready)
+        throw Error("Selected edge did not expose a reconnect target handle: "+
+          JSON.stringify({ambiguous:ambiguousValue,selected:chooseReconnectValue,updater:updaterValue}));
+      const reconnectFromPage=toPage(updaterValue.updater);
+      const reconnectToPage=toPage(updaterValue.target);
+      const reconnectMidPage={x:(reconnectFromPage.x+reconnectToPage.x)/2,
+        y:(reconnectFromPage.y+reconnectToPage.y)/2};
+      await command("Input.dispatchMouseEvent",{
+        type:"mousePressed",x:reconnectFromPage.x,y:reconnectFromPage.y,
+        button:"left",buttons:1,clickCount:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseMoved",x:reconnectMidPage.x,y:reconnectMidPage.y,
+        button:"left",buttons:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseMoved",x:reconnectToPage.x,y:reconnectToPage.y,
+        button:"left",buttons:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:reconnectToPage.x,y:reconnectToPage.y,
+        button:"left",buttons:0,clickCount:1
+      });
+      await sleep(600);
+      const reconnectProposal=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          route:document.querySelector("#routeList")?.value??"",
+          target:document.querySelector("#targetList")?.value??"",
+          targets:[...(document.querySelector("#targetList")?.options??[])].map(x=>x.value),
+          previewDisabled:Boolean(document.querySelector("#preview")?.disabled),
+          message:document.querySelector("#message")?.textContent??""
+        })`
+      });
+      const reconnectProposalValue=reconnectProposal.result?.value??null;
+      if(reconnectProposalValue?.route!=="await-initial-resources:FAILED"||
+         reconnectProposalValue?.target!=="failed")
+        throw Error("Canvas reconnect did not propose the selected Route's target: "+
+          JSON.stringify({edge:reconnectEdge,updater:updaterValue,proposal:reconnectProposalValue}));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#preview")?.click(); true`
+      });
+      await sleep(250);
+      const reconnectDiff=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          ready:!document.querySelector("#commit")?.disabled,
+          diff:document.querySelector("#diff")?.textContent??""
+        })`
+      });
+      const reconnectDiffValue=reconnectDiff.result?.value??null;
+      if(!reconnectDiffValue?.ready||
+         !reconnectDiffValue.diff.includes("unresolved")||
+         !reconnectDiffValue.diff.includes("failed"))
+        throw Error("Reconnect Diff did not qualify the exact target replacement: "+JSON.stringify(reconnectDiffValue));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#commit")?.click(); true`
+      });
+      await sleep(1800);
+      const reconnectApplied=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent??"",
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length,
+          routeOption:[...(document.querySelector("#routeList")?.options??[])]
+            .find(x=>x.value==="await-initial-resources:FAILED")?.textContent??"",
+          message:document.querySelector("#message")?.textContent??""
+        })`
+      });
+      const reconnectAppliedValue=reconnectApplied.result?.value??null;
+      if(!/TextDocument v\\d+/.test(reconnectAppliedValue?.revision??"")||
+         !String(reconnectAppliedValue?.routeOption??"").includes("→ failed")||
+         reconnectAppliedValue?.graphEdges!==routeFixture.view.graphEdges)
+        throw Error("Native TextDocument did not apply the reconnect Patch: "+
+          JSON.stringify(reconnectAppliedValue));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#openSource")?.click(); true`
+      });
+      await sleep(500);
+      await key("z","KeyZ",2,90);
+      await sleep(1700);
+      const reconnectUndo=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent??"",
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length,
+          routeOption:[...(document.querySelector("#routeList")?.options??[])]
+            .find(x=>x.value==="await-initial-resources:FAILED")?.textContent??""
+        })`
+      });
+      const reconnectUndoValue=reconnectUndo.result?.value??null;
+      if(!/TextDocument v\\d+/.test(reconnectUndoValue?.revision??"")||
+         !String(reconnectUndoValue?.routeOption??"").includes("→ unresolved")||
+         reconnectUndoValue?.graphEdges!==routeFixture.view.graphEdges)
+        throw Error("Native Undo did not restore the original Route target: "+JSON.stringify(reconnectUndoValue));
+      const routeReconnect={
+        edge:reconnectEdge,ambiguous:ambiguousValue,selected:chooseReconnectValue,
+        updater:updaterValue,proposal:reconnectProposalValue,diff:reconnectDiffValue,
+        applied:reconnectAppliedValue,undo:reconnectUndoValue
+      };
       patchEvidence.routeCreate={
         fixture:routeFixture,gesture:routeGesture,
         proposal:routeProposalValue,preview:routePreviewValue,
         applied:routeApplied.result?.value??null,appliedSource:routeAppliedSource,
-        undo:routeUndo.result?.value??null,undoSource:routeUndoSource
+        undo:routeUndo.result?.value??null,undoSource:routeUndoSource,
+        reconnect:routeReconnect
       };
     }else{
       patchEvidence={preview:previewEvidence,applied:null};
@@ -744,11 +955,18 @@ try{
       !patchEvidence.routeCreate?.appliedSource?.ready||
       !patchEvidence.routeCreate?.undoSource?.ready||
       patchEvidence.routeCreate?.undoSource?.graphEdges!==
-        patchEvidence.routeCreate?.fixture?.view?.graphEdges))
+        patchEvidence.routeCreate?.fixture?.view?.graphEdges||
+      !patchEvidence.routeCreate?.reconnect?.ambiguous||
+      !patchEvidence.routeCreate?.reconnect?.selected?.ready||
+      !patchEvidence.routeCreate?.reconnect?.updater?.ready||
+      patchEvidence.routeCreate?.reconnect?.proposal?.target!=="failed"||
+      !patchEvidence.routeCreate?.reconnect?.diff?.ready||
+      !String(patchEvidence.routeCreate?.reconnect?.applied?.routeOption??"").includes("→ failed")||
+      !String(patchEvidence.routeCreate?.reconnect?.undo?.routeOption??"").includes("→ unresolved")))
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
