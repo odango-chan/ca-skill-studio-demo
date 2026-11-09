@@ -1,8 +1,37 @@
 # ADR-0002 · Host-native SKILL Studio extension spike
 
-**Status: EXPERIMENT (not an architecture migration decision)**  
+**Status: ACCEPTED as the default online demo host (2026-11-09); feature-parity migration IN PROGRESS**  
 **Issue:** [#85](https://github.com/odango-chan/ca-skill-studio-demo/issues/85)  
 **Owner:** ca-skill-studio-demo (editor-only; Runtime/5GC excluded)
+
+## Decision update (2026-11-09)
+
+This update supersedes the initial spike-only deployment language below.
+**Theia browser-only is now the default online SKILL Studio host**:
+GitHub Pages `/` serves Theia, the previous complete browser Studio is
+preserved at `/classic/`, and the former `/ide-preview/` path redirects to
+the new root. The same Pages workflow builds Theia from the current ref and
+keeps the Classic artifact from the main-source build. After PR #86 is merged,
+`main` becomes the durable source for both builds.
+
+This is a **host-shell decision, not a claim of feature parity**. The initial
+plugin migration still lacks the old Studio's Node detail view, Route create
+and reconnect, Phase Designer, full Inspector, Package Audit and Markdown
+preview. Use `/classic/` for those capabilities until each is migrated and
+accepted. Do not delete or shrink Classic to make the new UI appear complete.
+
+**Security and persistence boundary:** GitHub Pages uses the demo-only
+same-origin Theia Webview adapter because it cannot provide per-Webview
+wildcard origins. The visible banner warns users not to open sensitive files.
+This static Pages build is for public/sample workspaces only, not sensitive
+or untrusted workspaces. Browser OPFS is local to that browser profile; it is
+not a native disk mount, GitHub synchronization, or a Runtime. Python, Skill
+execution and 5GC operations remain out of scope.
+
+The previous `main` baseline is protected at
+`backup/main-before-theia-default-2026-11-09` (exact SHA
+`dcb137d606e6a697fcf02f7d7c5a811f7921e0f5`).
+
 
 ## Problem
 
@@ -15,8 +44,9 @@ full IDE shell or VS Code's extension host.
 
 ## Trial implementation (isolated)
 
-Build a standard VS Code extension, but do not merge it into or replace the
-Pages application. Register an optional `CustomTextEditorProvider` for
+Build a standard VS Code extension and bundle its Web entry into the Theia
+browser-only host. The Pages root now uses Theia; the previous browser
+application is preserved at `/classic/`. Register an optional `CustomTextEditorProvider` for
 `**/assurance/procedure.yaml` with priority `option`, retaining the
 host's built-in YAML/Python editors. Do not implement another Explorer or
 workspace file manager.
@@ -39,8 +69,8 @@ automatic execution, no alternate YAML serializer, no custom host disk API.
 
 The Studio must remain usable **online**, including Explorer file creation,
 YAML/Python text editing, tabs and Procedure graph editing. A desktop-only
-VS Code plugin does not meet the product goal. The existing Pages application
-remains available and unchanged during the trial.
+VS Code plugin does not meet the product goal. The previous complete Pages application is preserved at `/classic/`; the
+new Theia browser-only host is the default at `/`.
 
 A promising common shell is **Eclipse Theia browser-only** (>=1.76): it
 requires no Node backend for editing, uses the browser Origin Private File
@@ -55,11 +85,14 @@ entries from one extension source:
 - `browser: dist/extension-web.cjs` for browser workers (VS Code Web /
   Theia browser-only once actually integrated).
 
-This is **build capability**, not an online working deployment. Browser-only
-Theia must bundle the Web extension during its own build (installing the Node
-VSIX from the Extensions UI at runtime is not sufficient). Webview resource
-URIs, the CustomTextEditor API, extension activation, OPFS file create/save,
-and deployment under a GitHub Pages subpath remain **NOT_RUN**.
+The browser-only Theia shell now builds with the Web extension bundled at
+build time. The exact-head online workflow previously passed real Chromium
+shell startup, sample import, Procedure CustomEditor rendering, guarded Patch,
+native Source editor and Undo at the `/ide-preview/` subpath (run
+[42575346100](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42575346100)).
+The new default-root path `/ca-skill-studio-demo/`, Classic preservation and
+release composition are being revalidated in the current PR run; do not call
+the new root deployment PASS until that run succeeds.
 
 For later **online execution** (not editing), a separate consented backend
 service or local runner is needed. Never pretend browser-only OPFS can run
@@ -75,8 +108,8 @@ https://eclipsesource.com/blogs/2024/01/29/running-eclipse-theia-without-a-backe
 |---|---|---|
 | VS Code | Explorer, New File/Folder, search, tabs, native text editing, undo/save | Build/API/AST/Patch unit tests in CI; desktop host visual acceptance must be observed |
 | Eclipse Theia desktop / browser+backend | Native IDE shell and VS Code extension host | Node VSIX compatibility unproven until real host |
-| Theia browser-only (>=1.76) | **First-class online editor candidate**, OPFS, prebundled Web extensions | Web entry builds; Theia static app, CustomEditor activation, OPFS, deploy **NOT_RUN** |
-| Existing Pages demo | Static and shareable standalone preview | Remains unchanged; it is a different host implementation, not yet a shared extension |
+| Theia browser-only (>=1.76) | Default online demo shell, OPFS, prebundled Web extensions | Real Chromium shell, sample import, CustomEditor, Patch, Source and Undo passed at `/ide-preview/`; default-root revalidation pending |
+| Classic Pages demo | Full previous browser Studio at `/classic/` | Preserved from the main-source build; link back to Theia root |
 
 Theia may implement/stub distinct VS Code API features; it is wrong to
 claim runtime compatibility based on compile-only extension support. A
@@ -100,18 +133,20 @@ Official API sources: [VS Code Custom Editor](https://code.visualstudio.com/api/
 - **Security:** local CSP, no remote downloads in Webview, no Script execution,
   no 5GC network operations, no file writes outside IDE `WorkspaceEdit`.
 
-A green Node build does **not** satisfy the native UX or Theia gate. Keep the
-spike draft/open until VS Code desktop, Theia browser-only online, and any
-optional Theia desktop host have independently verified acceptance (or an
-explicitly documented incompatibility). Do not ship a desktop-only migration.
+A green Node build alone does **not** satisfy the online host gate. The
+Theia browser-only online gate has real Chromium evidence at the former
+preview path; the new root-path and Classic-composition checks must pass
+before the default deployment is called accepted. VS Code desktop and
+Theia desktop are optional hosts and remain independently unverified.
 
-## Follow-up, not yet authorized
+## Remaining migration work
 
-If both hosts pass, move the reusable graph/Patch adapter into a host-neutral
-library before considering retirement of the hand-built Explorer. If Theia
-fails, do not patch around it in the DSL owner or introduce duplicate Runtime
-contracts. Continue to ship Pages as before until a separate migration
-decision explicitly approves replacement.
+Continue moving the Studio-specific graph, Node/Route/Phase editing and
+Inspector capabilities into the shared extension without duplicating Source
+or Runtime semantics. Keep `/classic/` until functional parity and security
+review are complete. If Theia compatibility fails for a capability, add a
+thin host adapter around the same Source projection/Patch contract; do not
+patch around it in the DSL owner or introduce duplicate Runtime contracts.
 
 ## First CI finding: old profile pin vs current sample
 
@@ -135,3 +170,16 @@ mocked VS Code `CustomTextEditorProvider` message round-trip, one guarded
 repo tests also pass. These are build / mock-host / unit results only:
 **VS Code GUI and Theia GUI remain NOT_RUN**. The draft is intentionally not
 merged into `main`.
+
+
+## 2026-11-09 · Default Pages deployment
+
+The Pages workflow now tests Theia at the repository root subpath
+`/ca-skill-studio-demo/`, composes Theia at `dist/`, preserves the prior
+main build at `dist/classic/`, writes `.nojekyll`, preserves a configured
+`CNAME`, and leaves a redirect at `dist/ide-preview/`. The Classic app
+contains a link back to the new host; Theia contains a link to Classic and a
+persistent same-origin safety warning.
+
+The exact-head run after this workflow change is the release gate. PR #86
+must not be merged on the strength of the earlier unit/mock build alone.
