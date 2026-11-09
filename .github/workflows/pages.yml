@@ -2,7 +2,7 @@ name: Deploy Skill Studio Pages
 
 on:
   push:
-    branches: [main, spike/ide-extension-theia-host]
+    branches: [main]
     paths:
       - "site/**"
       - "experiments/ide-host/**"
@@ -219,18 +219,16 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    # Both the migration branch and main publish the same default Theia root;
-    # main remains the durable deployment source after the migration is merged.
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+    # Pages is published from main only. Experiment and theme branches
+    # retain CI/build artifacts but cannot overwrite the public site.
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       pages: write
       id-token: write
-    # Both refs publish the same Pages root artifact. Keep the migration
-    # branch on its existing preview environment so github-pages protection
-    # remains intact; after merge, main publishes through github-pages.
+    # Single protected deployment environment for the main branch.
     environment:
-      name: ${{ github.ref == 'refs/heads/spike/ide-extension-theia-host' && 'skill-studio-preview' || 'github-pages' }}
+      name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy artifact to Pages
