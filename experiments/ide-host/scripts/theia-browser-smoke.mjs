@@ -10,7 +10,7 @@ import {extname,join,resolve,sep} from "node:path";
 
 const root=resolve("experiments/ide-host/theia-online/lib/frontend");
 const externalUrl=process.env.THEIA_URL;
-const basePath=(process.env.THEIA_BASE_PATH||"").replace(/\\/+$/,"");
+const basePath=(process.env.THEIA_BASE_PATH||"").replace(/\/+$/,"");
 const requireWebview=process.env.THEIA_REQUIRE_WEBVIEW==="1";
 const requireEditor=Boolean(externalUrl)||requireWebview;
 const chrome=process.env.CHROME_BIN||
