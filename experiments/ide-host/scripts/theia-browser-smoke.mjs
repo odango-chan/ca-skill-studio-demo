@@ -1,6 +1,6 @@
-// A real Chromium smoke against the generated backend-free Theia frontend.
-// This is a startup + prepared plugin test; OPFS workflow and custom Webview
-// editing have their own acceptance gate. No GitHub Pages deployment.
+// Real Chromium smoke for both Theia browser-only static preview and the
+// normal backend-backed browser host. Static mode uses an explicitly isolated
+// same-origin demo-only webview adapter; backend mode uses Theia's normal host.
 import {createServer} from "node:http";
 import {createReadStream,existsSync} from "node:fs";
 import {mkdtemp,readFile,rm} from "node:fs/promises";
@@ -10,6 +10,8 @@ import {extname,join,resolve,sep} from "node:path";
 
 const root=resolve("experiments/ide-host/theia-online/lib/frontend");
 const externalUrl=process.env.THEIA_URL;
+const requireWebview=process.env.THEIA_REQUIRE_WEBVIEW==="1";
+const requireEditor=Boolean(externalUrl)||requireWebview;
 const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
 if(!externalUrl&&!existsSync(join(root,"index.html")))throw Error("Theia frontend missing");
@@ -372,24 +374,24 @@ try{
      !afterImport.bodyText.includes("establish-pdu-session")||
      !afterImport.bodyText.includes("procedure.yaml"))
     throw Error("Theia sample import into browser workspace failed: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3000));
-  if(externalUrl&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
+  if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
-  if(externalUrl&&(!patchEvidence?.preview?.ready||
+  if(requireEditor&&(!patchEvidence?.preview?.ready||
       !String(patchEvidence.preview.diff).includes("-")||
       !String(patchEvidence.preview.diff).includes("+")||
       !/TextDocument v[2-9]/.test(patchEvidence.applied?.revision??"")))
     throw Error("Source-backed Patch preview/apply did not update the TextDocument: "+
       JSON.stringify(patchEvidence).slice(0,3000));
-  if(externalUrl&&(!(patchEvidence.sourceEditor?.monacoEditors>0)||
+  if(requireEditor&&(!(patchEvidence.sourceEditor?.monacoEditors>0)||
       !/TextDocument v[3-9]/.test(patchEvidence.undo?.revision??"")||
       patchEvidence.undo?.graphEdges!==46))
     throw Error("Native Source editor/undo did not restore the original Procedure projection: "+
       JSON.stringify(patchEvidence).slice(0,3000));
-  if(externalUrl)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS");
+  if(requireEditor)
+    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS");
   else
-    console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; WEBVIEW_CUSTOM_EDITOR_REQUIRES_BACKEND_HOST");
+    console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
   ws?.close();child.kill("SIGKILL");
   if(server?.listening)await new Promise(ok=>server.close(ok));
