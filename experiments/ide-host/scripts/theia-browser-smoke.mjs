@@ -707,11 +707,14 @@ try{
               const edge=document.querySelector('#reactFlowRoot .react-flow__edge[data-id="flow-edge-'+index+'"]');
               const path=edge?.querySelector(".react-flow__edge-path");
               if(!path)return null;
-              const rect=path.getBoundingClientRect();
+              const point=path.ownerSVGElement.createSVGPoint();
+              const middle=path.getPointAtLength(path.getTotalLength()/2);
+              point.x=middle.x;point.y=middle.y;
+              const screenPoint=point.matrixTransform(path.getScreenCTM());
               return {index,sourceHandle:handle.getAttribute("data-handleid"),
                 targetHandle:targetHandle.getAttribute("data-handleid"),
                 edgeId:edge.getAttribute("data-id"),
-                pathPoint:{x:rect.left+rect.width/2,y:rect.top+rect.height/2},
+                pathPoint:{x:screenPoint.x,y:screenPoint.y},
                 oldTarget:targetHandle.getBoundingClientRect(),
                 newTarget:newTarget.querySelector('.react-flow__handle[data-handleid="in"]')
               };
