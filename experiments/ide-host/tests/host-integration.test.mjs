@@ -7,6 +7,8 @@ import {createRequire} from "node:module";
 import Module from "node:module";
 import {projectWorkspace} from "../../../site/workspace.mjs";
 import {routeTargetChoices,previewTargetPatch} from "../vscode/src/route-target.mjs";
+import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
+  from "../../../site/route-connect.mjs";
 
 test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and native Source",async()=>{
   const source=readFileSync("site/samples/packages/establish-pdu-session/assurance/procedure.yaml","utf8");
@@ -146,6 +148,53 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
 
   await onMessage(message);
   assert.equal(writes.length,1,"stale proposal must not write twice");
+  assert.equal(posted.at(-2).type,"error");
+  assert.equal(posted.at(-1).type,"snapshot");
+
+  // Switch the same host document to a second real fixture with one
+  // observed Outcome intentionally removed. The new Route still requires
+  // a fresh gesture proposal, explicit Outcome, Diff and host revalidation.
+  const ensureSource=readFileSync(
+    "site/samples/packages/ensure-pdu-session/assurance/procedure.yaml","utf8");
+  const ensureModel=projectWorkspace(ensureSource);
+  const existing=ensureModel.procedures.get("ensure-session").routes.find(r=>
+    r.id==="observe-target-session:UNKNOWN"&&r.routeSource==="operator.on");
+  assert.ok(existing);
+  const lineStart=ensureSource.lastIndexOf("\n",existing.sourceSpan.start-1)+1;
+  const lineEnd=ensureSource.indexOf("\n",existing.sourceSpan.end);
+  assert.ok(lineEnd>=0);
+  const missing=ensureSource.slice(0,lineStart)+ensureSource.slice(lineEnd+1);
+  assert.equal(projectWorkspace(missing).state,"READY");
+  document.text=missing;document.version=23;
+  await onMessage({type:"ready"});
+  const intent=proposeCanvasRouteConnection({
+    source:missing,procedureId:"ensure-session",
+    sourceId:"observe-target-session",targetId:"unresolved",
+    sourceHandle:"new-route-out",targetHandle:"in"
+  });
+  const createPreview=previewCanvasRouteConnection(missing,intent,"UNKNOWN");
+  const createMessage={
+    type:"applyRouteCreation",expectedVersion:23,baseSource:missing,
+    candidateSource:createPreview.candidateSource,diff:createPreview.diff,
+    procedureId:"ensure-session",sourceId:"observe-target-session",
+    targetId:"unresolved",sourceHandle:"new-route-out",targetHandle:"in",
+    outcome:"UNKNOWN"
+  };
+  await onMessage({...createMessage,candidateSource:missing+"\\n# forged"});
+  assert.equal(document.text,missing);
+  assert.equal(writes.length,1,"forged Route creation must not write");
+  assert.equal(posted.at(-2).type,"error");
+  assert.equal(posted.at(-1).type,"snapshot");
+  await onMessage(createMessage);
+  assert.equal(document.text,createPreview.candidateSource);
+  assert.equal(document.version,24);
+  assert.equal(writes.length,2);
+  assert.equal(writes[1].range.start.offset,createPreview.sourceSpan.start);
+  assert.equal(writes[1].range.end.offset,createPreview.sourceSpan.end);
+  assert.ok(writes[1].value.includes("UNKNOWN: unresolved"));
+  assert.equal(posted.at(-1).type,"applied");
+  await onMessage(createMessage);
+  assert.equal(writes.length,2,"stale Route creation must not insert twice");
   assert.equal(posted.at(-2).type,"error");
   assert.equal(posted.at(-1).type,"snapshot");
 });
