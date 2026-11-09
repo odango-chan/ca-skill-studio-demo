@@ -31,8 +31,17 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
   for(const asset of ["index.html","app.js","studio.css","light.css","app.css"])
     await requireFile(classic,asset);
   const theiaIndexPath=await requireFile(theia,"index.html");
-  for(const asset of ["bundle.js","hostedPlugin/list.json","webview/index.html"])
-    await requireFile(theia,asset);
+  for(const asset of [
+    "bundle.js","hostedPlugin/list.json","webview/index.html",
+    "hostedPlugin/odango_chan_skill_studio_theme/package.json",
+    "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
+    "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
+    "hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg",
+    "hostedPlugin/odango_chan_skill_studio_theme/icons/yaml.svg"
+  ])await requireFile(theia,asset);
+  const pluginList=await readFile(join(theia,"hostedPlugin/list.json"),"utf8");
+  if(!pluginList.includes("skill-studio-theme"))
+    throw new Error("Theia hostedPlugin list does not include the shared Skill Studio theme");
   const theiaHtml=await readFile(theiaIndexPath,"utf8");
   if(!theiaHtml.includes('id="skill-studio-preview-warning"')||
      !theiaHtml.includes('href="./classic/"'))
@@ -77,6 +86,10 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
     await requireFile(output,"bundle.js");
     await requireFile(output,"hostedPlugin/list.json");
     await requireFile(output,"webview/index.html");
+    await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/package.json");
+    await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json");
+    await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json");
+    await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg");
     await requireFile(output,"classic/index.html");
     await requireFile(output,"classic/app.js");
     await requireFile(output,"classic/studio.css");

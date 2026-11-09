@@ -1,0 +1,59 @@
+{
+  "iconDefinitions": {
+    "_file": {
+      "iconPath": "./file.svg"
+    },
+    "_folder": {
+      "iconPath": "./folder.svg"
+    },
+    "_folder_open": {
+      "iconPath": "./folder-open.svg"
+    },
+    "_skill": {
+      "iconPath": "./skill.svg"
+    },
+    "_yaml": {
+      "iconPath": "./yaml.svg"
+    },
+    "_markdown": {
+      "iconPath": "./markdown.svg"
+    },
+    "_python": {
+      "iconPath": "./python.svg"
+    },
+    "_code": {
+      "iconPath": "./code.svg"
+    }
+  },
+  "file": "_file",
+  "folder": "_folder",
+  "folderExpanded": "_folder_open",
+  "rootFolder": "_folder",
+  "rootFolderExpanded": "_folder_open",
+  "fileNames": {
+    "SKILL.md": "_skill",
+    "AGENTS.md": "_markdown",
+    "README.md": "_markdown",
+    "procedure.yaml": "_yaml",
+    "contract.yaml": "_yaml",
+    "predicates.yaml": "_yaml",
+    "package.json": "_code"
+  },
+  "fileExtensions": {
+    "yaml": "_yaml",
+    "yml": "_yaml",
+    "md": "_markdown",
+    "py": "_python",
+    "json": "_code",
+    "jsonc": "_code",
+    "sh": "_code",
+    "bash": "_code",
+    "txt": "_markdown",
+    "toml": "_code",
+    "js": "_code",
+    "mjs": "_code",
+    "ts": "_code",
+    "tsx": "_code",
+    "css": "_code"
+  }
+}

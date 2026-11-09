@@ -1,0 +1,46 @@
+{
+  "name": "skill-studio-theme",
+  "displayName": "SKILL Studio Theme",
+  "description": "A shared light workbench, editor syntax and file icon theme for SKILL Studio in VS Code and Eclipse Theia.",
+  "version": "0.1.0",
+  "publisher": "odango-chan",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "keywords": [
+    "skill-studio",
+    "theme",
+    "light-theme",
+    "file-icons"
+  ],
+  "contributes": {
+    "themes": [
+      {
+        "label": "SKILL Studio Light",
+        "uiTheme": "vs",
+        "path": "./themes/skill-studio-light-color-theme.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "skill-studio-file-icons",
+        "label": "SKILL Studio File Icons",
+        "path": "./icons/skill-studio-file-icon-theme.json"
+      }
+    ]
+  },
+  "files": [
+    "themes/**",
+    "icons/**",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/odango-chan/ca-skill-studio-demo.git"
+  }
+}
