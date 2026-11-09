@@ -193,6 +193,7 @@ jobs:
           THEIA_BASE_PATH: "/ca-skill-studio-demo/ide-preview"
           THEIA_REQUIRE_WEBVIEW: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
+      # Explicitly publish the isolated PR #86 preview alongside the unchanged main site.
       - name: Compose temporary preview without replacing existing site root
         if: github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: main-source
