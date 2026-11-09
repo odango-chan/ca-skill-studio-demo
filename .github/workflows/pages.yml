@@ -200,10 +200,7 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: main-source
         run: |
-          node ../ide-source/experiments/ide-host/scripts/compose-pages-release.mjs \\
-            --classic dist \\
-            --theia ../ide-source/experiments/ide-host/theia-online/lib/frontend \\
-            --output dist
+          node ../ide-source/experiments/ide-host/scripts/compose-pages-release.mjs --classic dist --theia ../ide-source/experiments/ide-host/theia-online/lib/frontend --output dist
           test -s dist/index.html
           test -s dist/bundle.js
           test -s dist/hostedPlugin/list.json
