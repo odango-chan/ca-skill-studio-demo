@@ -86,9 +86,8 @@ The online host has real Chromium evidence from the previous subpath preview:
 Theia shell startup, sample SKILL import into OPFS, Procedure CustomEditor
 rendering, guarded Source-backed Patch, native Source editor and Undo passed
 in [workflow run #42575346100](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42575346100).
-The current default-root change adds a new root-subpath smoke and explicit
-Classic composition test; those exact-head checks must pass before the new
-root deployment is called accepted. The Node VSIX remains an optional
+The default-root smoke and explicit Classic composition test passed in the
+resulting-main Pages deployment [#42579544196](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42579544196). The Node VSIX remains an optional
 VS Code/desktop Theia entry point; the online host uses the build-time Web
 extension entry.
 
