@@ -552,6 +552,8 @@ try{
       })`);
       const routeFixture={
         ready:routeFixtureEditor.editorCount>0&&
+          findState.matchCount==="1 of 4"&&secondMatch.matchCount==="2 of 4"&&
+          editorFocus.ready&&
           /TextDocument v\\d+/.test(routeFixtureView.result?.value?.revision??"")&&
           routeFixtureView.result?.value?.procedure==="await-initial-n4-session-establishment"&&
           routeFixtureView.result?.value?.graphEdges===routeOriginalView.result?.value?.graphEdges-1,
