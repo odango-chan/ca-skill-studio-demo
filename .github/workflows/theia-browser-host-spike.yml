@@ -42,7 +42,7 @@ jobs:
         run: npm install --prefix experiments/ide-host/theia-browser --no-audit --no-fund
       - name: Build normal Theia browser app with backend
         run: npm run build --prefix experiments/ide-host/theia-browser
-      - name: Apply the shared Classic shell icon artwork
+      - name: Apply Classic shell icons and SKILL Studio menu branding
         run: node experiments/ide-host/scripts/prepare-theia-shell-icons.mjs experiments/ide-host/theia-browser/lib/frontend
       - name: Deploy prepared Web extension to Theia backend plugin directory
         run: |

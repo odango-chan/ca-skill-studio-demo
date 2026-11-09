@@ -19,6 +19,12 @@ are not writes to the user's local disk or their GitHub repository. The
 `plugins/` folder contains the prepared Web entry (same extension source as
 VS Code desktop); Theia must include it as a built-in plugin at build time.
 
+The post-build `prepare-theia-shell-icons.mjs` step also installs the Classic
+SKILL Studio wordmark into the same Lumino menu-bar row as File/Edit. It adds
+a presentation-only sibling immediately before Lumino's native menu content
+node; it does not rewrite menu items, commands, shortcuts, or click handlers.
+At narrow widths the wordmark text collapses to the Classic three-bar mark.
+
 Acceptance requires **real browser interaction**: Theia shell opens under
 a static subpath; Explorer New File/Folder and reopen persist in OPFS; native
 YAML/Python editors open; `assurance/procedure.yaml` invokes the source-backed

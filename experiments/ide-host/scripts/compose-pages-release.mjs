@@ -32,7 +32,8 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
     await requireFile(classic,asset);
   const theiaIndexPath=await requireFile(theia,"index.html");
   for(const asset of [
-    "bundle.js","classic-icons.css","hostedPlugin/list.json","webview/index.html",
+    "bundle.js","classic-icons.css","skill-studio-brand.css","skill-studio-brand.js",
+    "hostedPlugin/list.json","webview/index.html",
     "hostedPlugin/odango_chan_skill_studio_theme/package.json",
     "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
     "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
@@ -46,8 +47,12 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
   if(!theiaHtml.includes('id="skill-studio-preview-warning"')||
      !theiaHtml.includes('href="./classic/"')||
      !theiaHtml.includes('id="skill-studio-classic-icon-theme"')||
-     !theiaHtml.includes('href="./classic-icons.css"'))
-    throw new Error("Theia index must display the same-origin warning and Classic navigation link");
+     !theiaHtml.includes('href="./classic-icons.css"')||
+     !theiaHtml.includes('id="skill-studio-brand-theme"')||
+     !theiaHtml.includes('href="./skill-studio-brand.css"')||
+     !theiaHtml.includes('id="skill-studio-brand-script"')||
+     !theiaHtml.includes('src="./skill-studio-brand.js"'))
+    throw new Error("Theia index must include the same-origin warning, Classic navigation, and SKILL Studio brand assets");
 
   const stage=await mkdtemp(join(dirname(output),".skill-studio-classic-"));
   const stagedClassic=join(stage,"classic");
@@ -87,6 +92,8 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
     await requireFile(output,"index.html");
     await requireFile(output,"bundle.js");
     await requireFile(output,"classic-icons.css");
+    await requireFile(output,"skill-studio-brand.css");
+    await requireFile(output,"skill-studio-brand.js");
     await requireFile(output,"hostedPlugin/list.json");
     await requireFile(output,"webview/index.html");
     await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/package.json");
@@ -101,13 +108,16 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
     const classicHtml=await readFile(join(output,"classic","index.html"),"utf8");
     if(!rootHtml.includes('href="./classic/"')||
        !rootHtml.includes('href="./classic-icons.css"')||
+       !rootHtml.includes('href="./skill-studio-brand.css"')||
+       !rootHtml.includes('src="./skill-studio-brand.js"')||
        !classicHtml.includes('href="../"'))
       throw new Error("Published root/Classic navigation is incomplete");
     return Object.freeze({
       defaultHost:"theia-browser-only",
       classicPath:"/classic/",
       legacyPreviewRedirect:"/ide-preview/ -> /",
-      sameOriginWarning:true
+      sameOriginWarning:true,
+      brandedNativeMenuBar:true
     });
   }finally{
     await rm(stage,{recursive:true,force:true,maxRetries:4,retryDelay:100});

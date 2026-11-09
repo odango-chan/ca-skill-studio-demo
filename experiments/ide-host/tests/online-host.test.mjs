@@ -1,8 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync,statSync} from "node:fs";
+import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
+import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {buildClassicIconsCss,THEIA_CLASSIC_ICON_MAP} from "../scripts/classic-icons-css.mjs";
+import {buildSkillStudioBrandCss,buildSkillStudioBrandScript,prepareTheiaBrand}
+  from "../scripts/prepare-theia-brand.mjs";
 const root="experiments/ide-host/theia-online";
 test("Theia online target is a real backend-free 1.76 browser-only app",()=>{
   const app=JSON.parse(readFileSync(join(root,"package.json"),"utf8"));
@@ -74,4 +78,41 @@ test("Theia activity bar and shell toolbars render from the Classic icon registr
   assert.match(css,/mask-image:url\("data:image\/svg\+xml,/);
   assert.match(css,/background-color:currentColor/);
   assert.doesNotMatch(css,/https?:\/\//);
+});
+
+test("SKILL Studio wordmark sits beside the native menu list and compacts on narrow screens",async()=>{
+  const css=buildSkillStudioBrandCss();
+  const script=buildSkillStudioBrandScript();
+  assert.match(css,/\.lm-MenuBar\.skill-studio-branded/);
+  assert.match(css,/\.lm-MenuBar-content/);
+  assert.match(css,/linear-gradient\(145deg,#dcf8ef,#b8e6de\)/);
+  assert.match(css,/@media\(max-width:760px\)/);
+  assert.match(css,/\.skill-studio-brand-label\{display:none\}/);
+  assert.doesNotMatch(css,/\.lm-MenuBar-item/);
+  assert.match(script,/document\.querySelectorAll\(BAR_SELECTOR\)/);
+  assert.match(script,/\[id="theia:menubar"\]/);
+  assert.match(script,/bar\.insertBefore\(brand,content\)/);
+  assert.match(script,/label\.textContent = "SKILL Studio"/);
+  assert.match(script,/new MutationObserver\(mount\)/);
+  assert.doesNotMatch(script,/content\.appendChild|addEventListener\(["']click/);
+
+  const temp=await mkdtemp(join(tmpdir(),"theia-brand-"));
+  try{
+    await writeFile(join(temp,"index.html"),
+      '<!doctype html><html><head></head><body><div class="lm-MenuBar"><ul class="lm-MenuBar-content"></ul></div></body></html>');
+    const first=await prepareTheiaBrand(temp);
+    const second=await prepareTheiaBrand(temp);
+    const html=await readFile(join(temp,"index.html"),"utf8");
+    assert.equal((html.match(/id="skill-studio-brand-theme"/g)||[]).length,1);
+    assert.equal((html.match(/id="skill-studio-brand-script"/g)||[]).length,1);
+    assert.match(html,/href="\.\/skill-studio-brand\.css"/);
+    assert.match(html,/src="\.\/skill-studio-brand\.js"/);
+    assert.ok(first.cssBytes>500);
+    assert.ok(first.scriptBytes>500);
+    assert.equal(first.cssBytes,second.cssBytes);
+    assert.equal(first.scriptBytes,second.scriptBytes);
+    assert.match(await readFile(join(temp,"skill-studio-brand.js"),"utf8"),/SKILL Studio/);
+  }finally{
+    await rm(temp,{recursive:true,force:true});
+  }
 });
