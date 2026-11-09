@@ -97,8 +97,9 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(opened.at(-1).doc,document);
   assert.equal(opened.at(-1).opts.viewColumn,2);
 
+  assert.ok(document.lineCount>100,"the fixture must count real YAML lines");
   const sourceLine=source.split(/\r?\n/).findIndex(line=>line.includes("nudm-sdm-subscribe"))+1;
-  assert.ok(sourceLine>0);
+  assert.ok(sourceLine>1,"the selected Node must be below the first YAML line");
   await onMessage({type:"revealSourceLine",line:sourceLine});
   assert.equal(opened.at(-1).doc,document);
   assert.equal(textEditor.selection.anchor.line,sourceLine-1);
