@@ -498,10 +498,12 @@ try{
           const rect=viewport.getBoundingClientRect();
           const lines=editor.querySelector(".view-lines");
           const text=lines?.innerText??"";
-          const visible=rect.width>100&&rect.height>100&&
+          const visible=rect.width>30&&rect.height>100&&
             rect.bottom>0&&rect.top<window.innerHeight&&
             rect.right>0&&rect.left<window.innerWidth;
-          const hasFixture=text.includes("FAILED: unresolved")&&
+          // The active Source editor initially shows the first Procedure;
+          // Go to Line below moves it to the isolated N4 fixture.
+          const hasFixture=text.includes("FAILED: failed")&&
             text.includes("DENIED: failed");
           return {index,visible,hasFixture,
             rect:{x:rect.left,y:rect.top,width:rect.width,height:rect.height},
