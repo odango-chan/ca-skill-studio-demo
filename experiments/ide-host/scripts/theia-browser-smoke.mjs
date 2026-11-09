@@ -100,6 +100,13 @@ try{
     if(view?.appShell&&view.widgets>4&&view.bodyLength>15)break;
     await sleep(150);
   }
+  const warningDismissed=await evalJS(`(()=>{
+    const candidates=[...document.querySelectorAll('button,[role="button"]')];
+    const ok=candidates.find(x=>x.innerText.trim()==="OK");
+    if(ok){ok.click();return true;}
+    return false;
+  })()`);
+  await sleep(300);
   const diagnostics=await evalJS(`({
     htmlClass:document.documentElement.className,
     bodyStyle:document.body?.getAttribute('style'),
@@ -247,7 +254,7 @@ try{
     }catch(error){webviewFrameError=String(error);}
   }
   const listing=await(await fetch(url+"hostedPlugin/list.json")).text();
-  const evidence={view,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
+  const evidence={view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
     frameCount:frames.length,webviewFrame,webviewView,webviewFrameError,
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
