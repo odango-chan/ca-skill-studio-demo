@@ -58,6 +58,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(providers.get('skillStudio.problems').getChildren().length);
   doc.version++;doc.text=source;changed({document:doc});
   await commands.get('skillStudio.auditPackage')();
+  assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/editor warnings/);
   assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
   doc.text='# Preview title\n<script>alert(1)</script>';
   await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));

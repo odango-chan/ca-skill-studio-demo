@@ -416,7 +416,8 @@ $("commit").addEventListener("click",()=>{
 window.addEventListener("message",event=>{
   const data=event.data;
   if(!data||typeof data!=="object")return;
-  if(data.type==="focusNode"&&data.version===state.version&&state.procedures?.has(data.procedureId)){
+  if(data.type==="requestSelection"){publishSelection();}
+  else if(data.type==="focusNode"&&data.version===state.version&&state.procedures?.has(data.procedureId)){
     void showProcedure(data.procedureId).then(()=>openNodeFocus(data.nodeId));
   }
   else if(data.type==="snapshot")receiveSnapshot(data);

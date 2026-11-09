@@ -1,3 +1,4 @@
+import {createRequire} from "node:module";
 import {existsSync,readFileSync,readdirSync,statSync} from "node:fs";
 import {join} from "node:path";
 const root="experiments/ide-host/theia-online/lib/frontend";
@@ -38,3 +39,16 @@ console.log("STUDIO_THEIA_FRONTEND_ARTIFACT",JSON.stringify({
 if(!hasProcedurePlugin)throw Error("Theia browser-only build lacks prepared SKILL Studio Web extension");
 if(!hasThemePlugin)throw Error("Theia browser-only build lacks the built-in Skill Studio theme extension");
 if(missingThemeAssets.length)throw Error("Theia static preview is missing theme assets: "+missingThemeAssets.join(", "));
+
+// Exercise the pinned host matcher, including Windows URI separators. A plain
+// **/assurance/procedure.yaml takes a platform-separator fast path in Theia.
+const {match}=createRequire(import.meta.url)("../theia-online/node_modules/@theia/core/lib/common/glob.js");
+const manifest=JSON.parse(readFileSync("experiments/ide-host/vscode/package.json","utf8"));
+const pattern=manifest.contributes.customEditors[0].selector[0].filenamePattern;
+for(const path of ["file:/workspace/assurance/procedure.yaml","file:/C:/workspace/assurance/procedure.yaml","file:/.theia/globalStorage/demo/assurance/procedure.yaml"]){
+  if(!match(pattern,path))throw Error("Native CustomEditor selector failed: "+path);
+}
+for(const path of ["file:/workspace/procedure.yaml","file:/workspace/assurance/contract.yaml"]){
+  if(match(pattern,path))throw Error("CustomEditor selector claimed unrelated Source: "+path);
+}
+console.log("STUDIO_NATIVE_EDITOR_ASSOCIATION_MATCH_PASS");

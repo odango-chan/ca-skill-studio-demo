@@ -8,7 +8,7 @@
 |---|---|---|---|
 | Procedure / Child 导航、Node Focus | 完整 | 已有 | workspace、node-focus-graph、React Flow / ELK |
 | 文件默认打开 | 自有文件导航 | 原生 CustomEditor default association | 仅 assurance/procedure.yaml；其他 YAML 保持原生文本；用户自行配置的编辑器关联优先 |
-| 单击 / 双击 | 自有导航 | 委托 Theia 原生 Explorer | 预览 / 固定行为由宿主控制，不拦截树事件；真实 Chromium 门禁检查原生文件打开 |
+| 单击 / 双击 | 自有导航 | 委托 Theia 原生 Explorer | 预览 / 固定行为由宿主控制，不拦截树事件；真实 Chromium 门禁检查原生文件打开和预览标签晋升 |
 | Inspection / Inspector | 选择详情及有界编辑 | 原生活动栏与只读树视图 | 复用 workspace；节点、operator、PRE/POST steps、精确来源 Route；完整 Node/Phase 编辑仍缺失 |
 | Outline | Procedure / Node 导航 | 原生树视图 | 所有 Procedure / Node；点击定位 Source 并同步图中 Node Focus；版本失效拒绝旧导航 |
 | Evidence | Phase 输入/输出与消费者合同 | 源码 Child / Phase / Step 证据 | 仅 workspace 真实字段；完整消费者 ABI、输入输出证据尚未迁移；不表示 Runtime evidence |
@@ -26,6 +26,8 @@
 `vscode/package.json` 声明 View Container 和四个 View；`workbench.mjs` 只做 TreeDataProvider、TextDocument、Workspace FS 与 DiagnosticCollection 适配。`inspection.mjs` 把共享 `workspace.mjs` 投影映射为只读行，不定义 DSL。图中选择携带文档版本；宿主核对当前版本后才更新 Inspector。Outline 点击携带来源版本，旧版本命令拒绝执行。源文本仍是唯一业务真源。
 
 Package Audit 限于当前 procedure 所属 Package，最多 500 文件 / 4 MiB 文本，350 ms 合并事件后异步执行。引用规则只来自 Classic `package-audit.mjs`，不创造 Runtime qualification。缺文件、超限或读取失败不能报告“无问题”。更新、切换和销毁使过期任务失效；审计不会阻塞 CustomEditor 首次渲染。
+
+Theia 1.76 的文本预览宿主使用 `editor-preview-widget` opener，显式 Source 命令通过专用构建适配选择它；VS Code 仍使用 `default`。Native editor association 使用 basename 配置，CustomEditor selector 继续限定 assurance 路径；selector 的 `[p]` 是等价字面匹配，避免 Theia Windows glob 的多段路径快捷分支错误，不扩大文件范围。
 
 ## 延迟诊断与优化
 

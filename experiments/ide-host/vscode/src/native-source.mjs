@@ -3,7 +3,7 @@
 // Only the Theia worker build defines this flag; VS Code keeps its public ID.
 export async function openNativeSource(vscode,uri,options){
   const view=typeof STUDIO_THEIA_HOST!=='undefined'&&STUDIO_THEIA_HOST
-    ?'code-editor-opener':'default';
+    ?'editor-preview-widget':'default';
   try{return await vscode.commands.executeCommand('vscode.openWith',uri,view,options);}
   catch(error){await vscode.window.showErrorMessage('Source editor failed: '+String(error?.message??error));throw error;}
 }

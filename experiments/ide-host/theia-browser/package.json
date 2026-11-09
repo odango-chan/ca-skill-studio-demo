@@ -12,7 +12,10 @@
           "files.enableTrash": false,
           "security.workspace.trust.enabled": false,
           "workbench.list.openMode": "singleClick",
-          "editor.enablePreview": true
+          "editor.enablePreview": true,
+          "workbench.editorAssociations": {
+            "procedure.yaml": "skillStudio.procedurePreview"
+          }
         },
         "warnOnPotentiallyInsecureHostPattern": false
       }

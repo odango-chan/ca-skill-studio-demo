@@ -5,7 +5,7 @@ import {renderMarkdown} from '../../../../site/markdown-preview.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 
 export function registerWorkbench(vscode,context){
-  let document=null,selection={},snapshot=null,audit=[],generation=0,timer;
+  let document=null,selection={},snapshot=null,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   const providers=new Map(),sessions=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   context.subscriptions.push(diagnostics);
@@ -13,7 +13,7 @@ export function registerWorkbench(vscode,context){
     const emitter=new vscode.EventEmitter();
     const provider={onDidChangeTreeData:emitter.event,
       getChildren:item=>item?.children??(id==='problems'
-        ? [...(snapshot?.problems??[]),...audit].map(d=>({label:d.message,line:d.line,uri:d.uri,description:d.code??'Source projection',children:[]}))
+        ? [{label:auditStatus,children:[]},...([...(snapshot?.problems??[]),...audit].map(d=>({label:d.message,line:d.line,uri:d.uri,description:d.code??'Source projection',children:[]})))]
         :snapshot?.[id]??[{label:'Open assurance/procedure.yaml',children:[]}]),
       getTreeItem(item){
         const tree=new vscode.TreeItem(item.label,item.children?.length?vscode.TreeItemCollapsibleState.Collapsed:vscode.TreeItemCollapsibleState.None);
@@ -36,6 +36,7 @@ export function registerWorkbench(vscode,context){
   async function auditCurrent(){
     if(!document)return;
     const doc=document,version=doc.version,ticket=++generation;
+    auditStatus="Package Audit · running";fire();
     const files=new Map(),uris=new Map();
     try{
       const base=doc.uri.with({path:doc.uri.path.slice(0,-'assurance/procedure.yaml'.length)});
@@ -57,7 +58,8 @@ export function registerWorkbench(vscode,context){
       const results=missing.length?missing.map(path=>({message:'Audit unavailable: missing '+path,path:'assurance/procedure.yaml',line:1,code:'AUDIT_INCOMPLETE'})):
         auditPackageWorkspace({name:base.path.replace(/\/$/,'').split('/').at(-1),files},doc.getText());
       if(ticket!==generation||document!==doc||doc.version!==version)return;
-      audit=results.map(d=>({...d,uri:uris.get(d.path)??doc.uri}));diagnostics.clear();
+      audit=results.map(d=>({...d,uri:uris.get(d.path)??doc.uri}));
+      auditStatus="Package Audit · "+(missing.length?"unavailable":audit.length+" editor warnings");diagnostics.clear();
       for(const uri of new Set(audit.map(d=>d.uri))){
         diagnostics.set(uri,audit.filter(d=>d.uri===uri).map(d=>{
           const line=Math.max(0,d.line-1),diagnostic=new vscode.Diagnostic(new vscode.Range(line,0,line,1),d.message,vscode.DiagnosticSeverity.Warning);
@@ -65,9 +67,9 @@ export function registerWorkbench(vscode,context){
         }));
       }
       fire();
-    }catch(error){if(ticket!==generation)return;audit=[{message:'Audit unavailable: '+error.message,line:1,uri:doc.uri}];diagnostics.clear();fire();}
+    }catch(error){if(ticket!==generation)return;auditStatus='Package Audit · unavailable';audit=[{message:'Audit unavailable: '+error.message,line:1,uri:doc.uri}];diagnostics.clear();fire();}
   }
-  function scheduleAudit(){generation++;clearTimeout(timer);audit=[];diagnostics.clear();timer=setTimeout(()=>void auditCurrent(),350);}
+  function scheduleAudit(){generation++;clearTimeout(timer);auditStatus="Package Audit · pending";audit=[];diagnostics.clear();timer=setTimeout(()=>void auditCurrent(),350);fire();}
   context.subscriptions.push({dispose(){clearTimeout(timer);generation++;sessions.clear();}},
     vscode.commands.registerCommand('skillStudio.revealInspection',async item=>{
       if(!document||item.version!==document.version)return;

@@ -82,7 +82,7 @@
         "displayName": "SKILL Procedure Visual",
         "selector": [
           {
-            "filenamePattern": "**/assurance/procedure.yaml"
+            "filenamePattern": "**/assurance/[p]rocedure.yaml"
           }
         ],
         "priority": "default"

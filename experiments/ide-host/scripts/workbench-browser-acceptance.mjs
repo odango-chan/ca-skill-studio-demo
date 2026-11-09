@@ -2,18 +2,23 @@
 export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
     await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:count});
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:count});
   };
   async function palette(text){
-    await command('Input.dispatchKeyEvent',{type:'keyDown',key:'F1',code:'F1',windowsVirtualKeyCode:112});
-    await command('Input.dispatchKeyEvent',{type:'keyUp',key:'F1',code:'F1',windowsVirtualKeyCode:112});
-    await sleep(200);await command('Input.insertText',{text});await sleep(350);
-    const pos=await evalJS(`(()=>{const el=[...document.querySelectorAll('.monaco-list-row')].find(x=>x.innerText.toLowerCase().includes(${JSON.stringify(text.toLowerCase())}));const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-    if(!pos)throw Error('Command missing: '+text);await click(pos.x,pos.y);await sleep(500);
+    const view=await evalJS(`(()=>{const e=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='View'&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0);const r=e?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+    if(!view)throw Error('Native View menu missing');await click(view.x,view.y);await sleep(150);
+    const entry=await evalJS(`(()=>{const e=[...document.querySelectorAll('.lm-Menu-item')].find(x=>x.innerText.includes('Command Palette')&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=e?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+    if(!entry)throw Error('Native Command Palette menu missing');await click(entry.x,entry.y);await sleep(200);
+    await command('Input.dispatchKeyEvent',{type:'keyDown',key:'a',code:'KeyA',modifiers:2,windowsVirtualKeyCode:65});
+    await command('Input.dispatchKeyEvent',{type:'keyUp',key:'a',code:'KeyA',modifiers:2,windowsVirtualKeyCode:65});
+    await command('Input.insertText',{text:'>'+text});await sleep(300);
+    const pos=await evalJS(`(()=>{const el=[...document.querySelectorAll('.quick-input-widget .monaco-list-row')].find(x=>x.innerText.toLowerCase().includes(${JSON.stringify(text.toLowerCase())})&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+    if(!pos)throw Error('Command missing: '+text+' '+JSON.stringify(await evalJS(`({inputs:[...document.querySelectorAll('input')].map(x=>({value:x.value,rect:x.getBoundingClientRect().toJSON()})),rows:[...document.querySelectorAll('.monaco-list-row')].map(x=>({text:x.innerText,rect:x.getBoundingClientRect().toJSON()})).slice(-15),active:document.activeElement?.outerHTML,text:document.body.innerText.slice(-1200)})`)));await click(pos.x,pos.y);await sleep(500);
   }
   await palette('Skill Studio: Refresh Inspection');
-  const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides [title],.theia-app-sides [aria-label]')].find(x=>(x.title+' '+x.getAttribute('aria-label')).includes('Skill Studio'));const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
   await click(activity.x,activity.y);await sleep(500);
   const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
@@ -22,10 +27,11 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   const audit=await evalJS(`document.body.innerText`);
   if(audit.includes('Audit unavailable'))throw Error('Package Audit did not run: '+audit.slice(-1000));
   // Re-open through Explorer rather than extension openWith command.
+  await palette('Reveal in Explorer');
   await palette('Save All');
   await palette('Close All Editors');
   await palette('Focus on Files Explorer');
-  let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml');const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file not available in native Explorer');
   const start=performance.now();await click(file.x,file.y);await sleep(800);
   let graphContext;
@@ -59,7 +65,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   const warm=await graph(),warmTiming=JSON.parse(warm?.timing??'null');
   if(!initialTiming||!warmTiming?.cacheHit)throw Error('Version-scoped warm layout cache was not exercised: '+JSON.stringify({initialTiming,warmTiming}));
   // Safe Markdown uses the actual native source document and shared renderer.
-  const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md');const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
   await click(markdownFile.x,markdownFile.y,2);await sleep(400);
   await palette('Skill Studio: Preview Markdown');

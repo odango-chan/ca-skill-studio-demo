@@ -140,7 +140,7 @@ test("Build emits a bundled Node extension and a local script/style Webview",()=
 test("Theia worker bridge exports activation module via frontendModuleName",()=>{
   const bundle=readFileSync("experiments/ide-host/vscode/dist/extension-theia.js","utf8");
   assert.match(bundle,/__skillStudioTheiaModule/);
-  assert.match(bundle,/code-editor-opener/,"Theia Source must bypass the default visual association");
+  assert.match(bundle,/editor-preview-widget/,"Theia Source must bypass the default visual association");
   assert.match(bundle,/self\[self\.frontendModuleName\] = __skillStudioTheiaModule/);
   assert.match(bundle,/globalThis\.theia\[globalThis\.frontendModuleName\]/);
 });

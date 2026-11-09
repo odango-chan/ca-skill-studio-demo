@@ -50,7 +50,7 @@ export function activate(context){
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
-      const viewState=panel.onDidChangeViewState(()=>{if(panel.active)workbench.activate(document);});
+      const viewState=panel.onDidChangeViewState(()=>{if(panel.active){workbench.activate(document);void webview.postMessage({type:"requestSelection"});}});
       const media=vscode.Uri.joinPath(context.extensionUri,"media");
       webview.options={enableScripts:true,localResourceRoots:[media]};
       const nonce=newNonce();
@@ -124,7 +124,7 @@ export function activate(context){
       });
       const incoming=webview.onDidReceiveMessage(async message=>{
         if(disposed||typeof message!=="object"||!message)return;
-        if(message.type==="selection"){workbench.select(document,message);return;}
+        if(message.type==="selection"){if(panel.active)workbench.select(document,message);return;}
         if(message.type==="rendered"){
           if(message.version===document.version)console.log("STUDIO_OPEN_TIMING",JSON.stringify({version:document.version,hostToRenderMs:performance.now()-openedAt,projectionMs:message.projectionMs,layoutMs:message.layoutMs,cacheHit:message.cacheHit}));
           return;
@@ -144,8 +144,8 @@ export function activate(context){
           const position=new vscode.Position(line-1,0);
           const selection=new vscode.Range(position,position);
           // Pass the selection as part of the document-open request as well as
-          // setting it on the returned editor. This is important for browser
-          // hosts whose editor widget is created asynchronously by showTextDocument.
+          // setting it on the visible native editor. Theia uses its dedicated
+          // preview-capable text opener to bypass the visual association.
           await openNativeSource(vscode,document.uri,{
             viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false,
             selection
