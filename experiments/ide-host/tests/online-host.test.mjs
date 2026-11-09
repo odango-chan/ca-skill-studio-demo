@@ -90,7 +90,7 @@ test("SKILL Studio wordmark sits beside the native menu list and compacts on nar
   assert.match(css,/\.skill-studio-brand-label\{display:none\}/);
   assert.doesNotMatch(css,/\.lm-MenuBar-item/);
   assert.match(script,/document\.querySelectorAll\(BAR_SELECTOR\)/);
-  assert.match(script,/\\[id="theia:menubar"\\]/);
+  assert.match(script,/\[id="theia:menubar"\]/);
   assert.match(script,/bar\.insertBefore\(brand,content\)/);
   assert.match(script,/label\.textContent = "SKILL Studio"/);
   assert.match(script,/new MutationObserver\(mount\)/);
