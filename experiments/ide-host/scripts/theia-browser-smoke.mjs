@@ -491,18 +491,25 @@ try{
       const editorTarget=await evalJS(`(()=> {
         const editors=[...document.querySelectorAll(".monaco-editor")];
         const candidates=editors.map((editor,index)=>{
-          const rect=editor.getBoundingClientRect();
+          const root=editor.getBoundingClientRect();
+          // Monaco's view-lines rectangle spans the whole document. The
+          // scrollable element is the actual clipped editor viewport.
+          const viewport=editor.querySelector(".monaco-scrollable-element")??editor;
+          const rect=viewport.getBoundingClientRect();
           const lines=editor.querySelector(".view-lines");
           const text=lines?.innerText??"";
           const visible=rect.width>100&&rect.height>100&&
             rect.bottom>0&&rect.top<window.innerHeight&&
             rect.right>0&&rect.left<window.innerWidth;
-          return {index,visible,rect:{x:rect.left,y:rect.top,width:rect.width,height:rect.height},
-            text:text.slice(0,700),hasFixture:text.includes("DENIED: failed")};
+          const hasFixture=text.includes("FAILED: unresolved")&&
+            text.includes("DENIED: failed");
+          return {index,visible,hasFixture,
+            rect:{x:rect.left,y:rect.top,width:rect.width,height:rect.height},
+            rootRect:{x:root.left,y:root.top,width:root.width,height:root.height},
+            text:text.slice(0,700)};
         });
         const chosen=candidates.find(item=>item.visible&&item.hasFixture);
-        return {ready:Boolean(chosen),editorCount:editors.length,chosen,
-          candidates:candidates.map(({index,visible,rect,hasFixture})=>({index,visible,rect,hasFixture}))};
+        return {ready:Boolean(chosen),editorCount:editors.length,chosen,candidates};
       })()`);
       if(!editorTarget?.ready)
         throw Error("Native Theia Source editor viewport not found: "+JSON.stringify(editorTarget));
