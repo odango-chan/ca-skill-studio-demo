@@ -775,23 +775,34 @@ try{
       const updaterInfo=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
+          const source=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
           const oldTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="unresolved"]');
           const newTarget=document.querySelector('#reactFlowRoot .react-flow__node[data-id="failed"]');
-          const oldHandle=oldTarget?.querySelector('.react-flow__handle[data-handleid="edge-'+reconnectEdge.index+'-in"]');
+          const handle=[...(source?.querySelectorAll('.react-flow__handle[data-handleid^="edge-"][data-handleid$="-out"]')??[])]
+            .find(item=>{
+              const match=item.getAttribute("data-handleid")?.match(/^edge-(\\d+)-out$/);
+              return match&&oldTarget?.querySelector(
+                '.react-flow__handle[data-handleid="edge-'+match[1]+'-in"]');
+            });
+          const match=handle?.getAttribute("data-handleid")?.match(/^edge-(\\d+)-out$/);
+          const index=match?Number(match[1]):-1;
+          const edge=index>=0?document.querySelector(
+            '#reactFlowRoot .react-flow__edge[data-id="flow-edge-'+index+'"]'):null;
+          const oldHandle=index>=0?oldTarget?.querySelector(
+            '.react-flow__handle[data-handleid="edge-'+index+'-in"]'):null;
           const target=newTarget?.querySelector('.react-flow__handle[data-handleid="in"]');
           const rect=element=>{const r=element.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};};
-          const updaters=[...document.querySelectorAll("#reactFlowRoot .react-flow__edgeupdater")];
+          const updaters=[...(edge?.querySelectorAll(".react-flow__edgeupdater")??[])];
           const oldPoint=oldHandle?rect(oldHandle):null;
           const chosen=oldPoint?updaters.map(element=>({element,point:rect(element)}))
             .sort((a,b)=>Math.hypot(a.point.x-oldPoint.x,a.point.y-oldPoint.y)-
               Math.hypot(b.point.x-oldPoint.x,b.point.y-oldPoint.y))[0]:null;
-          return {ready:Boolean(chosen&&target),updaterCount:updaters.length,
+          return {ready:Boolean(chosen&&target),updaterCount:updaters.length,index,
             updater:chosen?.point??null,target:target?rect(target):null,
             oldPoint,updaterHtml:chosen?.element?.outerHTML??"",
-            edgeHtml:document.querySelector('#reactFlowRoot .react-flow__edge[data-id="flow-edge-'+reconnectEdge.index+'"]')?.outerHTML?.slice(0,1800)??""};
+            edgeHtml:edge?.outerHTML?.slice(0,1800)??""};
         })()`
       });
-      const updater=reconnectEdge.index;
       const updaterValue=updaterInfo.result?.value??null;
       if(!updaterValue?.ready)
         throw Error("Selected edge did not expose a reconnect target handle: "+
