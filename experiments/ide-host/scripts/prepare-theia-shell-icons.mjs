@@ -4,6 +4,7 @@ import {readFile,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 import {buildClassicIconsCss} from "./classic-icons-css.mjs";
+import {prepareTheiaBrand} from "./prepare-theia-brand.mjs";
 
 export async function prepareTheiaShellIcons(rootPath){
   if(typeof rootPath!=="string"||!rootPath.trim())
@@ -20,7 +21,8 @@ export async function prepareTheiaShellIcons(rootPath){
     html=html.replace(head[0],link+head[0]);
     await writeFile(indexPath,html);
   }
-  return Object.freeze({root,cssBytes:Buffer.byteLength(css),stylesheet:"classic-icons.css"});
+  const brand=await prepareTheiaBrand(root);
+  return Object.freeze({root,cssBytes:Buffer.byteLength(css),stylesheet:"classic-icons.css",brand});
 }
 
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
