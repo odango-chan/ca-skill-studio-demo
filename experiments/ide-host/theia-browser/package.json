@@ -8,6 +8,7 @@
     "frontend": {
       "config": {
         "applicationName": "SKILL Studio · Theia Browser Host Trial",
+        "warnOnPotentiallyInsecureHostPattern": false,
         "preferences": {
           "files.enableTrash": false,
           "security.workspace.trust.enabled": false
