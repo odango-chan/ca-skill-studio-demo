@@ -2,14 +2,16 @@ name: Deploy Skill Studio Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, spike/ide-extension-theia-host]
     paths:
       - "site/**"
+      - "experiments/ide-host/**"
       - "tests/**"
       - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/pages.yml"
+      - ".github/workflows/deploy-theia-pages-preview.yml"
   workflow_dispatch:
 
 permissions:
@@ -22,9 +24,21 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: main-source
     steps:
-      - name: Checkout source
+      - name: Checkout current published site from main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-source
+      - name: Checkout isolated Theia experiment
+        if: github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        uses: actions/checkout@v4
+        with:
+          ref: spike/ide-extension-theia-host
+          path: ide-source
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -159,17 +173,55 @@ jobs:
           node --check scripts/build.mjs
           node --check scripts/edge-smoke.mjs
           node --check scripts/d1-interaction-smoke.mjs
+      - name: Build Theia Web extension for temporary preview
+        if: github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: ide-source
+        run: |
+          npm ci --no-audit --no-fund
+          node experiments/ide-host/scripts/build-ide-spike.mjs
+          node experiments/ide-host/scripts/prepare-theia-online.mjs
+      - name: Build Theia browser-only static preview
+        if: github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: ide-source
+        run: |
+          npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
+          npm run build --prefix experiments/ide-host/theia-online
+          node experiments/ide-host/scripts/prepare-theia-static-preview.mjs
+      - name: Real Chromium acceptance at the Pages subpath
+        if: github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: ide-source
+        env:
+          THEIA_BASE_PATH: "/ca-skill-studio-demo/ide-preview"
+          THEIA_REQUIRE_WEBVIEW: "1"
+        run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
+      - name: Compose temporary preview without replacing existing site root
+        if: github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: main-source
+        run: |
+          mkdir -p dist/ide-preview
+          cp -R ../ide-source/experiments/ide-host/theia-online/lib/frontend/. dist/ide-preview/
+          test -s dist/ide-preview/index.html
+          test -s dist/ide-preview/webview/index.html
+          test -s dist/ide-preview/hostedPlugin/list.json
+          cat > dist/ide-preview/preview-meta.json <<'EOF'
+          {
+            "kind": "temporary-demo-preview",
+            "sourceBranch": "spike/ide-extension-theia-host",
+            "warning": "Same-origin webviews are enabled for this static demo only. Do not open sensitive workspaces."
+          }
+          EOF
+          test -s dist/index.html
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:
-          path: dist
+          path: main-source/dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
     permissions:
       contents: read
       pages: write
