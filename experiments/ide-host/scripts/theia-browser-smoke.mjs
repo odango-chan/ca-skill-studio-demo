@@ -327,9 +327,10 @@ try{
       await command("Input.dispatchKeyEvent",{
         type:"keyUp",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
       });
-      await sleep(1800);
+      await sleep(2600);
       const afterUndoTree=await command("Page.getFrameTree");
       const undoFrames=[];
+      frames.length=0;
       walkFrames(afterUndoTree.frameTree);
       for(const frame of frames.filter(item=>item.url.includes("/webview/index.html")||
           item.url.includes(".webview."))){
