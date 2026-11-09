@@ -603,7 +603,7 @@ try{
       })()`);
       const routeFixture={
         ready:routeFixtureEditor.editorCount>0&&
-          /TextDocument v\\d+/.test(routeFixtureView.result?.value?.revision??"")&&
+          /TextDocument v\d+/.test(routeFixtureView.result?.value?.revision??"")&&
           routeFixtureView.result?.value?.procedure==="await-initial-n4-session-establishment"&&
           routeFixtureView.result?.value?.graphEdges===routeOriginalView.result?.value?.graphEdges-1&&
           routeFixtureEditor.visibleText.includes("UNKNOWN: unresolved")&&
@@ -725,7 +725,7 @@ try{
         })`
       });
       const routeAppliedSource={
-        ready:/TextDocument v\\d+/.test(routeApplied.result?.value?.revision??""),
+        ready:/TextDocument v\d+/.test(routeApplied.result?.value?.revision??""),
         revision:routeApplied.result?.value?.revision??"",
         graphEdges:routeApplied.result?.value?.graphEdges??0
       };
@@ -755,7 +755,7 @@ try{
         })`
       });
       const routeUndoSource={
-        ready:/TextDocument v\\d+/.test(routeUndo.result?.value?.revision??""),
+        ready:/TextDocument v\d+/.test(routeUndo.result?.value?.revision??""),
         revision:routeUndo.result?.value?.revision??"",
         graphEdges:routeUndo.result?.value?.graphEdges??0
       };
@@ -952,7 +952,7 @@ try{
         })`
       });
       const reconnectAppliedValue=reconnectApplied.result?.value??null;
-      if(!/TextDocument v\\d+/.test(reconnectAppliedValue?.revision??"")||
+      if(!/TextDocument v\d+/.test(reconnectAppliedValue?.revision??"")||
          !String(reconnectAppliedValue?.routeOption??"").includes("→ failed")||
          reconnectAppliedValue?.graphEdges!==routeFixture.view.graphEdges)
         throw Error("Native TextDocument did not apply the reconnect Patch: "+
@@ -974,7 +974,7 @@ try{
         })`
       });
       const reconnectUndoValue=reconnectUndo.result?.value??null;
-      if(!/TextDocument v\\d+/.test(reconnectUndoValue?.revision??"")||
+      if(!/TextDocument v\d+/.test(reconnectUndoValue?.revision??"")||
          !String(reconnectUndoValue?.routeOption??"").includes("→ unresolved")||
          reconnectUndoValue?.graphEdges!==routeFixture.view.graphEdges)
         throw Error("Native Undo did not restore the original Route target: "+JSON.stringify(reconnectUndoValue));
