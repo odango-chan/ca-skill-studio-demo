@@ -21,6 +21,15 @@
     "_python": {
       "iconPath": "./python.svg"
     },
+    "_json": {
+      "iconPath": "./json.svg"
+    },
+    "_shell": {
+      "iconPath": "./shell.svg"
+    },
+    "_text": {
+      "iconPath": "./text.svg"
+    },
     "_code": {
       "iconPath": "./code.svg"
     }
@@ -37,23 +46,31 @@
     "procedure.yaml": "_yaml",
     "contract.yaml": "_yaml",
     "predicates.yaml": "_yaml",
-    "package.json": "_code"
+    "package.json": "_json"
   },
   "fileExtensions": {
     "yaml": "_yaml",
     "yml": "_yaml",
     "md": "_markdown",
+    "markdown": "_markdown",
     "py": "_python",
-    "json": "_code",
-    "jsonc": "_code",
-    "sh": "_code",
-    "bash": "_code",
-    "txt": "_markdown",
-    "toml": "_code",
+    "pyw": "_python",
+    "json": "_json",
+    "jsonc": "_json",
+    "sh": "_shell",
+    "bash": "_shell",
+    "fish": "_shell",
+    "txt": "_text",
+    "log": "_text",
+    "lrc": "_text",
     "js": "_code",
     "mjs": "_code",
+    "cjs": "_code",
     "ts": "_code",
     "tsx": "_code",
-    "css": "_code"
+    "go": "_code",
+    "css": "_code",
+    "html": "_code",
+    "jsx": "_code"
   }
 }

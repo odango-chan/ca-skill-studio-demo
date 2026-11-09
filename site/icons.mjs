@@ -79,7 +79,20 @@ const defs={
   flag:[p("M5 3v18"),p("M5 4h14l-3 5 3 5H5")],
   wrench:[p("M14 6a6 6 0 0 0-7 7l-5 5a2 2 0 0 0 3 3l5-5a6 6 0 0 0 8-7l-4 4-3-3 3-4Z")],
   "file-diff":[p("M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Z"),
-    poly("13 3 13 10 20 10"),line(8,14,16,14),line(12,11,12,17)]
+    poly("13 3 13 10 20 10"),line(8,14,16,14),line(12,11,12,17)],
+  plus:[line(12,5,12,19),line(5,12,19,12)],
+  minus:[line(5,12,19,12)],
+  x:[line(18,6,6,18),line(6,6,18,18)],
+  menu:[line(4,7,20,7),line(4,12,20,12),line(4,17,20,17)],
+  "more-horizontal":[circle(5,12,1),circle(12,12,1),circle(19,12,1)],
+  "chevron-up":[poly("6 15 12 9 18 15")],
+  "file-plus":[p("M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Z"),
+    poly("13 3 13 10 20 10"),line(12,13,12,19),line(9,16,15,16)],
+  "sliders-horizontal":[line(4,6,20,6),circle(9,6,2),line(4,12,20,12),
+    circle(15,12,2),line(4,18,20,18),circle(7,18,2)],
+  play:[poly("9 6 19 12 9 18 9 6")],
+  check:[poly("5 12 10 17 19 7")],
+  "user-round":[circle(12,8,3.5),p("M4 21a8 8 0 0 1 16 0")]
 };
 export const ICON_SHAPES=Object.freeze(Object.fromEntries(
   Object.entries(defs).map(([name,shapes])=>[name,Object.freeze(shapes.map(
