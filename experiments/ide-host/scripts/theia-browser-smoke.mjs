@@ -425,24 +425,88 @@ try{
         returned:focusReturn.result?.value??null
       };
 
-      // Exercise the actual canvas-only Route gesture. Remove one existing
-      // observed Outcome through the native Monaco TextModel, then recreate
-      // it only after the dedicated source handle, explicit Outcome and Diff.
-      const routeFixture=await evalJS(`(()=> {
-        const models=window.monaco?.editor?.getModels?.()??[];
-        const model=models.find(item=>item.uri?.path?.endsWith("/assurance/procedure.yaml"));
-        if(!model)return {ready:false,reason:"Native Monaco Procedure model unavailable",models:models.map(x=>x.uri?.path)};
-        const lines=model.getValue().split(/\\r?\\n/);
-        const procedure=lines.findIndex(line=>line.trim()==="await-initial-n4-session-establishment:");
-        const node=lines.findIndex((line,index)=>index>procedure&&line.trim()==="await-initial-resources:");
-        const denied=lines.findIndex((line,index)=>index>node&&index<node+35&&line.trim()==="DENIED: failed");
-        if(procedure<0||node<0||denied<0)return {ready:false,reason:"Known Route fixture row not found",procedure,node,denied};
-        model.applyEdits([{range:new window.monaco.Range(denied+1,1,denied+2,1),text:""}]);
-        return {ready:true,procedureLine:procedure+1,nodeLine:node+1,removedLine:denied+1,uri:model.uri.path};
+      // Prepare a real browser fixture through the native Theia text editor.
+      // Monaco's AMD module is not exposed as window.monaco in Theia, so this
+      // deliberately uses the public editor UI and keyboard instead of
+      // reaching into private editor models.
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#openSource")?.click(); true`
+      });
+      await sleep(700);
+      const editorTarget=await evalJS(`(()=> {
+        const editors=[...document.querySelectorAll(".monaco-editor")];
+        const editor=editors.find(item=>{
+          const rect=item.querySelector(".view-lines")?.getBoundingClientRect();
+          return rect&&rect.width>0&&rect.height>0;
+        });
+        const lines=editor?.querySelector(".view-lines");
+        const rect=lines?.getBoundingClientRect();
+        return {editorCount:editors.length,ready:Boolean(rect),
+          rect:rect?{x:rect.left,y:rect.top,width:rect.width,height:rect.height}:null,
+          visibleText:lines?.innerText?.slice(0,500)??""};
       })()`);
-      if(!routeFixture?.ready)
-        throw Error("Could not prepare the isolated Route-creation fixture: "+JSON.stringify(routeFixture));
-      await sleep(1300);
+      if(!editorTarget?.ready)
+        throw Error("Native Theia Source editor is not visible: "+JSON.stringify(editorTarget));
+      const clickX=editorTarget.rect.x+Math.min(90,editorTarget.rect.width/2);
+      const clickY=editorTarget.rect.y+Math.min(18,editorTarget.rect.height/2);
+      await command("Input.dispatchMouseEvent",{
+        type:"mousePressed",x:clickX,y:clickY,button:"left",clickCount:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:clickX,y:clickY,button:"left",clickCount:1
+      });
+      // The imported sample has four DENIED routes. Starting at the top and
+      // advancing once selects the one in await-initial-n4-session-establishment
+      // (the second occurrence), which is the isolated create-Route fixture.
+      const key=async(key,code,modifiers=0,virtualKeyCode)=>{
+        await command("Input.dispatchKeyEvent",{
+          type:"keyDown",key,code,modifiers,
+          windowsVirtualKeyCode:virtualKeyCode,nativeVirtualKeyCode:virtualKeyCode
+        });
+        await command("Input.dispatchKeyEvent",{
+          type:"keyUp",key,code,modifiers,
+          windowsVirtualKeyCode:virtualKeyCode,nativeVirtualKeyCode:virtualKeyCode
+        });
+      };
+      await key("Home","Home",2,36);
+      await key("f","KeyF",2,70);
+      await command("Input.insertText",{text:"DENIED: failed"});
+      await sleep(250);
+      const findState=await evalJS(`({
+        active:document.activeElement?.outerHTML?.slice(0,500)??"",
+        value:document.activeElement?.value??"",
+        findWidgets:document.querySelectorAll(".find-widget").length
+      })`);
+      if(findState.value!=="DENIED: failed")
+        throw Error("Native editor Find did not receive the exact fixture query: "+JSON.stringify(findState));
+      await key("Enter","Enter",0,13);
+      await key("Escape","Escape",0,27);
+      await key("Backspace","Backspace",0,8);
+      await sleep(1500);
+      const routeFixtureView=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent||"",
+          graphNodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length,
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
+        })`
+      });
+      const routeFixtureEditor=await evalJS(`({
+        editorCount:document.querySelectorAll(".monaco-editor").length,
+        active:document.activeElement?.className??"",
+        visibleText:[...document.querySelectorAll(".monaco-editor .view-line")]
+          .map(line=>line.innerText).join("\\n").slice(0,1400)
+      })`);
+      const routeFixture={
+        ready:routeFixtureEditor.editorCount>0&&/TextDocument v\\d+/.test(
+          routeFixtureView.result?.value?.revision??""),
+        editor:editorTarget,find:findState,
+        view:routeFixtureView.result?.value??null,after:routeFixtureEditor
+      };
+      if(!routeFixture.ready)
+        throw Error("Could not prepare the isolated Route-creation fixture using the native editor: "+
+          JSON.stringify(routeFixture).slice(0,3000));
       const routeMode=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
@@ -552,15 +616,15 @@ try{
           patchVisible:!document.querySelector("#patch")?.hidden
         })`
       });
-      const routeAppliedSource=await evalJS(`(()=> {
-        const model=window.monaco?.editor?.getModels?.().find(item=>
-          item.uri?.path?.endsWith("/assurance/procedure.yaml"));
-        return {ready:Boolean(model),hasDenied:Boolean(model?.getValue().split(/\\r?\\n/)
-          .some(line=>line.trim()==="DENIED: failed"))};
-      })()`);
-      if(!routeAppliedSource?.ready||!routeAppliedSource.hasDenied)
-        throw Error("Native host did not insert the new Route into Source: "+
-          JSON.stringify({applied:routeApplied.result?.value,source:routeAppliedSource}));
+      const routeAppliedSource={
+        ready:/TextDocument v\\d+/.test(routeApplied.result?.value?.revision??""),
+        revision:routeApplied.result?.value?.revision??"",
+        graphEdges:routeApplied.result?.value?.graphEdges??0
+      };
+      if(!routeAppliedSource.ready||
+         routeAppliedSource.graphEdges!==routeFixture.view.graphEdges+1)
+        throw Error("Host Source snapshot did not add exactly one projected Route: "+
+          JSON.stringify({fixture:routeFixture.view,applied:routeApplied.result?.value}));
       await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`document.querySelector("#openSource")?.click(); true`
@@ -582,12 +646,11 @@ try{
           graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
         })`
       });
-      const routeUndoSource=await evalJS(`(()=> {
-        const model=window.monaco?.editor?.getModels?.().find(item=>
-          item.uri?.path?.endsWith("/assurance/procedure.yaml"));
-        return {ready:Boolean(model),hasDenied:Boolean(model?.getValue().split(/\\r?\\n/)
-          .some(line=>line.trim()==="DENIED: failed"))};
-      })()`);
+      const routeUndoSource={
+        ready:/TextDocument v\\d+/.test(routeUndo.result?.value?.revision??""),
+        revision:routeUndo.result?.value?.revision??"",
+        graphEdges:routeUndo.result?.value?.graphEdges??0
+      };
       patchEvidence.routeCreate={
         fixture:routeFixture,gesture:routeGesture,
         proposal:routeProposalValue,preview:routePreviewValue,
@@ -646,7 +709,8 @@ try{
       !patchEvidence.routeCreate?.appliedSource?.ready||
       !patchEvidence.routeCreate?.appliedSource?.hasDenied||
       !patchEvidence.routeCreate?.undoSource?.ready||
-      patchEvidence.routeCreate?.undoSource?.hasDenied))
+      patchEvidence.routeCreate?.undoSource?.graphEdges!==
+        patchEvidence.routeCreate?.fixture?.view?.graphEdges))
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
   if(requireEditor)
