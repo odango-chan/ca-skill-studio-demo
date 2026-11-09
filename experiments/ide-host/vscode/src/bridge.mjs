@@ -41,7 +41,8 @@ export function validateCanvasRouteCreationProposal(source,currentVersion,propos
   if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||
      start<0||end!==start||end>source.length)
     throw new Error("Invalid Route insertion span");
-  const newText=candidateSource.slice(start,end);
+  const suffixLength=source.length-end;
+  const newText=candidateSource.slice(start,candidateSource.length-suffixLength);
   if(!newText||source.slice(0,start)+newText+source.slice(end)!==candidateSource)
     throw new Error("New Route would modify unrelated Source text");
   return Object.freeze({start,end,newText,candidateSource,diff:preview.diff,
