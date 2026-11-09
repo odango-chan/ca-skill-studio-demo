@@ -29,14 +29,22 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
       :"已选择节点 "+id+" · 仅显示当前 Source 明确允许的 Route 操作");
   },
   onEdgeSelect(bundle){
-    const first=bundle?.routes?.[0];
-    if(!first)return;
+    const routes=bundle?.routes??[];
+    if(!routes.length)return;
+    const selected=state.selection?.kind==="route"&&
+      routes.some(route=>route.id===state.selection.id)
+      ?state.selection.id:routes.length===1?routes[0].id:null;
     state.routeProposal=null;state.pending=null;state.pendingKind=null;
-    state.selection={kind:"route",id:first.id};
+    state.selection=selected?{kind:"route",id:selected}:null;
     renderRoutes();
-    $("routeList").value=first.id;
-    refreshTargets();
-    repaint();
+    if(selected){
+      $("routeList").value=selected;
+      refreshTargets();
+      status("已明确选择 "+selected+"；可拖动该 Route 的目标端进行重连。");
+    }else{
+      repaint();
+      status("此连线包含多个 Outcome。请先在 Route 列表中明确选择一个 Route，再拖动目标端重连。");
+    }
   },
   onPaneClick(){
     if(state.routeProposal)return;
@@ -150,15 +158,17 @@ function routeChoices(routeId){
   return routeTargetChoices(procedure,routeId);
 }
 function refreshTargets(){
-  state.pending=null;$("commit").disabled=true;$("diff").textContent="";
+  state.pending=null;state.pendingKind=null;
+  $("commit").disabled=true;$("diff").textContent="";
   const procedure=getProcedure(),routeId=$("routeList").value;
   const route=procedure?.routes.find(r=>r.id===routeId);
-  const targets=routeChoices(routeId).filter(x=>x!==route?.target);
+  const targets=route?routeChoices(routeId).filter(x=>x!==route.target):[];
   const menu=$("targetList");
   menu.replaceChildren();
   for(const name of targets)option(menu,name,name);
   $("preview").disabled=!targets.length;
-  if(!targets.length)status("该 Route 不满足当前 Source-backed Patch 资格；仍可原生编辑 YAML");
+  if(!route)status("请选择一个明确的 Route；多 Outcome Bundle 不会自动选择第一条");
+  else if(!targets.length)status("该 Route 不满足当前 Source-backed Patch 资格；仍可原生编辑 YAML");
   if(route)state.selection={kind:"route",id:route.id};
   repaint();
 }
@@ -166,15 +176,24 @@ function renderRoutes({preserveSelection=false}={}){
   const previousSelection=state.selection;
   const procedure=getProcedure(),list=$("routeList");
   list.replaceChildren();
+  option(list,"请选择一个 Route","");
+  let routeCount=0;
   for(const route of procedure?.routes??[]){
     const usable=routeChoices(route.id).some(x=>x!==route.target);
-    if(usable)option(list,route.source+" / "+route.outcome+
-      " ["+route.routeSource+"] → "+route.target,route.id);
+    if(usable){
+      option(list,route.source+" / "+route.outcome+
+        " ["+route.routeSource+"] → "+route.target,route.id);
+      routeCount++;
+    }
   }
+  const selectedRoute=previousSelection?.kind==="route"
+    ?previousSelection.id:"";
+  list.value=selectedRoute&&[...list.options].some(item=>item.value===selectedRoute)
+    ?selectedRoute:"";
   const hasProposal=Boolean(state.routeProposal);
-  $("existingRouteEditor").hidden=hasProposal||!list.options.length;
+  $("existingRouteEditor").hidden=hasProposal||!routeCount;
   $("newRouteEditor").hidden=!hasProposal;
-  $("patch").hidden=Boolean(state.nodeFocusId)||(!hasProposal&&!list.options.length);
+  $("patch").hidden=Boolean(state.nodeFocusId)||(!hasProposal&&!routeCount);
   if(hasProposal){
     const intent=state.routeProposal.intent;
     const outcome=$("newRouteOutcome");
@@ -187,15 +206,19 @@ function renderRoutes({preserveSelection=false}={}){
     $("newRoutePreview").disabled=true;
     state.pending=null;state.pendingKind=null;
     $("commit").disabled=true;$("diff").textContent="";
-  }else if(list.options.length){
+  }else if(routeCount&&list.value){
     refreshTargets();
-    if(preserveSelection&&previousSelection?.kind==="node"){
-      state.selection=previousSelection;
-      repaint();
-    }
   }else{
+    const targets=$("targetList");
+    targets.replaceChildren();
+    $("preview").disabled=true;
     state.pending=null;state.pendingKind=null;
     $("commit").disabled=true;$("diff").textContent="";
+    if(preserveSelection&&previousSelection?.kind==="node")
+      state.selection=previousSelection;
+    else if(previousSelection?.kind!=="node")
+      state.selection=null;
+    repaint();
   }
 }
 function prepareRouteCreation(connection){
@@ -291,7 +314,12 @@ function receiveSnapshot(data){
   void showProcedure(model.procedures.has(previous)?previous:model.entry);
 }
 $("procedureList").addEventListener("change",event=>void showProcedure(event.target.value));
-$("routeList").addEventListener("change",refreshTargets);
+$("routeList").addEventListener("change",()=>{
+  const routeId=$("routeList").value;
+  state.selection=routeId?{kind:"route",id:routeId}:null;
+  refreshTargets();
+  if(routeId)status("已明确选择 "+routeId+"；重连只会改变其目标，不会改动 Route Source。");
+});
 $("targetList").addEventListener("change",()=>{
   state.pending=null;state.pendingKind=null;
   $("commit").disabled=true;$("diff").textContent="";
