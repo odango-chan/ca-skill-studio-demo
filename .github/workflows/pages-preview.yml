@@ -1,0 +1,55 @@
+name: Deploy Skill Studio Preview
+
+on:
+  push:
+    branches:
+      - preview/skill-studio-online
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skill-studio-pages-preview
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout preview source
+        uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install exact toolchain dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run repository tests
+        run: npm test
+      - name: TypeScript check
+        run: npm run typecheck
+      - name: Build browser site
+        run: npm run build
+      - name: Chromium E2E
+        run: node scripts/edge-smoke.mjs
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy preview to existing Pages URL
+        id: deployment
+        uses: actions/deploy-pages@v4
