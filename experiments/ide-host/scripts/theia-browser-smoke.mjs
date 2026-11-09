@@ -502,7 +502,7 @@ try{
           const viewport=editor.querySelector(".monaco-scrollable-element")??editor;
           const rect=viewport.getBoundingClientRect();
           const lines=editor.querySelector(".view-lines");
-          const text=(lines?.innerText??"").replace(/\\u00a0/g," ");
+          const text=(lines?.innerText??"").replace(/\u00a0/g," ");
           const visible=rect.width>30&&rect.height>100&&
             rect.bottom>0&&rect.top<window.innerHeight&&
             rect.right>0&&rect.left<window.innerWidth;
@@ -565,7 +565,7 @@ try{
       const gotoLineView=await evalJS(`(()=> {
         const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
         const lines=editor?.querySelector(".view-lines");
-        return {text:(lines?.innerText??"").replace(/\\u00a0/g," "),editorVisible:Boolean(editor)};
+        return {text:(lines?.innerText??"").replace(/\u00a0/g," "),editorVisible:Boolean(editor)};
       })()`);
       if(!gotoLineView.editorVisible||
          !gotoLineView.text.includes("FAILED: unresolved")||
@@ -598,7 +598,7 @@ try{
           activeTag:document.activeElement?.tagName??"",
           activeClass:document.activeElement?.className??"",
           visibleText:[...(editor?.querySelectorAll(".view-line")??[])]
-            .map(line=>line.innerText.replace(/\\u00a0/g," ")).join("\\n").slice(0,1800)
+            .map(line=>line.innerText.replace(/\u00a0/g," ")).join("\\n").slice(0,1800)
         };
       })()`);
       const routeFixture={
