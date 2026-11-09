@@ -260,12 +260,63 @@ try{
   }
   const graphFrame=webviewFrames.find(item=>item.view?.procedureRoot&&item.view.graphNodes>0);
   const webviewFrame=graphFrame?.frame??webviewFrames[0]?.frame??null;
-  const webviewView=graphFrame?.view??webviewFrames[0]?.view??null;
+  let webviewView=graphFrame?.view??webviewFrames[0]?.view??null;
   const webviewFrameError=webviewFrames.find(item=>item.error)?.error??null;
+  let patchEvidence=null;
+  if(graphFrame){
+    const world=await command("Page.createIsolatedWorld",{
+      frameId:graphFrame.frame.id,worldName:"skill-studio-patch-acceptance",grantUniveralAccess:true
+    });
+    const preview=await command("Runtime.evaluate",{
+      contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+      expression:`(()=>{
+        const routes=document.querySelector("#routeList");
+        const targets=document.querySelector("#targetList");
+        if(!routes||!targets||routes.options.length<1)
+          return {ready:false,reason:"No source-qualified Route choices",routeOptions:routes?.options.length??0};
+        routes.selectedIndex=0;
+        routes.dispatchEvent(new Event("change",{bubbles:true}));
+        if(targets.options.length<1)
+          return {ready:false,reason:"No qualified target choices",routeOptions:routes.options.length};
+        targets.selectedIndex=0;
+        targets.dispatchEvent(new Event("change",{bubbles:true}));
+        document.querySelector("#preview")?.click();
+        return {
+          ready:!document.querySelector("#commit")?.disabled,
+          routeOptions:routes.options.length,targetOptions:targets.options.length,
+          route:routes.value,target:targets.value,
+          diff:document.querySelector("#diff")?.textContent||"",
+          revision:document.querySelector("#revision")?.textContent||""
+        };
+      })()`
+    });
+    const previewEvidence=preview.result?.value??null;
+    if(previewEvidence?.ready){
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#commit")?.click(); true`
+      });
+      await sleep(2200);
+      const applied=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent||"",
+          message:document.querySelector("#message")?.textContent||"",
+          procedureValue:document.querySelector("#procedureList")?.value||"",
+          graphNodes:document.querySelectorAll(".react-flow__node").length,
+          graphEdges:document.querySelectorAll(".react-flow__edge").length
+        })`
+      });
+      patchEvidence={preview:previewEvidence,applied:applied.result?.value??null};
+      webviewView={...webviewView,...(applied.result?.value??{})};
+    }else{
+      patchEvidence={preview:previewEvidence,applied:null};
+    }
+  }
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
-    frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrames,webviewFrame,webviewView,webviewFrameError,
+    frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrames,webviewFrame,webviewView,webviewFrameError,patchEvidence,
     extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500),
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
@@ -281,6 +332,12 @@ try{
   if(externalUrl&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
+  if(externalUrl&&(!patchEvidence?.preview?.ready||
+      !String(patchEvidence.preview.diff).includes("-")||
+      !String(patchEvidence.preview.diff).includes("+")||
+      !/TextDocument v[2-9]/.test(patchEvidence.applied?.revision??"")))
+    throw Error("Source-backed Patch preview/apply did not update the TextDocument: "+
+      JSON.stringify(patchEvidence).slice(0,3000));
   if(externalUrl)
     console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS");
   else
