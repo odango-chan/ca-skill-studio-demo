@@ -840,7 +840,7 @@ try{
       if(!reconnectEdge||!ambiguousValue)
         throw Error("Could not select the ambiguous operator.on Route bundle without selecting an Outcome: "+
           JSON.stringify({candidates:reconnectCandidates,selection:ambiguousValue,
-            lastMessage:document.querySelector("#message")?.textContent??""}));
+            lastMessage:ambiguousValue?.message??""}));
       const chooseReconnectRoute=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
