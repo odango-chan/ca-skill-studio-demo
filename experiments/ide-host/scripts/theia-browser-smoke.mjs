@@ -614,7 +614,7 @@ try{
       };
       if(!routeFixture.ready)
         throw Error("Could not prepare the isolated Route-creation fixture using the native editor: "+
-          JSON.stringify(routeFixture).slice(0,3000));
+          JSON.stringify(routeFixture).slice(0,9000));
       const routeMode=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
