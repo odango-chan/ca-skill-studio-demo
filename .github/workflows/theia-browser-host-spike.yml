@@ -27,6 +27,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Install Linux native keytar prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-1-dev
       - name: Install pinned Studio dependencies
         run: npm ci --no-audit --no-fund
       - name: Build shared Procedure extension and webview
