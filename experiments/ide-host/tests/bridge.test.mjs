@@ -72,8 +72,8 @@ function removeOutcome(source,procedureId,nodeId,outcome){
   const p=projectWorkspace(source).procedures.get(procedureId);
   const route=p?.routes.find(r=>r.id===nodeId+":"+outcome&&r.routeSource==="operator.on");
   assert.ok(route,"fixture must contain the exact existing Route");
-  const lineStart=source.lastIndexOf("\\n",route.sourceSpan.start-1)+1;
-  const lineEnd=source.indexOf("\\n",route.sourceSpan.end);
+  const lineStart=source.lastIndexOf("\n",route.sourceSpan.start-1)+1;
+  const lineEnd=source.indexOf("\n",route.sourceSpan.end);
   assert.ok(lineEnd>=0);
   return source.slice(0,lineStart)+source.slice(lineEnd+1);
 }
@@ -119,13 +119,13 @@ test("D3-A3 host rejects stale, forged, unsupported-handle and unobserved Route 
   };
   const reject=value=>assert.throws(()=>validateCanvasRouteCreationProposal(source,18,value));
   reject({...proposal,expectedVersion:17});
-  reject({...proposal,baseSource:source+"\\n"});
-  reject({...proposal,candidateSource:proposal.candidateSource+"\\n"});
+  reject({...proposal,baseSource:source+"\n"});
+  reject({...proposal,candidateSource:proposal.candidateSource+"\n"});
   reject({...proposal,sourceHandle:"edge-0-out"});
   reject({...proposal,targetId:"missing-node"});
   reject({...proposal,outcome:"INVENTED"});
   reject({...proposal,type:"applyRoute"});
-  assert.throws(()=>validateCanvasRouteCreationProposal(source+"\\n",18,proposal));
+  assert.throws(()=>validateCanvasRouteCreationProposal(source+"\n",18,proposal));
 });
 test("Build emits a bundled Node extension and a local script/style Webview",()=>{
   for(const path of ["experiments/ide-host/vscode/dist/extension.cjs",
