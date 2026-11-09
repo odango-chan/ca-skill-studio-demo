@@ -80,6 +80,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
   const direction=graph.direction==="RIGHT"?"RIGHT":"DOWN";
   const present=new Set((graph.visibleNodes??procedure.nodes).map(n=>n.id));
   const selectedRoute=selection?.kind==="route"?selection.id:null;
+  const selectedBundle=selection?.kind==="bundle"?selection.id:null;
   const ports=new Map([...present].map(id=>[id,[]]));
   for(const [i,bundle] of graph.bundles.entries()){
     const anchors=bundle.anchors;
@@ -128,7 +129,10 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
     if(!present.has(bundle.source)||!present.has(bundle.target))
       throw new Error("Unresolved flow edge: "+bundle.source+" -> "+bundle.target);
     if(!bundle.routes?.length)throw new Error("Empty Route bundle");
-    const selected=Boolean(selectedRoute&&bundle.routes.some(r=>r.id===selectedRoute));
+    const selected=Boolean(
+      (selectedRoute&&bundle.routes.some(r=>r.id===selectedRoute))||
+      selectedBundle===bundle.source+"->"+bundle.target
+    );
     const tone=classifyRouteTone(bundle.outcomes);
     const important=tone==="success";
     const origin=routeOrigin(bundle.routeSource);
