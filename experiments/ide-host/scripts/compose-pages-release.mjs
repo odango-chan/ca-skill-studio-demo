@@ -56,6 +56,16 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
         recursive:true,force:true
       });
     }
+    // GitHub Pages must bypass Jekyll so Theia's underscore-prefixed assets
+    // and browser-worker paths are published exactly as built.
+    await writeFile(join(output,".nojekyll"),"");
+    // Preserve a configured Pages custom domain if the Classic build carries it.
+    try{
+      const domain=await readFile(join(stagedClassic,"CNAME"),"utf8");
+      await writeFile(join(output,"CNAME"),domain);
+    }catch(error){
+      if(error?.code!=="ENOENT")throw error;
+    }
 
     const legacyPreview=join(output,"ide-preview");
     await mkdir(legacyPreview,{recursive:true});
