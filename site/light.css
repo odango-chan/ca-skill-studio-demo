@@ -1899,3 +1899,24 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   color:#0d7466;background:#edf8f3;border:1px solid #bfdfd3;
   border-radius:7px;font-weight:650;
 }
+
+/* Preview D1-A2d: visual-only frame grouping the current Node stages. */
+.focus-procedure-flow .react-flow__node-focus-boundary{
+  pointer-events:none!important;
+}
+.focus-current-boundary{
+  position:relative;
+  box-sizing:border-box;
+  border:1.5px dashed #94b2c2;
+  background:rgba(232,241,249,.35);
+  border-radius:14px;
+  box-shadow:0 0 0 3px rgba(234,243,249,.4);
+  pointer-events:none;
+}
+.focus-current-boundary-label{
+  display:block;position:absolute;
+  left:14px;top:10px;max-width:calc(100% - 28px);
+  color:#50768b;letter-spacing:.025em;
+  font:700 10px/1.35 system-ui,sans-serif;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
