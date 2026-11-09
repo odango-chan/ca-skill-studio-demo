@@ -22,8 +22,7 @@ python3 -m http.server 8080 --directory dist
 
 浏览器打开 http://localhost:8080。此命令仍启动 Classic 原版浏览器应用，用于本地开发和功能对照；GitHub Pages 的默认 Theia Host 由 `.github/workflows/pages.yml` 单独构建。请使用已打包的 `dist/`，不要将 `site/index.html` 直接当成可运行的 TSX 原生页面。
 
-**注意：这是本地启动 Studio 编辑器，不是运行 SKILL 或 Python / Runtime。**
-Pages 和本地静态站共用一个应用菜单及 Source 编辑逻辑；只有未来接入明确授权的本地执行宿主，才会增加真实 Run / Trace 操作。设计见 [应用菜单与本地宿主](docs/design/application-shell.md)。
+**注意：这是本地启动 Classic 编辑器，不是运行 SKILL 或 Python / Runtime。** Theia Pages 使用宿主原生菜单和编辑器，但复用相同的 Source 投影与受限 Patch 边界；两者都不提供真实 Run / Trace。设计见 [应用菜单与本地宿主](docs/design/application-shell.md)。
 
 ## 现有能力
 
