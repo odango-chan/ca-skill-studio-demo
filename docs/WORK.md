@@ -1,6 +1,6 @@
 # Skill Studio 当前工作状态
 
-**Updated: 2026-11-06**  
+**Updated: 2026-11-09**  
 **Integrated baseline before top-level menu UX: main@80cc153fc043cf3d6e7e6449fb9197adc7419eb6**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
 
 ## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
@@ -110,3 +110,39 @@
 - The continuing online IDE preview is based on `spike/ide-extension-theia-host` / PR #86; `main` remains the stable published baseline and is not changed by this integration.
 - The branch inherits the already-merged Root path-focus work: default proven success path, selectable/complete path modes, per-card `+N 条` expand / `收起`, explicit `查看`, and anchor-preserving expand/collapse (#73/#75/#77).
 - Added the view-only dashed boundary grouping the current Node's PRE/OP/POST stages, adapted from #71. It adds no business Node, Route, Source mutation or Runtime meaning. Exact-head verification is pending.
+
+
+## 2026-11-09 · Theia becomes the default online host; Classic is retained
+
+**Decision:** GitHub Pages root `/` now targets Theia browser-only 1.76 with
+the SKILL Studio Web extension bundled at build time. The previous complete
+browser Studio is preserved at `/classic/`; the old `/ide-preview/` path
+redirects to the new root. The Pages workflow builds the old Studio from the
+main-source checkout, builds Theia from the current ref, verifies the root
+subpath, and composes one artifact. After PR #86 is merged, the same workflow
+runs from `main` on every normal deployment.
+
+**This is not feature parity.** The current plugin host does not yet expose
+the old Node detail view, Route create/reconnect, Phase Designer, full
+Inspector, Package Audit or Markdown preview. Those capabilities remain
+available in Classic and must be migrated explicitly before Classic is
+retired. Do not treat a successful shell build as proof that all old features
+were carried over.
+
+**Security / persistence boundary:** the GitHub Pages Theia build uses a
+same-origin Webview adapter and displays a persistent warning. It is for
+public/sample workspaces only; do not open sensitive or untrusted files.
+Browser OPFS is local to the current browser profile, not native disk access
+or GitHub synchronization. No Python, SKILL Runtime or 5GC execution is
+provided by this static host.
+
+**Preservation:** `backup/main-before-theia-default-2026-11-09` points to the
+exact previous main SHA `dcb137d606e6a697fcf02f7d7c5a811f7921e0f5`.
+
+**Current migration evidence:** prior exact-head real Chromium run
+[#42575346100](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42575346100)
+passed the browser-only Theia shell, sample import, Procedure CustomEditor,
+guarded Patch, Source editor and Undo at the former `/ide-preview/` path.
+The new default-root smoke, release composition test and Pages deployment
+must pass at the current exact head before the new root deployment is called
+accepted. PR #86 remains open until those gates are green.
