@@ -552,7 +552,9 @@ try{
       await key("Home","Home",0,36);
       await key("Home","Home",0,36);
       await key("End","End",8,35);
-      await command("Input.insertText",{text:"          DENIED: unresolved"});
+      // Remove this one existing Route so DENIED becomes an observed,
+      // currently-unmapped Outcome eligible for the create-Route proposal.
+      await key("Backspace","Backspace",0,8);
       await sleep(1500);
       const routeFixtureView=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
@@ -575,7 +577,8 @@ try{
           /TextDocument v\\d+/.test(routeFixtureView.result?.value?.revision??"")&&
           routeFixtureView.result?.value?.procedure==="await-initial-n4-session-establishment"&&
           routeFixtureView.result?.value?.graphEdges===routeOriginalView.result?.value?.graphEdges-1&&
-          routeFixtureEditor.visibleText.includes("DENIED: unresolved"),
+          routeFixtureEditor.visibleText.includes("UNKNOWN: unresolved")&&
+          !routeFixtureEditor.visibleText.includes("DENIED: failed"),
         editor:editorTarget,goto:gotoState,gotoTyped,
         original:routeOriginalView.result?.value??null,
         view:routeFixtureView.result?.value??null,after:routeFixtureEditor
