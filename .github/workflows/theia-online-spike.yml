@@ -46,6 +46,7 @@ jobs:
           node experiments/ide-host/scripts/check-theia-online.mjs
       - name: Launch generated browser-only shell in real headless Chromium
         env:
+          THEIA_BASE_PATH: "/ca-skill-studio-demo/ide-preview"
           THEIA_REQUIRE_WEBVIEW: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       - name: Upload isolated online frontend preview artifact
