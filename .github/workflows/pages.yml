@@ -6,6 +6,7 @@ on:
     paths:
       - "site/**"
       - "experiments/ide-host/**"
+      - "extensions/skill-studio-theme/**"
       - "tests/**"
       - "scripts/**"
       - "package.json"
