@@ -60,6 +60,20 @@ test("selection, labels and direction remain UI-only",async()=>{
   assert.equal(flow.edges.find(e=>e.selected).markerEnd.color,"#087e71");
   assert.equal(JSON.stringify(ensure.procedure),source);
 });
+test("ambiguous Route bundle remains visibly selected without choosing an Outcome",async()=>{
+  const graph=await layoutProcedureELK(created.procedure);
+  const bundle=graph.bundles.find(item=>item.routes.length>1);
+  assert.ok(bundle);
+  const flow=makeFlowElements(graph,created.procedure,{
+    kind:"bundle",id:bundle.source+"->"+bundle.target
+  });
+  const selected=flow.edges.filter(edge=>edge.selected);
+  assert.equal(selected.length,1);
+  assert.equal(selected[0].data.bundle.source,bundle.source);
+  assert.equal(selected[0].data.bundle.target,bundle.target);
+  assert.equal(resolveReconnectedRoute(bundle,null),null,
+    "visual bundle selection is not a semantic Route selection");
+});
 test("multi-outcome edge cannot rewire an arbitrary Outcome without selection",async()=>{
   const graph=await layoutProcedureELK(created.procedure);
   const bundle=graph.bundles.find(b=>b.routes.length>1);
