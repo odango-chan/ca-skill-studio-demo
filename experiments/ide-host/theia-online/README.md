@@ -1,7 +1,8 @@
 # Theia browser-only · online Studio host spike
 
-This is an **isolated actual Theia 1.76.0 browser-only application build**.
-It is not the existing Pages product, a desktop-only VSIX or a Node-backed IDE.
+This is the **Theia 1.76.0 browser-only application build** used by the
+new default online SKILL Studio host. GitHub Pages serves it at `/`; the
+previous full browser Studio is retained at `/classic/`.
 
 Run from repository root (Node 24, separate dependency graph):
 
@@ -25,9 +26,12 @@ CustomTextEditor Webview; changes and native Undo/Save propagate without
 clobbering unrelated YAML. An artifact that merely contains bundled files is
 not online acceptance. Missing plugin metadata or a CSP/URI failure is BLOCKED.
 
-Existing production Pages at
-https://odango-chan.github.io/ca-skill-studio-demo/ is **never overwritten**
-by this build. See [ADR-0002](../../../docs/decisions/0002-ide-host-spike.md).
+After the Pages workflow composes the release, Theia is published at
+https://odango-chan.github.io/ca-skill-studio-demo/ and the previous full
+Studio is preserved at
+https://odango-chan.github.io/ca-skill-studio-demo/classic/.
+The static same-origin Webview adapter is demo-only; do not open sensitive
+files or untrusted workspaces. See [ADR-0002](../../../docs/decisions/0002-ide-host-spike.md).
 
 ## Static Pages preview adapter (demo only)
 
