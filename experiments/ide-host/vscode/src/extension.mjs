@@ -1,3 +1,4 @@
+import {openNativeSource} from "./native-source.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
 // workers. Do not import node:crypto: the online host has no Node APIs.
@@ -12,6 +13,7 @@ import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
 import {seedExampleWorkspace} from "./sample-loader.mjs";
 
+import {registerWorkbench} from "./workbench.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
@@ -38,13 +40,21 @@ function escaped(value){
   }[ch]));
 }
 export function activate(context){
+  const workbench=registerWorkbench(vscode,context);
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
         vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported in this spike");
         return;
       }
+      const openedAt=performance.now();
       const webview=panel.webview;
+      const detach=workbench.attach(document,message=>webview.postMessage(message));
+      let wasActive=panel.active;
+      const viewState=panel.onDidChangeViewState(()=>{
+        const becameActive=panel.active&&!wasActive;wasActive=panel.active;
+        if(becameActive)workbench.activate(document);
+      });
       const media=vscode.Uri.joinPath(context.extensionUri,"media");
       webview.options={enableScripts:true,localResourceRoots:[media]};
       const nonce=newNonce();
@@ -118,9 +128,14 @@ export function activate(context){
       });
       const incoming=webview.onDidReceiveMessage(async message=>{
         if(disposed||typeof message!=="object"||!message)return;
+        if(message.type==="selection"){if(panel.active)workbench.select(document,message);return;}
+        if(message.type==="rendered"){
+          if(message.version===document.version)console.log("STUDIO_OPEN_TIMING",JSON.stringify({version:document.version,hostToRenderMs:performance.now()-openedAt,projectionMs:message.projectionMs,layoutMs:message.layoutMs,cacheHit:message.cacheHit}));
+          return;
+        }
         if(message.type==="ready"){ready=true;push();return;}
         if(message.type==="openSource"){
-          await vscode.window.showTextDocument(document,{viewColumn:vscode.ViewColumn.Beside,
+          await openNativeSource(vscode,document.uri,{viewColumn:vscode.ViewColumn.Beside,
             preserveFocus:false,preview:false});
           return;
         }
@@ -133,14 +148,16 @@ export function activate(context){
           const position=new vscode.Position(line-1,0);
           const selection=new vscode.Range(position,position);
           // Pass the selection as part of the document-open request as well as
-          // setting it on the returned editor. This is important for browser
-          // hosts whose editor widget is created asynchronously by showTextDocument.
-          const editor=await vscode.window.showTextDocument(document,{
+          // setting it on the visible native editor. Theia uses its dedicated
+          // preview-capable text opener to bypass the visual association.
+          await openNativeSource(vscode,document.uri,{
             viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false,
             selection
           });
-          editor.selection=new vscode.Selection(position,position);
-          editor.revealRange(selection,vscode.TextEditorRevealType.InCenter);
+          const editor=vscode.window.visibleTextEditors.find(editor=>editor.document.uri.toString()===document.uri.toString());
+          if(editor){editor.selection=new vscode.Selection(position,position);
+            editor.revealRange(selection,vscode.TextEditorRevealType.InCenter);
+          }
           return;
         }
         if(message.type!=="applyRoute"&&message.type!=="applyRouteCreation")return;
@@ -166,12 +183,12 @@ export function activate(context){
         }
       });
       panel.onDidDispose(()=>{
-        disposed=true;changed.dispose();incoming.dispose();
+        disposed=true;detach();viewState.dispose();changed.dispose();incoming.dispose();
       });
     }
   };
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
-    webviewOptions:{retainContextWhenHidden:false}
+    webviewOptions:{retainContextWhenHidden:true}
   }));
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
     async()=>{
@@ -179,7 +196,7 @@ export function activate(context){
       try{
         const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri);
         stage="open-procedure";
-        await vscode.commands.executeCommand("vscode.openWith",result.procedure,VIEW);
+        await vscode.commands.executeCommand("vscode.open",result.procedure);
         void vscode.window.showInformationMessage(
           "示例 SKILL 已载入浏览器工作区："+result.created+" 新文件，"+
           result.skipped+" 个已存在文件保持不变");

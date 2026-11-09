@@ -6,7 +6,7 @@
 
 ## 在线入口
 
-GitHub Pages 根入口为 Theia 插件版；[原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) 保留旧功能，`/ide-preview/` 跳转新版。插件迁移尚未追平：Node 详情、Route 创建/重连、Phase Designer、完整 Inspector、Package Audit 和 Markdown 预览暂用 Classic。Theia 在线版使用同源 Webview，仅用于公开/示例工作区，不要打开敏感文件；OPFS 不等于本地磁盘或 GitHub 同步，也不执行 Python、Runtime 或 5GC。
+GitHub Pages 根入口为 Theia 插件版；[原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) 保留旧功能，`/ide-preview/` 跳转新版。插件迁移尚未追平：Node Focus 与 Route 创建/重连已迁移；本阶段新增原生只读 Inspection/Outline/Evidence/Problems、Package Audit 和 Markdown Preview，完整 Inspector/Phase Designer 等剩余缺口见 [功能对照](docs/architecture/theia-workbench.md)。Theia 在线版使用同源 Webview，仅用于公开/示例工作区，不要打开敏感文件；OPFS 不等于本地磁盘或 GitHub 同步，也不执行 Python、Runtime 或 5GC。
 
 ## 本地运行
 

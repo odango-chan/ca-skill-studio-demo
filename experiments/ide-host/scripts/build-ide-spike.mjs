@@ -32,6 +32,7 @@ const theiaWorkerEntry=join(root,"dist/extension-theia.js");
 await build({
   entryPoints:[join(root,"src/extension.mjs")],
   outfile:theiaWorkerEntry,
+  define:{STUDIO_THEIA_HOST:"true"},
   bundle:true,format:"iife",globalName:"__skillStudioTheiaModule",
   platform:"browser",target:"es2022",logLevel:"info",
   plugins:[{
@@ -55,6 +56,7 @@ await appendFile(theiaWorkerEntry,
 await build({
   entryPoints:[join(root,"src/webview.mjs")],
   outfile:join(root,"media/procedure.js"),
+  minify:true,
   bundle:true,format:"iife",platform:"browser",target:"es2022",
   loader:{".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file"},
   assetNames:"assets/[name]-[hash]",logLevel:"info"

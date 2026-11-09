@@ -23,7 +23,7 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   const plugin=JSON.parse(readFileSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike/package.json"),"utf8"));
   assert.ok(plugin.browser?.endsWith("extension-theia.js"));
   assert.equal(plugin.contributes.customEditors[0].viewType,"skillStudio.procedurePreview");
-  assert.equal(plugin.contributes.customEditors[0].priority,"option");
+  assert.equal(plugin.contributes.customEditors[0].priority,"default");
   assert.ok(plugin.activationEvents.includes("onStartupFinished"),
     "first-run demo discovery must activate on startup");
   assert.ok(plugin.contributes.viewsWelcome?.some(x=>

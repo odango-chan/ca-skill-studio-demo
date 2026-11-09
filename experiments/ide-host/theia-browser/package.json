@@ -10,7 +10,12 @@
         "applicationName": "SKILL Studio · Theia Browser Host Trial",
         "preferences": {
           "files.enableTrash": false,
-          "security.workspace.trust.enabled": false
+          "security.workspace.trust.enabled": false,
+          "workbench.list.openMode": "singleClick",
+          "editor.enablePreview": true,
+          "workbench.editorAssociations": {
+            "procedure.yaml": "skillStudio.procedurePreview"
+          }
         },
         "warnOnPotentiallyInsecureHostPattern": false
       }

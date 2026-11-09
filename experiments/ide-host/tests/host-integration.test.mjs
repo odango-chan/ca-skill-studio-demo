@@ -19,7 +19,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     positionAt(offset){return {offset};}
   };
   const listeners=new Set(),commands=new Map(),posted=[],writes=[],opened=[],registered=[],revealed=[];
-  const textEditor={selection:null,revealRange(range,kind){revealed.push({range,kind});}};
+  const textEditor={document,selection:null,revealRange(range,kind){revealed.push({range,kind});}};
   let provider=null,onMessage=null;
   class WorkspaceEdit{
     replace(file,range,value){this.change={file,range,value};}
@@ -28,11 +28,15 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   class Position{constructor(line,character){this.line=line;this.character=character;}}
   class Selection{constructor(anchor,active){this.anchor=anchor;this.active=active;}}
   const fake={
+    EventEmitter:class {event=()=>({dispose(){}});fire(){}dispose(){}},
+    languages:{createDiagnosticCollection:()=>({dispose(){},clear(){},set(){}})},
+    TreeItem:class {},TreeItemCollapsibleState:{None:0,Collapsed:1},
     ViewColumn:{Beside:2},
     Uri:{joinPath(base,...parts){return {path:base.path+"/"+parts.join("/")};}},
     Range,Position,Selection,WorkspaceEdit,
     TextEditorRevealType:{InCenter:1},
     workspace:{
+      textDocuments:[document],
       onDidChangeTextDocument(cb){listeners.add(cb);return {dispose(){listeners.delete(cb);}};},
       async applyEdit(edit){
         const {file,range,value}=edit.change;
@@ -48,6 +52,9 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       asRelativePath:file=>file.path
     },
     window:{
+      visibleTextEditors:[textEditor],
+      registerTreeDataProvider:()=>({dispose(){}}),
+      onDidChangeActiveTextEditor:()=>({dispose(){}}),
       activeTextEditor:{document},
       registerCustomEditorProvider(_name,p){provider=p;return{dispose(){}};},
       showWarningMessage:()=>{},
@@ -57,7 +64,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     },
     commands:{
       registerCommand(name,cb){commands.set(name,cb);return{dispose(){}};},
-      async executeCommand(...args){registered.push(args);}
+      async executeCommand(...args){registered.push(args);if(args[0]==="vscode.openWith"&&args[2]==="default")opened.push({doc:document,opts:args[3]});}
     }
   };
   const original=Module._load;
@@ -82,7 +89,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     postMessage:async data=>{posted.push(data);return true;},
     onDidReceiveMessage:cb=>{onMessage=cb;return{dispose(){}};}
   };
-  const panel={webview,onDidDispose:()=>({dispose(){}})};
+  const panel={webview,onDidChangeViewState:()=>({dispose(){}}),onDidDispose:()=>({dispose(){}})};
   await provider.resolveCustomTextEditor(document,panel);
   assert.match(webview.html,/Content-Security-Policy/);
   assert.match(webview.html,/procedure\.js/);
