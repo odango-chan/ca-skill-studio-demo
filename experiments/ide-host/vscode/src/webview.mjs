@@ -83,7 +83,7 @@ function clearNodeFocus(){
 function closeNodeFocus(){
   if(!state.nodeFocusId)return;
   clearNodeFocus();
-  renderRoutes();
+  renderRoutes({preserveSelection:true});
   requestAnimationFrame(()=>canvas.fit());
   status("已返回完整 Procedure 流程图；Source 未被修改。");
 }
@@ -226,6 +226,10 @@ function prepareReconnect(routeId,sourceId,targetId){
   const route=getProcedure()?.routes.find(item=>item.id===routeId);
   if(!route||route.source!==sourceId){
     status("重连拒绝：只允许保留原 Route Source 的目标变更");
+    return;
+  }
+  if(targetId===route.target){
+    status("重连未产生变化：目标仍是原 Node");
     return;
   }
   if(!routeChoices(routeId).includes(targetId)){
