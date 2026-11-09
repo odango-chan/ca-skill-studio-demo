@@ -424,6 +424,138 @@ try{
         sourceJumpView,
         returned:focusReturn.result?.value??null
       };
+
+      // Exercise the actual canvas-only Route gesture. Remove one existing
+      // observed Outcome through the native Monaco TextModel, then recreate
+      // it only after the dedicated source handle, explicit Outcome and Diff.
+      const routeFixture=await evalJS(`(()=> {
+        const models=window.monaco?.editor?.getModels?.()??[];
+        const model=models.find(item=>item.uri?.path?.endsWith("/assurance/procedure.yaml"));
+        if(!model)return {ready:false,reason:"Native Monaco Procedure model unavailable",models:models.map(x=>x.uri?.path)};
+        const lines=model.getValue().split(/\\r?\\n/);
+        const procedure=lines.findIndex(line=>line.trim()==="await-initial-n4-session-establishment:");
+        const node=lines.findIndex((line,index)=>index>procedure&&line.trim()==="await-initial-resources:");
+        const denied=lines.findIndex((line,index)=>index>node&&index<node+35&&line.trim()==="DENIED: failed");
+        if(procedure<0||node<0||denied<0)return {ready:false,reason:"Known Route fixture row not found",procedure,node,denied};
+        model.applyEdits([{range:new window.monaco.Range(denied+1,1,denied+2,1),text:""}]);
+        return {ready:true,procedureLine:procedure+1,nodeLine:node+1,removedLine:denied+1,uri:model.uri.path};
+      })()`);
+      if(!routeFixture?.ready)
+        throw Error("Could not prepare the isolated Route-creation fixture: "+JSON.stringify(routeFixture));
+      await sleep(1300);
+      const routeMode=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const select=document.querySelector("#procedureList");
+          if(!select)return {ready:false,reason:"Procedure selector missing"};
+          select.value="await-initial-n4-session-establishment";
+          select.dispatchEvent(new Event("change",{bubbles:true}));
+          return {ready:true,value:select.value};
+        })()`
+      });
+      await sleep(1500);
+      const routeGesture=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const node=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
+          const targetNode=document.querySelector('#reactFlowRoot .react-flow__node[data-id="failed"]');
+          if(!node||!targetNode)return {ready:false,reason:"Source/target Node missing"};
+          node.dispatchEvent(new MouseEvent("click",{bubbles:true}));
+          const source=node.querySelector('.react-flow__handle[data-handleid="new-route-out"]');
+          const target=targetNode.querySelector('.react-flow__handle[data-handleid="in"]');
+          if(!source||!target)return {ready:false,reason:"Dedicated add-Route or target handle missing",
+            source:Boolean(source),target:Boolean(target)};
+          const center=element=>{const r=element.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};};
+          const from=center(source),to=center(target),mid={x:(from.x+to.x)/2,y:(from.y+to.y)/2};
+          const fire=(element,type,point,buttons)=>element.dispatchEvent(new PointerEvent(type,{
+            bubbles:true,cancelable:true,composed:true,pointerId:73,pointerType:"mouse",
+            isPrimary:true,button:0,buttons,clientX:point.x,clientY:point.y
+          }));
+          fire(source,"pointerdown",from,1);
+          fire(document,"pointermove",mid,1);fire(window,"pointermove",mid,1);
+          fire(document,"pointermove",to,1);fire(window,"pointermove",to,1);
+          fire(target,"pointerup",to,0);
+          fire(document,"pointerup",to,0);fire(window,"pointerup",to,0);
+          return {ready:true,source:from,target:to,sourceHandle:source.getAttribute("data-handleid"),
+            targetHandle:target.getAttribute("data-handleid")};
+        })()`
+      });
+      await sleep(800);
+      const routeProposal=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          visible:!document.querySelector("#newRouteEditor")?.hidden,
+          summary:document.querySelector("#newRouteSummary")?.textContent||"",
+          outcomes:[...(document.querySelector("#newRouteOutcome")?.options??[])].map(x=>x.value),
+          message:document.querySelector("#message")?.textContent||""
+        })`
+      });
+      const routeProposalValue=routeProposal.result?.value??null;
+      if(!routeGesture.result?.value?.ready||!routeProposalValue?.visible||
+         !routeProposalValue.outcomes.includes("DENIED"))
+        throw Error("Canvas Route proposal did not expose the observed DENIED Outcome: "+
+          JSON.stringify({routeFixture,routeMode:routeMode.result?.value,
+            routeGesture:routeGesture.result?.value,routeProposal:routeProposalValue}));
+      const routePreview=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const outcome=document.querySelector("#newRouteOutcome");
+          outcome.value="DENIED";outcome.dispatchEvent(new Event("change",{bubbles:true}));
+          document.querySelector("#newRoutePreview")?.click();
+          return {ready:!document.querySelector("#commit")?.disabled,
+            diff:document.querySelector("#diff")?.textContent||"",
+            summary:document.querySelector("#newRouteSummary")?.textContent||""};
+        })()`
+      });
+      const routePreviewValue=routePreview.result?.value??null;
+      if(!routePreviewValue?.ready||!routePreviewValue.diff.includes("+")||
+         !routePreviewValue.diff.includes("DENIED: failed"))
+        throw Error("Canvas Route Diff preview did not qualify the selected Outcome: "+
+          JSON.stringify(routePreviewValue));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#commit")?.click(); true`
+      });
+      await sleep(1800);
+      const routeApplied=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent||"",
+          message:document.querySelector("#message")?.textContent||"",
+          procedure:document.querySelector("#procedureList")?.value||"",
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length,
+          patchVisible:!document.querySelector("#patch")?.hidden
+        })`
+      });
+      if(!String(routeApplied.result?.value?.message??"").includes("WorkspaceEdit 已应用"))
+        throw Error("Native host did not apply the new Route insertion: "+
+          JSON.stringify(routeApplied.result?.value));
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#openSource")?.click(); true`
+      });
+      await sleep(700);
+      await command("Input.dispatchKeyEvent",{
+        type:"keyDown",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
+      });
+      await command("Input.dispatchKeyEvent",{
+        type:"keyUp",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
+      });
+      await sleep(1800);
+      const routeUndo=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          revision:document.querySelector("#revision")?.textContent||"",
+          message:document.querySelector("#message")?.textContent||"",
+          procedure:document.querySelector("#procedureList")?.value||"",
+          graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
+        })`
+      });
+      patchEvidence.routeCreate={
+        fixture:routeFixture,gesture:routeGesture.result?.value??null,
+        proposal:routeProposalValue,preview:routePreviewValue,
+        applied:routeApplied.result?.value??null,undo:routeUndo.result?.value??null
+      };
     }else{
       patchEvidence={preview:previewEvidence,applied:null};
     }
@@ -468,11 +600,17 @@ try{
       !patchEvidence.nodeFocus?.sourceJump?.ready||
       !(patchEvidence.nodeFocus?.sourceJumpView?.monacoEditors>0)||
       !patchEvidence.nodeFocus?.returned?.returned||
-      !patchEvidence.nodeFocus?.returned?.mainGraphVisible))
+      !patchEvidence.nodeFocus?.returned?.mainGraphVisible||
+      !patchEvidence.routeCreate?.fixture?.ready||
+      !patchEvidence.routeCreate?.gesture?.ready||
+      !patchEvidence.routeCreate?.proposal?.visible||
+      !patchEvidence.routeCreate?.preview?.ready||
+      !String(patchEvidence.routeCreate?.applied?.message??"").includes("WorkspaceEdit 已应用")||
+      !String(patchEvidence.routeCreate?.undo?.message??"").includes("WorkspaceEdit 已应用")))
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify(patchEvidence.nodeFocus).slice(0,3500));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
