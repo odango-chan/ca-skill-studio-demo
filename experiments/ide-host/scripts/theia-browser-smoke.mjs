@@ -10,6 +10,7 @@ import {extname,join,resolve,sep} from "node:path";
 
 const root=resolve("experiments/ide-host/theia-online/lib/frontend");
 const externalUrl=process.env.THEIA_URL;
+const basePath=(process.env.THEIA_BASE_PATH||"").replace(/\\/+$/,"");
 const requireWebview=process.env.THEIA_REQUIRE_WEBVIEW==="1";
 const requireEditor=Boolean(externalUrl)||requireWebview;
 const chrome=process.env.CHROME_BIN||
@@ -25,6 +26,10 @@ const server=externalUrl?null:createServer((req,res)=>{
   const url=new URL(req.url,"http://localhost");
   let name;
   try{name=decodeURIComponent(url.pathname);}catch{res.writeHead(400).end();return;}
+  if(basePath){
+    if(name!==basePath&&!name.startsWith(basePath+"/")){res.writeHead(404).end();return;}
+    name=name.slice(basePath.length)||"/";
+  }
   requests.add(name);
   const file=resolve(root,"."+name.replace(/\/$/,"/index.html"));
   if(file!==root&&!file.startsWith(root+sep)){res.writeHead(403).end();return;}
@@ -36,7 +41,7 @@ const server=externalUrl?null:createServer((req,res)=>{
   });
 });
 if(server)await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
-const url=externalUrl||("http://127.0.0.1:"+server.address().port+"/");
+const url=externalUrl||("http://127.0.0.1:"+server.address().port+basePath+"/");
 const profile=await mkdtemp(join(tmpdir(),"theia-online-chrome-"));
 const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",
   "--disable-dev-shm-usage","--no-first-run","--no-default-browser-check",
