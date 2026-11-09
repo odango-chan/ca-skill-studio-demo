@@ -470,31 +470,22 @@ try{
       await sleep(700);
       const editorTarget=await evalJS(`(()=> {
         const editors=[...document.querySelectorAll(".monaco-editor")];
-        const index=editors.findIndex(item=>{
-          const rect=item.getBoundingClientRect();
-          return rect.width>0&&rect.height>0&&item.querySelector("textarea.inputarea");
+        const candidates=editors.map((editor,index)=>{
+          const rect=editor.getBoundingClientRect();
+          const lines=editor.querySelector(".view-lines");
+          const text=lines?.innerText??"";
+          const visible=rect.width>100&&rect.height>100&&
+            rect.bottom>0&&rect.top<window.innerHeight&&
+            rect.right>0&&rect.left<window.innerWidth;
+          return {index,visible,rect:{x:rect.left,y:rect.top,width:rect.width,height:rect.height},
+            text:text.slice(0,700),hasFixture:text.includes("DENIED: failed")};
         });
-        const editor=index>=0?editors[index]:null;
-        const viewport=editor?.querySelector(".monaco-scrollable-element")??editor;
-        const rect=viewport?.getBoundingClientRect();
-        const lines=editor?.querySelector(".view-lines");
-        return {editorCount:editors.length,index,ready:Boolean(rect&&rect.width>0&&rect.height>0),
-          rect:rect?{x:rect.left,y:rect.top,width:rect.width,height:rect.height}:null,
-          visibleText:lines?.innerText?.slice(0,500)??""};
+        const chosen=candidates.find(item=>item.visible&&item.hasFixture);
+        return {ready:Boolean(chosen),editorCount:editors.length,chosen,
+          candidates:candidates.map(({index,visible,rect,hasFixture})=>({index,visible,rect,hasFixture}))};
       })()`);
       if(!editorTarget?.ready)
-        throw Error("Native Theia Source editor is not visible: "+JSON.stringify(editorTarget));
-      const clickX=editorTarget.rect.x+Math.min(90,editorTarget.rect.width/2);
-      const clickY=editorTarget.rect.y+Math.min(18,editorTarget.rect.height/2);
-      await command("Input.dispatchMouseEvent",{
-        type:"mousePressed",x:clickX,y:clickY,button:"left",clickCount:1
-      });
-      await command("Input.dispatchMouseEvent",{
-        type:"mouseReleased",x:clickX,y:clickY,button:"left",clickCount:1
-      });
-      // The imported sample has four DENIED routes. Starting at the top and
-      // advancing once selects the one in await-initial-n4-session-establishment
-      // (the second occurrence), which is the isolated create-Route fixture.
+        throw Error("Native Theia Source editor viewport not found: "+JSON.stringify(editorTarget));
       const key=async(key,code,modifiers=0,virtualKeyCode)=>{
         await command("Input.dispatchKeyEvent",{
           type:"keyDown",key,code,modifiers,
@@ -505,35 +496,43 @@ try{
           windowsVirtualKeyCode:virtualKeyCode,nativeVirtualKeyCode:virtualKeyCode
         });
       };
-      await key("Home","Home",2,36);
-      await key("f","KeyF",2,70);
-      await command("Input.insertText",{text:"DENIED: failed"});
-      await sleep(250);
-      const findState=await evalJS(`({
-        active:document.activeElement?.outerHTML?.slice(0,500)??"",
-        value:document.activeElement?.value??"",
-        findWidgets:document.querySelectorAll(".find-widget").length,
-        matchCount:document.querySelector(".find-widget .matchesCount")?.textContent??""
+      const clickX=editorTarget.chosen.rect.x+Math.min(90,editorTarget.chosen.rect.width/2);
+      const clickY=editorTarget.chosen.rect.y+Math.min(24,editorTarget.chosen.rect.height/2);
+      await command("Input.dispatchMouseEvent",{
+        type:"mousePressed",x:clickX,y:clickY,button:"left",clickCount:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:clickX,y:clickY,button:"left",clickCount:1
+      });
+      // Go to the known DENIED Route in await-initial-n4-session-establishment.
+      // This uses the native editor's public keyboard UI, not Monaco internals.
+      await key("g","KeyG",2,71);
+      await sleep(150);
+      const gotoState=await evalJS(`({
+        activeTag:document.activeElement?.tagName??"",
+        activeClass:document.activeElement?.className??"",
+        activeValue:document.activeElement?.value??"",
+        ariaLabel:document.activeElement?.getAttribute("aria-label")??"",
+        visibleWidgets:[...document.querySelectorAll(".monaco-editor .zone-widget,.quick-input-widget,.quick-input-box,.goto-line-widget")]
+          .map(item=>({className:item.className,text:item.innerText?.slice(0,120)}))
       })`);
-      if(findState.value!=="DENIED: failed"||findState.findWidgets<1)
-        throw Error("Native editor Find did not receive the exact fixture query: "+JSON.stringify(findState));
+      await command("Input.insertText",{text:"637"});
+      await sleep(100);
+      const gotoTyped=await evalJS(`({
+        activeValue:document.activeElement?.value??"",
+        ariaLabel:document.activeElement?.getAttribute("aria-label")??""
+      })`);
+      if(!String(gotoTyped.activeValue??"").includes("637"))
+        throw Error("Native editor Go to Line did not receive line 637: "+
+          JSON.stringify({gotoState,gotoTyped}));
       await key("Enter","Enter",0,13);
-      const secondMatch=await evalJS(`({
-        value:document.activeElement?.value??"",
-        matchCount:document.querySelector(".find-widget .matchesCount")?.textContent??""
-      })`);
-      await key("Escape","Escape",0,27);
-      const editorFocus=await evalJS(`(()=> {
-        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.index}];
-        const input=editor?.querySelector("textarea.inputarea");
-        input?.focus();
-        return {ready:Boolean(input&&document.activeElement===input),
-          active:document.activeElement?.className??"",
-          findVisible:Boolean(document.querySelector(".find-widget.visible"))};
-      })()`);
-      if(!editorFocus.ready)
-        throw Error("Native Monaco editor input could not be focused after Find: "+JSON.stringify(editorFocus));
-      await key("Backspace","Backspace",0,8);
+      await sleep(200);
+      // Home twice is Monaco's stable route to column zero (first
+      // non-whitespace, then physical line start); replace the whole line.
+      await key("Home","Home",0,36);
+      await key("Home","Home",0,36);
+      await key("End","End",8,35);
+      await command("Input.insertText",{text:"          DENIED: unresolved"});
       await sleep(1500);
       const routeFixtureView=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
@@ -546,18 +545,18 @@ try{
       });
       const routeFixtureEditor=await evalJS(`({
         editorCount:document.querySelectorAll(".monaco-editor").length,
-        active:document.activeElement?.className??"",
+        activeTag:document.activeElement?.tagName??"",
+        activeClass:document.activeElement?.className??"",
         visibleText:[...document.querySelectorAll(".monaco-editor .view-line")]
-          .map(line=>line.innerText).join("\\n").slice(0,1400)
+          .map(line=>line.innerText).join("\\n").slice(0,1800)
       })`);
       const routeFixture={
         ready:routeFixtureEditor.editorCount>0&&
-          findState.matchCount==="1 of 4"&&secondMatch.matchCount==="2 of 4"&&
-          editorFocus.ready&&
           /TextDocument v\\d+/.test(routeFixtureView.result?.value?.revision??"")&&
           routeFixtureView.result?.value?.procedure==="await-initial-n4-session-establishment"&&
-          routeFixtureView.result?.value?.graphEdges===routeOriginalView.result?.value?.graphEdges-1,
-        editor:editorTarget,find:findState,secondMatch,editorFocus,
+          routeFixtureView.result?.value?.graphEdges===routeOriginalView.result?.value?.graphEdges-1&&
+          routeFixtureEditor.visibleText.includes("DENIED: unresolved"),
+        editor:editorTarget,goto:gotoState,gotoTyped,
         original:routeOriginalView.result?.value??null,
         view:routeFixtureView.result?.value??null,after:routeFixtureEditor
       };
