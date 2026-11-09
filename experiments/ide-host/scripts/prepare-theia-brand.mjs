@@ -6,8 +6,6 @@ import {join,resolve} from "node:path";
 export function buildSkillStudioBrandCss(){
   return `/* Classic SKILL Studio wordmark in the native Theia menu-bar row. */
 .lm-MenuBar.skill-studio-branded{
-  display:flex!important;
-  align-items:stretch!important;
   min-width:0;
 }
 .lm-MenuBar.skill-studio-branded > .skill-studio-brand{

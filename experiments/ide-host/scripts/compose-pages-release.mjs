@@ -52,7 +52,7 @@ export async function composePagesRelease({classicDist,theiaFrontend,outputDist=
      !theiaHtml.includes('href="./skill-studio-brand.css"')||
      !theiaHtml.includes('id="skill-studio-brand-script"')||
      !theiaHtml.includes('src="./skill-studio-brand.js"'))
-    throw new Error("Theia index must display the same-origin warning and Classic navigation link");
+    throw new Error("Theia index must include the same-origin warning, Classic navigation, and SKILL Studio brand assets");
 
   const stage=await mkdtemp(join(dirname(output),".skill-studio-classic-"));
   const stagedClassic=join(stage,"classic");
