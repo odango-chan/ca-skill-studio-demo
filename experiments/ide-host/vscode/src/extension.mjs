@@ -12,6 +12,25 @@ import {isProcedurePath,validateRouteProposal,MAX_SOURCE_BYTES} from "./bridge.m
 import {seedExampleWorkspace} from "./sample-loader.mjs";
 
 const VIEW="skillStudio.procedurePreview";
+// Theia's browser-only static build can omit its Pages subpath when creating
+// webview resource URLs. Restrict the workaround to the same-origin static
+// plugin worker; normal VS Code and backend-backed Theia retain host URIs.
+function staticPreviewResourceUrl(uri,extensionUri){
+  const value=uri.toString();
+  const path=globalThis.location?.pathname??"";
+  if(!path.endsWith("/plugin-worker.js")||
+     (extensionUri.scheme!=="http"&&extensionUri.scheme!=="https"))
+    return value;
+  const base=path.slice(0,-"/plugin-worker.js".length);
+  if(!base)return value;
+  try{
+    const origin=globalThis.location.origin;
+    const parsed=new URL(value,origin);
+    if(parsed.origin!==origin||!parsed.pathname.startsWith("/hostedPlugin/"))
+      return value;
+    return base+parsed.pathname+parsed.search+parsed.hash;
+  }catch{return value;}
+}
 function escaped(value){
   return String(value).replace(/[&<>"']/g,ch=>({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -28,8 +47,12 @@ export function activate(context){
       const media=vscode.Uri.joinPath(context.extensionUri,"media");
       webview.options={enableScripts:true,localResourceRoots:[media]};
       const nonce=newNonce();
-      const script=webview.asWebviewUri(vscode.Uri.joinPath(media,"procedure.js"));
-      const style=webview.asWebviewUri(vscode.Uri.joinPath(media,"procedure.css"));
+      const script=staticPreviewResourceUrl(
+        webview.asWebviewUri(vscode.Uri.joinPath(media,"procedure.js")),
+        context.extensionUri);
+      const style=staticPreviewResourceUrl(
+        webview.asWebviewUri(vscode.Uri.joinPath(media,"procedure.css")),
+        context.extensionUri);
       const csp="default-src 'none'; img-src "+webview.cspSource+" data:; "+
         "style-src "+webview.cspSource+"; script-src 'nonce-"+nonce+"'; "+
         "worker-src 'none'; connect-src 'none';";
