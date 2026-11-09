@@ -221,7 +221,8 @@ try{
     for(const child of node.childFrames??[])walkFrames(child);
   };
   walkFrames(frameTree.frameTree);
-  const webviewFrame=frames.find(frame=>frame.url.includes(".webview."));
+  const webviewFrame=frames.find(frame=>frame.url.includes("/webview/index.html")||
+    frame.url.includes(".webview."));
   let webviewView=null,webviewFrameError=null;
   if(webviewFrame){
     try{
