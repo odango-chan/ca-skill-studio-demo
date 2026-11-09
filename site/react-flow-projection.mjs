@@ -67,6 +67,11 @@ export function describeProcedureLegend(procedure,visibleNodes=null){
   return {nodeKinds:entries(nodeKinds),stepKinds:entries(stepKinds),
     nodeCount:nodes.length,preNodes,postNodes};
 }
+export function flowBundleSelectionId(bundle){
+  if(!bundle?.routes?.length)return null;
+  return bundle.source+"->"+bundle.target+"|"+bundle.routeSource+"|"+
+    bundle.routes.map(route=>route.id).sort().join("|");
+}
 export function routeOrigin(routeSource){
   if(routeSource==="preconditions.on")return "PRE";
   if(routeSource==="postconditions.on")return "POST";
@@ -131,7 +136,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
     if(!bundle.routes?.length)throw new Error("Empty Route bundle");
     const selected=Boolean(
       (selectedRoute&&bundle.routes.some(r=>r.id===selectedRoute))||
-      selectedBundle===bundle.source+"->"+bundle.target
+      selectedBundle===flowBundleSelectionId(bundle)
     );
     const tone=classifyRouteTone(bundle.outcomes);
     const important=tone==="success";
