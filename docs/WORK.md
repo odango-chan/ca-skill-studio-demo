@@ -2,6 +2,7 @@
 
 **Updated: 2026-11-09**  
 **Theia host migration merge:** `b2f4e991e5e273ebb98419ba0b66453bdd0f72cf` (PR #86 Squash Merge; Theia is now the default Pages host).  
+**Current main:** `b9c1c38cd286526d742dd254646a9ec3c2489562` (PR #89 Node Focus migration merged; resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727)).  
 **Integrated baseline before top-level menu UX: main@80cc153fc043cf3d6e7e6449fb9197adc7419eb6**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
 
 ## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
@@ -123,12 +124,12 @@ main-source checkout, builds Theia from the current ref, verifies the root
 subpath, and composes one artifact. PR #86 was merged by Squash Merge at `main@b2f4e991`; the same workflow
 now runs from `main` on every normal deployment.
 
-**This is not feature parity.** The current plugin host does not yet expose
-the old Node detail view, Route create/reconnect, Phase Designer, full
-Inspector, Package Audit or Markdown preview. Those capabilities remain
-available in Classic and must be migrated explicitly before Classic is
-retired. Do not treat a successful shell build as proof that all old features
-were carried over.
+**This is not feature parity.** PR #89 has migrated the read-only Node Focus view
+(previous/current/next, PRE/OP/POST, Source line reveal) into the IDE-host
+CustomEditor. Route creation/reconnect, Phase Designer, full Inspector,
+Package Audit and Markdown preview remain Classic-only and must be migrated
+explicitly before Classic is retired. Do not treat a successful shell build
+as proof that all old features were carried over.
 
 **Security / persistence boundary:** the GitHub Pages Theia build uses a
 same-origin Webview adapter and displays a persistent warning. It is for
@@ -145,6 +146,15 @@ exact previous main SHA `dcb137d606e6a697fcf02f7d7c5a811f7921e0f5`.
 passed the browser-only Theia shell, sample import, Procedure CustomEditor,
 guarded Patch, Source editor and Undo at the former `/ide-preview/` path.
 The resulting-main default-root smoke, release composition test and Pages
-deployment all passed in [workflow #42579544196](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42579544196)
-at `main@b2f4e991`. Theia is now the durable default Pages host; the previous
+deployment passed again after the Node Focus migration in [workflow #42585232727](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727)
+at `main@b9c1c38`. Theia is the durable default Pages host; the previous
 main browser application remains available at `/classic/`.
+
+
+## 2026-11-09 · Theia Node Focus migration (PR #89)
+
+**Scope:** Reused the existing Source-backed one-hop Node Focus projection inside the IDE-host CustomEditor. The view shows authentic previous/next Nodes, the selected Node's PRE/OP/POST stages, original Route identities and a read-only current-Node boundary. Clicking a Phase Step opens the same native Source TextDocument at its validated line; returning to the full graph does not edit YAML.
+
+**Architecture:** No second business projection, no new Procedure Route and no Runtime meaning for view-only phase-order links. The host validates 1-based line bounds and owns the editor selection/reveal. Only four IDE-host files changed; shared theme/package files were untouched.
+
+**Evidence:** [PR #89](https://github.com/odango-chan/ca-skill-studio-demo/pull/89) merged at `main@b9c1c38`. Exact merged-base checks: [IDE Host #42584800417 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800417), [Theia browser-only #42584800342 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800342), [Theia backend Chromium #42584800599 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800599). Resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727). Route create/reconnect, Phase Designer, full Inspector, Package Audit and Markdown preview remain outstanding.
