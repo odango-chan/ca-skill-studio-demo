@@ -31,11 +31,16 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
   onEdgeSelect(bundle){
     const routes=bundle?.routes??[];
     if(!routes.length)return;
-    const selected=state.selection?.kind==="route"&&
+    const candidate=state.selection?.kind==="route"&&
       routes.some(route=>route.id===state.selection.id)
-      ?state.selection.id:routes.length===1?routes[0].id:null;
+      ?routes.find(route=>route.id===state.selection.id)
+      :routes.length===1?routes[0]:null;
+    const selected=candidate&&routeChoices(candidate.id).length
+      ?candidate.id:null;
     state.routeProposal=null;state.pending=null;state.pendingKind=null;
-    state.selection=selected?{kind:"route",id:selected}:null;
+    state.selection=selected?{kind:"route",id:selected}:{
+      kind:"bundle",id:bundle.source+"->"+bundle.target
+    };
     renderRoutes();
     if(selected){
       $("routeList").value=selected;
@@ -43,7 +48,9 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
       status("已明确选择 "+selected+"；可拖动该 Route 的目标端进行重连。");
     }else{
       repaint();
-      status("此连线包含多个 Outcome。请先在 Route 列表中明确选择一个 Route，再拖动目标端重连。");
+      status(routes.length>1
+        ?"此连线包含多个 Outcome。请先在 Route 列表中明确选择一个 Route，再拖动目标端重连。"
+        :"该 Route 不满足当前 Source-backed Patch 资格；仍可原生编辑 YAML。");
     }
   },
   onPaneClick(){
@@ -216,7 +223,7 @@ function renderRoutes({preserveSelection=false}={}){
     $("commit").disabled=true;$("diff").textContent="";
     if(preserveSelection&&previousSelection?.kind==="node")
       state.selection=previousSelection;
-    else if(previousSelection?.kind!=="node")
+    else if(previousSelection?.kind!=="node"&&previousSelection?.kind!=="bundle")
       state.selection=null;
     repaint();
   }
