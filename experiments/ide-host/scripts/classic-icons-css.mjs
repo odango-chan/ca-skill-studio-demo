@@ -6,7 +6,7 @@ export const THEIA_CLASSIC_ICON_MAP=Object.freeze({
   files:"folder","explorer-view-icon":"folder",search:"search",
   "source-control":"git-branch","debug-alt":"workflow",debug:"workflow",
   extensions:"package","settings-gear":"settings",settings:"settings",gear:"settings",
-  account:"network",remote:"network","new-file":"file-plus","new-folder":"folder-plus",
+  account:"user-round",person:"user-round",remote:"network","new-file":"file-plus","new-folder":"folder-plus",
   add:"plus",plus:"plus",remove:"minus",minus:"minus",close:"x","close-all":"x",
   menu:"menu",more:"more-horizontal",ellipsis:"more-horizontal",
   "chevron-down":"chevron-down","chevron-up":"chevron-up",

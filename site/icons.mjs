@@ -91,7 +91,8 @@ const defs={
   "sliders-horizontal":[line(4,6,20,6),circle(9,6,2),line(4,12,20,12),
     circle(15,12,2),line(4,18,20,18),circle(7,18,2)],
   play:[poly("9 6 19 12 9 18 9 6")],
-  check:[poly("5 12 10 17 19 7")]
+  check:[poly("5 12 10 17 19 7")],
+  "user-round":[circle(12,8,3.5),p("M4 21a8 8 0 0 1 16 0")]
 };
 export const ICON_SHAPES=Object.freeze(Object.fromEntries(
   Object.entries(defs).map(([name,shapes])=>[name,Object.freeze(shapes.map(

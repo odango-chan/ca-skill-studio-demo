@@ -63,7 +63,6 @@
     "txt": "_text",
     "log": "_text",
     "lrc": "_text",
-    "toml": "_code",
     "js": "_code",
     "mjs": "_code",
     "cjs": "_code",
@@ -71,6 +70,7 @@
     "tsx": "_code",
     "go": "_code",
     "css": "_code",
-    "html": "_code"
+    "html": "_code",
+    "jsx": "_code"
   }
 }

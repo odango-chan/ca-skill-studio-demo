@@ -44,8 +44,8 @@ plugin at build time and selects both themes through default preferences.
 
 ## Scope
 
-This version is light-only. The Classic icon overlay is injected into browser-only and backend-backed
-Theia browser builds; it changes only shell icon artwork, not
-Theia commands or behavior. It does not override semantic status colors used
+This version is light-only. The Classic icon overlay is injected into
+browser-only and backend-backed Theia browser builds; it changes only shell
+icon artwork, not Theia commands or behavior. It does not override semantic status colors used
 by Procedure routes (PASS / FAIL / UNKNOWN), and does not change SKILL DSL,
 Source projection, Patch qualification or Runtime logic.

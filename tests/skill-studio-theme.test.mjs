@@ -41,6 +41,11 @@ test("file icon theme maps SKILL assets and local SVGs",()=>{
   assert.equal(icons.fileNames["procedure.yaml"],"_yaml");
   assert.equal(icons.fileExtensions.py,"_python");
   assert.equal(icons.fileExtensions.md,"_markdown");
+  assert.equal(icons.fileExtensions.markdown,"_markdown");
+  assert.equal(icons.fileExtensions.bash,"_shell");
+  assert.equal(icons.fileExtensions.jsx,"_code");
+  assert.equal(icons.fileExtensions.toml,undefined);
+  assert.equal(fileIconSpec("config.toml").icon,"file");
   for(const [id,definition] of Object.entries(icons.iconDefinitions)){
     const path=definition.iconPath,asset=join(root,"icons",path.slice(2));
     assert.ok(path.startsWith("./"),id);
@@ -62,6 +67,7 @@ test("Theia shell controls use Classic SVG geometry without changing native comm
     "settings-gear","account","new-file","new-folder","undo","redo","save",
     "refresh","close","menu","chevron-down","collapse-all"])
     assert.ok(THEIA_CLASSIC_ICON_MAP[name],name);
+  assert.equal(THEIA_CLASSIC_ICON_MAP.account,"user-round");
   assert.match(css,/\.theia-app-sides \.codicon-files::before/);
   assert.match(css,/\.theia-navigator \.codicon-new-file::before/);
   assert.match(css,/\.lm-MenuBar \.codicon-menu::before/);
