@@ -34,7 +34,7 @@ const indexPath=join(root,"index.html");
 let indexHtml=await readFile(indexPath,"utf8");
 const warning='<div id="skill-studio-preview-warning" role="note" style="position:fixed;right:12px;bottom:12px;z-index:2147483000;display:flex;gap:10px;align-items:center;padding:7px 11px;border:1px solid #d6a84b;border-radius:7px;background:#fff4d6;color:#614600;box-shadow:0 2px 12px #0002;font:12px/1.4 system-ui,sans-serif"><span>在线演示 · Webview 使用同源模式 · 请勿打开敏感文件</span><a href="./classic/" aria-label="打开原版完整工作台" style="color:#704c00;font-weight:600">打开原版工作台</a></div>';
 if(!indexHtml.includes('id="skill-studio-preview-warning"')){
-  const body=indexHtml.match(/<body(?:\\s[^>]*)?>/i);
+  const body=indexHtml.match(/<body(?:\s[^>]*)?>/i);
   if(!body)throw Error("Theia frontend index has no body element for the required safety/navigation banner");
   indexHtml=indexHtml.replace(body[0],body[0]+warning);
   await writeFile(indexPath,indexHtml);
