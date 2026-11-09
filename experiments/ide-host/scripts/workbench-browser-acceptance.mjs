@@ -80,7 +80,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   await inspect(tree.frameTree);if(!markdown)throw Error('Shared safe Markdown Preview did not render');
   // Native layout restoration must retain the CustomEditor across a reload.
   console.log("STUDIO_NATIVE_ACTION","reload");
-  await sleep(1200);await command('Page.reload');
+  await sleep(1200);await command('Page.reload');await sleep(800);
   let restored=null;
   for(let i=0;i<120&&!restored;i++){
     const tab=await evalJS(`(()=>{const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>x.textContent.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);

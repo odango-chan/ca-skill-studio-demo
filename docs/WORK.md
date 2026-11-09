@@ -45,7 +45,7 @@
 
 | Scope | Implementation | Acceptance | Tracking |
 |---|---|---|---|
-| Theia 工作台第一阶段：默认打开、原生只读 Inspection/Outline/Evidence/Problems、Package Audit、Markdown Preview、布局缓存与计时 | IMPLEMENTED | NOT_RUN（exact-head Chromium / Pages 待执行） | [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)、[范围与缺口](architecture/theia-workbench.md) |
+| Theia 工作台第一阶段：默认打开、原生只读 Inspection/Outline/Evidence/Problems、Package Audit、Markdown Preview、布局缓存与计时 | IMPLEMENTED | PASS（416 Unit / 23 Host、local Chrome Theia full smoke）；exact-head CI / resulting-main Pages 见 #93 | [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)、[范围与缺口](architecture/theia-workbench.md) |
 
 
 | Scope | Design | Implementation | Acceptance | Tracking / evidence |

@@ -2,7 +2,7 @@
 
 **Status: Accepted · Date: 2026-11-09**
 
-本阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。此表描述代码范围；实际验收见 WORK / TRACEABILITY 与 PR CI。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
+本阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；实际验收见 WORK / TRACEABILITY 与 PR CI。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
 
 | 能力 | Classic | Theia 第一阶段 | 共享实现 / 剩余缺口 |
 |---|---|---|---|
@@ -38,4 +38,8 @@ Theia 1.76 的文本预览宿主使用 `editor-preview-widget` opener，显式 S
 - 文档版本内按 Procedure 缓存最多 32 个布局；Source 变化清空缓存，不跨版本复用。重复相同快照跳过投影。
 - 同一 Source 的 Inspector 选择复用 projection；后台审计合并。隐藏 Webview 保留上下文，切换标签不重新加载图。代价是隐藏标签占用内存；关闭标签销毁上下文。
 
+一次本地 Chrome 157 / Windows 测量（同一版本、同一 Procedure）：首次 layout + 两帧 185.7 ms，缓存返回 22.6 ms；projection 10.5 ms，shellReady 1433 ms。`reopenMs` 的 925 ms 包含固定等待与采样开销，不作为精细延迟阈值；这些本地数字不等于公网冷启动保证。完整复现由 PR #94 的 Chromium 脚本输出 `STUDIO_LAYOUT_TIMING` / `STUDIO_THEIA_REAL_CHROMIUM`，后续 CI 数字以实际日志为准。
+
 不声称消除全部首次打开延迟；首次 ELK、Theia 框架下载及多文档内存成本仍需持续测量。真实桌面 VS Code GUI、操作系统原生文件授权和 Runtime 验收不包含在浏览器 CI 中。
+
+跨文件审计会合并 TextDocument 变化；未打开文件的外部创建/删除后使用原生 Audit / Refresh 命令重新检查。首阶段不宣称完整文件监听或完整 Classic 对等。

@@ -76,6 +76,10 @@ try{
     ws.addEventListener("error",fail,{once:true});});
   ws.addEventListener("message",event=>{
     const msg=JSON.parse(event.data);
+    if(msg.method==="Page.javascriptDialogOpening"&&msg.params?.type==="beforeunload"){
+      console.log("STUDIO_TEST_BEFOREUNLOAD_ACCEPTED");
+      void command("Page.handleJavaScriptDialog",{accept:true}).catch(error=>exceptions.push(String(error)));
+    }
     if(msg.method==="Runtime.exceptionThrown")
       exceptions.push(msg.params?.exceptionDetails?.exception?.description||msg.params?.exceptionDetails?.text);
     if(msg.method==="Network.loadingFailed")
