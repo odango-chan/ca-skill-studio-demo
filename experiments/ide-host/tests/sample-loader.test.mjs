@@ -26,6 +26,13 @@ function host(manifestOverride=null){
         async createDirectory(target){folders.add(target.path);},
         async stat(target){
           if(files.has(target.path)||folders.has(target.path))return {type:1};
+          if(target.path.startsWith("/extension/samples/establish-pdu-session/")){
+            try{
+              readFileSync("experiments/ide-host/vscode"+
+                target.path.slice("/extension".length));
+              return {type:1};
+            }catch{}
+          }
           throw Object.assign(Error("missing"),{code:"FileNotFound"});
         },
         async writeFile(target,bytes){
