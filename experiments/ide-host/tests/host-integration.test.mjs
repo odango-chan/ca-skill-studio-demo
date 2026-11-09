@@ -13,7 +13,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   const uri={path:"/workspace/assurance/procedure.yaml",toString(){return "file://"+this.path;}};
   const document={uri,text:source,version:21,
     getText(){return this.text;},
-    get lineCount(){return this.text.split(/\\r?\\n/).length;},
+    get lineCount(){return this.text.split(/\r?\n/).length;},
     positionAt(offset){return {offset};}
   };
   const listeners=new Set(),commands=new Map(),posted=[],writes=[],opened=[],registered=[],revealed=[];
@@ -97,7 +97,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(opened.at(-1).doc,document);
   assert.equal(opened.at(-1).opts.viewColumn,2);
 
-  const sourceLine=source.split(/\\r?\\n/).findIndex(line=>line.includes("nudm-sdm-subscribe"))+1;
+  const sourceLine=source.split(/\r?\n/).findIndex(line=>line.includes("nudm-sdm-subscribe"))+1;
   assert.ok(sourceLine>0);
   await onMessage({type:"revealSourceLine",line:sourceLine});
   assert.equal(opened.at(-1).doc,document);
