@@ -366,6 +366,7 @@ try{
         bodyText:document.body.innerText.slice(-900),
         editorTabs:[...document.querySelectorAll(".theia-tab,.lm-TabBar-tab")].map(x=>x.innerText).filter(Boolean).slice(-8)
       })`);
+      console.log("STUDIO_NATIVE_SOURCE",JSON.stringify({sourceEditor,consoleErrors,exceptions}));
       await command("Input.dispatchKeyEvent",{
         type:"keyDown",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
       });
@@ -524,7 +525,7 @@ try{
           viewport:{width:window.innerWidth,height:window.innerHeight}};
       })()`);
       if(!editorTarget?.ready)
-        throw Error("Native Theia Source editor viewport not found: "+JSON.stringify(editorTarget));
+        throw Error("Native Theia Source editor viewport not found: "+JSON.stringify({editorTarget,consoleErrors,exceptions,body:await evalJS(`document.body.innerText`)}));
       const key=async(key,code,modifiers=0,virtualKeyCode)=>{
         await command("Input.dispatchKeyEvent",{
           type:"keyDown",key,code,modifiers,
