@@ -470,13 +470,15 @@ try{
       await sleep(700);
       const editorTarget=await evalJS(`(()=> {
         const editors=[...document.querySelectorAll(".monaco-editor")];
-        const editor=editors.find(item=>{
-          const rect=item.querySelector(".view-lines")?.getBoundingClientRect();
-          return rect&&rect.width>0&&rect.height>0;
+        const index=editors.findIndex(item=>{
+          const rect=item.getBoundingClientRect();
+          return rect.width>0&&rect.height>0&&item.querySelector("textarea.inputarea");
         });
+        const editor=index>=0?editors[index]:null;
+        const viewport=editor?.querySelector(".monaco-scrollable-element")??editor;
+        const rect=viewport?.getBoundingClientRect();
         const lines=editor?.querySelector(".view-lines");
-        const rect=lines?.getBoundingClientRect();
-        return {editorCount:editors.length,ready:Boolean(rect),
+        return {editorCount:editors.length,index,ready:Boolean(rect&&rect.width>0&&rect.height>0),
           rect:rect?{x:rect.left,y:rect.top,width:rect.width,height:rect.height}:null,
           visibleText:lines?.innerText?.slice(0,500)??""};
       })()`);
@@ -521,6 +523,16 @@ try{
         matchCount:document.querySelector(".find-widget .matchesCount")?.textContent??""
       })`);
       await key("Escape","Escape",0,27);
+      const editorFocus=await evalJS(`(()=> {
+        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.index}];
+        const input=editor?.querySelector("textarea.inputarea");
+        input?.focus();
+        return {ready:Boolean(input&&document.activeElement===input),
+          active:document.activeElement?.className??"",
+          findVisible:Boolean(document.querySelector(".find-widget.visible"))};
+      })()`);
+      if(!editorFocus.ready)
+        throw Error("Native Monaco editor input could not be focused after Find: "+JSON.stringify(editorFocus));
       await key("Backspace","Backspace",0,8);
       await sleep(1500);
       const routeFixtureView=await command("Runtime.evaluate",{
@@ -543,7 +555,7 @@ try{
           /TextDocument v\\d+/.test(routeFixtureView.result?.value?.revision??"")&&
           routeFixtureView.result?.value?.procedure==="await-initial-n4-session-establishment"&&
           routeFixtureView.result?.value?.graphEdges===routeOriginalView.result?.value?.graphEdges-1,
-        editor:editorTarget,find:findState,secondMatch,
+        editor:editorTarget,find:findState,secondMatch,editorFocus,
         original:routeOriginalView.result?.value??null,
         view:routeFixtureView.result?.value??null,after:routeFixtureEditor
       };
