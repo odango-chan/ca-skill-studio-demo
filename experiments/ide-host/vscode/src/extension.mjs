@@ -86,10 +86,18 @@ export function activate(context){
             </section>
           </div>
           <div id="patch" class="spike-patch" hidden>
-            <strong>现有 Route 的 Source-backed Patch 预览</strong>
-            <label>Route <select id="routeList"></select></label>
-            <label>新目标 <select id="targetList"></select></label>
-            <button id="preview">生成 Diff</button>
+            <strong>Source-backed Route Patch · 预览后显式确认</strong>
+            <div id="existingRouteEditor" class="spike-route-editor">
+              <label>现有 Route <select id="routeList"></select></label>
+              <label>新目标 <select id="targetList"></select></label>
+              <button id="preview">预览目标变更</button>
+            </div>
+            <div id="newRouteEditor" class="spike-route-editor spike-route-create" hidden>
+              <span id="newRouteSummary"></span>
+              <label>Outcome <select id="newRouteOutcome"></select></label>
+              <button id="newRoutePreview" disabled>预览新增 Route</button>
+              <button id="newRouteCancel">放弃提案</button>
+            </div>
             <pre id="diff"></pre>
             <button id="commit" disabled>确认并修改当前文档</button>
           </div>
