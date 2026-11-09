@@ -1,13 +1,16 @@
-# IDE host experiment · online Theia + VS Code desktop/web
+# SKILL Studio online host · Theia + optional VS Code desktop/web
 
-**Spike, not a migration.** Repo owner: `ca-skill-studio-demo`; original
-browser Demo / GitHub Pages is untouched. Tracks #85.
+**Default online host direction (2026-11-09).** Repo owner:
+`ca-skill-studio-demo`. GitHub Pages now targets Theia browser-only at `/`;
+the previous full browser Studio is preserved at `/classic/`, and the former
+`/ide-preview/` path redirects to the new root. This is a host-shell switch,
+not a feature-parity claim. Tracks #85.
 
 **Online is mandatory.** The target product is a browser-accessible SKILL
-Studio plus optional local/VS Code entry points; this spike must never
-replace the existing GitHub Pages site with a desktop-only tool.
+Studio plus optional local/VS Code entry points. The browser host remains
+first-class; the old browser Studio stays available during feature migration.
 
-## Decision being tested
+## Host architecture and responsibility boundary
 
 We should not rebuild a second native IDE shell around Monaco. The current
 Studio has a browser-only, hand-built Explorer, tabs/save/menu and code editor.
@@ -65,12 +68,13 @@ Official sources:
 
 **Verified CI:** [ide-host-spike #42191440251](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42191440251) — 6/6 spike tests, 409/409 existing tests, bundled extension and VSIX artifact PASS. The simulated host verifies real WorkspaceEdit message handling, but not the real VS Code or Theia GUI. Download `ca-skill-studio-ide-spike-vsix` from the workflow **Artifacts** section.
 
-## Online host trial (still NOT_RUN)
+## Online Theia host and deployment
 
-**Target:** build an independent Theia `browser-only` app (>=1.76), bundle
-the browser extension entry `dist/extension-web.cjs` at **build time**, and
-host the resulting static frontend at a separate preview path. Existing
-`https://odango-chan.github.io/ca-skill-studio-demo/` continues unchanged.
+Theia `browser-only` (1.76.0) is built with the Web extension bundled at
+**build time**. The default GitHub Pages root is the Theia workbench; the
+previous full-featured browser Studio is copied to `/classic/`. The former
+`/ide-preview/` URL redirects to `/`. Both are generated in one Pages build;
+`main` is the durable source after PR #86 is merged.
 
 The online host must supply Explorer New File/Folder/Rename/Delete,
 YAML/Python tabs and Source, real Procedure graph and Source-backed Patch
@@ -78,10 +82,15 @@ through `TextDocument/WorkspaceEdit`. Its filesystem uses browser OPFS;
 this is **not** a native disk mount nor automatic synchronization to GitHub.
 Explicit import/export and persistence acceptance are separate gates.
 
-This spike builds the browser entry but does **not yet build/host the Theia
-browser-only shell**. Chrome/webview and `CustomTextEditorProvider` actual
-runtime support remain unverified. The Node VSIX is for desktop/server Theia;
-in a browser-only host the web extension must be bundled during Theia build.
+The online host has real Chromium evidence from the previous subpath preview:
+Theia shell startup, sample SKILL import into OPFS, Procedure CustomEditor
+rendering, guarded Source-backed Patch, native Source editor and Undo passed
+in [workflow run #42575346100](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42575346100).
+The current default-root change adds a new root-subpath smoke and explicit
+Classic composition test; those exact-head checks must pass before the new
+root deployment is called accepted. The Node VSIX remains an optional
+VS Code/desktop Theia entry point; the online host uses the build-time Web
+extension entry.
 
 References:
 - https://theia-ide.org/docs/composing_applications/
@@ -98,11 +107,15 @@ References:
 | VS Code Explorer/new file | native integration works | **NOT_RUN** |
 | VS Code editor open/edit/undo | graph refresh and single-scalar patch | **NOT_RUN** |
 | Theia same VSIX | custom editor and Webview API compatibility | **NOT_RUN** |
-| Online Theia browser-only with Web extension | Build-time bundled extension, OPFS create/edit, Procedure CustomEditor | Web entry built; full host **NOT_RUN** |
+| Online Theia browser-only with Web extension | Build-time bundled extension, OPFS sample import, Procedure CustomEditor, Patch, native Source and Undo | **PASS** in real Chromium at the previous `/ide-preview/` subpath; new default-root revalidation pending |
 | Local Runtime / 5GC | deliberately out of scope | **NOT_RUN** |
 
-No Theia backend/framework dependency is introduced into the existing Pages
-application. This is an architectural trial, not a release.
+The Pages host is now Theia browser-only. Its GitHub Pages adapter changes
+Theia's default per-Webview subdomain pattern to same-origin because Pages
+cannot provide wildcard Webview DNS/TLS. A persistent warning is shown:
+**do not open sensitive files or untrusted workspaces**. OPFS data stays in
+the browser profile; it is not a native disk mount or GitHub sync. This static
+host does not execute Python, SKILL Runtime or 5GC.
 
 ## Acceptance and possible outcomes
 
@@ -115,4 +128,4 @@ application. This is an architectural trial, not a release.
 - If neither is reliable, isolate the existing browser Studio's workspace
   adapter rather than continuing to grow a hand-built IDE.
 
-Do not merge or replace the established Pages UX until native evidence exists.
+Theia is the default online shell; keep `/classic/` until every required Studio capability has been migrated and accepted. Do not silently drop the old UI.
