@@ -15,6 +15,23 @@ const describeError=error=>({
   code:error?.code??null,
   message:String(error?.message??error)
 });
+// Theia 1.76 browser-only currently supplies an HTTP(S) extensionUri in this
+// hosted-plugin worker. Fetch only same-origin extension assets in that case.
+// Hosts exposing the documented theia-plugin:/vscode-vfs: schemes continue
+// through workspace.fs, which is their registered read-only provider.
+async function readBundledResource(vscode,uri){
+  if(uri.scheme==="http"||uri.scheme==="https"){
+    const url=new URL(uri.toString());
+    const origin=globalThis.location?.origin;
+    if(!origin||url.origin!==origin)
+      fail("Refusing cross-origin extension resource: "+url.origin);
+    const response=await fetch(url.href,{credentials:"same-origin"});
+    if(!response.ok)
+      fail("Extension resource HTTP "+response.status+": "+url.pathname);
+    return new Uint8Array(await response.arrayBuffer());
+  }
+  return vscode.workspace.fs.readFile(uri);
+}
 function validate(files){
   if(!Array.isArray(files)||files.length<3||files.length>100||
      !files.includes("SKILL.md")||!files.includes("assurance/procedure.yaml"))
@@ -38,22 +55,14 @@ export async function seedExampleWorkspace(vscode,extensionUri){
   const manifestUri=vscode.Uri.joinPath(extensionUri,...SRC,"files.json");
   const extensionInfo=describeUri(extensionUri);
   const manifestInfo=describeUri(manifestUri);
-  phase="stat-bundled-manifest";
-  try{
-    await fileSystem.stat(manifestUri);
-  }catch(error){
-    fail("Cannot stat bundled manifest; extensionUri="+JSON.stringify(extensionInfo)+
-      "; manifestUri="+JSON.stringify(manifestInfo)+
-      "; fs.stat="+JSON.stringify(describeError(error)));
-  }
   phase="read-bundled-manifest";
   let manifestBytes;
   try{
-    manifestBytes=await fileSystem.readFile(manifestUri);
+    manifestBytes=await readBundledResource(vscode,manifestUri);
   }catch(error){
     fail("Cannot read bundled manifest; extensionUri="+JSON.stringify(extensionInfo)+
       "; manifestUri="+JSON.stringify(manifestInfo)+
-      "; fs.readFile="+JSON.stringify(describeError(error)));
+      "; resourceRead="+JSON.stringify(describeError(error)));
   }
   const files=validate(JSON.parse(decoder.decode(manifestBytes)));
   const root=vscode.Uri.file(BASE);
@@ -72,7 +81,7 @@ export async function seedExampleWorkspace(vscode,extensionUri){
     if(exists){skipped++;continue;}
     const source=vscode.Uri.joinPath(extensionUri,...SRC,...segments);
     phase="read-bundled-file:"+file;
-    const bytes=await fileSystem.readFile(source);
+    const bytes=await readBundledResource(vscode,source);
     if(!(bytes instanceof Uint8Array))fail("Unrecognized sample file");
     phase="create-parent:"+file;
     if(segments.length>1)
