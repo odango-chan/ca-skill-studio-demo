@@ -30,12 +30,19 @@ async function readBundledResource(vscode,uri){
     const workerPath=globalThis.location?.pathname??"";
     const hostedMarker="/hostedPlugin/";
     const markerAt=workerPath.indexOf(hostedMarker);
-    const appPrefix=markerAt>=0?workerPath.slice(0,markerAt):"";
+    // Some Theia workers load from /context/plugin-vscode-init-fe.js,
+    // while extensionUri itself is root-relative. The context URL is still
+    // app-prefixed and provides the same trusted base without hardcoding it.
+    const contextMarker="/context/";
+    const contextAt=workerPath.indexOf(contextMarker);
+    const appPrefix=markerAt>=0?workerPath.slice(0,markerAt)
+      :contextAt>=0?workerPath.slice(0,contextAt):"";
     const resourcePath=appPrefix+url.pathname;
     const resourceUrl=new URL(resourcePath+url.search,origin);
     const response=await fetch(resourceUrl.href,{credentials:"same-origin"});
     if(!response.ok)
-      fail("Extension resource HTTP "+response.status+": "+resourceUrl.pathname);
+      fail("Extension resource HTTP "+response.status+": "+resourceUrl.pathname+
+        "; workerPath="+workerPath+"; appPrefix="+appPrefix);
     return new Uint8Array(await response.arrayBuffer());
   }
   return vscode.workspace.fs.readFile(uri);
