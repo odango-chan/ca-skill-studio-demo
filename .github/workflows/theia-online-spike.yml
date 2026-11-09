@@ -56,3 +56,59 @@ jobs:
           path: experiments/ide-host/theia-online/lib/frontend/
           if-no-files-found: error
           retention-days: 7
+
+  publish-isolated-preview:
+    # Never grant Pages deployment to arbitrary forks or other PRs.
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 86 && github.event.pull_request.head.ref == 'spike/ide-extension-theia-host' && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: theia-browser-only
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: skill-studio-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout published main only (preserve existing site)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-source
+      - name: Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Build main website unchanged
+        working-directory: main-source
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run typecheck
+          npm run build
+          node scripts/edge-smoke.mjs
+      - name: Include verified isolated preview under its own path
+        uses: actions/download-artifact@v4
+        with:
+          name: skill-studio-theia-online-spike
+          path: main-source/dist/ide-preview
+      - name: Verify root and preview before deployment
+        run: |
+          test -s main-source/dist/index.html
+          test -s main-source/dist/ide-preview/index.html
+          test -s main-source/dist/ide-preview/hostedPlugin/list.json
+          test -s main-source/dist/ide-preview/webview/index.html
+          test -s main-source/dist/ide-preview/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/samples/establish-pdu-session/files.json
+          printf '%s\\n' 'Existing main root preserved; /ide-preview is isolated.'
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload main site plus isolated preview
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: main-source/dist
+      - name: Publish separate demo preview path
+        id: deployment
+        uses: actions/deploy-pages@v4
