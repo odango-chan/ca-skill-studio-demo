@@ -70,6 +70,7 @@
     "tsx": "_code",
     "go": "_code",
     "css": "_code",
-    "html": "_code"
+    "html": "_code",
+    "jsx": "_code"
   }
 }
