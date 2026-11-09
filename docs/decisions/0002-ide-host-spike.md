@@ -11,8 +11,8 @@ This update supersedes the initial spike-only deployment language below.
 GitHub Pages `/` serves Theia, the previous complete browser Studio is
 preserved at `/classic/`, and the former `/ide-preview/` path redirects to
 the new root. The same Pages workflow builds Theia from the current ref and
-keeps the Classic artifact from the main-source build. After PR #86 is merged,
-`main` becomes the durable source for both builds.
+keeps the Classic artifact from the main-source build. PR #86 was merged by Squash Merge at `main@b2f4e991`; `main` is now the
+durable source for both builds.
 
 This is a **host-shell decision, not a claim of feature parity**. The initial
 plugin migration still lacks the old Studio's Node detail view, Route create
@@ -91,8 +91,9 @@ shell startup, sample import, Procedure CustomEditor rendering, guarded Patch,
 native Source editor and Undo at the `/ide-preview/` subpath (run
 [42575346100](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42575346100)).
 The new default-root path `/ca-skill-studio-demo/`, Classic preservation and
-release composition are being revalidated in the current PR run; do not call
-the new root deployment PASS until that run succeeds.
+release composition passed in the resulting-main Pages run
+[#42579544196](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42579544196)
+at `main@b2f4e991`.
 
 For later **online execution** (not editing), a separate consented backend
 service or local runner is needed. Never pretend browser-only OPFS can run
@@ -181,5 +182,6 @@ main build at `dist/classic/`, writes `.nojekyll`, preserves a configured
 contains a link back to the new host; Theia contains a link to Classic and a
 persistent same-origin safety warning.
 
-The exact-head run after this workflow change is the release gate. PR #86
-must not be merged on the strength of the earlier unit/mock build alone.
+The exact-main run [#42579544196](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42579544196)
+passed the root smoke, composition assertions and GitHub Pages deployment.
+The earlier unit/mock build alone was not used as the release gate.
