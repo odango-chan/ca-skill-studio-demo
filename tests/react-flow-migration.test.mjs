@@ -45,6 +45,10 @@ test("routeSource and all exact Outcome ids survive React Flow projection",async
   const fromEdges=flow.edges.flatMap(e=>e.data.bundle.routes.map(r=>r.id)).sort();
   const fromSource=created.procedure.routes.map(r=>r.id).sort();
   assert.deepEqual(fromEdges,fromSource);
+  for(const edge of flow.edges){
+    assert.deepEqual(edge.data.sourceRouteIds,
+      edge.data.bundle.routes.map(route=>route.id));
+  }
   assert.ok(flow.edges.some(e=>e.data.bundle.routeSource==="postconditions.on"));
   assert.ok(flow.edges.some(e=>e.data.bundle.routeSource==="operator.on"));
 });
