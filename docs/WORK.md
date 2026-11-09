@@ -1,6 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-09**  
+**Current main:** `b2f4e991e5e273ebb98419ba0b66453bdd0f72cf` (PR #86 Squash Merge; Theia is now the default Pages host).  
 **Integrated baseline before top-level menu UX: main@80cc153fc043cf3d6e7e6449fb9197adc7419eb6**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
 
 ## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
@@ -119,8 +120,8 @@ the SKILL Studio Web extension bundled at build time. The previous complete
 browser Studio is preserved at `/classic/`; the old `/ide-preview/` path
 redirects to the new root. The Pages workflow builds the old Studio from the
 main-source checkout, builds Theia from the current ref, verifies the root
-subpath, and composes one artifact. After PR #86 is merged, the same workflow
-runs from `main` on every normal deployment.
+subpath, and composes one artifact. PR #86 was merged by Squash Merge at `main@b2f4e991`; the same workflow
+now runs from `main` on every normal deployment.
 
 **This is not feature parity.** The current plugin host does not yet expose
 the old Node detail view, Route create/reconnect, Phase Designer, full
@@ -143,6 +144,7 @@ exact previous main SHA `dcb137d606e6a697fcf02f7d7c5a811f7921e0f5`.
 [#42575346100](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42575346100)
 passed the browser-only Theia shell, sample import, Procedure CustomEditor,
 guarded Patch, Source editor and Undo at the former `/ide-preview/` path.
-The new default-root smoke, release composition test and Pages deployment
-must pass at the current exact head before the new root deployment is called
-accepted. PR #86 remains open until those gates are green.
+The resulting-main default-root smoke, release composition test and Pages
+deployment all passed in [workflow #42579544196](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42579544196)
+at `main@b2f4e991`. Theia is now the durable default Pages host; the previous
+main browser application remains available at `/classic/`.
