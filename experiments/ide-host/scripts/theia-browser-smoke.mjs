@@ -802,7 +802,7 @@ try{
       if(!reconnectEdgeInfo.result?.value?.ready||!reconnectCandidates.length)
         throw Error("Could not locate an existing Route bundle to unresolved: "+
           JSON.stringify(reconnectEdgeInfo.result?.value));
-      let reconnectEdge=null,ambiguousValue=null;
+      let reconnectEdge=null,ambiguousValue=null,lastBundleValue=null;
       for(const candidate of reconnectCandidates){
         const edgeClick=toPage(candidate.pathPoint);
         await command("Input.dispatchMouseEvent",{
@@ -825,6 +825,7 @@ try{
           })`
         });
         const value=selectedBundle.result?.value??null;
+        lastBundleValue=value;
         const exactBundle=value?.selectedLabels?.some(label=>
           label.routeSource==="operator.on"&&
           label.routeIds.includes("await-initial-resources:FAILED")&&
@@ -839,8 +840,8 @@ try{
       }
       if(!reconnectEdge||!ambiguousValue)
         throw Error("Could not select the ambiguous operator.on Route bundle without selecting an Outcome: "+
-          JSON.stringify({candidates:reconnectCandidates,selection:ambiguousValue,
-            lastMessage:ambiguousValue?.message??""}));
+          JSON.stringify({candidates:reconnectCandidates,selection:lastBundleValue,
+            lastMessage:lastBundleValue?.message??""}));
       const chooseReconnectRoute=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
