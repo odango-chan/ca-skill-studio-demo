@@ -17,7 +17,7 @@ const types={".html":"text/html",".js":"text/javascript",".css":"text/css",
   ".json":"application/json",".svg":"image/svg+xml",".wasm":"application/wasm",
   ".ttf":"font/ttf",".woff":"font/woff",".woff2":"font/woff2",".png":"image/png",
   ".ico":"image/x-icon",".map":"application/json"};
-const requests=new Set(),notFound=new Set();
+const requests=new Set(),notFound=new Set(),networkFailures=[],networkResponses=[];
 const server=createServer((req,res)=>{
   const url=new URL(req.url,"http://localhost");
   let name;
@@ -67,6 +67,12 @@ try{
     const msg=JSON.parse(event.data);
     if(msg.method==="Runtime.exceptionThrown")
       exceptions.push(msg.params?.exceptionDetails?.exception?.description||msg.params?.exceptionDetails?.text);
+    if(msg.method==="Network.loadingFailed")
+      networkFailures.push({requestId:msg.params.requestId,errorText:msg.params.errorText,
+        canceled:msg.params.canceled,blockedReason:msg.params.blockedReason});
+    if(msg.method==="Network.responseReceived"&&networkResponses.length<80)
+      networkResponses.push({url:msg.params.response.url,status:msg.params.response.status,
+        type:msg.params.type});
     if(msg.method==="Runtime.consoleAPICalled"&&msg.params?.type==="error")
       consoleErrors.push(msg.params.args?.map(x=>x.value||x.description).join(" "));
     if(msg.id&&pending.has(msg.id)){
@@ -76,6 +82,7 @@ try{
   });
   await command("Page.enable");
   await command("Runtime.enable");
+  await command("Network.enable");
   await command("Page.navigate",{url});
   let view=null;
   for(let i=0;i<250;i++){
@@ -204,14 +211,56 @@ try{
         .map(x=>x.innerText).filter(Boolean).slice(0,14)
     };
   })()`);
+  await sleep(1200);
+  const frameTree=await command("Page.getFrameTree");
+  const frames=[];
+  const walkFrames=node=>{
+    if(!node)return;
+    frames.push(node.frame);
+    for(const child of node.childFrames??[])walkFrames(child);
+  };
+  walkFrames(frameTree.frameTree);
+  const webviewFrame=frames.find(frame=>frame.url.includes(".webview."));
+  let webviewView=null,webviewFrameError=null;
+  if(webviewFrame){
+    try{
+      const world=await command("Page.createIsolatedWorld",{
+        frameId:webviewFrame.id,worldName:"skill-studio-acceptance",grantUniveralAccess:true
+      });
+      const evaluated=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          readyState:document.readyState,title:document.title,
+          bodyText:document.body?.innerText?.slice(0,1200)||"",
+          procedureRoot:!!document.querySelector("#reactFlowRoot"),
+          graphNodes:document.querySelectorAll(".react-flow__node").length,
+          graphEdges:document.querySelectorAll(".react-flow__edge").length,
+          procedureValue:document.querySelector("#procedureList")?.value||"",
+          routeOptions:document.querySelector("#routeList")?.options?.length||0,
+          message:document.querySelector("#message")?.textContent||"",
+          patchVisible:!document.querySelector("#patch")?.hidden
+        })`
+      });
+      webviewView=evaluated.result?.value??null;
+    }catch(error){webviewFrameError=String(error);}
+  }
   const listing=await(await fetch(url+"hostedPlugin/list.json")).text();
-  const evidence={view,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
+  const evidence={view,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
+    frameCount:frames.length,webviewFrame,webviewView,webviewFrameError,
+    extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
+    networkFailures:networkFailures.slice(-15),networkResponses:networkResponses.slice(-30),
     consoleErrors:consoleErrors.slice(0,8),exceptions:exceptions.slice(0,6)};
   console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
   if(!evidence.extensionListPresent||!view?.appShell||view.widgets<5||view.bodyLength<15)
     throw Error("Theia browser-only shell/plugin activation failed: "+JSON.stringify(evidence).slice(0,2200));
-  console.log("THEIA_BROWSER_ONLY_SHELL_PASS; CUSTOM_EDITOR_AND_OPFS_GUI_NOT_RUN");
+  if(!afterImport.bodyText.includes("示例 SKILL 已载入浏览器工作区")||
+     !afterImport.folders.some(folder=>folder.name==="skill-studio-examples"))
+    throw Error("Theia sample import into OPFS failed: "+JSON.stringify(afterImport).slice(0,2400));
+  if(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1)
+    throw Error("Procedure Custom Editor webview did not render a graph: "+
+      JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
+  console.log("THEIA_SAMPLE_OPFS_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS");
 }finally{
   ws?.close();child.kill("SIGKILL");
   await new Promise(ok=>server.close(ok));
