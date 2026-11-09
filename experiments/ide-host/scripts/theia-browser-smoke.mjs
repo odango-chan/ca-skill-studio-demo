@@ -967,11 +967,14 @@ try{
         })`
       });
       const reconnectAppliedValue=reconnectApplied.result?.value??null;
+      // Moving FAILED out of the shared operator.on -> unresolved Bundle
+      // splits that visual Bundle into two. Route count is stable; edge count
+      // correctly increases by one until native Undo restores the original Bundle.
       if(!/TextDocument v\d+/.test(reconnectAppliedValue?.revision??"")||
          !String(reconnectAppliedValue?.routeOption??"").includes("→ failed")||
-         reconnectAppliedValue?.graphEdges!==routeFixture.view.graphEdges)
+         reconnectAppliedValue?.graphEdges!==routeFixture.view.graphEdges+1)
         throw Error("Native TextDocument did not apply the reconnect Patch: "+
-          JSON.stringify(reconnectAppliedValue));
+          JSON.stringify({fixture:routeFixture.view,applied:reconnectAppliedValue}));
       await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`document.querySelector("#openSource")?.click(); true`
