@@ -553,6 +553,7 @@ try{
         return {text:lines?.innerText??"",editorVisible:Boolean(editor)};
       })()`);
       if(!gotoLineView.editorVisible||
+         !gotoLineView.text.includes("FAILED: unresolved")||
          !gotoLineView.text.includes("UNKNOWN: unresolved")||
          !gotoLineView.text.includes("DENIED: failed"))
         throw Error("Go to Line did not land on the intended Route fixture: "+
