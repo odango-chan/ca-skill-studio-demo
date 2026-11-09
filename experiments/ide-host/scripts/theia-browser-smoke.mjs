@@ -464,7 +464,7 @@ try{
         })()`
       });
       await sleep(350);
-      const routeGesture=await command("Runtime.evaluate",{
+      const routeGestureInfo=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
           const node=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
@@ -475,19 +475,34 @@ try{
           if(!source||!target)return {ready:false,reason:"Dedicated add-Route or target handle missing",
             source:Boolean(source),target:Boolean(target)};
           const center=element=>{const r=element.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};};
-          const from=center(source),to=center(target),mid={x:(from.x+to.x)/2,y:(from.y+to.y)/2};
-          const fire=(element,type,point,buttons)=>element.dispatchEvent(new PointerEvent(type,{
-            bubbles:true,cancelable:true,composed:true,pointerId:73,pointerType:"mouse",
-            isPrimary:true,button:0,buttons,clientX:point.x,clientY:point.y
-          }));
-          fire(source,"pointerdown",from,1);
-          fire(document,"pointermove",mid,1);fire(window,"pointermove",mid,1);
-          fire(document,"pointermove",to,1);fire(window,"pointermove",to,1);
-          fire(target,"pointerup",to,0);
-          fire(document,"pointerup",to,0);fire(window,"pointerup",to,0);
-          return {ready:true,source:from,target:to,sourceHandle:source.getAttribute("data-handleid"),
-            targetHandle:target.getAttribute("data-handleid")};
+          return {ready:true,source:center(source),target:center(target),
+            width:window.innerWidth,height:window.innerHeight,
+            sourceHandle:source.getAttribute("data-handleid"),targetHandle:target.getAttribute("data-handleid")};
         })()`
+      });
+      const routeGesture=routeGestureInfo.result?.value??null;
+      if(!routeGesture?.ready)
+        throw Error("Dedicated Route handles are not rendered: "+JSON.stringify(routeGesture));
+      await command("DOM.enable");
+      const frameOwner=await command("DOM.getFrameOwner",{frameId:graphFrame.frame.id});
+      const frameBox=await command("DOM.getBoxModel",{backendNodeId:frameOwner.backendNodeId});
+      const quad=frameBox.model.content;
+      const scaleX=(quad[2]-quad[0])/routeGesture.width;
+      const scaleY=(quad[5]-quad[1])/routeGesture.height;
+      const toPage=point=>({x:quad[0]+point.x*scaleX,y:quad[1]+point.y*scaleY});
+      const fromPage=toPage(routeGesture.source),toPagePoint=toPage(routeGesture.target);
+      const midPage={x:(fromPage.x+toPagePoint.x)/2,y:(fromPage.y+toPagePoint.y)/2};
+      await command("Input.dispatchMouseEvent",{
+        type:"mousePressed",x:fromPage.x,y:fromPage.y,button:"left",buttons:1,clickCount:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseMoved",x:midPage.x,y:midPage.y,button:"left",buttons:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseMoved",x:toPagePoint.x,y:toPagePoint.y,button:"left",buttons:1
+      });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:toPagePoint.x,y:toPagePoint.y,button:"left",buttons:0,clickCount:1
       });
       await sleep(800);
       const routeProposal=await command("Runtime.evaluate",{
@@ -500,12 +515,12 @@ try{
         })`
       });
       const routeProposalValue=routeProposal.result?.value??null;
-      if(!selectRouteSource.result?.value?.ready||!routeGesture.result?.value?.ready||!routeProposalValue?.visible||
+      if(!selectRouteSource.result?.value?.ready||!routeGesture?.ready||!routeProposalValue?.visible||
          !routeProposalValue.outcomes.includes("DENIED"))
         throw Error("Canvas Route proposal did not expose the observed DENIED Outcome: "+
           JSON.stringify({routeFixture,routeMode:routeMode.result?.value,
             selectRouteSource:selectRouteSource.result?.value,
-            routeGesture:routeGesture.result?.value,routeProposal:routeProposalValue}));
+            routeGesture,routeProposal:routeProposalValue}));
       const routePreview=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
@@ -562,7 +577,7 @@ try{
         })`
       });
       patchEvidence.routeCreate={
-        fixture:routeFixture,gesture:routeGesture.result?.value??null,
+        fixture:routeFixture,gesture:routeGesture,
         proposal:routeProposalValue,preview:routePreviewValue,
         applied:routeApplied.result?.value??null,undo:routeUndo.result?.value??null
       };
@@ -618,7 +633,7 @@ try{
       !String(patchEvidence.routeCreate?.applied?.message??"").includes("WorkspaceEdit 已应用")||
       !(patchEvidence.routeCreate?.applied?.graphEdges>patchEvidence.routeCreate?.undo?.graphEdges)))
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
-      JSON.stringify(patchEvidence.nodeFocus).slice(0,3500));
+      JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
   if(requireEditor)
     console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS");
   else
