@@ -547,6 +547,16 @@ try{
           JSON.stringify({gotoState,gotoTyped}));
       await key("Enter","Enter",0,13);
       await sleep(200);
+      const gotoLineView=await evalJS(`(()=> {
+        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
+        const lines=editor?.querySelector(".view-lines");
+        return {text:lines?.innerText??"",editorVisible:Boolean(editor)};
+      })()`);
+      if(!gotoLineView.editorVisible||
+         !gotoLineView.text.includes("UNKNOWN: unresolved")||
+         !gotoLineView.text.includes("DENIED: failed"))
+        throw Error("Go to Line did not land on the intended Route fixture: "+
+          JSON.stringify({gotoState,gotoTyped,gotoLineView}).slice(0,2200));
       // Home twice is Monaco's stable route to column zero (first
       // non-whitespace, then physical line start); replace the whole line.
       await key("Home","Home",0,36);
@@ -565,13 +575,16 @@ try{
           graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
         })`
       });
-      const routeFixtureEditor=await evalJS(`({
-        editorCount:document.querySelectorAll(".monaco-editor").length,
-        activeTag:document.activeElement?.tagName??"",
-        activeClass:document.activeElement?.className??"",
-        visibleText:[...document.querySelectorAll(".monaco-editor .view-line")]
-          .map(line=>line.innerText).join("\\n").slice(0,1800)
-      })`);
+      const routeFixtureEditor=await evalJS(`(()=> {
+        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
+        return {
+          editorCount:document.querySelectorAll(".monaco-editor").length,
+          activeTag:document.activeElement?.tagName??"",
+          activeClass:document.activeElement?.className??"",
+          visibleText:[...(editor?.querySelectorAll(".view-line")??[])]
+            .map(line=>line.innerText).join("\\n").slice(0,1800)
+        };
+      })()`);
       const routeFixture={
         ready:routeFixtureEditor.editorCount>0&&
           /TextDocument v\\d+/.test(routeFixtureView.result?.value?.revision??"")&&
@@ -579,7 +592,7 @@ try{
           routeFixtureView.result?.value?.graphEdges===routeOriginalView.result?.value?.graphEdges-1&&
           routeFixtureEditor.visibleText.includes("UNKNOWN: unresolved")&&
           !routeFixtureEditor.visibleText.includes("DENIED: failed"),
-        editor:editorTarget,goto:gotoState,gotoTyped,
+        editor:editorTarget,goto:gotoState,gotoTyped,gotoLineView,
         original:routeOriginalView.result?.value??null,
         view:routeFixtureView.result?.value??null,after:routeFixtureEditor
       };
