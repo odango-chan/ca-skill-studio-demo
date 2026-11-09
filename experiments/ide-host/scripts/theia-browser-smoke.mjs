@@ -114,7 +114,7 @@ try{
         );
         const a=brand?.getBoundingClientRect();
         const b=content?.getBoundingClientRect();
-        const nativeMenus=content?(content.textContent||"").replace(/\\s+/g," ").trim():"";
+        const nativeMenus=content?(content.textContent||"").replace(/\s+/g," ").trim():"";
         return {
           present:Boolean(brand),
           label:brand?.querySelector(".skill-studio-brand-label")?.textContent.trim()||"",
