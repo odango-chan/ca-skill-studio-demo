@@ -4,22 +4,9 @@
 
 [新版在线工作台（Theia）](https://odango-chan.github.io/ca-skill-studio-demo/) · [原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) · [当前实现与验收](docs/WORK.md) · [开发文档地图](docs/README.md)
 
-## 在线入口与迁移状态
+## 在线入口
 
-GitHub Pages 默认入口已切换为 **Theia + SKILL Studio Web 插件**。原有
-完整浏览器工作台保留在
-[Classic](https://odango-chan.github.io/ca-skill-studio-demo/classic/)；
-此前的 `/ide-preview/` 地址会跳转到新版根入口。
-
-**注意：新版插件目前尚未追平旧版功能。** 下方“现有能力”清单描述
-的是 Classic 原版完整能力；Node 详情、Route 创建/重连、Phase
-Designer、完整 Inspector、Package Audit、Markdown 预览等尚未全部迁入
-插件版。迁移完成前，请使用 Classic 处理这些功能。
-
-GitHub Pages Theia 版使用同源 Webview 适配，页面会显示安全提醒：
-仅用于公开/示例工作区，不要打开敏感文件或不可信工作区。浏览器
-OPFS 不等于本地磁盘或 GitHub 自动同步；在线版不执行 Python、SKILL
-Runtime 或 5GC。
+GitHub Pages 根入口为 Theia 插件版；[原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) 保留旧功能，`/ide-preview/` 跳转新版。插件迁移尚未追平：Node 详情、Route 创建/重连、Phase Designer、完整 Inspector、Package Audit 和 Markdown 预览暂用 Classic。Theia 在线版使用同源 Webview，仅用于公开/示例工作区，不要打开敏感文件；OPFS 不等于本地磁盘或 GitHub 同步，也不执行 Python、Runtime 或 5GC。
 
 ## 本地运行
 
