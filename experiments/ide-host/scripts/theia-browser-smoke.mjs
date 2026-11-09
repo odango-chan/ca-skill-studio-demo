@@ -91,6 +91,11 @@ try{
   await command("Page.enable");
   await command("Runtime.enable");
   await command("Network.enable");
+  // Use a realistic desktop workbench viewport; the default headless size can
+  // collapse Theia's editor groups and make native Source interactions invalid.
+  await command("Emulation.setDeviceMetricsOverride",{
+    width:1440,height:1000,deviceScaleFactor:1,mobile:false
+  });
   await command("Page.navigate",{url});
   let view=null;
   for(let i=0;i<250;i++){
@@ -497,7 +502,7 @@ try{
           const viewport=editor.querySelector(".monaco-scrollable-element")??editor;
           const rect=viewport.getBoundingClientRect();
           const lines=editor.querySelector(".view-lines");
-          const text=lines?.innerText??"";
+          const text=(lines?.innerText??"").replace(/\\u00a0/g," ");
           const visible=rect.width>30&&rect.height>100&&
             rect.bottom>0&&rect.top<window.innerHeight&&
             rect.right>0&&rect.left<window.innerWidth;
@@ -511,7 +516,8 @@ try{
             text:text.slice(0,700)};
         });
         const chosen=candidates.find(item=>item.visible&&item.hasFixture);
-        return {ready:Boolean(chosen),editorCount:editors.length,chosen,candidates};
+        return {ready:Boolean(chosen),editorCount:editors.length,chosen,candidates,
+          viewport:{width:window.innerWidth,height:window.innerHeight}};
       })()`);
       if(!editorTarget?.ready)
         throw Error("Native Theia Source editor viewport not found: "+JSON.stringify(editorTarget));
@@ -559,7 +565,7 @@ try{
       const gotoLineView=await evalJS(`(()=> {
         const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
         const lines=editor?.querySelector(".view-lines");
-        return {text:lines?.innerText??"",editorVisible:Boolean(editor)};
+        return {text:(lines?.innerText??"").replace(/\\u00a0/g," "),editorVisible:Boolean(editor)};
       })()`);
       if(!gotoLineView.editorVisible||
          !gotoLineView.text.includes("FAILED: unresolved")||
@@ -592,7 +598,7 @@ try{
           activeTag:document.activeElement?.tagName??"",
           activeClass:document.activeElement?.className??"",
           visibleText:[...(editor?.querySelectorAll(".view-line")??[])]
-            .map(line=>line.innerText).join("\\n").slice(0,1800)
+            .map(line=>line.innerText.replace(/\\u00a0/g," ")).join("\\n").slice(0,1800)
         };
       })()`);
       const routeFixture={
