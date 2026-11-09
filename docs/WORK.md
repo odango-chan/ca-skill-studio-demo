@@ -1,6 +1,6 @@
 # Skill Studio 当前工作状态
 
-**Updated: 2026-11-06**  
+**Updated: 2026-11-09**  
 **Integrated baseline before top-level menu UX: main@80cc153fc043cf3d6e7e6449fb9197adc7419eb6**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
 
 ## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
@@ -22,6 +22,16 @@
 **本轮代码：** 左侧文件导航不再堆叠“打开单文件 / 导出 ZIP / 加载示例”三套入口，它们归并到顶部「菜单 → 文件」。Explorer 保留高频目录打开、资格成立才出现的目录保存、确有冲突才出现的重新导入和真实状态提示。顶部快捷导出和撤销/重做暂不动，避免失去操作效率。
 
 **一致性：** 原文件按钮与 handler 仍为命令所有者，低频重复按钮仅在视觉上隐藏；不可用与权限仍由 JS `hidden`/`disabled`、现有 Picker 和 Diff/Confirm 保护。浏览器回归要证明文件菜单可以访问示例/ZIP，真实样本加载确实经过菜单，Source 和导航不变。追踪 [#80](https://github.com/odango-chan/ca-skill-studio-demo/issues/80)。PR CI、Pages 待实际成功后补证据；不得把部署前的 UI 声称已上线。
+
+## 2026-11-06 · IDE Host Spike (Issue #85; 不影响已部署 Pages)
+
+**本轮为独立试验分支** `spike/ide-extension-theia-host`：标准 VS Code `CustomTextEditorProvider` / `TextDocument` / `WorkspaceEdit`，将现有 Procedure 投影、ELK、ReactFlow 复用到 Webview；普通 YAML/Python、文件树、新建/删除、Undo/Redo 交给宿主。另通过同一 VSIX 试验 Theia 的 VS Code API 兼容性。详细见 [ADR-0002](decisions/0002-ide-host-spike.md) 和 [试验说明](../experiments/ide-host/README.md)。
+
+**代码证据：** [独立 IDE Spike CI #42191440251 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42191440251)（6/6：实际 5-Procedure CreatedSession 投影、精确 Route Target Patch、旧版本/伪造负例、打包扩展的模拟 TextDocument/WorkspaceEdit 测试；409/409 现有回归；VSIX Artifacts 生成）。[Draft PR #86](https://github.com/odango-chan/ca-skill-studio-demo/pull/86) 保持 OPEN，未合入 main。**真实 VS Code 图形界面、Theia 安装/交互、Native Explorer 新建/删除/Undo 仍 NOT_RUN**；模拟宿主的 PASS 不代表真实 IDE 通过。此前 Source-only YAML/Python 工具栏的 WIP 分支不合并，主站仍以当前 main 为准；本次不修改 Runtime/5GC。
+
+## 2026-11-06 · 在线版必须保留（IDE Spike 修订）
+
+**产品约束更新：** 浏览器在线 Studio 是必需能力，而非 VS Code 桌面扩展的替代品。现有 GitHub Pages 保留；新方案评估 Theia 1.76+ 的 `browser-only` 静态应用与构建时内置 Web 扩展，文件树/新增/删除/标签页由宿主负责，Procedure/Source-backed Patch 复用核心。当前分支只新增双入口构建（Node + browser）；**完整 Theia Online、静态部署、OPFS 持久化、Native VS Code GUI 均 NOT_RUN**，不能据此替换 Pages。参见 [ADR-0002](decisions/0002-ide-host-spike.md)。
 
 ## Overall
 
@@ -94,3 +104,45 @@
 - [TRACEABILITY](TRACEABILITY.md)：当前范围→实现/测试→稳定证据。
 - [文档基线主分支 Pages 成功记录](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41612728393)：仅为本仓浏览器静态站部署。
 - Studio 唯一可选择且默认打开的 Package `establish-pdu-session`，其运行时相关 16 文件来自 [ca-agent-demo@eaadf948](https://github.com/odango-chan/ca-agent-demo/tree/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/skills/establish-pdu-session)。`references/3gpp-procedure.md`、`references/session-selection.md`、`references/failure-handling.md` 为可选业务参考材料；Studio 可浏览/编辑/导出，不表示已实现 Host `read_reference` 工具。`cases/` 和内部 `design/` 未纳入此编辑示例。Host/Runtime 可执行性仍由真正 owner 的 Schema/Validator/执行事实决定。
+
+## IDE preview integration follow-up (2026-11-09)
+
+- The continuing online IDE preview is based on `spike/ide-extension-theia-host` / PR #86; `main` remains the stable published baseline and is not changed by this integration.
+- The branch inherits the already-merged Root path-focus work: default proven success path, selectable/complete path modes, per-card `+N 条` expand / `收起`, explicit `查看`, and anchor-preserving expand/collapse (#73/#75/#77).
+- Added the view-only dashed boundary grouping the current Node's PRE/OP/POST stages, adapted from #71. It adds no business Node, Route, Source mutation or Runtime meaning. Exact-head verification is pending.
+
+
+## 2026-11-09 · Theia becomes the default online host; Classic is retained
+
+**Decision:** GitHub Pages root `/` now targets Theia browser-only 1.76 with
+the SKILL Studio Web extension bundled at build time. The previous complete
+browser Studio is preserved at `/classic/`; the old `/ide-preview/` path
+redirects to the new root. The Pages workflow builds the old Studio from the
+main-source checkout, builds Theia from the current ref, verifies the root
+subpath, and composes one artifact. After PR #86 is merged, the same workflow
+runs from `main` on every normal deployment.
+
+**This is not feature parity.** The current plugin host does not yet expose
+the old Node detail view, Route create/reconnect, Phase Designer, full
+Inspector, Package Audit or Markdown preview. Those capabilities remain
+available in Classic and must be migrated explicitly before Classic is
+retired. Do not treat a successful shell build as proof that all old features
+were carried over.
+
+**Security / persistence boundary:** the GitHub Pages Theia build uses a
+same-origin Webview adapter and displays a persistent warning. It is for
+public/sample workspaces only; do not open sensitive or untrusted files.
+Browser OPFS is local to the current browser profile, not native disk access
+or GitHub synchronization. No Python, SKILL Runtime or 5GC execution is
+provided by this static host.
+
+**Preservation:** `backup/main-before-theia-default-2026-11-09` points to the
+exact previous main SHA `dcb137d606e6a697fcf02f7d7c5a811f7921e0f5`.
+
+**Current migration evidence:** prior exact-head real Chromium run
+[#42575346100](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42575346100)
+passed the browser-only Theia shell, sample import, Procedure CustomEditor,
+guarded Patch, Source editor and Undo at the former `/ide-preview/` path.
+The new default-root smoke, release composition test and Pages deployment
+must pass at the current exact head before the new root deployment is called
+accepted. PR #86 remains open until those gates are green.

@@ -1,0 +1,46 @@
+name: Verify IDE Host Spike
+
+on:
+  pull_request:
+    paths:
+      - "experiments/ide-host/**"
+      - ".github/workflows/ide-host-spike.yml"
+      - "site/workspace.mjs"
+      - "site/layout.mjs"
+      - "site/react-flow-canvas.tsx"
+      - "site/visual-route-edit.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - name: Install pinned repo dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build standalone VS Code extension + bundled graph webview
+        run: node experiments/ide-host/scripts/build-ide-spike.mjs
+      - name: Stage optional online Web extension for shared tests
+        run: node experiments/ide-host/scripts/prepare-theia-online.mjs
+      - name: Test host Source authority and real CreatedSession projection
+        run: node --test experiments/ide-host/tests/*.test.mjs
+      - name: "Regression: existing Source / Procedure contract"
+        run: npm test
+      - name: Package experimental VSIX
+        working-directory: experiments/ide-host/vscode
+        run: |
+          npx --yes @vscode/vsce package --no-dependencies --out ca-skill-studio-ide-spike.vsix
+          test -s ca-skill-studio-ide-spike.vsix
+      - name: Publish experimental VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ca-skill-studio-ide-spike-vsix
+          path: experiments/ide-host/vscode/ca-skill-studio-ide-spike.vsix
+          if-no-files-found: error

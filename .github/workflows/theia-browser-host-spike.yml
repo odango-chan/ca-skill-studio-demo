@@ -1,0 +1,77 @@
+name: Verify Theia Browser Host Custom Editor
+
+on:
+  pull_request:
+    paths:
+      - "experiments/ide-host/**"
+      - ".github/workflows/theia-browser-host-spike.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  theia-browser-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      npm_config_audit: "false"
+      npm_config_fund: "false"
+      THEIA_WEBVIEW_EXTERNAL_ENDPOINT: "{{hostname}}"
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+      - name: Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install Linux native keytar prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-1-dev
+      - name: Install pinned Studio dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build shared Procedure extension and webview
+        run: node experiments/ide-host/scripts/build-ide-spike.mjs
+      - name: Stage same Web extension for Theia
+        run: node experiments/ide-host/scripts/prepare-theia-online.mjs
+      - name: Install isolated Theia 1.76 browser app
+        run: npm install --prefix experiments/ide-host/theia-browser --no-audit --no-fund
+      - name: Build normal Theia browser app with backend
+        run: npm run build --prefix experiments/ide-host/theia-browser
+      - name: Deploy prepared Web extension to Theia backend plugin directory
+        run: |
+          mkdir -p "$HOME/.theia/plugins"
+          cp -R experiments/ide-host/theia-online/plugins/odango-chan.ca-skill-studio-ide-spike "$HOME/.theia/plugins/"
+          test -s "$HOME/.theia/plugins/odango-chan.ca-skill-studio-ide-spike/package.json"
+      - name: Start Theia backend for Webview endpoint
+        run: |
+          npm run start --prefix experiments/ide-host/theia-browser > /tmp/theia-browser.log 2>&1 &
+          echo $! > /tmp/theia-browser.pid
+          for i in $(seq 1 180); do
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then
+              echo "THEIA_BROWSER_BACKEND_READY"
+              exit 0
+            fi
+            if ! kill -0 "$(cat /tmp/theia-browser.pid)" 2>/dev/null; then
+              cat /tmp/theia-browser.log
+              exit 1
+            fi
+            sleep 1
+          done
+          cat /tmp/theia-browser.log
+          exit 1
+      - name: Real Chromium import, CustomEditor and React Flow graph
+        env:
+          THEIA_URL: "http://127.0.0.1:3000/"
+        run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
+      - name: Upload Theia backend log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: theia-browser-host-failure-log
+          path: /tmp/theia-browser.log
+          if-no-files-found: ignore
+          retention-days: 7

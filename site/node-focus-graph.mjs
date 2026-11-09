@@ -75,6 +75,30 @@ export function projectNodeFocusFlow(procedure,centerId){
   };
 }
 
+// A read-only React Flow backdrop. It groups the current Node's PRE/OP/POST
+// visually without parenting or changing ELK geometry/handles/source Routes.
+export function currentNodeBoundary(local,layout){
+  if(!local||!layout)return null;
+  const stages=local.nodes.filter(node=>node.kind==="stage");
+  if(!stages.length)return null;
+  const rects=stages.map(node=>{
+    const position=layout.positions.get(node.id);
+    const size=local.dimensions.get(node.id);
+    if(!position||!size)return null;
+    return {left:position.x,top:position.y,
+      right:position.x+size.width,bottom:position.y+size.height};
+  });
+  if(rects.some(rect=>!rect))return null;
+  const left=Math.min(...rects.map(x=>x.left));
+  const top=Math.min(...rects.map(x=>x.top));
+  const right=Math.max(...rects.map(x=>x.right));
+  const bottom=Math.max(...rects.map(x=>x.bottom));
+  const padding={left:18,right:18,top:39,bottom:18};
+  return {position:{x:left-padding.left,y:top-padding.top},
+    width:right-left+padding.left+padding.right,
+    height:bottom-top+padding.top+padding.bottom};
+}
+
 export function makeNodeFocusElements(local,layout){
   if(!local||!layout)return {nodes:[],edges:[]};
   const ports=new Map(local.nodes.map(node=>[node.id,[]]));
@@ -85,6 +109,8 @@ export function makeNodeFocusElements(local,layout){
     ports.get(b.target)?.push({id:"focus-edge-"+i+"-in",type:"target",
       ...b.anchors.target});
   }
+  const boundary=currentNodeBoundary(local,layout);
+  if(!boundary)throw Error("Current Node phase boundary cannot be positioned");
   const nodes=local.nodes.map(node=>{
     const position=layout.positions.get(node.id),dimensions=local.dimensions.get(node.id);
     if(!position||!dimensions)throw Error("Missing positioned local flow Node: "+node.id);
@@ -93,6 +119,16 @@ export function makeNodeFocusElements(local,layout){
       selectable:false,
       data:{...node,dimensions,ports:nodePorts,direction:"RIGHT",
         portSignature:nodePorts.map(p=>p.id+":"+p.side+":"+p.offset).join("|")}};
+  });
+  // The outline is an explanatory visual Node, not a Procedure business Node.
+  // It owns no handles, Routes, editing actions or Runtime identity.
+  nodes.unshift({
+    id:"view:current-node-boundary",type:"focus-boundary",
+    position:boundary.position,draggable:false,selectable:false,
+    focusable:false,connectable:false,zIndex:-1,
+    style:{width:boundary.width,height:boundary.height,pointerEvents:"none"},
+    data:{centerId:local.focusId,width:boundary.width,height:boundary.height,
+      viewOnly:true}
   });
   const edges=layout.bundles.map((b,i)=>{
     const internal=b.routeSource==="view.phase";

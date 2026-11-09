@@ -2,9 +2,10 @@ name: Deploy Skill Studio Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, spike/ide-extension-theia-host]
     paths:
       - "site/**"
+      - "experiments/ide-host/**"
       - "tests/**"
       - "scripts/**"
       - "package.json"
@@ -22,9 +23,21 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: main-source
     steps:
-      - name: Checkout source
+      - name: Checkout current published site from main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-source
+      - name: Checkout isolated Theia experiment
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          path: ide-source
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -159,23 +172,65 @@ jobs:
           node --check scripts/build.mjs
           node --check scripts/edge-smoke.mjs
           node --check scripts/d1-interaction-smoke.mjs
+      - name: Build Theia Web extension for default online workbench
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: ide-source
+        run: |
+          npm ci --no-audit --no-fund
+          node experiments/ide-host/scripts/build-ide-spike.mjs
+          node experiments/ide-host/scripts/prepare-theia-online.mjs
+          node --test experiments/ide-host/tests/pages-compose.test.mjs
+      - name: Build Theia browser-only static workbench
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: ide-source
+        run: |
+          npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
+          npm run build --prefix experiments/ide-host/theia-online
+          node experiments/ide-host/scripts/prepare-theia-static-preview.mjs
+      - name: Real Chromium acceptance at the default Pages root
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: ide-source
+        env:
+          THEIA_BASE_PATH: "/ca-skill-studio-demo"
+          THEIA_REQUIRE_WEBVIEW: "1"
+        run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
+      # Theia is the default online host. The previous full-featured browser
+      # Studio is copied intact to /classic/ before the root is replaced.
+      - name: Compose default Theia root and preserve Classic Studio
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: main-source
+        run: |
+          node ../ide-source/experiments/ide-host/scripts/compose-pages-release.mjs --classic dist --theia ../ide-source/experiments/ide-host/theia-online/lib/frontend --output dist
+          test -s dist/index.html
+          test -s dist/bundle.js
+          test -s dist/hostedPlugin/list.json
+          test -s dist/webview/index.html
+          test -s dist/classic/index.html
+          test -s dist/classic/app.js
+          test -s dist/classic/samples/packages/establish-pdu-session/assurance/procedure.yaml
+          test -s dist/ide-preview/index.html
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:
-          path: dist
+          path: main-source/dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # Both the migration branch and main publish the same default Theia root;
+    # main remains the durable deployment source after the migration is merged.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
     permissions:
       contents: read
       pages: write
       id-token: write
+    # Both refs publish the same Pages root artifact. Keep the migration
+    # branch on its existing preview environment so github-pages protection
+    # remains intact; after merge, main publishes through github-pages.
     environment:
-      name: github-pages
+      name: ${{ github.ref == 'refs/heads/spike/ide-extension-theia-host' && 'skill-studio-preview' || 'github-pages' }}
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy artifact to Pages

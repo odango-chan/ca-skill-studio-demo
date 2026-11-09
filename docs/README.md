@@ -13,7 +13,8 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 7. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
 8. [E Source Editor](design/source-editor-workstream.md) — Monaco / shared D4 history and E2–E4 scope
 9. [Application Shell](design/application-shell.md) — Web/Local 共用菜单命令与未来本地执行边界
-10. [Documentation Governance](DOCUMENTATION.md) — canonical source map
+10. [ADR-0002 Theia default online host + Classic fallback](decisions/0002-ide-host-spike.md) — VS Code Extension / Theia 兼容性试验（未做迁移决定）
+11. [Documentation Governance](DOCUMENTATION.md) — canonical source map
 
 ## 已完成阶段技术记录
 
@@ -32,6 +33,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | 为何采用 Source-first | [ADR-0001](decisions/0001-source-first-visual.md) |
 | E1 Monaco Source Editor / E2–E4 boundaries | [E Source Editor](design/source-editor-workstream.md) |
 | 当前应用菜单 / 本地宿主边界 | [Application Shell](design/application-shell.md) |
+| Theia 默认在线宿主 / Classic 保留与功能迁移边界 | [ADR-0002](decisions/0002-ide-host-spike.md) |
 | 当前状态 | [WORK](WORK.md) |
 | 实施、测试与证据 locator | [TRACEABILITY](TRACEABILITY.md) |
 | 文档治理 | [DOCUMENTATION](DOCUMENTATION.md) |

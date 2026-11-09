@@ -2,7 +2,11 @@
 
 **Source-first 的浏览器端 Skill Package 编辑原型**。D1 React Flow / ELK 与 D2 A1–A5 有界编辑已完成；当前不是 Agent Runtime、5GC 控制台或完整 Runtime Validator。
 
-[在线 Demo](https://odango-chan.github.io/ca-skill-studio-demo/) · [当前实现与验收](docs/WORK.md) · [开发文档地图](docs/README.md)
+[新版在线工作台（Theia）](https://odango-chan.github.io/ca-skill-studio-demo/) · [原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) · [当前实现与验收](docs/WORK.md) · [开发文档地图](docs/README.md)
+
+## 在线入口
+
+GitHub Pages 根入口为 Theia 插件版；[原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) 保留旧功能，`/ide-preview/` 跳转新版。插件迁移尚未追平：Node 详情、Route 创建/重连、Phase Designer、完整 Inspector、Package Audit 和 Markdown 预览暂用 Classic。Theia 在线版使用同源 Webview，仅用于公开/示例工作区，不要打开敏感文件；OPFS 不等于本地磁盘或 GitHub 同步，也不执行 Python、Runtime 或 5GC。
 
 ## 本地运行
 
@@ -16,10 +20,9 @@ npm run build
 python3 -m http.server 8080 --directory dist
 ~~~
 
-浏览器打开 http://localhost:8080。请使用已打包的 `dist/`，不要将 `site/index.html` 直接当成可运行的 TSX 原生页面。
+浏览器打开 http://localhost:8080。此命令仍启动 Classic 原版浏览器应用，用于本地开发和功能对照；GitHub Pages 的默认 Theia Host 由 `.github/workflows/pages.yml` 单独构建。请使用已打包的 `dist/`，不要将 `site/index.html` 直接当成可运行的 TSX 原生页面。
 
-**注意：这是本地启动 Studio 编辑器，不是运行 SKILL 或 Python / Runtime。**
-Pages 和本地静态站共用一个应用菜单及 Source 编辑逻辑；只有未来接入明确授权的本地执行宿主，才会增加真实 Run / Trace 操作。设计见 [应用菜单与本地宿主](docs/design/application-shell.md)。
+**注意：这是本地启动 Classic 编辑器，不是运行 SKILL 或 Python / Runtime。** Theia Pages 使用宿主原生菜单和编辑器，但复用相同的 Source 投影与受限 Patch 边界；两者都不提供真实 Run / Trace。设计见 [应用菜单与本地宿主](docs/design/application-shell.md)。
 
 ## 现有能力
 
@@ -42,16 +45,6 @@ React 19 / React Flow 12 / ELK / TypeScript 7 / YAML 2.9.1 / Node 24 / esbuild�
 
 画布缩放提供三个并列按钮：**适配**（完整流程）、**横向**（宽度铺满）、**纵向**（高度铺满）。它们只改变当前流程图的视口，不会修改 Source，更多细节见 [Workbench](docs/design/authoring-workbench.md)。
 
-D4 Phase Designer 的 A1 已实现有界的 Phase Step 编辑；目前只允许在 Inspector 中将已有 `with.<key>.from` 更换为当前 Procedure 中声明、且类型相同的 `input.*`，不增加流程图节点或改变步骤顺序。见 [D4 设计](docs/design/phase-designer.md) 与 [Issue #15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)。
-
-D4-A2.1 新增受限的 Phase Step 输出引用编辑：仅在当前 Procedure 原文已经使用过两种写法、且指向同一已执行 Step 和相同输出字段时，提供局部与全限定引用切换；仍不涉及跨生产者重连或 Runtime 输出类型推断。详见 [Phase Designer](docs/design/phase-designer.md) 和 [PR #17](https://github.com/odango-chan/ca-skill-studio-demo/pull/17)。
-
-D4-A2.2a 增加了 Phase Step **只读数据依赖审查**：可以检查上游 Step、执行先后、跨 Node 必经关系，以及本地脚本输出 schema 的声明证据；不会自动修改引用或推断消费参数类型。跨生产者重绑定仍不开放。详见 [D4 设计](docs/design/phase-designer.md) 和 [PR #18](https://github.com/odango-chan/ca-skill-studio-demo/pull/18)。
-
-D4-A2.2b1 已补齐当前有界范围内的**消费者输入契约证据**：当前 Package 内本地脚本的 `# inputSchema` 与唯一同名 schema 可用于展示 `with.<key>` 的消费者字段类型，与源输入/脚本输出的声明类型做只读对照；这不会验证 Runtime 数据可用性、`const`/`pattern` 等约束或 `call` ABI，更不授权跨生产者修改。详见 [D4 Phase Designer](docs/design/phase-designer.md)、[PR #19](https://github.com/odango-chan/ca-skill-studio-demo/pull/19)。
-
-D4 Phase Designer 的 Verify Step 编辑、命名引用影响、失败 Route 重定向和 Outcome 修复均已进入主分支；边界、PR 和证据集中维护在 [D4 设计](docs/design/phase-designer.md)、[WORK](docs/WORK.md) 与 [TRACEABILITY](docs/TRACEABILITY.md)。这些仅是 Source 编辑器级能力，Runtime/5GC NOT_RUN。
-
-E1 Monaco Source Editor 已通过 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 合入最新 D4 主分支：本地 Monaco/Worker，YAML、Python、Markdown、JSON 的 Source 编辑，保留唯一工作副本及 Source/Visual/Split、Diff/确认/Undo/Redo；初始化失败回退原有文本编辑器。[322/322 + real Chromium 集成 CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366)，[resulting-main Pages PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343)，参见 [E 线设计](docs/design/source-editor-workstream.md)。
+D4 Phase Designer 已实现有界 Step 编辑、输出引用切换、只读依赖/消费者契约证据，以及 Verify Step、失败 Route 和 Outcome 编辑。所有操作仍受 Source Patch 与类型/来源约束；跨生产者重绑定和 Runtime/5GC 验证不在范围内。详见 [D4 设计](docs/design/phase-designer.md)、[WORK](docs/WORK.md) 与 [TRACEABILITY](docs/TRACEABILITY.md)。\n\nE1 Monaco Source Editor 已通过 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 合入最新 D4 主分支：本地 Monaco/Worker，YAML、Python、Markdown、JSON 的 Source 编辑，保留唯一工作副本及 Source/Visual/Split、Diff/确认/Undo/Redo；初始化失败回退原有文本编辑器。[322/322 + real Chromium 集成 CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366)，[resulting-main Pages PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343)，参见 [E 线设计](docs/design/source-editor-workstream.md)。
 
 E2 YAML 1.2 语法诊断和离线 Contract/Predicate Owner Schema 提示已由 [PR #42](https://github.com/odango-chan/ca-skill-studio-demo/pull/42) 合入主分支，通过 [328/328 + 真实补全/hover Chromium](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41803566642) 和 [Pages 部署验收](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41804005500)。Procedure 保持 syntax-only，避免旧 Schema 误报；Runtime/5GC NOT_RUN。
