@@ -454,13 +454,22 @@ try{
         })()`
       });
       await sleep(1500);
+      const selectRouteSource=await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=> {
+          const node=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
+          if(!node)return {ready:false,reason:"Source Node missing"};
+          node.dispatchEvent(new MouseEvent("click",{bubbles:true}));
+          return {ready:true,nodeId:node.getAttribute("data-id")};
+        })()`
+      });
+      await sleep(350);
       const routeGesture=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
           const node=document.querySelector('#reactFlowRoot .react-flow__node[data-id="await-initial-resources"]');
           const targetNode=document.querySelector('#reactFlowRoot .react-flow__node[data-id="failed"]');
           if(!node||!targetNode)return {ready:false,reason:"Source/target Node missing"};
-          node.dispatchEvent(new MouseEvent("click",{bubbles:true}));
           const source=node.querySelector('.react-flow__handle[data-handleid="new-route-out"]');
           const target=targetNode.querySelector('.react-flow__handle[data-handleid="in"]');
           if(!source||!target)return {ready:false,reason:"Dedicated add-Route or target handle missing",
@@ -491,10 +500,11 @@ try{
         })`
       });
       const routeProposalValue=routeProposal.result?.value??null;
-      if(!routeGesture.result?.value?.ready||!routeProposalValue?.visible||
+      if(!selectRouteSource.result?.value?.ready||!routeGesture.result?.value?.ready||!routeProposalValue?.visible||
          !routeProposalValue.outcomes.includes("DENIED"))
         throw Error("Canvas Route proposal did not expose the observed DENIED Outcome: "+
           JSON.stringify({routeFixture,routeMode:routeMode.result?.value,
+            selectRouteSource:selectRouteSource.result?.value,
             routeGesture:routeGesture.result?.value,routeProposal:routeProposalValue}));
       const routePreview=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
@@ -606,7 +616,7 @@ try{
       !patchEvidence.routeCreate?.proposal?.visible||
       !patchEvidence.routeCreate?.preview?.ready||
       !String(patchEvidence.routeCreate?.applied?.message??"").includes("WorkspaceEdit 已应用")||
-      !String(patchEvidence.routeCreate?.undo?.message??"").includes("WorkspaceEdit 已应用")))
+      !(patchEvidence.routeCreate?.applied?.graphEdges>patchEvidence.routeCreate?.undo?.graphEdges)))
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify(patchEvidence.nodeFocus).slice(0,3500));
   if(requireEditor)
