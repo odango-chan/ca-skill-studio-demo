@@ -137,6 +137,8 @@ jobs:
           node --check site/react-flow-projection.mjs
           node --check site/file-icons.mjs
           node --check tests/file-icons.test.mjs
+          node --check experiments/ide-host/scripts/classic-icons-css.mjs
+          node --check experiments/ide-host/scripts/prepare-theia-shell-icons.mjs
           node --check tests/react-flow-migration.test.mjs
           node --check tests/visual-route-edit.test.mjs
           node --check tests/navigation-menu.test.mjs
@@ -203,6 +205,7 @@ jobs:
         run: |
           node ../ide-source/experiments/ide-host/scripts/compose-pages-release.mjs --classic dist --theia ../ide-source/experiments/ide-host/theia-online/lib/frontend --output dist
           test -s dist/index.html
+          test -s dist/classic-icons.css
           test -s dist/bundle.js
           test -s dist/hostedPlugin/list.json
           test -s dist/hostedPlugin/odango_chan_skill_studio_theme/package.json

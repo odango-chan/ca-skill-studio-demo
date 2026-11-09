@@ -33,7 +33,7 @@ if(!themeManifest.contributes?.themes?.some(x=>x.label==="SKILL Studio Light")||
 for(const source of [
   join(themeSource,"themes","skill-studio-light-color-theme.json"),
   join(themeSource,"icons","skill-studio-file-icon-theme.json"),
-  ...["skill","yaml","markdown","python","file","folder","folder-open","code"]
+  ...["skill","yaml","markdown","python","json","shell","text","file","folder","folder-open","code"]
     .map(name=>join(themeSource,"icons",name+".svg"))
 ]){
   const info=await stat(source);

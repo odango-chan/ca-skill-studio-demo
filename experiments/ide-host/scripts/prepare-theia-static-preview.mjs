@@ -5,8 +5,10 @@
 // or production. The full backend host keeps the normal isolated host pattern.
 import {copyFile,cp,mkdir,readdir,readFile,stat,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
+import {prepareTheiaShellIcons} from "./prepare-theia-shell-icons.mjs";
 
 const root=resolve("experiments/ide-host/theia-online/lib/frontend");
+const classicIconTheme=await prepareTheiaShellIcons(root);
 const bundlePath=join(root,"bundle.js");
 let bundle=await readFile(bundlePath,"utf8");
 const from='defaultPattern="{{uuid}}.webview.{{hostname}}"';
@@ -37,8 +39,8 @@ if(!indexHtml.includes('id="skill-studio-preview-warning"')){
   const body=indexHtml.match(/<body(?:\s[^>]*)?>/i);
   if(!body)throw Error("Theia frontend index has no body element for the required safety/navigation banner");
   indexHtml=indexHtml.replace(body[0],body[0]+warning);
-  await writeFile(indexPath,indexHtml);
 }
+await writeFile(indexPath,indexHtml);
 // Theia's browser-only static build emits the extension worker bundle but
 // does not carry arbitrary package assets through its hostedPlugin copier.
 // Explicitly stage the read-only sample package and Webview media beside it.
@@ -73,7 +75,7 @@ for(const required of [
   join(themePluginTarget,"package.json"),
   join(themePluginTarget,"themes","skill-studio-light-color-theme.json"),
   join(themePluginTarget,"icons","skill-studio-file-icon-theme.json"),
-  ...["skill","yaml","markdown","python","file","folder","folder-open","code"]
+  ...["skill","yaml","markdown","python","json","shell","text","file","folder","folder-open","code"]
     .map(name=>join(themePluginTarget,"icons",name+".svg"))
 ]){
   const info=await stat(required);
@@ -81,7 +83,8 @@ for(const required of [
     throw Error("Static hosted Skill Studio theme asset missing or empty: "+required);
 }
 console.log("STUDIO_THEIA_STATIC_THEME_ASSETS",JSON.stringify({
-  themePluginTarget,assets:["package.json","themes/**","icons/**"],offlinePackage:true
+  themePluginTarget,assets:["package.json","themes/**","icons/**"],offlinePackage:true,
+  classicShellIconCss:classicIconTheme.cssBytes
 }));
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,

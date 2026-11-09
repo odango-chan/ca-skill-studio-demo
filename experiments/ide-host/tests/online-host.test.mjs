@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync,statSync} from "node:fs";
 import {join} from "node:path";
+import {buildClassicIconsCss,THEIA_CLASSIC_ICON_MAP} from "../scripts/classic-icons-css.mjs";
 const root="experiments/ide-host/theia-online";
 test("Theia online target is a real backend-free 1.76 browser-only app",()=>{
   const app=JSON.parse(readFileSync(join(root,"package.json"),"utf8"));
@@ -55,6 +56,22 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
   for(const path of [
     "themes/skill-studio-light-color-theme.json","icons/skill-studio-file-icon-theme.json",
     "icons/skill.svg","icons/yaml.svg","icons/markdown.svg","icons/python.svg",
+    "icons/json.svg","icons/shell.svg","icons/text.svg",
     "icons/file.svg","icons/folder.svg","icons/folder-open.svg","icons/code.svg"
   ])assert.ok(statSync(join(themeRoot,path)).size>80,path);
+});
+
+test("Theia activity bar and shell toolbars render from the Classic icon registry",()=>{
+  const css=buildClassicIconsCss();
+  for(const name of ["files","search","source-control","debug-alt","extensions",
+    "settings-gear","account","new-file","new-folder","undo","redo","save",
+    "refresh","close","menu","chevron-down","collapse-all"]){
+    assert.ok(THEIA_CLASSIC_ICON_MAP[name],name+" must map to a Classic icon");
+    assert.ok(css.includes(".theia-app-sides .codicon-"+name+"::before")||
+      css.includes(".theia-navigator .codicon-"+name+"::before")||
+      css.includes(".lm-MenuBar .codicon-"+name+"::before"),name);
+  }
+  assert.match(css,/mask-image:url\("data:image\/svg\+xml,/);
+  assert.match(css,/background-color:currentColor/);
+  assert.doesNotMatch(css,/https?:\/\//);
 });

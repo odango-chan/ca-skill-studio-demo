@@ -21,8 +21,9 @@ test("Pages root is Theia, complete previous Studio remains at /classic/",async(
     await put(classic,"light.css","/* classic theme */");
     await put(classic,"app.css","/* classic app */");
     await put(classic,"samples/establish-pdu-session/SKILL.md","# Sample");
-    await put(theia,"index.html",'<!doctype html><html><body><div id="skill-studio-preview-warning"><a href="./classic/">Classic</a></div><div id="theia-app-shell"></div></body></html>');
+    await put(theia,"index.html",'<!doctype html><html><head><link id="skill-studio-classic-icon-theme" rel="stylesheet" href="./classic-icons.css"></head><body><div id="skill-studio-preview-warning"><a href="./classic/">Classic</a></div><div id="theia-app-shell"></div></body></html>');
     await put(theia,"bundle.js","window.theia=true;");
+    await put(theia,"classic-icons.css","/* classic icon theme */");
     await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","odango-chan.skill-studio-theme"]');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/package.json",'{"name":"skill-studio-theme"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",'{"name":"SKILL Studio Light"}');
@@ -43,6 +44,7 @@ test("Pages root is Theia, complete previous Studio remains at /classic/",async(
     assert.equal(await readFile(join(classic,"classic","app.js"),"utf8"),"window.classicStudio=true;");
     assert.equal(await readFile(join(classic,"classic","samples/establish-pdu-session/SKILL.md"),"utf8"),"# Sample");
     assert.equal(await readFile(join(classic,"bundle.js"),"utf8"),"window.theia=true;");
+    assert.equal(await readFile(join(classic,"classic-icons.css"),"utf8"),"/* classic icon theme */");
     assert.match(await readFile(join(classic,"hostedPlugin/list.json"),"utf8"),/ca-skill-studio-ide-spike/);
     assert.match(await readFile(join(classic,"hostedPlugin/list.json"),"utf8"),/skill-studio-theme/);
     assert.equal(await readFile(join(classic,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json"),"utf8"),'{"name":"SKILL Studio Light"}');

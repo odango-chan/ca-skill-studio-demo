@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7">
-<path stroke="#57728B" d="m9 8-4 4 4 4m6-8 4 4-4 4m-2-9-2 10"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#638798" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+<path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Z"/><polyline points="13 3 13 10 20 10"/><polyline points="10 13 8 15 10 17"/><polyline points="14 13 16 15 14 17"/>
 </svg>
