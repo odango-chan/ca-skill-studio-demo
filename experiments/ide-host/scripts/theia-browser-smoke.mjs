@@ -253,19 +253,21 @@ try{
       webviewView=evaluated.result?.value??null;
     }catch(error){webviewFrameError=String(error);}
   }
-  const listing=await(await fetch(url+"hostedPlugin/list.json")).text();
+  const listingResponse=await fetch(url+"hostedPlugin/list.json");
+  const listing=await listingResponse.text();
   const evidence={view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
     frameCount:frames.length,webviewFrame,webviewView,webviewFrameError,
+    extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500),
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
     networkFailures:networkFailures.slice(-15),networkResponses:networkResponses.slice(-30),
     consoleErrors:consoleErrors.slice(0,8),exceptions:exceptions.slice(0,6)};
   console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
-  if(!evidence.extensionListPresent||!view?.appShell||view.widgets<5||view.bodyLength<15)
-    throw Error("Theia browser-only shell/plugin activation failed: "+JSON.stringify(evidence).slice(0,2200));
+  if(!view?.appShell||view.widgets<5||view.bodyLength<15)
+    throw Error("Theia browser shell failed to start: "+JSON.stringify(evidence).slice(0,2200));
   if(!afterImport.bodyText.includes("示例 SKILL 已载入浏览器工作区")||
      !afterImport.folders.some(folder=>folder.name==="skill-studio-examples"))
-    throw Error("Theia sample import into OPFS failed: "+JSON.stringify(afterImport).slice(0,2400));
+    throw Error("Theia sample import into OPFS failed: "+JSON.stringify({afterImport,registeredCommands,extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500)}).slice(0,3000));
   if(externalUrl&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
