@@ -103,7 +103,7 @@ export function activate(context){
     async()=>{
       let stage="seed-example";
       try{
-        const result=await seedExampleWorkspace(vscode,context.extensionUri);
+        const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri);
         stage="open-procedure";
         await vscode.commands.executeCommand("vscode.openWith",result.procedure,VIEW);
         void vscode.window.showInformationMessage(
