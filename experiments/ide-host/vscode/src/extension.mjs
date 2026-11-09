@@ -137,6 +137,20 @@ export function activate(context){
           "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
       }
     }));
+  // Make the first-run path discoverable without requiring users to know
+  // the command palette. The Explorer welcome content and toolbar provide
+  // persistent entry points; this one-time-per-empty-session prompt is a
+  // convenient shortcut for the online demo.
+  if(!(vscode.workspace.workspaceFolders??[]).length){
+    void vscode.window.showInformationMessage(
+      "欢迎使用 SKILL Studio。可以先载入内置演示 SKILL 项目体验编辑器。",
+      "载入演示 SKILL 项目"
+    ).then(choice=>{
+      if(choice==="载入演示 SKILL 项目")
+        return vscode.commands.executeCommand("skillStudio.loadExample");
+      return undefined;
+    });
+  }
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.openProcedure",
     async uri=>{
       let target=uri;
