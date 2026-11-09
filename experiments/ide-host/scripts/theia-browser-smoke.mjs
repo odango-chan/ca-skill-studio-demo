@@ -12,7 +12,7 @@ const root=resolve("experiments/ide-host/theia-online/lib/frontend");
 const externalUrl=process.env.THEIA_URL;
 const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
-if(!existsSync(join(root,"index.html")))throw Error("Theia frontend missing");
+if(!externalUrl&&!existsSync(join(root,"index.html")))throw Error("Theia frontend missing");
 if(!chrome)throw Error("Chrome unavailable; browser acceptance NOT_RUN");
 const types={".html":"text/html",".js":"text/javascript",".css":"text/css",
   ".json":"application/json",".svg":"image/svg+xml",".wasm":"application/wasm",
