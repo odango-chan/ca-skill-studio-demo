@@ -50,7 +50,7 @@ function host(manifestOverride=null){
   return {vscode,files,opened};
 }
 test("Sample command creates exact fixture in host filesystem, not a second buffer",async()=>{
-  const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"));
+  const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
   assert.ok(result.created>=16);
   assert.equal(result.files,result.created);
   assert.equal(result.skipped,0);
@@ -58,15 +58,15 @@ test("Sample command creates exact fixture in host filesystem, not a second buff
   assert.equal(h.opened.length,1);
   const text=new TextDecoder().decode(h.files.get(result.procedure.path));
   assert.match(text,/procedures:/);
-  assert.ok(h.files.has("/skill-studio-examples/establish-pdu-session/scripts/evaluate_udm_read.py"));
-  assert.equal(result.root.path,"/skill-studio-examples/establish-pdu-session");
+  assert.ok(h.files.has("/global-storage/workspaces/establish-pdu-session/scripts/evaluate_udm_read.py"));
+  assert.equal(result.root.path,"/global-storage/workspaces/establish-pdu-session");
 });
 test("Repeated import never overwrites edited Source or any other file",async()=>{
   const h=host(),base=uri("/extension");
-  const a=await seedExampleWorkspace(h.vscode,base);
+  const a=await seedExampleWorkspace(h.vscode,base,uri("/global-storage"));
   const modified=new TextEncoder().encode("# my new source\n");
   h.files.set(a.procedure.path,modified);
-  const b=await seedExampleWorkspace(h.vscode,base);
+  const b=await seedExampleWorkspace(h.vscode,base,uri("/global-storage"));
   assert.equal(b.created,0);
   assert.equal(b.skipped,b.files);
   assert.equal(b.workspaceUpdated,false);
@@ -80,7 +80,7 @@ test("Traversal, duplicate and absolute sample manifests are rejected before wri
     ["SKILL.md","assurance/procedure.yaml","foo\\bar"]
   ]){
     const h=host(manifest);
-    await assert.rejects(seedExampleWorkspace(h.vscode,uri("/extension")));
+    await assert.rejects(seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage")));
     assert.equal(h.files.size,0);
   }
 });
