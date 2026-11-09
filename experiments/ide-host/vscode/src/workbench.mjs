@@ -1,3 +1,4 @@
+import {openNativeSource} from "./native-source.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
 import {renderMarkdown} from '../../../../site/markdown-preview.mjs';
@@ -73,7 +74,7 @@ export function registerWorkbench(vscode,context){
       if(item.nodeId){selection={procedureId:item.procedureId,nodeId:item.nodeId};update(document);sessions.get(document.uri.toString())?.({type:'focusNode',...selection,version:document.version});}
       const doc=await vscode.workspace.openTextDocument(item.uri);
       const line=Math.min(Math.max(0,item.line-1),doc.lineCount-1);
-      await vscode.commands.executeCommand("vscode.openWith",doc.uri,"default",{preview:true,selection:new vscode.Range(line,0,line,0)});
+      await openNativeSource(vscode,doc.uri,{preview:true,selection:new vscode.Range(line,0,line,0)});
     }),
     vscode.commands.registerCommand('skillStudio.auditPackage',auditCurrent),
     vscode.commands.registerCommand('skillStudio.refreshInspection',()=>{if(document){update(document);scheduleAudit();}}),

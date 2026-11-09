@@ -1,3 +1,4 @@
+import {openNativeSource} from "./native-source.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
 // workers. Do not import node:crypto: the online host has no Node APIs.
@@ -130,7 +131,7 @@ export function activate(context){
         }
         if(message.type==="ready"){ready=true;push();return;}
         if(message.type==="openSource"){
-          await vscode.commands.executeCommand("vscode.openWith",document.uri,"default",{viewColumn:vscode.ViewColumn.Beside,
+          await openNativeSource(vscode,document.uri,{viewColumn:vscode.ViewColumn.Beside,
             preserveFocus:false,preview:false});
           return;
         }
@@ -145,7 +146,7 @@ export function activate(context){
           // Pass the selection as part of the document-open request as well as
           // setting it on the returned editor. This is important for browser
           // hosts whose editor widget is created asynchronously by showTextDocument.
-          await vscode.commands.executeCommand("vscode.openWith",document.uri,"default",{
+          await openNativeSource(vscode,document.uri,{
             viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false,
             selection
           });
