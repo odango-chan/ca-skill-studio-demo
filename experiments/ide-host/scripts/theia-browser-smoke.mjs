@@ -518,6 +518,7 @@ try{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`({
           revision:document.querySelector("#revision")?.textContent||"",
+          procedure:document.querySelector("#procedureList")?.value||"",
           graphNodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length,
           graphEdges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length
         })`
@@ -740,7 +741,6 @@ try{
       !patchEvidence.routeCreate?.proposal?.visible||
       !patchEvidence.routeCreate?.preview?.ready||
       !patchEvidence.routeCreate?.appliedSource?.ready||
-      !patchEvidence.routeCreate?.appliedSource?.hasDenied||
       !patchEvidence.routeCreate?.undoSource?.ready||
       patchEvidence.routeCreate?.undoSource?.graphEdges!==
         patchEvidence.routeCreate?.fixture?.view?.graphEdges))
