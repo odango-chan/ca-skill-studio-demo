@@ -309,6 +309,48 @@ try{
       });
       patchEvidence={preview:previewEvidence,applied:applied.result?.value??null};
       webviewView={...webviewView,...(applied.result?.value??{})};
+      // Verify the host's native Source editor can open and own undo after
+      // the webview-originated WorkspaceEdit. The sample workspace is isolated.
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#openSource")?.click(); true`
+      });
+      await sleep(1200);
+      const sourceEditor=await evalJS(`({
+        monacoEditors:document.querySelectorAll(".monaco-editor").length,
+        bodyText:document.body.innerText.slice(-900),
+        editorTabs:[...document.querySelectorAll(".theia-tab,.lm-TabBar-tab")].map(x=>x.innerText).filter(Boolean).slice(-8)
+      })`);
+      await command("Input.dispatchKeyEvent",{
+        type:"keyDown",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
+      });
+      await command("Input.dispatchKeyEvent",{
+        type:"keyUp",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
+      });
+      await sleep(1800);
+      const afterUndoTree=await command("Page.getFrameTree");
+      const undoFrames=[];
+      walkFrames(afterUndoTree.frameTree);
+      for(const frame of frames.filter(item=>item.url.includes("/webview/index.html")||
+          item.url.includes(".webview."))){
+        try{
+          const undoWorld=await command("Page.createIsolatedWorld",{
+            frameId:frame.id,worldName:"skill-studio-undo-acceptance",grantUniveralAccess:true
+          });
+          const undone=await command("Runtime.evaluate",{
+            contextId:undoWorld.executionContextId,returnByValue:true,awaitPromise:true,
+            expression:`({
+              revision:document.querySelector("#revision")?.textContent||"",
+              graphNodes:document.querySelectorAll(".react-flow__node").length,
+              graphEdges:document.querySelectorAll(".react-flow__edge").length,
+              procedureRoot:!!document.querySelector("#reactFlowRoot")
+            })`
+          });
+          if(undone.result?.value?.procedureRoot)undoFrames.push(undone.result.value);
+        }catch{}
+      }
+      patchEvidence.sourceEditor=sourceEditor;
+      patchEvidence.undo=undoFrames[0]??null;
     }else{
       patchEvidence={preview:previewEvidence,applied:null};
     }
@@ -337,6 +379,11 @@ try{
       !String(patchEvidence.preview.diff).includes("+")||
       !/TextDocument v[2-9]/.test(patchEvidence.applied?.revision??"")))
     throw Error("Source-backed Patch preview/apply did not update the TextDocument: "+
+      JSON.stringify(patchEvidence).slice(0,3000));
+  if(externalUrl&&(!(patchEvidence.sourceEditor?.monacoEditors>0)||
+      !/TextDocument v[3-9]/.test(patchEvidence.undo?.revision??"")||
+      patchEvidence.undo?.graphEdges!==46))
+    throw Error("Native Source editor/undo did not restore the original Procedure projection: "+
       JSON.stringify(patchEvidence).slice(0,3000));
   if(externalUrl)
     console.log("THEIA_SAMPLE_IMPORT_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS");
