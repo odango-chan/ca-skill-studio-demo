@@ -69,9 +69,13 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   // root. With no opened workspace, seed into this extension's persistent
   // global storage and then expose that directory as the active workspace.
   const current=vscode.workspace.workspaceFolders??[];
+  const existingSample=current.find(folder=>
+    folder.name==="establish-pdu-session"||
+    /(?:^|\\/)establish-pdu-session$/.test(folder.uri.path));
   const parent=current[0]?.uri??storageUri;
-  if(!parent)fail("No writable workspace or extension storage URI is available");
-  const root=vscode.Uri.joinPath(parent,
+  if(!existingSample&&!parent)
+    fail("No writable workspace or extension storage URI is available");
+  const root=existingSample?.uri??vscode.Uri.joinPath(parent,
     ...(current.length?["skill-studio-examples"]:["workspaces"]),
     "establish-pdu-session");
   let created=0,skipped=0;
