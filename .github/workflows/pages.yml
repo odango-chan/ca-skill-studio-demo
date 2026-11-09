@@ -226,10 +226,11 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    # The Theia root is now the default online Studio, including during the
-    # migration branch deployment. Use the same Pages environment for both.
+    # Both refs publish the same Pages root artifact. Keep the migration
+    # branch on its existing preview environment so github-pages protection
+    # remains intact; after merge, main publishes through github-pages.
     environment:
-      name: github-pages
+      name: ${{ github.ref == 'refs/heads/spike/ide-extension-theia-host' && 'skill-studio-preview' || 'github-pages' }}
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy artifact to Pages
