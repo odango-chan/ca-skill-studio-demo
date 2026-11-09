@@ -137,6 +137,8 @@ jobs:
           node --check site/react-flow-projection.mjs
           node --check site/file-icons.mjs
           node --check tests/file-icons.test.mjs
+          node --check experiments/ide-host/scripts/classic-icons-css.mjs
+          node --check experiments/ide-host/scripts/prepare-theia-shell-icons.mjs
           node --check tests/react-flow-migration.test.mjs
           node --check tests/visual-route-edit.test.mjs
           node --check tests/navigation-menu.test.mjs

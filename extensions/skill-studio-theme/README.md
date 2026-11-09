@@ -9,7 +9,7 @@ in VS Code and Eclipse Theia.
   YAML/Python/JSON/Markdown token colors and semantic highlighting.
 - **SKILL Studio File Icons** — file and folder SVGs use the same 24px
   rounded-outline geometry and file-type mapping as Classic.
-- **Classic Theia Shell Icons** — the browser-only online host maps activity-bar,
+- **Classic Theia Shell Icons** — Theia browser hosts map activity-bar,
   Navigator, menu and toolbar Codicon identifiers onto SVG artwork generated
   from `site/icons.mjs`. Theia still owns commands, click targets, tooltips,
   keyboard shortcuts and accessible labels. Unmapped/editor-internal Codicons
@@ -44,8 +44,8 @@ plugin at build time and selects both themes through default preferences.
 
 ## Scope
 
-This version is light-only. The Classic icon overlay is injected into the
-browser-only GitHub Pages Theia build; it changes only shell icon artwork, not
+This version is light-only. The Classic icon overlay is injected into browser-only and backend-backed
+Theia browser builds; it changes only shell icon artwork, not
 Theia commands or behavior. It does not override semantic status colors used
 by Procedure routes (PASS / FAIL / UNKNOWN), and does not change SKILL DSL,
 Source projection, Patch qualification or Runtime logic.

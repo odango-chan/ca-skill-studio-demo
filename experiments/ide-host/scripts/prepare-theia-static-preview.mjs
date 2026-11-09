@@ -5,11 +5,10 @@
 // or production. The full backend host keeps the normal isolated host pattern.
 import {copyFile,cp,mkdir,readdir,readFile,stat,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
-import {buildClassicIconsCss} from "./classic-icons-css.mjs";
+import {prepareTheiaShellIcons} from "./prepare-theia-shell-icons.mjs";
 
 const root=resolve("experiments/ide-host/theia-online/lib/frontend");
-const classicIconsCss=buildClassicIconsCss();
-await writeFile(join(root,"classic-icons.css"),classicIconsCss);
+const classicIconTheme=await prepareTheiaShellIcons(root);
 const bundlePath=join(root,"bundle.js");
 let bundle=await readFile(bundlePath,"utf8");
 const from='defaultPattern="{{uuid}}.webview.{{hostname}}"';
@@ -91,7 +90,7 @@ for(const required of [
 }
 console.log("STUDIO_THEIA_STATIC_THEME_ASSETS",JSON.stringify({
   themePluginTarget,assets:["package.json","themes/**","icons/**"],offlinePackage:true,
-  classicShellIconCss:classicIconsCss.length
+  classicShellIconCss:classicIconTheme.cssBytes
 }));
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,
