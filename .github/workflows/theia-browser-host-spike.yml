@@ -37,6 +37,11 @@ jobs:
         run: npm install --prefix experiments/ide-host/theia-browser --no-audit --no-fund
       - name: Build normal Theia browser app with backend
         run: npm run build --prefix experiments/ide-host/theia-browser
+      - name: Deploy prepared Web extension to Theia backend plugin directory
+        run: |
+          mkdir -p "$HOME/.theia/plugins"
+          cp -R experiments/ide-host/theia-online/plugins/odango-chan.ca-skill-studio-ide-spike "$HOME/.theia/plugins/"
+          test -s "$HOME/.theia/plugins/odango-chan.ca-skill-studio-ide-spike/package.json"
       - name: Start Theia backend for Webview endpoint
         run: |
           npm run start --prefix experiments/ide-host/theia-browser > /tmp/theia-browser.log 2>&1 &
