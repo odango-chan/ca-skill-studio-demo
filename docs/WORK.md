@@ -1,7 +1,7 @@
 # Skill Studio 当前工作状态
 
 **Updated: 2026-11-09**  
-**Current main:** `b2f4e991e5e273ebb98419ba0b66453bdd0f72cf` (PR #86 Squash Merge; Theia is now the default Pages host).  
+**Theia host migration merge:** `b2f4e991e5e273ebb98419ba0b66453bdd0f72cf` (PR #86 Squash Merge; Theia is now the default Pages host).  
 **Integrated baseline before top-level menu UX: main@80cc153fc043cf3d6e7e6449fb9197adc7419eb6**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
 
 ## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
