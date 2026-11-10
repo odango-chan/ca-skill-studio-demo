@@ -119,6 +119,30 @@ test("reset and close clear old document diagnostics, never leak across Packages
   assert.deepEqual(await session.submit(other),{accepted:false,reason:"DISPOSED"});
 });
 
+test("closed TextDocument falls back to disk version zero and can reopen at version one",async()=>{
+  const published=[];
+  const session=new LanguageDiagnosticSession({
+    publish:x=>published.push(x),status:()=>{}
+  },input=>analysis(input,[diagnostic("current")]));
+  assert.deepEqual(await session.submit(snapshot(1,5,"a\n")),{accepted:true});
+  assert.deepEqual(await session.submit(snapshot(2,0,"a\n")),{accepted:true});
+  assert.deepEqual(await session.submit(snapshot(3,1,"a\nb\n")),{accepted:true});
+  assert.equal(published.at(-1).version,1);
+  assert.equal(published.at(-1).generation,3);
+});
+
+test("invalid session snapshots fail closed before attempting analysis",async()=>{
+  let called=false;
+  const session=new LanguageDiagnosticSession({
+    publish:()=>{},status:()=>{}
+  },input=>{called=true;return analysis(input);});
+  const invalid=snapshot();
+  invalid.documents=null;
+  assert.deepEqual(await session.submit(invalid),
+    {accepted:false,reason:"INVALID_SNAPSHOT"});
+  assert.equal(called,false);
+});
+
 test("failed analysis clears previous diagnostics and exposes explicit unavailable state",async()=>{
   const published=[],statuses=[];
   const session=new LanguageDiagnosticSession({
