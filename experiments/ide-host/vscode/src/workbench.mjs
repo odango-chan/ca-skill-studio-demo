@@ -125,6 +125,12 @@ export function registerWorkbench(vscode,context){
     const options=insertNodeOptions(ctx.source,ctx.procedureId,item.routeId,
       predicates.predicateSource,predicates.skillName);
     if(!options)throw Error("Selected Route is not eligible for Node insertion");
+    let nodeId=spec?.nodeId;
+    if(typeof nodeId!=="string")
+      nodeId=await vscode.window.showInputBox({
+        value:"new-node",prompt:"输入新 Node ID",placeHolder:"new-node-id"
+      });
+    if(typeof nodeId!=="string"||!nodeId.trim())return false;
     let operator=spec?.operator;
     if(typeof operator!=="string"){
       const choices=[
@@ -160,7 +166,7 @@ export function registerWorkbench(vscode,context){
     if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
       throw Error("Source changed while choosing the new Node");
     const preview=previewNodeInsert(ctx.source,ctx.procedureId,item.routeId,
-      {nodeId:spec?.nodeId,operator,value,outcome},
+      {nodeId,operator,value,outcome},
       predicates.predicateSource,predicates.skillName);
     const applied=await confirmAndApply({
       ...ctx,preview,
