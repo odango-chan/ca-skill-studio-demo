@@ -763,6 +763,129 @@ export function registerWorkbench(vscode,context){
     ));
   }
 
+  // End-to-end recovery probe: a dirty Python buffer must be rehydrated
+  // into the replacement Worker, observed through native LSP Hover, and then
+  // restored without persisting the temporary edit.
+  const languageRecoveryAcceptance=new Map();
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&
+     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.languageRecoveryAcceptance",
+      async(procedureUriValue,phase="prepare")=>{
+        const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
+        const procedure=await vscode.workspace.openTextDocument(procedureUri);
+        const root=packageRootForProcedure(vscode,procedure);
+        const state=root?languagePackages.get(root.uri.toString()):null;
+        if(!state||state.disposed)throw Error("L2-D4b active Package state missing");
+        const scriptUri=vscode.Uri.joinPath(root.uri,"scripts",
+          "select_establishment_configuration.py");
+        const disk=async()=>new TextDecoder("utf-8",{fatal:true}).decode(
+          await vscode.workspace.fs.readFile(scriptUri));
+        const replace=async(doc,value)=>{
+          const edit=new vscode.WorkspaceEdit();
+          edit.replace(doc.uri,new vscode.Range(doc.positionAt(0),
+            doc.positionAt(doc.getText().length)),value);
+          if(!await vscode.workspace.applyEdit(edit))
+            throw Error("L2-D4b native Python WorkspaceEdit was rejected");
+        };
+        if(phase==="prepare"){
+          if(!languageTransportFailure||
+             languageStatusItem?.text!=="SKILL LSP: UNAVAILABLE")
+            throw Error("L2-D4b recovery preparation requires terminal Worker failure");
+          const doc=await vscode.workspace.openTextDocument(scriptUri);
+          const original=doc.getText();
+          const persisted=await disk();
+          if(doc.isDirty||persisted!==original)
+            throw Error("L2-D4b Python recovery baseline is not clean");
+          const oldName="# name: select-establishment-configuration";
+          const newName="# name: select-establishment-configuration-l2d4-recovered";
+          if(!original.includes(oldName))throw Error("L2-D4b Skill Script metadata is missing");
+          if(languageRecoveryAcceptance.has(procedureUri.toString()))
+            throw Error("L2-D4b dirty-buffer recovery probe is already active");
+          await replace(doc,original.replace(oldName,newName));
+          if(!doc.isDirty||!doc.getText().includes(newName)||await disk()!==original)
+            throw Error("L2-D4b failed to prepare an unsaved Python buffer");
+          languageRecoveryAcceptance.set(procedureUri.toString(),{
+            procedure,doc,state,original,newName
+          });
+          return {dirtyBufferPrepared:true,pythonVersion:doc.version,
+            originalDiskUnchanged:true,marker:newName};
+        }
+        if(phase==="verify-and-restore"){
+          const key=procedureUri.toString();
+          const prepared=languageRecoveryAcceptance.get(key);
+          if(!prepared)throw Error("L2-D4b dirty Python recovery probe is missing");
+          let evidence=null;
+          try{
+            const status=await waitForLanguagePackageStatus(
+              prepared.state,prepared.state.generation
+            );
+            if(status.state!=="READY")
+              throw Error("Recovered Package is not READY: "+status.state);
+            if(!prepared.doc.isDirty||
+               !prepared.doc.getText().includes(prepared.newName)||
+               await disk()!==prepared.original)
+              throw Error("Recovery changed or discarded the unsaved Python buffer");
+            const snapshot=await collectPackageSnapshot(
+              vscode,prepared.procedure,prepared.state.generation
+            );
+            const script=snapshot.documents.find(item=>
+              item.relativePath==="scripts/select_establishment_configuration.py");
+            if(!script||script.text!==prepared.doc.getText()||
+               script.version!==prepared.doc.version)
+              throw Error("Recovered Package snapshot did not use the current dirty Python TextDocument");
+            const lines=prepared.procedure.getText().split(/\r\n|\n|\r/);
+            const target="scripts/select_establishment_configuration.py";
+            const line=lines.findIndex(value=>value.includes("script: "+target));
+            if(line<0)throw Error("L2-D4b Procedure script reference is missing");
+            const character=lines[line].indexOf(target)+12;
+            const hover=await vscode.commands.executeCommand(
+              "vscode.executeHoverProvider",procedureUri,new vscode.Position(line,character));
+            const hoverText=(Array.isArray(hover)?hover:hover?[hover]:[])
+              .flatMap(item=>Array.isArray(item?.contents)?item.contents:[item?.contents])
+              .map(item=>typeof item==="string"?item:item?.value??String(item??""))
+              .join(" ");
+            if(!hoverText.includes(prepared.newName.slice("# name: ".length)))
+              throw Error("Replacement Worker Hover did not reflect the dirty Python buffer: "+
+                hoverText.slice(0,500));
+            evidence={
+              recovered:true,packageState:status.state,
+              generation:status.generation,
+              dirtyPythonRehydrated:true,pythonVersion:script.version,
+              hoverReflectsUnsavedMetadata:true,originalDiskUnchanged:true
+            };
+          }finally{
+            const cleanup=[];
+            try{
+              if(prepared.doc.getText()!==prepared.original)
+                await replace(prepared.doc,prepared.original);
+              if(await disk()!==prepared.original)
+                throw Error("Python disk bytes changed before restoration");
+              if(prepared.doc.isDirty&&!await prepared.doc.save())
+                throw Error("Restored Python Source save was rejected");
+              if(prepared.doc.isDirty||await disk()!==prepared.original)
+                throw Error("Python Source did not return to its original clean state");
+              const before=prepared.state.generation;
+              scheduleLanguagePackageRefresh(prepared.state,true);
+              const generation=prepared.state.generation;
+              await waitForLanguagePackageStatus(prepared.state,generation);
+              if(prepared.doc.getText()!==prepared.original||
+                 await disk()!==prepared.original)
+                throw Error("Python Source changed after post-recovery reanalysis");
+              if(generation<=before)throw Error("Post-recovery restoration did not advance Package generation");
+            }catch(error){cleanup.push(String(error?.message??error));}
+            languageRecoveryAcceptance.delete(key);
+            try{await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);}
+            catch(error){cleanup.push("Procedure focus: "+String(error?.message??error));}
+            if(cleanup.length)throw Error("L2-D4b recovery cleanup failed: "+cleanup.join("; "));
+          }
+          return {...evidence,restored:true};
+        }
+        throw Error("Unknown L2-D4b recovery phase: "+String(phase));
+      }
+    ));
+  }
+
   // L2-D3 real-Theia acceptance: authoritative dirty buffers and latest
   // cross-file generation. Test-only commands never authorize Runtime writes.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
