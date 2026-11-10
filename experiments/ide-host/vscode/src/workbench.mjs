@@ -624,7 +624,25 @@ export function registerWorkbench(vscode,context){
     const options=phaseVerifyAddOptions(ctx.source,ctx.procedureId,ctx.nodeId,
       predicates.predicateSource,predicates.skillName);
     const phase=options.find(x=>x.phaseName===item.phaseName);
-    if(!phase)throw Error("Selected Phase has no safe Verify append anchor or available PredicateSet entry");
+    if(!phase){
+      // Diagnostic-only: preserve the structural editer's fail-closed decision
+      // while reporting which source/predicate precondition disqualified it.
+      let detail="unknown";
+      try{
+        previewAddPhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
+          item.phaseName,typeof predicate==="string"?predicate:"createdsession.n4.initial_resources_ready",
+          predicates.predicateSource,predicates.skillName);
+        detail="unexpected preview eligible";
+      }catch(error){detail=String(error?.message??error);}
+      console.warn("STUDIO_PHASE_VERIFY_INELIGIBLE",JSON.stringify({
+        documentVersion:ctx.doc.version,isDirty:ctx.doc.isDirty,
+        sourceBytes:ctx.source.length,
+        predicateBytes:predicates.predicateSource?.length??null,
+        skillName:predicates.skillName,phase:item.phaseName,
+        procedureId:ctx.procedureId,nodeId:ctx.nodeId,detail
+      }));
+      throw Error("Selected Phase has no safe Verify append anchor or available PredicateSet entry");
+    }
     let value=predicate;
     if(typeof value!=="string"){
       const picked=await vscode.window.showQuickPick(phase.choices,{
