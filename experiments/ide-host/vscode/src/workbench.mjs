@@ -5,6 +5,8 @@ import {renderMarkdown} from '../../../../site/markdown-preview.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
+import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from '../../../../site/node-create.mjs';
+import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from '../../../../site/node-delete.mjs';
 import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
 
 export function registerWorkbench(vscode,context){
@@ -61,8 +63,12 @@ export function registerWorkbench(vscode,context){
     const spans=changes(preview);
     if(!spans.length)throw Error("Patch has no qualified Source spans");
     for(const span of spans){
+      const insertion=span.start===span.end&&span.oldValue===""&&
+        typeof span.newValue==="string"&&span.newValue.length>0;
       if(!Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
-         span.start<0||span.end<=span.start||span.end>source.length||
+         span.start<0||span.end<span.start||span.end>source.length||
+         (span.end===span.start&&!insertion)||
+         typeof span.oldValue!=="string"||typeof span.newValue!=="string"||
          source.slice(span.start,span.end)!==span.oldValue)
         throw Error("Patch Source span no longer matches the current document");
       edit.replace(doc.uri,new vscode.Range(
@@ -110,6 +116,104 @@ export function registerWorkbench(vscode,context){
       verify:text=>applyPhaseInputBinding(text,preview)
     });
   }
+
+  async function insertNode(item,spec){
+    if(item?.kind!=="route"||typeof item.routeId!=="string")
+      throw Error("Select an eligible Route in the native Inspector");
+    const ctx=currentNode(item);
+    const predicates=await predicateContext(ctx.doc);
+    const options=insertNodeOptions(ctx.source,ctx.procedureId,item.routeId,
+      predicates.predicateSource,predicates.skillName);
+    if(!options)throw Error("Selected Route is not eligible for Node insertion");
+    let operator=spec?.operator;
+    if(typeof operator!=="string"){
+      const choices=[
+        ...(options.terminalValues.length?["terminal"]:[]),
+        "call",...(options.predicates.length?["verify"]:[])
+      ];
+      operator=await vscode.window.showQuickPick(choices,{
+        placeHolder:"选择要插入的 Node Operator"
+      });
+    }
+    if(typeof operator!=="string")return false;
+    let value=spec?.value;
+    if(typeof value!=="string"){
+      if(operator==="terminal"||operator==="verify"){
+        const choices=operator==="terminal"?options.terminalValues:options.predicates;
+        value=await vscode.window.showQuickPick(choices,{
+          placeHolder:operator==="terminal"?"选择 Terminal 状态":"选择 Package Predicate"
+        });
+      }else{
+        value=await vscode.window.showInputBox({
+          value:"sbi.new.operation",prompt:"输入新 Node 的 Call operation"
+        });
+      }
+    }
+    if(typeof value!=="string"||!value.trim())return false;
+    let outcome=operator==="terminal"?"":spec?.outcome;
+    if(operator!=="terminal"&&typeof outcome!=="string")
+      outcome=await vscode.window.showInputBox({
+        value:operator==="verify"?"PASS":"COMMITTED",
+        prompt:"输入新 Node 的 Outcome"
+      });
+    if(operator!=="terminal"&&typeof outcome!=="string")return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the new Node");
+    const preview=previewNodeInsert(ctx.source,ctx.procedureId,item.routeId,
+      {nodeId:spec?.nodeId,operator,value,outcome},
+      predicates.predicateSource,predicates.skillName);
+    const applied=await confirmAndApply({
+      ...ctx,preview,
+      changes:p=>p.sourceSpans.map(span=>({
+        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
+      })),
+      verify:async text=>{
+        const current=await predicateContext(ctx.doc);
+        return applyNodeInsert(text,preview,current.predicateSource,current.skillName);
+      }
+    });
+    if(applied){
+      selection={procedureId:ctx.procedureId,nodeId:preview.nodeId};
+      selections.set(ctx.doc.uri.toString(),selection);
+      update(ctx.doc,selection);
+    }
+    return applied;
+  }
+
+  async function deleteNode(item,redirectTarget){
+    if(item?.kind!=="node")
+      throw Error("Select a Node in the native Inspector");
+    const ctx=currentNode(item);
+    const options=deleteNodeOptions(ctx.source,ctx.procedureId,ctx.nodeId);
+    if(!options)throw Error("Selected Node is not eligible for safe deletion");
+    let target=redirectTarget;
+    if(typeof target!=="string"){
+      target=options.targets.length===1?options.targets[0]:
+        await vscode.window.showQuickPick(options.targets,{
+          placeHolder:"选择删除 Node 后的 Route 重定向目标"
+        });
+    }
+    if(typeof target!=="string")return false;
+    if(!options.targets.includes(target))
+      throw Error("Redirect target is not in the qualified deletion choices");
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the redirect target");
+    const preview=previewNodeDelete(ctx.source,ctx.procedureId,ctx.nodeId,target);
+    const applied=await confirmAndApply({
+      ...ctx,preview,
+      changes:p=>p.sourceSpans.map(span=>({
+        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
+      })),
+      verify:text=>applyNodeDelete(text,preview)
+    });
+    if(applied){
+      selection={procedureId:ctx.procedureId,nodeId:target};
+      selections.set(ctx.doc.uri.toString(),selection);
+      update(ctx.doc,selection);
+    }
+    return applied;
+  }
+
   async function renameNode(item,newId){
     const ctx=currentNode(item);
     let value=newId;
@@ -181,10 +285,20 @@ export function registerWorkbench(vscode,context){
         const tree=new vscode.TreeItem(item.label,item.children?.length?vscode.TreeItemCollapsibleState.Collapsed:vscode.TreeItemCollapsibleState.None);
         tree.description=item.description;tree.tooltip=item.label+(item.line?' · L'+item.line:'');
         if(item.kind==='node'){
-          tree.contextValue='skillStudio.node';
+          const deletable=id==='inspection'&&document&&
+            deleteNodeOptions(document.getText(),item.procedureId,item.nodeId);
+          tree.contextValue=deletable?'skillStudio.deletableNode':'skillStudio.node';
           item.sourceVersion=document?.version;item.documentUri=document?.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
+        }
+        if(item.kind==='route'&&id==='inspection'&&document&&
+           insertNodeOptions(document.getText(),item.procedureId,item.routeId)){
+          tree.contextValue='skillStudio.route';
+          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
+          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
+          tree.routeId=item.routeId;tree.sourceVersion=item.sourceVersion;
+          tree.documentUri=item.documentUri;
         }
         if(item.kind==='phase-step'&&bindingOptions.some(x=>
           x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex)){
@@ -275,6 +389,14 @@ export function registerWorkbench(vscode,context){
     vscode.commands.registerCommand('skillStudio.editPhaseInputBinding',async(item,bindingKey,newValue)=>{
       try{return await editPhaseInputBinding(item,bindingKey,newValue);}
       catch(error){await vscode.window.showWarningMessage('Phase Binding 修改未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.insertNode',async(item,spec)=>{
+      try{return await insertNode(item,spec);}
+      catch(error){await vscode.window.showWarningMessage('Node 插入未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.deleteNode',async(item,redirectTarget)=>{
+      try{return await deleteNode(item,redirectTarget);}
+      catch(error){await vscode.window.showWarningMessage('Node 删除未执行：'+error.message);return false;}
     }),
     vscode.workspace.onDidChangeTextDocument(e=>{
       if(isProcedurePath(e.document.uri.path)&&document?.uri.toString()===e.document.uri.toString())update(e.document);
