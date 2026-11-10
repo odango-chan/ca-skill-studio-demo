@@ -111,6 +111,15 @@ export function registerWorkbench(vscode,context){
       if(state.disposed||ticket!==state.ticket)return;
       const client=await ensureLanguageClient();
       if(!client||state.disposed||ticket!==state.ticket||languageTransportFailure)return;
+      state.lastSentSnapshot={
+        generation:snapshot.generation,
+        completeness:snapshot.completeness,
+        reason:snapshot.reason??null,
+        files:snapshot.documents.map(item=>({
+          path:item.relativePath,version:item.version,chars:item.text.length
+        })).filter(item=>item.path.startsWith("assurance/")||
+          item.path.endsWith("select_establishment_configuration.py"))
+      };
       updateLanguageStatus("ANALYZING","Analyzing "+snapshot.packageName+
         " · generation "+snapshot.generation);
       client.sendPackageSnapshot(snapshot);
@@ -164,7 +173,7 @@ export function registerWorkbench(vscode,context){
     }else{
       state={
         root,key,procedureDocument:doc,refs:1,generation:0,ticket:0,
-        timer:null,disposed:false,subscriptions:[]
+        timer:null,disposed:false,subscriptions:[],lastSentSnapshot:null
       };
       languagePackages.set(key,state);
       const listen=(event,handler)=>{
@@ -304,21 +313,14 @@ export function registerWorkbench(vscode,context){
           await new Promise(resolve=>setTimeout(resolve,50));
         }
         if(!readyForCurrentGeneration()){
-          // An asynchronous open may expose a genuinely incomplete Package.
-          // Capture the exact current snapshot without retrying or treating
-          // PARTIAL as READY. This is failure evidence, never a bypass.
-          const failedSnapshot=await collectPackageSnapshot(vscode,
-            procedureDocument,packageState.generation);
+          // Report the snapshot *actually sent* to the Worker for this
+          // generation, not a newly collected snapshot that might now be
+          // complete after an earlier transient workspace read failure.
           throw Error("Current Package generation did not reach SKILL LSP: READY: "+
             JSON.stringify({expectedGeneration,actualGeneration:packageState.generation,
               status:languageStatusItem?.text??"missing",
               tooltip:languageStatusItem?.tooltip??"",
-              snapshotCompleteness:failedSnapshot.completeness,
-              snapshotReason:failedSnapshot.reason??null,
-              files:failedSnapshot.documents.map(item=>({
-                path:item.relativePath,version:item.version,chars:item.text.length
-              })).filter(item=>item.path.startsWith("assurance/")||
-                item.path.endsWith("select_establishment_configuration.py"))
+              sentSnapshot:packageState.lastSentSnapshot??null
             }));
         }
         const referencePosition=new vscode.Position(nameLine,"# name: ".length);
