@@ -540,21 +540,29 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
   if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
   const evidenceHeader=await evalJS(`(()=>{
-    const candidates=[...document.querySelectorAll('*')].filter(x=>
+    const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>
       x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
       x.getBoundingClientRect().x>=0);
-    const el=candidates.sort((a,b)=>{
-      const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
-      return ar.width*ar.height-br.width*br.height;
-    })[0];
     el?.scrollIntoView({block:'center',inline:'nearest'});
-    const r=el?.getBoundingClientRect();
+    const r=el?.getBoundingClientRect(),part=el?.closest('.part');
     const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
       x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
-    return r?{x:r.x+r.width/2,y:r.y+r.height/2,needsOpen:!root}:null;
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
+      collapsed:/collapsed/.test(part?.className??''),root}:null;
   })()`);
   if(!evidenceHeader)throw Error('Native Evidence view header is missing');
-  if(evidenceHeader.needsOpen){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
+  if(evidenceHeader.collapsed||!evidenceHeader.root){
+    await click(evidenceHeader.x,evidenceHeader.y);
+    await sleep(250);
+  }
+  let evidenceRoot=false;
+  for(let attempt=0;attempt<60&&!evidenceRoot;attempt++){
+    evidenceRoot=await evalJS(`[...document.querySelectorAll('.theia-TreeNode')].some(x=>
+      x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0)`);
+    if(!evidenceRoot)await sleep(100);
+  }
+  if(!evidenceRoot)throw Error('Native Evidence tree did not open after its exact view header was activated: '+
+    JSON.stringify({evidenceHeader,body:(await evalJS('document.body.innerText')).slice(-1000)}));
   // Re-select after opening the side container. Some Theia hosts activate a
   // replacement Webview context while changing the Activity Bar container;
   // the read-only dataflow tree must be bound to the current Procedure Node.
