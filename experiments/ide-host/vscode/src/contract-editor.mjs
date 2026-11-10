@@ -156,8 +156,16 @@ function webviewHtml(webview, token) {
     '<div class="footer">Source 是唯一真源。此视图不修改 YAML、不执行 Skill，也不授予 Capability / Tool 权限；实际校验以 Owner Schema 与 Runtime 为准。</div>' +
     '</main><script nonce="' + token + '">' + script + '</script></body></html>';
 }
+function commandUri(vscode,value) {
+  if (value && typeof value.path === 'string') return value;
+  const serialized = typeof value === 'string' ? value : value?.toString?.();
+  return typeof serialized === 'string' &&
+    /^[a-z][a-z0-9+.-]*:\/\//i.test(serialized)
+    ? vscode.Uri.parse(serialized) : null;
+}
 async function chooseContract(vscode, uri) {
-  if (uri && contractPath(uri.path)) return uri;
+  const supplied = commandUri(vscode,uri);
+  if (supplied && contractPath(supplied.path)) return supplied;
   const active = vscode.window.activeTextEditor?.document.uri;
   if (active && contractPath(active.path)) return active;
   const candidates = await vscode.workspace.findFiles(
