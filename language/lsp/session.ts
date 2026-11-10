@@ -38,7 +38,7 @@ export class LanguageDiagnosticSession {
   private generation = -1;
   private sequence = 0;
   private disposed = false;
-  private published = new Map<string, number>();
+  private published = new Set<string>();
   private documents = new Map<string, { version: number; text: string }>();
 
   constructor(
@@ -115,7 +115,7 @@ export class LanguageDiagnosticSession {
     if (batch.state !== "UNAVAILABLE") {
       for (const document of batch.documents) {
         this.sink.publish(document);
-        this.published.set(document.uri, document.version);
+        this.published.add(document.uri);
       }
     }
     this.sink.status({
