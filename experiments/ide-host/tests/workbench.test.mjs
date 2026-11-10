@@ -212,7 +212,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const namedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(namedVerify);
   assert.equal(namedVerifyItem.contextValue,'skillStudio.namedVerifyStep');
   assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(namedVerifyItem,'delete'),true);
-  assert.equal(doc.text,source.replace("            - verify: createdsession.lifecycle.ready\\n",""),
+  assert.equal(doc.text,source.replace("            - verify: createdsession.lifecycle.ready\n",""),
     'named Verify deletion removes only the unreferenced Step');
   doc.text=source;doc.version++;changed({document:doc});
   assert.ok(commands.has('skillStudio.insertNode'));
