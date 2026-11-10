@@ -2326,9 +2326,16 @@ export function registerWorkbench(vscode,context){
         return;
       }
       try{
-        const stat=await vscode.workspace.fs.stat(targetUri);
-        if(stat.type&vscode.FileType.SymbolicLink)
-          throw new Error('符号链接不能作为 Package 内文件跳转目标');
+        const relativeSegments=targetUri.path.slice(rootPath.length+1).split('/');
+        let prefix=rootPath,stat;
+        for(let index=0;index<relativeSegments.length;index++){
+          prefix+='/'+relativeSegments[index];
+          stat=await vscode.workspace.fs.stat(uri.with({path:prefix}));
+          if(stat.type&vscode.FileType.SymbolicLink)
+            throw new Error('Package 路径中不能包含符号链接');
+          if(index<relativeSegments.length-1&&!(stat.type&vscode.FileType.Directory))
+            throw new Error('Package 路径的中间节点不是目录');
+        }
         if(stat.type&vscode.FileType.Directory)
           throw new Error('目标是目录，不是文件');
         if(targetUri.path.toLowerCase().endsWith('.md'))
