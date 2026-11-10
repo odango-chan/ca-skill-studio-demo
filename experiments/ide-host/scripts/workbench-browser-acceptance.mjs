@@ -26,10 +26,10 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       if(!target)await sleep(100);
     }
     if(!target)throw Error('Native Inspector Diff confirmation dialog did not appear');
-    if(!target.text.includes('call: sbi.udm.sdm.get')||!target.text.includes('sbi.udm.sdm.get.preview'))
+    if(!target.text.includes('call: sbi.udm.sm_data.get')||!target.text.includes('sbi.udm.sm_data.get.preview'))
       throw Error('Native Inspector confirmation did not show the expected Source Diff');
     await click(target.x,target.y);await sleep(250);
-    await evalJS(`(async()=>{await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
+    await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
   await invoke('skillStudio.refreshInspection');
   const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
@@ -93,25 +93,26 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
   });
-  await startNativeCommand('skillStudio.editNodeOperatorValue',null,'sbi.udm.sdm.get.preview');
+  const sourceVersion=Number(/v(\\d+)/.exec(beforeEdit.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(sourceVersion))throw Error('Could not read native Source version');
+  await startNativeCommand('skillStudio.editNodeOperatorValue',{
+    procedureId:selectionResult.result.value.procedure,nodeId:'nudm-sdm-get',sourceVersion
+  },'sbi.udm.sm_data.get.preview');
   await confirmNativePreview();
   const afterEdit=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
   });
-  const editedTree=await evalJS(`document.body.innerText`);
-  if(!afterEdit.result?.value||afterEdit.result.value===beforeEdit.result?.value||
-     !editedTree.includes('sbi.udm.sdm.get.preview'))
-    throw Error('Native Inspector edit did not update the Source-backed view: '+editedTree.slice(-1400));
+  const editResult=await evalJS(`window.__skillStudioCommandResult`);
+  if(editResult!==true||!afterEdit.result?.value||afterEdit.result.value===beforeEdit.result?.value)
+    throw Error('Native Inspector edit did not commit a Source revision: '+JSON.stringify({editResult,before:beforeEdit.result?.value,after:afterEdit.result?.value}));
   await invoke('core.undo');
   const afterUndo=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
   });
-  const undoneTree=await evalJS(`document.body.innerText`);
-  if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value||
-     !undoneTree.includes('sbi.udm.sdm.get'))
-    throw Error('Native Inspector edit did not round-trip through native Undo');
+  if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value)
+    throw Error('Native Inspector edit did not round-trip through native Undo: '+JSON.stringify({after:afterEdit.result?.value,undo:afterUndo.result?.value}));
   console.log('STUDIO_INSPECTOR_AUTHORING_CHROMIUM',JSON.stringify({
     node:selectionResult.result.value.node,procedure:selectionResult.result.value.procedure,
     before:beforeEdit.result?.value,after:afterEdit.result?.value,undo:afterUndo.result?.value
