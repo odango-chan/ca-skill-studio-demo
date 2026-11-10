@@ -515,8 +515,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   })()`);
   if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
   if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
-  const evidenceHeader=await evalJS(`(()=>{
-    const candidates=[...document.querySelectorAll('*')].filter(x=>
+  const evidenceHeader=await evalJS("(()=>{
+    const candidates=[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>
       x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
       x.getBoundingClientRect().x>=0);
     const el=candidates.sort((a,b)=>{
@@ -525,12 +525,22 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     })[0];
     el?.scrollIntoView({block:'center',inline:'nearest'});
     const r=el?.getBoundingClientRect();
+    const widget=el?.closest('.lm-Widget');
+    const collapsed=!!widget&&(widget.classList.contains('collapsed')||widget.classList.contains('lm-mod-hidden'));
     const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
       x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
-    return r?{x:r.x+r.width/2,y:r.y+r.height/2,needsOpen:!root}:null;
-  })()`);
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,needsOpen:collapsed,viewClass:widget?.className??null,headerClass:el.className,root}:null;
+  })()");
   if(!evidenceHeader)throw Error('Native Evidence view header is missing');
-  if(evidenceHeader.needsOpen){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
+  if(evidenceHeader.needsOpen){
+    await click(evidenceHeader.x,evidenceHeader.y);
+    for(let attempt=0;attempt<30;attempt++){
+      const state=await evalJS("(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim()==='Evidence');const w=el?.closest('.lm-Widget');return {collapsed:!!w&&(w.classList.contains('collapsed')||w.classList.contains('lm-mod-hidden')),viewClass:w?.className??null};})()");
+      if(!state?.collapsed)break;
+      await sleep(100);
+    }
+  }
+  console.log('STUDIO_EVIDENCE_VIEW_CHROMIUM',JSON.stringify(evidenceHeader));
   await invoke('skillStudio.auditPackage');
   let phaseEvidenceText='';
   for(let i=0;i<100;i++){
@@ -563,7 +573,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   })()`);
     if(!dataflowTreeRow)await sleep(100);
   }
-  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after readiness wait: '+(await evalJS('document.body.innerText')).slice(-1600));
+  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after readiness wait: '+JSON.stringify(evidenceHeader)+' · '+(await evalJS('document.body.innerText')).slice(-1600));
   if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
   for(let i=0;i<50;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
