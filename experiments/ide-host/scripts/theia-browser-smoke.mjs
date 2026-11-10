@@ -1,4 +1,4 @@
-import {runWorkbenchAcceptance} from "./workbench-browser-acceptance.mjs";
+import {runPackageOverviewAcceptance,runWorkbenchAcceptance} from "./workbench-browser-acceptance.mjs";
 // Real Chromium smoke for both Theia browser-only static preview and the
 // normal backend-backed browser host. Static mode uses an explicitly isolated
 // same-origin demo-only webview adapter; backend mode uses Theia's normal host.
@@ -863,6 +863,12 @@ try{
         graphEdges:routeUndo.result?.value?.graphEdges??0
       };
 
+      // C4 is verified before the unrelated canvas Route reconnect regression,
+      // so its real sidebar evidence remains independently observable.
+      const packageOverviewEvidence=await runPackageOverviewAcceptance({
+        command,evalJS,sleep,requireEditor
+      });
+
       // Reconnect a specific member of a multi-Outcome edge bundle. Clicking
       // the bundle must not silently pick its first Route; the Route selector
       // is the explicit disambiguation step before the target endpoint drag.
@@ -1173,7 +1179,7 @@ try{
   catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
-  const evidence={shellReadyMs,workbenchEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
+  const evidence={shellReadyMs,workbenchEvidence,packageOverviewEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
     frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrames,webviewFrame,webviewView,webviewFrameError,patchEvidence,
     extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500),
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
