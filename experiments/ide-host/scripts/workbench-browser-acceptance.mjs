@@ -195,7 +195,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   // world instead of reading a possibly detached Webview context.
   const beforeNamedGraph=await graph();
   const beforeNamedRename=beforeNamedGraph?.revision??afterBindingUndo.result?.value??null;
-  const namedRenameVersion=Number(/v(\\d+)/.exec(beforeNamedRename??'')?.[1]);
+  const namedRenameVersion=Number(/v(\d+)/.exec(beforeNamedRename??'')?.[1]);
   if(!Number.isSafeInteger(namedRenameVersion))throw Error('Named Step rename missing native Source revision');
   const oldStepName='select-subscription-configuration';
   const newStepName='select-subscription-config-v2';
