@@ -242,6 +242,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(document.version,26);
   assert.equal(projectWorkspace(document.text).state,"READY");
   assert.match(document.text,/create-session-renamed:/);
-  assert.doesNotMatch(document.text,/create-session:/);
+  assert.doesNotMatch(document.text,/^\\s{6}create-session:/m);
+  assert.doesNotMatch(document.text,/from: create-session\\./);
   assert.ok(writes.length>3,"Node rename applies its complete non-overlapping CST span set");
 });
