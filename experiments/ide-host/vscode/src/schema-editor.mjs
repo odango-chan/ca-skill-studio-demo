@@ -127,6 +127,18 @@ async function chooseSchema(vscode, uri) {
   const active = vscode.window.activeTextEditor?.document.uri;
   if (active && isSkillSchema(active.path)) return active;
   const found = await vscode.workspace.findFiles('**/schemas/*.schema.yaml','**/node_modules/**',50);
+  // Optional precise package-relative path for deterministic callers/tests.
+  // Never construct a URI from arbitrary command input; choose an actual
+  // workspace file only when there is exactly one matching candidate.
+  if (typeof uri === 'string') {
+    const suffix = uri;
+    if (!/^schemas\/[A-Za-z0-9_-]+(?:[._-][A-Za-z0-9_-]+)*\.schema\.ya?ml$/.test(suffix))
+      throw new Error('Unsafe or unsupported Schema relative path');
+    const matches = found.filter(file => file.path.endsWith('/'+suffix));
+    if (matches.length !== 1)
+      throw new Error('Schema relative path did not resolve uniquely in the workspace');
+    return matches[0];
+  }
   if (!found.length) {
     await vscode.window.showInformationMessage('Open a SKILL project with schemas/*.schema.yaml first.');
     return null;
