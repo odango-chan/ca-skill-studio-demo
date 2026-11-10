@@ -66,9 +66,13 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "x.innerText.includes('establish-pdu-session')&&x.getBoundingClientRect().width>0&&"+
     "x.getBoundingClientRect().x>=0);"+
     "const toggle=el?.querySelector('.theia-TreeNodeContent [data-node-id]');"+
+    "window.__studioToggleClickCount=0;toggle?.addEventListener('click',()=>window.__studioToggleClickCount++,{once:true});"+
     "const target=toggle??el;const r=target?.getBoundingClientRect();"+
+    "const hit=r?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2):null;"+
     "return r?{x:r.x+r.width/2,y:r.y+r.height/2,target:toggle?'expansion-toggle':'row',"+
-    "rowClass:el?.className,toggleClass:toggle?.className}:null;})()");
+    "rowClass:el?.className,toggleClass:toggle?.className,toggleRect:{x:r.x,y:r.y,w:r.width,h:r.height},"+
+    "pointerEvents:toggle?getComputedStyle(toggle).pointerEvents:null,"+
+    "hitClass:hit?.className??null,hitNodeId:hit?.getAttribute('data-node-id')??null}:null;})()");
   if(!scan?.packages?.some(x=>x.name==='establish-pdu-session')||!packageRow)
     throw Error('Package Overview TreeView did not render discovered Package: '+
       JSON.stringify({scan,view}));
@@ -88,9 +92,11 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
       "const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(x=>"+
       "x.innerText.includes('establish-pdu-session'));const toggle=row?.querySelector("+
-      "'.theia-TreeNodeContent [data-node-id]');"+
+      "'.theia-TreeNodeContent [data-node-id]');const r=toggle?.getBoundingClientRect();"+
       "return {text:part?.innerText??'',rows:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(x=>({"+
-      "text:x.innerText.trim(),className:x.className})),toggleClass:toggle?.className??null};})()");
+      "text:x.innerText.trim(),className:x.className})),toggleClass:toggle?.className??null,"+
+      "clickCount:window.__studioToggleClickCount??null,"+
+      "hitClass:r?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.className??null:null};})()");
     groups=await readGroups();
   }
   for(const group of expectedGroups)
