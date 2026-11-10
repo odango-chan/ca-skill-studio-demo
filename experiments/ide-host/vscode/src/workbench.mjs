@@ -251,12 +251,27 @@ export function registerWorkbench(vscode,context){
         if(nameLine<0||schemaLine<0)
           throw Error("Python Source is missing the declared name or inputSchema metadata");
         await openNativeSource(vscode,scriptUri,{preview:true});
-        await new Promise(resolve=>setTimeout(resolve,300));
+        // Opening another Source document invalidates the current Package
+        // generation. Do not probe a provider while the replacement snapshot
+        // is still being collected/analyzed: that correctly returns no links.
+        const analysisWaitStarted=Date.now();
+        while(languageStatusItem?.text!=="SKILL LSP: READY"&&
+              Date.now()-analysisWaitStarted<15000){
+          if(languageStatusItem?.text==="SKILL LSP: ERROR")
+            throw Error("Package re-analysis failed before References acceptance: "+
+              String(languageStatusItem.tooltip??""));
+          await new Promise(resolve=>setTimeout(resolve,50));
+        }
+        if(languageStatusItem?.text!=="SKILL LSP: READY")
+          throw Error("Package did not return to SKILL LSP: READY before References acceptance: "+
+            String(languageStatusItem?.text??"missing status"));
+        const referencePosition=new vscode.Position(nameLine,"# name: ".length);
         const referenceResult=await vscode.commands.executeCommand(
-          "vscode.executeReferenceProvider",scriptUri,new vscode.Position(nameLine,12));
+          "vscode.executeReferenceProvider",scriptUri,referencePosition);
         const references=Array.isArray(referenceResult)?referenceResult:[];
         if(!references.some(item=>item?.uri?.toString()===procedureUri.toString()))
-          throw Error("References provider did not return the Procedure caller");
+          throw Error("References provider did not return the Procedure caller: "+
+            JSON.stringify(references.map(item=>item?.uri?.toString?.()??null)));
         const symbolResult=await vscode.commands.executeCommand(
           "vscode.executeDocumentSymbolProvider",scriptUri);
         const symbols=Array.isArray(symbolResult)?symbolResult:[];
