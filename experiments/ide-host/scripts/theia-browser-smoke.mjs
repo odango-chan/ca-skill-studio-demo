@@ -407,6 +407,7 @@ try{
       if(!(yamlSyntax?.tokenColors?.length>=3))
         throw Error("Native YAML syntax tokenization not active: "+JSON.stringify(yamlSyntax));
       patchEvidence.yamlSyntax=yamlSyntax;
+      // This probe opens a pinned owner script in the native workbench.
       // Open a real bundled Python source through Theia's native Quick Open.
       // This verifies the Python TextMate grammar in the same editor host.
       const yamlEditorRect=await evalJS(`(()=>{
