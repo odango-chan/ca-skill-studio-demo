@@ -111,12 +111,12 @@ export interface ScriptReference {
   readonly targetUri: string;
   readonly targetPath: string;
   readonly line: number;
-  /** Target identity is exact; the current legacy index does not expose token offsets. */
   /** Exact identity of the observed target, not proof that the Package is complete. */
   readonly targetIdentityExact: true;
   /** False when any required Package evidence is missing, partial, or unparseable. */
   readonly packageContextComplete: boolean;
-  readonly sourceRange: null;
+  readonly sourceRange: SourceOffsetRange | null;
+  readonly targetRange: SourceOffsetRange | null;
 }
 
 export interface SchemaReference {
@@ -129,7 +129,8 @@ export interface SchemaReference {
   readonly title: string;
   /** Completeness of the containing Package analysis; no inferred Schema ABI. */
   readonly packageContextComplete: boolean;
-  readonly sourceRange: null;
+  readonly sourceRange: SourceOffsetRange | null;
+  readonly targetRange: SourceOffsetRange | null;
 }
 
 export interface PythonOutlineSymbol {
@@ -139,9 +140,9 @@ export interface PythonOutlineSymbol {
   readonly kind: "class" | "function";
   readonly line: number;
   readonly async: boolean;
-  /** The current bounded lexical index exposes a line, not an exact token span. */
-  readonly range: null;
-  readonly navigable: false;
+  /** Exact UTF-16 range of the top-level class/function name token. */
+  readonly range: SourceOffsetRange | null;
+  readonly navigable: boolean;
 }
 
 export interface DocumentAnalysis {
