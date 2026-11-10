@@ -732,12 +732,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         });
         const result=await command('Runtime.evaluate',{
           contextId:world.executionContextId,returnByValue:true,
-          expression:\`({
+          expression:`({
             title:document.title,
             text:document.body?.innerText??'',
             cards:[...document.querySelectorAll('.card h2')].map(x=>x.textContent.trim()),
             status:document.querySelector('#status')?.textContent??''
-          })\`
+          })`
         });
         const candidate=result.result?.value;
         if(candidate?.title==='SKILL Contract Visual'){
