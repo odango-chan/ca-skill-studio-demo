@@ -12,6 +12,7 @@ import { parseDocument, isMap, isScalar } from "yaml";
 import { LanguageDiagnosticSession } from "../../../../../language/lsp/session.js";
 
 const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
+const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
 const PACKAGE_CLOSE_NOTIFICATION = "skillStudio/packageClose";
 const ANALYSIS_STATUS_NOTIFICATION = "skillStudio/analysisStatus";
 const SERVER_ERROR_NOTIFICATION = "skillStudio/serverError";
@@ -350,16 +351,29 @@ connection.onCompletion(params => {
   return [];
 });
 
+connection.onNotification(PACKAGE_INVALIDATE_NOTIFICATION, params => {
+  const rootUri = params?.rootUri;
+  const generation = params?.generation;
+  if (typeof rootUri !== "string" || !rootUri.trim() ||
+      !Number.isSafeInteger(generation) || generation < 0) return;
+  const knownGeneration = requestedGeneration.get(rootUri) ?? -1;
+  if (generation > knownGeneration) {
+    requestedGeneration.set(rootUri, generation);
+    packageAnalyses.delete(rootUri);
+  }
+});
+
 connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
   if (!snapshot || typeof snapshot !== "object" ||
-      typeof snapshot.rootUri !== "string" || !snapshot.rootUri.trim()) {
-    reportError("Rejected Package snapshot without a valid root URI");
+      typeof snapshot.rootUri !== "string" || !snapshot.rootUri.trim() ||
+      !Number.isSafeInteger(snapshot.generation) || snapshot.generation < 0) {
+    reportError("Rejected Package snapshot without a valid root URI or generation");
     return;
   }
   const rootUri = snapshot.rootUri;
   const knownGeneration = requestedGeneration.get(rootUri) ?? -1;
-  if (Number.isSafeInteger(snapshot.generation) &&
-      snapshot.generation > knownGeneration) {
+  if (snapshot.generation < knownGeneration) return;
+  if (snapshot.generation > knownGeneration) {
     requestedGeneration.set(rootUri, snapshot.generation);
     packageAnalyses.delete(rootUri);
   }
