@@ -91,3 +91,5 @@ Pages identity: `experiments/ide-host/scripts/write-pages-build-info.mjs`, `expe
 ## LSP stack refresh · 2026-11-10
 
 The L1 / L2-A / L2-B / L2-C / L2-D1 draft stack (#103 / #105 / #109 / #110 / #113) has been refreshed from the current `main` through sequential merge commits. This preserves the current Theia workbench and canvas toolbar implementation alongside the browser Language Service work. Earlier exact-head CI PASS results predate this refresh and are historical only; all current-head gates must rerun before promotion, merge, or deployment. No Pages deployment has been made.
+
+The refreshed L2-D1 browser acceptance additionally asserts the restored Theia canvas toolbar, `layoutDirection=DOWN`, Root path selector visibility, and the presence of fit-width / fit-height, zoom, path, neighbor, label, and locate controls. This check is part of the current exact-head CI run, not yet a PASS until that run completes.
