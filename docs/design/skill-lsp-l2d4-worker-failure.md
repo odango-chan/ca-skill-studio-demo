@@ -4,7 +4,7 @@
 
 ## Fault containment
 
-- Browser LanguageClient listens for the Worker `error` / `messageerror` events, VS Code LSP connection error/closed handlers and unexpected stopped state. The transport error is terminal for that client; explicitly disable SDK automatic restart.
+- Browser LanguageClient listens for Worker `error` / `messageerror`, LSP connection failure/closure, unexpected stopped state and a bounded read-only `skillStudio/health` request. This detects silent Worker termination without a fabricated failure event. The transport error is terminal for that client; SDK automatic restart is disabled.
 - The host presents `SKILL LSP: UNAVAILABLE`, preserving the original failure reason in status tooltip and Language Service Output. Subsequent Package refresh events must not replace that terminal state with `ANALYZING` or stale `READY`.
 - Native source editing, Inspector and Package Audit remain outside the Worker; failure must not authorize Source writes or promote old LSP evidence.
 - No uncontrolled retry loop or cross-transport fallback.
@@ -12,10 +12,10 @@
 ## Real Chromium acceptance
 
 1. Complete all pre-existing live editor-provider, Problems, unsaved cross-file, Inspector, Verify Step, Undo, Route and layout/reload gates **before** Worker fault injection.
-2. Use Chrome DevTools Protocol `Target.getTargets` and `Target.closeTarget` to close the *actual nested Language Worker* (`skill-language-server.js`), not the Theia host, an LSP mock, or an internal fabricated error notification.
-3. Assert `SKILL LSP: UNAVAILABLE` replaces old READY, with a bounded observational wait. A missing CDP worker target is a failure with target inventory, not a skip.
+2. Use a localhost-only internal acceptance command on the real LanguageClient that created the dedicated `skill-studio-language-server` Worker and calls **that Worker's actual `terminate()`**. The command returns the exact script identity but does not set error status. It is unavailable on deployed Pages.
+3. Assert that the real transport/health detector independently changes the status to `SKILL LSP: UNAVAILABLE` within the bounded observation window. The acceptance may not call the status handler directly.
 4. Through real VS Code `TextDocument` and `WorkspaceEdit`, open the Package Python script, modify its unsaved text and prove its persistent Source bytes stayed unchanged. Restore original bytes, native clean buffer, and Procedure editor focus.
-5. Record `STUDIO_LSP_WORKER_TARGETS_CHROMIUM` and `STUDIO_LSP_WORKER_DEGRADED_CHROMIUM`; require the ordinary four CI workflows at exact head.
+5. Record `STUDIO_LSP_WORKER_TERMINATION_CHROMIUM` and `STUDIO_LSP_WORKER_DEGRADED_CHROMIUM`; require the ordinary four CI workflows at exact head.
 
 This slice does not claim recovery to READY, automatic Worker recreation, or clearing every prior LSP diagnostic on abrupt termination. Those must be separately verified before general fault-recovery acceptance. The Worker and Language Core remain read-only; the test harness owns temporary Source modifications.
 
@@ -35,6 +35,6 @@ The host now preserves that PARTIAL result and retries **only** when its actual 
 
 Status diagnostics distinguish the exact dispatched snapshot completeness from a later recollection and expose same-generation Procedure / Audit state on PARTIAL. This is an L2-D4 integration blocker correction, not proof of successful Worker failure acceptance by itself.
 
-## Chromium Worker identity discovery
+## Worker fault injection identity
 
-The first run that reached the fault gate revealed four dedicated-worker CDP targets with empty `TargetInfo.url` values. Treating any one of those targets as the Language Worker would risk killing the browser extension host instead. The Chromium acceptance now opens a flattened CDP session for each dedicated Worker, reads `WorkerGlobalScope.name` and `self.location.href`, detaches, and selects only the exact `skill-studio-language-server` identity or the bundled `skill-language-server.js` script. Unknown targets are never terminated. `Target.closeTarget` is issued only after this identity proof.
+The CDP `TargetInfo.url` values for nested Workers were empty, and inspecting attached flattened sessions from the page CDP transport timed out. The test therefore must **not** pick an unlabeled target ID or terminate the whole extension host. The browser LanguageClient already owns an exact dedicated Worker handle created with the name `skill-studio-language-server`. Only on local test origins, a non-contributed internal acceptance command terminates that handle without emitting a synthetic failure notification. The ordinary heartbeat / connection-fault path must report the outage. The local test hook is not a restart mechanism or a production user command.
