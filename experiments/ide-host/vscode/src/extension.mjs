@@ -17,6 +17,7 @@ import {registerWorkbench} from "./workbench.mjs";
 import {registerContractEditor} from "./contract-editor.mjs";
 import {registerPredicateEditor} from "./predicate-editor.mjs";
 import {registerSchemaEditor} from "./schema-editor.mjs";
+import {registerPackageOverview} from "./package-overview.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
@@ -47,6 +48,7 @@ export function activate(context){
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
   registerSchemaEditor(vscode,context);
+  registerPackageOverview(vscode,context);
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
