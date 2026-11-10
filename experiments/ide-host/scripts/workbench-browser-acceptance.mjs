@@ -759,7 +759,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const ownership=await nativeCommand(
       "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"verify");
     if(!ownership?.lspCollectionDisposed||!ownership?.lspDiagnosticCleared||
-       !ownership?.hostPackageAuditDiagnosticPreserved)
+       !ownership?.independentHostCollectionPreserved)
       throw Error("L2-D4b SDK diagnostic ownership failed: "+JSON.stringify(ownership));
     await nativeCommand(
       "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"restore");
