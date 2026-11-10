@@ -6,6 +6,7 @@ import {registerWorkbench} from '../vscode/src/workbench.mjs';
 import {deleteNodeOptions,previewNodeDelete} from '../../../site/node-delete.mjs';
 const root='site/samples/packages/establish-pdu-session/';
 const source=readFileSync(root+'assurance/procedure.yaml','utf8');
+const outputReferenceSource=readFileSync('tests/fixtures/establish-pre-hold/assurance/procedure.yaml','utf8');
 test('Inspection preserves Classic node/phase/route source identity; unknown syntax fails closed',()=>{
   const result=inspectionSnapshot(source,{procedureId:'establish-session',nodeId:'nudm-sdm-subscribe'});
   assert.equal(result.model.state,'READY');
@@ -46,6 +47,58 @@ properties:
     'dataflow evidence rows remain read-only');
   const invalid=inspectionSnapshot('procedures: [invalid]');
   assert.equal(invalid.model.state,'UNAVAILABLE');assert.equal(invalid.outline.length,0);assert.ok(invalid.problems.length);
+});
+
+test('Inspection exposes only Classic-qualified same-producer output reference normalization',()=>{
+  const procedureId='ue-requested-pdu-session-establishment';
+  const selected=inspectionSnapshot(outputReferenceSource,{
+    procedureId,nodeId:'nudm-sdm-subscribe'
+  });
+  const phase=selected.inspection.find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const step=phase?.children.find(x=>x.kind==='phase-step'&&x.stepIndex===1);
+  const reference=step?.children.find(x=>x.kind==='phase-output-reference'&&
+    x.bindingKey==='selection');
+  assert.ok(reference,'eligible same-producer output reference is exposed under its Phase Step');
+  assert.equal(reference.currentValue,
+    'preconditions.select-subscription-configuration.output');
+  assert.deepEqual(reference.choices,[
+    'preconditions.select-subscription-configuration.output',
+    'nudm-sdm-subscribe.preconditions.select-subscription-configuration.output'
+  ]);
+  assert.equal(reference.producerPhase,'preconditions');
+  assert.equal(reference.producerStep,'select-subscription-configuration');
+  const current=inspectionSnapshot(source,{
+    procedureId,nodeId:'nudm-sdm-subscribe'
+  });
+  assert.ok(current.inspection.every(p=>p.children.every(s=>
+    s.children.every(x=>x.kind!=='phase-output-reference'))),
+    'UDM Subscribe sample does not expose unsupported output-reference actions');
+  // The PCF candidate is observed but not executable: converting its last
+  // local occurrence would remove Classic's required dual-form evidence.
+  const pcf=inspectionSnapshot(source,{
+    procedureId,nodeId:'npcf-sm-policy-control-create'
+  });
+  const pcfPhase=pcf.inspection.find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const pcfStep=pcfPhase?.children.find(x=>x.kind==='phase-step'&&x.stepIndex===4);
+  assert.ok(pcfStep,'PCF baseline Verify Step remains visible');
+  assert.ok(!pcfStep.children.some(x=>x.kind==='phase-output-reference'&&
+    x.bindingKey==='pcfPolicyAssociationRef'),
+    'native Inspector must hide candidates rejected by Classic preview');
+  // The published AMF node has multiple local occurrences plus a qualified
+  // form, so normalizing one Verify binding remains reprovable.
+  const live=inspectionSnapshot(source,{
+    procedureId,nodeId:'namf-communication-n1n2-message-transfer'
+  });
+  const livePhase=live.inspection.find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const liveStep=livePhase?.children.find(x=>x.kind==='phase-step'&&x.stepIndex===1);
+  const liveRef=liveStep?.children.find(x=>x.kind==='phase-output-reference'&&
+    x.bindingKey==='operationContextRef');
+  assert.ok(liveRef,'published AMF sample contains a reversible output-reference candidate');
+  assert.deepEqual(liveRef.choices,[
+    'preconditions.resolve-effective-session-configuration.output.contextRef',
+    'namf-communication-n1n2-message-transfer.preconditions.resolve-effective-session-configuration.output.contextRef'
+  ]);
+  assert.equal(liveRef.producerStep,'resolve-effective-session-configuration');
 });
 
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
@@ -137,6 +190,54 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const writesAfterBinding=doc.text;
   await commands.get('skillStudio.editPhaseInputBinding')(phaseItem,'dnn','input.dnn');
   assert.equal(doc.text,writesAfterBinding,'stale Phase Step selection must not write');
+  // The current demo has no same-Node alias pair. Exercise this bounded
+  // operation against the pinned predecessor fixture that proves both spellings.
+  assert.ok(commands.has('skillStudio.editPhaseOutputReference'));
+  doc.text=outputReferenceSource;doc.version++;changed({document:doc});
+  const outputProcedure='ue-requested-pdu-session-establishment';
+  const outputNode='nudm-sdm-subscribe';
+  workbench.select(doc,{version:doc.version,procedureId:outputProcedure,nodeId:outputNode});
+  const outputPhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const outputStep=outputPhase?.children.find(x=>x.kind==='phase-step'&&x.stepIndex===1);
+  const outputRow=outputStep?.children.find(x=>x.kind==='phase-output-reference'&&
+    x.bindingKey==='selection');
+  assert.ok(outputRow,'eligible output reference is represented as a nested Inspector row');
+  const outputItem=providers.get('skillStudio.inspection').getTreeItem(outputRow);
+  assert.equal(outputItem.contextValue,'skillStudio.phaseOutputReference');
+  assert.equal(outputItem.sourceVersion,doc.version);
+  assert.equal(outputItem.documentUri,doc.uri.toString());
+  const localOutput='preconditions.select-subscription-configuration.output';
+  const qualifiedOutput='nudm-sdm-subscribe.'+localOutput;
+  const beforeOutput=doc.text,outputVersion=doc.version;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.editPhaseOutputReference')(
+    outputItem,'selection',qualifiedOutput),false);
+  assert.equal(doc.text,beforeOutput,'cancelled output-reference normalization must not touch Source');
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.editPhaseOutputReference')(
+    outputItem,'selection',qualifiedOutput),true);
+  assert.equal(doc.version,outputVersion+1);
+  assert.ok(doc.text.includes('from: '+qualifiedOutput));
+  assert.equal(appliedEdits.at(-1).length,1,'normalization is one exact scalar WorkspaceEdit');
+  assert.equal(appliedEdits.at(-1)[0].range.end.offset-
+    appliedEdits.at(-1)[0].range.start.offset,localOutput.length);
+  const normalized=doc.text;
+  assert.equal(await commands.get('skillStudio.editPhaseOutputReference')(
+    outputItem,'selection',localOutput),false,'stale output-reference selection cannot be reused');
+  assert.equal(doc.text,normalized);
+  workbench.select(doc,{version:doc.version,procedureId:outputProcedure,nodeId:outputNode});
+  const normalizedPhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const normalizedStep=normalizedPhase.children.find(x=>x.kind==='phase-step'&&x.stepIndex===1);
+  const normalizedRow=normalizedStep.children.find(x=>x.kind==='phase-output-reference');
+  const normalizedItem=providers.get('skillStudio.inspection').getTreeItem(normalizedRow);
+  assert.equal(await commands.get('skillStudio.editPhaseOutputReference')(
+    normalizedItem,'selection',localOutput),true,'reverse normalization is allowed only while both forms remain observed');
+  assert.equal(doc.text,beforeOutput,'forward and reverse normalization round-trip exactly');
+  doc.text=source;doc.version++;changed({document:doc});
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+
   assert.ok(commands.has('skillStudio.addPhaseVerify'));
   assert.ok(commands.has('skillStudio.editPhaseVerifyStep'));
   assert.ok(commands.has('skillStudio.renameNamedPhaseStep'));

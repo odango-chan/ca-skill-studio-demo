@@ -25,6 +25,7 @@
     "onCommand:skillStudio.renameNode",
     "onCommand:skillStudio.editNodeOperatorValue",
     "onCommand:skillStudio.editPhaseInputBinding",
+    "onCommand:skillStudio.editPhaseOutputReference",
     "onCommand:skillStudio.insertNode",
     "onCommand:skillStudio.deleteNode",
     "onCommand:skillStudio.addPhaseVerify",
@@ -68,6 +69,10 @@
       {
         "command": "skillStudio.editPhaseInputBinding",
         "title": "SKILL Studio: Edit Phase Input Binding"
+      },
+      {
+        "command": "skillStudio.editPhaseOutputReference",
+        "title": "SKILL Studio: Normalize Phase Output Reference"
       },
       {
         "command": "skillStudio.insertNode",
@@ -224,6 +229,11 @@
         {
           "command": "skillStudio.editPhaseVerifyStep",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStepAndBinding",
+          "group": "4_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseOutputReference",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseOutputReference",
           "group": "4_phase"
         }
       ]

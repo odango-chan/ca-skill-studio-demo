@@ -388,6 +388,60 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   console.log('STUDIO_PHASE_VERIFY_CHROMIUM',JSON.stringify({
     append:verifyAppend,name:verifyName,delete:verifyDelete,reorder:verifyReorder
   }));
+  // Exercise D4-A2.1 against the current published sample, not a wholesale
+  // Source replacement. The AMF delivery-context Verify consumes an earlier
+  // same-Node output; its local and fully-qualified forms both occur in Source.
+  // Multiple local occurrences remain after one normalization, allowing the
+  // shared source-backed planner to reprove the producer identity.
+  const beforeOutputGraph=await graph();
+  if(!beforeOutputGraph?.revision)
+    throw Error('Output reference test has no initial native Source revision');
+  const outputVersion=Number(/v(\d+)/.exec(beforeOutputGraph.revision)?.[1]);
+  if(!Number.isSafeInteger(outputVersion))
+    throw Error('Could not read native Source version before output reference test');
+  const outputProcedure='ue-requested-pdu-session-establishment';
+  const outputNode='namf-communication-n1n2-message-transfer';
+  const localOutput='preconditions.resolve-effective-session-configuration.output.contextRef';
+  const qualifiedOutput=outputNode+'.'+localOutput;
+  const outputItem={kind:'phase-output-reference',procedureId:outputProcedure,
+    nodeId:outputNode,phaseName:'preconditions',stepIndex:1,
+    bindingKey:'operationContextRef',sourceVersion:outputVersion};
+  await startNativeCommand('skillStudio.editPhaseOutputReference',outputItem,
+    'operationContextRef',qualifiedOutput);
+  await confirmNativePreview(localOutput,qualifiedOutput);
+  const outputAccepted=await evalJS('window.__skillStudioCommandResult');
+  const afterOutput=await waitForRevisionChange(graphContext,beforeOutputGraph.revision,
+    'Phase output reference normalization');
+  if(outputAccepted!==true)throw Error('Phase output reference normalization was not accepted');
+  await invoke('core.undo');
+  const afterOutputUndo=await waitForRevisionChange(graphContext,
+    afterOutput.result?.value,'Phase output reference native Undo');
+  // Reapply after Undo to prove the original local spelling was restored and
+  // that the same source-backed candidate is still eligible.
+  const undoVersion=Number(/v(\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(undoVersion))
+    throw Error('Could not read Source version after output reference Undo');
+  await startNativeCommand('skillStudio.editPhaseOutputReference',{
+    ...outputItem,sourceVersion:undoVersion
+  },'operationContextRef',qualifiedOutput);
+  await confirmNativePreview(localOutput,qualifiedOutput);
+  const outputReapply=await evalJS('window.__skillStudioCommandResult');
+  const afterOutputReapply=await waitForRevisionChange(graphContext,
+    afterOutputUndo.result?.value,'Phase output reference reapply');
+  if(outputReapply!==true)
+    throw Error('Output reference was not eligible again after native Undo');
+  await invoke('core.undo');
+  const afterOutputReapplyUndo=await waitForRevisionChange(graphContext,
+    afterOutputReapply.result?.value,'Phase output reference second Undo');
+  const restoredOutputGraph=await graph();
+  if(!restoredOutputGraph?.revision||restoredOutputGraph.nodes!==beforeOutputGraph.nodes)
+    throw Error('Native output-reference Undo lost the original graph');
+  const outputReference={before:beforeOutputGraph.revision,
+    applied:afterOutput.result?.value,undo:afterOutputUndo.result?.value,
+    reapplied:afterOutputReapply.result?.value,
+    undoAgain:afterOutputReapplyUndo.result?.value,
+    restored:restoredOutputGraph.revision,localOutput,qualifiedOutput};
+  console.log('STUDIO_PHASE_OUTPUT_REFERENCE_CHROMIUM',JSON.stringify(outputReference));
   const graphHasNode=async id=>{
     const result=await command('Runtime.evaluate',{
       contextId:graphContext,returnByValue:true,
@@ -511,5 +565,5 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
+  return {views:true,packageAudit:true,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference};
 }

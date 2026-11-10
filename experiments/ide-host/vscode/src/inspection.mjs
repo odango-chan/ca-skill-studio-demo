@@ -3,6 +3,8 @@ import {phaseStepDependencyReport} from '../../../../site/phase-dataflow.mjs';
 import {phaseConsumerContractReport} from '../../../../site/phase-consumer-contract.mjs';
 import {phaseStepEvidenceSummary,bindingEvidenceExplanation}
   from '../../../../site/phase-evidence-copy.mjs';
+import {phaseOutputReferenceOptions,previewPhaseOutputReference}
+  from '../../../../site/phase-output-refs.mjs';
 
 // UI adapter only: every fact below comes from Classic's source projection.
 const row=(label,line,children=[],extra={})=>({label,line,children,...extra});
@@ -22,17 +24,44 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
   const contractFor=binding=>consumerContracts?.bindings.find(x=>sameBinding(x,binding))??null;
   const stepEvidence=(phaseName,stepIndex)=>
     phaseStepEvidenceSummary(phaseName,stepIndex,dataflow,consumerContracts);
+  // Classic candidate discovery may find two historically observed spellings
+  // even when replacing the last occurrence would remove the proof required
+  // by its own Preview revalidation. Never advertise a native edit that the
+  // shared Source planner would reject.
+  const outputReferences=node?phaseOutputReferenceOptions(text,procedure.name,node.id)
+    .filter(reference=>reference.choices.some(value=>{
+      if(value===reference.value)return false;
+      try{
+        previewPhaseOutputReference(text,procedure.name,node.id,
+          reference.phaseName,reference.stepIndex,reference.bindingKey,value);
+        return true;
+      }catch{return false;}
+    })):[];
+
+  const outputReferencesFor=(phaseName,stepIndex)=>outputReferences.filter(x=>
+    x.phaseName===phaseName&&x.stepIndex===stepIndex);
   const outline=[...model.procedures.values()].map(p=>row(p.name,p.nodes[0]?.line??1,
     p.nodes.map(n=>row(n.id,n.line,[],{description:n.operator,procedureId:p.name,nodeId:n.id,kind:'node'})),{description:p.nodes.length+' nodes',procedureId:p.name}));
   const inspection=node?[
     row(node.id,node.line,[],{description:node.operator+' · '+node.value,kind:'node',procedureId:procedure.name,nodeId:node.id}),
     ...node.phases.map(p=>row(p.name,p.line,p.steps.map(s=>{
-      const evidence=stepEvidence(p.name,s.index-1);
-      return row((s.name||'Step '+s.index)+' · '+s.operator+' '+s.value,s.line,[],{
-        kind:'phase-step',procedureId:procedure.name,nodeId:node.id,phaseName:p.name,
-        stepIndex:s.index-1,stepName:s.name||null,stepOperator:s.operator,stepValue:s.value,
-        description:[s.operator+' · '+s.value,evidence?.label].filter(Boolean).join(' · ')
-      });
+      const stepIndex=s.index-1,evidence=stepEvidence(p.name,stepIndex);
+      const outputRows=outputReferencesFor(p.name,stepIndex).map(reference=>
+        row('Output reference · '+reference.bindingKey,s.line,[],{
+          kind:'phase-output-reference',procedureId:procedure.name,nodeId:node.id,
+          phaseName:p.name,stepIndex,bindingKey:reference.bindingKey,
+          currentValue:reference.value,choices:reference.choices,
+          producerPhase:reference.producerPhase,producerStep:reference.producerStep,
+          producerStepIndex:reference.producerStepIndex,outputSuffix:reference.outputSuffix,
+          description:reference.value+' · 可切换为 '+reference.choices
+            .filter(value=>value!==reference.value).join(' / ')
+        }));
+      return row((s.name||'Step '+s.index)+' · '+s.operator+' '+s.value,
+        s.line,outputRows,{
+          kind:'phase-step',procedureId:procedure.name,nodeId:node.id,phaseName:p.name,
+          stepIndex,stepName:s.name||null,stepOperator:s.operator,stepValue:s.value,
+          description:[s.operator+' · '+s.value,evidence?.label].filter(Boolean).join(' · ')
+        });
     }),{kind:'phase',procedureId:procedure.name,nodeId:node.id,phaseName:p.name})),
     ...procedure.routes.filter(r=>r.source===node.id).map(r=>row(r.routeSource+' · '+r.outcome+' → '+r.target,r.line,[],{kind:'route',procedureId:procedure.name,nodeId:node.id,routeId:r.id,routeSource:r.routeSource,outcome:r.outcome,target:r.target}))
   ]:[row(procedure.name,1,[],{description:'Select a node in the graph or Outline'})];
