@@ -396,7 +396,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const beforeOutputGraph=await graph();
   if(!beforeOutputGraph?.revision)
     throw Error('Output reference test has no initial native Source revision');
-  const outputVersion=Number(/v(\\d+)/.exec(beforeOutputGraph.revision)?.[1]);
+  const outputVersion=Number(/v(\d+)/.exec(beforeOutputGraph.revision)?.[1]);
   if(!Number.isSafeInteger(outputVersion))
     throw Error('Could not read native Source version before output reference test');
   const outputProcedure='ue-requested-pdu-session-establishment';
@@ -418,7 +418,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     afterOutput.result?.value,'Phase output reference native Undo');
   // Reapply after Undo to prove the original local spelling was restored and
   // that the same source-backed candidate is still eligible.
-  const undoVersion=Number(/v(\\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
+  const undoVersion=Number(/v(\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
   if(!Number.isSafeInteger(undoVersion))
     throw Error('Could not read Source version after output reference Undo');
   await startNativeCommand('skillStudio.editPhaseOutputReference',{
