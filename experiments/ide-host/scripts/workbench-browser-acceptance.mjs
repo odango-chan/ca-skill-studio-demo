@@ -83,8 +83,8 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     expandedView=await evalJS(
       "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
       ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
-      "return {text:part?.innerText??'',rows:[...(part?.querySelectorAll('.theia-TreeNode')??[]).map(x=>({"+
-      "text:x.innerText.trim(),className:x.className}))]};})()");
+      "return {text:part?.innerText??'',rows:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(x=>({"+
+      "text:x.innerText.trim(),className:x.className}))};})()");
     groups=await readGroups();
   }
   for(const group of expectedGroups)
