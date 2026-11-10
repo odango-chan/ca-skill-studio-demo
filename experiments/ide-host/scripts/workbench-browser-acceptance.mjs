@@ -389,10 +389,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     append:verifyAppend,name:verifyName,delete:verifyDelete,reorder:verifyReorder
   }));
   // Exercise D4-A2.1 against the current published sample, not a wholesale
-  // Source replacement. Its PCF node already has both real spellings:
-  // a local preconditions.resolve-pcf-create-inputs output reference on the
-  // later baseline Verify Step, and a fully-qualified reference elsewhere
-  // in the same Procedure. This keeps the real Source version / undo path.
+  // Source replacement. The AMF delivery-context Verify consumes an earlier
+  // same-Node output; its local and fully-qualified forms both occur in Source.
+  // Multiple local occurrences remain after one normalization, allowing the
+  // shared source-backed planner to reprove the producer identity.
   const beforeOutputGraph=await graph();
   if(!beforeOutputGraph?.revision)
     throw Error('Output reference test has no initial native Source revision');
@@ -400,14 +400,14 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!Number.isSafeInteger(outputVersion))
     throw Error('Could not read native Source version before output reference test');
   const outputProcedure='ue-requested-pdu-session-establishment';
-  const outputNode='npcf-sm-policy-control-create';
-  const localOutput='preconditions.resolve-pcf-create-inputs.output.pcfPolicyAssociationRef';
+  const outputNode='namf-communication-n1n2-message-transfer';
+  const localOutput='preconditions.resolve-effective-session-configuration.output.contextRef';
   const qualifiedOutput=outputNode+'.'+localOutput;
   const outputItem={kind:'phase-output-reference',procedureId:outputProcedure,
-    nodeId:outputNode,phaseName:'preconditions',stepIndex:4,
-    bindingKey:'pcfPolicyAssociationRef',sourceVersion:outputVersion};
+    nodeId:outputNode,phaseName:'preconditions',stepIndex:1,
+    bindingKey:'operationContextRef',sourceVersion:outputVersion};
   await startNativeCommand('skillStudio.editPhaseOutputReference',outputItem,
-    'pcfPolicyAssociationRef',qualifiedOutput);
+    'operationContextRef',qualifiedOutput);
   await confirmNativePreview(localOutput,qualifiedOutput);
   const outputAccepted=await evalJS('window.__skillStudioCommandResult');
   const afterOutput=await waitForRevisionChange(graphContext,beforeOutputGraph.revision,
@@ -423,7 +423,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     throw Error('Could not read Source version after output reference Undo');
   await startNativeCommand('skillStudio.editPhaseOutputReference',{
     ...outputItem,sourceVersion:undoVersion
-  },'pcfPolicyAssociationRef',qualifiedOutput);
+  },'operationContextRef',qualifiedOutput);
   await confirmNativePreview(localOutput,qualifiedOutput);
   const outputReapply=await evalJS('window.__skillStudioCommandResult');
   const afterOutputReapply=await waitForRevisionChange(graphContext,
