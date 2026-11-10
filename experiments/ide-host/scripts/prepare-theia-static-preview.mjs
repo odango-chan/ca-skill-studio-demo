@@ -50,8 +50,9 @@ for(const name of ["samples","media","icons"]){
   await cp(join(pluginSource,name),join(pluginTarget,name),{recursive:true,force:true});
 }
 for(const required of [
-  join(pluginTarget,"samples","establish-pdu-session","files.json"),
-  join(pluginTarget,"samples","establish-pdu-session","assurance","procedure.yaml"),
+  join(pluginTarget,"samples","skills","files.json"),
+  join(pluginTarget,"samples","skills","establish-pdu-session","assurance","procedure.yaml"),
+  join(pluginTarget,"samples","skills","establish-pdu-session-mas","assurance","procedure.yaml"),
   join(pluginTarget,"media","procedure.js"),
   join(pluginTarget,"media","procedure.css")
 ]){
