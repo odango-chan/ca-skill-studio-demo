@@ -941,8 +941,11 @@ export function registerWorkbench(vscode,context){
           if(!sourceRoot||!workspaceRoot)
             throw Error("L2-D4b source Package or workspace root is missing");
           const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
-          const packageBName="skill-studio-l2d4b-package-b-"+suffix;
-          const packageBRoot=vscode.Uri.joinPath(workspaceRoot,packageBName);
+          const packageBContainer=vscode.Uri.joinPath(
+            workspaceRoot,"skill-studio-l2d4b-"+suffix);
+          // Keep the leaf Package name equal to the copied SKILL/contract name.
+          const packageBRoot=vscode.Uri.joinPath(
+            packageBContainer,"establish-pdu-session");
           const fs=vscode.workspace.fs;
           const releases=[];
           try{
@@ -983,14 +986,14 @@ export function registerWorkbench(vscode,context){
             if(packageBState.refs!==2)
               throw Error("L2-D4b Package B did not acquire two editor references");
             languagePackageLifecycleAcceptance.set(key,{
-              packageBRoot,packageBKey,procedureB,packageBState,releases,
+              packageBRoot,packageBContainer,packageBKey,procedureB,packageBState,releases,
               sourceFileCount:found.length
             });
             return {packageBRoot:packageBKey,sourceFileCount:found.length,
               references:packageBState.refs,created:true};
           }catch(error){
             for(const release of releases.reverse())try{release();}catch{}
-            try{await fs.delete(packageBRoot,{recursive:true,useTrash:false});}catch{}
+            try{await fs.delete(packageBContainer,{recursive:true,useTrash:false});}catch{}
             throw error;
           }
         }
@@ -999,7 +1002,7 @@ export function registerWorkbench(vscode,context){
         if(phase==="abort-and-clean"){
           try{
             for(const release of [...prepared.releases].reverse())try{release();}catch{}
-            await vscode.workspace.fs.delete(prepared.packageBRoot,
+            await vscode.workspace.fs.delete(prepared.packageBContainer,
               {recursive:true,useTrash:false});
             return {phase,cleaned:true};
           }finally{languagePackageLifecycleAcceptance.delete(key);}
@@ -1040,7 +1043,7 @@ export function registerWorkbench(vscode,context){
               cleaned:true};
           }finally{
             for(const release of [...prepared.releases].reverse())try{release();}catch{}
-            try{await vscode.workspace.fs.delete(prepared.packageBRoot,
+            try{await vscode.workspace.fs.delete(prepared.packageBContainer,
               {recursive:true,useTrash:false});}catch{}
             languagePackageLifecycleAcceptance.delete(key);
           }
