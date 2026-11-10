@@ -51,13 +51,11 @@ const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",
   "--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],{stdio:"ignore"});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[];
-const command=(method,params={},sessionId=null)=>new Promise((resolve,reject)=>{
+const command=(method,params={})=>new Promise((resolve,reject)=>{
   const id=++seq;
   const timer=setTimeout(()=>{pending.delete(id);reject(Error("Chromium command timed out: "+method+" "+String(params.expression??"").slice(0,200)));},30000);
   pending.set(id,{resolve,reject,timer});
-  // Flat CDP sessions permit inspecting nested dedicated Workers without
-  // guessing target identity from URL fields (sometimes empty in Chromium).
-  ws.send(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})}));
+  ws.send(JSON.stringify({id,method,params}));
 });
 const evalJS=async expression=>{
   const data=await command("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});
