@@ -19,6 +19,19 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     console.log("STUDIO_NATIVE_ACTION",id);
     await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
   }
+  async function waitForRevisionChange(contextId,previous,label){
+    let latest=null;
+    for(let i=0;i<50;i++){
+      latest=await command('Runtime.evaluate',{
+        contextId,returnByValue:true,
+        expression:`document.querySelector('#revision')?.textContent`
+      });
+      if(latest.result?.value&&latest.result.value!==previous)return latest;
+      await sleep(100);
+    }
+    throw Error(label+' did not produce a native Source revision within 5s: '+
+      JSON.stringify({previous,latest:latest?.result?.value??null}));
+  }
   async function confirmNativePreview(oldText,newText){
     let target=null;
     for(let i=0;i<40&&!target;i++){
@@ -43,12 +56,14 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(problemsHeader?.collapsed){await click(problemsHeader.x,problemsHeader.y);await sleep(250);}
   await invoke('skillStudio.auditPackage');
   let audit='';
-  for(let i=0;i<30;i++){
+  for(let i=0;i<100;i++){
     audit=await evalJS(`document.body.innerText`);
     if(/Package Audit · \d+ editor warnings/.test(audit))break;
+    if(/Package Audit · unavailable|Audit unavailable:/.test(audit))
+      throw Error('Package Audit reported unavailable: '+audit.slice(-1000));
     await sleep(100);
   }
-  if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not run: '+audit.slice(-1000));
+  if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not render within 10s: '+audit.slice(-1000));
   // Re-open through Explorer rather than extension openWith command.
   await invoke('navigator.reveal');
   await invoke('core.saveAll');
@@ -114,10 +129,8 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(editResult!==true||!afterEdit.result?.value||afterEdit.result.value===beforeEdit.result?.value)
     throw Error('Native Inspector edit did not commit a Source revision: '+JSON.stringify({editResult,before:beforeEdit.result?.value,after:afterEdit.result?.value}));
   await invoke('core.undo');
-  const afterUndo=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
+  const afterUndo=await waitForRevisionChange(graphContext,afterEdit.result?.value,
+    'Native Inspector Undo');
   if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value)
     throw Error('Native Inspector edit did not round-trip through native Undo: '+JSON.stringify({after:afterEdit.result?.value,undo:afterUndo.result?.value}));
   console.log('STUDIO_INSPECTOR_AUTHORING_CHROMIUM',JSON.stringify({
@@ -150,15 +163,105 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(bindingResult!==true||!afterBinding.result?.value||afterBinding.result.value===beforeBinding.result?.value)
     throw Error('Native Phase Binding edit did not commit a Source revision');
   await invoke('core.undo');
-  const afterBindingUndo=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
-  if(!afterBindingUndo.result?.value||afterBindingUndo.result.value===afterBinding.result?.value)
-    throw Error('Native Phase Binding edit did not round-trip through native Undo');
+  const afterBindingUndo=await waitForRevisionChange(graphContext,afterBinding.result?.value,
+    'Native Phase Binding Undo');
   console.log('STUDIO_PHASE_BINDING_CHROMIUM',JSON.stringify({
     node:bindingSelection.result.value.node,procedure:bindingSelection.result.value.procedure,
     before:beforeBinding.result?.value,after:afterBinding.result?.value,undo:afterBindingUndo.result?.value
+  }));
+  const graphHasNode=async id=>{
+    const result=await command('Runtime.evaluate',{
+      contextId:graphContext,returnByValue:true,
+      expression:`[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].some(x=>x.getAttribute('data-id')===${JSON.stringify(id)})`
+    });
+    return result.result?.value===true;
+  };
+  const insertSelection=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-get');if(!node)throw Error('Node insertion source is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  });
+  if(!insertSelection.result?.value?.node)throw Error('Could not select Route source Node for insertion');
+  await sleep(250);
+  const beforeInsert=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const insertVersion=Number(/v(\d+)/.exec(beforeInsert.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(insertVersion))throw Error('Could not read Source version before Node insertion');
+  await startNativeCommand('skillStudio.insertNode',{
+    kind:'route',procedureId:insertSelection.result.value.procedure,
+    nodeId:'nudm-sdm-get',routeId:'nudm-sdm-get:postconditions:PASS',
+    sourceVersion:insertVersion
+  },{
+    nodeId:'ide-host-insert-probe',operator:'call',
+    value:'sbi.demo.insert_probe',outcome:'COMMITTED'
+  });
+  await confirmNativePreview('PASS: nudm-sdm-subscribe','PASS: ide-host-insert-probe');
+  const insertResult=await evalJS(`window.__skillStudioCommandResult`);
+  const afterInsert=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  await sleep(400);
+  const insertedGraph=await graph();
+  const insertedPresent=await graphHasNode('ide-host-insert-probe');
+  if(insertResult!==true||!afterInsert.result?.value||
+     afterInsert.result.value===beforeInsert.result?.value||insertedGraph?.nodes!==18||!insertedPresent)
+    throw Error('Native Node insertion did not add one Source-backed Node: '+JSON.stringify({insertResult,before:beforeInsert.result?.value,after:afterInsert.result?.value,graph:insertedGraph}));
+  const deleteSelection=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='ide-host-insert-probe');if(!node)throw Error('Inserted Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  });
+  if(!deleteSelection.result?.value?.node)throw Error('Could not select inserted Node for deletion');
+  await sleep(250);
+  const beforeDelete=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const deleteVersion=Number(/v(\d+)/.exec(beforeDelete.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(deleteVersion))throw Error('Could not read Source version before Node deletion');
+  await startNativeCommand('skillStudio.deleteNode',{
+    kind:'node',procedureId:deleteSelection.result.value.procedure,
+    nodeId:'ide-host-insert-probe',sourceVersion:deleteVersion
+  },'nudm-sdm-subscribe');
+  await confirmNativePreview('ide-host-insert-probe:','PASS: nudm-sdm-subscribe');
+  const deleteResult=await evalJS(`window.__skillStudioCommandResult`);
+  const afterDelete=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  await sleep(350);
+  const deletedGraph=await graph();
+  const deletedPresent=await graphHasNode('ide-host-insert-probe');
+  if(deleteResult!==true||!afterDelete.result?.value||
+     afterDelete.result.value===beforeDelete.result?.value||deletedGraph?.nodes!==17||deletedPresent)
+    throw Error('Native Node deletion did not remove the Node and repair the Route: '+JSON.stringify({deleteResult,before:beforeDelete.result?.value,after:afterDelete.result?.value,graph:deletedGraph}));
+  await invoke('core.undo');
+  const afterDeleteUndo=await waitForRevisionChange(graphContext,afterDelete.result?.value,
+    'Native Undo of Node deletion');
+  await sleep(350);
+  const restoredInsertGraph=await graph();
+  const restoredInsertPresent=await graphHasNode('ide-host-insert-probe');
+  if(!afterDeleteUndo.result?.value||afterDeleteUndo.result.value===afterDelete.result?.value||
+     restoredInsertGraph?.nodes!==18||!restoredInsertPresent)
+    throw Error('Native Undo did not restore the deleted Node');
+  await invoke('core.undo');
+  const afterInsertUndo=await waitForRevisionChange(graphContext,afterDeleteUndo.result?.value,
+    'Native Undo of Node insertion');
+  await sleep(350);
+  const restoredOriginalGraph=await graph();
+  const originalAbsent=!(await graphHasNode('ide-host-insert-probe'));
+  if(!afterInsertUndo.result?.value||afterInsertUndo.result.value===afterDeleteUndo.result?.value||
+     restoredOriginalGraph?.nodes!==17||!originalAbsent)
+    throw Error('Native Undo did not remove the inserted Node and restore original graph');
+  console.log('STUDIO_NODE_INSERT_DELETE_CHROMIUM',JSON.stringify({
+    procedure:insertSelection.result.value.procedure,node:'ide-host-insert-probe',
+    before:beforeInsert.result?.value,inserted:afterInsert.result?.value,
+    deleted:afterDelete.result?.value,undoDelete:afterDeleteUndo.result?.value,
+    undoInsert:afterInsertUndo.result?.value,
+    nodeCounts:[insertedGraph?.nodes,deletedGraph?.nodes,
+      restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes],
+    identity:[insertedPresent,deletedPresent,restoredInsertPresent,originalAbsent]
   }));
   // Safe Markdown uses the actual native source document and shared renderer.
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
