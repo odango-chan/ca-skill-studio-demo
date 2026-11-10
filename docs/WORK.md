@@ -192,3 +192,12 @@ main browser application remains available at `/classic/`.
 **删除边界：** 仅开放两种已有 Classic profile：同状态 Terminal 合并到另一个 Terminal；或无 Phase/Child、恰有一个 Operator 出口的 Node bypass 到唯一出口目标。删除前由共享模块检查全部入站 Route 与其他引用；所有删除/重定向 spans 通过一次 WorkspaceEdit 提交。Start、Phase-bearing、Child Procedure、多出口及存在外部引用的 Node 不显示删除操作。
 
 **安全与验收：** 所有操作均要求当前 TextDocument revision、精确 Diff、用户显式确认、宿主重算 Patch 与原生 Undo。Host 测试覆盖取消、过期选择、两 span 原子编辑及不可删除 Node；真实 Chromium 验收覆盖插入、删除、Route 修复和两次 Undo。PR #98 exact head `93a80fb` 的 IDE Host、Theia Browser-Only、Theia Browser Host、PR Verify 均 PASS；Browser Host 首次运行在既有 Package Audit 等待点偶发超时，failed-job rerun attempt 2 PASS；Runtime / 5GC / desktop VS Code GUI NOT_RUN。Classic 保持完整。
+
+
+## 2026-11-10 · Theia Phase Verify authoring（PR #99，受限增量）
+
+**范围：** 在原生 Inspector 的 Phase 行支持向既有 Phase 尾部追加 Package PredicateSet 中已声明且未重复的无名 Verify；在符合 Source span 安全条件的无名 Verify Step 上支持删除或只与相邻独立 Verify 换序。受限的「编辑能力」不表示已完成全部 Phase Designer 或生产 Runtime 语义验收。
+
+**实现边界：** 直接复用 `site/phase-step-structural.mjs` 与 `site/phase-step-order.mjs` 的候选、Source patch 和重算资格；Theia 宿主仅维护 TextDocument revision、跨文件 PredicateSet 读取、精确 Diff/用户确认、一组原生 WorkspaceEdit 和 Undo。保留注释或命名输出来源归属不可证的情况，原生 Inspector 不提供修改动作；已有 Classic /classic/ 保持不变。
+
+**证据：** [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99) 的代码提交 `9b79517` 上 IDE Host [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42743628311)、Theia Browser-Only [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42743628441)、真实 Theia Browser Host Chromium [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42743628504)；后者实际完成添加 v12→v13→Undo v14、删除 v14→v15→Undo v16、换序 v16→v17→Undo v18。该提交不是合并证据；Runtime / 5GC / desktop VS Code GUI / resulting-main Pages NOT_RUN。
