@@ -300,6 +300,35 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   await commands.get('skillStudio.auditPackage')();
   assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/editor warnings/);
   assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
+  assert.ok(commands.has('skillStudio.exportPackageZip'));
+  // Package export uses the complete byte snapshot but overlays every open
+  // TextDocument, so unsaved edits are included without writing to OPFS.
+  const exportSource=source+'\\n# unsaved-export-probe\\n';
+  doc.text=exportSource;doc.version++;changed({document:doc});
+  const beforeZipMessages=posted.length;
+  assert.equal(await commands.get('skillStudio.exportPackageZip')(),true);
+  const zipMessage=posted.slice(beforeZipMessages).find(x=>x.type==='packageZipReady');
+  assert.ok(zipMessage,'Package ZIP is delivered to the active Procedure Webview');
+  assert.equal(zipMessage.filename,'establish-pdu-session.zip');
+  assert.equal(zipMessage.fileCount,4);
+  assert.equal(zipMessage.opaqueCount,0);
+  const zipBytes=Buffer.from(zipMessage.base64,'base64');
+  assert.equal(zipBytes.readUInt32LE(0),0x04034b50,'export is a real ZIP archive');
+  let zipOffset=0,exportedProcedure='';
+  while(zipBytes.readUInt32LE(zipOffset)===0x04034b50){
+    const size=zipBytes.readUInt32LE(zipOffset+18);
+    const nameLength=zipBytes.readUInt16LE(zipOffset+26);
+    const extraLength=zipBytes.readUInt16LE(zipOffset+28);
+    const nameStart=zipOffset+30;
+    const name=zipBytes.subarray(nameStart,nameStart+nameLength).toString('utf8');
+    const dataStart=nameStart+nameLength+extraLength;
+    if(name==='assurance/procedure.yaml')
+      exportedProcedure=zipBytes.subarray(dataStart,dataStart+size).toString('utf8');
+    zipOffset=dataStart+size;
+  }
+  assert.ok(exportedProcedure.includes('# unsaved-export-probe'),
+    'ZIP contains current unsaved native Source rather than stale disk bytes');
+  doc.text=source;doc.version++;changed({document:doc});
   const evidence=providers.get('skillStudio.evidence').getChildren();
   assert.ok(evidence[0].label.includes('no write authority'));
   const dataflow=evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
