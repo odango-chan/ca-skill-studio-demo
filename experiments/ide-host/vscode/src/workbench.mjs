@@ -244,6 +244,12 @@ export function registerWorkbench(vscode,context){
         if(!hoverText.includes("Skill Script")||
            !hoverText.includes("select-establishment-configuration"))
           throw Error("Hover provider did not return the declared Skill Script metadata");
+        const packageRoot=packageRootForProcedure(vscode,procedureDocument);
+        const packageState=packageRoot?languagePackages.get(packageRoot.uri.toString()):null;
+        if(!packageState)throw Error("Active Procedure Package has no Language Service state");
+        const scriptAlreadyOpen=(vscode.workspace.textDocuments??[]).some(item=>
+          item.uri.toString()===scriptUri.toString());
+        const generationBeforeScriptOpen=packageState.generation;
         const scriptDocument=await vscode.workspace.openTextDocument(scriptUri);
         const scriptLines=scriptDocument.getText().split(/\r\n|\n|\r/);
         const nameLine=scriptLines.findIndex(line=>line==="# name: select-establishment-configuration");
@@ -251,20 +257,27 @@ export function registerWorkbench(vscode,context){
         if(nameLine<0||schemaLine<0)
           throw Error("Python Source is missing the declared name or inputSchema metadata");
         await openNativeSource(vscode,scriptUri,{preview:true});
-        // Opening another Source document invalidates the current Package
-        // generation. Do not probe a provider while the replacement snapshot
-        // is still being collected/analyzed: that correctly returns no links.
+        // Opening a previously closed Package Source must advance the Package
+        // generation. Waiting only for READY can accidentally observe the old
+        // READY status before onDidOpenTextDocument schedules the new snapshot.
+        const expectedGeneration=generationBeforeScriptOpen+(scriptAlreadyOpen?0:1);
         const analysisWaitStarted=Date.now();
-        while(languageStatusItem?.text!=="SKILL LSP: READY"&&
-              Date.now()-analysisWaitStarted<15000){
-          if(languageStatusItem?.text==="SKILL LSP: ERROR")
-            throw Error("Package re-analysis failed before References acceptance: "+
+        const readyForCurrentGeneration=()=>packageState.generation>=expectedGeneration&&
+          languageStatusItem?.text==="SKILL LSP: READY"&&
+          String(languageStatusItem?.tooltip??"").includes(
+            "generation "+packageState.generation);
+        while(!readyForCurrentGeneration()&&Date.now()-analysisWaitStarted<15000){
+          if(languageStatusItem?.text==="SKILL LSP: ERROR"||
+             languageStatusItem?.text==="SKILL LSP: UNAVAILABLE")
+            throw Error("Package re-analysis failed before editor-provider acceptance: "+
               String(languageStatusItem.tooltip??""));
           await new Promise(resolve=>setTimeout(resolve,50));
         }
-        if(languageStatusItem?.text!=="SKILL LSP: READY")
-          throw Error("Package did not return to SKILL LSP: READY before References acceptance: "+
-            String(languageStatusItem?.text??"missing status"));
+        if(!readyForCurrentGeneration())
+          throw Error("Current Package generation did not reach SKILL LSP: READY: "+
+            JSON.stringify({expectedGeneration,actualGeneration:packageState.generation,
+              status:languageStatusItem?.text??"missing",
+              tooltip:languageStatusItem?.tooltip??""}));
         const referencePosition=new vscode.Position(nameLine,"# name: ".length);
         const referenceResult=await vscode.commands.executeCommand(
           "vscode.executeReferenceProvider",scriptUri,referencePosition);
