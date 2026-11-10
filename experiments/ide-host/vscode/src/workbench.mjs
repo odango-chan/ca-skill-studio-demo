@@ -531,6 +531,7 @@ export function registerWorkbench(vscode,context){
   // edit is temporary, Source-owned by TextDocument/WorkspaceEdit, and split
   // into publish/repair phases so Chromium can inspect the actual Problems UI.
   const languageDiagnosticAcceptance=new Map();
+  const languageDiagnosticOwnershipAcceptance=new Map();
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.languageDiagnosticsAcceptance",
@@ -632,6 +633,32 @@ export function registerWorkbench(vscode,context){
           }
         }
 
+        if(phase==="repair-after-failure"){
+          const state=languageDiagnosticAcceptance.get(key);
+          if(!state)return {phase,cleared:true,restored:true,skipped:true};
+          try{
+            const restoredDocument=currentDocument();
+            if(!restoredDocument)throw Error("Procedure TextDocument closed during Worker failure");
+            if(restoredDocument.getText()!==state.original)
+              await replaceSource(state,state.original);
+            const diskBeforeClean=new TextDecoder("utf-8",{fatal:true}).decode(
+              await vscode.workspace.fs.readFile(procedureUri));
+            if(diskBeforeClean!==state.original)
+              throw Error("Original Procedure disk bytes changed during degraded-mode acceptance");
+            const cleanupSaved=restoredDocument.isDirty;
+            if(cleanupSaved&&!await restoredDocument.save())
+              throw Error("Native Procedure restoration save was rejected");
+            const diskAfterClean=new TextDecoder("utf-8",{fatal:true}).decode(
+              await vscode.workspace.fs.readFile(procedureUri));
+            if(restoredDocument.isDirty||diskAfterClean!==state.original)
+              throw Error("Procedure Source was not restored after Worker failure");
+            return {phase,cleared:true,restored:true,originalDiskUnchanged:true,cleanupSaved};
+          }finally{
+            languageDiagnosticAcceptance.delete(key);
+            await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
+          }
+        }
+
         if(phase==="repair"){
           const state=languageDiagnosticAcceptance.get(key);
           if(!state)return {phase:"repair",cleared:true,restored:true,skipped:true};
@@ -676,6 +703,65 @@ export function registerWorkbench(vscode,context){
     ));
   }
 
+
+  // Verify that the LanguageClient SDK owns and disposes only its own
+  // diagnostic collection. The host Package Audit collection is deliberately
+  // given a temporary marker so its survival is observable in Chromium.
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&
+     /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(globalThis.location.hostname)){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",
+      async(procedureUriValue,phase="publish")=>{
+        const uri=vscode.Uri.parse(String(procedureUriValue??""));
+        const key=uri.toString();
+        if(phase==="publish"){
+          if(languageDiagnosticOwnershipAcceptance.has(key))
+            throw Error("L2-D4b diagnostic ownership probe is already active");
+          const lsp=languageClient?.diagnosticsForAcceptance(uri.toString())??[];
+          if(!lsp.some(item=>
+            String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"))
+            throw Error("L2-D4b requires a real LSP Procedure diagnostic before Worker termination");
+          const original=diagnostics.get(uri)??[];
+          const probe=new vscode.Diagnostic(new vscode.Range(0,0,0,1),
+            "L2-D4b host-owned Package Audit diagnostic ownership probe",
+            vscode.DiagnosticSeverity.Warning);
+          probe.source="Skill Studio · editor audit";
+          probe.code="D4B_HOST_DIAGNOSTIC_OWNERSHIP";
+          diagnostics.set(uri,[...original,probe]);
+          languageDiagnosticOwnershipAcceptance.set(key,{uri,original});
+          return {lspDiagnosticPresent:true,hostProbePresent:true,
+            hostDiagnosticCount:diagnostics.get(uri)?.length??0};
+        }
+        const state=languageDiagnosticOwnershipAcceptance.get(key);
+        if(!state)return {phase,skipped:true};
+        if(phase==="verify"){
+          const host=diagnostics.get(uri)??[];
+          const visible=vscode.languages.getDiagnostics(uri);
+          const lspCollectionPresent=languageClient?.hasDiagnosticCollectionForAcceptance()??false;
+          const lspStillVisible=visible.some(item=>
+            String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"&&
+            item.source==="Skill Studio · procedure-projection");
+          const hostProbePresent=host.some(item=>
+            String(item.code?.value??item.code??"")==="D4B_HOST_DIAGNOSTIC_OWNERSHIP");
+          if(lspCollectionPresent||lspStillVisible||!hostProbePresent)
+            throw Error("L2-D4b diagnostic ownership failed: "+JSON.stringify({
+              lspCollectionPresent,lspStillVisible,hostProbePresent,
+              hostSources:host.map(item=>item.source)
+            }));
+          return {lspCollectionDisposed:true,lspDiagnosticCleared:true,
+            hostPackageAuditDiagnosticPreserved:true,
+            hostDiagnosticCount:host.length};
+        }
+        if(phase==="restore"){
+          if(state.original.length)diagnostics.set(uri,state.original);
+          else diagnostics.delete(uri);
+          languageDiagnosticOwnershipAcceptance.delete(key);
+          return {restored:true,hostDiagnosticCount:state.original.length};
+        }
+        throw Error("Unknown diagnostic ownership phase: "+String(phase));
+      }
+    ));
+  }
 
   // L2-D3 real-Theia acceptance: authoritative dirty buffers and latest
   // cross-file generation. Test-only commands never authorize Runtime writes.
