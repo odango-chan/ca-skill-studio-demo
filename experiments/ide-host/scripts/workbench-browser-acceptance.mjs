@@ -687,6 +687,68 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!liveToggle?.hitWithinToggle)
       throw Error('Native Evidence expansion toggle lost hit target before click: '+
         JSON.stringify({dataflowTreeRow,liveToggle}));
+    const toggleInstrumentation=await evalJS(`(()=>{
+      const container=[...document.querySelectorAll('.theia-view-container')]
+        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+      const part=header?.closest('.part');
+      const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
+        const caption=[...node.children].find(child=>
+          child.classList?.contains('theia-TreeNodeContent'));
+        return caption?.innerText?.includes('Producer / Consumer dataflow');
+      });
+      const toggle=row?.querySelector('.theia-ExpansionToggle');
+      const c=window.theia?.container,keys=[...(c?._bindingDictionary?._map?.keys()??[])];
+      const managerKey=keys.find(key=>typeof key==='function'&&
+        typeof key.prototype?.getWidgets==='function'&&
+        typeof key.prototype?.getOrCreateWidget==='function');
+      const manager=managerKey?c.get(managerKey):null;
+      const widget=manager?.getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence');
+      const model=widget?.model,id=toggle?.getAttribute('data-node-id');
+      const originalGet=model?.getNode?.bind(model);
+      const originalToggle=model?.toggleNodeExpansion?.bind(model);
+      window.__skillStudioEvidenceModelCalls=[];
+      if(model&&originalGet)model.getNode=function(nodeId){
+        const value=originalGet(nodeId);
+        if(nodeId===id)window.__skillStudioEvidenceModelCalls.push({
+          method:'getNode',found:!!value,expanded:value?.expanded,
+          childCount:value?.children?.length??null
+        });
+        return value;
+      };
+      if(model&&originalToggle)model.toggleNodeExpansion=function(node){
+        const record={method:'toggleNodeExpansion',nodeId:node?.id??null,
+          expandedBefore:node?.expanded??null,childCountBefore:node?.children?.length??null};
+        window.__skillStudioEvidenceModelCalls.push(record);
+        let result;
+        try{result=originalToggle(node);}
+        catch(error){record.error=String(error?.message??error);throw error;}
+        return Promise.resolve(result).then(value=>{
+          record.resolved=true;record.value=value;
+          const latest=originalGet(node?.id);
+          record.expandedAfter=latest?.expanded??null;
+          record.childCountAfter=latest?.children?.length??null;
+          return value;
+        },error=>{
+          record.rejected=String(error?.message??error);throw error;
+        });
+      };
+      return {widgetFound:!!widget,widgetType:widget?.constructor?.name??null,
+        props:{expandOnlyOnExpansionToggleClick:widget?.props?.expandOnlyOnExpansionToggleClick,
+          multiSelect:widget?.props?.multiSelect},
+        nodeFound:!!originalGet?.(id),nodeId:id,
+        node:{expanded:originalGet?.(id)?.expanded,
+          childCount:originalGet?.(id)?.children?.length??null,
+          hasExpanded:'expanded' in (originalGet?.(id)??{})},
+        methods:{getNode:typeof model?.getNode,toggleNodeExpansion:typeof model?.toggleNodeExpansion,
+          isExpandable:typeof widget?.isExpandable},
+        isExpandable:typeof widget?.isExpandable==='function'
+          ?widget.isExpandable(originalGet?.(id)):null};
+    })()`);
+    if(!toggleInstrumentation.widgetFound||!toggleInstrumentation.nodeFound)
+      throw Error('Evidence TreeWidget instrumentation could not resolve the live model: '+
+        JSON.stringify(toggleInstrumentation));
     if(!liveToggle.expanded){
       await command('Input.dispatchMouseEvent',{type:'mousePressed',x:liveToggle.x,y:liveToggle.y,button:'left',clickCount:1});
       await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:liveToggle.x,y:liveToggle.y,button:'left',clickCount:1});
@@ -762,6 +824,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         consumerAbi:labels.some(label=>label.includes('Consumer ABI')),
         clickEvents:window.__skillStudioEvidenceClickEvents??[],
         bubbleEvents:window.__skillStudioEvidenceBubbleEvents??[],
+        modelCalls:window.__skillStudioEvidenceModelCalls??[],
         treeWidgets:treeWidgets.map(widget=>({id:widget.id,type:widget.constructor?.name,
           disposed:widget.isDisposed,visible:widget.isVisible,attached:widget.isAttached})),
         evidenceWidgetFound:!!evidenceWidget,modelType:evidenceWidget?.model?.constructor?.name??null,
