@@ -77,8 +77,10 @@ test("partial Package snapshots never report Package Audit as clean",()=>{
   assert.ok(result.scriptReferences.length>0,"locally observed references are still indexed");
   assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===false));
   assert.ok(result.schemaReferences.every(ref=>ref.packageContextComplete===false));
-  assert.ok(result.scriptReferences.every(ref=>ref.sourceRange===null),
-    "line-only references must not become exact LSP locations");
+  assert.ok(result.scriptReferences.every(ref=>ref.sourceRange!==null&&ref.targetRange!==null),
+    "exact local token ranges remain known even when cross-file navigation is gated");
+  assert.ok(result.schemaReferences.every(ref=>ref.sourceRange!==null&&ref.targetRange!==null));
+  assert.ok(result.documents.flatMap(doc=>doc.pythonSymbols).every(symbol=>symbol.navigable&&symbol.range));
 });
 
 test("missing required Package files make only Package Audit unavailable",()=>{
