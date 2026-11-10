@@ -70,20 +70,9 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "x.innerText.includes('establish-pdu-session')&&x.getBoundingClientRect().width>0&&"+
     "x.getBoundingClientRect().x>=0);"+
     "const toggle=el?.querySelector('.theia-TreeNodeContent [data-node-id]');"+
-    "window.__studioToggleEvents=[];"+
-    "for(const type of ['pointerdown','mousedown','pointerup','mouseup','click'])"+
-    "document.addEventListener(type,e=>window.__studioToggleEvents.push({type,"+
-    "targetClass:e.target?.className??e.target?.tagName??null,"+
-    "targetNodeId:e.target?.getAttribute?.('data-node-id')??null,"+
-    "x:e.clientX,y:e.clientY,button:e.button,buttons:e.buttons,detail:e.detail,"+
-    "trusted:e.isTrusted,pointerId:e.pointerId??null}),true);"+
     "const target=toggle??el;const r=target?.getBoundingClientRect();"+
-    "const hit=r?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2):null;"+
     "return r?{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),"+
-    "target:toggle?'expansion-toggle':'row',rowClass:el?.className,toggleClass:toggle?.className,"+
-    "toggleRect:{x:r.x,y:r.y,w:r.width,h:r.height},"+
-    "pointerEvents:toggle?getComputedStyle(toggle).pointerEvents:null,"+
-    "hitClass:hit?.className??null,hitNodeId:hit?.getAttribute('data-node-id')??null}:null;})()");
+    "target:toggle?'expansion-toggle':'row',rowClass:el?.className,toggleClass:toggle?.className}:null;})()");
   if(!scan?.packages?.some(x=>x.name==='establish-pdu-session')||!packageRow)
     throw Error('Package Overview TreeView did not render discovered Package: '+
       JSON.stringify({scan,view}));
@@ -94,35 +83,21 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const expectedGroups=['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'];
   let groups=await readGroups();
   let expandedView=null;
-  let expansionMode='native-mouse';
   if(!expectedGroups.every(group=>groups.includes(group))){
     await click(packageRow.x,packageRow.y);
     await sleep(700);
     groups=await readGroups();
-    expandedView=await evalJS(
-      "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
-      ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
-      "const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(x=>"+
-      "x.innerText.includes('establish-pdu-session'));const toggle=row?.querySelector("+
-      "'.theia-TreeNodeContent [data-node-id]');const r=toggle?.getBoundingClientRect();"+
-      "return {text:part?.innerText??'',rows:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(x=>({"+
-      "text:x.innerText.trim(),className:x.className})),toggleClass:toggle?.className??null,"+
-      "events:window.__studioToggleEvents??null,"+
-      "hitClass:r?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.className??null:null};})()");
-    groups=await readGroups();
     if(!expectedGroups.every(group=>groups.includes(group))){
-      // Chromium's CDP mouse stream can miss the React-owned toggle even when
-      // hit-testing resolves the exact DOM target. Exercise that same native
-      // DOM click handler directly as a browser-host fallback and record it.
-      await evalJS(
+      expandedView=await evalJS(
         "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
         ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
         "const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(x=>"+
-        "x.innerText.includes('establish-pdu-session'));"+
-        "row?.querySelector('.theia-TreeNodeContent [data-node-id]')?.click();return true;})()");
-      expansionMode='native-dom-click-fallback';
-      await sleep(700);
-      groups=await readGroups();
+        "x.innerText.includes('establish-pdu-session'));const toggle=row?.querySelector("+
+        "'.theia-TreeNodeContent [data-node-id]');"+
+        "return {text:part?.innerText??'',rows:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(x=>({"+
+        "text:x.innerText.trim(),className:x.className})),toggleClass:toggle?.className??null};})()");
+      throw Error('Package Overview native TreeView expansion failed: '+
+        JSON.stringify({groups,packageRow,expandedView}));
     }
   }
   for(const group of expectedGroups)
@@ -209,9 +184,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
   await invoke('skillStudio.refreshInspection');
-  const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  const activity=await evalJS(`(()=>{const candidates=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].filter(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const el=candidates.find(x=>x.classList.contains('lm-mod-current'))??candidates[0];const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,active:el.classList.contains('lm-mod-current')}:null;})()`);
   if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
-  await click(activity.x,activity.y);await sleep(500);
+  // C4 may already have opened this Activity Bar container. Clicking an
+  // active Theia viewlet toggles it closed, so only open it when inactive.
+  if(!activity.active){await click(activity.x,activity.y);await sleep(500);}
   const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
   for(const name of ['Packages','Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
   const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
