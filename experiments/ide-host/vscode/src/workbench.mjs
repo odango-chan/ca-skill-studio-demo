@@ -708,7 +708,7 @@ export function registerWorkbench(vscode,context){
   // diagnostic collection. The host Package Audit collection is deliberately
   // given a temporary marker so its survival is observable in Chromium.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&
-     /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(globalThis.location.hostname)){
+     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.languageDiagnosticOwnershipAcceptance",
       async(procedureUriValue,phase="publish")=>{
