@@ -183,10 +183,10 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   }));
   // Rename a named Script Step and all proven local/qualified consumers through
   // the shared closed-world source-span planner, then verify native Undo.
-  const beforeNamedRename=(await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  })).result?.value;
+  // Undo may replace the CustomEditor iframe; reacquire its live execution
+  // world instead of reading a possibly detached Webview context.
+  const beforeNamedGraph=await graph();
+  const beforeNamedRename=beforeNamedGraph?.revision??null;
   const namedRenameVersion=Number(/v(\\d+)/.exec(beforeNamedRename??'')?.[1]);
   if(!Number.isSafeInteger(namedRenameVersion))throw Error('Named Step rename missing native Source revision');
   const oldStepName='select-subscription-configuration';
@@ -211,10 +211,8 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   // Real Chromium + actual Theia extension command registry. Each Verify edit
   // must return to the unmodified Source through native TextDocument Undo.
   async function nativeVerifyRoundTrip(commandId,item,argument,oldText,newText){
-    const before=(await command('Runtime.evaluate',{
-      contextId:graphContext,returnByValue:true,
-      expression:`document.querySelector('#revision')?.textContent`
-    })).result?.value;
+    const currentGraph=await graph();
+    const before=currentGraph?.revision??null;
     const version=Number(/v(\d+)/.exec(before??'')?.[1]);
     if(!Number.isSafeInteger(version))throw Error('Verify command missing native Source revision');
     await startNativeCommand(commandId,{...item,
