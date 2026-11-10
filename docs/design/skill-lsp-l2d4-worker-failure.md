@@ -34,3 +34,7 @@ The Chromium failure was traced to a transient `EntryNotFound / ENOENT` reading 
 The host now preserves that PARTIAL result and retries **only** when its actual sent snapshot reports a workspace `Unable to read file` with `EntryNotFound` / `ENOENT`; maximum three subsequent snapshots, each with its own monotonically increasing Package generation and stale-result invalidation. External Source changes reset the bounded attempt count; a persistent failure remains PARTIAL rather than being silently accepted. No fixed sleep is used as a readiness oracle, no Source write or Package Audit ownership changes.
 
 Status diagnostics distinguish the exact dispatched snapshot completeness from a later recollection and expose same-generation Procedure / Audit state on PARTIAL. This is an L2-D4 integration blocker correction, not proof of successful Worker failure acceptance by itself.
+
+## Chromium Worker identity discovery
+
+The first run that reached the fault gate revealed four dedicated-worker CDP targets with empty `TargetInfo.url` values. Treating any one of those targets as the Language Worker would risk killing the browser extension host instead. The Chromium acceptance now opens a flattened CDP session for each dedicated Worker, reads `WorkerGlobalScope.name` and `self.location.href`, detaches, and selects only the exact `skill-studio-language-server` identity or the bundled `skill-language-server.js` script. Unknown targets are never terminated. `Target.closeTarget` is issued only after this identity proof.
