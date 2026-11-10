@@ -442,7 +442,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
     await sleep(100);
   }
-  const dataflowTreeRow=await evalJS(`(()=>{
+  let dataflowTreeRow=null;
+  for(let attempt=0;attempt<60&&!dataflowTreeRow;attempt++){
+    dataflowTreeRow=await evalJS(`(()=>{
     // TreeNode.innerText includes nested descendants. Inspect only each
     // TreeNode's own content element so we expand the exact summary row.
     const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{
@@ -461,7 +463,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
       candidateCount:rows.length}:null;
   })()`);
-  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing');
+    if(!dataflowTreeRow)await sleep(100);
+  }
+  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after bounded visible-row wait');
   if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
   for(let i=0;i<50;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
