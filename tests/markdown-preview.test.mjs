@@ -88,18 +88,18 @@ test("current dual Skill guides render safely and expose only explicit Package-l
     const preview=renderMarkdown(source);
     assert.equal(preview.available,true,name);
     assert.match(preview.html,/<details class="md-frontmatter">/,name);
-    assert.match(preview.html,/<h1>[^<]+<\\/h1>/,name);
-    assert.doesNotMatch(preview.html,/<script\\b|<iframe\\b|<img\\b/i,name);
+    assert.match(preview.html,/<h1>[^<]+<\/h1>/,name);
+    assert.doesNotMatch(preview.html,/<script\b|<iframe\b|<img\b/i,name);
   }
   const source=readFileSync(new URL(
     "../site/samples/skills/establish-pdu-session/SKILL.md",import.meta.url),"utf8");
   const linked=renderMarkdown(source,{localLinks:true}).html;
-  assert.match(linked,/data-local-path="references\\/3gpp-procedure\\.md"/);
-  assert.match(linked,/data-local-path="references\\/session-selection\\.md"/);
-  assert.match(linked,/data-local-path="references\\/failure-handling\\.md"/);
+  assert.match(linked,/data-local-path="references\/3gpp-procedure\.md"/);
+  assert.match(linked,/data-local-path="references\/session-selection\.md"/);
+  assert.match(linked,/data-local-path="references\/failure-handling\.md"/);
   // The guide also links to a repository-level design note. It must not be
   // converted into a Package-local link because it escapes the Skill root.
-  assert.doesNotMatch(linked,/data-local-path="\\.\\.\\/\\.\\.\\/docs/);
+  assert.doesNotMatch(linked,/data-local-path="\.\.\/\.\.\/docs/);
   assert.match(linked,/md-unresolved-link/);
 });
 
@@ -110,7 +110,7 @@ test("Reference Markdown can link back to SKILL.md, while local navigation is op
   const ordinary=renderMarkdown(source).html;
   assert.doesNotMatch(ordinary,/data-local-path=/);
   const linked=renderMarkdown(source,{localLinks:true}).html;
-  assert.match(linked,/data-local-path="\\.\\.\\/SKILL\\.md"/);
+  assert.match(linked,/data-local-path="\.\.\/SKILL\.md"/);
 });
 
 test("Package-local Markdown navigation never promotes unsafe or escaping paths",()=>{
@@ -120,11 +120,11 @@ test("Package-local Markdown navigation never promotes unsafe or escaping paths"
     "[escape](../../docs/design/private.md)",
     "[unsafe](javascript:alert(1))",
     "[remote](https://example.com/manual)"
-  ].join("\\n");
+  ].join("\n");
   const html=renderMarkdown(source,{localLinks:true}).html;
-  assert.match(html,/data-local-path="references\\/session-selection\\.md"/);
-  assert.match(html,/data-local-path="\\.\\.\\/SKILL\\.md"/);
-  assert.doesNotMatch(html,/data-local-path="\\.\\.\\/\\.\\.\\//);
+  assert.match(html,/data-local-path="references\/session-selection\.md"/);
+  assert.match(html,/data-local-path="\.\.\/SKILL\.md"/);
+  assert.doesNotMatch(html,/data-local-path="\.\.\/\.\.\//);
   assert.doesNotMatch(html,/href="javascript:/i);
-  assert.match(html,/href="https:\\/\\/example\\.com\\/manual"/);
+  assert.match(html,/href="https:\/\/example\.com\/manual"/);
 });
