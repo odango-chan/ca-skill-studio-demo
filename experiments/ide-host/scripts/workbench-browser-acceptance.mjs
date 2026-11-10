@@ -1,10 +1,4 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
-import {readFile} from "node:fs/promises";
-
-const outputReferenceFixture=await readFile(new URL(
-  "../../../tests/fixtures/establish-pre-hold/assurance/procedure.yaml",import.meta.url),"utf8");
-const originalPackageProcedure=await readFile(new URL(
-  "../../../site/samples/packages/establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
 export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
@@ -24,70 +18,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   async function startNativeCommand(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
     await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
-  }
-  async function replaceNativeProcedureSource(text){
-    // This only seeds/restores a pinned test fixture. The edit being tested
-    // still goes through the actual Inspector command and native WorkspaceEdit.
-    const direct=await evalJS(`(()=>{
-      const c=window.theia?.container;
-      const api=window.monaco?.editor??(typeof monaco!=="undefined"?monaco.editor:null);
-      const models=api?.getModels?.()??[];
-      let model=models.find(item=>item.uri?.path?.endsWith('/assurance/procedure.yaml'));
-      if(model){model.setValue(${JSON.stringify(text)});return {method:'monaco-model',path:model.uri.path};}
-      const keys=[...(c?._bindingDictionary?._map?.keys?.()??[])];
-      const editorKeys=keys.filter(key=>/EditorManager|MonacoEditor/.test(key?.name??String(key)));
-      for(const key of editorKeys){
-        try{
-          const service=c.get(key);
-          const widgets=[service.currentEditor,service.currentEditorWidget,
-            service.activeEditor,service.currentEditor?.editor,service.currentEditorWidget?.editor];
-          for(const widget of widgets){
-            const editor=widget?.editor??widget;
-            const control=editor?.getControl?.()??editor?.control;
-            const candidate=control?.getModel?.()??editor?.model;
-            if(candidate?.setValue&&candidate.uri?.path?.endsWith('/assurance/procedure.yaml')){
-              candidate.setValue(${JSON.stringify(text)});
-              return {method:'editor-manager-model',key:key.name??String(key),path:candidate.uri.path};
-            }
-          }
-        }catch{}
-      }
-      return {method:'native-type-fallback',monaco:typeof window.monaco,
-        modelPaths:models.map(item=>item.uri?.path).filter(Boolean).slice(0,8),
-        editorKeys:editorKeys.map(key=>key.name??String(key)).slice(0,12)};
-    })()`);
-    console.log("STUDIO_OUTPUT_FIXTURE_EDITOR",JSON.stringify(direct));
-    if(direct.method==='native-type-fallback'){
-      // Current Monaco may use native EditContext instead of a textarea.
-      // Focus its real editing surface and drive keyboard/CDP events; never
-      // require a legacy textarea that modern Chromium does not provide.
-      const focus=await evalJS(`(()=>{
-        const editors=[...document.querySelectorAll('.monaco-editor')]
-          .filter(el=>el.getBoundingClientRect().width>200&&
-            el.getBoundingClientRect().height>100);
-        const editor=editors.find(el=>
-          el.closest('.theia-editor')?.classList.contains('theia-mod-active'))??
-          editors.at(-1);
-        const input=editor?.querySelector('.native-edit-context, textarea.inputarea');
-        input?.focus();
-        return {editorCount:editors.length,hasInput:Boolean(input),
-          focusReady:document.activeElement===input,
-          activeTag:document.activeElement?.tagName,
-          activeClass:document.activeElement?.className};
-      })()`);
-      console.log("STUDIO_OUTPUT_FIXTURE_FOCUS",JSON.stringify(focus));
-      if(!focus?.focusReady)throw Error(
-        "Cannot focus native Monaco input for output-reference fixture: "+
-          JSON.stringify(focus));
-      const key={key:"a",code:"KeyA",windowsVirtualKeyCode:65,
-        nativeVirtualKeyCode:65,modifiers:2};
-      await command("Input.dispatchKeyEvent",{type:"keyDown",...key});
-      await command("Input.dispatchKeyEvent",{type:"keyUp",...key});
-      await command("Input.insertText",{text});
-    }
-    await sleep(450);
-    const visible=await graph();
-    console.log("STUDIO_OUTPUT_REFERENCE_FIXTURE_SOURCE",JSON.stringify({method:direct.method,revision:visible?.revision,nodes:visible?.nodes}));
   }
   async function waitForRevisionChange(contextId,previous,label){
     let latest=null,refreshed=null;
@@ -458,60 +388,58 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   console.log('STUDIO_PHASE_VERIFY_CHROMIUM',JSON.stringify({
     append:verifyAppend,name:verifyName,delete:verifyDelete,reorder:verifyReorder
   }));
-  // The published sample intentionally has no same-Node local/qualified
-  // alias pair. Load the pinned predecessor fixture into the real native
-  // Source editor to exercise bounded D4-A2.1 normalization and Undo.
-  const beforeOutputFixture=await graph();
-  if(!beforeOutputFixture?.revision)throw Error('Output reference fixture has no initial Source revision');
-  await replaceNativeProcedureSource(outputReferenceFixture);
-  const fixtureRevision=await waitForRevisionChange(graphContext,beforeOutputFixture.revision,
-    'Output reference fixture load');
-  const fixtureGraph=await graph();
-  if(!fixtureGraph?.revision||fixtureGraph.revision===beforeOutputFixture.revision)
-    throw Error('Output reference fixture did not reach the live Procedure projection');
-  const fixtureVersion=Number(/v(\d+)/.exec(fixtureGraph.revision)?.[1]);
-  if(!Number.isSafeInteger(fixtureVersion))throw Error('Could not read fixture TextDocument version');
+  // Exercise D4-A2.1 against the current published sample, not a wholesale
+  // Source replacement. Its PCF node already has both real spellings:
+  // a local preconditions.resolve-pcf-create-inputs output reference on the
+  // later baseline Verify Step, and a fully-qualified reference elsewhere
+  // in the same Procedure. This keeps the real Source version / undo path.
+  const beforeOutputGraph=await graph();
+  if(!beforeOutputGraph?.revision)
+    throw Error('Output reference test has no initial native Source revision');
+  const outputVersion=Number(/v(\\d+)/.exec(beforeOutputGraph.revision)?.[1]);
+  if(!Number.isSafeInteger(outputVersion))
+    throw Error('Could not read native Source version before output reference test');
   const outputProcedure='ue-requested-pdu-session-establishment';
-  const outputNode='nudm-sdm-subscribe';
-  const localOutput='preconditions.select-subscription-configuration.output';
+  const outputNode='npcf-sm-policy-control-create';
+  const localOutput='preconditions.resolve-pcf-create-inputs.output.pcfPolicyAssociationRef';
   const qualifiedOutput=outputNode+'.'+localOutput;
   const outputItem={kind:'phase-output-reference',procedureId:outputProcedure,
-    nodeId:outputNode,phaseName:'preconditions',stepIndex:1,
-    bindingKey:'selection',sourceVersion:fixtureVersion};
+    nodeId:outputNode,phaseName:'preconditions',stepIndex:4,
+    bindingKey:'pcfPolicyAssociationRef',sourceVersion:outputVersion};
   await startNativeCommand('skillStudio.editPhaseOutputReference',outputItem,
-    'selection',qualifiedOutput);
+    'pcfPolicyAssociationRef',qualifiedOutput);
   await confirmNativePreview(localOutput,qualifiedOutput);
   const outputAccepted=await evalJS('window.__skillStudioCommandResult');
-  const afterOutput=await waitForRevisionChange(graphContext,fixtureGraph.revision,
+  const afterOutput=await waitForRevisionChange(graphContext,beforeOutputGraph.revision,
     'Phase output reference normalization');
   if(outputAccepted!==true)throw Error('Phase output reference normalization was not accepted');
   await invoke('core.undo');
   const afterOutputUndo=await waitForRevisionChange(graphContext,
     afterOutput.result?.value,'Phase output reference native Undo');
   // Reapply after Undo to prove the original local spelling was restored and
-  // remains eligible; undo it again before restoring the real sample.
-  const undoVersion=Number(/v(\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
-  if(!Number.isSafeInteger(undoVersion))throw Error('Could not read Source version after output reference Undo');
+  // that the same source-backed candidate is still eligible.
+  const undoVersion=Number(/v(\\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(undoVersion))
+    throw Error('Could not read Source version after output reference Undo');
   await startNativeCommand('skillStudio.editPhaseOutputReference',{
     ...outputItem,sourceVersion:undoVersion
-  },'selection',qualifiedOutput);
+  },'pcfPolicyAssociationRef',qualifiedOutput);
   await confirmNativePreview(localOutput,qualifiedOutput);
   const outputReapply=await evalJS('window.__skillStudioCommandResult');
-  const afterOutputReapply=await graph();
-  if(outputReapply!==true||!afterOutputReapply?.revision||
-     afterOutputReapply.revision===afterOutputUndo.result?.value)
+  const afterOutputReapply=await waitForRevisionChange(graphContext,
+    afterOutputUndo.result?.value,'Phase output reference reapply');
+  if(outputReapply!==true)
     throw Error('Output reference was not eligible again after native Undo');
   await invoke('core.undo');
   const afterOutputReapplyUndo=await waitForRevisionChange(graphContext,
-    afterOutputReapply.revision,'Phase output reference second Undo');
-  await replaceNativeProcedureSource(originalPackageProcedure);
-  await invoke('core.saveAll');
+    afterOutputReapply.result?.value,'Phase output reference second Undo');
   const restoredOutputGraph=await graph();
-  if(!restoredOutputGraph?.revision||restoredOutputGraph.nodes!==17)
-    throw Error('Original Package Procedure was not restored after output reference acceptance');
-  const outputReference={before:fixtureRevision.result?.value??beforeOutputFixture.revision,
+  if(!restoredOutputGraph?.revision||restoredOutputGraph.nodes!==beforeOutputGraph.nodes)
+    throw Error('Native output-reference Undo lost the original graph');
+  const outputReference={before:beforeOutputGraph.revision,
     applied:afterOutput.result?.value,undo:afterOutputUndo.result?.value,
-    reapplied:afterOutputReapply.revision,undoAgain:afterOutputReapplyUndo.result?.value,
+    reapplied:afterOutputReapply.result?.value,
+    undoAgain:afterOutputReapplyUndo.result?.value,
     restored:restoredOutputGraph.revision,localOutput,qualifiedOutput};
   console.log('STUDIO_PHASE_OUTPUT_REFERENCE_CHROMIUM',JSON.stringify(outputReference));
   const graphHasNode=async id=>{
