@@ -134,11 +134,11 @@ test("Markdown preview adds navigable headings and ignores fenced code",()=>{
   ].join("\n");
   const html=renderMarkdown(source).html;
   assert.match(html,/class="md-toc"/);
-  const ids=[...html.matchAll(/<h[1-6] id="(md-heading-\\d+)"/g)].map(match=>match[1]);
+  const ids=[...html.matchAll(/<h[1-6] id="(md-heading-\d+)"/g)].map(match=>match[1]);
   assert.equal(ids.length,3);
   assert.equal(new Set(ids).size,3);
   assert.match(html,/href="#md-heading-0"/);
   assert.match(html,/href="#md-heading-2"/);
   assert.match(html,/href="#md-heading-8"/);
-  assert.doesNotMatch(html,/Not a heading/);
+  assert.doesNotMatch(html,/href="#md-heading-5"/);
 });
