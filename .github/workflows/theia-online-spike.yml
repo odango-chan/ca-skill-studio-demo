@@ -29,6 +29,10 @@ jobs:
           node-version: "24"
       - name: Install pinned Studio dependencies
         run: npm ci --no-audit --no-fund
+      - name: Install pinned browser LSP client and server dependencies
+        run: |
+          npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
+          npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
       - name: Build Node and browser Procedure extensions
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Stage web plugin for browser-only Theia
