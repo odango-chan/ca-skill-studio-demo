@@ -35,7 +35,8 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | 为何采用 Source-first | [ADR-0001](decisions/0001-source-first-visual.md) |
 | E1 Monaco Source Editor / E2–E4 boundaries | [E Source Editor](design/source-editor-workstream.md) |
 | 当前应用菜单 / 本地宿主边界 | [Application Shell](design/application-shell.md) |
-| Skill Language Core / Browser LSP | [L2-D Editor Acceptance](design/skill-lsp-l2d-editor-acceptance.md) |
+| Skill Language Core / Browser LSP · L2-D1 | [L2-D1 Editor Acceptance](design/skill-lsp-l2d-editor-acceptance.md) |
+| Native Problems diagnostics lifecycle · L2-D2 | [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) |
 | Theia 默认在线宿主 / Classic 保留与功能迁移边界 | [ADR-0002](decisions/0002-ide-host-spike.md) |
 | 当前状态 | [WORK](WORK.md) |
 | 实施、测试与证据 locator | [TRACEABILITY](TRACEABILITY.md) |
