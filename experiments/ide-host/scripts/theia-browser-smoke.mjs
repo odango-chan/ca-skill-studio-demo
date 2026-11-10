@@ -407,6 +407,63 @@ try{
       if(!(yamlSyntax?.tokenColors?.length>=3))
         throw Error("Native YAML syntax tokenization not active: "+JSON.stringify(yamlSyntax));
       patchEvidence.yamlSyntax=yamlSyntax;
+      // Open a real bundled Python source through Theia's native Quick Open.
+      // This verifies the Python TextMate grammar in the same editor host.
+      const yamlEditorRect=await evalJS(\`(()=>{
+        const el=[...document.querySelectorAll('.monaco-editor')]
+          .find(x=>x.getBoundingClientRect().width>150&&x.querySelector('.view-lines'));
+        const r=el?.getBoundingClientRect();
+        return r?{x:r.x+Math.min(120,r.width/2),y:r.y+Math.min(60,r.height/2)}:null;
+      })()\`);
+      if(!yamlEditorRect)throw Error("Native YAML editor is not visible before Python syntax probe");
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:yamlEditorRect.x,y:yamlEditorRect.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:yamlEditorRect.x,y:yamlEditorRect.y,button:"left",clickCount:1});
+      await command("Input.dispatchKeyEvent",{type:"keyDown",key:"p",code:"KeyP",modifiers:2,windowsVirtualKeyCode:80,nativeVirtualKeyCode:80});
+      await command("Input.dispatchKeyEvent",{type:"keyUp",key:"p",code:"KeyP",modifiers:2,windowsVirtualKeyCode:80,nativeVirtualKeyCode:80});
+      let quickOpen=null;
+      for(let attempt=0;attempt<30;attempt++){
+        quickOpen=await evalJS(\`(()=>{
+          const inputs=[...document.querySelectorAll('input')].filter(el=>{
+            const r=el.getBoundingClientRect();return r.width>0&&r.height>0;
+          });
+          const input=inputs.find(el=>el.closest('.quick-input-widget,.monaco-quick-open-widget,.theia-quick-view'))||
+            inputs.find(el=>/quick|file|search/i.test(el.getAttribute('aria-label')||el.placeholder||''));
+          return input?{tag:input.tagName,placeholder:input.placeholder||'',
+            aria:input.getAttribute('aria-label')||'',value:input.value||''}:null;
+        })()\`);
+        if(quickOpen)break;
+        await sleep(100);
+      }
+      if(!quickOpen)throw Error("Native Quick Open did not appear for Python syntax probe");
+      await command("Input.insertText",{text:"build_n1n2_delivery.py"});
+      await sleep(600);
+      const quickResults=await evalJS(\`document.body.innerText.slice(-1200)\`);
+      if(!quickResults.includes("build_n1n2_delivery.py"))
+        throw Error("Native Quick Open did not find the bundled Python script: "+quickResults);
+      await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Enter",code:"Enter",windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});
+      await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Enter",code:"Enter",windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});
+      await sleep(900);
+      const pythonSyntax=await evalJS(\`(()=>{
+        const editors=[...document.querySelectorAll('.monaco-editor')]
+          .filter(el=>el.getBoundingClientRect().width>150&&el.querySelector('.view-lines'));
+        const editor=editors.find(el=>el.contains(document.activeElement))||editors.at(-1);
+        const spans=[...(editor?.querySelectorAll('.view-lines span')??[])];
+        return {visibleEditors:editors.length,active:Boolean(editor?.contains(document.activeElement)),
+          tokenCount:spans.length,tokenColors:[...new Set(spans.map(el=>getComputedStyle(el).color))],
+          text:editor?.querySelector('.view-lines')?.innerText?.slice(0,500)||'',
+          bodyTail:document.body.innerText.slice(-350)};
+      })()\`);
+      console.log("STUDIO_NATIVE_PYTHON_SYNTAX_CHROMIUM",JSON.stringify(pythonSyntax));
+      if(!(pythonSyntax?.tokenColors?.length>=3)||
+         !/def |import |from /.test(pythonSyntax.text))
+        throw Error("Native Python syntax tokenization not active: "+JSON.stringify(pythonSyntax));
+      patchEvidence.pythonSyntax=pythonSyntax;
+      // Return to the authoritative Procedure Source editor before testing Undo.
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:\`document.querySelector("#openSource")?.click();true\`
+      });
+      await sleep(700);
       await command("Input.dispatchKeyEvent",{
         type:"keyDown",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
       });
