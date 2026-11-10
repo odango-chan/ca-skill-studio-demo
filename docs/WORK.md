@@ -1,6 +1,6 @@
 # Skill Studio 当前工作状态
 
-**Updated: 2026-11-09**  
+**Updated: 2026-11-10**  
 **Theia host migration merge:** `b2f4e991e5e273ebb98419ba0b66453bdd0f72cf` (PR #86 Squash Merge; Theia is now the default Pages host).  
 **Node Focus merge baseline:** `b9c1c38cd286526d742dd254646a9ec3c2489562` (PR #89 Node Focus migration merged; resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727)).  
 **Integrated baseline before top-level menu UX: main@80cc153fc043cf3d6e7e6449fb9197adc7419eb6**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
@@ -171,4 +171,4 @@ main browser application remains available at `/classic/`.
 
 **安全边界：** 预览后必须显式确认；确认期间 Source 版本或文档身份变化则拒绝；宿主重新计算 Patch 并核对精确 source spans；不允许 Operator kind 转换，不安全/不支持的节点继续 Source-only。Classic 不删除、不降级。
 
-**未包含：** Node 插入/删除、Phase Step 编辑、Binding 编辑、Root 路径筛选、Runtime / 5GC。该增量的 IDE Host、Theia backend Chromium、Theia browser-only 和 Inspector Undo 真实 Chromium 验收仍待 exact-head CI；未通过前不得标记 IMPLEMENTED / PASS。
+**未包含：** Node 插入/删除、Phase Step 编辑、Binding 编辑、Root 路径筛选、Runtime / 5GC。该增量由 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96) 跟踪；IDE Host、Theia backend Chromium、Theia browser-only 和 Inspector Undo 真实 Chromium验收仍待 exact-head CI；未通过前不得标记 IMPLEMENTED / PASS。
