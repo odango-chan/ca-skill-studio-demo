@@ -8,7 +8,7 @@ const fixture=name=>readFileSync(
 test("Markdown preview renders headings, emphasis, inline code, lists and blockquotes",()=>{
   const source="# Demo\n\nA **bold** and *italic* word with \x60code\x60.\n\n- First\n- Second\n\n> A quote\n";
   const html=renderMarkdown(source).html;
-  assert.match(html,/<h1>Demo<\/h1>/);
+  assert.match(html,/<h1(?: id="[^"]+")?>Demo<\/h1>/);
   assert.match(html,/<strong>bold<\/strong>/);
   assert.match(html,/<em>italic<\/em>/);
   assert.match(html,/<code>code<\/code>/);
@@ -21,8 +21,8 @@ test("SKILL.md frontmatter is readable and actual fixture renders as a document"
     const result=renderMarkdown(content);
     assert.equal(result.available,true);
     assert.match(result.html,/<details class="md-frontmatter">/);
-    assert.match(result.html,/<h1>[^<]+<\/h1>/);
-    assert.match(result.html,/<h2>Purpose<\/h2>/);
+    assert.match(result.html,/<h1(?: id="[^"]+")?>[^<]+<\/h1>/);
+    assert.match(result.html,/<h2(?: id="[^"]+")?>Purpose<\/h2>/);
     assert.doesNotMatch(result.html,/<script\b/i);
   }
 });
@@ -72,7 +72,7 @@ test("all three current CreatedSession business References render safely in Mark
       "establish-pdu-session/references/"+name,import.meta.url),"utf8");
     const rendered=renderMarkdown(source);
     assert.equal(rendered.available,true,name);
-    assert.match(rendered.html,/<h1>[^<]+<\/h1>/,name);
+    assert.match(rendered.html,/<h1(?: id="[^"]+")?>[^<]+<\/h1>/,name);
     assert.doesNotMatch(rendered.html,/<script\b|<iframe\b|<img\b/i,name);
     assert.ok(rendered.html.length>1000,name);
   }
@@ -88,7 +88,7 @@ test("current dual Skill guides render safely and expose only explicit Package-l
     const preview=renderMarkdown(source);
     assert.equal(preview.available,true,name);
     assert.match(preview.html,/<details class="md-frontmatter">/,name);
-    assert.match(preview.html,/<h1>[^<]+<\/h1>/,name);
+    assert.match(preview.html,/<h1(?: id="[^"]+")?>[^<]+<\/h1>/,name);
     assert.doesNotMatch(preview.html,/<script\b|<iframe\b|<img\b/i,name);
   }
   const source=readFileSync(new URL(
@@ -127,4 +127,18 @@ test("Package-local Markdown navigation never promotes unsafe or escaping paths"
   assert.doesNotMatch(html,/data-local-path="\.\.\/\.\.\//);
   assert.doesNotMatch(html,/href="javascript:/i);
   assert.match(html,/href="https:\/\/example\.com\/manual"/);
+});
+test("Markdown preview adds navigable headings and ignores fenced code",()=>{
+  const source=[
+    "# Guide","","## Setup","","```md","## Not a heading","```","","## Setup"
+  ].join("\n");
+  const html=renderMarkdown(source).html;
+  assert.match(html,/class="md-toc"/);
+  const ids=[...html.matchAll(/<h[1-6] id="(md-heading-\\d+)"/g)].map(match=>match[1]);
+  assert.equal(ids.length,3);
+  assert.equal(new Set(ids).size,3);
+  assert.match(html,/href="#md-heading-0"/);
+  assert.match(html,/href="#md-heading-2"/);
+  assert.match(html,/href="#md-heading-8"/);
+  assert.doesNotMatch(html,/Not a heading/);
 });
