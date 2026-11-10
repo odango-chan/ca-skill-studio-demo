@@ -1,6 +1,6 @@
 # SKILL Studio online host · Theia + optional VS Code desktop/web
 
-**Default online host direction (2026-11-09).** Repo owner:
+**Default online host direction (2026-11-09), canvas parity increment merged (2026-11-10).** Repo owner:
 `ca-skill-studio-demo`. GitHub Pages now targets Theia browser-only at `/`;
 the previous full browser Studio is preserved at `/classic/`, and the former
 `/ide-preview/` path redirects to the new root. This is a host-shell switch,
@@ -28,7 +28,7 @@ The current spike imports the real projection, ReactFlow and ELK sources from
 `site/` and bundles those exact modules. It registers a **non-default**
 custom visual editor on `**/assurance/procedure.yaml`. Ordinary YAML/Python
 stay in the host's default editors. New/rename/delete files work through
-the **host's Explorer**, not through separate Studio code.
+the **host's Explorer**, not through separate Studio code. The Procedure CustomEditor also restores the Classic canvas toolbar and Root path focus (vertical/horizontal, fit/zoom, main/selected/all paths and anchored branch expand/collapse) via PR #106; these controls remain view-only.
 
 ## Shared theme · offline VS Code and online Theia
 
@@ -122,19 +122,19 @@ References:
 
 ## What is and is not proven
 
-| Test | Acceptance | Status at main b9c1c38 |
+| Test | Acceptance | Status at main 5dfa50e |
 |---|---|---|
 | Existing CreatedSession YAML projection | five procedures, Root 17 nodes, 63 Outcome routes | **PASS** (unit) |
 | Native TextDocument + WorkspaceEdit boundary | IDE owns file IO, undo, save; Webview never does | **PASS** in real Theia browser-only and backend Chromium CustomEditor acceptance; desktop VS Code GUI **NOT_RUN** |
 | Patch isolation / stale rejection | host reprojects, checks version and exact scalar span | **PASS** (unit + mock-host) |
-| ReactFlow + ELK bundling | Webview bundle with local CSS and scripts | **PASS** (real Theia Chromium render, including Node Focus) |
+| ReactFlow + ELK bundling | Webview bundle with local CSS and scripts | **PASS** (real Theia Chromium render, including Node Focus and restored canvas toolbar / Root path controls) |
 | VS Code Explorer/new file | native integration works | **NOT_RUN** |
 | VS Code editor open/edit/undo | graph refresh and single-scalar patch | **NOT_RUN** |
 | Theia same VSIX | custom editor and Webview API compatibility | **NOT_RUN** |
 | Theia browser-only with Web extension | Build-time bundled extension, sample import, Procedure CustomEditor, Patch, native Source/Undo, Node Focus and Source line reveal | **PASS** in real Chromium at the default Pages root; Classic composition and Pages deployment also PASS |
 | Local Runtime / 5GC | deliberately out of scope | **NOT_RUN** |
 
-The Pages host is now Theia browser-only. The Node Focus view and Route creation/reconnect are migrated. Inspector Node rename and Operator-value editing ([PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)), Phase Input Binding ([PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97)) and bounded Node insertion/deletion ([PR #98](https://github.com/odango-chan/ca-skill-studio-demo/pull/98)) are now merged into main using ancestry-preserving merge commits. The merged Node insertion/deletion supports: insert on eligible existing Routes; delete only safe same-status Terminal merges or single-outcome bypasses. Both real Theia Chromium modes verify insert, delete, Route repair and native Undo. Full named/effectful Phase Step and consumer/producer authoring remains Classic-only. [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99) implements only a bounded native Inspector Verify tail append, safe unnamed Verify delete and adjacent reorder by reusing existing Classic modules; exact-head IDE Host and real Theia Chromium both passed, with native Undo; PR #99 is merged into main at `1ac11d6c`. Resulting-main Pages [#42746670113 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42746670113) for `main@5a5cb981`, including real Chromium at the default root and successful deployment. The D4-A1 Phase Input Binding subset remains limited to existing same-Procedure, same-type input sources. Package Audit and Markdown preview are already native Theia views. Its GitHub Pages adapter changes
+The Pages host is now Theia browser-only. The Node Focus view, Route creation/reconnect and the Classic canvas toolbar / Root path filtering are migrated. PR #106 exact-head IDE Host, Theia Browser-Only and backend real Chromium checks all PASS; browser evidence confirms default vertical Root success-path view (9 Nodes / 8 visible edges), horizontal layout, restored vertical layout and all-path view (17 Nodes / 46 edges). PR #106 merged as `5dfa50e0`. Resulting-main Pages for this merge SHA must still be verified independently. Inspector Node rename and Operator-value editing ([PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)), Phase Input Binding ([PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97)) and bounded Node insertion/deletion ([PR #98](https://github.com/odango-chan/ca-skill-studio-demo/pull/98)) are now merged into main using ancestry-preserving merge commits. The merged Node insertion/deletion supports: insert on eligible existing Routes; delete only safe same-status Terminal merges or single-outcome bypasses. Both real Theia Chromium modes verify insert, delete, Route repair and native Undo. Full named/effectful Phase Step and consumer/producer authoring remains Classic-only. [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99) implements only a bounded native Inspector Verify tail append, safe unnamed Verify delete and adjacent reorder by reusing existing Classic modules; exact-head IDE Host and real Theia Chromium both passed, with native Undo; PR #99 is merged into main at `1ac11d6c`. Resulting-main Pages [#42746670113 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42746670113) for `main@5a5cb981`, including real Chromium at the default root and successful deployment. The D4-A1 Phase Input Binding subset remains limited to existing same-Procedure, same-type input sources. Package Audit and Markdown preview are already native Theia views. Its GitHub Pages adapter changes
 Theia's default per-Webview subdomain pattern to same-origin because Pages
 cannot provide wildcard Webview DNS/TLS. A persistent warning is shown:
 **do not open sensitive files or untrusted workspaces**. OPFS data stays in
