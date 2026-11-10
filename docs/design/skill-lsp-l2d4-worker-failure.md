@@ -26,3 +26,11 @@ Draft stacked on L2-D3a (#117); no merge to main, no Pages deployment, no Runtim
 ## First Chromium integration failure (pre-fault)
 
 The first exact-head run did not reach fault injection: the existing D1 editor feature acceptance waited on a current Package generation that returned `PARTIAL`, despite a structurally complete snapshot and no published diagnostics. This remains a failure, not an accepted degraded result. The new diagnostic-only status fields report the exact generation's Procedure projection state, Procedure diagnostic count, Package Audit state and unavailability reason, and the host tooltip surfaces them when `PARTIAL`. Follow-up must establish whether source/undo left an actually invalid graph or analysis misclassified a valid Package, rather than adding sleeps or accepting stale READY.
+
+## Pre-fault Package read race and bounded recovery
+
+The Chromium failure was traced to a transient `EntryNotFound / ENOENT` reading `schemas/selection.schema.yaml` **after** file enumeration: current Procedure projection was READY while Package Audit was UNAVAILABLE. A later fresh snapshot could read the same file. Merely waiting longer for READY cannot resolve a generation already published as PARTIAL.
+
+The host now preserves that PARTIAL result and retries **only** when its actual sent snapshot reports a workspace `Unable to read file` with `EntryNotFound` / `ENOENT`; maximum three subsequent snapshots, each with its own monotonically increasing Package generation and stale-result invalidation. External Source changes reset the bounded attempt count; a persistent failure remains PARTIAL rather than being silently accepted. No fixed sleep is used as a readiness oracle, no Source write or Package Audit ownership changes.
+
+Status diagnostics distinguish the exact dispatched snapshot completeness from a later recollection and expose same-generation Procedure / Audit state on PARTIAL. This is an L2-D4 integration blocker correction, not proof of successful Worker failure acceptance by itself.
