@@ -112,6 +112,16 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     "rootPathFilters","pathFailure","pathUncertain","pathRecovery"]){
     assert.match(webview.html,new RegExp('id="'+id+'"'),id+" must be in the native graph toolbar");
   }
+  for(const [id,name] of [
+    ["neighborsOnly","network"],["showAllLabels","eye"],["centerSelection","locate-fixed"],
+    ["zoomOut","zoom-out"],["zoomIn","zoom-in"],["fit","maximize"],
+    ["fitWidth","fit-width"],["fitHeight","fit-height"]
+  ]){
+    assert.match(webview.html,new RegExp('id="'+id+'"[^>]*aria-label="[^"]+"'),
+      id+" must retain an accessible label");
+    assert.ok(webview.html.includes('data-icon="'+name+'"'),
+      id+" must use the shared Classic icon "+name);
+  }
   assert.ok(webview.html.includes('<option value="DOWN" selected>垂直</option>'));
   assert.doesNotMatch(webview.html,/unsafe-inline/);
   assert.ok(typeof onMessage==="function");
@@ -259,4 +269,19 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.doesNotMatch(document.text,/^\\s{6}create-session:/m);
   assert.doesNotMatch(document.text,/from: create-session\\./);
   assert.ok(writes.length>3,"Node rename applies its complete non-overlapping CST span set");
+});
+
+test("Skill Studio authoring views are integrated below Explorer, not a competing Activity Bar",()=>{
+  const manifest=JSON.parse(readFileSync("experiments/ide-host/vscode/package.json","utf8"));
+  assert.equal(manifest.contributes.viewsContainers,undefined,
+    "no separate Skill Studio Activity Bar container");
+  const views=manifest.contributes.views.explorer;
+  assert.deepEqual(views.map(x=>[x.id,x.name]),[
+    ["skillStudio.inspection","SKILL Inspector"],
+    ["skillStudio.outline","Procedure Outline"],
+    ["skillStudio.evidence","Evidence"],
+    ["skillStudio.problems","Problems"]
+  ]);
+  assert.ok(!views.some(x=>x.name==="Outline"),
+    "avoid an ambiguous duplicate of Theia's native Outline");
 });
