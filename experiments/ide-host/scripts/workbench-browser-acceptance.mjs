@@ -169,6 +169,40 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     node:bindingSelection.result.value.node,procedure:bindingSelection.result.value.procedure,
     before:beforeBinding.result?.value,after:afterBinding.result?.value,undo:afterBindingUndo.result?.value
   }));
+  // Real Chromium + actual Theia extension command registry. Each Verify edit
+  // must return to the unmodified Source through native TextDocument Undo.
+  async function nativeVerifyRoundTrip(commandId,item,argument,oldText,newText){
+    const before=(await command('Runtime.evaluate',{
+      contextId:graphContext,returnByValue:true,
+      expression:`document.querySelector('#revision')?.textContent`
+    })).result?.value;
+    const version=Number(/v(\\d+)/.exec(before??'')?.[1]);
+    if(!Number.isSafeInteger(version))throw Error('Verify command missing native Source revision');
+    await startNativeCommand(commandId,{...item,
+      procedureId:bindingSelection.result.value.procedure,
+      nodeId:'nudm-sdm-subscribe',sourceVersion:version
+    },argument);
+    await confirmNativePreview(oldText,newText);
+    const accepted=await evalJS(`window.__skillStudioCommandResult`);
+    const after=await waitForRevisionChange(graphContext,before,commandId+' apply');
+    if(accepted!==true)throw Error(commandId+' did not apply after confirmation');
+    await invoke('core.undo');
+    const undone=await waitForRevisionChange(graphContext,after.result?.value,commandId+' Undo');
+    return {before,applied:after.result?.value,undone:undone.result?.value};
+  }
+  const verifyAppend=await nativeVerifyRoundTrip('skillStudio.addPhaseVerify',
+    {kind:'phase',phaseName:'preconditions'},
+    'createdsession.n4.initial_resources_ready',
+    '新增','createdsession.n4.initial_resources_ready');
+  const verifyDelete=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
+    {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
+    'delete','删除','createdsession.lifecycle.ready');
+  const verifyReorder=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
+    {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
+    'move-up','调整','createdsession.ingress.eligible');
+  console.log('STUDIO_PHASE_VERIFY_CHROMIUM',JSON.stringify({
+    append:verifyAppend,delete:verifyDelete,reorder:verifyReorder
+  }));
   const graphHasNode=async id=>{
     const result=await command('Runtime.evaluate',{
       contextId:graphContext,returnByValue:true,
