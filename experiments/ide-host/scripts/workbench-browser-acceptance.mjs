@@ -25,6 +25,34 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     catch(error){throw Error("Native command "+id+": "+error.message);}
     await sleep(300);
   }
+  async function invokeSkillPackageFile(id,relativePath){
+    console.log("STUDIO_NATIVE_ACTION",id,relativePath);
+    await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      if(!key)throw Error('Native command registry missing');
+      const registry=c.get(key);
+      const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
+        String(k)==='Symbol(OpenerService)');
+      const openers=await c.get(openerKey).getOpeners();
+      const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');
+      const widget=custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>
+        w.resource?.path.toString().includes(
+          '/skills/establish-pdu-session/assurance/procedure.yaml'));
+      const procedureUri=widget?.resource;
+      if(!procedureUri)throw Error('Conventional 5GC Procedure URI missing');
+      const procedureUriString=procedureUri.toString();
+      const procedureSuffix='/assurance/procedure.yaml';
+      if(!procedureUriString.endsWith(procedureSuffix))
+        throw Error('Conventional Procedure URI has an unexpected path');
+      const targetUriString=procedureUriString.slice(0,-procedureSuffix.length)+
+        '/'+${JSON.stringify(relativePath)};
+      await registry.executeCommand(${JSON.stringify(id)},targetUriString);
+    })()`);
+    await sleep(300);
+  }
   async function nativeCommand(id,...args){
     return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
   }
@@ -603,6 +631,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!evidenceTreeState?.rootPresent)
     throw Error('Native Evidence tree root did not appear after refresh: '+
       JSON.stringify(evidenceTreeState));
+  // Re-select the Phase Binding Node after activating the native Evidence
+  // container; Theia may replace the active Webview context during the switch.
+  const evidenceBindingSelection=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Evidence binding Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  });
+  if(!evidenceBindingSelection.result?.value?.node)
+    throw Error('Could not re-select Phase binding Node for Evidence view');
+  await sleep(250);
   let phaseEvidenceText='';
   for(let i=0;i<100;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
@@ -957,7 +994,23 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      !phaseEvidence.readOnly)
     throw Error('Native Evidence view did not render bounded read-only Producer / Consumer evidence: '+
       JSON.stringify({phaseEvidence,dataflowTreeRow})+' · '+phaseEvidenceText.slice(-1400));
-  console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify(phaseEvidence));
+  // A prior TextDocument edit may have scheduled a debounced Package Audit.
+  // Do not start another native edit while that audit still owns the current
+  // snapshot; wait for the exact Package Audit terminal state first.
+  for(let attempt=0;attempt<100;attempt++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(/Package Audit · [0-9]+ editor warnings/.test(phaseEvidenceText))break;
+    if(phaseEvidenceText.includes('Package Audit · unavailable'))
+      throw Error('Package Audit became unavailable before Phase binding edit: '+
+        phaseEvidenceText.slice(-1000));
+    await sleep(100);
+  }
+  if(!/Package Audit · [0-9]+ editor warnings/.test(phaseEvidenceText))
+    throw Error('Package Audit did not settle before Phase binding edit: '+
+      phaseEvidenceText.slice(-1000));
+  console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify({
+    ...phaseEvidence,auditReady:true
+  }));
   // Expanding the native Evidence tree moves focus away from the editor. Open
   // the authoritative Source editor before testing native Undo so the host's
   // undo command is bound to the edited TextDocument, not the tree widget.
@@ -1369,6 +1422,105 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     for(const c of n.childFrames??[])await inspect(c);
   }
   await inspect(tree.frameTree);if(!markdown)throw Error('Shared safe Markdown Preview did not render');
+  // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
+  await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
+  let contractView=null,contractFrame=null,contractContextId=null;
+  for(let attempt=0;attempt<100&&!contractView;attempt++){
+    const contractTree=await command('Page.getFrameTree');
+    const contractFrames=[];
+    const collectContractFrames=node=>{
+      if(!node)return;
+      contractFrames.push(node.frame);
+      for(const child of node.childFrames??[])collectContractFrames(child);
+    };
+    collectContractFrames(contractTree.frameTree);
+    for(const frame of contractFrames.filter(item=>
+        item.url.includes('/webview/index.html')||item.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'contract-designer-acceptance',grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:`({
+            title:document.title,
+            text:document.body?.innerText??'',
+            cards:[...document.querySelectorAll('.card h2')].map(x=>x.textContent.trim()),
+            status:document.querySelector('#status')?.textContent??''
+          })`
+        });
+        const candidate=result.result?.value;
+        if(candidate?.title==='SKILL Contract Visual'){
+          contractView=candidate;contractFrame=frame;
+          contractContextId=world.executionContextId;break;
+        }
+      }catch{/* another webview frame may be disposed while tabs activate */}
+    }
+    if(!contractView)await sleep(100);
+  }
+  const contractExpectedCards=['Skill Identity','Entry & Inputs','Required Context',
+    'Allowed Resources','Preconditions','Requirements','Postconditions',
+    'Planning','Failure Semantics','Dependencies'];
+  if(!contractView||!contractFrame||
+     !contractView.text.includes('establish-pdu-session')||
+     !contractView.text.includes('sbi.udm.sm_data.get')||
+     !contractView.text.includes('skill.evaluate-udm-read')||
+     !contractView.text.includes('createdsession.ran.setup_accepted')||
+     contractExpectedCards.some(title=>!contractView.cards.includes(title)))
+    throw Error('Contract Designer did not render the current Package Source: '+
+      JSON.stringify(contractView).slice(0,3000));
+  console.log('STUDIO_CONTRACT_DESIGNER_CHROMIUM',JSON.stringify({
+    title:contractView.title,status:contractView.status,cards:contractView.cards,
+    capabilityVisible:contractView.text.includes('sbi.udm.sm_data.get'),
+    predicateVisible:contractView.text.includes('createdsession.ran.setup_accepted'),
+    readOnly:contractView.text.includes('Source 是唯一真源')
+  }));
+  // PredicateSet uses its own Observation -> Evaluator visual, never a live result graph.
+  await invokeSkillPackageFile('skillStudio.openPredicates','assurance/predicates.yaml');
+  let predicateView=null,predicateFrame=null;
+  for(let attempt=0;attempt<100&&!predicateView;attempt++){
+    const predicateTree=await command('Page.getFrameTree');
+    const predicateFrames=[];
+    const collectPredicateFrames=node=>{
+      if(!node)return;
+      predicateFrames.push(node.frame);
+      for(const child of node.childFrames??[])collectPredicateFrames(child);
+    };
+    collectPredicateFrames(predicateTree.frameTree);
+    for(const frame of predicateFrames.filter(item=>
+        item.url.includes('/webview/index.html')||item.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'predicate-designer-acceptance',grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:"({title:document.title,text:document.body?.textContent??'',predicates:document.querySelectorAll('details.predicate').length,ids:[...document.querySelectorAll('.predicate summary .pid')].map(x=>x.textContent.trim()),observations:document.querySelectorAll('.observation').length,status:document.querySelector('#status')?.textContent??''})"
+        });
+        const candidate=result.result?.value;
+        if(candidate?.title==='SKILL Predicate Visual'){
+          predicateView=candidate;predicateFrame=frame;break;
+        }
+      }catch{/* another webview frame may be disposed while tabs activate */}
+    }
+    if(!predicateView)await sleep(100);
+  }
+  if(!predicateView||!predicateFrame||
+     predicateView.predicates!==17||predicateView.observations<17||
+     !predicateView.text.includes('createdsession.ran.setup_accepted')||
+     !predicateView.text.includes('createdsession.udm.hold_bound')||
+     !predicateView.text.includes('skill.evaluate-udm-read')||
+     !predicateView.text.includes('Observation → Evaluator')||
+     !predicateView.text.includes('不是当前运行证据'))
+    throw Error('Predicate Designer did not render the real PredicateSet declarations: '+
+      JSON.stringify(predicateView).slice(0,3000));
+  console.log('STUDIO_PREDICATE_DESIGNER_CHROMIUM',JSON.stringify({
+    title:predicateView.title,status:predicateView.status,
+    predicates:predicateView.predicates,observations:predicateView.observations,
+    realPredicateVisible:predicateView.ids.includes('createdsession.ran.setup_accepted'),
+    scriptEvaluatorVisible:predicateView.text.includes('skill.evaluate-udm-read'),
+    noLiveResultClaim:predicateView.text.includes('不是当前运行证据')
+  }));
   // Native layout restoration must retain the CustomEditor across a reload.
   console.log("STUDIO_NATIVE_ACTION","reload");
   await sleep(1200);await command('Page.reload');await sleep(800);

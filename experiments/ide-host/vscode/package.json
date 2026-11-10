@@ -1,7 +1,7 @@
 {
   "name": "ca-skill-studio-ide-spike",
   "displayName": "SKILL Studio IDE Host Spike",
-  "description": "Experimental Procedure visual editor for VS Code desktop/web and Theia host variants",
+  "description": "Experimental source-first Procedure, Contract and Predicate visual editors for VS Code desktop/web and Theia host variants",
   "version": "0.0.1",
   "publisher": "odango-chan",
   "private": true,
@@ -33,7 +33,11 @@
     "onCommand:skillStudio.addPhaseVerify",
     "onCommand:skillStudio.editPhaseVerifyStep",
     "onCommand:skillStudio.renameNamedPhaseStep",
-    "onCommand:skillStudio.restartLanguageService"
+    "onCommand:skillStudio.restartLanguageService",
+    "onCustomEditor:skillStudio.contractPreview",
+    "onCommand:skillStudio.openContract",
+    "onCustomEditor:skillStudio.predicatePreview",
+    "onCommand:skillStudio.openPredicates"
   ],
   "contributes": {
     "commands": [
@@ -108,10 +112,28 @@
       {
         "command": "skillStudio.restartLanguageService",
         "title": "SKILL Studio: Restart Language Service"
+      },
+      {
+        "command": "skillStudio.openPredicates",
+        "title": "SKILL Studio: Open Predicate Visual"
+      },
+      {
+        "command": "skillStudio.openContract",
+        "title": "SKILL Studio: Open Contract Visual"
       }
     ],
     "menus": {
       "explorer/context": [
+        {
+          "command": "skillStudio.openContract",
+          "when": "resourceFilename == contract.yaml",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.openPredicates",
+          "when": "resourceFilename == predicates.yaml",
+          "group": "navigation"
+        },
         {
           "command": "skillStudio.openProcedure",
           "when": "resourceFilename == procedure.yaml",
@@ -280,6 +302,26 @@
         "selector": [
           {
             "filenamePattern": "**/assurance/[p]rocedure.yaml"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "skillStudio.contractPreview",
+        "displayName": "SKILL Contract Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/assurance/[c]ontract.yaml"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "skillStudio.predicatePreview",
+        "displayName": "SKILL Predicate Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/assurance/[p]redicates.yaml"
           }
         ],
         "priority": "default"

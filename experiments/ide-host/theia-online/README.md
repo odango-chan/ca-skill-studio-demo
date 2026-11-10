@@ -27,8 +27,10 @@ At narrow widths the wordmark text collapses to the Classic three-bar mark.
 
 Acceptance requires **real browser interaction**: Theia shell opens under
 a static subpath; Explorer New File/Folder and reopen persist in OPFS; native
-YAML/Python editors open; `assurance/procedure.yaml` invokes the source-backed
-CustomTextEditor Webview; changes and native Undo/Save propagate without
+YAML/Python editors open; `assurance/procedure.yaml`, `assurance/contract.yaml` and
+`assurance/predicates.yaml` open their respective source-backed visual editors;
+Contract and Predicate views reveal their declarations and cross-file source
+references without claiming Runtime evidence. Changes and native Undo/Save propagate without
 clobbering unrelated YAML. An artifact that merely contains bundled files is
 not online acceptance. Missing plugin metadata or a CSP/URI failure is BLOCKED.
 
