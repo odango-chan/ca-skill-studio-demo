@@ -1,10 +1,12 @@
 name: Verify Theia Browser Host Custom Editor
+# Browser acceptance asserts native YAML and Python TextMate tokenization without LSP.
 
 on:
   pull_request:
     paths:
       - "experiments/ide-host/**"
       - "extensions/skill-studio-theme/**"
+      - "extensions/skill-studio-languages/**"
       - ".github/workflows/theia-browser-host-spike.yml"
   workflow_dispatch:
 
@@ -34,6 +36,10 @@ jobs:
           sudo apt-get install -y libsecret-1-dev
       - name: Install pinned Studio dependencies
         run: npm ci --no-audit --no-fund
+      - name: Install pinned browser LSP client and server dependencies
+        run: |
+          npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
+          npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
       - name: Build shared Procedure extension and webview
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Stage same Web extension for Theia
@@ -51,6 +57,8 @@ jobs:
           test -s "$HOME/.theia/plugins/odango-chan.ca-skill-studio-ide-spike/package.json"
           cp -R experiments/ide-host/theia-online/plugins/odango-chan.skill-studio-theme "$HOME/.theia/plugins/"
           test -s "$HOME/.theia/plugins/odango-chan.skill-studio-theme/package.json"
+          cp -R experiments/ide-host/theia-online/plugins/odango-chan.skill-studio-languages "$HOME/.theia/plugins/"
+          test -s "$HOME/.theia/plugins/odango-chan.skill-studio-languages/package.json"
       - name: Start Theia backend for Webview endpoint
         run: |
           npm run start --prefix experiments/ide-host/theia-browser > /tmp/theia-browser.log 2>&1 &

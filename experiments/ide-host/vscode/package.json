@@ -1,7 +1,7 @@
 {
   "name": "ca-skill-studio-ide-spike",
   "displayName": "SKILL Studio IDE Host Spike",
-  "description": "Experimental source-first Procedure, Contract, Predicate and Schema visual editors for VS Code and Theia",
+  "description": "Experimental source-first Procedure, Contract and Predicate visual editors for VS Code desktop/web and Theia host variants",
   "version": "0.0.1",
   "publisher": "odango-chan",
   "private": true,
@@ -33,6 +33,7 @@
     "onCommand:skillStudio.addPhaseVerify",
     "onCommand:skillStudio.editPhaseVerifyStep",
     "onCommand:skillStudio.renameNamedPhaseStep",
+    "onCommand:skillStudio.restartLanguageService",
     "onCustomEditor:skillStudio.contractPreview",
     "onCommand:skillStudio.openContract",
     "onCustomEditor:skillStudio.predicatePreview",
@@ -51,14 +52,6 @@
       {
         "command": "skillStudio.openSchema",
         "title": "SKILL Studio: Open Schema Visual"
-      },
-      {
-        "command": "skillStudio.openPredicates",
-        "title": "SKILL Studio: Open Predicate Visual"
-      },
-      {
-        "command": "skillStudio.openContract",
-        "title": "SKILL Studio: Open Contract Visual"
       },
       {
         "command": "skillStudio.openProcedure",
@@ -127,6 +120,18 @@
       {
         "command": "skillStudio.renameNamedPhaseStep",
         "title": "SKILL Studio: Rename Named Phase Step"
+      },
+      {
+        "command": "skillStudio.restartLanguageService",
+        "title": "SKILL Studio: Restart Language Service"
+      },
+      {
+        "command": "skillStudio.openPredicates",
+        "title": "SKILL Studio: Open Predicate Visual"
+      },
+      {
+        "command": "skillStudio.openContract",
+        "title": "SKILL Studio: Open Contract Visual"
       }
     ],
     "menus": {
@@ -137,13 +142,13 @@
           "group": "navigation"
         },
         {
-          "command": "skillStudio.openPredicates",
-          "when": "resourceFilename == predicates.yaml",
+          "command": "skillStudio.openContract",
+          "when": "resourceFilename == contract.yaml",
           "group": "navigation"
         },
         {
-          "command": "skillStudio.openContract",
-          "when": "resourceFilename == contract.yaml",
+          "command": "skillStudio.openPredicates",
+          "when": "resourceFilename == predicates.yaml",
           "group": "navigation"
         },
         {

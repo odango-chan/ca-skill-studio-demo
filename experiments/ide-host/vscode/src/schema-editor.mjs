@@ -122,8 +122,16 @@ function html(token) {
     '<div class="footer">仅展示 JSON Schema 声明。当前视图不运行验证、不自动展开循环引用、不修改 Source、不发起外部请求。</div>'+
     '</main><script nonce="'+token+'">'+script+'</script></body></html>';
 }
+function commandUri(vscode,value) {
+  if (value && typeof value.path === 'string') return value;
+  const serialized = typeof value === 'string' ? value : value?.toString?.();
+  return typeof serialized === 'string' &&
+    /^[a-z][a-z0-9+.-]*:\/\//i.test(serialized)
+    ? vscode.Uri.parse(serialized) : null;
+}
 async function chooseSchema(vscode, uri) {
-  if (uri && isSkillSchema(uri.path)) return uri;
+  const supplied = commandUri(vscode,uri);
+  if (supplied && isSkillSchema(supplied.path)) return supplied;
   const active = vscode.window.activeTextEditor?.document.uri;
   if (active && isSkillSchema(active.path)) return active;
   const found = await vscode.workspace.findFiles('**/schemas/*.schema.yaml','**/node_modules/**',50);

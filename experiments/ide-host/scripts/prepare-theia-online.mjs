@@ -13,7 +13,7 @@ const requiredEditors=["skillStudio.procedurePreview","skillStudio.contractPrevi
 const editorViews=new Set(manifest.contributes.customEditors.map(x=>x.viewType));
 for(const view of requiredEditors)if(!editorViews.has(view))
   throw Error("Required visual editor is missing from prepared Web extension: "+view);
-for(const source of [manifest.browser,"./dist/extension-theia.js",join("media","procedure.js"),join("media","procedure.css")]){
+for(const source of [manifest.browser,"./dist/extension-theia.js","./dist/skill-language-server.js",join("media","procedure.js"),join("media","procedure.css")]){
   const info=await stat(join(ext,source));
   if(!info.isFile()||info.size<1000)throw Error("Missing built Web extension file: "+source);
 }
@@ -53,4 +53,29 @@ console.log("STUDIO_THEIA_PREPARED_THEME_EXTENSION",JSON.stringify({
   themes:themeManifest.contributes.themes.map(x=>x.label),
   iconThemes:themeManifest.contributes.iconThemes.map(x=>x.id),
   runtimeDependencies:Object.keys(themeManifest.dependencies??{}).length
+}));
+
+// Syntax highlighting must not depend on the deferred LSP workstream.
+// Browser-only Theia does not ship VS Code's default language extensions:
+// bundle a declarative, pinned YAML/Python TextMate plugin at build time.
+const syntaxSource="extensions/skill-studio-languages";
+const syntaxTarget=join(app,"plugins","odango-chan.skill-studio-languages");
+const syntaxManifest=JSON.parse(await readFile(join(syntaxSource,"package.json"),"utf8"));
+for(const language of ["yaml","python"]){
+  if(!syntaxManifest.contributes?.languages?.some(x=>x.id===language)||
+     !syntaxManifest.contributes.grammars?.some(x=>x.language===language))
+    throw Error("Missing bundled "+language+" language and TextMate grammar");
+}
+if(syntaxManifest.main||syntaxManifest.browser)
+  throw Error("Syntax extension must remain declarative");
+for(const grammar of syntaxManifest.contributes.grammars){
+  const info=await stat(join(syntaxSource,grammar.path));
+  if(!info.isFile()||info.size<100)
+    throw Error("Bundled grammar missing: "+grammar.path);
+}
+await rm(syntaxTarget,{recursive:true,force:true});
+await cp(syntaxSource,syntaxTarget,{recursive:true});
+console.log("STUDIO_THEIA_PREPARED_SYNTAX_EXTENSION",JSON.stringify({
+  target:syntaxTarget,syntaxes:syntaxManifest.contributes.languages.map(x=>x.id),
+  grammarCount:syntaxManifest.contributes.grammars.length
 }));

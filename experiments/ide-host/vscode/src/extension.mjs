@@ -242,8 +242,8 @@ export function activate(context){
         stage="open-procedure";
         await vscode.commands.executeCommand("vscode.open",result.procedure);
         void vscode.window.showInformationMessage(
-          "示例 SKILL 已载入浏览器工作区："+result.created+" 新文件，"+
-          result.skipped+" 个已存在文件保持不变");
+          "两个示例 SKILL 已载入 skills/："+result.created+" 个新文件，"+
+          result.skipped+" 个已有文件保留。可展开两个 Skill 的 assurance/procedure.yaml");
       }catch(error){
         await vscode.window.showErrorMessage(
           "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
@@ -255,7 +255,7 @@ export function activate(context){
   // convenient shortcut for the online demo.
   if(!(vscode.workspace.workspaceFolders??[]).length){
     const welcome=vscode.window.showInformationMessage?.(
-      "欢迎使用 SKILL Studio。可以先载入内置演示 SKILL 项目体验编辑器。",
+      "欢迎使用 SKILL Studio。可以载入 skills/ 下的两个示例（传统 5GC 与 MAS）。",
       "载入演示 SKILL 项目"
     );
     if(welcome&&typeof welcome.then==="function"){
