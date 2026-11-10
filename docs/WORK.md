@@ -251,10 +251,19 @@ main browser application remains available at `/classic/`.
 **验收状态：** [PR #116](https://github.com/odango-chan/ca-skill-studio-demo/pull/116) 已合并，main merge `330c9b80`。Exact-head `c5153a8e` IDE Host [#42776798637 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798637)、Browser-Only [#42776798442 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798442)、Backend Chromium [#42776798608 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798608)、PR Verify [#42776798584 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798584)。Resulting-main Pages 对 merge SHA 尚未核实；Runtime/5GC/桌面 GUI NOT_RUN。
 
 
-## 2026-11-10 · Theia D4-A4a Phase Route 目标重定向（当前开发分支）
+## 2026-11-10 · Theia D4-A4a Phase Route 目标重定向（PR #118 MERGED）
 
 **范围：** 仅迁移 Classic 已验收 `site/phase-routes.mjs` 的现有 Phase 失败/未决 Route 目标编辑，不新定义 YAML/业务规则。Inspector Route 行仅在共享模块证明同 Procedure、同 Phase、同 Outcome 的候选及保留可达 Node 集时提供原生命令；保留现有 Insert Node 命令并支持双菜单共存。
 
-**写入与验证：** 文档和 Source 版本校验 → QuickPick → Classic Source Preview / Diff → 用户确认 → 原生 `WorkspaceEdit`/Undo。Host 测试覆盖取消、应用、过期 Route；真实 Chromium 针对 UDM `preconditions.on.FAILED: failed` → 已观测的 `finalize-failed` 并 Undo 原文；四组 CI 尚待验收。
+**写入与验证：** 文档和 Source 版本校验 → QuickPick → Classic Source Preview / Diff → 用户确认 → 原生 `WorkspaceEdit`/Undo。Host 测试覆盖取消、应用、过期 Route；真实 Chromium 针对 UDM `preconditions.on.FAILED: failed` → 已观测的 `finalize-failed` 并 Undo 原文。PR #118 merge `31987e41`；exact-head `5dc55f0a` 四组 CI 全部 PASS：IDE Host [#42778316708](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42778316708)、Browser-Only [#42778316442](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42778316442)、Backend Chromium [#42778316448](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42778316448)、PR Verify 重跑 [#42778316986](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42778316986)。
 
 **边界：** 仅前置 `FAILED/UNRESOLVED`、后置 `FAIL/UNKNOWN` 已有 Route；没有创建 Phase/Outcome、修改 `operator.on` / `PASS` 或跨 Producer ABI。失败收尾路径的业务等价性及 Runtime/5GC NOT_RUN。
+
+
+## 2026-11-10 · Theia D4-A4b1 已有 Phase Outcome 修复（PR #119 DRAFT）
+
+**迁移范围：** 完全复用 Classic `site/phase-outcomes.mjs`，只操作已有 Phase 的字面 `'on'` map；共享资格允许三种 Source 修复：从同 Procedure/同 Phase/同 Outcome 已观察值补齐缺失核心 Outcome；把可唯一证明的非核心拼写纠正成缺失核心键；当核心键齐全且无其他引用时删除孤立非核心键。正常完整 Phase 不出现编辑入口。
+
+**原生交互：** Inspector Phase 下有资格才显示 `Outcome repair` 子行；原生 QuickPick 显示可证明的操作；重查最新 TextDocument/完整 Source/候选资格，显示 Diff 并要求明确确认，然后仅用原生 WorkspaceEdit 写精确 Source span、支持 Undo。Host 验证三操作、取消/过期/虚构候选；Chromium 验证在真实 Monaco 中制造单行拼写错误、通过原生命令恢复并撤销两步。四组 exact-head CI 待完成。
+
+**不授权：** 新建 Phase/on map、任意 Outcome 字典、Runtime 失败处理等价性、跨生产者 ABI 和真实 5GC，均保持 NOT_RUN / Source-only 边界。
