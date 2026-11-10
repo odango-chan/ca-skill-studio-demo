@@ -8,9 +8,16 @@ import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from '../../../../site/node-create.mjs';
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from '../../../../site/node-delete.mjs';
 import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
+import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
+  previewAddPhaseVerify,applyAddPhaseVerify,
+  previewDeletePhaseVerify,applyDeletePhaseVerify}
+  from '../../../../site/phase-step-structural.mjs';
+import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
+  applyAdjacentVerifyReorder} from '../../../../site/phase-step-order.mjs';
 
 export function registerWorkbench(vscode,context){
-  let document=null,selection={},snapshot=null,bindingOptions=[],audit=[],auditStatus="Package Audit · not run",generation=0,timer;
+  let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
+    predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
 
@@ -43,6 +50,24 @@ export function registerWorkbench(vscode,context){
         new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
       return {predicateSource,skillName};
     }catch{return {predicateSource:null,skillName};}
+  }
+  async function refreshPredicateSnapshot(doc){
+    const version=doc.version,uri=doc.uri.toString(),ticket=++predicateGeneration;
+    const next=await predicateContext(doc);
+    if(document!==doc||doc.version!==version||ticket!==predicateGeneration)return;
+    predicateSnapshot={uri,version,...next};
+    fire();
+  }
+  function singleSourceChange(preview){
+    const {start,end}=preview.sourceSpan;
+    const delta=preview.candidateSource.length-preview.baseSource.length;
+    if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||
+       start<0||end<start||end>preview.baseSource.length||
+       end+delta<start||end+delta>preview.candidateSource.length)
+      throw Error("Phase Patch Source span is invalid");
+    return [{start,end,
+      oldValue:preview.baseSource.slice(start,end),
+      newValue:preview.candidateSource.slice(start,end+delta)}];
   }
   async function confirmAndApply({doc,source,version,preview,changes,verify}){
     const message=[preview.summary,preview.diff].filter(Boolean).join("\n\n");
@@ -115,6 +140,81 @@ export function registerWorkbench(vscode,context){
       }],
       verify:text=>applyPhaseInputBinding(text,preview)
     });
+  }
+
+  async function addPhaseVerify(item,predicate){
+    if(item?.kind!=="phase"||typeof item.phaseName!=="string")
+      throw Error("Select an eligible Phase in the native Inspector");
+    const ctx=currentNode(item);
+    const predicates=await predicateContext(ctx.doc);
+    const options=phaseVerifyAddOptions(ctx.source,ctx.procedureId,ctx.nodeId,
+      predicates.predicateSource,predicates.skillName);
+    const phase=options.find(x=>x.phaseName===item.phaseName);
+    if(!phase)throw Error("Selected Phase has no safe Verify append anchor or available PredicateSet entry");
+    let value=predicate;
+    if(typeof value!=="string"){
+      const picked=await vscode.window.showQuickPick(phase.choices,{
+        placeHolder:"选择要追加到 Phase 末尾的 Package Predicate"
+      });
+      value=typeof picked==="string"?picked:picked?.value??picked?.label;
+    }
+    if(typeof value!=="string"||!value.trim())return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the new Verify Step");
+    const preview=previewAddPhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
+      item.phaseName,value,predicates.predicateSource,predicates.skillName);
+    const applied=await confirmAndApply({
+      ...ctx,preview,changes:singleSourceChange,
+      verify:text=>applyAddPhaseVerify(text,preview,predicates.predicateSource)
+    });
+    if(applied)update(ctx.doc);
+    return applied;
+  }
+
+  async function editPhaseVerifyStep(item,requestedAction){
+    if(item?.kind!=="phase-step"||item.stepOperator!=="verify"||
+       typeof item.phaseName!=="string"||!Number.isSafeInteger(item.stepIndex))
+      throw Error("Select an eligible Verify Step in the native Inspector");
+    const ctx=currentNode(item);
+    const deletions=phaseVerifyDeleteOptions(ctx.source,ctx.procedureId,ctx.nodeId);
+    const reorder=adjacentVerifyReorderOptions(ctx.source,ctx.procedureId,ctx.nodeId);
+    const canDelete=deletions.some(x=>x.phaseName===item.phaseName&&
+      x.stepIndex===item.stepIndex);
+    const canMoveUp=reorder.some(x=>x.phaseName===item.phaseName&&
+      x.stepIndex===item.stepIndex-1);
+    const canMoveDown=reorder.some(x=>x.phaseName===item.phaseName&&
+      x.stepIndex===item.stepIndex);
+    const choices=[
+      ...(canMoveUp?[{label:"Move Verify Up",value:"move-up"}]:[]),
+      ...(canMoveDown?[{label:"Move Verify Down",value:"move-down"}]:[]),
+      ...(canDelete?[{label:"Delete Verify Step",value:"delete"}]:[])
+    ];
+    let action=requestedAction;
+    if(typeof action!=="string"){
+      const picked=await vscode.window.showQuickPick(choices,{
+        placeHolder:"选择此 Verify Step 的安全编辑操作"
+      });
+      action=typeof picked==="string"?picked:picked?.value;
+    }
+    if(!choices.some(x=>x.value===action))return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the Verify Step operation");
+    let preview,verify;
+    if(action==="delete"){
+      preview=previewDeletePhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
+        item.phaseName,item.stepIndex);
+      verify=text=>applyDeletePhaseVerify(text,preview);
+    }else{
+      const pairIndex=action==="move-up"?item.stepIndex-1:item.stepIndex;
+      preview=previewAdjacentVerifyReorder(ctx.source,ctx.procedureId,ctx.nodeId,
+        item.phaseName,pairIndex);
+      verify=text=>applyAdjacentVerifyReorder(text,preview);
+    }
+    const applied=await confirmAndApply({
+      ...ctx,preview,changes:singleSourceChange,verify
+    });
+    if(applied)update(ctx.doc);
+    return applied;
   }
 
   async function insertNode(item,spec){
@@ -307,12 +407,40 @@ export function registerWorkbench(vscode,context){
           tree.routeId=item.routeId;tree.sourceVersion=item.sourceVersion;
           tree.documentUri=item.documentUri;
         }
-        if(item.kind==='phase-step'&&bindingOptions.some(x=>
-          x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex)){
-          tree.contextValue='skillStudio.phaseStep';
-          item.sourceVersion=document?.version;item.documentUri=document?.uri.toString();
+        if(item.kind==='phase'&&id==='inspection'&&document){
+          const cached=predicateSnapshot?.uri===document.uri.toString()&&
+            predicateSnapshot.version===document.version?predicateSnapshot:null;
+          const canAdd=cached&&phaseVerifyAddOptions(document.getText(),
+            item.procedureId,item.nodeId,cached.predicateSource,cached.skillName)
+            .some(x=>x.phaseName===item.phaseName);
+          tree.contextValue=canAdd?'skillStudio.phaseWithVerifyAdd':'skillStudio.phase';
+          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
+          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
+          tree.phaseName=item.phaseName;tree.sourceVersion=item.sourceVersion;
+          tree.documentUri=item.documentUri;
+        }
+        if(item.kind==='phase-step'&&id==='inspection'&&document){
+          const source=document.getText();
+          const hasBinding=bindingOptions.some(x=>
+            x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
+          const deletable=item.stepOperator==='verify'&&
+            phaseVerifyDeleteOptions(source,item.procedureId,item.nodeId).some(x=>
+              x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
+          const reorder=item.stepOperator==='verify'
+            ?adjacentVerifyReorderOptions(source,item.procedureId,item.nodeId):[];
+          const canMoveUp=reorder.some(x=>x.phaseName===item.phaseName&&
+            x.stepIndex===item.stepIndex-1);
+          const canMoveDown=reorder.some(x=>x.phaseName===item.phaseName&&
+            x.stepIndex===item.stepIndex);
+          const canEditVerify=deletable||canMoveUp||canMoveDown;
+          tree.contextValue=hasBinding
+            ?(canEditVerify?'skillStudio.phaseStepAndVerify':'skillStudio.phaseStep')
+            :(canEditVerify?'skillStudio.verifyStep':'skillStudio.phaseStepPlain');
+          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.phaseName=item.phaseName;tree.stepIndex=item.stepIndex;
+          tree.stepName=item.stepName;tree.stepOperator=item.stepOperator;
+          tree.stepValue=item.stepValue;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
         if(document&&item.line)tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',arguments:[{...item,uri:item.uri??document.uri,version:document.version,sourceVersion:document.version,documentUri:document.uri.toString(),...(item.uri?{auditGeneration:generation}:{})}]};
@@ -328,8 +456,16 @@ export function registerWorkbench(vscode,context){
     const text=doc.getText(),projected=same&&snapshot?.text===text?snapshot.model:null;
     const next=choice??(same?selection:selections.get(key)??{});
     const changed=!same||snapshot?.text!==text||next.procedureId!==selection.procedureId||next.nodeId!==selection.nodeId;
-    if(!same){generation++;audit=[];diagnostics.clear();}
+    if(!same){
+      generation++;audit=[];diagnostics.clear();
+      predicateSnapshot=null;predicateGeneration++;
+    }
     document=doc;selection=next;selections.set(key,next);
+    if(!predicateSnapshot||predicateSnapshot.uri!==key||
+       predicateSnapshot.version!==doc.version){
+      predicateSnapshot=null;
+      void refreshPredicateSnapshot(doc);
+    }
     if(changed){
       snapshot={...inspectionSnapshot(text,selection,projected),text};
       bindingOptions=snapshot.model.state==='READY'&&selection.procedureId&&selection.nodeId
@@ -397,6 +533,14 @@ export function registerWorkbench(vscode,context){
       try{return await editPhaseInputBinding(item,bindingKey,newValue);}
       catch(error){await vscode.window.showWarningMessage('Phase Binding 修改未执行：'+error.message);return false;}
     }),
+    vscode.commands.registerCommand('skillStudio.addPhaseVerify',async(item,predicate)=>{
+      try{return await addPhaseVerify(item,predicate);}
+      catch(error){await vscode.window.showWarningMessage('新增 Verify Step 未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.editPhaseVerifyStep',async(item,action)=>{
+      try{return await editPhaseVerifyStep(item,action);}
+      catch(error){await vscode.window.showWarningMessage('Verify Step 修改未执行：'+error.message);return false;}
+    }),
     vscode.commands.registerCommand('skillStudio.insertNode',async(item,spec)=>{
       try{return await insertNode(item,spec);}
       catch(error){await vscode.window.showWarningMessage('Node 插入未执行：'+error.message);return false;}
@@ -407,7 +551,14 @@ export function registerWorkbench(vscode,context){
     }),
     vscode.workspace.onDidChangeTextDocument(e=>{
       if(isProcedurePath(e.document.uri.path)&&document?.uri.toString()===e.document.uri.toString())update(e.document);
-      if(document)scheduleAudit();
+      if(document){
+        const predicatePath=document.uri.path.slice(0,-'procedure.yaml'.length)+'predicates.yaml';
+        if(e.document.uri.path===predicatePath){
+          predicateSnapshot=null;predicateGeneration++;
+          void refreshPredicateSnapshot(document);
+        }
+        scheduleAudit();
+      }
     }),
     vscode.window.onDidChangeActiveTextEditor(editor=>{if(isProcedurePath(editor?.document.uri.path)){update(editor.document);scheduleAudit();}}));
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.previewMarkdown',async uri=>{
