@@ -863,12 +863,6 @@ try{
         graphEdges:routeUndo.result?.value?.graphEdges??0
       };
 
-      // C4 is verified before the unrelated canvas Route reconnect regression,
-      // so its real sidebar evidence remains independently observable.
-      const packageOverviewEvidence=await runPackageOverviewAcceptance({
-        command,evalJS,sleep,requireEditor
-      });
-
       // Reconnect a specific member of a multi-Outcome edge bundle. Clicking
       // the bundle must not silently pick its first Route; the Route selector
       // is the explicit disambiguation step before the target endpoint drag.
@@ -1121,6 +1115,12 @@ try{
       patchEvidence={preview:previewEvidence,applied:null};
     }
   }
+  // Run the new Package Overview sidebar acceptance after the existing
+  // canvas Route gestures. Opening a new Activity Bar container resizes and
+  // refocuses the workbench; it must not perturb the preceding graph gestures.
+  const packageOverviewEvidence=await runPackageOverviewAcceptance({
+    command,evalJS,sleep,requireEditor
+  });
   console.log("STUDIO_THEIA_STAGE","native-workbench");
   const evalWebviewJS=async expression=>{
     // Native editor interactions above can recreate the Webview iframe.
