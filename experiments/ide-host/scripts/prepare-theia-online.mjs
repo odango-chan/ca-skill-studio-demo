@@ -49,3 +49,27 @@ console.log("STUDIO_THEIA_PREPARED_THEME_EXTENSION",JSON.stringify({
   iconThemes:themeManifest.contributes.iconThemes.map(x=>x.id),
   runtimeDependencies:Object.keys(themeManifest.dependencies??{}).length
 }));
+
+ // Syntax highlighting and language IDs are baseline editor capabilities, not
+ // a replacement for the LSP. Bundle a declarative, pinned YAML/Python grammar.
+const syntaxSource="extensions/skill-studio-languages";
+const syntaxTarget=join(app,"plugins","odango-chan.skill-studio-languages");
+const syntaxManifest=JSON.parse(await readFile(join(syntaxSource,"package.json"),"utf8"));
+for(const language of ["yaml","python"]){
+  if(!syntaxManifest.contributes?.languages?.some(x=>x.id===language)||
+     !syntaxManifest.contributes.grammars?.some(x=>x.language===language))
+    throw Error("Missing bundled "+language+" language and TextMate grammar");
+}
+if(syntaxManifest.main||syntaxManifest.browser)
+  throw Error("Syntax extension must remain declarative");
+for(const grammar of syntaxManifest.contributes.grammars){
+  const info=await stat(join(syntaxSource,grammar.path));
+  if(!info.isFile()||info.size<100)
+    throw Error("Bundled grammar missing: "+grammar.path);
+}
+await rm(syntaxTarget,{recursive:true,force:true});
+await cp(syntaxSource,syntaxTarget,{recursive:true});
+console.log("STUDIO_THEIA_PREPARED_SYNTAX_EXTENSION",JSON.stringify({
+  target:syntaxTarget,syntaxes:syntaxManifest.contributes.languages.map(x=>x.id),
+  grammarCount:syntaxManifest.contributes.grammars.length
+}));
