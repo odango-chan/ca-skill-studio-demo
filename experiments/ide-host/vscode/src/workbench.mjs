@@ -33,16 +33,17 @@ export function registerWorkbench(vscode,context){
     if(typeof Worker!=="function"||typeof globalThis.location==="undefined")return null;
     if(!languageClientPromise){
       languageClientPromise=(async()=>{
-        const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
-        const candidate=createSkillLanguageClient(vscode,context,{
-          onError:error=>console.warn("Skill Studio Language Service",error)
-        });
+        let candidate=null;
         try{
+          const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
+          candidate=createSkillLanguageClient(vscode,context,{
+            onError:error=>console.warn("Skill Studio Language Service",error)
+          });
           await candidate.start();
           languageClient=candidate;
           return candidate;
         }catch(error){
-          await candidate.stop().catch(()=>{});
+          if(candidate)await candidate.stop().catch(()=>{});
           languageClient=null;
           languageClientPromise=null;
           throw error;
