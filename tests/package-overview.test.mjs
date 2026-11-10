@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildPackageInventory,packageFileCommand,registerPackageOverview}
+import {buildPackageInventory,packageFileCommand,packageScanRoots,registerPackageOverview}
   from '../experiments/ide-host/vscode/src/package-overview.mjs';
 
 function uri(path) {
@@ -30,6 +30,16 @@ const files=[
   '/workspace/skills/establish-pdu-session/node_modules/ignored/index.js',
   '/workspace/skills/establish-pdu-session/.git/config'
 ].map(uri);
+
+test('C4 recovers the Skills/workspaces container from an open OPFS document without workspaceFolders',()=>{
+  const active=uri('/workspace/workspaces/establish-pdu-session/assurance/procedure.yaml');
+  const roots=packageScanRoots([], [{uri:active}]);
+  assert.equal(roots.length,1);
+  assert.equal(roots[0].path,'/workspace/workspaces');
+  const sibling=uri('/workspace/skills/establish-pdu-session-mas/scripts/run.py');
+  const siblingRoots=packageScanRoots([], [{uri:sibling}]);
+  assert.equal(siblingRoots[0].path,'/workspace/skills');
+});
 
 test('C4 discovers multiple SKILL roots in one Workspace and groups real files',()=>{
   const dirty=new Set([
@@ -110,16 +120,22 @@ test('C4 registers Packages view and renders package tree with source actions',a
     constructor(label,state){this.label=label;this.collapsibleState=state;}
   }
   class Icon {constructor(id){this.id=id;}}
+  class RelativePattern {
+    constructor(base,pattern){this.baseUri=base;this.pattern=pattern;}
+  }
   const noop=()=>({dispose(){}});
   const workspace={
-    workspaceFolders:[{uri:uri('/workspace')}],
-    textDocuments:[{uri:uri('/workspace/skills/establish-pdu-session/scripts/evaluate.py'),isDirty:true}],
+    workspaceFolders:[],
+    textDocuments:[
+      {uri:uri('/workspace/skills/establish-pdu-session/scripts/evaluate.py'),isDirty:true},
+      {uri:uri('/workspace/skills/establish-pdu-session/assurance/procedure.yaml'),isDirty:false}
+    ],
     async findFiles(){return files;},
     asRelativePath(value){return value.path;},
     onDidChangeWorkspaceFolders:noop
   };
   const vscode={
-    EventEmitter:Emitter,TreeItem:Item,ThemeIcon:Icon,
+    EventEmitter:Emitter,TreeItem:Item,ThemeIcon:Icon,RelativePattern,
     TreeItemCollapsibleState:{Collapsed:1,None:0},
     workspace,window:{
       registerTreeDataProvider(id,provider){treeProviders.set(id,provider);return {dispose(){}};}
