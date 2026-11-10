@@ -67,7 +67,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await sleep(450);
     const visible=await graph();
     console.log("STUDIO_OUTPUT_REFERENCE_FIXTURE_SOURCE",JSON.stringify({method:direct.method,revision:visible?.revision,nodes:visible?.nodes}));
-  }  async function waitForRevisionChange(contextId,previous,label){
+  }
+  async function waitForRevisionChange(contextId,previous,label){
     let latest=null,refreshed=null;
     for(let i=0;i<50;i++){
       try{
