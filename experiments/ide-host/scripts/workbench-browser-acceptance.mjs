@@ -162,19 +162,22 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
          diagnosticPublishEvidence.packageAuditDuplicates!==0)
         throw Error("Live LSP diagnostic did not publish exact evidence: "+
           JSON.stringify(diagnosticPublishEvidence));
-      const problemsTab=await evalJS(`(()=>{
-        const el=[...document.querySelectorAll(".lm-TabBar-tab")].find(x=>
-          x.textContent.trim().startsWith("Problems"));
-        if(!el)return null;
-        const label=el.textContent.trim(),aria=el.getAttribute("aria-label");
-        // Theia may keep the panel tab in the DOM while the bottom panel is
-        // collapsed, so use the actual tab action rather than requiring a
-        // non-zero bounding box before it can be revealed.
-        el.click();
-        const r=el.getBoundingClientRect();
-        return {label,aria,rect:{x:r.x,y:r.y,width:r.width,height:r.height}};
-      })()`);
-      if(!problemsTab)throw Error("Native Theia Problems panel tab is missing");
+      let problemsTab=null;
+      for(let i=0;i<50&&!problemsTab;i++){
+        problemsTab=await evalJS(`(()=>{
+          const el=[...document.querySelectorAll(".lm-TabBar-tab")].find(x=>
+            x.textContent.trim().startsWith("Problems"));
+          if(!el)return null;
+          const label=el.textContent.trim(),aria=el.getAttribute("aria-label");
+          // Theia may create/reveal the Problems tab asynchronously after the
+          // diagnostics collection receives its first LSP publication.
+          el.click();
+          const r=el.getBoundingClientRect();
+          return {label,aria,rect:{x:r.x,y:r.y,width:r.width,height:r.height}};
+        })()`);
+        if(!problemsTab)await sleep(100);
+      }
+      if(!problemsTab)throw Error("Native Theia Problems panel tab did not appear after diagnostic publication");
       await sleep(350);
       let problemsText="";
       for(let i=0;i<100;i++){
