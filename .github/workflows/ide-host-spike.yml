@@ -1,4 +1,5 @@
 name: Verify IDE Host Spike
+# IDE host acceptance covers the current owner-pinned dual-SKILL sample manifest.
 
 on:
   pull_request:
@@ -27,6 +28,10 @@ jobs:
           cache: "npm"
       - name: Install pinned repo dependencies
         run: npm ci --no-audit --no-fund
+      - name: Install pinned browser LSP client and server dependencies
+        run: |
+          npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
+          npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
       - name: Build standalone VS Code extension + bundled graph webview
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Stage optional online Web extension for shared tests

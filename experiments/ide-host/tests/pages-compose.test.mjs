@@ -81,3 +81,18 @@ test("invalid Theia input is rejected before the Classic build is replaced",asyn
     await rm(temp,{recursive:true,force:true});
   }
 });
+
+test("Pages installs pinned browser LSP dependencies before bundling the Web extension",async()=>{
+  const workflow=await readFile(
+    new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
+  const marker="- name: Build Theia Web extension for default online workbench";
+  const start=workflow.indexOf(marker);
+  const end=workflow.indexOf("- name: Build Theia browser-only static workbench",start);
+  assert.ok(start>=0&&end>start,"Pages Web extension build step must exist");
+  const step=workflow.slice(start,end);
+  const client=step.indexOf("npm ci --prefix experiments/ide-host/lsp-browser/client ");
+  const server=step.indexOf("npm ci --prefix experiments/ide-host/lsp-browser/server ");
+  const bundle=step.indexOf("node experiments/ide-host/scripts/build-ide-spike.mjs");
+  assert.ok(client>=0&&server>client&&bundle>server,
+    "Both independently locked LSP SDK dependency roots must be installed before the Pages Worker bundle");
+});

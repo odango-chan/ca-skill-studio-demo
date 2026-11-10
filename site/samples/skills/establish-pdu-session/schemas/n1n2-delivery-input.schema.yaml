@@ -1,0 +1,53 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: n1n2-delivery-input.schema.yaml
+title: N1N2DeliveryInput
+description: The exact prepared N1/N2 metadata and the attempt association the
+  Skill uses to choose a delivery. The Tool input schema remains authoritative
+  for the complete transfer request; this schema only covers the Script input.
+type: object
+additionalProperties: false
+required:
+- preparedResponse
+- operationContextRef
+- policyResultRef
+- pduSessionType
+properties:
+  preparedResponse:
+    type: object
+    additionalProperties: false
+    required:
+    - profileRef
+    - responseArtifactRef
+    - artifactDigest
+    - nasDigest
+    - n2Digest
+    - validUntil
+    properties:
+      profileRef:
+        type: string
+        minLength: 1
+      responseArtifactRef:
+        type: string
+        pattern: ^csa:v1:[0-9a-f]{64}$
+      artifactDigest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      nasDigest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      n2Digest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      validUntil:
+        type: string
+        minLength: 1
+  operationContextRef:
+    type: string
+    minLength: 1
+  policyResultRef:
+    type: string
+    minLength: 1
+  pduSessionType:
+    type: string
+    enum:
+    - IPV4
