@@ -72,7 +72,23 @@ test('Inspection exposes only Classic-qualified same-producer output reference n
   });
   assert.ok(current.inspection.every(p=>p.children.every(s=>
     s.children.every(x=>x.kind!=='phase-output-reference'))),
-    'ordinary sample Source does not expose unsupported output-reference actions');
+    'UDM Subscribe sample does not expose unsupported output-reference actions');
+  // The current published Package also contains a real, eligible pair.
+  // PCF's N4-baseline Verify consumes an earlier PCF-create-inputs output;
+  // both local and fully-qualified spellings occur in the same Procedure.
+  const live=inspectionSnapshot(source,{
+    procedureId,nodeId:'npcf-sm-policy-control-create'
+  });
+  const livePhase=live.inspection.find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const liveStep=livePhase?.children.find(x=>x.kind==='phase-step'&&x.stepIndex===4);
+  const liveRef=liveStep?.children.find(x=>x.kind==='phase-output-reference'&&
+    x.bindingKey==='pcfPolicyAssociationRef');
+  assert.ok(liveRef,'current published sample contains a safe output-reference candidate');
+  assert.deepEqual(liveRef.choices,[
+    'preconditions.resolve-pcf-create-inputs.output.pcfPolicyAssociationRef',
+    'npcf-sm-policy-control-create.preconditions.resolve-pcf-create-inputs.output.pcfPolicyAssociationRef'
+  ]);
+  assert.equal(liveRef.producerStep,'resolve-pcf-create-inputs');
 });
 
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
