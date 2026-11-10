@@ -92,6 +92,8 @@ Worker host. This L2-B slice intentionally does not start the browser client
 there; it retains the existing host diagnostics and Source behavior. A Node
 LSP transport can be added separately if desktop/backend parity is required.
 
+The L2-C language-feature protocol coverage is extended by [L2-D1 real editor-provider acceptance](skill-lsp-l2d-editor-acceptance.md): the browser-only Chromium host invokes Definition, Hover, References, Document Symbols and Completion through Theia's public VS Code command registry. This does not change the host matrix above: backend-backed Theia remains the Node extension-host path and is not required to start the browser Worker.
+
 Still required before broad language-feature acceptance:
 
 1. verify Procedure diagnostics appear in native Problems and disappear after
