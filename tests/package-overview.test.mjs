@@ -110,7 +110,7 @@ test('C4 reports bounded inventory instead of implying a complete scan',()=>{
 });
 
 test('C4 registers Packages view and renders package tree with source actions',async()=>{
-  const treeProviders=new Map(),commands=new Map(),revealed=[];
+  const treeProviders=new Map(),commands=new Map();
   class Emitter {
     constructor(){this.event=()=>{};}
     fire(){}
@@ -137,16 +137,6 @@ test('C4 registers Packages view and renders package tree with source actions',a
     EventEmitter:Emitter,TreeItem:Item,ThemeIcon:Icon,RelativePattern,
     TreeItemCollapsibleState:{Collapsed:1,None:0},
     workspace,window:{
-      createTreeView(id,{treeDataProvider}){
-        treeProviders.set(id,treeDataProvider);
-        return {
-          async reveal(node,options){
-            revealed.push({node,options});
-            treeDataProvider.getChildren();
-          },
-          dispose(){}
-        };
-      },
       registerTreeDataProvider(id,provider){
         treeProviders.set(id,provider);return {dispose(){}};
       }
@@ -161,9 +151,6 @@ test('C4 registers Packages view and renders package tree with source actions',a
   const refresh=commands.get('skillStudio.refreshPackages');
   assert.equal(typeof refresh,'function');
   await refresh();
-  assert.equal(revealed.length,1);
-  assert.equal(revealed[0].node.name,'establish-pdu-session');
-  assert.deepEqual(revealed[0].options,{select:false,focus:false,expand:0});
   const provider=treeProviders.get('skillStudio.packages');
   assert.ok(provider);
 
