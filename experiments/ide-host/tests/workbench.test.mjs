@@ -15,6 +15,35 @@ test('Inspection preserves Classic node/phase/route source identity; unknown syn
   assert.ok(selected.inspection.some(x=>x.label==='preconditions'&&x.children.length===5));
   assert.ok(selected.evidence.some(x=>x.label.includes('Runtime NOT_RUN')));
   assert.ok(selected.inspection.every(x=>x.line>0));
+  assert.ok(selected.dataflow.bindings.length>0,'selected Node exposes source-resolved Phase dependencies');
+  assert.equal(selected.consumerContracts.summary.authorizedWrites,0,
+    'read-only Evidence never grants ABI write authority');
+  const script=readFileSync(root+'scripts/select_establishment_configuration.py','utf8');
+  const schemas=new Map([
+    ['scripts/select_establishment_configuration.py',{text:script}],
+    ['schemas/EstablishmentSelectionInput.schema.yaml',{text:`title: EstablishmentSelectionInput
+type: object
+required: [dnn, slice, plmn, ingress-ref, lifecycle-ref, requested-type, requested-ssc, udmResult]
+properties:
+  dnn: {type: string}
+  slice: {type: object}
+  plmn: {type: object}
+  ingress-ref: {type: string}
+  lifecycle-ref: {type: string}
+  requested-type: {type: string}
+  requested-ssc: {type: integer}
+  udmResult: {type: object}
+`}]
+  ]);
+  const typed=inspectionSnapshot(source,{procedureId:proc.name,nodeId:'nudm-sdm-subscribe'},null,schemas);
+  assert.ok(typed.consumerContracts.bindings.some(x=>x.typeRelation==='TYPE_ONLY_MATCH'),
+    'Evidence distinguishes declared type-only matches from full ABI proof');
+  assert.ok(typed.consumerContracts.bindings.some(x=>x.typeRelation==='PRODUCER_TYPE_UNAVAILABLE'),
+    'Evidence keeps unknown producer output types explicit');
+  const flow=typed.evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
+  assert.ok(flow?.children.some(x=>x.label.includes('Consumer ABI')));
+  assert.ok(flow.children.every(x=>!x.writeAuthorized),
+    'dataflow evidence rows remain read-only');
   const invalid=inspectionSnapshot('procedures: [invalid]');
   assert.equal(invalid.model.state,'UNAVAILABLE');assert.equal(invalid.outline.length,0);assert.ok(invalid.problems.length);
 });
@@ -93,7 +122,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     x.kind==='phase-step'&&x.phaseName==='preconditions'&&x.stepIndex===0);
   assert.ok(phaseStep,'eligible Phase Step identity is exposed');
   const phaseItem=providers.get('skillStudio.inspection').getTreeItem(phaseStep);
-  assert.equal(phaseItem.contextValue,'skillStudio.phaseStep');
+  assert.equal(phaseItem.contextValue,'skillStudio.namedPhaseStepAndBinding');
   assert.equal(phaseItem.kind,'phase-step');
   assert.equal(phaseStep.sourceVersion,doc.version);
   assert.equal(phaseStep.documentUri,doc.uri.toString());
@@ -110,6 +139,30 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(doc.text,writesAfterBinding,'stale Phase Step selection must not write');
   assert.ok(commands.has('skillStudio.addPhaseVerify'));
   assert.ok(commands.has('skillStudio.editPhaseVerifyStep'));
+  assert.ok(commands.has('skillStudio.renameNamedPhaseStep'));
+  doc.text=source;doc.version++;changed({document:doc});
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const renamePhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const renameStep=renamePhase.children.find(x=>x.kind==='phase-step'&&x.stepIndex===0);
+  const renameItem=providers.get('skillStudio.inspection').getTreeItem(renameStep);
+  assert.equal(renameItem.contextValue,'skillStudio.namedPhaseStepAndBinding');
+  const renamed='select-subscription-config-v2';
+  const beforeRename=doc.text,renameVersion=doc.version;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.renameNamedPhaseStep')(renameItem,renamed),false);
+  assert.equal(doc.text,beforeRename,'cancelled named Step rename must not touch Source');
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.renameNamedPhaseStep')(renameItem,renamed),true);
+  assert.equal(doc.version,renameVersion+1);
+  assert.ok(doc.text.includes('- name: '+renamed));
+  assert.equal(doc.text.includes('select-subscription-configuration'),false,
+    'all closed-world same-Procedure output references are renamed atomically');
+  assert.equal(appliedEdits.at(-1).length,6,'named Step identity and five references share one WorkspaceEdit');
+  const afterRename=doc.text;
+  assert.equal(await commands.get('skillStudio.renameNamedPhaseStep')(renameItem,'another-name'),false,
+    'stale named Step selection cannot be reused');
+  assert.equal(doc.text,afterRename);
   doc.text=source;doc.version++;changed({document:doc});
   workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
   const verifyPhaseRow=providers.get('skillStudio.inspection').getChildren()
@@ -170,9 +223,29 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(doc.text,source,'Verify insertion/reorder/deletion round-trip preserves exact original Source');
   assert.equal(appliedEdits.at(-1).length,1,'Verify deletion uses one Source deletion');
   assert.equal(appliedEdits.at(-1)[0].value,'');
+
+  // Exercise naming and zero-consumer deletion on a plain Verify whose
+  // immediate Source neighbors are unambiguous in the current owner sample.
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const namedVerifyPhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const unnamedVerify=namedVerifyPhase.children.find(x=>x.stepIndex===4);
+  const unnamedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(unnamedVerify);
+  assert.equal(unnamedVerifyItem.contextValue,'skillStudio.verifyStep');
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(unnamedVerifyItem,
+    {action:'name',newName:'lifecycle-ready'}),true);
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const namedPhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const namedVerify=namedPhase.children.find(x=>x.stepName==='lifecycle-ready');
+  const namedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(namedVerify);
+  assert.equal(namedVerifyItem.contextValue,'skillStudio.namedVerifyStep');
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(namedVerifyItem,'delete'),true);
+  assert.equal(doc.text,source.replace("            - verify: createdsession.lifecycle.ready\n",""),
+    'named Verify deletion removes only the unreferenced Step');
+  doc.text=source;doc.version++;changed({document:doc});
   assert.ok(commands.has('skillStudio.insertNode'));
   assert.ok(commands.has('skillStudio.deleteNode'));
-  doc.text=source;doc.version++;changed({document:doc});
   const routeProcedure='ue-requested-pdu-session-establishment';
   workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'nudm-sdm-get'});
   const routeRow=providers.get('skillStudio.inspection').getChildren().find(x=>
@@ -227,6 +300,42 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   await commands.get('skillStudio.auditPackage')();
   assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/editor warnings/);
   assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
+  assert.ok(commands.has('skillStudio.exportPackageZip'));
+  // Package export uses the complete byte snapshot but overlays every open
+  // TextDocument, so unsaved edits are included without writing to OPFS.
+  const exportSource=source+'\n# unsaved-export-probe\n';
+  doc.text=exportSource;doc.version++;changed({document:doc});
+  const beforeZipMessages=posted.length;
+  assert.equal(await commands.get('skillStudio.exportPackageZip')(),true);
+  const zipMessage=posted.slice(beforeZipMessages).find(x=>x.type==='packageZipReady');
+  assert.ok(zipMessage,'Package ZIP is delivered to the active Procedure Webview');
+  assert.equal(zipMessage.filename,'establish-pdu-session.zip');
+  assert.equal(zipMessage.fileCount,4);
+  assert.equal(zipMessage.opaqueCount,0);
+  const zipBytes=Buffer.from(zipMessage.base64,'base64');
+  assert.equal(zipBytes.readUInt32LE(0),0x04034b50,'export is a real ZIP archive');
+  let zipOffset=0,exportedProcedure='';
+  while(zipBytes.readUInt32LE(zipOffset)===0x04034b50){
+    const size=zipBytes.readUInt32LE(zipOffset+18);
+    const nameLength=zipBytes.readUInt16LE(zipOffset+26);
+    const extraLength=zipBytes.readUInt16LE(zipOffset+28);
+    const nameStart=zipOffset+30;
+    const name=zipBytes.subarray(nameStart,nameStart+nameLength).toString('utf8');
+    const dataStart=nameStart+nameLength+extraLength;
+    if(name==='assurance/procedure.yaml')
+      exportedProcedure=zipBytes.subarray(dataStart,dataStart+size).toString('utf8');
+    zipOffset=dataStart+size;
+  }
+  assert.ok(exportedProcedure.includes('# unsaved-export-probe'),
+    'ZIP contains current unsaved native Source rather than stale disk bytes');
+  doc.text=source;doc.version++;changed({document:doc});
+  const evidence=providers.get('skillStudio.evidence').getChildren();
+  assert.ok(evidence[0].label.includes('no write authority'));
+  const dataflow=evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
+  assert.ok(dataflow,'bounded Package Audit hydrates selected-Node dataflow evidence');
+  assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
+  assert.match(dataflow.description,/no write authorization/);
+  assert.ok(dataflow.children.some(x=>x.label.includes('Source lineage')));
   doc.text='# Preview title\n<script>alert(1)</script>';
   await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));
   assert.match(panels[0].webview.html,/Content-Security-Policy/);
