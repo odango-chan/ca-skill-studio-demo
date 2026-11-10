@@ -2233,9 +2233,89 @@ export function registerWorkbench(vscode,context){
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
-    const panel=vscode.window.createWebviewPanel('skillStudio.markdown','Preview · '+uri.path.split('/').at(-1),vscode.ViewColumn.Beside,{enableScripts:false});
-    const render=()=>{const preview=renderMarkdown(doc.getText());panel.webview.html='<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;none&#39;;"></head><body><article>'+(preview.available?preview.html:'<p>预览不可用，请使用源码编辑器。</p>')+'</article></body></html>';};
-    render();const changed=vscode.workspace.onDidChangeTextDocument(e=>{if(e.document.uri.toString()===uri.toString())render();});panel.onDidDispose(()=>changed.dispose());
+    const rootMarker='/references/';
+    const referenceIndex=uri.path.lastIndexOf(rootMarker);
+    const packageRootPath=uri.path.endsWith('/SKILL.md')
+      ?uri.path.slice(0,-'/SKILL.md'.length)
+      :referenceIndex>=0?uri.path.slice(0,referenceIndex):null;
+    const rootPath=packageRootPath?.replace(/\/$/,'')??null;
+    const resolvePackageTarget=rawPath=>{
+      if(!rootPath||typeof rawPath!=='string'||rawPath.length>240||
+         rawPath.startsWith('/')||rawPath.includes('\\')||rawPath.includes('?')||
+         rawPath.includes('#'))return null;
+      const currentDir=uri.path.slice(0,uri.path.lastIndexOf('/'));
+      if(currentDir!==rootPath&&!currentDir.startsWith(rootPath+'/'))return null;
+      const relativeDir=currentDir.slice(rootPath.length).replace(/^\\/+/, '');
+      const segments=relativeDir?relativeDir.split('/').filter(Boolean):[];
+      for(const part of rawPath.split('/')){
+        if(!part||part==='.')continue;
+        if(part==='..'){if(!segments.length)return null;segments.pop();continue;}
+        if(!/^[A-Za-z0-9_.-]+$/.test(part))return null;
+        segments.push(part);
+      }
+      if(!segments.length)return null;
+      const targetPath=rootPath+'/'+segments.join('/');
+      if(!targetPath.startsWith(rootPath+'/')||
+         !/\\.(?:md|ya?ml|py|json)$/i.test(targetPath))return null;
+      return uri.with({path:targetPath});
+    };
+    const random=new Uint8Array(16);
+    if(typeof globalThis.crypto?.getRandomValues!=='function')
+      throw new Error('Secure randomness unavailable: refusing to render Markdown Webview');
+    globalThis.crypto.getRandomValues(random);
+    const nonce=[...random].map(value=>value.toString(16).padStart(2,'0')).join('');
+    const panel=vscode.window.createWebviewPanel(
+      'skillStudio.markdown','Preview · '+uri.path.split('/').at(-1),
+      vscode.ViewColumn.Beside,{enableScripts:true}
+    );
+    const webview=panel.webview;
+    const render=()=>{
+      const preview=renderMarkdown(doc.getText(),{localLinks:Boolean(rootPath)});
+      const csp="default-src 'none'; base-uri 'none'; form-action 'none'; "+
+        "style-src 'nonce-"+nonce+"'; script-src 'nonce-"+nonce+"'; "+
+        "img-src 'none'; connect-src 'none';";
+      webview.html='<!doctype html><html lang="zh"><head><meta charset="utf-8">'+
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'+
+        '<meta http-equiv="Content-Security-Policy" content="'+csp+'">'+
+        '<style nonce="'+nonce+'">body{font-family:var(--vscode-font-family,sans-serif);'+
+        'color:var(--vscode-foreground);background:var(--vscode-editor-background);'+
+        'margin:0;padding:24px}article{max-width:1000px;margin:0 auto;line-height:1.65}'+
+        'a{color:var(--vscode-textLink-foreground)}a.md-local-link{font-weight:600;'+
+        'text-decoration:underline;text-decoration-style:dotted}'+
+        '.md-unresolved-link{border-bottom:1px dotted var(--vscode-descriptionForeground)}'+
+        '</style></head><body><article>'+
+        (preview.available?preview.html:'<p>预览不可用，请使用源码编辑器。</p>')+
+        '</article><script nonce="'+nonce+'">(()=>{const api=acquireVsCodeApi();'+
+        'document.addEventListener("click",event=>{const target=event.target;'+
+        'const link=target instanceof Element?target.closest("a[data-local-path]"):null;'+
+        'if(!link)return;event.preventDefault();api.postMessage({type:"openPackageFile",'+
+        'path:link.dataset.localPath});});})();</script></body></html>';
+    };
+    const incoming=webview.onDidReceiveMessage(async message=>{
+      if(message?.type!=='openPackageFile'||typeof message.path!=='string')return;
+      const targetUri=resolvePackageTarget(message.path);
+      if(!targetUri){
+        void vscode.window.showWarningMessage('链接目标不在当前 Skill Package 内，已阻止打开。');
+        return;
+      }
+      try{
+        const stat=await vscode.workspace.fs.stat(targetUri);
+        if(stat.type&vscode.FileType.Directory)
+          throw new Error('目标是目录，不是文件');
+        if(targetUri.path.toLowerCase().endsWith('.md'))
+          await vscode.commands.executeCommand('skillStudio.previewMarkdown',targetUri);
+        else
+          await vscode.commands.executeCommand('vscode.open',targetUri);
+      }catch(error){
+        void vscode.window.showWarningMessage(
+          '无法打开 Package 文件 '+message.path+'：'+String(error?.message??error));
+      }
+    });
+    render();
+    const changed=vscode.workspace.onDidChangeTextDocument(e=>{
+      if(e.document.uri.toString()===uri.toString())render();
+    });
+    panel.onDidDispose(()=>{changed.dispose();incoming.dispose();});
   }));
   return {attach(doc,post){
     sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();
