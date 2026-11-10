@@ -198,6 +198,15 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
       message.params?.rootUri===snapshot.rootUri
     );
     assert.equal(status.params.state,"READY");
+    // The liveness endpoint must answer on the real Worker JSON-RPC channel
+    // without changing the Package analysis generation or Source.
+    const health=await lspRequest(worker,91,"skillStudio/health",{});
+    assert.deepEqual(health,{alive:true});
+    const unchanged=await lspRequest(worker,92,"textDocument/documentSymbol",{
+      textDocument:{uri:snapshot.documents.find(x=>
+        x.relativePath==="scripts/select_establishment_configuration.py").uri}
+    });
+    assert.ok(unchanged.some(x=>x.name==="main"));
 
     const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
     const script=snapshot.documents.find(x=>
