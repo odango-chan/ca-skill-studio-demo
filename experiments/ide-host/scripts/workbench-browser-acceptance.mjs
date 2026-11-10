@@ -615,7 +615,23 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      !phaseEvidence.readOnly)
     throw Error('Native Evidence view did not render bounded read-only Producer / Consumer evidence: '+
       JSON.stringify({phaseEvidence,dataflowTreeRow})+' · '+phaseEvidenceText.slice(-1400));
-  console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify(phaseEvidence));
+  // A prior TextDocument edit may have scheduled a debounced Package Audit.
+  // Do not start another native edit while that audit still owns the current
+  // snapshot; wait for the exact Package Audit terminal state first.
+  for(let attempt=0;attempt<100;attempt++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(/Package Audit · \\d+ editor warnings/.test(phaseEvidenceText))break;
+    if(phaseEvidenceText.includes('Package Audit · unavailable'))
+      throw Error('Package Audit became unavailable before Phase binding edit: '+
+        phaseEvidenceText.slice(-1000));
+    await sleep(100);
+  }
+  if(!/Package Audit · \\d+ editor warnings/.test(phaseEvidenceText))
+    throw Error('Package Audit did not settle before Phase binding edit: '+
+      phaseEvidenceText.slice(-1000));
+  console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify({
+    ...phaseEvidence,auditReady:true
+  }));
   // Expanding the native Evidence tree moves focus away from the editor. Open
   // the authoritative Source editor before testing native Undo so the host's
   // undo command is bound to the edited TextDocument, not the tree widget.
