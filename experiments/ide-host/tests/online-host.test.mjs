@@ -41,9 +41,10 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   assert.ok(plugin.contributes.menus?.["view/title"]?.some(x=>
     x.command==="skillStudio.loadExample"),
     "Explorer title toolbar must expose the demo project");
-  for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","media/procedure.js","media/procedure.css",
-    "samples/establish-pdu-session/files.json",
-    "samples/establish-pdu-session/assurance/procedure.yaml"])
+  for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js","media/procedure.js","media/procedure.css",
+    "samples/skills/files.json",
+    "samples/skills/establish-pdu-session/assurance/procedure.yaml",
+    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });
 test("Trial is isolated from existing Pages distribution",()=>{
@@ -71,6 +72,25 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
     "icons/json.svg","icons/shell.svg","icons/text.svg",
     "icons/file.svg","icons/folder.svg","icons/folder-open.svg","icons/code.svg"
   ])assert.ok(statSync(join(themeRoot,path)).size>80,path);
+});
+
+test("Theia bundles offline YAML and Python TextMate grammars independently of LSP",()=>{
+  const rootSyntax=join(root,"plugins/odango-chan.skill-studio-languages");
+  const manifest=JSON.parse(readFileSync(join(rootSyntax,"package.json"),"utf8"));
+  assert.equal(manifest.main,undefined);
+  assert.equal(manifest.browser,undefined);
+  for(const [id,suffix] of [["yaml",".yaml"],["python",".py"]]){
+    assert.ok(manifest.contributes.languages.some(x=>
+      x.id===id&&x.extensions.includes(suffix)),id+" language id");
+    assert.ok(manifest.contributes.grammars.some(x=>x.language===id),id+" grammar");
+  }
+  for(const grammar of manifest.contributes.grammars){
+    const path=join(rootSyntax,grammar.path);
+    const syntax=JSON.parse(readFileSync(path,"utf8"));
+    assert.equal(syntax.scopeName,grammar.scopeName);
+    assert.ok(statSync(path).size>100);
+  }
+  assert.ok(statSync(join(rootSyntax,"LICENSE.txt")).size>500);
 });
 
 test("Theia activity bar and shell toolbars render from the Classic icon registry",()=>{
