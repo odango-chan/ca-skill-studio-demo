@@ -51,6 +51,18 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const outline=providers.get('skillStudio.outline');
   const node=outline.getChildren()[0].children[0];
   const item=outline.getTreeItem(node);
+  const firstProcedure=outline.getChildren()[0];
+  const selectedNode=firstProcedure.children[0];
+  workbench.select(doc,{version:doc.version,procedureId:selectedNode.procedureId,nodeId:selectedNode.nodeId});
+  const inspector=providers.get('skillStudio.inspection');
+  const inspectorNode=inspector.getChildren().find(x=>x.kind==='node');
+  assert.ok(inspectorNode,'selected Node identity is exposed to the native Inspector');
+  const inspectorItem=inspector.getTreeItem(inspectorNode);
+  assert.equal(inspectorItem.contextValue,'skillStudio.node');
+  assert.equal(inspectorItem.nodeId,selectedNode.nodeId);
+  assert.equal(inspectorItem.sourceVersion,doc.version);
+  assert.ok(commands.has('skillStudio.renameNode'));
+  assert.ok(commands.has('skillStudio.editNodeOperatorValue'));
   await commands.get(item.command.command)(...item.command.arguments);
   assert.equal(posted.at(-1).type,'focusNode');
   doc.version++;doc.text='procedures: [broken]';changed({document:doc});
