@@ -58,7 +58,7 @@ export function packageScanRoots(workspaceFolders, openDocuments = []) {
     if (typeof path !== 'string') continue;
     let packageRoot = packageMarker(path);
     if (!packageRoot) {
-      const match = path.match(/^(.*\\/(?:skills|workspaces)\\/[^/]+)(?:\\/|$)/);
+      const match = path.match(/^(.*\/(?:skills|workspaces)\/[^/]+)(?:\/|$)/);
       if (match) packageRoot = match[1];
     }
     if (!packageRoot) continue;
