@@ -978,20 +978,96 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Return the native Explorer to the foreground: the evidence acceptance
   // opened the Skill Studio Activity Bar and intentionally kept it selected.
   await invoke('workbench.files.action.focusFilesExplorer');
-  // Safe Markdown uses the actual native source document and shared renderer.
-  const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-  if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
-  await click(markdownFile.x,markdownFile.y,2);await sleep(400);
-  await invoke('skillStudio.previewMarkdown');
-  const tree=await command('Page.getFrameTree');let markdown=false;
-  async function inspect(n){
-    try{const w=await command('Page.createIsolatedWorld',{frameId:n.frame.id,worldName:'markdown-acceptance',grantUniveralAccess:true});
-      const r=await command('Runtime.evaluate',{contextId:w.executionContextId,returnByValue:true,expression:`Boolean(document.querySelector('article h1')&&!document.querySelector('article script,article img'))`});
-      markdown ||= r.result?.value===true;
-    }catch{}
-    for(const c of n.childFrames??[])await inspect(c);
+  // Open the exact owner-pinned conventional Skill guide through the real
+  // Theia command registry, then exercise package-local navigation in Chromium.
+  await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session');
+  async function markdownViews(){
+    const tree=await command('Page.getFrameTree'),found=[];
+    async function walk(node){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:node.frame.id,worldName:'markdown-c5-acceptance',grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:'(()=>{const article=document.querySelector("article");if(!article)return null;return {heading:article.querySelector("h1")?.textContent?.trim()??null,toc:!!article.querySelector(".md-toc"),tocLinks:[...article.querySelectorAll(".md-toc a")].filter(a=>(a.getAttribute("href")??"").startsWith("#md-heading-")).length,localPaths:[...article.querySelectorAll("a[data-local-path]")].map(a=>a.getAttribute("data-local-path"))};})()'
+        });
+        if(result.result?.value?.heading)
+          found.push({contextId:world.executionContextId,...result.result.value});
+      }catch{}
+      for(const child of node.childFrames??[])await walk(child);
+    }
+    await walk(tree.frameTree);
+    return found;
   }
-  await inspect(tree.frameTree);if(!markdown)throw Error('Shared safe Markdown Preview did not render');
+  async function waitMarkdown(predicate,label){
+    let views=[];
+    for(let attempt=0;attempt<80;attempt++){
+      views=await markdownViews();
+      const view=views.find(predicate);
+      if(view)return {view,views};
+      await sleep(100);
+    }
+    throw Error(label+' did not appear in a real Theia Webview: '+JSON.stringify(views));
+  }
+  const guideOpen=await waitMarkdown(
+    view=>view.heading==='Establish PDU Session','Conventional SKILL.md preview');
+  if(!guideOpen.view.toc||guideOpen.view.tocLinks<10||
+     !guideOpen.view.localPaths.includes('references/3gpp-procedure.md')||
+     !guideOpen.view.localPaths.includes('references/session-selection.md')||
+     !guideOpen.view.localPaths.includes('references/failure-handling.md'))
+    throw Error('SKILL.md outline or explicit Reference links are incomplete: '+
+      JSON.stringify(guideOpen.view));
+  const openReference=await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="references/3gpp-procedure.md");if(!link)return false;link.click();return true;})()'
+  });
+  if(openReference.result?.value!==true)
+    throw Error('Could not click the explicit 3GPP Reference path in SKILL.md');
+  const referenceOpen=await waitMarkdown(
+    view=>view.heading==='PDU Session Establishment: actors and causal boundaries',
+    '3GPP Reference preview');
+  if(!referenceOpen.view.localPaths.includes('../SKILL.md'))
+    throw Error('Reference preview did not expose its explicit link back to SKILL.md: '+
+      JSON.stringify(referenceOpen.view));
+  const beforeForgery=(await markdownViews()).length;
+  await command('Runtime.evaluate',{
+    contextId:referenceOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{const link=document.createElement("a");link.href="#";link.dataset.localPath="../../docs/design/llm-skill-execution-baseline.md";document.body.append(link);link.click();link.remove();return true;})()'
+  });
+  await sleep(300);
+  const afterForgery=await markdownViews();
+  const traversalBlocked=afterForgery.length===beforeForgery;
+  if(!traversalBlocked)
+    throw Error('Forged Webview message opened a file outside the active Skill Package');
+  const guideCountBeforeReturn=afterForgery.filter(
+    view=>view.heading==='Establish PDU Session').length;
+  const returnToGuide=await command('Runtime.evaluate',{
+    contextId:referenceOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="../SKILL.md");if(!link)return false;link.click();return true;})()'
+  });
+  if(returnToGuide.result?.value!==true)
+    throw Error('Could not follow Reference → SKILL.md navigation');
+  let returnedGuides=[];
+  for(let attempt=0;attempt<80;attempt++){
+    returnedGuides=(await markdownViews()).filter(
+      view=>view.heading==='Establish PDU Session');
+    if(returnedGuides.length>guideCountBeforeReturn)break;
+    await sleep(100);
+  }
+  if(returnedGuides.length<=guideCountBeforeReturn)
+    throw Error('Reference → SKILL.md did not open a new guide preview');
+  await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session-mas');
+  const masOpen=await waitMarkdown(
+    view=>view.heading==='Establish PDU Session through SMF MAS','MAS SKILL.md preview');
+  if(!masOpen.view.toc||masOpen.view.localPaths.length!==0)
+    throw Error('MAS Skill preview invented Package-local Reference links: '+
+      JSON.stringify(masOpen.view));
+  const markdownGuideEvidence={
+    conventional:guideOpen.view,reference:referenceOpen.view,
+    returnedGuideCount:returnedGuides.length,mas:masOpen.view,traversalBlocked
+  };
+  console.log('STUDIO_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
   // Native layout restoration must retain the CustomEditor across a reload.
   console.log("STUDIO_NATIVE_ACTION","reload");
   await sleep(1200);await command('Page.reload');await sleep(800);
