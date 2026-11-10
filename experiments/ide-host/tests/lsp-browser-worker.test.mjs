@@ -83,11 +83,11 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
     // A delayed old snapshot must not republish its diagnostic after invalidation.
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(1,"procedures: [\\n")
+      params:packageSnapshot(1,"procedures: [\n")
     });
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(2,"procedures: [\\n")
+      params:packageSnapshot(2,"procedures: [\n")
     });
     const latest=await waitForMessage(worker,message=>
       message?.method==="textDocument/publishDiagnostics" &&
