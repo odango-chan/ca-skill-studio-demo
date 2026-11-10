@@ -720,8 +720,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   let workerFailureEvidence=null,recoveryEvidence=null;
   if(requireBrowserLsp){
     let procedureDiagnosticActive=false,ownershipProbeActive=false,recoveryBufferPrepared=false;
+    let procedureUri=null;
     try{
-    const procedureUri=await evalJS(`(async()=>{const c=window.theia.container;const opKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');if(!opKey)throw Error('L2-D4 Procedure OpenerService missing');const openers=await c.get(opKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource?.toString()??null;})()`);
+    procedureUri=await evalJS(`(async()=>{const c=window.theia.container;const opKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');if(!opKey)throw Error('L2-D4 Procedure OpenerService missing');const openers=await c.get(opKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource?.toString()??null;})()`);
     if(!procedureUri)throw Error("L2-D4 Procedure URI missing");
 
     const diagnostic=await nativeCommand(
