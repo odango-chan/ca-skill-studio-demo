@@ -162,8 +162,18 @@ export function projectSkillContract(source) {
   const failure = get(spec, 'failureSemantics');
   const outcomeUnknown = get(failure, 'outcomeUnknown');
   const unknown = collectUnprojected(root);
+  const requiredFacts = listValues(root, counter, ['spec', 'context', 'requiredFacts'], warnings);
+  const capabilities = listValues(root, counter,
+    ['spec', 'allowedResources', 'capabilities'], warnings);
+  const localTools = listValues(root, counter,
+    ['spec', 'allowedResources', 'localTools'], warnings);
+  const preconditions = expectationList(root, counter, 'preconditions', warnings);
+  const requirements = expectationList(root, counter, 'requirements', warnings, true);
+  const postconditions = expectationList(root, counter, 'postconditions', warnings);
+  const dependencies = dependencyList(root, counter, warnings);
+  const state = unknown.length || warnings.length ? 'PARTIAL' : 'READY';
   return {
-    state: unknown.length || warnings.length ? 'PARTIAL' : 'READY',
+    state,
     kind: 'SkillContract',
     apiVersion: field(root, counter, 'apiVersion'),
     name: field(root, counter, 'metadata', 'name'),
@@ -171,15 +181,13 @@ export function projectSkillContract(source) {
     goal: field(root, counter, 'spec', 'goal'),
     entryProcedure: field(root, counter, 'spec', 'entryProcedure'),
     requestSchema: field(root, counter, 'spec', 'inputs', 'requestSchema'),
-    requiredFacts: listValues(root, counter, ['spec', 'context', 'requiredFacts'], warnings),
-    capabilities: listValues(root, counter,
-      ['spec', 'allowedResources', 'capabilities'], warnings),
-    localTools: listValues(root, counter,
-      ['spec', 'allowedResources', 'localTools'], warnings),
-    preconditions: expectationList(root, counter, 'preconditions', warnings),
-    requirements: expectationList(root, counter, 'requirements', warnings, true),
-    postconditions: expectationList(root, counter, 'postconditions', warnings),
-    dependencies: dependencyList(root, counter, warnings),
+    requiredFacts,
+    capabilities,
+    localTools,
+    preconditions,
+    requirements,
+    postconditions,
+    dependencies,
     maxActions: field(root, counter, 'spec', 'planning', 'maxActions'),
     allowDynamicProcedure: field(root, counter, 'spec', 'planning', 'allowDynamicProcedure'),
     fallbackProcedure: field(root, counter, 'spec', 'planning', 'fallbackProcedure'),
