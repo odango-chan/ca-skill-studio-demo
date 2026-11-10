@@ -316,12 +316,16 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
     message?.method==="textDocument/publishDiagnostics"&&
     message.params?.uri===uri&&
     (version===undefined||message.params?.version===version);
+  const wait=async(label,predicate,timeoutMs=5000)=>{
+    try{return await waitForMessage(worker,predicate,timeoutMs);}
+    catch(error){throw Error(label+": "+error.message);}
+  };
   try{
     worker.postMessage({
       jsonrpc:"2.0",id:101,method:"initialize",
       params:{processId:null,rootUri:"file:///workspace",capabilities:{}}
     });
-    const initialized=await waitForMessage(worker,message=>message?.id===101);
+    const initialized=await wait("initialize",message=>message?.id===101);
     assert.equal(initialized.result.serverInfo.name,"Skill Studio Language Service");
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
@@ -334,16 +338,16 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
       params:packageSnapshot(1,"procedures: [\n",rootB)
     });
     const [statusA,statusB]=await Promise.all([
-      waitForMessage(worker,message=>message?.method==="skillStudio/analysisStatus"&&
+      wait("Package A initial status",message=>message?.method==="skillStudio/analysisStatus"&&
         message.params?.rootUri===rootA&&message.params?.generation===1),
-      waitForMessage(worker,message=>message?.method==="skillStudio/analysisStatus"&&
+      wait("Package B initial status",message=>message?.method==="skillStudio/analysisStatus"&&
         message.params?.rootUri===rootB&&message.params?.generation===1)
     ]);
     assert.equal(statusA.params.state,"PARTIAL");
     assert.equal(statusB.params.state,"PARTIAL");
     const [publishedA,publishedB]=await Promise.all([
-      waitForMessage(worker,diagnosticFor(procedureA,1)),
-      waitForMessage(worker,diagnosticFor(procedureB,1))
+      wait("Package A initial diagnostic",diagnosticFor(procedureA,1)),
+      wait("Package B initial diagnostic",diagnosticFor(procedureB,1))
     ]);
     assert.ok(publishedA.params.diagnostics.some(item=>item.code==="PROCEDURE_PROJECTION"));
     assert.ok(publishedB.params.diagnostics.some(item=>item.code==="PROCEDURE_PROJECTION"));
@@ -352,7 +356,7 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
       jsonrpc:"2.0",method:"skillStudio/packageClose",
       params:{rootUri:rootA}
     });
-    const clearedA=await waitForMessage(worker,message=>
+    const clearedA=await wait("Package A close diagnostic clear",message=>
       diagnosticFor(procedureA)(message)&&message.params.diagnostics.length===0
     );
     assert.equal(clearedA.params.diagnostics.length,0);
@@ -365,11 +369,11 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(2,"procedures: [\n",rootA)
     });
-    const reopened=await waitForMessage(worker,message=>
+    const reopened=await wait("Package A reopened status",message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===rootA&&message.params?.generation===2);
     assert.equal(reopened.params.state,"PARTIAL");
-    const republishedA=await waitForMessage(worker,diagnosticFor(procedureA,2));
+    const republishedA=await wait("Package A reopened diagnostic",diagnosticFor(procedureA,2));
     assert.ok(republishedA.params.diagnostics.some(item=>
       item.code==="PROCEDURE_PROJECTION"));
     const bStillOwned=await expectNoMessage(worker,message=>
@@ -381,7 +385,7 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
       jsonrpc:"2.0",method:"skillStudio/packageClose",
       params:{rootUri:rootB}
     });
-    const clearedB=await waitForMessage(worker,message=>
+    const clearedB=await wait("Package B close diagnostic clear",message=>
       diagnosticFor(procedureB)(message)&&message.params.diagnostics.length===0);
     assert.equal(clearedB.params.diagnostics.length,0);
   }finally{
