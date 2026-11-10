@@ -324,7 +324,7 @@ connection.onCompletion(params => {
   const prefix = document.text.slice(lineStart, offset);
 
   if (document.relativePath === "assurance/procedure.yaml" &&
-      /^\\s*script:\\s*[^#]*$/.test(prefix) &&
+      /^\s*script:\s*[^#]*$/.test(prefix) &&
       value.analysis.state === "READY" &&
       value.snapshot.completeness === "complete") {
     const colon = prefix.indexOf(":");
@@ -334,7 +334,7 @@ connection.onCompletion(params => {
     const start = lineStart + colon + 1 + leading;
     const editRange = toLspRange(document.text, { start, end: offset });
     return value.snapshot.documents
-      .filter(item => /^scripts\\/[A-Za-z0-9_.-]+\\.py$/.test(item.relativePath) &&
+      .filter(item => /^scripts\/[A-Za-z0-9_.-]+\.py$/.test(item.relativePath) &&
         item.relativePath.startsWith(typed))
       .map(item => ({
         label: item.relativePath,
@@ -347,7 +347,7 @@ connection.onCompletion(params => {
   }
 
   if (document.languageId === "python" &&
-      /^\\s*# (?:inputSchema|outputSchema):\\s*[^#]*$/.test(prefix) &&
+      /^\s*# (?:inputSchema|outputSchema):\s*[^#]*$/.test(prefix) &&
       value.analysis.state === "READY" &&
       value.snapshot.completeness === "complete") {
     const colon = prefix.indexOf(":");
