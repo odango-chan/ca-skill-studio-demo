@@ -118,6 +118,7 @@ test("Package-local Markdown navigation never promotes unsafe or escaping paths"
     "`references/session-selection.md`",
     "[return](../SKILL.md)",
     "[escape](../../docs/design/private.md)",
+    "[sibling](../../establish-pdu-session-mas/SKILL.md)",
     "[unsafe](javascript:alert(1))",
     "[remote](https://example.com/manual)"
   ].join("\n");
@@ -125,6 +126,7 @@ test("Package-local Markdown navigation never promotes unsafe or escaping paths"
   assert.match(html,/data-local-path="references\/session-selection\.md"/);
   assert.match(html,/data-local-path="\.\.\/SKILL\.md"/);
   assert.doesNotMatch(html,/data-local-path="\.\.\/\.\.\//);
+  assert.doesNotMatch(html,/data-local-path="\.\.\/establish-pdu-session-mas/);
   assert.doesNotMatch(html,/href="javascript:/i);
   assert.match(html,/href="https:\/\/example\.com\/manual"/);
 });
