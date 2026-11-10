@@ -214,7 +214,7 @@ export function registerWorkbench(vscode,context){
       async procedureUriValue=>{
         const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
         const procedureDocument=await vscode.workspace.openTextDocument(procedureUri);
-        const procedureLines=procedureDocument.getText().split(/\\r\\n|\\n|\\r/);
+        const procedureLines=procedureDocument.getText().split(/\r\n|\n|\r/);
         const scriptPathValue="scripts/select_establishment_configuration.py";
         const procedureLine=procedureLines.findIndex(line=>line.includes("script: "+scriptPathValue));
         if(procedureLine<0)throw Error("Procedure Source does not contain the expected declared script path");
@@ -245,7 +245,7 @@ export function registerWorkbench(vscode,context){
            !hoverText.includes("select-establishment-configuration"))
           throw Error("Hover provider did not return the declared Skill Script metadata");
         const scriptDocument=await vscode.workspace.openTextDocument(scriptUri);
-        const scriptLines=scriptDocument.getText().split(/\\r\\n|\\n|\\r/);
+        const scriptLines=scriptDocument.getText().split(/\r\n|\n|\r/);
         const nameLine=scriptLines.findIndex(line=>line==="# name: select-establishment-configuration");
         const schemaLine=scriptLines.findIndex(line=>line==="# inputSchema: EstablishmentSelectionInput");
         if(nameLine<0||schemaLine<0)
