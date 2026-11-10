@@ -1142,9 +1142,151 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       }
     }
   }
+  // Verify the sibling MAS Skill through the actual native Explorer path.
+  // Reveal expands the workspace tree to the MAS Procedure; a real Explorer
+  // double-click must then open its associated Procedure CustomEditor.
+  await invoke('workbench.files.action.focusFilesExplorer');
+  const masTarget=await evalJS(`(async()=>{
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&
+      k.prototype?.registerCommand&&k.prototype?.getCommand);
+    if(!key)throw Error('MAS Explorer acceptance: native command registry missing');
+    const registry=c.get(key);
+    const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
+      String(k)==='Symbol(OpenerService)');
+    if(!openerKey)throw Error('MAS Explorer acceptance: OpenerService missing');
+    const openers=await c.get(openerKey).getOpeners();
+    const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');
+    const source=custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>
+      w.resource?.path.toString().endsWith('/establish-pdu-session/assurance/procedure.yaml'));
+    if(!source)throw Error('MAS Explorer acceptance: pinned 5GC Procedure resource missing');
+    const target=source.resource.parent.parent.parent
+      .resolve('establish-pdu-session-mas')
+      .resolve('assurance')
+      .resolve('procedure.yaml');
+    await registry.executeCommand('navigator.reveal',target);
+    return {
+      uri:target.toString(),
+      path:target.path.toString(),
+      skillPath:target.parent.parent.path.toString(),
+      assurancePath:target.parent.path.toString()
+    };
+  })()`);
+  if(!masTarget?.path||!masTarget.skillPath||!masTarget.assurancePath)
+    throw Error('MAS Explorer target URI could not be derived: '+JSON.stringify(masTarget));
+  let masExplorer=null;
+  for(let attempt=0;attempt<100&&!masExplorer;attempt++){
+    masExplorer=await evalJS(`(()=>{
+      const target=${JSON.stringify(masTarget.path)};
+      const skill=${JSON.stringify(masTarget.skillPath)};
+      const assurance=${JSON.stringify(masTarget.assurancePath)};
+      const captions=[...document.querySelectorAll(
+        '.theia-TreeNodeContent .theia-TreeNodeSegment[id]')];
+      const find=id=>captions.find(node=>node.id===id)??null;
+      const describe=caption=>{
+        if(!caption)return null;
+        const row=caption.closest('.theia-TreeNode');
+        const r=row?.getBoundingClientRect();
+        return r?{
+          x:r.x+r.width/2,y:r.y+r.height/2,
+          visible:r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight,
+          text:caption.innerText?.trim()??'',
+          expandable:row.classList.contains('theia-ExpandableTreeNode')
+        }:null;
+      };
+      const skillRow=describe(find(skill));
+      const assuranceRow=describe(find(assurance));
+      const procedureRow=describe(find(target));
+      if(!skillRow?.visible||!assuranceRow?.visible||!procedureRow?.visible)return null;
+      return {skill:skillRow,assurance:assuranceRow,procedure:procedureRow,
+        expandedPath:true,captionCount:captions.length};
+    })()`);
+    if(!masExplorer)await sleep(100);
+  }
+  if(!masExplorer)
+    throw Error('MAS Skill folders and assurance/procedure.yaml did not appear expanded in native Explorer: '+
+      JSON.stringify({masTarget,body:(await evalJS('document.body.innerText')).slice(-1800)}));
+  if(masExplorer.skill.text!=='establish-pdu-session-mas'||
+     masExplorer.assurance.text!=='assurance'||
+     masExplorer.procedure.text!=='procedure.yaml')
+    throw Error('MAS Explorer resolved an unexpected tree path: '+JSON.stringify(masExplorer));
+  await click(masExplorer.procedure.x,masExplorer.procedure.y,2);
+  let masWidget=null;
+  for(let attempt=0;attempt<100&&!masWidget;attempt++){
+    masWidget=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
+        String(k)==='Symbol(OpenerService)');
+      if(!openerKey)return null;
+      const openers=await c.get(openerKey).getOpeners();
+      const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');
+      const widgets=custom?.widgetManager.getWidgets('plugin-custom-editor')??[];
+      const widget=widgets.find(w=>w.resource?.path.toString()===${JSON.stringify(masTarget.path)});
+      return widget?{uri:widget.resource.toString(),path:widget.resource.path.toString()}:null;
+    })()`);
+    if(!masWidget)await sleep(100);
+  }
+  if(masWidget?.path!==masTarget.path)
+    throw Error('MAS Explorer double-click did not open the exact MAS Procedure CustomEditor: '+
+      JSON.stringify({masTarget,masWidget}));
+  async function masGraph(){
+    const tree=await command('Page.getFrameTree'),frames=[];
+    const collect=node=>{
+      if(!node)return;
+      frames.push(node.frame);
+      for(const child of node.childFrames??[])collect(child);
+    };
+    collect(tree.frameTree);
+    for(const frame of frames.filter(item=>
+      item.url.includes('/webview/index.html')||item.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'mas-skill-explorer-acceptance',grantUniveralAccess:true
+        });
+        const evaluated=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+          expression:`({
+            procedureRoot:!!document.querySelector('#reactFlowRoot'),
+            procedure:document.querySelector('#procedureList')?.value??'',
+            graphNodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,
+            graphEdges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length,
+            bodyText:document.body?.innerText?.slice(0,1600)??''
+          })`
+        });
+        const view=evaluated.result?.value??null;
+        if(view?.procedure==='establish-session'&&view.graphNodes>0)
+          return {frameId:frame.id,view};
+      }catch{/* Retry other CustomEditor frames while MAS finishes rendering. */}
+    }
+    return null;
+  }
+  let masOpened=null;
+  for(let attempt=0;attempt<100&&!masOpened;attempt++){
+    masOpened=await masGraph();
+    if(!masOpened)await sleep(100);
+  }
+  if(!masOpened?.view?.procedureRoot||
+     masOpened.view.procedure!=='establish-session'||
+     masOpened.view.graphNodes<1||
+     !masOpened.view.bodyText.includes('verify-eligible')||
+     !masOpened.view.bodyText.includes('validate-subscription'))
+    throw Error('MAS Procedure did not render its own graph after native Explorer open: '+
+      JSON.stringify({masTarget,masWidget,masOpened}).slice(0,3200));
+  const dualSkillExplorer={
+    skill:'establish-pdu-session-mas',
+    uri:masWidget.uri,
+    explorer:{skillFolder:true,assuranceFolder:true,procedureFile:true,expandedPath:true},
+    opened:true,
+    procedure:masOpened.view.procedure,
+    graphNodes:masOpened.view.graphNodes,
+    graphEdges:masOpened.view.graphEdges,
+    frameId:masOpened.frameId
+  };
+  console.log('STUDIO_DUAL_SKILL_EXPLORER_CHROMIUM',JSON.stringify(dualSkillExplorer));
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference,phaseRoute,phaseOutcome,workerFailureEvidence,recoveryEvidence};
+  return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,dualSkillExplorer,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference,phaseRoute,phaseOutcome,workerFailureEvidence,recoveryEvidence};
 }
 
 // Keep native Explorer acceptance independent of the user's scroll position.
