@@ -981,20 +981,28 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Open the exact owner-pinned conventional Skill guide through the real
   // Theia command registry, then exercise package-local navigation in Chromium.
   await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session');
+  const markdownWorlds=new Map();
   async function markdownViews(){
     const tree=await command('Page.getFrameTree'),found=[];
     async function walk(node){
       try{
-        const world=await command('Page.createIsolatedWorld',{
-          frameId:node.frame.id,worldName:'markdown-c5-acceptance',grantUniveralAccess:true
-        });
+        let contextId=markdownWorlds.get(node.frame.id);
+        if(!contextId){
+          const world=await command('Page.createIsolatedWorld',{
+            frameId:node.frame.id,worldName:'markdown-c5-acceptance',grantUniveralAccess:true
+          });
+          contextId=world.executionContextId;
+          markdownWorlds.set(node.frame.id,contextId);
+        }
         const result=await command('Runtime.evaluate',{
-          contextId:world.executionContextId,returnByValue:true,
+          contextId,returnByValue:true,
           expression:'(()=>{const article=document.querySelector("article");if(!article)return null;return {heading:article.querySelector("h1")?.textContent?.trim()??null,toc:!!article.querySelector(".md-toc"),tocLinks:[...article.querySelectorAll(".md-toc a")].filter(a=>(a.getAttribute("href")??"").startsWith("#md-heading-")).length,localPaths:[...article.querySelectorAll("a[data-local-path]")].map(a=>a.getAttribute("data-local-path"))};})()'
         });
         if(result.result?.value?.heading)
-          found.push({contextId:world.executionContextId,...result.result.value});
-      }catch{}
+          found.push({contextId,...result.result.value});
+      }catch{
+        markdownWorlds.delete(node.frame.id);
+      }
       for(const child of node.childFrames??[])await walk(child);
     }
     await walk(tree.frameTree);
