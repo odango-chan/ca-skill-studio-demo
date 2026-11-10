@@ -66,6 +66,9 @@ export class LanguageDiagnosticSession {
 
   async submit(snapshot: PackageSnapshot): Promise<SubmitResult> {
     if (this.disposed) return { accepted: false, reason: "DISPOSED" };
+    if (!snapshot || typeof snapshot !== "object" ||
+        typeof snapshot.rootUri !== "string" || !snapshot.rootUri.trim())
+      return { accepted: false, reason: "INVALID_SNAPSHOT" };
     if (this.rootUri !== null && snapshot.rootUri !== this.rootUri)
       return { accepted: false, reason: "WRONG_PACKAGE" };
     if (!Number.isSafeInteger(snapshot.generation) ||
