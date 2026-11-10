@@ -801,7 +801,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      !predicateView.text.includes('createdsession.udm.hold_bound')||
      !predicateView.text.includes('skill.evaluate-udm-read')||
      !predicateView.text.includes('Observation → Evaluator')||
-     !predicateView.text.includes('非运行结果'))
+     !predicateView.text.includes('不是当前运行证据'))
     throw Error('Predicate Designer did not render the real PredicateSet declarations: '+
       JSON.stringify(predicateView).slice(0,3000));
   console.log('STUDIO_PREDICATE_DESIGNER_CHROMIUM',JSON.stringify({
@@ -809,7 +809,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     predicates:predicateView.predicates,observations:predicateView.observations,
     realPredicateVisible:predicateView.ids.includes('createdsession.ran.setup_accepted'),
     scriptEvaluatorVisible:predicateView.text.includes('skill.evaluate-udm-read'),
-    noLiveResultClaim:predicateView.text.includes('非运行结果')
+    noLiveResultClaim:predicateView.text.includes('不是当前运行证据')
   }));
   // Native layout restoration must retain the CustomEditor across a reload.
   console.log("STUDIO_NATIVE_ACTION","reload");
