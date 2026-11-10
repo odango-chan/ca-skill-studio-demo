@@ -204,7 +204,9 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const namedVerifyPhaseItem=providers.get('skillStudio.inspection').getTreeItem(namedVerifyPhase);
   assert.equal(await commands.get('skillStudio.addPhaseVerify')(namedVerifyPhaseItem,verifyPredicate),true);
   workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
-  const unnamedVerify=namedVerifyPhase.children.find(x=>x.stepIndex===5);
+  const appendedNamedVerifyPhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const unnamedVerify=appendedNamedVerifyPhase.children.find(x=>x.stepIndex===5);
   const unnamedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(unnamedVerify);
   assert.equal(unnamedVerifyItem.contextValue,'skillStudio.verifyStep');
   assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(unnamedVerifyItem,
