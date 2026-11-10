@@ -102,6 +102,8 @@
 
 - [#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25)：E3-A1/A2 已合入且部署；Python 语言服务（例如浏览器内 Pyright）仍仅候选，尚无真实语义诊断、类型检查或脚本执行。E4 目录读写仍独立推进。
 
+- **Skill Language Core / Browser LSP（未合并草稿栈）：** [#103 L1 Core](https://github.com/odango-chan/ca-skill-studio-demo/pull/103) 与 [#105 L2-A](https://github.com/odango-chan/ca-skill-studio-demo/pull/105) 的精确 HEAD CI PASS；[#109 L2-B](https://github.com/odango-chan/ca-skill-studio-demo/pull/109) 的 IDE Host、Theia Browser Host、Browser-Only 和回归四项门禁 PASS；[#110 L2-C](https://github.com/odango-chan/ca-skill-studio-demo/pull/110) 四项门禁 PASS。L2-B/C 仍为 Draft、未合入、未部署。Browser Worker 只在 Theia Browser-Only / Pages host 验收；backend-backed Theia 继续使用 Node extension-host 路径，不应错误要求 Browser Worker READY。当前 L2-D1 增加真实 Theia VS Code provider API 验收，尚待 exact-head CI。
+
 - [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)：D3 有界 operator.on Route 编辑已合入；Runtime Outcome 资格和 Phase-specific Route 仍未覆盖。
 - [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)：D4 Phase Designer；A1/A2.1/A2.2a 已合入，A2.2b1 只读脚本消费字段对照已合入；A3a 仅允许相邻无名无绑定单行 Verify 换序（首轮 CI 与浏览器 PASS）；A2.2b2、A3b2b2b 具副作用或带引用 Step 的写入与 A4b1 仅提供已有 Phase on-map 的受限 Outcome 修复（本仓编辑器级验收通过）；A4b2 新 Phase on-map 及 owner Outcome 完整性验证仍未开始；A4a 仅实现已存在失败分支目标的同 Phase/同 Outcome 观察值重定向（本仓编辑器级验收通过）；A3b2b2a 仅提供已验收的执行/引用风险只读审查；A3b2b1 仅允许无输出引用的纯 Verify 命名/删除/相邻换序（本仓编辑器级验收通过）；A3b2a 先审查命名输出引用并受限改名，不能据此宣称 Runtime 兼容。
 - 早期未合并 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)、[#2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)、[#3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3) 目前只作为历史候选，**不推断可直接合并**。
