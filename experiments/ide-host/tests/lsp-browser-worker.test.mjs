@@ -228,6 +228,26 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.ok(references.some(item=>item.uri===procedure.uri));
     assert.ok(references.some(item=>item.uri===script.uri));
 
+    const schemaNeedle="# inputSchema: EstablishmentSelectionInput";
+    const schemaDefinition=await lspRequest(worker,20,"textDocument/definition",{
+      textDocument:{uri:script.uri},
+      position:positionOf(script.text,schemaNeedle,"# inputSchema: ".length)
+    });
+    assert.equal(schemaDefinition.uri,schema.uri);
+    const schemaHover=await lspRequest(worker,21,"textDocument/hover",{
+      textDocument:{uri:script.uri},
+      position:positionOf(script.text,schemaNeedle,"# inputSchema: ".length)
+    });
+    assert.match(schemaHover.contents.value,/Input Schema/);
+    assert.match(schemaHover.contents.value,/EstablishmentSelectionInput/);
+    const schemaReferences=await lspRequest(worker,22,"textDocument/references",{
+      textDocument:{uri:schema.uri},
+      position:positionOf(schema.text,"EstablishmentSelectionInput"),
+      context:{includeDeclaration:true}
+    });
+    assert.ok(schemaReferences.some(item=>item.uri===script.uri));
+    assert.ok(schemaReferences.some(item=>item.uri===schema.uri));
+
     const symbols=await lspRequest(worker,15,"textDocument/documentSymbol",{
       textDocument:{uri:script.uri}
     });
@@ -239,7 +259,6 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     });
     assert.ok(scriptCompletion.some(item=>item.label===script.relativePath));
 
-    const schemaNeedle="# inputSchema: EstablishmentSelectionInput";
     const schemaCompletion=await lspRequest(worker,17,"textDocument/completion",{
       textDocument:{uri:script.uri},
       position:positionOf(script.text,schemaNeedle,schemaNeedle.length)
