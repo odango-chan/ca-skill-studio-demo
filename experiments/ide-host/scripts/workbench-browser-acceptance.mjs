@@ -596,9 +596,22 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const r=row?.content?.getBoundingClientRect();
       const toggle=row?.node.querySelector('.theia-ExpansionToggle');
       const tr=toggle?.getBoundingClientRect();
-      return r?{found:true,x:tr?tr.x+tr.width/2:r.x+12,
-        y:tr?tr.y+tr.height/2:r.y+r.height/2,
+      const x=tr?tr.x+tr.width/2:r.x+12;
+      const y=tr?tr.y+tr.height/2:r.y+r.height/2;
+      const hit=document.elementFromPoint(x,y);
+      const describe=element=>{
+        if(!element)return null;
+        const style=getComputedStyle(element),box=element.getBoundingClientRect();
+        return {tag:element.tagName,id:element.id,className:typeof element.className==='string'?element.className:'',
+          nodeId:element.getAttribute('data-node-id'),text:element.textContent?.trim().slice(0,100)??'',
+          pointerEvents:style.pointerEvents,visibility:style.visibility,display:style.display,
+          zIndex:style.zIndex,rect:{x:box.x,y:box.y,width:box.width,height:box.height}};
+      };
+      return r?{found:true,x,y,
         toggleFound:!!toggle,toggleClass:toggle?.className??null,
+        toggleRect:tr?{x:tr.x,y:tr.y,width:tr.width,height:tr.height}:null,
+        hit:describe(hit),hitIsToggle:hit===toggle,hitWithinToggle:!!toggle&&toggle.contains(hit),
+        hitStack:document.elementsFromPoint(x,y).slice(0,6).map(describe),
         expanded:!!toggle&&!toggle.classList.contains('theia-mod-collapsed'),
         rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
         candidateCount:rows.length}:{
@@ -620,10 +633,39 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     throw Error('Native Evidence dataflow row has no Theia expansion toggle: '+
       JSON.stringify(dataflowTreeRow));
   if(!dataflowTreeRow.expanded){
-    // Theia 1.76 renders expansion as a dedicated .theia-ExpansionToggle
-    // segment; the row itself has no aria-expanded attribute. Click the
-    // actual native arrow, not an inferred point in the row caption.
-    await click(dataflowTreeRow.x,dataflowTreeRow.y);
+    if(!dataflowTreeRow.hitWithinToggle)
+      throw Error('Native Evidence toggle is obscured at its click point: '+JSON.stringify(dataflowTreeRow));
+    // Use the verified on-screen hit target. Recompute after the hover frame
+    // because Theia can rerender virtualized tree rows between pointer move
+    // and press; do not click stale coordinates.
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:dataflowTreeRow.x,y:dataflowTreeRow.y});
+    await sleep(100);
+    const liveToggle=await evalJS(`(()=>{
+      const container=[...document.querySelectorAll('.theia-view-container')]
+        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+      const part=header?.closest('.part');
+      const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
+        const caption=[...node.children].find(child=>
+          child.classList?.contains('theia-TreeNodeContent'));
+        return caption?.innerText?.includes('Producer / Consumer dataflow');
+      });
+      const toggle=row?.querySelector('.theia-ExpansionToggle');
+      const rect=toggle?.getBoundingClientRect();
+      const hit=rect?document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2):null;
+      return rect?{x:rect.x+rect.width/2,y:rect.y+rect.height/2,
+        expanded:!toggle.classList.contains('theia-mod-collapsed'),
+        hitWithinToggle:hit===toggle||toggle.contains(hit),
+        hitTag:hit?.tagName??null,hitClass:typeof hit?.className==='string'?hit.className:''}:null;
+    })()`);
+    if(!liveToggle?.hitWithinToggle)
+      throw Error('Native Evidence expansion toggle lost hit target before click: '+
+        JSON.stringify({dataflowTreeRow,liveToggle}));
+    if(!liveToggle.expanded){
+      await command('Input.dispatchMouseEvent',{type:'mousePressed',x:liveToggle.x,y:liveToggle.y,button:'left',clickCount:1});
+      await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:liveToggle.x,y:liveToggle.y,button:'left',clickCount:1});
+    }
   }
   let dataflowExpansion=null;
   for(let attempt=0;attempt<50;attempt++){
