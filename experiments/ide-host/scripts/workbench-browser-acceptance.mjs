@@ -163,6 +163,36 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   });
   if(!bindingSelection.result?.value?.node)throw Error('Could not select Phase binding Node');
   await sleep(250);
+  const evidenceHeader=await evalJS(`(()=>{
+    const el=[...document.querySelectorAll('.theia-view-container-part-header')]
+      .find(x=>x.textContent.trim().toLowerCase()==='evidence'&&
+        x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);
+    const r=el?.getBoundingClientRect(),part=el?.closest('.part');
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
+      collapsed:el.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'')}:null;
+  })()`);
+  if(!evidenceHeader)throw Error('Native Evidence view header is missing');
+  if(evidenceHeader.collapsed){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
+  await invoke('skillStudio.auditPackage');
+  let phaseEvidenceText='';
+  for(let i=0;i<100;i++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(phaseEvidenceText.includes('Producer / Consumer dataflow')&&
+       phaseEvidenceText.includes('Consumer ABI'))break;
+    await sleep(100);
+  }
+  const phaseEvidence={
+    ready:phaseEvidenceText.includes('Producer / Consumer dataflow')&&
+      phaseEvidenceText.includes('Consumer ABI'),
+    dataflowRows:(phaseEvidenceText.match(/Producer \/ Consumer dataflow/g)||[]).length,
+    consumerAbiRows:(phaseEvidenceText.match(/Consumer ABI/g)||[]).length,
+    readOnly:phaseEvidenceText.includes('no write authority')
+  };
+  if(!phaseEvidence.ready||!phaseEvidence.dataflowRows||!phaseEvidence.consumerAbiRows||
+     !phaseEvidence.readOnly)
+    throw Error('Native Evidence view did not render bounded read-only Producer / Consumer evidence: '+
+      JSON.stringify(phaseEvidence)+' · '+phaseEvidenceText.slice(-1400));
+  console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify(phaseEvidence));
   const beforeBinding=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
@@ -374,5 +404,5 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
+  return {views:true,packageAudit:true,phaseEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
 }
