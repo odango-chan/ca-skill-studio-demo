@@ -27,6 +27,7 @@
     "onCommand:skillStudio.editPhaseInputBinding",
     "onCommand:skillStudio.editPhaseOutputReference",
     "onCommand:skillStudio.editPhaseRouteTarget",
+    "onCommand:skillStudio.repairPhaseOutcome",
     "onCommand:skillStudio.insertNode",
     "onCommand:skillStudio.deleteNode",
     "onCommand:skillStudio.addPhaseVerify",
@@ -78,6 +79,10 @@
       {
         "command": "skillStudio.editPhaseRouteTarget",
         "title": "SKILL Studio: Retarget Existing Phase Failure Route"
+      },
+      {
+        "command": "skillStudio.repairPhaseOutcome",
+        "title": "SKILL Studio: Repair Observed Phase Outcome"
       },
       {
         "command": "skillStudio.insertNode",
@@ -180,6 +185,11 @@
           "command": "skillStudio.editPhaseRouteTarget",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.routeAndPhaseTarget",
           "group": "2_route"
+        },
+        {
+          "command": "skillStudio.repairPhaseOutcome",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseOutcomeRepair",
+          "group": "6_phase"
         },
         {
           "command": "skillStudio.editPhaseInputBinding",

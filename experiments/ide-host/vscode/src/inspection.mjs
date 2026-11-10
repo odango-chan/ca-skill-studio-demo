@@ -6,6 +6,7 @@ import {phaseStepEvidenceSummary,bindingEvidenceExplanation}
 import {phaseOutputReferenceOptions,previewPhaseOutputReference}
   from '../../../../site/phase-output-refs.mjs';
 import {phaseRouteTargetOptions} from '../../../../site/phase-routes.mjs';
+import {phaseOutcomeEditOptions} from '../../../../site/phase-outcomes.mjs';
 
 // UI adapter only: every fact below comes from Classic's source projection.
 const row=(label,line,children=[],extra={})=>({label,line,children,...extra});
@@ -42,11 +43,12 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
   const outputReferencesFor=(phaseName,stepIndex)=>outputReferences.filter(x=>
     x.phaseName===phaseName&&x.stepIndex===stepIndex);
   const phaseRouteTargets=node?phaseRouteTargetOptions(text,procedure.name,node.id):[];
+  const outcomeRepairs=node?phaseOutcomeEditOptions(text,procedure.name,node.id):[];
   const outline=[...model.procedures.values()].map(p=>row(p.name,p.nodes[0]?.line??1,
     p.nodes.map(n=>row(n.id,n.line,[],{description:n.operator,procedureId:p.name,nodeId:n.id,kind:'node'})),{description:p.nodes.length+' nodes',procedureId:p.name}));
   const inspection=node?[
     row(node.id,node.line,[],{description:node.operator+' · '+node.value,kind:'node',procedureId:procedure.name,nodeId:node.id}),
-    ...node.phases.map(p=>row(p.name,p.line,p.steps.map(s=>{
+    ...node.phases.map(p=>row(p.name,p.line,[...p.steps.map(s=>{
       const stepIndex=s.index-1,evidence=stepEvidence(p.name,stepIndex);
       const outputRows=outputReferencesFor(p.name,stepIndex).map(reference=>
         row('Output reference · '+reference.bindingKey,s.line,[],{
@@ -64,7 +66,15 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
           stepIndex,stepName:s.name||null,stepOperator:s.operator,stepValue:s.value,
           description:[s.operator+' · '+s.value,evidence?.label].filter(Boolean).join(' · ')
         });
-    }),{kind:'phase',procedureId:procedure.name,nodeId:node.id,phaseName:p.name})),
+    }),...outcomeRepairs.filter(option=>option.phaseName===p.name)
+      .filter(option=>option.adds.length||option.renames.length||option.deletions.length)
+      .map(option=>row('Outcome repair · '+p.name,p.line,[],{
+        kind:'phase-outcome-repair',procedureId:procedure.name,nodeId:node.id,
+        phaseName:p.name,addCount:option.adds.length,
+        renameCount:option.renames.length,deleteCount:option.deletions.length,
+        description:['补齐 '+option.adds.length,'纠正 '+option.renames.length,
+          '删除 '+option.deletions.length].join(' · ')+' · Source-only'
+      }))],{kind:'phase',procedureId:procedure.name,nodeId:node.id,phaseName:p.name})),
     ...procedure.routes.filter(r=>r.source===node.id).map(r=>{
       const eligible=phaseRouteTargets.find(target=>target.routeId===r.id);
       return row(r.routeSource+' · '+r.outcome+' → '+r.target,r.line,[],{
