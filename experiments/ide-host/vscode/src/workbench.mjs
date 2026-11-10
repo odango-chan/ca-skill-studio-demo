@@ -114,14 +114,23 @@ export function registerWorkbench(vscode,context){
     return languageClientPromise;
   }
   async function refreshLanguagePackage(state,ticket,generation,strict=false){
-    if(state.disposed||ticket!==state.ticket||languageTransportFailure)return;
+    if(state.disposed||ticket!==state.ticket||languageTransportFailure){
+      if(strict)throw Error("Package refresh was superseded or Language Worker is unavailable");
+      return null;
+    }
     try{
       const snapshot=await collectPackageSnapshot(
         vscode,state.procedureDocument,generation
       );
-      if(state.disposed||ticket!==state.ticket)return;
+      if(state.disposed||ticket!==state.ticket){
+        if(strict)throw Error("Package refresh was superseded during snapshot collection");
+        return null;
+      }
       const client=await ensureLanguageClient();
-      if(!client||state.disposed||ticket!==state.ticket||languageTransportFailure)return;
+      if(!client||state.disposed||ticket!==state.ticket||languageTransportFailure){
+        if(strict)throw Error("Package refresh lost its active Language Worker");
+        return null;
+      }
       state.lastSentSnapshot={
         generation:snapshot.generation,
         completeness:snapshot.completeness,
@@ -196,6 +205,99 @@ export function registerWorkbench(vscode,context){
       void refreshLanguagePackage(state,ticket,generation);
     },120);
   }
+  async function waitForLanguagePackageStatus(state,generation,timeoutMs=20000){
+    const started=Date.now();
+    while(Date.now()-started<timeoutMs){
+      if(state.disposed||languagePackages.get(state.key)!==state)
+        throw Error("Package closed while Language Worker recovery was in progress: "+state.key);
+      if(languageTransportFailure)
+        throw Error("Language Worker failed during recovery: "+languageTransportFailure);
+      const status=languagePackageStatuses.get(state.key);
+      if(status?.generation===generation){
+        if(status.state==="READY"||status.state==="PARTIAL")return status;
+        if(status.state==="UNAVAILABLE")
+          throw Error("Package analysis unavailable after Worker recovery: "+
+            (status.reason??state.key));
+      }
+      await new Promise(resolve=>setTimeout(resolve,50));
+    }
+    throw Error("Timed out waiting for recovered Package generation "+
+      generation+" at "+state.key);
+  }
+  async function restartLanguageService(){
+    if(languageRecoveryPromise)return languageRecoveryPromise;
+    if(!languageTransportFailure)
+      return {recovered:false,reason:"Language Worker is not in a terminal failure state"};
+    languageRecoveryPromise=(async()=>{
+      const active=[...languagePackages.values()].filter(state=>
+        !state.disposed&&state.refs>0);
+      // A failed startup can still be settling when the user requests recovery.
+      if(!languageClient&&languageClientPromise){
+        try{await languageClientPromise;}catch{/* failed candidate is cleaned by ensureLanguageClient */}
+      }
+      const failedClient=languageClient;
+      languageClient=null;
+      languageClientPromise=null;
+      languagePackageStatuses.clear();
+      if(failedClient)await failedClient.stop().catch(error=>
+        console.warn("Previous LanguageClient cleanup",error));
+      languageTransportFailure=null;
+      languageClientFailureShown=false;
+      updateLanguageStatus("STARTING","User requested Language Worker recovery");
+      const nextClient=await ensureLanguageClient();
+      if(!nextClient)throw Error("Browser Language Worker is unavailable in this host");
+      const targets=active.map(state=>{
+        state.ticket++;
+        clearTimeout(state.timer);
+        state.timer=null;
+        state.transientReadRetries=0;
+        state.generation=Math.max(state.generation,
+          languagePackageGenerations.get(state.key)??0)+1;
+        languagePackageGenerations.set(state.key,state.generation);
+        languagePackageStatuses.delete(state.key);
+        return {state,ticket:state.ticket,generation:state.generation};
+      });
+      const packages=await Promise.all(targets.map(async target=>{
+        const {state,ticket,generation}=target;
+        const snapshot=await refreshLanguagePackage(state,ticket,generation,true);
+        if(!snapshot)throw Error("No fresh snapshot was sent for "+state.key);
+        const status=await waitForLanguagePackageStatus(state,generation);
+        return {rootUri:state.key,generation,status:status.state,
+          completeness:snapshot.completeness,
+          dirtyDocuments:snapshot.documents.filter(item=>item.version>0)
+            .map(item=>({path:item.relativePath,version:item.version}))};
+      }));
+      const partial=packages.some(item=>item.status==="PARTIAL");
+      updateLanguageStatus(partial?"PARTIAL":"READY",
+        "Language Worker recovered · "+packages.length+" active Package(s) rehydrated");
+      return {recovered:true,packages};
+    })().catch(async error=>{
+      const reason=String(error?.message??error);
+      if(!languageTransportFailure)updateLanguageStatus("ERROR",reason);
+      console.warn("Skill Studio Language Worker recovery failed",error);
+      return {recovered:false,reason};
+    }).finally(()=>{
+      languageRecoveryPromise=null;
+    });
+    return languageRecoveryPromise;
+  }
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.restartLanguageService",async()=>{
+      const result=await restartLanguageService();
+      if(result.recovered){
+        void vscode.window.showInformationMessage(
+          "SKILL Studio Language Worker 已恢复；活动 Package 已重新分析。"
+        );
+      }else{
+        void vscode.window.showWarningMessage(
+          "SKILL Studio Language Worker 恢复失败："+result.reason+
+          "。YAML/Python 源码仍可继续编辑。"
+        );
+      }
+      return result;
+    }
+  ));
+
   function attachLanguagePackage(doc){
     const rootInfo=packageRootForProcedure(vscode,doc);
     if(!rootInfo||typeof Worker!=="function"||typeof globalThis.location==="undefined")
