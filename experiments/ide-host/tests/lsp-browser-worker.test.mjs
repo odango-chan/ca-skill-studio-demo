@@ -41,8 +41,7 @@ function expectNoMessage(worker,predicate,timeoutMs=200) {
   });
 }
 
-function packageSnapshot(generation, procedureText) {
-  const rootUri = "file:///workspace/skill";
+function packageSnapshot(generation, procedureText, rootUri = "file:///workspace/skill") {
   return {
     rootUri,
     packageName: "skill",
@@ -302,6 +301,90 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.ok(localSymbols.some(item=>item.name==="main"),
       "same-document Python outline remains available for partial Packages");
   } finally {
+    await worker.terminate();
+  }
+});
+
+
+test("browser LSP isolates concurrent Package roots across close and reopen",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  const rootA="file:///workspace/skill-a";
+  const rootB="file:///workspace/skill-b";
+  const procedureA=rootA+"/assurance/procedure.yaml";
+  const procedureB=rootB+"/assurance/procedure.yaml";
+  const diagnosticFor=(uri,version)=>message=>
+    message?.method==="textDocument/publishDiagnostics"&&
+    message.params?.uri===uri&&
+    (version===undefined||message.params?.version===version);
+  try{
+    worker.postMessage({
+      jsonrpc:"2.0",id:101,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}
+    });
+    const initialized=await waitForMessage(worker,message=>message?.id===101);
+    assert.equal(initialized.result.serverInfo.name,"Skill Studio Language Service");
+    worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
+
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
+      params:packageSnapshot(1,"procedures: [\\n",rootA)
+    });
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
+      params:packageSnapshot(1,"procedures: [\\n",rootB)
+    });
+    const [statusA,statusB]=await Promise.all([
+      waitForMessage(worker,message=>message?.method==="skillStudio/analysisStatus"&&
+        message.params?.rootUri===rootA&&message.params?.generation===1),
+      waitForMessage(worker,message=>message?.method==="skillStudio/analysisStatus"&&
+        message.params?.rootUri===rootB&&message.params?.generation===1)
+    ]);
+    assert.equal(statusA.params.state,"PARTIAL");
+    assert.equal(statusB.params.state,"PARTIAL");
+    const [publishedA,publishedB]=await Promise.all([
+      waitForMessage(worker,diagnosticFor(procedureA,1)),
+      waitForMessage(worker,diagnosticFor(procedureB,1))
+    ]);
+    assert.ok(publishedA.params.diagnostics.some(item=>item.code==="PROCEDURE_PROJECTION"));
+    assert.ok(publishedB.params.diagnostics.some(item=>item.code==="PROCEDURE_PROJECTION"));
+
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageClose",
+      params:{rootUri:rootA}
+    });
+    const clearedA=await waitForMessage(worker,message=>
+      diagnosticFor(procedureA)(message)&&message.params.diagnostics.length===0
+    );
+    assert.equal(clearedA.params.diagnostics.length,0);
+    const bWasNotCleared=await expectNoMessage(worker,message=>
+      diagnosticFor(procedureB)(message)&&message.params.diagnostics.length===0,250);
+    assert.equal(bWasNotCleared,null,
+      "closing Package A must not clear Package B diagnostics");
+
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
+      params:packageSnapshot(2,"procedures: [\\n",rootA)
+    });
+    const reopened=await waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===rootA&&message.params?.generation===2);
+    assert.equal(reopened.params.state,"PARTIAL");
+    const republishedA=await waitForMessage(worker,diagnosticFor(procedureA,2));
+    assert.ok(republishedA.params.diagnostics.some(item=>
+      item.code==="PROCEDURE_PROJECTION"));
+    const bStillOwned=await expectNoMessage(worker,message=>
+      diagnosticFor(procedureB)(message)&&message.params.diagnostics.length===0,250);
+    assert.equal(bStillOwned,null,
+      "reopening Package A must not invalidate Package B diagnostics");
+
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageClose",
+      params:{rootUri:rootB}
+    });
+    const clearedB=await waitForMessage(worker,message=>
+      diagnosticFor(procedureB)(message)&&message.params.diagnostics.length===0);
+    assert.equal(clearedB.params.diagnostics.length,0);
+  }finally{
     await worker.terminate();
   }
 });
