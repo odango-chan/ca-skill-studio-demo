@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["language/core/**/*.ts"]
+  "include": ["language/**/*.ts"]
 }
