@@ -201,3 +201,13 @@ main browser application remains available at `/classic/`.
 **实现边界：** 直接复用 `site/phase-step-structural.mjs` 与 `site/phase-step-order.mjs` 的候选、Source patch 和重算资格；Theia 宿主仅维护 TextDocument revision、跨文件 PredicateSet 读取、精确 Diff/用户确认、一组原生 WorkspaceEdit 和 Undo。保留注释或命名输出来源归属不可证的情况，原生 Inspector 不提供修改动作；已有 Classic /classic/ 保持不变。
 
 **证据：** [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99) 的代码验收提交 `9b79517` 在真实 Theia Chromium 完成 Verify 新增 v12→v13→Undo v14、删除 v14→v15→Undo v16、换序 v16→v17→Undo v18。文档刷新后的 exact head `0281894` 四组门禁均 PASS：[IDE Host](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42745664432)、[Theia Browser-Only](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42745664161)、[Theia Browser Host Chromium](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42745664398)、[PR Verify](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42745664136)。PR #99 已合入 `main`，merge commit `1ac11d6c`；resulting-main Pages [#42746670113 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42746670113)；发布源码身份为 `main@5a5cb981`，Theia 默认入口真实 Chromium 验收及 Pages Deploy 均 PASS。Runtime / 5GC / desktop VS Code GUI NOT_RUN。
+
+
+## 2026-11-10 · Theia 画布工具栏与 Root 路径筛选恢复（PR #106，已合入 main）
+
+**范围：** 新版 Theia CustomEditor 恢复 Classic 画布上方的整行工具栏：默认垂直 / 可切水平、放大缩小、适配整图 / 横向铺满 / 纵向铺满、邻居视图、Route 标签和定位当前节点。Root Procedure 另恢复主路径、选择路径、全部路径，以及失败 / 未决 / 恢复分支筛选；节点上的 `+N 条 / 收起` 支持逐节点展开并保持锚点。
+
+**实现边界：** 不另造图模型。复用 `site/path-focus.mjs`、`site/layout.mjs`、`layoutProcedureELK`、共享 React Flow Canvas 的 `fitAxis` / `captureNodeAnchor` / `restoreNodeAnchor`。布局方向、路径模式和展开集合进入视图缓存键；Child Procedure 不显示 Root 专属筛选。所有按钮只影响视图，不改 YAML、不授予 Runtime / 5GC 权限。
+
+**验收：** [PR #106](https://github.com/odango-chan/ca-skill-studio-demo/pull/106) 已合并，merge commit `5dfa50e0e39e43087f01e1d5fee9ada1e6ce7d63`。exact-head `36a252319281e7c0829100a07455b56af6236176` 三组门禁全部 PASS：[IDE Host #42752173199](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173199)、[Theia Browser-Only #42752173510](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173510)、[Theia Browser Host / real Chromium #42752173208](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173208)。真实 Chromium 记录默认主路径 9 Nodes / 8 visible edges、水平 9/9、恢复垂直、全部路径 17 Nodes / 46 edges；Source、Inspector、Node Focus、Route create/reconnect 与 native Undo 回归通过。resulting-main Pages 对新 merge SHA 的部署仍需单独确认；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
+
