@@ -63,6 +63,7 @@ await build({
 });
 // Bundle the two runtime-used, source-pinned owner SKILLs under one skills/
 // workspace root. The legacy Classic fixture remains unchanged.
+// Snapshot provenance is checked against the current ca-agent-demo/main in sample-loader tests.
 const sampleSource="site/samples/skills";
 const sampleDest=join(root,"samples","skills");
 await rm(sampleDest,{recursive:true,force:true});
