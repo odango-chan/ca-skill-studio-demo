@@ -435,10 +435,10 @@ try{
         await sleep(100);
       }
       if(!quickOpen)throw Error("Native Quick Open did not appear for Python syntax probe");
-      await command("Input.insertText",{text:"build_n1n2_delivery.py"});
+      await command("Input.insertText",{text:"evaluate_transfer_start.py"});
       await sleep(600);
       const quickResults=await evalJS(\`document.body.innerText.slice(-1200)\`);
-      if(!quickResults.includes("build_n1n2_delivery.py"))
+      if(!quickResults.includes("evaluate_transfer_start.py"))
         throw Error("Native Quick Open did not find the bundled Python script: "+quickResults);
       await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Enter",code:"Enter",windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});
       await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Enter",code:"Enter",windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});
