@@ -323,6 +323,11 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
     };
   }
 
+  // A locally observed target can be exact even when the surrounding Package
+  // cannot be fully analyzed. Future LSP Definition/References handlers must
+  // check this flag as well as exact token ranges before publishing locations.
+  const packageContextComplete = snapshot.completeness === "complete" &&
+    procedure.state === "READY" && packageAudit.state === "READY";
   const scriptReferences: ScriptReference[] = [];
   const schemaReferences: SchemaReference[] = [];
   const pythonSymbols: PythonOutlineSymbol[] = [];
@@ -378,6 +383,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
             targetPath: document.relativePath,
             line: caller.line,
             targetIdentityExact: true,
+            packageContextComplete,
             sourceRange: null
           });
         }
@@ -392,6 +398,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
             targetPath: schema.path,
             targetLine: schema.line,
             title: schema.title,
+            packageContextComplete,
             sourceRange: null
           });
         }
