@@ -985,13 +985,14 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     sourceVersion:bindingVersion
   },'dnn','input.ue-ref');
   await confirmNativePreview('from: input.dnn','from: input.ue-ref');
-  const afterBinding=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
   const bindingResult=await evalJS(`window.__skillStudioCommandResult`);
-  if(bindingResult!==true||!afterBinding.result?.value||afterBinding.result.value===beforeBinding.result?.value)
-    throw Error('Native Phase Binding edit did not commit a Source revision');
+  const afterBinding=await waitForRevisionChange(graphContext,beforeBinding.result?.value,
+    'Native Phase Binding edit');
+  if(bindingResult!==true||!afterBinding.result?.value||
+     afterBinding.result.value===beforeBinding.result?.value)
+    throw Error('Native Phase Binding edit did not commit a Source revision: '+
+      JSON.stringify({bindingResult,before:beforeBinding.result?.value,
+        after:afterBinding.result?.value}));
   await invoke('core.undo');
   const afterBindingUndo=await waitForRevisionChange(graphContext,afterBinding.result?.value,
     'Native Phase Binding Undo');
