@@ -76,7 +76,7 @@ test("E3-A2 Python symbol ranges use UTF-16 offsets across CRLF and non-BMP text
     "    pass",
     "async def main():",
     "    return 1"
-  ].join("\\r\\n");
+  ].join("\r\n");
   const result=pythonTopLevelOutline(text);
   assert.equal(result.status,"READY");
   assert.deepEqual(result.symbols.map(symbol=>symbol.name),["Model","main"]);
