@@ -164,15 +164,16 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(!bindingSelection.result?.value?.node)throw Error('Could not select Phase binding Node');
   await sleep(250);
   const evidenceHeader=await evalJS(`(()=>{
-    const el=[...document.querySelectorAll('.theia-view-container-part-header')]
-      .find(x=>x.textContent.trim().toLowerCase()==='evidence'&&
-        x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);
-    const r=el?.getBoundingClientRect(),part=el?.closest('.part');
-    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
-      collapsed:el.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'')}:null;
+    const el=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&
+      x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
+      x.getBoundingClientRect().x>=0);
+    const r=el?.getBoundingClientRect();
+    const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
+      x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,needsOpen:!root}:null;
   })()`);
   if(!evidenceHeader)throw Error('Native Evidence view header is missing');
-  if(evidenceHeader.collapsed){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
+  if(evidenceHeader.needsOpen){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
   await invoke('skillStudio.auditPackage');
   let phaseEvidenceText='';
   for(let i=0;i<100;i++){
