@@ -84,7 +84,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const sourceOpened=await evalWebviewJS(`(()=>{const button=document.querySelector('#openSource');if(!button)return false;button.click();return true;})()`);
   if(!sourceOpened)throw Error('Procedure Webview did not expose its native Source action');
   await sleep(500);
-  await invoke('skillStudio.refreshInspection');
   const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
   await click(activity.x,activity.y);await sleep(500);
@@ -549,10 +548,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify(evidenceHeader));
   if(evidenceHeader.collapsed){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
   await invoke('skillStudio.auditPackage');
-  // auditPackage refreshes the owner-file snapshot asynchronously. Explicitly
-  // refresh the tree provider after it completes, then wait for the Evidence
-  // view's own root row before looking for its dataflow child.
-  await invoke('skillStudio.refreshInspection');
+  // auditPackage publishes the refreshed owner-file snapshot. Its source
+  // projection refreshes Evidence when that snapshot changes; wait for the
+  // Evidence root and dataflow row rather than scheduling another audit.
   let evidenceTreeState=null;
   for(let attempt=0;attempt<100;attempt++){
     evidenceTreeState=await evalJS(`(()=>{
