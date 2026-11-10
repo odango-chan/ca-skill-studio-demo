@@ -1521,6 +1521,52 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     scriptEvaluatorVisible:predicateView.text.includes('skill.evaluate-udm-read'),
     noLiveResultClaim:predicateView.text.includes('不是当前运行证据')
   }));
+  // C3: real, source-backed JSON Schema field tree in the same Theia host.
+  await invokeSkillPackageFile('skillStudio.openSchema','schemas/establishment-request.schema.yaml');
+  let schemaView=null;
+  for(let attempt=0;attempt<100&&!schemaView;attempt++){
+    const schemaTree=await command('Page.getFrameTree');
+    const frames=[];
+    const collect=node=>{
+      if(!node)return;
+      frames.push(node.frame);
+      for(const child of node.childFrames??[])collect(child);
+    };
+    collect(schemaTree.frameTree);
+    for(const frame of frames.filter(x=>
+        x.url.includes('/webview/index.html')||x.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'schema-designer-acceptance',
+          grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:"({title:document.title,fields:document.querySelectorAll('.field').length,names:[...document.querySelectorAll('.field-name')].map(x=>x.textContent.trim()),required:document.querySelectorAll('.required').length,text:document.querySelector('#tree')?.textContent??'',status:document.querySelector('#status')?.textContent??''})"
+        });
+        const candidate=result.result?.value;
+        if(candidate?.title==='SKILL Schema Visual'&&candidate.fields>0){
+          schemaView=candidate;break;
+        }
+      }catch{/* webview frames can disappear during editor activation */}
+    }
+    if(!schemaView)await sleep(100);
+  }
+  if(!schemaView || schemaView.fields<12 || schemaView.required<8 ||
+     !schemaView.names.includes('sNssai') ||
+     !schemaView.names.includes('sst') ||
+     !schemaView.names.includes('requestedPduSessionType') ||
+     !schemaView.text.includes('maximum: 16777214') ||
+     !schemaView.text.includes('const: IPV4') ||
+     !schemaView.status.includes('SOURCE VERSION'))
+    throw Error('Schema Designer did not render real owner request fields: '+
+      JSON.stringify(schemaView).slice(0,3000));
+  console.log('STUDIO_SCHEMA_DESIGNER_CHROMIUM',JSON.stringify({
+    title:schemaView.title,fields:schemaView.fields,required:schemaView.required,
+    sourceVersion:schemaView.status,
+    nestedSst:schemaView.names.includes('sst'),
+    enumOrConst:schemaView.text.includes('const: IPV4')
+  }));
   // Native layout restoration must retain the CustomEditor across a reload.
   console.log("STUDIO_NATIVE_ACTION","reload");
   await sleep(1200);await command('Page.reload');await sleep(800);

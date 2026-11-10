@@ -1,4 +1,4 @@
-// Stage the Procedure, Contract and Predicate Web extension plus standalone theme into
+// Stage the Procedure, Contract, Predicate and Schema Web extension plus standalone theme into
 // the isolated Theia browser-only application. Both are built-in plugins.
 import {cp,mkdir,readFile,rm,stat,writeFile} from "node:fs/promises";
 import {join} from "node:path";
@@ -9,7 +9,7 @@ const manifest=JSON.parse(await readFile(join(ext,"package.json"),"utf8"));
 if(!manifest.browser||!manifest.contributes?.customEditors?.length)
   throw Error("VS Code Web extension entry or CustomEditor missing");
 const requiredEditors=["skillStudio.procedurePreview","skillStudio.contractPreview",
-  "skillStudio.predicatePreview"];
+  "skillStudio.predicatePreview","skillStudio.schemaPreview"];
 const editorViews=new Set(manifest.contributes.customEditors.map(x=>x.viewType));
 for(const view of requiredEditors)if(!editorViews.has(view))
   throw Error("Required visual editor is missing from prepared Web extension: "+view);

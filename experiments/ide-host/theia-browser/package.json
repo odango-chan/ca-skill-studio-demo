@@ -16,7 +16,8 @@
           "workbench.editorAssociations": {
             "procedure.yaml": "skillStudio.procedurePreview",
             "contract.yaml": "skillStudio.contractPreview",
-            "predicates.yaml": "skillStudio.predicatePreview"
+            "predicates.yaml": "skillStudio.predicatePreview",
+            "*.schema.yaml": "skillStudio.schemaPreview"
           }
         },
         "warnOnPotentiallyInsecureHostPattern": false

@@ -37,10 +37,16 @@
     "onCustomEditor:skillStudio.contractPreview",
     "onCommand:skillStudio.openContract",
     "onCustomEditor:skillStudio.predicatePreview",
-    "onCommand:skillStudio.openPredicates"
+    "onCommand:skillStudio.openPredicates",
+    "onCustomEditor:skillStudio.schemaPreview",
+    "onCommand:skillStudio.openSchema"
   ],
   "contributes": {
     "commands": [
+      {
+        "command": "skillStudio.openSchema",
+        "title": "SKILL Studio: Open Schema Visual"
+      },
       {
         "command": "skillStudio.openProcedure",
         "title": "SKILL Studio: Open Procedure Visual"
@@ -124,6 +130,11 @@
     ],
     "menus": {
       "explorer/context": [
+        {
+          "command": "skillStudio.openSchema",
+          "when": "resourceFilename =~ /\\.schema\\.ya?ml$/",
+          "group": "navigation"
+        },
         {
           "command": "skillStudio.openContract",
           "when": "resourceFilename == contract.yaml",
@@ -322,6 +333,16 @@
         "selector": [
           {
             "filenamePattern": "**/assurance/[p]redicates.yaml"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "skillStudio.schemaPreview",
+        "displayName": "SKILL Schema Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/schemas/*.schema.yaml"
           }
         ],
         "priority": "default"
