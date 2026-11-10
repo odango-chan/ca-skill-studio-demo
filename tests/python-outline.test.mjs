@@ -16,6 +16,8 @@ test("E3-A2 source-aware top-level classes/main in all three owner scripts",()=>
     for(const symbol of result.symbols){
       const line=text.split(/\r?\n/)[symbol.line-1];
       assert.match(line,new RegExp("^(class|def|async def) "+symbol.name+"\\b"));
+      assert.ok(symbol.range);
+      assert.equal(text.slice(symbol.range.start,symbol.range.end),symbol.name);
     }
     assert.equal(pythonTopLevelOutline(text).symbols.length,result.symbols.length);
   }
@@ -64,4 +66,20 @@ test("E3-A2 lexical navigation never modifies Python source",()=>{
   assert.equal(text,copy);
   assert.ok(Object.isFrozen(result)&&Object.isFrozen(result.symbols));
   assert.ok(result.symbols.every(Object.isFrozen));
+});
+
+test("E3-A2 Python symbol ranges use UTF-16 offsets across CRLF and non-BMP text",()=>{
+  const text=[
+    "# coding: utf-8",
+    "description = \"😀 class Decoy:\"",
+    "class Model:",
+    "    pass",
+    "async def main():",
+    "    return 1"
+  ].join("\\r\\n");
+  const result=pythonTopLevelOutline(text);
+  assert.equal(result.status,"READY");
+  assert.deepEqual(result.symbols.map(symbol=>symbol.name),["Model","main"]);
+  for(const symbol of result.symbols)
+    assert.equal(text.slice(symbol.range.start,symbol.range.end),symbol.name);
 });
