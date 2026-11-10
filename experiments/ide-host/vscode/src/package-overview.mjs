@@ -50,7 +50,8 @@ export function buildPackageInventory(uris, dirtyPaths = new Set(), truncated = 
     .filter(uri => uri && typeof uri.path === 'string' && !NOISE.test(uri.path))
     .map(uri => ({uri,path:uri.path}));
   const rootSet = new Set(files.map(file => packageMarker(file.path)).filter(Boolean));
-  const roots = [...rootSet].sort((a,b)=>b.length-a.length || a.localeCompare(b));
+  const roots = [...rootSet].filter(root=>root.length>0 && root!=='/')
+    .sort((a,b)=>b.length-a.length || a.localeCompare(b));
   const packages = [];
   for (const rootPath of [...roots].sort((a,b)=>a.localeCompare(b))) {
     const packageFiles = files.filter(file => ownerOf(file.path,roots) === rootPath)
@@ -103,7 +104,7 @@ function treeNode(vscode, node) {
   return item;
 }
 export function registerPackageOverview(vscode,context) {
-  let packages = [], message = '等待扫描当前 Workspace', timer = null, generation = 0;
+  let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
   const fire = () => emitter.fire();
   const provider = {
@@ -114,11 +115,17 @@ export function registerPackageOverview(vscode,context) {
           kind:'summary',label:packages.length+' SKILL Package'+(packages.length===1?'':'s'),
           description:message,icon:'layers',tooltip:'文件清点，不代表 SKILL 内容已通过语义校验'
         };
-        if (!packages.length) return [summary,{
-          kind:'notice',label:'未发现 SKILL Package',
-          description:'需要 SKILL.md 或 assurance/*.yaml',icon:'info',
-          tooltip:'打开一个包含 SKILL Package 的 Workspace，然后刷新'
-        }];
+        if (!packages.length) {
+          const notice = inventoryState === 'no-workspace'
+            ? {label:'请先打开 Workspace',description:'然后刷新 Package 清单'}
+            : inventoryState === 'unavailable'
+              ? {label:'Package 清单不可用',description:message}
+              : inventoryState === 'truncated-empty'
+                ? {label:'扫描范围内未发现 SKILL Package',description:'文件数量达到上限，无法判断剩余文件'}
+                : {label:'未发现 SKILL Package',description:'需要 SKILL.md 或 assurance/*.yaml'};
+          return [summary,{kind:'notice',...notice,icon:'info',
+            tooltip:'Package Overview 只清点文件，不做语义校验'}];
+        }
         return [summary,...packages.map(pkg=>({
           ...pkg,kind:'package',
           label:pkg.name,
@@ -165,7 +172,7 @@ export function registerPackageOverview(vscode,context) {
     const ticket = ++generation;
     const folders = vscode.workspace.workspaceFolders ?? [];
     if (!folders.length) {
-      packages=[];message='请先打开 Workspace';fire();return [];
+      packages=[];inventoryState='no-workspace';message='请先打开 Workspace';fire();return [];
     }
     try {
       const found = await vscode.workspace.findFiles(
@@ -182,6 +189,7 @@ export function registerPackageOverview(vscode,context) {
           ?vscode.workspace.asRelativePath(pkg.rootUri)
           :pkg.rootPath
       }));
+      inventoryState = packages.length ? 'ready' : inventory.truncated ? 'truncated-empty' : 'empty';
       message = inventory.truncated
         ?'已扫描前 '+inventory.scannedFiles+' 个文件 · 结果可能不完整'
         :inventory.scannedFiles+' 个文件 · 仅清点，不做语义校验';
@@ -189,7 +197,7 @@ export function registerPackageOverview(vscode,context) {
       return packages;
     } catch(error) {
       if (ticket !== generation) return packages;
-      packages=[];
+      packages=[];inventoryState='unavailable';
       message='Inventory unavailable · '+String(error?.message??error);
       fire();
       return [];
