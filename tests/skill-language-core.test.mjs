@@ -1,24 +1,33 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {fileURLToPath} from "node:url";
+import {mkdir,mkdtemp,rm} from "node:fs/promises";
+import {join,resolve} from "node:path";
+import {fileURLToPath,pathToFileURL} from "node:url";
 import {build} from "esbuild";
 import {SAMPLE_PACKAGES} from "../site/sample-packages.mjs";
 
 const entry=fileURLToPath(new URL("../language/core/index.ts",import.meta.url));
-const built=await build({
-  entryPoints:[entry],
-  bundle:true,
-  format:"esm",
-  platform:"node",
-  target:"node24",
-  packages:"bundle",
-  write:false,
-  logLevel:"silent"
-});
-const bundleUrl="data:text/javascript;base64,"+
-  Buffer.from(built.outputFiles[0].contents).toString("base64");
-const {analyzePackageSnapshot}=await import(bundleUrl);
+const scratchRoot=resolve(process.cwd(),".agent-tmp");
+await mkdir(scratchRoot,{recursive:true});
+const scratch=await mkdtemp(join(scratchRoot,"skill-language-core-"));
+const bundlePath=join(scratch,"index.mjs");
+let analyzePackageSnapshot;
+try{
+  await build({
+    entryPoints:[entry],
+    outfile:bundlePath,
+    bundle:true,
+    format:"esm",
+    platform:"node",
+    target:"node24",
+    packages:"external",
+    logLevel:"silent"
+  });
+  ({analyzePackageSnapshot}=await import(pathToFileURL(bundlePath).href));
+}finally{
+  await rm(scratch,{recursive:true,force:true});
+}
 
 function sampleSnapshot(){
   const spec=SAMPLE_PACKAGES.establish;
