@@ -118,8 +118,10 @@ export class LanguageDiagnosticSession {
     }
     if (seq !== this.sequence || this.disposed)
       return { accepted: false, reason: "SUPERSEDED" };
-    this.sink.analysis?.(snapshot, result);
     const batch = diagnosticsFromAnalysis(snapshot, result);
+    this.sink.analysis?.(snapshot,
+      batch.state === "UNAVAILABLE" ? { ...result, state: "UNAVAILABLE" } : result
+    );
     const current = new Set(batch.documents.map(doc => doc.uri));
     for (const uri of this.published.keys()) {
       if (!current.has(uri))
