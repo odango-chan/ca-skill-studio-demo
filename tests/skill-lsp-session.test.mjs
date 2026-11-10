@@ -112,10 +112,10 @@ test("reset and close clear old document diagnostics, never leak across Packages
   other.documents[0].uri="file:///workspace/other/assurance/procedure.yaml";
   assert.deepEqual(await session.submit(other),{accepted:false,reason:"WRONG_PACKAGE"});
   session.reset();
-  assert.ok(published.some(x=>x.uri===uri&&x.version===null&&x.diagnostics.length===0));
+  assert.ok(published.some(x=>x.uri===uri&&x.version===undefined&&x.diagnostics.length===0));
   assert.deepEqual(await session.submit(other),{accepted:true});
   session.dispose();
-  assert.ok(published.some(x=>x.uri===other.documents[0].uri&&x.version===null));
+  assert.ok(published.some(x=>x.uri===other.documents[0].uri&&x.version===undefined));
   assert.deepEqual(await session.submit(other),{accepted:false,reason:"DISPOSED"});
 });
 
@@ -130,7 +130,7 @@ test("failed analysis clears previous diagnostics and exposes explicit unavailab
   await session.submit(snapshot());
   const next=await session.submit(snapshot(2,2));
   assert.deepEqual(next,{accepted:false,reason:"ANALYSIS_UNAVAILABLE"});
-  assert.equal(published.at(-1).version,null);
+  assert.equal(published.at(-1).version,undefined);
   assert.equal(published.at(-1).diagnostics.length,0);
   assert.equal(statuses.at(-1).state,"UNAVAILABLE");
 });
