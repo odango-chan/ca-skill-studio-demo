@@ -26,7 +26,7 @@ export function registerWorkbench(vscode,context){
 
   function languagePackageContains(root,uri){
     if(!uri||uri.scheme!==root.scheme||uri.authority!==root.authority)return false;
-    const base=root.path.replace(/\\/$/,"");
+    const base=root.path.replace(/\/$/,"");
     return uri.path.startsWith(base+"/");
   }
   async function ensureLanguageClient(){
