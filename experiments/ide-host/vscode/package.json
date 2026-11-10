@@ -22,7 +22,8 @@
     "onCommand:skillStudio.previewMarkdown",
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
-    "onCommand:skillStudio.editNodeOperatorValue"
+    "onCommand:skillStudio.editNodeOperatorValue",
+    "onCommand:skillStudio.editPhaseInputBinding"
   ],
   "contributes": {
     "commands": [
@@ -53,6 +54,10 @@
       {
         "command": "skillStudio.editNodeOperatorValue",
         "title": "SKILL Studio: Edit Node Operator Value"
+      },
+      {
+        "command": "skillStudio.editPhaseInputBinding",
+        "title": "SKILL Studio: Edit Phase Input Binding"
       }
     ],
     "menus": {
@@ -95,6 +100,11 @@
           "command": "skillStudio.editNodeOperatorValue",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
           "group": "2_node"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStep",
+          "group": "3_phase"
         }
       ]
     },
