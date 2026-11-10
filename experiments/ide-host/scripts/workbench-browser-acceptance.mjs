@@ -442,6 +442,32 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     undoAgain:afterOutputReapplyUndo.result?.value,
     restored:restoredOutputGraph.revision,localOutput,qualifiedOutput};
   console.log('STUDIO_PHASE_OUTPUT_REFERENCE_CHROMIUM',JSON.stringify(outputReference));
+  // D4-A4a uses the existing owner Source. Only an already-observed
+  // same-Phase/same-Outcome failure target is eligible, and Undo restores
+  // the original failure cleanup route before the later graph regressions.
+  const beforePhaseRoute=await graph();
+  const routeVersion=Number(/v(\d+)/.exec(beforePhaseRoute?.revision??'')?.[1]);
+  if(!Number.isSafeInteger(routeVersion))
+    throw Error('Phase Route test has no native TextDocument revision');
+  const phaseRouteItem={kind:'route',procedureId:'ue-requested-pdu-session-establishment',
+    nodeId:'nudm-sdm-subscribe',routeId:'nudm-sdm-subscribe:preconditions:FAILED',
+    sourceVersion:routeVersion};
+  await startNativeCommand('skillStudio.editPhaseRouteTarget',phaseRouteItem,'finalize-failed');
+  await confirmNativePreview('FAILED: failed','FAILED: finalize-failed');
+  const phaseRouteAccepted=await evalJS('window.__skillStudioCommandResult');
+  const afterPhaseRoute=await waitForRevisionChange(graphContext,beforePhaseRoute.revision,
+    'Phase Route retarget');
+  if(phaseRouteAccepted!==true)throw Error('Native Phase Route retarget was not accepted');
+  await invoke('core.undo');
+  const afterPhaseRouteUndo=await waitForRevisionChange(graphContext,
+    afterPhaseRoute.result?.value,'Phase Route retarget Undo');
+  const afterRouteGraph=await graph();
+  if(!afterRouteGraph?.revision||afterRouteGraph.nodes!==beforePhaseRoute.nodes)
+    throw Error('Phase Route native Undo lost the original Procedure graph');
+  const phaseRoute={before:beforePhaseRoute.revision,
+    applied:afterPhaseRoute.result?.value,undo:afterPhaseRouteUndo.result?.value,
+    routeId:phaseRouteItem.routeId,target:'finalize-failed'};
+  console.log('STUDIO_PHASE_ROUTE_TARGET_CHROMIUM',JSON.stringify(phaseRoute));
   const graphHasNode=async id=>{
     const result=await command('Runtime.evaluate',{
       contextId:graphContext,returnByValue:true,
@@ -565,5 +591,5 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference};
+  return {views:true,packageAudit:true,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference,phaseRoute};
 }

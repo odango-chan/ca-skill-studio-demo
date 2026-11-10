@@ -238,6 +238,36 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   doc.text=source;doc.version++;changed({document:doc});
   workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
 
+  // D4-A4a: the native Route row only exposes shared, Source-proven targets.
+  assert.ok(commands.has('skillStudio.editPhaseRouteTarget'));
+  const phaseRouteRow=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='route'&&x.routeSource==='preconditions.on'&&
+      x.outcome==='FAILED');
+  assert.ok(phaseRouteRow?.phaseTargetChoices?.includes('finalize-failed'),
+    'current UDM failed Route has a real same-Phase/same-Outcome target');
+  const phaseRouteItem=providers.get('skillStudio.inspection').getTreeItem(phaseRouteRow);
+  assert.ok(['skillStudio.phaseRouteTarget','skillStudio.routeAndPhaseTarget']
+    .includes(phaseRouteItem.contextValue));
+  assert.equal(phaseRouteItem.sourceVersion,doc.version);
+  assert.equal(phaseRouteItem.documentUri,doc.uri.toString());
+  const beforeRoute=doc.text,routeVersion=doc.version;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.editPhaseRouteTarget')(
+    phaseRouteItem,'finalize-failed'),false);
+  assert.equal(doc.text,beforeRoute,'cancelled Route retarget must not change Source');
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.editPhaseRouteTarget')(
+    phaseRouteItem,'finalize-failed'),true);
+  assert.equal(doc.version,routeVersion+1);
+  assert.ok(doc.text.includes('FAILED: finalize-failed'));
+  assert.equal(appliedEdits.at(-1).length,1,'Route retarget patches one Source scalar');
+  const modifiedRoute=doc.text;
+  assert.equal(await commands.get('skillStudio.editPhaseRouteTarget')(
+    phaseRouteItem,'finalize-failed'),false,'stale Route row must fail closed');
+  assert.equal(doc.text,modifiedRoute);
+  doc.text=source;doc.version++;changed({document:doc});
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+
   assert.ok(commands.has('skillStudio.addPhaseVerify'));
   assert.ok(commands.has('skillStudio.editPhaseVerifyStep'));
   assert.ok(commands.has('skillStudio.renameNamedPhaseStep'));

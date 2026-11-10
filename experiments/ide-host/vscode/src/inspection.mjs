@@ -5,6 +5,7 @@ import {phaseStepEvidenceSummary,bindingEvidenceExplanation}
   from '../../../../site/phase-evidence-copy.mjs';
 import {phaseOutputReferenceOptions,previewPhaseOutputReference}
   from '../../../../site/phase-output-refs.mjs';
+import {phaseRouteTargetOptions} from '../../../../site/phase-routes.mjs';
 
 // UI adapter only: every fact below comes from Classic's source projection.
 const row=(label,line,children=[],extra={})=>({label,line,children,...extra});
@@ -40,6 +41,7 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
 
   const outputReferencesFor=(phaseName,stepIndex)=>outputReferences.filter(x=>
     x.phaseName===phaseName&&x.stepIndex===stepIndex);
+  const phaseRouteTargets=node?phaseRouteTargetOptions(text,procedure.name,node.id):[];
   const outline=[...model.procedures.values()].map(p=>row(p.name,p.nodes[0]?.line??1,
     p.nodes.map(n=>row(n.id,n.line,[],{description:n.operator,procedureId:p.name,nodeId:n.id,kind:'node'})),{description:p.nodes.length+' nodes',procedureId:p.name}));
   const inspection=node?[
@@ -63,7 +65,15 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
           description:[s.operator+' · '+s.value,evidence?.label].filter(Boolean).join(' · ')
         });
     }),{kind:'phase',procedureId:procedure.name,nodeId:node.id,phaseName:p.name})),
-    ...procedure.routes.filter(r=>r.source===node.id).map(r=>row(r.routeSource+' · '+r.outcome+' → '+r.target,r.line,[],{kind:'route',procedureId:procedure.name,nodeId:node.id,routeId:r.id,routeSource:r.routeSource,outcome:r.outcome,target:r.target}))
+    ...procedure.routes.filter(r=>r.source===node.id).map(r=>{
+      const eligible=phaseRouteTargets.find(target=>target.routeId===r.id);
+      return row(r.routeSource+' · '+r.outcome+' → '+r.target,r.line,[],{
+        kind:'route',procedureId:procedure.name,nodeId:node.id,
+        routeId:r.id,routeSource:r.routeSource,outcome:r.outcome,target:r.target,
+        ...(eligible?{phaseTargetChoices:eligible.targets,
+          phaseName:eligible.phaseName}: {})
+      });
+    })
   ]:[row(procedure.name,1,[],{description:'Select a node in the graph or Outline'})];
   const dataflowRows=(dataflow?.bindings??[]).map(binding=>{
     const contract=contractFor(binding);
