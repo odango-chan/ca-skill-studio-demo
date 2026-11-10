@@ -94,8 +94,8 @@ export async function collectPackageSnapshot(vscode, procedureDocument, generati
   for (const document of openDocuments.values()) {
     const uri = document.uri;
     if (!insideRoot(rootUri, uri)) continue;
-    const relativePath = uri.path.slice(rootPath.length).replace(/^\\//, "");
-    if (!relativePath || relativePath.includes("\\\\") ||
+    const relativePath = uri.path.slice(rootPath.length).replace(/^\//, "");
+    if (!relativePath || relativePath.includes("\\") ||
         relativePath.split("/").some(part => !part || part === "." || part === "..")) {
       completeness = "partial";
       reasons.push("Ignored an unsafe open Package-relative path");
