@@ -432,6 +432,9 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes],
     identity:[insertedPresent,deletedPresent,restoredInsertPresent,originalAbsent]
   }));
+  // Return the native Explorer to the foreground: the evidence acceptance
+  // opened the Skill Studio Activity Bar and intentionally kept it selected.
+  await invoke('workbench.files.action.focusFilesExplorer');
   // Safe Markdown uses the actual native source document and shared renderer.
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
