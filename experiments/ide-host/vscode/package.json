@@ -25,7 +25,9 @@
     "onCommand:skillStudio.editNodeOperatorValue",
     "onCommand:skillStudio.editPhaseInputBinding",
     "onCommand:skillStudio.insertNode",
-    "onCommand:skillStudio.deleteNode"
+    "onCommand:skillStudio.deleteNode",
+    "onCommand:skillStudio.addPhaseVerify",
+    "onCommand:skillStudio.editPhaseVerifyStep"
   ],
   "contributes": {
     "commands": [
@@ -68,6 +70,14 @@
       {
         "command": "skillStudio.deleteNode",
         "title": "SKILL Studio: Delete Node"
+      },
+      {
+        "command": "skillStudio.addPhaseVerify",
+        "title": "SKILL Studio: Add Verify Step"
+      },
+      {
+        "command": "skillStudio.editPhaseVerifyStep",
+        "title": "SKILL Studio: Edit Verify Step"
       }
     ],
     "menus": {
@@ -135,6 +145,26 @@
           "command": "skillStudio.insertNode",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.route",
           "group": "1_route"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStepAndVerify",
+          "group": "3_phase"
+        },
+        {
+          "command": "skillStudio.addPhaseVerify",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseWithVerifyAdd",
+          "group": "4_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStep",
+          "group": "5_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStepAndVerify",
+          "group": "5_phase"
         }
       ]
     },
