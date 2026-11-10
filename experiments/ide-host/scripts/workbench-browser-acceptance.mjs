@@ -44,11 +44,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const procedureUri=widget?.resource;
       if(!procedureUri)throw Error('Conventional 5GC Procedure URI missing');
       const procedureUriString=procedureUri.toString();
-      const targetUriString=procedureUriString.replace(
-        /\\/assurance\\/procedure\\.yaml$/,
-        '/'+${JSON.stringify(relativePath)});
-      if(targetUriString===procedureUriString)
-        throw Error('Could not derive Package-scoped URI from Procedure resource');
+      const procedureSuffix='/assurance/procedure.yaml';
+      if(!procedureUriString.endsWith(procedureSuffix))
+        throw Error('Conventional Procedure URI has an unexpected path');
+      const targetUriString=procedureUriString.slice(0,-procedureSuffix.length)+
+        '/'+${JSON.stringify(relativePath)};
       await registry.executeCommand(${JSON.stringify(id)},targetUriString);
     })()`);
     await sleep(300);
