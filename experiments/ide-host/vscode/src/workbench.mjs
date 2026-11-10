@@ -2245,8 +2245,8 @@ export function registerWorkbench(vscode,context){
          rawPath.includes('#'))return null;
       const currentDir=uri.path.slice(0,uri.path.lastIndexOf('/'));
       if(currentDir!==rootPath&&!currentDir.startsWith(rootPath+'/'))return null;
-      const relativeDir=currentDir.slice(rootPath.length).replace(/^\\/+/, '');
-      const segments=relativeDir?relativeDir.split('/').filter(Boolean):[];
+      const relativeDir=currentDir.slice(rootPath.length).split('/').filter(Boolean).join('/');
+      const segments=relativeDir?relativeDir.split('/'):[];
       for(const part of rawPath.split('/')){
         if(!part||part==='.')continue;
         if(part==='..'){if(!segments.length)return null;segments.pop();continue;}
@@ -2255,8 +2255,9 @@ export function registerWorkbench(vscode,context){
       }
       if(!segments.length)return null;
       const targetPath=rootPath+'/'+segments.join('/');
+      const lowerTarget=targetPath.toLowerCase();
       if(!targetPath.startsWith(rootPath+'/')||
-         !/\\.(?:md|ya?ml|py|json)$/i.test(targetPath))return null;
+         !['.md','.yaml','.yml','.py','.json'].some(ext=>lowerTarget.endsWith(ext)))return null;
       return uri.with({path:targetPath});
     };
     const random=new Uint8Array(16);
