@@ -488,6 +488,100 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     applied:afterPhaseRoute.result?.value,undo:afterPhaseRouteUndo.result?.value,
     routeId:phaseRouteItem.routeId,target:'finalize-failed'};
   console.log('STUDIO_PHASE_ROUTE_TARGET_CHROMIUM',JSON.stringify(phaseRoute));
+  const graphHasNode=async id=>{
+    const result=await command('Runtime.evaluate',{
+      contextId:graphContext,returnByValue:true,
+      expression:`[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].some(x=>x.getAttribute('data-id')===${JSON.stringify(id)})`
+    });
+    return result.result?.value===true;
+  };
+  const insertSelection=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-get');if(!node)throw Error('Node insertion source is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  });
+  if(!insertSelection.result?.value?.node)throw Error('Could not select Route source Node for insertion');
+  await sleep(250);
+  const beforeInsert=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const insertVersion=Number(/v(\d+)/.exec(beforeInsert.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(insertVersion))throw Error('Could not read Source version before Node insertion');
+  await startNativeCommand('skillStudio.insertNode',{
+    kind:'route',procedureId:insertSelection.result.value.procedure,
+    nodeId:'nudm-sdm-get',routeId:'nudm-sdm-get:postconditions:PASS',
+    sourceVersion:insertVersion
+  },{
+    nodeId:'ide-host-insert-probe',operator:'call',
+    value:'sbi.demo.insert_probe',outcome:'COMMITTED'
+  });
+  await confirmNativePreview('PASS: nudm-sdm-subscribe','PASS: ide-host-insert-probe');
+  const insertResult=await evalJS(`window.__skillStudioCommandResult`);
+  const afterInsert=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  await sleep(400);
+  const insertedGraph=await graph();
+  const insertedPresent=await graphHasNode('ide-host-insert-probe');
+  if(insertResult!==true||!afterInsert.result?.value||
+     afterInsert.result.value===beforeInsert.result?.value||insertedGraph?.nodes!==18||!insertedPresent)
+    throw Error('Native Node insertion did not add one Source-backed Node: '+JSON.stringify({insertResult,before:beforeInsert.result?.value,after:afterInsert.result?.value,graph:insertedGraph}));
+  const deleteSelection=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='ide-host-insert-probe');if(!node)throw Error('Inserted Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  });
+  if(!deleteSelection.result?.value?.node)throw Error('Could not select inserted Node for deletion');
+  await sleep(250);
+  const beforeDelete=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const deleteVersion=Number(/v(\d+)/.exec(beforeDelete.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(deleteVersion))throw Error('Could not read Source version before Node deletion');
+  await startNativeCommand('skillStudio.deleteNode',{
+    kind:'node',procedureId:deleteSelection.result.value.procedure,
+    nodeId:'ide-host-insert-probe',sourceVersion:deleteVersion
+  },'nudm-sdm-subscribe');
+  await confirmNativePreview('ide-host-insert-probe:','PASS: nudm-sdm-subscribe');
+  const deleteResult=await evalJS(`window.__skillStudioCommandResult`);
+  const afterDelete=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  await sleep(350);
+  const deletedGraph=await graph();
+  const deletedPresent=await graphHasNode('ide-host-insert-probe');
+  if(deleteResult!==true||!afterDelete.result?.value||
+     afterDelete.result.value===beforeDelete.result?.value||deletedGraph?.nodes!==17||deletedPresent)
+    throw Error('Native Node deletion did not remove the Node and repair the Route: '+JSON.stringify({deleteResult,before:beforeDelete.result?.value,after:afterDelete.result?.value,graph:deletedGraph}));
+  await invoke('core.undo');
+  const afterDeleteUndo=await waitForRevisionChange(graphContext,afterDelete.result?.value,
+    'Native Undo of Node deletion');
+  await sleep(350);
+  const restoredInsertGraph=await graph();
+  const restoredInsertPresent=await graphHasNode('ide-host-insert-probe');
+  if(!afterDeleteUndo.result?.value||afterDeleteUndo.result.value===afterDelete.result?.value||
+     restoredInsertGraph?.nodes!==18||!restoredInsertPresent)
+    throw Error('Native Undo did not restore the deleted Node');
+  await invoke('core.undo');
+  const afterInsertUndo=await waitForRevisionChange(graphContext,afterDeleteUndo.result?.value,
+    'Native Undo of Node insertion');
+  await sleep(350);
+  const restoredOriginalGraph=await graph();
+  const originalAbsent=!(await graphHasNode('ide-host-insert-probe'));
+  if(!afterInsertUndo.result?.value||afterInsertUndo.result.value===afterDeleteUndo.result?.value||
+     restoredOriginalGraph?.nodes!==17||!originalAbsent)
+    throw Error('Native Undo did not remove the inserted Node and restore original graph');
+  console.log('STUDIO_NODE_INSERT_DELETE_CHROMIUM',JSON.stringify({
+    procedure:insertSelection.result.value.procedure,node:'ide-host-insert-probe',
+    before:beforeInsert.result?.value,inserted:afterInsert.result?.value,
+    deleted:afterDelete.result?.value,undoDelete:afterDeleteUndo.result?.value,
+    undoInsert:afterInsertUndo.result?.value,
+    nodeCounts:[insertedGraph?.nodes,deletedGraph?.nodes,
+      restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes],
+    identity:[insertedPresent,deletedPresent,restoredInsertPresent,originalAbsent]
+  }));
   // D4-A4b1: create a one-scalar typo in the actual native Monaco Source
   // editor, then exercise the real extension's guarded correction + Undo.
   // We never bulk-replace the Procedure or save a synthetic example Package.
@@ -601,100 +695,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     restored:fixtureRestored.result?.value,
     restoration:'native editor exact line replacement'};
   console.log('STUDIO_PHASE_OUTCOME_REPAIR_CHROMIUM',JSON.stringify(phaseOutcome));
-  const graphHasNode=async id=>{
-    const result=await command('Runtime.evaluate',{
-      contextId:graphContext,returnByValue:true,
-      expression:`[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].some(x=>x.getAttribute('data-id')===${JSON.stringify(id)})`
-    });
-    return result.result?.value===true;
-  };
-  const insertSelection=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-get');if(!node)throw Error('Node insertion source is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
-  });
-  if(!insertSelection.result?.value?.node)throw Error('Could not select Route source Node for insertion');
-  await sleep(250);
-  const beforeInsert=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
-  const insertVersion=Number(/v(\d+)/.exec(beforeInsert.result?.value??'')?.[1]);
-  if(!Number.isSafeInteger(insertVersion))throw Error('Could not read Source version before Node insertion');
-  await startNativeCommand('skillStudio.insertNode',{
-    kind:'route',procedureId:insertSelection.result.value.procedure,
-    nodeId:'nudm-sdm-get',routeId:'nudm-sdm-get:postconditions:PASS',
-    sourceVersion:insertVersion
-  },{
-    nodeId:'ide-host-insert-probe',operator:'call',
-    value:'sbi.demo.insert_probe',outcome:'COMMITTED'
-  });
-  await confirmNativePreview('PASS: nudm-sdm-subscribe','PASS: ide-host-insert-probe');
-  const insertResult=await evalJS(`window.__skillStudioCommandResult`);
-  const afterInsert=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
-  await sleep(400);
-  const insertedGraph=await graph();
-  const insertedPresent=await graphHasNode('ide-host-insert-probe');
-  if(insertResult!==true||!afterInsert.result?.value||
-     afterInsert.result.value===beforeInsert.result?.value||insertedGraph?.nodes!==18||!insertedPresent)
-    throw Error('Native Node insertion did not add one Source-backed Node: '+JSON.stringify({insertResult,before:beforeInsert.result?.value,after:afterInsert.result?.value,graph:insertedGraph}));
-  const deleteSelection=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='ide-host-insert-probe');if(!node)throw Error('Inserted Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
-  });
-  if(!deleteSelection.result?.value?.node)throw Error('Could not select inserted Node for deletion');
-  await sleep(250);
-  const beforeDelete=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
-  const deleteVersion=Number(/v(\d+)/.exec(beforeDelete.result?.value??'')?.[1]);
-  if(!Number.isSafeInteger(deleteVersion))throw Error('Could not read Source version before Node deletion');
-  await startNativeCommand('skillStudio.deleteNode',{
-    kind:'node',procedureId:deleteSelection.result.value.procedure,
-    nodeId:'ide-host-insert-probe',sourceVersion:deleteVersion
-  },'nudm-sdm-subscribe');
-  await confirmNativePreview('ide-host-insert-probe:','PASS: nudm-sdm-subscribe');
-  const deleteResult=await evalJS(`window.__skillStudioCommandResult`);
-  const afterDelete=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
-  await sleep(350);
-  const deletedGraph=await graph();
-  const deletedPresent=await graphHasNode('ide-host-insert-probe');
-  if(deleteResult!==true||!afterDelete.result?.value||
-     afterDelete.result.value===beforeDelete.result?.value||deletedGraph?.nodes!==17||deletedPresent)
-    throw Error('Native Node deletion did not remove the Node and repair the Route: '+JSON.stringify({deleteResult,before:beforeDelete.result?.value,after:afterDelete.result?.value,graph:deletedGraph}));
-  await invoke('core.undo');
-  const afterDeleteUndo=await waitForRevisionChange(graphContext,afterDelete.result?.value,
-    'Native Undo of Node deletion');
-  await sleep(350);
-  const restoredInsertGraph=await graph();
-  const restoredInsertPresent=await graphHasNode('ide-host-insert-probe');
-  if(!afterDeleteUndo.result?.value||afterDeleteUndo.result.value===afterDelete.result?.value||
-     restoredInsertGraph?.nodes!==18||!restoredInsertPresent)
-    throw Error('Native Undo did not restore the deleted Node');
-  await invoke('core.undo');
-  const afterInsertUndo=await waitForRevisionChange(graphContext,afterDeleteUndo.result?.value,
-    'Native Undo of Node insertion');
-  await sleep(350);
-  const restoredOriginalGraph=await graph();
-  const originalAbsent=!(await graphHasNode('ide-host-insert-probe'));
-  if(!afterInsertUndo.result?.value||afterInsertUndo.result.value===afterDeleteUndo.result?.value||
-     restoredOriginalGraph?.nodes!==17||!originalAbsent)
-    throw Error('Native Undo did not remove the inserted Node and restore original graph');
-  console.log('STUDIO_NODE_INSERT_DELETE_CHROMIUM',JSON.stringify({
-    procedure:insertSelection.result.value.procedure,node:'ide-host-insert-probe',
-    before:beforeInsert.result?.value,inserted:afterInsert.result?.value,
-    deleted:afterDelete.result?.value,undoDelete:afterDeleteUndo.result?.value,
-    undoInsert:afterInsertUndo.result?.value,
-    nodeCounts:[insertedGraph?.nodes,deletedGraph?.nodes,
-      restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes],
-    identity:[insertedPresent,deletedPresent,restoredInsertPresent,originalAbsent]
-  }));
   // Return the native Explorer to the foreground: the evidence acceptance
   // opened the Skill Studio Activity Bar and intentionally kept it selected.
   await invoke('workbench.files.action.focusFilesExplorer');
