@@ -14,7 +14,7 @@ const safeHref=raw=>{
 };
 // Only path-shaped references can become host-mediated links. The extension
 // host still resolves and verifies every target stays inside the active Skill.
-function localPackagePath(raw){
+function localPackagePath(raw,options={}){
   const value=String(raw).trim();
   if(!value||value.length>240||value.startsWith("/")||value.includes("\\")||
      value.includes("?")||value.includes("#")||
@@ -24,6 +24,13 @@ function localPackagePath(raw){
   if(parts.some(part=>!part||part==="."))return null;
   const parents=parts.filter(part=>part==="..").length;
   if(parents>1||(parents===1&&(parts[0]!==".."||parts.length!==2)))return null;
+  if(!(options.localFiles instanceof Set))return null;
+  const targetParts=String(options.relativeDir??"").split("/").filter(Boolean);
+  for(const part of parts){
+    if(part===".."){if(!targetParts.length)return null;targetParts.pop();}
+    else targetParts.push(part);
+  }
+  if(!options.localFiles.has(targetParts.join("/")))return null;
   return value;
 }
 function inline(src,depth=0,options={}){
@@ -37,13 +44,13 @@ function inline(src,depth=0,options={}){
       out+='<span class="md-image-ref" title="图片不会在本地预览中自动请求外部资源">图片：'+escapeHTML(match[2])+"</span>";
     }else if(raw.startsWith("[")){
       const href=safeHref(match[3]);
-      const localPath=options.localLinks?localPackagePath(match[3]):null;
+      const localPath=options.localLinks?localPackagePath(match[3],options):null;
       out+=href?'<a href="'+escapeHTML(href)+'" rel="noopener noreferrer" target="_blank">'+inline(match[2],depth+1,options)+"</a>":
         localPath?'<a class="md-local-link" href="#" data-local-path="'+escapeHTML(localPath)+
           '" title="打开当前 Skill Package 内的文件">'+inline(match[2],depth+1,options)+"</a>":
         '<span class="md-unresolved-link" title="'+escapeHTML(match[3])+'">'+inline(match[2],depth+1,options)+"</span>";
     }else if(raw.charCodeAt(0)===96){
-      const localPath=options.localLinks?localPackagePath(match[5]):null;
+      const localPath=options.localLinks?localPackagePath(match[5],options):null;
       out+=localPath
         ?'<a class="md-local-link" href="#" data-local-path="'+escapeHTML(localPath)+
           '" title="打开当前 Skill Package 内的文件"><code>'+escapeHTML(match[5])+"</code></a>"
@@ -182,7 +189,7 @@ function renderBlocks(lines,depth=0,options={}){
   }
   return out;
 }
-export function renderMarkdown(source,{maxChars=300000,localLinks=false}={}){
+export function renderMarkdown(source,{maxChars=300000,localLinks=false,localFiles=null,relativeDir=""}={}){
   if(typeof source!=="string")throw new TypeError("Markdown Source must be a string");
   if(source.length>maxChars)return {available:false,html:"",reason:"文件太大，无法安全预览"};
   const lines=source.replace(/\r\n?/g,"\n").split("\n");
