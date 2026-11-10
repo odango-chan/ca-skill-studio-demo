@@ -582,6 +582,22 @@ export function registerWorkbench(vscode,context){
               }
             }catch(error){problems.push(String(error?.message??error));}
           }
+          // Returning in-memory text to the original bytes is not enough in
+          // Theia: a dirty backup can resurrect an older invalid edit on reload.
+          // Save ONLY restored bytes identical to disk, never transient content.
+          // The Procedure may already be dirty from the earlier L2-D2 probe.
+          const cleanup=[...entries,{name:"procedure",uri:procedureUri,doc:procedure}];
+          for(const entry of cleanup){
+            try{
+              const persisted=await disk(entry.uri);
+              if(entry.doc.getText()!==persisted)
+                throw Error("restored buffer differs from original disk Source");
+              if(entry.doc.isDirty&&!await entry.doc.save())
+                throw Error("native TextDocument cleanup save rejected");
+              if(entry.doc.isDirty||await disk(entry.uri)!==persisted)
+                throw Error("clean Source state was not restored");
+            }catch(error){problems.push("clean "+entry.name+": "+String(error?.message??error));}
+          }
           try{await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);}
           catch(error){problems.push("Procedure focus: "+String(error?.message??error));}
           if(problems.length)throw Error("L2-D3 cleanup: "+problems.join("; "));
