@@ -51,7 +51,7 @@ export class LanguageDiagnosticSession {
     if (this.disposed) return;
     this.sequence++;
     for (const uri of this.published.keys())
-      this.sink.publish({ uri, version: null, generation: this.generation, diagnostics: [] });
+      this.sink.publish({ uri, generation: this.generation, diagnostics: [] });
     this.published.clear();
     this.documents.clear();
     this.rootUri = null;
@@ -109,7 +109,7 @@ export class LanguageDiagnosticSession {
     const current = new Set(batch.documents.map(doc => doc.uri));
     for (const uri of this.published.keys()) {
       if (!current.has(uri))
-        this.sink.publish({uri, version: null, generation: snapshot.generation, diagnostics: []});
+        this.sink.publish({uri, generation: snapshot.generation, diagnostics: []});
     }
     this.published.clear();
     if (batch.state !== "UNAVAILABLE") {
@@ -131,7 +131,7 @@ export class LanguageDiagnosticSession {
 
   private clearPublished(generation: number): void {
     for (const uri of this.published.keys())
-      this.sink.publish({uri, version: null, generation, diagnostics: []});
+      this.sink.publish({uri, generation, diagnostics: []});
     this.published.clear();
   }
 }
