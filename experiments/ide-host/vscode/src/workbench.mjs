@@ -5,9 +5,10 @@ import {renderMarkdown} from '../../../../site/markdown-preview.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
+import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
 
 export function registerWorkbench(vscode,context){
-  let document=null,selection={},snapshot=null,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
+  let document=null,selection={},snapshot=null,bindingOptions=[],audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
 
@@ -70,6 +71,44 @@ export function registerWorkbench(vscode,context){
     const applied=await vscode.workspace.applyEdit(edit);
     if(!applied)throw Error("Host rejected WorkspaceEdit");
     return true;
+  }
+
+  async function editPhaseInputBinding(item,bindingKey,newValue){
+    if(item?.kind!=="phase-step"||typeof item.phaseName!=="string"||
+       !Number.isSafeInteger(item.stepIndex))
+      throw Error("Select an eligible Phase Step in the native Inspector");
+    const ctx=currentNode(item);
+    const options=phaseStepBindingOptions(ctx.source,ctx.procedureId,ctx.nodeId)
+      .filter(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
+    if(!options.length)throw Error("This Phase Step has no qualified same-type input bindings");
+    let key=bindingKey;
+    if(typeof key!=="string"){
+      const picked=await vscode.window.showQuickPick(options.map(x=>({
+        label:x.bindingKey,description:x.value,detail:x.inputType+" · "+x.stepName
+      })),{placeHolder:"选择要修改的 Phase Step 输入绑定"});
+      key=picked?.label??picked;
+    }
+    const binding=options.find(x=>x.bindingKey===key);
+    if(!binding)throw Error("Selected binding is not part of the current Phase Step");
+    let value=newValue;
+    if(typeof value!=="string"){
+      value=await vscode.window.showQuickPick(binding.choices.filter(x=>x!==binding.value),{
+        placeHolder:"选择同类型的 Procedure 输入来源"
+      });
+    }
+    if(typeof value!=="string"||!value.trim())return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the Phase binding");
+    const preview=previewPhaseInputBinding(ctx.source,ctx.procedureId,ctx.nodeId,
+      item.phaseName,item.stepIndex,key,value);
+    return confirmAndApply({
+      ...ctx,preview,
+      changes:p=>[{
+        start:p.sourceSpan.start,end:p.sourceSpan.end,
+        oldValue:p.oldValue,newValue:p.newValue
+      }],
+      verify:text=>applyPhaseInputBinding(text,preview)
+    });
   }
   async function renameNode(item,newId){
     const ctx=currentNode(item);
@@ -147,6 +186,14 @@ export function registerWorkbench(vscode,context){
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
+        if(item.kind==='phase-step'&&bindingOptions.some(x=>
+          x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex)){
+          tree.contextValue='skillStudio.phaseStep';
+          item.sourceVersion=document?.version;item.documentUri=document?.uri.toString();
+          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
+          tree.phaseName=item.phaseName;tree.stepIndex=item.stepIndex;
+          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
+        }
         if(document&&item.line)tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',arguments:[{...item,uri:item.uri??document.uri,version:document.version,sourceVersion:document.version,documentUri:document.uri.toString(),...(item.uri?{auditGeneration:generation}:{})}]};
         return tree;
       }};
@@ -162,7 +209,12 @@ export function registerWorkbench(vscode,context){
     const changed=!same||snapshot?.text!==text||next.procedureId!==selection.procedureId||next.nodeId!==selection.nodeId;
     if(!same){generation++;audit=[];diagnostics.clear();}
     document=doc;selection=next;selections.set(key,next);
-    if(changed){snapshot={...inspectionSnapshot(text,selection,projected),text};fire();}
+    if(changed){
+      snapshot={...inspectionSnapshot(text,selection,projected),text};
+      bindingOptions=snapshot.model.state==='READY'&&selection.procedureId&&selection.nodeId
+        ?phaseStepBindingOptions(text,selection.procedureId,selection.nodeId):[];
+      fire();
+    }
   }
   async function auditCurrent(){
     if(!document)return;
@@ -219,6 +271,10 @@ export function registerWorkbench(vscode,context){
     vscode.commands.registerCommand('skillStudio.editNodeOperatorValue',async(item,newValue)=>{
       try{return await editNodeOperatorValue(item,newValue);}
       catch(error){await vscode.window.showWarningMessage('Operator 修改未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.editPhaseInputBinding',async(item,bindingKey,newValue)=>{
+      try{return await editPhaseInputBinding(item,bindingKey,newValue);}
+      catch(error){await vscode.window.showWarningMessage('Phase Binding 修改未执行：'+error.message);return false;}
     }),
     vscode.workspace.onDidChangeTextDocument(e=>{
       if(isProcedurePath(e.document.uri.path)&&document?.uri.toString()===e.document.uri.toString())update(e.document);

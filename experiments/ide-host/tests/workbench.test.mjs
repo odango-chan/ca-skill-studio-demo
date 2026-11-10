@@ -21,15 +21,17 @@ test('Inspection preserves Classic node/phase/route source identity; unknown syn
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
   const commands=new Map(),providers=new Map(),changes=[],panels=[],diagnosticSets=[];
   const disposable=()=>({dispose(){}});
+  let confirmChoice='确认并应用';
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
   const file=uri('/workspace/establish-pdu-session/assurance/procedure.yaml');
-  const doc={uri:file,version:1,text:source,getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
+  const doc={uri:file,version:1,text:source,getText(){return this.text;},positionAt(offset){return {offset};},get lineCount(){return this.text.split('\n').length;}};
   let changed;
   const vscode={
     EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
     TreeItem:class {constructor(label,state){this.label=label;this.collapsibleState=state;}},
     TreeItemCollapsibleState:{None:0,Collapsed:1},
-    Range:class {constructor(...args){this.args=args;}},
+    Range:class {constructor(start,end){this.start=start;this.end=end;}},
+    WorkspaceEdit:class {constructor(){this.changes=[];}replace(uri,range,value){this.changes.push({uri,range,value});}},
     Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
     ViewColumn:{Beside:2},
@@ -38,9 +40,15 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     workspace:{textDocuments:[doc],
       findFiles:async()=>['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md'].map(p=>uri('/workspace/establish-pdu-session/'+p)),
       fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8'))},
+      async applyEdit(edit){
+        for(const change of [...edit.changes].sort((a,b)=>b.range.start.offset-a.range.start.offset))
+          doc.text=doc.text.slice(0,change.range.start.offset)+change.value+doc.text.slice(change.range.end.offset);
+        doc.version++;changed({document:doc});return true;
+      },
       onDidChangeTextDocument(cb){changed=cb;return disposable();},openTextDocument:async()=>doc},
     window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
       onDidChangeActiveTextEditor:()=>disposable(),showTextDocument:async()=>{},
+      showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},showQuickPick:async items=>items[0],
       createWebviewPanel(){const p={webview:{html:''},onDidDispose:()=>disposable()};panels.push(p);return p;}}
   };
   const context={subscriptions:[]},workbench=registerWorkbench(vscode,context),posted=[];
@@ -73,6 +81,29 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(outline.getChildren().length,0);
   assert.ok(providers.get('skillStudio.problems').getChildren().length);
   doc.version++;doc.text=source;changed({document:doc});
+  assert.ok(commands.has('skillStudio.editPhaseInputBinding'));
+  const phaseProcedure='ue-requested-pdu-session-establishment';
+  const phaseNode='nudm-sdm-subscribe';
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const phaseRow=providers.get('skillStudio.inspection').getChildren().find(x=>x.label==='preconditions');
+  const phaseStep=phaseRow?.children.find(x=>
+    x.kind==='phase-step'&&x.phaseName==='preconditions'&&x.stepIndex===0);
+  assert.ok(phaseStep,'eligible Phase Step identity is exposed');
+  const phaseItem=providers.get('skillStudio.inspection').getTreeItem(phaseStep);
+  assert.equal(phaseItem.contextValue,'skillStudio.phaseStep');
+  assert.equal(phaseStep.sourceVersion,doc.version);
+  assert.equal(phaseStep.documentUri,doc.uri.toString());
+  const beforeBinding=doc.text,phaseVersion=doc.version;
+  confirmChoice='取消';
+  await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.ue-ref');
+  assert.equal(doc.text,beforeBinding,'cancelled Phase binding preview must not write');
+  confirmChoice='确认并应用';
+  await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.ue-ref');
+  assert.equal(doc.version,phaseVersion+1);
+  assert.ok(doc.text.includes('dnn:\n                  from: input.ue-ref'));
+  const writesAfterBinding=doc.text;
+  await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.dnn');
+  assert.equal(doc.text,writesAfterBinding,'stale Phase Step selection must not write');
   await commands.get('skillStudio.auditPackage')();
   assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/editor warnings/);
   assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
