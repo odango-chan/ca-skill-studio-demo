@@ -43,7 +43,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           '/skills/establish-pdu-session/assurance/procedure.yaml'));
       const procedureUri=widget?.resource;
       if(!procedureUri)throw Error('Conventional 5GC Procedure URI missing');
-      const root=procedureUri.path.slice(0,-'assurance/procedure.yaml'.length);
+      const procedurePath=procedureUri.path.toString();
+      const root=procedurePath.slice(0,-'assurance/procedure.yaml'.length);
       const target=procedureUri.with({path:root+${JSON.stringify(relativePath)}});
       await registry.executeCommand(${JSON.stringify(id)},target);
     })()`);
