@@ -933,5 +933,5 @@ export function registerWorkbench(vscode,context){
   return {attach(doc,post){sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();return ()=>{sessions.delete(doc.uri.toString());};},select(doc,message){
     if(message.version!==doc.version||typeof message.procedureId!=='string')return;
     update(doc,{procedureId:message.procedureId,nodeId:typeof message.nodeId==='string'?message.nodeId:null});
-  },activate(doc){const changed=document?.uri.toString()!==doc.uri.toString()||snapshot?.text!==doc.getText();update(doc);if(changed)scheduleAudit();}};
+  },activate(doc){const changed=document?.uri.toString()!==doc.uri.toString()||snapshot?.text!==doc.getText();update(doc);if(changed)scheduleAudit();},getActiveDocument(){return document;}};
 }
