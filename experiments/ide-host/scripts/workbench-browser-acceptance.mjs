@@ -611,39 +611,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after scoped readiness wait: '+
     JSON.stringify({evidenceHeader,evidenceTreeState,evidenceRows,
       bodyTail:(await evalJS('document.body.innerText')).slice(-1600)}));
-  await invoke('skillStudio.auditPackage');
   let phaseEvidenceText='';
-  for(let i=0;i<100;i++){
-    phaseEvidenceText=await evalJS('document.body.innerText');
-    if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
-    await sleep(100);
-  }
-  // The native TreeDataProvider can publish its rows after the visible
-  // summary text. Await the actual visible row, not a fixed post-click sleep.
-  let dataflowTreeRow=null;
-  for(let attempt=0;attempt<100&&!dataflowTreeRow;attempt++){
-    dataflowTreeRow=await evalJS(`(()=>{
-    // TreeNode.innerText includes nested descendants. Inspect only each
-    // TreeNode's own content element so we expand the exact summary row.
-    const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{
-      const content=[...node.children].find(child=>
-        child.classList?.contains('theia-TreeNodeContent'));
-      return {node,content,text:content?.innerText?.trim()??''};
-    }).filter(row=>row.text.includes('Producer / Consumer dataflow')&&
-      row.content?.getBoundingClientRect().height>0);
-    const row=rows[0];
-    // The evidence view is below the large Inspector/Outline trees in the
-    // default layout. A non-zero rect can still be outside the viewport.
-    row?.content?.scrollIntoView({block:'center',inline:'nearest'});
-    const r=row?.content?.getBoundingClientRect();
-    return r?{x:r.x+12,y:r.y+r.height/2,
-      expanded:row.node.getAttribute('aria-expanded')==='true',
-      rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
-      candidateCount:rows.length}:null;
-  })()`);
-    if(!dataflowTreeRow)await sleep(100);
-  }
-  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after readiness wait: '+(await evalJS('document.body.innerText')).slice(-1600));
   if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
   for(let i=0;i<50;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
