@@ -53,3 +53,6 @@ The Package snapshot's bounded extension-to-language mapping remains the analysi
 ## References acceptance synchronization
 
 Opening the Python Source document emits a workspace `onDidOpenTextDocument` event and schedules a new Package generation. A fixed sleep is not evidence that the replacement snapshot has been analyzed. The Chromium provider probe therefore waits for the Language Service to return to `SKILL LSP: READY` (with a bounded timeout) before requesting References. It also queries the exact start of the declared `# name:` token. This keeps the acceptance test aligned with the existing generation invalidation contract rather than weakening stale-result rejection.
+
+
+The readiness check is generation-specific: the probe captures the Package generation before opening the Python Source, requires `onDidOpenTextDocument` to advance it when the file was not already open, and then requires the READY status tooltip to identify that exact current generation. This prevents an old READY status from satisfying the wait before the open-document event is delivered.
