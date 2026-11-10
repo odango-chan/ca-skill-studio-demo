@@ -14,6 +14,8 @@ export interface SessionStatus {
 export interface SessionSink {
   publish(result: DocumentDiagnostics): void;
   status(result: SessionStatus): void;
+  /** Expose only the current accepted generation to read-only LSP providers. */
+  analysis?(snapshot: PackageSnapshot, result: SkillLanguageAnalysis): void;
 }
 export interface SubmitResult {
   readonly accepted: boolean;
@@ -116,6 +118,7 @@ export class LanguageDiagnosticSession {
     }
     if (seq !== this.sequence || this.disposed)
       return { accepted: false, reason: "SUPERSEDED" };
+    this.sink.analysis?.(snapshot, result);
     const batch = diagnosticsFromAnalysis(snapshot, result);
     const current = new Set(batch.documents.map(doc => doc.uri));
     for (const uri of this.published.keys()) {
