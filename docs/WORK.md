@@ -165,13 +165,13 @@ main browser application remains available at `/classic/`.
 **Evidence:** [PR #89](https://github.com/odango-chan/ca-skill-studio-demo/pull/89) merged at `main@b9c1c38`. Exact merged-base checks: [IDE Host #42584800417 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800417), [Theia browser-only #42584800342 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800342), [Theia backend Chromium #42584800599 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800599). Resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727). Route create/reconnect, Phase Designer, full Inspector, Package Audit and Markdown preview remain outstanding.
 
 
-## 2026-11-10 · Theia Inspector Node authoring（首批增量，待验收）
+## 2026-11-10 · Theia Inspector Node authoring（首批增量，exact-head PASS，待review/merge）
 
 **范围：** 在原生 Inspection / Inspector Node 项上增加「重命名 Node」与「编辑 Operator 值」上下文操作。复用 `site/node-designer.mjs` 的完整 Node 引用重命名 Patch，以及 `site/node-attributes.mjs` 的 Operator 值选择/校验；Theia Host 只负责当前 TextDocument 版本、Package PredicateSet 读取、Diff 确认与原生 WorkspaceEdit。
 
 **安全边界：** 预览后必须显式确认；确认期间 Source 版本或文档身份变化则拒绝；宿主重新计算 Patch 并核对精确 source spans；不允许 Operator kind 转换，不安全/不支持的节点继续 Source-only。Classic 不删除、不降级。
 
-**未包含：** Node 插入/删除、Phase Step 编辑、Binding 编辑、Root 路径筛选、Runtime / 5GC。该增量由 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96) 跟踪；IDE Host、Theia backend Chromium、Theia browser-only 和 Inspector Undo 真实 Chromium验收仍待 exact-head CI；未通过前不得标记 IMPLEMENTED / PASS。
+**未包含：** Node 插入/删除、Phase Step 编辑、Binding 编辑、Root 路径筛选、Runtime / 5GC。该增量由 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96) 跟踪；IDE Host、Theia backend Chromium、Theia browser-only 和 Inspector Undo 真实 Chromium 均在 exact head `6ed046b` PASS。PR 尚未合并，Pages 未部署。
 
 
 ## 2026-11-10 · Theia Phase Input Binding authoring（D4-A1 首个增量，待验收）
