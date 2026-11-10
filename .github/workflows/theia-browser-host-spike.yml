@@ -5,6 +5,7 @@ on:
     paths:
       - "experiments/ide-host/**"
       - "extensions/skill-studio-theme/**"
+      - "extensions/skill-studio-languages/**"
       - ".github/workflows/theia-browser-host-spike.yml"
   workflow_dispatch:
 
