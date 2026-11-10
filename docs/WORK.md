@@ -220,7 +220,7 @@ main browser application remains available at `/classic/`.
 **验收：** [PR #108](https://github.com/odango-chan/ca-skill-studio-demo/pull/108) 已合并，merge commit `a08041446dd79c9cd8e143f682144cf037f1569b`。exact-head `0dbd9125a68e20ebedb5781ed6bc58c3089f1907` 的 IDE Host、Theia Browser-Only、Theia Browser Host / real Chromium 三组门禁全部 PASS；真实 Chromium 验证命名 Step 引用重命名及原生 Undo、Verify 命名及原生 Undo；Host 验证命名 Verify 安全删除。Runtime / 5GC / desktop VS Code GUI NOT_RUN。
 
 
-## 2026-11-10 · Theia Inspector Producer / Consumer Evidence（PR #111，待验收）
+## 2026-11-10 · Theia Inspector Producer / Consumer Evidence（PR #111，已合入 main）
 
 **范围：** 原生 Evidence 树复用 Classic 的 `phase-dataflow.mjs`、`phase-consumer-contract.mjs` 与 `phase-evidence-copy.mjs`，显示选中 Node 的 Phase 输入来源、Producer 输出 Schema 证据、Consumer 输入字段/类型证据，以及每条绑定的未知原因和边界。Phase Step 行同时显示简短证据摘要。
 
@@ -228,5 +228,14 @@ main browser application remains available at `/classic/`.
 
 **安全边界：** 这是只读证据，不授权任何 binding / Producer / Consumer 写入；`authorizedWrites` 固定为 0，Runtime 仍为 NOT_RUN。跨 Producer ABI 写入、effectful Step 结构变更与 owner Outcome 合约仍需单独定义和审查。
 
-**验收：** PR #111 exact HEAD `e189c3de40bb1f89302e255680ffbd9293b44d6e` 的四组门禁全部 PASS：IDE Host [#42761777293](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777293)、Theia Browser-Only [#42761777244](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777244)、Theia Browser Host / real Chromium [#42761777239](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777239)、PR Verify [#42761777251](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777251)。真实 Chromium 验证 Evidence 树展开并显示 Producer/Consumer 行、只读边界，以及原有 Phase Binding Undo、命名 Step / Verify、Node Focus、Route 和 Source 回归。PR 仍 OPEN，未合并、未部署 Pages；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
+**验收：** PR #111 exact HEAD `00877a0414674e4e5b8e056787b56e3d3fa5228e` 的四组门禁全部 PASS：IDE Host [#42762425857](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42762425857)、Theia Browser-Only [#42762425856](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42762425856)、Theia Browser Host / real Chromium [#42762425883](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42762425883)、PR Verify [#42762426052](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42762426052)。PR #111 已合入 `main`，merge commit `50eb16d5`；resulting-main Pages 需按该精确 merge SHA 单独核对。Runtime / 5GC / desktop VS Code GUI NOT_RUN。
 
+## 2026-11-10 · Theia Package ZIP export（PR #114，exact-head 验收中）
+
+**范围：** 在原生 Procedure CustomEditor 增加「导出 Package ZIP」，只读取当前 Procedure 所属 Package。复用 Classic 的 `directory-import.mjs` / `zip.mjs` 校验和 ZIP 写入逻辑；使用 Theia 原生 Workspace FileSystem API 读取文件快照，将已打开 TextDocument 的未保存文本覆盖到快照，并原样保留未修改文本字节（含 BOM）及不透明二进制资源。
+
+**一致性与安全：** 限制为最多 64 个文件、8 MiB 总量、1 MiB 单文件；校验安全相对路径、大小写冲突、单一 Package 根和根 `SKILL.md`。生成前后复核文件集合、文件字节和已打开文档版本/内容；发现并发修改则拒绝并要求重试。宿主不写入或覆盖工作区文件；用户需要在画布上再点击一次「下载 ZIP」才触发浏览器 Blob 下载。
+
+**边界：** 这是 ZIP **导出**，Classic 当前没有 ZIP importer，因此不新增或声称已有 ZIP 导入对等功能。OPFS 不是本地磁盘挂载或 Git 同步；不涉及 Runtime / 5GC。
+
+**验收状态：** PR #114 最新代码 HEAD `0cdec87f76dd580cddf695f15985af6294524afe` 的 IDE Host、Theia Browser-Only 真实 Chromium、PR Verify 已 PASS；Theia Backend 真实 Chromium [#42767870191 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767870191)；同一实现 HEAD `0cdec87` 的 IDE Host [#42767869981 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767869981)、Browser-Only [#42767869976 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767869976)、PR Verify [#42767870221 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767870221) 也全部通过。后续 `f5dac6` 为文档对齐提交，不改 ZIP 代码；合并后仍需单独验证 resulting-main Pages。

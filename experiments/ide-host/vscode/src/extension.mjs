@@ -74,8 +74,14 @@ export function activate(context){
         <body><div class="spike-head"><strong>SKILL · Procedure</strong>
           <select id="procedureList" aria-label="Procedure"></select>
           <button id="openSource">打开原生 YAML 编辑器</button>
+          <button id="exportPackageZip" type="button" title="导出当前 Package 的 ZIP 备份">导出 Package ZIP</button>
           <span id="revision"></span></div>
           <div id="message" role="status">等待当前文档…</div>
+          <div id="zipExportNotice" class="spike-zip-notice" role="status" hidden>
+            <span id="zipExportDetails"></span>
+            <button id="downloadPackageZip" type="button">下载 ZIP</button>
+            <button id="dismissPackageZip" type="button" aria-label="关闭 ZIP 下载提示">关闭</button>
+          </div>
           <div id="graphTools" class="spike-tools" role="toolbar" aria-label="流程图显示选项">
             <label>布局 <select id="layoutDirection" aria-label="自动布局方向">
               <option value="DOWN" selected>垂直</option><option value="RIGHT">水平</option>
@@ -158,6 +164,10 @@ export function activate(context){
           return;
         }
         if(message.type==="ready"){ready=true;push();return;}
+        if(message.type==="exportPackageZip"){
+          await vscode.commands.executeCommand("skillStudio.exportPackageZip");
+          return;
+        }
         if(message.type==="openSource"){
           await openNativeSource(vscode,document.uri,{viewColumn:vscode.ViewColumn.Beside,
             preserveFocus:false,preview:false});

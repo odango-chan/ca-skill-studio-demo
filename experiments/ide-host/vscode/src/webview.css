@@ -54,3 +54,12 @@ button:disabled{cursor:not-allowed;opacity:.45}
   .spike-head{flex-wrap:wrap}.spike-head select{max-width:100%}
   .spike-patch #routeList{max-width:210px}
 }
+
+.spike-zip-notice{display:flex;align-items:center;gap:9px;flex:none;min-height:36px;
+  padding:5px 12px;box-sizing:border-box;background:#f1faf7;border-bottom:1px solid #d8ebe4}
+.spike-zip-notice[hidden]{display:none}
+.spike-zip-notice span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:#416f67;font-size:11px}
+.spike-zip-notice button{flex:none;border:1px solid #c7e0d7;background:#fff;
+  border-radius:6px;padding:5px 9px;color:#236d5f;font:inherit}
+.spike-zip-notice button:hover{background:#e7f5f0}

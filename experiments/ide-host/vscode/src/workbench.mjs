@@ -20,6 +20,7 @@ import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
   previewDeleteUnreferencedNamedVerify,applyDeleteUnreferencedNamedVerify,
   previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
   from '../../../../site/phase-named-verify.mjs';
+import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export.mjs';
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
@@ -620,6 +621,65 @@ export function registerWorkbench(vscode,context){
     if(document)update(document);
     timer=setTimeout(()=>void auditCurrent(),350);fire();
   }
+  async function preparePackageZip(){
+    const doc=document,suffix='assurance/procedure.yaml';
+    if(!doc||!isProcedurePath(doc.uri.path)||!doc.uri.path.endsWith(suffix))
+      throw Error('请先打开当前 Package 的 Procedure 可视化编辑器');
+    const basePath=doc.uri.path.slice(0,-suffix.length);
+    const base=doc.uri.with({path:basePath});
+    const name=basePath.replace(/\/$/,'').split('/').at(-1);
+    if(!name)throw Error('无法确定 Package 根目录名称');
+    const sourceVersion=doc.version,sourceText=doc.getText();
+    const opened=(vscode.workspace.textDocuments??[])
+      .filter(item=>item.uri.path.startsWith(basePath))
+      .map(item=>({item,path:item.uri.path.slice(basePath.length),
+        version:item.version,text:item.getText()}));
+    const pattern=new vscode.RelativePattern(base,'**/*');
+    const found=await vscode.workspace.findFiles(pattern,'**/node_modules/**',65);
+    if(found.length>64)throw Error('Package 超过 ZIP 导出的 64 文件上限');
+    const files=[],uris=new Map();
+    for(const uri of found){
+      if(!uri.path.startsWith(basePath))continue;
+      const path=uri.path.slice(basePath.length);
+      if(!path)continue;
+      const bytes=await vscode.workspace.fs.readFile(uri);
+      if(!(bytes instanceof Uint8Array))throw Error('无法读取 Package 文件：'+path);
+      files.push({path,bytes:bytes.slice()});uris.set(path,uri);
+    }
+    files.sort((a,b)=>a.path.localeCompare(b.path));
+    const currentTextByPath=new Map(opened.map(entry=>[entry.path,entry.text]));
+    currentTextByPath.set('assurance/procedure.yaml',sourceText);
+    const built=await buildPackageZip({name,files,currentTextByPath});
+    if(document!==doc||doc.version!==sourceVersion||doc.getText()!==sourceText)
+      throw Error('Procedure Source 在导出期间发生变化；请重新导出');
+    for(const entry of opened){
+      if(entry.item.version!==entry.version||entry.item.getText()!==entry.text)
+        throw Error('Package Source 在导出期间发生变化：'+entry.path);
+    }
+    const after=await vscode.workspace.findFiles(pattern,'**/node_modules/**',65);
+    const afterPaths=after.filter(uri=>uri.path.startsWith(basePath))
+      .map(uri=>uri.path.slice(basePath.length)).filter(Boolean).sort();
+    const beforePaths=files.map(file=>file.path).sort();
+    if(after.length>64||JSON.stringify(afterPaths)!==JSON.stringify(beforePaths))
+      throw Error('Package 文件集合在导出期间发生变化；请重新导出');
+    for(const file of files){
+      const uri=uris.get(file.path),latest=uri?await vscode.workspace.fs.readFile(uri):null;
+      if(!latest||latest.length!==file.bytes.length||
+        latest.some((value,index)=>value!==file.bytes[index]))
+        throw Error('Package 文件在导出期间发生变化：'+file.path);
+    }
+    const post=sessions.get(doc.uri.toString());
+    if(!post)throw Error('Procedure Visual Webview 不可用；请重新打开可视化编辑器');
+    const delivered=await post({
+      type:'packageZipReady',filename:built.filename,
+      fileCount:built.fileCount,opaqueCount:built.opaqueCount,
+      base64:bytesToBase64(built.bytes)
+    });
+    if(delivered===false)throw Error('无法将 ZIP 交付给 Procedure Visual Webview');
+    await vscode.window.showInformationMessage(
+      'Package ZIP 已准备好；请在 Procedure 画布上点击“下载 ZIP”。');
+    return true;
+  }
   context.subscriptions.push({dispose(){clearTimeout(timer);generation++;sessions.clear();selections.clear();}},
     vscode.commands.registerCommand('skillStudio.revealInspection',async item=>{
       if(!document||item.version!==document.version||
@@ -630,6 +690,13 @@ export function registerWorkbench(vscode,context){
       await openNativeSource(vscode,doc.uri,{preview:true,selection:new vscode.Range(line,0,line,0)});
     }),
     vscode.commands.registerCommand('skillStudio.auditPackage',auditCurrent),
+    vscode.commands.registerCommand('skillStudio.exportPackageZip',async()=>{
+      try{return await preparePackageZip();}
+      catch(error){
+        await vscode.window.showWarningMessage('Package ZIP 导出未准备好：'+error.message);
+        return false;
+      }
+    }),
     vscode.commands.registerCommand('skillStudio.refreshInspection',()=>{if(document){update(document);scheduleAudit();}}),
     vscode.commands.registerCommand('skillStudio.renameNode',async(item,newId)=>{
       try{return await renameNode(item,newId);}

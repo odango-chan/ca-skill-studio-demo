@@ -23,6 +23,7 @@ const types={".html":"text/html",".js":"text/javascript",".css":"text/css",
   ".ttf":"font/ttf",".woff":"font/woff",".woff2":"font/woff2",".png":"image/png",
   ".ico":"image/x-icon",".map":"application/json"};
 const requests=new Set(),notFound=new Set(),networkFailures=[],networkResponses=[];
+const defaultExecutionContexts=new Map();
 const server=externalUrl?null:createServer((req,res)=>{
   const url=new URL(req.url,"http://localhost");
   let name;
@@ -80,6 +81,16 @@ try{
       console.log("STUDIO_TEST_BEFOREUNLOAD_ACCEPTED");
       void command("Page.handleJavaScriptDialog",{accept:true}).catch(error=>exceptions.push(String(error)));
     }
+    if(msg.method==="Runtime.executionContextCreated"){
+      const context=msg.params?.context,frameId=context?.auxData?.frameId;
+      if(context?.auxData?.isDefault&&frameId)
+        defaultExecutionContexts.set(frameId,context.id);
+    }
+    if(msg.method==="Runtime.executionContextDestroyed"){
+      for(const [frameId,id] of defaultExecutionContexts)
+        if(id===msg.params?.executionContextId)defaultExecutionContexts.delete(frameId);
+    }
+    if(msg.method==="Runtime.executionContextsCleared")defaultExecutionContexts.clear();
     if(msg.method==="Runtime.exceptionThrown")
       exceptions.push(msg.params?.exceptionDetails?.exception?.description||msg.params?.exceptionDetails?.text);
     if(msg.method==="Network.loadingFailed")
@@ -1105,8 +1116,60 @@ try{
     }
   }
   console.log("STUDIO_THEIA_STAGE","native-workbench");
+  const evalWebviewJS=async expression=>{
+    // Native editor interactions above can recreate the Webview iframe.
+    // Refresh CDP execution contexts and resolve the current frame each time
+    // rather than retaining an executionContextId from an earlier render.
+    const tree=await command("Page.getFrameTree");
+    const currentFrames=[];
+    const collect=node=>{
+      if(!node)return;
+      currentFrames.push(node.frame);
+      for(const child of node.childFrames??[])collect(child);
+    };
+    collect(tree.frameTree);
+    const expectedPath=(webviewFrame?.url??"").split("?")[0];
+    const candidates=currentFrames.filter(frame=>
+      (frame.url.includes("/webview/index.html")||frame.url.includes(".webview."))&&
+      (!expectedPath||frame.url.split("?")[0]===expectedPath));
+    await command("Runtime.enable");
+    await sleep(40);
+    let frame=null,contextId=null;
+    const probes=[];
+    for(const candidate of candidates){
+      const isolated=await command("Page.createIsolatedWorld",{
+        frameId:candidate.id,worldName:"skill-studio-live-webview-probe",
+        grantUniveralAccess:true
+      });
+      const probe=await command("Runtime.evaluate",{
+        contextId:isolated.executionContextId,returnByValue:true,
+        expression:`Boolean(document.querySelector("#downloadPackageZip")&&
+          document.querySelector("#exportPackageZip")&&
+          document.querySelector("#reactFlowRoot"))`
+      });
+      probes.push({id:candidate.id,url:candidate.url,hasStudioControls:probe.result?.value===true});
+      if(probe.result?.value!==true)continue;
+      const id=defaultExecutionContexts.get(candidate.id);
+      if(id){frame=candidate;contextId=id;break;}
+    }
+    if(!contextId)
+      throw Error("Active Procedure Webview main context is unavailable: "+
+        JSON.stringify({expectedPath,probes,known:[...defaultExecutionContexts.entries()]}));
+    const data=await command("Runtime.evaluate",{
+      contextId,expression,returnByValue:true,awaitPromise:true
+    });
+    if(data.exceptionDetails)
+      throw Error("Procedure Webview evaluate: "+JSON.stringify({
+        text:data.exceptionDetails.text,
+        exception:data.exceptionDetails.exception?.description??null,
+        line:data.exceptionDetails.lineNumber,column:data.exceptionDetails.columnNumber
+      }));
+    return data.result?.value;
+  };
   let workbenchEvidence;
-  try{workbenchEvidence=await runWorkbenchAcceptance({command,evalJS,sleep,requireEditor});}
+  try{workbenchEvidence=await runWorkbenchAcceptance({
+    command,evalJS,evalWebviewJS,sleep,requireEditor
+  });}
   catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
