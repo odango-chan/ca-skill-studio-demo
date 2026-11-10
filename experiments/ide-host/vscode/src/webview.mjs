@@ -16,8 +16,10 @@ import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
 
 const vscode=acquireVsCodeApi();
 const $=id=>document.getElementById(id);
-let state={text:"",version:0,procedures:null,procedureId:null,graph:null,
-  selection:null,pending:null,pendingKind:null,routeProposal:null,nodeFocusId:null},epoch=0,focusTicket=0;
+let state={text:"",version:0,procedures:null,procedureId:null,entry:null,graph:null,
+  selection:null,pending:null,pendingKind:null,routeProposal:null,nodeFocusId:null,
+  layoutDirection:"DOWN",fitMode:"all",showAllLabels:false,neighborsOnly:false,
+  rootPathMode:"normal",pathCategories:new Set(),expandedNodes:new Set()},epoch=0,focusTicket=0;
 const layouts=new Map();
 let projectionMs=0;
 function publishSelection(){vscode.postMessage({type:"selection",version:state.version,procedureId:state.procedureId,nodeId:state.selection?.kind==="node"?state.selection.id:null});}
@@ -27,6 +29,7 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
     state.routeProposal=null;state.pending=null;state.pendingKind=null;
     state.selection={kind:"node",id};
     renderRoutes({preserveSelection:true});repaint();
+    if(state.neighborsOnly)void layoutCurrentProcedure();
     const options=addRouteOutcomeOptions(state.text,state.procedureId,id);
     status(options?.outcomes?.length
       ?"已选择 "+id+" · 可从节点专用添加端口提出新 Route"
@@ -61,10 +64,17 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
     if(state.routeProposal)return;
     state.selection=null;state.pending=null;state.pendingKind=null;
     repaint();renderRoutes();
+    if(state.neighborsOnly)void layoutCurrentProcedure();
   },
   onViewDetails(id){openNodeFocus(id);},
   onEnterChild(_caller,procedureId){if(state.procedures?.has(procedureId))void showProcedure(procedureId);},
-  onToggleBranches(){status("分支筛选仍保留在原网页 Demo；此处显示完整声明图");},
+  onToggleBranches(id){
+    if(!isRootPath()||!getProcedure()?.nodes.some(node=>node.id===id))return;
+    state.rootPathMode="custom";
+    if(state.expandedNodes.has(id))state.expandedNodes.delete(id);
+    else state.expandedNodes.add(id);
+    void layoutCurrentProcedure({anchorId:id});
+  },
   onReconnect(routeId,sourceId,targetId){prepareReconnect(routeId,sourceId,targetId);},
   onCreateRoute(connection){prepareRouteCreation(connection);},
   onAmbiguousReconnect(){status("Bundle 含多个 Outcome。请先选中具体 Route 再重连");}
@@ -78,13 +88,14 @@ const nodeFocusCanvas=mountNodeFocusCanvas($("nodeFocusFlow"),{
 });
 function repaint(){
   publishSelection();
+  updateGraphTools();
   if(state.graph&&!state.nodeFocusId){
     const selected=state.selection?.kind==="node"?state.selection.id:null;
     const options=selected&&!state.routeProposal
       ?addRouteOutcomeOptions(state.text,state.procedureId,selected):null;
     const routeCreationSourceId=options?.outcomes?.length?selected:null;
     canvas.render(state.graph,state.procedures.get(state.procedureId),
-      state.selection,false,routeCreationSourceId);
+      state.selection,state.showAllLabels,routeCreationSourceId);
   }
 }
 function option(select,text,value){
@@ -93,19 +104,41 @@ function option(select,text,value){
   select.appendChild(o);
 }
 function getProcedure(){return state.procedures?.get(state.procedureId)??null;}
+function isRootPath(){
+  return Boolean(state.procedures&&state.procedureId===state.entry&&!state.neighborsOnly);
+}
+function updateGraphTools(){
+  $("graphTools").hidden=!state.procedures||Boolean(state.nodeFocusId);
+  const root=isRootPath()&&!state.nodeFocusId;
+  $("rootPathToolbar").hidden=!root;
+  $("rootPathFilters").hidden=!root||state.rootPathMode!=="custom";
+  $("rootPathMode").value=state.rootPathMode;
+  $("layoutDirection").value=state.layoutDirection;
+  for(const [id,key] of [["pathFailure","failure"],["pathUncertain","uncertain"],
+    ["pathRecovery","recovery"]])$(""+id).checked=state.pathCategories.has(key);
+  for(const [id,value] of [["neighborsOnly",state.neighborsOnly],
+    ["showAllLabels",state.showAllLabels]])
+    $(""+id).setAttribute("aria-pressed",String(value));
+}
+function fitGraph(){
+  if(!state.graph||state.nodeFocusId)return;
+  if(state.fitMode!=="all"&&canvas.fitAxis(state.fitMode))return;
+  canvas.fit();
+}
 function clearNodeFocus(){
   focusTicket++;
   state.nodeFocusId=null;
   nodeFocusCanvas.clear();
   $("nodeFocus").hidden=true;
   $("reactFlowRoot").hidden=false;
+  updateGraphTools();
 }
 function closeNodeFocus(){
   if(!state.nodeFocusId)return;
   clearNodeFocus();
   renderRoutes({preserveSelection:true});
-  requestAnimationFrame(()=>canvas.fit());
-  status("已返回完整 Procedure 流程图；Source 未被修改。");
+  requestAnimationFrame(fitGraph);
+  status("已返回 Procedure 流程图；Source 未被修改。");
 }
 function openNodeFocus(id){
   const procedure=getProcedure();
@@ -126,6 +159,7 @@ function openNodeFocus(id){
   $("reactFlowRoot").hidden=true;
   $("nodeFocus").hidden=false;
   $("patch").hidden=true;
+  updateGraphTools();
   $("nodeFocusTitle").textContent=node.id;
   $("nodeFocusSubtitle").textContent=
     state.procedureId+" · "+node.operator.toUpperCase()+" · L"+node.line;
@@ -282,36 +316,60 @@ function prepareReconnect(routeId,sourceId,targetId){
   repaint();
   status("重连只选择了新目标；请检查 Route Diff 并显式确认。");
 }
-async function showProcedure(id){
-  const procedure=state.procedures?.get(id);
+async function layoutCurrentProcedure({anchorId=null}={}){
+  const procedure=getProcedure();
   if(!procedure)return;
-  clearNodeFocus();
   const ticket=++epoch;
-  state.procedureId=id;state.selection=null;state.graph=null;
-  state.pending=null;state.pendingKind=null;state.routeProposal=null;
-  $("procedureList").value=id;
-  $("patch").hidden=true;
-  status("ELK 正在布局 "+id+"（不修改 YAML）…");
+  const started=performance.now();
+  const anchor=anchorId?canvas.captureNodeAnchor(anchorId):null;
+  const focus=state.neighborsOnly&&state.selection?.kind==="node"?state.selection.id:null;
+  const pathFocus=isRootPath()?{
+    mode:state.rootPathMode,categories:[...state.pathCategories],
+    expandedNodes:[...state.expandedNodes]
+  }:null;
+  const key=JSON.stringify([state.version,state.procedureId,state.layoutDirection,focus,pathFocus]);
+  const cacheHit=layouts.has(key);
+  status("ELK 正在布局 "+state.procedureId+"（不修改 YAML）…");
   try{
-    const started=performance.now();
-    const key=state.version+":"+id;
-    const cacheHit=layouts.has(key);
-    const graph=cacheHit?layouts.get(key):await layoutProcedureELK(procedure,{direction:"DOWN"});
+    const graph=cacheHit?layouts.get(key):await layoutProcedureELK(procedure,{
+      direction:state.layoutDirection,focus,neighborsOnly:Boolean(focus),pathFocus
+    });
     if(ticket!==epoch)return;
-    if(layouts.size>=32)layouts.delete(layouts.keys().next().value);
-    layouts.set(key,graph);
-    state.graph=graph;repaint();renderRoutes();canvas.fit();
+    if(!cacheHit){
+      if(layouts.size>=32)layouts.delete(layouts.keys().next().value);
+      layouts.set(key,graph);
+    }
+    state.graph=graph;
+    repaint();
+    // When the clicked card expands or collapses, keep it at the same screen
+    // coordinates and zoom. Other toolbar actions intentionally refit.
+    if(!anchor||!canvas.restoreNodeAnchor(anchor,graph))fitGraph();
     requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ticket===epoch){
-      const timing={type:"rendered",version:state.version,projectionMs,layoutMs:performance.now()-started,cacheHit};
+      const timing={type:"rendered",version:state.version,projectionMs,
+        layoutMs:performance.now()-started,cacheHit};
       $("reactFlowRoot").dataset.studioTiming=JSON.stringify(timing);
       vscode.postMessage(timing);
     }}));
-    status(id+" · "+procedure.nodes.length+" Nodes / "+procedure.routes.length+
-      " Outcomes / "+graph.bundles.length+" Bundles · YAML Source 由 IDE 管理");
+    const visible=graph.visibleRoutes?.length??procedure.routes.length;
+    const summary=graph.filterReason??(graph.isFiltered
+      ?" · 筛选显示 "+visible+"/"+procedure.routes.length+" 条 Route":"");
+    status(state.procedureId+" · "+procedure.nodes.length+" Nodes / "+procedure.routes.length+
+      " Outcomes / "+graph.bundles.length+" Bundles"+summary+" · YAML Source 由 IDE 管理");
   }catch(error){
     if(ticket!==epoch)return;
     status("布局失败："+String(error?.message??error));
   }
+}
+async function showProcedure(id){
+  if(!state.procedures?.has(id))return;
+  clearNodeFocus();
+  state.procedureId=id;state.selection=null;state.graph=null;
+  state.pending=null;state.pendingKind=null;state.routeProposal=null;
+  $("procedureList").value=id;
+  $("patch").hidden=true;
+  renderRoutes();
+  updateGraphTools();
+  await layoutCurrentProcedure();
 }
 function receiveSnapshot(data){
   if(typeof data.text!=="string"||data.text.length>1024*1024||
@@ -335,12 +393,56 @@ function receiveSnapshot(data){
   }
   const previous=state.procedureId;
   state.procedures=model.procedures;
+  state.entry=model.entry;
+  state.expandedNodes.clear();
   const list=$("procedureList");list.replaceChildren();
   for(const proc of model.procedures.values())
     option(list,proc.name+" ("+proc.nodes.length+" Nodes)",proc.name);
   void showProcedure(model.procedures.has(previous)?previous:model.entry);
 }
 $("procedureList").addEventListener("change",event=>void showProcedure(event.target.value));
+$("layoutDirection").addEventListener("change",event=>{
+  if(!["DOWN","RIGHT"].includes(event.target.value))return;
+  state.layoutDirection=event.target.value;
+  void layoutCurrentProcedure();
+});
+for(const [id,mode] of [["fit","all"],["fitWidth","width"],["fitHeight","height"]]){
+  $(""+id).addEventListener("click",()=>{state.fitMode=mode;fitGraph();});
+}
+$("zoomIn").addEventListener("click",()=>canvas.zoomIn());
+$("zoomOut").addEventListener("click",()=>canvas.zoomOut());
+$("centerSelection").addEventListener("click",()=>{
+  const id=state.selection?.kind==="node"?state.selection.id:null;
+  if(id&&state.graph?.positions.has(id))canvas.center(id);
+  else fitGraph();
+});
+$("showAllLabels").addEventListener("click",()=>{
+  state.showAllLabels=!state.showAllLabels;
+  repaint();
+});
+$("neighborsOnly").addEventListener("click",()=>{
+  state.neighborsOnly=!state.neighborsOnly;
+  void layoutCurrentProcedure();
+});
+$("rootPathMode").addEventListener("change",event=>{
+  if(!["normal","custom","all"].includes(event.target.value)||!isRootPath())return;
+  state.rootPathMode=event.target.value;
+  void layoutCurrentProcedure();
+});
+for(const [id,key] of [["pathFailure","failure"],["pathUncertain","uncertain"],
+  ["pathRecovery","recovery"]]){
+  $(""+id).addEventListener("change",event=>{
+    if(!isRootPath())return;
+    if(event.target.checked)state.pathCategories.add(key);
+    else state.pathCategories.delete(key);
+    state.rootPathMode="custom";
+    void layoutCurrentProcedure();
+  });
+}
+window.addEventListener("resize",()=>{
+  if(state.nodeFocusId)nodeFocusCanvas.fit();
+  else fitGraph();
+});
 $("routeList").addEventListener("change",()=>{
   const routeId=$("routeList").value;
   state.selection=routeId?{kind:"route",id:routeId}:null;
