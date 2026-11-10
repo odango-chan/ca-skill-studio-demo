@@ -2283,6 +2283,9 @@ export function registerWorkbench(vscode,context){
         'margin:0;padding:24px}article{max-width:1000px;margin:0 auto;line-height:1.65}'+
         'a{color:var(--vscode-textLink-foreground)}a.md-local-link{font-weight:600;'+
         'text-decoration:underline;text-decoration-style:dotted}'+
+        '.md-toc{border:1px solid var(--vscode-panel-border);border-radius:6px;'+
+        'padding:8px 14px;margin:0 0 24px}.md-toc ol{margin:8px 0 0;padding-left:24px}'+
+        '.md-toc-level-3{margin-left:16px}'+
         '.md-unresolved-link{border-bottom:1px dotted var(--vscode-descriptionForeground)}'+
         '</style></head><body><article>'+
         (preview.available?preview.html:'<p>预览不可用，请使用源码编辑器。</p>')+
