@@ -129,7 +129,7 @@ function treeNode(vscode, node) {
   if (node.command) item.command = node.command;
   return item;
 }
-export function registerPackageOverview(vscode,context) {
+export function registerPackageOverview(vscode,context,getActiveDocument=()=>null) {
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
   const fire = () => emitter.fire();
@@ -197,8 +197,10 @@ export function registerPackageOverview(vscode,context) {
   async function refresh() {
     const ticket = ++generation;
     try {
-      const roots = packageScanRoots(vscode.workspace.workspaceFolders??[],
-        vscode.workspace.textDocuments??[]);
+      const activeDocument = getActiveDocument?.();
+      const openDocuments = [...(vscode.workspace.textDocuments??[]),
+        ...(activeDocument?[activeDocument]:[])];
+      const roots = packageScanRoots(vscode.workspace.workspaceFolders??[],openDocuments);
       if (!roots.length) {
         packages=[];inventoryState='no-workspace';message='请先打开 Workspace 或一个 SKILL 文件';fire();return [];
       }
@@ -258,8 +260,8 @@ export function registerPackageOverview(vscode,context) {
     vscode.workspace.onDidCreateFiles?.(schedule),
     vscode.workspace.onDidDeleteFiles?.(schedule),
     vscode.workspace.onDidRenameFiles?.(schedule),
-    vscode.workspace.onDidOpenTextDocument?.(refreshDirty),
-    vscode.workspace.onDidCloseTextDocument?.(refreshDirty),
+    vscode.workspace.onDidOpenTextDocument?.(schedule),
+    vscode.workspace.onDidCloseTextDocument?.(schedule),
     vscode.workspace.onDidChangeTextDocument?.(refreshDirty),
     vscode.workspace.onDidSaveTextDocument?.(refreshDirty),
     {dispose(){clearTimeout(timer);generation++;}}
