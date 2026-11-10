@@ -85,7 +85,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const phaseProcedure='ue-requested-pdu-session-establishment';
   const phaseNode='nudm-sdm-subscribe';
   workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
-  const phaseStep=providers.get('skillStudio.inspection').getChildren().find(x=>
+  const phaseRow=providers.get('skillStudio.inspection').getChildren().find(x=>x.label==='preconditions');
+  const phaseStep=phaseRow?.children.find(x=>
     x.kind==='phase-step'&&x.phaseName==='preconditions'&&x.stepIndex===0);
   assert.ok(phaseStep,'eligible Phase Step identity is exposed');
   const phaseItem=providers.get('skillStudio.inspection').getTreeItem(phaseStep);
