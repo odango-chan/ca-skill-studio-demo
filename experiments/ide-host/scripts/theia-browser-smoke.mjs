@@ -384,6 +384,28 @@ try{
         bodyText:document.body.innerText.slice(-900),
         editorTabs:[...document.querySelectorAll(".theia-tab,.lm-TabBar-tab")].map(x=>x.innerText).filter(Boolean).slice(-8)
       })`);
+      // Real native YAML tokenization must not depend on deferred LSP features.
+      let yamlSyntax=null;
+      for(let attempt=0;attempt<35;attempt++){
+        yamlSyntax=await evalJS(`(()=>{
+          const editor=[...document.querySelectorAll('.monaco-editor')]
+            .find(el=>el.getBoundingClientRect().width>150&&
+              el.querySelector('.view-lines'));
+          const spans=[...(editor?.querySelectorAll('.view-lines span')??[])];
+          const tokenColors=[...new Set(spans.map(el=>getComputedStyle(el).color))];
+          const items=[...document.querySelectorAll('.theia-status-bar-item')]
+            .map(el=>el.textContent?.trim()).filter(Boolean);
+          return {items,tokenCount:spans.length,tokenColors,visible:!!editor};
+        })()`);
+        if(yamlSyntax?.tokenColors?.length>=3&&
+           yamlSyntax.items.some(x=>/YAML/i.test(x)))break;
+        await sleep(120);
+      }
+      console.log("STUDIO_NATIVE_YAML_SYNTAX_CHROMIUM",JSON.stringify(yamlSyntax));
+      if(!yamlSyntax?.items?.some(x=>/YAML/i.test(x))||
+         !(yamlSyntax.tokenColors.length>=3))
+        throw Error("Native YAML syntax/language not active: "+JSON.stringify(yamlSyntax));
+      patchEvidence.yamlSyntax=yamlSyntax;
       await command("Input.dispatchKeyEvent",{
         type:"keyDown",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
       });
