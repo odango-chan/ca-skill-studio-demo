@@ -56,3 +56,8 @@ Opening the Python Source document emits a workspace `onDidOpenTextDocument` eve
 
 
 The readiness check is generation-specific: the probe captures the Package generation before opening the Python Source, requires `onDidOpenTextDocument` to advance it when the file was not already open, and then requires the READY status tooltip to identify that exact current generation. This prevents an old READY status from satisfying the wait before the open-document event is delivered.
+
+
+## Theia CompletionList result shape
+
+The real Theia 1.76 `vscode.executeCompletionItemProvider` command returns its completion list as `{ incomplete, suggestions }`, while the VS Code API commonly exposes `{ isIncomplete, items }`. The acceptance probe accepts both host result shapes and still requires the exact `EstablishmentSelectionInput` label. The browser run showed the Schema Hover provider already resolved the exact Schema; this was an acceptance adapter shape mismatch, not evidence of a missing Schema index.
