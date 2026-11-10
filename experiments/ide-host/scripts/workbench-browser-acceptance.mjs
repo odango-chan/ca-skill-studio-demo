@@ -17,7 +17,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }
   async function startNativeCommand(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
-    await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
+    await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioCommandState={status:"pending",id:${JSON.stringify(id)}};window.__skillStudioPendingCommand=Promise.resolve(registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)})).then(value=>{window.__skillStudioCommandState={status:"resolved",id:${JSON.stringify(id)},value};return value;},error=>{window.__skillStudioCommandState={status:"rejected",id:${JSON.stringify(id)},error:String(error?.message??error)};throw error;});return true;})()`);
   }
   async function waitForRevisionChange(contextId,previous,label){
     let latest=null,refreshed=null;
@@ -46,7 +46,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       target=await evalJS(`(()=>{const el=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='确认并应用'&&x.getBoundingClientRect().width>0);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,text:document.body.innerText}:null;})()`);
       if(!target)await sleep(100);
     }
-    if(!target)throw Error('Native Inspector Diff confirmation dialog did not appear');
+    if(!target){
+      const state=await evalJS(`({command:window.__skillStudioCommandState??null,
+        pending:typeof window.__skillStudioPendingCommand,
+        tail:document.body.innerText.slice(-1400)})`);
+      throw Error('Native Inspector Diff confirmation dialog did not appear: '+
+        JSON.stringify(state));
+    }
     if(!target.text.includes(oldText)||!target.text.includes(newText))
       throw Error('Native Inspector confirmation did not show the expected Source Diff: '+target.text.slice(-1200));
     await click(target.x,target.y);await sleep(250);
