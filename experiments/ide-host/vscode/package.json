@@ -23,7 +23,9 @@
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
     "onCommand:skillStudio.editNodeOperatorValue",
-    "onCommand:skillStudio.editPhaseInputBinding"
+    "onCommand:skillStudio.editPhaseInputBinding",
+    "onCommand:skillStudio.insertNode",
+    "onCommand:skillStudio.deleteNode"
   ],
   "contributes": {
     "commands": [
@@ -58,6 +60,14 @@
       {
         "command": "skillStudio.editPhaseInputBinding",
         "title": "SKILL Studio: Edit Phase Input Binding"
+      },
+      {
+        "command": "skillStudio.insertNode",
+        "title": "SKILL Studio: Insert Node on Route"
+      },
+      {
+        "command": "skillStudio.deleteNode",
+        "title": "SKILL Studio: Delete Node"
       }
     ],
     "menus": {
@@ -105,6 +115,26 @@
           "command": "skillStudio.editPhaseInputBinding",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStep",
           "group": "3_phase"
+        },
+        {
+          "command": "skillStudio.renameNode",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.deletableNode",
+          "group": "1_node"
+        },
+        {
+          "command": "skillStudio.editNodeOperatorValue",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.deletableNode",
+          "group": "2_node"
+        },
+        {
+          "command": "skillStudio.deleteNode",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.deletableNode",
+          "group": "3_node"
+        },
+        {
+          "command": "skillStudio.insertNode",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.route",
+          "group": "1_route"
         }
       ]
     },
