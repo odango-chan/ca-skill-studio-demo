@@ -22,7 +22,19 @@ export function registerWorkbench(vscode,context){
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
-  let languageClient=null,languageClientPromise=null,languageClientFailureShown=false;
+  let languageClient=null,languageClientPromise=null,languageClientFailureShown=false,
+    languageStatusItem=null;
+  function updateLanguageStatus(state,detail){
+    if(typeof Worker!=="function"||typeof globalThis.location==="undefined")return;
+    if(!languageStatusItem){
+      languageStatusItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left,20);
+      languageStatusItem.name="SKILL Studio Language Service";
+      context.subscriptions.push(languageStatusItem);
+    }
+    languageStatusItem.text="SKILL LSP: "+state;
+    languageStatusItem.tooltip=detail||"Skill Studio browser Language Service";
+    languageStatusItem.show();
+  }
 
   function languagePackageContains(root,uri){
     if(!uri||uri.scheme!==root.scheme||uri.authority!==root.authority)return false;
@@ -37,10 +49,19 @@ export function registerWorkbench(vscode,context){
         try{
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
           candidate=createSkillLanguageClient(vscode,context,{
-            onError:error=>console.warn("Skill Studio Language Service",error)
+            onStatus:status=>updateLanguageStatus(
+              status.state,
+              status.reason||("Package "+status.rootUri+" · generation "+status.generation)
+            ),
+            onError:error=>{
+              console.warn("Skill Studio Language Service",error);
+              updateLanguageStatus("ERROR",String(error?.message??error));
+            }
           });
+          updateLanguageStatus("STARTING","Starting browser language Worker");
           await candidate.start();
           languageClient=candidate;
+          updateLanguageStatus("STARTED","Browser language Worker initialized");
           return candidate;
         }catch(error){
           if(candidate)await candidate.stop().catch(()=>{});
@@ -63,10 +84,13 @@ export function registerWorkbench(vscode,context){
       if(state.disposed||ticket!==state.ticket)return;
       const client=await ensureLanguageClient();
       if(!client||state.disposed||ticket!==state.ticket)return;
+      updateLanguageStatus("ANALYZING","Analyzing "+snapshot.packageName+
+        " · generation "+snapshot.generation);
       client.sendPackageSnapshot(snapshot);
     }catch(error){
       if(state.disposed||ticket!==state.ticket)return;
       console.warn("Skill Studio Package analysis unavailable",error);
+      updateLanguageStatus("ERROR",String(error?.message??error));
       if(!languageClientFailureShown){
         languageClientFailureShown=true;
         void vscode.window.showWarningMessage(
@@ -152,6 +176,7 @@ export function registerWorkbench(vscode,context){
       for(const subscription of state.subscriptions)subscription.dispose();
       state.subscriptions.length=0;
       languagePackages.delete(key);
+      if(languagePackages.size===0)updateLanguageStatus("IDLE","No open Procedure Package");
       const close=client=>client?.closePackage(key);
       if(languageClientPromise)void languageClientPromise.then(close).catch(()=>{});
       else close(languageClient);
