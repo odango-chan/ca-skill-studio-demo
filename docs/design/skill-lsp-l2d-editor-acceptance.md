@@ -48,3 +48,8 @@ The Theia browser-only host can expose a workspace-backed `.yaml` / `.py` Source
 - language selectors for hosts that provide canonical `yaml` / `python` language IDs.
 
 The Package snapshot's bounded extension-to-language mapping remains the analysis input. URI selectors only determine which native documents can invoke the read-only provider; they do not infer DSL semantics or alter Source. The real Theia Chromium probe must still prove that native provider commands resolve exact Package targets.
+
+
+## References acceptance synchronization
+
+Opening the Python Source document emits a workspace `onDidOpenTextDocument` event and schedules a new Package generation. A fixed sleep is not evidence that the replacement snapshot has been analyzed. The Chromium provider probe therefore waits for the Language Service to return to `SKILL LSP: READY` (with a bounded timeout) before requesting References. It also queries the exact start of the declared `# name:` token. This keeps the acceptance test aligned with the existing generation invalidation contract rather than weakening stale-result rejection.
