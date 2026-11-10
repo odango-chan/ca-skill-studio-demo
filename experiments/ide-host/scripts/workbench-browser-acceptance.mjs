@@ -191,8 +191,22 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   let phaseEvidenceText='';
   for(let i=0;i<100;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
-    if(phaseEvidenceText.includes('Producer / Consumer dataflow')&&
-       phaseEvidenceText.includes('Consumer ABI'))break;
+    if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
+    await sleep(100);
+  }
+  const dataflowTreeRow=await evalJS(`(()=>{
+    const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>
+      x.innerText.includes('Producer / Consumer dataflow')&&
+      x.getBoundingClientRect().height>0);
+    const r=el?.getBoundingClientRect();
+    return r?{x:r.x+12,y:r.y+r.height/2,
+      expanded:el.getAttribute('aria-expanded')==='true'}:null;
+  })()`);
+  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing');
+  if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
+  for(let i=0;i<50;i++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(phaseEvidenceText.includes('Consumer ABI'))break;
     await sleep(100);
   }
   const phaseEvidence={
