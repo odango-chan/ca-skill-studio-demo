@@ -515,7 +515,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   })()`);
   if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
   if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
-  const evidenceHeader=await evalJS("(()=>{
+  const evidenceHeader=await evalJS(`(()=>{
     const candidates=[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>
       x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
       x.getBoundingClientRect().x>=0);
@@ -530,12 +530,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
       x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
     return r?{x:r.x+r.width/2,y:r.y+r.height/2,needsOpen:collapsed,viewClass:widget?.className??null,headerClass:el.className,root}:null;
-  })()");
+  })()`);
   if(!evidenceHeader)throw Error('Native Evidence view header is missing');
   if(evidenceHeader.needsOpen){
     await click(evidenceHeader.x,evidenceHeader.y);
     for(let attempt=0;attempt<30;attempt++){
-      const state=await evalJS("(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim()==='Evidence');const w=el?.closest('.lm-Widget');return {collapsed:!!w&&(w.classList.contains('collapsed')||w.classList.contains('lm-mod-hidden')),viewClass:w?.className??null};})()");
+      const state=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim()==='Evidence');const w=el?.closest('.lm-Widget');return {collapsed:!!w&&(w.classList.contains('collapsed')||w.classList.contains('lm-mod-hidden')),viewClass:w?.className??null};})()`);
       if(!state?.collapsed)break;
       await sleep(100);
     }
