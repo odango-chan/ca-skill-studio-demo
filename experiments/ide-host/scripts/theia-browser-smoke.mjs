@@ -642,7 +642,24 @@ try{
       await command("Input.dispatchMouseEvent",{
         type:"mouseReleased",x:clickX,y:clickY,button:"left",clickCount:1
       });
-      // Go to the known DENIED Route in await-initial-n4-session-establishment.
+      // Resolve the fixture line from the *same pinned owner Source* that
+      // the browser actually imported. A numeric hard-coded line silently
+      // breaks when a legitimate owner SKILL refresh adds comments/Steps.
+      const ownerProcedure=(await readFile(
+        resolve("site/samples/skills/establish-pdu-session/assurance/procedure.yaml"),
+        "utf8")).split("\\n");
+      const n4Start=ownerProcedure.findIndex(x=>
+        /^  await-initial-n4-session-establishment:\\s*$/.test(x));
+      const nextProcedure=ownerProcedure.findIndex((x,i)=>i>n4Start&&
+        /^  [a-z0-9-]+:\\s*$/.test(x));
+      const n4End=nextProcedure<0?ownerProcedure.length:nextProcedure;
+      const candidates=ownerProcedure
+        .map((x,i)=>i>=n4Start&&i<n4End&&
+          /^            DENIED: failed\\s*$/.test(x)?i+1:null)
+        .filter(Boolean);
+      if(n4Start<0||candidates.length!==1)
+        throw Error("Pinned owner N4 DENIED Route line is not unique");
+      const n4RouteLine=candidates[0];
       // This uses the native editor's public keyboard UI, not Monaco internals.
       await key("g","KeyG",2,71);
       await sleep(150);
@@ -654,14 +671,14 @@ try{
         visibleWidgets:[...document.querySelectorAll(".monaco-editor .zone-widget,.quick-input-widget,.quick-input-box,.goto-line-widget")]
           .map(item=>({className:item.className,text:item.innerText?.slice(0,120)}))
       })`);
-      await command("Input.insertText",{text:"637"});
+      await command("Input.insertText",{text:String(n4RouteLine)});
       await sleep(100);
       const gotoTyped=await evalJS(`({
         activeValue:document.activeElement?.value??"",
         ariaLabel:document.activeElement?.getAttribute("aria-label")??""
       })`);
-      if(!String(gotoTyped.activeValue??"").includes("637"))
-        throw Error("Native editor Go to Line did not receive line 637: "+
+      if(!String(gotoTyped.activeValue??"").includes(String(n4RouteLine)))
+        throw Error("Native editor Go to Line did not receive fixture line "+n4RouteLine+": "+
           JSON.stringify({gotoState,gotoTyped}));
       await key("Enter","Enter",0,13);
       await sleep(200);
