@@ -24,7 +24,8 @@ function localPackagePath(raw,options={}){
   if(parts.some(part=>!part||part==="."))return null;
   const parents=parts.filter(part=>part==="..").length;
   if(parents>1||(parents===1&&(parts[0]!==".."||parts.length!==2)))return null;
-  if(!(options.localFiles instanceof Set))return null;
+  const inventory=options.localFiles;
+  if(!inventory||typeof inventory.has!=="function")return null;
   const targetParts=String(options.relativeDir??"").split("/").filter(Boolean);
   for(const part of parts){
     if(part===".."){if(!targetParts.length)return null;targetParts.pop();}
