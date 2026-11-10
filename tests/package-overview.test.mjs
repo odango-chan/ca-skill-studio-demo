@@ -110,7 +110,7 @@ test('C4 reports bounded inventory instead of implying a complete scan',()=>{
 });
 
 test('C4 registers Packages view and renders package tree with source actions',async()=>{
-  const treeProviders=new Map(),commands=new Map();
+  const treeProviders=new Map(),treeViews=new Map(),commands=new Map();
   class Emitter {
     constructor(){this.event=()=>{};}
     fire(){}
@@ -137,7 +137,10 @@ test('C4 registers Packages view and renders package tree with source actions',a
     EventEmitter:Emitter,TreeItem:Item,ThemeIcon:Icon,RelativePattern,
     TreeItemCollapsibleState:{Collapsed:1,None:0},
     workspace,window:{
-      registerTreeDataProvider(id,provider){treeProviders.set(id,provider);return {dispose(){}};}
+      createTreeView(id,options){
+        treeViews.set(id,options);treeProviders.set(id,options.treeDataProvider);
+        return {dispose(){}};
+      }
     },
     commands:{
       registerCommand(id,fn){commands.set(id,fn);return {dispose(){}};}
@@ -151,6 +154,8 @@ test('C4 registers Packages view and renders package tree with source actions',a
   await refresh();
   const provider=treeProviders.get('skillStudio.packages');
   assert.ok(provider);
+  assert.equal(treeViews.get('skillStudio.packages').showCollapseAll,true);
+  assert.equal(treeViews.get('skillStudio.packages').treeDataProvider,provider);
   const roots=provider.getChildren();
   assert.equal(roots[0].label,'3 SKILL Packages');
   const pkg=roots.find(x=>x.kind==='package'&&x.name==='establish-pdu-session');
