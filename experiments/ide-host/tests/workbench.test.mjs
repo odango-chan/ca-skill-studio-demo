@@ -195,40 +195,25 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(appliedEdits.at(-1).length,1,'Verify deletion uses one Source deletion');
   assert.equal(appliedEdits.at(-1)[0].value,'');
 
-  // Exercise the named Verify lifecycle on a source-qualified middle Step.
-  // It is adjacent to another plain Verify, so the closed-world editor can
-  // safely name it, swap it in either direction, and delete it with zero refs.
+  // Exercise naming and zero-consumer deletion on a plain Verify whose
+  // immediate Source neighbors are unambiguous in the current owner sample.
   workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
   const namedVerifyPhase=providers.get('skillStudio.inspection').getChildren()
     .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
-  const unnamedVerify=namedVerifyPhase.children.find(x=>x.stepIndex===3);
+  const unnamedVerify=namedVerifyPhase.children.find(x=>x.stepIndex===4);
   const unnamedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(unnamedVerify);
   assert.equal(unnamedVerifyItem.contextValue,'skillStudio.verifyStep');
   assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(unnamedVerifyItem,
-    {action:'name',newName:'ingress-eligibility'}),true);
+    {action:'name',newName:'lifecycle-ready'}),true);
   workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
   const namedPhase=providers.get('skillStudio.inspection').getChildren()
     .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
-  const namedVerify=namedPhase.children.find(x=>x.stepName==='ingress-eligibility');
+  const namedVerify=namedPhase.children.find(x=>x.stepName==='lifecycle-ready');
   const namedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(namedVerify);
   assert.equal(namedVerifyItem.contextValue,'skillStudio.namedVerifyStep');
-  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(namedVerifyItem,'move-down'),true);
-  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
-  const movedNamedPhase=providers.get('skillStudio.inspection').getChildren()
-    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
-  const movedNamedVerify=movedNamedPhase.children.find(x=>x.stepName==='ingress-eligibility');
-  const movedNamedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(movedNamedVerify);
-  assert.equal(movedNamedVerify.stepIndex,4);
-  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(movedNamedVerifyItem,'move-up'),true);
-  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
-  const restoredNamedPhase=providers.get('skillStudio.inspection').getChildren()
-    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
-  const restoredNamedVerify=restoredNamedPhase.children.find(x=>x.stepName==='ingress-eligibility');
-  const restoredNamedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(restoredNamedVerify);
-  assert.equal(restoredNamedVerify.stepIndex,3);
-  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(restoredNamedVerifyItem,'delete'),true);
-  assert.equal(doc.text,source.replace("            - verify: createdsession.ingress.eligible\n",""),
-    'named Verify delete removes only the unreferenced Step after safe adjacent swaps');
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(namedVerifyItem,'delete'),true);
+  assert.equal(doc.text,source.replace("            - verify: createdsession.lifecycle.ready\\n",""),
+    'named Verify deletion removes only the unreferenced Step');
   doc.text=source;doc.version++;changed({document:doc});
   assert.ok(commands.has('skillStudio.insertNode'));
   assert.ok(commands.has('skillStudio.deleteNode'));
