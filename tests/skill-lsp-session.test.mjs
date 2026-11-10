@@ -77,6 +77,16 @@ test("analysis identity mismatch cannot publish diagnostics into wrong Package",
   assert.deepEqual(result.documents,[]);
 });
 
+test("stale document versions in otherwise READY analysis are not published",()=>{
+  const input=snapshot(2,2);
+  const stale=analysis(input,[diagnostic("old")]);
+  stale.documents[0].version=1;
+  const batch=diagnosticsFromAnalysis(input,stale);
+  assert.equal(batch.state,"UNAVAILABLE");
+  assert.deepEqual(batch.documents,[]);
+  assert.match(batch.reason,/versions do not match/);
+});
+
 test("newer generation supersedes pending old analysis and rejects old edits",async()=>{
   let firstResolve;
   const first=new Promise(resolve=>{firstResolve=resolve;});
