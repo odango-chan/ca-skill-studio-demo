@@ -195,18 +195,19 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     await sleep(100);
   }
   const dataflowTreeRow=await evalJS(`(()=>{
-    // Theia nests child TreeNodes inside their parent. Matching innerText on
-    // the first ancestor can therefore select the entire Evidence subtree
-    // rather than the actual dataflow row. Pick the smallest visible matching
-    // row so the click lands on this row's own expand affordance.
-    const rows=[...document.querySelectorAll('.theia-TreeNode')]
-      .filter(x=>x.innerText.includes('Producer / Consumer dataflow')&&
-        x.getBoundingClientRect().height>0)
-      .sort((a,b)=>a.getBoundingClientRect().height-b.getBoundingClientRect().height);
-    const el=rows[0],r=el?.getBoundingClientRect();
+    // TreeNode.innerText includes nested descendants. Inspect only each
+    // TreeNode's own content element so we expand the exact summary row.
+    const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{
+      const content=[...node.children].find(child=>
+        child.classList?.contains('theia-TreeNodeContent'));
+      return {node,content,text:content?.innerText?.trim()??''};
+    }).filter(row=>row.text.includes('Producer / Consumer dataflow')&&
+      row.content?.getBoundingClientRect().height>0);
+    const row=rows[0],r=row?.content?.getBoundingClientRect();
     return r?{x:r.x+12,y:r.y+r.height/2,
-      expanded:el.getAttribute('aria-expanded')==='true',
-      rowHeight:r.height,rowText:el.innerText.slice(0,180)}:null;
+      expanded:row.node.getAttribute('aria-expanded')==='true',
+      rowHeight:r.height,rowText:row.text,
+      candidateCount:rows.length}:null;
   })()`);
   if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing');
   if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
@@ -225,7 +226,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(!phaseEvidence.ready||!phaseEvidence.dataflowRows||!phaseEvidence.consumerAbiRows||
      !phaseEvidence.readOnly)
     throw Error('Native Evidence view did not render bounded read-only Producer / Consumer evidence: '+
-      JSON.stringify(phaseEvidence)+' · '+phaseEvidenceText.slice(-1400));
+      JSON.stringify({phaseEvidence,dataflowTreeRow})+' · '+phaseEvidenceText.slice(-1400));
   console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify(phaseEvidence));
   const beforeBinding=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
