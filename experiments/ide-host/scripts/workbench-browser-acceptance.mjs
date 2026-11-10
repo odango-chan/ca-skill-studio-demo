@@ -127,60 +127,17 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
         item.resource?.path.toString().endsWith("/assurance/procedure.yaml"));
       const procedureUri=widget?.resource;
       if(!procedureUri)throw Error("Active Skill Package Procedure URI missing");
-      const uriPath=uri=>{
-        if(typeof uri==="string")return new URL(uri,location.origin).pathname;
-        if(typeof uri?.path==="string")return uri.path;
-        if(uri?.path?.toString)return uri.path.toString();
-        return String(uri);
-      };
-      const procedurePosition={line:75,character:35};
-      const definitionResult=await registry.executeCommand(
-        "vscode.executeDefinitionProvider",procedureUri,procedurePosition);
-      const definitions=Array.isArray(definitionResult)?definitionResult:
-        definitionResult?[definitionResult]:[];
-      const target=definitions.find(item=>item?.uri||item?.targetUri);
-      if(!target)throw Error("Native Definition provider returned no exact script target");
-      const scriptUri=target.uri??target.targetUri;
-      const scriptPath=uriPath(scriptUri);
-      if(!scriptPath.endsWith("/scripts/select_establishment_configuration.py"))
-        throw Error("Definition resolved to an unexpected target: "+scriptPath);
-      const hoverResult=await registry.executeCommand(
-        "vscode.executeHoverProvider",procedureUri,procedurePosition);
-      const hovers=Array.isArray(hoverResult)?hoverResult:
-        hoverResult?[hoverResult]:[];
-      const hoverText=hovers.flatMap(item=>
-        Array.isArray(item?.contents)?item.contents:[item?.contents])
-        .map(item=>typeof item==="string"?item:item?.value??String(item??""))
-        .join(" ");
-      if(!hoverText.includes("Skill Script")||
-         !hoverText.includes("select-establishment-configuration"))
-        throw Error("Native Hover provider did not return the declared Script metadata");
-      const references=await registry.executeCommand(
-        "vscode.executeReferenceProvider",scriptUri,{line:1,character:12});
-      const referenceList=Array.isArray(references)?references:[];
-      if(!referenceList.some(item=>uriPath(item.uri)===uriPath(procedureUri)))
-        throw Error("Native References provider did not return the Procedure caller");
-      const symbolsResult=await registry.executeCommand(
-        "vscode.executeDocumentSymbolProvider",scriptUri);
-      const symbols=Array.isArray(symbolsResult)?symbolsResult:[];
-      if(!symbols.some(item=>item.name==="main"))
-        throw Error("Native Python Document Symbols did not include main()");
-      const completionResult=await registry.executeCommand(
-        "vscode.executeCompletionItemProvider",scriptUri,{line:2,character:42});
-      const completions=Array.isArray(completionResult)?completionResult:
-        completionResult?.items??[];
-      const labels=completions.map(item=>
-        typeof item.label==="string"?item.label:item.label?.label??"");
-      if(!labels.includes("EstablishmentSelectionInput"))
-        throw Error("Native Schema metadata Completion did not return the unique Package title");
-      return {
-        definition:scriptPath,
-        hover:hovers.length,
-        references:referenceList.length,
-        symbols:symbols.map(item=>item.name),
-        schemaCompletion:labels.includes("EstablishmentSelectionInput")
-      };
+      return registry.executeCommand(
+        "skillStudio.internal.languageProviderAcceptance",procedureUri.toString());
     })()`);
+    if(!languageFeatureEvidence?.definition?.endsWith(
+      "/scripts/select_establishment_configuration.py")||
+      !languageFeatureEvidence.hover||
+      !languageFeatureEvidence.references||
+      !languageFeatureEvidence.symbols?.includes("main")||
+      languageFeatureEvidence.schemaCompletion!=="EstablishmentSelectionInput")
+      throw Error("Theia public language-provider acceptance returned incomplete evidence: "+
+        JSON.stringify(languageFeatureEvidence));
     console.log("STUDIO_LSP_EDITOR_FEATURES",JSON.stringify(languageFeatureEvidence));
   }
   const initialTiming=JSON.parse(pinned.timing??'null');
