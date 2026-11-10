@@ -708,9 +708,10 @@ export function registerWorkbench(vscode,context){
   }
 
 
-  // Verify that the LanguageClient SDK owns and disposes only its own
-  // diagnostic collection. The host Package Audit collection is deliberately
-  // given a temporary marker so its survival is observable in Chromium.
+  // Test ownership with an independent host DiagnosticCollection, not a
+  // temporary item inside Package Audit (normal audit refresh clears that
+  // collection and would create a false SDK-cleanup failure).
+  const d4bDiagnosticGuard=new Map();
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&
      /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
     context.subscriptions.push(vscode.commands.registerCommand(
@@ -719,61 +720,63 @@ export function registerWorkbench(vscode,context){
         const uri=vscode.Uri.parse(String(procedureUriValue??""));
         const key=uri.toString();
         if(phase==="publish"){
-          if(languageDiagnosticOwnershipAcceptance.has(key))
+          if(d4bDiagnosticGuard.has(key))
             throw Error("L2-D4b diagnostic ownership probe is already active");
-          // Force a final Package Audit generation after the temporary malformed
-          // Procedure edit. This supersedes any earlier debounce/run before the
-          // host-owned marker is installed, so the audit timer cannot erase it.
-          if(!document||document.uri.toString()!==uri.toString())
-            throw Error("L2-D4b Package Audit ownership probe requires the active Procedure");
-          clearTimeout(timer);
-          await auditCurrent();
-          if(/pending|running/.test(auditStatus))
-            throw Error("L2-D4b Package Audit did not settle before diagnostic ownership probe");
-          const lsp=languageClient?.diagnosticsForAcceptance(uri.toString())??[];
+          const lsp=languageClient?.diagnosticsForAcceptance(key)??[];
           if(!lsp.some(item=>
             String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"))
-            throw Error("L2-D4b requires a real LSP Procedure diagnostic before Worker termination");
-          const original=diagnostics.get(uri)??[];
+            throw Error("L2-D4b requires a live LSP Procedure diagnostic");
+          const guard=vscode.languages.createDiagnosticCollection(
+            "skill-studio-d4b-control");
           const probe=new vscode.Diagnostic(new vscode.Range(0,0,0,1),
-            "L2-D4b host-owned Package Audit diagnostic ownership probe",
+            "L2-D4b host-owned diagnostic survives Language Worker termination",
             vscode.DiagnosticSeverity.Warning);
           probe.source="Skill Studio · editor audit";
           probe.code="D4B_HOST_DIAGNOSTIC_OWNERSHIP";
-          diagnostics.set(uri,[...original,probe]);
-          languageDiagnosticOwnershipAcceptance.set(key,{uri,original});
+          guard.set(uri,[probe]);
+          const hostAudit=diagnostics.get(uri)??[];
+          d4bDiagnosticGuard.set(key,{uri,guard,
+            auditStatusBefore:auditStatus,auditCountBefore:hostAudit.length});
           return {lspDiagnosticPresent:true,hostProbePresent:true,
-            hostDiagnosticCount:diagnostics.get(uri)?.length??0};
+            hostDiagnosticCount:guard.get(uri)?.length??0,
+            packageAuditStatus:auditStatus,packageAuditCount:hostAudit.length};
         }
-        const state=languageDiagnosticOwnershipAcceptance.get(key);
+        const state=d4bDiagnosticGuard.get(key);
         if(!state)return {phase,skipped:true};
         if(phase==="verify"){
-          const host=diagnostics.get(uri)??[];
+          const controls=state.guard.get(uri)??[];
           const visible=vscode.languages.getDiagnostics(uri);
           const lspCollectionPresent=languageClient?.hasDiagnosticCollectionForAcceptance()??false;
           const lspStillVisible=visible.some(item=>
             String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"&&
             item.source==="Skill Studio · procedure-projection");
-          const hostProbePresent=host.some(item=>
+          const hostProbePresent=controls.some(item=>
             String(item.code?.value??item.code??"")==="D4B_HOST_DIAGNOSTIC_OWNERSHIP");
+          const auditAfter=diagnostics.get(uri)??[];
           if(lspCollectionPresent||lspStillVisible||!hostProbePresent)
             throw Error("L2-D4b diagnostic ownership failed: "+JSON.stringify({
               lspCollectionPresent,lspStillVisible,hostProbePresent,
-              hostSources:host.map(item=>item.source)
+              auditStatus,auditCount:auditAfter.length
             }));
           return {lspCollectionDisposed:true,lspDiagnosticCleared:true,
-            hostPackageAuditDiagnosticPreserved:true,
-            hostDiagnosticCount:host.length};
+            independentHostCollectionPreserved:true,
+            auditStatusBefore:state.auditStatusBefore,
+            auditStatusAfter:auditStatus,
+            auditCountBefore:state.auditCountBefore,
+            auditCountAfter:auditAfter.length};
         }
         if(phase==="restore"){
-          if(state.original.length)diagnostics.set(uri,state.original);
-          else diagnostics.delete(uri);
-          languageDiagnosticOwnershipAcceptance.delete(key);
-          return {restored:true,hostDiagnosticCount:state.original.length};
+          try{state.guard.dispose();}
+          finally{d4bDiagnosticGuard.delete(key);}
+          return {restored:true};
         }
         throw Error("Unknown diagnostic ownership phase: "+String(phase));
       }
     ));
+    context.subscriptions.push({dispose(){
+      for(const state of d4bDiagnosticGuard.values())state.guard.dispose();
+      d4bDiagnosticGuard.clear();
+    }});
   }
 
   // End-to-end recovery probe: a dirty Python buffer must be rehydrated
