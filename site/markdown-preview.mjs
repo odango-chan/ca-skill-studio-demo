@@ -63,6 +63,25 @@ function inline(src,depth=0,options={}){
 }
 const fenceStart=line=>line.match(/^\s{0,3}(\x60{3,}|\x7e{3,})([^\r\n]*)$/);
 const heading=line=>line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+function collectMarkdownHeadings(lines){
+  const items=[];let fence=null;
+  for(let i=0;i<lines.length;i++){
+    const marker=fenceStart(lines[i]);
+    if(marker){
+      const char=marker[1][0],length=marker[1].length;
+      if(!fence)fence={char,length};
+      else if(char===fence.char&&length>=fence.length)fence=null;
+      continue;
+    }
+    if(fence)continue;
+    const match=heading(lines[i]);
+    if(!match)continue;
+    const label=match[2].replace(/\[([^\]]+)\]\([^)]+\)/g,"$1")
+      .replace(/[*_~]/g,"").trim();
+    items.push({line:i,id:"md-heading-"+i,level:match[1].length,label});
+  }
+  return items;
+}
 const listItem=line=>line.match(/^(\s*)([-+*]|\d+[.)])\s+(.+)$/);
 const hr=line=>/^\s{0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(line);
 const quote=line=>/^\s{0,3}>\s?/.test(line);
@@ -125,7 +144,9 @@ function renderBlocks(lines,depth=0,options={}){
     const h=heading(lines[i]);
     if(h){
       const level=h[1].length;
-      out+="<h"+level+">"+inline(h[2],0,options)+"</h"+level+">";i++;continue;
+      const id=depth===0?options.headingIds?.get(i):null;
+      out+=(id?'<h'+level+' id="'+id+'">':"<h"+level+">")+
+        inline(h[2],0,options)+"</h"+level+">";i++;continue;
     }
     if(hr(lines[i])){out+="<hr>";i++;continue;}
     if(quote(lines[i])){
@@ -173,5 +194,12 @@ export function renderMarkdown(source,{maxChars=300000,localLinks=false}={}){
       lines.splice(0,end+2);
     }
   }
-  return {available:true,html:head+renderBlocks(lines,0,{localLinks})};
+  const headings=collectMarkdownHeadings(lines);
+  const headingIds=new Map(headings.map(item=>[item.line,item.id]));
+  const toc=headings.length>1
+    ?'<details class="md-toc"><summary>目录 · '+headings.length+'</summary><ol>'+
+      headings.map(item=>'<li class="md-toc-level-'+item.level+'"><a href="#'+item.id+
+        '">'+escapeHTML(item.label)+'</a></li>').join("")+'</ol></details>'
+    :"";
+  return {available:true,html:head+toc+renderBlocks(lines,0,{localLinks,headingIds})};
 }
