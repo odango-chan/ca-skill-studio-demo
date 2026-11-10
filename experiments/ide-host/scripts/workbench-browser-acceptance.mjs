@@ -93,7 +93,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
   });
-  const sourceVersion=Number(/v(\\d+)/.exec(beforeEdit.result?.value??'')?.[1]);
+  const sourceVersion=Number(/v(\d+)/.exec(beforeEdit.result?.value??'')?.[1]);
   if(!Number.isSafeInteger(sourceVersion))throw Error('Could not read native Source version');
   await startNativeCommand('skillStudio.editNodeOperatorValue',{
     procedureId:selectionResult.result.value.procedure,nodeId:'nudm-sdm-get',sourceVersion
