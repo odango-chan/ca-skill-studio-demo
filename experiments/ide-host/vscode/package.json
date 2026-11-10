@@ -286,24 +286,15 @@
         "contents": "**欢迎使用 SKILL Studio**\\n\\n还没有打开项目？可以先载入内置演示项目，体验 SKILL 文件树、YAML / Python 编辑，以及 Procedure 可视化。\\n\\n[载入演示 SKILL 项目](command:skillStudio.loadExample)\\n\\n演示项目会复制到浏览器工作区，不会覆盖已有文件。"
       }
     ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "skillStudio",
-          "title": "Skill Studio",
-          "icon": "icons/skill-studio.svg"
-        }
-      ]
-    },
     "views": {
-      "skillStudio": [
+      "explorer": [
         {
           "id": "skillStudio.inspection",
-          "name": "Inspection / Inspector"
+          "name": "SKILL Inspector"
         },
         {
           "id": "skillStudio.outline",
-          "name": "Outline"
+          "name": "Procedure Outline"
         },
         {
           "id": "skillStudio.evidence",
