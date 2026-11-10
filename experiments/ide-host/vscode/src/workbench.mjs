@@ -30,6 +30,9 @@ export function registerWorkbench(vscode,context){
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
+  const languagePackageGenerations=new Map();
+  const languagePackageStatuses=new Map();
+  let languageRecoveryPromise=null;
   let languageClient=null,languageClientPromise=null,languageClientFailureShown=false,
     languageStatusItem=null,languageTransportFailure=null;
   function updateLanguageStatus(state,detail){
@@ -44,6 +47,8 @@ export function registerWorkbench(vscode,context){
     }
     languageStatusItem.text="SKILL LSP: "+state;
     languageStatusItem.tooltip=detail||"Skill Studio browser Language Service";
+    languageStatusItem.command=state==="UNAVAILABLE"?
+      "skillStudio.restartLanguageService":undefined;
     languageStatusItem.show();
   }
 
@@ -60,17 +65,23 @@ export function registerWorkbench(vscode,context){
         try{
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
           candidate=createSkillLanguageClient(vscode,context,{
-            onStatus:status=>updateLanguageStatus(
-              status.state,
-              status.reason||(status.state==="PARTIAL" ?
-                ("Package "+status.rootUri+" · generation "+status.generation+
-                  " · Procedure "+(status.procedureState??"unknown")+
-                  " ("+(status.procedureDiagnosticCount??"?")+" diagnostics)"+
-                  " · Audit "+(status.packageAuditState??"unknown")+
-                  (status.packageAuditReason?" · "+status.packageAuditReason:"")) :
-                ("Package "+status.rootUri+" · generation "+status.generation+
-                  " · "+(status.publishedDiagnosticCount??0)+" diagnostics"))
-            ),
+            onStatus:status=>{
+              const state=languagePackages.get(status?.rootUri);
+              // Ignore delayed notifications from an old Package generation.
+              if(!state||state.disposed||status.generation!==state.generation)return;
+              languagePackageStatuses.set(status.rootUri,status);
+              updateLanguageStatus(
+                status.state,
+                status.reason||(status.state==="PARTIAL" ?
+                  ("Package "+status.rootUri+" · generation "+status.generation+
+                    " · Procedure "+(status.procedureState??"unknown")+
+                    " ("+(status.procedureDiagnosticCount??"?")+" diagnostics)"+
+                    " · Audit "+(status.packageAuditState??"unknown")+
+                    (status.packageAuditReason?" · "+status.packageAuditReason:"")) :
+                  ("Package "+status.rootUri+" · generation "+status.generation+
+                    " · "+(status.publishedDiagnosticCount??0)+" diagnostics"))
+              );
+            },
             onError:error=>{
               console.warn("Skill Studio Language Service",error);
               updateLanguageStatus("ERROR",String(error?.message??error));
@@ -102,7 +113,7 @@ export function registerWorkbench(vscode,context){
     }
     return languageClientPromise;
   }
-  async function refreshLanguagePackage(state,ticket,generation){
+  async function refreshLanguagePackage(state,ticket,generation,strict=false){
     if(state.disposed||ticket!==state.ticket||languageTransportFailure)return;
     try{
       const snapshot=await collectPackageSnapshot(
@@ -140,8 +151,12 @@ export function registerWorkbench(vscode,context){
       }else if(snapshot.completeness==="complete"){
         state.transientReadRetries=0;
       }
+      return snapshot;
     }catch(error){
-      if(state.disposed||ticket!==state.ticket)return;
+      if(state.disposed||ticket!==state.ticket){
+        if(strict)throw error;
+        return null;
+      }
       console.warn("Skill Studio Package analysis unavailable",error);
       updateLanguageStatus("ERROR",String(error?.message??error));
       if(!languageClientFailureShown){
@@ -150,6 +165,8 @@ export function registerWorkbench(vscode,context){
           "SKILL Studio 语言服务未能启动；现有编辑器仍可继续使用。详情见 Language Service Output。"
         );
       }
+      if(strict)throw error;
+      return null;
     }
   }
   function scheduleLanguagePackageRefresh(state,immediate=false,fromReadRetry=false){
@@ -157,6 +174,8 @@ export function registerWorkbench(vscode,context){
     if(!fromReadRetry)state.transientReadRetries=0;
     const ticket=++state.ticket;
     const generation=++state.generation;
+    languagePackageGenerations.set(state.key,generation);
+    languagePackageStatuses.delete(state.key);
     clearTimeout(state.timer);
     if(languageTransportFailure)return;
     updateLanguageStatus("ANALYZING","Package "+state.key+
@@ -190,10 +209,12 @@ export function registerWorkbench(vscode,context){
       scheduleLanguagePackageRefresh(state);
     }else{
       state={
-        root,key,procedureDocument:doc,refs:1,generation:0,ticket:0,
+        root,key,procedureDocument:doc,refs:1,
+        generation:languagePackageGenerations.get(key)??0,ticket:0,
         timer:null,disposed:false,subscriptions:[],
         lastSentSnapshot:null,transientReadRetries:0
       };
+      languagePackageStatuses.delete(key);
       languagePackages.set(key,state);
       const listen=(event,handler)=>{
         if(typeof event==="function"){
@@ -247,6 +268,7 @@ export function registerWorkbench(vscode,context){
       for(const subscription of state.subscriptions)subscription.dispose();
       state.subscriptions.length=0;
       languagePackages.delete(key);
+      languagePackageStatuses.delete(key);
       if(languagePackages.size===0)updateLanguageStatus("IDLE","No open Procedure Package");
       const close=client=>client?.closePackage(key);
       if(languageClientPromise)void languageClientPromise.then(close).catch(()=>{});
@@ -259,6 +281,8 @@ export function registerWorkbench(vscode,context){
       for(const subscription of state.subscriptions)subscription.dispose();
     }
     languagePackages.clear();
+    languagePackageStatuses.clear();
+    languagePackageGenerations.clear();
     const stop=client=>client?.stop();
     if(languageClientPromise)void languageClientPromise.then(stop).catch(()=>{});
     else void languageClient?.stop();
