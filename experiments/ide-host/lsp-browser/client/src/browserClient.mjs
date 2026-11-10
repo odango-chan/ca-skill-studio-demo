@@ -39,20 +39,36 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let stopped = false;
   let terminalFailure = null;
   let heartbeatTimer = null;
-  function fatal(reason) {
+  let clientStopPromise = null;
+  let client = null;
+  function stopClientAfterFailure() {
+    if (!started || !client) return Promise.resolve();
+    if (!clientStopPromise) {
+      clientStopPromise = Promise.resolve().then(() => client.stop()).catch(error => {
+        output.appendLine("LanguageClient cleanup after Worker failure: " +
+          String(error?.message ?? error));
+      });
+    }
+    return clientStopPromise;
+  }
+  function fatal(reason, { stopClient = false } = {}) {
     if (stopped || terminalFailure) return;
     terminalFailure = String(reason?.message ?? reason ?? "Browser Worker connection stopped");
     clearTimeout(heartbeatTimer);
     output.appendLine("Language Worker unavailable: " + terminalFailure);
     handlers.onFatal?.({ message: terminalFailure });
+    // A Worker event or watchdog timeout is outside vscode-languageclient's
+    // own close/error handlers. Converge it on SDK stop so its OWN diagnostic
+    // collection is disposed; never clear host Package Audit diagnostics.
+    if (stopClient) void stopClientAfterFailure();
   }
   worker.addEventListener("error", event => {
-    fatal(event?.message || "Browser language Worker crashed");
+    fatal(event?.message || "Browser language Worker crashed", { stopClient: true });
   });
   worker.addEventListener("messageerror", () => {
-    fatal("Browser language Worker message could not be decoded");
+    fatal("Browser language Worker message could not be decoded", { stopClient: true });
   });
-  const client = new LanguageClient(
+  client = new LanguageClient(
     "skillStudioLanguageService",
     "Skill Studio Language Service",
     {
@@ -101,7 +117,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
             timeout=setTimeout(()=>reject(Error("Browser language Worker health request timed out")),5000);
           })
         ]);
-      }catch(error){fatal(error);}
+      }catch(error){fatal(error,{stopClient:true});}
       finally{if(timeout!==null)clearTimeout(timeout);}
       if(!stopped&&!terminalFailure)scheduleHeartbeat();
     },2000);
@@ -146,6 +162,13 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       if (!started || stopped || terminalFailure) return;
       client.sendNotification(PACKAGE_CLOSE_NOTIFICATION, { rootUri });
     },
+    hasDiagnosticCollectionForAcceptance(){
+      return Boolean(client.diagnostics);
+    },
+    diagnosticsForAcceptance(uri){
+      const collection=client.diagnostics;
+      return collection?.get(vscode.Uri.parse(String(uri)))??null;
+    },
     terminateWorkerForAcceptance(){
       // Never expose an arbitrary Worker termination path on deployed Pages.
       const hostname=globalThis.location?.hostname??"";
@@ -167,7 +190,10 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       try {
         if (startPromise) {
           await startPromise.catch(() => {});
-          if (started) await client.stop();
+          if (started) {
+            if(clientStopPromise)await clientStopPromise;
+            else await client.stop();
+          }
         }
       } finally {
         worker.terminate();
