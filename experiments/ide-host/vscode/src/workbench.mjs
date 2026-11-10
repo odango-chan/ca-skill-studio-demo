@@ -643,16 +643,20 @@ export function registerWorkbench(vscode,context){
               await replaceSource(state,state.original);
             const diskBeforeClean=new TextDecoder("utf-8",{fatal:true}).decode(
               await vscode.workspace.fs.readFile(procedureUri));
-            if(diskBeforeClean!==state.original)
-              throw Error("Original Procedure disk bytes changed during degraded-mode acceptance");
-            const cleanupSaved=restoredDocument.isDirty;
+            // Some Theia hosts may auto-save a temporary WorkspaceEdit. Only
+            // restore if persisted bytes are either the captured original or
+            // the exact malformed probe this command itself wrote.
+            if(diskBeforeClean!==state.original&&diskBeforeClean!==state.malformed)
+              throw Error("Procedure disk Source changed outside the owned diagnostic probe");
+            const cleanupSaved=restoredDocument.isDirty||diskBeforeClean!==state.original;
             if(cleanupSaved&&!await restoredDocument.save())
               throw Error("Native Procedure restoration save was rejected");
             const diskAfterClean=new TextDecoder("utf-8",{fatal:true}).decode(
               await vscode.workspace.fs.readFile(procedureUri));
             if(restoredDocument.isDirty||diskAfterClean!==state.original)
               throw Error("Procedure Source was not restored after Worker failure");
-            return {phase,cleared:true,restored:true,originalDiskUnchanged:true,cleanupSaved};
+            return {phase,cleared:true,restored:true,originalDiskRestored:true,
+              persistedDriftObserved:diskBeforeClean!==state.original,cleanupSaved};
           }finally{
             languageDiagnosticAcceptance.delete(key);
             await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
@@ -717,9 +721,13 @@ export function registerWorkbench(vscode,context){
         if(phase==="publish"){
           if(languageDiagnosticOwnershipAcceptance.has(key))
             throw Error("L2-D4b diagnostic ownership probe is already active");
-          const auditWaitStarted=Date.now();
-          while(/pending|running/.test(auditStatus)&&Date.now()-auditWaitStarted<15000)
-            await new Promise(resolve=>setTimeout(resolve,50));
+          // Force a final Package Audit generation after the temporary malformed
+          // Procedure edit. This supersedes any earlier debounce/run before the
+          // host-owned marker is installed, so the audit timer cannot erase it.
+          if(!document||document.uri.toString()!==uri.toString())
+            throw Error("L2-D4b Package Audit ownership probe requires the active Procedure");
+          clearTimeout(timer);
+          await auditCurrent();
           if(/pending|running/.test(auditStatus))
             throw Error("L2-D4b Package Audit did not settle before diagnostic ownership probe");
           const lsp=languageClient?.diagnosticsForAcceptance(uri.toString())??[];
