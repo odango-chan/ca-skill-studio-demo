@@ -107,7 +107,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     "rootPathFilters","pathFailure","pathUncertain","pathRecovery"]){
     assert.match(webview.html,new RegExp('id="'+id+'"'),id+" must be in the native graph toolbar");
   }
-  assert.match(webview.html,/<option value="DOWN" selected>垂直<\\/option>/);
+  assert.ok(webview.html.includes('<option value="DOWN" selected>垂直</option>'));
   assert.doesNotMatch(webview.html,/unsafe-inline/);
   assert.ok(typeof onMessage==="function");
   await onMessage({type:"ready"});
