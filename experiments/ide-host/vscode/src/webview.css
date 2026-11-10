@@ -24,6 +24,12 @@ button:disabled{cursor:not-allowed;opacity:.45}
   border-radius:6px;padding:5px 8px;color:#31556a;font:inherit;flex:none}
 .spike-tools button[aria-pressed="true"]{color:#137b70;border-color:#7bbfb4;
   background:#e5f5f1}
+.spike-tools button{width:30px;height:28px;padding:4px;display:inline-flex;
+  align-items:center;justify-content:center;flex:none}
+.spike-tools button .studio-icon{width:16px;height:16px;display:block;flex:none}
+.studio-icon{vertical-align:middle}
+.node-focus-back{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.node-focus-back .studio-icon{width:15px;height:15px;flex:none}
 .spike-tools button:hover:not(:disabled){background:#edf5f8}
 .spike-tools-separator{height:19px;width:1px;background:#dbe6ec;flex:none;margin:0 3px}
 .spike-path-filters{display:flex;align-items:center;gap:14px;flex:none;flex-wrap:wrap;
