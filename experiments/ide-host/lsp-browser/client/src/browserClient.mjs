@@ -1,4 +1,4 @@
-import { LanguageClient } from "vscode-languageclient/browser";
+import { LanguageClient, ErrorAction, CloseAction, State } from "vscode-languageclient/browser";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
 export const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
@@ -33,6 +33,22 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     name: "skill-studio-language-server"
   });
   const output = vscode.window.createOutputChannel("Skill Studio · Language Service");
+  let startPromise = null;
+  let started = false;
+  let stopped = false;
+  let terminalFailure = null;
+  function fatal(reason) {
+    if (stopped || terminalFailure) return;
+    terminalFailure = String(reason?.message ?? reason ?? "Browser Worker connection stopped");
+    output.appendLine("Language Worker unavailable: " + terminalFailure);
+    handlers.onFatal?.({ message: terminalFailure });
+  }
+  worker.addEventListener("error", event => {
+    fatal(event?.message || "Browser language Worker crashed");
+  });
+  worker.addEventListener("messageerror", () => {
+    fatal("Browser language Worker message could not be decoded");
+  });
   const client = new LanguageClient(
     "skillStudioLanguageService",
     "Skill Studio Language Service",
@@ -51,21 +67,32 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       ],
       synchronize: {},
       initializationOptions: {},
-      outputChannel: output
+      outputChannel: output,
+      errorHandler: {
+        error(error) {
+          fatal(error);
+          return { action: ErrorAction.Shutdown };
+        },
+        closed() {
+          fatal("Browser language Worker connection closed");
+          return { action: CloseAction.DoNotRestart };
+        }
+      }
     },
     worker
   );
 
-  let startPromise = null;
-  let started = false;
-  let stopped = false;
+  client.onDidChangeState(event => {
+    if (started && !stopped && event.newState === State.Stopped)
+      fatal("Browser LanguageClient stopped unexpectedly");
+  });
   client.onNotification(ANALYSIS_STATUS_NOTIFICATION, status => {
-    handlers.onStatus?.(status);
+    if (!terminalFailure) handlers.onStatus?.(status);
     if (status?.state === "UNAVAILABLE" && status?.reason)
       output.appendLine("Analysis unavailable: " + status.reason);
   });
   client.onNotification(SERVER_ERROR_NOTIFICATION, error => {
-    handlers.onError?.(error);
+    if (!terminalFailure) handlers.onError?.(error);
     output.appendLine("Language server error: " + String(error?.message ?? error));
   });
 
@@ -78,17 +105,19 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         });
       }
       await startPromise;
+      if (terminalFailure) throw Error("Language Worker unavailable: " + terminalFailure);
     },
     invalidatePackage(rootUri, generation) {
-      if (!started || stopped) return;
+      if (!started || stopped || terminalFailure) return;
       client.sendNotification(PACKAGE_INVALIDATE_NOTIFICATION, { rootUri, generation });
     },
     sendPackageSnapshot(snapshot) {
-      if (!started || stopped) throw new Error("Language client is not running");
+      if (!started || stopped || terminalFailure)
+        throw new Error("Language Worker unavailable: " + (terminalFailure ?? "not running"));
       client.sendNotification(PACKAGE_SNAPSHOT_NOTIFICATION, snapshot);
     },
     closePackage(rootUri) {
-      if (!started || stopped) return;
+      if (!started || stopped || terminalFailure) return;
       client.sendNotification(PACKAGE_CLOSE_NOTIFICATION, { rootUri });
     },
     async stop() {
