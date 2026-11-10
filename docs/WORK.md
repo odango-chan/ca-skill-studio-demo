@@ -171,19 +171,19 @@ main browser application remains available at `/classic/`.
 
 **安全边界：** 预览后必须显式确认；确认期间 Source 版本或文档身份变化则拒绝；宿主重新计算 Patch 并核对精确 source spans；不允许 Operator kind 转换，不安全/不支持的节点继续 Source-only。Classic 不删除、不降级。
 
-**未包含：** Node 插入/删除、Phase Step 编辑、Binding 编辑、Root 路径筛选、Runtime / 5GC。该增量由 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96) 跟踪；IDE Host、Theia backend Chromium、Theia browser-only 和 Inspector Undo 真实 Chromium 均在 exact head `6ed046b` PASS。PR 尚未合并，Pages 未部署。
+**未包含：** Node 插入/删除、Phase Step 编辑、Binding 编辑、Root 路径筛选、Runtime / 5GC。该增量由 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96) 跟踪；IDE Host、Theia backend Chromium、Theia browser-only 和 Inspector Undo 真实 Chromium 均在 exact head `6ed046b` PASS。已合入 `main`，merge commit `dbcbf387`；合入后的 Pages 将在本轮链式 PR 收尾后做最终验收。
 
 
-## 2026-11-10 · Theia Phase Input Binding authoring（D4-A1 首个增量，exact-head PASS，待review/merge）
+## 2026-11-10 · Theia Phase Input Binding authoring（D4-A1 首个增量，已合入 main）
 
 **范围：** 在原生 Inspector 的 Phase Step 行增加「Edit Phase Input Binding」上下文操作。仅允许将既有 `with.<key>.from` 从当前输入改绑到同一 Procedure 中、声明类型相同的另一个 `input.*`。复用 `site/phase-bindings.mjs` 的候选集、资格判定、精确 Source span、图语义不变量和不可伪造 Preview；Theia 只负责版本校验、显式 Diff 确认与原生 WorkspaceEdit / Undo。
 
 **拒绝边界：** 不新增/删除 Phase 或 Step，不改 Operator，不绑定 output producer、不跨 Procedure、不猜 Runtime 参数兼容性；引号、别名、锚点和非 plain scalar 继续拒绝。没有同类型替代输入的 Step 不显示编辑动作。Classic 保持完整。
 
-**验收：** [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97) exact head `b6a80ab` 的 IDE Host、Theia backend Chromium、browser-only Chromium 与 PR Verify 均 PASS；两种真实 Chromium 模式均验证 Source v10 → v11 → v12（编辑后原生 Undo）。PR 仍基于 #96 堆叠，待 review/merge；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
+**验收：** [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97) exact head `b6a80ab` 的 IDE Host、Theia backend Chromium、browser-only Chromium 与 PR Verify 均 PASS；两种真实 Chromium 模式均验证 Source v10 → v11 → v12（编辑后原生 Undo）。已合入 `main`，merge commit `5ddd2759`；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
 
 
-## 2026-11-10 · Theia Node insert/delete authoring（首个受限增量，PR #98）
+## 2026-11-10 · Theia Node insert/delete authoring（首个受限增量，PR #98 已合入 main）
 
 **范围：** 在原生 Inspector 的 Route 行增加「Insert Node on Route」，在符合安全删除条件的 Node 行增加「Delete Node」。复用 Classic 的 `site/node-create.mjs` / `site/node-delete.mjs`，不复制 Route/Node 语义。
 
@@ -191,7 +191,7 @@ main browser application remains available at `/classic/`.
 
 **删除边界：** 仅开放两种已有 Classic profile：同状态 Terminal 合并到另一个 Terminal；或无 Phase/Child、恰有一个 Operator 出口的 Node bypass 到唯一出口目标。删除前由共享模块检查全部入站 Route 与其他引用；所有删除/重定向 spans 通过一次 WorkspaceEdit 提交。Start、Phase-bearing、Child Procedure、多出口及存在外部引用的 Node 不显示删除操作。
 
-**安全与验收：** 所有操作均要求当前 TextDocument revision、精确 Diff、用户显式确认、宿主重算 Patch 与原生 Undo。Host 测试覆盖取消、过期选择、两 span 原子编辑及不可删除 Node；真实 Chromium 验收覆盖插入、删除、Route 修复和两次 Undo。PR #98 exact head `93a80fb` 的 IDE Host、Theia Browser-Only、Theia Browser Host、PR Verify 均 PASS；Browser Host 首次运行在既有 Package Audit 等待点偶发超时，failed-job rerun attempt 2 PASS；Runtime / 5GC / desktop VS Code GUI NOT_RUN。Classic 保持完整。
+**安全与验收：** 所有操作均要求当前 TextDocument revision、精确 Diff、用户显式确认、宿主重算 Patch 与原生 Undo。Host 测试覆盖取消、过期选择、两 span 原子编辑及不可删除 Node；真实 Chromium 验收覆盖插入、删除、Route 修复和两次 Undo。PR #98 exact head `93a80fb` 的 IDE Host、Theia Browser-Only、Theia Browser Host、PR Verify 均 PASS；Browser Host 首次运行在既有 Package Audit 等待点偶发超时，failed-job rerun attempt 2 PASS；已合入 `main`，merge commit `27502c57`。Runtime / 5GC / desktop VS Code GUI NOT_RUN。Classic 保持完整。
 
 
 ## 2026-11-10 · Theia Phase Verify authoring（PR #99，受限增量）
@@ -200,4 +200,4 @@ main browser application remains available at `/classic/`.
 
 **实现边界：** 直接复用 `site/phase-step-structural.mjs` 与 `site/phase-step-order.mjs` 的候选、Source patch 和重算资格；Theia 宿主仅维护 TextDocument revision、跨文件 PredicateSet 读取、精确 Diff/用户确认、一组原生 WorkspaceEdit 和 Undo。保留注释或命名输出来源归属不可证的情况，原生 Inspector 不提供修改动作；已有 Classic /classic/ 保持不变。
 
-**证据：** [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99) 的代码提交 `9b79517` 上 IDE Host [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42743628311)、Theia Browser-Only [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42743628441)、真实 Theia Browser Host Chromium [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42743628504)；后者实际完成添加 v12→v13→Undo v14、删除 v14→v15→Undo v16、换序 v16→v17→Undo v18。该提交不是合并证据；Runtime / 5GC / desktop VS Code GUI / resulting-main Pages NOT_RUN。
+**证据：** [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99) 的代码提交 `9b79517` 上 IDE Host [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42743628311)、Theia Browser-Only [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42743628441)、真实 Theia Browser Host Chromium [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42743628504)；后者实际完成添加 v12→v13→Undo v14、删除 v14→v15→Undo v16、换序 v16→v17→Undo v18。PR #99 现已直接以 `main` 为 base，待最终合并；Runtime / 5GC / desktop VS Code GUI NOT_RUN。resulting-main Pages 将在 #99 合入后统一验收。

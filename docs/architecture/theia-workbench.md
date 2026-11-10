@@ -9,15 +9,15 @@
 | Procedure / Child 导航、Node Focus | 完整 | 已有 | workspace、node-focus-graph、React Flow / ELK |
 | 文件默认打开 | 自有文件导航 | 原生 CustomEditor default association | 仅 assurance/procedure.yaml；其他 YAML 保持原生文本；用户自行配置的编辑器关联优先 |
 | 单击 / 双击 | 自有导航 | 委托 Theia 原生 Explorer | 预览 / 固定行为由宿主控制，不拦截树事件；真实 Chromium 门禁检查原生文件打开和预览标签晋升 |
-| Inspection / Inspector | 选择详情及有界编辑 | 原生树视图；Node 重命名/Operator 值（PR #96）与 Node 插入/删除（PR #98）分批迁移 | 复用 workspace、node-designer、node-attributes、node-create、node-delete；宿主以 Source revision 校验、Diff/显式确认和 WorkspaceEdit 写入；复杂 Node 仍 fail-closed |
+| Inspection / Inspector | 选择详情及有界编辑 | 原生树视图；Node 重命名/Operator 值（#96 MERGED）与 Node 插入/删除（#98 MERGED）已迁移 | 复用 workspace、node-designer、node-attributes、node-create、node-delete；宿主以 Source revision 校验、Diff/显式确认和 WorkspaceEdit 写入；复杂 Node 仍 fail-closed |
 | Outline | Procedure / Node 导航 | 原生树视图 | 所有 Procedure / Node；点击定位 Source 并同步图中 Node Focus；版本失效拒绝旧导航 |
 | Evidence | Phase 输入/输出与消费者合同 | 源码 Child / Phase / Step 证据 | 仅 workspace 真实字段；完整消费者 ABI、输入输出证据尚未迁移；不表示 Runtime evidence |
 | Problems / Package Audit | 编辑期跨文件提醒 | 原生视图及宿主诊断 collection | 直接复用 package-audit；读取当前 Package 和已打开的未保存文档；缺必要文件明确 unavailable |
 | Markdown Preview | 安全只读预览 | 原生命令 / Explorer 右键预览 | 直接复用 markdown-preview；无脚本、无外部图像；随文档变化刷新 |
 | Route 创建 / 重连 / Diff / Apply / Undo | 有界实现 | 已有且保留 | 复用 route-connect / route-target、原生 WorkspaceEdit；仍要求 Diff 后显式确认 |
-| Phase Designer | 有界 Step / binding / verify 编辑 | D4-A1 Phase Input Binding（PR #97 PASS）+ Verify 尾部新增、无名 Verify 删除与相邻换序（PR #99 exact-head IDE Host / 两种 Theia Chromium PASS，尚未合入） | 复用 `site/phase-bindings.mjs`、`site/phase-step-structural.mjs`、`site/phase-step-order.mjs`；仅允许当前 Package PredicateSet 声明的可用 Verify 和原 Source 可安全修改的单行无名 Verify；宿主必须基于精确文档版本、显式 Diff、重算及 WorkspaceEdit / Undo；完整命名 Step/Producer/Consumer 编辑仍缺失 |
-| Node 重命名 / Operator 值编辑 | 有界实现 | 首批适配（PR #96 exact-head PASS，待review/merge） | 复用 `site/node-designer.mjs` / `site/node-attributes.mjs`；仅精确 Source spans，拒绝过期选择；原生 WorkspaceEdit / Undo；不支持 Operator kind 替换或不安全标量 |
-| Node 插入 / 删除 | 有界实现 | 首个受限适配（PR #98，exact-head IDE Host / Browser-Only / Browser Host / PR Verify PASS，待 review/merge） | Insert 仅作用于可 Patch 的现有 Route；Delete 仅限同状态 Terminal 合并或单出口 Node bypass；复用完整 Route 影响检查与精确 Source spans；复杂 Phase/Child/多出口 Node 不开放删除 |
+| Phase Designer | 有界 Step / binding / verify 编辑 | D4-A1 Phase Input Binding（#97 MERGED）+ Verify 尾部新增、无名 Verify 删除与相邻换序（#99 exact-head IDE Host / 两种 Theia Chromium PASS，待合入） | 复用 `site/phase-bindings.mjs`、`site/phase-step-structural.mjs`、`site/phase-step-order.mjs`；仅允许当前 Package PredicateSet 声明的可用 Verify 和原 Source 可安全修改的单行无名 Verify；宿主必须基于精确文档版本、显式 Diff、重算及 WorkspaceEdit / Undo；完整命名 Step/Producer/Consumer 编辑仍缺失 |
+| Node 重命名 / Operator 值编辑 | 有界实现 | 已合入 main（PR #96；merge `dbcbf387`） | 复用 `site/node-designer.mjs` / `site/node-attributes.mjs`；仅精确 Source spans，拒绝过期选择；原生 WorkspaceEdit / Undo；不支持 Operator kind 替换或不安全标量 |
+| Node 插入 / 删除 | 有界实现 | 已合入 main（PR #98；merge `27502c57`，exact-head IDE Host / Browser-Only / Browser Host / PR Verify PASS） | Insert 仅作用于可 Patch 的现有 Route；Delete 仅限同状态 Terminal 合并或单出口 Node bypass；复用完整 Route 影响检查与精确 Source spans；复杂 Phase/Child/多出口 Node 不开放删除 |
 | Root 路径筛选 / 锚定 | 已有 | 未迁移 | Theia 仍显示完整声明图 |
 | 目录导入 / ZIP / 保存 | Classic 自有工作副本 | 宿主文件系统与 OPFS | 不提供 Classic ZIP 导入导出等价能力；OPFS 不等于磁盘或 GitHub 同步 |
 | Run / Runtime / 5GC | 无 | 无 | NOT_RUN，非本仓 authority |
