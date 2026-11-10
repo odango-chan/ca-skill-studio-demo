@@ -196,8 +196,8 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   if (totalTextLength > MAX_PACKAGE_TEXT_LENGTH)
     return unavailable(snapshot, "PACKAGE_TEXT_LIMIT", "Package exceeds the 4 MiB cumulative text-length limit");
 
-  const documentsByPath = new Map(normalizedDocuments.map(document => [document.relativePath, document]));
-  const files = new Map(normalizedDocuments.map(document => [document.relativePath, { text: document.text }]));
+  const documentsByPath = new Map(normalizedDocuments.map(document => [document.relativePath, document] as const));
+  const files = new Map(normalizedDocuments.map(document => [document.relativePath, { text: document.text }] as const));
   const procedureDocument = documentsByPath.get("assurance/procedure.yaml");
   let procedure: ProcedureProjection;
 
