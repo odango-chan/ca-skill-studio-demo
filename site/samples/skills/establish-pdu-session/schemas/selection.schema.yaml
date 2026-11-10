@@ -1,0 +1,172 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: selection.schema.yaml
+title: EstablishmentSelection
+type: object
+additionalProperties: false
+required:
+- dnn
+- sNssai
+- pduSessionType
+- sscMode
+- subscriptionData
+- subscriptionSource
+properties:
+  dnn:
+    type: string
+    pattern: ^[a-z0-9][a-z0-9.-]*$
+  sNssai:
+    type: object
+    additionalProperties: false
+    required:
+    - sst
+    properties:
+      sst:
+        type: integer
+        minimum: 0
+        maximum: 255
+      sd:
+        type: integer
+        minimum: 0
+        maximum: 16777214
+  pduSessionType:
+    const: IPV4
+  sscMode:
+    type: integer
+    const: 1
+  subscriptionData:
+    type: object
+    additionalProperties: false
+    required:
+    - sNssai
+    - dnn
+    - pduSessionTypes
+    - sscModes
+    - sessionAmbr
+    - defaultQos
+    properties:
+      sNssai:
+        type: object
+        additionalProperties: false
+        required:
+        - sst
+        properties:
+          sst:
+            type: integer
+            minimum: 0
+            maximum: 255
+          sd:
+            type: integer
+            minimum: 0
+            maximum: 16777214
+      dnn:
+        type: string
+        minLength: 1
+        pattern: ^[a-z0-9][a-z0-9.-]*$
+      pduSessionTypes:
+        type: object
+        additionalProperties: false
+        required:
+        - defaultSessionType
+        properties:
+          defaultSessionType:
+            type: string
+            enum:
+            - IPV4
+            - IPV6
+            - IPV4V6
+          allowedSessionTypes:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              enum:
+              - IPV4
+              - IPV6
+              - IPV4V6
+      sscModes:
+        type: object
+        additionalProperties: false
+        required:
+        - defaultSscMode
+        properties:
+          defaultSscMode:
+            type: integer
+            minimum: 1
+            maximum: 3
+          allowedSscModes:
+            type: array
+            minItems: 1
+            maxItems: 3
+            uniqueItems: true
+            items:
+              type: integer
+              minimum: 1
+              maximum: 3
+      sessionAmbr:
+        type: object
+        additionalProperties: false
+        required:
+        - uplink
+        - downlink
+        properties:
+          uplink:
+            type: string
+            pattern: ^[0-9]+(\.[0-9]+)? (bps|Kbps|Mbps|Gbps|Tbps)$
+          downlink:
+            type: string
+            pattern: ^[0-9]+(\.[0-9]+)? (bps|Kbps|Mbps|Gbps|Tbps)$
+      defaultQos:
+        type: object
+        additionalProperties: false
+        required:
+        - fiveQi
+        - arp
+        properties:
+          fiveQi:
+            type: integer
+            minimum: 0
+            maximum: 255
+          arp:
+            type: object
+            additionalProperties: false
+            required:
+            - priorityLevel
+            - preemptCap
+            - preemptVuln
+            properties:
+              priorityLevel:
+                type: integer
+                minimum: 1
+                maximum: 15
+              preemptCap:
+                enum:
+                - MAY_PREEMPT
+                - NOT_PREEMPT
+                type: string
+              preemptVuln:
+                enum:
+                - PREEMPTABLE
+                - NOT_PREEMPTABLE
+                type: string
+  subscriptionSource:
+    type: object
+    additionalProperties: false
+    required:
+    - transactionRef
+    - requestRef
+    - fabricRecordRef
+    - fabricRecordDigest
+    properties:
+      transactionRef:
+        type: string
+        minLength: 1
+      requestRef:
+        type: string
+        minLength: 1
+      fabricRecordRef:
+        type: string
+        minLength: 1
+      fabricRecordDigest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
