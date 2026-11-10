@@ -1,4 +1,4 @@
-// Stage the Procedure Web extension and standalone theme extension into
+// Stage the Procedure, Contract and Predicate Web extension plus standalone theme into
 // the isolated Theia browser-only application. Both are built-in plugins.
 import {cp,mkdir,readFile,rm,stat,writeFile} from "node:fs/promises";
 import {join} from "node:path";
@@ -8,6 +8,11 @@ const target=join(app,"plugins","odango-chan.ca-skill-studio-ide-spike");
 const manifest=JSON.parse(await readFile(join(ext,"package.json"),"utf8"));
 if(!manifest.browser||!manifest.contributes?.customEditors?.length)
   throw Error("VS Code Web extension entry or CustomEditor missing");
+const requiredEditors=["skillStudio.procedurePreview","skillStudio.contractPreview",
+  "skillStudio.predicatePreview"];
+const editorViews=new Set(manifest.contributes.customEditors.map(x=>x.viewType));
+for(const view of requiredEditors)if(!editorViews.has(view))
+  throw Error("Required visual editor is missing from prepared Web extension: "+view);
 for(const source of [manifest.browser,"./dist/extension-theia.js",join("media","procedure.js"),join("media","procedure.css")]){
   const info=await stat(join(ext,source));
   if(!info.isFile()||info.size<1000)throw Error("Missing built Web extension file: "+source);
