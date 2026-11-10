@@ -132,7 +132,7 @@ export function projectJsonSchema(source) {
       if (key === 'enum') {
         if (!isSeq(value)) {warnings.push(pointer+'/enum must be an array');continue;}
         const values = value.items.map(v=>scalar(v));
-        if (values.some(v => v === undefined || typeof v === 'object')) {
+        if (values.some(v => v === undefined || (v !== null && typeof v === 'object'))) {
           warnings.push(pointer+'/enum contains complex values; inspect Source');
           continue;
         }
