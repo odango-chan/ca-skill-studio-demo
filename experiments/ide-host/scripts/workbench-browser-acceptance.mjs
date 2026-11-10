@@ -26,30 +26,48 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
   }
   async function replaceNativeProcedureSource(text){
-    // Prefer the live Monaco model when the host exposes it. This is fixture
-    // setup only; the operation under test still goes through the real native
-    // command registry, TextDocument, WorkspaceEdit, Diff and Undo.
+    // This only seeds/restores a pinned test fixture. The edit being tested
+    // still goes through the actual Inspector command and native WorkspaceEdit.
     const direct=await evalJS(`(()=>{
+      const c=window.theia?.container;
       const api=window.monaco?.editor??(typeof monaco!=="undefined"?monaco.editor:null);
       const models=api?.getModels?.()??[];
-      const model=models.find(item=>item.uri?.path?.endsWith('/assurance/procedure.yaml'));
-      if(!model)return {method:'keyboard-fallback',monaco:typeof window.monaco,
-        models:models.map(item=>item.uri?.path).filter(Boolean).slice(0,8)};
-      model.setValue(${JSON.stringify(text)});
-      return {method:'monaco-model',path:model.uri.path,length:model.getValueLength?.()??model.getValue().length};
+      let model=models.find(item=>item.uri?.path?.endsWith('/assurance/procedure.yaml'));
+      if(model){model.setValue(${JSON.stringify(text)});return {method:'monaco-model',path:model.uri.path};}
+      const keys=[...(c?._bindingDictionary?._map?.keys?.()??[])];
+      const editorKeys=keys.filter(key=>/EditorManager|MonacoEditor/.test(key?.name??String(key)));
+      for(const key of editorKeys){
+        try{
+          const service=c.get(key);
+          const widgets=[service.currentEditor,service.currentEditorWidget,
+            service.activeEditor,service.currentEditor?.editor,service.currentEditorWidget?.editor];
+          for(const widget of widgets){
+            const editor=widget?.editor??widget;
+            const control=editor?.getControl?.()??editor?.control;
+            const candidate=control?.getModel?.()??editor?.model;
+            if(candidate?.setValue&&candidate.uri?.path?.endsWith('/assurance/procedure.yaml')){
+              candidate.setValue(${JSON.stringify(text)});
+              return {method:'editor-manager-model',key:key.name??String(key),path:candidate.uri.path};
+            }
+          }
+        }catch{}
+      }
+      return {method:'native-type-fallback',monaco:typeof window.monaco,
+        modelPaths:models.map(item=>item.uri?.path).filter(Boolean).slice(0,8),
+        editorKeys:editorKeys.map(key=>key.name??String(key)).slice(0,12)};
     })()`);
-    if(direct.method!=='monaco-model'){
+    console.log("STUDIO_OUTPUT_FIXTURE_EDITOR",JSON.stringify(direct));
+    if(direct.method==='native-type-fallback'){
       const editor=await evalJS(`(()=>{const e=[...document.querySelectorAll('.monaco-editor')].find(x=>x.getBoundingClientRect().width>0);const target=e?.querySelector('.view-lines')??e;const r=target?.getBoundingClientRect();return r?{x:r.x+Math.min(90,r.width/2),y:r.y+Math.min(24,r.height/2)}:null;})()`);
       if(!editor)throw Error("Native Source editor is not available for the fixture round-trip: "+JSON.stringify(direct));
       await click(editor.x,editor.y);
       await invoke("editor.action.selectAll");
-      await command("Input.insertText",{text});
+      await invoke("type",{text});
     }
     await sleep(450);
     const visible=await graph();
     console.log("STUDIO_OUTPUT_REFERENCE_FIXTURE_SOURCE",JSON.stringify({method:direct.method,revision:visible?.revision,nodes:visible?.nodes}));
-  }
-  async function waitForRevisionChange(contextId,previous,label){
+  }  async function waitForRevisionChange(contextId,previous,label){
     let latest=null,refreshed=null;
     for(let i=0;i<50;i++){
       try{
