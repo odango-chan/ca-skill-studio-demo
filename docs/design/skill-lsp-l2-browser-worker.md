@@ -55,7 +55,14 @@ warnings. This intentional split prevents duplicate Problems entries while
 the old audit UI remains in place. Unlocated or heuristic findings are not
 upgraded into exact source ranges.
 
-## Build and dependencies
+## Implementation language and build
+
+The semantic analysis and generation-safe session are TypeScript
+(`language/core`, `language/lsp`). The VS Code extension and the thin browser
+JSON-RPC transport adapters are ESM JavaScript, matching the existing
+`.mjs` extension host. They contain no duplicate Skill semantics; esbuild
+bundles the TypeScript core/session into the browser Worker. No Python runtime,
+Node filesystem API or backend service runs inside the browser Worker.
 
 The client and server use the official browser entry points from the
 VS Code LSP SDK, pinned to `vscode-languageclient@9.0.1` and
