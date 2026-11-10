@@ -10,6 +10,8 @@ import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from '../../../../s
 import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
 import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from '../../../../site/phase-output-refs.mjs';
+import {phaseRouteTargetOptions,previewPhaseRouteTarget,applyPhaseRouteTarget}
+  from '../../../../site/phase-routes.mjs';
 import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   previewAddPhaseVerify,applyAddPhaseVerify,
   previewDeletePhaseVerify,applyDeletePhaseVerify}
@@ -186,6 +188,37 @@ export function registerWorkbench(vscode,context){
         oldValue:p.oldValue,newValue:p.newValue
       }],
       verify:text=>applyPhaseOutputReference(text,preview)
+    });
+    if(applied)update(ctx.doc);
+    return applied;
+  }
+
+  async function editPhaseRouteTarget(item,newTarget){
+    if(item?.kind!=='route'||typeof item.routeId!=='string'||
+       !Number.isSafeInteger(item.sourceVersion))
+      throw Error("Select a current eligible Phase failure/unknown Route");
+    const ctx=currentNode(item);
+    const option=phaseRouteTargetOptions(ctx.source,ctx.procedureId,ctx.nodeId)
+      .find(candidate=>candidate.routeId===item.routeId);
+    if(!option?.targets?.length)
+      throw Error("Phase Route has no Source-observed eligible target");
+    let target=newTarget;
+    if(typeof target!=='string'){
+      const picked=await vscode.window.showQuickPick(
+        option.targets.map(value=>({label:value,
+          description:option.phaseName+'.on · '+option.outcome,
+          detail:'来自同 Procedure、同 Phase、同 Outcome 的现有 Route'})),
+        {placeHolder:"选择已在当前 Source 出现的 Phase Route 目标"});
+      target=typeof picked==='string'?picked:picked?.label;
+    }
+    if(typeof target!=='string'||!target.trim())return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the Phase Route target");
+    const preview=previewPhaseRouteTarget(ctx.source,ctx.procedureId,
+      item.routeId,target);
+    const applied=await confirmAndApply({
+      ...ctx,preview,changes:singleSourceChange,
+      verify:text=>applyPhaseRouteTarget(text,preview)
     });
     if(applied)update(ctx.doc);
     return applied;
@@ -508,13 +541,24 @@ export function registerWorkbench(vscode,context){
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
-        if(item.kind==='route'&&id==='inspection'&&document&&
-           insertNodeOptions(document.getText(),item.procedureId,item.routeId)){
-          tree.contextValue='skillStudio.route';
-          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
-          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.routeId=item.routeId;tree.sourceVersion=item.sourceVersion;
-          tree.documentUri=item.documentUri;
+        if(item.kind==='route'&&id==='inspection'&&document){
+          const canInsert=Boolean(insertNodeOptions(
+            document.getText(),item.procedureId,item.routeId));
+          const canRetarget=Array.isArray(item.phaseTargetChoices)&&
+            item.phaseTargetChoices.length>0;
+          if(canRetarget)
+            tree.contextValue=canInsert
+              ?'skillStudio.routeAndPhaseTarget':'skillStudio.phaseRouteTarget';
+          else if(canInsert)tree.contextValue='skillStudio.route';
+          if(canInsert||canRetarget){
+            item.sourceVersion=document.version;
+            item.documentUri=document.uri.toString();
+            for(const key of ['procedureId','nodeId','routeId','phaseName',
+              'routeSource','outcome','target','phaseTargetChoices'])
+              tree[key]=item[key];
+            tree.sourceVersion=item.sourceVersion;
+            tree.documentUri=item.documentUri;
+          }
         }
         if(item.kind==='phase'&&id==='inspection'&&document){
           const cached=predicateSnapshot?.uri===document.uri.toString()&&
@@ -763,6 +807,10 @@ export function registerWorkbench(vscode,context){
     vscode.commands.registerCommand('skillStudio.editPhaseOutputReference',async(item,bindingKey,newValue)=>{
       try{return await editPhaseOutputReference(item,bindingKey,newValue);}
       catch(error){await vscode.window.showWarningMessage('Phase Output Reference 修改未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.editPhaseRouteTarget',async(item,newTarget)=>{
+      try{return await editPhaseRouteTarget(item,newTarget);}
+      catch(error){await vscode.window.showWarningMessage('Phase Route 修改未执行：'+error.message);return false;}
     }),
     vscode.commands.registerCommand('skillStudio.addPhaseVerify',async(item,predicate)=>{
       try{return await addPhaseVerify(item,predicate);}
