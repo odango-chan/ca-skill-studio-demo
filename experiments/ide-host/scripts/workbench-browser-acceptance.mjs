@@ -726,7 +726,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         // The production bundle minifies DI class names, so locate the real
         // WidgetManager by its public method rather than constructor.name.
         const managerKey=serviceKeys.find(key=>
-          typeof key==='function'&&typeof key.prototype?.getWidgets==='function');
+          typeof key==='function'&&typeof key.prototype?.getWidgets==='function'&&
+          typeof key.prototype?.getOrCreateWidget==='function');
         if(managerKey){
           manager=c.get(managerKey);
           matchingServiceKeys.push({name:managerKey.name??'',text:'WidgetManager#getWidgets'});
