@@ -6,7 +6,7 @@ import {seedExampleWorkspace} from "../vscode/src/sample-loader.mjs";
 const sampleRoot="site/samples/skills/";
 const manifest=JSON.parse(readFileSync(sampleRoot+"files.json","utf8"));
 const uri=path=>({path,toString(){return "file://"+path;}});
-const joinPath=(base,...paths)=>uri((base.path+"/"+paths.join("/")).replace(/\\/+/g,"/"));
+const joinPath=(base,...paths)=>uri([base.path,...paths].join("/"));
 function host(manifestOverride=null,existing=[]){
   const files=new Map(),folders=new Set(),opened=[];
   const vscode={
