@@ -136,7 +136,6 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   catch(error){deleteDiagnostic=error.message;}
   assert.ok(deleteNodeOptions(doc.text,routeProcedure,'ide-host-insert-probe'),
     'Inserted single-outcome Node should be deletable: '+deleteDiagnostic);
-  workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'ide-host-insert-probe'});
   const insertedNode=providers.get('skillStudio.inspection').getChildren().find(x=>x.kind==='node');
   assert.ok(insertedNode);
   assert.equal(insertedNode.procedureId,routeProcedure);
@@ -159,8 +158,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const afterDelete=doc.text;
   assert.equal(await commands.get('skillStudio.deleteNode')(insertedItem,'nudm-sdm-subscribe'),false);
   assert.equal(doc.text,afterDelete,'stale Node selection cannot be deleted');
-  workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'nudm-sdm-subscribe'});
   const protectedNode=providers.get('skillStudio.inspection').getChildren().find(x=>x.kind==='node');
+  assert.equal(protectedNode.nodeId,'nudm-sdm-subscribe','successful delete selects the qualified redirect target');
   assert.equal(providers.get('skillStudio.inspection').getTreeItem(protectedNode).contextValue,
     'skillStudio.node','Phase-bearing Node does not expose deletion');
   await commands.get('skillStudio.auditPackage')();
