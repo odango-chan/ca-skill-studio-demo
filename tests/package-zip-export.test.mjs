@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {buildPackageZip,bytesToBase64} from "../package-zip-export.mjs";
+import {buildPackageZip,bytesToBase64} from "../site/package-zip-export.mjs";
 
 const encoder=new TextEncoder(),decoder=new TextDecoder();
 function localEntries(bytes){
