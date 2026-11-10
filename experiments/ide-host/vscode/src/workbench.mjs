@@ -51,7 +51,8 @@ export function registerWorkbench(vscode,context){
           candidate=createSkillLanguageClient(vscode,context,{
             onStatus:status=>updateLanguageStatus(
               status.state,
-              status.reason||("Package "+status.rootUri+" · generation "+status.generation)
+              status.reason||("Package "+status.rootUri+" · generation "+status.generation+
+                " · "+(status.publishedDiagnosticCount??0)+" diagnostics")
             ),
             onError:error=>{
               console.warn("Skill Studio Language Service",error);
@@ -102,6 +103,8 @@ export function registerWorkbench(vscode,context){
     const ticket=++state.ticket;
     const generation=++state.generation;
     clearTimeout(state.timer);
+    updateLanguageStatus("ANALYZING","Package "+state.key+
+      " changed · generation "+generation);
     const invalidate=client=>{
       if(!state.disposed&&ticket===state.ticket)
         client?.invalidatePackage(state.key,generation);
