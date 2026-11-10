@@ -28,6 +28,10 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      - name: Install pinned browser LSP client and server dependencies
+        run: |
+          npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
+          npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
       - name: Build IDE host extensions
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Chromium interaction smoke
