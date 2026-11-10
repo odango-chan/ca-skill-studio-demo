@@ -126,6 +126,36 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!sourceOpenedForAudit)throw Error('Reopened Procedure Webview did not expose its native Source action');
   console.log('STUDIO_NATIVE_SOURCE_OPENED_FOR_AUDIT',sourceOpenedForAudit);
   await sleep(500);
+  // Explorer is active after the native file-open path. Re-activate Skill
+  // Studio so the Problems-owned Package Audit status is actually visible.
+  const skillStudioActivityAfterOpen=await evalJS(`(()=>{
+    const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]
+      .find(x=>x.textContent.trim()==='Skill Studio'&&
+        x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&
+        x.getBoundingClientRect().x<innerWidth);
+    const r=el?.getBoundingClientRect();
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;
+  })()`);
+  if(!skillStudioActivityAfterOpen)
+    throw Error('Skill Studio Activity Bar entry missing after CustomEditor open');
+  await click(skillStudioActivityAfterOpen.x,skillStudioActivityAfterOpen.y);
+  await sleep(350);
+  const auditProblemsHeader=await evalJS(`(()=>{
+    const container=document.querySelector(
+      '#plugin-view-container\\:workbench\\.view\\.extension\\.skillStudio');
+    const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+      .find(x=>x.textContent.trim().toLowerCase()==='problems');
+    header?.scrollIntoView({block:'center'});
+    const r=header?.getBoundingClientRect(),part=header?.closest('.part');
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
+      collapsed:part?.classList.contains('collapsed')??false,
+      containerFound:!!container}:null;
+  })()`);
+  if(!auditProblemsHeader)
+    throw Error('Skill Studio Problems view is missing after reactivation');
+  if(auditProblemsHeader.collapsed){
+    await click(auditProblemsHeader.x,auditProblemsHeader.y);await sleep(250);
+  }
   await invoke('skillStudio.auditPackage');
   let audit='';
   for(let i=0;i<100;i++){
