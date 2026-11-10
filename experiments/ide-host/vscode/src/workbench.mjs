@@ -206,6 +206,64 @@ export function registerWorkbench(vscode,context){
     if(languageClientPromise)void languageClientPromise.then(stop).catch(()=>{});
     else void languageClient?.stop();
   }});
+  // Internal, non-contributed browser acceptance probe. It runs inside the
+  // real VS Code extension host so VS Code Uri instances never cross the
+  // Theia frontend command boundary.
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.languageProviderAcceptance",
+      async procedureUriValue=>{
+        const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
+        const procedurePosition=new vscode.Position(75,35);
+        const definitionResult=await vscode.commands.executeCommand(
+          "vscode.executeDefinitionProvider",procedureUri,procedurePosition);
+        const definitions=Array.isArray(definitionResult)?definitionResult:
+          definitionResult?[definitionResult]:[];
+        const target=definitions.find(item=>item?.uri||item?.targetUri);
+        if(!target)throw Error("Definition provider returned no exact script target");
+        const scriptUri=target.uri??target.targetUri;
+        const scriptPath=scriptUri.path;
+        if(!scriptPath.endsWith("/scripts/select_establishment_configuration.py"))
+          throw Error("Definition resolved to an unexpected target: "+scriptPath);
+        const hoverResult=await vscode.commands.executeCommand(
+          "vscode.executeHoverProvider",procedureUri,procedurePosition);
+        const hovers=Array.isArray(hoverResult)?hoverResult:
+          hoverResult?[hoverResult]:[];
+        const hoverText=hovers.flatMap(item=>
+          Array.isArray(item?.contents)?item.contents:[item?.contents])
+          .map(item=>typeof item==="string"?item:item?.value??String(item??""))
+          .join(" ");
+        if(!hoverText.includes("Skill Script")||
+           !hoverText.includes("select-establishment-configuration"))
+          throw Error("Hover provider did not return the declared Skill Script metadata");
+        const referenceResult=await vscode.commands.executeCommand(
+          "vscode.executeReferenceProvider",scriptUri,new vscode.Position(1,12));
+        const references=Array.isArray(referenceResult)?referenceResult:[];
+        if(!references.some(item=>item?.uri?.toString()===procedureUri.toString()))
+          throw Error("References provider did not return the Procedure caller");
+        const symbolResult=await vscode.commands.executeCommand(
+          "vscode.executeDocumentSymbolProvider",scriptUri);
+        const symbols=Array.isArray(symbolResult)?symbolResult:[];
+        if(!symbols.some(item=>item.name==="main"))
+          throw Error("Python Document Symbols did not include main()");
+        const completionResult=await vscode.commands.executeCommand(
+          "vscode.executeCompletionItemProvider",scriptUri,new vscode.Position(2,42));
+        const completions=Array.isArray(completionResult)?completionResult:
+          completionResult?.items??[];
+        const labels=completions.map(item=>
+          typeof item.label==="string"?item.label:item.label?.label??"");
+        if(!labels.includes("EstablishmentSelectionInput"))
+          throw Error("Schema Completion did not return the unique Package title");
+        return {
+          definition:scriptPath,
+          hover:hovers.length,
+          references:references.length,
+          symbols:symbols.map(item=>item.name),
+          schemaCompletion:"EstablishmentSelectionInput"
+        };
+      }
+    ));
+  }
 
   function currentNode(item){
     if(!document||!isProcedurePath(document.uri.path))throw Error("No active Procedure Source");
