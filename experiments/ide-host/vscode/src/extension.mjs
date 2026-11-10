@@ -48,7 +48,8 @@ export function activate(context){
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
   registerSchemaEditor(vscode,context);
-  registerPackageOverview(vscode,context);
+  const packageOverview=registerPackageOverview(vscode,context,
+    ()=>workbench.getActiveDocument?.()??null);
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
@@ -58,6 +59,7 @@ export function activate(context){
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
+      void packageOverview.refresh();
       let wasActive=panel.active;
       const viewState=panel.onDidChangeViewState(()=>{
         const becameActive=panel.active&&!wasActive;wasActive=panel.active;
