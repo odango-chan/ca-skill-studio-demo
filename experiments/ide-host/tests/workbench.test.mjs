@@ -227,7 +227,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const restoredNamedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(restoredNamedVerify);
   assert.equal(restoredNamedVerify.stepIndex,3);
   assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(restoredNamedVerifyItem,'delete'),true);
-  assert.equal(doc.text,source.replace("            - verify: createdsession.ingress.eligible\\n",""),
+  assert.equal(doc.text,source.replace("            - verify: createdsession.ingress.eligible\n",""),
     'named Verify delete removes only the unreferenced Step after safe adjacent swaps');
   doc.text=source;doc.version++;changed({document:doc});
   assert.ok(commands.has('skillStudio.insertNode'));
