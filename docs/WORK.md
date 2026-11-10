@@ -264,6 +264,6 @@ main browser application remains available at `/classic/`.
 
 **迁移范围：** 完全复用 Classic `site/phase-outcomes.mjs`，只操作已有 Phase 的字面 `'on'` map；共享资格允许三种 Source 修复：从同 Procedure/同 Phase/同 Outcome 已观察值补齐缺失核心 Outcome；把可唯一证明的非核心拼写纠正成缺失核心键；当核心键齐全且无其他引用时删除孤立非核心键。正常完整 Phase 不出现编辑入口。
 
-**原生交互：** Inspector Phase 下有资格才显示 `Outcome repair` 子行；原生 QuickPick 显示可证明的操作；重查最新 TextDocument/完整 Source/候选资格，显示 Diff 并要求明确确认，然后仅用原生 WorkspaceEdit 写精确 Source span、支持 Undo。Host 验证三操作、取消/过期/虚构候选；Chromium 验证在真实 Monaco 中制造单行拼写错误、通过原生命令恢复并撤销两步。四组 exact-head CI 待完成。
+**原生交互：** Inspector Phase 下有资格才显示 `Outcome repair` 子行；原生 QuickPick 显示可证明的操作；重查最新 TextDocument/完整 Source/候选资格，显示 Diff 并要求明确确认，然后仅用原生 WorkspaceEdit 写精确 Source span、支持 Undo。Host 验证三操作、取消/过期/虚构候选；Chromium 验证在真实 Monaco 中制造单行拼写错误、通过原生命令修复、对修复操作执行原生 Undo，然后精确恢复测试样本；不假设键盘编辑的 Undo 分组。四组 exact-head CI 待完成。
 
 **不授权：** 新建 Phase/on map、任意 Outcome 字典、Runtime 失败处理等价性、跨生产者 ABI 和真实 5GC，均保持 NOT_RUN / Source-only 边界。
