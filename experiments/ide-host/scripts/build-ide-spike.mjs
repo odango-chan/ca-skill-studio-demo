@@ -1,7 +1,7 @@
 // Run from repository root after npm ci. Experimental artifact only.
 // No change to the existing Pages app or its dist/ output.
 import {build} from "esbuild";
-import {mkdir,rm,cp,readdir,writeFile,appendFile} from "node:fs/promises";
+import {mkdir,rm,cp,readdir,readFile,appendFile} from "node:fs/promises";
 import {join} from "node:path";
 const root="experiments/ide-host/vscode";
 await rm(join(root,"dist"),{recursive:true,force:true});
@@ -71,10 +71,11 @@ await build({
   loader:{".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file"},
   assetNames:"assets/[name]-[hash]",logLevel:"info"
 });
-// Prepare a fully local, explicitly user-triggered sample import for OPFS or
-// desktop workspace.fs. It cannot overwrite an existing user file.
-const sampleSource="site/samples/packages/establish-pdu-session";
-const sampleDest=join(root,"samples","establish-pdu-session");
+// Bundle the two runtime-used, source-pinned owner SKILLs under one skills/
+// workspace root. The legacy Classic fixture remains unchanged.
+// Snapshot provenance is checked against the current ca-agent-demo/main in sample-loader tests.
+const sampleSource="site/samples/skills";
+const sampleDest=join(root,"samples","skills");
 await rm(sampleDest,{recursive:true,force:true});
 await cp(sampleSource,sampleDest,{recursive:true});
 async function relativeFiles(dir,prefix=""){
@@ -86,9 +87,22 @@ async function relativeFiles(dir,prefix=""){
   }
   return result.sort();
 }
-const files=await relativeFiles(sampleSource);
-if(!files.includes("SKILL.md")||!files.includes("assurance/procedure.yaml")||
-    !files.some(x=>x.endsWith(".py")))throw Error("Incomplete sample Package");
-await writeFile(join(sampleDest,"files.json"),JSON.stringify(files,null,2)+"\n");
-console.log("STUDIO_PREPARED_SAMPLE",JSON.stringify({files:files.length,root:sampleDest}));
+const sampleManifest=JSON.parse(await readFile(join(sampleSource,"files.json"),"utf8"));
+const sourceFiles=(await relativeFiles(sampleSource))
+  .filter(p=>p!=="files.json"&&p!=="README.md");
+if(sampleManifest.schemaVersion!==1||
+   sampleManifest.sourceRepo!=="odango-chan/ca-agent-demo"||
+   !/^[0-9a-f]{40}$/.test(sampleManifest.sourceSha)||
+   JSON.stringify([...sampleManifest.skills].sort())!==
+     JSON.stringify(["establish-pdu-session","establish-pdu-session-mas"].sort())||
+   JSON.stringify([...sampleManifest.files].sort())!==JSON.stringify(sourceFiles)||
+   !sampleManifest.skills.every(name=>
+     sourceFiles.includes(name+"/SKILL.md")&&
+     sourceFiles.includes(name+"/assurance/procedure.yaml")))
+  throw Error("Incomplete or divergent pinned two-SKILL sample manifest");
+console.log("STUDIO_PREPARED_SAMPLE",JSON.stringify({
+  root:sampleDest,skills:sampleManifest.skills,files:sourceFiles.length,
+  sourceSha:sampleManifest.sourceSha
+}));
 console.log("IDE spike: built Node + browser extension entries, isolated LSP Worker and local ReactFlow webview (not installed or run)");
+// Owner Skill snapshots are pinned and validated; the demo does not auto-sync.

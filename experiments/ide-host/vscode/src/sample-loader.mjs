@@ -1,6 +1,7 @@
 // Explicit user-triggered Sample Package import for VS Code desktop/web or
 // Theia browser-only OPFS. Never overwrite existing workspace files.
-const SRC=["samples","establish-pdu-session"];
+const SRC=["samples","skills"];
+const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
 const decoder=new TextDecoder();
 const fail=reason=>{throw Error(reason);};
 const describeUri=uri=>({
@@ -51,19 +52,31 @@ async function readBundledResource(vscode,uri){
   }
   return vscode.workspace.fs.readFile(uri);
 }
-function validate(files){
-  if(!Array.isArray(files)||files.length<3||files.length>100||
-     !files.includes("SKILL.md")||!files.includes("assurance/procedure.yaml"))
-    fail("Unrecognized sample manifest");
+function validate(manifest){
+  if(manifest?.schemaVersion!==1||
+     manifest?.sourceRepo!=="odango-chan/ca-agent-demo"||
+     !/^[a-f0-9]{40}$/.test(manifest?.sourceSha??"")||
+     !Array.isArray(manifest.skills)||
+     JSON.stringify(manifest.skills)!==JSON.stringify(SKILLS)||
+     !Array.isArray(manifest.files)||manifest.files.length<6||
+     manifest.files.length>100)
+    fail("Unrecognized two-SKILL sample manifest");
   const seen=new Set();
-  for(const item of files){
+  for(const item of manifest.files){
     if(typeof item!=="string"||item.length>180||
        item.startsWith("/")||item.includes("\\")||
-       item.split("/").some(s=>!s||s==="."||s==="..")||seen.has(item))
-      fail("Unsafe sample manifest path");
+       item.split("/").some(p=>!p||p==="."||p==="..")||
+       !SKILLS.includes(item.split("/")[0])||seen.has(item))
+      fail("Unsafe or unexpected sample path");
     seen.add(item);
   }
-  return files;
+  for(const skill of SKILLS)
+    if(!seen.has(skill+"/SKILL.md")||
+       !seen.has(skill+"/assurance/procedure.yaml")||
+       !seen.has(skill+"/assurance/contract.yaml")||
+       !seen.has(skill+"/assurance/predicates.yaml"))
+      fail("Missing required "+skill+" package files");
+  return manifest;
 }
 export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   let phase="initial";
@@ -83,22 +96,14 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
       "; manifestUri="+JSON.stringify(manifestInfo)+
       "; resourceRead="+JSON.stringify(describeError(error)));
   }
-  const files=validate(JSON.parse(decoder.decode(manifestBytes)));
-  // Do not write at file:/// root: browser-only Theia's OPFS provider grants
-  // extension workers access to workspace/storage mounts, not the filesystem
-  // root. With no opened workspace, seed into this extension's persistent
-  // global storage and then expose that directory as the active workspace.
+  const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
+  const files=manifest.files;
+  // Browser-only Theia OPFS exposes the extension's persistent storage.
+  // Keep the demonstration separate from any user workspace or existing
+  // project named skills: never use a user-selected project as the target.
+  if(!storageUri)fail("No writable extension storage URI");
+  const root=vscode.Uri.joinPath(storageUri,"workspaces","skills");
   const current=vscode.workspace.workspaceFolders??[];
-  const existingSample=current.find(folder=>
-    folder.name==="establish-pdu-session"||
-    folder.uri.path.endsWith("/establish-pdu-session")||
-    folder.uri.path==="establish-pdu-session");
-  const parent=current[0]?.uri??storageUri;
-  if(!existingSample&&!parent)
-    fail("No writable workspace or extension storage URI is available");
-  const root=existingSample?.uri??vscode.Uri.joinPath(parent,
-    ...(current.length?["skill-studio-examples"]:["workspaces"]),
-    "establish-pdu-session");
   let created=0,skipped=0;
   phase="create-workspace-root";
   await fileSystem.createDirectory(root);
@@ -129,14 +134,16 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   }
   phase="workspace-update";
   let workspaceUpdated=false;
-  if(!current.some(f=>f.uri.toString()===root.toString())&&!current.some(f=>
-      f.uri.toString()===parent.toString())){
+  if(!current.some(f=>f.uri.toString()===root.toString())){
     workspaceUpdated=Boolean(vscode.workspace.updateWorkspaceFolders?.(
-      current.length,0,{uri:root,name:"establish-pdu-session"
-    }));
+      current.length,0,{uri:root,name:"skills"}));
+    if(!workspaceUpdated)
+      fail("Cannot expose bundled SKILLs in the native Explorer");
   }
-  return {root,procedure:vscode.Uri.joinPath(root,"assurance","procedure.yaml"),
-    files:files.length,created,skipped,workspaceUpdated};
+  const procedures=Object.fromEntries(SKILLS.map(name=>
+    [name,vscode.Uri.joinPath(root,name,"assurance","procedure.yaml")]));
+  return {root,procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
+    sourceSha:manifest.sourceSha,files:files.length,created,skipped,workspaceUpdated};
   }catch(error){
     throw Error(phase+": "+String(error?.message??error));
   }

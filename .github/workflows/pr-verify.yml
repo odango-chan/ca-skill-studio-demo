@@ -8,6 +8,7 @@ on:
       - 'AGENTS.md'
       - '.gitignore'
       - 'tests/**'
+      - 'extensions/skill-studio-languages/**'
       - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'

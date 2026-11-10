@@ -1,0 +1,49 @@
+apiVersion: connectionagent.io/v1alpha1
+kind: SkillContract
+metadata:
+  name: establish-pdu-session-mas
+spec:
+  skillType: executable
+  goal: pdu_session.initial_request_fulfilled
+  entryProcedure: establish-session
+  inputs:
+    requestSchema: schemas/establishment-request.schema.yaml
+  context:
+    requiredFacts:
+    - createdsession_ingress
+    - createdsession_lifecycle
+  allowedResources:
+    capabilities:
+    - ca.pdu_session.subscription.validate
+    - ca.pdu_session.secondary_auth.disposition
+    - ca.pdu_session.context.create
+    - ca.pdu_session.uecm.register
+    - ca.pdu_session.policy.create
+    - ca.pdu_session.anchor.select
+    - ca.pdu_session.address.allocate
+    - ca.pdu_session.policy.update
+    - ca.pdu_session.charging.create
+    - ca.pdu_session.user_plane.establish
+    - ca.pdu_session.address.confirm
+    - ca.pdu_session.access.signal
+    - ca.pdu_session.user_plane.activate
+    - ca.pdu_session.events.emit
+    - ca.pdu_session.resources.finalize
+    - ca.pdu_session.resources.cleanup
+    localTools: []
+  preconditions:
+  - predicate: mas.establishment.eligible
+    expect: PASS
+  postconditions:
+  - predicate: mas.establishment.ran_accepted
+    expect: PASS
+  - predicate: mas.establishment.forwarding_ready
+    expect: PASS
+  - predicate: mas.establishment.resources_managed
+    expect: PASS
+  planning:
+    maxActions: 48
+    allowDynamicProcedure: false
+  failureSemantics:
+    outcomeUnknown:
+      requireReconcile: true
