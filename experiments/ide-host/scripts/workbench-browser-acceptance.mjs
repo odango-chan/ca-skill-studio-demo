@@ -628,13 +628,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // snapshot; wait for the exact Package Audit terminal state first.
   for(let attempt=0;attempt<100;attempt++){
     phaseEvidenceText=await evalJS('document.body.innerText');
-    if(/Package Audit · \\d+ editor warnings/.test(phaseEvidenceText))break;
+    if(/Package Audit · [0-9]+ editor warnings/.test(phaseEvidenceText))break;
     if(phaseEvidenceText.includes('Package Audit · unavailable'))
       throw Error('Package Audit became unavailable before Phase binding edit: '+
         phaseEvidenceText.slice(-1000));
     await sleep(100);
   }
-  if(!/Package Audit · \\d+ editor warnings/.test(phaseEvidenceText))
+  if(!/Package Audit · [0-9]+ editor warnings/.test(phaseEvidenceText))
     throw Error('Package Audit did not settle before Phase binding edit: '+
       phaseEvidenceText.slice(-1000));
   console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify({
