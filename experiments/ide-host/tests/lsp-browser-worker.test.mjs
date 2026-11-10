@@ -246,6 +246,33 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     });
     assert.ok(schemaCompletion.some(item=>item.label==="EstablishmentSelectionInput"));
     assert.ok(schema.uri.endsWith("selection-input.schema.yaml"));
+
+    // Exact local ranges do not override the Package completeness gate.
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageInvalidate",
+      params:{rootUri:snapshot.rootUri,generation:2}
+    });
+    const partial={...snapshot,generation:2,completeness:"partial",
+      documents:snapshot.documents.map(document=>document.relativePath==="assurance/procedure.yaml"
+        ? {...document,version:2} : document)};
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:partial
+    });
+    const partialStatus=await waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus" &&
+      message.params?.rootUri===snapshot.rootUri &&
+      message.params?.generation===2
+    );
+    assert.equal(partialStatus.params.state,"PARTIAL");
+    const blockedDefinition=await lspRequest(worker,18,"textDocument/definition",{
+      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,scriptNeedle)
+    });
+    assert.equal(blockedDefinition,null);
+    const localSymbols=await lspRequest(worker,19,"textDocument/documentSymbol",{
+      textDocument:{uri:script.uri}
+    });
+    assert.ok(localSymbols.some(item=>item.name==="main"),
+      "same-document Python outline remains available for partial Packages");
   } finally {
     await worker.terminate();
   }
