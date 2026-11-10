@@ -765,7 +765,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     ownershipProbeActive=false;
     const procedureRestore=await nativeCommand(
       "skillStudio.internal.languageDiagnosticsAcceptance",procedureUri,"repair-after-failure");
-    if(!procedureRestore?.restored||!procedureRestore?.originalDiskUnchanged)
+    if(!procedureRestore?.restored||!procedureRestore?.originalDiskRestored)
       throw Error("L2-D4b degraded Procedure restoration failed: "+JSON.stringify(procedureRestore));
     procedureDiagnosticActive=false;
 
