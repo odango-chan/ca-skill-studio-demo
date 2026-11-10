@@ -51,14 +51,14 @@ test("shared core adapts the current Package analyzers into one JSON-safe result
   const result=analyzePackageSnapshot(snapshot);
   assert.equal(result.state,"READY");
   assert.equal(result.procedure.state,"READY");
-  assert.equal(result.procedure.procedures.length,6);
+  assert.equal(result.procedure.procedures.length,5);
   assert.equal(result.packageAudit.state,"READY");
   assert.deepEqual(result.packageAudit.diagnostics,[]);
   assert.equal(result.documents.filter(document=>document.pythonOutlineState==="READY").length,3);
   assert.equal(result.scriptReferences.length,3);
   assert.equal(result.schemaReferences.length,6);
   assert.equal(result.diagnostics.length,0);
-  assert.equal(JSON.parse(JSON.stringify(result)).procedure.procedures.length,6);
+  assert.equal(JSON.parse(JSON.stringify(result)).procedure.procedures.length,5);
   assert.deepEqual(snapshot.documents.map(document=>document.text),before,
     "analysis must never mutate Package Source");
 });
@@ -156,8 +156,8 @@ test("existing heuristic Package warnings keep their heuristic classification",(
   const procedure=snapshot.documents.find(document=>
     document.relativePath==="assurance/procedure.yaml");
   procedure.text=procedure.text.replace(
-    "dnn:\n                  from: input.dnn",
-    "dnn:\n                  from: input.psi"
+    "dnn:\n            from: input.dnn",
+    "dnn:\n            from: input.psi"
   );
   const result=analyzePackageSnapshot(snapshot);
   const warning=result.packageAudit.diagnostics.find(diagnostic=>
