@@ -1128,10 +1128,10 @@ try{
       for(const child of node.childFrames??[])collect(child);
     };
     collect(tree.frameTree);
-    const expectedUrl=webviewFrame?.url??"";
+    const expectedPath=(webviewFrame?.url??"").split("?")[0];
     const candidates=currentFrames.filter(frame=>
       (frame.url.includes("/webview/index.html")||frame.url.includes(".webview."))&&
-      (!expectedUrl||frame.url===expectedUrl));
+      (!expectedPath||frame.url.split("?")[0]===expectedPath));
     await command("Runtime.enable");
     await sleep(40);
     let frame=null,contextId=null;
@@ -1141,7 +1141,7 @@ try{
     }
     if(!contextId)
       throw Error("Default Procedure Webview context is unavailable: "+
-        JSON.stringify({expectedUrl,candidates:candidates.map(x=>({id:x.id,url:x.url})),
+        JSON.stringify({expectedPath,candidates:candidates.map(x=>({id:x.id,url:x.url})),
           known:[...defaultExecutionContexts.entries()]}));
     const data=await command("Runtime.evaluate",{
       contextId,expression,returnByValue:true,awaitPromise:true
