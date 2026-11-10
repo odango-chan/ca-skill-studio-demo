@@ -297,6 +297,13 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   await commands.get('skillStudio.auditPackage')();
   assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/editor warnings/);
   assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
+  const evidence=providers.get('skillStudio.evidence').getChildren();
+  assert.ok(evidence[0].label.includes('no write authority'));
+  const dataflow=evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
+  assert.ok(dataflow,'bounded Package Audit hydrates selected-Node dataflow evidence');
+  assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
+  assert.match(dataflow.description,/no write authorization/);
+  assert.ok(dataflow.children.some(x=>x.label.includes('Source lineage')));
   doc.text='# Preview title\n<script>alert(1)</script>';
   await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));
   assert.match(panels[0].webview.html,/Content-Security-Policy/);
