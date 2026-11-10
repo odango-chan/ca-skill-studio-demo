@@ -9,11 +9,27 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   };
   // Use the real native command registry for setup/actions. Explorer gestures
   // below remain actual Chromium input; no host or TextDocument is mocked.
-  async function invoke(id){
+  async function invoke(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
-    try{await evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key),id=${JSON.stringify(id)};if(id==="navigator.reveal"){const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==="Symbol(OpenerService)");const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;if(!resource)throw Error("Procedure native resource missing");await registry.executeCommand(id,resource);}else await registry.executeCommand(id);})()`);}
+    try{await evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key),id=${JSON.stringify(id)};if(id==="navigator.reveal"){const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==="Symbol(OpenerService)");const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;if(!resource)throw Error("Procedure native resource missing");await registry.executeCommand(id,resource);}else await registry.executeCommand(id,...${JSON.stringify(args)});})()`);}
     catch(error){throw Error("Native command "+id+": "+error.message);}
     await sleep(300);
+  }
+  async function startNativeCommand(id,...args){
+    console.log("STUDIO_NATIVE_ACTION",id);
+    await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
+  }
+  async function confirmNativePreview(){
+    let target=null;
+    for(let i=0;i<40&&!target;i++){
+      target=await evalJS(`(()=>{const el=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='确认并应用'&&x.getBoundingClientRect().width>0);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,text:document.body.innerText}:null;})()`);
+      if(!target)await sleep(100);
+    }
+    if(!target)throw Error('Native Inspector Diff confirmation dialog did not appear');
+    if(!target.text.includes('call: sbi.udm.sm_data.get')||!target.text.includes('sbi.udm.sm_data.get.preview'))
+      throw Error('Native Inspector confirmation did not show the expected Source Diff');
+    await click(target.x,target.y);await sleep(250);
+    await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
   await invoke('skillStudio.refreshInspection');
   const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
@@ -21,10 +37,17 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   await click(activity.x,activity.y);await sleep(500);
   const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
   for(const name of ['Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
-  const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.closest('.part')?.classList.contains('collapsed'));const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-  if(problemsHeader){await click(problemsHeader.x,problemsHeader.y);await sleep(200);}
+  const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
+  const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
+  console.log('STUDIO_PROBLEMS_HEADERS',JSON.stringify(problemHeaderDiagnostics));
+  if(problemsHeader?.collapsed){await click(problemsHeader.x,problemsHeader.y);await sleep(250);}
   await invoke('skillStudio.auditPackage');
-  const audit=await evalJS(`document.body.innerText`);
+  let audit='';
+  for(let i=0;i<30;i++){
+    audit=await evalJS(`document.body.innerText`);
+    if(/Package Audit · \d+ editor warnings/.test(audit))break;
+    await sleep(100);
+  }
   if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not run: '+audit.slice(-1000));
   // Re-open through Explorer rather than extension openWith command.
   await invoke('navigator.reveal');
@@ -64,6 +87,43 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   await sleep(500);
   const warm=await graph(),warmTiming=JSON.parse(warm?.timing??'null');
   if(!initialTiming||!warmTiming?.cacheHit)throw Error('Version-scoped warm layout cache was not exercised: '+JSON.stringify({initialTiming,warmTiming}));
+  // Exercise a real native Inspector edit. The command is invoked through
+  // Theia's command registry, presents a native Diff confirmation, and writes
+  // through the host TextDocument/WorkspaceEdit rather than the Webview.
+  const selectionResult=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-get');if(!node)throw Error('Expected Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value,revision:document.querySelector('#revision')?.textContent};})()`
+  });
+  if(!selectionResult.result?.value?.node)throw Error('Could not select Node for native Inspector editing');
+  await sleep(250);
+  const beforeEdit=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const sourceVersion=Number(/v(\d+)/.exec(beforeEdit.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(sourceVersion))throw Error('Could not read native Source version');
+  await startNativeCommand('skillStudio.editNodeOperatorValue',{
+    procedureId:selectionResult.result.value.procedure,nodeId:'nudm-sdm-get',sourceVersion
+  },'sbi.udm.sm_data.get.preview');
+  await confirmNativePreview();
+  const afterEdit=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const editResult=await evalJS(`window.__skillStudioCommandResult`);
+  if(editResult!==true||!afterEdit.result?.value||afterEdit.result.value===beforeEdit.result?.value)
+    throw Error('Native Inspector edit did not commit a Source revision: '+JSON.stringify({editResult,before:beforeEdit.result?.value,after:afterEdit.result?.value}));
+  await invoke('core.undo');
+  const afterUndo=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value)
+    throw Error('Native Inspector edit did not round-trip through native Undo: '+JSON.stringify({after:afterEdit.result?.value,undo:afterUndo.result?.value}));
+  console.log('STUDIO_INSPECTOR_AUTHORING_CHROMIUM',JSON.stringify({
+    node:selectionResult.result.value.node,procedure:selectionResult.result.value.procedure,
+    before:beforeEdit.result?.value,after:afterEdit.result?.value,undo:afterUndo.result?.value
+  }));
   // Safe Markdown uses the actual native source document and shared renderer.
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!markdownFile)throw Error('SKILL.md missing from native Explorer');

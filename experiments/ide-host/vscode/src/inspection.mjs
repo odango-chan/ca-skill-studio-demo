@@ -8,9 +8,9 @@ export function inspectionSnapshot(text,selection={},projected=null){
   const procedure=model.procedures.get(selection.procedureId)??model.procedures.get(model.entry);
   const node=procedure.nodes.find(n=>n.id===selection.nodeId);
   const outline=[...model.procedures.values()].map(p=>row(p.name,p.nodes[0]?.line??1,
-    p.nodes.map(n=>row(n.id,n.line,[],{description:n.operator,procedureId:p.name,nodeId:n.id})),{description:p.nodes.length+' nodes',procedureId:p.name}));
+    p.nodes.map(n=>row(n.id,n.line,[],{description:n.operator,procedureId:p.name,nodeId:n.id,kind:'node'})),{description:p.nodes.length+' nodes',procedureId:p.name}));
   const inspection=node?[
-    row(node.id,node.line,[],{description:node.operator+' · '+node.value}),
+    row(node.id,node.line,[],{description:node.operator+' · '+node.value,kind:'node',procedureId:procedure.name,nodeId:node.id}),
     ...node.phases.map(p=>row(p.name,p.line,p.steps.map(s=>row((s.name||'Step '+s.index)+' · '+s.operator+' '+s.value,s.line)))),
     ...procedure.routes.filter(r=>r.source===node.id).map(r=>row(r.routeSource+' · '+r.outcome+' → '+r.target,r.line))
   ]:[row(procedure.name,1,[],{description:'Select a node in the graph or Outline'})];

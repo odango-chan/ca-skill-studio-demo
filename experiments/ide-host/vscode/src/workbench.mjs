@@ -3,11 +3,134 @@ import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
 import {renderMarkdown} from '../../../../site/markdown-preview.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
+import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
+import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
+
+  function currentNode(item){
+    if(!document||!isProcedurePath(document.uri.path))throw Error("No active Procedure Source");
+    const doc=document,source=doc.getText(),version=doc.version;
+    const procedureId=item?.procedureId??selection.procedureId;
+    const nodeId=item?.nodeId??selection.nodeId;
+    if(item?.documentUri&&item.documentUri!==doc.uri.toString())
+      throw Error("Inspector selection belongs to another Source document");
+    if(Number.isSafeInteger(item?.sourceVersion)&&item.sourceVersion!==version)
+      throw Error("Inspector selection is stale; select the Node again");
+    if(typeof procedureId!=="string"||typeof nodeId!=="string")
+      throw Error("Select a Node in the graph or Inspector first");
+    const projected=inspectionSnapshot(source,{procedureId,nodeId});
+    const procedure=projected.model.procedures.get(procedureId);
+    if(projected.model.state!=="READY"||!procedure?.nodes.some(n=>n.id===nodeId))
+      throw Error("Selected Node is not present in the current Source");
+    return {doc,source,version,procedureId,nodeId};
+  }
+  async function predicateContext(doc){
+    const suffix="assurance/procedure.yaml";
+    if(!doc.uri.path.endsWith(suffix))return {predicateSource:null,skillName:null};
+    const base=doc.uri.path.slice(0,-suffix.length);
+    const skillName=base.replace(/\/$/,"").split("/").at(-1)||null;
+    const uri=doc.uri.with({path:base+"assurance/predicates.yaml"});
+    const opened=vscode.workspace.textDocuments?.find(x=>x.uri.toString()===uri.toString());
+    try{
+      const predicateSource=opened?opened.getText():
+        new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
+      return {predicateSource,skillName};
+    }catch{return {predicateSource:null,skillName};}
+  }
+  async function confirmAndApply({doc,source,version,preview,changes,verify}){
+    const message=[preview.summary,preview.diff].filter(Boolean).join("\n\n");
+    const choice=await vscode.window.showInformationMessage(
+      message||"确认修改当前 Source",
+      {modal:true},
+      "确认并应用"
+    );
+    if(choice!=="确认并应用")return false;
+    if(document!==doc||doc.version!==version||doc.getText()!==source)
+      throw Error("Source changed after Preview; the edit was discarded");
+    const candidate=await verify(doc.getText());
+    if(candidate!==preview.candidateSource)
+      throw Error("Revalidated Patch does not match the reviewed Preview");
+    if(document!==doc||doc.version!==version||doc.getText()!==source)
+      throw Error("Source changed during Patch revalidation");
+    const edit=new vscode.WorkspaceEdit();
+    const spans=changes(preview);
+    if(!spans.length)throw Error("Patch has no qualified Source spans");
+    for(const span of spans){
+      if(!Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
+         span.start<0||span.end<=span.start||span.end>source.length||
+         source.slice(span.start,span.end)!==span.oldValue)
+        throw Error("Patch Source span no longer matches the current document");
+      edit.replace(doc.uri,new vscode.Range(
+        doc.positionAt(span.start),doc.positionAt(span.end)),span.newValue);
+    }
+    const applied=await vscode.workspace.applyEdit(edit);
+    if(!applied)throw Error("Host rejected WorkspaceEdit");
+    return true;
+  }
+  async function renameNode(item,newId){
+    const ctx=currentNode(item);
+    let value=newId;
+    if(typeof value!=="string")value=await vscode.window.showInputBox({
+      value:ctx.nodeId,prompt:"输入新的 Node ID",placeHolder:"new-node-id"
+    });
+    if(typeof value!=="string"||!value.trim())return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the new Node ID");
+    const preview=previewNodeRename(ctx.source,ctx.procedureId,ctx.nodeId,value);
+    const applied=await confirmAndApply({
+      ...ctx,preview,
+      changes:p=>p.sourceSpans.map(span=>({
+        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
+      })),
+      verify:text=>applyNodeRename(text,preview)
+    });
+    if(applied){
+      selection={procedureId:ctx.procedureId,nodeId:value};
+      selections.set(ctx.doc.uri.toString(),selection);
+      update(ctx.doc,selection);
+    }
+    return applied;
+  }
+  async function editNodeOperatorValue(item,newValue){
+    const ctx=currentNode(item);
+    const predicates=await predicateContext(ctx.doc);
+    const state=nodeAttributeState(ctx.source,ctx.procedureId,ctx.nodeId,
+      predicates.predicateSource,predicates.skillName);
+    if(!state?.operator)
+      throw Error("This Operator is Source-only or has no qualified Package choices");
+    let value=newValue;
+    if(typeof value!=="string"){
+      value=state.operator.type==="select"
+        ?await vscode.window.showQuickPick(state.operator.values,{
+          placeHolder:"选择 "+state.operator.operator+" Operator 值"
+        })
+        :await vscode.window.showInputBox({
+          value:state.operator.value,prompt:"输入新的 "+state.operator.operator+" Operator 值"
+        });
+    }
+    if(typeof value!=="string"||!value.trim())return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the Operator value");
+    const preview=previewNodeOperatorValue(ctx.source,ctx.procedureId,ctx.nodeId,
+      value,predicates.predicateSource,predicates.skillName);
+    return confirmAndApply({
+      ...ctx,preview,
+      changes:p=>[{
+        start:p.sourceSpan.start,end:p.sourceSpan.end,
+        oldValue:p.oldValue,newValue:p.newValue
+      }],
+      verify:async text=>{
+        const current=await predicateContext(ctx.doc);
+        return applyNodeOperatorValue(text,preview,
+          current.predicateSource,current.skillName);
+      }
+    });
+  }
+
   context.subscriptions.push(diagnostics);
   for(const id of ['inspection','outline','evidence','problems']){
     const emitter=new vscode.EventEmitter();
@@ -18,7 +141,13 @@ export function registerWorkbench(vscode,context){
       getTreeItem(item){
         const tree=new vscode.TreeItem(item.label,item.children?.length?vscode.TreeItemCollapsibleState.Collapsed:vscode.TreeItemCollapsibleState.None);
         tree.description=item.description;tree.tooltip=item.label+(item.line?' · L'+item.line:'');
-        if(document&&item.line)tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',arguments:[{...item,uri:item.uri??document.uri,version:document.version,...(item.uri?{auditGeneration:generation}:{})}]};
+        if(item.kind==='node'){
+          tree.contextValue='skillStudio.node';
+          item.sourceVersion=document?.version;item.documentUri=document?.uri.toString();
+          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
+          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
+        }
+        if(document&&item.line)tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',arguments:[{...item,uri:item.uri??document.uri,version:document.version,sourceVersion:document.version,documentUri:document.uri.toString(),...(item.uri?{auditGeneration:generation}:{})}]};
         return tree;
       }};
     providers.set(id,emitter);
@@ -83,6 +212,14 @@ export function registerWorkbench(vscode,context){
     }),
     vscode.commands.registerCommand('skillStudio.auditPackage',auditCurrent),
     vscode.commands.registerCommand('skillStudio.refreshInspection',()=>{if(document){update(document);scheduleAudit();}}),
+    vscode.commands.registerCommand('skillStudio.renameNode',async(item,newId)=>{
+      try{return await renameNode(item,newId);}
+      catch(error){await vscode.window.showWarningMessage('Node 重命名未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.editNodeOperatorValue',async(item,newValue)=>{
+      try{return await editNodeOperatorValue(item,newValue);}
+      catch(error){await vscode.window.showWarningMessage('Operator 修改未执行：'+error.message);return false;}
+    }),
     vscode.workspace.onDidChangeTextDocument(e=>{
       if(isProcedurePath(e.document.uri.path)&&document?.uri.toString()===e.document.uri.toString())update(e.document);
       if(document)scheduleAudit();

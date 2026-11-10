@@ -1,6 +1,6 @@
 # Skill Studio 实施证据追溯
 
-**Status: Accepted · Date: 2026-11-09**
+**Status: Accepted · Date: 2026-11-10**
 
 `WORK` 回答 **现在到哪**；本页回答 **规范→代码→测试→何种证据**。下表不复制 owner Runtime 契约，也不把静态/Mock 宣告为 Live PASS。
 
@@ -63,3 +63,6 @@
 Contract / parity: [Theia workbench](architecture/theia-workbench.md). Implementation: `experiments/ide-host/vscode/src/{extension,inspection,workbench,webview}.mjs`, native manifest contributions. Shared rules: `site/workspace.mjs`, `site/package-audit.mjs`, `site/markdown-preview.mjs`. Tests: `experiments/ide-host/tests/workbench.test.mjs`, `host-integration.test.mjs`, `online-host.test.mjs`; real Chromium: `scripts/workbench-browser-acceptance.mjs` (inside existing Theia smoke) plus existing Classic smoke. Local: 416 root unit tests, 29 host tests, TypeScript/build and full Chrome Theia smoke PASS (including native preview/pin, Package Audit, Markdown and reload restore). Exact-head CI and resulting-main Pages acceptance: [issue #93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93) records durable run links. Runtime / desktop GUI: NOT_RUN.
 
 Pages identity: `experiments/ide-host/scripts/write-pages-build-info.mjs`, `experiments/ide-host/tests/pages-provenance.test.mjs` and `.github/workflows/pages.yml` gate the exact checkout SHA and publish `build-info.json`; public source identity and successful deployment run are checked after merge.
+
+
+| Theia Inspector Node authoring · first slice (2026-11-10) | [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)、[Theia workbench parity](architecture/theia-workbench.md)、[#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95) | `experiments/ide-host/vscode/src/{inspection,workbench}.mjs`, `experiments/ide-host/vscode/package.json`; shared `site/node-designer.mjs`, `site/node-attributes.mjs` | `experiments/ide-host/tests/{workbench,host-integration}.test.mjs`, `experiments/ide-host/scripts/workbench-browser-acceptance.mjs` | PR exact-head IDE Host / Theia backend Chromium / browser-only Chromium and native Undo **PENDING**; Runtime / 5GC / desktop VS Code GUI NOT_RUN |
