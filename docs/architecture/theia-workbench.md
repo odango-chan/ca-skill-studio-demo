@@ -16,7 +16,7 @@
 | Markdown Preview | 安全只读预览 | 原生命令 / Explorer 右键预览 | 直接复用 markdown-preview；无脚本、无外部图像；随文档变化刷新 |
 | Route 创建 / 重连 / Diff / Apply / Undo | 有界实现 | 已有且保留 | 复用 route-connect / route-target、原生 WorkspaceEdit；仍要求 Diff 后显式确认 |
 | Phase Designer | 有界 Step / binding / verify 编辑 | 首个 D4-A1 Phase Input Binding 编辑进入 PR #97 验收 | 仅修改现有 Step 的 `with.<key>.from`；同一 Procedure 中同类型的已声明输入；复用 `site/phase-bindings.mjs`；Phase/Step/Route 结构不变；完整 Step、Verify、Producer/Consumer 编辑仍缺失 |
-| Node 重命名 / Operator 值编辑 | 有界实现 | 首批适配（PR #96，待验收） | 复用 `site/node-designer.mjs` / `site/node-attributes.mjs`；仅精确 Source spans，拒绝过期选择；原生 WorkspaceEdit / Undo；不支持 Operator kind 替换或不安全标量 |
+| Node 重命名 / Operator 值编辑 | 有界实现 | 首批适配（PR #96 exact-head PASS，待review/merge） | 复用 `site/node-designer.mjs` / `site/node-attributes.mjs`；仅精确 Source spans，拒绝过期选择；原生 WorkspaceEdit / Undo；不支持 Operator kind 替换或不安全标量 |
 | Node 插入 / 删除 | 有界实现 | 未迁移 | 仍由 Classic 提供；后续迁移需保留 Route 影响检查与显式 Diff |
 | Root 路径筛选 / 锚定 | 已有 | 未迁移 | Theia 仍显示完整声明图 |
 | 目录导入 / ZIP / 保存 | Classic 自有工作副本 | 宿主文件系统与 OPFS | 不提供 Classic ZIP 导入导出等价能力；OPFS 不等于磁盘或 GitHub 同步 |
