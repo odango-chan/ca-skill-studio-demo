@@ -162,34 +162,45 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
          diagnosticPublishEvidence.packageAuditDuplicates!==0)
         throw Error("Live LSP diagnostic did not publish exact evidence: "+
           JSON.stringify(diagnosticPublishEvidence));
-      let problemsTab=null;
-      for(let i=0;i<50&&!problemsTab;i++){
-        problemsTab=await evalJS(`(()=>{
-          const el=[...document.querySelectorAll(".lm-TabBar-tab")].find(x=>
-            x.textContent.trim().startsWith("Problems"));
-          if(!el)return null;
-          const label=el.textContent.trim(),aria=el.getAttribute("aria-label");
-          // Theia may create/reveal the Problems tab asynchronously after the
-          // diagnostics collection receives its first LSP publication.
-          el.click();
+      // The native Theia Problems view is the built-in "problems" widget
+      // (ProblemContribution, command problemsView:toggle). The extension
+      // separately contributes a Skill Studio tree also named "Problems";
+      // that tree is NOT the LSP marker view, and can be hidden at 0x0.
+      const problemsView=await evalJS(`(async()=>{
+        const visible=el=>{
+          if(!el)return false;
           const r=el.getBoundingClientRect();
-          return {label,aria,rect:{x:r.x,y:r.y,width:r.width,height:r.height}};
-        })()`);
-        if(!problemsTab)await sleep(100);
-      }
-      if(!problemsTab)throw Error("Native Theia Problems panel tab did not appear after diagnostic publication");
-      await sleep(350);
+          return r.width>0&&r.height>0&&
+            getComputedStyle(el).visibility!=="hidden";
+        };
+        let native=document.getElementById("problems");
+        if(!visible(native)){
+          const c=window.theia.container;
+          const key=[...c._bindingDictionary._map.keys()].find(k=>
+            typeof k==="function"&&k.prototype?.executeCommand&&
+            k.prototype?.registerCommand&&k.prototype?.getCommand);
+          if(!key)throw Error("Native Theia command registry missing");
+          await c.get(key).executeCommand("problemsView:toggle");
+          native=document.getElementById("problems");
+        }
+        const r=native?.getBoundingClientRect();
+        return {id:native?.id??null,visible:visible(native),
+          rect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,
+          text:native?.innerText?.slice(0,1400)??"",
+          source:"theia-markers/ProblemContribution"};
+      })()`);
+      if(!problemsView?.visible||problemsView.id!=="problems")
+        throw Error("Native Theia Problems widget did not become visible: "+
+          JSON.stringify(problemsView));
       let problemsText="";
       for(let i=0;i<100;i++){
-        problemsText=await evalJS("document.body.innerText");
+        problemsText=await evalJS(`document.getElementById("problems")?.innerText??""`);
         if(problemsText.includes("YAML 解析失败"))break;
         await sleep(100);
       }
-      const problemsAria=await evalJS(`[...document.querySelectorAll(".lm-TabBar-tab")].find(x=>
-        x.textContent.trim().startsWith("Problems"))?.getAttribute("aria-label")??""`);
       if(!problemsText.includes("YAML 解析失败"))
-        throw Error("Native Problems UI did not display the live Procedure diagnostic: "+
-          JSON.stringify({problemsText:problemsText.slice(-1200),problemsAria,problemsTab}));
+        throw Error("Native Problems widget did not display the live Procedure diagnostic: "+
+          JSON.stringify({widget:problemsView,problemsText:problemsText.slice(-1400)}));
     }finally{
       diagnosticRepairEvidence=await evalJS(`(async()=>{
         const c=window.theia.container;
