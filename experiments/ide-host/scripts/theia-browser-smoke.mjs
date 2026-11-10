@@ -1370,3 +1370,4 @@ try{
   if(server?.listening){server.closeAllConnections();await new Promise(ok=>server.close(ok));}
   await rm(profile,{recursive:true,force:true,maxRetries:4,retryDelay:200});
 }
+// Exact-head CI note: assert YAML and Python TextMate tokens in both Theia hosts.
