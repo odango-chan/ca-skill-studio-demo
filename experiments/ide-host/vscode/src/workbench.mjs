@@ -143,8 +143,9 @@ export function registerWorkbench(vscode,context){
         tree.description=item.description;tree.tooltip=item.label+(item.line?' · L'+item.line:'');
         if(item.kind==='node'){
           tree.contextValue='skillStudio.node';
+          item.sourceVersion=document?.version;item.documentUri=document?.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.sourceVersion=document?.version;tree.documentUri=document?.uri.toString();
+          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
         if(document&&item.line)tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',arguments:[{...item,uri:item.uri??document.uri,version:document.version,sourceVersion:document.version,documentUri:document.uri.toString(),...(item.uri?{auditGeneration:generation}:{})}]};
         return tree;
