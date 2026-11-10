@@ -179,9 +179,9 @@ export function registerWorkbench(vscode,context){
       }
     });
     if(applied){
-      selection={procedureId:ctx.procedureId,nodeId:preview.nodeId};
-      selections.set(ctx.doc.uri.toString(),selection);
-      update(ctx.doc,selection);
+      const nextSelection={procedureId:ctx.procedureId,nodeId:preview.nodeId};
+      selections.set(ctx.doc.uri.toString(),nextSelection);
+      update(ctx.doc,nextSelection);
     }
     return applied;
   }
@@ -213,9 +213,9 @@ export function registerWorkbench(vscode,context){
       verify:text=>applyNodeDelete(text,preview)
     });
     if(applied){
-      selection={procedureId:ctx.procedureId,nodeId:target};
-      selections.set(ctx.doc.uri.toString(),selection);
-      update(ctx.doc,selection);
+      const nextSelection={procedureId:ctx.procedureId,nodeId:target};
+      selections.set(ctx.doc.uri.toString(),nextSelection);
+      update(ctx.doc,nextSelection);
     }
     return applied;
   }
@@ -238,9 +238,9 @@ export function registerWorkbench(vscode,context){
       verify:text=>applyNodeRename(text,preview)
     });
     if(applied){
-      selection={procedureId:ctx.procedureId,nodeId:value};
-      selections.set(ctx.doc.uri.toString(),selection);
-      update(ctx.doc,selection);
+      const nextSelection={procedureId:ctx.procedureId,nodeId:value};
+      selections.set(ctx.doc.uri.toString(),nextSelection);
+      update(ctx.doc,nextSelection);
     }
     return applied;
   }
