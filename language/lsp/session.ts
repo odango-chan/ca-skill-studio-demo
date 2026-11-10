@@ -25,13 +25,12 @@ type Analyzer = (snapshot: PackageSnapshot) =>
   SkillLanguageAnalysis | Promise<SkillLanguageAnalysis>;
 
 /**
- * L2-A protocol-neutral document/session layer for a future browser Worker.
- * The host supplies a fresh bounded Package snapshot on open/change/close;
- * the service never owns a filesystem or writes Source.
+ * Transport-neutral, per-Package diagnostic session shared by the browser
+ * LSP Worker and any future Node-host transport. The host supplies bounded
+ * Package snapshots; the service never owns filesystem IO or writes Source.
  *
- * The LSP transport is intentionally not implemented here. Keeping this
- * session behind one narrow interface prevents duplicate Theia document
- * authority while the browser Worker transport is being verified.
+ * Package generations and TextDocument versions are checked before results
+ * are published, so the protocol adapter cannot revive stale diagnostics.
  */
 export class LanguageDiagnosticSession {
   private rootUri: string | null = null;
