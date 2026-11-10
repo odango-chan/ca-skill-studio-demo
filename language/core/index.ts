@@ -349,8 +349,8 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
             kind: symbol.kind,
             line: symbol.line,
             async: symbol.async,
-            range: null,
-            navigable: false
+            range: symbol.range ?? null,
+            navigable: Boolean(symbol.range)
           });
         }
       }
@@ -384,7 +384,8 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
             line: caller.line,
             targetIdentityExact: true,
             packageContextComplete,
-            sourceRange: null
+            sourceRange: caller.sourceRange ?? null,
+            targetRange: caller.targetRange ?? null
           });
         }
         for (const schema of report.schemas) {
@@ -399,7 +400,8 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
             targetLine: schema.line,
             title: schema.title,
             packageContextComplete,
-            sourceRange: null
+            sourceRange: schema.sourceRange ?? null,
+            targetRange: schema.targetRange ?? null
           });
         }
       }
