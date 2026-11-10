@@ -209,5 +209,5 @@ export function renderMarkdown(source,{maxChars=300000,localLinks=false,localFil
       headings.map(item=>'<li class="md-toc-level-'+item.level+'"><a href="#'+item.id+
         '">'+escapeHTML(item.label)+'</a></li>').join("")+'</ol></details>'
     :"";
-  return {available:true,html:head+toc+renderBlocks(lines,0,{localLinks,headingIds})};
+  return {available:true,html:head+toc+renderBlocks(lines,0,{localLinks,localFiles,relativeDir,headingIds})};
 }
