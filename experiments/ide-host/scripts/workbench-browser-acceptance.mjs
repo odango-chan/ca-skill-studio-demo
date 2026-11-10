@@ -635,6 +635,17 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!dataflowTreeRow.expanded){
     if(!dataflowTreeRow.hitWithinToggle)
       throw Error('Native Evidence toggle is obscured at its click point: '+JSON.stringify(dataflowTreeRow));
+    await evalJS(`(()=>{
+      window.__skillStudioEvidenceClickEvents=[];
+      document.addEventListener('click',event=>{
+        const toggle=event.target?.closest?.('.theia-ExpansionToggle');
+        if(toggle)window.__skillStudioEvidenceClickEvents.push({
+          trusted:event.isTrusted,button:event.button,x:event.clientX,y:event.clientY,
+          nodeId:toggle.getAttribute('data-node-id'),
+          className:toggle.className,defaultPrevented:event.defaultPrevented
+        });
+      },true);
+    })()`);
     // Use the verified on-screen hit target. Recompute after the hover frame
     // because Theia can rerender virtualized tree rows between pointer move
     // and press; do not click stale coordinates.
@@ -690,6 +701,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         toggleClass:toggle?.className??null,
         expanded:!!toggle&&!toggle.classList.contains('theia-mod-collapsed'),
         consumerAbi:labels.some(label=>label.includes('Consumer ABI')),
+        clickEvents:window.__skillStudioEvidenceClickEvents??[],
         labels:labels.slice(-16)};
     })()`);
     phaseEvidenceText=await evalJS('document.body.innerText');
