@@ -220,7 +220,7 @@ main browser application remains available at `/classic/`.
 **验收：** [PR #108](https://github.com/odango-chan/ca-skill-studio-demo/pull/108) 已合并，merge commit `a08041446dd79c9cd8e143f682144cf037f1569b`。exact-head `0dbd9125a68e20ebedb5781ed6bc58c3089f1907` 的 IDE Host、Theia Browser-Only、Theia Browser Host / real Chromium 三组门禁全部 PASS；真实 Chromium 验证命名 Step 引用重命名及原生 Undo、Verify 命名及原生 Undo；Host 验证命名 Verify 安全删除。Runtime / 5GC / desktop VS Code GUI NOT_RUN。
 
 
-## 2026-11-10 · Theia Inspector Producer / Consumer Evidence（PR #109，待验收）
+## 2026-11-10 · Theia Inspector Producer / Consumer Evidence（PR #111，待验收）
 
 **范围：** 原生 Evidence 树复用 Classic 的 `phase-dataflow.mjs`、`phase-consumer-contract.mjs` 与 `phase-evidence-copy.mjs`，显示选中 Node 的 Phase 输入来源、Producer 输出 Schema 证据、Consumer 输入字段/类型证据，以及每条绑定的未知原因和边界。Phase Step 行同时显示简短证据摘要。
 
@@ -228,5 +228,5 @@ main browser application remains available at `/classic/`.
 
 **安全边界：** 这是只读证据，不授权任何 binding / Producer / Consumer 写入；`authorizedWrites` 固定为 0，Runtime 仍为 NOT_RUN。跨 Producer ABI 写入、effectful Step 结构变更与 owner Outcome 合约仍需单独定义和审查。
 
-**验收：** PR #109 exact-head IDE Host / Theia Browser-Only / Theia Browser Host Chromium 待执行；未合并、未部署 Pages。
+**验收：** PR #111 exact-head IDE Host / Theia Browser-Only / Theia Browser Host Chromium 待执行；未合并、未部署 Pages。
 
