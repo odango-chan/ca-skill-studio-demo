@@ -385,6 +385,70 @@ try{
         bodyText:document.body.innerText.slice(-900),
         editorTabs:[...document.querySelectorAll(".theia-tab,.lm-TabBar-tab")].map(x=>x.innerText).filter(Boolean).slice(-8)
       })`);
+      // Native Monaco must tokenize both YAML and Python. The LSP provides
+      // semantic features; this declarative extension provides language IDs
+      // and TextMate highlighting even while the LSP worker is unavailable.
+      const yamlTokens=await evalJS(`(()=>{
+        const editor=[...document.querySelectorAll('.monaco-editor')]
+          .find(el=>el.getBoundingClientRect().width>150&&el.querySelector('.view-lines'));
+        const spans=[...(editor?.querySelectorAll('.view-lines span')??[])];
+        return {count:spans.length,colors:[...new Set(spans.map(el=>getComputedStyle(el).color))],
+          text:editor?.querySelector('.view-lines')?.innerText?.slice(0,300)||''};
+      })()`);
+      if(!(yamlTokens?.colors?.length>=3))
+        throw Error("Native YAML TextMate highlighting missing: "+JSON.stringify(yamlTokens));
+      const editorRect=await evalJS(`(()=>{
+        const el=[...document.querySelectorAll('.monaco-editor')]
+          .find(x=>x.getBoundingClientRect().width>150&&x.querySelector('.view-lines'));
+        const r=el?.getBoundingClientRect();
+        return r?{x:r.x+Math.min(120,r.width/2),y:r.y+Math.min(60,r.height/2)}:null;
+      })()`);
+      if(!editorRect)throw Error("Native YAML editor missing before Python token probe");
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:editorRect.x,y:editorRect.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:editorRect.x,y:editorRect.y,button:"left",clickCount:1});
+      await command("Input.dispatchKeyEvent",{type:"keyDown",key:"p",code:"KeyP",modifiers:2,windowsVirtualKeyCode:80,nativeVirtualKeyCode:80});
+      await command("Input.dispatchKeyEvent",{type:"keyUp",key:"p",code:"KeyP",modifiers:2,windowsVirtualKeyCode:80,nativeVirtualKeyCode:80});
+      let quickOpen=null;
+      for(let attempt=0;attempt<30;attempt++){
+        quickOpen=await evalJS(`(()=>{
+          const inputs=[...document.querySelectorAll('input')].filter(el=>{
+            const r=el.getBoundingClientRect();return r.width>0&&r.height>0;
+          });
+          const input=inputs.find(el=>el.closest('.quick-input-widget,.monaco-quick-open-widget,.theia-quick-view'))||
+            inputs.find(el=>/quick|file|search/i.test(el.getAttribute('aria-label')||el.placeholder||''));
+          return input?{placeholder:input.placeholder||'',aria:input.getAttribute('aria-label')||''}:null;
+        })()`);
+        if(quickOpen)break;
+        await sleep(100);
+      }
+      if(!quickOpen)throw Error("Native Quick Open missing for Python token probe");
+      await command("Input.insertText",{text:"evaluate_transfer_start.py"});
+      await sleep(600);
+      const quickResults=await evalJS(`document.body.innerText.slice(-1200)`);
+      if(!quickResults.includes("evaluate_transfer_start.py"))
+        throw Error("Python sample source missing from native Quick Open: "+quickResults);
+      await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Enter",code:"Enter",windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});
+      await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Enter",code:"Enter",windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});
+      await sleep(900);
+      const pythonTokens=await evalJS(`(()=>{
+        const editors=[...document.querySelectorAll('.monaco-editor')]
+          .filter(el=>el.getBoundingClientRect().width>150&&el.querySelector('.view-lines'));
+        const editor=editors.find(el=>el.contains(document.activeElement))||editors.at(-1);
+        const spans=[...(editor?.querySelectorAll('.view-lines span')??[])];
+        return {count:spans.length,colors:[...new Set(spans.map(el=>getComputedStyle(el).color))],
+          text:editor?.querySelector('.view-lines')?.innerText?.slice(0,500)||'',
+          bodyTail:document.body.innerText.slice(-350)};
+      })()`);
+      console.log("STUDIO_NATIVE_LANGUAGE_SYNTAX_CHROMIUM",JSON.stringify({yaml:yamlTokens,python:pythonTokens}));
+      if(!(pythonTokens?.colors?.length>=3)||
+         !pythonTokens.text.replace(/\\u00a0/g," ").includes("def main"))
+        throw Error("Native Python TextMate highlighting missing: "+JSON.stringify(pythonTokens));
+      patchEvidence.languageSyntax={yaml:yamlTokens,python:pythonTokens};
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#openSource")?.click();true`
+      });
+      await sleep(700);
       await command("Input.dispatchKeyEvent",{
         type:"keyDown",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
       });
