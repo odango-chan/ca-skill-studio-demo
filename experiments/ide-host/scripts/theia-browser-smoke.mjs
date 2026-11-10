@@ -647,15 +647,15 @@ try{
       // breaks when a legitimate owner SKILL refresh adds comments/Steps.
       const ownerProcedure=(await readFile(
         resolve("site/samples/skills/establish-pdu-session/assurance/procedure.yaml"),
-        "utf8")).split("\\n");
+        "utf8")).split("\n");
       const n4Start=ownerProcedure.findIndex(x=>
-        /^  await-initial-n4-session-establishment:\\s*$/.test(x));
+        /^  await-initial-n4-session-establishment:\s*$/.test(x));
       const nextProcedure=ownerProcedure.findIndex((x,i)=>i>n4Start&&
-        /^  [a-z0-9-]+:\\s*$/.test(x));
+        /^  [a-z0-9-]+:\s*$/.test(x));
       const n4End=nextProcedure<0?ownerProcedure.length:nextProcedure;
       const candidates=ownerProcedure
         .map((x,i)=>i>=n4Start&&i<n4End&&
-          /^            DENIED: failed\\s*$/.test(x)?i+1:null)
+          /^            DENIED: failed\s*$/.test(x)?i+1:null)
         .filter(Boolean);
       if(n4Start<0||candidates.length!==1)
         throw Error("Pinned owner N4 DENIED Route line is not unique");
