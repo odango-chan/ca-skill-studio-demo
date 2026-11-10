@@ -97,7 +97,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(phaseStep.documentUri,doc.uri.toString());
   const beforeBinding=doc.text,phaseVersion=doc.version;
   confirmChoice='取消';
-  await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.ue-ref');
+  await commands.get('skillStudio.editPhaseInputBinding')(phaseItem,'dnn','input.ue-ref');
   assert.equal(doc.text,beforeBinding,'cancelled Phase binding preview must not write');
   confirmChoice='确认并应用';
   await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.ue-ref');
@@ -120,7 +120,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     value:'sbi.demo.insert_probe',outcome:'COMMITTED'};
   const beforeInsert=doc.text,insertVersion=doc.version;
   confirmChoice='取消';
-  assert.equal(await commands.get('skillStudio.insertNode')(routeRow,insertSpec),false);
+  assert.equal(await commands.get('skillStudio.insertNode')(routeItem,insertSpec),false);
   assert.equal(doc.text,beforeInsert,'cancelled Node insertion must not write');
   confirmChoice='确认并应用';
   assert.equal(await commands.get('skillStudio.insertNode')(routeRow,insertSpec),true);
@@ -135,7 +135,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(insertedItem.contextValue,'skillStudio.deletableNode');
   const afterInsert=doc.text,deleteVersion=doc.version;
   confirmChoice='取消';
-  assert.equal(await commands.get('skillStudio.deleteNode')(insertedNode,'nudm-sdm-subscribe'),false);
+  assert.equal(await commands.get('skillStudio.deleteNode')(insertedItem,'nudm-sdm-subscribe'),false);
   assert.equal(doc.text,afterInsert,'cancelled Node deletion must not write');
   confirmChoice='确认并应用';
   assert.equal(await commands.get('skillStudio.deleteNode')(insertedNode,'nudm-sdm-subscribe'),true);
