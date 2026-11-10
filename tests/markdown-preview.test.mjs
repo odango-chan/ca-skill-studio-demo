@@ -93,13 +93,22 @@ test("current dual Skill guides render safely and expose only explicit Package-l
   }
   const source=readFileSync(new URL(
     "../site/samples/skills/establish-pdu-session/SKILL.md",import.meta.url),"utf8");
-  const linked=renderMarkdown(source,{localLinks:true}).html;
+  const packageFiles=new Set([
+    "SKILL.md","assurance/procedure.yaml",
+    "references/3gpp-procedure.md","references/session-selection.md",
+    "references/failure-handling.md"
+  ]);
+  const linked=renderMarkdown(source,{
+    localLinks:true,localFiles:packageFiles,relativeDir:""
+  }).html;
+  assert.match(linked,/data-local-path="assurance\/procedure\.yaml"/);
   assert.match(linked,/data-local-path="references\/3gpp-procedure\.md"/);
   assert.match(linked,/data-local-path="references\/session-selection\.md"/);
   assert.match(linked,/data-local-path="references\/failure-handling\.md"/);
   // The guide also links to a repository-level design note. It must not be
   // converted into a Package-local link because it escapes the Skill root.
   assert.doesNotMatch(linked,/data-local-path="\.\.\/\.\.\/docs/);
+  assert.doesNotMatch(linked,/data-local-path="docs\/design\/llm-skill-execution-baseline\.md"/);
   assert.match(linked,/md-unresolved-link/);
 });
 
@@ -109,20 +118,26 @@ test("Reference Markdown can link back to SKILL.md, while local navigation is op
     import.meta.url),"utf8");
   const ordinary=renderMarkdown(source).html;
   assert.doesNotMatch(ordinary,/data-local-path=/);
-  const linked=renderMarkdown(source,{localLinks:true}).html;
+  const linked=renderMarkdown(source,{
+    localLinks:true,localFiles:new Set(["SKILL.md","references/3gpp-procedure.md"]),
+    relativeDir:"references"
+  }).html;
   assert.match(linked,/data-local-path="\.\.\/SKILL\.md"/);
 });
 
 test("Package-local Markdown navigation never promotes unsafe or escaping paths",()=>{
   const source=[
-    "`references/session-selection.md`",
+    "`session-selection.md`",
     "[return](../SKILL.md)",
     "[escape](../../docs/design/private.md)",
     "[sibling](../../establish-pdu-session-mas/SKILL.md)",
     "[unsafe](javascript:alert(1))",
     "[remote](https://example.com/manual)"
   ].join("\n");
-  const html=renderMarkdown(source,{localLinks:true}).html;
+  const html=renderMarkdown(source,{
+    localLinks:true,localFiles:new Set(["SKILL.md","references/session-selection.md"]),
+    relativeDir:"references"
+  }).html;
   assert.match(html,/data-local-path="references\/session-selection\.md"/);
   assert.match(html,/data-local-path="\.\.\/SKILL\.md"/);
   assert.doesNotMatch(html,/data-local-path="\.\.\/\.\.\//);
