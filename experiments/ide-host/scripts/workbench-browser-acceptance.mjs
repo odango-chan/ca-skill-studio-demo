@@ -122,20 +122,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!sourceOpenedForAudit)throw Error('Reopened Procedure Webview did not expose its native Source action');
   console.log('STUDIO_NATIVE_SOURCE_OPENED_FOR_AUDIT',sourceOpenedForAudit);
   await sleep(500);
-  // Explorer is active after the native file-open path. Re-activate Skill
-  // Studio so the Problems-owned Package Audit status is actually visible.
-  const skillStudioActivityAfterOpen=await evalJS(`(()=>{
-    const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]
-      .find(x=>x.textContent.trim()==='Skill Studio'&&
-        x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&
-        x.getBoundingClientRect().x<innerWidth);
-    const r=el?.getBoundingClientRect();
-    return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;
-  })()`);
-  if(!skillStudioActivityAfterOpen)
-    throw Error('Skill Studio Activity Bar entry missing after CustomEditor open');
-  await click(skillStudioActivityAfterOpen.x,skillStudioActivityAfterOpen.y);
-  await sleep(350);
   // The Problems pane can be hidden independently of the Skill Studio view
   // container. Package Audit is exercised through the source-backed Evidence
   // snapshot below; do not make this C5 tree interaction depend on Problems
