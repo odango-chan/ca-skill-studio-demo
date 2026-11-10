@@ -19,10 +19,12 @@ change the authoritative Markdown document.
   Fenced code blocks are excluded from the outline.
 - Recognize explicit package-file references in Markdown links and inline-code path
   literals, such as `references/session-selection.md` and `../SKILL.md`.
+- Promote a path to a link only when its normalized target exists in the current Package
+  file inventory. Missing path-shaped mentions remain ordinary code/text, not dead links.
 - Make those references host-mediated links. The extension host resolves the path against
   the active Skill root, rejects absolute paths, traversal into sibling Skills, unsupported
-  extensions, missing files, directories and symbolic links, then opens the target through the normal
-  editor association.
+  extensions, missing files, directories and symbolic links, then opens the target through
+  the normal editor association.
 - Markdown targets open the existing Markdown preview. YAML, Python and JSON targets use
   the normal `vscode.open` route, allowing an installed visual editor association to own
   the file when available.
