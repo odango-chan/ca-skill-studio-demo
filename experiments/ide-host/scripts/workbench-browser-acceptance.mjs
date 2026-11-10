@@ -20,17 +20,25 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
   }
   async function waitForRevisionChange(contextId,previous,label){
-    let latest=null;
+    let latest=null,refreshed=null;
     for(let i=0;i<50;i++){
-      latest=await command('Runtime.evaluate',{
-        contextId,returnByValue:true,
-        expression:`document.querySelector('#revision')?.textContent`
-      });
-      if(latest.result?.value&&latest.result.value!==previous)return latest;
+      try{
+        latest=await command('Runtime.evaluate',{
+          contextId,returnByValue:true,
+          expression:`document.querySelector('#revision')?.textContent`
+        });
+        if(latest.result?.value&&latest.result.value!==previous)return latest;
+      }catch{/* the CustomEditor iframe can be replaced by native Undo */}
+      try{
+        refreshed=await graph();
+        if(refreshed?.revision&&refreshed.revision!==previous)
+          return {result:{value:refreshed.revision}};
+      }catch{/* retry until the replacement frame is ready */}
       await sleep(100);
     }
     throw Error(label+' did not produce a native Source revision within 5s: '+
-      JSON.stringify({previous,latest:latest?.result?.value??null}));
+      JSON.stringify({previous,latest:latest?.result?.value??null,
+        refreshed:refreshed?.revision??null}));
   }
   async function confirmNativePreview(oldText,newText){
     let target=null;
@@ -186,7 +194,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   // Undo may replace the CustomEditor iframe; reacquire its live execution
   // world instead of reading a possibly detached Webview context.
   const beforeNamedGraph=await graph();
-  const beforeNamedRename=beforeNamedGraph?.revision??null;
+  const beforeNamedRename=beforeNamedGraph?.revision??afterBindingUndo.result?.value??null;
   const namedRenameVersion=Number(/v(\\d+)/.exec(beforeNamedRename??'')?.[1]);
   if(!Number.isSafeInteger(namedRenameVersion))throw Error('Named Step rename missing native Source revision');
   const oldStepName='select-subscription-configuration';
@@ -210,9 +218,10 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   }));
   // Real Chromium + actual Theia extension command registry. Each Verify edit
   // must return to the unmodified Source through native TextDocument Undo.
+  let lastKnownRevision=afterNamedRenameUndo.result?.value??beforeNamedRename;
   async function nativeVerifyRoundTrip(commandId,item,argument,oldText,newText){
     const currentGraph=await graph();
-    const before=currentGraph?.revision??null;
+    const before=currentGraph?.revision??lastKnownRevision??null;
     const version=Number(/v(\d+)/.exec(before??'')?.[1]);
     if(!Number.isSafeInteger(version))throw Error('Verify command missing native Source revision');
     await startNativeCommand(commandId,{...item,
@@ -225,6 +234,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     if(accepted!==true)throw Error(commandId+' did not apply after confirmation');
     await invoke('core.undo');
     const undone=await waitForRevisionChange(graphContext,after.result?.value,commandId+' Undo');
+    lastKnownRevision=undone.result?.value??lastKnownRevision;
     return {before,applied:after.result?.value,undone:undone.result?.value};
   }
   const verifyAppend=await nativeVerifyRoundTrip('skillStudio.addPhaseVerify',
