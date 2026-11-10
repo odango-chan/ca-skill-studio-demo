@@ -2325,20 +2325,18 @@ export function registerWorkbench(vscode,context){
   }));
   // Internal real-browser acceptance opens the owner-pinned conventional guide
   // by exact workspace path; it is not a contributed user command.
-  if(typeof Worker==='function'&&typeof globalThis.location!=='undefined'){
-    context.subscriptions.push(vscode.commands.registerCommand(
-      'skillStudio.internal.markdownNavigationAcceptance',async skillName=>{
-        const name=typeof skillName==='string'?skillName:'establish-pdu-session';
-        if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
-        const matches=await vscode.workspace.findFiles(
-          '**/'+name+'/SKILL.md','**/node_modules/**',5);
-        const exact=matches.filter(item=>item.path.endsWith('/'+name+'/SKILL.md'));
-        if(exact.length!==1)
-          throw Error('Expected exactly one '+name+' guide in the active Workspace');
-        await vscode.commands.executeCommand('skillStudio.previewMarkdown',exact[0]);
-        return exact[0].toString();
-      }));
-  }
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.markdownNavigationAcceptance',async skillName=>{
+      const name=typeof skillName==='string'?skillName:'establish-pdu-session';
+      if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
+      const matches=await vscode.workspace.findFiles(
+        '**/'+name+'/SKILL.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith('/'+name+'/SKILL.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one '+name+' guide in the active Workspace');
+      await vscode.commands.executeCommand('skillStudio.previewMarkdown',exact[0]);
+      return exact[0].toString();
+    }));
   return {attach(doc,post){
     sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();
     const releaseLanguagePackage=attachLanguagePackage(doc);
