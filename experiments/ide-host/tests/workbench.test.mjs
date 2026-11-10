@@ -126,7 +126,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(await commands.get('skillStudio.insertNode')(routeRow,insertSpec),true);
   assert.equal(doc.version,insertVersion+1);
   assert.ok(doc.text.includes('PASS: ide-host-insert-probe'));
-  assert.ok(doc.text.includes('ide-host-insert-probe:\\n        call: sbi.demo.insert_probe'));
+  assert.ok(doc.text.includes('ide-host-insert-probe:\n        call: sbi.demo.insert_probe'));
   assert.equal(appliedEdits.at(-1).length,2,'Node insertion uses one two-span WorkspaceEdit');
   workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'ide-host-insert-probe'});
   const insertedNode=providers.get('skillStudio.inspection').getChildren().find(x=>x.kind==='node');
