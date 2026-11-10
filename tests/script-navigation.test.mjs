@@ -77,3 +77,29 @@ test("E3-A1 malformed YAML cannot fabricate links, and Source remains unchanged"
   assert.equal(scriptNavigationReport(f,"scripts/../bad.py").status,"UNAVAILABLE");
   assert.equal(scriptNavigationReport(null,select).status,"UNAVAILABLE");
 });
+
+test("E3-A1 YAML and Python metadata references expose exact UTF-16 source and target ranges",()=>{
+  const f=files();
+  const procedure=f.get("assurance/procedure.yaml");
+  procedure.text="# 注释 😀\r\n"+procedure.text.replace(/\r?\n/g,"\r\n");
+  for(const [path,file] of f){
+    if(path.endsWith(".schema.yaml"))file.text="# schema 😀\r\n"+file.text.replace(/\r?\n/g,"\r\n");
+    else if(path.endsWith(".py"))file.text=file.text.replace(/\r?\n/g,"\r\n");
+  }
+  const report=scriptNavigationReport(f,select);
+  assert.equal(report.status,"READY");
+  const caller=report.callers.find(item=>item.path==="assurance/procedure.yaml");
+  assert.ok(caller?.sourceRange&&caller?.targetRange);
+  const sourceText=procedure.text.slice(caller.sourceRange.start,caller.sourceRange.end);
+  assert.equal(sourceText,"scripts/select_establishment_configuration.py");
+  const scriptText=f.get(select).text;
+  assert.equal(scriptText.slice(caller.targetRange.start,caller.targetRange.end),
+    "select-establishment-configuration");
+  for(const schema of report.schemas){
+    assert.ok(schema.sourceRange&&schema.targetRange);
+    const script=f.get(select).text;
+    assert.equal(script.slice(schema.sourceRange.start,schema.sourceRange.end),schema.title);
+    const target=f.get(schema.path).text.slice(schema.targetRange.start,schema.targetRange.end);
+    assert.equal(target,schema.title);
+  }
+});

@@ -10,22 +10,38 @@ const freeze=Object.freeze;
 
 function metadata(text) {
   if(typeof text!=="string"||text.length>1024*1024)return null;
-  const lines=text.slice(0,4096).split(/\r?\n/);
+  const header=text.slice(0,4096);
+  const lines=header.split(/\r\n|\n|\r/);
   if(lines[0]!=="# /// connectionagent-tool")return null;
   const end=lines.findIndex((line,index)=>index>0&&line==="# ///");
   if(end<2)return null;
-  const fields=new Map();
-  for(const line of lines.slice(1,end)){
-    const match=/^# (name|inputSchema|outputSchema): ([A-Za-z][A-Za-z0-9_-]*)$/.exec(line);
+  const starts=[];
+  let offset=0;
+  for(const line of lines){
+    starts.push(offset);
+    offset+=line.length;
+    if(header.startsWith("\r\n",offset))offset+=2;
+    else if(header[offset]==="\r"||header[offset]==="\n")offset++;
+  }
+  const fields=new Map(),ranges=new Map();
+  for(let i=1;i<end;i++){
+    const match=/^# (name|inputSchema|outputSchema): ([A-Za-z][A-Za-z0-9_-]*)$/.exec(lines[i]);
     if(!match)continue;
     if(fields.has(match[1]))return null;
     fields.set(match[1],match[2]);
+    const start=starts[i]+lines[i].length-match[2].length;
+    ranges.set(match[1],freeze({start,end:start+match[2].length}));
   }
   const name=fields.get("name"),inputSchema=fields.get("inputSchema"),
     outputSchema=fields.get("outputSchema");
   if(!NAME.test(name??"")||!TITLE.test(inputSchema??"")||
      !TITLE.test(outputSchema??""))return null;
-  return freeze({name,inputSchema,outputSchema});
+  return freeze({
+    name,inputSchema,outputSchema,
+    nameRange:ranges.get("name"),
+    inputSchemaRange:ranges.get("inputSchema"),
+    outputSchemaRange:ranges.get("outputSchema")
+  });
 }
 function source(files,path) {
   const item=files?.get(path);
@@ -70,8 +86,12 @@ function matchesSchema(files,title,warnings){
   for(const [path] of files){
     if(!SCHEMA_PATH.test(path))continue;
     const doc=parse(files,path,warnings);
-    if(doc&&scalar(field(doc.root,"title"))===title)
-      matches.push(freeze({path,line:lineOf(field(doc.root,"title"),doc.lines)}));
+    const titleNode=field(doc?.root,"title");
+    if(doc&&scalar(titleNode)===title&&Array.isArray(titleNode.range))
+      matches.push(freeze({
+        path,line:lineOf(titleNode,doc.lines),
+        targetRange:freeze({start:titleNode.range[0],end:titleNode.range[1]})
+      }));
   }
   return matches;
 }
@@ -90,8 +110,15 @@ export function scriptNavigationReport(files,path) {
   if(procedure){
     walk(procedure.root,(key,value)=>{
       if(key==="script"&&scalar(value)===path){
-        callers.push(freeze({path:"assurance/procedure.yaml",
-          line:lineOf(value,procedure.lines),label:"Procedure · script: "+path}));
+        if(Array.isArray(value?.range)&&own?.nameRange){
+          callers.push(freeze({
+            path:"assurance/procedure.yaml",
+            line:lineOf(value,procedure.lines),
+            label:"Procedure · script: "+path,
+            sourceRange:freeze({start:value.range[0],end:value.range[1]}),
+            targetRange:own.nameRange
+          }));
+        }
       }
     });
   }
@@ -110,15 +137,25 @@ export function scriptNavigationReport(files,path) {
         const ref=field(evaluator,"ref");
         if(scalar(field(evaluator,"type"))==="script"&&
            scalar(ref)==="skill."+own.name){
-          callers.push(freeze({path:"assurance/predicates.yaml",
-            line:lineOf(ref,predicates.lines),
-            label:"Predicate · "+scalar(pair.key)}));
+          if(Array.isArray(ref?.range)&&own.nameRange){
+            callers.push(freeze({
+              path:"assurance/predicates.yaml",
+              line:lineOf(ref,predicates.lines),
+              label:"Predicate · "+scalar(pair.key),
+              sourceRange:freeze({start:ref.range[0],end:ref.range[1]}),
+              targetRange:own.nameRange
+            }));
+          }
         }
       }
     }
-    for(const [role,title] of [["输入",own.inputSchema],["输出",own.outputSchema]]){
+    for(const [role,title,sourceRange] of [
+      ["输入",own.inputSchema,own.inputSchemaRange],
+      ["输出",own.outputSchema,own.outputSchemaRange]
+    ]){
       const matches=matchesSchema(files,title,warnings);
-      if(matches.length===1)schemas.push(freeze({...matches[0],role,title}));
+      if(matches.length===1&&sourceRange)
+        schemas.push(freeze({...matches[0],role,title,sourceRange}));
       else warnings.push(role+" Schema "+title+
         (matches.length?" 存在多个同名声明":" 未在 Package 中找到"));
     }

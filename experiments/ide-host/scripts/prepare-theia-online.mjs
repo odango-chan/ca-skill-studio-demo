@@ -8,7 +8,7 @@ const target=join(app,"plugins","odango-chan.ca-skill-studio-ide-spike");
 const manifest=JSON.parse(await readFile(join(ext,"package.json"),"utf8"));
 if(!manifest.browser||!manifest.contributes?.customEditors?.length)
   throw Error("VS Code Web extension entry or CustomEditor missing");
-for(const source of [manifest.browser,"./dist/extension-theia.js",join("media","procedure.js"),join("media","procedure.css")]){
+for(const source of [manifest.browser,"./dist/extension-theia.js","./dist/skill-language-server.js",join("media","procedure.js"),join("media","procedure.css")]){
   const info=await stat(join(ext,source));
   if(!info.isFile()||info.size<1000)throw Error("Missing built Web extension file: "+source);
 }

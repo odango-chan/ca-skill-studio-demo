@@ -33,7 +33,7 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   assert.ok(plugin.contributes.menus?.["view/title"]?.some(x=>
     x.command==="skillStudio.loadExample"),
     "Explorer title toolbar must expose the demo project");
-  for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","media/procedure.js","media/procedure.css",
+  for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js","media/procedure.js","media/procedure.css",
     "samples/establish-pdu-session/files.json",
     "samples/establish-pdu-session/assurance/procedure.yaml"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);

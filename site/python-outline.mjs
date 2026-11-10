@@ -29,22 +29,29 @@ export function pythonTopLevelOutline(text) {
   const lines=text.split(/\r\n|\n|\r/);
   if(lines.length>20000)return unavailable("Python Source 行数超出索引上限");
   const candidates=[];
-  let mode=null;
+  let mode=null,lineOffset=0;
   for(let i=0;i<lines.length;i++){
     const line=lines[i];
     if(!mode){
       const match=SYMBOL.exec(line);
       if(match){
         if(candidates.length>=200)return unavailable("顶层符号超出索引上限");
+        const start=lineOffset+match[0].lastIndexOf(match[2]);
         candidates.push(freeze({name:match[2],
           kind:match[1]==="class"?"class":"function",
-          line:i+1,async:match[1].startsWith("async")}));
+          line:i+1,async:match[1].startsWith("async"),
+          range:freeze({start,end:start+match[2].length})}));
       }
     }
     const next=scanLine(line,mode);
     if(next.uncertain)
       return unavailable("无法可靠扫描非三引号跨行字符串；符号定位已关闭");
     mode=next.mode;
+    lineOffset+=line.length;
+    if(i<lines.length-1){
+      if(text.startsWith("\r\n",lineOffset))lineOffset+=2;
+      else if(text[lineOffset]==="\r"||text[lineOffset]==="\n")lineOffset++;
+    }
   }
   if(mode)return unavailable("三引号字符串未闭合；符号定位已关闭");
   const counts=new Map();
