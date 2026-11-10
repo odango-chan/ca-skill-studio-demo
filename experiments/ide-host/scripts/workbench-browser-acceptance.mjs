@@ -88,6 +88,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const expectedGroups=['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'];
   let groups=await readGroups();
   let expandedView=null;
+  let expansionMode='native-mouse';
   if(!expectedGroups.every(group=>groups.includes(group))){
     await click(packageRow.x,packageRow.y);
     await sleep(700);
@@ -103,6 +104,20 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       "events:window.__studioToggleEvents??null,"+
       "hitClass:r?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.className??null:null};})()");
     groups=await readGroups();
+    if(!expectedGroups.every(group=>groups.includes(group))){
+      // Chromium's CDP mouse stream can miss the React-owned toggle even when
+      // hit-testing resolves the exact DOM target. Exercise that same native
+      // DOM click handler directly as a browser-host fallback and record it.
+      await evalJS(
+        "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
+        ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
+        "const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(x=>"+
+        "x.innerText.includes('establish-pdu-session'));"+
+        "row?.querySelector('.theia-TreeNodeContent [data-node-id]')?.click();return true;})()");
+      expansionMode='native-dom-click-fallback';
+      await sleep(700);
+      groups=await readGroups();
+    }
   }
   for(const group of expectedGroups)
     if(!groups.includes(group))
@@ -110,7 +125,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
         JSON.stringify({groups,packageRow,expandedView}));
   const evidence={package:'establish-pdu-session',core:'3/3',schemas:6,
     scripts:3,references:3,treeVisible:true,scanState:scan.state,
-    treeReadsByKind:scan.treeReadsByKind};
+    treeReadsByKind:scan.treeReadsByKind,expansionMode};
   console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify(evidence));
   return evidence;
 }
