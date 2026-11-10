@@ -133,9 +133,10 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
      !packageReady.result.value.details.includes('个文件'))
     throw Error('Native Package ZIP export did not prepare a bounded browser download: '+
       JSON.stringify(packageReady.result?.value));
-  const packageZip=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,awaitPromise:true,
-    expression:`(()=>{
+  // Instrument the page's main JavaScript realm. Runtime.evaluate against
+  // graphContext uses an isolated CDP world whose URL/DOM prototypes are not
+  // the same objects used by the Webview's event listener.
+  const zipEvidence=await evalJS(`(()=>{
       let blobMeta=null,linkMeta=null;
       const create=URL.createObjectURL,click=HTMLAnchorElement.prototype.click;
       URL.createObjectURL=function(blob){
@@ -148,9 +149,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       URL.createObjectURL=create;
       HTMLAnchorElement.prototype.click=click;
       return {blobMeta,linkMeta,noticeHidden:document.querySelector('#zipExportNotice')?.hidden};
-    })()`
-  });
-  const zipEvidence=packageZip.result?.value;
+    })()`);
   if(!(zipEvidence?.blobMeta?.size>22)||
      zipEvidence.blobMeta.type!=='application/zip'||
      !zipEvidence.linkMeta?.download?.endsWith('.zip')||
