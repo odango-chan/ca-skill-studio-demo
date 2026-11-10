@@ -173,9 +173,13 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
   if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
   const evidenceHeader=await evalJS(`(()=>{
-    const el=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&
+    const candidates=[...document.querySelectorAll('*')].filter(x=>
       x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
       x.getBoundingClientRect().x>=0);
+    const el=candidates.sort((a,b)=>{
+      const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
+      return ar.width*ar.height-br.width*br.height;
+    })[0];
     const r=el?.getBoundingClientRect();
     const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
       x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
