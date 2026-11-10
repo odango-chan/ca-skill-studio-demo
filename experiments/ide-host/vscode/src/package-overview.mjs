@@ -222,12 +222,14 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       const dirty = new Set((vscode.workspace.textDocuments??[])
         .filter(doc=>doc.isDirty).map(doc=>doc.uri.path));
       const inventory = buildPackageInventory(visible,dirty,truncated);
-      packages = inventory.packages.map(pkg=>({
-        ...pkg,
-        relativeRoot:pkg.rootUri
-          ?vscode.workspace.asRelativePath(pkg.rootUri)
-          :pkg.rootPath
-      }));
+      packages = inventory.packages.map(pkg=>{
+        let relativeRoot=pkg.rootPath;
+        if (pkg.rootUri) {
+          try { relativeRoot=vscode.workspace.asRelativePath(pkg.rootUri)||pkg.name; }
+          catch { relativeRoot=pkg.name; }
+        }
+        return {...pkg,relativeRoot};
+      });
       inventoryState = packages.length ? 'ready' : inventory.truncated ? 'truncated-empty' : 'empty';
       message = inventory.truncated
         ?'已扫描前 '+inventory.scannedFiles+' 个文件 · 结果可能不完整'
