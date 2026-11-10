@@ -19,6 +19,7 @@
     "onCommand:skillStudio.loadExample",
     "onStartupFinished",
     "onCommand:skillStudio.auditPackage",
+    "onCommand:skillStudio.exportPackageZip",
     "onCommand:skillStudio.previewMarkdown",
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
@@ -43,6 +44,10 @@
       {
         "command": "skillStudio.auditPackage",
         "title": "SKILL Studio: Audit Current Package"
+      },
+      {
+        "command": "skillStudio.exportPackageZip",
+        "title": "SKILL Studio: Export Current Package ZIP"
       },
       {
         "command": "skillStudio.previewMarkdown",
