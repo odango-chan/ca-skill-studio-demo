@@ -137,10 +137,12 @@ function treeNode(vscode, node) {
 export function registerPackageOverview(vscode,context,getActiveDocument=()=>null) {
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
+  let treeView=null,treeReads=0;
   const fire = () => emitter.fire();
   const provider = {
     onDidChangeTreeData:emitter.event,
     getChildren(node) {
+      treeReads++;
       if (!node) {
         const summary = {
           kind:'summary',label:packages.length+' SKILL Package'+(packages.length===1?'':'s'),
@@ -197,7 +199,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       return treeNode(vscode,node);
     }
   };
-  const treeView = typeof vscode.window.createTreeView === 'function'
+  treeView = typeof vscode.window.createTreeView === 'function'
     ? vscode.window.createTreeView('skillStudio.packages',{
         treeDataProvider:provider,showCollapseAll:true
       })
@@ -244,6 +246,11 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
         ?'已扫描前 '+inventory.scannedFiles+' 个文件 · 结果可能不完整'
         :inventory.scannedFiles+' 个文件 · 仅清点，不做语义校验';
       fire();
+      if (packages.length && treeView?.reveal) {
+        const first={...packages[0],kind:'package',label:packages[0].name};
+        try { await treeView.reveal(first,{select:false,focus:false,expand:1}); }
+        catch {/* a hidden/disposed view can be refreshed again by the user */}
+      }
       return packages;
     } catch(error) {
       if (ticket !== generation) return packages;
@@ -269,7 +276,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     vscode.commands.registerCommand('skillStudio.refreshPackages',async()=>{
       const result=await refresh();
       return {
-        state:inventoryState,message,
+        state:inventoryState,message,treeReads,treeVisible:treeView?.visible??null,
         packages:result.map(pkg=>({
           name:pkg.name,relativeRoot:pkg.relativeRoot,
           fileCount:pkg.fileCount,corePresent:pkg.corePresent,
