@@ -387,7 +387,10 @@ function receiveSnapshot(data){
   projectionMs=performance.now()-started;
   if(model.state!=="READY"){
     state.procedures=null;
+    state.graph=null;
+    state.entry=null;
     canvas.render(null,null,null,false);
+    updateGraphTools();
     status("Source-only · "+(model.diagnostics?.[0]?.message||"当前 YAML 无法安全投影"));
     return;
   }
