@@ -93,6 +93,9 @@ test("Procedure projection failures remain visible and fail closed",()=>{
   const result=analyzePackageSnapshot(snapshot);
   assert.equal(result.state,"PARTIAL");
   assert.equal(result.procedure.state,"UNAVAILABLE");
+  assert.equal(result.packageAudit.state,"UNAVAILABLE",
+    "a failed projection cannot produce a clean Package Audit");
+  assert.match(result.packageAudit.reason,/not performed/);
   assert.ok(result.diagnostics.some(diagnostic=>
     diagnostic.source==="procedure-projection"&&diagnostic.code==="PROCEDURE_PROJECTION"));
 });
@@ -119,6 +122,54 @@ test("unsafe or duplicate Package paths are rejected before analysis",()=>{
   result=analyzePackageSnapshot(duplicate);
   assert.equal(result.state,"UNAVAILABLE");
   assert.equal(result.diagnostics[0].code,"DUPLICATE_PACKAGE_DOCUMENT");
+});
+
+test("Package analysis binds document URIs to exact Package-relative paths",()=>{
+  const fixture=sampleSnapshot();
+  const procedure=fixture.documents.find(document=>
+    document.relativePath==="assurance/procedure.yaml");
+  const originalUri=procedure.uri;
+  const invalidUris=[
+    "file:///workspace/other/assurance/procedure.yaml",
+    "file:///workspace/establish-pdu-session/other/procedure.yaml",
+    "file:///workspace/establish-pdu-session/scripts/%2e%2e/assurance/procedure.yaml",
+    "file:///workspace/establish-pdu-session/assurance%2Fprocedure.yaml",
+    "file:///workspace/establish-pdu-session/assurance/procedure.yaml?version=1",
+    "vscode-remote://wsl+Ubuntu/workspace/establish-pdu-session/assurance/procedure.yaml",
+    "file:///workspace/establish-pdu-session/assurance/procedure.yaml/"
+  ];
+  for(const uri of invalidUris){
+    procedure.uri=uri;
+    const result=analyzePackageSnapshot(fixture);
+    assert.equal(result.state,"UNAVAILABLE",uri);
+    assert.equal(result.diagnostics[0].code,"PACKAGE_DOCUMENT_URI_MISMATCH",uri);
+  }
+  procedure.uri=originalUri;
+  assert.equal(analyzePackageSnapshot(fixture).state,"READY");
+
+  const remote=sampleSnapshot();
+  remote.rootUri="vscode-remote://wsl+Ubuntu/workspace/My%20Skill";
+  remote.documents=remote.documents.map(document=>({
+    ...document,
+    uri:remote.rootUri+"/"+document.relativePath
+  }));
+  assert.equal(analyzePackageSnapshot(remote).state,"READY",
+    "safe remote URI and encoded Package directory remain supported");
+});
+
+test("unsafe Package root URIs fail closed before publishing analysis",()=>{
+  for(const rootUri of [
+    "file:///workspace/a/%2e%2e/pkg",
+    "file:///workspace/pkg?other",
+    "file:///workspace/pkg#fragment",
+    "relative/package"
+  ]){
+    const snapshot=sampleSnapshot();
+    snapshot.rootUri=rootUri;
+    const result=analyzePackageSnapshot(snapshot);
+    assert.equal(result.state,"UNAVAILABLE",rootUri);
+    assert.equal(result.diagnostics[0].code,"INVALID_PACKAGE_ROOT_URI",rootUri);
+  }
 });
 
 test("Package file-count and cumulative text-length limits fail closed",()=>{
