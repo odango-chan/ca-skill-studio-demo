@@ -780,8 +780,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
 
     const packageLifecycle=await nativeCommand(
       "skillStudio.internal.languagePackageLifecycleAcceptance",procedureUri,"prepare");
-    if(!packageLifecycle?.created||packageLifecycle.references!==2)
-      throw Error("L2-D4b multi-Package lifecycle setup failed: "+
+    if(!packageLifecycle?.created||packageLifecycle.references!==2||
+       !packageLifecycle.distinctNonNestedRoots||
+       !packageLifecycle.packageARoot||!packageLifecycle.packageBRoot||
+       packageLifecycle.packageBRoot.startsWith(packageLifecycle.packageARoot+"/")||
+       packageLifecycle.packageARoot.startsWith(packageLifecycle.packageBRoot+"/"))
+      throw Error("L2-D4b requires two truly separate Package roots: "+
         JSON.stringify(packageLifecycle));
     packageLifecyclePrepared=true;
     const prepared=await nativeCommand(
@@ -792,8 +796,14 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const recovery=await nativeCommand("skillStudio.restartLanguageService");
     if(!recovery?.recovered||!Array.isArray(recovery.packages)||
        recovery.packages.length!==2||
-       recovery.packages.some(item=>item.status!=="READY"))
-      throw Error("L2-D4b explicit multi-Package Language Worker recovery failed: "+
+       recovery.packages.some(item=>item.status!=="READY")||
+       new Set(recovery.packages.map(item=>item.rootUri)).size!==2||
+       !recovery.packages.some(item=>item.rootUri===packageLifecycle.packageARoot)||
+       !recovery.packages.some(item=>item.rootUri===packageLifecycle.packageBRoot)||
+       recovery.packages.some(item=>
+         item.rootUri===packageLifecycle.packageARoot&&
+         item.dirtyDocuments?.some(file=>file.path.startsWith("skill-studio-l2d4b-"))))
+      throw Error("L2-D4b cross-Package isolation or recovery failed: "+
         JSON.stringify(recovery));
     const recovered=await nativeCommand(
       "skillStudio.internal.languageRecoveryAcceptance",procedureUri,"verify-and-restore");
