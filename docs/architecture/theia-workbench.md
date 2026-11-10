@@ -1,6 +1,6 @@
 # Theia 工作台与 Classic 功能对照
 
-**Status: Stage One accepted; Inspector Node and Phase Binding increments passed exact-head CI; Node insert/delete increment in PR #98 · Date: 2026-11-10**
+**Status: Stage One accepted; Inspector Node, Phase Binding and bounded Node insert/delete increments passed exact-head CI; PR #98 ready for review · Date: 2026-11-10**
 
 第一阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；当前 Inspector Node authoring 见 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)；Phase Input Binding 首个增量见 [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97)；Node insert/delete 首个有界增量见 [PR #98](https://github.com/odango-chan/ca-skill-studio-demo/pull/98)。验收见 WORK / TRACEABILITY 与各自 exact-head PR CI。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
 
@@ -17,7 +17,7 @@
 | Route 创建 / 重连 / Diff / Apply / Undo | 有界实现 | 已有且保留 | 复用 route-connect / route-target、原生 WorkspaceEdit；仍要求 Diff 后显式确认 |
 | Phase Designer | 有界 Step / binding / verify 编辑 | 首个 D4-A1 Phase Input Binding 编辑（PR #97 exact-head PASS，待 review/merge） | 仅修改现有 Step 的 `with.<key>.from`；同一 Procedure 中同类型的已声明输入；复用 `site/phase-bindings.mjs`；Phase/Step/Route 结构不变；完整 Step、Verify、Producer/Consumer 编辑仍缺失 |
 | Node 重命名 / Operator 值编辑 | 有界实现 | 首批适配（PR #96 exact-head PASS，待review/merge） | 复用 `site/node-designer.mjs` / `site/node-attributes.mjs`；仅精确 Source spans，拒绝过期选择；原生 WorkspaceEdit / Undo；不支持 Operator kind 替换或不安全标量 |
-| Node 插入 / 删除 | 有界实现 | 首个受限适配（PR #98，exact-head 验收中） | Insert 仅作用于可 Patch 的现有 Route；Delete 仅限同状态 Terminal 合并或单出口 Node bypass；复用完整 Route 影响检查与精确 Source spans；复杂 Phase/Child/多出口 Node 不开放删除 |
+| Node 插入 / 删除 | 有界实现 | 首个受限适配（PR #98，exact-head IDE Host / Browser-Only / Browser Host / PR Verify PASS，待 review/merge） | Insert 仅作用于可 Patch 的现有 Route；Delete 仅限同状态 Terminal 合并或单出口 Node bypass；复用完整 Route 影响检查与精确 Source spans；复杂 Phase/Child/多出口 Node 不开放删除 |
 | Root 路径筛选 / 锚定 | 已有 | 未迁移 | Theia 仍显示完整声明图 |
 | 目录导入 / ZIP / 保存 | Classic 自有工作副本 | 宿主文件系统与 OPFS | 不提供 Classic ZIP 导入导出等价能力；OPFS 不等于磁盘或 GitHub 同步 |
 | Run / Runtime / 5GC | 无 | 无 | NOT_RUN，非本仓 authority |
