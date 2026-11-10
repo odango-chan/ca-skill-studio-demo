@@ -317,6 +317,10 @@ export function registerWorkbench(vscode,context){
               packageGeneration:packageState.generation,
               languageStatus:languageStatusItem?.text??"missing",
               languageTooltip:languageStatusItem?.tooltip??""}));
+        // The native provider probe opened a Python editor. Restore the
+        // Procedure CustomEditor so subsequent workbench actions (notably
+        // native Undo) continue to target the visual editor under test.
+        await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
         return {
           definition:scriptPath,
           hover:hovers.length,
