@@ -14,7 +14,6 @@ import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   from '../../../../site/phase-step-structural.mjs';
 import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
   applyAdjacentVerifyReorder} from '../../../../site/phase-step-order.mjs';
-import {openNativeSource} from "./native-source.mjs";
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 
 export function registerWorkbench(vscode,context){
