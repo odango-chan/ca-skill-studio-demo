@@ -181,6 +181,33 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     node:bindingSelection.result.value.node,procedure:bindingSelection.result.value.procedure,
     before:beforeBinding.result?.value,after:afterBinding.result?.value,undo:afterBindingUndo.result?.value
   }));
+  // Rename a named Script Step and all proven local/qualified consumers through
+  // the shared closed-world source-span planner, then verify native Undo.
+  const beforeNamedRename=(await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  })).result?.value;
+  const namedRenameVersion=Number(/v(\\d+)/.exec(beforeNamedRename??'')?.[1]);
+  if(!Number.isSafeInteger(namedRenameVersion))throw Error('Named Step rename missing native Source revision');
+  const oldStepName='select-subscription-configuration';
+  const newStepName='select-subscription-config-v2';
+  await startNativeCommand('skillStudio.renameNamedPhaseStep',{
+    kind:'phase-step',procedureId:bindingSelection.result.value.procedure,
+    nodeId:'nudm-sdm-subscribe',phaseName:'preconditions',stepIndex:0,
+    stepName:oldStepName,stepOperator:'script',sourceVersion:namedRenameVersion
+  },newStepName);
+  await confirmNativePreview(oldStepName,newStepName);
+  const namedRenameAccepted=await evalJS(`window.__skillStudioCommandResult`);
+  const afterNamedRename=await waitForRevisionChange(graphContext,beforeNamedRename,
+    'Named Phase Step rename');
+  if(namedRenameAccepted!==true)throw Error('Named Phase Step rename was not accepted');
+  await invoke('core.undo');
+  const afterNamedRenameUndo=await waitForRevisionChange(graphContext,
+    afterNamedRename.result?.value,'Named Phase Step rename Undo');
+  console.log('STUDIO_PHASE_NAMED_STEP_RENAME_CHROMIUM',JSON.stringify({
+    before:beforeNamedRename,applied:afterNamedRename.result?.value,
+    undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName
+  }));
   // Real Chromium + actual Theia extension command registry. Each Verify edit
   // must return to the unmodified Source through native TextDocument Undo.
   async function nativeVerifyRoundTrip(commandId,item,argument,oldText,newText){
@@ -206,6 +233,10 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     {kind:'phase',phaseName:'preconditions'},
     'createdsession.n4.initial_resources_ready',
     '新增','createdsession.n4.initial_resources_ready');
+  const verifyName=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
+    {kind:'phase-step',phaseName:'preconditions',stepIndex:5,stepOperator:'verify'},
+    {action:'name',newName:'resource-ready-check'},
+    'verify: createdsession.n4.initial_resources_ready','name: resource-ready-check');
   const verifyDelete=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
     {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
     'delete','删除','createdsession.lifecycle.ready');
@@ -213,7 +244,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
     'move-up','调整','createdsession.ingress.eligible');
   console.log('STUDIO_PHASE_VERIFY_CHROMIUM',JSON.stringify({
-    append:verifyAppend,delete:verifyDelete,reorder:verifyReorder
+    append:verifyAppend,name:verifyName,delete:verifyDelete,reorder:verifyReorder
   }));
   const graphHasNode=async id=>{
     const result=await command('Runtime.evaluate',{
