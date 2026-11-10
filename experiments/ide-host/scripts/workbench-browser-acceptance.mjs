@@ -109,7 +109,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('core.saveAll');
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file not available in native Explorer');
   // Measure the actual Explorer click → CustomEditor render path. Do not
   // insert a fixed sleep before polling; it would dominate the reported time.
