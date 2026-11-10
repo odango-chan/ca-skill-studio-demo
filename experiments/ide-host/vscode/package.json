@@ -34,10 +34,16 @@
     "onCommand:skillStudio.editPhaseVerifyStep",
     "onCommand:skillStudio.renameNamedPhaseStep",
     "onCustomEditor:skillStudio.contractPreview",
-    "onCommand:skillStudio.openContract"
+    "onCommand:skillStudio.openContract",
+    "onCustomEditor:skillStudio.predicatePreview",
+    "onCommand:skillStudio.openPredicates"
   ],
   "contributes": {
     "commands": [
+      {
+        "command": "skillStudio.openPredicates",
+        "title": "SKILL Studio: Open Predicate Visual"
+      },
       {
         "command": "skillStudio.openContract",
         "title": "SKILL Studio: Open Contract Visual"
@@ -113,6 +119,11 @@
     ],
     "menus": {
       "explorer/context": [
+        {
+          "command": "skillStudio.openPredicates",
+          "when": "resourceFilename == predicates.yaml",
+          "group": "navigation"
+        },
         {
           "command": "skillStudio.openContract",
           "when": "resourceFilename == contract.yaml",
@@ -296,6 +307,16 @@
         "selector": [
           {
             "filenamePattern": "**/assurance/[c]ontract.yaml"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "skillStudio.predicatePreview",
+        "displayName": "SKILL Predicate Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/assurance/[p]redicates.yaml"
           }
         ],
         "priority": "default"
