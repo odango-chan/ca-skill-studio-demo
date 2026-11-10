@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "sourceRepo": "odango-chan/ca-agent-demo",
+  "sourceSha": "f022319052f9c8a9a9b85a67ef485b135e416379",
+  "skills": [
+    "establish-pdu-session",
+    "establish-pdu-session-mas"
+  ],
+  "files": [
+    "establish-pdu-session-mas/SKILL.md",
+    "establish-pdu-session-mas/assurance/contract.yaml",
+    "establish-pdu-session-mas/assurance/predicates.yaml",
+    "establish-pdu-session-mas/assurance/procedure.yaml",
+    "establish-pdu-session-mas/schemas/establishment-request.schema.yaml",
+    "establish-pdu-session/SKILL.md",
+    "establish-pdu-session/assurance/contract.yaml",
+    "establish-pdu-session/assurance/predicates.yaml",
+    "establish-pdu-session/assurance/procedure.yaml",
+    "establish-pdu-session/references/3gpp-procedure.md",
+    "establish-pdu-session/references/failure-handling.md",
+    "establish-pdu-session/references/session-selection.md",
+    "establish-pdu-session/schemas/establishment-request.schema.yaml",
+    "establish-pdu-session/schemas/n1n2-delivery-input.schema.yaml",
+    "establish-pdu-session/schemas/n1n2-delivery.schema.yaml",
+    "establish-pdu-session/schemas/pcf-policy-inputs-input.schema.yaml",
+    "establish-pdu-session/schemas/pcf-policy-inputs.schema.yaml",
+    "establish-pdu-session/schemas/predicate-evaluation-result.schema.yaml",
+    "establish-pdu-session/schemas/selection-input.schema.yaml",
+    "establish-pdu-session/schemas/selection.schema.yaml",
+    "establish-pdu-session/schemas/transfer-start-evaluation-input.schema.yaml",
+    "establish-pdu-session/schemas/udm-read-evaluation-input.schema.yaml",
+    "establish-pdu-session/scripts/build_n1n2_delivery.py",
+    "establish-pdu-session/scripts/build_pcf_policy_inputs.py",
+    "establish-pdu-session/scripts/evaluate_transfer_start.py",
+    "establish-pdu-session/scripts/evaluate_udm_read.py",
+    "establish-pdu-session/scripts/select_establishment_configuration.py"
+  ]
+}
