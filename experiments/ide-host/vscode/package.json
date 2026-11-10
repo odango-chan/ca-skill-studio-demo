@@ -29,7 +29,8 @@
     "onCommand:skillStudio.deleteNode",
     "onCommand:skillStudio.addPhaseVerify",
     "onCommand:skillStudio.editPhaseVerifyStep",
-    "onCommand:skillStudio.renameNamedPhaseStep"
+    "onCommand:skillStudio.renameNamedPhaseStep",
+    "onCommand:skillStudio.restartLanguageService"
   ],
   "contributes": {
     "commands": [
@@ -88,6 +89,10 @@
       {
         "command": "skillStudio.renameNamedPhaseStep",
         "title": "SKILL Studio: Rename Named Phase Step"
+      },
+      {
+        "command": "skillStudio.restartLanguageService",
+        "title": "SKILL Studio: Restart Language Service"
       }
     ],
     "menus": {
