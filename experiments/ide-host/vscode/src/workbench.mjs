@@ -14,12 +14,158 @@ import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   from '../../../../site/phase-step-structural.mjs';
 import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
   applyAdjacentVerifyReorder} from '../../../../site/phase-step-order.mjs';
+import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
+  const languagePackages=new Map();
+  let languageClient=null,languageClientPromise=null,languageClientFailureShown=false;
+
+  function languagePackageContains(root,uri){
+    if(!uri||uri.scheme!==root.scheme||uri.authority!==root.authority)return false;
+    const base=root.path.replace(/\\/$/,"");
+    return uri.path.startsWith(base+"/");
+  }
+  async function ensureLanguageClient(){
+    if(typeof Worker!=="function"||typeof globalThis.location==="undefined")return null;
+    if(!languageClientPromise){
+      languageClientPromise=(async()=>{
+        const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
+        const candidate=createSkillLanguageClient(vscode,context,{
+          onError:error=>console.warn("Skill Studio Language Service",error)
+        });
+        try{
+          await candidate.start();
+          languageClient=candidate;
+          return candidate;
+        }catch(error){
+          await candidate.stop().catch(()=>{});
+          languageClient=null;
+          languageClientPromise=null;
+          throw error;
+        }
+      })();
+    }
+    return languageClientPromise;
+  }
+  async function refreshLanguagePackage(state){
+    if(state.disposed)return;
+    const ticket=++state.ticket;
+    const generation=++state.generation;
+    try{
+      const snapshot=await collectPackageSnapshot(
+        vscode,state.procedureDocument,generation
+      );
+      if(state.disposed||ticket!==state.ticket)return;
+      const client=await ensureLanguageClient();
+      if(!client||state.disposed||ticket!==state.ticket)return;
+      client.sendPackageSnapshot(snapshot);
+    }catch(error){
+      if(state.disposed||ticket!==state.ticket)return;
+      console.warn("Skill Studio Package analysis unavailable",error);
+      if(!languageClientFailureShown){
+        languageClientFailureShown=true;
+        void vscode.window.showWarningMessage(
+          "SKILL Studio 语言服务未能启动；现有编辑器仍可继续使用。详情见 Language Service Output。"
+        );
+      }
+    }
+  }
+  function scheduleLanguagePackageRefresh(state){
+    if(state.disposed)return;
+    clearTimeout(state.timer);
+    state.timer=setTimeout(()=>{
+      state.timer=null;
+      void refreshLanguagePackage(state);
+    },120);
+  }
+  function attachLanguagePackage(doc){
+    const rootInfo=packageRootForProcedure(vscode,doc);
+    if(!rootInfo||typeof Worker!=="function"||typeof globalThis.location==="undefined")
+      return ()=>{};
+    const root=rootInfo.uri;
+    const key=root.toString();
+    let state=languagePackages.get(key);
+    if(state){
+      state.refs++;
+      state.procedureDocument=doc;
+      scheduleLanguagePackageRefresh(state);
+    }else{
+      state={
+        root,key,procedureDocument:doc,refs:1,generation:0,ticket:0,
+        timer:null,disposed:false,subscriptions:[]
+      };
+      languagePackages.set(key,state);
+      const listen=(event,handler)=>{
+        if(typeof event==="function"){
+          const disposable=event(handler);
+          if(disposable?.dispose)state.subscriptions.push(disposable);
+        }
+      };
+      const refreshIfInside=uri=>{
+        if(languagePackageContains(root,uri))scheduleLanguagePackageRefresh(state);
+      };
+      listen(vscode.workspace.onDidChangeTextDocument,event=>{
+        if(languagePackageContains(root,event.document.uri)){
+          if(event.document.uri.toString()===doc.uri.toString())
+            state.procedureDocument=event.document;
+          scheduleLanguagePackageRefresh(state);
+        }
+      });
+      listen(vscode.workspace.onDidOpenTextDocument,document=>{
+        refreshIfInside(document.uri);
+        if(document.uri.toString()===state.procedureDocument.uri.toString())
+          state.procedureDocument=document;
+      });
+      listen(vscode.workspace.onDidCloseTextDocument,document=>{
+        refreshIfInside(document.uri);
+      });
+      listen(vscode.workspace.onDidCreateFiles,event=>{
+        if(event.files?.some(uri=>languagePackageContains(root,uri)))
+          scheduleLanguagePackageRefresh(state);
+      });
+      listen(vscode.workspace.onDidDeleteFiles,event=>{
+        if(event.files?.some(uri=>languagePackageContains(root,uri)))
+          scheduleLanguagePackageRefresh(state);
+      });
+      listen(vscode.workspace.onDidRenameFiles,event=>{
+        if(event.files?.some(item=>
+          languagePackageContains(root,item.oldUri)||
+          languagePackageContains(root,item.newUri)))
+          scheduleLanguagePackageRefresh(state);
+      });
+      void refreshLanguagePackage(state);
+    }
+    let released=false;
+    return ()=>{
+      if(released)return;
+      released=true;
+      state.refs--;
+      if(state.refs>0)return;
+      state.disposed=true;
+      state.ticket++;
+      clearTimeout(state.timer);
+      for(const subscription of state.subscriptions)subscription.dispose();
+      state.subscriptions.length=0;
+      languagePackages.delete(key);
+      const close=client=>client?.closePackage(key);
+      if(languageClientPromise)void languageClientPromise.then(close).catch(()=>{});
+      else close(languageClient);
+    };
+  }
+  context.subscriptions.push({dispose(){
+    for(const state of languagePackages.values()){
+      state.disposed=true;state.ticket++;clearTimeout(state.timer);
+      for(const subscription of state.subscriptions)subscription.dispose();
+    }
+    languagePackages.clear();
+    const stop=client=>client?.stop();
+    if(languageClientPromise)void languageClientPromise.then(stop).catch(()=>{});
+    else void languageClient?.stop();
+  }});
 
   function currentNode(item){
     if(!document||!isProcedurePath(document.uri.path))throw Error("No active Procedure Source");
@@ -569,8 +715,18 @@ export function registerWorkbench(vscode,context){
     const render=()=>{const preview=renderMarkdown(doc.getText());panel.webview.html='<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;none&#39;;"></head><body><article>'+(preview.available?preview.html:'<p>预览不可用，请使用源码编辑器。</p>')+'</article></body></html>';};
     render();const changed=vscode.workspace.onDidChangeTextDocument(e=>{if(e.document.uri.toString()===uri.toString())render();});panel.onDidDispose(()=>changed.dispose());
   }));
-  return {attach(doc,post){sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();return ()=>{sessions.delete(doc.uri.toString());};},select(doc,message){
+  return {attach(doc,post){
+    sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();
+    const releaseLanguagePackage=attachLanguagePackage(doc);
+    return ()=>{sessions.delete(doc.uri.toString());releaseLanguagePackage();};
+  },select(doc,message){
     if(message.version!==doc.version||typeof message.procedureId!=='string')return;
     update(doc,{procedureId:message.procedureId,nodeId:typeof message.nodeId==='string'?message.nodeId:null});
-  },activate(doc){const changed=document?.uri.toString()!==doc.uri.toString()||snapshot?.text!==doc.getText();update(doc);if(changed)scheduleAudit();}};
+  },activate(doc){
+    const changed=document?.uri.toString()!==doc.uri.toString()||snapshot?.text!==doc.getText();
+    update(doc);if(changed)scheduleAudit();
+    const rootInfo=packageRootForProcedure(vscode,doc);
+    const state=rootInfo?languagePackages.get(rootInfo.uri.toString()):null;
+    if(state){state.procedureDocument=doc;scheduleLanguagePackageRefresh(state);}
+  }};
 }
