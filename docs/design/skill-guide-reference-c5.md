@@ -1,6 +1,6 @@
 # C5 — Skill Guide & Reference Navigation
 
-**Status:** Implementation branch; exact-head validation pending  
+**Status:** Implemented and accepted in real Chromium on code HEAD `e2ff8eccaa2c6a2cd8a34df82f1c9d5ea8f92f4a` (2026-11-10); PR #138 remains Draft pending the upstream multi-file merge sequence.  
 **Base:** `main@fb869df8e773e5beb2e8a2f166ced95eeb1d8f6e`  
 **Owner:** SKILL Studio authoring UI
 
@@ -68,3 +68,21 @@ change the authoritative Markdown document.
 C5 is independent of the still-stacked C1/C2/C3/C4 visual-editor integration. It is based
 on current `main` so the Markdown and LSP improvements can be reviewed without retargeting
 those earlier branches.
+
+## C5 acceptance evidence (2026-11-10)
+
+Validated exact code HEAD `e2ff8eccaa2c6a2cd8a34df82f1c9d5ea8f92f4a`:
+
+- Root verification `42817226395`: `npm test`, typecheck, build and Chromium interaction smoke PASS.
+- IDE Host Spike `42817226311`: extension bundle, Source authority and Procedure regressions PASS.
+- Theia Browser-Only `42817226726`: real Theia build and Chromium acceptance PASS.
+- Theia Browser Host `42817226340`: backend-backed Theia build and real Chromium acceptance PASS.
+
+Both real Theia Chromium hosts emitted `STUDIO_MARKDOWN_GUIDE_CHROMIUM`:
+
+- Conventional `SKILL.md`: 16 navigable headings and explicit links to the three existing References and `assurance/procedure.yaml`.
+- Reference navigation: opened `3gpp-procedure.md`, exposed `../SKILL.md`, and returned to the guide.
+- MAS `SKILL.md`: rendered its own outline and exposed no fabricated local Reference links.
+- A forged path attempting to open the sibling MAS Skill from the conventional Skill was rejected (`traversalBlocked: true`).
+
+No Skill sample bytes changed. This is a browser-verified read-only authoring surface, not a Runtime or 5GC validation.
