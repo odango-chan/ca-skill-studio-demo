@@ -125,7 +125,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   confirmChoice='确认并应用';
   assert.equal(await commands.get('skillStudio.addPhaseVerify')(verifyPhaseItem,verifyPredicate),true);
   assert.equal(doc.version,verifyVersion+1);
-  assert.ok(doc.text.includes('            - verify: '+verifyPredicate+'\\n'));
+  assert.ok(doc.text.includes('            - verify: '+verifyPredicate+'\n'));
   assert.equal(appliedEdits.at(-1).length,1,'Verify addition uses a single bounded Source span');
   assert.equal(appliedEdits.at(-1)[0].range.start.offset,appliedEdits.at(-1)[0].range.end.offset,
     'Verify addition is a zero-width insertion');
