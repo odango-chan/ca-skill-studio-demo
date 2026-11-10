@@ -49,6 +49,7 @@ test("Sample creates both exact pinned owner SKILL packages beneath one skills r
   assert.equal(result.files,manifest.files.length);
   assert.equal(result.created,manifest.files.length);
   assert.equal(result.skipped,0);
+  assert.equal(manifest.sourceSha,"9abb6b829d4466b42f0bc55ba26caa33abe8d7e3");
   assert.equal(result.sourceSha,manifest.sourceSha);
   assert.deepEqual(result.skills,["establish-pdu-session","establish-pdu-session-mas"]);
   assert.ok(result.workspaceUpdated);
