@@ -716,12 +716,41 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const targetResult=await command("Target.getTargets");
     const workers=(targetResult.targetInfos??[]).filter(item=>
       item.type==="worker"||item.type==="service_worker");
-    const selected=workers.find(item=>
-      /skill-language-server\.js/.test(item.url??""));
+    // Chromium 1.76's worker targets can have empty URL fields. Attach via
+    // flattened CDP sessions and inspect the actual WorkerGlobalScope name
+    // and script URL. Never guess from an unlabeled Worker target ID.
+    const identities=[];
+    for(const item of workers.filter(x=>x.type==="worker")){
+      let sessionId=null;
+      try{
+        const attached=await command("Target.attachToTarget",{
+          targetId:item.targetId,flatten:true
+        });
+        sessionId=attached.sessionId;
+        if(!sessionId)throw Error("flat CDP session missing");
+        const result=await command("Runtime.evaluate",{
+          expression:"({workerName:self.name??'',scriptUrl:self.location?.href??''})",
+          returnByValue:true,awaitPromise:false
+        },sessionId);
+        const value=result.result?.value??{};
+        identities.push({...item,workerName:value.workerName??"",
+          scriptUrl:value.scriptUrl??""});
+      }catch(error){
+        identities.push({...item,inspectError:String(error?.message??error)});
+      }finally{
+        if(sessionId)await command("Target.detachFromTarget",{sessionId})
+          .catch(()=>{});
+      }
+    }
+    const selected=identities.find(item=>
+      item.workerName==="skill-studio-language-server"||
+      /skill-language-server\.js/.test(item.scriptUrl??""));
     console.log("STUDIO_LSP_WORKER_TARGETS_CHROMIUM",JSON.stringify(
-      workers.map(item=>({type:item.type,url:item.url,id:item.targetId}))));
-    if(!selected)throw Error("L2-D4 real language Worker CDP target missing: "+
-      JSON.stringify(workers.map(x=>({type:x.type,url:x.url}))));
+      identities.map(item=>({id:item.targetId,name:item.workerName,
+        scriptUrl:item.scriptUrl,inspectError:item.inspectError??null}))));
+    if(!selected)throw Error("L2-D4 exact Language Worker identity unavailable: "+
+      JSON.stringify(identities.map(x=>({id:x.targetId,name:x.workerName,
+        scriptUrl:x.scriptUrl,error:x.inspectError??null}))));
     const closed=await command("Target.closeTarget",{targetId:selected.targetId});
     if(closed?.success!==true)
       throw Error("L2-D4 could not terminate real Worker: "+JSON.stringify(closed));
