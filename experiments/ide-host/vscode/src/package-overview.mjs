@@ -30,7 +30,7 @@ function classify(path) {
   if (path.startsWith('references/')) return 'references';
   return 'other';
 }
-function openAction(path, uri) {
+export function packageFileCommand(path, uri) {
   if (path === 'assurance/procedure.yaml')
     return {command:'skillStudio.openProcedure',title:'Open Procedure Designer',arguments:[uri]};
   if (path === 'assurance/contract.yaml')
@@ -140,7 +140,7 @@ export function registerPackageOverview(vscode,context) {
           const isMarkdown = /\.md$/i.test(file.path);
           return {
             kind:'file',label,description:file.path,uri:file.uri,
-            command:openAction(file.path,file.uri),
+            command:packageFileCommand(file.path,file.uri),
             contextValue:isMarkdown?'skillStudio.packageMarkdown':'skillStudio.packageFile',
             icon:/\.py$/i.test(file.path)?'file-code':
               /\.schema\.ya?ml$/i.test(file.path)?'symbol-structure':
