@@ -20,3 +20,7 @@ Browser evidence marker: `STUDIO_LSP_UNSAVED_CHROMIUM`. The three non-browser CI
 - This slice does **not** claim Node/Desktop LSP parity, Worker crash recovery, switching Packages, or stale diagnostics after close. Those are L2-D4.
 - Language Core and LSP remain read-only; the test harness exclusively owns temporary writes. No Python execution, Pyright/Ruff, rename/refactor functionality, Runtime/5GC operations, Pages deployment or main merge.
 - Do not mark L2-D3a PASS until exact-head **all four** CI gates pass, including actual Chromium with its new `STUDIO_LSP_UNSAVED_CHROMIUM` evidence.
+
+## Chromium first-run isolation finding
+
+The initial real Chromium D3 probe passed all three dirty-buffer snapshot assertions and current-generation native Hover, but the existing workspace-reload regression failed afterward. An exact in-memory text restore can leave Theia backup/dirty state behind. Cleanup now verifies each restored buffer is identical to persisted bytes, saves only those original bytes when still dirty (never the transient test text), and verifies the buffer is clean. The same check covers the Procedure buffer previously touched by L2-D2. This is a test-only cleanup operation, not a new user save behavior. The exact-head retest is required before claiming PASS.
