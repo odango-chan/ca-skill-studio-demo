@@ -1015,7 +1015,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!guideOpen.view.toc||guideOpen.view.tocLinks<10||
      !guideOpen.view.localPaths.includes('references/3gpp-procedure.md')||
      !guideOpen.view.localPaths.includes('references/session-selection.md')||
-     !guideOpen.view.localPaths.includes('references/failure-handling.md'))
+     !guideOpen.view.localPaths.includes('references/failure-handling.md')||
+     !guideOpen.view.localPaths.includes('assurance/procedure.yaml'))
     throw Error('SKILL.md outline or explicit Reference links are incomplete: '+
       JSON.stringify(guideOpen.view));
   const openReference=await command('Runtime.evaluate',{
@@ -1033,7 +1034,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const beforeForgery=(await markdownViews()).length;
   await command('Runtime.evaluate',{
     contextId:referenceOpen.view.contextId,returnByValue:true,
-    expression:'(()=>{const link=document.createElement("a");link.href="#";link.dataset.localPath="../../docs/design/llm-skill-execution-baseline.md";document.body.append(link);link.click();link.remove();return true;})()'
+    expression:'(()=>{const link=document.createElement("a");link.href="#";link.dataset.localPath="../../establish-pdu-session-mas/SKILL.md";document.body.append(link);link.click();link.remove();return true;})()'
   });
   await sleep(300);
   const afterForgery=await markdownViews();
