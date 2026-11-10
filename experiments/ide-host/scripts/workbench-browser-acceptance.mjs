@@ -176,7 +176,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       contextId:graphContext,returnByValue:true,
       expression:`document.querySelector('#revision')?.textContent`
     })).result?.value;
-    const version=Number(/v(\\d+)/.exec(before??'')?.[1]);
+    const version=Number(/v(\d+)/.exec(before??'')?.[1]);
     if(!Number.isSafeInteger(version))throw Error('Verify command missing native Source revision');
     await startNativeCommand(commandId,{...item,
       procedureId:bindingSelection.result.value.procedure,
