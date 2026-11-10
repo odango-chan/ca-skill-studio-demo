@@ -244,7 +244,7 @@ main browser application remains available at `/classic/`.
 
 **范围：** 将 Classic 已有 `site/phase-output-refs.mjs` 接入 Theia 原生 Inspector。对可证明的同一生产 Node / Phase / 唯一 earlier named Step / output suffix，只提供 local 与 fully-qualified 两种已在同一 Procedure Source 中实际出现的写法互换。Eligible Phase Step 下显示独立的 `Output reference · <bindingKey>` 子行，右键提供规范化操作；不把跨 Node 引用误判成同生产者。
 
-**写入路径：** Theia 只负责 TreeItem/command、当前 TextDocument revision 检查、QuickPick、Diff/显式确认和原生 WorkspaceEdit；候选发现、身份判定、Source scalar span、候选重算和 forged/stale Preview 拒绝全部复用 Classic 模块。Undo 由 Theia 原生编辑历史负责。当前公开示例没有符合条件的 local/qualified 双写法，因此 host/Chromium 验收使用仓内 pinned predecessor fixture；不会为制造演示而修改真实 Skill 示例。
+**写入路径：** Theia 只负责 TreeItem/command、当前 TextDocument revision 检查、QuickPick、Diff/显式确认和原生 WorkspaceEdit；候选发现、身份判定、Source scalar span、候选重算和 forged/stale Preview 拒绝全部复用 Classic 模块。Undo 由 Theia 原生编辑历史负责。当前公开示例的 PCF 节点已有符合条件的同生产 Step local/qualified 引用对（N4 baseline Verify 的 pcfPolicyAssociationRef）。真实 Chromium 直接对该示例执行原生 WorkspaceEdit、Undo、再次编辑和再次 Undo；host 测试另外覆盖仓内 pinned predecessor fixture，既不需要整份替换 Source，也不会为了演示改变原始 SKILL 资产。
 
 **边界：** 这是引用写法规范化，不证明 Runtime 能解析别名，不证明 output field schema/type，不授权跨生产者 ABI 写入，也不改变 Procedure/Route 语义。Runtime / 5GC NOT_RUN。
 
