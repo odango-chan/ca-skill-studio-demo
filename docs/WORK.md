@@ -174,10 +174,10 @@ main browser application remains available at `/classic/`.
 **未包含：** Node 插入/删除、Phase Step 编辑、Binding 编辑、Root 路径筛选、Runtime / 5GC。该增量由 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96) 跟踪；IDE Host、Theia backend Chromium、Theia browser-only 和 Inspector Undo 真实 Chromium 均在 exact head `6ed046b` PASS。PR 尚未合并，Pages 未部署。
 
 
-## 2026-11-10 · Theia Phase Input Binding authoring（D4-A1 首个增量，待验收）
+## 2026-11-10 · Theia Phase Input Binding authoring（D4-A1 首个增量，exact-head PASS，待review/merge）
 
 **范围：** 在原生 Inspector 的 Phase Step 行增加「Edit Phase Input Binding」上下文操作。仅允许将既有 `with.<key>.from` 从当前输入改绑到同一 Procedure 中、声明类型相同的另一个 `input.*`。复用 `site/phase-bindings.mjs` 的候选集、资格判定、精确 Source span、图语义不变量和不可伪造 Preview；Theia 只负责版本校验、显式 Diff 确认与原生 WorkspaceEdit / Undo。
 
 **拒绝边界：** 不新增/删除 Phase 或 Step，不改 Operator，不绑定 output producer、不跨 Procedure、不猜 Runtime 参数兼容性；引号、别名、锚点和非 plain scalar 继续拒绝。没有同类型替代输入的 Step 不显示编辑动作。Classic 保持完整。
 
-**验收：** [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97) exact-head IDE Host、Theia backend Chromium、browser-only Chromium 与 Undo 门禁待跑；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
+**验收：** [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97) exact head `b6a80ab` 的 IDE Host、Theia backend Chromium、browser-only Chromium 与 PR Verify 均 PASS；两种真实 Chromium 模式均验证 Source v10 → v11 → v12（编辑后原生 Undo）。PR 仍基于 #96 堆叠，待 review/merge；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
