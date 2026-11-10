@@ -46,7 +46,7 @@ function openDoc(uri,text,version){return {uri,version,getText:()=>text,isDirty:
 test("Package snapshot keeps exact root, required files, language ids and unsaved text",async()=>{
   const openProcedure=openDoc(procedureUri,"procedures: {unsaved: true}\n",9);
   const openPython=openDoc(pythonUri,"def unsaved(): pass\n",3);
-  const openNew=openDoc(unsavedNewUri,"def notYetSaved(): pass\\n",1);
+  const openNew=openDoc(unsavedNewUri,"def notYetSaved(): pass\n",1);
   const vscode=makeVscode({
     files:[procedureUri,contractUri,predicatesUri,pythonUri,jsonUri],
     open:[openProcedure,openPython,openNew]
