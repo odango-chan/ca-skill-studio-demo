@@ -20,7 +20,9 @@
     "onStartupFinished",
     "onCommand:skillStudio.auditPackage",
     "onCommand:skillStudio.previewMarkdown",
-    "onCommand:skillStudio.refreshInspection"
+    "onCommand:skillStudio.refreshInspection",
+    "onCommand:skillStudio.renameNode",
+    "onCommand:skillStudio.editNodeOperatorValue"
   ],
   "contributes": {
     "commands": [
@@ -43,6 +45,14 @@
       {
         "command": "skillStudio.refreshInspection",
         "title": "SKILL Studio: Refresh Inspection"
+      },
+      {
+        "command": "skillStudio.renameNode",
+        "title": "SKILL Studio: Rename Node"
+      },
+      {
+        "command": "skillStudio.editNodeOperatorValue",
+        "title": "SKILL Studio: Edit Node Operator Value"
       }
     ],
     "menus": {
@@ -73,6 +83,18 @@
           "command": "skillStudio.refreshInspection",
           "when": "view == skillStudio.inspection",
           "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "skillStudio.renameNode",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
+          "group": "1_node"
+        },
+        {
+          "command": "skillStudio.editNodeOperatorValue",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
+          "group": "2_node"
         }
       ]
     },
