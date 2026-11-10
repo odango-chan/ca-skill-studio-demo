@@ -80,6 +80,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(const name of ['Packages','Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
   // C4: Package Overview discovers the current Package and exposes file-kind groups.
   await invoke('skillStudio.refreshPackages');
+  const packageScanResult=await evalJS('window.__skillStudioLastCommandResult??null');
+  console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(packageScanResult));
   let packageInventory='';
   for(let attempt=0;attempt<100;attempt++){
     packageInventory=await evalJS('document.body.innerText');
@@ -89,7 +91,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }
   if(!packageInventory.includes('1 SKILL Package')||
      !packageInventory.includes('establish-pdu-session'))
-    throw Error('Package Overview did not discover the current Package: '+packageInventory.slice(-1200));
+    throw Error('Package Overview did not discover the current Package: '+JSON.stringify({packageScanResult,body:packageInventory.slice(-1200)}));
   const packageRow=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.includes('establish-pdu-session')&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!packageRow)throw Error('Package Overview package row is not visible');
   await click(packageRow.x,packageRow.y);await sleep(250);
