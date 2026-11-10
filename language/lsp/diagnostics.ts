@@ -22,7 +22,7 @@ export interface LspDiagnostic {
 }
 export interface DocumentDiagnostics {
   readonly uri: string;
-  readonly version: number;
+  readonly version: number | null;
   readonly generation: number;
   readonly diagnostics: readonly LspDiagnostic[];
 }
