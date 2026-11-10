@@ -466,6 +466,131 @@ export function registerWorkbench(vscode,context){
     ));
   }
 
+
+  // L2-D3 real-Theia acceptance: authoritative dirty buffers and latest
+  // cross-file generation. Test-only commands never authorize Runtime writes.
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.languageUnsavedAcceptance",
+      async procedureUriValue=>{
+        const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
+        const procedure=await vscode.workspace.openTextDocument(procedureUri);
+        const root=packageRootForProcedure(vscode,procedure);
+        const state=root?languagePackages.get(root.uri.toString()):null;
+        if(!state)throw Error("L2-D3: active Package state missing");
+        const paths=[
+          ["contract","assurance/contract.yaml"],
+          ["predicates","assurance/predicates.yaml"],
+          ["python","scripts/select_establishment_configuration.py"]
+        ];
+        const entries=[];
+        const disk=async uri=>new TextDecoder("utf-8",{fatal:true}).decode(
+          await vscode.workspace.fs.readFile(uri));
+        const replace=async(doc,value)=>{
+          if(doc.getText()===value)return;
+          const edit=new vscode.WorkspaceEdit();
+          edit.replace(doc.uri,new vscode.Range(doc.positionAt(0),
+            doc.positionAt(doc.getText().length)),value);
+          if(!await vscode.workspace.applyEdit(edit))
+            throw Error("L2-D3: rejected native WorkspaceEdit for "+doc.uri);
+        };
+        const ready=async(before,phase)=>{
+          const start=Date.now();
+          while(Date.now()-start<18000){
+            const generation=state.generation;
+            const status=languageStatusItem?.text??"";
+            const tooltip=String(languageStatusItem?.tooltip??"");
+            if(generation>before&&status==="SKILL LSP: READY"&&
+               tooltip.includes("generation "+generation))return generation;
+            if(status==="SKILL LSP: ERROR"||status==="SKILL LSP: UNAVAILABLE")
+              throw Error("L2-D3 "+phase+" failed: "+tooltip);
+            await new Promise(resolve=>setTimeout(resolve,50));
+          }
+          throw Error("L2-D3 "+phase+" stale or unready generation "+state.generation+
+            " / "+languageStatusItem?.text);
+        };
+        const getHover=async()=>{
+          const lines=procedure.getText().split(/\r\n|\n|\r/);
+          const target="scripts/select_establishment_configuration.py";
+          const line=lines.findIndex(x=>x.includes("script: "+target));
+          if(line<0)throw Error("L2-D3: missing Procedure script declaration");
+          const char=lines[line].indexOf(target)+12;
+          const result=await vscode.commands.executeCommand(
+            "vscode.executeHoverProvider",procedureUri,new vscode.Position(line,char));
+          return (Array.isArray(result)?result:result?[result]:[])
+            .flatMap(x=>Array.isArray(x?.contents)?x.contents:[x?.contents])
+            .map(x=>typeof x==="string"?x:x?.value??String(x??"")).join(" ");
+        };
+        let evidence=null;
+        try{
+          for(const [name,path] of paths){
+            const uri=vscode.Uri.joinPath(root.uri,...path.split("/"));
+            const doc=await vscode.workspace.openTextDocument(uri);
+            await openNativeSource(vscode,uri,{preview:true});
+            const original=doc.getText();
+            if(doc.isDirty||await disk(uri)!==original)
+              throw Error("L2-D3: initial "+name+" Source is not clean");
+            entries.push({name,path,uri,doc,original});
+          }
+          const before=state.generation;
+          const [contract,predicates,python]=entries;
+          const old="# name: select-establishment-configuration";
+          const first="# name: select-establishment-configuration-l2d3-first";
+          const latest="# name: select-establishment-configuration-l2d3-latest";
+          if(!python.original.includes(old))throw Error("L2-D3: script metadata missing");
+          await replace(contract.doc,contract.original+"\n# l2d3 unsaved contract probe\n");
+          await replace(predicates.doc,predicates.original+"\n# l2d3 unsaved predicate probe\n");
+          await replace(python.doc,python.original.replace(old,first));
+          await replace(python.doc,python.original.replace(old,latest));
+          const generation=await ready(before,"cross-file edits");
+          const snapshot=await collectPackageSnapshot(vscode,procedure,generation);
+          if(snapshot.completeness!=="complete")
+            throw Error("L2-D3: incomplete Package snapshot "+snapshot.reason);
+          const covered=[];
+          for(const entry of entries){
+            const match=snapshot.documents.find(x=>x.relativePath===entry.path);
+            if(!entry.doc.isDirty||!match||match.text!==entry.doc.getText()||
+               match.version!==entry.doc.version||await disk(entry.uri)!==entry.original)
+              throw Error("L2-D3: dirty "+entry.name+" was lost or persisted");
+            covered.push({name:entry.name,version:match.version,dirty:true});
+          }
+          const hover=await getHover();
+          if(!hover.includes("-l2d3-latest")||hover.includes("-l2d3-first"))
+            throw Error("L2-D3: stale native Hover after rapid Python edit: "+
+              hover.slice(0,400));
+          evidence={generationBefore:before,generationLatest:generation,covered,
+            latestPythonHover:true,originalDiskUnchanged:true};
+        }finally{
+          const beforeRestore=state.generation,problems=[];
+          for(const entry of entries){
+            try{await replace(entry.doc,entry.original);}
+            catch(error){problems.push(entry.name+": "+String(error?.message??error));}
+          }
+          if(entries.length===paths.length&&!problems.length){
+            try{
+              await ready(beforeRestore,"restore");
+              for(const entry of entries){
+                if(entry.doc.getText()!==entry.original||
+                   await disk(entry.uri)!==entry.original)
+                  problems.push("restore mismatch: "+entry.name);
+              }
+              if(evidence){
+                const hover=await getHover();
+                if(hover.includes("-l2d3-")||
+                   !hover.includes("select-establishment-configuration"))
+                  problems.push("native Hover retained stale Python name");
+              }
+            }catch(error){problems.push(String(error?.message??error));}
+          }
+          try{await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);}
+          catch(error){problems.push("Procedure focus: "+String(error?.message??error));}
+          if(problems.length)throw Error("L2-D3 cleanup: "+problems.join("; "));
+        }
+        return {...evidence,restored:true};
+      }
+    ));
+  }
+
   function currentNode(item){
     if(!document||!isProcedurePath(document.uri.path))throw Error("No active Procedure Source");
     const doc=document,source=doc.getText(),version=doc.version;
