@@ -38,10 +38,15 @@
     "onCustomEditor:skillStudio.predicatePreview",
     "onCommand:skillStudio.openPredicates",
     "onCustomEditor:skillStudio.schemaPreview",
-    "onCommand:skillStudio.openSchema"
+    "onCommand:skillStudio.openSchema",
+    "onCommand:skillStudio.refreshPackages"
   ],
   "contributes": {
     "commands": [
+      {
+        "command": "skillStudio.refreshPackages",
+        "title": "SKILL Studio: Refresh Packages"
+      },
       {
         "command": "skillStudio.openSchema",
         "title": "SKILL Studio: Open Schema Visual"
@@ -153,6 +158,11 @@
       ],
       "view/title": [
         {
+          "command": "skillStudio.refreshPackages",
+          "when": "view == skillStudio.packages",
+          "group": "navigation"
+        },
+        {
           "command": "skillStudio.loadExample",
           "when": "view == workbench.explorer.fileView",
           "group": "navigation"
@@ -169,6 +179,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "skillStudio.previewMarkdown",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.packageMarkdown",
+          "group": "navigation"
+        },
         {
           "command": "skillStudio.renameNode",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
@@ -347,6 +362,10 @@
       {
         "view": "workbench.explorer.fileView",
         "contents": "**欢迎使用 SKILL Studio**\\n\\n还没有打开项目？可以先载入内置演示项目，体验 SKILL 文件树、YAML / Python 编辑，以及 Procedure 可视化。\\n\\n[载入演示 SKILL 项目](command:skillStudio.loadExample)\\n\\n演示项目会复制到浏览器工作区，不会覆盖已有文件。"
+      },
+      {
+        "view": "skillStudio.packages",
+        "contents": "**SKILL Packages**\n\n在当前 Workspace 中发现 SKILL.md 与 assurance 文件，并按文件类型归类。\n\n[刷新 Package 清单](command:skillStudio.refreshPackages)\n\n此处仅清点文件，不代表语义校验或 Runtime 验收。"
       }
     ],
     "viewsContainers": {
@@ -360,6 +379,10 @@
     },
     "views": {
       "skillStudio": [
+        {
+          "id": "skillStudio.packages",
+          "name": "Packages"
+        },
         {
           "id": "skillStudio.inspection",
           "name": "Inspection / Inspector"
