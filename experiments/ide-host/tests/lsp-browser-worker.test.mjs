@@ -329,6 +329,16 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
     assert.equal(initialized.result.serverInfo.name,"Skill Studio Language Service");
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
+    // Register all listeners before sending: LanguageDiagnosticSession publishes
+    // document diagnostics before the matching analysisStatus notification.
+    const statusAWait=wait("Package A initial status",message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===rootA&&message.params?.generation===1);
+    const statusBWait=wait("Package B initial status",message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===rootB&&message.params?.generation===1);
+    const diagnosticAWait=wait("Package A initial diagnostic",diagnosticFor(procedureA,1));
+    const diagnosticBWait=wait("Package B initial diagnostic",diagnosticFor(procedureB,1));
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(1,"procedures: [\n",rootA)
@@ -337,43 +347,39 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(1,"procedures: [\n",rootB)
     });
-    const [statusA,statusB]=await Promise.all([
-      wait("Package A initial status",message=>message?.method==="skillStudio/analysisStatus"&&
-        message.params?.rootUri===rootA&&message.params?.generation===1),
-      wait("Package B initial status",message=>message?.method==="skillStudio/analysisStatus"&&
-        message.params?.rootUri===rootB&&message.params?.generation===1)
+    const [statusA,statusB,publishedA,publishedB]=await Promise.all([
+      statusAWait,statusBWait,diagnosticAWait,diagnosticBWait
     ]);
     assert.equal(statusA.params.state,"PARTIAL");
     assert.equal(statusB.params.state,"PARTIAL");
-    const [publishedA,publishedB]=await Promise.all([
-      wait("Package A initial diagnostic",diagnosticFor(procedureA,1)),
-      wait("Package B initial diagnostic",diagnosticFor(procedureB,1))
-    ]);
     assert.ok(publishedA.params.diagnostics.some(item=>item.code==="PROCEDURE_PROJECTION"));
     assert.ok(publishedB.params.diagnostics.some(item=>item.code==="PROCEDURE_PROJECTION"));
 
+    const clearAWait=wait("Package A close diagnostic clear",message=>
+      diagnosticFor(procedureA)(message)&&message.params.diagnostics.length===0);
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageClose",
       params:{rootUri:rootA}
     });
-    const clearedA=await wait("Package A close diagnostic clear",message=>
-      diagnosticFor(procedureA)(message)&&message.params.diagnostics.length===0
-    );
+    const clearedA=await clearAWait;
     assert.equal(clearedA.params.diagnostics.length,0);
     const bWasNotCleared=await expectNoMessage(worker,message=>
       diagnosticFor(procedureB)(message)&&message.params.diagnostics.length===0,250);
     assert.equal(bWasNotCleared,null,
       "closing Package A must not clear Package B diagnostics");
 
+    const reopenedStatusWait=wait("Package A reopened status",message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===rootA&&message.params?.generation===2);
+    const republishedAWait=wait("Package A reopened diagnostic",diagnosticFor(procedureA,2));
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(2,"procedures: [\n",rootA)
     });
-    const reopened=await wait("Package A reopened status",message=>
-      message?.method==="skillStudio/analysisStatus"&&
-      message.params?.rootUri===rootA&&message.params?.generation===2);
+    const [reopened,republishedA]=await Promise.all([
+      reopenedStatusWait,republishedAWait
+    ]);
     assert.equal(reopened.params.state,"PARTIAL");
-    const republishedA=await wait("Package A reopened diagnostic",diagnosticFor(procedureA,2));
     assert.ok(republishedA.params.diagnostics.some(item=>
       item.code==="PROCEDURE_PROJECTION"));
     const bStillOwned=await expectNoMessage(worker,message=>
@@ -381,12 +387,13 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
     assert.equal(bStillOwned,null,
       "reopening Package A must not invalidate Package B diagnostics");
 
+    const clearBWait=wait("Package B close diagnostic clear",message=>
+      diagnosticFor(procedureB)(message)&&message.params.diagnostics.length===0);
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageClose",
       params:{rootUri:rootB}
     });
-    const clearedB=await wait("Package B close diagnostic clear",message=>
-      diagnosticFor(procedureB)(message)&&message.params.diagnostics.length===0);
+    const clearedB=await clearBWait;
     assert.equal(clearedB.params.diagnostics.length,0);
   }finally{
     await worker.terminate();
