@@ -76,3 +76,40 @@ test('Existing Skill fixture can be projected without Runtime assumptions', () =
   assert.ok(p.entryProcedure.value);
   assert.ok(p.postconditions.length);
 });
+
+
+test('Full Owner Contract sections are projected, including requirements and dependencies', () => {
+  const advanced = contract
+    .replace('  postconditions:',
+      '  preconditions:\n  - predicate: session.input_ready\n    expect: PASS\n  postconditions:')
+    .replace('  planning:\n    maxActions: 32\n    allowDynamicProcedure: false',
+      '  requirements:\n  - predicate: policy.ready\n    expect: PASS\n    satisfiable: true\n' +
+      '  dependencies:\n  - name: child-skill\n    artifactRef: child-skill\n' +
+      '    digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n' +
+      '    variant: compact\n  planning:\n    maxActions: 32\n' +
+      '    allowDynamicProcedure: false\n    fallbackProcedure: recover\n' +
+      '    budgetPartition:\n      parentActions: 10\n      childActions: 22');
+  const p = projectSkillContract(advanced);
+  assert.equal(p.state, 'READY');
+  assert.equal(p.preconditions[0].predicate.value, 'session.input_ready');
+  assert.equal(p.requirements[0].satisfiable.value, true);
+  assert.equal(p.dependencies[0].artifactRef.value, 'child-skill');
+  assert.equal(p.dependencies[0].variant.value, 'compact');
+  assert.equal(p.fallbackProcedure.value, 'recover');
+  assert.equal(p.budgetPartition.parentActions.value, 10);
+  assert.equal(p.budgetPartition.childActions.value, 22);
+});
+
+test('Unknown nested fields and malformed known sections are explicitly partial', () => {
+  const unknown = contract.replace('    requiredFacts:',
+    '    futureContextPolicy: strict\n    requiredFacts:');
+  const p = projectSkillContract(unknown);
+  assert.equal(p.state, 'PARTIAL');
+  assert.ok(p.unprojectedPaths.includes('spec.context.futureContextPolicy'));
+
+  const malformed = contract.replace('    requiredFacts:\n    - ingress',
+    '    requiredFacts: ingress');
+  const partial = projectSkillContract(malformed);
+  assert.equal(partial.state, 'PARTIAL');
+  assert.ok(partial.projectionWarnings.includes('spec.context.requiredFacts is not a sequence'));
+});
