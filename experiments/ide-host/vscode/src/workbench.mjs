@@ -668,6 +668,66 @@ export function registerWorkbench(vscode,context){
     ));
   }
 
+
+  // L2-D4 real Chromium fault acceptance: after the browser closes the actual
+  // language Worker target, native TextDocument/WorkspaceEdit must still work.
+  // This command never terminates a Worker or fabricates a transport failure.
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.languageDegradedEditingAcceptance",
+      async procedureUriValue=>{
+        if(!languageTransportFailure||
+           languageStatusItem?.text!=="SKILL LSP: UNAVAILABLE")
+          throw Error("L2-D4: terminal browser Worker failure was not observed");
+        const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
+        const proc=await vscode.workspace.openTextDocument(procedureUri);
+        const root=packageRootForProcedure(vscode,proc);
+        if(!root)throw Error("L2-D4: active Procedure Package missing");
+        const uri=vscode.Uri.joinPath(root.uri,"scripts",
+          "select_establishment_configuration.py");
+        const doc=await vscode.workspace.openTextDocument(uri);
+        const original=doc.getText();
+        const disk=()=>vscode.workspace.fs.readFile(uri).then(bytes=>
+          new TextDecoder("utf-8",{fatal:true}).decode(bytes));
+        if(doc.isDirty||await disk()!==original)
+          throw Error("L2-D4: native Python editor baseline is not clean");
+        const edit=async value=>{
+          const transaction=new vscode.WorkspaceEdit();
+          transaction.replace(uri,new vscode.Range(doc.positionAt(0),
+            doc.positionAt(doc.getText().length)),value);
+          if(!await vscode.workspace.applyEdit(transaction))
+            throw Error("L2-D4: native Source WorkspaceEdit was rejected");
+        };
+        let edited=false;
+        try{
+          await openNativeSource(vscode,uri,{preview:true});
+          await edit(original+"\n# l2-d4 native editor survives Worker failure\n");
+          if(!doc.isDirty||!doc.getText().includes("l2-d4 native editor")||
+             await disk()!==original)
+            throw Error("L2-D4: native unsaved Python editing failed after Worker exit");
+          edited=true;
+        }finally{
+          const cleanup=[];
+          try{
+            await edit(original);
+            if(doc.getText()!==original||await disk()!==original)
+              throw Error("restoration did not recover original Python Source");
+            if(doc.isDirty&&!await doc.save())
+              throw Error("native clean-buffer save rejected");
+            if(doc.isDirty||await disk()!==original)
+              throw Error("Python Source remained dirty after restoration");
+          }catch(error){cleanup.push(String(error?.message??error));}
+          try{await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);}
+          catch(error){cleanup.push("Procedure focus: "+String(error?.message??error));}
+          if(cleanup.length)throw Error("L2-D4 cleanup failed: "+cleanup.join("; "));
+        }
+        return {workerUnavailable:true,nativePythonEditing:edited,
+          originalDiskUnchanged:true,restored:true,
+          status:languageStatusItem?.text};
+      }
+    ));
+  }
+
   function currentNode(item){
     if(!document||!isProcedurePath(document.uri.path))throw Error("No active Procedure Source");
     const doc=document,source=doc.getText(),version=doc.version;
