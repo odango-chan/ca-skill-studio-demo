@@ -17,8 +17,8 @@ const FIELDS = new Set([
   'required', 'items', 'additionalProperties', ...CONSTRAINTS
 ]);
 const scalar = n => isScalar(n) ? n.value : undefined;
-const pathOf = (...parts) => '#/' + parts.map(part =>
-  String(part).replaceAll('~', '~0').replaceAll('/', '~1')).join('/');
+const pathOf = (...parts) => parts.length ? '#/' + parts.map(part =>
+  String(part).replaceAll('~', '~0').replaceAll('/', '~1')).join('/') : '#';
 const lineOf = (n, counter) => counter.linePos(n?.range?.[0] ?? 0).line || 1;
 const child = (map, key) => isMap(map) ? map.get(key, true) : undefined;
 const sourceField = (n, counter, pointer) => isScalar(n)
