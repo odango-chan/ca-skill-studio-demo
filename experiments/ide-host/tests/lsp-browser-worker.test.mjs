@@ -92,4 +92,7 @@ test("built browser Worker is isolated from Node filesystem and process transpor
   const bundle=await readFile(resolve("experiments/ide-host/vscode/dist/skill-language-server.js"),"utf8");
   assert.match(bundle,/skillStudio\/packageSnapshot/);
   assert.doesNotMatch(bundle,/node:fs|node:worker_threads|process\.stdin|process\.stdout/);
+  const extensionBundle=await readFile(resolve("experiments/ide-host/vscode/dist/extension-theia.js"),"utf8");
+  assert.match(extensionBundle,/skillStudioLanguageService/);
+  assert.match(extensionBundle,/skill-language-server\.js/);
 });
