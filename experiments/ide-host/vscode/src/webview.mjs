@@ -21,7 +21,29 @@ let state={text:"",version:0,procedures:null,procedureId:null,entry:null,graph:n
   layoutDirection:"DOWN",fitMode:"all",showAllLabels:false,neighborsOnly:false,
   rootPathMode:"normal",pathCategories:new Set(),expandedNodes:new Set()},epoch=0,focusTicket=0;
 const layouts=new Map();
-let projectionMs=0;
+let projectionMs=0,pendingPackageZip=null;
+function base64ToBytes(value){
+  if(typeof value!=="string"||value.length>16*1024*1024)
+    throw new Error("ZIP 下载数据超出安全上限");
+  const binary=atob(value),bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return bytes;
+}
+function downloadPreparedPackageZip(){
+  if(!pendingPackageZip)return;
+  try{
+    const bytes=base64ToBytes(pendingPackageZip.base64);
+    const blob=new Blob([bytes],{type:"application/zip"});
+    const url=URL.createObjectURL(blob),link=document.createElement("a");
+    link.href=url;link.download=pendingPackageZip.filename;
+    document.body.appendChild(link);link.click();link.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(url),30000);
+    status("已请求下载 "+pendingPackageZip.filename+" · "+
+      pendingPackageZip.fileCount+" 个文件；工作区和原始文件未被修改。");
+    pendingPackageZip=null;
+    $("zipExportNotice").hidden=true;
+  }catch(error){status("ZIP 下载失败："+String(error?.message??error));}
+}
 function publishSelection(){vscode.postMessage({type:"selection",version:state.version,procedureId:state.procedureId,nodeId:state.selection?.kind==="node"?state.selection.id:null});}
 const status=text=>{$("message").textContent=text;};
 const canvas=mountProcedureCanvas($("reactFlowRoot"),{
@@ -518,10 +540,32 @@ $("commit").addEventListener("click",()=>{
   }
   status("已提交 Patch 请求；等待原生 TextDocument 确认…");
 });
+$("exportPackageZip").addEventListener("click",()=>{
+  vscode.postMessage({type:"exportPackageZip"});
+  status("正在读取当前 Package 并准备 ZIP；不会写入磁盘或覆盖原文件…");
+});
+$("downloadPackageZip").addEventListener("click",downloadPreparedPackageZip);
+$("dismissPackageZip").addEventListener("click",()=>{
+  pendingPackageZip=null;$("zipExportNotice").hidden=true;
+});
 window.addEventListener("message",event=>{
   const data=event.data;
   if(!data||typeof data!=="object")return;
-  if(data.type==="focusNode"&&data.version===state.version&&state.procedures?.has(data.procedureId)){
+  if(data.type==="packageZipReady"){
+    if(typeof data.filename!=="string"||
+      !/^[A-Za-z0-9._-]{1,100}\\.zip$/.test(data.filename)||
+      typeof data.base64!=="string"||
+      !Number.isSafeInteger(data.fileCount)||data.fileCount<1||data.fileCount>64||
+      !Number.isSafeInteger(data.opaqueCount)||data.opaqueCount<0||data.opaqueCount>64){
+      status("Package ZIP 响应无效，已拒绝下载。");return;
+    }
+    pendingPackageZip=data;
+    $("zipExportDetails").textContent=data.filename+" · "+data.fileCount+
+      " 个文件 · "+data.opaqueCount+" 个二进制/不透明文件原样保留";
+    $("zipExportNotice").hidden=false;
+    status("Package ZIP 已准备好；请点击“下载 ZIP”完成浏览器下载。");
+  }
+  else if(data.type==="focusNode"&&data.version===state.version&&state.procedures?.has(data.procedureId)){
     void showProcedure(data.procedureId).then(()=>openNodeFocus(data.nodeId));
   }
   else if(data.type==="snapshot")receiveSnapshot(data);
