@@ -96,8 +96,6 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(1,"procedures: [\n")
     });
-    worker.postMessage({
-      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
     const stalePublication=await expectNoMessage(worker,message=>
       message?.method==="textDocument/publishDiagnostics" &&
       message.params?.uri==="file:///workspace/skill/assurance/procedure.yaml" &&
@@ -105,6 +103,8 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
       message.params?.diagnostics?.some(item=>item.code==="PROCEDURE_PROJECTION")
     );
     assert.equal(stalePublication,null,"old generation must not republish diagnostics");
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(2,"procedures: [\n")
     });
     const latest=await waitForMessage(worker,message=>
