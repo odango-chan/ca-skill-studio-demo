@@ -2010,6 +2010,10 @@ export function registerWorkbench(vscode,context){
     context.subscriptions.push(emitter,vscode.window.registerTreeDataProvider('skillStudio.'+id,provider));
   }
   const fire=()=>{for(const p of providers.values())p.fire();};
+  // Audit status belongs to Problems. Do not refresh every source tree for
+  // status-only changes: concurrent root refreshes can invalidate an expanded
+  // Evidence node while its lazy children are being resolved.
+  const fireProblems=()=>providers.get('problems')?.fire();
   function update(doc,choice){
     if(!isProcedurePath(doc?.uri.path))return;
     const key=doc.uri.toString(),same=document?.uri.toString()===key;
@@ -2040,7 +2044,7 @@ export function registerWorkbench(vscode,context){
   async function auditCurrent(){
     if(!document)return;
     const doc=document,version=doc.version,ticket=++generation;
-    auditStatus="Package Audit · running";fire();
+    auditStatus="Package Audit · running";fireProblems();
     const files=new Map(),uris=new Map();
     try{
       const base=doc.uri.with({path:doc.uri.path.slice(0,-'assurance/procedure.yaml'.length)});
@@ -2077,13 +2081,13 @@ export function registerWorkbench(vscode,context){
           diagnostic.source='Skill Studio · editor audit';diagnostic.code=d.code;return diagnostic;
         }));
       }
-      fire();
+      fireProblems();
     }catch(error){
       if(ticket!==generation)return;
       packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
       auditStatus='Package Audit · unavailable';
       audit=[{message:'Audit unavailable: '+error.message,line:1,uri:doc.uri}];
-      diagnostics.clear();update(doc);fire();
+      diagnostics.clear();update(doc);fireProblems();
     }
   }
   function scheduleAudit(){
@@ -2091,7 +2095,7 @@ export function registerWorkbench(vscode,context){
     packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
     auditStatus="Package Audit · pending";audit=[];diagnostics.clear();
     if(document)update(document);
-    timer=setTimeout(()=>void auditCurrent(),350);fire();
+    timer=setTimeout(()=>void auditCurrent(),350);fireProblems();
   }
   async function preparePackageZip(){
     const doc=document,suffix='assurance/procedure.yaml';
