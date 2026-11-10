@@ -1,6 +1,6 @@
 # Theia 工作台与 Classic 功能对照
 
-**Status: Stage One accepted; Inspector Node authoring increment pending acceptance · Date: 2026-11-10**
+**Status: Stage One accepted; Inspector Node and Phase Binding authoring increments passed exact-head CI, pending review/merge · Date: 2026-11-10**
 
 第一阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；当前 Inspector Node authoring 见 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)；Phase Input Binding 首个增量见 [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97)。验收见 WORK / TRACEABILITY 与各自 exact-head PR CI。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
 
@@ -15,7 +15,7 @@
 | Problems / Package Audit | 编辑期跨文件提醒 | 原生视图及宿主诊断 collection | 直接复用 package-audit；读取当前 Package 和已打开的未保存文档；缺必要文件明确 unavailable |
 | Markdown Preview | 安全只读预览 | 原生命令 / Explorer 右键预览 | 直接复用 markdown-preview；无脚本、无外部图像；随文档变化刷新 |
 | Route 创建 / 重连 / Diff / Apply / Undo | 有界实现 | 已有且保留 | 复用 route-connect / route-target、原生 WorkspaceEdit；仍要求 Diff 后显式确认 |
-| Phase Designer | 有界 Step / binding / verify 编辑 | 首个 D4-A1 Phase Input Binding 编辑进入 PR #97 验收 | 仅修改现有 Step 的 `with.<key>.from`；同一 Procedure 中同类型的已声明输入；复用 `site/phase-bindings.mjs`；Phase/Step/Route 结构不变；完整 Step、Verify、Producer/Consumer 编辑仍缺失 |
+| Phase Designer | 有界 Step / binding / verify 编辑 | 首个 D4-A1 Phase Input Binding 编辑（PR #97 exact-head PASS，待 review/merge） | 仅修改现有 Step 的 `with.<key>.from`；同一 Procedure 中同类型的已声明输入；复用 `site/phase-bindings.mjs`；Phase/Step/Route 结构不变；完整 Step、Verify、Producer/Consumer 编辑仍缺失 |
 | Node 重命名 / Operator 值编辑 | 有界实现 | 首批适配（PR #96 exact-head PASS，待review/merge） | 复用 `site/node-designer.mjs` / `site/node-attributes.mjs`；仅精确 Source spans，拒绝过期选择；原生 WorkspaceEdit / Undo；不支持 Operator kind 替换或不安全标量 |
 | Node 插入 / 删除 | 有界实现 | 未迁移 | 仍由 Classic 提供；后续迁移需保留 Route 影响检查与显式 Diff |
 | Root 路径筛选 / 锚定 | 已有 | 未迁移 | Theia 仍显示完整声明图 |
