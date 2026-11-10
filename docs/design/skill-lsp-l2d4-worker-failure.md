@@ -22,3 +22,7 @@ This slice does not claim recovery to READY, automatic Worker recreation, or cle
 ## Delivery
 
 Draft stacked on L2-D3a (#117); no merge to main, no Pages deployment, no Runtime or 5GC operations. Exact-head real Chromium PASS is mandatory.
+
+## First Chromium integration failure (pre-fault)
+
+The first exact-head run did not reach fault injection: the existing D1 editor feature acceptance waited on a current Package generation that returned `PARTIAL`, despite a structurally complete snapshot and no published diagnostics. This remains a failure, not an accepted degraded result. The new diagnostic-only status fields report the exact generation's Procedure projection state, Procedure diagnostic count, Package Audit state and unavailability reason, and the host tooltip surfaces them when `PARTIAL`. Follow-up must establish whether source/undo left an actually invalid graph or analysis misclassified a valid Package, rather than adding sleeps or accepting stale READY.
