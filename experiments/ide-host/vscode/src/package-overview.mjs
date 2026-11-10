@@ -45,6 +45,32 @@ export function packageFileCommand(path, uri) {
 // Inventory only. It does not parse or validate Package contents.
 // A package is discovered from SKILL.md or an assurance core file so incomplete
 // packages remain visible instead of disappearing from the workbench.
+export function packageScanRoots(workspaceFolders, openDocuments = []) {
+  const folders = (workspaceFolders ?? [])
+    .map(folder=>folder?.uri).filter(uri=>typeof uri?.path==='string');
+  if (folders.length) return folders;
+  // Browser-only Theia can expose an imported OPFS Package through an open
+  // TextDocument before it reports a workspace folder. Recover only the
+  // nearest known Skills/workspaces container, never scan the whole OPFS.
+  const roots = new Map();
+  for (const document of openDocuments ?? []) {
+    const path = document?.uri?.path;
+    if (typeof path !== 'string') continue;
+    let packageRoot = packageMarker(path);
+    if (!packageRoot) {
+      const match = path.match(/^(.*\\/(?:skills|workspaces)\\/[^/]+)(?:\\/|$)/);
+      if (match) packageRoot = match[1];
+    }
+    if (!packageRoot) continue;
+    const parent = parentOf(packageRoot);
+    const container = ['skills','workspaces'].includes(basename(parent))
+      ? parent : packageRoot;
+    const uri = document.uri.with?.({path:container});
+    if (uri) roots.set(uri.toString(),uri);
+  }
+  return [...roots.values()];
+}
+
 export function buildPackageInventory(uris, dirtyPaths = new Set(), truncated = false) {
   const files = (Array.isArray(uris) ? uris : [])
     .filter(uri => uri && typeof uri.path === 'string' && !NOISE.test(uri.path))
@@ -170,13 +196,23 @@ export function registerPackageOverview(vscode,context) {
     vscode.window.registerTreeDataProvider('skillStudio.packages',provider));
   async function refresh() {
     const ticket = ++generation;
-    const folders = vscode.workspace.workspaceFolders ?? [];
-    if (!folders.length) {
-      packages=[];inventoryState='no-workspace';message='请先打开 Workspace';fire();return [];
-    }
     try {
-      const found = await vscode.workspace.findFiles(
-        '**/*','**/node_modules/**',FILE_LIMIT+1);
+      const roots = packageScanRoots(folders,vscode.workspace.textDocuments??[]);
+      if (!roots.length) {
+        packages=[];inventoryState='no-workspace';message='请先打开 Workspace 或一个 SKILL 文件';fire();return [];
+      }
+      const found = [], seen = new Set();
+      for (const root of roots) {
+        const remaining = FILE_LIMIT+1-found.length;
+        if (remaining <= 0) break;
+        const pattern = new vscode.RelativePattern(root,'**/*');
+        const batch = await vscode.workspace.findFiles(
+          pattern,'**/node_modules/**',remaining);
+        for (const uri of batch) {
+          const key = uri.toString();
+          if (!seen.has(key)) {seen.add(key);found.push(uri);}
+        }
+      }
       if (ticket !== generation) return packages;
       const truncated = found.length > FILE_LIMIT;
       const visible = found.slice(0,FILE_LIMIT);
