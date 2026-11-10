@@ -84,7 +84,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     return {text:document.body.innerText,headers,trees:document.querySelectorAll('.theia-Tree').length,skillStudioTab};
   })()`);
   for(const name of ['SKILL Inspector','Procedure Outline','Evidence','Problems'])
-    if(!views.text.toLowerCase().includes(name.toLowerCase()))
+    if(!views.headers.some(header=>header.toLowerCase()===name.toLowerCase()))
       throw Error('Native Explorer-contributed view missing: '+name+' · '+JSON.stringify(views.headers));
   if(views.skillStudioTab)
     throw Error('A separate Skill Studio Activity Bar container must not compete with Explorer');
