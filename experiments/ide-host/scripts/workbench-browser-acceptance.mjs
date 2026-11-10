@@ -719,7 +719,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // degraded native editing, explicit restart and dirty-buffer rehydration.
   let workerFailureEvidence=null,recoveryEvidence=null;
   if(requireBrowserLsp){
-    let procedureDiagnosticActive=false,ownershipProbeActive=false,recoveryBufferPrepared=false;
+    let procedureDiagnosticActive=false,ownershipProbeActive=false,
+      recoveryBufferPrepared=false,packageLifecyclePrepared=false;
     let procedureUri=null;
     try{
     procedureUri=await evalJS(`(async()=>{const c=window.theia.container;const opKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');if(!opKey)throw Error('L2-D4 Procedure OpenerService missing');const openers=await c.get(opKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource?.toString()??null;})()`);
@@ -777,6 +778,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       throw Error("L2-D4 native editor or real transport-failure evidence missing: "+
         JSON.stringify(nativeEdit));
 
+    const packageLifecycle=await nativeCommand(
+      "skillStudio.internal.languagePackageLifecycleAcceptance",procedureUri,"prepare");
+    if(!packageLifecycle?.created||packageLifecycle.references!==2)
+      throw Error("L2-D4b multi-Package lifecycle setup failed: "+
+        JSON.stringify(packageLifecycle));
+    packageLifecyclePrepared=true;
     const prepared=await nativeCommand(
       "skillStudio.internal.languageRecoveryAcceptance",procedureUri,"prepare");
     if(!prepared?.dirtyBufferPrepared||!prepared?.originalDiskUnchanged)
@@ -784,9 +791,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     recoveryBufferPrepared=true;
     const recovery=await nativeCommand("skillStudio.restartLanguageService");
     if(!recovery?.recovered||!Array.isArray(recovery.packages)||
-       recovery.packages.length<1||
+       recovery.packages.length!==2||
        recovery.packages.some(item=>item.status!=="READY"))
-      throw Error("L2-D4b explicit Language Worker recovery failed: "+JSON.stringify(recovery));
+      throw Error("L2-D4b explicit multi-Package Language Worker recovery failed: "+
+        JSON.stringify(recovery));
     const recovered=await nativeCommand(
       "skillStudio.internal.languageRecoveryAcceptance",procedureUri,"verify-and-restore");
     if(!recovered?.recovered||!recovered?.dirtyPythonRehydrated||
@@ -795,11 +803,20 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       throw Error("L2-D4b replacement Worker did not rehydrate the unsaved buffer: "+
         JSON.stringify(recovered));
     recoveryBufferPrepared=false;
+    const lifecycle=await nativeCommand(
+      "skillStudio.internal.languagePackageLifecycleAcceptance",
+      procedureUri,"verify-and-close");
+    if(!lifecycle?.twoPackageRecovery||!lifecycle?.firstReferenceRetained||
+       !lifecycle?.finalCloseRemoved||!lifecycle?.generationMonotonic||
+       !lifecycle?.cleaned)
+      throw Error("L2-D4b host Package close/reopen acceptance failed: "+
+        JSON.stringify(lifecycle));
+    packageLifecyclePrepared=false;
 
     workerFailureEvidence={workerTarget:terminated.scriptUri,
       transportUnavailable:true,nativeEditing:nativeEdit,
       diagnosticOwnership:ownership};
-    recoveryEvidence={...recovery,dirtyBuffer:recovered};
+    recoveryEvidence={...recovery,dirtyBuffer:recovered,packageLifecycle:lifecycle};
     console.log("STUDIO_LSP_WORKER_DEGRADED_CHROMIUM",
       JSON.stringify(workerFailureEvidence));
     console.log("STUDIO_LSP_WORKER_RECOVERY_CHROMIUM",
@@ -809,6 +826,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         try{await nativeCommand("skillStudio.internal.languageRecoveryAcceptance",
           procedureUri,"abort-and-restore");}catch(error){
           console.warn("L2-D4b recovery abort cleanup",String(error?.message??error));
+        }
+      }
+      if(packageLifecyclePrepared){
+        try{await nativeCommand("skillStudio.internal.languagePackageLifecycleAcceptance",
+          procedureUri,"abort-and-clean");}catch(error){
+          console.warn("L2-D4b Package lifecycle cleanup",String(error?.message??error));
         }
       }
       if(ownershipProbeActive){
