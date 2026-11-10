@@ -1,6 +1,7 @@
 import { LanguageClient } from "vscode-languageclient/browser";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
+export const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
 export const PACKAGE_CLOSE_NOTIFICATION = "skillStudio/packageClose";
 export const ANALYSIS_STATUS_NOTIFICATION = "skillStudio/analysisStatus";
 export const SERVER_ERROR_NOTIFICATION = "skillStudio/serverError";
@@ -71,6 +72,10 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         });
       }
       await startPromise;
+    },
+    invalidatePackage(rootUri, generation) {
+      if (!started || stopped) return;
+      client.sendNotification(PACKAGE_INVALIDATE_NOTIFICATION, { rootUri, generation });
     },
     sendPackageSnapshot(snapshot) {
       if (!started || stopped) throw new Error("Language client is not running");
