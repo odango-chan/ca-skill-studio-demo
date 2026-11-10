@@ -66,3 +66,13 @@ The real Theia 1.76 `vscode.executeCompletionItemProvider` command returns its c
 ## Restore the workbench after provider probes
 
 The native provider probe opens the Python file to invoke its registered editor providers. Before returning, it reopens the Procedure through the existing `skillStudio.openProcedure` command. The outer Chromium smoke reacquires the live Procedure CustomEditor Webview context before continuing the existing Inspector/Undo regression. This keeps the LSP acceptance isolated and ensures the pre-existing authoring checks still target the visual Procedure editor.
+
+
+## L2-D1 exact-head result
+
+**PASS** at `de8f6d3973ae2fb181015a5a09b188eef5243f50`.
+
+- Real Theia Browser-Only Chromium: Definition, Hover, References, Python Document Symbols and Schema Completion all passed through the native editor-provider commands.
+- Existing Procedure CustomEditor, Inspector edit, native Undo, Route create/reconnect and workbench regressions passed after the probe restored Procedure editor focus.
+- Exact-head CI: IDE Host [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42768148856), backend Theia [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42768148850), Browser-Only [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42768148999), general regression [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42768149112).
+- PR #113 remains Draft and unmerged; no Pages deployment, Runtime qualification or 5GC operation was performed.
