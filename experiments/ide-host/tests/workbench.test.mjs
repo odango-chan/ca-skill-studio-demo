@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {inspectionSnapshot} from '../vscode/src/inspection.mjs';
 import {registerWorkbench} from '../vscode/src/workbench.mjs';
+import {deleteNodeOptions,previewNodeDelete} from '../../../site/node-delete.mjs';
 const root='site/samples/packages/establish-pdu-session/';
 const source=readFileSync(root+'assurance/procedure.yaml','utf8');
 test('Inspection preserves Classic node/phase/route source identity; unknown syntax fails closed',()=>{
@@ -130,6 +131,11 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(doc.text.includes('PASS: ide-host-insert-probe'));
   assert.ok(doc.text.includes('ide-host-insert-probe:\n        call: sbi.demo.insert_probe'));
   assert.equal(appliedEdits.at(-1).length,2,'Node insertion uses one two-span WorkspaceEdit');
+  let deleteDiagnostic='';
+  try{previewNodeDelete(doc.text,routeProcedure,'ide-host-insert-probe','nudm-sdm-subscribe');}
+  catch(error){deleteDiagnostic=error.message;}
+  assert.ok(deleteNodeOptions(doc.text,routeProcedure,'ide-host-insert-probe'),
+    'Inserted single-outcome Node should be deletable: '+deleteDiagnostic);
   workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'ide-host-insert-probe'});
   const insertedNode=providers.get('skillStudio.inspection').getChildren().find(x=>x.kind==='node');
   assert.ok(insertedNode);
