@@ -1,6 +1,6 @@
 # C3 — Schema Designer (stacked on PR #122)
 
-Status: implementation awaiting exact-head tests and real Theia Chromium verification.
+Status: C3 implemented and accepted on code HEAD 95888d82 (2026-11-10); stacked PR #130 remains unmerged and not deployed.
 
 ## Scope
 
@@ -57,3 +57,28 @@ The branch is intentionally stacked on `feat/multifile-contract-designer-spike`.
 When PR #122 lands, retarget/rebase C3 after reviewing the resulting main,
 then run the same acceptance on the rebased head. Never call an isolated
 preview artifact deployed to the public Pages site.
+
+
+## C3 acceptance evidence (2026-11-10)
+
+Code HEAD `95888d82f0f5ba4ac34832a34fde870020094f27` was validated
+with four successful Actions runs:
+
+- PR verification `42793240472`: root tests, typecheck, build and Chromium smoke.
+- IDE Host Spike `42793240413`: extension bundle/VSIX and native
+  Source/Procedure regressions.
+- Browser-only Theia `42793240421`: real Chromium showed
+  `STUDIO_SCHEMA_DESIGNER_CHROMIUM` with 13 fields, 11 required
+  markers, nested `sst` and `const: IPV4`.
+- Backend-backed Theia `42793240436`: same Schema evidence plus
+  Contract, Predicate and original Procedure workbench markers.
+
+Two initial failures were corrected before the above code HEAD: canonical
+root JSON Pointer formatting and an invalid duplicate-key negative fixture;
+then an unattended multi-file Schema QuickPick timeout was resolved by allowing
+the command to receive an exact known package-relative Schema path, without
+changing the human file-selection behavior.
+
+These results qualify the C3 trial within the scope above, **not** Schema
+validation correctness, the latest Agent Host/MAS SKILL schemas, any direct
+5GC execution, a merge to main or a public Pages deployment.
