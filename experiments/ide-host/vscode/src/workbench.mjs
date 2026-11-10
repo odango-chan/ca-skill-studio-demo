@@ -1,5 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
+import {projectWorkspace} from '../../../../site/workspace.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
 import {renderMarkdown} from '../../../../site/markdown-preview.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
@@ -48,9 +49,12 @@ export function registerWorkbench(vscode,context){
       throw Error("Inspector selection is stale; select the Node again");
     if(typeof procedureId!=="string"||typeof nodeId!=="string")
       throw Error("Select a Node in the graph or Inspector first");
-    const projected=inspectionSnapshot(source,{procedureId,nodeId});
-    const procedure=projected.model.procedures.get(procedureId);
-    if(projected.model.state!=="READY"||!procedure?.nodes.some(n=>n.id===nodeId))
+    // Admission only needs the shared Source projection, not a second full
+    // Inspector/Evidence/Route/Outcome snapshot. The latter re-runs expensive
+    // owner qualifications and can delay or race modal edits in real Theia.
+    const projected=projectWorkspace(source);
+    const procedure=projected.procedures.get(procedureId);
+    if(projected.state!=="READY"||!procedure?.nodes.some(n=>n.id===nodeId))
       throw Error("Selected Node is not present in the current Source");
     return {doc,source,version,procedureId,nodeId};
   }
