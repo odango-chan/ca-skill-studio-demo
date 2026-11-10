@@ -39,9 +39,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     {
       documentSelector: [
         { language: "yaml" },
-        { language: "python" },
-        { language: "json" },
-        { language: "markdown" }
+        { language: "python" }
       ],
       synchronize: {},
       initializationOptions: {},
