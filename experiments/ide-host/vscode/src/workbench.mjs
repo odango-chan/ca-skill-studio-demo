@@ -301,8 +301,10 @@ export function registerWorkbench(vscode,context){
           .join(" ");
         const completionResult=await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",scriptUri,schemaPosition);
+        // VS Code exposes CompletionList.items; Theia 1.76's native
+        // command adapter exposes the same list as suggestions.
         const completions=Array.isArray(completionResult)?completionResult:
-          completionResult?.items??[];
+          completionResult?.items??completionResult?.suggestions??[];
         const labels=completions.map(item=>
           typeof item.label==="string"?item.label:item.label?.label??"");
         if(!labels.includes("EstablishmentSelectionInput"))
