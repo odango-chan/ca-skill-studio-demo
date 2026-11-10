@@ -812,7 +812,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     noLiveResultClaim:predicateView.text.includes('不是当前运行证据')
   }));
   // C3: real, source-backed JSON Schema field tree in the same Theia host.
-  await invoke('skillStudio.openSchema');
+  await invoke('skillStudio.openSchema','schemas/establishment-request.schema.yaml');
   let schemaView=null;
   for(let attempt=0;attempt<100&&!schemaView;attempt++){
     const schemaTree=await command('Page.getFrameTree');
