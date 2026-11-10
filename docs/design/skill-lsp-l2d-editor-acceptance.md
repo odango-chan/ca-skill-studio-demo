@@ -76,3 +76,8 @@ The native provider probe opens the Python file to invoke its registered editor 
 - Existing Procedure CustomEditor, Inspector edit, native Undo, Route create/reconnect and workbench regressions passed after the probe restored Procedure editor focus.
 - Exact-head CI: IDE Host [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42768148856), backend Theia [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42768148850), Browser-Only [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42768148999), general regression [PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42768149112).
 - PR #113 remains Draft and unmerged; no Pages deployment, Runtime qualification or 5GC operation was performed.
+
+
+## Canvas toolbar regression
+
+The same real Theia Chromium acceptance also verifies that the migrated Procedure CustomEditor exposes the authoring toolbar, not merely the graph: default layout direction is `DOWN` (vertical), Root path selection is visible for the entry Procedure, and the layout, path, neighbor, label, locate, zoom, fit-all, fit-width, fit-height, and branch-filter controls all exist. This guards against a repeat of the Classic-to-Theia migration omission.
