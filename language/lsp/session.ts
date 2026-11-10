@@ -18,7 +18,7 @@ export interface SessionSink {
 export interface SubmitResult {
   readonly accepted: boolean;
   readonly reason?: "DISPOSED" | "WRONG_PACKAGE" | "STALE_GENERATION" |
-    "STALE_DOCUMENT" | "SUPERSEDED" | "ANALYSIS_UNAVAILABLE";
+    "STALE_DOCUMENT" | "INVALID_SNAPSHOT" | "SUPERSEDED" | "ANALYSIS_UNAVAILABLE";
 }
 
 type Analyzer = (snapshot: PackageSnapshot) =>
@@ -72,14 +72,23 @@ export class LanguageDiagnosticSession {
         snapshot.generation <= this.generation)
       return { accepted: false, reason: "STALE_GENERATION" };
 
-    // Reject an old TextDocument result before it can invalidate newer
-    // diagnostics. Disk-only documents may use version 0 with a newer Package
-    // generation; open versioned documents must change their version with text.
+    // Reject stale open TextDocument results before invalidating diagnostics.
+    // The host records a new Package generation for open/change/close. Disk-only
+    // snapshots use version zero, including after the editor closes.
+    if (!Array.isArray(snapshot.documents))
+      return { accepted: false, reason: "INVALID_SNAPSHOT" };
     for (const document of snapshot.documents) {
+      if (!document || typeof document.uri !== "string" ||
+          !Number.isSafeInteger(document.version) || document.version < 0 ||
+          typeof document.text !== "string")
+        return { accepted: false, reason: "INVALID_SNAPSHOT" };
       const prior = this.documents.get(document.uri);
-      if (prior && (document.version < prior.version ||
-          (document.version > 0 && document.version === prior.version &&
-           document.text !== prior.text)))
+      // Version zero is a disk-only snapshot after an editor was closed.
+      // A subsequent open may restart at version one; Package generation
+      // still advances so older in-flight results remain superseded.
+      if (prior && document.version !== 0 &&
+          (document.version < prior.version ||
+           (document.version === prior.version && document.text !== prior.text)))
         return { accepted: false, reason: "STALE_DOCUMENT" };
     }
 
