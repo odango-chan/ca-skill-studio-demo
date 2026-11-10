@@ -248,7 +248,7 @@ main browser application remains available at `/classic/`.
 
 **边界：** 这是引用写法规范化，不证明 Runtime 能解析别名，不证明 output field schema/type，不授权跨生产者 ABI 写入，也不改变 Procedure/Route 语义。Runtime / 5GC NOT_RUN。
 
-**验收状态：** [PR #116](https://github.com/odango-chan/ca-skill-studio-demo/pull/116) 已合并，main merge `330c9b80`。Exact-head `c5153a8e` IDE Host [#42776798637 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798637)、Browser-Only [#42776798442 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798442)、Backend Chromium [#42776798608 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798608)、PR Verify [#42776798584 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798584)。Resulting-main Pages 对 merge SHA 尚未核实；Runtime/5GC/桌面 GUI NOT_RUN。
+**验收状态：** [PR #116](https://github.com/odango-chan/ca-skill-studio-demo/pull/116) 已合并，main merge `330c9b80`。Exact-head `c5153a8e` IDE Host [#42776798637 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798637)、Browser-Only [#42776798442 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798442)、Backend Chromium [#42776798608 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798608)、PR Verify [#42776798584 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798584)。Resulting-main Pages [#42777288099 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42777288099)，精确 source/classic/workflow SHA 为 `330c9b8058452f6b1de1b25f990c6a0bca036fd4`；Runtime/5GC/桌面 GUI NOT_RUN。
 
 
 ## 2026-11-10 · Theia D4-A4a Phase Route 目标重定向（PR #118 MERGED）
@@ -260,10 +260,10 @@ main browser application remains available at `/classic/`.
 **边界：** 仅前置 `FAILED/UNRESOLVED`、后置 `FAIL/UNKNOWN` 已有 Route；没有创建 Phase/Outcome、修改 `operator.on` / `PASS` 或跨 Producer ABI。失败收尾路径的业务等价性及 Runtime/5GC NOT_RUN。
 
 
-## 2026-11-10 · Theia D4-A4b1 已有 Phase Outcome 修复（PR #119 DRAFT）
+## 2026-11-10 · Theia D4-A4b1 已有 Phase Outcome 修复（PR #119 MERGED）
 
 **迁移范围：** 完全复用 Classic `site/phase-outcomes.mjs`，只操作已有 Phase 的字面 `'on'` map；共享资格允许三种 Source 修复：从同 Procedure/同 Phase/同 Outcome 已观察值补齐缺失核心 Outcome；把可唯一证明的非核心拼写纠正成缺失核心键；当核心键齐全且无其他引用时删除孤立非核心键。正常完整 Phase 不出现编辑入口。
 
-**原生交互：** Inspector Phase 下有资格才显示 `Outcome repair` 子行；原生 QuickPick 显示可证明的操作；重查最新 TextDocument/完整 Source/候选资格，显示 Diff 并要求明确确认，然后仅用原生 WorkspaceEdit 写精确 Source span、支持 Undo。Host 验证三操作、取消/过期/虚构候选；Chromium 验证在真实 Monaco 中制造单行拼写错误、通过原生命令修复、对修复操作执行原生 Undo，然后精确恢复测试样本；不假设键盘编辑的 Undo 分组。四组 exact-head CI 待完成。
+**原生交互：** Inspector Phase 下有资格才显示 `Outcome repair` 子行；原生 QuickPick 显示可证明的操作；重查最新 TextDocument/完整 Source/候选资格，显示 Diff 并要求明确确认，然后仅用原生 WorkspaceEdit 写精确 Source span、支持 Undo。Host 验证三操作、取消/过期/虚构候选；Chromium 在真实 Monaco 中制造单行拼写错误、通过原生命令修复、对修复操作执行原生 Undo，然后精确恢复测试样本；不假设键盘编辑的 Undo 分组。PR #119 已合入 main，merge `a19f9886`，exact-head `5ade768c` 四组 PASS：IDE Host [#42783478978](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42783478978)、Browser-Only Chromium [#42783479017](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42783479017)、Backend Chromium [#42783478968](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42783478968)、PR Verify [#42783479057](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42783479057)。合并后的 Pages SHA 仍需独立核对。
 
 **不授权：** 新建 Phase/on map、任意 Outcome 字典、Runtime 失败处理等价性、跨生产者 ABI 和真实 5GC，均保持 NOT_RUN / Source-only 边界。
