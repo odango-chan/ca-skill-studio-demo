@@ -410,7 +410,7 @@ try{
       // The original root is focused by default, but all routes remain selectable
       // for the existing route editor fixture after explicitly choosing All.
       const toolbarBefore=await command("Runtime.evaluate",{
-        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`({
           layout:document.querySelector("#layoutDirection")?.value,
           rootMode:document.querySelector("#rootPathMode")?.value,
@@ -424,13 +424,13 @@ try{
          !initialToolbar.rootVisible||!initialToolbar.toolbarVisible)
         throw Error("Missing/default-incorrect Theia toolbar: "+JSON.stringify(initialToolbar));
       await command("Runtime.evaluate",{
-        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=>{const select=document.querySelector("#layoutDirection");
           select.value="RIGHT";select.dispatchEvent(new Event("change",{bubbles:true}));return true;})()`
       });
       await sleep(1000);
       const horizontal=await command("Runtime.evaluate",{
-        contextId:focusWorld.executionContextId,returnByValue:true,
+        contextId:world.executionContextId,returnByValue:true,
         expression:`({
           layout:document.querySelector("#layoutDirection")?.value,
           horizontal:document.querySelectorAll("#reactFlowRoot .designer-node.is-horizontal").length,
@@ -440,7 +440,7 @@ try{
       if(horizontal.result?.value?.layout!=="RIGHT"||!(horizontal.result.value.horizontal>0))
         throw Error("Theia toolbar failed to relayout RIGHT: "+JSON.stringify(horizontal.result?.value));
       await command("Runtime.evaluate",{
-        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=>{const select=document.querySelector("#layoutDirection");
           select.value="DOWN";select.dispatchEvent(new Event("change",{bubbles:true}));
           document.querySelector("#fitWidth").click();
@@ -452,7 +452,7 @@ try{
       });
       await sleep(1000);
       const vertical=await command("Runtime.evaluate",{
-        contextId:focusWorld.executionContextId,returnByValue:true,
+        contextId:world.executionContextId,returnByValue:true,
         expression:`({
           layout:document.querySelector("#layoutDirection")?.value,
           horizontal:document.querySelectorAll("#reactFlowRoot .designer-node.is-horizontal").length,
@@ -463,13 +463,13 @@ try{
         !(vertical.result.value.nodes>0))
         throw Error("Theia toolbar failed to restore DOWN: "+JSON.stringify(vertical.result?.value));
       await command("Runtime.evaluate",{
-        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=>{const select=document.querySelector("#rootPathMode");
           select.value="all";select.dispatchEvent(new Event("change",{bubbles:true}));return true;})()`
       });
       await sleep(1000);
       const fullPaths=await command("Runtime.evaluate",{
-        contextId:focusWorld.executionContextId,returnByValue:true,
+        contextId:world.executionContextId,returnByValue:true,
         expression:`({
           rootMode:document.querySelector("#rootPathMode")?.value,
           nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length,
