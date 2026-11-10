@@ -707,6 +707,60 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!restored)await sleep(150);
   }
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
+
+  // Terminate the actual nested Language Worker target through Chromium CDP.
+  // Run last; all normal editor, Inspector, Undo and layout tests stay mandatory.
+  let workerFailureEvidence=null;
+  if(requireBrowserLsp){
+    await command("Target.setDiscoverTargets",{discover:true});
+    const targetResult=await command("Target.getTargets");
+    const workers=(targetResult.targetInfos??[]).filter(item=>
+      item.type==="worker"||item.type==="service_worker");
+    const selected=workers.find(item=>
+      /skill-language-server\.js/.test(item.url??""));
+    console.log("STUDIO_LSP_WORKER_TARGETS_CHROMIUM",JSON.stringify(
+      workers.map(item=>({type:item.type,url:item.url,id:item.targetId}))));
+    if(!selected)throw Error("L2-D4 real language Worker CDP target missing: "+
+      JSON.stringify(workers.map(x=>({type:x.type,url:x.url}))));
+    const closed=await command("Target.closeTarget",{targetId:selected.targetId});
+    if(closed?.success!==true)
+      throw Error("L2-D4 could not terminate real Worker: "+JSON.stringify(closed));
+    let observedStatus="";
+    for(let i=0;i<100;i++){
+      observedStatus=await evalJS('document.body.innerText.match(/SKILL LSP: (UNAVAILABLE|ERROR|READY|ANALYZING|IDLE)/)?.[0]??""');
+      if(observedStatus==="SKILL LSP: UNAVAILABLE")break;
+      await sleep(100);
+    }
+    if(observedStatus!=="SKILL LSP: UNAVAILABLE")
+      throw Error("L2-D4 Worker termination was not surfaced: "+
+        JSON.stringify({observedStatus,worker:selected.url}));
+    const nativeEdit=await evalJS([
+      "(async()=>{",
+      "const c=window.theia.container;",
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>",
+      "typeof k==='function'&&k.prototype?.executeCommand&&",
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);",
+      "const opKey=[...c._bindingDictionary._map.keys()].find(k=>",
+      "String(k)==='Symbol(OpenerService)');",
+      "if(!key||!opKey)throw Error('L2-D4 native services missing');",
+      "const openers=await c.get(opKey).getOpeners();",
+      "const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');",
+      "const uri=custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>",
+      "w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource;",
+      "if(!uri)throw Error('L2-D4 Procedure URI missing');",
+      "return c.get(key).executeCommand(",
+      "'skillStudio.internal.languageDegradedEditingAcceptance',uri.toString());",
+      "})()"
+    ].join("\n"));
+    if(!nativeEdit?.nativePythonEditing||!nativeEdit?.workerUnavailable||
+       !nativeEdit.restored||nativeEdit.status!=="SKILL LSP: UNAVAILABLE")
+      throw Error("L2-D4 native editor failed after Worker termination: "+
+        JSON.stringify(nativeEdit));
+    workerFailureEvidence={workerTarget:selected.url,
+      transportUnavailable:true,nativeEditing:nativeEdit};
+    console.log("STUDIO_LSP_WORKER_DEGRADED_CHROMIUM",
+      JSON.stringify(workerFailureEvidence));
+  }
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
   return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
