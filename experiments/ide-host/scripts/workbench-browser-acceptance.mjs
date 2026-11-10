@@ -722,15 +722,23 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           /WidgetManager|PluginViewRegistry/.test((key?.name??'')+' '+String(key))
         ).map(key=>({name:key?.name??'',text:String(key).slice(0,180)}));
       }catch(error){managerError='service key match: '+String(error?.message??error);}
-      const findServiceKey=name=>serviceKeys.find(key=>
-        key?.name===name||String(key).includes(name));
       try{
-        const managerKey=findServiceKey('WidgetManager');
-        if(managerKey)manager=c.get(managerKey);
+        // The production bundle minifies DI class names, so locate the real
+        // WidgetManager by its public method rather than constructor.name.
+        const managerKey=serviceKeys.find(key=>
+          typeof key==='function'&&typeof key.prototype?.getWidgets==='function');
+        if(managerKey){
+          manager=c.get(managerKey);
+          matchingServiceKeys.push({name:managerKey.name??'',text:'WidgetManager#getWidgets'});
+        }
       }catch(error){managerError=String(error?.message??error);}
       try{
-        const registryKey=findServiceKey('PluginViewRegistry');
-        if(registryKey)registry=c.get(registryKey);
+        const registryKey=serviceKeys.find(key=>
+          typeof key==='function'&&typeof key.prototype?.getView==='function');
+        if(registryKey){
+          registry=c.get(registryKey);
+          matchingServiceKeys.push({name:registryKey.name??'',text:'PluginViewRegistry#getView'});
+        }
       }catch(error){registryError=String(error?.message??error);}
       try{manager=manager??registry?.widgetManager??null;}
       catch(error){registryError='widgetManager: '+String(error?.message??error);}
