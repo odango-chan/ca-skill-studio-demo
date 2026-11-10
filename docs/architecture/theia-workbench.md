@@ -2,7 +2,7 @@
 
 **Status: Stage One accepted; Inspector Node authoring increment pending acceptance · Date: 2026-11-10**
 
-第一阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；当前 Inspector Node authoring 为独立后续增量，验收见 WORK / TRACEABILITY 与对应 PR CI。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
+第一阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；当前 Inspector Node authoring 为独立后续增量，见 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)；验收见 WORK / TRACEABILITY 与 exact-head PR CI。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
 
 | 能力 | Classic | Theia 第一阶段 | 共享实现 / 剩余缺口 |
 |---|---|---|---|
@@ -16,7 +16,7 @@
 | Markdown Preview | 安全只读预览 | 原生命令 / Explorer 右键预览 | 直接复用 markdown-preview；无脚本、无外部图像；随文档变化刷新 |
 | Route 创建 / 重连 / Diff / Apply / Undo | 有界实现 | 已有且保留 | 复用 route-connect / route-target、原生 WorkspaceEdit；仍要求 Diff 后显式确认 |
 | Phase Designer | 有界 Step / binding / verify 编辑 | 未迁移 | 本阶段仅只读 Phase 浏览，不能称完整 Designer |
-| Node 重命名 / Operator 值编辑 | 有界实现 | 首批适配（当前 PR，待验收） | 复用 `site/node-designer.mjs` / `site/node-attributes.mjs`；仅精确 Source spans，拒绝过期选择；原生 WorkspaceEdit / Undo；不支持 Operator kind 替换或不安全标量 |
+| Node 重命名 / Operator 值编辑 | 有界实现 | 首批适配（PR #96，待验收） | 复用 `site/node-designer.mjs` / `site/node-attributes.mjs`；仅精确 Source spans，拒绝过期选择；原生 WorkspaceEdit / Undo；不支持 Operator kind 替换或不安全标量 |
 | Node 插入 / 删除 | 有界实现 | 未迁移 | 仍由 Classic 提供；后续迁移需保留 Route 影响检查与显式 Diff |
 | Root 路径筛选 / 锚定 | 已有 | 未迁移 | Theia 仍显示完整声明图 |
 | 目录导入 / ZIP / 保存 | Classic 自有工作副本 | 宿主文件系统与 OPFS | 不提供 Classic ZIP 导入导出等价能力；OPFS 不等于磁盘或 GitHub 同步 |
