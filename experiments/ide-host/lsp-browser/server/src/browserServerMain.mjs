@@ -52,8 +52,21 @@ function createSession(rootUri) {
     status(result) {
       const publishedDiagnosticCount = [...published.values()]
         .reduce((total, count) => total + count, 0);
+      // Observability only: PARTIAL with zero published diagnostics must not
+      // look like a successful empty analysis. Expose exact component states
+      // of the *same* accepted generation; do not weaken readiness criteria.
+      const current = packageAnalyses.get(rootUri);
+      const analysis = current?.snapshot.generation === result.generation ?
+        current.analysis : null;
+      const partialDetail = result.state === "PARTIAL" && analysis ? {
+        procedureState: analysis.procedure.state,
+        procedureDiagnosticCount: analysis.procedure.diagnostics.length,
+        packageAuditState: analysis.packageAudit.state,
+        packageAuditReason: analysis.packageAudit.reason ?? null
+      } : {};
       connection.sendNotification(ANALYSIS_STATUS_NOTIFICATION, {
         ...result,
+        ...partialDetail,
         rootUri,
         publishedDiagnosticCount
       });
