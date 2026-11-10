@@ -77,6 +77,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await click(target.x,target.y);await sleep(250);
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
+  // In browser-only mode the Procedure Webview may be active while the
+  // workbench extension has not yet observed its Source TextEditor. Open the
+  // authoritative Source through the real Webview action before invoking
+  // host-side inspection/audit commands.
+  const sourceOpened=await evalWebviewJS(`(()=>{const button=document.querySelector('#openSource');if(!button)return false;button.click();return true;})()`);
+  if(!sourceOpened)throw Error('Procedure Webview did not expose its native Source action');
+  await sleep(500);
   await invoke('skillStudio.refreshInspection');
   const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
@@ -638,6 +645,57 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!dataflowTreeRow.expanded){
     if(!dataflowTreeRow.hitWithinToggle)
       throw Error('Native Evidence toggle is obscured at its click point: '+JSON.stringify(dataflowTreeRow));
+    const evidenceModelSetup=await evalJS(`(()=>{
+      const c=window.theia?.container;
+      const serviceKeys=[...(c?._bindingDictionary?._map?.keys()??[])];
+      const managerKey=serviceKeys.find(key=>typeof key==='function'&&
+        typeof key.prototype?.getWidgets==='function'&&
+        typeof key.prototype?.getOrCreateWidget==='function');
+      if(!managerKey)return {found:false,reason:'WidgetManager unavailable'};
+      const manager=c.get(managerKey);
+      const widget=manager.getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence');
+      if(!widget)return {found:false,reason:'Evidence widget unavailable'};
+      const toggle=[...document.querySelectorAll('#skillStudio\\.evidence .theia-ExpansionToggle')]
+        .find(item=>item.getAttribute('data-node-id')?.includes('Producer // Consumer dataflow'));
+      const node=widget.model?.getNode(toggle?.getAttribute('data-node-id'));
+      const model=widget.model,tree=model?.tree;
+      const trace=window.__skillStudioEvidenceModelTrace={
+        toggleCalls:[],refreshCalls:[],fetchCalls:[],expansionEvents:[]
+      };
+      if(model&&typeof model.toggleNodeExpansion==='function'){
+        const original=model.toggleNodeExpansion.bind(model);
+        model.toggleNodeExpansion=async function(target){
+          const record={id:target?.id??null,before:target?.expanded??null,
+            sameNode:target===node,expandOnly:widget.props?.expandOnlyOnExpansionToggleClick};
+          trace.toggleCalls.push(record);
+          try{await original(target);record.after=target?.expanded??null;record.childCount=target?.children?.length??null;}
+          catch(error){record.error=String(error?.message??error);throw error;}
+        };
+      }
+      if(tree&&typeof tree.refresh==='function'){
+        const original=tree.refresh.bind(tree);
+        tree.refresh=async function(parent,...args){
+          const record={id:parent?.id??null,before:parent?.expanded??null,childCount:parent?.children?.length??null};
+          trace.refreshCalls.push({...record,stage:'start'});
+          try{const result=await original(parent,...args);trace.refreshCalls.push({...record,stage:'end',result:!!result,after:parent?.expanded??null,afterChildren:parent?.children?.length??null});return result;}
+          catch(error){trace.refreshCalls.push({...record,stage:'error',error:String(error?.message??error)});throw error;}
+        };
+      }
+      if(tree&&typeof tree.fetchChildren==='function'){
+        const original=tree.fetchChildren.bind(tree);
+        tree.fetchChildren=async function(proxy,parent,...args){
+          const record={id:parent?.id??null,hasProxy:!!proxy};
+          trace.fetchCalls.push({...record,stage:'start'});
+          try{const children=await original(proxy,parent,...args);trace.fetchCalls.push({...record,stage:'end',count:children?.length??null,labels:(children??[]).map(item=>item.label??item.name??'').slice(0,8)});return children;}
+          catch(error){trace.fetchCalls.push({...record,stage:'error',error:String(error?.message??error)});throw error;}
+        };
+      }
+      model?.onExpansionChanged?.(target=>trace.expansionEvents.push({id:target?.id??null,expanded:target?.expanded??null,childCount:target?.children?.length??null}));
+      return {found:true,widgetId:widget.id,expandOnlyOnExpansionToggleClick:widget.props?.expandOnlyOnExpansionToggleClick??null,
+        hasProxy:!!tree?.proxy,nodeFound:!!node,nodeExpandable:!!node&&'children'in node&&'expanded'in node,
+        nodeId:node?.id??null,nodeExpanded:node?.expanded??null,nodeChildren:node?.children?.length??null};
+    })()`);
+    console.log('STUDIO_EVIDENCE_MODEL_SETUP',JSON.stringify(evidenceModelSetup));
     await evalJS(`(()=>{
       window.__skillStudioEvidenceClickEvents=[];
       window.__skillStudioEvidenceBubbleEvents=[];
@@ -843,9 +901,21 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
        (dataflowExpansion.consumerAbi||phaseEvidenceText.includes('Consumer ABI')))break;
     await sleep(100);
   }
-  if(!dataflowExpansion?.expanded)
+  if(!dataflowExpansion?.expanded){
+    const directExpansionDiagnostic=await evalJS(`(async()=>{
+      const c=window.theia?.container,keys=[...(c?._bindingDictionary?._map?.keys()??[])];
+      const key=keys.find(item=>typeof item==='function'&&typeof item.prototype?.getWidgets==='function'&&typeof item.prototype?.getOrCreateWidget==='function');
+      const widget=key?c.get(key).getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence'):null;
+      const id=[...document.querySelectorAll('#skillStudio\\.evidence .theia-ExpansionToggle')]
+        .find(item=>item.getAttribute('data-node-id')?.includes('Producer // Consumer dataflow'))?.getAttribute('data-node-id');
+      const node=widget?.model?.getNode(id),before={expanded:node?.expanded??null,children:node?.children?.length??null,proxy:!!widget?.model?.tree?.proxy};
+      try{if(node)await widget.model.expandNode(node);return {before,after:{expanded:node?.expanded??null,children:node?.children?.length??null}};}
+      catch(error){return {before,error:String(error?.message??error),after:{expanded:node?.expanded??null,children:node?.children?.length??null}};}
+    })()`);
+    const modelTrace=await evalJS('window.__skillStudioEvidenceModelTrace??null');
     throw Error('Native Evidence dataflow arrow did not expand: '+
-      JSON.stringify({dataflowTreeRow,dataflowExpansion}));
+      JSON.stringify({dataflowTreeRow,dataflowExpansion,evidenceModelSetup,modelTrace,directExpansionDiagnostic}));
+  }
   for(let i=0;i<50;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
     if(phaseEvidenceText.includes('Consumer ABI'))break;
