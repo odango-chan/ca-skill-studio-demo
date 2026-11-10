@@ -1,7 +1,7 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
 import {readFile} from 'node:fs/promises';
 const publishedProcedure=await readFile(new URL(
-  '../../../site/samples/packages/establish-pdu-session/assurance/procedure.yaml',
+  '../../../site/samples/skills/establish-pdu-session/assurance/procedure.yaml',
   import.meta.url),'utf8');
 const pcfOutcomeHeader="          'on':\n            FAILED: finalize-failed\n            UNRESOLVED: finalize-unresolved\n";
 const pcfOutcomeStart=publishedProcedure.indexOf(pcfOutcomeHeader);
