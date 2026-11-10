@@ -918,6 +918,143 @@ export function registerWorkbench(vscode,context){
     ));
   }
 
+  // Real host-registry lifecycle probe with a temporary sibling Package.
+  // It creates two references to Package B, verifies first-release retention,
+  // final close, and same-root reopen with a strictly newer generation.
+  const languagePackageLifecycleAcceptance=new Map();
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&
+     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.languagePackageLifecycleAcceptance",
+      async(procedureUriValue,phase="prepare")=>{
+        const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
+        const key=procedureUri.toString();
+        if(phase==="prepare"){
+          if(!languageTransportFailure||
+             languageStatusItem?.text!=="SKILL LSP: UNAVAILABLE")
+            throw Error("L2-D4b Package lifecycle probe requires terminal Worker failure");
+          if(languagePackageLifecycleAcceptance.has(key))
+            throw Error("L2-D4b Package lifecycle probe is already active");
+          const procedure=await vscode.workspace.openTextDocument(procedureUri);
+          const sourceRoot=packageRootForProcedure(vscode,procedure);
+          const workspaceRoot=vscode.workspace.workspaceFolders?.[0]?.uri;
+          if(!sourceRoot||!workspaceRoot)
+            throw Error("L2-D4b source Package or workspace root is missing");
+          const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
+          const packageBName="skill-studio-l2d4b-package-b-"+suffix;
+          const packageBRoot=vscode.Uri.joinPath(workspaceRoot,packageBName);
+          const fs=vscode.workspace.fs;
+          const releases=[];
+          try{
+            const found=await vscode.workspace.findFiles(
+              new vscode.RelativePattern(sourceRoot.uri,"**/*"),
+              "**/{node_modules,.git,.venv,__pycache__}/**",501
+            );
+            if(!found.length||found.length>500)
+              throw Error("L2-D4b could not enumerate a bounded source Package");
+            await fs.createDirectory(packageBRoot);
+            const createdDirectories=new Set([packageBRoot.toString()]);
+            for(const uri of found){
+              if(!uri.path.startsWith(sourceRoot.uri.path.replace(/\/$/,"")+"/"))continue;
+              const relative=uri.path.slice(sourceRoot.uri.path.replace(/\/$/,"").length+1);
+              const parts=relative.split("/");
+              if(!relative||parts.some(part=>!part||part==="."||part===".."))
+                throw Error("L2-D4b source Package contains an unsafe relative path");
+              for(let i=1;i<parts.length;i++){
+                const directory=vscode.Uri.joinPath(packageBRoot,...parts.slice(0,i));
+                if(!createdDirectories.has(directory.toString())){
+                  await fs.createDirectory(directory);
+                  createdDirectories.add(directory.toString());
+                }
+              }
+              const destination=vscode.Uri.joinPath(packageBRoot,...parts);
+              await fs.writeFile(destination,await fs.readFile(uri));
+            }
+            const procedureBUri=vscode.Uri.joinPath(packageBRoot,
+              "assurance","procedure.yaml");
+            const procedureB=await vscode.workspace.openTextDocument(procedureBUri);
+            const releaseOne=attachLanguagePackage(procedureB);
+            releases.push(releaseOne);
+            const packageBKey=packageBRoot.toString();
+            const packageBState=languagePackages.get(packageBKey);
+            if(!packageBState)throw Error("L2-D4b Package B was not registered");
+            const releaseTwo=attachLanguagePackage(procedureB);
+            releases.push(releaseTwo);
+            if(packageBState.refs!==2)
+              throw Error("L2-D4b Package B did not acquire two editor references");
+            languagePackageLifecycleAcceptance.set(key,{
+              packageBRoot,packageBKey,procedureB,packageBState,releases,
+              sourceFileCount:found.length
+            });
+            return {packageBRoot:packageBKey,sourceFileCount:found.length,
+              references:packageBState.refs,created:true};
+          }catch(error){
+            for(const release of releases.reverse())try{release();}catch{}
+            try{await fs.delete(packageBRoot,{recursive:true,useTrash:false});}catch{}
+            throw error;
+          }
+        }
+        const prepared=languagePackageLifecycleAcceptance.get(key);
+        if(!prepared)throw Error("L2-D4b Package lifecycle fixture is missing");
+        if(phase==="abort-and-clean"){
+          try{
+            for(const release of [...prepared.releases].reverse())try{release();}catch{}
+            const reopened=languagePackages.get(prepared.packageBKey);
+            if(reopened)reopened.refs=0;
+            if(reopened){
+              reopened.disposed=true;reopened.ticket++;clearTimeout(reopened.timer);
+              for(const subscription of reopened.subscriptions)subscription.dispose();
+              languagePackages.delete(prepared.packageBKey);
+              languagePackageStatuses.delete(prepared.packageBKey);
+              languageClient?.closePackage(prepared.packageBKey);
+            }
+            await vscode.workspace.fs.delete(prepared.packageBRoot,
+              {recursive:true,useTrash:false});
+            return {phase,cleaned:true};
+          }finally{languagePackageLifecycleAcceptance.delete(key);}
+        }
+        if(phase==="verify-and-close"){
+          try{
+            const status=await waitForLanguagePackageStatus(
+              prepared.packageBState,prepared.packageBState.generation
+            );
+            if(status.state!=="READY")
+              throw Error("Recovered Package B is not READY: "+status.state);
+            const initialGeneration=prepared.packageBState.generation;
+            prepared.releases[0]();
+            if(prepared.packageBState.refs!==1||
+               languagePackages.get(prepared.packageBKey)!==prepared.packageBState)
+              throw Error("Closing the first Package B editor reference closed the active Package");
+            prepared.releases[1]();
+            if(languagePackages.has(prepared.packageBKey))
+              throw Error("Closing the final Package B editor reference retained the Package");
+            const generationBeforeReopen=languagePackageGenerations.get(
+              prepared.packageBKey
+            )??0;
+            const releaseReopened=attachLanguagePackage(prepared.procedureB);
+            const reopened=languagePackages.get(prepared.packageBKey);
+            if(!reopened||reopened.generation<=generationBeforeReopen)
+              throw Error("Reopened Package B did not advance its retained generation");
+            const reopenedStatus=await waitForLanguagePackageStatus(
+              reopened,reopened.generation
+            );
+            if(reopenedStatus.state!=="READY")
+              throw Error("Reopened Package B is not READY: "+reopenedStatus.state);
+            releaseReopened();
+            await vscode.workspace.fs.delete(prepared.packageBRoot,
+              {recursive:true,useTrash:false});
+            return {twoPackageRecovery:true,packageBReady:true,
+              firstReferenceRetained:true,finalCloseRemoved:true,
+              initialGeneration,reopenGeneration:reopened.generation,
+              generationMonotonic:reopened.generation>generationBeforeReopen,
+              cleaned:true};
+          }finally{languagePackageLifecycleAcceptance.delete(key);}
+        }
+        throw Error("Unknown Package lifecycle acceptance phase: "+String(phase));
+      }
+    ));
+  }
+
   // L2-D3 real-Theia acceptance: authoritative dirty buffers and latest
   // cross-file generation. Test-only commands never authorize Runtime writes.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
