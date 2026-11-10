@@ -81,3 +81,50 @@ test("all three current CreatedSession business References render safely in Mark
   assert.match(gpp.html,/md-unresolved-link/);
   assert.doesNotMatch(gpp.html,/href="\.\.\/SKILL.md"/);
 });
+
+test("current dual Skill guides render safely and expose only explicit Package-local paths",()=>{
+  for(const name of ["establish-pdu-session","establish-pdu-session-mas"]){
+    const source=readFileSync(new URL("../site/samples/skills/"+name+"/SKILL.md",import.meta.url),"utf8");
+    const preview=renderMarkdown(source);
+    assert.equal(preview.available,true,name);
+    assert.match(preview.html,/<details class="md-frontmatter">/,name);
+    assert.match(preview.html,/<h1>[^<]+<\\/h1>/,name);
+    assert.doesNotMatch(preview.html,/<script\\b|<iframe\\b|<img\\b/i,name);
+  }
+  const source=readFileSync(new URL(
+    "../site/samples/skills/establish-pdu-session/SKILL.md",import.meta.url),"utf8");
+  const linked=renderMarkdown(source,{localLinks:true}).html;
+  assert.match(linked,/data-local-path="references\\/3gpp-procedure\\.md"/);
+  assert.match(linked,/data-local-path="references\\/session-selection\\.md"/);
+  assert.match(linked,/data-local-path="references\\/failure-handling\\.md"/);
+  // The guide also links to a repository-level design note. It must not be
+  // converted into a Package-local link because it escapes the Skill root.
+  assert.doesNotMatch(linked,/data-local-path="\\.\\.\\/\\.\\.\\/docs/);
+  assert.match(linked,/md-unresolved-link/);
+});
+
+test("Reference Markdown can link back to SKILL.md, while local navigation is opt-in",()=>{
+  const source=readFileSync(new URL(
+    "../site/samples/skills/establish-pdu-session/references/3gpp-procedure.md",
+    import.meta.url),"utf8");
+  const ordinary=renderMarkdown(source).html;
+  assert.doesNotMatch(ordinary,/data-local-path=/);
+  const linked=renderMarkdown(source,{localLinks:true}).html;
+  assert.match(linked,/data-local-path="\\.\\.\\/SKILL\\.md"/);
+});
+
+test("Package-local Markdown navigation never promotes unsafe or escaping paths",()=>{
+  const source=[
+    "`references/session-selection.md`",
+    "[return](../SKILL.md)",
+    "[escape](../../docs/design/private.md)",
+    "[unsafe](javascript:alert(1))",
+    "[remote](https://example.com/manual)"
+  ].join("\\n");
+  const html=renderMarkdown(source,{localLinks:true}).html;
+  assert.match(html,/data-local-path="references\\/session-selection\\.md"/);
+  assert.match(html,/data-local-path="\\.\\.\\/SKILL\\.md"/);
+  assert.doesNotMatch(html,/data-local-path="\\.\\.\\/\\.\\.\\//);
+  assert.doesNotMatch(html,/href="javascript:/i);
+  assert.match(html,/href="https:\\/\\/example\\.com\\/manual"/);
+});
