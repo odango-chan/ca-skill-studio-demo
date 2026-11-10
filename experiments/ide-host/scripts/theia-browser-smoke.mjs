@@ -406,6 +406,85 @@ try{
       patchEvidence.sourceEditor=sourceEditor;
       patchEvidence.undo=undoFrames[0]??null;
 
+      // Check real Webview toolbar interaction before later Node/Route gestures.
+      // The original root is focused by default, but all routes remain selectable
+      // for the existing route editor fixture after explicitly choosing All.
+      const toolbarBefore=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          layout:document.querySelector("#layoutDirection")?.value,
+          rootMode:document.querySelector("#rootPathMode")?.value,
+          rootVisible:!document.querySelector("#rootPathToolbar")?.hidden,
+          toolbarVisible:!document.querySelector("#graphTools")?.hidden,
+          nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length
+        })`
+      });
+      const initialToolbar=toolbarBefore.result?.value??null;
+      if(initialToolbar?.layout!=="DOWN"||initialToolbar?.rootMode!=="normal"||
+         !initialToolbar.rootVisible||!initialToolbar.toolbarVisible)
+        throw Error("Missing/default-incorrect Theia toolbar: "+JSON.stringify(initialToolbar));
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=>{const select=document.querySelector("#layoutDirection");
+          select.value="RIGHT";select.dispatchEvent(new Event("change",{bubbles:true}));return true;})()`
+      });
+      await sleep(1000);
+      const horizontal=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,
+        expression:`({
+          layout:document.querySelector("#layoutDirection")?.value,
+          horizontal:document.querySelectorAll("#reactFlowRoot .designer-node.is-horizontal").length,
+          nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length
+        })`
+      });
+      if(horizontal.result?.value?.layout!=="RIGHT"||!(horizontal.result.value.horizontal>0))
+        throw Error("Theia toolbar failed to relayout RIGHT: "+JSON.stringify(horizontal.result?.value));
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=>{const select=document.querySelector("#layoutDirection");
+          select.value="DOWN";select.dispatchEvent(new Event("change",{bubbles:true}));
+          document.querySelector("#fitWidth").click();
+          document.querySelector("#fitHeight").click();
+          document.querySelector("#fit").click();
+          document.querySelector("#zoomIn").click();
+          document.querySelector("#zoomOut").click();
+          return true;})()`
+      });
+      await sleep(1000);
+      const vertical=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,
+        expression:`({
+          layout:document.querySelector("#layoutDirection")?.value,
+          horizontal:document.querySelectorAll("#reactFlowRoot .designer-node.is-horizontal").length,
+          nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length
+        })`
+      });
+      if(vertical.result?.value?.layout!=="DOWN"||vertical.result.value.horizontal!==0||
+        !(vertical.result.value.nodes>0))
+        throw Error("Theia toolbar failed to restore DOWN: "+JSON.stringify(vertical.result?.value));
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=>{const select=document.querySelector("#rootPathMode");
+          select.value="all";select.dispatchEvent(new Event("change",{bubbles:true}));return true;})()`
+      });
+      await sleep(1000);
+      const fullPaths=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,
+        expression:`({
+          rootMode:document.querySelector("#rootPathMode")?.value,
+          nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length,
+          edges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length,
+          branchControls:document.querySelectorAll("#reactFlowRoot .designer-hidden-branches").length
+        })`
+      });
+      if(fullPaths.result?.value?.rootMode!=="all"||
+         !(fullPaths.result.value.nodes>=initialToolbar.nodes))
+        throw Error("Theia Root path filter did not restore full graph: "+
+          JSON.stringify({initialToolbar,fullPaths:fullPaths.result?.value}));
+      patchEvidence.canvasToolbar={initial:initialToolbar,horizontal:horizontal.result?.value,
+        vertical:vertical.result?.value,allPaths:fullPaths.result?.value};
+      console.log("STUDIO_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(patchEvidence.canvasToolbar));
+
       // The Classic one-hop Node view is reused inside the host CustomEditor:
       // real neighbor Nodes/Routes plus read-only PRE/OP/POST stages.
       console.log("STUDIO_THEIA_STAGE","node-focus");
@@ -1081,9 +1160,15 @@ try{
       !/TextDocument v[2-9]/.test(patchEvidence.applied?.revision??"")))
     throw Error("Source-backed Patch preview/apply did not update the TextDocument: "+
       JSON.stringify(patchEvidence).slice(0,3000));
+  // The default Root view is the proven success path (9 nodes / 8 bundled
+  // edges); the old smoke asserted 46 full-graph edges even before switching
+  // to All Paths. Require both the default restored view and the full graph.
   if(requireEditor&&(!(patchEvidence.sourceEditor?.monacoEditors>0)||
       !/TextDocument v[3-9]/.test(patchEvidence.undo?.revision??"")||
-      patchEvidence.undo?.graphEdges!==46))
+      patchEvidence.undo?.graphNodes!==9||
+      patchEvidence.undo?.graphEdges!==8||
+      patchEvidence.canvasToolbar?.allPaths?.nodes!==17||
+      patchEvidence.canvasToolbar?.allPaths?.edges!==46))
     throw Error("Native Source editor/undo did not restore the original Procedure projection: "+
       JSON.stringify(patchEvidence).slice(0,3000));
   if(requireEditor&&(!patchEvidence.nodeFocus?.open?.clicked||

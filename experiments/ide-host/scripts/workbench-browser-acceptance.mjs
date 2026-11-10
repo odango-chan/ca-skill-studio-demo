@@ -102,6 +102,18 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   await sleep(500);
   const warm=await graph(),warmTiming=JSON.parse(warm?.timing??'null');
   if(!initialTiming||!warmTiming?.cacheHit)throw Error('Version-scoped warm layout cache was not exercised: '+JSON.stringify({initialTiming,warmTiming}));
+  // The Theia canvas now defaults to Classic's proven success-path focus.
+  // This Inspector structural-edit regression deliberately needs all 17
+  // source-declared Nodes so its 17→18→17 assertions remain meaningful.
+  await command('Runtime.evaluate',{contextId:graphContext,expression:`(()=>{
+    const s=document.querySelector('#rootPathMode');
+    if(!s)throw Error('Native Root path mode is missing');
+    s.value='all';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`});
+  await sleep(700);
+  const allPathGraph=await graph();
+  if(allPathGraph?.nodes!==17)
+    throw Error('Could not restore the 17-node original Root graph before structural editing: '+
+      JSON.stringify(allPathGraph));
   // Exercise a real native Inspector edit. The command is invoked through
   // Theia's command registry, presents a native Diff confirmation, and writes
   // through the host TextDocument/WorkspaceEdit rather than the Webview.

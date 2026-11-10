@@ -15,6 +15,21 @@ button{cursor:pointer}
 button:disabled{cursor:not-allowed;opacity:.45}
 #message{font-size:11px;padding:8px 14px;background:#eef7f5;color:#386d65;
   border-bottom:1px solid #dcebe5;min-height:14px}
+.spike-tools{display:flex;flex:none;align-items:center;gap:6px;min-height:37px;
+  box-sizing:border-box;padding:5px 12px;background:#fff;border-bottom:1px solid #dce7ec;
+  overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:thin}
+.spike-tools label,.spike-path-filters label{display:inline-flex;align-items:center;gap:5px;
+  white-space:nowrap;font-size:11px;color:#4f687e}
+.spike-tools button,.spike-tools select{border:1px solid #d6e3eb;background:#fff;
+  border-radius:6px;padding:5px 8px;color:#31556a;font:inherit;flex:none}
+.spike-tools button[aria-pressed="true"]{color:#137b70;border-color:#7bbfb4;
+  background:#e5f5f1}
+.spike-tools button:hover:not(:disabled){background:#edf5f8}
+.spike-tools-separator{height:19px;width:1px;background:#dbe6ec;flex:none;margin:0 3px}
+.spike-path-filters{display:flex;align-items:center;gap:14px;flex:none;flex-wrap:wrap;
+  padding:6px 14px;background:#f4faf8;border-bottom:1px solid #dcebe5}
+.spike-path-filters span{color:#657c8e;font-size:10px}
+#graphTools[hidden],#rootPathFilters[hidden],#rootPathToolbar[hidden]{display:none}
 .spike-pane{flex:1;min-height:130px;width:100%;display:flex;position:relative;overflow:hidden}
 .spike-flow{flex:1;min-height:130px;width:100%;position:relative;background-color:#f7f9fc;
   background-image:radial-gradient(#cfdae7 .85px,transparent .85px);background-size:22px 22px}

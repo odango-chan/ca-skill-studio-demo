@@ -76,6 +76,30 @@ export function activate(context){
           <button id="openSource">打开原生 YAML 编辑器</button>
           <span id="revision"></span></div>
           <div id="message" role="status">等待当前文档…</div>
+          <div id="graphTools" class="spike-tools" role="toolbar" aria-label="流程图显示选项">
+            <label>布局 <select id="layoutDirection" aria-label="自动布局方向">
+              <option value="DOWN" selected>垂直</option><option value="RIGHT">水平</option>
+            </select></label>
+            <label id="rootPathToolbar" hidden>路径 <select id="rootPathMode" aria-label="Root Procedure 路径显示">
+              <option value="normal" selected>主路径</option>
+              <option value="custom">选择路径</option><option value="all">全部路径</option>
+            </select></label>
+            <button id="neighborsOnly" type="button" aria-pressed="false" title="仅显示当前节点的一跳邻居">邻居</button>
+            <button id="showAllLabels" type="button" aria-pressed="false" title="显示全部 Route 标签">标签</button>
+            <button id="centerSelection" type="button" title="定位已选节点；未选中时适配画布">定位</button>
+            <span class="spike-tools-separator" aria-hidden="true"></span>
+            <button id="zoomOut" type="button" title="缩小">−</button>
+            <button id="zoomIn" type="button" title="放大">＋</button>
+            <button id="fit" type="button" title="适配整张流程图">适配</button>
+            <button id="fitWidth" type="button" title="横向铺满流程图">横向</button>
+            <button id="fitHeight" type="button" title="纵向铺满流程图">纵向</button>
+          </div>
+          <div id="rootPathFilters" class="spike-path-filters" role="group" aria-label="按需显示 Root 分支" hidden>
+            <label><input id="pathFailure" type="checkbox">失败分支</label>
+            <label><input id="pathUncertain" type="checkbox">未决分支</label>
+            <label><input id="pathRecovery" type="checkbox">恢复/其他分支</label>
+            <span>点击节点上的 +N 条，可逐个展开；再次点击收起</span>
+          </div>
           <div id="graphPane" class="graph-pane spike-pane">
             <div id="reactFlowRoot" class="spike-flow"></div>
             <section id="nodeFocus" class="node-focus" aria-label="节点上下游与内部流程" tabindex="-1" hidden>
