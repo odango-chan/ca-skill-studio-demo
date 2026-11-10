@@ -80,13 +80,19 @@ export function registerWorkbench(vscode,context){
     if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
       throw Error("Source changed while choosing the new Node ID");
     const preview=previewNodeRename(ctx.source,ctx.procedureId,ctx.nodeId,value);
-    return confirmAndApply({
+    const applied=await confirmAndApply({
       ...ctx,preview,
       changes:p=>p.sourceSpans.map(span=>({
         start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
       })),
       verify:text=>applyNodeRename(text,preview)
     });
+    if(applied){
+      selection={procedureId:ctx.procedureId,nodeId:value};
+      selections.set(ctx.doc.uri.toString(),selection);
+      update(ctx.doc,selection);
+    }
+    return applied;
   }
   async function editNodeOperatorValue(item,newValue){
     const ctx=currentNode(item);
