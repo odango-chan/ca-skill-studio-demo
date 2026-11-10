@@ -87,16 +87,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
   console.log('STUDIO_PROBLEMS_HEADERS',JSON.stringify(problemHeaderDiagnostics));
   if(problemsHeader?.collapsed){await click(problemsHeader.x,problemsHeader.y);await sleep(250);}
-  await invoke('skillStudio.auditPackage');
-  let audit='';
-  for(let i=0;i<100;i++){
-    audit=await evalJS(`document.body.innerText`);
-    if(/Package Audit · \d+ editor warnings/.test(audit))break;
-    if(/Package Audit · unavailable|Audit unavailable:/.test(audit))
-      throw Error('Package Audit reported unavailable: '+audit.slice(-1000));
-    await sleep(100);
-  }
-  if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not render within 10s: '+audit.slice(-1000));
   // Re-open through Explorer rather than extension openWith command.
   await invoke('navigator.reveal');
   await invoke('core.saveAll');
@@ -130,6 +120,19 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(stillPreview)throw Error("Double-click did not pin native preview tab");
   const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
+  // restore one from its workbench state. Run it only after the Explorer open.
+  // Browser-Only starts without an active editor, unlike Browser Host which may
+  // Package Audit requires the actual CustomEditor document to be active.
+  await invoke('skillStudio.auditPackage');
+  let audit='';
+  for(let i=0;i<100;i++){
+    audit=await evalJS(`document.body.innerText`);
+    if(/Package Audit · \d+ editor warnings/.test(audit))break;
+    if(/Package Audit · unavailable|Audit unavailable:/.test(audit))
+      throw Error('Package Audit reported unavailable: '+audit.slice(-1000));
+    await sleep(100);
+  }
+  if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not render within 10s: '+audit.slice(-1000));
   // The online sample is a two-SKILL workspace. Prove the MAS sibling can be
   // expanded and its own Procedure opened through the native Explorer, then
   // restore the conventional 5GC Procedure for the remaining regression suite.
