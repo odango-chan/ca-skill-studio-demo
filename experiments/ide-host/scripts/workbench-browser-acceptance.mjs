@@ -245,15 +245,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   });
   if(!bindingSelection.result?.value?.node)throw Error('Could not select Phase binding Node');
   await sleep(250);
-  const skillStudioTab=await evalJS(`(()=>{
-    const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>
-      x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
-    const r=el?.getBoundingClientRect();
-    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
-      active:el.classList.contains('lm-mod-current')}:null;
-  })()`);
-  if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
-  if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
+  // Evidence is contributed directly to the native Explorer container.
   const evidenceHeader=await evalJS(`(()=>{
     const candidates=[...document.querySelectorAll('*')].filter(x=>
       x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
@@ -707,8 +699,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     restored:fixtureRestored.result?.value,
     restoration:'native editor exact line replacement'};
   console.log('STUDIO_PHASE_OUTCOME_REPAIR_CHROMIUM',JSON.stringify(phaseOutcome));
-  // Return the native Explorer to the foreground: the evidence acceptance
-  // opened the Skill Studio Activity Bar and intentionally kept it selected.
+  // Return the native Explorer to the foreground after Evidence inspection.
   await invoke('workbench.files.action.focusFilesExplorer');
   // Safe Markdown uses the actual native source document and shared renderer.
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
