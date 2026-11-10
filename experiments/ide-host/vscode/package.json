@@ -1,7 +1,7 @@
 {
   "name": "ca-skill-studio-ide-spike",
   "displayName": "SKILL Studio IDE Host Spike",
-  "description": "Experimental source-first Procedure, Contract and Predicate visual editors for VS Code desktop/web and Theia host variants",
+  "description": "Experimental source-first Procedure, Contract, Predicate and Schema visual editors for VS Code and Theia",
   "version": "0.0.1",
   "publisher": "odango-chan",
   "private": true,
@@ -36,10 +36,16 @@
     "onCustomEditor:skillStudio.contractPreview",
     "onCommand:skillStudio.openContract",
     "onCustomEditor:skillStudio.predicatePreview",
-    "onCommand:skillStudio.openPredicates"
+    "onCommand:skillStudio.openPredicates",
+    "onCustomEditor:skillStudio.schemaPreview",
+    "onCommand:skillStudio.openSchema"
   ],
   "contributes": {
     "commands": [
+      {
+        "command": "skillStudio.openSchema",
+        "title": "SKILL Studio: Open Schema Visual"
+      },
       {
         "command": "skillStudio.openPredicates",
         "title": "SKILL Studio: Open Predicate Visual"
@@ -119,6 +125,11 @@
     ],
     "menus": {
       "explorer/context": [
+        {
+          "command": "skillStudio.openSchema",
+          "when": "resourceFilename =~ /\\.schema\\.ya?ml$/",
+          "group": "navigation"
+        },
         {
           "command": "skillStudio.openPredicates",
           "when": "resourceFilename == predicates.yaml",
@@ -317,6 +328,16 @@
         "selector": [
           {
             "filenamePattern": "**/assurance/[p]redicates.yaml"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "skillStudio.schemaPreview",
+        "displayName": "SKILL Schema Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/schemas/*.schema.yaml"
           }
         ],
         "priority": "default"
