@@ -273,6 +273,8 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   const scriptReferences: ScriptReference[] = [];
   const schemaReferences: SchemaReference[] = [];
   const pythonSymbols: PythonOutlineSymbol[] = [];
+  const pythonOutlineDiagnostics: LanguageDiagnostic[] = [];
+  const scriptNavigationDiagnostics: LanguageDiagnostic[] = [];
   const documentAnalyses: DocumentAnalysis[] = [];
 
   for (const document of normalizedDocuments) {
@@ -304,14 +306,6 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
           source: "python-outline",
           confidence: "unknown"
         };
-        documentAnalyses.push({
-          uri: document.uri,
-          relativePath: document.relativePath,
-          version: document.version,
-          languageId: document.languageId,
-          pythonOutlineState,
-          pythonSymbols: []
-        });
         // Keep warnings in the package-level diagnostics list below.
         pythonOutlineDiagnostics.push(diagnostic);
       }
@@ -343,7 +337,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
             sourcePath: document.relativePath,
             targetUri: targetDocument.uri,
             targetPath: schema.path,
-            line: schema.line,
+            targetLine: schema.line,
             title: schema.title,
             sourceRange: null
           });
@@ -371,8 +365,6 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
     });
   }
 
-  const pythonOutlineDiagnostics: LanguageDiagnostic[] = [];
-  const scriptNavigationDiagnostics: LanguageDiagnostic[] = [];
   // Diagnostics are collected after document analysis to keep the document
   // result shape stable and to avoid mutating the source snapshot.
   const diagnostics = [
