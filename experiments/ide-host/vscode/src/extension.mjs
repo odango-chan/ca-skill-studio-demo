@@ -14,6 +14,7 @@ import {isProcedurePath,validateRouteProposal,
 import {seedExampleWorkspace} from "./sample-loader.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
+import {iconShapes} from "../../../../site/icons.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
@@ -38,6 +39,22 @@ function escaped(value){
   return String(value).replace(/[&<>"']/g,ch=>({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[ch]));
+}
+function svgIcon(name){
+  const shapes=iconShapes(name).map(({tag,attrs})=>{
+    const attributes=Object.entries(attrs)
+      .map(([key,value])=>key+'="'+escaped(value)+'"').join(" ");
+    return "<"+tag+" "+attributes+"/>";
+  }).join("");
+  return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" '+
+    'stroke="currentColor" stroke-width="1.75" stroke-linecap="round" '+
+    'stroke-linejoin="round" aria-hidden="true" focusable="false" '+
+    'class="studio-icon" data-icon="'+escaped(name)+'">'+shapes+"</svg>";
+}
+function toolbarIconButton(id,name,label,{pressed=false}={}){
+  return '<button id="'+escaped(id)+'" type="button" title="'+escaped(label)+
+    '" aria-label="'+escaped(label)+'"'+
+    (pressed?' aria-pressed="false"':'')+'>'+svgIcon(name)+'</button>';
 }
 export function activate(context){
   const workbench=registerWorkbench(vscode,context);
@@ -90,15 +107,15 @@ export function activate(context){
               <option value="normal" selected>主路径</option>
               <option value="custom">选择路径</option><option value="all">全部路径</option>
             </select></label>
-            <button id="neighborsOnly" type="button" aria-pressed="false" title="仅显示当前节点的一跳邻居">邻居</button>
-            <button id="showAllLabels" type="button" aria-pressed="false" title="显示全部 Route 标签">标签</button>
-            <button id="centerSelection" type="button" title="定位已选节点；未选中时适配画布">定位</button>
+            ${toolbarIconButton("neighborsOnly","network","仅显示当前节点的一跳邻居",{pressed:true})}
+            ${toolbarIconButton("showAllLabels","eye","显示全部 Route 标签",{pressed:true})}
+            ${toolbarIconButton("centerSelection","locate-fixed","定位已选节点；未选中时适配画布")}
             <span class="spike-tools-separator" aria-hidden="true"></span>
-            <button id="zoomOut" type="button" title="缩小">−</button>
-            <button id="zoomIn" type="button" title="放大">＋</button>
-            <button id="fit" type="button" title="适配整张流程图">适配</button>
-            <button id="fitWidth" type="button" title="横向铺满流程图">横向</button>
-            <button id="fitHeight" type="button" title="纵向铺满流程图">纵向</button>
+            ${toolbarIconButton("zoomOut","zoom-out","缩小")}
+            ${toolbarIconButton("zoomIn","zoom-in","放大")}
+            ${toolbarIconButton("fit","maximize","适配整张流程图")}
+            ${toolbarIconButton("fitWidth","fit-width","横向铺满流程图")}
+            ${toolbarIconButton("fitHeight","fit-height","纵向铺满流程图")}
           </div>
           <div id="rootPathFilters" class="spike-path-filters" role="group" aria-label="按需显示 Root 分支" hidden>
             <label><input id="pathFailure" type="checkbox">失败分支</label>
@@ -110,7 +127,7 @@ export function activate(context){
             <div id="reactFlowRoot" class="spike-flow"></div>
             <section id="nodeFocus" class="node-focus" aria-label="节点上下游与内部流程" tabindex="-1" hidden>
               <header class="node-focus-header">
-                <button id="nodeFocusReturn" type="button" class="node-focus-back">返回流程图</button>
+                <button id="nodeFocusReturn" type="button" class="node-focus-back" title="返回流程图">${svgIcon("arrow-left")}<span>返回流程图</span></button>
                 <div class="node-focus-heading">
                   <span class="node-focus-eyebrow">NODE · 局部流程图（真实 Route / 阶段顺序）</span>
                   <h2 id="nodeFocusTitle"></h2>
@@ -120,7 +137,7 @@ export function activate(context){
               <div class="node-focus-toolbar">
                 <span id="nodeFocusStats"></span>
                 <div id="nodeFocusChildren"></div>
-                <button id="nodeFocusFit" type="button" class="node-focus-back">适配局部图</button>
+                <button id="nodeFocusFit" type="button" class="node-focus-back" title="适配局部图">${svgIcon("maximize")}<span>适配局部图</span></button>
               </div>
               <div id="nodeFocusFlow" class="node-focus-flow-host" aria-label="当前节点一跳局部 React Flow 流程图"></div>
             </section>
