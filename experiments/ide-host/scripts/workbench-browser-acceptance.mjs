@@ -179,6 +179,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const masResourcePaths=await evalJS("(async()=>{const c=window.theia.container;const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').map(w=>w.resource?.path.toString()??'').filter(p=>p.includes('/establish-pdu-session-mas/'))??[];})()");
   if(!masGraph||masGraph.procedureValue!=='establish-session'||!masResourcePaths.some(p=>p.endsWith('/establish-pdu-session-mas/assurance/procedure.yaml')))
     throw Error('MAS Procedure did not open from native Explorer: '+JSON.stringify({masFolder,assuranceRows,procedureRows,masProcedure,masGraph,masResourcePaths}));
+  // Dispose both test editors before resuming the older regression suite.
+  // Several existing native-command probes intentionally expect one active
+  // Procedure resource, so keep the MAS proof isolated from those probes.
+  await invoke('core.close.all.main.tabs');
+  await invoke('workbench.files.action.focusFilesExplorer');
   const conventionalProcedure=await explorerRow('procedure.yaml','first');
   if(!conventionalProcedure?.found)throw Error('Conventional 5GC procedure.yaml row missing after MAS open');
   await click(conventionalProcedure.x,conventionalProcedure.y);
@@ -189,6 +194,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await sleep(100);
   }
   if(!conventionalGraph)throw Error('Could not restore conventional 5GC Procedure after MAS Explorer acceptance');
+  await click(conventionalProcedure.x,conventionalProcedure.y,2);
+  await sleep(250);
+  conventionalGraph=await graph('ue-requested-pdu-session-establishment');
+  if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
   console.log('STUDIO_DUAL_SKILL_EXPLORER_CHROMIUM',JSON.stringify({
     root:'skills',conventionalFolder:'establish-pdu-session',masFolder,
     assuranceRows,procedureRows,masProcedure,masGraph,masResourcePaths,
