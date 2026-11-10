@@ -213,6 +213,10 @@ connection.onInitialize(() => ({
   }
 }));
 
+// Health is a read-only transport liveness check. It does not inspect or
+// mutate Package Source or claim an analysis generation is READY.
+connection.onRequest("skillStudio/health", () => ({alive:true}));
+
 connection.onDefinition(params => {
   const value = packageForUri(params.textDocument.uri);
   if (!value || value.analysis.state === "UNAVAILABLE") return null;
