@@ -58,12 +58,31 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     })()`);
     console.log("STUDIO_OUTPUT_FIXTURE_EDITOR",JSON.stringify(direct));
     if(direct.method==='native-type-fallback'){
-      const editor=await evalJS(`(()=>{const e=[...document.querySelectorAll('.monaco-editor')].find(x=>x.getBoundingClientRect().width>0);const target=e?.querySelector('.view-lines')??e;const r=target?.getBoundingClientRect();return r?{x:r.x+Math.min(90,r.width/2),y:r.y+Math.min(24,r.height/2)}:null;})()`);
-      if(!editor)throw Error("Native Source editor is not available for the fixture round-trip: "+JSON.stringify(direct));
-      await click(editor.x,editor.y);
-      await invoke("editor.action.selectAll");
-      // Theia generic "type" can hang; CDP inserts text into the focused
-      // native Monaco editor and retains the actual TextDocument semantics.
+      // Theia exposes a native Monaco textarea even when window.monaco is
+      // private. Explicitly focus that input and drive the real keyboard/CDP
+      // rather than invoking Theia's unrelated generic "type" command.
+      const focus=await evalJS(`(()=>{
+        const editors=[...document.querySelectorAll('.monaco-editor')]
+          .filter(el=>el.getBoundingClientRect().width>200&&
+            el.getBoundingClientRect().height>100);
+        const editor=editors.find(el=>
+          el.closest('.theia-editor')?.classList.contains('theia-mod-active'))??
+          editors.at(-1);
+        const input=editor?.querySelector('textarea.inputarea');
+        input?.focus();
+        return {editorCount:editors.length,hasInput:Boolean(input),
+          focusReady:document.activeElement===input,
+          activeTag:document.activeElement?.tagName,
+          activeClass:document.activeElement?.className};
+      })()`);
+      console.log("STUDIO_OUTPUT_FIXTURE_FOCUS",JSON.stringify(focus));
+      if(!focus?.focusReady)throw Error(
+        "Cannot focus native Monaco input for output-reference fixture: "+
+          JSON.stringify(focus));
+      const key={key:"a",code:"KeyA",windowsVirtualKeyCode:65,
+        nativeVirtualKeyCode:65,modifiers:2};
+      await command("Input.dispatchKeyEvent",{type:"keyDown",...key});
+      await command("Input.dispatchKeyEvent",{type:"keyUp",...key});
       await command("Input.insertText",{text});
     }
     await sleep(450);
