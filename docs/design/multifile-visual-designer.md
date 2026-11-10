@@ -144,3 +144,40 @@ Alias/unknown fields fall back to Source, preserving author intent.
 **Current evidence:** the C0 files have been committed for review. Their
 test suite, Typecheck, build, Chromium and Pages gates are NOT_RUN here.
 No integration to Theia is claimed.
+
+
+## 2026-11-10 · C0/C1 implementation status (PR #122)
+
+C0 and the first C1 Contract view are implemented on
+`feat/multifile-contract-designer-spike`:
+
+- `site/contract-projection.mjs` projects the full pinned v1alpha1 Contract shape:
+  Preconditions, Requirements, Postconditions, Dependencies, budget partition,
+  fallback Procedure, resources and failure policy.
+- Unknown nested fields and malformed known list sections are explicitly
+  `PARTIAL`; unsupported YAML / kinds fall back to `SOURCE_ONLY`.
+- `experiments/ide-host/vscode/src/contract-editor.mjs` registers a separate, read-only
+  Contract Custom Editor. It updates from the live TextDocument version,
+  uses nonce-only inline CSS/JS, and refuses stale reference actions.
+- Entry Procedure, Schema and Predicate links resolve against current package
+  Source and open the native Source editor at the referenced line. The Contract
+  page never writes Source.
+- The extension manifest registers `skillStudio.contractPreview` and the
+  `skillStudio.openContract` command; Theia browser preferences associate
+  `contract.yaml` with this view. Procedure remains a separate editor.
+- Unit tests cover projection, full Contract sections, unknown fields,
+  editor registration, live document refresh and stale message rejection.
+- `workbench-browser-acceptance.mjs` now has a real Theia Chromium assertion
+  for the rendered Contract cards and actual `establish-pdu-session` package
+  values. It is only evidence when run against the real Theia host with
+  `THEIA_REQUIRE_WEBVIEW=1` or `THEIA_URL`.
+
+The PR workflow now includes IDE-host changes and bundles the Node, VS Code
+Web and Theia browser extension artifacts. Its resulting run is the C1 build
+gate. The actual Contract page browser assertion remains **NOT_RUN** until the
+real Theia browser acceptance is executed; the existing generic Chromium smoke
+does not substitute for it.
+
+C2 Predicate Designer and C3 Schema Designer remain follow-up stages. No
+visual authoring mutations, Runtime qualification, LLM planning or 5GC
+execution semantics are introduced by C1.
