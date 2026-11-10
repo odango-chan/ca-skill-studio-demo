@@ -570,7 +570,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.match(panels[0].webview.html,/&lt;script&gt;/);
   doc.text='x'.repeat(300001);changed({document:{...doc,uri:uri('/workspace/SKILL.md')}});
   assert.match(panels[0].webview.html,/预览不可用/);
-  assert.equal((panels[0].webview.html.match(/<script\\b/gi)??[]).length,1,
+  assert.equal((panels[0].webview.html.match(/<script\b/gi)??[]).length,1,
     'only the nonce-protected host navigation bridge script is present');
   assert.match(panels[0].webview.html,/<script nonce="[a-f0-9]{32}">/);
   for(const sub of context.subscriptions)sub.dispose();
