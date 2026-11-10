@@ -637,14 +637,28 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       throw Error('Native Evidence toggle is obscured at its click point: '+JSON.stringify(dataflowTreeRow));
     await evalJS(`(()=>{
       window.__skillStudioEvidenceClickEvents=[];
-      document.addEventListener('click',event=>{
+      const record=event=>{
         const toggle=event.target?.closest?.('.theia-ExpansionToggle');
-        if(toggle)window.__skillStudioEvidenceClickEvents.push({
+        if(toggle)return {
           trusted:event.isTrusted,button:event.button,x:event.clientX,y:event.clientY,
-          nodeId:toggle.getAttribute('data-node-id'),
-          className:toggle.className,defaultPrevented:event.defaultPrevented
-        });
+          nodeId:toggle.getAttribute('data-node-id'),className:toggle.className,
+          defaultPrevented:event.defaultPrevented,
+          path:[...event.composedPath()].slice(0,10).map(item=>({
+            tag:item?.tagName??'',id:item?.id??'',
+            className:typeof item?.className==='string'?item.className:''
+          }))
+        };
+        return null;
+      };
+      document.addEventListener('click',event=>{
+        const detail=record(event);
+        if(detail)window.__skillStudioEvidenceClickEvents.push(detail);
       },true);
+      document.addEventListener('click',event=>{
+        const detail=record(event);
+        if(detail)window.__skillStudioEvidenceBubbleEvents.push(detail);
+      },false);
+      window.__skillStudioEvidenceBubbleEvents=[];
     })()`);
     // Use the verified on-screen hit target. Recompute after the hover frame
     // because Theia can rerender virtualized tree rows between pointer move
@@ -697,11 +711,630 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           child.classList?.contains('theia-TreeNodeContent'));
         return caption?.innerText?.trim()??'';
       }).filter(Boolean);
+      const c=window.theia?.container;
+      const managerKey=[...(c?._bindingDictionary?._map?.keys()??[])]
+        .find(key=>key?.name==='WidgetManager');
+      const manager=managerKey?c.get(managerKey):null;
+      const treeWidgets=manager?.getWidgets('plugin-view-data')??[];
+      const evidenceWidget=treeWidgets.find(widget=>widget.id==='skillStudio.evidence');
+      const modelNode=evidenceWidget?.model?.getNode(toggle?.getAttribute('data-node-id'));
+      const reactPropsKey=toggle&&Object.keys(toggle).find(key=>key.startsWith('__reactProps    })()`);
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(dataflowExpansion?.expanded&&
+       (dataflowExpansion.consumerAbi||phaseEvidenceText.includes('Consumer ABI')))break;
+    await sleep(100);
+  }
+  if(!dataflowExpansion?.expanded)
+    throw Error('Native Evidence dataflow arrow did not expand: '+
+      JSON.stringify({dataflowTreeRow,dataflowExpansion}));
+  for(let i=0;i<50;i++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(phaseEvidenceText.includes('Consumer ABI'))break;
+    await sleep(100);
+  }
+  const phaseEvidence={
+    ready:phaseEvidenceText.includes('Producer / Consumer dataflow')&&
+      phaseEvidenceText.includes('Consumer ABI'),
+    dataflowRows:(phaseEvidenceText.match(/Producer \/ Consumer dataflow/g)||[]).length,
+    consumerAbiRows:(phaseEvidenceText.match(/Consumer ABI/g)||[]).length,
+    readOnly:phaseEvidenceText.includes('no write authority')
+  };
+  if(!phaseEvidence.ready||!phaseEvidence.dataflowRows||!phaseEvidence.consumerAbiRows||
+     !phaseEvidence.readOnly)
+    throw Error('Native Evidence view did not render bounded read-only Producer / Consumer evidence: '+
+      JSON.stringify({phaseEvidence,dataflowTreeRow})+' · '+phaseEvidenceText.slice(-1400));
+  console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify(phaseEvidence));
+  // Expanding the native Evidence tree moves focus away from the editor. Open
+  // the authoritative Source editor before testing native Undo so the host's
+  // undo command is bound to the edited TextDocument, not the tree widget.
+  await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,awaitPromise:true,
+    expression:`document.querySelector('#openSource')?.click();true`
+  });
+  await sleep(600);
+  const sourceEditorReady=await evalJS(`({
+    monacoEditors:document.querySelectorAll('.monaco-editor').length,
+    activeText:document.activeElement?.closest('.monaco-editor')!==null
+  })`);
+  if(!(sourceEditorReady.monacoEditors>0))
+    throw Error('Native Source editor did not open before Phase binding Undo regression: '+
+      JSON.stringify(sourceEditorReady));
+  const beforeBinding=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const bindingVersion=Number(/v(\d+)/.exec(beforeBinding.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(bindingVersion))throw Error('Could not read Source version before Phase binding edit');
+  await startNativeCommand('skillStudio.editPhaseInputBinding',{
+    kind:'phase-step',procedureId:bindingSelection.result.value.procedure,
+    nodeId:'nudm-sdm-subscribe',phaseName:'preconditions',stepIndex:0,
+    sourceVersion:bindingVersion
+  },'dnn','input.ue-ref');
+  await confirmNativePreview('from: input.dnn','from: input.ue-ref');
+  const afterBinding=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const bindingResult=await evalJS(`window.__skillStudioCommandResult`);
+  if(bindingResult!==true||!afterBinding.result?.value||afterBinding.result.value===beforeBinding.result?.value)
+    throw Error('Native Phase Binding edit did not commit a Source revision');
+  await invoke('core.undo');
+  const afterBindingUndo=await waitForRevisionChange(graphContext,afterBinding.result?.value,
+    'Native Phase Binding Undo');
+  console.log('STUDIO_PHASE_BINDING_CHROMIUM',JSON.stringify({
+    node:bindingSelection.result.value.node,procedure:bindingSelection.result.value.procedure,
+    before:beforeBinding.result?.value,after:afterBinding.result?.value,undo:afterBindingUndo.result?.value
+  }));
+  // Rename a named Script Step and all proven local/qualified consumers through
+  // the shared closed-world source-span planner, then verify native Undo.
+  // Undo may replace the CustomEditor iframe; reacquire its live execution
+  // world instead of reading a possibly detached Webview context.
+  const beforeNamedGraph=await graph();
+  const beforeNamedRename=beforeNamedGraph?.revision??afterBindingUndo.result?.value??null;
+  const namedRenameVersion=Number(/v(\d+)/.exec(beforeNamedRename??'')?.[1]);
+  if(!Number.isSafeInteger(namedRenameVersion))throw Error('Named Step rename missing native Source revision');
+  const oldStepName='select-subscription-configuration';
+  const newStepName='select-subscription-config-v2';
+  await startNativeCommand('skillStudio.renameNamedPhaseStep',{
+    kind:'phase-step',procedureId:bindingSelection.result.value.procedure,
+    nodeId:'nudm-sdm-subscribe',phaseName:'preconditions',stepIndex:0,
+    stepName:oldStepName,stepOperator:'script',sourceVersion:namedRenameVersion
+  },newStepName);
+  await confirmNativePreview(oldStepName,newStepName);
+  const namedRenameAccepted=await evalJS(`window.__skillStudioCommandResult`);
+  const afterNamedRename=await waitForRevisionChange(graphContext,beforeNamedRename,
+    'Named Phase Step rename');
+  if(namedRenameAccepted!==true)throw Error('Named Phase Step rename was not accepted');
+  await invoke('core.undo');
+  const afterNamedRenameUndo=await waitForRevisionChange(graphContext,
+    afterNamedRename.result?.value,'Named Phase Step rename Undo');
+  console.log('STUDIO_PHASE_NAMED_STEP_RENAME_CHROMIUM',JSON.stringify({
+    before:beforeNamedRename,applied:afterNamedRename.result?.value,
+    undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName
+  }));
+  // Real Chromium + actual Theia extension command registry. Each Verify edit
+  // must return to the unmodified Source through native TextDocument Undo.
+  let lastKnownRevision=afterNamedRenameUndo.result?.value??beforeNamedRename;
+  async function nativeVerifyRoundTrip(commandId,item,argument,oldText,newText){
+    const currentGraph=await graph();
+    const before=currentGraph?.revision??lastKnownRevision??null;
+    const version=Number(/v(\d+)/.exec(before??'')?.[1]);
+    if(!Number.isSafeInteger(version))throw Error('Verify command missing native Source revision');
+    await startNativeCommand(commandId,{...item,
+      procedureId:bindingSelection.result.value.procedure,
+      nodeId:'nudm-sdm-subscribe',sourceVersion:version
+    },argument);
+    await confirmNativePreview(oldText,newText);
+    const accepted=await evalJS(`window.__skillStudioCommandResult`);
+    const after=await waitForRevisionChange(graphContext,before,commandId+' apply');
+    if(accepted!==true)throw Error(commandId+' did not apply after confirmation');
+    await invoke('core.undo');
+    const undone=await waitForRevisionChange(graphContext,after.result?.value,commandId+' Undo');
+    lastKnownRevision=undone.result?.value??lastKnownRevision;
+    return {before,applied:after.result?.value,undone:undone.result?.value};
+  }
+  const verifyAppend=await nativeVerifyRoundTrip('skillStudio.addPhaseVerify',
+    {kind:'phase',phaseName:'preconditions'},
+    'createdsession.n4.initial_resources_ready',
+    '新增','createdsession.n4.initial_resources_ready');
+  const verifyName=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
+    {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
+    {action:'name',newName:'lifecycle-ready'},
+    'verify: createdsession.lifecycle.ready','name: lifecycle-ready');
+  const verifyDelete=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
+    {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
+    'delete','删除','createdsession.lifecycle.ready');
+  const verifyReorder=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
+    {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
+    'move-up','调整','createdsession.ingress.eligible');
+  console.log('STUDIO_PHASE_VERIFY_CHROMIUM',JSON.stringify({
+    append:verifyAppend,name:verifyName,delete:verifyDelete,reorder:verifyReorder
+  }));
+  // Exercise D4-A2.1 against the current published sample, not a wholesale
+  // Source replacement. The AMF delivery-context Verify consumes an earlier
+  // same-Node output; its local and fully-qualified forms both occur in Source.
+  // Multiple local occurrences remain after one normalization, allowing the
+  // shared source-backed planner to reprove the producer identity.
+  const beforeOutputGraph=await graph();
+  if(!beforeOutputGraph?.revision)
+    throw Error('Output reference test has no initial native Source revision');
+  const outputVersion=Number(/v(\d+)/.exec(beforeOutputGraph.revision)?.[1]);
+  if(!Number.isSafeInteger(outputVersion))
+    throw Error('Could not read native Source version before output reference test');
+  const outputProcedure='ue-requested-pdu-session-establishment';
+  const outputNode='namf-communication-n1n2-message-transfer';
+  const localOutput='preconditions.resolve-effective-session-configuration.output.contextRef';
+  const qualifiedOutput=outputNode+'.'+localOutput;
+  const outputItem={kind:'phase-output-reference',procedureId:outputProcedure,
+    nodeId:outputNode,phaseName:'preconditions',stepIndex:1,
+    bindingKey:'operationContextRef',sourceVersion:outputVersion};
+  await startNativeCommand('skillStudio.editPhaseOutputReference',outputItem,
+    'operationContextRef',qualifiedOutput);
+  await confirmNativePreview(localOutput,qualifiedOutput);
+  const outputAccepted=await evalJS('window.__skillStudioCommandResult');
+  const afterOutput=await waitForRevisionChange(graphContext,beforeOutputGraph.revision,
+    'Phase output reference normalization');
+  if(outputAccepted!==true)throw Error('Phase output reference normalization was not accepted');
+  await invoke('core.undo');
+  const afterOutputUndo=await waitForRevisionChange(graphContext,
+    afterOutput.result?.value,'Phase output reference native Undo');
+  // Reapply after Undo to prove the original local spelling was restored and
+  // that the same source-backed candidate is still eligible.
+  const undoVersion=Number(/v(\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(undoVersion))
+    throw Error('Could not read Source version after output reference Undo');
+  await startNativeCommand('skillStudio.editPhaseOutputReference',{
+    ...outputItem,sourceVersion:undoVersion
+  },'operationContextRef',qualifiedOutput);
+  await confirmNativePreview(localOutput,qualifiedOutput);
+  const outputReapply=await evalJS('window.__skillStudioCommandResult');
+  const afterOutputReapply=await waitForRevisionChange(graphContext,
+    afterOutputUndo.result?.value,'Phase output reference reapply');
+  if(outputReapply!==true)
+    throw Error('Output reference was not eligible again after native Undo');
+  await invoke('core.undo');
+  const afterOutputReapplyUndo=await waitForRevisionChange(graphContext,
+    afterOutputReapply.result?.value,'Phase output reference second Undo');
+  const restoredOutputGraph=await graph();
+  if(!restoredOutputGraph?.revision||restoredOutputGraph.nodes!==beforeOutputGraph.nodes)
+    throw Error('Native output-reference Undo lost the original graph');
+  const outputReference={before:beforeOutputGraph.revision,
+    applied:afterOutput.result?.value,undo:afterOutputUndo.result?.value,
+    reapplied:afterOutputReapply.result?.value,
+    undoAgain:afterOutputReapplyUndo.result?.value,
+    restored:restoredOutputGraph.revision,localOutput,qualifiedOutput};
+  console.log('STUDIO_PHASE_OUTPUT_REFERENCE_CHROMIUM',JSON.stringify(outputReference));
+  // D4-A4a uses the existing owner Source. Only an already-observed
+  // same-Phase/same-Outcome failure target is eligible, and Undo restores
+  // the original failure cleanup route before the later graph regressions.
+  const beforePhaseRoute=await graph();
+  const routeVersion=Number(/v(\d+)/.exec(beforePhaseRoute?.revision??'')?.[1]);
+  if(!Number.isSafeInteger(routeVersion))
+    throw Error('Phase Route test has no native TextDocument revision');
+  const phaseRouteItem={kind:'route',procedureId:'ue-requested-pdu-session-establishment',
+    nodeId:'nudm-sdm-subscribe',routeId:'nudm-sdm-subscribe:preconditions:FAILED',
+    sourceVersion:routeVersion};
+  await startNativeCommand('skillStudio.editPhaseRouteTarget',phaseRouteItem,'finalize-failed');
+  await confirmNativePreview('FAILED: failed','FAILED: finalize-failed');
+  const phaseRouteAccepted=await evalJS('window.__skillStudioCommandResult');
+  const afterPhaseRoute=await waitForRevisionChange(graphContext,beforePhaseRoute.revision,
+    'Phase Route retarget');
+  if(phaseRouteAccepted!==true)throw Error('Native Phase Route retarget was not accepted');
+  await invoke('core.undo');
+  const afterPhaseRouteUndo=await waitForRevisionChange(graphContext,
+    afterPhaseRoute.result?.value,'Phase Route retarget Undo');
+  const afterRouteGraph=await graph();
+  if(!afterRouteGraph?.revision||afterRouteGraph.nodes!==beforePhaseRoute.nodes)
+    throw Error('Phase Route native Undo lost the original Procedure graph');
+  const phaseRoute={before:beforePhaseRoute.revision,
+    applied:afterPhaseRoute.result?.value,undo:afterPhaseRouteUndo.result?.value,
+    routeId:phaseRouteItem.routeId,target:'finalize-failed'};
+  console.log('STUDIO_PHASE_ROUTE_TARGET_CHROMIUM',JSON.stringify(phaseRoute));
+  const graphHasNode=async id=>{
+    const result=await command('Runtime.evaluate',{
+      contextId:graphContext,returnByValue:true,
+      expression:`[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].some(x=>x.getAttribute('data-id')===${JSON.stringify(id)})`
+    });
+    return result.result?.value===true;
+  };
+  const insertSelection=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-get');if(!node)throw Error('Node insertion source is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  });
+  if(!insertSelection.result?.value?.node)throw Error('Could not select Route source Node for insertion');
+  await sleep(250);
+  const beforeInsert=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const insertVersion=Number(/v(\d+)/.exec(beforeInsert.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(insertVersion))throw Error('Could not read Source version before Node insertion');
+  await startNativeCommand('skillStudio.insertNode',{
+    kind:'route',procedureId:insertSelection.result.value.procedure,
+    nodeId:'nudm-sdm-get',routeId:'nudm-sdm-get:postconditions:PASS',
+    sourceVersion:insertVersion
+  },{
+    nodeId:'ide-host-insert-probe',operator:'call',
+    value:'sbi.demo.insert_probe',outcome:'COMMITTED'
+  });
+  await confirmNativePreview('PASS: nudm-sdm-subscribe','PASS: ide-host-insert-probe');
+  const insertResult=await evalJS(`window.__skillStudioCommandResult`);
+  const afterInsert=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  await sleep(400);
+  const insertedGraph=await graph();
+  const insertedPresent=await graphHasNode('ide-host-insert-probe');
+  if(insertResult!==true||!afterInsert.result?.value||
+     afterInsert.result.value===beforeInsert.result?.value||insertedGraph?.nodes!==18||!insertedPresent)
+    throw Error('Native Node insertion did not add one Source-backed Node: '+JSON.stringify({insertResult,before:beforeInsert.result?.value,after:afterInsert.result?.value,graph:insertedGraph}));
+  const deleteSelection=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='ide-host-insert-probe');if(!node)throw Error('Inserted Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  });
+  if(!deleteSelection.result?.value?.node)throw Error('Could not select inserted Node for deletion');
+  await sleep(250);
+  const beforeDelete=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const deleteVersion=Number(/v(\d+)/.exec(beforeDelete.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(deleteVersion))throw Error('Could not read Source version before Node deletion');
+  await startNativeCommand('skillStudio.deleteNode',{
+    kind:'node',procedureId:deleteSelection.result.value.procedure,
+    nodeId:'ide-host-insert-probe',sourceVersion:deleteVersion
+  },'nudm-sdm-subscribe');
+  await confirmNativePreview('ide-host-insert-probe:','PASS: nudm-sdm-subscribe');
+  const deleteResult=await evalJS(`window.__skillStudioCommandResult`);
+  const afterDelete=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  await sleep(350);
+  const deletedGraph=await graph();
+  const deletedPresent=await graphHasNode('ide-host-insert-probe');
+  if(deleteResult!==true||!afterDelete.result?.value||
+     afterDelete.result.value===beforeDelete.result?.value||deletedGraph?.nodes!==17||deletedPresent)
+    throw Error('Native Node deletion did not remove the Node and repair the Route: '+JSON.stringify({deleteResult,before:beforeDelete.result?.value,after:afterDelete.result?.value,graph:deletedGraph}));
+  await invoke('core.undo');
+  const afterDeleteUndo=await waitForRevisionChange(graphContext,afterDelete.result?.value,
+    'Native Undo of Node deletion');
+  await sleep(350);
+  const restoredInsertGraph=await graph();
+  const restoredInsertPresent=await graphHasNode('ide-host-insert-probe');
+  if(!afterDeleteUndo.result?.value||afterDeleteUndo.result.value===afterDelete.result?.value||
+     restoredInsertGraph?.nodes!==18||!restoredInsertPresent)
+    throw Error('Native Undo did not restore the deleted Node');
+  await invoke('core.undo');
+  const afterInsertUndo=await waitForRevisionChange(graphContext,afterDeleteUndo.result?.value,
+    'Native Undo of Node insertion');
+  await sleep(350);
+  const restoredOriginalGraph=await graph();
+  const originalAbsent=!(await graphHasNode('ide-host-insert-probe'));
+  if(!afterInsertUndo.result?.value||afterInsertUndo.result.value===afterDeleteUndo.result?.value||
+     restoredOriginalGraph?.nodes!==17||!originalAbsent)
+    throw Error('Native Undo did not remove the inserted Node and restore original graph');
+  console.log('STUDIO_NODE_INSERT_DELETE_CHROMIUM',JSON.stringify({
+    procedure:insertSelection.result.value.procedure,node:'ide-host-insert-probe',
+    before:beforeInsert.result?.value,inserted:afterInsert.result?.value,
+    deleted:afterDelete.result?.value,undoDelete:afterDeleteUndo.result?.value,
+    undoInsert:afterInsertUndo.result?.value,
+    nodeCounts:[insertedGraph?.nodes,deletedGraph?.nodes,
+      restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes],
+    identity:[insertedPresent,deletedPresent,restoredInsertPresent,originalAbsent]
+  }));
+  // D4-A4b1: create a one-scalar typo in the actual native Monaco Source
+  // editor, then exercise the real extension's guarded correction + Undo.
+  // We never bulk-replace the Procedure or save a synthetic example Package.
+  const key=async(keyName,code,modifiers=0,virtualKeyCode)=>{
+    const event={key:keyName,code,modifiers,
+      windowsVirtualKeyCode:virtualKeyCode,nativeVirtualKeyCode:virtualKeyCode};
+    await command('Input.dispatchKeyEvent',{type:'keyDown',...event});
+    await command('Input.dispatchKeyEvent',{type:'keyUp',...event});
+  };
+  const beforeOutcomeFixture=await graph();
+  const nativeEditor=await evalJS(`(()=>{
+    const editors=[...document.querySelectorAll('.monaco-editor')];
+    const chosen=editors.map((node,index)=>{
+      const rect=node.getBoundingClientRect();
+      return {index,x:rect.x,y:rect.y,width:rect.width,height:rect.height};
+    }).find(rect=>rect.width>80&&rect.height>100&&rect.x>=0&&rect.y>=0&&
+      rect.x+rect.width/2<innerWidth&&rect.y+rect.height/2<innerHeight);
+    return chosen??null;
+  })()`);
+  if(!nativeEditor)throw Error('No native Monaco Source editor for Outcome acceptance');
+  await click(nativeEditor.x+Math.min(90,nativeEditor.width/2),
+    nativeEditor.y+Math.min(24,nativeEditor.height/2));
+  await key('g','KeyG',2,71);await sleep(200);
+  await command('Input.insertText',{text:String(pcfOutcomeLine)});
+  const gotoInput=await evalJS('document.activeElement?.value??""');
+  if(!String(gotoInput).includes(String(pcfOutcomeLine)))
+    throw Error('Native Go to Line did not accept PCF Outcome line: '+JSON.stringify(gotoInput));
+  await key('Enter','Enter',0,13);await sleep(250);
+  const visiblePcfLine=await evalJS(`(()=>{
+    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
+    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
+  })()`);
+  if(!visiblePcfLine.includes('FAILED: finalize-failed'))
+    throw Error('Native Source editor did not reveal the PCF Outcome target: '+
+      visiblePcfLine.slice(0,1400));
+  await key('Home','Home',0,36);await key('Home','Home',0,36);
+  await key('End','End',8,35);
+  await command('Input.insertText',{text:'            MISTYPED: finalize-failed'});
+  const afterTypo=await waitForRevisionChange(graphContext,
+    beforeOutcomeFixture.revision,'Native Phase Outcome typo fixture');
+  const typoVersion=Number(/v(\d+)/.exec(afterTypo.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(typoVersion))throw Error('Outcome typo lost native Source version');
+  const typoItem={kind:'phase-outcome-repair',
+    procedureId:'ue-requested-pdu-session-establishment',
+    nodeId:'npcf-sm-policy-control-create',
+    phaseName:'preconditions',sourceVersion:typoVersion};
+  await startNativeCommand('skillStudio.repairPhaseOutcome',typoItem,
+    {mode:'rename',oldOutcome:'MISTYPED',newOutcome:'FAILED',target:'finalize-failed'});
+  await evalJS(`(()=>{
+    window.__outcomeCommandState={status:'pending'};
+    window.__skillStudioPendingCommand.then(
+      value=>{window.__outcomeCommandState={status:'resolved',value};},
+      error=>{window.__outcomeCommandState={status:'rejected',error:String(error)};});
+    return true;
+  })()`);
+  await sleep(450);
+  const outcomeProbe=await evalJS(`({
+    state:window.__outcomeCommandState,
+    tail:document.body.innerText.slice(-800),
+    modals:[...document.querySelectorAll('button')]
+      .filter(x=>x.getBoundingClientRect().width>0)
+      .map(x=>x.textContent?.trim()).filter(Boolean).slice(-25)
+  })`);
+  console.log('STUDIO_PHASE_OUTCOME_COMMAND_PROBE',JSON.stringify(outcomeProbe));
+  if(outcomeProbe.state?.status==='resolved'&&outcomeProbe.state.value!==true)
+    throw Error('Phase Outcome command rejected fixture before confirmation: '+
+      JSON.stringify(outcomeProbe));
+  await confirmNativePreview('MISTYPED: finalize-failed','FAILED: finalize-failed',
+    {attempts:120});
+  const outcomeAccepted=await evalJS('window.__skillStudioCommandResult');
+  const outcomeApplied=await waitForRevisionChange(graphContext,
+    afterTypo.result?.value,'Native Phase Outcome correction');
+  if(outcomeAccepted!==true)throw Error('Native Phase Outcome repair was not accepted');
+  await invoke('core.undo');
+  const outcomeUndo=await waitForRevisionChange(graphContext,
+    outcomeApplied.result?.value,'Native Phase Outcome repair Undo');
+  const afterNativeUndo=await evalJS(`(()=>{
+    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
+    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
+  })()`);
+  if(!afterNativeUndo.includes('MISTYPED: finalize-failed'))
+    throw Error('Native Undo did not revert the Outcome repair back to the typed fixture: '+
+      afterNativeUndo.slice(-1200));
+  // The keyboard-created fixture can have its own Monaco edit/undo grouping.
+  // Restore the original Source explicitly with one native editor line edit;
+  // do not assume a second core.undo will undo exactly that fixture.
+  await click(nativeEditor.x+Math.min(90,nativeEditor.width/2),
+    nativeEditor.y+Math.min(24,nativeEditor.height/2));
+  await key('g','KeyG',2,71);await sleep(160);
+  await command('Input.insertText',{text:String(pcfOutcomeLine)});
+  await key('Enter','Enter',0,13);await sleep(160);
+  await key('Home','Home',0,36);await key('Home','Home',0,36);
+  await key('End','End',8,35);
+  await command('Input.insertText',{text:'            FAILED: finalize-failed'});
+  const fixtureRestored=await waitForRevisionChange(graphContext,
+    outcomeUndo.result?.value,'Native Phase Outcome fixture restoration');
+  const restoredText=await evalJS(`(()=>{
+    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
+    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
+  })()`);
+  if(!restoredText.includes('FAILED: finalize-failed')||
+     restoredText.includes('MISTYPED: finalize-failed'))
+    throw Error('Native Source fixture was not restored to its original scalar: '+
+      restoredText.slice(-1200));
+  const outcomeRestored=await graph();
+  if(!outcomeRestored?.revision||outcomeRestored.nodes!==beforeOutcomeFixture.nodes)
+    throw Error('Phase Outcome restoration lost the original Procedure graph');
+  const phaseOutcome={line:pcfOutcomeLine,
+    before:beforeOutcomeFixture.revision,seed:afterTypo.result?.value,
+    repaired:outcomeApplied.result?.value,undo:outcomeUndo.result?.value,
+    restored:fixtureRestored.result?.value,
+    restoration:'native editor exact line replacement'};
+  console.log('STUDIO_PHASE_OUTCOME_REPAIR_CHROMIUM',JSON.stringify(phaseOutcome));
+  // Return the native Explorer to the foreground: the evidence acceptance
+  // opened the Skill Studio Activity Bar and intentionally kept it selected.
+  await invoke('workbench.files.action.focusFilesExplorer');
+  // Safe Markdown uses the actual native source document and shared renderer.
+  const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
+  await click(markdownFile.x,markdownFile.y,2);await sleep(400);
+  await invoke('skillStudio.previewMarkdown');
+  const tree=await command('Page.getFrameTree');let markdown=false;
+  async function inspect(n){
+    try{const w=await command('Page.createIsolatedWorld',{frameId:n.frame.id,worldName:'markdown-acceptance',grantUniveralAccess:true});
+      const r=await command('Runtime.evaluate',{contextId:w.executionContextId,returnByValue:true,expression:`Boolean(document.querySelector('article h1')&&!document.querySelector('article script,article img'))`});
+      markdown ||= r.result?.value===true;
+    }catch{}
+    for(const c of n.childFrames??[])await inspect(c);
+  }
+  await inspect(tree.frameTree);if(!markdown)throw Error('Shared safe Markdown Preview did not render');
+  // Native layout restoration must retain the CustomEditor across a reload.
+  console.log("STUDIO_NATIVE_ACTION","reload");
+  await sleep(1200);await command('Page.reload');await sleep(800);
+  let restored=null;
+  for(let i=0;i<120&&!restored;i++){
+    const tab=await evalJS(`(()=>{const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>x.textContent.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+    if(tab){await click(tab.x,tab.y);restored=await graph();}
+    if(!restored)await sleep(150);
+  }
+  if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
+
+  // D4a + D4b: prove real Worker termination, SDK-owned diagnostic cleanup,
+  // degraded native editing, explicit restart and dirty-buffer rehydration.
+  let workerFailureEvidence=null,recoveryEvidence=null;
+  if(requireBrowserLsp){
+    let procedureDiagnosticActive=false,ownershipProbeActive=false,
+      recoveryBufferPrepared=false,packageLifecyclePrepared=false;
+    let procedureUri=null;
+    try{
+    procedureUri=await evalJS(`(async()=>{const c=window.theia.container;const opKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');if(!opKey)throw Error('L2-D4 Procedure OpenerService missing');const openers=await c.get(opKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource?.toString()??null;})()`);
+    if(!procedureUri)throw Error("L2-D4 Procedure URI missing");
+
+    const diagnostic=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticsAcceptance",procedureUri,"publish");
+    if(!diagnostic?.appeared||diagnostic.code!=="PROCEDURE_PROJECTION")
+      throw Error("L2-D4b real LSP diagnostic setup failed: "+JSON.stringify(diagnostic));
+    procedureDiagnosticActive=true;
+    const ownershipSetup=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"publish");
+    if(!ownershipSetup?.lspDiagnosticPresent||!ownershipSetup?.hostProbePresent)
+      throw Error("L2-D4b diagnostic ownership setup failed: "+JSON.stringify(ownershipSetup));
+    ownershipProbeActive=true;
+
+    const terminated=await nativeCommand(
+      "skillStudio.internal.languageWorkerTerminationAcceptance");
+    if(!terminated?.actualWorkerTerminated||
+       terminated.workerName!=="skill-studio-language-server"||
+       !terminated.scriptUri?.endsWith("/skill-language-server.js"))
+      throw Error("L2-D4 did not terminate the real Language Worker: "+
+        JSON.stringify(terminated));
+    console.log("STUDIO_LSP_WORKER_TERMINATION_CHROMIUM",JSON.stringify(terminated));
+
+    let observedStatus="";
+    for(let i=0;i<100;i++){
+      observedStatus=await evalJS('document.body.innerText.match(/SKILL LSP: (UNAVAILABLE|ERROR|READY|ANALYZING|IDLE)/)?.[0]??""');
+      if(observedStatus==="SKILL LSP: UNAVAILABLE")break;
+      await sleep(100);
+    }
+    if(observedStatus!=="SKILL LSP: UNAVAILABLE")
+      throw Error("L2-D4 Worker termination was not surfaced: "+
+        JSON.stringify({observedStatus,worker:terminated.scriptUri}));
+
+    const ownership=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"verify");
+    if(!ownership?.lspCollectionDisposed||!ownership?.lspDiagnosticCleared||
+       !ownership?.independentHostCollectionPreserved)
+      throw Error("L2-D4b SDK diagnostic ownership failed: "+JSON.stringify(ownership));
+    await nativeCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"restore");
+    ownershipProbeActive=false;
+    const procedureRestore=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticsAcceptance",procedureUri,"repair-after-failure");
+    if(!procedureRestore?.restored||!procedureRestore?.originalDiskRestored)
+      throw Error("L2-D4b degraded Procedure restoration failed: "+JSON.stringify(procedureRestore));
+    procedureDiagnosticActive=false;
+
+    const nativeEdit=await nativeCommand(
+      "skillStudio.internal.languageDegradedEditingAcceptance",procedureUri);
+    if(!nativeEdit?.nativePythonEditing||!nativeEdit?.workerUnavailable||
+       !nativeEdit.restored||nativeEdit.status!=="SKILL LSP: UNAVAILABLE"||
+       !/health request timed out|connection closed|stopped unexpectedly|crashed|could not be decoded/i.test(nativeEdit.failureReason??""))
+      throw Error("L2-D4 native editor or real transport-failure evidence missing: "+
+        JSON.stringify(nativeEdit));
+
+    const packageLifecycle=await nativeCommand(
+      "skillStudio.internal.languagePackageLifecycleAcceptance",procedureUri,"prepare");
+    if(!packageLifecycle?.created||packageLifecycle.references!==2||
+       !packageLifecycle.distinctNonNestedRoots||
+       !packageLifecycle.packageARoot||!packageLifecycle.packageBRoot||
+       packageLifecycle.packageBRoot.startsWith(packageLifecycle.packageARoot+"/")||
+       packageLifecycle.packageARoot.startsWith(packageLifecycle.packageBRoot+"/"))
+      throw Error("L2-D4b requires two truly separate Package roots: "+
+        JSON.stringify(packageLifecycle));
+    packageLifecyclePrepared=true;
+    const prepared=await nativeCommand(
+      "skillStudio.internal.languageRecoveryAcceptance",procedureUri,"prepare");
+    if(!prepared?.dirtyBufferPrepared||!prepared?.originalDiskUnchanged)
+      throw Error("L2-D4b unsaved-buffer recovery setup failed: "+JSON.stringify(prepared));
+    recoveryBufferPrepared=true;
+    const recovery=await nativeCommand("skillStudio.restartLanguageService");
+    if(!recovery?.recovered||!Array.isArray(recovery.packages)||
+       recovery.packages.length!==2||
+       recovery.packages.some(item=>item.status!=="READY")||
+       new Set(recovery.packages.map(item=>item.rootUri)).size!==2||
+       !recovery.packages.some(item=>item.rootUri===packageLifecycle.packageARoot)||
+       !recovery.packages.some(item=>item.rootUri===packageLifecycle.packageBRoot)||
+       recovery.packages.some(item=>
+         item.rootUri===packageLifecycle.packageARoot&&
+         item.dirtyDocuments?.some(file=>file.path.startsWith("skill-studio-l2d4b-"))))
+      throw Error("L2-D4b cross-Package isolation or recovery failed: "+
+        JSON.stringify(recovery));
+    const recovered=await nativeCommand(
+      "skillStudio.internal.languageRecoveryAcceptance",procedureUri,"verify-and-restore");
+    if(!recovered?.recovered||!recovered?.dirtyPythonRehydrated||
+       !recovered?.hoverReflectsUnsavedMetadata||
+       !recovered?.originalDiskUnchanged||!recovered?.restored)
+      throw Error("L2-D4b replacement Worker did not rehydrate the unsaved buffer: "+
+        JSON.stringify(recovered));
+    recoveryBufferPrepared=false;
+    let lifecycle=null;
+    try{
+      lifecycle=await nativeCommand(
+        "skillStudio.internal.languagePackageLifecycleAcceptance",
+        procedureUri,"verify-and-close");
+    }finally{
+      // The command's own finally always releases references and removes the
+      // temporary Package, including when a lifecycle assertion fails.
+      packageLifecyclePrepared=false;
+    }
+    if(!lifecycle?.twoPackageRecovery||!lifecycle?.firstReferenceRetained||
+       !lifecycle?.finalCloseRemoved||!lifecycle?.generationMonotonic||
+       !lifecycle?.cleaned)
+      throw Error("L2-D4b host Package close/reopen acceptance failed: "+
+        JSON.stringify(lifecycle));
+
+    workerFailureEvidence={workerTarget:terminated.scriptUri,
+      transportUnavailable:true,nativeEditing:nativeEdit,
+      diagnosticOwnership:ownership};
+    recoveryEvidence={...recovery,dirtyBuffer:recovered,packageLifecycle:lifecycle};
+    console.log("STUDIO_LSP_WORKER_DEGRADED_CHROMIUM",
+      JSON.stringify(workerFailureEvidence));
+    console.log("STUDIO_LSP_WORKER_RECOVERY_CHROMIUM",
+      JSON.stringify(recoveryEvidence));
+    }finally{
+      if(recoveryBufferPrepared){
+        try{await nativeCommand("skillStudio.internal.languageRecoveryAcceptance",
+          procedureUri,"abort-and-restore");}catch(error){
+          console.warn("L2-D4b recovery abort cleanup",String(error?.message??error));
+        }
+      }
+      if(packageLifecyclePrepared){
+        try{await nativeCommand("skillStudio.internal.languagePackageLifecycleAcceptance",
+          procedureUri,"abort-and-clean");}catch(error){
+          console.warn("L2-D4b Package lifecycle cleanup",String(error?.message??error));
+        }
+      }
+      if(ownershipProbeActive){
+        try{await nativeCommand("skillStudio.internal.languageDiagnosticOwnershipAcceptance",
+          procedureUri,"restore");}catch(error){
+          console.warn("L2-D4b diagnostic ownership cleanup",String(error?.message??error));
+        }
+      }
+      if(procedureDiagnosticActive){
+        try{await nativeCommand("skillStudio.internal.languageDiagnosticsAcceptance",
+          procedureUri,"repair-after-failure");}catch(error){
+          console.warn("L2-D4b Procedure diagnostic cleanup",String(error?.message??error));
+        }
+      }
+    }
+  }
+  console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
+  console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
+  return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,dualSkillExplorer,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference,phaseRoute,phaseOutcome,workerFailureEvidence,recoveryEvidence};
+}
+
+// Keep native Explorer acceptance independent of the user's scroll position.
+));
+      const reactProps=reactPropsKey?toggle[reactPropsKey]:null;
       return {found:!!node,toggleFound:!!toggle,
         toggleClass:toggle?.className??null,
         expanded:!!toggle&&!toggle.classList.contains('theia-mod-collapsed'),
         consumerAbi:labels.some(label=>label.includes('Consumer ABI')),
         clickEvents:window.__skillStudioEvidenceClickEvents??[],
+        bubbleEvents:window.__skillStudioEvidenceBubbleEvents??[],
+        treeWidgets:treeWidgets.map(widget=>({id:widget.id,type:widget.constructor?.name,
+          disposed:widget.isDisposed,visible:widget.isVisible,attached:widget.isAttached})),
+        evidenceWidgetFound:!!evidenceWidget,modelType:evidenceWidget?.model?.constructor?.name??null,
+        modelNode:modelNode?{id:modelNode.id,name:modelNode.name,expanded:modelNode.expanded,
+          childCount:modelNode.children?.length,parentId:modelNode.parent?.id??null,
+          type:modelNode.constructor?.name??null}:null,
+        reactPropsKey:reactPropsKey??null,reactOnClick:typeof reactProps?.onClick,
         labels:labels.slice(-16)};
     })()`);
     phaseEvidenceText=await evalJS('document.body.innerText');
