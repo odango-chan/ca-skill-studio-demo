@@ -106,6 +106,13 @@ export function diagnosticsFromAnalysis(
   const documents = snapshot.documents.filter(doc =>
     analyzed.get(doc.uri)?.version === doc.version &&
     analyzed.get(doc.uri)?.relativePath === doc.relativePath);
+  // A stale or incomplete analyzer result must not be rendered as READY with
+  // an empty Problems panel. Every input document requires a matching result.
+  if (documents.length !== snapshot.documents.length ||
+      analyzed.size !== snapshot.documents.length)
+    return { state: "UNAVAILABLE", generation: snapshot.generation,
+      documents: [], unlocated: analysis.diagnostics,
+      reason: "Analysis document identities or versions do not match current Source" };
   const byUri = new Map(documents.map(doc => [doc.uri, doc] as const));
   const indexed = new Map(documents.map(doc => [doc.uri, {
     starts: lineStarts(doc.text),
