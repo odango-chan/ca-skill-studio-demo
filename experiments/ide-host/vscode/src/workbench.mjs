@@ -31,8 +31,11 @@ export function registerWorkbench(vscode,context){
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   let languageClient=null,languageClientPromise=null,languageClientFailureShown=false,
-    languageStatusItem=null;
+    languageStatusItem=null,languageTransportFailure=null;
   function updateLanguageStatus(state,detail){
+    // A terminal Worker failure must never be overwritten by stale READY or
+    // another scheduled ANALYZING refresh. Native Source editing is separate.
+    if(languageTransportFailure && state!=="UNAVAILABLE" && state!=="IDLE")return;
     if(typeof Worker!=="function"||typeof globalThis.location==="undefined")return;
     if(!languageStatusItem){
       languageStatusItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left,20);
@@ -65,6 +68,17 @@ export function registerWorkbench(vscode,context){
             onError:error=>{
               console.warn("Skill Studio Language Service",error);
               updateLanguageStatus("ERROR",String(error?.message??error));
+            },
+            onFatal:error=>{
+              if(languageTransportFailure)return;
+              languageTransportFailure=String(error?.message??error??"Worker failed");
+              updateLanguageStatus("UNAVAILABLE",languageTransportFailure);
+              if(!languageClientFailureShown){
+                languageClientFailureShown=true;
+                void vscode.window.showWarningMessage(
+                  "SKILL Studio 语言 Worker 已中断，语言功能暂不可用；YAML/Python 源码仍可继续编辑。"
+                );
+              }
             }
           });
           updateLanguageStatus("STARTING","Starting browser language Worker");
@@ -83,14 +97,14 @@ export function registerWorkbench(vscode,context){
     return languageClientPromise;
   }
   async function refreshLanguagePackage(state,ticket,generation){
-    if(state.disposed||ticket!==state.ticket)return;
+    if(state.disposed||ticket!==state.ticket||languageTransportFailure)return;
     try{
       const snapshot=await collectPackageSnapshot(
         vscode,state.procedureDocument,generation
       );
       if(state.disposed||ticket!==state.ticket)return;
       const client=await ensureLanguageClient();
-      if(!client||state.disposed||ticket!==state.ticket)return;
+      if(!client||state.disposed||ticket!==state.ticket||languageTransportFailure)return;
       updateLanguageStatus("ANALYZING","Analyzing "+snapshot.packageName+
         " · generation "+snapshot.generation);
       client.sendPackageSnapshot(snapshot);
@@ -111,6 +125,7 @@ export function registerWorkbench(vscode,context){
     const ticket=++state.ticket;
     const generation=++state.generation;
     clearTimeout(state.timer);
+    if(languageTransportFailure)return;
     updateLanguageStatus("ANALYZING","Package "+state.key+
       " changed · generation "+generation);
     const invalidate=client=>{
