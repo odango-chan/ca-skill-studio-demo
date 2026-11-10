@@ -12,6 +12,10 @@ import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from '../../../../site/phase-output-refs.mjs';
 import {phaseRouteTargetOptions,previewPhaseRouteTarget,applyPhaseRouteTarget}
   from '../../../../site/phase-routes.mjs';
+import {phaseOutcomeEditOptions,previewAddObservedPhaseOutcome,
+  previewRenameNoncorePhaseOutcome,previewDeleteNoncorePhaseOutcome,
+  applyAddObservedPhaseOutcome,applyRenameNoncorePhaseOutcome,
+  applyDeleteNoncorePhaseOutcome} from '../../../../site/phase-outcomes.mjs';
 import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   previewAddPhaseVerify,applyAddPhaseVerify,
   previewDeletePhaseVerify,applyDeletePhaseVerify}
@@ -219,6 +223,65 @@ export function registerWorkbench(vscode,context){
     const applied=await confirmAndApply({
       ...ctx,preview,changes:singleSourceChange,
       verify:text=>applyPhaseRouteTarget(text,preview)
+    });
+    if(applied)update(ctx.doc);
+    return applied;
+  }
+
+  async function repairPhaseOutcome(item,requestedAction){
+    if(item?.kind!=='phase-outcome-repair'||typeof item.phaseName!=='string'||
+       !Number.isSafeInteger(item.sourceVersion))
+      throw Error('Select a current eligible Phase Outcome repair in native Inspector');
+    const ctx=currentNode(item);
+    const phase=phaseOutcomeEditOptions(ctx.source,ctx.procedureId,ctx.nodeId)
+      .find(option=>option.phaseName===item.phaseName);
+    if(!phase)throw Error('Phase Outcome Source is not qualified for repair');
+    const actions=[
+      ...phase.adds.map(option=>({mode:'add',outcome:option.outcome,target:option.target,
+        label:'补齐 '+option.outcome,description:'→ '+option.target})),
+      ...phase.renames.map(option=>({mode:'rename',oldOutcome:option.oldOutcome,
+        newOutcome:option.newOutcome,target:option.target,
+        label:'纠正 '+option.oldOutcome+' → '+option.newOutcome,
+        description:'现有目标 '+option.target})),
+      ...phase.deletions.map(option=>({mode:'delete',outcome:option.outcome,
+        target:option.target,label:'删除非核心 '+option.outcome,
+        description:'当前目标 '+option.target}))
+    ];
+    if(!actions.length)throw Error('No owner-observed Phase Outcome repair is available');
+    let choice=requestedAction;
+    if(choice===undefined){
+      const picked=await vscode.window.showQuickPick(actions.map(action=>({
+        label:action.label,description:action.description,
+        detail:'仅修复当前 Source 已证明的 Outcome；不代表 Runtime Outcome 完整性',
+        spec:action
+      })),{placeHolder:'选择可证明的 Phase Outcome 修复'});
+      choice=picked?.spec??null;
+    }
+    if(choice===null)return false;
+    const identity=action=>JSON.stringify([
+      action?.mode??null,action?.outcome??null,action?.oldOutcome??null,
+      action?.newOutcome??null,action?.target??null]);
+    const selected=actions.find(action=>identity(action)===identity(choice));
+    if(!selected)throw Error('Phase Outcome action is not qualified by current Source');
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error('Source changed while selecting Phase Outcome repair');
+    const {source,procedureId,nodeId}=ctx,phaseName=item.phaseName;
+    let preview,verify;
+    if(selected.mode==='add'){
+      preview=previewAddObservedPhaseOutcome(source,procedureId,nodeId,phaseName,
+        selected.outcome,selected.target);
+      verify=text=>applyAddObservedPhaseOutcome(text,preview);
+    }else if(selected.mode==='rename'){
+      preview=previewRenameNoncorePhaseOutcome(source,procedureId,nodeId,phaseName,
+        selected.oldOutcome,selected.newOutcome);
+      verify=text=>applyRenameNoncorePhaseOutcome(text,preview);
+    }else if(selected.mode==='delete'){
+      preview=previewDeleteNoncorePhaseOutcome(source,procedureId,nodeId,phaseName,
+        selected.outcome);
+      verify=text=>applyDeleteNoncorePhaseOutcome(text,preview);
+    }else throw Error('Unsupported Phase Outcome action');
+    const applied=await confirmAndApply({
+      ...ctx,preview,changes:singleSourceChange,verify
     });
     if(applied)update(ctx.doc);
     return applied;
@@ -616,6 +679,14 @@ export function registerWorkbench(vscode,context){
           tree.stepValue=item.stepValue;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
+        if(item.kind==='phase-outcome-repair'&&id==='inspection'&&document){
+          tree.contextValue='skillStudio.phaseOutcomeRepair';
+          item.sourceVersion=document.version;
+          item.documentUri=document.uri.toString();
+          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
+          tree.phaseName=item.phaseName;tree.sourceVersion=item.sourceVersion;
+          tree.documentUri=item.documentUri;
+        }
         if(item.kind==='phase-output-reference'&&id==='inspection'&&document){
           tree.contextValue='skillStudio.phaseOutputReference';
           item.sourceVersion=document.version;item.documentUri=document.uri.toString();
@@ -811,6 +882,13 @@ export function registerWorkbench(vscode,context){
     vscode.commands.registerCommand('skillStudio.editPhaseRouteTarget',async(item,newTarget)=>{
       try{return await editPhaseRouteTarget(item,newTarget);}
       catch(error){await vscode.window.showWarningMessage('Phase Route 修改未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.repairPhaseOutcome',async(item,requestedAction)=>{
+      try{return await repairPhaseOutcome(item,requestedAction);}
+      catch(error){
+        await vscode.window.showWarningMessage('Phase Outcome 修复未执行：'+error.message);
+        return false;
+      }
     }),
     vscode.commands.registerCommand('skillStudio.addPhaseVerify',async(item,predicate)=>{
       try{return await addPhaseVerify(item,predicate);}
