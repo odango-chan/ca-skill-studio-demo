@@ -234,6 +234,31 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       published:diagnosticPublishEvidence,repaired:diagnosticRepairEvidence,
       nativeProblemsCleared:true
     }));
+
+    // L2-D3: native TextDocuments, actual unsaved buffers, current-generation
+    // Worker analysis and public Hover; no direct Worker shortcut.
+    const unsavedEvidence=await evalJS("(async()=>{"+
+      "const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('L2-D3 native registry missing');"+
+      "const registry=c.get(key);"+
+      "const openerKey=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "String(k)==='Symbol(OpenerService)');"+
+      "const openers=await c.get(openerKey).getOpeners();"+
+      "const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');"+
+      "const uri=custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>"+
+      "w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource;"+
+      "if(!uri)throw Error('L2-D3 Procedure URI missing');"+
+      "return registry.executeCommand('skillStudio.internal.languageUnsavedAcceptance',"+
+      "uri.toString());})()");
+    if(!unsavedEvidence?.restored||!unsavedEvidence.latestPythonHover||
+       !unsavedEvidence.originalDiskUnchanged||
+       unsavedEvidence.covered?.length!==3)
+      throw Error("L2-D3 native unsaved editor probe incomplete: "+
+        JSON.stringify(unsavedEvidence));
+    console.log("STUDIO_LSP_UNSAVED_CHROMIUM",JSON.stringify(unsavedEvidence));
     // The extension probe restores the Procedure CustomEditor after opening
     // Python Source. Reacquire its live Webview execution context before the
     // existing graph/Inspector/Undo regression continues.
