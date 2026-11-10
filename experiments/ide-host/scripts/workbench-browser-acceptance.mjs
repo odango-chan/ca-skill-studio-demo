@@ -594,8 +594,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const row=rows[0];
       row?.content?.scrollIntoView({block:'center',inline:'nearest'});
       const r=row?.content?.getBoundingClientRect();
-      return r?{found:true,x:r.x+12,y:r.y+r.height/2,
-        expanded:row.node.getAttribute('aria-expanded')==='true',
+      const toggle=row?.node.querySelector('.theia-ExpansionToggle');
+      const tr=toggle?.getBoundingClientRect();
+      return r?{found:true,x:tr?tr.x+tr.width/2:r.x+12,
+        y:tr?tr.y+tr.height/2:r.y+r.height/2,
+        toggleFound:!!toggle,toggleClass:toggle?.className??null,
+        expanded:!!toggle&&!toggle.classList.contains('theia-mod-collapsed'),
         rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
         candidateCount:rows.length}:{
           found:false,candidateCount:rows.length,
@@ -612,7 +616,48 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after scoped readiness wait: '+
     JSON.stringify({evidenceHeader,evidenceTreeState,evidenceRows,
       bodyTail:(await evalJS('document.body.innerText')).slice(-1600)}));
-  if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
+  if(!dataflowTreeRow.toggleFound)
+    throw Error('Native Evidence dataflow row has no Theia expansion toggle: '+
+      JSON.stringify(dataflowTreeRow));
+  if(!dataflowTreeRow.expanded){
+    // Theia 1.76 renders expansion as a dedicated .theia-ExpansionToggle
+    // segment; the row itself has no aria-expanded attribute. Click the
+    // actual native arrow, not an inferred point in the row caption.
+    await click(dataflowTreeRow.x,dataflowTreeRow.y);
+  }
+  let dataflowExpansion=null;
+  for(let attempt=0;attempt<50;attempt++){
+    dataflowExpansion=await evalJS(`(()=>{
+      const container=[...document.querySelectorAll('.theia-view-container')]
+        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+      const part=header?.closest('.part');
+      const node=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(item=>{
+        const caption=[...item.children].find(child=>
+          child.classList?.contains('theia-TreeNodeContent'));
+        return caption?.innerText?.includes('Producer / Consumer dataflow');
+      });
+      const toggle=node?.querySelector('.theia-ExpansionToggle');
+      const labels=[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(item=>{
+        const caption=[...item.children].find(child=>
+          child.classList?.contains('theia-TreeNodeContent'));
+        return caption?.innerText?.trim()??'';
+      }).filter(Boolean);
+      return {found:!!node,toggleFound:!!toggle,
+        toggleClass:toggle?.className??null,
+        expanded:!!toggle&&!toggle.classList.contains('theia-mod-collapsed'),
+        consumerAbi:labels.some(label=>label.includes('Consumer ABI')),
+        labels:labels.slice(-16)};
+    })()`);
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(dataflowExpansion?.expanded&&
+       (dataflowExpansion.consumerAbi||phaseEvidenceText.includes('Consumer ABI')))break;
+    await sleep(100);
+  }
+  if(!dataflowExpansion?.expanded)
+    throw Error('Native Evidence dataflow arrow did not expand: '+
+      JSON.stringify({dataflowTreeRow,dataflowExpansion}));
   for(let i=0;i<50;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
     if(phaseEvidenceText.includes('Consumer ABI'))break;
