@@ -154,8 +154,9 @@ export function registerWorkbench(vscode,context){
 
   async function editPhaseOutputReference(item,bindingKey,newValue){
     if(item?.kind!=='phase-output-reference'||
-       typeof item.phaseName!=='string'||!Number.isSafeInteger(item.stepIndex))
-      throw Error("Select an eligible Phase output reference in the native Inspector");
+       typeof item.phaseName!=='string'||!Number.isSafeInteger(item.stepIndex)||
+       !Number.isSafeInteger(item.sourceVersion))
+      throw Error("Select a current eligible Phase output reference in the native Inspector");
     const ctx=currentNode(item);
     const options=phaseOutputReferenceOptions(ctx.source,ctx.procedureId,ctx.nodeId)
       .filter(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex&&
