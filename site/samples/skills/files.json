@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "sourceRepo": "odango-chan/ca-agent-demo",
-  "sourceSha": "f022319052f9c8a9a9b85a67ef485b135e416379",
+  "sourceSha": "9abb6b829d4466b42f0bc55ba26caa33abe8d7e3",
   "skills": [
     "establish-pdu-session",
     "establish-pdu-session-mas"
