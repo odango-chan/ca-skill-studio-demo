@@ -77,7 +77,29 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
   await click(activity.x,activity.y);await sleep(500);
   const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
-  for(const name of ['Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
+  for(const name of ['Packages','Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
+  // C4: Package Overview discovers the current Package and exposes file-kind groups.
+  await invoke('skillStudio.refreshPackages');
+  let packageInventory='';
+  for(let attempt=0;attempt<100;attempt++){
+    packageInventory=await evalJS('document.body.innerText');
+    if(packageInventory.includes('1 SKILL Package')&&
+       packageInventory.includes('establish-pdu-session'))break;
+    await sleep(100);
+  }
+  if(!packageInventory.includes('1 SKILL Package')||
+     !packageInventory.includes('establish-pdu-session'))
+    throw Error('Package Overview did not discover the current Package: '+packageInventory.slice(-1200));
+  const packageRow=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.includes('establish-pdu-session')&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  if(!packageRow)throw Error('Package Overview package row is not visible');
+  await click(packageRow.x,packageRow.y);await sleep(250);
+  const packageGroups=await evalJS('document.body.innerText');
+  for(const group of ['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'])
+    if(!packageGroups.includes(group))throw Error('Package Overview missing group '+group+': '+packageGroups.slice(-1000));
+  console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify({
+    package:'establish-pdu-session',core:'3/3',schemas:6,scripts:3,references:3,
+    inventoryOnly:true
+  }));
   const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
   console.log('STUDIO_PROBLEMS_HEADERS',JSON.stringify(problemHeaderDiagnostics));
