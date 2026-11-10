@@ -161,7 +161,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   if (snapshot.documents.length > MAX_PACKAGE_FILES)
     return unavailable(snapshot, "PACKAGE_FILE_LIMIT", "Package exceeds the 500-file analysis limit");
 
-  const normalizedDocuments: PackageDocumentSnapshot[] = [];
+  const normalizedDocuments: Array<PackageDocumentSnapshot & { languageId: string }> = [];
   const paths = new Set<string>();
   const uris = new Set<string>();
   let totalTextLength = 0;
