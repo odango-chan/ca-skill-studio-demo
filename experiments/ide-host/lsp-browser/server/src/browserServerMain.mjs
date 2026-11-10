@@ -324,29 +324,48 @@ connection.onCompletion(params => {
   const prefix = document.text.slice(lineStart, offset);
 
   if (document.relativePath === "assurance/procedure.yaml" &&
-      /^\s*script:\s*[^#]*$/.test(prefix) &&
+      /^\\s*script:\\s*[^#]*$/.test(prefix) &&
       value.analysis.state === "READY" &&
       value.snapshot.completeness === "complete") {
+    const colon = prefix.indexOf(":");
+    const rawValue = prefix.slice(colon + 1);
+    const leading = rawValue.length - rawValue.trimStart().length;
+    const typed = rawValue.trim();
+    const start = lineStart + colon + 1 + leading;
+    const editRange = toLspRange(document.text, { start, end: offset });
     return value.snapshot.documents
-      .filter(item => /^scripts\/[A-Za-z0-9_.-]+\.py$/.test(item.relativePath))
+      .filter(item => /^scripts\\/[A-Za-z0-9_.-]+\\.py$/.test(item.relativePath) &&
+        item.relativePath.startsWith(typed))
       .map(item => ({
         label: item.relativePath,
         kind: CompletionItemKind.File,
         insertText: item.relativePath,
+        filterText: item.relativePath,
+        ...(editRange ? { textEdit: { range: editRange, newText: item.relativePath } } : {}),
         detail: "Package-local Python script"
       }));
   }
 
   if (document.languageId === "python" &&
-      /^\s*# (?:inputSchema|outputSchema):\s*[^#]*$/.test(prefix) &&
+      /^\\s*# (?:inputSchema|outputSchema):\\s*[^#]*$/.test(prefix) &&
       value.analysis.state === "READY" &&
       value.snapshot.completeness === "complete") {
-    return schemaTitleCatalog(value.snapshot).map(item => ({
-      label: item.title,
-      kind: CompletionItemKind.Reference,
-      insertText: item.title,
-      detail: "Package Schema · " + item.path
-    }));
+    const colon = prefix.indexOf(":");
+    const rawValue = prefix.slice(colon + 1);
+    const leading = rawValue.length - rawValue.trimStart().length;
+    const typed = rawValue.trim();
+    const start = lineStart + colon + 1 + leading;
+    const editRange = toLspRange(document.text, { start, end: offset });
+    return schemaTitleCatalog(value.snapshot)
+      .filter(item => item.title.startsWith(typed))
+      .map(item => ({
+        label: item.title,
+        kind: CompletionItemKind.Reference,
+        insertText: item.title,
+        filterText: item.title,
+        ...(editRange ? { textEdit: { range: editRange, newText: item.title } } : {}),
+        detail: "Package Schema · " + item.path
+      }));
   }
   return [];
 });
