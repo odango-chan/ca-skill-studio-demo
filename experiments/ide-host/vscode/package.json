@@ -33,6 +33,7 @@
     "onCommand:skillStudio.addPhaseVerify",
     "onCommand:skillStudio.editPhaseVerifyStep",
     "onCommand:skillStudio.renameNamedPhaseStep",
+    "onCommand:skillStudio.restartLanguageService",
     "onCustomEditor:skillStudio.contractPreview",
     "onCommand:skillStudio.openContract",
     "onCustomEditor:skillStudio.predicatePreview",
@@ -40,14 +41,6 @@
   ],
   "contributes": {
     "commands": [
-      {
-        "command": "skillStudio.openPredicates",
-        "title": "SKILL Studio: Open Predicate Visual"
-      },
-      {
-        "command": "skillStudio.openContract",
-        "title": "SKILL Studio: Open Contract Visual"
-      },
       {
         "command": "skillStudio.openProcedure",
         "title": "SKILL Studio: Open Procedure Visual"
@@ -115,18 +108,30 @@
       {
         "command": "skillStudio.renameNamedPhaseStep",
         "title": "SKILL Studio: Rename Named Phase Step"
+      },
+      {
+        "command": "skillStudio.restartLanguageService",
+        "title": "SKILL Studio: Restart Language Service"
+      },
+      {
+        "command": "skillStudio.openPredicates",
+        "title": "SKILL Studio: Open Predicate Visual"
+      },
+      {
+        "command": "skillStudio.openContract",
+        "title": "SKILL Studio: Open Contract Visual"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "command": "skillStudio.openPredicates",
-          "when": "resourceFilename == predicates.yaml",
+          "command": "skillStudio.openContract",
+          "when": "resourceFilename == contract.yaml",
           "group": "navigation"
         },
         {
-          "command": "skillStudio.openContract",
-          "when": "resourceFilename == contract.yaml",
+          "command": "skillStudio.openPredicates",
+          "when": "resourceFilename == predicates.yaml",
           "group": "navigation"
         },
         {

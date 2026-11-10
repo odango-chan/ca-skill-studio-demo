@@ -1,7 +1,7 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
 import {readFile} from 'node:fs/promises';
 const publishedProcedure=await readFile(new URL(
-  '../../../site/samples/packages/establish-pdu-session/assurance/procedure.yaml',
+  '../../../site/samples/skills/establish-pdu-session/assurance/procedure.yaml',
   import.meta.url),'utf8');
 const pcfOutcomeHeader="          'on':\n            FAILED: finalize-failed\n            UNRESOLVED: finalize-unresolved\n";
 const pcfOutcomeStart=publishedProcedure.indexOf(pcfOutcomeHeader);
@@ -9,7 +9,7 @@ if(pcfOutcomeStart<0)throw Error('Published PCF Outcome test anchor missing');
 const pcfOutcomeLine=publishedProcedure.slice(0,
   pcfOutcomeStart+pcfOutcomeHeader.indexOf('            FAILED:'))
   .split('\n').length;
-export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor}){
+export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
@@ -25,9 +25,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     catch(error){throw Error("Native command "+id+": "+error.message);}
     await sleep(300);
   }
+  async function nativeCommand(id,...args){
+    return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
+  }
   async function startNativeCommand(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
-    await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
+    await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioCommandState={status:"pending",id:${JSON.stringify(id)}};window.__skillStudioPendingCommand=Promise.resolve(registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)})).then(value=>{window.__skillStudioCommandState={status:"resolved",id:${JSON.stringify(id)},value};return value;},error=>{window.__skillStudioCommandState={status:"rejected",id:${JSON.stringify(id)},error:String(error?.message??error)};throw error;});return true;})()`);
   }
   async function waitForRevisionChange(contextId,previous,label){
     let latest=null,refreshed=null;
@@ -59,7 +62,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!target){
       const state=await evalJS(`({
         command:window.__outcomeCommandState??null,
-        tail:document.body.innerText.slice(-600),
+        lspCommand:window.__skillStudioCommandState??null,
+        pending:typeof window.__skillStudioPendingCommand,
+        tail:document.body.innerText.slice(-1400),
         visibleButtons:[...document.querySelectorAll('button')]
           .filter(x=>x.getBoundingClientRect().width>0)
           .map(x=>x.textContent?.trim()).filter(Boolean).slice(-12)
@@ -78,7 +83,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await click(activity.x,activity.y);await sleep(500);
   const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
   for(const name of ['Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
-  const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
+  const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);el?.scrollIntoView({block:'center'});const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
   console.log('STUDIO_PROBLEMS_HEADERS',JSON.stringify(problemHeaderDiagnostics));
   if(problemsHeader?.collapsed){await click(problemsHeader.x,problemsHeader.y);await sleep(250);}
@@ -97,18 +102,20 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('core.saveAll');
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file not available in native Explorer');
-  const start=performance.now();await click(file.x,file.y);await sleep(800);
+  // Measure the actual Explorer click → CustomEditor render path. Do not
+  // insert a fixed sleep before polling; it would dominate the reported time.
+  const start=performance.now();await click(file.x,file.y);
   let graphContext;
-  async function graph(){
+  async function graph(expectedProcedure=null){
     const tree=await command('Page.getFrameTree'),frames=[];
     const walk=n=>{frames.push(n.frame);for(const c of n.childFrames??[])walk(c);};walk(tree.frameTree);
     for(const f of frames.filter(f=>f.url.includes('/webview/index.html')||f.url.includes('.webview.'))){
       try{const world=await command('Page.createIsolatedWorld',{frameId:f.id,worldName:'workbench-native-open',grantUniveralAccess:true});
         graphContext=world.executionContextId;
-        const result=await command('Runtime.evaluate',{contextId:world.executionContextId,returnByValue:true,expression:`({nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,revision:document.querySelector('#revision')?.textContent,timing:document.querySelector('#reactFlowRoot')?.dataset.studioTiming})`});
-        if(result.result?.value?.nodes>0)return result.result.value;
+        const result=await command('Runtime.evaluate',{contextId:world.executionContextId,returnByValue:true,expression:`({nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,procedureValue:document.querySelector('#procedureList')?.value??null,bodyText:document.body?.innerText?.slice(0,1600)??'',revision:document.querySelector('#revision')?.textContent,timing:document.querySelector('#reactFlowRoot')?.dataset.studioTiming})`});
+        if(result.result?.value?.nodes>0&&(!expectedProcedure||result.result.value.procedureValue===expectedProcedure))return result.result.value;
       }catch{}
     }
     return null;
@@ -123,6 +130,272 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(stillPreview)throw Error("Double-click did not pin native preview tab");
   const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
+  // The online sample is a two-SKILL workspace. Prove the MAS sibling can be
+  // expanded and its own Procedure opened through the native Explorer, then
+  // restore the conventional 5GC Procedure for the remaining regression suite.
+  await invoke('workbench.files.action.focusFilesExplorer');
+  const explorerRow=async(label,which='last')=>evalJS(
+    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length};})()"
+  );
+  let masFolder=null;
+  for(let attempt=0;attempt<60;attempt++){
+    masFolder=await explorerRow('establish-pdu-session-mas');
+    if(masFolder?.found)break;
+    await evalJS("(()=>{for(const root of document.querySelectorAll('.theia-Tree')){let el=root;while(el){if(el.scrollHeight>el.clientHeight+4){el.scrollTop=el.scrollHeight;break;}el=el.parentElement;}}return true;})()");
+    await sleep(100);
+  }
+  if(!masFolder?.found)throw Error('MAS Skill folder missing from native Explorer: '+JSON.stringify(masFolder));
+  let assuranceRows=await explorerRow('assurance');
+  if((assuranceRows?.count??0)<2){
+    await click(masFolder.x,masFolder.y);
+    for(let attempt=0;attempt<60;attempt++){
+      assuranceRows=await explorerRow('assurance');
+      if((assuranceRows?.count??0)>=2)break;
+      await sleep(100);
+    }
+  }
+  if((assuranceRows?.count??0)<2)throw Error('MAS assurance folder did not expand in native Explorer: '+JSON.stringify({masFolder,assuranceRows}));
+  let procedureRows=await explorerRow('procedure.yaml');
+  if((procedureRows?.count??0)<2){
+    const masAssurance=await explorerRow('assurance','last');
+    if(!masAssurance?.found)throw Error('MAS assurance row missing after folder expansion');
+    await click(masAssurance.x,masAssurance.y);
+    for(let attempt=0;attempt<60;attempt++){
+      procedureRows=await explorerRow('procedure.yaml');
+      if((procedureRows?.count??0)>=2)break;
+      await sleep(100);
+    }
+  }
+  if((procedureRows?.count??0)<2)throw Error('Explorer did not expose both Skill procedure.yaml files: '+JSON.stringify(procedureRows));
+  const masProcedure=await explorerRow('procedure.yaml','last');
+  if(!masProcedure?.found)throw Error('MAS procedure.yaml row missing from Explorer');
+  await click(masProcedure.x,masProcedure.y);
+  let masProcedureGraph=null;
+  for(let attempt=0;attempt<100;attempt++){
+    masProcedureGraph=await graph('establish-session');
+    if(masProcedureGraph)break;
+    await sleep(100);
+  }
+  const masResourcePaths=await evalJS("(async()=>{const c=window.theia.container;const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').map(w=>w.resource?.path.toString()??'').filter(p=>p.includes('/establish-pdu-session-mas/'))??[];})()");
+  if(!masProcedureGraph||masProcedureGraph.procedureValue!=='establish-session'||!masProcedureGraph.bodyText?.includes('verify-eligible')||!masProcedureGraph.bodyText?.includes('validate-subscription')||!masResourcePaths.some(p=>p.endsWith('/establish-pdu-session-mas/assurance/procedure.yaml')))
+    throw Error('MAS Procedure did not open from native Explorer: '+JSON.stringify({masFolder,assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths}));
+  // Dispose both test editors before resuming the older regression suite.
+  // Several existing native-command probes intentionally expect one active
+  // Procedure resource, so keep the MAS proof isolated from those probes.
+  await invoke('core.close.all.main.tabs');
+  await invoke('workbench.files.action.focusFilesExplorer');
+  const conventionalProcedure=await explorerRow('procedure.yaml','first');
+  if(!conventionalProcedure?.found)throw Error('Conventional 5GC procedure.yaml row missing after MAS open');
+  await click(conventionalProcedure.x,conventionalProcedure.y);
+  let conventionalGraph=null;
+  for(let attempt=0;attempt<100;attempt++){
+    conventionalGraph=await graph('ue-requested-pdu-session-establishment');
+    if(conventionalGraph)break;
+    await sleep(100);
+  }
+  if(!conventionalGraph)throw Error('Could not restore conventional 5GC Procedure after MAS Explorer acceptance');
+  await click(conventionalProcedure.x,conventionalProcedure.y,2);
+  await sleep(250);
+  conventionalGraph=await graph('ue-requested-pdu-session-establishment');
+  if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
+  const dualSkillExplorer={
+    root:'skills',conventionalFolder:'establish-pdu-session',masFolder,
+    assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths,
+    conventionalProcedure,conventionalGraph
+  };
+  console.log('STUDIO_DUAL_SKILL_EXPLORER_CHROMIUM',JSON.stringify(dualSkillExplorer));
+  // Guard the canvas controls that were present in Classic Studio but were
+  // previously omitted from the Theia CustomEditor migration.
+  const canvasToolbarEvidence=await evalWebviewJS(`(()=> {
+    const ids=["layoutDirection","rootPathMode","neighborsOnly","showAllLabels",
+      "centerSelection","zoomOut","zoomIn","fit","fitWidth","fitHeight",
+      "pathFailure","pathUncertain","pathRecovery"];
+    const controls=Object.fromEntries(ids.map(id=>[id,Boolean(document.getElementById(id))]));
+    const direction=document.getElementById("layoutDirection")?.value??null;
+    return {
+      visible:document.getElementById("graphTools")?.hidden===false,
+      direction,
+      rootPathToolbarVisible:document.getElementById("rootPathToolbar")?.hidden===false,
+      controls
+    };
+  })()`);
+  if(!canvasToolbarEvidence?.visible||canvasToolbarEvidence.direction!=="DOWN"||
+     !canvasToolbarEvidence.rootPathToolbarVisible||
+     Object.values(canvasToolbarEvidence.controls??{}).some(value=>!value))
+    throw Error("Theia Procedure canvas toolbar is incomplete or not vertically initialized: "+
+      JSON.stringify(canvasToolbarEvidence));
+  console.log("STUDIO_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbarEvidence));
+  let languageServiceStatus="NOT_REQUIRED_NODE_HOST";
+  if(requireBrowserLsp){
+    languageServiceStatus="";
+    for(let i=0;i<100;i++){
+      languageServiceStatus=await evalJS(`(()=>{const text=document.body.innerText;return text.match(/SKILL LSP: (READY|PARTIAL|UNAVAILABLE|ERROR|ANALYZING|STARTED|STARTING|IDLE)/)?.[0]||""})()`);
+      if(languageServiceStatus==="SKILL LSP: READY")break;
+      if(languageServiceStatus==="SKILL LSP: ERROR"||languageServiceStatus==="SKILL LSP: UNAVAILABLE")
+        throw Error("Browser LSP did not become healthy: "+languageServiceStatus);
+      await sleep(100);
+    }
+    if(languageServiceStatus!=="SKILL LSP: READY")
+      throw Error("Theia browser LanguageClient/Worker did not publish READY Package analysis: "+languageServiceStatus);
+    console.log("STUDIO_LSP_CHROMIUM",JSON.stringify({status:languageServiceStatus}));
+  }
+  let languageFeatureEvidence=null;
+  if(requireBrowserLsp){
+    languageFeatureEvidence=await evalJS(`(async()=>{
+      const container=window.theia.container;
+      const commandKey=[...container._bindingDictionary._map.keys()].find(key=>
+        typeof key==="function"&&key.prototype?.executeCommand&&
+        key.prototype?.registerCommand&&key.prototype?.getCommand);
+      if(!commandKey)throw Error("Native Theia command registry missing");
+      const registry=container.get(commandKey);
+      const openerKey=[...container._bindingDictionary._map.keys()].find(key=>
+        String(key)==="Symbol(OpenerService)");
+      if(!openerKey)throw Error("Native Theia OpenerService missing");
+      const openers=await container.get(openerKey).getOpeners();
+      const custom=openers.find(item=>item.id==="custom-editor-skillStudio.procedurePreview");
+      const widget=custom?.widgetManager.getWidgets("plugin-custom-editor").find(item=>
+        item.resource?.path.toString().endsWith("/assurance/procedure.yaml"));
+      const procedureUri=widget?.resource;
+      if(!procedureUri)throw Error("Active Skill Package Procedure URI missing");
+      return registry.executeCommand(
+        "skillStudio.internal.languageProviderAcceptance",procedureUri.toString());
+    })()`);
+    if(!languageFeatureEvidence?.definition?.endsWith(
+      "/scripts/select_establishment_configuration.py")||
+      !languageFeatureEvidence.hover||
+      !languageFeatureEvidence.references||
+      !languageFeatureEvidence.symbols?.includes("main")||
+      languageFeatureEvidence.schemaCompletion!=="EstablishmentSelectionInput")
+      throw Error("Theia public language-provider acceptance returned incomplete evidence: "+
+        JSON.stringify(languageFeatureEvidence));
+    console.log("STUDIO_LSP_EDITOR_FEATURES",JSON.stringify(languageFeatureEvidence));
+    let diagnosticPublishEvidence=null,diagnosticRepairEvidence=null;
+    try{
+      diagnosticPublishEvidence=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==="function"&&k.prototype?.executeCommand&&
+          k.prototype?.registerCommand&&k.prototype?.getCommand);
+        const registry=c.get(key);
+        const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
+          String(k)==="Symbol(OpenerService)");
+        const openers=await c.get(openerKey).getOpeners();
+        const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");
+        const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>
+          w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;
+        if(!resource)throw Error("Procedure resource missing for Problems acceptance");
+        return registry.executeCommand(
+          "skillStudio.internal.languageDiagnosticsAcceptance",resource.toString(),"publish");
+      })()`);
+      if(!diagnosticPublishEvidence?.appeared||
+         diagnosticPublishEvidence.code!=="PROCEDURE_PROJECTION"||
+         diagnosticPublishEvidence.packageAuditDuplicates!==0)
+        throw Error("Live LSP diagnostic did not publish exact evidence: "+
+          JSON.stringify(diagnosticPublishEvidence));
+      // The native Theia Problems view is the built-in "problems" widget
+      // (ProblemContribution, command problemsView:toggle). The extension
+      // separately contributes a Skill Studio tree also named "Problems";
+      // that tree is NOT the LSP marker view, and can be hidden at 0x0.
+      const problemsView=await evalJS(`(async()=>{
+        const visible=el=>{
+          if(!el)return false;
+          const r=el.getBoundingClientRect();
+          return r.width>0&&r.height>0&&
+            getComputedStyle(el).visibility!=="hidden";
+        };
+        let native=document.getElementById("problems");
+        if(!visible(native)){
+          const c=window.theia.container;
+          const key=[...c._bindingDictionary._map.keys()].find(k=>
+            typeof k==="function"&&k.prototype?.executeCommand&&
+            k.prototype?.registerCommand&&k.prototype?.getCommand);
+          if(!key)throw Error("Native Theia command registry missing");
+          await c.get(key).executeCommand("problemsView:toggle");
+          native=document.getElementById("problems");
+        }
+        const r=native?.getBoundingClientRect();
+        return {id:native?.id??null,visible:visible(native),
+          rect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,
+          text:native?.innerText?.slice(0,1400)??"",
+          source:"theia-markers/ProblemContribution"};
+      })()`);
+      if(!problemsView?.visible||problemsView.id!=="problems")
+        throw Error("Native Theia Problems widget did not become visible: "+
+          JSON.stringify(problemsView));
+      let problemsText="";
+      for(let i=0;i<100;i++){
+        problemsText=await evalJS(`document.getElementById("problems")?.innerText??""`);
+        if(problemsText.includes("YAML 解析失败"))break;
+        await sleep(100);
+      }
+      if(!problemsText.includes("YAML 解析失败"))
+        throw Error("Native Problems widget did not display the live Procedure diagnostic: "+
+          JSON.stringify({widget:problemsView,problemsText:problemsText.slice(-1400)}));
+    }finally{
+      diagnosticRepairEvidence=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==="function"&&k.prototype?.executeCommand&&
+          k.prototype?.registerCommand&&k.prototype?.getCommand);
+        const registry=c.get(key);
+        const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
+          String(k)==="Symbol(OpenerService)");
+        const openers=await c.get(openerKey).getOpeners();
+        const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");
+        const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>
+          w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;
+        if(!resource)throw Error("Procedure resource missing for diagnostic repair");
+        return registry.executeCommand(
+          "skillStudio.internal.languageDiagnosticsAcceptance",resource.toString(),"repair");
+      })()`);
+    }
+    if(!diagnosticRepairEvidence?.cleared||!diagnosticRepairEvidence?.restored)
+      throw Error("Live LSP diagnostic did not clear after Source repair: "+
+        JSON.stringify(diagnosticRepairEvidence));
+    let clearedProblemsText="";
+    for(let i=0;i<100;i++){
+      clearedProblemsText=await evalJS("document.body.innerText");
+      if(!clearedProblemsText.includes("YAML 解析失败"))break;
+      await sleep(100);
+    }
+    if(clearedProblemsText.includes("YAML 解析失败"))
+      throw Error("Native Problems UI retained the stale Procedure diagnostic after repair");
+    console.log("STUDIO_LSP_DIAGNOSTICS_CHROMIUM",JSON.stringify({
+      published:diagnosticPublishEvidence,repaired:diagnosticRepairEvidence,
+      nativeProblemsCleared:true
+    }));
+
+    // L2-D3: native TextDocuments, actual unsaved buffers, current-generation
+    // Worker analysis and public Hover; no direct Worker shortcut.
+    const unsavedEvidence=await evalJS("(async()=>{"+
+      "const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('L2-D3 native registry missing');"+
+      "const registry=c.get(key);"+
+      "const openerKey=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "String(k)==='Symbol(OpenerService)');"+
+      "const openers=await c.get(openerKey).getOpeners();"+
+      "const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');"+
+      "const uri=custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>"+
+      "w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource;"+
+      "if(!uri)throw Error('L2-D3 Procedure URI missing');"+
+      "return registry.executeCommand('skillStudio.internal.languageUnsavedAcceptance',"+
+      "uri.toString());})()");
+    if(!unsavedEvidence?.restored||!unsavedEvidence.latestPythonHover||
+       !unsavedEvidence.originalDiskUnchanged||
+       unsavedEvidence.covered?.length!==3)
+      throw Error("L2-D3 native unsaved editor probe incomplete: "+
+        JSON.stringify(unsavedEvidence));
+    console.log("STUDIO_LSP_UNSAVED_CHROMIUM",JSON.stringify(unsavedEvidence));
+    // The extension probe restores the Procedure CustomEditor after opening
+    // Python Source. Reacquire its live Webview execution context before the
+    // existing graph/Inspector/Undo regression continues.
+    const restoredGraph=await graph();
+    if(!restoredGraph)throw Error("Procedure CustomEditor did not regain its live graph after LSP provider acceptance");
+    pinned.timing=restoredGraph.timing??pinned.timing;
+  }
   const initialTiming=JSON.parse(pinned.timing??'null');
   await command('Runtime.evaluate',{contextId:graphContext,expression:`(()=>{const s=document.querySelector('#procedureList');window.__acceptanceProcedure=s.value;s.selectedIndex=1;s.dispatchEvent(new Event('change'));})()`});
   await sleep(500);
@@ -250,6 +523,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
       return ar.width*ar.height-br.width*br.height;
     })[0];
+    el?.scrollIntoView({block:'center',inline:'nearest'});
     const r=el?.getBoundingClientRect();
     const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
       x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
@@ -264,7 +538,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
     await sleep(100);
   }
-  const dataflowTreeRow=await evalJS(`(()=>{
+  // The native TreeDataProvider can publish its rows after the visible
+  // summary text. Await the actual visible row, not a fixed post-click sleep.
+  let dataflowTreeRow=null;
+  for(let attempt=0;attempt<100&&!dataflowTreeRow;attempt++){
+    dataflowTreeRow=await evalJS(`(()=>{
     // TreeNode.innerText includes nested descendants. Inspect only each
     // TreeNode's own content element so we expand the exact summary row.
     const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{
@@ -283,7 +561,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
       candidateCount:rows.length}:null;
   })()`);
-  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing');
+    if(!dataflowTreeRow)await sleep(100);
+  }
+  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after readiness wait: '+(await evalJS('document.body.innerText')).slice(-1600));
   if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
   for(let i=0;i<50;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
@@ -821,7 +1101,159 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!restored)await sleep(150);
   }
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
+
+  // D4a + D4b: prove real Worker termination, SDK-owned diagnostic cleanup,
+  // degraded native editing, explicit restart and dirty-buffer rehydration.
+  let workerFailureEvidence=null,recoveryEvidence=null;
+  if(requireBrowserLsp){
+    let procedureDiagnosticActive=false,ownershipProbeActive=false,
+      recoveryBufferPrepared=false,packageLifecyclePrepared=false;
+    let procedureUri=null;
+    try{
+    procedureUri=await evalJS(`(async()=>{const c=window.theia.container;const opKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');if(!opKey)throw Error('L2-D4 Procedure OpenerService missing');const openers=await c.get(opKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource?.toString()??null;})()`);
+    if(!procedureUri)throw Error("L2-D4 Procedure URI missing");
+
+    const diagnostic=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticsAcceptance",procedureUri,"publish");
+    if(!diagnostic?.appeared||diagnostic.code!=="PROCEDURE_PROJECTION")
+      throw Error("L2-D4b real LSP diagnostic setup failed: "+JSON.stringify(diagnostic));
+    procedureDiagnosticActive=true;
+    const ownershipSetup=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"publish");
+    if(!ownershipSetup?.lspDiagnosticPresent||!ownershipSetup?.hostProbePresent)
+      throw Error("L2-D4b diagnostic ownership setup failed: "+JSON.stringify(ownershipSetup));
+    ownershipProbeActive=true;
+
+    const terminated=await nativeCommand(
+      "skillStudio.internal.languageWorkerTerminationAcceptance");
+    if(!terminated?.actualWorkerTerminated||
+       terminated.workerName!=="skill-studio-language-server"||
+       !terminated.scriptUri?.endsWith("/skill-language-server.js"))
+      throw Error("L2-D4 did not terminate the real Language Worker: "+
+        JSON.stringify(terminated));
+    console.log("STUDIO_LSP_WORKER_TERMINATION_CHROMIUM",JSON.stringify(terminated));
+
+    let observedStatus="";
+    for(let i=0;i<100;i++){
+      observedStatus=await evalJS('document.body.innerText.match(/SKILL LSP: (UNAVAILABLE|ERROR|READY|ANALYZING|IDLE)/)?.[0]??""');
+      if(observedStatus==="SKILL LSP: UNAVAILABLE")break;
+      await sleep(100);
+    }
+    if(observedStatus!=="SKILL LSP: UNAVAILABLE")
+      throw Error("L2-D4 Worker termination was not surfaced: "+
+        JSON.stringify({observedStatus,worker:terminated.scriptUri}));
+
+    const ownership=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"verify");
+    if(!ownership?.lspCollectionDisposed||!ownership?.lspDiagnosticCleared||
+       !ownership?.independentHostCollectionPreserved)
+      throw Error("L2-D4b SDK diagnostic ownership failed: "+JSON.stringify(ownership));
+    await nativeCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"restore");
+    ownershipProbeActive=false;
+    const procedureRestore=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticsAcceptance",procedureUri,"repair-after-failure");
+    if(!procedureRestore?.restored||!procedureRestore?.originalDiskRestored)
+      throw Error("L2-D4b degraded Procedure restoration failed: "+JSON.stringify(procedureRestore));
+    procedureDiagnosticActive=false;
+
+    const nativeEdit=await nativeCommand(
+      "skillStudio.internal.languageDegradedEditingAcceptance",procedureUri);
+    if(!nativeEdit?.nativePythonEditing||!nativeEdit?.workerUnavailable||
+       !nativeEdit.restored||nativeEdit.status!=="SKILL LSP: UNAVAILABLE"||
+       !/health request timed out|connection closed|stopped unexpectedly|crashed|could not be decoded/i.test(nativeEdit.failureReason??""))
+      throw Error("L2-D4 native editor or real transport-failure evidence missing: "+
+        JSON.stringify(nativeEdit));
+
+    const packageLifecycle=await nativeCommand(
+      "skillStudio.internal.languagePackageLifecycleAcceptance",procedureUri,"prepare");
+    if(!packageLifecycle?.created||packageLifecycle.references!==2||
+       !packageLifecycle.distinctNonNestedRoots||
+       !packageLifecycle.packageARoot||!packageLifecycle.packageBRoot||
+       packageLifecycle.packageBRoot.startsWith(packageLifecycle.packageARoot+"/")||
+       packageLifecycle.packageARoot.startsWith(packageLifecycle.packageBRoot+"/"))
+      throw Error("L2-D4b requires two truly separate Package roots: "+
+        JSON.stringify(packageLifecycle));
+    packageLifecyclePrepared=true;
+    const prepared=await nativeCommand(
+      "skillStudio.internal.languageRecoveryAcceptance",procedureUri,"prepare");
+    if(!prepared?.dirtyBufferPrepared||!prepared?.originalDiskUnchanged)
+      throw Error("L2-D4b unsaved-buffer recovery setup failed: "+JSON.stringify(prepared));
+    recoveryBufferPrepared=true;
+    const recovery=await nativeCommand("skillStudio.restartLanguageService");
+    if(!recovery?.recovered||!Array.isArray(recovery.packages)||
+       recovery.packages.length!==2||
+       recovery.packages.some(item=>item.status!=="READY")||
+       new Set(recovery.packages.map(item=>item.rootUri)).size!==2||
+       !recovery.packages.some(item=>item.rootUri===packageLifecycle.packageARoot)||
+       !recovery.packages.some(item=>item.rootUri===packageLifecycle.packageBRoot)||
+       recovery.packages.some(item=>
+         item.rootUri===packageLifecycle.packageARoot&&
+         item.dirtyDocuments?.some(file=>file.path.startsWith("skill-studio-l2d4b-"))))
+      throw Error("L2-D4b cross-Package isolation or recovery failed: "+
+        JSON.stringify(recovery));
+    const recovered=await nativeCommand(
+      "skillStudio.internal.languageRecoveryAcceptance",procedureUri,"verify-and-restore");
+    if(!recovered?.recovered||!recovered?.dirtyPythonRehydrated||
+       !recovered?.hoverReflectsUnsavedMetadata||
+       !recovered?.originalDiskUnchanged||!recovered?.restored)
+      throw Error("L2-D4b replacement Worker did not rehydrate the unsaved buffer: "+
+        JSON.stringify(recovered));
+    recoveryBufferPrepared=false;
+    let lifecycle=null;
+    try{
+      lifecycle=await nativeCommand(
+        "skillStudio.internal.languagePackageLifecycleAcceptance",
+        procedureUri,"verify-and-close");
+    }finally{
+      // The command's own finally always releases references and removes the
+      // temporary Package, including when a lifecycle assertion fails.
+      packageLifecyclePrepared=false;
+    }
+    if(!lifecycle?.twoPackageRecovery||!lifecycle?.firstReferenceRetained||
+       !lifecycle?.finalCloseRemoved||!lifecycle?.generationMonotonic||
+       !lifecycle?.cleaned)
+      throw Error("L2-D4b host Package close/reopen acceptance failed: "+
+        JSON.stringify(lifecycle));
+
+    workerFailureEvidence={workerTarget:terminated.scriptUri,
+      transportUnavailable:true,nativeEditing:nativeEdit,
+      diagnosticOwnership:ownership};
+    recoveryEvidence={...recovery,dirtyBuffer:recovered,packageLifecycle:lifecycle};
+    console.log("STUDIO_LSP_WORKER_DEGRADED_CHROMIUM",
+      JSON.stringify(workerFailureEvidence));
+    console.log("STUDIO_LSP_WORKER_RECOVERY_CHROMIUM",
+      JSON.stringify(recoveryEvidence));
+    }finally{
+      if(recoveryBufferPrepared){
+        try{await nativeCommand("skillStudio.internal.languageRecoveryAcceptance",
+          procedureUri,"abort-and-restore");}catch(error){
+          console.warn("L2-D4b recovery abort cleanup",String(error?.message??error));
+        }
+      }
+      if(packageLifecyclePrepared){
+        try{await nativeCommand("skillStudio.internal.languagePackageLifecycleAcceptance",
+          procedureUri,"abort-and-clean");}catch(error){
+          console.warn("L2-D4b Package lifecycle cleanup",String(error?.message??error));
+        }
+      }
+      if(ownershipProbeActive){
+        try{await nativeCommand("skillStudio.internal.languageDiagnosticOwnershipAcceptance",
+          procedureUri,"restore");}catch(error){
+          console.warn("L2-D4b diagnostic ownership cleanup",String(error?.message??error));
+        }
+      }
+      if(procedureDiagnosticActive){
+        try{await nativeCommand("skillStudio.internal.languageDiagnosticsAcceptance",
+          procedureUri,"repair-after-failure");}catch(error){
+          console.warn("L2-D4b Procedure diagnostic cleanup",String(error?.message??error));
+        }
+      }
+    }
+  }
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
-  console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference,phaseRoute,phaseOutcome};
+  console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
+  return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,dualSkillExplorer,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference,phaseRoute,phaseOutcome,workerFailureEvidence,recoveryEvidence};
 }
+
+// Keep native Explorer acceptance independent of the user's scroll position.

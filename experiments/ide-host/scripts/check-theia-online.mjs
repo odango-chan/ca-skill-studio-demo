@@ -39,6 +39,12 @@ console.log("STUDIO_THEIA_FRONTEND_ARTIFACT",JSON.stringify({
 if(!hasProcedurePlugin)throw Error("Theia browser-only build lacks prepared SKILL Studio Web extension");
 if(!hasThemePlugin)throw Error("Theia browser-only build lacks the built-in Skill Studio theme extension");
 if(missingThemeAssets.length)throw Error("Theia static preview is missing theme assets: "+missingThemeAssets.join(", "));
+const languageServerWorker=join(root,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js");
+if(!existsSync(languageServerWorker)||statSync(languageServerWorker).size<1000)
+  throw Error("Theia static preview is missing the bundled browser LSP Worker");
+console.log("STUDIO_THEIA_LSP_WORKER_ASSET",JSON.stringify({
+  path:languageServerWorker,bytes:statSync(languageServerWorker).size
+}));
 
 // Exercise the pinned host matcher, including Windows URI separators. A plain
 // **/assurance/procedure.yaml takes a platform-separator fast path in Theia.

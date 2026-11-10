@@ -13,6 +13,7 @@ const root=resolve("experiments/ide-host/theia-online/lib/frontend");
 const externalUrl=process.env.THEIA_URL;
 const basePath=(process.env.THEIA_BASE_PATH||"").replace(/\/+$/,"");
 const requireWebview=process.env.THEIA_REQUIRE_WEBVIEW==="1";
+const requireBrowserLsp=process.env.THEIA_REQUIRE_BROWSER_LSP==="1";
 const requireEditor=Boolean(externalUrl)||requireWebview;
 const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
@@ -384,6 +385,87 @@ try{
         bodyText:document.body.innerText.slice(-900),
         editorTabs:[...document.querySelectorAll(".theia-tab,.lm-TabBar-tab")].map(x=>x.innerText).filter(Boolean).slice(-8)
       })`);
+      // Real native YAML tokenization must not depend on deferred LSP features.
+      let yamlSyntax=null;
+      for(let attempt=0;attempt<35;attempt++){
+        yamlSyntax=await evalJS(`(()=>{
+          const editor=[...document.querySelectorAll('.monaco-editor')]
+            .find(el=>el.getBoundingClientRect().width>150&&
+              el.querySelector('.view-lines'));
+          const spans=[...(editor?.querySelectorAll('.view-lines span')??[])];
+          const tokenColors=[...new Set(spans.map(el=>getComputedStyle(el).color))];
+          const items=[...document.querySelectorAll('.theia-status-bar-item')]
+            .map(el=>el.textContent?.trim()).filter(Boolean);
+          return {items,tokenCount:spans.length,tokenColors,visible:!!editor};
+        })()`);
+        if(yamlSyntax?.tokenColors?.length>=3)break;
+        await sleep(120);
+      }
+      console.log("STUDIO_NATIVE_YAML_SYNTAX_CHROMIUM",JSON.stringify(yamlSyntax));
+      // Theia 1.76 uses a non-VS-Code status-bar DOM, so text-based
+      // '.theia-status-bar-item' selectors are not authoritative here.
+      // Require native Monaco to display multiple actual syntax token colors.
+      if(!(yamlSyntax?.tokenColors?.length>=3))
+        throw Error("Native YAML syntax tokenization not active: "+JSON.stringify(yamlSyntax));
+      patchEvidence.yamlSyntax=yamlSyntax;
+      // This probe opens a pinned owner script in the native workbench.
+      // Open a real bundled Python source through Theia's native Quick Open.
+      // This verifies the Python TextMate grammar in the same editor host.
+      const yamlEditorRect=await evalJS(`(()=>{
+        const el=[...document.querySelectorAll('.monaco-editor')]
+          .find(x=>x.getBoundingClientRect().width>150&&x.querySelector('.view-lines'));
+        const r=el?.getBoundingClientRect();
+        return r?{x:r.x+Math.min(120,r.width/2),y:r.y+Math.min(60,r.height/2)}:null;
+      })()`);
+      if(!yamlEditorRect)throw Error("Native YAML editor is not visible before Python syntax probe");
+      await command("Input.dispatchMouseEvent",{type:"mousePressed",x:yamlEditorRect.x,y:yamlEditorRect.y,button:"left",clickCount:1});
+      await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:yamlEditorRect.x,y:yamlEditorRect.y,button:"left",clickCount:1});
+      await command("Input.dispatchKeyEvent",{type:"keyDown",key:"p",code:"KeyP",modifiers:2,windowsVirtualKeyCode:80,nativeVirtualKeyCode:80});
+      await command("Input.dispatchKeyEvent",{type:"keyUp",key:"p",code:"KeyP",modifiers:2,windowsVirtualKeyCode:80,nativeVirtualKeyCode:80});
+      let quickOpen=null;
+      for(let attempt=0;attempt<30;attempt++){
+        quickOpen=await evalJS(`(()=>{
+          const inputs=[...document.querySelectorAll('input')].filter(el=>{
+            const r=el.getBoundingClientRect();return r.width>0&&r.height>0;
+          });
+          const input=inputs.find(el=>el.closest('.quick-input-widget,.monaco-quick-open-widget,.theia-quick-view'))||
+            inputs.find(el=>/quick|file|search/i.test(el.getAttribute('aria-label')||el.placeholder||''));
+          return input?{tag:input.tagName,placeholder:input.placeholder||'',
+            aria:input.getAttribute('aria-label')||'',value:input.value||''}:null;
+        })()`);
+        if(quickOpen)break;
+        await sleep(100);
+      }
+      if(!quickOpen)throw Error("Native Quick Open did not appear for Python syntax probe");
+      await command("Input.insertText",{text:"evaluate_transfer_start.py"});
+      await sleep(600);
+      const quickResults=await evalJS(`document.body.innerText.slice(-1200)`);
+      if(!quickResults.includes("evaluate_transfer_start.py"))
+        throw Error("Native Quick Open did not find the bundled Python script: "+quickResults);
+      await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Enter",code:"Enter",windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});
+      await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Enter",code:"Enter",windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});
+      await sleep(900);
+      const pythonSyntax=await evalJS(`(()=>{
+        const editors=[...document.querySelectorAll('.monaco-editor')]
+          .filter(el=>el.getBoundingClientRect().width>150&&el.querySelector('.view-lines'));
+        const editor=editors.find(el=>el.contains(document.activeElement))||editors.at(-1);
+        const spans=[...(editor?.querySelectorAll('.view-lines span')??[])];
+        return {visibleEditors:editors.length,active:Boolean(editor?.contains(document.activeElement)),
+          tokenCount:spans.length,tokenColors:[...new Set(spans.map(el=>getComputedStyle(el).color))],
+          text:editor?.querySelector('.view-lines')?.innerText?.slice(0,500)||'',
+          bodyTail:document.body.innerText.slice(-350)};
+      })()`);
+      console.log("STUDIO_NATIVE_PYTHON_SYNTAX_CHROMIUM",JSON.stringify(pythonSyntax));
+      if(!(pythonSyntax?.tokenColors?.length>=3)||
+         !pythonSyntax.text.replace(/\u00a0/g," ").includes("def main"))
+        throw Error("Native Python syntax tokenization not active: "+JSON.stringify(pythonSyntax));
+      patchEvidence.pythonSyntax=pythonSyntax;
+      // Return to the authoritative Procedure Source editor before testing Undo.
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#openSource")?.click();true`
+      });
+      await sleep(700);
       await command("Input.dispatchKeyEvent",{
         type:"keyDown",key:"z",code:"KeyZ",modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90
       });
@@ -642,7 +724,24 @@ try{
       await command("Input.dispatchMouseEvent",{
         type:"mouseReleased",x:clickX,y:clickY,button:"left",clickCount:1
       });
-      // Go to the known DENIED Route in await-initial-n4-session-establishment.
+      // Resolve the fixture line from the *same pinned owner Source* that
+      // the browser actually imported. A numeric hard-coded line silently
+      // breaks when a legitimate owner SKILL refresh adds comments/Steps.
+      const ownerProcedure=(await readFile(
+        resolve("site/samples/skills/establish-pdu-session/assurance/procedure.yaml"),
+        "utf8")).split("\n");
+      const n4Start=ownerProcedure.findIndex(x=>
+        /^  await-initial-n4-session-establishment:\s*$/.test(x));
+      const nextProcedure=ownerProcedure.findIndex((x,i)=>i>n4Start&&
+        /^  [a-z0-9-]+:\s*$/.test(x));
+      const n4End=nextProcedure<0?ownerProcedure.length:nextProcedure;
+      const candidates=ownerProcedure
+        .map((x,i)=>i>=n4Start&&i<n4End&&
+          /^          DENIED: failed\s*$/.test(x)?i+1:null)
+        .filter(Boolean);
+      if(n4Start<0||candidates.length!==1)
+        throw Error("Pinned owner N4 DENIED Route line is not unique");
+      const n4RouteLine=candidates[0];
       // This uses the native editor's public keyboard UI, not Monaco internals.
       await key("g","KeyG",2,71);
       await sleep(150);
@@ -654,14 +753,14 @@ try{
         visibleWidgets:[...document.querySelectorAll(".monaco-editor .zone-widget,.quick-input-widget,.quick-input-box,.goto-line-widget")]
           .map(item=>({className:item.className,text:item.innerText?.slice(0,120)}))
       })`);
-      await command("Input.insertText",{text:"637"});
+      await command("Input.insertText",{text:String(n4RouteLine)});
       await sleep(100);
       const gotoTyped=await evalJS(`({
         activeValue:document.activeElement?.value??"",
         ariaLabel:document.activeElement?.getAttribute("aria-label")??""
       })`);
-      if(!String(gotoTyped.activeValue??"").includes("637"))
-        throw Error("Native editor Go to Line did not receive line 637: "+
+      if(!String(gotoTyped.activeValue??"").includes(String(n4RouteLine)))
+        throw Error("Native editor Go to Line did not receive fixture line "+n4RouteLine+": "+
           JSON.stringify({gotoState,gotoTyped}));
       await key("Enter","Enter",0,13);
       await sleep(200);
@@ -1168,7 +1267,7 @@ try{
   };
   let workbenchEvidence;
   try{workbenchEvidence=await runWorkbenchAcceptance({
-    command,evalJS,evalWebviewJS,sleep,requireEditor
+    command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp
   });}
   catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
@@ -1210,8 +1309,9 @@ try{
   if(!narrowBrand.present||narrowBrand.labelDisplay!=="none"||!narrowBrand.markVisible)
     throw Error("SKILL Studio brand did not compact cleanly on narrow screens: "+
       JSON.stringify(narrowBrand));
-  if(!afterImport.notificationText.some(message=>message.includes("示例 SKILL 已载入浏览器工作区"))||
-     !afterImport.bodyText.includes("establish-pdu-session")||
+  if(!afterImport.notificationText.some(message=>message.includes("两个示例 SKILL 已载入 skills/：27 个新文件"))||
+     !afterImport.bodyText.includes("skills")||
+      !afterImport.bodyText.includes("establish-pdu-session")||
      !afterImport.bodyText.includes("procedure.yaml"))
     throw Error("Theia sample import into browser workspace failed: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3000));
   if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
@@ -1289,3 +1389,4 @@ try{
   if(server?.listening){server.closeAllConnections();await new Promise(ok=>server.close(ok));}
   await rm(profile,{recursive:true,force:true,maxRetries:4,retryDelay:200});
 }
+// Exact-head CI note: assert YAML and Python TextMate tokens in both Theia hosts.
