@@ -712,48 +712,26 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Run last; all normal editor, Inspector, Undo and layout tests stay mandatory.
   let workerFailureEvidence=null;
   if(requireBrowserLsp){
-    await command("Target.setDiscoverTargets",{discover:true});
-    const targetResult=await command("Target.getTargets");
-    const workers=(targetResult.targetInfos??[]).filter(item=>
-      item.type==="worker"||item.type==="service_worker");
-    // Chromium 1.76's worker targets can have empty URL fields. Attach via
-    // flattened CDP sessions and inspect the actual WorkerGlobalScope name
-    // and script URL. Never guess from an unlabeled Worker target ID.
-    const identities=[];
-    for(const item of workers.filter(x=>x.type==="worker")){
-      let sessionId=null;
-      try{
-        const attached=await command("Target.attachToTarget",{
-          targetId:item.targetId,flatten:true
-        });
-        sessionId=attached.sessionId;
-        if(!sessionId)throw Error("flat CDP session missing");
-        const result=await command("Runtime.evaluate",{
-          expression:"({workerName:self.name??'',scriptUrl:self.location?.href??''})",
-          returnByValue:true,awaitPromise:false
-        },sessionId);
-        const value=result.result?.value??{};
-        identities.push({...item,workerName:value.workerName??"",
-          scriptUrl:value.scriptUrl??""});
-      }catch(error){
-        identities.push({...item,inspectError:String(error?.message??error)});
-      }finally{
-        if(sessionId)await command("Target.detachFromTarget",{sessionId})
-          .catch(()=>{});
-      }
-    }
-    const selected=identities.find(item=>
-      item.workerName==="skill-studio-language-server"||
-      /skill-language-server\.js/.test(item.scriptUrl??""));
-    console.log("STUDIO_LSP_WORKER_TARGETS_CHROMIUM",JSON.stringify(
-      identities.map(item=>({id:item.targetId,name:item.workerName,
-        scriptUrl:item.scriptUrl,inspectError:item.inspectError??null}))));
-    if(!selected)throw Error("L2-D4 exact Language Worker identity unavailable: "+
-      JSON.stringify(identities.map(x=>({id:x.targetId,name:x.workerName,
-        scriptUrl:x.scriptUrl,error:x.inspectError??null}))));
-    const closed=await command("Target.closeTarget",{targetId:selected.targetId});
-    if(closed?.success!==true)
-      throw Error("L2-D4 could not terminate real Worker: "+JSON.stringify(closed));
+    // The Browser LanguageClient itself owns this Worker; terminate that
+    // exact instance on localhost. This does not fake a failure notification.
+    const terminated=await evalJS([
+      "(async()=>{",
+      "const c=window.theia.container;",
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>",
+      "typeof k==='function'&&k.prototype?.executeCommand&&",
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);",
+      "if(!key)throw Error('L2-D4 native command registry missing');",
+      "return c.get(key).executeCommand(",
+      "'skillStudio.internal.languageWorkerTerminationAcceptance');",
+      "})()"
+    ].join("\n"));
+    if(!terminated?.actualWorkerTerminated||
+       terminated.workerName!=="skill-studio-language-server"||
+       !terminated.scriptUri?.endsWith("/skill-language-server.js"))
+      throw Error("L2-D4 did not terminate the real Language Worker: "+
+        JSON.stringify(terminated));
+    console.log("STUDIO_LSP_WORKER_TERMINATION_CHROMIUM",
+      JSON.stringify(terminated));
     let observedStatus="";
     for(let i=0;i<100;i++){
       observedStatus=await evalJS('document.body.innerText.match(/SKILL LSP: (UNAVAILABLE|ERROR|READY|ANALYZING|IDLE)/)?.[0]??""');
@@ -762,7 +740,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     }
     if(observedStatus!=="SKILL LSP: UNAVAILABLE")
       throw Error("L2-D4 Worker termination was not surfaced: "+
-        JSON.stringify({observedStatus,worker:selected.url}));
+        JSON.stringify({observedStatus,worker:terminated.scriptUri}));
     const nativeEdit=await evalJS([
       "(async()=>{",
       "const c=window.theia.container;",
@@ -785,7 +763,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
        !nativeEdit.restored||nativeEdit.status!=="SKILL LSP: UNAVAILABLE")
       throw Error("L2-D4 native editor failed after Worker termination: "+
         JSON.stringify(nativeEdit));
-    workerFailureEvidence={workerTarget:selected.url,
+    workerFailureEvidence={workerTarget:terminated.scriptUri,
       transportUnavailable:true,nativeEditing:nativeEdit};
     console.log("STUDIO_LSP_WORKER_DEGRADED_CHROMIUM",
       JSON.stringify(workerFailureEvidence));
