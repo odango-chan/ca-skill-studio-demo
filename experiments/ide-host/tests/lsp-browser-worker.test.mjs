@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { Worker } from "node:worker_threads";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
+import { SAMPLE_PACKAGES } from "../../../site/sample-packages.mjs";
 
 const workerEntry = new URL("./lsp-server-worker-thread.mjs", import.meta.url);
 const serverBundle = pathToFileURL(resolve(
@@ -122,4 +124,116 @@ test("built browser Worker is isolated from Node filesystem and process transpor
   const extensionBundle=await readFile(resolve("experiments/ide-host/vscode/dist/extension-theia.js"),"utf8");
   assert.match(extensionBundle,/skillStudioLanguageService/);
   assert.match(extensionBundle,/skill-language-server\.js/);
+});
+
+function samplePackageSnapshot() {
+  const spec=SAMPLE_PACKAGES.establish;
+  const rootUri="file:///workspace/"+spec.name;
+  return {
+    rootUri,packageName:spec.name,generation:1,completeness:"complete",
+    documents:spec.files.map(relativePath=>{
+      const languageId=relativePath.endsWith(".py")?"python":
+        relativePath.endsWith(".yaml")||relativePath.endsWith(".yml")?"yaml":
+        relativePath.endsWith(".json")?"json":"plaintext";
+      return {
+        uri:rootUri+"/"+relativePath,relativePath,languageId,
+        version:relativePath==="assurance/procedure.yaml"?1:0,
+        text:readFileSync(new URL("../../../site/samples/packages/"+
+          spec.name+"/"+relativePath,import.meta.url),"utf8")
+      };
+    })
+  };
+}
+function positionOf(text,needle) {
+  const offset=text.indexOf(needle);
+  assert.ok(offset>=0,"missing source token: "+needle);
+  const before=text.slice(0,offset);
+  const line=before.split(/\\r\\n|\\n|\\r/).length-1;
+  const lastBreak=Math.max(before.lastIndexOf("\\n"),before.lastIndexOf("\\r"));
+  return {line,character:offset-(lastBreak+1)};
+}
+async function lspRequest(worker,id,method,params) {
+  const response=waitForMessage(worker,message=>message?.id===id);
+  worker.postMessage({jsonrpc:"2.0",id,method,params});
+  const result=await response;
+  if(result.error)throw new Error(method+": "+JSON.stringify(result.error));
+  return result.result;
+}
+
+test("browser LSP provides exact Definition, References, Hover, Python symbols and Package completions",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  try {
+    worker.postMessage({
+      jsonrpc:"2.0",id:11,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}
+    });
+    const initialized=await waitForMessage(worker,message=>message?.id===11);
+    assert.equal(initialized.result.capabilities.definitionProvider,true);
+    assert.equal(initialized.result.capabilities.referencesProvider,true);
+    assert.equal(initialized.result.capabilities.hoverProvider,true);
+    assert.equal(initialized.result.capabilities.documentSymbolProvider,true);
+    worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
+
+    const snapshot=samplePackageSnapshot();
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot
+    });
+    const status=await waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus" &&
+      message.params?.rootUri===snapshot.rootUri
+    );
+    assert.equal(status.params.state,"READY");
+
+    const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+    const script=snapshot.documents.find(x=>
+      x.relativePath==="scripts/select_establishment_configuration.py");
+    const schema=snapshot.documents.find(x=>
+      x.relativePath==="schemas/selection-input.schema.yaml");
+    assert.ok(procedure&&script&&schema);
+
+    const scriptNeedle="scripts/select_establishment_configuration.py";
+    const definition=await lspRequest(worker,12,"textDocument/definition",{
+      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,scriptNeedle)
+    });
+    assert.equal(definition.uri,script.uri);
+    assert.ok(definition.range.start.line>=0);
+
+    const hover=await lspRequest(worker,13,"textDocument/hover",{
+      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,scriptNeedle)
+    });
+    assert.match(hover.contents.value,/Skill Script/);
+    assert.match(hover.contents.value,/select-establishment-configuration/);
+
+    const nameNeedle="# name: select-establishment-configuration";
+    const references=await lspRequest(worker,14,"textDocument/references",{
+      textDocument:{uri:script.uri},
+      position:positionOf(script.text,nameNeedle),
+      context:{includeDeclaration:true}
+    });
+    assert.ok(references.some(item=>item.uri===procedure.uri));
+    assert.ok(references.some(item=>item.uri===script.uri));
+
+    const symbols=await lspRequest(worker,15,"textDocument/documentSymbol",{
+      textDocument:{uri:script.uri}
+    });
+    assert.ok(symbols.some(item=>item.name==="main"));
+
+    const scriptCompletion=await lspRequest(worker,16,"textDocument/completion",{
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,scriptNeedle)+
+        {line:0,character:scriptNeedle.length}
+    });
+    assert.ok(scriptCompletion.some(item=>item.label===script.relativePath));
+
+    const schemaNeedle="# inputSchema: EstablishmentSelectionInput";
+    const schemaCompletion=await lspRequest(worker,17,"textDocument/completion",{
+      textDocument:{uri:script.uri},
+      position:positionOf(script.text,schemaNeedle)+
+        {line:0,character:schemaNeedle.length}
+    });
+    assert.ok(schemaCompletion.some(item=>item.label==="EstablishmentSelectionInput"));
+    assert.ok(schema.uri.endsWith("selection-input.schema.yaml"));
+  } finally {
+    await worker.terminate();
+  }
 });
