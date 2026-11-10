@@ -57,6 +57,8 @@ test("shared core adapts the current Package analyzers into one JSON-safe result
   assert.equal(result.documents.filter(document=>document.pythonOutlineState==="READY").length,3);
   assert.equal(result.scriptReferences.length,3);
   assert.equal(result.schemaReferences.length,6);
+  assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===true));
+  assert.ok(result.schemaReferences.every(ref=>ref.packageContextComplete===true));
   assert.equal(result.diagnostics.length,0);
   assert.equal(JSON.parse(JSON.stringify(result)).procedure.procedures.length,5);
   assert.deepEqual(snapshot.documents.map(document=>document.text),before,
@@ -72,6 +74,11 @@ test("partial Package snapshots never report Package Audit as clean",()=>{
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
   assert.match(result.packageAudit.reason,/could not enumerate/);
+  assert.ok(result.scriptReferences.length>0,"locally observed references are still indexed");
+  assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===false));
+  assert.ok(result.schemaReferences.every(ref=>ref.packageContextComplete===false));
+  assert.ok(result.scriptReferences.every(ref=>ref.sourceRange===null),
+    "line-only references must not become exact LSP locations");
 });
 
 test("missing required Package files make only Package Audit unavailable",()=>{
@@ -83,6 +90,7 @@ test("missing required Package files make only Package Audit unavailable",()=>{
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
   assert.match(result.packageAudit.reason,/assurance\/contract.yaml/);
+  assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===false));
 });
 
 test("Procedure projection failures remain visible and fail closed",()=>{
