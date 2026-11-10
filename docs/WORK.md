@@ -238,4 +238,4 @@ main browser application remains available at `/classic/`.
 
 **边界：** 这是 ZIP **导出**，Classic 当前没有 ZIP importer，因此不新增或声称已有 ZIP 导入对等功能。OPFS 不是本地磁盘挂载或 Git 同步；不涉及 Runtime / 5GC。
 
-**验收状态：** PR #114 最新代码 HEAD `0cdec87f76dd580cddf695f15985af6294524afe` 的 IDE Host、Theia Browser-Only 真实 Chromium、PR Verify 已 PASS；Theia Backend 真实 Chromium仍在运行。文档刷新会产生新的 exact HEAD，必须对新 HEAD 重跑全部门禁；合并后还需单独验证 resulting-main Pages。
+**验收状态：** PR #114 最新代码 HEAD `0cdec87f76dd580cddf695f15985af6294524afe` 的 IDE Host、Theia Browser-Only 真实 Chromium、PR Verify 已 PASS；Theia Backend 真实 Chromium [#42767870191 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767870191)；同一实现 HEAD `0cdec87` 的 IDE Host [#42767869981 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767869981)、Browser-Only [#42767869976 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767869976)、PR Verify [#42767870221 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767870221) 也全部通过。后续 `f5dac6` 为文档对齐提交，不改 ZIP 代码；合并后仍需单独验证 resulting-main Pages。
