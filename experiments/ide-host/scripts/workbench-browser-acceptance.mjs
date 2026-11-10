@@ -59,8 +59,11 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
     "const el=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(x=>"+
     "x.innerText.includes('establish-pdu-session')&&x.getBoundingClientRect().width>0&&"+
-    "x.getBoundingClientRect().x>=0);const r=el?.getBoundingClientRect();"+
-    "return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()");
+    "x.getBoundingClientRect().x>=0);"+
+    "const toggle=el?.querySelector('.theia-TreeNodeContent [data-node-id]');"+
+    "const target=toggle??el;const r=target?.getBoundingClientRect();"+
+    "return r?{x:r.x+r.width/2,y:r.y+r.height/2,target:toggle?'expansion-toggle':'row',"+
+    "rowClass:el?.className,toggleClass:toggle?.className}:null;})()");
   if(!scan?.packages?.some(x=>x.name==='establish-pdu-session')||!packageRow)
     throw Error('Package Overview TreeView did not render discovered Package: '+
       JSON.stringify({scan,view}));
@@ -70,16 +73,27 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "return header?.closest('.part')?.innerText??'';})()");
   const expectedGroups=['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'];
   let groups=await readGroups();
+  let scanAfterExpand=null,expandedView=null;
   if(!expectedGroups.every(group=>groups.includes(group))){
     await click(packageRow.x,packageRow.y);
-    await sleep(250);
+    await sleep(500);
+    groups=await readGroups();
+    await invoke('skillStudio.refreshPackages');
+    scanAfterExpand=await evalJS('window.__skillStudioLastCommandResult??null');
+    expandedView=await evalJS(
+      "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
+      ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
+      "return {text:part?.innerText??'',rows:[...(part?.querySelectorAll('.theia-TreeNode')??[]).map(x=>({"+
+      "text:x.innerText.trim(),className:x.className}))]};})()");
     groups=await readGroups();
   }
   for(const group of expectedGroups)
     if(!groups.includes(group))
-      throw Error('Package Overview missing group '+group+': '+groups.slice(-1200));
+      throw Error('Package Overview missing group '+group+': '+
+        JSON.stringify({groups,packageRow,scanAfterExpand,expandedView}));
   const evidence={package:'establish-pdu-session',core:'3/3',schemas:6,
-    scripts:3,references:3,treeVisible:true,scanState:scan.state};
+    scripts:3,references:3,treeVisible:true,scanState:scan.state,
+    treeReadsByKind:scanAfterExpand?.treeReadsByKind??scan.treeReadsByKind};
   console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify(evidence));
   return evidence;
 }
