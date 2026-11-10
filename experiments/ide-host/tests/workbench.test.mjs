@@ -99,7 +99,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   confirmChoice='确认并应用';
   await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.ue-ref');
   assert.equal(doc.version,phaseVersion+1);
-  assert.ok(doc.text.includes('dnn:\\n                  from: input.ue-ref'));
+  assert.ok(doc.text.includes('dnn:\n                  from: input.ue-ref'));
   const writesAfterBinding=doc.text;
   await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.dnn');
   assert.equal(doc.text,writesAfterBinding,'stale Phase Step selection must not write');
