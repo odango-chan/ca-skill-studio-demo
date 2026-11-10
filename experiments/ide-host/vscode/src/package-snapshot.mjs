@@ -89,6 +89,20 @@ export async function collectPackageSnapshot(vscode, procedureDocument, generati
     }
     candidates.set(uri.toString(), { uri, relativePath });
   }
+  // New unsaved files may not exist in the filesystem search result yet.
+  // Include every open TextDocument inside this exact Package root.
+  for (const document of openDocuments.values()) {
+    const uri = document.uri;
+    if (!insideRoot(rootUri, uri)) continue;
+    const relativePath = uri.path.slice(rootPath.length).replace(/^\\//, "");
+    if (!relativePath || relativePath.includes("\\\\") ||
+        relativePath.split("/").some(part => !part || part === "." || part === "..")) {
+      completeness = "partial";
+      reasons.push("Ignored an unsafe open Package-relative path");
+      continue;
+    }
+    candidates.set(uri.toString(), { uri, relativePath });
+  }
   if (!candidates.has(procedureDocument.uri.toString())) {
     candidates.set(procedureDocument.uri.toString(), {
       uri: procedureDocument.uri,
