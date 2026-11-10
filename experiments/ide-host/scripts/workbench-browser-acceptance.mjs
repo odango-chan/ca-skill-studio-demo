@@ -179,8 +179,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       }
       const problemsAria=await evalJS(`[...document.querySelectorAll(".lm-TabBar-tab")].find(x=>
         x.textContent.trim().startsWith("Problems"))?.getAttribute("aria-label")??""`);
-      if(!problemsText.includes("YAML 解析失败")&&
-         !/\\b[1-9][0-9]* (?:Error|Problem)/i.test(problemsAria))
+      if(!problemsText.includes("YAML 解析失败"))
         throw Error("Native Problems UI did not display the live Procedure diagnostic: "+
           JSON.stringify({problemsText:problemsText.slice(-1200),problemsAria,problemsTab}));
     }finally{
