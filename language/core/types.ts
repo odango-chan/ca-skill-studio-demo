@@ -112,7 +112,10 @@ export interface ScriptReference {
   readonly targetPath: string;
   readonly line: number;
   /** Target identity is exact; the current legacy index does not expose token offsets. */
+  /** Exact identity of the observed target, not proof that the Package is complete. */
   readonly targetIdentityExact: true;
+  /** False when any required Package evidence is missing, partial, or unparseable. */
+  readonly packageContextComplete: boolean;
   readonly sourceRange: null;
 }
 
@@ -124,6 +127,8 @@ export interface SchemaReference {
   readonly targetPath: string;
   readonly targetLine: number;
   readonly title: string;
+  /** Completeness of the containing Package analysis; no inferred Schema ABI. */
+  readonly packageContextComplete: boolean;
   readonly sourceRange: null;
 }
 
