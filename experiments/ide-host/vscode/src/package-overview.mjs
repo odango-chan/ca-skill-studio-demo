@@ -127,6 +127,11 @@ function treeNode(vscode, node) {
   if (node.contextValue) item.contextValue = node.contextValue;
   if (node.icon && vscode.ThemeIcon) item.iconPath = new vscode.ThemeIcon(node.icon);
   if (node.command) item.command = node.command;
+  if (node.kind==='package') item.id='package:'+node.rootPath;
+  else if (node.kind==='group') item.id='group:'+node.packageRoot+':'+node.key;
+  else if (node.kind==='file') item.id='file:'+node.uri.toString();
+  else if (node.kind==='missing') item.id='missing:'+node.label;
+  else item.id=node.kind;
   return item;
 }
 export function registerPackageOverview(vscode,context,getActiveDocument=()=>null) {
@@ -192,8 +197,12 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       return treeNode(vscode,node);
     }
   };
-  context.subscriptions.push(emitter,
-    vscode.window.registerTreeDataProvider('skillStudio.packages',provider));
+  const treeView = typeof vscode.window.createTreeView === 'function'
+    ? vscode.window.createTreeView('skillStudio.packages',{
+        treeDataProvider:provider,showCollapseAll:true
+      })
+    : vscode.window.registerTreeDataProvider('skillStudio.packages',provider);
+  context.subscriptions.push(emitter,treeView);
   async function refresh() {
     const ticket = ++generation;
     try {
