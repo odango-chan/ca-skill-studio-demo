@@ -139,6 +139,12 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       throw Error("Theia public language-provider acceptance returned incomplete evidence: "+
         JSON.stringify(languageFeatureEvidence));
     console.log("STUDIO_LSP_EDITOR_FEATURES",JSON.stringify(languageFeatureEvidence));
+    // The extension probe restores the Procedure CustomEditor after opening
+    // Python Source. Reacquire its live Webview execution context before the
+    // existing graph/Inspector/Undo regression continues.
+    const restoredGraph=await graph();
+    if(!restoredGraph)throw Error("Procedure CustomEditor did not regain its live graph after LSP provider acceptance");
+    pinned.timing=restoredGraph.timing??pinned.timing;
   }
   const initialTiming=JSON.parse(pinned.timing??'null');
   await command('Runtime.evaluate',{contextId:graphContext,expression:`(()=>{const s=document.querySelector('#procedureList');window.__acceptanceProcedure=s.value;s.selectedIndex=1;s.dispatchEvent(new Event('change'));})()`});
