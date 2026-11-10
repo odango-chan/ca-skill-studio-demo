@@ -14,6 +14,12 @@ import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   from '../../../../site/phase-step-structural.mjs';
 import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
   applyAdjacentVerifyReorder} from '../../../../site/phase-step-order.mjs';
+import {namedPhaseStepImpactReport,previewNamedPhaseStepRename,
+  applyNamedPhaseStepRename} from '../../../../site/phase-step-rename.mjs';
+import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
+  previewDeleteUnreferencedNamedVerify,applyDeleteUnreferencedNamedVerify,
+  previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
+  from '../../../../site/phase-named-verify.mjs';
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
@@ -178,18 +184,25 @@ export function registerWorkbench(vscode,context){
     const ctx=currentNode(item);
     const deletions=phaseVerifyDeleteOptions(ctx.source,ctx.procedureId,ctx.nodeId);
     const reorder=adjacentVerifyReorderOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    const canDelete=deletions.some(x=>x.phaseName===item.phaseName&&
-      x.stepIndex===item.stepIndex);
-    const canMoveUp=reorder.some(x=>x.phaseName===item.phaseName&&
-      x.stepIndex===item.stepIndex-1);
-    const canMoveDown=reorder.some(x=>x.phaseName===item.phaseName&&
-      x.stepIndex===item.stepIndex);
+    const named=namedVerifyEditOptions(ctx.source,ctx.procedureId,ctx.nodeId);
+    const at=(rows,index)=>rows.some(x=>x.phaseName===item.phaseName&&x.stepIndex===index);
+    const canName=!item.stepName&&at(named.names,item.stepIndex);
+    const canDelete=at(deletions,item.stepIndex);
+    const canMoveUp=at(reorder,item.stepIndex-1);
+    const canMoveDown=at(reorder,item.stepIndex);
+    const canDeleteNamed=Boolean(item.stepName)&&at(named.deletions,item.stepIndex);
+    const canMoveUpNamed=Boolean(item.stepName)&&at(named.swaps,item.stepIndex-1);
+    const canMoveDownNamed=Boolean(item.stepName)&&at(named.swaps,item.stepIndex);
     const choices=[
-      ...(canMoveUp?[{label:"Move Verify Up",value:"move-up"}]:[]),
-      ...(canMoveDown?[{label:"Move Verify Down",value:"move-down"}]:[]),
-      ...(canDelete?[{label:"Delete Verify Step",value:"delete"}]:[])
+      ...(canName?[{label:"Name Verify Step",value:"name"}]:[]),
+      ...(canMoveUp||canMoveUpNamed?[{label:"Move Verify Up",value:"move-up"}]:[]),
+      ...(canMoveDown||canMoveDownNamed?[{label:"Move Verify Down",value:"move-down"}]:[]),
+      ...(canDelete||canDeleteNamed?[{label:"Delete Verify Step",value:"delete"}]:[])
     ];
-    let action=requestedAction;
+    let action=typeof requestedAction==="object"&&requestedAction
+      ?requestedAction.action:requestedAction;
+    let newName=typeof requestedAction==="object"&&requestedAction
+      ?requestedAction.newName:undefined;
     if(typeof action!=="string"){
       const picked=await vscode.window.showQuickPick(choices,{
         placeHolder:"选择此 Verify Step 的安全编辑操作"
@@ -197,10 +210,32 @@ export function registerWorkbench(vscode,context){
       action=typeof picked==="string"?picked:picked?.value;
     }
     if(!choices.some(x=>x.value===action))return false;
+    if(action==="name"&&typeof newName!=="string"){
+      newName=await vscode.window.showInputBox({
+        value:"verify-"+item.stepValue.split(".").at(-1).replace(/[^A-Za-z0-9_-]/g,"-"),
+        prompt:"为这个 Verify Step 设置稳定名称",
+        placeHolder:"verify-step-name"
+      });
+    }
+    if(action==="name"&&(typeof newName!=="string"||!newName.trim()))return false;
     if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
       throw Error("Source changed while choosing the Verify Step operation");
     let preview,verify;
-    if(action==="delete"){
+    if(action==="name"){
+      preview=previewNamePlainVerify(ctx.source,ctx.procedureId,ctx.nodeId,
+        item.phaseName,item.stepIndex,newName);
+      verify=text=>applyNamePlainVerify(text,preview);
+    }else if(action==="delete"&&canDeleteNamed){
+      preview=previewDeleteUnreferencedNamedVerify(ctx.source,ctx.procedureId,
+        ctx.nodeId,item.phaseName,item.stepIndex);
+      verify=text=>applyDeleteUnreferencedNamedVerify(text,preview);
+    }else if(action==="move-up"&&canMoveUpNamed||
+             action==="move-down"&&canMoveDownNamed){
+      const pairIndex=action==="move-up"?item.stepIndex-1:item.stepIndex;
+      preview=previewSwapAdjacentNamedVerify(ctx.source,ctx.procedureId,
+        ctx.nodeId,item.phaseName,pairIndex);
+      verify=text=>applySwapAdjacentNamedVerify(text,preview);
+    }else if(action==="delete"){
       preview=previewDeletePhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
         item.phaseName,item.stepIndex);
       verify=text=>applyDeletePhaseVerify(text,preview);
@@ -212,6 +247,37 @@ export function registerWorkbench(vscode,context){
     }
     const applied=await confirmAndApply({
       ...ctx,preview,changes:singleSourceChange,verify
+    });
+    if(applied)update(ctx.doc);
+    return applied;
+  }
+
+  async function renameNamedPhaseStep(item,newName){
+    if(item?.kind!=="phase-step"||typeof item.phaseName!=="string"||
+       !Number.isSafeInteger(item.stepIndex)||typeof item.stepName!=="string"||
+       !item.stepName)
+      throw Error("Select a named Phase Step in the native Inspector");
+    const ctx=currentNode(item);
+    const impact=namedPhaseStepImpactReport(ctx.source,ctx.procedureId,ctx.nodeId)
+      .find(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
+    if(!impact?.editEligible||impact.stepName!==item.stepName)
+      throw Error("Named Step references are ambiguous or Source-only");
+    let value=newName;
+    if(typeof value!=="string")value=await vscode.window.showInputBox({
+      value:item.stepName,prompt:"输入新的 Phase Step 名称",
+      placeHolder:"new-step-name"
+    });
+    if(typeof value!=="string"||!value.trim())return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the new Phase Step name");
+    const preview=previewNamedPhaseStepRename(ctx.source,ctx.procedureId,
+      ctx.nodeId,item.phaseName,item.stepIndex,value);
+    const applied=await confirmAndApply({
+      ...ctx,preview,
+      changes:p=>p.sourceSpans.map(span=>({
+        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
+      })),
+      verify:text=>applyNamedPhaseStepRename(text,preview)
     });
     if(applied)update(ctx.doc);
     return applied;
@@ -433,9 +499,29 @@ export function registerWorkbench(vscode,context){
           const canMoveDown=reorder.some(x=>x.phaseName===item.phaseName&&
             x.stepIndex===item.stepIndex);
           const canEditVerify=deletable||canMoveUp||canMoveDown;
-          tree.contextValue=hasBinding
-            ?(canEditVerify?'skillStudio.phaseStepAndVerify':'skillStudio.phaseStep')
-            :(canEditVerify?'skillStudio.verifyStep':'skillStudio.phaseStepPlain');
+          const namedVerify=namedVerifyEditOptions(source,item.procedureId,item.nodeId);
+          const canNameVerify=item.stepOperator==='verify'&&!item.stepName&&
+            namedVerify.names.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
+          const canDeleteNamedVerify=item.stepOperator==='verify'&&Boolean(item.stepName)&&
+            namedVerify.deletions.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
+          const namedReorder=item.stepOperator==='verify'&&Boolean(item.stepName)&&
+            namedVerify.swaps.some(x=>x.phaseName===item.phaseName&&
+              (x.stepIndex===item.stepIndex||x.stepIndex===item.stepIndex-1));
+          const namedStep=item.stepName?namedPhaseStepImpactReport(source,
+            item.procedureId,item.nodeId).find(x=>x.phaseName===item.phaseName&&
+              x.stepIndex===item.stepIndex&&x.stepName===item.stepName):null;
+          const canRenameNamed=Boolean(namedStep?.editEligible);
+          if(item.stepOperator==='verify'&&(canDeleteNamedVerify||namedReorder)){
+            tree.contextValue=hasBinding?'skillStudio.namedVerifyStepAndBinding':'skillStudio.namedVerifyStep';
+          }else if(canRenameNamed){
+            tree.contextValue=hasBinding?'skillStudio.namedPhaseStepAndBinding':'skillStudio.namedPhaseStep';
+          }else if(item.stepOperator==='verify'&&(canNameVerify||canEditVerify)){
+            tree.contextValue=hasBinding?'skillStudio.verifyStepAndBinding':'skillStudio.verifyStep';
+          }else{
+            tree.contextValue=hasBinding
+              ?(canEditVerify?'skillStudio.phaseStepAndVerify':'skillStudio.phaseStep')
+              :(canEditVerify?'skillStudio.verifyStep':'skillStudio.phaseStepPlain');
+          }
           item.sourceVersion=document.version;item.documentUri=document.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.phaseName=item.phaseName;tree.stepIndex=item.stepIndex;
@@ -540,6 +626,10 @@ export function registerWorkbench(vscode,context){
     vscode.commands.registerCommand('skillStudio.editPhaseVerifyStep',async(item,action)=>{
       try{return await editPhaseVerifyStep(item,action);}
       catch(error){await vscode.window.showWarningMessage('Verify Step 修改未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.renameNamedPhaseStep',async(item,newName)=>{
+      try{return await renameNamedPhaseStep(item,newName);}
+      catch(error){await vscode.window.showWarningMessage('Phase Step 重命名未执行：'+error.message);return false;}
     }),
     vscode.commands.registerCommand('skillStudio.insertNode',async(item,spec)=>{
       try{return await insertNode(item,spec);}
