@@ -1135,19 +1135,35 @@ try{
     await command("Runtime.enable");
     await sleep(40);
     let frame=null,contextId=null;
+    const probes=[];
     for(const candidate of candidates){
+      const isolated=await command("Page.createIsolatedWorld",{
+        frameId:candidate.id,worldName:"skill-studio-live-webview-probe",
+        grantUniveralAccess:true
+      });
+      const probe=await command("Runtime.evaluate",{
+        contextId:isolated.executionContextId,returnByValue:true,
+        expression:`Boolean(document.querySelector("#downloadPackageZip")&&
+          document.querySelector("#exportPackageZip")&&
+          document.querySelector("#reactFlowRoot"))`
+      });
+      probes.push({id:candidate.id,url:candidate.url,hasStudioControls:probe.result?.value===true});
+      if(probe.result?.value!==true)continue;
       const id=defaultExecutionContexts.get(candidate.id);
       if(id){frame=candidate;contextId=id;break;}
     }
     if(!contextId)
-      throw Error("Default Procedure Webview context is unavailable: "+
-        JSON.stringify({expectedPath,candidates:candidates.map(x=>({id:x.id,url:x.url})),
-          known:[...defaultExecutionContexts.entries()]}));
+      throw Error("Active Procedure Webview main context is unavailable: "+
+        JSON.stringify({expectedPath,probes,known:[...defaultExecutionContexts.entries()]}));
     const data=await command("Runtime.evaluate",{
       contextId,expression,returnByValue:true,awaitPromise:true
     });
     if(data.exceptionDetails)
-      throw Error("Procedure Webview evaluate: "+data.exceptionDetails.text);
+      throw Error("Procedure Webview evaluate: "+JSON.stringify({
+        text:data.exceptionDetails.text,
+        exception:data.exceptionDetails.exception?.description??null,
+        line:data.exceptionDetails.lineNumber,column:data.exceptionDetails.columnNumber
+      }));
     return data.result?.value;
   };
   let workbenchEvidence;
