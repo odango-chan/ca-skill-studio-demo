@@ -7,8 +7,8 @@ const SUPPORTED = 'connectionagent.io/v1alpha1';
 const ROOT_KEYS = new Set(['apiVersion', 'kind', 'metadata', 'spec']);
 const SPEC_KEYS = new Set([
   'skillType', 'goal', 'entryProcedure', 'inputs', 'context',
-  'allowedResources', 'preconditions', 'postconditions',
-  'planning', 'failureSemantics'
+  'allowedResources', 'preconditions', 'requirements', 'postconditions',
+  'dependencies', 'planning', 'failureSemantics'
 ]);
 const scalar = node => isScalar(node) ? node.value : undefined;
 const nodeAt = (node, counter) => counter.linePos(node?.range?.[0] ?? 0).line || 1;
@@ -28,20 +28,92 @@ const field = (root, counter, ...path) => {
     line: nodeAt(node, counter)
   } : null;
 };
-const values = (root, counter, ...path) => {
+function listValues(root, counter, path, warnings) {
   const parent = get(root, ...path);
-  if (!isSeq(parent)) return [];
+  if (!parent) return [];
+  if (!isSeq(parent)) {
+    warnings.push(path.join('.') + ' is not a sequence');
+    return [];
+  }
   return parent.items.filter(isScalar).map((node, index) => ({
     value: scalar(node),
     path: path.join('.') + '[' + index + ']',
     line: nodeAt(node, counter)
   }));
-};
-const extraKeys = (node, known, prefix) => isMap(node) ? node.items
-  .map(pair => scalar(pair.key))
-  .filter(key => typeof key === 'string' && !known.has(key))
-  .map(key => prefix + key) : [];
-
+}
+function expectationList(root, counter, name, warnings, satisfiable = false) {
+  const path = ['spec', name];
+  const list = get(root, ...path);
+  if (!list) return [];
+  if (!isSeq(list)) {
+    warnings.push(path.join('.') + ' is not a sequence');
+    return [];
+  }
+  return list.items.map((entry, index) => ({
+    predicate: field(entry, counter, 'predicate'),
+    expect: field(entry, counter, 'expect'),
+    satisfiable: satisfiable ? field(entry, counter, 'satisfiable') : null,
+    line: nodeAt(entry, counter),
+    path: path.join('.') + '[' + index + ']'
+  }));
+}
+function dependencyList(root, counter, warnings) {
+  const list = get(root, 'spec', 'dependencies');
+  if (!list) return [];
+  if (!isSeq(list)) {
+    warnings.push('spec.dependencies is not a sequence');
+    return [];
+  }
+  return list.items.map((entry, index) => ({
+    name: field(entry, counter, 'name'),
+    artifactRef: field(entry, counter, 'artifactRef'),
+    digest: field(entry, counter, 'digest'),
+    variant: field(entry, counter, 'variant'),
+    line: nodeAt(entry, counter),
+    path: 'spec.dependencies[' + index + ']'
+  }));
+}
+function unknownFields(node, allowed, prefix, output) {
+  if (!isMap(node)) return;
+  for (const pair of node.items) {
+    const key = scalar(pair.key);
+    if (typeof key === 'string' && !allowed.has(key)) output.push(prefix + key);
+  }
+}
+function collectUnprojected(root) {
+  const paths = [];
+  unknownFields(root, ROOT_KEYS, '', paths);
+  unknownFields(get(root, 'metadata'), new Set(['name']), 'metadata.', paths);
+  const spec = get(root, 'spec');
+  unknownFields(spec, SPEC_KEYS, 'spec.', paths);
+  unknownFields(get(spec, 'inputs'), new Set(['requestSchema']), 'spec.inputs.', paths);
+  unknownFields(get(spec, 'context'), new Set(['requiredFacts']), 'spec.context.', paths);
+  unknownFields(get(spec, 'allowedResources'), new Set(['capabilities', 'localTools']),
+    'spec.allowedResources.', paths);
+  unknownFields(get(spec, 'planning'),
+    new Set(['maxActions', 'allowDynamicProcedure', 'fallbackProcedure', 'budgetPartition']),
+    'spec.planning.', paths);
+  unknownFields(get(spec, 'planning', 'budgetPartition'),
+    new Set(['parentActions', 'childActions']), 'spec.planning.budgetPartition.', paths);
+  unknownFields(get(spec, 'failureSemantics'), new Set(['outcomeUnknown']),
+    'spec.failureSemantics.', paths);
+  unknownFields(get(spec, 'failureSemantics', 'outcomeUnknown'),
+    new Set(['requireReconcile']), 'spec.failureSemantics.outcomeUnknown.', paths);
+  for (const section of ['preconditions', 'requirements', 'postconditions']) {
+    const list = get(spec, section);
+    if (!isSeq(list)) continue;
+    list.items.forEach((entry, index) => unknownFields(entry,
+      section === 'requirements'
+        ? new Set(['predicate', 'expect', 'satisfiable'])
+        : new Set(['predicate', 'expect']),
+      'spec.' + section + '[' + index + '].', paths));
+  }
+  const dependencies = get(spec, 'dependencies');
+  if (isSeq(dependencies)) dependencies.items.forEach((entry, index) =>
+    unknownFields(entry, new Set(['name', 'artifactRef', 'digest', 'variant']),
+      'spec.dependencies[' + index + '].', paths));
+  return paths;
+}
 function unsafeTree(root) {
   const stack = [root];
   let seen = 0;
@@ -50,9 +122,11 @@ function unsafeTree(root) {
     if (!node) continue;
     if (++seen > MAX_NODES || node.anchor || node.tag || isAlias(node))
       return true;
-    if (isMap(node)) for (const pair of node.items) {
-      stack.push(pair.key, pair.value);
-    } else if (isSeq(node)) stack.push(...node.items);
+    if (isMap(node)) {
+      for (const pair of node.items) stack.push(pair.key, pair.value);
+    } else if (isSeq(node)) {
+      for (const item of node.items) stack.push(item);
+    }
   }
   return false;
 }
@@ -81,20 +155,15 @@ export function projectSkillContract(source) {
       !isMap(get(root, 'metadata')) || !isMap(get(root, 'spec')))
     return fallback('Not a supported v1alpha1 SkillContract');
 
+  const warnings = [];
   const spec = get(root, 'spec');
-  const unknown = [
-    ...extraKeys(root, ROOT_KEYS, ''),
-    ...extraKeys(spec, SPEC_KEYS, 'spec.')
-  ];
-  const post = get(root, 'spec', 'postconditions');
-  const postconditions = isSeq(post) ? post.items.map((entry, index) => ({
-    predicate: field(entry, counter, 'predicate'),
-    expect: field(entry, counter, 'expect'),
-    line: nodeAt(entry, counter),
-    path: 'spec.postconditions[' + index + ']'
-  })) : [];
+  const post = get(spec, 'planning');
+  const budget = get(post, 'budgetPartition');
+  const failure = get(spec, 'failureSemantics');
+  const outcomeUnknown = get(failure, 'outcomeUnknown');
+  const unknown = collectUnprojected(root);
   return {
-    state: unknown.length ? 'PARTIAL' : 'READY',
+    state: unknown.length || warnings.length ? 'PARTIAL' : 'READY',
     kind: 'SkillContract',
     apiVersion: field(root, counter, 'apiVersion'),
     name: field(root, counter, 'metadata', 'name'),
@@ -102,14 +171,24 @@ export function projectSkillContract(source) {
     goal: field(root, counter, 'spec', 'goal'),
     entryProcedure: field(root, counter, 'spec', 'entryProcedure'),
     requestSchema: field(root, counter, 'spec', 'inputs', 'requestSchema'),
-    requiredFacts: values(root, counter, 'spec', 'context', 'requiredFacts'),
-    capabilities: values(root, counter, 'spec', 'allowedResources', 'capabilities'),
-    localTools: values(root, counter, 'spec', 'allowedResources', 'localTools'),
-    postconditions,
+    requiredFacts: listValues(root, counter, ['spec', 'context', 'requiredFacts'], warnings),
+    capabilities: listValues(root, counter,
+      ['spec', 'allowedResources', 'capabilities'], warnings),
+    localTools: listValues(root, counter,
+      ['spec', 'allowedResources', 'localTools'], warnings),
+    preconditions: expectationList(root, counter, 'preconditions', warnings),
+    requirements: expectationList(root, counter, 'requirements', warnings, true),
+    postconditions: expectationList(root, counter, 'postconditions', warnings),
+    dependencies: dependencyList(root, counter, warnings),
     maxActions: field(root, counter, 'spec', 'planning', 'maxActions'),
     allowDynamicProcedure: field(root, counter, 'spec', 'planning', 'allowDynamicProcedure'),
-    requireReconcile: field(root, counter, 'spec', 'failureSemantics',
-      'outcomeUnknown', 'requireReconcile'),
-    unprojectedPaths: unknown
+    fallbackProcedure: field(root, counter, 'spec', 'planning', 'fallbackProcedure'),
+    budgetPartition: {
+      parentActions: field(budget, counter, 'parentActions'),
+      childActions: field(budget, counter, 'childActions')
+    },
+    requireReconcile: field(outcomeUnknown, counter, 'requireReconcile'),
+    unprojectedPaths: unknown,
+    projectionWarnings: warnings
   };
 }
