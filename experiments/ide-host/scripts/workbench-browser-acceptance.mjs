@@ -712,13 +712,18 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         return caption?.innerText?.trim()??'';
       }).filter(Boolean);
       const c=window.theia?.container;
-      const serviceKeys=[...(c?._bindingDictionary?._map?.keys()??[])];
-      const matchingServiceKeys=serviceKeys.filter(key=>
-        /WidgetManager|PluginViewRegistry/.test((key?.name??'')+' '+String(key))
-      ).map(key=>({name:key?.name??'',text:String(key).slice(0,180)}));
+      let serviceKeys=[],matchingServiceKeys=[],manager=null,managerError=null;
+      let registry=null,registryError=null,treeWidgets=[],treeWidgetsError=null;
+      let evidenceWidget=null,modelNode=null,modelError=null,reactPropsKey=null,reactProps=null;
+      try{serviceKeys=[...(c?._bindingDictionary?._map?.keys()??[])];}
+      catch(error){managerError='service keys: '+String(error?.message??error);}
+      try{
+        matchingServiceKeys=serviceKeys.filter(key=>
+          /WidgetManager|PluginViewRegistry/.test((key?.name??'')+' '+String(key))
+        ).map(key=>({name:key?.name??'',text:String(key).slice(0,180)}));
+      }catch(error){managerError='service key match: '+String(error?.message??error);}
       const findServiceKey=name=>serviceKeys.find(key=>
         key?.name===name||String(key).includes(name));
-      let manager=null,managerError=null,registry=null,registryError=null;
       try{
         const managerKey=findServiceKey('WidgetManager');
         if(managerKey)manager=c.get(managerKey);
@@ -727,14 +732,21 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         const registryKey=findServiceKey('PluginViewRegistry');
         if(registryKey)registry=c.get(registryKey);
       }catch(error){registryError=String(error?.message??error);}
-      manager=manager??registry?.widgetManager??null;
-      const treeWidgets=manager?.getWidgets('plugin-view-data')??[];
-      const evidenceWidget=treeWidgets.find(widget=>widget.id==='skillStudio.evidence');
-      let modelNode=null,modelError=null;
+      try{manager=manager??registry?.widgetManager??null;}
+      catch(error){registryError='widgetManager: '+String(error?.message??error);}
+      try{
+        if(manager&&typeof manager.getWidgets==='function')
+          treeWidgets=manager.getWidgets('plugin-view-data')??[];
+        else treeWidgetsError='WidgetManager/getWidgets unavailable';
+      }catch(error){treeWidgetsError=String(error?.message??error);}
+      try{evidenceWidget=treeWidgets.find(widget=>widget.id==='skillStudio.evidence')??null;}
+      catch(error){treeWidgetsError='find Evidence widget: '+String(error?.message??error);}
       try{modelNode=evidenceWidget?.model?.getNode(toggle?.getAttribute('data-node-id'))??null;}
       catch(error){modelError=String(error?.message??error);}
-      const reactPropsKey=toggle&&Object.keys(toggle).find(key=>key.startsWith('__reactProps$'));
-      const reactProps=reactPropsKey?toggle[reactPropsKey]:null;
+      try{
+        reactPropsKey=toggle&&Object.keys(toggle).find(key=>key.startsWith('__reactProps$'));
+        reactProps=reactPropsKey?toggle[reactPropsKey]:null;
+      }catch(error){modelError='React props: '+String(error?.message??error);}
       return {found:!!node,toggleFound:!!toggle,
         toggleClass:toggle?.className??null,
         expanded:!!toggle&&!toggle.classList.contains('theia-mod-collapsed'),
@@ -744,7 +756,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         treeWidgets:treeWidgets.map(widget=>({id:widget.id,type:widget.constructor?.name,
           disposed:widget.isDisposed,visible:widget.isVisible,attached:widget.isAttached})),
         evidenceWidgetFound:!!evidenceWidget,modelType:evidenceWidget?.model?.constructor?.name??null,
-        managerError,registryError,matchingServiceKeys,
+        managerError,registryError,treeWidgetsError,matchingServiceKeys,
         modelNode:modelNode?{id:modelNode.id,name:modelNode.name,expanded:modelNode.expanded,
           childCount:modelNode.children?.length,parentId:modelNode.parent?.id??null,
           type:modelNode.constructor?.name??null}:null,
