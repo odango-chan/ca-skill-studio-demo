@@ -327,11 +327,11 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
 
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(1,"procedures: [\\n",rootA)
+      params:packageSnapshot(1,"procedures: [\n",rootA)
     });
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(1,"procedures: [\\n",rootB)
+      params:packageSnapshot(1,"procedures: [\n",rootB)
     });
     const [statusA,statusB]=await Promise.all([
       waitForMessage(worker,message=>message?.method==="skillStudio/analysisStatus"&&
@@ -363,7 +363,7 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
 
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(2,"procedures: [\\n",rootA)
+      params:packageSnapshot(2,"procedures: [\n",rootA)
     });
     const reopened=await waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
