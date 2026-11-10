@@ -32,6 +32,15 @@ function waitForMessage(worker, predicate, timeoutMs = 5000) {
   });
 }
 
+function expectNoMessage(worker,predicate,timeoutMs=200) {
+  return new Promise(resolve=>{
+    const cleanup=()=>{clearTimeout(timer);worker.off("message",onMessage);};
+    const onMessage=message=>{if(predicate(message)){cleanup();resolve(message);}};
+    const timer=setTimeout(()=>{cleanup();resolve(null);},timeoutMs);
+    worker.on("message",onMessage);
+  });
+}
+
 function packageSnapshot(generation, procedureText) {
   const rootUri = "file:///workspace/skill";
   return {
@@ -89,6 +98,13 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
     });
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
+    const stalePublication=await expectNoMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics" &&
+      message.params?.uri==="file:///workspace/skill/assurance/procedure.yaml" &&
+      message.params?.version===1 &&
+      message.params?.diagnostics?.some(item=>item.code==="PROCEDURE_PROJECTION")
+    );
+    assert.equal(stalePublication,null,"old generation must not republish diagnostics");
       params:packageSnapshot(2,"procedures: [\n")
     });
     const latest=await waitForMessage(worker,message=>
