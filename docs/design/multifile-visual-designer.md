@@ -1,6 +1,6 @@
 # Multi-file Visual Designer · parallel workstream
 
-**Status: Proposed / Contract projection spike; 2026-11-10.**  
+**Status: C1 Contract Designer implemented and real Theia Chromium accepted; C2 Predicate Designer next; 2026-11-10.**  
 Owner: Skill Studio editor (not Skill DSL, Runtime, Agent Host or 5GC).
 
 ## Problem and objective
@@ -173,10 +173,16 @@ C0 and the first C1 Contract view are implemented on
   `THEIA_REQUIRE_WEBVIEW=1` or `THEIA_URL`.
 
 The PR workflow now includes IDE-host changes and bundles the Node, VS Code
-Web and Theia browser extension artifacts. Its resulting run is the C1 build
-gate. The actual Contract page browser assertion remains **NOT_RUN** until the
-real Theia browser acceptance is executed; the existing generic Chromium smoke
-does not substitute for it.
+Web and Theia browser extension artifacts. At head `315448a1`, all four
+workflows passed: root PR verification, IDE Host Spike, Theia Browser-Only
+Online Spike, and Theia Browser Host Custom Editor. The real backend-backed
+Theia Chromium acceptance emitted `STUDIO_CONTRACT_DESIGNER_CHROMIUM` with
+`SKILL Contract Visual`, `SOURCE VERSION 1`, all ten Contract cards, the real
+`establish-pdu-session` capability and Predicate references, and `readOnly: true`.
+The browser-only Theia shell also built and passed its own Chromium smoke; its
+`skill-studio-theia-online-spike` artifact is a CI artifact, not a published
+Pages deployment. The generic root Chromium smoke is supplemental, not the
+Contract UI acceptance.
 
 C2 Predicate Designer and C3 Schema Designer remain follow-up stages. No
 visual authoring mutations, Runtime qualification, LLM planning or 5GC
