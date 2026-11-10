@@ -141,8 +141,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await click(skillStudioActivityAfterOpen.x,skillStudioActivityAfterOpen.y);
   await sleep(350);
   const auditProblemsHeader=await evalJS(`(()=>{
-    const container=document.querySelector(
-      '#plugin-view-container\\:workbench\\.view\\.extension\\.skillStudio');
+    const container=[...document.querySelectorAll('.theia-view-container')]
+      .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
     const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
       .find(x=>x.textContent.trim().toLowerCase()==='problems');
     header?.scrollIntoView({block:'center'});
