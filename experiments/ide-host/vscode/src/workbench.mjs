@@ -600,7 +600,11 @@ export function registerWorkbench(vscode,context){
             try{
               const persisted=await disk(entry.uri);
               if(entry.doc.getText()!==persisted)
-                throw Error("restored buffer differs from original disk Source");
+                throw Error("restored buffer differs from original disk Source: "+
+                  JSON.stringify({name:entry.name,dirty:entry.doc.isDirty,
+                    bufferLength:entry.doc.getText().length,diskLength:persisted.length,
+                    bufferHead:entry.doc.getText().slice(0,72),
+                    diskHead:persisted.slice(0,72)}));
               if(entry.doc.isDirty&&!await entry.doc.save())
                 throw Error("native TextDocument cleanup save rejected");
               if(entry.doc.isDirty||await disk(entry.uri)!==persisted)
