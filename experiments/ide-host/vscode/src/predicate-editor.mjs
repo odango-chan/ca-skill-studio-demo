@@ -14,8 +14,16 @@ function nonce() {
 function predicatePath(path) {
   return typeof path === 'string' && path.toLowerCase().endsWith(SUFFIX);
 }
+function commandUri(vscode,value) {
+  if (value && typeof value.path === 'string') return value;
+  const serialized = typeof value === 'string' ? value : value?.toString?.();
+  return typeof serialized === 'string' &&
+    /^[a-z][a-z0-9+.-]*:\/\//i.test(serialized)
+    ? vscode.Uri.parse(serialized) : null;
+}
 async function choosePredicateSet(vscode, uri) {
-  if (uri && predicatePath(uri.path)) return uri;
+  const supplied = commandUri(vscode,uri);
+  if (supplied && predicatePath(supplied.path)) return supplied;
   const active = vscode.window.activeTextEditor?.document.uri;
   if (active && predicatePath(active.path)) return active;
   const candidates = await vscode.workspace.findFiles(
