@@ -25,6 +25,30 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     catch(error){throw Error("Native command "+id+": "+error.message);}
     await sleep(300);
   }
+  async function invokeSkillPackageFile(id,relativePath){
+    console.log("STUDIO_NATIVE_ACTION",id,relativePath);
+    await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      if(!key)throw Error('Native command registry missing');
+      const registry=c.get(key);
+      const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
+        String(k)==='Symbol(OpenerService)');
+      const openers=await c.get(openerKey).getOpeners();
+      const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');
+      const widget=custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>
+        w.resource?.path.toString().includes(
+          '/skills/establish-pdu-session/assurance/procedure.yaml'));
+      const procedureUri=widget?.resource;
+      if(!procedureUri)throw Error('Conventional 5GC Procedure URI missing');
+      const root=procedureUri.path.slice(0,-'assurance/procedure.yaml'.length);
+      const target=procedureUri.with({path:root+${JSON.stringify(relativePath)}});
+      await registry.executeCommand(${JSON.stringify(id)},target);
+    })()`);
+    await sleep(300);
+  }
   async function nativeCommand(id,...args){
     return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
   }
@@ -531,6 +555,16 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   })()`);
   if(!evidenceHeader)throw Error('Native Evidence view header is missing');
   if(evidenceHeader.needsOpen){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
+  // Re-select after opening the side container. Some Theia hosts activate a
+  // replacement Webview context while changing the Activity Bar container;
+  // the read-only dataflow tree must be bound to the current Procedure Node.
+  const evidenceBindingSelection=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Evidence binding Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  });
+  if(!evidenceBindingSelection.result?.value?.node)
+    throw Error('Could not re-select Phase binding Node for Evidence view');
+  await sleep(250);
   await invoke('skillStudio.auditPackage');
   let phaseEvidenceText='';
   for(let i=0;i<100;i++){
@@ -993,7 +1027,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }
   await inspect(tree.frameTree);if(!markdown)throw Error('Shared safe Markdown Preview did not render');
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
-  await invoke('skillStudio.openContract');
+  await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
   let contractView=null,contractFrame=null,contractContextId=null;
   for(let attempt=0;attempt<100&&!contractView;attempt++){
     const contractTree=await command('Page.getFrameTree');
@@ -1046,7 +1080,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     readOnly:contractView.text.includes('Source 是唯一真源')
   }));
   // PredicateSet uses its own Observation -> Evaluator visual, never a live result graph.
-  await invoke('skillStudio.openPredicates');
+  await invokeSkillPackageFile('skillStudio.openPredicates','assurance/predicates.yaml');
   let predicateView=null,predicateFrame=null;
   for(let attempt=0;attempt<100&&!predicateView;attempt++){
     const predicateTree=await command('Page.getFrameTree');
