@@ -1,6 +1,6 @@
 # Theia 工作台与 Classic 功能对照
 
-**Status: Stage One accepted; Inspector Node, Phase Input Binding, bounded Node insert/delete, named Phase Step / Verify authoring, canvas toolbar and Root path filtering merged into main; read-only Producer/Consumer evidence is this PR's scope · Date: 2026-11-10**
+**Status: Stage One accepted on main@a080414; Inspector Node, Phase Input Binding, bounded Node insert/delete, named Phase Step / Verify authoring, canvas toolbar and Root path filtering merged; read-only Producer/Consumer Evidence exact-head gates PASS in PR #111 (OPEN, not merged) · Date: 2026-11-10**
 
 第一阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；当前 Inspector Node authoring 见 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)；Phase Input Binding 首个增量见 [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97)；Node insert/delete 首个有界增量见 [PR #98](https://github.com/odango-chan/ca-skill-studio-demo/pull/98)；Phase Verify 受限增量见 [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99)；画布工具栏与 Root 路径筛选恢复见 [PR #106](https://github.com/odango-chan/ca-skill-studio-demo/pull/106)；命名 Step / Verify 生命周期迁移见 [PR #108](https://github.com/odango-chan/ca-skill-studio-demo/pull/108)。本 PR 将 Classic 的只读 Producer/Consumer 证据接入原生 Evidence 树，不增加 ABI 写权限；验收见 WORK / TRACEABILITY 与 exact-head PR CI。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
 
