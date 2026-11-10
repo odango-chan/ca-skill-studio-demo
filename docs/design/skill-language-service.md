@@ -32,12 +32,15 @@ Current language-related behavior is spread across independent modules. The modu
 | `site/semantic.mjs` | Narrower, earlier Procedure projection with different supported shape and limits | Legacy path: audit actual consumers and tests before deprecating; do not silently merge its syntax into the current profile |
 | `site/graph.mjs` | Re-exports `projectProcedure` from `semantic.mjs` and provides a basic layout function | Trace consumers; keep compatibility until proven unused or migrated |
 | `site/monaco-language.mjs` | Maps file paths to syntax grammar IDs only | Not a semantic service; may remain a small editor helper |
+| `site/node-*.mjs`, `site/phase-*.mjs`, `site/patch.mjs` | Source-backed bounded mutation proposals, span/revision checks, Diff/Confirm and shared history | Stay in the Visual editor / Source Patch layer; the Language Core may provide analysis facts but must not absorb mutation authority |
 | `site/yaml-schema-policy.mjs` + `site/yaml-owner-schemas.mjs` | Applies pinned Owner Contract / PredicateSet schemas; Procedure is deliberately syntax-only | Reuse policy and pin; never widen Schema applicability without Owner compatibility evidence |
 | `experiments/ide-host/vscode/src/inspection.mjs` | Maps `projectWorkspace` results into read-only Inspection / Outline / Evidence rows | Later become a thin host/UI projection over shared analysis |
 | `experiments/ide-host/vscode/src/workbench.mjs` | Host-side document lifecycle, Package file enumeration, audit scheduling and DiagnosticCollection | Later become a thin LSP client + host filesystem adapter; do not modify while PRs #96–#99 are open |
 | Monaco E2 integration | Local `monaco-yaml` Worker and pinned Contract/Predicate schema completion/hover in Classic | Preserve as compatibility evidence; avoid two competing YAML diagnostic owners when LSP is integrated |
 
 The old `semantic.mjs` path and current `workspace.mjs` path are not interchangeable parsers. The inspected Classic app entry and Theia Inspector use `workspace.mjs`; `graph.mjs` re-exports the legacy `projectProcedure`, and `tests/graph.test.mjs` still characterizes that path. A repository-wide import/reachability check is still required before retirement. Do not make the new core depend on both as equal semantic authorities.
+
+The visual mutation modules (`node-*`, `phase-*`, `patch.mjs`) are intentionally outside the Language Core: they own typed proposals and Source Patch admission. LSP may expose read-only facts used by those views, but must not replace their revision/span/Diff/Confirm checks.
 
 ## 3. Layer boundaries
 
@@ -195,7 +198,7 @@ Every diagnostic must carry:
 Rules:
 1. YAML syntax diagnostics use YAML 1.2 and the current parser.
 2. Owner Schema diagnostics use only the pinned Schema and exact file applicability in `yaml-schema-policy.mjs`.
-3. Contract and PredicateSet may use the currently pinned Owner Schemas. `assurance/procedure.yaml` remains syntax-only while the pinned Toolchain Procedure Schema does not model the current PRE/POST Phase structure.
+3. Contract and PredicateSet may use the currently pinned Owner Schemas. `assurance/procedure.yaml` remains syntax-only while the pinned Toolchain Procedure Schema does not model the current PRE/POST Phase structure. Keep the sample Skill commit, Schema source commit and Toolchain snapshot as three distinct provenance identities; do not collapse them into one version label.
 4. Exact local references may be indexed when their source syntax and target identity are both unambiguous.
 5. Heuristic findings (for example `INPUT_BINDING_SUSPECT`) remain visibly heuristic warnings; they cannot create Definition, Rename or automatic Code Action behavior.
 6. Suggestions from a Package's declared capabilities/tools are editor navigation/completion hints only. They do not qualify or authorize a Tool.
