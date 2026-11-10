@@ -43,10 +43,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           '/skills/establish-pdu-session/assurance/procedure.yaml'));
       const procedureUri=widget?.resource;
       if(!procedureUri)throw Error('Conventional 5GC Procedure URI missing');
-      const procedurePath=procedureUri.path.toString();
-      const root=procedurePath.slice(0,-'assurance/procedure.yaml'.length);
-      const target=procedureUri.with({path:root+${JSON.stringify(relativePath)}});
-      await registry.executeCommand(${JSON.stringify(id)},target);
+      const procedureUriString=procedureUri.toString();
+      const targetUriString=procedureUriString.replace(
+        /\\/assurance\\/procedure\\.yaml$/,
+        '/'+${JSON.stringify(relativePath)});
+      if(targetUriString===procedureUriString)
+        throw Error('Could not derive Package-scoped URI from Procedure resource');
+      await registry.executeCommand(${JSON.stringify(id)},targetUriString);
     })()`);
     await sleep(300);
   }
