@@ -203,10 +203,14 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       return {node,content,text:content?.innerText?.trim()??''};
     }).filter(row=>row.text.includes('Producer / Consumer dataflow')&&
       row.content?.getBoundingClientRect().height>0);
-    const row=rows[0],r=row?.content?.getBoundingClientRect();
+    const row=rows[0];
+    // The evidence view is below the large Inspector/Outline trees in the
+    // default layout. A non-zero rect can still be outside the viewport.
+    row?.content?.scrollIntoView({block:'center',inline:'nearest'});
+    const r=row?.content?.getBoundingClientRect();
     return r?{x:r.x+12,y:r.y+r.height/2,
       expanded:row.node.getAttribute('aria-expanded')==='true',
-      rowHeight:r.height,rowText:row.text,
+      rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
       candidateCount:rows.length}:null;
   })()`);
   if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing');
