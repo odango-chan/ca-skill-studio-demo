@@ -254,6 +254,6 @@ The current Theia feature migration PRs #96–#99 continue independently. The LS
 - [x] Theia browser Worker compatibility explicitly marked as a proof gate.
 - [ ] Owner review of this design.
 - [x] Existing characterization suites and behavior-preservation obligations inventoried.
-- [ ] L1 extraction started in a separate implementation change.
+- [x] L1 extraction started in separate [PR #103](https://github.com/odango-chan/ca-skill-studio-demo/pull/103); implementation and acceptance remain in progress.
 
 No LSP implementation, TypeScript migration, browser Worker, CI, Pages, desktop GUI or Runtime acceptance is claimed by this design document.
