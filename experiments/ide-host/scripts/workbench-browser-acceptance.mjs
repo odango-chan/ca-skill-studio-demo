@@ -232,6 +232,21 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     throw Error('Native Evidence view did not render bounded read-only Producer / Consumer evidence: '+
       JSON.stringify({phaseEvidence,dataflowTreeRow})+' · '+phaseEvidenceText.slice(-1400));
   console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify(phaseEvidence));
+  // Expanding the native Evidence tree moves focus away from the editor. Open
+  // the authoritative Source editor before testing native Undo so the host's
+  // undo command is bound to the edited TextDocument, not the tree widget.
+  await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,awaitPromise:true,
+    expression:`document.querySelector('#openSource')?.click();true`
+  });
+  await sleep(600);
+  const sourceEditorReady=await evalJS(`({
+    monacoEditors:document.querySelectorAll('.monaco-editor').length,
+    activeText:document.activeElement?.closest('.monaco-editor')!==null
+  })`);
+  if(!(sourceEditorReady.monacoEditors>0))
+    throw Error('Native Source editor did not open before Phase binding Undo regression: '+
+      JSON.stringify(sourceEditorReady));
   const beforeBinding=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
