@@ -206,24 +206,32 @@ export function registerWorkbench(vscode,context){
     if(languageClientPromise)void languageClientPromise.then(stop).catch(()=>{});
     else void languageClient?.stop();
   }});
-  // Internal, non-contributed browser acceptance probe. It runs inside the
-  // real VS Code extension host so VS Code Uri instances never cross the
-  // Theia frontend command boundary.
+  // Internal, non-contributed browser acceptance probe. It opens the real
+  // native Source documents before invoking VS Code's public provider commands.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.languageProviderAcceptance",
       async procedureUriValue=>{
         const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
-        const procedurePosition=new vscode.Position(75,35);
+        const procedureDocument=await vscode.workspace.openTextDocument(procedureUri);
+        const procedureLines=procedureDocument.getText().split(/\\r\\n|\\n|\\r/);
+        const scriptPathValue="scripts/select_establishment_configuration.py";
+        const procedureLine=procedureLines.findIndex(line=>line.includes("script: "+scriptPathValue));
+        if(procedureLine<0)throw Error("Procedure Source does not contain the expected declared script path");
+        const procedureCharacter=procedureLines[procedureLine].indexOf(scriptPathValue)+12;
+        await vscode.window.showTextDocument(procedureDocument,{preview:true});
+        await new Promise(resolve=>setTimeout(resolve,180));
+        const procedurePosition=new vscode.Position(procedureLine,procedureCharacter);
         const definitionResult=await vscode.commands.executeCommand(
           "vscode.executeDefinitionProvider",procedureUri,procedurePosition);
         const definitions=Array.isArray(definitionResult)?definitionResult:
           definitionResult?[definitionResult]:[];
         const target=definitions.find(item=>item?.uri||item?.targetUri);
-        if(!target)throw Error("Definition provider returned no exact script target");
+        if(!target)throw Error("Definition provider returned no exact script target (languageId="+
+          procedureDocument.languageId+", line="+procedureLine+", position="+procedureCharacter+")");
         const scriptUri=target.uri??target.targetUri;
         const scriptPath=scriptUri.path;
-        if(!scriptPath.endsWith("/scripts/select_establishment_configuration.py"))
+        if(!scriptPath.endsWith("/"+scriptPathValue))
           throw Error("Definition resolved to an unexpected target: "+scriptPath);
         const hoverResult=await vscode.commands.executeCommand(
           "vscode.executeHoverProvider",procedureUri,procedurePosition);
@@ -236,8 +244,16 @@ export function registerWorkbench(vscode,context){
         if(!hoverText.includes("Skill Script")||
            !hoverText.includes("select-establishment-configuration"))
           throw Error("Hover provider did not return the declared Skill Script metadata");
+        const scriptDocument=await vscode.workspace.openTextDocument(scriptUri);
+        const scriptLines=scriptDocument.getText().split(/\\r\\n|\\n|\\r/);
+        const nameLine=scriptLines.findIndex(line=>line==="# name: select-establishment-configuration");
+        const schemaLine=scriptLines.findIndex(line=>line==="# inputSchema: EstablishmentSelectionInput");
+        if(nameLine<0||schemaLine<0)
+          throw Error("Python Source is missing the declared name or inputSchema metadata");
+        await vscode.window.showTextDocument(scriptDocument,{preview:true});
+        await new Promise(resolve=>setTimeout(resolve,300));
         const referenceResult=await vscode.commands.executeCommand(
-          "vscode.executeReferenceProvider",scriptUri,new vscode.Position(1,12));
+          "vscode.executeReferenceProvider",scriptUri,new vscode.Position(nameLine,12));
         const references=Array.isArray(referenceResult)?referenceResult:[];
         if(!references.some(item=>item?.uri?.toString()===procedureUri.toString()))
           throw Error("References provider did not return the Procedure caller");
@@ -247,7 +263,8 @@ export function registerWorkbench(vscode,context){
         if(!symbols.some(item=>item.name==="main"))
           throw Error("Python Document Symbols did not include main()");
         const completionResult=await vscode.commands.executeCommand(
-          "vscode.executeCompletionItemProvider",scriptUri,new vscode.Position(2,42));
+          "vscode.executeCompletionItemProvider",scriptUri,
+          new vscode.Position(schemaLine,scriptLines[schemaLine].length));
         const completions=Array.isArray(completionResult)?completionResult:
           completionResult?.items??[];
         const labels=completions.map(item=>
@@ -259,7 +276,12 @@ export function registerWorkbench(vscode,context){
           hover:hovers.length,
           references:references.length,
           symbols:symbols.map(item=>item.name),
-          schemaCompletion:"EstablishmentSelectionInput"
+          schemaCompletion:"EstablishmentSelectionInput",
+          procedureLanguage:procedureDocument.languageId,
+          scriptLanguage:scriptDocument.languageId,
+          procedureLine,
+          nameLine,
+          schemaLine
         };
       }
     ));
