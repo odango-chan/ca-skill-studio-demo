@@ -803,15 +803,21 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       throw Error("L2-D4b replacement Worker did not rehydrate the unsaved buffer: "+
         JSON.stringify(recovered));
     recoveryBufferPrepared=false;
-    const lifecycle=await nativeCommand(
-      "skillStudio.internal.languagePackageLifecycleAcceptance",
-      procedureUri,"verify-and-close");
+    let lifecycle=null;
+    try{
+      lifecycle=await nativeCommand(
+        "skillStudio.internal.languagePackageLifecycleAcceptance",
+        procedureUri,"verify-and-close");
+    }finally{
+      // The command's own finally always releases references and removes the
+      // temporary Package, including when a lifecycle assertion fails.
+      packageLifecyclePrepared=false;
+    }
     if(!lifecycle?.twoPackageRecovery||!lifecycle?.firstReferenceRetained||
        !lifecycle?.finalCloseRemoved||!lifecycle?.generationMonotonic||
        !lifecycle?.cleaned)
       throw Error("L2-D4b host Package close/reopen acceptance failed: "+
         JSON.stringify(lifecycle));
-    packageLifecyclePrepared=false;
 
     workerFailureEvidence={workerTarget:terminated.scriptUri,
       transportUnavailable:true,nativeEditing:nativeEdit,
