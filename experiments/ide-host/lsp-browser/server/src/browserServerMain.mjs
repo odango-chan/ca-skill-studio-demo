@@ -360,6 +360,7 @@ connection.onNotification(PACKAGE_INVALIDATE_NOTIFICATION, params => {
   if (generation > knownGeneration) {
     requestedGeneration.set(rootUri, generation);
     packageAnalyses.delete(rootUri);
+    sessions.get(rootUri)?.reset();
   }
 });
 
