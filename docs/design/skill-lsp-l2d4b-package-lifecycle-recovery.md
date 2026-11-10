@@ -105,3 +105,18 @@ All race tests must use controlled delayed analysis / deterministic barriers whe
 4. Implement explicit single-flight restart and diagnostic clearing only after ownership is proven.
 5. Add real Chromium recovery acceptance with dirty buffers and two Packages.
 6. Keep the PR stacked on #120 and Draft until exact-head four-workflow CI plus the real browser matrix pass.
+
+
+## 9. Implementation progress · L2-D4b
+
+The first implementation slice is now on the stacked code branch (acceptance still pending):
+
+- **SDK cleanup:** Worker `error` / `messageerror` and silent health-timeout failures now converge on the pinned LanguageClient's `stop()`. The SDK disposes its own public diagnostic collection; the Workbench Package Audit collection is never cleared by this path.
+- **Generation continuity:** the host retains the last issued generation per canonical Package URI across final close/reopen, preventing a newly opened Package from reusing a generation that an old notification could carry.
+- **Status isolation:** server status notifications are accepted only for the currently active host Package instance and its exact current generation.
+- **Explicit recovery:** a single-flight `SKILL Studio: Restart Language Service` command (also attached to the UNAVAILABLE status item) stops the failed client, creates one new Worker, snapshots every still-active Package, and waits for each matching generation. No automatic restart loop is added.
+- **Dirty-buffer recovery probe:** real Theia acceptance prepares an unsaved Python metadata change, restarts the Worker, verifies that the replacement Worker's native Hover reflects the unsaved value, verifies persisted bytes remain unchanged, then restores the original Source.
+- **Diagnostic ownership probe:** real LSP Procedure diagnostics are published before Worker termination. A separate host-owned Package Audit diagnostic marker must survive SDK cleanup while the LSP collection is disposed and its diagnostic disappears.
+- **Server Package isolation test:** the browser LSP Worker test now opens two Package roots, closes A, proves B's diagnostics remain, reopens A with a higher generation, and then closes B independently.
+
+**Still required before D4b can be called complete:** run exact-head CI and real Chromium acceptance; add/verify host-level editor reference-count close/reopen behavior and multi-Package recovery in Chromium; add deterministic stale-in-flight session coverage where a controllable analyzer can be injected. The current implementation slice does not claim those remaining gates.
