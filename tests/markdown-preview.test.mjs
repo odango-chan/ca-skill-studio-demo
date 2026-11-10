@@ -138,7 +138,7 @@ test("Package-local Markdown navigation never promotes unsafe or escaping paths"
     localLinks:true,localFiles:new Set(["SKILL.md","references/session-selection.md"]),
     relativeDir:"references"
   }).html;
-  assert.match(html,/data-local-path="references\/session-selection\.md"/);
+  assert.match(html,/data-local-path="session-selection\.md"/);
   assert.match(html,/data-local-path="\.\.\/SKILL\.md"/);
   assert.doesNotMatch(html,/data-local-path="\.\.\/\.\.\//);
   assert.doesNotMatch(html,/data-local-path="\.\.\/establish-pdu-session-mas/);
