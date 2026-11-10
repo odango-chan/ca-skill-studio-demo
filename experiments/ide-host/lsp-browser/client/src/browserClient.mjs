@@ -5,6 +5,7 @@ export const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
 export const PACKAGE_CLOSE_NOTIFICATION = "skillStudio/packageClose";
 export const ANALYSIS_STATUS_NOTIFICATION = "skillStudio/analysisStatus";
 export const SERVER_ERROR_NOTIFICATION = "skillStudio/serverError";
+export const HEALTH_REQUEST = "skillStudio/health";
 
 /** Browser-only client. The Theia/VS Code extension host owns all workspace IO. */
 function workerResourceUrl(uri) {
@@ -37,9 +38,11 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let started = false;
   let stopped = false;
   let terminalFailure = null;
+  let heartbeatTimer = null;
   function fatal(reason) {
     if (stopped || terminalFailure) return;
     terminalFailure = String(reason?.message ?? reason ?? "Browser Worker connection stopped");
+    clearTimeout(heartbeatTimer);
     output.appendLine("Language Worker unavailable: " + terminalFailure);
     handlers.onFatal?.({ message: terminalFailure });
   }
@@ -82,6 +85,28 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     worker
   );
 
+  // Browser Worker termination can be silent (no error/close event).
+  // A bounded read-only request detects a dead transport without probing
+  // Source files, restarting, or making the analysis state artificially READY.
+  function scheduleHeartbeat(){
+    if(stopped||terminalFailure||!started)return;
+    heartbeatTimer=setTimeout(async()=>{
+      heartbeatTimer=null;
+      if(stopped||terminalFailure)return;
+      let timeout=null;
+      try{
+        await Promise.race([
+          client.sendRequest(HEALTH_REQUEST),
+          new Promise((_,reject)=>{
+            timeout=setTimeout(()=>reject(Error("Browser language Worker health request timed out")),5000);
+          })
+        ]);
+      }catch(error){fatal(error);}
+      finally{if(timeout!==null)clearTimeout(timeout);}
+      if(!stopped&&!terminalFailure)scheduleHeartbeat();
+    },2000);
+  }
+
   client.onDidChangeState(event => {
     if (started && !stopped && event.newState === State.Stopped)
       fatal("Browser LanguageClient stopped unexpectedly");
@@ -102,6 +127,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       if (!startPromise) {
         startPromise = client.start().then(() => {
           started = true;
+          scheduleHeartbeat();
         });
       }
       await startPromise;
@@ -120,9 +146,24 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       if (!started || stopped || terminalFailure) return;
       client.sendNotification(PACKAGE_CLOSE_NOTIFICATION, { rootUri });
     },
+    terminateWorkerForAcceptance(){
+      // Never expose an arbitrary Worker termination path on deployed Pages.
+      const hostname=globalThis.location?.hostname??"";
+      if(!/^(localhost|127(?:\.\d{1,3}){3})$/.test(hostname))
+        throw Error("L2-D4 Worker termination probe is local-test-only");
+      if(!started||stopped||terminalFailure)
+        throw Error("L2-D4 language Worker is not running");
+      worker.terminate();
+      // Deliberately do NOT call fatal(): the real watchdog/transport path
+      // must independently observe loss of the actual dedicated Worker.
+      return {actualWorkerTerminated:true,
+        workerName:"skill-studio-language-server",
+        scriptUri:serverUri.toString(true)};
+    },
     async stop() {
       if (stopped) return;
       stopped = true;
+      clearTimeout(heartbeatTimer);
       try {
         if (startPromise) {
           await startPromise.catch(() => {});
