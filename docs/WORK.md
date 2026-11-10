@@ -181,3 +181,14 @@ main browser application remains available at `/classic/`.
 **拒绝边界：** 不新增/删除 Phase 或 Step，不改 Operator，不绑定 output producer、不跨 Procedure、不猜 Runtime 参数兼容性；引号、别名、锚点和非 plain scalar 继续拒绝。没有同类型替代输入的 Step 不显示编辑动作。Classic 保持完整。
 
 **验收：** [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97) exact head `b6a80ab` 的 IDE Host、Theia backend Chromium、browser-only Chromium 与 PR Verify 均 PASS；两种真实 Chromium 模式均验证 Source v10 → v11 → v12（编辑后原生 Undo）。PR 仍基于 #96 堆叠，待 review/merge；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
+
+
+## 2026-11-10 · Theia Node insert/delete authoring（首个受限增量，PR #98）
+
+**范围：** 在原生 Inspector 的 Route 行增加「Insert Node on Route」，在符合安全删除条件的 Node 行增加「Delete Node」。复用 Classic 的 `site/node-create.mjs` / `site/node-delete.mjs`，不复制 Route/Node 语义。
+
+**插入边界：** 只允许在现有且 Source span 可 Patch 的 Route 上插入；原 Route 改指向新 Node，Call / Verify 新 Node 通过显式 Outcome 回到原目标；Terminal 只能使用同 Procedure 已存在的 Terminal 状态；Verify Predicate 必须来自当前 Package PredicateSet。Theia 通过一个包含零宽插入 span 和 Route target span 的原生 WorkspaceEdit 原子提交。
+
+**删除边界：** 仅开放两种已有 Classic profile：同状态 Terminal 合并到另一个 Terminal；或无 Phase/Child、恰有一个 Operator 出口的 Node bypass 到唯一出口目标。删除前由共享模块检查全部入站 Route 与其他引用；所有删除/重定向 spans 通过一次 WorkspaceEdit 提交。Start、Phase-bearing、Child Procedure、多出口及存在外部引用的 Node 不显示删除操作。
+
+**安全与验收：** 所有操作均要求当前 TextDocument revision、精确 Diff、用户显式确认、宿主重算 Patch 与原生 Undo。Host 测试覆盖取消、过期选择、两 span 原子编辑及不可删除 Node；真实 Chromium 验收覆盖插入、删除、Route 修复和两次 Undo。PR #98 exact-head CI 待验；Runtime / 5GC / desktop VS Code GUI NOT_RUN。Classic 保持完整。
