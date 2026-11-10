@@ -2043,6 +2043,9 @@ export function registerWorkbench(vscode,context){
   }
   async function auditCurrent(){
     if(!document)return;
+    // An explicit audit supersedes a pending debounced audit. Letting both
+    // run concurrently can race their package snapshots and tree refreshes.
+    clearTimeout(timer);timer=undefined;
     const doc=document,version=doc.version,ticket=++generation;
     auditStatus="Package Audit · running";fireProblems();
     const files=new Map(),uris=new Map();
