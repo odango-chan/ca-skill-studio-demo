@@ -117,6 +117,25 @@ export function buildPackageInventory(uris, dirtyPaths = new Set(), truncated = 
   return {packages,scannedFiles:files.length,truncated};
 }
 
+function packageNode(pkg) {
+  return {
+    ...pkg,kind:'package',
+    label:pkg.name,
+    description:(pkg.relativeRoot??pkg.rootPath)+' · '+
+      pkg.corePresent+'/'+pkg.coreTotal+' core · '+pkg.fileCount+' files'+
+      (pkg.dirtyCount?' · '+pkg.dirtyCount+' modified':''),
+    tooltip:'Package 文件清点；不代表内容校验或 Runtime 资格。'+
+      (pkg.incomplete?' 缺少：'+[...(!pkg.hasSkillMd?['SKILL.md']:[]),...pkg.missingCore].join(', '):''),
+    icon:pkg.incomplete?'warning':'package'
+  };
+}
+function groupNode(pkg, group) {
+  return {
+    ...group,kind:'group',packageRoot:pkg.rootPath,
+    label:group.label,
+    description:group.missing.length?'缺少 '+group.missing.length+' 个文件':undefined
+  };
+}
 function treeNode(vscode, node) {
   const collapsible = node.kind === 'package' || node.kind === 'group'
     ? vscode.TreeItemCollapsibleState.Collapsed
@@ -130,14 +149,14 @@ function treeNode(vscode, node) {
   if (node.kind==='package') item.id='package:'+node.rootPath;
   else if (node.kind==='group') item.id='group:'+node.packageRoot+':'+node.key;
   else if (node.kind==='file') item.id='file:'+node.uri.toString();
-  else if (node.kind==='missing') item.id='missing:'+node.label;
+  else if (node.kind==='missing') item.id='missing:'+node.packageRoot+':'+node.groupKey+':'+node.label;
   else item.id=node.kind;
   return item;
 }
 export function registerPackageOverview(vscode,context,getActiveDocument=()=>null) {
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
-  let treeReads=0;
+  let treeReads=0, revealError=null;
   const fire = () => emitter.fire();
   const provider = {
     onDidChangeTreeData:emitter.event,
@@ -159,27 +178,19 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
           return [summary,{kind:'notice',...notice,icon:'info',
             tooltip:'Package Overview 只清点文件，不做语义校验'}];
         }
-        return [summary,...packages.map(pkg=>({
-          ...pkg,kind:'package',
-          label:pkg.name,
-          description:(pkg.relativeRoot??pkg.rootPath)+' · '+
-            pkg.corePresent+'/'+pkg.coreTotal+' core · '+pkg.fileCount+' files'+
-            (pkg.dirtyCount?' · '+pkg.dirtyCount+' modified':''),
-          tooltip:'Package 文件清点；不代表内容校验或 Runtime 资格。'+
-            (pkg.incomplete?' 缺少：'+[...(!pkg.hasSkillMd?['SKILL.md']:[]),...pkg.missingCore].join(', '):''),
-          icon:pkg.incomplete?'warning':'package'
-        }))];
+        return [summary,...packages.map(packageNode)];
       }
-      if (node.kind === 'package') return node.groups.map(group=>({
-        ...group,kind:'group',packageRoot:node.rootPath,
-        label:group.label,description:group.missing.length?'缺少 '+group.missing.length+' 个文件':undefined
-      }));
+      if (node.kind === 'package') {
+        const pkg=packages.find(item=>item.rootPath===node.rootPath);
+        return pkg ? pkg.groups.map(group=>groupNode(pkg,group)) : [];
+      }
       if (node.kind === 'group') {
         const files = node.files.map(file=>{
           const label = basename(file.path);
           const isMarkdown = /\.md$/i.test(file.path);
           return {
             kind:'file',label,description:file.path,uri:file.uri,
+            packageRoot:node.packageRoot,groupKey:node.key,
             command:packageFileCommand(file.path,file.uri),
             contextValue:isMarkdown?'skillStudio.packageMarkdown':'skillStudio.packageFile',
             icon:/\.py$/i.test(file.path)?'file-code':
@@ -189,6 +200,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
         });
         const missing = node.missing.map(path=>({
           kind:'missing',label:'Missing · '+path,description:'Not found in Package',
+          packageRoot:node.packageRoot,groupKey:node.key,
           tooltip:'当前文件清单中未发现该核心文件',icon:'warning'
         }));
         return [...missing,...files];
@@ -197,12 +209,25 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     },
     getTreeItem(node) {
       return treeNode(vscode,node);
+    },
+    // Theia's TreeView.reveal requires a parent chain. Returning real parent
+    // nodes also makes reveal work when the UI has not fetched descendants yet.
+    getParent(node) {
+      if (!node || node.kind==='package') return undefined;
+      const pkg=packages.find(item=>item.rootPath===node.packageRoot);
+      if (!pkg) return undefined;
+      if (node.kind==='group') return packageNode(pkg);
+      if (node.kind==='file' || node.kind==='missing') {
+        const group=pkg.groups.find(item=>item.key===node.groupKey);
+        return group ? groupNode(pkg,group) : packageNode(pkg);
+      }
+      return undefined;
     }
   };
-  // Theia's browser host can defer a contributed TreeView until its view
-  // container is activated. createTreeView eagerly owns the view lifecycle;
-  // registerTreeDataProvider alone left the Packages welcome page visible and
-  // never asked the provider for its first root children in real Chromium.
+  // Use createTreeView because Package Overview also needs TreeView.reveal.
+  // Do not contribute viewsWelcome for this provider-backed view: Theia can
+  // materialize a welcome widget before the extension activates, and that
+  // child can prevent a later provider registration from replacing it.
   const treeApi = {
     createTreeView:typeof vscode.window.createTreeView==='function',
     registerTreeDataProvider:typeof vscode.window.registerTreeDataProvider==='function'
@@ -260,15 +285,12 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       // presentation refresh only; it does not expand child groups or steal
       // editor focus.
       if (packages.length && treeView?.reveal) {
-        const first = packages[0];
         try {
-          await treeView.reveal({
-            ...first,kind:'package',label:first.name,
-            description:first.relativeRoot+' · '+first.corePresent+'/'+
-              first.coreTotal+' core · '+first.fileCount+' files'
-          },{select:false,focus:false,expand:0});
-        } catch {
+          await treeView.reveal(packageNode(packages[0]),
+            {select:false,focus:false,expand:0});
+        } catch(error) {
           // A view can be disposed while workspace scanning is in flight.
+          revealError=String(error?.message??error);
         }
       }
       return packages;
@@ -297,7 +319,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       const result=await refresh();
       return {
         state:inventoryState,message,treeReads,treeApi,
-        treeViewCreated:Boolean(treeView),
+        treeViewCreated:Boolean(treeView),revealError,
         packages:result.map(pkg=>({
           name:pkg.name,relativeRoot:pkg.relativeRoot,
           fileCount:pkg.fileCount,corePresent:pkg.corePresent,
