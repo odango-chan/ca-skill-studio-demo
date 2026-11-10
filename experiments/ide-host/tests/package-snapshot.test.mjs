@@ -67,7 +67,7 @@ test("Package snapshot keeps exact root, required files, language ids and unsave
 test("Package file enumeration over limit is partial and prioritizes required assurance files",async()=>{
   const extras=Array.from({length:501},(_,i)=>makeUri(root+"/docs/file-"+String(i).padStart(3,"0")+".md"));
   const procedure=openDoc(procedureUri,"procedures: {}\n",1);
-  const vscode=makeVscode({files:[...extras,pythonUri,procedureUri,contractUri,predicatesUri]});
+  const vscode=makeVscode({files:[procedureUri,contractUri,predicatesUri,pythonUri,...extras]});
   const snapshot=await collectPackageSnapshot(vscode,procedure,1);
   assert.equal(snapshot.completeness,"partial");
   assert.match(snapshot.reason,/500-file/);
