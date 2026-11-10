@@ -1103,7 +1103,7 @@ export function registerWorkbench(vscode,context){
           ["python","scripts/select_establishment_configuration.py"]
         ];
         const entries=[];
-        const transientRead=error=>/\\b(?:EIO|ENOENT|EntryNotFound)\\b/i.test(
+        const transientRead=error=>/\b(?:EIO|ENOENT|EntryNotFound)\b/i.test(
           String(error?.message??error));
         // OPFS-backed Theia can briefly fail a read or open during Package
         // import/refresh. Retry ONLY the same read, at most three times. A
