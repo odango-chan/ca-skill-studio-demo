@@ -93,6 +93,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(phaseStep,'eligible Phase Step identity is exposed');
   const phaseItem=providers.get('skillStudio.inspection').getTreeItem(phaseStep);
   assert.equal(phaseItem.contextValue,'skillStudio.phaseStep');
+  assert.equal(phaseItem.kind,'phase-step');
   assert.equal(phaseStep.sourceVersion,doc.version);
   assert.equal(phaseStep.documentUri,doc.uri.toString());
   const beforeBinding=doc.text,phaseVersion=doc.version;
@@ -116,6 +117,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(routeRow,'patchable Route identity is exposed');
   const routeItem=providers.get('skillStudio.inspection').getTreeItem(routeRow);
   assert.equal(routeItem.contextValue,'skillStudio.route');
+  assert.equal(routeItem.kind,'route');
   const insertSpec={nodeId:'ide-host-insert-probe',operator:'call',
     value:'sbi.demo.insert_probe',outcome:'COMMITTED'};
   const beforeInsert=doc.text,insertVersion=doc.version;
@@ -133,6 +135,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(insertedNode);
   const insertedItem=providers.get('skillStudio.inspection').getTreeItem(insertedNode);
   assert.equal(insertedItem.contextValue,'skillStudio.deletableNode');
+  assert.equal(insertedItem.kind,'node');
   const afterInsert=doc.text,deleteVersion=doc.version;
   confirmChoice='取消';
   assert.equal(await commands.get('skillStudio.deleteNode')(insertedItem,'nudm-sdm-subscribe'),false);
