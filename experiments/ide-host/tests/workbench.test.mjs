@@ -217,7 +217,6 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   doc.text=source;doc.version++;changed({document:doc});
   assert.ok(commands.has('skillStudio.insertNode'));
   assert.ok(commands.has('skillStudio.deleteNode'));
-  doc.text=source;doc.version++;changed({document:doc});
   const routeProcedure='ue-requested-pdu-session-establishment';
   workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'nudm-sdm-get'});
   const routeRow=providers.get('skillStudio.inspection').getChildren().find(x=>
