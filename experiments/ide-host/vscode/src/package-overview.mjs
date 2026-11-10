@@ -156,7 +156,7 @@ function treeNode(vscode, node) {
 export function registerPackageOverview(vscode,context,getActiveDocument=()=>null) {
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
-  let treeReads=0, revealError=null;
+  let treeReads=0;
   const treeReadsByKind={root:0,package:0,group:0,other:0};
   const fire = () => emitter.fire();
   const provider = {
@@ -228,21 +228,11 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       return undefined;
     }
   };
-  // Use createTreeView because Package Overview also needs TreeView.reveal.
-  // Do not contribute viewsWelcome for this provider-backed view: Theia can
-  // materialize a welcome widget before the extension activates, and that
-  // child can prevent a later provider registration from replacing it.
-  const treeApi = {
-    createTreeView:typeof vscode.window.createTreeView==='function',
-    registerTreeDataProvider:typeof vscode.window.registerTreeDataProvider==='function'
-  };
-  const treeView = vscode.window.createTreeView
-    ? vscode.window.createTreeView('skillStudio.packages',{
-        treeDataProvider:provider,showCollapseAll:true
-      })
-    : null;
-  const treeRegistration = treeView ??
-    vscode.window.registerTreeDataProvider('skillStudio.packages',provider);
+  // Register the provider without revealing/opening the view. Package Overview
+  // must populate when the user opens its Activity Bar container, not steal
+  // focus or open a sidebar automatically during extension startup.
+  const treeRegistration = vscode.window.registerTreeDataProvider(
+    'skillStudio.packages',provider);
   context.subscriptions.push(emitter,treeRegistration);
   async function refresh() {
     const ticket = ++generation;
@@ -285,18 +275,6 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
         ?'已扫描前 '+inventory.scannedFiles+' 个文件 · 结果可能不完整'
         :inventory.scannedFiles+' 个文件 · 仅清点，不做语义校验';
       fire();
-      // Force the first Package row into the native TreeView. This is a
-      // presentation refresh only; it does not expand child groups or steal
-      // editor focus.
-      if (packages.length && treeView?.reveal) {
-        try {
-          await treeView.reveal(packageNode(packages[0]),
-            {select:false,focus:false,expand:0});
-        } catch(error) {
-          // A view can be disposed while workspace scanning is in flight.
-          revealError=String(error?.message??error);
-        }
-      }
       return packages;
     } catch(error) {
       if (ticket !== generation) return packages;
@@ -322,8 +300,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     vscode.commands.registerCommand('skillStudio.refreshPackages',async()=>{
       const result=await refresh();
       return {
-        state:inventoryState,message,treeReads,treeReadsByKind,treeApi,
-        treeViewCreated:Boolean(treeView),revealError,
+        state:inventoryState,message,treeReads,treeReadsByKind,
         packages:result.map(pkg=>({
           name:pkg.name,relativeRoot:pkg.relativeRoot,
           fileCount:pkg.fileCount,corePresent:pkg.corePresent,
