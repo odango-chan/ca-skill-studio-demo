@@ -158,8 +158,8 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
      !zipEvidence.noticeHidden)
     throw Error('Native Package ZIP download did not produce a browser Blob: '+
       JSON.stringify(zipEvidence));
-  patchEvidence.packageZip={details:packageReady.result.value.details,...zipEvidence};
-  console.log('STUDIO_PACKAGE_ZIP_CHROMIUM',JSON.stringify(patchEvidence.packageZip));
+  const packageZipEvidence={details:packageReady.result.value.details,...zipEvidence};
+  console.log('STUDIO_PACKAGE_ZIP_CHROMIUM',JSON.stringify(packageZipEvidence));
   // The Theia canvas now defaults to Classic's proven success-path focus.
   // This Inspector structural-edit regression deliberately needs all 17
   // source-declared Nodes so its 17→18→17 assertions remain meaningful.
@@ -511,5 +511,5 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,phaseEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
+  return {views:true,packageAudit:true,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
 }
