@@ -22,8 +22,14 @@ test("Theia online target is a real backend-free 1.76 browser-only app",()=>{
 test("Theia plugin is the exact Web extension, with native editor + view contributions",()=>{
   const plugin=JSON.parse(readFileSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike/package.json"),"utf8"));
   assert.ok(plugin.browser?.endsWith("extension-theia.js"));
-  assert.equal(plugin.contributes.customEditors[0].viewType,"skillStudio.procedurePreview");
-  assert.equal(plugin.contributes.customEditors[0].priority,"default");
+  const editorViews=new Set(plugin.contributes.customEditors.map(x=>x.viewType));
+  for(const view of ["skillStudio.procedurePreview","skillStudio.contractPreview",
+    "skillStudio.predicatePreview"])assert.ok(editorViews.has(view),view);
+  assert.ok(plugin.contributes.customEditors.every(x=>x.priority==="default"));
+  const associations=app.theia.frontend.config.preferences["workbench.editorAssociations"];
+  assert.equal(associations["procedure.yaml"],"skillStudio.procedurePreview");
+  assert.equal(associations["contract.yaml"],"skillStudio.contractPreview");
+  assert.equal(associations["predicates.yaml"],"skillStudio.predicatePreview");
   assert.ok(plugin.activationEvents.includes("onStartupFinished"),
     "first-run demo discovery must activate on startup");
   assert.ok(plugin.contributes.viewsWelcome?.some(x=>
