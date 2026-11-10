@@ -1,5 +1,5 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
-export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor}){
+export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor,requireBrowserLsp=false}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
@@ -95,17 +95,20 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(stillPreview)throw Error("Double-click did not pin native preview tab");
   const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
-  let languageServiceStatus="";
-  for(let i=0;i<100;i++){
-    languageServiceStatus=await evalJS(`(()=>{const text=document.body.innerText;return text.match(/SKILL LSP: (READY|PARTIAL|UNAVAILABLE|ERROR|ANALYZING|STARTED|STARTING|IDLE)/)?.[0]||""})()`);
-    if(languageServiceStatus==="SKILL LSP: READY")break;
-    if(languageServiceStatus==="SKILL LSP: ERROR"||languageServiceStatus==="SKILL LSP: UNAVAILABLE")
-      throw Error("Browser LSP did not become healthy: "+languageServiceStatus);
-    await sleep(100);
+  let languageServiceStatus="NOT_REQUIRED_NODE_HOST";
+  if(requireBrowserLsp){
+    languageServiceStatus="";
+    for(let i=0;i<100;i++){
+      languageServiceStatus=await evalJS(`(()=>{const text=document.body.innerText;return text.match(/SKILL LSP: (READY|PARTIAL|UNAVAILABLE|ERROR|ANALYZING|STARTED|STARTING|IDLE)/)?.[0]||""})()`);
+      if(languageServiceStatus==="SKILL LSP: READY")break;
+      if(languageServiceStatus==="SKILL LSP: ERROR"||languageServiceStatus==="SKILL LSP: UNAVAILABLE")
+        throw Error("Browser LSP did not become healthy: "+languageServiceStatus);
+      await sleep(100);
+    }
+    if(languageServiceStatus!=="SKILL LSP: READY")
+      throw Error("Theia browser LanguageClient/Worker did not publish READY Package analysis: "+languageServiceStatus);
+    console.log("STUDIO_LSP_CHROMIUM",JSON.stringify({status:languageServiceStatus}));
   }
-  if(languageServiceStatus!=="SKILL LSP: READY")
-    throw Error("Theia browser LanguageClient/Worker did not publish READY Package analysis: "+languageServiceStatus);
-  console.log("STUDIO_LSP_CHROMIUM",JSON.stringify({status:languageServiceStatus}));
   const initialTiming=JSON.parse(pinned.timing??'null');
   await command('Runtime.evaluate',{contextId:graphContext,expression:`(()=>{const s=document.querySelector('#procedureList');window.__acceptanceProcedure=s.value;s.selectedIndex=1;s.dispatchEvent(new Event('change'));})()`});
   await sleep(500);
