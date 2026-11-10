@@ -12,12 +12,14 @@ const pcfOutcomeLine=publishedProcedure.slice(0,
 export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
   if (!requireEditor) return {required:false};
   const click=async(x,y)=>{
-    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,buttons:0});
-    await sleep(80);
-    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',buttons:1,clickCount:1});
-    await sleep(60);
+    // Reset any stale button state left by an earlier workbench gesture.
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1});
-    await sleep(80);
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,button:'none',buttons:0,pointerType:'mouse'});
+    await sleep(120);
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',buttons:1,clickCount:1,pointerType:'mouse'});
+    await sleep(100);
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1,pointerType:'mouse'});
+    await sleep(120);
   };
   const invoke=async(id,...args)=>{
     const expression="(async()=>{const c=window.theia.container;"+
@@ -70,7 +72,11 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "const toggle=el?.querySelector('.theia-TreeNodeContent [data-node-id]');"+
     "window.__studioToggleEvents=[];"+
     "for(const type of ['pointerdown','mousedown','pointerup','mouseup','click'])"+
-    "toggle?.addEventListener(type,()=>window.__studioToggleEvents.push(type));"+
+    "document.addEventListener(type,e=>window.__studioToggleEvents.push({type,"+
+    "targetClass:e.target?.className??e.target?.tagName??null,"+
+    "targetNodeId:e.target?.getAttribute?.('data-node-id')??null,"+
+    "x:e.clientX,y:e.clientY,button:e.button,buttons:e.buttons,detail:e.detail,"+
+    "trusted:e.isTrusted,pointerId:e.pointerId??null}),true);"+
     "const target=toggle??el;const r=target?.getBoundingClientRect();"+
     "const hit=r?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2):null;"+
     "return r?{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),"+
