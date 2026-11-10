@@ -24,6 +24,7 @@ const types={".html":"text/html",".js":"text/javascript",".css":"text/css",
   ".ttf":"font/ttf",".woff":"font/woff",".woff2":"font/woff2",".png":"image/png",
   ".ico":"image/x-icon",".map":"application/json"};
 const requests=new Set(),notFound=new Set(),networkFailures=[],networkResponses=[];
+const defaultExecutionContexts=new Map();
 const server=externalUrl?null:createServer((req,res)=>{
   const url=new URL(req.url,"http://localhost");
   let name;
@@ -81,6 +82,16 @@ try{
       console.log("STUDIO_TEST_BEFOREUNLOAD_ACCEPTED");
       void command("Page.handleJavaScriptDialog",{accept:true}).catch(error=>exceptions.push(String(error)));
     }
+    if(msg.method==="Runtime.executionContextCreated"){
+      const context=msg.params?.context,frameId=context?.auxData?.frameId;
+      if(context?.auxData?.isDefault&&frameId)
+        defaultExecutionContexts.set(frameId,context.id);
+    }
+    if(msg.method==="Runtime.executionContextDestroyed"){
+      for(const [frameId,id] of defaultExecutionContexts)
+        if(id===msg.params?.executionContextId)defaultExecutionContexts.delete(frameId);
+    }
+    if(msg.method==="Runtime.executionContextsCleared")defaultExecutionContexts.clear();
     if(msg.method==="Runtime.exceptionThrown")
       exceptions.push(msg.params?.exceptionDetails?.exception?.description||msg.params?.exceptionDetails?.text);
     if(msg.method==="Network.loadingFailed")
@@ -406,6 +417,85 @@ try{
       console.log("STUDIO_THEIA_STAGE","native-source-undo");
       patchEvidence.sourceEditor=sourceEditor;
       patchEvidence.undo=undoFrames[0]??null;
+
+      // Check real Webview toolbar interaction before later Node/Route gestures.
+      // The original root is focused by default, but all routes remain selectable
+      // for the existing route editor fixture after explicitly choosing All.
+      const toolbarBefore=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          layout:document.querySelector("#layoutDirection")?.value,
+          rootMode:document.querySelector("#rootPathMode")?.value,
+          rootVisible:!document.querySelector("#rootPathToolbar")?.hidden,
+          toolbarVisible:!document.querySelector("#graphTools")?.hidden,
+          nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length
+        })`
+      });
+      const initialToolbar=toolbarBefore.result?.value??null;
+      if(initialToolbar?.layout!=="DOWN"||initialToolbar?.rootMode!=="normal"||
+         !initialToolbar.rootVisible||!initialToolbar.toolbarVisible)
+        throw Error("Missing/default-incorrect Theia toolbar: "+JSON.stringify(initialToolbar));
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=>{const select=document.querySelector("#layoutDirection");
+          select.value="RIGHT";select.dispatchEvent(new Event("change",{bubbles:true}));return true;})()`
+      });
+      await sleep(1000);
+      const horizontal=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,
+        expression:`({
+          layout:document.querySelector("#layoutDirection")?.value,
+          horizontal:document.querySelectorAll("#reactFlowRoot .designer-node.is-horizontal").length,
+          nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length
+        })`
+      });
+      if(horizontal.result?.value?.layout!=="RIGHT"||!(horizontal.result.value.horizontal>0))
+        throw Error("Theia toolbar failed to relayout RIGHT: "+JSON.stringify(horizontal.result?.value));
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=>{const select=document.querySelector("#layoutDirection");
+          select.value="DOWN";select.dispatchEvent(new Event("change",{bubbles:true}));
+          document.querySelector("#fitWidth").click();
+          document.querySelector("#fitHeight").click();
+          document.querySelector("#fit").click();
+          document.querySelector("#zoomIn").click();
+          document.querySelector("#zoomOut").click();
+          return true;})()`
+      });
+      await sleep(1000);
+      const vertical=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,
+        expression:`({
+          layout:document.querySelector("#layoutDirection")?.value,
+          horizontal:document.querySelectorAll("#reactFlowRoot .designer-node.is-horizontal").length,
+          nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length
+        })`
+      });
+      if(vertical.result?.value?.layout!=="DOWN"||vertical.result.value.horizontal!==0||
+        !(vertical.result.value.nodes>0))
+        throw Error("Theia toolbar failed to restore DOWN: "+JSON.stringify(vertical.result?.value));
+      await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`(()=>{const select=document.querySelector("#rootPathMode");
+          select.value="all";select.dispatchEvent(new Event("change",{bubbles:true}));return true;})()`
+      });
+      await sleep(1000);
+      const fullPaths=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,
+        expression:`({
+          rootMode:document.querySelector("#rootPathMode")?.value,
+          nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length,
+          edges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length,
+          branchControls:document.querySelectorAll("#reactFlowRoot .designer-hidden-branches").length
+        })`
+      });
+      if(fullPaths.result?.value?.rootMode!=="all"||
+         !(fullPaths.result.value.nodes>=initialToolbar.nodes))
+        throw Error("Theia Root path filter did not restore full graph: "+
+          JSON.stringify({initialToolbar,fullPaths:fullPaths.result?.value}));
+      patchEvidence.canvasToolbar={initial:initialToolbar,horizontal:horizontal.result?.value,
+        vertical:vertical.result?.value,allPaths:fullPaths.result?.value};
+      console.log("STUDIO_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(patchEvidence.canvasToolbar));
 
       // The Classic one-hop Node view is reused inside the host CustomEditor:
       // real neighbor Nodes/Routes plus read-only PRE/OP/POST stages.
@@ -1027,8 +1117,60 @@ try{
     }
   }
   console.log("STUDIO_THEIA_STAGE","native-workbench");
+  const evalWebviewJS=async expression=>{
+    // Native editor interactions above can recreate the Webview iframe.
+    // Refresh CDP execution contexts and resolve the current frame each time
+    // rather than retaining an executionContextId from an earlier render.
+    const tree=await command("Page.getFrameTree");
+    const currentFrames=[];
+    const collect=node=>{
+      if(!node)return;
+      currentFrames.push(node.frame);
+      for(const child of node.childFrames??[])collect(child);
+    };
+    collect(tree.frameTree);
+    const expectedPath=(webviewFrame?.url??"").split("?")[0];
+    const candidates=currentFrames.filter(frame=>
+      (frame.url.includes("/webview/index.html")||frame.url.includes(".webview."))&&
+      (!expectedPath||frame.url.split("?")[0]===expectedPath));
+    await command("Runtime.enable");
+    await sleep(40);
+    let frame=null,contextId=null;
+    const probes=[];
+    for(const candidate of candidates){
+      const isolated=await command("Page.createIsolatedWorld",{
+        frameId:candidate.id,worldName:"skill-studio-live-webview-probe",
+        grantUniveralAccess:true
+      });
+      const probe=await command("Runtime.evaluate",{
+        contextId:isolated.executionContextId,returnByValue:true,
+        expression:`Boolean(document.querySelector("#downloadPackageZip")&&
+          document.querySelector("#exportPackageZip")&&
+          document.querySelector("#reactFlowRoot"))`
+      });
+      probes.push({id:candidate.id,url:candidate.url,hasStudioControls:probe.result?.value===true});
+      if(probe.result?.value!==true)continue;
+      const id=defaultExecutionContexts.get(candidate.id);
+      if(id){frame=candidate;contextId=id;break;}
+    }
+    if(!contextId)
+      throw Error("Active Procedure Webview main context is unavailable: "+
+        JSON.stringify({expectedPath,probes,known:[...defaultExecutionContexts.entries()]}));
+    const data=await command("Runtime.evaluate",{
+      contextId,expression,returnByValue:true,awaitPromise:true
+    });
+    if(data.exceptionDetails)
+      throw Error("Procedure Webview evaluate: "+JSON.stringify({
+        text:data.exceptionDetails.text,
+        exception:data.exceptionDetails.exception?.description??null,
+        line:data.exceptionDetails.lineNumber,column:data.exceptionDetails.columnNumber
+      }));
+    return data.result?.value;
+  };
   let workbenchEvidence;
-  try{workbenchEvidence=await runWorkbenchAcceptance({command,evalJS,sleep,requireEditor,requireBrowserLsp});}
+  try{workbenchEvidence=await runWorkbenchAcceptance({
+    command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp
+  });}
   catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
@@ -1082,11 +1224,32 @@ try{
       !/TextDocument v[2-9]/.test(patchEvidence.applied?.revision??"")))
     throw Error("Source-backed Patch preview/apply did not update the TextDocument: "+
       JSON.stringify(patchEvidence).slice(0,3000));
+  // The default Root view is the proven success path (9 nodes / 8 bundled
+  // edges); the old smoke asserted 46 full-graph edges even before switching
+  // to All Paths. Require both the default restored view and the full graph.
   if(requireEditor&&(!(patchEvidence.sourceEditor?.monacoEditors>0)||
       !/TextDocument v[3-9]/.test(patchEvidence.undo?.revision??"")||
-      patchEvidence.undo?.graphEdges!==46))
+      patchEvidence.undo?.graphNodes!==9||
+      patchEvidence.undo?.graphEdges!==8||
+      patchEvidence.canvasToolbar?.allPaths?.nodes!==17||
+      patchEvidence.canvasToolbar?.allPaths?.edges!==46))
     throw Error("Native Source editor/undo did not restore the original Procedure projection: "+
       JSON.stringify(patchEvidence).slice(0,3000));
+  if(requireEditor&&(!workbenchEvidence?.phaseEvidence?.ready||
+      !workbenchEvidence.phaseEvidence.dataflowRows||
+      !workbenchEvidence.phaseEvidence.consumerAbiRows||
+      !workbenchEvidence.phaseEvidence.readOnly))
+    throw Error("Native read-only Producer / Consumer Evidence acceptance failed: "+
+      JSON.stringify(workbenchEvidence?.phaseEvidence).slice(0,3000));
+  if(requireEditor&&(!workbenchEvidence?.namedStepRename?.accepted||
+      !workbenchEvidence.namedStepRename.applied||
+      !workbenchEvidence.namedStepRename.undo||
+      workbenchEvidence.namedStepRename.applied===workbenchEvidence.namedStepRename.undo||
+      !workbenchEvidence?.namedVerifyName?.applied||
+      !workbenchEvidence.namedVerifyName.undone||
+      workbenchEvidence.namedVerifyName.applied===workbenchEvidence.namedVerifyName.undone))
+    throw Error("Named Phase Step / Verify native authoring and Undo acceptance failed: "+
+      JSON.stringify(workbenchEvidence).slice(0,4000));
   if(requireEditor&&(!patchEvidence.nodeFocus?.open?.clicked||
       !patchEvidence.nodeFocus?.view?.visible||
       patchEvidence.nodeFocus.view.title!=="nudm-sdm-subscribe"||
@@ -1116,7 +1279,7 @@ try{
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; PHASE_DATAFLOW_EVIDENCE_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
