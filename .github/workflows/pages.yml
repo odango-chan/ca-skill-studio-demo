@@ -7,6 +7,7 @@ on:
       - "site/**"
       - "experiments/ide-host/**"
       - "extensions/skill-studio-theme/**"
+      - "extensions/skill-studio-languages/**"
       - "tests/**"
       - "scripts/**"
       - "package.json"
