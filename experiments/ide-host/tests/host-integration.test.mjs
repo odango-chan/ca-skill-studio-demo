@@ -101,7 +101,13 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   await provider.resolveCustomTextEditor(document,panel);
   assert.match(webview.html,/Content-Security-Policy/);
   assert.match(webview.html,/procedure\.js/);
-  assert.match(webview.html,/procedure\.css/);
+  assert.match(webview.html,/procedure\\.css/);
+  for(const id of ["layoutDirection","zoomIn","zoomOut","fit","fitWidth","fitHeight",
+    "centerSelection","neighborsOnly","showAllLabels","rootPathMode",
+    "rootPathFilters","pathFailure","pathUncertain","pathRecovery"]){
+    assert.match(webview.html,new RegExp('id="'+id+'"'),id+" must be in the native graph toolbar");
+  }
+  assert.match(webview.html,/<option value="DOWN" selected>垂直<\\/option>/);
   assert.doesNotMatch(webview.html,/unsafe-inline/);
   assert.ok(typeof onMessage==="function");
   await onMessage({type:"ready"});
