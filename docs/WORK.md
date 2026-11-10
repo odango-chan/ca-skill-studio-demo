@@ -211,3 +211,22 @@ main browser application remains available at `/classic/`.
 
 **验收：** [PR #106](https://github.com/odango-chan/ca-skill-studio-demo/pull/106) 已合并，merge commit `5dfa50e0e39e43087f01e1d5fee9ada1e6ce7d63`。exact-head `36a252319281e7c0829100a07455b56af6236176` 三组门禁全部 PASS：[IDE Host #42752173199](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173199)、[Theia Browser-Only #42752173510](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173510)、[Theia Browser Host / real Chromium #42752173208](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173208)。真实 Chromium 记录默认主路径 9 Nodes / 8 visible edges、水平 9/9、恢复垂直、全部路径 17 Nodes / 46 edges；Source、Inspector、Node Focus、Route create/reconnect 与 native Undo 回归通过。resulting-main Pages 对新 merge SHA 的部署仍需单独确认；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
 
+## 2026-11-10 · Theia named Phase Step / Verify authoring（PR #108，已合入 main）
+
+**范围：** 原生 Inspector 迁移命名 Phase Step 原子重命名，以及普通 / 命名 Verify 的安全生命周期操作。命名 Step 重命名只在同 Procedure 的完整 `from` 引用闭包可证明时开放；身份与所有已证明引用通过一个 WorkspaceEdit 同步更新。普通 Verify 仅在 Source 邻接行归属明确时可命名；命名 Verify 仅在零消费者证明成立时可删除，换序复用相邻独立 Verify 的共享规则。
+
+**边界：** 不重写 DSL、不复制 Classic 语义、不开放跨 Producer ABI 写入、不改变 Runtime 行为。保留 Phase Input Binding 的原生菜单入口；不安全或存在未知引用的 Step 不出现相应修改动作。
+
+**验收：** [PR #108](https://github.com/odango-chan/ca-skill-studio-demo/pull/108) 已合并，merge commit `a08041446dd79c9cd8e143f682144cf037f1569b`。exact-head `0dbd9125a68e20ebedb5781ed6bc58c3089f1907` 的 IDE Host、Theia Browser-Only、Theia Browser Host / real Chromium 三组门禁全部 PASS；真实 Chromium 验证命名 Step 引用重命名及原生 Undo、Verify 命名及原生 Undo；Host 验证命名 Verify 安全删除。Runtime / 5GC / desktop VS Code GUI NOT_RUN。
+
+
+## 2026-11-10 · Theia Inspector Producer / Consumer Evidence（PR #111，待验收）
+
+**范围：** 原生 Evidence 树复用 Classic 的 `phase-dataflow.mjs`、`phase-consumer-contract.mjs` 与 `phase-evidence-copy.mjs`，显示选中 Node 的 Phase 输入来源、Producer 输出 Schema 证据、Consumer 输入字段/类型证据，以及每条绑定的未知原因和边界。Phase Step 行同时显示简短证据摘要。
+
+**数据与失效：** Evidence 使用 Package Audit 已读取的有界文件快照（最多 500 文件 / 4 MiB）；Procedure 或 Package 文件变更后立即失效旧快照，重新审计完成前只显示无 schema 的 Source 证据。不会把缺文件、未知类型或 TYPE_ONLY_MATCH 升级成 ABI PASS。
+
+**安全边界：** 这是只读证据，不授权任何 binding / Producer / Consumer 写入；`authorizedWrites` 固定为 0，Runtime 仍为 NOT_RUN。跨 Producer ABI 写入、effectful Step 结构变更与 owner Outcome 合约仍需单独定义和审查。
+
+**验收：** PR #111 exact HEAD `e189c3de40bb1f89302e255680ffbd9293b44d6e` 的四组门禁全部 PASS：IDE Host [#42761777293](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777293)、Theia Browser-Only [#42761777244](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777244)、Theia Browser Host / real Chromium [#42761777239](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777239)、PR Verify [#42761777251](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777251)。真实 Chromium 验证 Evidence 树展开并显示 Producer/Consumer 行、只读边界，以及原有 Phase Binding Undo、命名 Step / Verify、Node Focus、Route 和 Source 回归。PR 仍 OPEN，未合并、未部署 Pages；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
+

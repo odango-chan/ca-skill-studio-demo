@@ -24,6 +24,7 @@ import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
+  let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
 
@@ -541,9 +542,13 @@ export function registerWorkbench(vscode,context){
     const key=doc.uri.toString(),same=document?.uri.toString()===key;
     const text=doc.getText(),projected=same&&snapshot?.text===text?snapshot.model:null;
     const next=choice??(same?selection:selections.get(key)??{});
-    const changed=!same||snapshot?.text!==text||next.procedureId!==selection.procedureId||next.nodeId!==selection.nodeId;
+    const evidenceFiles=packageFilesUri===key&&packageFilesVersion===doc.version?packageFiles:null;
+    const evidenceStamp=evidenceFiles?doc.version:null;
+    const changed=!same||snapshot?.text!==text||next.procedureId!==selection.procedureId||
+      next.nodeId!==selection.nodeId||snapshot?.evidenceStamp!==evidenceStamp;
     if(!same){
       generation++;audit=[];diagnostics.clear();
+      packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
       predicateSnapshot=null;predicateGeneration++;
     }
     document=doc;selection=next;selections.set(key,next);
@@ -553,7 +558,7 @@ export function registerWorkbench(vscode,context){
       void refreshPredicateSnapshot(doc);
     }
     if(changed){
-      snapshot={...inspectionSnapshot(text,selection,projected),text};
+      snapshot={...inspectionSnapshot(text,selection,projected,evidenceFiles),text,evidenceStamp};
       bindingOptions=snapshot.model.state==='READY'&&selection.procedureId&&selection.nodeId
         ?phaseStepBindingOptions(text,selection.procedureId,selection.nodeId):[];
       fire();
@@ -586,6 +591,13 @@ export function registerWorkbench(vscode,context){
       if(ticket!==generation||document!==doc||doc.version!==version)return;
       audit=results.map(d=>({...d,uri:uris.get(d.path)??doc.uri}));
       auditStatus="Package Audit · "+(missing.length?"unavailable":audit.length+" editor warnings");diagnostics.clear();
+      if(!missing.length){
+        packageFiles=files;packageFilesUri=doc.uri.toString();packageFilesVersion=version;
+        update(doc);
+      }else{
+        packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
+        update(doc);
+      }
       for(const uri of new Set(audit.map(d=>d.uri))){
         diagnostics.set(uri,audit.filter(d=>d.uri===uri).map(d=>{
           const line=Math.max(0,d.line-1),diagnostic=new vscode.Diagnostic(new vscode.Range(line,0,line,1),d.message,vscode.DiagnosticSeverity.Warning);
@@ -593,9 +605,21 @@ export function registerWorkbench(vscode,context){
         }));
       }
       fire();
-    }catch(error){if(ticket!==generation)return;auditStatus='Package Audit · unavailable';audit=[{message:'Audit unavailable: '+error.message,line:1,uri:doc.uri}];diagnostics.clear();fire();}
+    }catch(error){
+      if(ticket!==generation)return;
+      packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
+      auditStatus='Package Audit · unavailable';
+      audit=[{message:'Audit unavailable: '+error.message,line:1,uri:doc.uri}];
+      diagnostics.clear();update(doc);fire();
+    }
   }
-  function scheduleAudit(){generation++;clearTimeout(timer);auditStatus="Package Audit · pending";audit=[];diagnostics.clear();timer=setTimeout(()=>void auditCurrent(),350);fire();}
+  function scheduleAudit(){
+    generation++;clearTimeout(timer);
+    packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
+    auditStatus="Package Audit · pending";audit=[];diagnostics.clear();
+    if(document)update(document);
+    timer=setTimeout(()=>void auditCurrent(),350);fire();
+  }
   context.subscriptions.push({dispose(){clearTimeout(timer);generation++;sessions.clear();selections.clear();}},
     vscode.commands.registerCommand('skillStudio.revealInspection',async item=>{
       if(!document||item.version!==document.version||

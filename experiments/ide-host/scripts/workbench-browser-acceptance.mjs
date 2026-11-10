@@ -163,6 +163,90 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   });
   if(!bindingSelection.result?.value?.node)throw Error('Could not select Phase binding Node');
   await sleep(250);
+  const skillStudioTab=await evalJS(`(()=>{
+    const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>
+      x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
+    const r=el?.getBoundingClientRect();
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
+      active:el.classList.contains('lm-mod-current')}:null;
+  })()`);
+  if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
+  if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
+  const evidenceHeader=await evalJS(`(()=>{
+    const candidates=[...document.querySelectorAll('*')].filter(x=>
+      x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
+      x.getBoundingClientRect().x>=0);
+    const el=candidates.sort((a,b)=>{
+      const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
+      return ar.width*ar.height-br.width*br.height;
+    })[0];
+    const r=el?.getBoundingClientRect();
+    const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
+      x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,needsOpen:!root}:null;
+  })()`);
+  if(!evidenceHeader)throw Error('Native Evidence view header is missing');
+  if(evidenceHeader.needsOpen){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
+  await invoke('skillStudio.auditPackage');
+  let phaseEvidenceText='';
+  for(let i=0;i<100;i++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
+    await sleep(100);
+  }
+  const dataflowTreeRow=await evalJS(`(()=>{
+    // TreeNode.innerText includes nested descendants. Inspect only each
+    // TreeNode's own content element so we expand the exact summary row.
+    const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{
+      const content=[...node.children].find(child=>
+        child.classList?.contains('theia-TreeNodeContent'));
+      return {node,content,text:content?.innerText?.trim()??''};
+    }).filter(row=>row.text.includes('Producer / Consumer dataflow')&&
+      row.content?.getBoundingClientRect().height>0);
+    const row=rows[0];
+    // The evidence view is below the large Inspector/Outline trees in the
+    // default layout. A non-zero rect can still be outside the viewport.
+    row?.content?.scrollIntoView({block:'center',inline:'nearest'});
+    const r=row?.content?.getBoundingClientRect();
+    return r?{x:r.x+12,y:r.y+r.height/2,
+      expanded:row.node.getAttribute('aria-expanded')==='true',
+      rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
+      candidateCount:rows.length}:null;
+  })()`);
+  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing');
+  if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
+  for(let i=0;i<50;i++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(phaseEvidenceText.includes('Consumer ABI'))break;
+    await sleep(100);
+  }
+  const phaseEvidence={
+    ready:phaseEvidenceText.includes('Producer / Consumer dataflow')&&
+      phaseEvidenceText.includes('Consumer ABI'),
+    dataflowRows:(phaseEvidenceText.match(/Producer \/ Consumer dataflow/g)||[]).length,
+    consumerAbiRows:(phaseEvidenceText.match(/Consumer ABI/g)||[]).length,
+    readOnly:phaseEvidenceText.includes('no write authority')
+  };
+  if(!phaseEvidence.ready||!phaseEvidence.dataflowRows||!phaseEvidence.consumerAbiRows||
+     !phaseEvidence.readOnly)
+    throw Error('Native Evidence view did not render bounded read-only Producer / Consumer evidence: '+
+      JSON.stringify({phaseEvidence,dataflowTreeRow})+' · '+phaseEvidenceText.slice(-1400));
+  console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify(phaseEvidence));
+  // Expanding the native Evidence tree moves focus away from the editor. Open
+  // the authoritative Source editor before testing native Undo so the host's
+  // undo command is bound to the edited TextDocument, not the tree widget.
+  await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,awaitPromise:true,
+    expression:`document.querySelector('#openSource')?.click();true`
+  });
+  await sleep(600);
+  const sourceEditorReady=await evalJS(`({
+    monacoEditors:document.querySelectorAll('.monaco-editor').length,
+    activeText:document.activeElement?.closest('.monaco-editor')!==null
+  })`);
+  if(!(sourceEditorReady.monacoEditors>0))
+    throw Error('Native Source editor did not open before Phase binding Undo regression: '+
+      JSON.stringify(sourceEditorReady));
   const beforeBinding=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
@@ -348,6 +432,9 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes],
     identity:[insertedPresent,deletedPresent,restoredInsertPresent,originalAbsent]
   }));
+  // Return the native Explorer to the foreground: the evidence acceptance
+  // opened the Skill Studio Activity Bar and intentionally kept it selected.
+  await invoke('workbench.files.action.focusFilesExplorer');
   // Safe Markdown uses the actual native source document and shared renderer.
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
@@ -374,5 +461,5 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
+  return {views:true,packageAudit:true,phaseEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
 }

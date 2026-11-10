@@ -15,6 +15,35 @@ test('Inspection preserves Classic node/phase/route source identity; unknown syn
   assert.ok(selected.inspection.some(x=>x.label==='preconditions'&&x.children.length===5));
   assert.ok(selected.evidence.some(x=>x.label.includes('Runtime NOT_RUN')));
   assert.ok(selected.inspection.every(x=>x.line>0));
+  assert.ok(selected.dataflow.bindings.length>0,'selected Node exposes source-resolved Phase dependencies');
+  assert.equal(selected.consumerContracts.summary.authorizedWrites,0,
+    'read-only Evidence never grants ABI write authority');
+  const script=readFileSync(root+'scripts/select_establishment_configuration.py','utf8');
+  const schemas=new Map([
+    ['scripts/select_establishment_configuration.py',{text:script}],
+    ['schemas/EstablishmentSelectionInput.schema.yaml',{text:`title: EstablishmentSelectionInput
+type: object
+required: [dnn, slice, plmn, ingress-ref, lifecycle-ref, requested-type, requested-ssc, udmResult]
+properties:
+  dnn: {type: string}
+  slice: {type: object}
+  plmn: {type: object}
+  ingress-ref: {type: string}
+  lifecycle-ref: {type: string}
+  requested-type: {type: string}
+  requested-ssc: {type: integer}
+  udmResult: {type: object}
+`}]
+  ]);
+  const typed=inspectionSnapshot(source,{procedureId:proc.name,nodeId:'nudm-sdm-subscribe'},null,schemas);
+  assert.ok(typed.consumerContracts.bindings.some(x=>x.typeRelation==='TYPE_ONLY_MATCH'),
+    'Evidence distinguishes declared type-only matches from full ABI proof');
+  assert.ok(typed.consumerContracts.bindings.some(x=>x.typeRelation==='PRODUCER_TYPE_UNAVAILABLE'),
+    'Evidence keeps unknown producer output types explicit');
+  const flow=typed.evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
+  assert.ok(flow?.children.some(x=>x.label.includes('Consumer ABI')));
+  assert.ok(flow.children.every(x=>!x.writeAuthorized),
+    'dataflow evidence rows remain read-only');
   const invalid=inspectionSnapshot('procedures: [invalid]');
   assert.equal(invalid.model.state,'UNAVAILABLE');assert.equal(invalid.outline.length,0);assert.ok(invalid.problems.length);
 });
@@ -271,6 +300,13 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   await commands.get('skillStudio.auditPackage')();
   assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/editor warnings/);
   assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
+  const evidence=providers.get('skillStudio.evidence').getChildren();
+  assert.ok(evidence[0].label.includes('no write authority'));
+  const dataflow=evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
+  assert.ok(dataflow,'bounded Package Audit hydrates selected-Node dataflow evidence');
+  assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
+  assert.match(dataflow.description,/no write authorization/);
+  assert.ok(dataflow.children.some(x=>x.label.includes('Source lineage')));
   doc.text='# Preview title\n<script>alert(1)</script>';
   await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));
   assert.match(panels[0].webview.html,/Content-Security-Policy/);
