@@ -20,6 +20,7 @@ test("Theia online target is a real backend-free 1.76 browser-only app",()=>{
   assert.equal(app.scripts.build,"theia build --mode production");
 });
 test("Theia plugin is the exact Web extension, with native editor + view contributions",()=>{
+  const app=JSON.parse(readFileSync(join(root,"package.json"),"utf8"));
   const plugin=JSON.parse(readFileSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike/package.json"),"utf8"));
   assert.ok(plugin.browser?.endsWith("extension-theia.js"));
   const editorViews=new Set(plugin.contributes.customEditors.map(x=>x.viewType));
