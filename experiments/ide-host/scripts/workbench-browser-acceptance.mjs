@@ -764,8 +764,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       "})()"
     ].join("\n"));
     if(!nativeEdit?.nativePythonEditing||!nativeEdit?.workerUnavailable||
-       !nativeEdit.restored||nativeEdit.status!=="SKILL LSP: UNAVAILABLE")
-      throw Error("L2-D4 native editor failed after Worker termination: "+
+       !nativeEdit.restored||nativeEdit.status!=="SKILL LSP: UNAVAILABLE"||
+       !/health request timed out|connection closed|stopped unexpectedly|crashed|could not be decoded/i.test(nativeEdit.failureReason??""))
+      throw Error("L2-D4 native editor or real transport-failure evidence missing: "+
         JSON.stringify(nativeEdit));
     workerFailureEvidence={workerTarget:terminated.scriptUri,
       transportUnavailable:true,nativeEditing:nativeEdit};
