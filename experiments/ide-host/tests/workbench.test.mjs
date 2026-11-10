@@ -73,22 +73,32 @@ test('Inspection exposes only Classic-qualified same-producer output reference n
   assert.ok(current.inspection.every(p=>p.children.every(s=>
     s.children.every(x=>x.kind!=='phase-output-reference'))),
     'UDM Subscribe sample does not expose unsupported output-reference actions');
-  // The current published Package also contains a real, eligible pair.
-  // PCF's N4-baseline Verify consumes an earlier PCF-create-inputs output;
-  // both local and fully-qualified spellings occur in the same Procedure.
-  const live=inspectionSnapshot(source,{
+  // The PCF candidate is observed but not executable: converting its last
+  // local occurrence would remove Classic's required dual-form evidence.
+  const pcf=inspectionSnapshot(source,{
     procedureId,nodeId:'npcf-sm-policy-control-create'
   });
+  const pcfPhase=pcf.inspection.find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const pcfStep=pcfPhase?.children.find(x=>x.kind==='phase-step'&&x.stepIndex===4);
+  assert.ok(pcfStep,'PCF baseline Verify Step remains visible');
+  assert.ok(!pcfStep.children.some(x=>x.kind==='phase-output-reference'&&
+    x.bindingKey==='pcfPolicyAssociationRef'),
+    'native Inspector must hide candidates rejected by Classic preview');
+  // The published AMF node has multiple local occurrences plus a qualified
+  // form, so normalizing one Verify binding remains reprovable.
+  const live=inspectionSnapshot(source,{
+    procedureId,nodeId:'namf-communication-n1n2-message-transfer'
+  });
   const livePhase=live.inspection.find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
-  const liveStep=livePhase?.children.find(x=>x.kind==='phase-step'&&x.stepIndex===4);
+  const liveStep=livePhase?.children.find(x=>x.kind==='phase-step'&&x.stepIndex===1);
   const liveRef=liveStep?.children.find(x=>x.kind==='phase-output-reference'&&
-    x.bindingKey==='pcfPolicyAssociationRef');
-  assert.ok(liveRef,'current published sample contains a safe output-reference candidate');
+    x.bindingKey==='operationContextRef');
+  assert.ok(liveRef,'published AMF sample contains a reversible output-reference candidate');
   assert.deepEqual(liveRef.choices,[
-    'preconditions.resolve-pcf-create-inputs.output.pcfPolicyAssociationRef',
-    'npcf-sm-policy-control-create.preconditions.resolve-pcf-create-inputs.output.pcfPolicyAssociationRef'
+    'preconditions.resolve-effective-session-configuration.output.contextRef',
+    'namf-communication-n1n2-message-transfer.preconditions.resolve-effective-session-configuration.output.contextRef'
   ]);
-  assert.equal(liveRef.producerStep,'resolve-pcf-create-inputs');
+  assert.equal(liveRef.producerStep,'resolve-effective-session-configuration');
 });
 
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
