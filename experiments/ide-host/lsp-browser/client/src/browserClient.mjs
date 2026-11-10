@@ -6,11 +6,29 @@ export const ANALYSIS_STATUS_NOTIFICATION = "skillStudio/analysisStatus";
 export const SERVER_ERROR_NOTIFICATION = "skillStudio/serverError";
 
 /** Browser-only client. The Theia/VS Code extension host owns all workspace IO. */
+function workerResourceUrl(uri) {
+  const value = uri.toString(true);
+  const path = globalThis.location?.pathname ?? "";
+  if (!path.endsWith("/plugin-worker.js") ||
+      (uri.scheme !== "http" && uri.scheme !== "https")) return value;
+  const base = path.slice(0, -"/plugin-worker.js".length);
+  if (!base) return value;
+  try {
+    const origin = globalThis.location.origin;
+    const parsed = new URL(value, origin);
+    if (parsed.origin !== origin || !parsed.pathname.startsWith("/hostedPlugin/"))
+      return value;
+    return base + parsed.pathname + parsed.search + parsed.hash;
+  } catch {
+    return value;
+  }
+}
+
 export function createSkillLanguageClient(vscode, context, handlers = {}) {
   const serverUri = vscode.Uri.joinPath(
     context.extensionUri, "dist", "skill-language-server.js"
   );
-  const worker = new Worker(serverUri.toString(true), {
+  const worker = new Worker(workerResourceUrl(serverUri), {
     name: "skill-studio-language-server"
   });
   const output = vscode.window.createOutputChannel("Skill Studio · Language Service");
