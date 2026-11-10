@@ -40,21 +40,23 @@ const contractUri=makeUri(root+"/assurance/contract.yaml");
 const predicatesUri=makeUri(root+"/assurance/predicates.yaml");
 const pythonUri=makeUri(root+"/scripts/prepare.py");
 const jsonUri=makeUri(root+"/schemas/request.json");
+const unsavedNewUri=makeUri(root+"/scripts/new-unsaved.py");
 function openDoc(uri,text,version){return {uri,version,getText:()=>text,isDirty:true};}
 
 test("Package snapshot keeps exact root, required files, language ids and unsaved text",async()=>{
   const openProcedure=openDoc(procedureUri,"procedures: {unsaved: true}\n",9);
   const openPython=openDoc(pythonUri,"def unsaved(): pass\n",3);
+  const openNew=openDoc(unsavedNewUri,"def notYetSaved(): pass\\n",1);
   const vscode=makeVscode({
     files:[procedureUri,contractUri,predicatesUri,pythonUri,jsonUri],
-    open:[openProcedure,openPython]
+    open:[openProcedure,openPython,openNew]
   });
   const snapshot=await collectPackageSnapshot(vscode,openProcedure,12);
   assert.equal(snapshot.rootUri,"file://"+root);
   assert.equal(snapshot.packageName,"my-skill");
   assert.equal(snapshot.generation,12);
   assert.equal(snapshot.completeness,"complete");
-  assert.equal(snapshot.documents.length,5);
+  assert.equal(snapshot.documents.length,6);
   const byPath=new Map(snapshot.documents.map(x=>[x.relativePath,x]));
   assert.equal(byPath.get("assurance/procedure.yaml").text,"procedures: {unsaved: true}\n");
   assert.equal(byPath.get("assurance/procedure.yaml").version,9);
@@ -62,6 +64,8 @@ test("Package snapshot keeps exact root, required files, language ids and unsave
   assert.equal(byPath.get("scripts/prepare.py").text,"def unsaved(): pass\n");
   assert.equal(byPath.get("assurance/contract.yaml").version,0);
   assert.equal(byPath.get("schemas/request.json").languageId,"json");
+  assert.equal(byPath.get("scripts/new-unsaved.py").text,"def notYetSaved(): pass\\n");
+  assert.equal(byPath.get("scripts/new-unsaved.py").version,1);
 });
 
 test("Package file enumeration over limit is partial and prioritizes required assurance files",async()=>{
