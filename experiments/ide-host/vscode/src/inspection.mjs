@@ -3,7 +3,8 @@ import {phaseStepDependencyReport} from '../../../../site/phase-dataflow.mjs';
 import {phaseConsumerContractReport} from '../../../../site/phase-consumer-contract.mjs';
 import {phaseStepEvidenceSummary,bindingEvidenceExplanation}
   from '../../../../site/phase-evidence-copy.mjs';
-import {phaseOutputReferenceOptions} from '../../../../site/phase-output-refs.mjs';
+import {phaseOutputReferenceOptions,previewPhaseOutputReference}
+  from '../../../../site/phase-output-refs.mjs';
 
 // UI adapter only: every fact below comes from Classic's source projection.
 const row=(label,line,children=[],extra={})=>({label,line,children,...extra});
@@ -23,7 +24,20 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
   const contractFor=binding=>consumerContracts?.bindings.find(x=>sameBinding(x,binding))??null;
   const stepEvidence=(phaseName,stepIndex)=>
     phaseStepEvidenceSummary(phaseName,stepIndex,dataflow,consumerContracts);
-  const outputReferences=node?phaseOutputReferenceOptions(text,procedure.name,node.id):[];
+  // Classic candidate discovery may find two historically observed spellings
+  // even when replacing the last occurrence would remove the proof required
+  // by its own Preview revalidation. Never advertise a native edit that the
+  // shared Source planner would reject.
+  const outputReferences=node?phaseOutputReferenceOptions(text,procedure.name,node.id)
+    .filter(reference=>reference.choices.some(value=>{
+      if(value===reference.value)return false;
+      try{
+        previewPhaseOutputReference(text,procedure.name,node.id,
+          reference.phaseName,reference.stepIndex,reference.bindingKey,value);
+        return true;
+      }catch{return false;}
+    })):[];
+
   const outputReferencesFor=(phaseName,stepIndex)=>outputReferences.filter(x=>
     x.phaseName===phaseName&&x.stepIndex===stepIndex);
   const outline=[...model.procedures.values()].map(p=>row(p.name,p.nodes[0]?.line??1,
