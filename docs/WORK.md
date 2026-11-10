@@ -191,4 +191,4 @@ main browser application remains available at `/classic/`.
 
 **删除边界：** 仅开放两种已有 Classic profile：同状态 Terminal 合并到另一个 Terminal；或无 Phase/Child、恰有一个 Operator 出口的 Node bypass 到唯一出口目标。删除前由共享模块检查全部入站 Route 与其他引用；所有删除/重定向 spans 通过一次 WorkspaceEdit 提交。Start、Phase-bearing、Child Procedure、多出口及存在外部引用的 Node 不显示删除操作。
 
-**安全与验收：** 所有操作均要求当前 TextDocument revision、精确 Diff、用户显式确认、宿主重算 Patch 与原生 Undo。Host 测试覆盖取消、过期选择、两 span 原子编辑及不可删除 Node；真实 Chromium 验收覆盖插入、删除、Route 修复和两次 Undo。PR #98 exact-head CI 待验；Runtime / 5GC / desktop VS Code GUI NOT_RUN。Classic 保持完整。
+**安全与验收：** 所有操作均要求当前 TextDocument revision、精确 Diff、用户显式确认、宿主重算 Patch 与原生 Undo。Host 测试覆盖取消、过期选择、两 span 原子编辑及不可删除 Node；真实 Chromium 验收覆盖插入、删除、Route 修复和两次 Undo。PR #98 exact head `93a80fb` 的 IDE Host、Theia Browser-Only、Theia Browser Host、PR Verify 均 PASS；Browser Host 首次运行在既有 Package Audit 等待点偶发超时，failed-job rerun attempt 2 PASS；Runtime / 5GC / desktop VS Code GUI NOT_RUN。Classic 保持完整。
