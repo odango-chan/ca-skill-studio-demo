@@ -282,11 +282,24 @@ export function registerWorkbench(vscode,context){
               String(languageStatusItem.tooltip??""));
           await new Promise(resolve=>setTimeout(resolve,50));
         }
-        if(!readyForCurrentGeneration())
+        if(!readyForCurrentGeneration()){
+          // An asynchronous open may expose a genuinely incomplete Package.
+          // Capture the exact current snapshot without retrying or treating
+          // PARTIAL as READY. This is failure evidence, never a bypass.
+          const failedSnapshot=await collectPackageSnapshot(vscode,
+            procedureDocument,packageState.generation);
           throw Error("Current Package generation did not reach SKILL LSP: READY: "+
             JSON.stringify({expectedGeneration,actualGeneration:packageState.generation,
               status:languageStatusItem?.text??"missing",
-              tooltip:languageStatusItem?.tooltip??""}));
+              tooltip:languageStatusItem?.tooltip??"",
+              snapshotCompleteness:failedSnapshot.completeness,
+              snapshotReason:failedSnapshot.reason??null,
+              files:failedSnapshot.documents.map(item=>({
+                path:item.relativePath,version:item.version,chars:item.text.length
+              })).filter(item=>item.path.startsWith("assurance/")||
+                item.path.endsWith("select_establishment_configuration.py"))
+            }));
+        }
         const referencePosition=new vscode.Position(nameLine,"# name: ".length);
         const referenceResult=await vscode.commands.executeCommand(
           "vscode.executeReferenceProvider",scriptUri,referencePosition);
