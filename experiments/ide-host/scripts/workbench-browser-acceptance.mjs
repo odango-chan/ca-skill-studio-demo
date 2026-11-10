@@ -568,6 +568,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!evidenceTreeState?.rootPresent)
     throw Error('Native Evidence tree root did not appear after refresh: '+
       JSON.stringify(evidenceTreeState));
+  let phaseEvidenceText='';
   for(let i=0;i<100;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
     if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
@@ -611,7 +612,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after scoped readiness wait: '+
     JSON.stringify({evidenceHeader,evidenceTreeState,evidenceRows,
       bodyTail:(await evalJS('document.body.innerText')).slice(-1600)}));
-  let phaseEvidenceText='';
   if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
   for(let i=0;i<50;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
