@@ -282,11 +282,24 @@ export function registerWorkbench(vscode,context){
               String(languageStatusItem.tooltip??""));
           await new Promise(resolve=>setTimeout(resolve,50));
         }
-        if(!readyForCurrentGeneration())
+        if(!readyForCurrentGeneration()){
+          // An asynchronous open may expose a genuinely incomplete Package.
+          // Capture the exact current snapshot without retrying or treating
+          // PARTIAL as READY. This is failure evidence, never a bypass.
+          const failedSnapshot=await collectPackageSnapshot(vscode,
+            procedureDocument,packageState.generation);
           throw Error("Current Package generation did not reach SKILL LSP: READY: "+
             JSON.stringify({expectedGeneration,actualGeneration:packageState.generation,
               status:languageStatusItem?.text??"missing",
-              tooltip:languageStatusItem?.tooltip??""}));
+              tooltip:languageStatusItem?.tooltip??"",
+              snapshotCompleteness:failedSnapshot.completeness,
+              snapshotReason:failedSnapshot.reason??null,
+              files:failedSnapshot.documents.map(item=>({
+                path:item.relativePath,version:item.version,chars:item.text.length
+              })).filter(item=>item.path.startsWith("assurance/")||
+                item.path.endsWith("select_establishment_configuration.py"))
+            }));
+        }
         const referencePosition=new vscode.Position(nameLine,"# name: ".length);
         const referenceResult=await vscode.commands.executeCommand(
           "vscode.executeReferenceProvider",scriptUri,referencePosition);
@@ -400,6 +413,10 @@ export function registerWorkbench(vscode,context){
           if(languageDiagnosticAcceptance.has(key))
             throw Error("A live diagnostic acceptance is already active for this Procedure");
           const initialDocument=await vscode.workspace.openTextDocument(procedureUri);
+          const persistedInitial=new TextDecoder("utf-8",{fatal:true}).decode(
+            await vscode.workspace.fs.readFile(procedureUri));
+          if(initialDocument.isDirty||persistedInitial!==initialDocument.getText())
+            throw Error("L2-D2 requires a clean Procedure Source baseline");
           const packageRoot=packageRootForProcedure(vscode,initialDocument);
           const packageState=packageRoot?languagePackages.get(packageRoot.uri.toString()):null;
           if(!packageState)throw Error("Procedure Package has no active Language Service state");
@@ -459,11 +476,27 @@ export function registerWorkbench(vscode,context){
             const repaired=await waitForGeneration(state,beforeRepair,"READY",
               diagnostics=>lspProcedureDiagnostics(diagnostics).length===0,
               "Live Procedure diagnostic clear after repair");
-            if(currentDocument()?.getText()!==state.original)
+            const restoredDocument=currentDocument();
+            if(restoredDocument?.getText()!==state.original)
               throw Error("Procedure Source was not restored byte-for-byte after diagnostic acceptance");
+            // Theia can retain a dirty editor backup after a second WorkspaceEdit;
+            // opening another native editor then reloading may resurrect stale
+            // malformed YAML. Clean ONLY the original restored text, never the
+            // diagnostic test mutation, before another editor takes focus.
+            const diskBeforeClean=new TextDecoder("utf-8",{fatal:true}).decode(
+              await vscode.workspace.fs.readFile(procedureUri));
+            const cleanupSaved=restoredDocument.isDirty||diskBeforeClean!==state.original;
+            if(cleanupSaved&&!await restoredDocument.save())
+              throw Error("Native Procedure cleanup save was rejected");
+            const diskAfterClean=new TextDecoder("utf-8",{fatal:true}).decode(
+              await vscode.workspace.fs.readFile(procedureUri));
+            if(restoredDocument.isDirty||diskAfterClean!==state.original)
+              throw Error("Native Procedure persisted Source/dirty state was not restored");
             return {
               phase:"repair",cleared:true,restored:true,
-              generation:repaired.generation,packageAuditDuplicates:0
+              generation:repaired.generation,packageAuditDuplicates:0,
+              originalDiskRestored:true,cleanupSaved,
+              persistedDriftObserved:diskBeforeClean!==state.original
             };
           }finally{
             languageDiagnosticAcceptance.delete(key);
@@ -749,7 +782,25 @@ export function registerWorkbench(vscode,context){
     const options=phaseVerifyAddOptions(ctx.source,ctx.procedureId,ctx.nodeId,
       predicates.predicateSource,predicates.skillName);
     const phase=options.find(x=>x.phaseName===item.phaseName);
-    if(!phase)throw Error("Selected Phase has no safe Verify append anchor or available PredicateSet entry");
+    if(!phase){
+      // Diagnostic-only: preserve the structural editer's fail-closed decision
+      // while reporting which source/predicate precondition disqualified it.
+      let detail="unknown";
+      try{
+        previewAddPhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
+          item.phaseName,typeof predicate==="string"?predicate:"createdsession.n4.initial_resources_ready",
+          predicates.predicateSource,predicates.skillName);
+        detail="unexpected preview eligible";
+      }catch(error){detail=String(error?.message??error);}
+      console.warn("STUDIO_PHASE_VERIFY_INELIGIBLE",JSON.stringify({
+        documentVersion:ctx.doc.version,isDirty:ctx.doc.isDirty,
+        sourceBytes:ctx.source.length,
+        predicateBytes:predicates.predicateSource?.length??null,
+        skillName:predicates.skillName,phase:item.phaseName,
+        procedureId:ctx.procedureId,nodeId:ctx.nodeId,detail
+      }));
+      throw Error("Selected Phase has no safe Verify append anchor or available PredicateSet entry");
+    }
     let value=predicate;
     if(typeof value!=="string"){
       const picked=await vscode.window.showQuickPick(phase.choices,{
