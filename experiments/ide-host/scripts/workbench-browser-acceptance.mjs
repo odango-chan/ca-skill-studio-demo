@@ -110,6 +110,56 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   await sleep(500);
   const warm=await graph(),warmTiming=JSON.parse(warm?.timing??'null');
   if(!initialTiming||!warmTiming?.cacheHit)throw Error('Version-scoped warm layout cache was not exercised: '+JSON.stringify({initialTiming,warmTiming}));
+  // Export the complete imported Package through the native host snapshot and
+  // require a second explicit browser gesture to download the generated ZIP.
+  await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,awaitPromise:true,
+    expression:`document.querySelector('#exportPackageZip')?.click();true`
+  });
+  let packageReady=null;
+  for(let i=0;i<60;i++){
+    packageReady=await command('Runtime.evaluate',{
+      contextId:graphContext,returnByValue:true,
+      expression:`({
+        visible:!document.querySelector('#zipExportNotice')?.hidden,
+        details:document.querySelector('#zipExportDetails')?.textContent??''
+      })`
+    });
+    if(packageReady.result?.value?.visible)break;
+    await sleep(100);
+  }
+  if(!packageReady.result?.value?.visible||
+     !packageReady.result.value.details.includes('.zip')||
+     !packageReady.result.value.details.includes('个文件'))
+    throw Error('Native Package ZIP export did not prepare a bounded browser download: '+
+      JSON.stringify(packageReady.result?.value));
+  const packageZip=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,awaitPromise:true,
+    expression:`(()=>{
+      let blobMeta=null,linkMeta=null;
+      const create=URL.createObjectURL,click=HTMLAnchorElement.prototype.click;
+      URL.createObjectURL=function(blob){
+        blobMeta={size:blob.size,type:blob.type};return create.call(URL,blob);
+      };
+      HTMLAnchorElement.prototype.click=function(){
+        linkMeta={download:this.download,href:this.href};
+      };
+      document.querySelector('#downloadPackageZip').click();
+      URL.createObjectURL=create;
+      HTMLAnchorElement.prototype.click=click;
+      return {blobMeta,linkMeta,noticeHidden:document.querySelector('#zipExportNotice')?.hidden};
+    })()`
+  });
+  const zipEvidence=packageZip.result?.value;
+  if(!(zipEvidence?.blobMeta?.size>22)||
+     zipEvidence.blobMeta.type!=='application/zip'||
+     !zipEvidence.linkMeta?.download?.endsWith('.zip')||
+     !zipEvidence.linkMeta.href.startsWith('blob:')||
+     !zipEvidence.noticeHidden)
+    throw Error('Native Package ZIP download did not produce a browser Blob: '+
+      JSON.stringify(zipEvidence));
+  patchEvidence.packageZip={details:packageReady.result.value.details,...zipEvidence};
+  console.log('STUDIO_PACKAGE_ZIP_CHROMIUM',JSON.stringify(patchEvidence.packageZip));
   // The Theia canvas now defaults to Classic's proven success-path focus.
   // This Inspector structural-edit regression deliberately needs all 17
   // source-declared Nodes so its 17→18→17 assertions remain meaningful.
