@@ -73,11 +73,21 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
   await invoke('skillStudio.refreshInspection');
-  const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-  if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
-  await click(activity.x,activity.y);await sleep(500);
-  const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
-  for(const name of ['Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
+  // Skill Studio views live inside the native Explorer container; do not
+  // create a competing Activity Bar. Distinguish our semantic Procedure
+  // Outline from Theia's built-in document-symbol Outline.
+  const views=await evalJS(`(()=>{
+    const headers=[...document.querySelectorAll('.theia-view-container-part-header')]
+      .map(x=>x.textContent.trim()).filter(Boolean);
+    const skillStudioTab=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]
+      .some(x=>x.textContent.trim()==='Skill Studio');
+    return {text:document.body.innerText,headers,trees:document.querySelectorAll('.theia-Tree').length,skillStudioTab};
+  })()`);
+  for(const name of ['SKILL Inspector','Procedure Outline','Evidence','Problems'])
+    if(!views.text.toLowerCase().includes(name.toLowerCase()))
+      throw Error('Native Explorer-contributed view missing: '+name+' · '+JSON.stringify(views.headers));
+  if(views.skillStudioTab)
+    throw Error('A separate Skill Studio Activity Bar container must not compete with Explorer');
   const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
   console.log('STUDIO_PROBLEMS_HEADERS',JSON.stringify(problemHeaderDiagnostics));
