@@ -12,10 +12,12 @@ const pcfOutcomeLine=publishedProcedure.slice(0,
 export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
   if (!requireEditor) return {required:false};
   const click=async(x,y)=>{
-    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,buttons:0});
     await sleep(80);
-    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:1});
-    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:1});
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',buttons:1,clickCount:1});
+    await sleep(60);
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1});
+    await sleep(80);
   };
   const invoke=async(id,...args)=>{
     const expression="(async()=>{const c=window.theia.container;"+
