@@ -33,6 +33,7 @@ export function registerWorkbench(vscode,context){
   const languagePackageGenerations=new Map();
   const languagePackageStatuses=new Map();
   let languageRecoveryPromise=null;
+  let languageClientEpoch=0;
   let languageClient=null,languageClientPromise=null,languageClientFailureShown=false,
     languageStatusItem=null,languageTransportFailure=null;
   function updateLanguageStatus(state,detail){
@@ -64,8 +65,10 @@ export function registerWorkbench(vscode,context){
         let candidate=null;
         try{
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
+          const epoch=++languageClientEpoch;
           candidate=createSkillLanguageClient(vscode,context,{
             onStatus:status=>{
+              if(epoch!==languageClientEpoch)return;
               const state=languagePackages.get(status?.rootUri);
               // Ignore delayed notifications from an old Package generation.
               if(!state||state.disposed||status.generation!==state.generation)return;
@@ -83,11 +86,12 @@ export function registerWorkbench(vscode,context){
               );
             },
             onError:error=>{
+              if(epoch!==languageClientEpoch)return;
               console.warn("Skill Studio Language Service",error);
               updateLanguageStatus("ERROR",String(error?.message??error));
             },
             onFatal:error=>{
-              if(languageTransportFailure)return;
+              if(epoch!==languageClientEpoch||languageTransportFailure)return;
               languageTransportFailure=String(error?.message??error??"Worker failed");
               updateLanguageStatus("UNAVAILABLE",languageTransportFailure);
               if(!languageClientFailureShown){
@@ -235,6 +239,9 @@ export function registerWorkbench(vscode,context){
       if(!languageClient&&languageClientPromise){
         try{await languageClientPromise;}catch{/* failed candidate is cleaned by ensureLanguageClient */}
       }
+      // Any late notification from the old Worker is invalid once recovery
+      // begins, even if the SDK completes its stop handshake afterward.
+      ++languageClientEpoch;
       const failedClient=languageClient;
       languageClient=null;
       languageClientPromise=null;
@@ -271,9 +278,12 @@ export function registerWorkbench(vscode,context){
       updateLanguageStatus(partial?"PARTIAL":"READY",
         "Language Worker recovered · "+packages.length+" active Package(s) rehydrated");
       return {recovered:true,packages};
-    })().catch(async error=>{
+    })().catch(error=>{
       const reason=String(error?.message??error);
-      if(!languageTransportFailure)updateLanguageStatus("ERROR",reason);
+      // A failed manual restart is terminal; no edit/open event may
+      // implicitly spin up another Worker until the user requests retry.
+      languageTransportFailure="Language Worker recovery failed: "+reason;
+      updateLanguageStatus("UNAVAILABLE",languageTransportFailure);
       console.warn("Skill Studio Language Worker recovery failed",error);
       return {recovered:false,reason};
     }).finally(()=>{
