@@ -954,7 +954,7 @@ export function registerWorkbench(vscode,context){
           // Theia's workspace folder can BE the Package A root. Use the
           // parent of that exact root so B is a true sibling, not a nested
           // subdirectory enumerated into A's Package snapshot.
-          const sourcePath=sourceRoot.uri.path.replace(/\\/$/,"");
+          const sourcePath=sourceRoot.uri.path.replace(/\/$/,"");
           const parentPath=sourcePath.slice(0,sourcePath.lastIndexOf("/"))||"/";
           const parentUri=sourceRoot.uri.with({path:parentPath});
           const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
