@@ -290,15 +290,31 @@ export function registerWorkbench(vscode,context){
         const symbols=Array.isArray(symbolResult)?symbolResult:[];
         if(!symbols.some(item=>item.name==="main"))
           throw Error("Python Document Symbols did not include main()");
+        const schemaPosition=new vscode.Position(schemaLine,scriptLines[schemaLine].length);
+        const schemaHoverResult=await vscode.commands.executeCommand(
+          "vscode.executeHoverProvider",scriptUri,
+          new vscode.Position(schemaLine,"# inputSchema: ".length+4));
+        const schemaHoverText=(Array.isArray(schemaHoverResult)?schemaHoverResult:
+          schemaHoverResult?[schemaHoverResult]:[]).flatMap(item=>
+            Array.isArray(item?.contents)?item.contents:[item?.contents])
+          .map(item=>typeof item==="string"?item:item?.value??String(item??""))
+          .join(" ");
         const completionResult=await vscode.commands.executeCommand(
-          "vscode.executeCompletionItemProvider",scriptUri,
-          new vscode.Position(schemaLine,scriptLines[schemaLine].length));
+          "vscode.executeCompletionItemProvider",scriptUri,schemaPosition);
         const completions=Array.isArray(completionResult)?completionResult:
           completionResult?.items??[];
         const labels=completions.map(item=>
           typeof item.label==="string"?item.label:item.label?.label??"");
         if(!labels.includes("EstablishmentSelectionInput"))
-          throw Error("Schema Completion did not return the unique Package title");
+          throw Error("Schema Completion did not return the unique Package title: "+
+            JSON.stringify({labels,completionResultType:typeof completionResult,
+              completionResultKeys:completionResult&&typeof completionResult==="object"?
+                Object.keys(completionResult):[],
+              schemaHoverText,scriptLanguage:scriptDocument.languageId,
+              schemaLineText:scriptLines[schemaLine],schemaLine,schemaPosition,
+              packageGeneration:packageState.generation,
+              languageStatus:languageStatusItem?.text??"missing",
+              languageTooltip:languageStatusItem?.tooltip??""}));
         return {
           definition:scriptPath,
           hover:hovers.length,
