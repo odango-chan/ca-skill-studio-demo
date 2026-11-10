@@ -950,15 +950,22 @@ export function registerWorkbench(vscode,context){
             throw Error("L2-D4b Package lifecycle probe is already active");
           const procedure=await vscode.workspace.openTextDocument(procedureUri);
           const sourceRoot=packageRootForProcedure(vscode,procedure);
-          const workspaceRoot=vscode.workspace.workspaceFolders?.[0]?.uri;
-          if(!sourceRoot||!workspaceRoot)
-            throw Error("L2-D4b source Package or workspace root is missing");
+          if(!sourceRoot)throw Error("L2-D4b source Package root is missing");
+          // Theia's workspace folder can BE the Package A root. Use the
+          // parent of that exact root so B is a true sibling, not a nested
+          // subdirectory enumerated into A's Package snapshot.
+          const sourcePath=sourceRoot.uri.path.replace(/\\/$/,"");
+          const parentPath=sourcePath.slice(0,sourcePath.lastIndexOf("/"))||"/";
+          const parentUri=sourceRoot.uri.with({path:parentPath});
           const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
           const packageBContainer=vscode.Uri.joinPath(
-            workspaceRoot,"skill-studio-l2d4b-"+suffix);
+            parentUri,"skill-studio-l2d4b-"+suffix);
           // Keep the leaf Package name equal to the copied SKILL/contract name.
           const packageBRoot=vscode.Uri.joinPath(
             packageBContainer,"establish-pdu-session");
+          if(languagePackageContains(sourceRoot.uri,packageBRoot)||
+             languagePackageContains(packageBRoot,sourceRoot.uri))
+            throw Error("L2-D4b requires two non-nested Package roots");
           const fs=vscode.workspace.fs;
           const releases=[];
           try{
@@ -1002,7 +1009,8 @@ export function registerWorkbench(vscode,context){
               packageBRoot,packageBContainer,packageBKey,procedureB,packageBState,releases,
               sourceFileCount:found.length
             });
-            return {packageBRoot:packageBKey,sourceFileCount:found.length,
+            return {packageARoot:sourceRoot.uri.toString(),packageBRoot:packageBKey,
+              distinctNonNestedRoots:true,sourceFileCount:found.length,
               references:packageBState.refs,created:true};
           }catch(error){
             for(const release of releases.reverse())try{release();}catch{}
