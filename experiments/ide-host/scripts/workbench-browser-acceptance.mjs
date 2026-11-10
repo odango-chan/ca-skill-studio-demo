@@ -170,15 +170,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const masProcedure=await explorerRow('procedure.yaml','last');
   if(!masProcedure?.found)throw Error('MAS procedure.yaml row missing from Explorer');
   await click(masProcedure.x,masProcedure.y);
-  let masGraph=null;
+  let masProcedureGraph=null;
   for(let attempt=0;attempt<100;attempt++){
-    masGraph=await graph('establish-session');
-    if(masGraph)break;
+    masProcedureGraph=await graph('establish-session');
+    if(masProcedureGraph)break;
     await sleep(100);
   }
   const masResourcePaths=await evalJS("(async()=>{const c=window.theia.container;const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').map(w=>w.resource?.path.toString()??'').filter(p=>p.includes('/establish-pdu-session-mas/'))??[];})()");
-  if(!masGraph||masGraph.procedureValue!=='establish-session'||!masResourcePaths.some(p=>p.endsWith('/establish-pdu-session-mas/assurance/procedure.yaml')))
-    throw Error('MAS Procedure did not open from native Explorer: '+JSON.stringify({masFolder,assuranceRows,procedureRows,masProcedure,masGraph,masResourcePaths}));
+  if(!masProcedureGraph||masProcedureGraph.procedureValue!=='establish-session'||!masResourcePaths.some(p=>p.endsWith('/establish-pdu-session-mas/assurance/procedure.yaml')))
+    throw Error('MAS Procedure did not open from native Explorer: '+JSON.stringify({masFolder,assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths}));
   // Dispose both test editors before resuming the older regression suite.
   // Several existing native-command probes intentionally expect one active
   // Procedure resource, so keep the MAS proof isolated from those probes.
@@ -200,7 +200,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
   console.log('STUDIO_DUAL_SKILL_EXPLORER_CHROMIUM',JSON.stringify({
     root:'skills',conventionalFolder:'establish-pdu-session',masFolder,
-    assuranceRows,procedureRows,masProcedure,masGraph,masResourcePaths,
+    assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths,
     conventionalProcedure,conventionalGraph
   }));
   // Guard the canvas controls that were present in Classic Studio but were
