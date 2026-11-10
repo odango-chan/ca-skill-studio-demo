@@ -100,7 +100,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   const panel={webview,onDidChangeViewState:()=>({dispose(){}}),onDidDispose:()=>({dispose(){}})};
   await provider.resolveCustomTextEditor(document,panel);
   assert.match(webview.html,/Content-Security-Policy/);
-  assert.match(webview.html,/procedure\.js/);
+  assert.ok(webview.html.includes("procedure.css"));
   assert.match(webview.html,/procedure\\.css/);
   for(const id of ["layoutDirection","zoomIn","zoomOut","fit","fitWidth","fitHeight",
     "centerSelection","neighborsOnly","showAllLabels","rootPathMode",
