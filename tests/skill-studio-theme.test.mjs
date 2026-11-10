@@ -34,6 +34,15 @@ test("host colors reuse established Studio Light design tokens",()=>{
   assert.equal(theme.colors["sideBar.background"],"#FFFFFF");
   assert.equal(theme.colors["activityBar.activeBorder"],"#0C8E7B");
   assert.equal(theme.colors["icon.foreground"],"#57728B");
+  // Native Theia/VS Code menus are rendered outside the editor root; define
+  // their surface and selected state explicitly instead of inheriting a
+  // transparent or host-default menu surface.
+  assert.equal(theme.colors["menu.background"],"#FFFFFF");
+  assert.equal(theme.colors["menu.foreground"],"#294259");
+  assert.equal(theme.colors["menu.selectionBackground"],"#E8F4F0");
+  assert.equal(theme.colors["menu.selectionForeground"],"#155A52");
+  assert.equal(theme.colors["menu.separatorBackground"],"#DCE7ED");
+  assert.equal(theme.colors["menu.border"],"#D3E1E9");
   assert.ok(theme.tokenColors.length>=12&&theme.semanticTokenColors.function);
 });
 test("file icon theme maps SKILL assets and local SVGs",()=>{
