@@ -203,6 +203,10 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
   // container is activated. createTreeView eagerly owns the view lifecycle;
   // registerTreeDataProvider alone left the Packages welcome page visible and
   // never asked the provider for its first root children in real Chromium.
+  const treeApi = {
+    createTreeView:typeof vscode.window.createTreeView==='function',
+    registerTreeDataProvider:typeof vscode.window.registerTreeDataProvider==='function'
+  };
   const treeView = vscode.window.createTreeView
     ? vscode.window.createTreeView('skillStudio.packages',{
         treeDataProvider:provider,showCollapseAll:true
@@ -292,7 +296,8 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     vscode.commands.registerCommand('skillStudio.refreshPackages',async()=>{
       const result=await refresh();
       return {
-        state:inventoryState,message,treeReads,
+        state:inventoryState,message,treeReads,treeApi,
+        treeViewCreated:Boolean(treeView),
         packages:result.map(pkg=>({
           name:pkg.name,relativeRoot:pkg.relativeRoot,
           fileCount:pkg.fileCount,corePresent:pkg.corePresent,
