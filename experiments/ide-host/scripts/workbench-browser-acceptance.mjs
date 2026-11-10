@@ -785,7 +785,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         });
         const result=await command('Runtime.evaluate',{
           contextId:world.executionContextId,returnByValue:true,
-          expression:"({title:document.title,text:document.body?.innerText??'',predicates:document.querySelectorAll('details.predicate').length,ids:[...document.querySelectorAll('.predicate summary .pid')].map(x=>x.textContent.trim()),observations:document.querySelectorAll('.observation').length,status:document.querySelector('#status')?.textContent??''})"
+          expression:"({title:document.title,text:document.body?.textContent??'',predicates:document.querySelectorAll('details.predicate').length,ids:[...document.querySelectorAll('.predicate summary .pid')].map(x=>x.textContent.trim()),observations:document.querySelectorAll('.observation').length,status:document.querySelector('#status')?.textContent??''})"
         });
         const candidate=result.result?.value;
         if(candidate?.title==='SKILL Predicate Visual'){
