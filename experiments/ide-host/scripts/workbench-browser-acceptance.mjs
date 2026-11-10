@@ -15,6 +15,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     catch(error){throw Error("Native command "+id+": "+error.message);}
     await sleep(300);
   }
+  async function nativeCommand(id,...args){
+    return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
+  }
   async function startNativeCommand(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
     await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioCommandState={status:"pending",id:${JSON.stringify(id)}};window.__skillStudioPendingCommand=Promise.resolve(registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)})).then(value=>{window.__skillStudioCommandState={status:"resolved",id:${JSON.stringify(id)},value};return value;},error=>{window.__skillStudioCommandState={status:"rejected",id:${JSON.stringify(id)},error:String(error?.message??error)};throw error;});return true;})()`);
@@ -712,30 +715,31 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
 
-  // Terminate the actual nested Language Worker target through Chromium CDP.
-  // Run last; all normal editor, Inspector, Undo and layout tests stay mandatory.
-  let workerFailureEvidence=null;
+  // D4a + D4b: prove real Worker termination, SDK-owned diagnostic cleanup,
+  // degraded native editing, explicit restart and dirty-buffer rehydration.
+  let workerFailureEvidence=null,recoveryEvidence=null;
   if(requireBrowserLsp){
-    // The Browser LanguageClient itself owns this Worker; terminate that
-    // exact instance on localhost. This does not fake a failure notification.
-    const terminated=await evalJS([
-      "(async()=>{",
-      "const c=window.theia.container;",
-      "const key=[...c._bindingDictionary._map.keys()].find(k=>",
-      "typeof k==='function'&&k.prototype?.executeCommand&&",
-      "k.prototype?.registerCommand&&k.prototype?.getCommand);",
-      "if(!key)throw Error('L2-D4 native command registry missing');",
-      "return c.get(key).executeCommand(",
-      "'skillStudio.internal.languageWorkerTerminationAcceptance');",
-      "})()"
-    ].join("\n"));
+    const procedureUri=await evalJS(`(async()=>{const c=window.theia.container;const opKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');if(!opKey)throw Error('L2-D4 Procedure OpenerService missing');const openers=await c.get(opKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource?.toString()??null;})()`);
+    if(!procedureUri)throw Error("L2-D4 Procedure URI missing");
+
+    const diagnostic=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticsAcceptance",procedureUri,"publish");
+    if(!diagnostic?.appeared||diagnostic.code!=="PROCEDURE_PROJECTION")
+      throw Error("L2-D4b real LSP diagnostic setup failed: "+JSON.stringify(diagnostic));
+    const ownershipSetup=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"publish");
+    if(!ownershipSetup?.lspDiagnosticPresent||!ownershipSetup?.hostProbePresent)
+      throw Error("L2-D4b diagnostic ownership setup failed: "+JSON.stringify(ownershipSetup));
+
+    const terminated=await nativeCommand(
+      "skillStudio.internal.languageWorkerTerminationAcceptance");
     if(!terminated?.actualWorkerTerminated||
        terminated.workerName!=="skill-studio-language-server"||
        !terminated.scriptUri?.endsWith("/skill-language-server.js"))
       throw Error("L2-D4 did not terminate the real Language Worker: "+
         JSON.stringify(terminated));
-    console.log("STUDIO_LSP_WORKER_TERMINATION_CHROMIUM",
-      JSON.stringify(terminated));
+    console.log("STUDIO_LSP_WORKER_TERMINATION_CHROMIUM",JSON.stringify(terminated));
+
     let observedStatus="";
     for(let i=0;i<100;i++){
       observedStatus=await evalJS('document.body.innerText.match(/SKILL LSP: (UNAVAILABLE|ERROR|READY|ANALYZING|IDLE)/)?.[0]??""');
@@ -745,35 +749,54 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(observedStatus!=="SKILL LSP: UNAVAILABLE")
       throw Error("L2-D4 Worker termination was not surfaced: "+
         JSON.stringify({observedStatus,worker:terminated.scriptUri}));
-    const nativeEdit=await evalJS([
-      "(async()=>{",
-      "const c=window.theia.container;",
-      "const key=[...c._bindingDictionary._map.keys()].find(k=>",
-      "typeof k==='function'&&k.prototype?.executeCommand&&",
-      "k.prototype?.registerCommand&&k.prototype?.getCommand);",
-      "const opKey=[...c._bindingDictionary._map.keys()].find(k=>",
-      "String(k)==='Symbol(OpenerService)');",
-      "if(!key||!opKey)throw Error('L2-D4 native services missing');",
-      "const openers=await c.get(opKey).getOpeners();",
-      "const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');",
-      "const uri=custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>",
-      "w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource;",
-      "if(!uri)throw Error('L2-D4 Procedure URI missing');",
-      "return c.get(key).executeCommand(",
-      "'skillStudio.internal.languageDegradedEditingAcceptance',uri.toString());",
-      "})()"
-    ].join("\n"));
+
+    const ownership=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"verify");
+    if(!ownership?.lspCollectionDisposed||!ownership?.lspDiagnosticCleared||
+       !ownership?.hostPackageAuditDiagnosticPreserved)
+      throw Error("L2-D4b SDK diagnostic ownership failed: "+JSON.stringify(ownership));
+    await nativeCommand(
+      "skillStudio.internal.languageDiagnosticOwnershipAcceptance",procedureUri,"restore");
+    const procedureRestore=await nativeCommand(
+      "skillStudio.internal.languageDiagnosticsAcceptance",procedureUri,"repair-after-failure");
+    if(!procedureRestore?.restored||!procedureRestore?.originalDiskUnchanged)
+      throw Error("L2-D4b degraded Procedure restoration failed: "+JSON.stringify(procedureRestore));
+
+    const nativeEdit=await nativeCommand(
+      "skillStudio.internal.languageDegradedEditingAcceptance",procedureUri);
     if(!nativeEdit?.nativePythonEditing||!nativeEdit?.workerUnavailable||
        !nativeEdit.restored||nativeEdit.status!=="SKILL LSP: UNAVAILABLE"||
        !/health request timed out|connection closed|stopped unexpectedly|crashed|could not be decoded/i.test(nativeEdit.failureReason??""))
       throw Error("L2-D4 native editor or real transport-failure evidence missing: "+
         JSON.stringify(nativeEdit));
+
+    const prepared=await nativeCommand(
+      "skillStudio.internal.languageRecoveryAcceptance",procedureUri,"prepare");
+    if(!prepared?.dirtyBufferPrepared||!prepared?.originalDiskUnchanged)
+      throw Error("L2-D4b unsaved-buffer recovery setup failed: "+JSON.stringify(prepared));
+    const recovery=await nativeCommand("skillStudio.restartLanguageService");
+    if(!recovery?.recovered||!Array.isArray(recovery.packages)||
+       recovery.packages.length<1||
+       recovery.packages.some(item=>item.status!=="READY"))
+      throw Error("L2-D4b explicit Language Worker recovery failed: "+JSON.stringify(recovery));
+    const recovered=await nativeCommand(
+      "skillStudio.internal.languageRecoveryAcceptance",procedureUri,"verify-and-restore");
+    if(!recovered?.recovered||!recovered?.dirtyPythonRehydrated||
+       !recovered?.hoverReflectsUnsavedMetadata||
+       !recovered?.originalDiskUnchanged||!recovered?.restored)
+      throw Error("L2-D4b replacement Worker did not rehydrate the unsaved buffer: "+
+        JSON.stringify(recovered));
+
     workerFailureEvidence={workerTarget:terminated.scriptUri,
-      transportUnavailable:true,nativeEditing:nativeEdit};
+      transportUnavailable:true,nativeEditing:nativeEdit,
+      diagnosticOwnership:ownership};
+    recoveryEvidence={...recovery,dirtyBuffer:recovered};
     console.log("STUDIO_LSP_WORKER_DEGRADED_CHROMIUM",
       JSON.stringify(workerFailureEvidence));
+    console.log("STUDIO_LSP_WORKER_RECOVERY_CHROMIUM",
+      JSON.stringify(recoveryEvidence));
   }
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
+  return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,workerFailureEvidence,recoveryEvidence};
 }
