@@ -240,7 +240,7 @@ main browser application remains available at `/classic/`.
 
 **验收：** PR #114 exact HEAD `851d327fd8eb48f34d2e3d616c51f320c11a29bd` 四组门禁全部 PASS：IDE Host [#42769069009](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42769069009)、Theia Browser-Only [#42769069011](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42769069011)、PR Verify [#42769069003](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42769069003)、Theia Backend real Chromium [#42769069069](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42769069069)。已合入 main，merge commit `1401530b`。Resulting-main Pages [#42770237030 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42770237030)，exact identity 为 source/classic/workflow SHA 全部 `1401530befab33704a60a3b3799b7c5047b21f53`，Theia 为默认根入口，Classic 保留 `/classic/`。
 
-## 2026-11-10 · Theia Inspector D4-A2.1 Output Reference normalization（当前开发分支）
+## 2026-11-10 · Theia Inspector D4-A2.1 Output Reference normalization（PR #116 MERGED）
 
 **范围：** 将 Classic 已有 `site/phase-output-refs.mjs` 接入 Theia 原生 Inspector。对可证明的同一生产 Node / Phase / 唯一 earlier named Step / output suffix，只提供 local 与 fully-qualified 两种已在同一 Procedure Source 中实际出现的写法互换。Eligible Phase Step 下显示独立的 `Output reference · <bindingKey>` 子行，右键提供规范化操作；不把跨 Node 引用误判成同生产者。
 
@@ -248,4 +248,13 @@ main browser application remains available at `/classic/`.
 
 **边界：** 这是引用写法规范化，不证明 Runtime 能解析别名，不证明 output field schema/type，不授权跨生产者 ABI 写入，也不改变 Procedure/Route 语义。Runtime / 5GC NOT_RUN。
 
-**验收状态：** 当前分支 `feat/theia-phase-output-reference`；已接入 Inspector 子行、命令和 host integration / real Chromium acceptance。PR 与 exact-head CI 待提交后核对。
+**验收状态：** [PR #116](https://github.com/odango-chan/ca-skill-studio-demo/pull/116) 已合并，main merge `330c9b80`。Exact-head `c5153a8e` IDE Host [#42776798637 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798637)、Browser-Only [#42776798442 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798442)、Backend Chromium [#42776798608 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798608)、PR Verify [#42776798584 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798584)。Resulting-main Pages 对 merge SHA 尚未核实；Runtime/5GC/桌面 GUI NOT_RUN。
+
+
+## 2026-11-10 · Theia D4-A4a Phase Route 目标重定向（当前开发分支）
+
+**范围：** 仅迁移 Classic 已验收 `site/phase-routes.mjs` 的现有 Phase 失败/未决 Route 目标编辑，不新定义 YAML/业务规则。Inspector Route 行仅在共享模块证明同 Procedure、同 Phase、同 Outcome 的候选及保留可达 Node 集时提供原生命令；保留现有 Insert Node 命令并支持双菜单共存。
+
+**写入与验证：** 文档和 Source 版本校验 → QuickPick → Classic Source Preview / Diff → 用户确认 → 原生 `WorkspaceEdit`/Undo。Host 测试覆盖取消、应用、过期 Route；真实 Chromium 针对 UDM `preconditions.on.FAILED: failed` → 已观测的 `finalize-failed` 并 Undo 原文；四组 CI 尚待验收。
+
+**边界：** 仅前置 `FAILED/UNRESOLVED`、后置 `FAIL/UNKNOWN` 已有 Route；没有创建 Phase/Outcome、修改 `operator.on` / `PASS` 或跨 Producer ABI。失败收尾路径的业务等价性及 Runtime/5GC NOT_RUN。
