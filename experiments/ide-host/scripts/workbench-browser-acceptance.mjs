@@ -42,42 +42,6 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   await invoke('skillStudio.auditPackage');
   const audit=await evalJS(`document.body.innerText`);
   if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not run: '+audit.slice(-1000));
-  // Exercise a real native Inspector edit. The command is invoked through
-  // Theia's command registry, presents a native Diff confirmation, and writes
-  // through the host TextDocument/WorkspaceEdit rather than the Webview.
-  const selectionResult=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-get');if(!node)throw Error('Expected Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value,revision:document.querySelector('#revision')?.textContent};})()`
-  });
-  if(!selectionResult.result?.value?.node)throw Error('Could not select Node for native Inspector editing');
-  await sleep(250);
-  const beforeEdit=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
-  await startNativeCommand('skillStudio.editNodeOperatorValue',null,'sbi.udm.sdm.get.preview');
-  await confirmNativePreview();
-  const afterEdit=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
-  const editedTree=await evalJS(`document.body.innerText`);
-  if(!afterEdit.result?.value||afterEdit.result.value===beforeEdit.result?.value||
-     !editedTree.includes('sbi.udm.sdm.get.preview'))
-    throw Error('Native Inspector edit did not update the Source-backed view: '+editedTree.slice(-1400));
-  await invoke('core.undo');
-  const afterUndo=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
-  const undoneTree=await evalJS(`document.body.innerText`);
-  if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value||
-     !undoneTree.includes('sbi.udm.sdm.get'))
-    throw Error('Native Inspector edit did not round-trip through native Undo');
-  console.log('STUDIO_INSPECTOR_AUTHORING_CHROMIUM',JSON.stringify({
-    node:selectionResult.result.value.node,procedure:selectionResult.result.value.procedure,
-    before:beforeEdit.result?.value,after:afterEdit.result?.value,undo:afterUndo.result?.value
-  }));
   // Re-open through Explorer rather than extension openWith command.
   await invoke('navigator.reveal');
   await invoke('core.saveAll');
@@ -116,6 +80,42 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   await sleep(500);
   const warm=await graph(),warmTiming=JSON.parse(warm?.timing??'null');
   if(!initialTiming||!warmTiming?.cacheHit)throw Error('Version-scoped warm layout cache was not exercised: '+JSON.stringify({initialTiming,warmTiming}));
+  // Exercise a real native Inspector edit. The command is invoked through
+  // Theia's command registry, presents a native Diff confirmation, and writes
+  // through the host TextDocument/WorkspaceEdit rather than the Webview.
+  const selectionResult=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-get');if(!node)throw Error('Expected Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value,revision:document.querySelector('#revision')?.textContent};})()`
+  });
+  if(!selectionResult.result?.value?.node)throw Error('Could not select Node for native Inspector editing');
+  await sleep(250);
+  const beforeEdit=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  await startNativeCommand('skillStudio.editNodeOperatorValue',null,'sbi.udm.sdm.get.preview');
+  await confirmNativePreview();
+  const afterEdit=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const editedTree=await evalJS(`document.body.innerText`);
+  if(!afterEdit.result?.value||afterEdit.result.value===beforeEdit.result?.value||
+     !editedTree.includes('sbi.udm.sdm.get.preview'))
+    throw Error('Native Inspector edit did not update the Source-backed view: '+editedTree.slice(-1400));
+  await invoke('core.undo');
+  const afterUndo=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const undoneTree=await evalJS(`document.body.innerText`);
+  if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value||
+     !undoneTree.includes('sbi.udm.sdm.get'))
+    throw Error('Native Inspector edit did not round-trip through native Undo');
+  console.log('STUDIO_INSPECTOR_AUTHORING_CHROMIUM',JSON.stringify({
+    node:selectionResult.result.value.node,procedure:selectionResult.result.value.procedure,
+    before:beforeEdit.result?.value,after:afterEdit.result?.value,undo:afterUndo.result?.value
+  }));
   // Safe Markdown uses the actual native source document and shared renderer.
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
