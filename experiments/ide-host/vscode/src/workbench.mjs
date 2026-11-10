@@ -14,6 +14,7 @@ import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   from '../../../../site/phase-step-structural.mjs';
 import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
   applyAdjacentVerifyReorder} from '../../../../site/phase-step-order.mjs';
+import {openNativeSource} from "./native-source.mjs";
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 
 export function registerWorkbench(vscode,context){
@@ -219,7 +220,7 @@ export function registerWorkbench(vscode,context){
         const procedureLine=procedureLines.findIndex(line=>line.includes("script: "+scriptPathValue));
         if(procedureLine<0)throw Error("Procedure Source does not contain the expected declared script path");
         const procedureCharacter=procedureLines[procedureLine].indexOf(scriptPathValue)+12;
-        await vscode.window.showTextDocument(procedureDocument,{preview:true});
+        await openNativeSource(vscode,procedureUri,{preview:true});
         await new Promise(resolve=>setTimeout(resolve,180));
         const procedurePosition=new vscode.Position(procedureLine,procedureCharacter);
         const definitionResult=await vscode.commands.executeCommand(
@@ -250,7 +251,7 @@ export function registerWorkbench(vscode,context){
         const schemaLine=scriptLines.findIndex(line=>line==="# inputSchema: EstablishmentSelectionInput");
         if(nameLine<0||schemaLine<0)
           throw Error("Python Source is missing the declared name or inputSchema metadata");
-        await vscode.window.showTextDocument(scriptDocument,{preview:true});
+        await openNativeSource(vscode,scriptUri,{preview:true});
         await new Promise(resolve=>setTimeout(resolve,300));
         const referenceResult=await vscode.commands.executeCommand(
           "vscode.executeReferenceProvider",scriptUri,new vscode.Position(nameLine,12));
