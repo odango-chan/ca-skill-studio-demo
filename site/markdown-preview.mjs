@@ -48,11 +48,11 @@ function inline(src,depth=0,options={}){
           '" title="打开当前 Skill Package 内的文件"><code>'+escapeHTML(match[5])+"</code></a>"
         :"<code>"+escapeHTML(match[5])+"</code>";
     }else if(raw.startsWith("**")||raw.startsWith("__")){
-      out+="<strong>"+inline(match[6]??match[7],depth+1)+"</strong>";
+      out+="<strong>"+inline(match[6]??match[7],depth+1,options)+"</strong>";
     }else if(raw.startsWith("~~")){
-      out+="<del>"+inline(match[8],depth+1)+"</del>";
+      out+="<del>"+inline(match[8],depth+1,options)+"</del>";
     }else if(raw.startsWith("*")||raw.startsWith("_")){
-      out+="<em>"+inline(match[9]??match[10],depth+1)+"</em>";
+      out+="<em>"+inline(match[9]??match[10],depth+1,options)+"</em>";
     }else if(raw.startsWith("<")){
       const href=safeHref(raw.slice(1,-1));
       out+=href?'<a href="'+escapeHTML(href)+'" rel="noopener noreferrer" target="_blank">'+escapeHTML(href)+"</a>":escapeHTML(raw);
@@ -137,12 +137,12 @@ function renderBlocks(lines,depth=0,options={}){
     if(i+1<lines.length&&lines[i].includes("|")&&tableSeparator(lines[i+1])){
       const headers=cells(lines[i]),align=cells(lines[i+1]);
       i+=2;out+="<div class=\"md-table-wrap\"><table><thead><tr>";
-      for(let j=0;j<headers.length;j++)out+="<th>"+inline(headers[j])+"</th>";
+      for(let j=0;j<headers.length;j++)out+="<th>"+inline(headers[j],0,options)+"</th>";
       out+="</tr></thead><tbody>";
       let rows=0;
       while(i<lines.length&&lines[i].trim()&&lines[i].includes("|")&&rows++<1000){
         const vals=cells(lines[i++]);out+="<tr>";
-        for(let j=0;j<headers.length;j++)out+="<td>"+inline(vals[j]??"")+"</td>";
+        for(let j=0;j<headers.length;j++)out+="<td>"+inline(vals[j]??"",0,options)+"</td>";
         out+="</tr>";
       }
       out+="</tbody></table></div>";
