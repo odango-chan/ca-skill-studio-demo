@@ -699,7 +699,8 @@ export function registerWorkbench(vscode,context){
   // Local Chromium acceptance only: terminate the exact browser LanguageClient's
   // owned dedicated Worker. The termination does not set UNAVAILABLE itself;
   // real transport signals or the health timeout must detect it.
-  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&
+     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.languageWorkerTerminationAcceptance",async()=>{
         const client=await ensureLanguageClient();
@@ -711,7 +712,8 @@ export function registerWorkbench(vscode,context){
   // L2-D4 real Chromium fault acceptance: after the browser closes the actual
   // language Worker target, native TextDocument/WorkspaceEdit must still work.
   // This command never terminates a Worker or fabricates a transport failure.
-  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&
+     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.languageDegradedEditingAcceptance",
       async procedureUriValue=>{
@@ -762,7 +764,8 @@ export function registerWorkbench(vscode,context){
         }
         return {workerUnavailable:true,nativePythonEditing:edited,
           originalDiskUnchanged:true,restored:true,
-          status:languageStatusItem?.text};
+          status:languageStatusItem?.text,
+          failureReason:languageTransportFailure};
       }
     ));
   }
