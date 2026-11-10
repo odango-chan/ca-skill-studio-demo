@@ -90,6 +90,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.ok(commands.has("skillStudio.openProcedure"));
   assert.ok(commands.has("skillStudio.renameNode"));
   assert.ok(commands.has("skillStudio.editNodeOperatorValue"));
+  assert.ok(commands.has("skillStudio.exportPackageZip"));
   const webview={
     cspSource:"vscode-resource:",
     options:null,html:"",
@@ -102,6 +103,10 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.match(webview.html,/Content-Security-Policy/);
   assert.ok(webview.html.includes("procedure.js"));
   assert.ok(webview.html.includes("procedure.css"));
+  for(const id of ["exportPackageZip","zipExportNotice","zipExportDetails",
+    "downloadPackageZip","dismissPackageZip"]){
+    assert.ok(webview.html.includes('id="'+id+'"'),id+" must be present in the native ZIP export UI");
+  }
   for(const id of ["layoutDirection","zoomIn","zoomOut","fit","fitWidth","fitHeight",
     "centerSelection","neighborsOnly","showAllLabels","rootPathMode",
     "rootPathFilters","pathFailure","pathUncertain","pathRecovery"]){
@@ -113,6 +118,9 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   await onMessage({type:"ready"});
   assert.equal(posted.at(-1).type,"snapshot");
   assert.equal(posted.at(-1).version,21);
+  await onMessage({type:"exportPackageZip"});
+  assert.ok(registered.some(args=>args[0]==="skillStudio.exportPackageZip"),
+    "the native Procedure Webview routes ZIP export to the host command");
 
   await commands.get("skillStudio.openProcedure")(uri);
   assert.equal(registered.at(-1)[0],"vscode.openWith");
