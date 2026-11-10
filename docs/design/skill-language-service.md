@@ -42,6 +42,23 @@ The old `semantic.mjs` path and current `workspace.mjs` path are not interchange
 
 The visual mutation modules (`node-*`, `phase-*`, `patch.mjs`) are intentionally outside the Language Core: they own typed proposals and Source Patch admission. LSP may expose read-only facts used by those views, but must not replace their revision/span/Diff/Confirm checks.
 
+### 2.1 Existing characterization suites
+
+These are the behavior-preservation baseline for L1 extraction. They must continue to pass unchanged before new language behavior is added.
+
+| Existing suite | Behavior to preserve |
+|---|---|
+| `tests/workspace.test.mjs` | Multi-Procedure parse, Root/Child links, PRE/POST/operator Route identity, ordered Steps, exact Route source spans and fail-closed projection |
+| `tests/package-audit.test.mjs` | Positive sample packages, missing Entry/Predicate/Schema/Script/Input/Producer references, explicitly heuristic binding warning and malformed/partial workspace behavior |
+| `tests/script-navigation.test.mjs` | Exact Procedure script callers, Predicate evaluator callers, unique Schema title links, duplicate/ambiguous rejection and no Source mutation |
+| `tests/python-outline.test.mjs` | Top-level lexical Python symbols, comments/triple strings/nested declarations, duplicate-name rejection and uncertain-source fail-closed behavior |
+| `tests/graph.test.mjs` | Legacy single-Procedure projection and basic fallback layout behavior; preserve until the fixed Ensure patch compatibility path is removed |
+| `tests/monaco-language.test.mjs` | Path-based syntax grammar selection and plain-text fallback |
+| `tests/yaml-owner-schemas.test.mjs` | Owner Schema pin/provenance and local offline Schema resolution |
+| `experiments/ide-host/tests/workbench.test.mjs` | Native Theia document lifecycle, Package Audit, Inspection/Outline/Problems host adaptation |
+
+L1 must add contract-level tests for the new shared API without weakening these existing assertions. If the legacy Ensure patch path is later retired, its tests must be removed or migrated in the same separately reviewed change, not silently bypassed during extraction.
+
 ## 3. Layer boundaries
 
 ```text
@@ -236,7 +253,7 @@ The current Theia feature migration PRs #96–#99 continue independently. The LS
 - [x] Source authority, Package scope, version/stale-result and fail-closed contracts documented.
 - [x] Theia browser Worker compatibility explicitly marked as a proof gate.
 - [ ] Owner review of this design.
-- [ ] Characterization test inventory linked from implementation PR.
+- [x] Existing characterization suites and behavior-preservation obligations inventoried.
 - [ ] L1 extraction started in a separate implementation change.
 
 No LSP implementation, TypeScript migration, browser Worker, CI, Pages, desktop GUI or Runtime acceptance is claimed by this design document.
