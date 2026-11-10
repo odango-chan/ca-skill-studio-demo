@@ -64,13 +64,18 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   if(!scan?.packages?.some(x=>x.name==='establish-pdu-session')||!packageRow)
     throw Error('Package Overview TreeView did not render discovered Package: '+
       JSON.stringify({scan,view}));
-  await click(packageRow.x,packageRow.y);
-  await sleep(250);
-  const groups=await evalJS(
+  const readGroups=()=>evalJS(
     "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
     ".find(x=>x.textContent.trim().toLowerCase()==='packages');"+
     "return header?.closest('.part')?.innerText??'';})()");
-  for(const group of ['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'])
+  const expectedGroups=['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'];
+  let groups=await readGroups();
+  if(!expectedGroups.every(group=>groups.includes(group))){
+    await click(packageRow.x,packageRow.y);
+    await sleep(250);
+    groups=await readGroups();
+  }
+  for(const group of expectedGroups)
     if(!groups.includes(group))
       throw Error('Package Overview missing group '+group+': '+groups.slice(-1200));
   const evidence={package:'establish-pdu-session',core:'3/3',schemas:6,
