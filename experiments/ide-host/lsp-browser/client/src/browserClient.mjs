@@ -44,10 +44,18 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   function stopClientAfterFailure() {
     if (!started || !client) return Promise.resolve();
     if (!clientStopPromise) {
-      clientStopPromise = Promise.resolve().then(() => client.stop()).catch(error => {
+      try {
+        // LanguageClient.stop() enters SDK cleanup synchronously before its
+        // shutdown handshake, so its owned diagnostics disappear immediately.
+        clientStopPromise = client.stop().catch(error => {
+          output.appendLine("LanguageClient cleanup after Worker failure: " +
+            String(error?.message ?? error));
+        });
+      } catch (error) {
         output.appendLine("LanguageClient cleanup after Worker failure: " +
           String(error?.message ?? error));
-      });
+        clientStopPromise = Promise.resolve();
+      }
     }
     return clientStopPromise;
   }
