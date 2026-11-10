@@ -1116,13 +1116,35 @@ try{
     }
   }
   console.log("STUDIO_THEIA_STAGE","native-workbench");
-  const webviewMainContextId=webviewFrame
-    ?defaultExecutionContexts.get(webviewFrame.id):null;
-  if(requireEditor&&!webviewMainContextId)
-    throw Error("Default JavaScript context for the native Procedure Webview is missing");
   const evalWebviewJS=async expression=>{
+    // Native editor interactions above can recreate the Webview iframe.
+    // Refresh CDP execution contexts and resolve the current frame each time
+    // rather than retaining an executionContextId from an earlier render.
+    const tree=await command("Page.getFrameTree");
+    const currentFrames=[];
+    const collect=node=>{
+      if(!node)return;
+      currentFrames.push(node.frame);
+      for(const child of node.childFrames??[])collect(child);
+    };
+    collect(tree.frameTree);
+    const expectedUrl=webviewFrame?.url??"";
+    const candidates=currentFrames.filter(frame=>
+      (frame.url.includes("/webview/index.html")||frame.url.includes(".webview."))&&
+      (!expectedUrl||frame.url===expectedUrl));
+    await command("Runtime.enable");
+    await sleep(40);
+    let frame=null,contextId=null;
+    for(const candidate of candidates){
+      const id=defaultExecutionContexts.get(candidate.id);
+      if(id){frame=candidate;contextId=id;break;}
+    }
+    if(!contextId)
+      throw Error("Default Procedure Webview context is unavailable: "+
+        JSON.stringify({expectedUrl,candidates:candidates.map(x=>({id:x.id,url:x.url})),
+          known:[...defaultExecutionContexts.entries()]}));
     const data=await command("Runtime.evaluate",{
-      contextId:webviewMainContextId,expression,returnByValue:true,awaitPromise:true
+      contextId,expression,returnByValue:true,awaitPromise:true
     });
     if(data.exceptionDetails)
       throw Error("Procedure Webview evaluate: "+data.exceptionDetails.text);
