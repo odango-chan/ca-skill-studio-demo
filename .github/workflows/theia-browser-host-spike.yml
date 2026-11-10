@@ -34,6 +34,10 @@ jobs:
           sudo apt-get install -y libsecret-1-dev
       - name: Install pinned Studio dependencies
         run: npm ci --no-audit --no-fund
+      - name: Install pinned browser LSP client and server dependencies
+        run: |
+          npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
+          npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
       - name: Build shared Procedure extension and webview
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Stage same Web extension for Theia
