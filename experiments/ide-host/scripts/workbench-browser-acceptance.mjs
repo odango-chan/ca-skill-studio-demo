@@ -1,5 +1,5 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
-export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor}){
+export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
@@ -136,7 +136,8 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   // Instrument the page's main JavaScript realm. Runtime.evaluate against
   // graphContext uses an isolated CDP world whose URL/DOM prototypes are not
   // the same objects used by the Webview's event listener.
-  const zipEvidence=await evalJS(`(()=>{
+  if(typeof evalWebviewJS!=="function")throw Error("Procedure Webview main-realm evaluator is unavailable");
+  const zipEvidence=await evalWebviewJS(`(()=>{
       let blobMeta=null,linkMeta=null;
       const create=URL.createObjectURL,click=HTMLAnchorElement.prototype.click;
       URL.createObjectURL=function(blob){
