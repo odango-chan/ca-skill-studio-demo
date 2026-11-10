@@ -413,7 +413,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const fixtureGraph=await graph();
   if(!fixtureGraph?.revision||fixtureGraph.revision===beforeOutputFixture.revision)
     throw Error('Output reference fixture did not reach the live Procedure projection');
-  const fixtureVersion=Number(/v(\\d+)/.exec(fixtureGraph.revision)?.[1]);
+  const fixtureVersion=Number(/v(\d+)/.exec(fixtureGraph.revision)?.[1]);
   if(!Number.isSafeInteger(fixtureVersion))throw Error('Could not read fixture TextDocument version');
   const outputProcedure='ue-requested-pdu-session-establishment';
   const outputNode='nudm-sdm-subscribe';
@@ -434,7 +434,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     afterOutput.result?.value,'Phase output reference native Undo');
   // Reapply after Undo to prove the original local spelling was restored and
   // remains eligible; undo it again before restoring the real sample.
-  const undoVersion=Number(/v(\\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
+  const undoVersion=Number(/v(\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
   if(!Number.isSafeInteger(undoVersion))throw Error('Could not read Source version after output reference Undo');
   await startNativeCommand('skillStudio.editPhaseOutputReference',{
     ...outputItem,sourceVersion:undoVersion
