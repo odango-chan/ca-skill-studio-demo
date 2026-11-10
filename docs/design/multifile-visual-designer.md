@@ -1,6 +1,6 @@
 # Multi-file Visual Designer · parallel workstream
 
-**Status: C1 Contract Designer accepted; C2 Predicate Designer implementation in progress; C3 Schema Designer next; 2026-11-10.**  
+**Status: C1 Contract Designer and C2 Predicate Designer accepted in real Theia Chromium; C3 Schema Designer next; 2026-11-10.**  
 Owner: Skill Studio editor (not Skill DSL, Runtime, Agent Host or 5GC).
 
 ## Problem and objective
@@ -191,8 +191,7 @@ execution semantics are introduced by C1.
 
 ## C2 · Predicate Designer implementation (same parallel workstream)
 
-C2 is now implemented on this branch, pending its own four-workflow CI and
-real Theia browser evidence:
+C2 is implemented and accepted on this branch:
 
 - `site/predicate-projection.mjs` projects the pinned PredicateSet shape:
   named predicates, one or more Observations, `ref`, `scope`, `freshness`,
@@ -213,11 +212,27 @@ real Theia browser evidence:
 - Unit tests cover the 17 real owner Predicate declarations, CEL and Script
   variants, nested unknowns, required fields, aliases, duplicate keys and
   source-only fallback.
-- Real Theia Chromium acceptance now checks all 17 real Predicate cards,
-  their Observation count, a real CreatedSession Predicate and the Script
-  evaluator reference. Its run is pending for this head.
+- Real Theia Chromium acceptance checks all 17 real Predicate cards, their 17
+  Observation cards, a real CreatedSession Predicate and the Script evaluator
+  reference. Both browser-only and backend-backed Theia hosts passed.
 
 C2 remains strictly a declaration viewer. Observation declarations do not
 prove an observation exists; freshness values are configuration, not evidence
 age; evaluator declarations do not prove the evaluator is installed, admitted
 or executed.
+
+
+### C2 final acceptance evidence · head 941e8b2b
+
+All four required workflows passed on the same exact head:
+
+| Workflow | Run | Result |
+| --- | --- | --- |
+| Skill Studio PR verification (tests, typecheck, root build, IDE build, Chromium smoke) | [#42789837324](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42789837324) | PASS |
+| IDE Host Spike (VS Code/Web extension, Source/Procedure regression, VSIX) | [#42789837342](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42789837342) | PASS |
+| Theia Browser-Only Online Spike (build, selectors, real Chromium, preview artifact) | [#42789837227](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42789837227) | PASS |
+| Theia Browser Host Custom Editor (backend build, real Chromium) | [#42789837356](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42789837356) | PASS |
+
+Both Theia browser acceptance logs emitted STUDIO_PREDICATE_DESIGNER_CHROMIUM: SKILL Predicate Visual, SOURCE VERSION 1, 17 predicates, 17 observations, the real createdsession.ran.setup_accepted Predicate, the skill.evaluate-udm-read Script evaluator reference, and noLiveResultClaim: true.
+
+The PR remains unmerged. The browser-only preview artifact is retained by Actions for seven days; the public Pages deployment still occurs only after a reviewed merge to main.
