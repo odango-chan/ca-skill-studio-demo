@@ -20,17 +20,25 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
   }
   async function waitForRevisionChange(contextId,previous,label){
-    let latest=null;
+    let latest=null,refreshed=null;
     for(let i=0;i<50;i++){
-      latest=await command('Runtime.evaluate',{
-        contextId,returnByValue:true,
-        expression:`document.querySelector('#revision')?.textContent`
-      });
-      if(latest.result?.value&&latest.result.value!==previous)return latest;
+      try{
+        latest=await command('Runtime.evaluate',{
+          contextId,returnByValue:true,
+          expression:`document.querySelector('#revision')?.textContent`
+        });
+        if(latest.result?.value&&latest.result.value!==previous)return latest;
+      }catch{/* the CustomEditor iframe can be replaced by native Undo */}
+      try{
+        refreshed=await graph();
+        if(refreshed?.revision&&refreshed.revision!==previous)
+          return {result:{value:refreshed.revision}};
+      }catch{/* retry until the replacement frame is ready */}
       await sleep(100);
     }
     throw Error(label+' did not produce a native Source revision within 5s: '+
-      JSON.stringify({previous,latest:latest?.result?.value??null}));
+      JSON.stringify({previous,latest:latest?.result?.value??null,
+        refreshed:refreshed?.revision??null}));
   }
   async function confirmNativePreview(oldText,newText){
     let target=null;
@@ -181,13 +189,39 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     node:bindingSelection.result.value.node,procedure:bindingSelection.result.value.procedure,
     before:beforeBinding.result?.value,after:afterBinding.result?.value,undo:afterBindingUndo.result?.value
   }));
+  // Rename a named Script Step and all proven local/qualified consumers through
+  // the shared closed-world source-span planner, then verify native Undo.
+  // Undo may replace the CustomEditor iframe; reacquire its live execution
+  // world instead of reading a possibly detached Webview context.
+  const beforeNamedGraph=await graph();
+  const beforeNamedRename=beforeNamedGraph?.revision??afterBindingUndo.result?.value??null;
+  const namedRenameVersion=Number(/v(\d+)/.exec(beforeNamedRename??'')?.[1]);
+  if(!Number.isSafeInteger(namedRenameVersion))throw Error('Named Step rename missing native Source revision');
+  const oldStepName='select-subscription-configuration';
+  const newStepName='select-subscription-config-v2';
+  await startNativeCommand('skillStudio.renameNamedPhaseStep',{
+    kind:'phase-step',procedureId:bindingSelection.result.value.procedure,
+    nodeId:'nudm-sdm-subscribe',phaseName:'preconditions',stepIndex:0,
+    stepName:oldStepName,stepOperator:'script',sourceVersion:namedRenameVersion
+  },newStepName);
+  await confirmNativePreview(oldStepName,newStepName);
+  const namedRenameAccepted=await evalJS(`window.__skillStudioCommandResult`);
+  const afterNamedRename=await waitForRevisionChange(graphContext,beforeNamedRename,
+    'Named Phase Step rename');
+  if(namedRenameAccepted!==true)throw Error('Named Phase Step rename was not accepted');
+  await invoke('core.undo');
+  const afterNamedRenameUndo=await waitForRevisionChange(graphContext,
+    afterNamedRename.result?.value,'Named Phase Step rename Undo');
+  console.log('STUDIO_PHASE_NAMED_STEP_RENAME_CHROMIUM',JSON.stringify({
+    before:beforeNamedRename,applied:afterNamedRename.result?.value,
+    undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName
+  }));
   // Real Chromium + actual Theia extension command registry. Each Verify edit
   // must return to the unmodified Source through native TextDocument Undo.
+  let lastKnownRevision=afterNamedRenameUndo.result?.value??beforeNamedRename;
   async function nativeVerifyRoundTrip(commandId,item,argument,oldText,newText){
-    const before=(await command('Runtime.evaluate',{
-      contextId:graphContext,returnByValue:true,
-      expression:`document.querySelector('#revision')?.textContent`
-    })).result?.value;
+    const currentGraph=await graph();
+    const before=currentGraph?.revision??lastKnownRevision??null;
     const version=Number(/v(\d+)/.exec(before??'')?.[1]);
     if(!Number.isSafeInteger(version))throw Error('Verify command missing native Source revision');
     await startNativeCommand(commandId,{...item,
@@ -200,12 +234,17 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     if(accepted!==true)throw Error(commandId+' did not apply after confirmation');
     await invoke('core.undo');
     const undone=await waitForRevisionChange(graphContext,after.result?.value,commandId+' Undo');
+    lastKnownRevision=undone.result?.value??lastKnownRevision;
     return {before,applied:after.result?.value,undone:undone.result?.value};
   }
   const verifyAppend=await nativeVerifyRoundTrip('skillStudio.addPhaseVerify',
     {kind:'phase',phaseName:'preconditions'},
     'createdsession.n4.initial_resources_ready',
     '新增','createdsession.n4.initial_resources_ready');
+  const verifyName=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
+    {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
+    {action:'name',newName:'lifecycle-ready'},
+    'verify: createdsession.lifecycle.ready','name: lifecycle-ready');
   const verifyDelete=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
     {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
     'delete','删除','createdsession.lifecycle.ready');
@@ -213,7 +252,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
     'move-up','调整','createdsession.ingress.eligible');
   console.log('STUDIO_PHASE_VERIFY_CHROMIUM',JSON.stringify({
-    append:verifyAppend,delete:verifyDelete,reorder:verifyReorder
+    append:verifyAppend,name:verifyName,delete:verifyDelete,reorder:verifyReorder
   }));
   const graphHasNode=async id=>{
     const result=await command('Runtime.evaluate',{
@@ -335,5 +374,5 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs};
+  return {views:true,packageAudit:true,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
 }

@@ -93,7 +93,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     x.kind==='phase-step'&&x.phaseName==='preconditions'&&x.stepIndex===0);
   assert.ok(phaseStep,'eligible Phase Step identity is exposed');
   const phaseItem=providers.get('skillStudio.inspection').getTreeItem(phaseStep);
-  assert.equal(phaseItem.contextValue,'skillStudio.phaseStep');
+  assert.equal(phaseItem.contextValue,'skillStudio.namedPhaseStepAndBinding');
   assert.equal(phaseItem.kind,'phase-step');
   assert.equal(phaseStep.sourceVersion,doc.version);
   assert.equal(phaseStep.documentUri,doc.uri.toString());
@@ -110,6 +110,30 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(doc.text,writesAfterBinding,'stale Phase Step selection must not write');
   assert.ok(commands.has('skillStudio.addPhaseVerify'));
   assert.ok(commands.has('skillStudio.editPhaseVerifyStep'));
+  assert.ok(commands.has('skillStudio.renameNamedPhaseStep'));
+  doc.text=source;doc.version++;changed({document:doc});
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const renamePhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const renameStep=renamePhase.children.find(x=>x.kind==='phase-step'&&x.stepIndex===0);
+  const renameItem=providers.get('skillStudio.inspection').getTreeItem(renameStep);
+  assert.equal(renameItem.contextValue,'skillStudio.namedPhaseStepAndBinding');
+  const renamed='select-subscription-config-v2';
+  const beforeRename=doc.text,renameVersion=doc.version;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.renameNamedPhaseStep')(renameItem,renamed),false);
+  assert.equal(doc.text,beforeRename,'cancelled named Step rename must not touch Source');
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.renameNamedPhaseStep')(renameItem,renamed),true);
+  assert.equal(doc.version,renameVersion+1);
+  assert.ok(doc.text.includes('- name: '+renamed));
+  assert.equal(doc.text.includes('select-subscription-configuration'),false,
+    'all closed-world same-Procedure output references are renamed atomically');
+  assert.equal(appliedEdits.at(-1).length,6,'named Step identity and five references share one WorkspaceEdit');
+  const afterRename=doc.text;
+  assert.equal(await commands.get('skillStudio.renameNamedPhaseStep')(renameItem,'another-name'),false,
+    'stale named Step selection cannot be reused');
+  assert.equal(doc.text,afterRename);
   doc.text=source;doc.version++;changed({document:doc});
   workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
   const verifyPhaseRow=providers.get('skillStudio.inspection').getChildren()
@@ -170,9 +194,29 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(doc.text,source,'Verify insertion/reorder/deletion round-trip preserves exact original Source');
   assert.equal(appliedEdits.at(-1).length,1,'Verify deletion uses one Source deletion');
   assert.equal(appliedEdits.at(-1)[0].value,'');
+
+  // Exercise naming and zero-consumer deletion on a plain Verify whose
+  // immediate Source neighbors are unambiguous in the current owner sample.
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const namedVerifyPhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const unnamedVerify=namedVerifyPhase.children.find(x=>x.stepIndex===4);
+  const unnamedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(unnamedVerify);
+  assert.equal(unnamedVerifyItem.contextValue,'skillStudio.verifyStep');
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(unnamedVerifyItem,
+    {action:'name',newName:'lifecycle-ready'}),true);
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const namedPhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const namedVerify=namedPhase.children.find(x=>x.stepName==='lifecycle-ready');
+  const namedVerifyItem=providers.get('skillStudio.inspection').getTreeItem(namedVerify);
+  assert.equal(namedVerifyItem.contextValue,'skillStudio.namedVerifyStep');
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(namedVerifyItem,'delete'),true);
+  assert.equal(doc.text,source.replace("            - verify: createdsession.lifecycle.ready\n",""),
+    'named Verify deletion removes only the unreferenced Step');
+  doc.text=source;doc.version++;changed({document:doc});
   assert.ok(commands.has('skillStudio.insertNode'));
   assert.ok(commands.has('skillStudio.deleteNode'));
-  doc.text=source;doc.version++;changed({document:doc});
   const routeProcedure='ue-requested-pdu-session-establishment';
   workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'nudm-sdm-get'});
   const routeRow=providers.get('skillStudio.inspection').getChildren().find(x=>
