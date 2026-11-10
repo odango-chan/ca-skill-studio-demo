@@ -12,17 +12,20 @@ import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
 
 test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and native Source",async()=>{
   const source=readFileSync("site/samples/packages/establish-pdu-session/assurance/procedure.yaml","utf8");
-  const uri={path:"/workspace/assurance/procedure.yaml",toString(){return "file://"+this.path;}};
+  const makeUri=path=>({path,toString(){return "file://"+this.path;},with(change){return makeUri(change.path??this.path);}});
+  const uri=makeUri("/workspace/assurance/procedure.yaml");
   const document={uri,text:source,version:21,
     getText(){return this.text;},
     get lineCount(){return this.text.split(/\r?\n/).length;},
     positionAt(offset){return {offset};}
   };
   const listeners=new Set(),commands=new Map(),posted=[],writes=[],opened=[],registered=[],revealed=[];
+  let confirmChoice="确认并应用";
   const textEditor={document,selection:null,revealRange(range,kind){revealed.push({range,kind});}};
   let provider=null,onMessage=null;
   class WorkspaceEdit{
-    replace(file,range,value){this.change={file,range,value};}
+    constructor(){this.changes=[];}
+    replace(file,range,value){this.change={file,range,value};this.changes.push(this.change);}
   }
   class Range{constructor(start,end){this.start=start;this.end=end;}}
   class Position{constructor(line,character){this.line=line;this.character=character;}}
@@ -39,15 +42,17 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       textDocuments:[document],
       onDidChangeTextDocument(cb){listeners.add(cb);return {dispose(){listeners.delete(cb);}};},
       async applyEdit(edit){
-        const {file,range,value}=edit.change;
-        assert.equal(file,document.uri);
-        writes.push(edit.change);
-        document.text=document.text.slice(0,range.start.offset)+value+
-          document.text.slice(range.end.offset);
+        const changes=edit.changes??[edit.change];
+        for(const change of changes)assert.equal(change.file,document.uri);
+        writes.push(...changes);
+        for(const change of [...changes].sort((a,b)=>b.range.start.offset-a.range.start.offset))
+          document.text=document.text.slice(0,change.range.start.offset)+change.value+
+            document.text.slice(change.range.end.offset);
         document.version++;
         for(const callback of listeners)callback({document});
         return true;
       },
+      fs:{readFile:async()=>new TextEncoder().encode(readFileSync("site/samples/packages/establish-pdu-session/assurance/predicates.yaml","utf8"))},
       findFiles:async()=>[uri],
       asRelativePath:file=>file.path
     },
@@ -58,7 +63,8 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       activeTextEditor:{document},
       registerCustomEditorProvider(_name,p){provider=p;return{dispose(){}};},
       showWarningMessage:()=>{},
-      showInformationMessage:()=>{},
+      showInformationMessage:async()=>confirmChoice,
+      showInputBox:async()=>"unused-node-value",
       showTextDocument:async(doc,opts)=>{opened.push({doc,opts});return textEditor;},
       showQuickPick:async items=>items[0]
     },
@@ -82,6 +88,8 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   activate(context);
   assert.ok(provider);
   assert.ok(commands.has("skillStudio.openProcedure"));
+  assert.ok(commands.has("skillStudio.renameNode"));
+  assert.ok(commands.has("skillStudio.editNodeOperatorValue"));
   const webview={
     cspSource:"vscode-resource:",
     options:null,html:"",
@@ -204,4 +212,36 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(writes.length,2,"stale Route creation must not insert twice");
   assert.equal(posted.at(-2).type,"error");
   assert.equal(posted.at(-1).type,"snapshot");
+
+  // Native Inspector authoring reuses the Classic typed patch modules. A
+  // cancelled confirmation and stale selection never mutate the TextDocument.
+  const selected={procedureId:"ensure-session",nodeId:"create-session",
+    sourceVersion:document.version,documentUri:document.uri.toString()};
+  const beforeOperator=document.text;
+  confirmChoice="取消";
+  await commands.get("skillStudio.editNodeOperatorValue")(selected,"pdu_session.reconcile");
+  assert.equal(document.text,beforeOperator,"cancelled Inspector edit must not write");
+  assert.equal(writes.length,2);
+  confirmChoice="确认并应用";
+  await commands.get("skillStudio.editNodeOperatorValue")(selected,"pdu_session.reconcile");
+  assert.equal(document.version,25);
+  assert.match(document.text,/call: pdu_session\.reconcile/);
+  assert.equal(writes.length,3);
+  assert.equal(writes[2].range.end.offset-writes[2].range.start.offset,
+    "pdu_session.create".length,"Operator edit replaces only its original scalar span");
+
+  await commands.get("skillStudio.editNodeOperatorValue")(
+    {...selected,sourceVersion:24},"pdu_session.create");
+  assert.equal(document.version,25,"stale Inspector selection must not change Source");
+  assert.equal(writes.length,3);
+
+  const renamedId="create-session-renamed";
+  await commands.get("skillStudio.renameNode")({
+    ...selected,sourceVersion:document.version
+  },renamedId);
+  assert.equal(document.version,26);
+  assert.equal(projectWorkspace(document.text).state,"READY");
+  assert.match(document.text,/create-session-renamed:/);
+  assert.doesNotMatch(document.text,/create-session:/);
+  assert.ok(writes.length>3,"Node rename applies its complete non-overlapping CST span set");
 });
