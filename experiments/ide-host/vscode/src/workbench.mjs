@@ -627,7 +627,7 @@ export function registerWorkbench(vscode,context){
       throw Error('请先打开当前 Package 的 Procedure 可视化编辑器');
     const basePath=doc.uri.path.slice(0,-suffix.length);
     const base=doc.uri.with({path:basePath});
-    const name=basePath.replace(/\\/$/,'').split('/').at(-1);
+    const name=basePath.replace(/\/$/,'').split('/').at(-1);
     if(!name)throw Error('无法确定 Package 根目录名称');
     const sourceVersion=doc.version,sourceText=doc.getText();
     const opened=(vscode.workspace.textDocuments??[])
