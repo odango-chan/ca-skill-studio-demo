@@ -195,12 +195,18 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     await sleep(100);
   }
   const dataflowTreeRow=await evalJS(`(()=>{
-    const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>
-      x.innerText.includes('Producer / Consumer dataflow')&&
-      x.getBoundingClientRect().height>0);
-    const r=el?.getBoundingClientRect();
+    // Theia nests child TreeNodes inside their parent. Matching innerText on
+    // the first ancestor can therefore select the entire Evidence subtree
+    // rather than the actual dataflow row. Pick the smallest visible matching
+    // row so the click lands on this row's own expand affordance.
+    const rows=[...document.querySelectorAll('.theia-TreeNode')]
+      .filter(x=>x.innerText.includes('Producer / Consumer dataflow')&&
+        x.getBoundingClientRect().height>0)
+      .sort((a,b)=>a.getBoundingClientRect().height-b.getBoundingClientRect().height);
+    const el=rows[0],r=el?.getBoundingClientRect();
     return r?{x:r.x+12,y:r.y+r.height/2,
-      expanded:el.getAttribute('aria-expanded')==='true'}:null;
+      expanded:el.getAttribute('aria-expanded')==='true',
+      rowHeight:r.height,rowText:el.innerText.slice(0,180)}:null;
   })()`);
   if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing');
   if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
