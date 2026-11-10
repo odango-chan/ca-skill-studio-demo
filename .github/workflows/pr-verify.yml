@@ -9,6 +9,7 @@ on:
       - '.gitignore'
       - 'tests/**'
       - 'scripts/**'
+      - 'experiments/ide-host/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/pr-verify.yml'
@@ -26,5 +27,7 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      - name: Build IDE host extensions
+        run: node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Chromium interaction smoke
         run: node scripts/edge-smoke.mjs
