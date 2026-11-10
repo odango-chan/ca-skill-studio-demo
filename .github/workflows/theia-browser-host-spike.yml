@@ -75,6 +75,7 @@ jobs:
       - name: Real Chromium import, CustomEditor and React Flow graph
         env:
           THEIA_URL: "http://127.0.0.1:3000/"
+          THEIA_REQUIRE_BROWSER_LSP: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       - name: Upload Theia backend log on failure
         if: failure()
