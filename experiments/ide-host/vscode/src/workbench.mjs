@@ -999,15 +999,6 @@ export function registerWorkbench(vscode,context){
         if(phase==="abort-and-clean"){
           try{
             for(const release of [...prepared.releases].reverse())try{release();}catch{}
-            const reopened=languagePackages.get(prepared.packageBKey);
-            if(reopened)reopened.refs=0;
-            if(reopened){
-              reopened.disposed=true;reopened.ticket++;clearTimeout(reopened.timer);
-              for(const subscription of reopened.subscriptions)subscription.dispose();
-              languagePackages.delete(prepared.packageBKey);
-              languagePackageStatuses.delete(prepared.packageBKey);
-              languageClient?.closePackage(prepared.packageBKey);
-            }
             await vscode.workspace.fs.delete(prepared.packageBRoot,
               {recursive:true,useTrash:false});
             return {phase,cleaned:true};
@@ -1032,6 +1023,7 @@ export function registerWorkbench(vscode,context){
               prepared.packageBKey
             )??0;
             const releaseReopened=attachLanguagePackage(prepared.procedureB);
+            prepared.releases.push(releaseReopened);
             const reopened=languagePackages.get(prepared.packageBKey);
             if(!reopened||reopened.generation<=generationBeforeReopen)
               throw Error("Reopened Package B did not advance its retained generation");
@@ -1041,14 +1033,17 @@ export function registerWorkbench(vscode,context){
             if(reopenedStatus.state!=="READY")
               throw Error("Reopened Package B is not READY: "+reopenedStatus.state);
             releaseReopened();
-            await vscode.workspace.fs.delete(prepared.packageBRoot,
-              {recursive:true,useTrash:false});
             return {twoPackageRecovery:true,packageBReady:true,
               firstReferenceRetained:true,finalCloseRemoved:true,
               initialGeneration,reopenGeneration:reopened.generation,
               generationMonotonic:reopened.generation>generationBeforeReopen,
               cleaned:true};
-          }finally{languagePackageLifecycleAcceptance.delete(key);}
+          }finally{
+            for(const release of [...prepared.releases].reverse())try{release();}catch{}
+            try{await vscode.workspace.fs.delete(prepared.packageBRoot,
+              {recursive:true,useTrash:false});}catch{}
+            languagePackageLifecycleAcceptance.delete(key);
+          }
         }
         throw Error("Unknown Package lifecycle acceptance phase: "+String(phase));
       }
