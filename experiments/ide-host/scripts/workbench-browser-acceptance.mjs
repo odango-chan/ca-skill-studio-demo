@@ -639,9 +639,17 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const rootStyle=color(root),surfaceStyle=color(surface);
       const item=root.querySelector('.action-menu-item,.lm-Menu-item');
       const itemStyle=item?color(item):null;
+      // Lumino/Monaco inner content may intentionally be transparent while
+      // the menu root paints the effective opaque surface. Evaluate the first
+      // opaque layer, not the transparent child in isolation.
+      const effectiveBackground=[
+        surfaceStyle.background,rootStyle.background
+      ].find(value=>(rgba(value)?.alpha??0)>=.98)??null;
       return {className:String(root.className),root:rootStyle,surface:surfaceStyle,
-        item:itemStyle,opaque:(rgba(surfaceStyle.background)?.alpha??0)>=.98,
-        contrast:contrast(surfaceStyle.foreground,surfaceStyle.background)};
+        item:itemStyle,opaque:Boolean(effectiveBackground),
+        effectiveBackground,
+        contrast:effectiveBackground?
+          contrast(surfaceStyle.foreground,effectiveBackground):0};
     });
   })()`);
   if(!contextMenu.length||!contextMenu.some(x=>x.opaque&&x.contrast>=4.5))
