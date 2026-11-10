@@ -34,8 +34,11 @@ function structurallyUnsafe(root) {
     const n = stack.pop();
     if (!n) continue;
     if (++count > MAX_NODES || n.anchor || n.tag || isAlias(n)) return true;
-    if (isMap(n)) for (const pair of n.items) stack.push(pair.key, pair.value);
-    else if (isSeq(n)) for (const item of n.items) stack.push(item);
+    if (isMap(n)) {
+      for (const pair of n.items) stack.push(pair.key, pair.value);
+    } else if (isSeq(n)) {
+      for (const item of n.items) stack.push(item);
+    }
   }
   return false;
 }
@@ -118,7 +121,7 @@ export function projectJsonSchema(source) {
       else if (isSeq(t)) type = stringSequence(t, lines, pointer + '/type', warnings).join(' | ');
       else {warnings.push(pointer + '/type must be string or array');type = 'unsupported';}
     }
-    const ref = summaryValue(child(node,'$ref'),lines,pointer+'/\\$ref',warnings);
+    const ref = summaryValue(child(node,'$ref'),lines,pointer+'/$ref',warnings);
     const title = summaryValue(child(node,'title'),lines,pointer+'/title',warnings);
     const description = summaryValue(child(node,'description'),lines,pointer+'/description',warnings);
     if (ref) allRefs.push({sourcePointer: pointer, reference: ref.value, line: ref.line});
@@ -143,6 +146,8 @@ export function projectJsonSchema(source) {
     const requirements = child(node,'required');
     const requiredNames = requirements === undefined ? [] :
       stringSequence(requirements, lines, pointer+'/required',warnings);
+    if (requirements !== undefined)
+      constraints.push({key:'required',value:requiredNames,line:lineOf(requirements,lines)});
     if (props !== undefined && !isMap(props))
       warnings.push(pointer+'/properties must be a mapping');
     if (isMap(props)) for (const pair of props.items) {
