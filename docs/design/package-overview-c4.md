@@ -42,13 +42,17 @@ the three core files. Missing core files are explicit placeholder rows.
 - No Source writes. Clicking a row opens the matching Designer or native Source.
 - Existing Package Audit and diagnostics remain the only owner of current
   editor audit findings.
+- Package Overview is provider-backed and intentionally has no `viewsWelcome`
+  contribution. Theia can materialize a welcome widget before the extension
+  provider activates; that stale child can prevent the real TreeView provider
+  from replacing it. The provider owns its loading/empty state.
 - No duplicate Package Session, no new language-service parser, and no
   changes to Procedure graph, LSP or Source Patch authority.
 
 ## Acceptance
 
 1. Pure inventory tests: multiple packages, nested roots, missing core files,
-   dirty counts, file-kind routing and bounded scan.
+   dirty counts, file-kind routing, bounded scan and TreeView parent chains.
 2. Extension contribution test: Package view and refresh action are present
    in the same Theia extension bundle.
 3. Real Theia Chromium: current owner sample appears, groups show exact
