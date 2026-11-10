@@ -43,10 +43,10 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   let audit='';
   for(let i=0;i<30;i++){
     audit=await evalJS(`document.body.innerText`);
-    if(/Package Audit · \\d+ editor warnings/.test(audit))break;
+    if(/Package Audit · \d+ editor warnings/.test(audit))break;
     await sleep(100);
   }
-  if(!/Package Audit · \\d+ editor warnings/.test(audit))throw Error('Package Audit did not run: '+audit.slice(-1000));
+  if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not run: '+audit.slice(-1000));
   // Re-open through Explorer rather than extension openWith command.
   await invoke('navigator.reveal');
   await invoke('core.saveAll');
