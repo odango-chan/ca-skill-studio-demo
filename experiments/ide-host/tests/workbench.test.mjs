@@ -125,7 +125,9 @@ test('Inspector exposes only owner-observed, Preview-qualified Outcome repairs',
     [1,0,0]);
   const typo=findRepair(typoOutcomeSource,'npcf-sm-policy-control-create');
   assert.ok(typo,'uniquely misspelled noncore Outcome has repair eligibility');
-  assert.deepEqual([typo.addCount,typo.renameCount,typo.deleteCount],[0,1,0]);
+  assert.ok(typo.addCount>=1,'owner-observed missing-core additions also remain available');
+  assert.equal(typo.renameCount,1,'the one provable typo correction is exposed');
+  assert.equal(typo.deleteCount,0,'noncore deletion is forbidden until core is complete');
   const extra=findRepair(extraOutcomeSource,'nudm-sdm-subscribe');
   assert.ok(extra,'isolated noncore Outcome may be safely deleted');
   assert.deepEqual([extra.addCount,extra.renameCount,extra.deleteCount],[0,0,1]);
