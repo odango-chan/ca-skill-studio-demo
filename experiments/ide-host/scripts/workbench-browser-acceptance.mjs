@@ -99,7 +99,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('workbench.files.action.focusFilesExplorer');
   let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file not available in native Explorer');
-  const start=performance.now();await click(file.x,file.y);await sleep(800);
+  // Measure the actual Explorer click → CustomEditor render path. Do not
+  // insert a fixed sleep before polling; it would dominate the reported time.
+  const start=performance.now();await click(file.x,file.y);
   let graphContext;
   async function graph(){
     const tree=await command('Page.getFrameTree'),frames=[];
