@@ -526,6 +526,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     phaseName:'preconditions',sourceVersion:typoVersion};
   await startNativeCommand('skillStudio.repairPhaseOutcome',typoItem,
     {mode:'rename',oldOutcome:'MISTYPED',newOutcome:'FAILED',target:'finalize-failed'});
+  await evalJS(`(()=>{
+    window.__outcomeCommandState={status:'pending'};
+    window.__skillStudioPendingCommand.then(
+      value=>{window.__outcomeCommandState={status:'resolved',value};},
+      error=>{window.__outcomeCommandState={status:'rejected',error:String(error)};});
+    return true;
+  })()`);
+  await sleep(450);
+  const outcomeProbe=await evalJS(`({
+    state:window.__outcomeCommandState,
+    tail:document.body.innerText.slice(-800),
+    modals:[...document.querySelectorAll('button')]
+      .filter(x=>x.getBoundingClientRect().width>0)
+      .map(x=>x.textContent?.trim()).filter(Boolean).slice(-25)
+  })`);
+  console.log('STUDIO_PHASE_OUTCOME_COMMAND_PROBE',JSON.stringify(outcomeProbe));
+  if(outcomeProbe.state?.status==='resolved'&&outcomeProbe.state.value!==true)
+    throw Error('Phase Outcome command rejected fixture before confirmation: '+
+      JSON.stringify(outcomeProbe));
   await confirmNativePreview('MISTYPED: finalize-failed','FAILED: finalize-failed');
   const outcomeAccepted=await evalJS('window.__skillStudioCommandResult');
   const outcomeApplied=await waitForRevisionChange(graphContext,
