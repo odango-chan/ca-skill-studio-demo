@@ -515,22 +515,103 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   })()`);
   if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
   if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
+  // Resolve the Evidence part inside the exact Skill Studio view container.
+  // Avoid matching an unrelated tab/label when Theia has multiple split panels.
   const evidenceHeader=await evalJS(`(()=>{
-    const candidates=[...document.querySelectorAll('*')].filter(x=>
-      x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
-      x.getBoundingClientRect().x>=0);
-    const el=candidates.sort((a,b)=>{
-      const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
-      return ar.width*ar.height-br.width*br.height;
-    })[0];
-    el?.scrollIntoView({block:'center',inline:'nearest'});
-    const r=el?.getBoundingClientRect();
-    const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
+    const container=[...document.querySelectorAll('.theia-view-container')]
+      .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+    const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+      .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+    if(!container||!header)return {found:false,containerFound:!!container,
+      headers:[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+        .map(x=>x.textContent.trim())};
+    header.scrollIntoView({block:'center',inline:'nearest'});
+    const r=header.getBoundingClientRect(),part=header.closest('.part');
+    const rootPresent=[...(part?.querySelectorAll('.theia-TreeNode')??[])].some(x=>
       x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
-    return r?{x:r.x+r.width/2,y:r.y+r.height/2,needsOpen:!root}:null;
+    return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,
+      collapsed:part?.classList.contains('collapsed')??false,
+      rootPresent,partClass:part?.className??'',headerText:header.textContent.trim(),
+      containerId:container.id};
   })()`);
-  if(!evidenceHeader)throw Error('Native Evidence view header is missing');
-  if(evidenceHeader.needsOpen){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
+  if(!evidenceHeader?.found)
+    throw Error('Native Evidence view header is missing from Skill Studio container: '+
+      JSON.stringify(evidenceHeader));
+  if(evidenceHeader.collapsed){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
+  await invoke('skillStudio.auditPackage');
+  // auditPackage refreshes the owner-file snapshot asynchronously. Explicitly
+  // refresh the tree provider after it completes, then wait for the Evidence
+  // view's own root row before looking for its dataflow child.
+  await invoke('skillStudio.refreshInspection');
+  let evidenceTreeState=null;
+  for(let attempt=0;attempt<100;attempt++){
+    evidenceTreeState=await evalJS(`(()=>{
+      const container=[...document.querySelectorAll('.theia-view-container')]
+        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+      const part=header?.closest('.part');
+      const rows=[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
+        const content=[...node.children].find(child=>
+          child.classList?.contains('theia-TreeNodeContent'));
+        return {node,content,text:content?.innerText?.trim()??''};
+      }).filter(row=>row.content?.getBoundingClientRect().height>0);
+      return {containerFound:!!container,headerFound:!!header,
+        partClass:part?.className??'',rootPresent:rows.some(row=>
+          row.text.includes('Source evidence only')),
+        labels:rows.map(row=>row.text).slice(-24),
+        partText:part?.innerText?.slice(-1800)??''};
+    })()`);
+    if(evidenceTreeState?.rootPresent)break;
+    await sleep(100);
+  }
+  if(!evidenceTreeState?.rootPresent)
+    throw Error('Native Evidence tree root did not appear after refresh: '+
+      JSON.stringify(evidenceTreeState));
+  let phaseEvidenceText='';
+  for(let i=0;i<100;i++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
+    await sleep(100);
+  }
+  // The native TreeDataProvider can publish its rows after the visible
+  // summary text. Await the actual row inside the Evidence part, not another
+  // TreeView that happens to contain similarly named items.
+  let dataflowTreeRow=null,evidenceRows=null;
+  for(let attempt=0;attempt<100&&!dataflowTreeRow;attempt++){
+    evidenceRows=await evalJS(`(()=>{
+      const container=[...document.querySelectorAll('.theia-view-container')]
+        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+      const part=header?.closest('.part');
+      const rows=[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
+        const content=[...node.children].find(child=>
+          child.classList?.contains('theia-TreeNodeContent'));
+        return {node,content,text:content?.innerText?.trim()??''};
+      }).filter(row=>row.text.includes('Producer / Consumer dataflow')&&
+        row.content?.getBoundingClientRect().height>0);
+      const row=rows[0];
+      row?.content?.scrollIntoView({block:'center',inline:'nearest'});
+      const r=row?.content?.getBoundingClientRect();
+      return r?{found:true,x:r.x+12,y:r.y+r.height/2,
+        expanded:row.node.getAttribute('aria-expanded')==='true',
+        rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
+        candidateCount:rows.length}:{
+          found:false,candidateCount:rows.length,
+          labels:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
+            const child=[...node.children].find(x=>x.classList?.contains('theia-TreeNodeContent'));
+            return child?.innerText?.trim()??'';
+          }).slice(-24),
+          partClass:part?.className??''
+        };
+    })()`);
+    if(evidenceRows?.found)dataflowTreeRow=evidenceRows;
+    else await sleep(100);
+  }
+  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after scoped readiness wait: '+
+    JSON.stringify({evidenceHeader,evidenceTreeState,evidenceRows,
+      bodyTail:(await evalJS('document.body.innerText')).slice(-1600)}));
   await invoke('skillStudio.auditPackage');
   let phaseEvidenceText='';
   for(let i=0;i<100;i++){
