@@ -1,4 +1,14 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
+import {readFile} from 'node:fs/promises';
+const publishedProcedure=await readFile(new URL(
+  '../../../site/samples/packages/establish-pdu-session/assurance/procedure.yaml',
+  import.meta.url),'utf8');
+const pcfOutcomeHeader="          'on':\n            FAILED: finalize-failed\n            UNRESOLVED: finalize-unresolved\n";
+const pcfOutcomeStart=publishedProcedure.indexOf(pcfOutcomeHeader);
+if(pcfOutcomeStart<0)throw Error('Published PCF Outcome test anchor missing');
+const pcfOutcomeLine=publishedProcedure.slice(0,
+  pcfOutcomeStart+pcfOutcomeHeader.indexOf('            FAILED:'))
+  .split('\n').length;
 export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
@@ -43,16 +53,22 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify({previous,latest:latest?.result?.value??null,
         refreshed:refreshed?.revision??null}));
   }
-  async function confirmNativePreview(oldText,newText){
+  async function confirmNativePreview(oldText,newText,{attempts=40}={}){
     let target=null;
-    for(let i=0;i<40&&!target;i++){
+    for(let i=0;i<attempts&&!target;i++){
       target=await evalJS(`(()=>{const el=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='确认并应用'&&x.getBoundingClientRect().width>0);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,text:document.body.innerText}:null;})()`);
       if(!target)await sleep(100);
     }
     if(!target){
-      const state=await evalJS(`({command:window.__skillStudioCommandState??null,
+      const state=await evalJS(`({
+        command:window.__outcomeCommandState??null,
+        lspCommand:window.__skillStudioCommandState??null,
         pending:typeof window.__skillStudioPendingCommand,
-        tail:document.body.innerText.slice(-1400)})`);
+        tail:document.body.innerText.slice(-1400),
+        visibleButtons:[...document.querySelectorAll('button')]
+          .filter(x=>x.getBoundingClientRect().width>0)
+          .map(x=>x.textContent?.trim()).filter(Boolean).slice(-12)
+      })`);
       throw Error('Native Inspector Diff confirmation dialog did not appear: '+
         JSON.stringify(state));
     }
@@ -88,7 +104,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('workbench.files.action.focusFilesExplorer');
   let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file not available in native Explorer');
-  const start=performance.now();await click(file.x,file.y);await sleep(800);
+  // Measure the actual Explorer click → CustomEditor render path. Do not
+  // insert a fixed sleep before polling; it would dominate the reported time.
+  const start=performance.now();await click(file.x,file.y);
   let graphContext;
   async function graph(){
     const tree=await command('Page.getFrameTree'),frames=[];
@@ -593,6 +611,86 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   console.log('STUDIO_PHASE_VERIFY_CHROMIUM',JSON.stringify({
     append:verifyAppend,name:verifyName,delete:verifyDelete,reorder:verifyReorder
   }));
+  // Exercise D4-A2.1 against the current published sample, not a wholesale
+  // Source replacement. The AMF delivery-context Verify consumes an earlier
+  // same-Node output; its local and fully-qualified forms both occur in Source.
+  // Multiple local occurrences remain after one normalization, allowing the
+  // shared source-backed planner to reprove the producer identity.
+  const beforeOutputGraph=await graph();
+  if(!beforeOutputGraph?.revision)
+    throw Error('Output reference test has no initial native Source revision');
+  const outputVersion=Number(/v(\d+)/.exec(beforeOutputGraph.revision)?.[1]);
+  if(!Number.isSafeInteger(outputVersion))
+    throw Error('Could not read native Source version before output reference test');
+  const outputProcedure='ue-requested-pdu-session-establishment';
+  const outputNode='namf-communication-n1n2-message-transfer';
+  const localOutput='preconditions.resolve-effective-session-configuration.output.contextRef';
+  const qualifiedOutput=outputNode+'.'+localOutput;
+  const outputItem={kind:'phase-output-reference',procedureId:outputProcedure,
+    nodeId:outputNode,phaseName:'preconditions',stepIndex:1,
+    bindingKey:'operationContextRef',sourceVersion:outputVersion};
+  await startNativeCommand('skillStudio.editPhaseOutputReference',outputItem,
+    'operationContextRef',qualifiedOutput);
+  await confirmNativePreview(localOutput,qualifiedOutput);
+  const outputAccepted=await evalJS('window.__skillStudioCommandResult');
+  const afterOutput=await waitForRevisionChange(graphContext,beforeOutputGraph.revision,
+    'Phase output reference normalization');
+  if(outputAccepted!==true)throw Error('Phase output reference normalization was not accepted');
+  await invoke('core.undo');
+  const afterOutputUndo=await waitForRevisionChange(graphContext,
+    afterOutput.result?.value,'Phase output reference native Undo');
+  // Reapply after Undo to prove the original local spelling was restored and
+  // that the same source-backed candidate is still eligible.
+  const undoVersion=Number(/v(\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(undoVersion))
+    throw Error('Could not read Source version after output reference Undo');
+  await startNativeCommand('skillStudio.editPhaseOutputReference',{
+    ...outputItem,sourceVersion:undoVersion
+  },'operationContextRef',qualifiedOutput);
+  await confirmNativePreview(localOutput,qualifiedOutput);
+  const outputReapply=await evalJS('window.__skillStudioCommandResult');
+  const afterOutputReapply=await waitForRevisionChange(graphContext,
+    afterOutputUndo.result?.value,'Phase output reference reapply');
+  if(outputReapply!==true)
+    throw Error('Output reference was not eligible again after native Undo');
+  await invoke('core.undo');
+  const afterOutputReapplyUndo=await waitForRevisionChange(graphContext,
+    afterOutputReapply.result?.value,'Phase output reference second Undo');
+  const restoredOutputGraph=await graph();
+  if(!restoredOutputGraph?.revision||restoredOutputGraph.nodes!==beforeOutputGraph.nodes)
+    throw Error('Native output-reference Undo lost the original graph');
+  const outputReference={before:beforeOutputGraph.revision,
+    applied:afterOutput.result?.value,undo:afterOutputUndo.result?.value,
+    reapplied:afterOutputReapply.result?.value,
+    undoAgain:afterOutputReapplyUndo.result?.value,
+    restored:restoredOutputGraph.revision,localOutput,qualifiedOutput};
+  console.log('STUDIO_PHASE_OUTPUT_REFERENCE_CHROMIUM',JSON.stringify(outputReference));
+  // D4-A4a uses the existing owner Source. Only an already-observed
+  // same-Phase/same-Outcome failure target is eligible, and Undo restores
+  // the original failure cleanup route before the later graph regressions.
+  const beforePhaseRoute=await graph();
+  const routeVersion=Number(/v(\d+)/.exec(beforePhaseRoute?.revision??'')?.[1]);
+  if(!Number.isSafeInteger(routeVersion))
+    throw Error('Phase Route test has no native TextDocument revision');
+  const phaseRouteItem={kind:'route',procedureId:'ue-requested-pdu-session-establishment',
+    nodeId:'nudm-sdm-subscribe',routeId:'nudm-sdm-subscribe:preconditions:FAILED',
+    sourceVersion:routeVersion};
+  await startNativeCommand('skillStudio.editPhaseRouteTarget',phaseRouteItem,'finalize-failed');
+  await confirmNativePreview('FAILED: failed','FAILED: finalize-failed');
+  const phaseRouteAccepted=await evalJS('window.__skillStudioCommandResult');
+  const afterPhaseRoute=await waitForRevisionChange(graphContext,beforePhaseRoute.revision,
+    'Phase Route retarget');
+  if(phaseRouteAccepted!==true)throw Error('Native Phase Route retarget was not accepted');
+  await invoke('core.undo');
+  const afterPhaseRouteUndo=await waitForRevisionChange(graphContext,
+    afterPhaseRoute.result?.value,'Phase Route retarget Undo');
+  const afterRouteGraph=await graph();
+  if(!afterRouteGraph?.revision||afterRouteGraph.nodes!==beforePhaseRoute.nodes)
+    throw Error('Phase Route native Undo lost the original Procedure graph');
+  const phaseRoute={before:beforePhaseRoute.revision,
+    applied:afterPhaseRoute.result?.value,undo:afterPhaseRouteUndo.result?.value,
+    routeId:phaseRouteItem.routeId,target:'finalize-failed'};
+  console.log('STUDIO_PHASE_ROUTE_TARGET_CHROMIUM',JSON.stringify(phaseRoute));
   const graphHasNode=async id=>{
     const result=await command('Runtime.evaluate',{
       contextId:graphContext,returnByValue:true,
@@ -687,6 +785,119 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes],
     identity:[insertedPresent,deletedPresent,restoredInsertPresent,originalAbsent]
   }));
+  // D4-A4b1: create a one-scalar typo in the actual native Monaco Source
+  // editor, then exercise the real extension's guarded correction + Undo.
+  // We never bulk-replace the Procedure or save a synthetic example Package.
+  const key=async(keyName,code,modifiers=0,virtualKeyCode)=>{
+    const event={key:keyName,code,modifiers,
+      windowsVirtualKeyCode:virtualKeyCode,nativeVirtualKeyCode:virtualKeyCode};
+    await command('Input.dispatchKeyEvent',{type:'keyDown',...event});
+    await command('Input.dispatchKeyEvent',{type:'keyUp',...event});
+  };
+  const beforeOutcomeFixture=await graph();
+  const nativeEditor=await evalJS(`(()=>{
+    const editors=[...document.querySelectorAll('.monaco-editor')];
+    const chosen=editors.map((node,index)=>{
+      const rect=node.getBoundingClientRect();
+      return {index,x:rect.x,y:rect.y,width:rect.width,height:rect.height};
+    }).find(rect=>rect.width>80&&rect.height>100&&rect.x>=0&&rect.y>=0&&
+      rect.x+rect.width/2<innerWidth&&rect.y+rect.height/2<innerHeight);
+    return chosen??null;
+  })()`);
+  if(!nativeEditor)throw Error('No native Monaco Source editor for Outcome acceptance');
+  await click(nativeEditor.x+Math.min(90,nativeEditor.width/2),
+    nativeEditor.y+Math.min(24,nativeEditor.height/2));
+  await key('g','KeyG',2,71);await sleep(200);
+  await command('Input.insertText',{text:String(pcfOutcomeLine)});
+  const gotoInput=await evalJS('document.activeElement?.value??""');
+  if(!String(gotoInput).includes(String(pcfOutcomeLine)))
+    throw Error('Native Go to Line did not accept PCF Outcome line: '+JSON.stringify(gotoInput));
+  await key('Enter','Enter',0,13);await sleep(250);
+  const visiblePcfLine=await evalJS(`(()=>{
+    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
+    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
+  })()`);
+  if(!visiblePcfLine.includes('FAILED: finalize-failed'))
+    throw Error('Native Source editor did not reveal the PCF Outcome target: '+
+      visiblePcfLine.slice(0,1400));
+  await key('Home','Home',0,36);await key('Home','Home',0,36);
+  await key('End','End',8,35);
+  await command('Input.insertText',{text:'            MISTYPED: finalize-failed'});
+  const afterTypo=await waitForRevisionChange(graphContext,
+    beforeOutcomeFixture.revision,'Native Phase Outcome typo fixture');
+  const typoVersion=Number(/v(\d+)/.exec(afterTypo.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(typoVersion))throw Error('Outcome typo lost native Source version');
+  const typoItem={kind:'phase-outcome-repair',
+    procedureId:'ue-requested-pdu-session-establishment',
+    nodeId:'npcf-sm-policy-control-create',
+    phaseName:'preconditions',sourceVersion:typoVersion};
+  await startNativeCommand('skillStudio.repairPhaseOutcome',typoItem,
+    {mode:'rename',oldOutcome:'MISTYPED',newOutcome:'FAILED',target:'finalize-failed'});
+  await evalJS(`(()=>{
+    window.__outcomeCommandState={status:'pending'};
+    window.__skillStudioPendingCommand.then(
+      value=>{window.__outcomeCommandState={status:'resolved',value};},
+      error=>{window.__outcomeCommandState={status:'rejected',error:String(error)};});
+    return true;
+  })()`);
+  await sleep(450);
+  const outcomeProbe=await evalJS(`({
+    state:window.__outcomeCommandState,
+    tail:document.body.innerText.slice(-800),
+    modals:[...document.querySelectorAll('button')]
+      .filter(x=>x.getBoundingClientRect().width>0)
+      .map(x=>x.textContent?.trim()).filter(Boolean).slice(-25)
+  })`);
+  console.log('STUDIO_PHASE_OUTCOME_COMMAND_PROBE',JSON.stringify(outcomeProbe));
+  if(outcomeProbe.state?.status==='resolved'&&outcomeProbe.state.value!==true)
+    throw Error('Phase Outcome command rejected fixture before confirmation: '+
+      JSON.stringify(outcomeProbe));
+  await confirmNativePreview('MISTYPED: finalize-failed','FAILED: finalize-failed',
+    {attempts:120});
+  const outcomeAccepted=await evalJS('window.__skillStudioCommandResult');
+  const outcomeApplied=await waitForRevisionChange(graphContext,
+    afterTypo.result?.value,'Native Phase Outcome correction');
+  if(outcomeAccepted!==true)throw Error('Native Phase Outcome repair was not accepted');
+  await invoke('core.undo');
+  const outcomeUndo=await waitForRevisionChange(graphContext,
+    outcomeApplied.result?.value,'Native Phase Outcome repair Undo');
+  const afterNativeUndo=await evalJS(`(()=>{
+    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
+    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
+  })()`);
+  if(!afterNativeUndo.includes('MISTYPED: finalize-failed'))
+    throw Error('Native Undo did not revert the Outcome repair back to the typed fixture: '+
+      afterNativeUndo.slice(-1200));
+  // The keyboard-created fixture can have its own Monaco edit/undo grouping.
+  // Restore the original Source explicitly with one native editor line edit;
+  // do not assume a second core.undo will undo exactly that fixture.
+  await click(nativeEditor.x+Math.min(90,nativeEditor.width/2),
+    nativeEditor.y+Math.min(24,nativeEditor.height/2));
+  await key('g','KeyG',2,71);await sleep(160);
+  await command('Input.insertText',{text:String(pcfOutcomeLine)});
+  await key('Enter','Enter',0,13);await sleep(160);
+  await key('Home','Home',0,36);await key('Home','Home',0,36);
+  await key('End','End',8,35);
+  await command('Input.insertText',{text:'            FAILED: finalize-failed'});
+  const fixtureRestored=await waitForRevisionChange(graphContext,
+    outcomeUndo.result?.value,'Native Phase Outcome fixture restoration');
+  const restoredText=await evalJS(`(()=>{
+    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
+    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
+  })()`);
+  if(!restoredText.includes('FAILED: finalize-failed')||
+     restoredText.includes('MISTYPED: finalize-failed'))
+    throw Error('Native Source fixture was not restored to its original scalar: '+
+      restoredText.slice(-1200));
+  const outcomeRestored=await graph();
+  if(!outcomeRestored?.revision||outcomeRestored.nodes!==beforeOutcomeFixture.nodes)
+    throw Error('Phase Outcome restoration lost the original Procedure graph');
+  const phaseOutcome={line:pcfOutcomeLine,
+    before:beforeOutcomeFixture.revision,seed:afterTypo.result?.value,
+    repaired:outcomeApplied.result?.value,undo:outcomeUndo.result?.value,
+    restored:fixtureRestored.result?.value,
+    restoration:'native editor exact line replacement'};
+  console.log('STUDIO_PHASE_OUTCOME_REPAIR_CHROMIUM',JSON.stringify(phaseOutcome));
   // Return the native Explorer to the foreground: the evidence acceptance
   // opened the Skill Studio Activity Bar and intentionally kept it selected.
   await invoke('workbench.files.action.focusFilesExplorer');
@@ -866,5 +1077,5 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,workerFailureEvidence,recoveryEvidence};
+  return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference,phaseRoute,phaseOutcome,workerFailureEvidence,recoveryEvidence};
 }

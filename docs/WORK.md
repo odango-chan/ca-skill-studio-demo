@@ -232,7 +232,7 @@ main browser application remains available at `/classic/`.
 
 **验收：** PR #111 exact HEAD `00877a0414674e4e5b8e056787b56e3d3fa5228e` 的四组门禁全部 PASS：IDE Host [#42762425857](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42762425857)、Theia Browser-Only [#42762425856](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42762425856)、Theia Browser Host / real Chromium [#42762425883](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42762425883)、PR Verify [#42762426052](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42762426052)。PR #111 已合入 `main`，merge commit `50eb16d5`；resulting-main Pages 需按该精确 merge SHA 单独核对。Runtime / 5GC / desktop VS Code GUI NOT_RUN。
 
-## 2026-11-10 · Theia Package ZIP export（PR #114，exact-head 验收中）
+## 2026-11-10 · Theia Package ZIP export（PR #114，已合入 main）
 
 **范围：** 在原生 Procedure CustomEditor 增加「导出 Package ZIP」，只读取当前 Procedure 所属 Package。复用 Classic 的 `directory-import.mjs` / `zip.mjs` 校验和 ZIP 写入逻辑；使用 Theia 原生 Workspace FileSystem API 读取文件快照，将已打开 TextDocument 的未保存文本覆盖到快照，并原样保留未修改文本字节（含 BOM）及不透明二进制资源。
 
@@ -240,7 +240,35 @@ main browser application remains available at `/classic/`.
 
 **边界：** 这是 ZIP **导出**，Classic 当前没有 ZIP importer，因此不新增或声称已有 ZIP 导入对等功能。OPFS 不是本地磁盘挂载或 Git 同步；不涉及 Runtime / 5GC。
 
-**验收状态：** PR #114 最新代码 HEAD `0cdec87f76dd580cddf695f15985af6294524afe` 的 IDE Host、Theia Browser-Only 真实 Chromium、PR Verify 已 PASS；Theia Backend 真实 Chromium [#42767870191 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767870191)；同一实现 HEAD `0cdec87` 的 IDE Host [#42767869981 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767869981)、Browser-Only [#42767869976 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767869976)、PR Verify [#42767870221 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42767870221) 也全部通过。后续 `f5dac6` 为文档对齐提交，不改 ZIP 代码；合并后仍需单独验证 resulting-main Pages。
+**验收：** PR #114 exact HEAD `851d327fd8eb48f34d2e3d616c51f320c11a29bd` 四组门禁全部 PASS：IDE Host [#42769069009](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42769069009)、Theia Browser-Only [#42769069011](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42769069011)、PR Verify [#42769069003](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42769069003)、Theia Backend real Chromium [#42769069069](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42769069069)。已合入 main，merge commit `1401530b`。Resulting-main Pages [#42770237030 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42770237030)，exact identity 为 source/classic/workflow SHA 全部 `1401530befab33704a60a3b3799b7c5047b21f53`，Theia 为默认根入口，Classic 保留 `/classic/`。
+
+## 2026-11-10 · Theia Inspector D4-A2.1 Output Reference normalization（PR #116 MERGED）
+
+**范围：** 将 Classic 已有 `site/phase-output-refs.mjs` 接入 Theia 原生 Inspector。对可证明的同一生产 Node / Phase / 唯一 earlier named Step / output suffix，只提供 local 与 fully-qualified 两种已在同一 Procedure Source 中实际出现的写法互换。Eligible Phase Step 下显示独立的 `Output reference · <bindingKey>` 子行，右键提供规范化操作；不把跨 Node 引用误判成同生产者。
+
+**写入路径：** Theia 只负责 TreeItem/command、当前 TextDocument revision 检查、QuickPick、Diff/显式确认和原生 WorkspaceEdit；候选发现、身份判定、Source scalar span、候选重算和 forged/stale Preview 拒绝全部复用 Classic 模块。Undo 由 Theia 原生编辑历史负责。当前公开示例的 AMF 节点拥有可重验的同生产 Step local/qualified 引用对（delivery-context Verify 的 operationContextRef），真实 Chromium 直接对该示例执行原生 WorkspaceEdit、Undo、再次编辑和再次 Undo；host 测试另外覆盖仓内 pinned predecessor fixture。PCF baseline Verify 虽曾观察到两种写法，但替换最后一处 local 会使 Classic Preview 失去双写法证明，Theia Inspector 需隐藏该不可执行入口。既不需要整份替换 Source，也不会为了演示改变原始 SKILL 资产。
+
+**边界：** 这是引用写法规范化，不证明 Runtime 能解析别名，不证明 output field schema/type，不授权跨生产者 ABI 写入，也不改变 Procedure/Route 语义。Runtime / 5GC NOT_RUN。
+
+**验收状态：** [PR #116](https://github.com/odango-chan/ca-skill-studio-demo/pull/116) 已合并，main merge `330c9b80`。Exact-head `c5153a8e` IDE Host [#42776798637 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798637)、Browser-Only [#42776798442 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798442)、Backend Chromium [#42776798608 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798608)、PR Verify [#42776798584 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42776798584)。Resulting-main Pages [#42777288099 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42777288099)，精确 source/classic/workflow SHA 为 `330c9b8058452f6b1de1b25f990c6a0bca036fd4`；Runtime/5GC/桌面 GUI NOT_RUN。
+
+
+## 2026-11-10 · Theia D4-A4a Phase Route 目标重定向（PR #118 MERGED）
+
+**范围：** 仅迁移 Classic 已验收 `site/phase-routes.mjs` 的现有 Phase 失败/未决 Route 目标编辑，不新定义 YAML/业务规则。Inspector Route 行仅在共享模块证明同 Procedure、同 Phase、同 Outcome 的候选及保留可达 Node 集时提供原生命令；保留现有 Insert Node 命令并支持双菜单共存。
+
+**写入与验证：** 文档和 Source 版本校验 → QuickPick → Classic Source Preview / Diff → 用户确认 → 原生 `WorkspaceEdit`/Undo。Host 测试覆盖取消、应用、过期 Route；真实 Chromium 针对 UDM `preconditions.on.FAILED: failed` → 已观测的 `finalize-failed` 并 Undo 原文。PR #118 merge `31987e41`；exact-head `5dc55f0a` 四组 CI 全部 PASS：IDE Host [#42778316708](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42778316708)、Browser-Only [#42778316442](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42778316442)、Backend Chromium [#42778316448](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42778316448)、PR Verify 重跑 [#42778316986](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42778316986)。
+
+**边界：** 仅前置 `FAILED/UNRESOLVED`、后置 `FAIL/UNKNOWN` 已有 Route；没有创建 Phase/Outcome、修改 `operator.on` / `PASS` 或跨 Producer ABI。失败收尾路径的业务等价性及 Runtime/5GC NOT_RUN。
+
+
+## 2026-11-10 · Theia D4-A4b1 已有 Phase Outcome 修复（PR #119 MERGED）
+
+**迁移范围：** 完全复用 Classic `site/phase-outcomes.mjs`，只操作已有 Phase 的字面 `'on'` map；共享资格允许三种 Source 修复：从同 Procedure/同 Phase/同 Outcome 已观察值补齐缺失核心 Outcome；把可唯一证明的非核心拼写纠正成缺失核心键；当核心键齐全且无其他引用时删除孤立非核心键。正常完整 Phase 不出现编辑入口。
+
+**原生交互：** Inspector Phase 下有资格才显示 `Outcome repair` 子行；原生 QuickPick 显示可证明的操作；重查最新 TextDocument/完整 Source/候选资格，显示 Diff 并要求明确确认，然后仅用原生 WorkspaceEdit 写精确 Source span、支持 Undo。Host 验证三操作、取消/过期/虚构候选；Chromium 在真实 Monaco 中制造单行拼写错误、通过原生命令修复、对修复操作执行原生 Undo，然后精确恢复测试样本；不假设键盘编辑的 Undo 分组。PR #119 已合入 main，merge `a19f9886`，exact-head `5ade768c` 四组 PASS：IDE Host [#42783478978](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42783478978)、Browser-Only Chromium [#42783479017](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42783479017)、Backend Chromium [#42783478968](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42783478968)、PR Verify [#42783479057](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42783479057)。合并后的 Pages SHA 仍需独立核对。
+
+**不授权：** 新建 Phase/on map、任意 Outcome 字典、Runtime 失败处理等价性、跨生产者 ABI 和真实 5GC，均保持 NOT_RUN / Source-only 边界。
 
 
 - **LSP stack refresh (2026-11-10):** #103 / #105 / #109 / #110 / #113 now include the current `main` workbench changes, including the canvas toolbar. All remain Draft; prior PASS results are historical until the refreshed exact heads complete CI. No merge or Pages deployment.
