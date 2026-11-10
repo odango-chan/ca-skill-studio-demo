@@ -50,13 +50,23 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify({previous,latest:latest?.result?.value??null,
         refreshed:refreshed?.revision??null}));
   }
-  async function confirmNativePreview(oldText,newText){
+  async function confirmNativePreview(oldText,newText,{attempts=40}={}){
     let target=null;
-    for(let i=0;i<40&&!target;i++){
+    for(let i=0;i<attempts&&!target;i++){
       target=await evalJS(`(()=>{const el=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='确认并应用'&&x.getBoundingClientRect().width>0);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,text:document.body.innerText}:null;})()`);
       if(!target)await sleep(100);
     }
-    if(!target)throw Error('Native Inspector Diff confirmation dialog did not appear');
+    if(!target){
+      const state=await evalJS(`({
+        command:window.__outcomeCommandState??null,
+        tail:document.body.innerText.slice(-600),
+        visibleButtons:[...document.querySelectorAll('button')]
+          .filter(x=>x.getBoundingClientRect().width>0)
+          .map(x=>x.textContent?.trim()).filter(Boolean).slice(-12)
+      })`);
+      throw Error('Native Inspector Diff confirmation dialog did not appear: '+
+        JSON.stringify(state));
+    }
     if(!target.text.includes(oldText)||!target.text.includes(newText))
       throw Error('Native Inspector confirmation did not show the expected Source Diff: '+target.text.slice(-1200));
     await click(target.x,target.y);await sleep(250);
@@ -545,7 +555,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(outcomeProbe.state?.status==='resolved'&&outcomeProbe.state.value!==true)
     throw Error('Phase Outcome command rejected fixture before confirmation: '+
       JSON.stringify(outcomeProbe));
-  await confirmNativePreview('MISTYPED: finalize-failed','FAILED: finalize-failed');
+  await confirmNativePreview('MISTYPED: finalize-failed','FAILED: finalize-failed',
+    {attempts:120});
   const outcomeAccepted=await evalJS('window.__skillStudioCommandResult');
   const outcomeApplied=await waitForRevisionChange(graphContext,
     afterTypo.result?.value,'Native Phase Outcome correction');
