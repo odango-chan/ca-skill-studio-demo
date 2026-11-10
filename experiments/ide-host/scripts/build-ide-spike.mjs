@@ -8,6 +8,16 @@ await rm(join(root,"dist"),{recursive:true,force:true});
 await rm(join(root,"media"),{recursive:true,force:true});
 await mkdir(join(root,"dist"),{recursive:true});
 await mkdir(join(root,"media"),{recursive:true});
+
+// The browser LSP server is a separate classic Worker bundle. It imports the
+// same transport-neutral LanguageDiagnosticSession as the host tests; no Node
+// runtime or filesystem access is available inside this Worker.
+await build({
+  entryPoints:["experiments/ide-host/lsp-browser/server/src/browserServerMain.mjs"],
+  outfile:join(root,"dist","skill-language-server.js"),
+  bundle:true,format:"iife",platform:"browser",target:"es2022",
+  logLevel:"info"
+});
 await build({
   entryPoints:[join(root,"src/extension.mjs")],
   outfile:join(root,"dist/extension.cjs"),
@@ -81,4 +91,4 @@ if(!files.includes("SKILL.md")||!files.includes("assurance/procedure.yaml")||
     !files.some(x=>x.endsWith(".py")))throw Error("Incomplete sample Package");
 await writeFile(join(sampleDest,"files.json"),JSON.stringify(files,null,2)+"\n");
 console.log("STUDIO_PREPARED_SAMPLE",JSON.stringify({files:files.length,root:sampleDest}));
-console.log("IDE spike: built Node + browser extension entries and local ReactFlow webview (not installed or run)");
+console.log("IDE spike: built Node + browser extension entries, isolated LSP Worker and local ReactFlow webview (not installed or run)");
