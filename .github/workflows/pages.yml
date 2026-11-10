@@ -181,6 +181,10 @@ jobs:
         working-directory: ide-source
         run: |
           npm ci --no-audit --no-fund
+          # Browser LSP has two separately locked dependency roots. Without
+          # these installs, the Pages Worker bundle cannot resolve the LSP SDK.
+          npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
+          npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
           node experiments/ide-host/scripts/build-ide-spike.mjs
           node experiments/ide-host/scripts/prepare-theia-online.mjs
           node --test experiments/ide-host/tests/pages-compose.test.mjs
