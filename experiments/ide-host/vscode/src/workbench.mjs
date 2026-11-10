@@ -2260,6 +2260,27 @@ export function registerWorkbench(vscode,context){
          !['.md','.yaml','.yml','.py','.json'].some(ext=>lowerTarget.endsWith(ext)))return null;
       return uri.with({path:targetPath});
     };
+    const localFiles=new Set();
+    let relativeDir='';
+    if(rootPath){
+      const currentDir=uri.path.slice(0,uri.path.lastIndexOf('/'));
+      relativeDir=currentDir.slice(rootPath.length).split('/').filter(Boolean).join('/');
+      try{
+        const packageRoot=uri.with({path:rootPath});
+        const files=await vscode.workspace.findFiles(
+          new vscode.RelativePattern(packageRoot,'**/*'),'**/node_modules/**',5000);
+        for(const file of files)
+          if(file.path.startsWith(rootPath+'/'))
+            localFiles.add(file.path.slice(rootPath.length+1));
+      }catch{
+        // Fail closed: without an exact package inventory, path literals stay plain code.
+      }
+      for(const openDocument of vscode.workspace.textDocuments)
+        if(openDocument.uri.path.startsWith(rootPath+'/'))
+          localFiles.add(openDocument.uri.path.slice(rootPath.length+1));
+      if(uri.path.startsWith(rootPath+'/'))
+        localFiles.add(uri.path.slice(rootPath.length+1));
+    }
     const random=new Uint8Array(16);
     if(typeof globalThis.crypto?.getRandomValues!=='function')
       throw new Error('Secure randomness unavailable: refusing to render Markdown Webview');
@@ -2271,7 +2292,9 @@ export function registerWorkbench(vscode,context){
     );
     const webview=panel.webview;
     const render=()=>{
-      const preview=renderMarkdown(doc.getText(),{localLinks:Boolean(rootPath)});
+      const preview=renderMarkdown(doc.getText(),{
+        localLinks:Boolean(rootPath),localFiles,relativeDir
+      });
       const csp="default-src 'none'; base-uri 'none'; form-action 'none'; "+
         "style-src 'nonce-"+nonce+"'; script-src 'nonce-"+nonce+"'; "+
         "img-src 'none'; connect-src 'none';";
