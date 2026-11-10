@@ -73,10 +73,8 @@ export function registerWorkbench(vscode,context){
     }
     return languageClientPromise;
   }
-  async function refreshLanguagePackage(state){
-    if(state.disposed)return;
-    const ticket=++state.ticket;
-    const generation=++state.generation;
+  async function refreshLanguagePackage(state,ticket,generation){
+    if(state.disposed||ticket!==state.ticket)return;
     try{
       const snapshot=await collectPackageSnapshot(
         vscode,state.procedureDocument,generation
@@ -99,12 +97,25 @@ export function registerWorkbench(vscode,context){
       }
     }
   }
-  function scheduleLanguagePackageRefresh(state){
+  function scheduleLanguagePackageRefresh(state,immediate=false){
     if(state.disposed)return;
+    const ticket=++state.ticket;
+    const generation=++state.generation;
     clearTimeout(state.timer);
+    const invalidate=client=>{
+      if(!state.disposed&&ticket===state.ticket)
+        client?.invalidatePackage(state.key,generation);
+    };
+    if(languageClient)invalidate(languageClient);
+    else if(languageClientPromise)
+      void languageClientPromise.then(invalidate).catch(()=>{});
+    if(immediate){
+      void refreshLanguagePackage(state,ticket,generation);
+      return;
+    }
     state.timer=setTimeout(()=>{
       state.timer=null;
-      void refreshLanguagePackage(state);
+      void refreshLanguagePackage(state,ticket,generation);
     },120);
   }
   function attachLanguagePackage(doc){
@@ -162,7 +173,7 @@ export function registerWorkbench(vscode,context){
           languagePackageContains(root,item.newUri)))
           scheduleLanguagePackageRefresh(state);
       });
-      void refreshLanguagePackage(state);
+      scheduleLanguagePackageRefresh(state,true);
     }
     let released=false;
     return ()=>{
