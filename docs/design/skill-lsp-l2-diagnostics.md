@@ -34,17 +34,19 @@ VS Code extension files, existing Visual Patch logic, or the formal Skill DSL.
   problems. This anchor is a file-level status, not a claimed source-token span.
 - Clearing diagnostics omits `version` rather than supplying a stale version.
 
-### Next integration
+### Browser Worker integration
 
-L2-B will implement the **official** `vscode-languageserver/browser` Worker
-and matching browser client, using this layer only for diagnostic facts/session
-gating. Theia 1.76 static Pages compatibility needs real Chromium evidence,
-including Worker load, rapid edits, close/reopen, Package switch, cancellation,
-same-origin resource loading and explicit failure fallback.
+L2-B implements the official `vscode-languageclient/browser` client and
+`vscode-languageserver/browser` Worker on top of this transport-neutral
+session. See [skill-lsp-l2-browser-worker.md](skill-lsp-l2-browser-worker.md)
+for the snapshot protocol, diagnostic ownership and real Theia acceptance
+evidence. The browser-only Theia 1.76 Chromium smoke requires Package analysis
+to reach `SKILL LSP: READY`.
 
-Do not describe the current module as an LSP server: it is a pure TypeScript
-transport-neutral precursor. No completion/hover, Runtime validation, Python
-type analysis, Tool execution or 5GC operation is provided.
+This document describes the reusable L2-A session contract; the combined
+L2-A + L2-B implementation is now a real browser LSP server. Completion, hover,
+definition/references, semantic tokens, Python type analysis and Runtime
+validation remain outside this slice.
 
 ## Tests
 
