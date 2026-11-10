@@ -9,6 +9,76 @@ if(pcfOutcomeStart<0)throw Error('Published PCF Outcome test anchor missing');
 const pcfOutcomeLine=publishedProcedure.slice(0,
   pcfOutcomeStart+pcfOutcomeHeader.indexOf('            FAILED:'))
   .split('\n').length;
+export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
+  if (!requireEditor) return {required:false};
+  const click=async(x,y)=>{
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
+    await sleep(80);
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:1});
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:1});
+  };
+  const invoke=async(id,...args)=>{
+    const expression="(async()=>{const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('Native command registry missing');"+
+      "const registry=c.get(key);window.__skillStudioLastCommandResult="+
+      "await registry.executeCommand("+JSON.stringify(id)+",..."+
+      JSON.stringify(args)+");return true;})()";
+    await evalJS(expression);
+    await sleep(300);
+  };
+  const activity=await evalJS(
+    "(()=>{const tabs=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
+    ".filter(x=>x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&"+
+    "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&"+
+    "x.getBoundingClientRect().y<innerHeight);const el=tabs.find(x=>"+
+    "x.textContent.trim()==='Skill Studio');const r=el?.getBoundingClientRect();"+
+    "return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()");
+  if(!activity)throw Error('Package Overview Activity Bar entry missing');
+  await click(activity.x,activity.y);
+  await sleep(350);
+  await invoke('skillStudio.refreshPackages');
+  const scan=await evalJS('window.__skillStudioLastCommandResult??null');
+  console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(scan));
+  let view=null;
+  for(let attempt=0;attempt<100;attempt++){
+    view=await evalJS(
+      "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
+      ".find(x=>x.textContent.trim().toLowerCase()==='packages'&&"+
+      "x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);"+
+      "const part=header?.closest('.part');return {header:Boolean(header),text:part?.innerText??'',"+
+      "rows:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(x=>x.innerText.trim()),"+
+      "rect:(()=>{const r=part?.getBoundingClientRect();return r?{x:r.x,y:r.y,w:r.width,h:r.height}:null;})()};})()");
+    if(view?.rows?.some(x=>x.includes('establish-pdu-session')))break;
+    await sleep(100);
+  }
+  const packageRow=await evalJS(
+    "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
+    ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
+    "const el=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(x=>"+
+    "x.innerText.includes('establish-pdu-session')&&x.getBoundingClientRect().width>0&&"+
+    "x.getBoundingClientRect().x>=0);const r=el?.getBoundingClientRect();"+
+    "return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()");
+  if(!scan?.packages?.some(x=>x.name==='establish-pdu-session')||!packageRow)
+    throw Error('Package Overview TreeView did not render discovered Package: '+
+      JSON.stringify({scan,view}));
+  await click(packageRow.x,packageRow.y);
+  await sleep(250);
+  const groups=await evalJS(
+    "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
+    ".find(x=>x.textContent.trim().toLowerCase()==='packages');"+
+    "return header?.closest('.part')?.innerText??'';})()");
+  for(const group of ['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'])
+    if(!groups.includes(group))
+      throw Error('Package Overview missing group '+group+': '+groups.slice(-1200));
+  const evidence={package:'establish-pdu-session',core:'3/3',schemas:6,
+    scripts:3,references:3,treeVisible:true,scanState:scan.state};
+  console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify(evidence));
+  return evidence;
+}
+
 export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
@@ -78,30 +148,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await click(activity.x,activity.y);await sleep(500);
   const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
   for(const name of ['Packages','Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
-  // C4: Package Overview discovers the current Package and exposes file-kind groups.
-  await invoke('skillStudio.refreshPackages');
-  const packageScanResult=await evalJS('window.__skillStudioLastCommandResult??null');
-  console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(packageScanResult));
-  let packageInventory='';
-  for(let attempt=0;attempt<100;attempt++){
-    packageInventory=await evalJS('document.body.innerText');
-    if(packageInventory.includes('1 SKILL Package')&&
-       packageInventory.includes('establish-pdu-session'))break;
-    await sleep(100);
-  }
-  if(!packageInventory.includes('1 SKILL Package')||
-     !packageInventory.includes('establish-pdu-session'))
-    throw Error('Package Overview did not discover the current Package: '+JSON.stringify({packageScanResult,body:packageInventory.slice(-1200)}));
-  const packageRow=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.includes('establish-pdu-session')&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-  if(!packageRow)throw Error('Package Overview package row is not visible');
-  await click(packageRow.x,packageRow.y);await sleep(250);
-  const packageGroups=await evalJS('document.body.innerText');
-  for(const group of ['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'])
-    if(!packageGroups.includes(group))throw Error('Package Overview missing group '+group+': '+packageGroups.slice(-1000));
-  console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify({
-    package:'establish-pdu-session',core:'3/3',schemas:6,scripts:3,references:3,
-    inventoryOnly:true
-  }));
   const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
   console.log('STUDIO_PROBLEMS_HEADERS',JSON.stringify(problemHeaderDiagnostics));
