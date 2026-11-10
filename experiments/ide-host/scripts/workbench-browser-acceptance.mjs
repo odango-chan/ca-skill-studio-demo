@@ -1,5 +1,5 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
-export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor,requireBrowserLsp=false}){
+export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
@@ -17,20 +17,28 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   }
   async function startNativeCommand(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
-    await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
+    await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioCommandState={status:"pending",id:${JSON.stringify(id)}};window.__skillStudioPendingCommand=Promise.resolve(registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)})).then(value=>{window.__skillStudioCommandState={status:"resolved",id:${JSON.stringify(id)},value};return value;},error=>{window.__skillStudioCommandState={status:"rejected",id:${JSON.stringify(id)},error:String(error?.message??error)};throw error;});return true;})()`);
   }
   async function waitForRevisionChange(contextId,previous,label){
-    let latest=null;
+    let latest=null,refreshed=null;
     for(let i=0;i<50;i++){
-      latest=await command('Runtime.evaluate',{
-        contextId,returnByValue:true,
-        expression:`document.querySelector('#revision')?.textContent`
-      });
-      if(latest.result?.value&&latest.result.value!==previous)return latest;
+      try{
+        latest=await command('Runtime.evaluate',{
+          contextId,returnByValue:true,
+          expression:`document.querySelector('#revision')?.textContent`
+        });
+        if(latest.result?.value&&latest.result.value!==previous)return latest;
+      }catch{/* the CustomEditor iframe can be replaced by native Undo */}
+      try{
+        refreshed=await graph();
+        if(refreshed?.revision&&refreshed.revision!==previous)
+          return {result:{value:refreshed.revision}};
+      }catch{/* retry until the replacement frame is ready */}
       await sleep(100);
     }
     throw Error(label+' did not produce a native Source revision within 5s: '+
-      JSON.stringify({previous,latest:latest?.result?.value??null}));
+      JSON.stringify({previous,latest:latest?.result?.value??null,
+        refreshed:refreshed?.revision??null}));
   }
   async function confirmNativePreview(oldText,newText){
     let target=null;
@@ -38,7 +46,13 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       target=await evalJS(`(()=>{const el=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='确认并应用'&&x.getBoundingClientRect().width>0);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,text:document.body.innerText}:null;})()`);
       if(!target)await sleep(100);
     }
-    if(!target)throw Error('Native Inspector Diff confirmation dialog did not appear');
+    if(!target){
+      const state=await evalJS(`({command:window.__skillStudioCommandState??null,
+        pending:typeof window.__skillStudioPendingCommand,
+        tail:document.body.innerText.slice(-1400)})`);
+      throw Error('Native Inspector Diff confirmation dialog did not appear: '+
+        JSON.stringify(state));
+    }
     if(!target.text.includes(oldText)||!target.text.includes(newText))
       throw Error('Native Inspector confirmation did not show the expected Source Diff: '+target.text.slice(-1200));
     await click(target.x,target.y);await sleep(250);
@@ -95,6 +109,27 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(stillPreview)throw Error("Double-click did not pin native preview tab");
   const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
+  // Guard the canvas controls that were present in Classic Studio but were
+  // previously omitted from the Theia CustomEditor migration.
+  const canvasToolbarEvidence=await evalWebviewJS(`(()=> {
+    const ids=["layoutDirection","rootPathMode","neighborsOnly","showAllLabels",
+      "centerSelection","zoomOut","zoomIn","fit","fitWidth","fitHeight",
+      "pathFailure","pathUncertain","pathRecovery"];
+    const controls=Object.fromEntries(ids.map(id=>[id,Boolean(document.getElementById(id))]));
+    const direction=document.getElementById("layoutDirection")?.value??null;
+    return {
+      visible:document.getElementById("graphTools")?.hidden===false,
+      direction,
+      rootPathToolbarVisible:document.getElementById("rootPathToolbar")?.hidden===false,
+      controls
+    };
+  })()`);
+  if(!canvasToolbarEvidence?.visible||canvasToolbarEvidence.direction!=="DOWN"||
+     !canvasToolbarEvidence.rootPathToolbarVisible||
+     Object.values(canvasToolbarEvidence.controls??{}).some(value=>!value))
+    throw Error("Theia Procedure canvas toolbar is incomplete or not vertically initialized: "+
+      JSON.stringify(canvasToolbarEvidence));
+  console.log("STUDIO_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbarEvidence));
   let languageServiceStatus="NOT_REQUIRED_NODE_HOST";
   if(requireBrowserLsp){
     languageServiceStatus="";
@@ -248,6 +283,68 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   await sleep(500);
   const warm=await graph(),warmTiming=JSON.parse(warm?.timing??'null');
   if(!initialTiming||!warmTiming?.cacheHit)throw Error('Version-scoped warm layout cache was not exercised: '+JSON.stringify({initialTiming,warmTiming}));
+  // Export the complete imported Package through the native host snapshot and
+  // require a second explicit browser gesture to download the generated ZIP.
+  await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,awaitPromise:true,
+    expression:`document.querySelector('#exportPackageZip')?.click();true`
+  });
+  let packageReady=null;
+  for(let i=0;i<60;i++){
+    packageReady=await command('Runtime.evaluate',{
+      contextId:graphContext,returnByValue:true,
+      expression:`({
+        visible:!document.querySelector('#zipExportNotice')?.hidden,
+        details:document.querySelector('#zipExportDetails')?.textContent??''
+      })`
+    });
+    if(packageReady.result?.value?.visible)break;
+    await sleep(100);
+  }
+  if(!packageReady.result?.value?.visible||
+     !packageReady.result.value.details.includes('.zip')||
+     !packageReady.result.value.details.includes('个文件'))
+    throw Error('Native Package ZIP export did not prepare a bounded browser download: '+
+      JSON.stringify(packageReady.result?.value));
+  // Instrument the page's main JavaScript realm. Runtime.evaluate against
+  // graphContext uses an isolated CDP world whose URL/DOM prototypes are not
+  // the same objects used by the Webview's event listener.
+  if(typeof evalWebviewJS!=="function")throw Error("Procedure Webview main-realm evaluator is unavailable");
+  const zipEvidence=await evalWebviewJS(`(()=>{
+      let blobMeta=null,linkMeta=null;
+      const create=URL.createObjectURL,click=HTMLAnchorElement.prototype.click;
+      URL.createObjectURL=function(blob){
+        blobMeta={size:blob.size,type:blob.type};return create.call(URL,blob);
+      };
+      HTMLAnchorElement.prototype.click=function(){
+        linkMeta={download:this.download,href:this.href};
+      };
+      document.querySelector('#downloadPackageZip').click();
+      URL.createObjectURL=create;
+      HTMLAnchorElement.prototype.click=click;
+      return {blobMeta,linkMeta,noticeHidden:document.querySelector('#zipExportNotice')?.hidden};
+    })()`);
+  if(!(zipEvidence?.blobMeta?.size>22)||
+     zipEvidence.blobMeta.type!=='application/zip'||
+     !zipEvidence.linkMeta?.download?.endsWith('.zip')||
+     !zipEvidence.linkMeta.href.startsWith('blob:')||
+     !zipEvidence.noticeHidden)
+    throw Error('Native Package ZIP download did not produce a browser Blob: '+
+      JSON.stringify(zipEvidence));
+  const packageZipEvidence={details:packageReady.result.value.details,...zipEvidence};
+  console.log('STUDIO_PACKAGE_ZIP_CHROMIUM',JSON.stringify(packageZipEvidence));
+  // The Theia canvas now defaults to Classic's proven success-path focus.
+  // This Inspector structural-edit regression deliberately needs all 17
+  // source-declared Nodes so its 17→18→17 assertions remain meaningful.
+  await command('Runtime.evaluate',{contextId:graphContext,expression:`(()=>{
+    const s=document.querySelector('#rootPathMode');
+    if(!s)throw Error('Native Root path mode is missing');
+    s.value='all';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`});
+  await sleep(700);
+  const allPathGraph=await graph();
+  if(allPathGraph?.nodes!==17)
+    throw Error('Could not restore the 17-node original Root graph before structural editing: '+
+      JSON.stringify(allPathGraph));
   // Exercise a real native Inspector edit. The command is invoked through
   // Theia's command registry, presents a native Diff confirmation, and writes
   // through the host TextDocument/WorkspaceEdit rather than the Webview.
@@ -289,6 +386,90 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   });
   if(!bindingSelection.result?.value?.node)throw Error('Could not select Phase binding Node');
   await sleep(250);
+  const skillStudioTab=await evalJS(`(()=>{
+    const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>
+      x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
+    const r=el?.getBoundingClientRect();
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
+      active:el.classList.contains('lm-mod-current')}:null;
+  })()`);
+  if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
+  if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
+  const evidenceHeader=await evalJS(`(()=>{
+    const candidates=[...document.querySelectorAll('*')].filter(x=>
+      x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
+      x.getBoundingClientRect().x>=0);
+    const el=candidates.sort((a,b)=>{
+      const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
+      return ar.width*ar.height-br.width*br.height;
+    })[0];
+    const r=el?.getBoundingClientRect();
+    const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
+      x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,needsOpen:!root}:null;
+  })()`);
+  if(!evidenceHeader)throw Error('Native Evidence view header is missing');
+  if(evidenceHeader.needsOpen){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
+  await invoke('skillStudio.auditPackage');
+  let phaseEvidenceText='';
+  for(let i=0;i<100;i++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
+    await sleep(100);
+  }
+  const dataflowTreeRow=await evalJS(`(()=>{
+    // TreeNode.innerText includes nested descendants. Inspect only each
+    // TreeNode's own content element so we expand the exact summary row.
+    const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{
+      const content=[...node.children].find(child=>
+        child.classList?.contains('theia-TreeNodeContent'));
+      return {node,content,text:content?.innerText?.trim()??''};
+    }).filter(row=>row.text.includes('Producer / Consumer dataflow')&&
+      row.content?.getBoundingClientRect().height>0);
+    const row=rows[0];
+    // The evidence view is below the large Inspector/Outline trees in the
+    // default layout. A non-zero rect can still be outside the viewport.
+    row?.content?.scrollIntoView({block:'center',inline:'nearest'});
+    const r=row?.content?.getBoundingClientRect();
+    return r?{x:r.x+12,y:r.y+r.height/2,
+      expanded:row.node.getAttribute('aria-expanded')==='true',
+      rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
+      candidateCount:rows.length}:null;
+  })()`);
+  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing');
+  if(!dataflowTreeRow.expanded){await click(dataflowTreeRow.x,dataflowTreeRow.y);await sleep(250);}
+  for(let i=0;i<50;i++){
+    phaseEvidenceText=await evalJS('document.body.innerText');
+    if(phaseEvidenceText.includes('Consumer ABI'))break;
+    await sleep(100);
+  }
+  const phaseEvidence={
+    ready:phaseEvidenceText.includes('Producer / Consumer dataflow')&&
+      phaseEvidenceText.includes('Consumer ABI'),
+    dataflowRows:(phaseEvidenceText.match(/Producer \/ Consumer dataflow/g)||[]).length,
+    consumerAbiRows:(phaseEvidenceText.match(/Consumer ABI/g)||[]).length,
+    readOnly:phaseEvidenceText.includes('no write authority')
+  };
+  if(!phaseEvidence.ready||!phaseEvidence.dataflowRows||!phaseEvidence.consumerAbiRows||
+     !phaseEvidence.readOnly)
+    throw Error('Native Evidence view did not render bounded read-only Producer / Consumer evidence: '+
+      JSON.stringify({phaseEvidence,dataflowTreeRow})+' · '+phaseEvidenceText.slice(-1400));
+  console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify(phaseEvidence));
+  // Expanding the native Evidence tree moves focus away from the editor. Open
+  // the authoritative Source editor before testing native Undo so the host's
+  // undo command is bound to the edited TextDocument, not the tree widget.
+  await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,awaitPromise:true,
+    expression:`document.querySelector('#openSource')?.click();true`
+  });
+  await sleep(600);
+  const sourceEditorReady=await evalJS(`({
+    monacoEditors:document.querySelectorAll('.monaco-editor').length,
+    activeText:document.activeElement?.closest('.monaco-editor')!==null
+  })`);
+  if(!(sourceEditorReady.monacoEditors>0))
+    throw Error('Native Source editor did not open before Phase binding Undo regression: '+
+      JSON.stringify(sourceEditorReady));
   const beforeBinding=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
@@ -315,13 +496,39 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     node:bindingSelection.result.value.node,procedure:bindingSelection.result.value.procedure,
     before:beforeBinding.result?.value,after:afterBinding.result?.value,undo:afterBindingUndo.result?.value
   }));
+  // Rename a named Script Step and all proven local/qualified consumers through
+  // the shared closed-world source-span planner, then verify native Undo.
+  // Undo may replace the CustomEditor iframe; reacquire its live execution
+  // world instead of reading a possibly detached Webview context.
+  const beforeNamedGraph=await graph();
+  const beforeNamedRename=beforeNamedGraph?.revision??afterBindingUndo.result?.value??null;
+  const namedRenameVersion=Number(/v(\d+)/.exec(beforeNamedRename??'')?.[1]);
+  if(!Number.isSafeInteger(namedRenameVersion))throw Error('Named Step rename missing native Source revision');
+  const oldStepName='select-subscription-configuration';
+  const newStepName='select-subscription-config-v2';
+  await startNativeCommand('skillStudio.renameNamedPhaseStep',{
+    kind:'phase-step',procedureId:bindingSelection.result.value.procedure,
+    nodeId:'nudm-sdm-subscribe',phaseName:'preconditions',stepIndex:0,
+    stepName:oldStepName,stepOperator:'script',sourceVersion:namedRenameVersion
+  },newStepName);
+  await confirmNativePreview(oldStepName,newStepName);
+  const namedRenameAccepted=await evalJS(`window.__skillStudioCommandResult`);
+  const afterNamedRename=await waitForRevisionChange(graphContext,beforeNamedRename,
+    'Named Phase Step rename');
+  if(namedRenameAccepted!==true)throw Error('Named Phase Step rename was not accepted');
+  await invoke('core.undo');
+  const afterNamedRenameUndo=await waitForRevisionChange(graphContext,
+    afterNamedRename.result?.value,'Named Phase Step rename Undo');
+  console.log('STUDIO_PHASE_NAMED_STEP_RENAME_CHROMIUM',JSON.stringify({
+    before:beforeNamedRename,applied:afterNamedRename.result?.value,
+    undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName
+  }));
   // Real Chromium + actual Theia extension command registry. Each Verify edit
   // must return to the unmodified Source through native TextDocument Undo.
+  let lastKnownRevision=afterNamedRenameUndo.result?.value??beforeNamedRename;
   async function nativeVerifyRoundTrip(commandId,item,argument,oldText,newText){
-    const before=(await command('Runtime.evaluate',{
-      contextId:graphContext,returnByValue:true,
-      expression:`document.querySelector('#revision')?.textContent`
-    })).result?.value;
+    const currentGraph=await graph();
+    const before=currentGraph?.revision??lastKnownRevision??null;
     const version=Number(/v(\d+)/.exec(before??'')?.[1]);
     if(!Number.isSafeInteger(version))throw Error('Verify command missing native Source revision');
     await startNativeCommand(commandId,{...item,
@@ -334,12 +541,17 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     if(accepted!==true)throw Error(commandId+' did not apply after confirmation');
     await invoke('core.undo');
     const undone=await waitForRevisionChange(graphContext,after.result?.value,commandId+' Undo');
+    lastKnownRevision=undone.result?.value??lastKnownRevision;
     return {before,applied:after.result?.value,undone:undone.result?.value};
   }
   const verifyAppend=await nativeVerifyRoundTrip('skillStudio.addPhaseVerify',
     {kind:'phase',phaseName:'preconditions'},
     'createdsession.n4.initial_resources_ready',
     '新增','createdsession.n4.initial_resources_ready');
+  const verifyName=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
+    {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
+    {action:'name',newName:'lifecycle-ready'},
+    'verify: createdsession.lifecycle.ready','name: lifecycle-ready');
   const verifyDelete=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
     {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
     'delete','删除','createdsession.lifecycle.ready');
@@ -347,7 +559,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
     'move-up','调整','createdsession.ingress.eligible');
   console.log('STUDIO_PHASE_VERIFY_CHROMIUM',JSON.stringify({
-    append:verifyAppend,delete:verifyDelete,reorder:verifyReorder
+    append:verifyAppend,name:verifyName,delete:verifyDelete,reorder:verifyReorder
   }));
   const graphHasNode=async id=>{
     const result=await command('Runtime.evaluate',{
@@ -443,6 +655,9 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes],
     identity:[insertedPresent,deletedPresent,restoredInsertPresent,originalAbsent]
   }));
+  // Return the native Explorer to the foreground: the evidence acceptance
+  // opened the Skill Studio Activity Bar and intentionally kept it selected.
+  await invoke('workbench.files.action.focusFilesExplorer');
   // Safe Markdown uses the actual native source document and shared renderer.
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
@@ -468,6 +683,6 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   }
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
-  console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,languageServiceStatus,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs};
+  console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
+  return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
 }

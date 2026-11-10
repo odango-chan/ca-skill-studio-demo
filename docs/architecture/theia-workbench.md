@@ -1,8 +1,8 @@
 # Theia 工作台与 Classic 功能对照
 
-**Status: Stage One accepted; Inspector Node, Phase Input Binding, bounded Node insert/delete and bounded Phase Verify authoring merged into main; resulting-main Pages PASS (`main@5a5cb981`) · Date: 2026-11-10**
+**Status: Stage One accepted on main@50eb16d5; Inspector Node, Phase Input Binding, bounded Node insert/delete, named Phase Step / Verify authoring, canvas toolbar, Root path filtering and read-only Producer/Consumer Evidence merged; bounded Theia Package ZIP export in PR #114 under exact-head validation · Date: 2026-11-10**
 
-第一阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；当前 Inspector Node authoring 见 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)；Phase Input Binding 首个增量见 [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97)；Node insert/delete 首个有界增量见 [PR #98](https://github.com/odango-chan/ca-skill-studio-demo/pull/98)；Phase Verify 受限增量见 [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99)。验收见 WORK / TRACEABILITY 与各自 exact-head PR CI。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
+第一阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；当前 Inspector Node authoring 见 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)；Phase Input Binding 首个增量见 [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97)；Node insert/delete 首个有界增量见 [PR #98](https://github.com/odango-chan/ca-skill-studio-demo/pull/98)；Phase Verify 受限增量见 [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99)；画布工具栏与 Root 路径筛选恢复见 [PR #106](https://github.com/odango-chan/ca-skill-studio-demo/pull/106)；命名 Step / Verify 生命周期迁移见 [PR #108](https://github.com/odango-chan/ca-skill-studio-demo/pull/108)；只读 Producer/Consumer Evidence 见已合并的 [PR #111](https://github.com/odango-chan/ca-skill-studio-demo/pull/111)（merge `50eb16d5`）；当前 bounded Package ZIP export 见 [PR #114](https://github.com/odango-chan/ca-skill-studio-demo/pull/114)。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
 
 | 能力 | Classic | Theia 第一阶段 | 共享实现 / 剩余缺口 |
 |---|---|---|---|
@@ -11,22 +11,23 @@
 | 单击 / 双击 | 自有导航 | 委托 Theia 原生 Explorer | 预览 / 固定行为由宿主控制，不拦截树事件；真实 Chromium 门禁检查原生文件打开和预览标签晋升 |
 | Inspection / Inspector | 选择详情及有界编辑 | 原生树视图；Node 重命名/Operator 值（#96 MERGED）与 Node 插入/删除（#98 MERGED）已迁移 | 复用 workspace、node-designer、node-attributes、node-create、node-delete；宿主以 Source revision 校验、Diff/显式确认和 WorkspaceEdit 写入；复杂 Node 仍 fail-closed |
 | Outline | Procedure / Node 导航 | 原生树视图 | 所有 Procedure / Node；点击定位 Source 并同步图中 Node Focus；版本失效拒绝旧导航 |
-| Evidence | Phase 输入/输出与消费者合同 | 源码 Child / Phase / Step 证据 | 仅 workspace 真实字段；完整消费者 ABI、输入输出证据尚未迁移；不表示 Runtime evidence |
+| Evidence | Phase 输入/输出与消费者合同 | 源码 Child / Phase / Step + 选中 Node 的 Producer/Consumer dataflow 与 Consumer ABI 证据（#111 MERGED） | 复用 `phase-dataflow`、`phase-consumer-contract`、`phase-evidence-copy`；只显示 Source 可证明的生产者来源、消费者字段/类型与不确定原因；TYPE_ONLY_MATCH 仅表示类型一致，不是完整 ABI 证明；authorizedWrites 恒为 0；不表示 Runtime evidence |
 | Problems / Package Audit | 编辑期跨文件提醒 | 原生视图及宿主诊断 collection | 直接复用 package-audit；读取当前 Package 和已打开的未保存文档；缺必要文件明确 unavailable |
 | Markdown Preview | 安全只读预览 | 原生命令 / Explorer 右键预览 | 直接复用 markdown-preview；无脚本、无外部图像；随文档变化刷新 |
 | Route 创建 / 重连 / Diff / Apply / Undo | 有界实现 | 已有且保留 | 复用 route-connect / route-target、原生 WorkspaceEdit；仍要求 Diff 后显式确认 |
-| Phase Designer | 有界 Step / binding / verify 编辑 | D4-A1 Phase Input Binding（#97 MERGED）+ Verify 尾部新增、无名 Verify 删除与相邻换序（#99 MERGED；exact-head IDE Host / 两种 Theia Chromium PASS） | 复用 `site/phase-bindings.mjs`、`site/phase-step-structural.mjs`、`site/phase-step-order.mjs`；仅允许当前 Package PredicateSet 声明的可用 Verify 和原 Source 可安全修改的单行无名 Verify；宿主必须基于精确文档版本、显式 Diff、重算及 WorkspaceEdit / Undo；完整命名 Step/Producer/Consumer 编辑仍缺失 |
+| Phase Designer | 有界 Step / binding / verify 编辑 | D4-A1 Phase Input Binding（#97 MERGED）+ Verify 新增/删除/换序（#99 MERGED）+ 命名 Step 原子重命名与命名 Verify 命名/安全删除（#108 MERGED） | 复用 `site/phase-bindings.mjs`、`site/phase-step-structural.mjs`、`site/phase-step-order.mjs`、`site/phase-step-rename.mjs`、`site/phase-named-verify.mjs`；命名 Step 只在同 Procedure 引用闭包可证明时开放，Verify 删除只允许零消费者；D4-A2.1 同生产者 Output Reference normalization（Classic 已有 `phase-output-refs.mjs`）仍待迁入 Theia；Phase Route/Outcome 编辑仍待迁移；跨生产者 ABI 写入、effectful Step 结构写入需先有 owner 契约 |
 | Node 重命名 / Operator 值编辑 | 有界实现 | 已合入 main（PR #96；merge `dbcbf387`） | 复用 `site/node-designer.mjs` / `site/node-attributes.mjs`；仅精确 Source spans，拒绝过期选择；原生 WorkspaceEdit / Undo；不支持 Operator kind 替换或不安全标量 |
 | Node 插入 / 删除 | 有界实现 | 已合入 main（PR #98；merge `27502c57`，exact-head IDE Host / Browser-Only / Browser Host / PR Verify PASS） | Insert 仅作用于可 Patch 的现有 Route；Delete 仅限同状态 Terminal 合并或单出口 Node bypass；复用完整 Route 影响检查与精确 Source spans；复杂 Phase/Child/多出口 Node 不开放删除 |
-| Root 路径筛选 / 锚定 | 已有 | 未迁移 | Theia 仍显示完整声明图 |
-| 目录导入 / ZIP / 保存 | Classic 自有工作副本 | 宿主文件系统与 OPFS | 不提供 Classic ZIP 导入导出等价能力；OPFS 不等于磁盘或 GitHub 同步 |
+| Root 路径筛选 / 锚定 | 已有 | 已迁移（PR #106 MERGED） | 默认垂直主路径；支持选择路径/全部路径、失败/未决/恢复筛选、分支逐节点展开/收起并锚定；复用 `path-focus`、ELK 和 React Flow 视口接口 |
+| 画布工具栏 | 已有 | 已迁移（PR #106 MERGED） | 垂直/水平、缩放、适配整图/横向/纵向、邻居视图、Route 标签、定位；仅视图状态，不修改 YAML |
+| 目录导入 / ZIP / 保存 | Classic 自有工作副本 | Theia 原生 Explorer + OPFS + 示例导入 | Theia Package ZIP export 的有界实现见 PR #114（当前 exact-head 验收中）；Classic 本身没有 ZIP importer，因此不把 ZIP 导入列为既有对等功能。Theia 目录会话原位保存仍待迁移；OPFS 不等于磁盘或 GitHub 同步 |
 | Run / Runtime / 5GC | 无 | 无 | NOT_RUN，非本仓 authority |
 
 ## 原生工作台适配边界
 
 `vscode/package.json` 声明 View Container 和四个 View；`workbench.mjs` 只做 TreeDataProvider、TextDocument、Workspace FS 与 DiagnosticCollection 适配。`inspection.mjs` 把共享 `workspace.mjs` 投影映射为只读行，不定义 DSL。图中选择携带文档版本；宿主核对当前版本后才更新 Inspector。Outline 点击携带来源版本，旧版本命令拒绝执行。源文本仍是唯一业务真源。
 
-Package Audit 限于当前 procedure 所属 Package，最多 500 文件 / 4 MiB 文本，350 ms 合并事件后异步执行。引用规则只来自 Classic `package-audit.mjs`，不创造 Runtime qualification。缺文件、超限或读取失败不能报告“无问题”。更新、切换和销毁使过期任务失效；审计不会阻塞 CustomEditor 首次渲染。
+Package Audit 限于当前 procedure 所属 Package，最多 500 文件 / 4 MiB 文本，350 ms 合并事件后异步执行。引用规则只来自 Classic `package-audit.mjs`，不创造 Runtime qualification。审计成功读取的同一有界 Package 文件快照也供 Evidence 解析消费者 schema；Procedure 或 Package 文件变更即失效并回退为未知证据。缺文件、超限或读取失败不能报告“无问题”。更新、切换和销毁使过期任务失效；审计不会阻塞 CustomEditor 首次渲染。
 
 Theia 1.76 的文本预览宿主使用 `editor-preview-widget` opener，显式 Source 命令通过专用构建适配选择它；backend-backed Theia 的 Node 扩展入口通过原生 `env.uriScheme` 识别宿主；无 preview 模块时仅在 opener 不存在的错误上回退 `code-editor-opener`。VS Code 仍使用 `default`。Native editor association 使用 basename 配置，CustomEditor selector 继续限定 assurance 路径；selector 的 `[p]` 是等价字面匹配，避免 Theia Windows glob 的多段路径快捷分支错误，不扩大文件范围。
 

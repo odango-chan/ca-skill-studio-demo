@@ -14,11 +14,19 @@ import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   from '../../../../site/phase-step-structural.mjs';
 import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
   applyAdjacentVerifyReorder} from '../../../../site/phase-step-order.mjs';
+import {namedPhaseStepImpactReport,previewNamedPhaseStepRename,
+  applyNamedPhaseStepRename} from '../../../../site/phase-step-rename.mjs';
+import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
+  previewDeleteUnreferencedNamedVerify,applyDeleteUnreferencedNamedVerify,
+  previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
+  from '../../../../site/phase-named-verify.mjs';
+import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export.mjs';
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
+  let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
@@ -206,6 +214,7 @@ export function registerWorkbench(vscode,context){
     if(languageClientPromise)void languageClientPromise.then(stop).catch(()=>{});
     else void languageClient?.stop();
   }});
+
   // Internal, non-contributed browser acceptance probe. It opens the real
   // native Source documents before invoking VS Code's public provider commands.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
@@ -623,18 +632,25 @@ export function registerWorkbench(vscode,context){
     const ctx=currentNode(item);
     const deletions=phaseVerifyDeleteOptions(ctx.source,ctx.procedureId,ctx.nodeId);
     const reorder=adjacentVerifyReorderOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    const canDelete=deletions.some(x=>x.phaseName===item.phaseName&&
-      x.stepIndex===item.stepIndex);
-    const canMoveUp=reorder.some(x=>x.phaseName===item.phaseName&&
-      x.stepIndex===item.stepIndex-1);
-    const canMoveDown=reorder.some(x=>x.phaseName===item.phaseName&&
-      x.stepIndex===item.stepIndex);
+    const named=namedVerifyEditOptions(ctx.source,ctx.procedureId,ctx.nodeId);
+    const at=(rows,index)=>rows.some(x=>x.phaseName===item.phaseName&&x.stepIndex===index);
+    const canName=!item.stepName&&at(named.names,item.stepIndex);
+    const canDelete=at(deletions,item.stepIndex);
+    const canMoveUp=at(reorder,item.stepIndex-1);
+    const canMoveDown=at(reorder,item.stepIndex);
+    const canDeleteNamed=Boolean(item.stepName)&&at(named.deletions,item.stepIndex);
+    const canMoveUpNamed=Boolean(item.stepName)&&at(named.swaps,item.stepIndex-1);
+    const canMoveDownNamed=Boolean(item.stepName)&&at(named.swaps,item.stepIndex);
     const choices=[
-      ...(canMoveUp?[{label:"Move Verify Up",value:"move-up"}]:[]),
-      ...(canMoveDown?[{label:"Move Verify Down",value:"move-down"}]:[]),
-      ...(canDelete?[{label:"Delete Verify Step",value:"delete"}]:[])
+      ...(canName?[{label:"Name Verify Step",value:"name"}]:[]),
+      ...(canMoveUp||canMoveUpNamed?[{label:"Move Verify Up",value:"move-up"}]:[]),
+      ...(canMoveDown||canMoveDownNamed?[{label:"Move Verify Down",value:"move-down"}]:[]),
+      ...(canDelete||canDeleteNamed?[{label:"Delete Verify Step",value:"delete"}]:[])
     ];
-    let action=requestedAction;
+    let action=typeof requestedAction==="object"&&requestedAction
+      ?requestedAction.action:requestedAction;
+    let newName=typeof requestedAction==="object"&&requestedAction
+      ?requestedAction.newName:undefined;
     if(typeof action!=="string"){
       const picked=await vscode.window.showQuickPick(choices,{
         placeHolder:"选择此 Verify Step 的安全编辑操作"
@@ -642,10 +658,32 @@ export function registerWorkbench(vscode,context){
       action=typeof picked==="string"?picked:picked?.value;
     }
     if(!choices.some(x=>x.value===action))return false;
+    if(action==="name"&&typeof newName!=="string"){
+      newName=await vscode.window.showInputBox({
+        value:"verify-"+item.stepValue.split(".").at(-1).replace(/[^A-Za-z0-9_-]/g,"-"),
+        prompt:"为这个 Verify Step 设置稳定名称",
+        placeHolder:"verify-step-name"
+      });
+    }
+    if(action==="name"&&(typeof newName!=="string"||!newName.trim()))return false;
     if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
       throw Error("Source changed while choosing the Verify Step operation");
     let preview,verify;
-    if(action==="delete"){
+    if(action==="name"){
+      preview=previewNamePlainVerify(ctx.source,ctx.procedureId,ctx.nodeId,
+        item.phaseName,item.stepIndex,newName);
+      verify=text=>applyNamePlainVerify(text,preview);
+    }else if(action==="delete"&&canDeleteNamed){
+      preview=previewDeleteUnreferencedNamedVerify(ctx.source,ctx.procedureId,
+        ctx.nodeId,item.phaseName,item.stepIndex);
+      verify=text=>applyDeleteUnreferencedNamedVerify(text,preview);
+    }else if(action==="move-up"&&canMoveUpNamed||
+             action==="move-down"&&canMoveDownNamed){
+      const pairIndex=action==="move-up"?item.stepIndex-1:item.stepIndex;
+      preview=previewSwapAdjacentNamedVerify(ctx.source,ctx.procedureId,
+        ctx.nodeId,item.phaseName,pairIndex);
+      verify=text=>applySwapAdjacentNamedVerify(text,preview);
+    }else if(action==="delete"){
       preview=previewDeletePhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
         item.phaseName,item.stepIndex);
       verify=text=>applyDeletePhaseVerify(text,preview);
@@ -657,6 +695,37 @@ export function registerWorkbench(vscode,context){
     }
     const applied=await confirmAndApply({
       ...ctx,preview,changes:singleSourceChange,verify
+    });
+    if(applied)update(ctx.doc);
+    return applied;
+  }
+
+  async function renameNamedPhaseStep(item,newName){
+    if(item?.kind!=="phase-step"||typeof item.phaseName!=="string"||
+       !Number.isSafeInteger(item.stepIndex)||typeof item.stepName!=="string"||
+       !item.stepName)
+      throw Error("Select a named Phase Step in the native Inspector");
+    const ctx=currentNode(item);
+    const impact=namedPhaseStepImpactReport(ctx.source,ctx.procedureId,ctx.nodeId)
+      .find(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
+    if(!impact?.editEligible||impact.stepName!==item.stepName)
+      throw Error("Named Step references are ambiguous or Source-only");
+    let value=newName;
+    if(typeof value!=="string")value=await vscode.window.showInputBox({
+      value:item.stepName,prompt:"输入新的 Phase Step 名称",
+      placeHolder:"new-step-name"
+    });
+    if(typeof value!=="string"||!value.trim())return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the new Phase Step name");
+    const preview=previewNamedPhaseStepRename(ctx.source,ctx.procedureId,
+      ctx.nodeId,item.phaseName,item.stepIndex,value);
+    const applied=await confirmAndApply({
+      ...ctx,preview,
+      changes:p=>p.sourceSpans.map(span=>({
+        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
+      })),
+      verify:text=>applyNamedPhaseStepRename(text,preview)
     });
     if(applied)update(ctx.doc);
     return applied;
@@ -878,9 +947,29 @@ export function registerWorkbench(vscode,context){
           const canMoveDown=reorder.some(x=>x.phaseName===item.phaseName&&
             x.stepIndex===item.stepIndex);
           const canEditVerify=deletable||canMoveUp||canMoveDown;
-          tree.contextValue=hasBinding
-            ?(canEditVerify?'skillStudio.phaseStepAndVerify':'skillStudio.phaseStep')
-            :(canEditVerify?'skillStudio.verifyStep':'skillStudio.phaseStepPlain');
+          const namedVerify=namedVerifyEditOptions(source,item.procedureId,item.nodeId);
+          const canNameVerify=item.stepOperator==='verify'&&!item.stepName&&
+            namedVerify.names.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
+          const canDeleteNamedVerify=item.stepOperator==='verify'&&Boolean(item.stepName)&&
+            namedVerify.deletions.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
+          const namedReorder=item.stepOperator==='verify'&&Boolean(item.stepName)&&
+            namedVerify.swaps.some(x=>x.phaseName===item.phaseName&&
+              (x.stepIndex===item.stepIndex||x.stepIndex===item.stepIndex-1));
+          const namedStep=item.stepName?namedPhaseStepImpactReport(source,
+            item.procedureId,item.nodeId).find(x=>x.phaseName===item.phaseName&&
+              x.stepIndex===item.stepIndex&&x.stepName===item.stepName):null;
+          const canRenameNamed=Boolean(namedStep?.editEligible);
+          if(item.stepOperator==='verify'&&(canDeleteNamedVerify||namedReorder)){
+            tree.contextValue=hasBinding?'skillStudio.namedVerifyStepAndBinding':'skillStudio.namedVerifyStep';
+          }else if(canRenameNamed){
+            tree.contextValue=hasBinding?'skillStudio.namedPhaseStepAndBinding':'skillStudio.namedPhaseStep';
+          }else if(item.stepOperator==='verify'&&(canNameVerify||canEditVerify)){
+            tree.contextValue=hasBinding?'skillStudio.verifyStepAndBinding':'skillStudio.verifyStep';
+          }else{
+            tree.contextValue=hasBinding
+              ?(canEditVerify?'skillStudio.phaseStepAndVerify':'skillStudio.phaseStep')
+              :(canEditVerify?'skillStudio.verifyStep':'skillStudio.phaseStepPlain');
+          }
           item.sourceVersion=document.version;item.documentUri=document.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.phaseName=item.phaseName;tree.stepIndex=item.stepIndex;
@@ -900,9 +989,13 @@ export function registerWorkbench(vscode,context){
     const key=doc.uri.toString(),same=document?.uri.toString()===key;
     const text=doc.getText(),projected=same&&snapshot?.text===text?snapshot.model:null;
     const next=choice??(same?selection:selections.get(key)??{});
-    const changed=!same||snapshot?.text!==text||next.procedureId!==selection.procedureId||next.nodeId!==selection.nodeId;
+    const evidenceFiles=packageFilesUri===key&&packageFilesVersion===doc.version?packageFiles:null;
+    const evidenceStamp=evidenceFiles?doc.version:null;
+    const changed=!same||snapshot?.text!==text||next.procedureId!==selection.procedureId||
+      next.nodeId!==selection.nodeId||snapshot?.evidenceStamp!==evidenceStamp;
     if(!same){
       generation++;audit=[];diagnostics.clear();
+      packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
       predicateSnapshot=null;predicateGeneration++;
     }
     document=doc;selection=next;selections.set(key,next);
@@ -912,7 +1005,7 @@ export function registerWorkbench(vscode,context){
       void refreshPredicateSnapshot(doc);
     }
     if(changed){
-      snapshot={...inspectionSnapshot(text,selection,projected),text};
+      snapshot={...inspectionSnapshot(text,selection,projected,evidenceFiles),text,evidenceStamp};
       bindingOptions=snapshot.model.state==='READY'&&selection.procedureId&&selection.nodeId
         ?phaseStepBindingOptions(text,selection.procedureId,selection.nodeId):[];
       fire();
@@ -945,6 +1038,13 @@ export function registerWorkbench(vscode,context){
       if(ticket!==generation||document!==doc||doc.version!==version)return;
       audit=results.map(d=>({...d,uri:uris.get(d.path)??doc.uri}));
       auditStatus="Package Audit · "+(missing.length?"unavailable":audit.length+" editor warnings");diagnostics.clear();
+      if(!missing.length){
+        packageFiles=files;packageFilesUri=doc.uri.toString();packageFilesVersion=version;
+        update(doc);
+      }else{
+        packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
+        update(doc);
+      }
       for(const uri of new Set(audit.map(d=>d.uri))){
         diagnostics.set(uri,audit.filter(d=>d.uri===uri).map(d=>{
           const line=Math.max(0,d.line-1),diagnostic=new vscode.Diagnostic(new vscode.Range(line,0,line,1),d.message,vscode.DiagnosticSeverity.Warning);
@@ -952,9 +1052,80 @@ export function registerWorkbench(vscode,context){
         }));
       }
       fire();
-    }catch(error){if(ticket!==generation)return;auditStatus='Package Audit · unavailable';audit=[{message:'Audit unavailable: '+error.message,line:1,uri:doc.uri}];diagnostics.clear();fire();}
+    }catch(error){
+      if(ticket!==generation)return;
+      packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
+      auditStatus='Package Audit · unavailable';
+      audit=[{message:'Audit unavailable: '+error.message,line:1,uri:doc.uri}];
+      diagnostics.clear();update(doc);fire();
+    }
   }
-  function scheduleAudit(){generation++;clearTimeout(timer);auditStatus="Package Audit · pending";audit=[];diagnostics.clear();timer=setTimeout(()=>void auditCurrent(),350);fire();}
+  function scheduleAudit(){
+    generation++;clearTimeout(timer);
+    packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
+    auditStatus="Package Audit · pending";audit=[];diagnostics.clear();
+    if(document)update(document);
+    timer=setTimeout(()=>void auditCurrent(),350);fire();
+  }
+  async function preparePackageZip(){
+    const doc=document,suffix='assurance/procedure.yaml';
+    if(!doc||!isProcedurePath(doc.uri.path)||!doc.uri.path.endsWith(suffix))
+      throw Error('请先打开当前 Package 的 Procedure 可视化编辑器');
+    const basePath=doc.uri.path.slice(0,-suffix.length);
+    const base=doc.uri.with({path:basePath});
+    const name=basePath.replace(/\/$/,'').split('/').at(-1);
+    if(!name)throw Error('无法确定 Package 根目录名称');
+    const sourceVersion=doc.version,sourceText=doc.getText();
+    const opened=(vscode.workspace.textDocuments??[])
+      .filter(item=>item.uri.path.startsWith(basePath))
+      .map(item=>({item,path:item.uri.path.slice(basePath.length),
+        version:item.version,text:item.getText()}));
+    const pattern=new vscode.RelativePattern(base,'**/*');
+    const found=await vscode.workspace.findFiles(pattern,'**/node_modules/**',65);
+    if(found.length>64)throw Error('Package 超过 ZIP 导出的 64 文件上限');
+    const files=[],uris=new Map();
+    for(const uri of found){
+      if(!uri.path.startsWith(basePath))continue;
+      const path=uri.path.slice(basePath.length);
+      if(!path)continue;
+      const bytes=await vscode.workspace.fs.readFile(uri);
+      if(!(bytes instanceof Uint8Array))throw Error('无法读取 Package 文件：'+path);
+      files.push({path,bytes:bytes.slice()});uris.set(path,uri);
+    }
+    files.sort((a,b)=>a.path.localeCompare(b.path));
+    const currentTextByPath=new Map(opened.map(entry=>[entry.path,entry.text]));
+    currentTextByPath.set('assurance/procedure.yaml',sourceText);
+    const built=await buildPackageZip({name,files,currentTextByPath});
+    if(document!==doc||doc.version!==sourceVersion||doc.getText()!==sourceText)
+      throw Error('Procedure Source 在导出期间发生变化；请重新导出');
+    for(const entry of opened){
+      if(entry.item.version!==entry.version||entry.item.getText()!==entry.text)
+        throw Error('Package Source 在导出期间发生变化：'+entry.path);
+    }
+    const after=await vscode.workspace.findFiles(pattern,'**/node_modules/**',65);
+    const afterPaths=after.filter(uri=>uri.path.startsWith(basePath))
+      .map(uri=>uri.path.slice(basePath.length)).filter(Boolean).sort();
+    const beforePaths=files.map(file=>file.path).sort();
+    if(after.length>64||JSON.stringify(afterPaths)!==JSON.stringify(beforePaths))
+      throw Error('Package 文件集合在导出期间发生变化；请重新导出');
+    for(const file of files){
+      const uri=uris.get(file.path),latest=uri?await vscode.workspace.fs.readFile(uri):null;
+      if(!latest||latest.length!==file.bytes.length||
+        latest.some((value,index)=>value!==file.bytes[index]))
+        throw Error('Package 文件在导出期间发生变化：'+file.path);
+    }
+    const post=sessions.get(doc.uri.toString());
+    if(!post)throw Error('Procedure Visual Webview 不可用；请重新打开可视化编辑器');
+    const delivered=await post({
+      type:'packageZipReady',filename:built.filename,
+      fileCount:built.fileCount,opaqueCount:built.opaqueCount,
+      base64:bytesToBase64(built.bytes)
+    });
+    if(delivered===false)throw Error('无法将 ZIP 交付给 Procedure Visual Webview');
+    await vscode.window.showInformationMessage(
+      'Package ZIP 已准备好；请在 Procedure 画布上点击“下载 ZIP”。');
+    return true;
+  }
   context.subscriptions.push({dispose(){clearTimeout(timer);generation++;sessions.clear();selections.clear();}},
     vscode.commands.registerCommand('skillStudio.revealInspection',async item=>{
       if(!document||item.version!==document.version||
@@ -965,6 +1136,13 @@ export function registerWorkbench(vscode,context){
       await openNativeSource(vscode,doc.uri,{preview:true,selection:new vscode.Range(line,0,line,0)});
     }),
     vscode.commands.registerCommand('skillStudio.auditPackage',auditCurrent),
+    vscode.commands.registerCommand('skillStudio.exportPackageZip',async()=>{
+      try{return await preparePackageZip();}
+      catch(error){
+        await vscode.window.showWarningMessage('Package ZIP 导出未准备好：'+error.message);
+        return false;
+      }
+    }),
     vscode.commands.registerCommand('skillStudio.refreshInspection',()=>{if(document){update(document);scheduleAudit();}}),
     vscode.commands.registerCommand('skillStudio.renameNode',async(item,newId)=>{
       try{return await renameNode(item,newId);}
@@ -985,6 +1163,10 @@ export function registerWorkbench(vscode,context){
     vscode.commands.registerCommand('skillStudio.editPhaseVerifyStep',async(item,action)=>{
       try{return await editPhaseVerifyStep(item,action);}
       catch(error){await vscode.window.showWarningMessage('Verify Step 修改未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.renameNamedPhaseStep',async(item,newName)=>{
+      try{return await renameNamedPhaseStep(item,newName);}
+      catch(error){await vscode.window.showWarningMessage('Phase Step 重命名未执行：'+error.message);return false;}
     }),
     vscode.commands.registerCommand('skillStudio.insertNode',async(item,spec)=>{
       try{return await insertNode(item,spec);}
