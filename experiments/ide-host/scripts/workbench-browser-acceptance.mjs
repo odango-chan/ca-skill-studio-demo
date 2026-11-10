@@ -139,6 +139,83 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       throw Error("Theia public language-provider acceptance returned incomplete evidence: "+
         JSON.stringify(languageFeatureEvidence));
     console.log("STUDIO_LSP_EDITOR_FEATURES",JSON.stringify(languageFeatureEvidence));
+    let diagnosticPublishEvidence=null,diagnosticRepairEvidence=null;
+    try{
+      diagnosticPublishEvidence=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==="function"&&k.prototype?.executeCommand&&
+          k.prototype?.registerCommand&&k.prototype?.getCommand);
+        const registry=c.get(key);
+        const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
+          String(k)==="Symbol(OpenerService)");
+        const openers=await c.get(openerKey).getOpeners();
+        const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");
+        const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>
+          w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;
+        if(!resource)throw Error("Procedure resource missing for Problems acceptance");
+        return registry.executeCommand(
+          "skillStudio.internal.languageDiagnosticsAcceptance",resource.toString(),"publish");
+      })()`);
+      if(!diagnosticPublishEvidence?.appeared||
+         diagnosticPublishEvidence.code!=="PROCEDURE_PROJECTION"||
+         diagnosticPublishEvidence.packageAuditDuplicates!==0)
+        throw Error("Live LSP diagnostic did not publish exact evidence: "+
+          JSON.stringify(diagnosticPublishEvidence));
+      const problemsTab=await evalJS(`(()=>{
+        const el=[...document.querySelectorAll(".lm-TabBar-tab")].find(x=>
+          x.textContent.trim().startsWith("Problems"));
+        const r=el?.getBoundingClientRect();
+        return r&&r.width>0?{x:r.x+r.width/2,y:r.y+r.height/2,
+          label:el.textContent.trim(),aria:el.getAttribute("aria-label")}:null;
+      })()`);
+      if(!problemsTab)throw Error("Native Theia Problems panel tab is missing");
+      await click(problemsTab.x,problemsTab.y);await sleep(350);
+      let problemsText="";
+      for(let i=0;i<100;i++){
+        problemsText=await evalJS("document.body.innerText");
+        if(problemsText.includes("YAML 解析失败"))break;
+        await sleep(100);
+      }
+      const problemsAria=await evalJS(`[...document.querySelectorAll(".lm-TabBar-tab")].find(x=>
+        x.textContent.trim().startsWith("Problems"))?.getAttribute("aria-label")??""`);
+      if(!problemsText.includes("YAML 解析失败")&&
+         !/\\b[1-9][0-9]* (?:Error|Problem)/i.test(problemsAria))
+        throw Error("Native Problems UI did not display the live Procedure diagnostic: "+
+          JSON.stringify({problemsText:problemsText.slice(-1200),problemsAria,problemsTab}));
+    }finally{
+      diagnosticRepairEvidence=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==="function"&&k.prototype?.executeCommand&&
+          k.prototype?.registerCommand&&k.prototype?.getCommand);
+        const registry=c.get(key);
+        const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
+          String(k)==="Symbol(OpenerService)");
+        const openers=await c.get(openerKey).getOpeners();
+        const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");
+        const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>
+          w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;
+        if(!resource)throw Error("Procedure resource missing for diagnostic repair");
+        return registry.executeCommand(
+          "skillStudio.internal.languageDiagnosticsAcceptance",resource.toString(),"repair");
+      })()`);
+    }
+    if(!diagnosticRepairEvidence?.cleared||!diagnosticRepairEvidence?.restored)
+      throw Error("Live LSP diagnostic did not clear after Source repair: "+
+        JSON.stringify(diagnosticRepairEvidence));
+    let clearedProblemsText="";
+    for(let i=0;i<100;i++){
+      clearedProblemsText=await evalJS("document.body.innerText");
+      if(!clearedProblemsText.includes("YAML 解析失败"))break;
+      await sleep(100);
+    }
+    if(clearedProblemsText.includes("YAML 解析失败"))
+      throw Error("Native Problems UI retained the stale Procedure diagnostic after repair");
+    console.log("STUDIO_LSP_DIAGNOSTICS_CHROMIUM",JSON.stringify({
+      published:diagnosticPublishEvidence,repaired:diagnosticRepairEvidence,
+      nativeProblemsCleared:true
+    }));
     // The extension probe restores the Procedure CustomEditor after opening
     // Python Source. Reacquire its live Webview execution context before the
     // existing graph/Inspector/Undo regression continues.
