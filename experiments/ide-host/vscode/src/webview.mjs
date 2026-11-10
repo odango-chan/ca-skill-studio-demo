@@ -553,7 +553,7 @@ window.addEventListener("message",event=>{
   if(!data||typeof data!=="object")return;
   if(data.type==="packageZipReady"){
     if(typeof data.filename!=="string"||
-      !/^[A-Za-z0-9._-]{1,100}\\.zip$/.test(data.filename)||
+      !/^[A-Za-z0-9._-]{1,100}\.zip$/.test(data.filename)||
       typeof data.base64!=="string"||
       !Number.isSafeInteger(data.fileCount)||data.fileCount<1||data.fileCount>64||
       !Number.isSafeInteger(data.opaqueCount)||data.opaqueCount<0||data.opaqueCount>64){
