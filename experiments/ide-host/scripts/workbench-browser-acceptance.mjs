@@ -568,7 +568,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!evidenceTreeState?.rootPresent)
     throw Error('Native Evidence tree root did not appear after refresh: '+
       JSON.stringify(evidenceTreeState));
-  let phaseEvidenceText='';
   for(let i=0;i<100;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
     if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
