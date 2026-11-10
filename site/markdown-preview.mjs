@@ -1,6 +1,7 @@
 // Lightweight local Markdown preview for SKILL.md and other .md files.
-// Raw HTML is escaped; no external assets or script execution.
-// Source textarea remains the only editable and authoritative document.
+// Raw HTML is escaped; source-provided scripts and images are never executed or fetched.
+// Optional local links are data-only; the extension host validates every navigation.
+// Native Source remains the only editable and authoritative document.
 const escapeHTML=value=>String(value).replace(/[&<>"']/g,ch=>({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&#39;"
 })[ch]);
