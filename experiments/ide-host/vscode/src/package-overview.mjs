@@ -217,7 +217,7 @@ export function registerPackageOverview(vscode,context) {
   }
   const subscriptions = [
     vscode.commands.registerCommand('skillStudio.refreshPackages',refresh),
-    vscode.workspace.onDidChangeWorkspaceFolders(schedule),
+    vscode.workspace.onDidChangeWorkspaceFolders?.(schedule),
     vscode.workspace.onDidCreateFiles?.(schedule),
     vscode.workspace.onDidDeleteFiles?.(schedule),
     vscode.workspace.onDidRenameFiles?.(schedule),
