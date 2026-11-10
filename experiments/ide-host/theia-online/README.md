@@ -31,7 +31,10 @@ YAML/Python editors open; `assurance/procedure.yaml`, `assurance/contract.yaml` 
 `assurance/predicates.yaml` and `schemas/*.schema.yaml` open their respective
 source-backed visual editors;
 Contract, Predicate and Schema views reveal their declarations and cross-file source
-references without claiming Runtime evidence. Changes and native Undo/Save propagate without
+references without claiming Runtime evidence. The Skill Studio activity bar also
+contains a Packages inventory that can discover multiple SKILL roots in one
+workspace and group their Definition, Assurance, Schemas, Scripts and References.
+It does not duplicate Package Audit or claim semantic validation. Changes and native Undo/Save propagate without
 clobbering unrelated YAML. An artifact that merely contains bundled files is
 not online acceptance. Missing plugin metadata or a CSP/URI failure is BLOCKED.
 
