@@ -765,6 +765,52 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     predicateVisible:contractView.text.includes('createdsession.ran.setup_accepted'),
     readOnly:contractView.text.includes('Source 是唯一真源')
   }));
+  // PredicateSet uses its own Observation -> Evaluator visual, never a live result graph.
+  await invoke('skillStudio.openPredicates');
+  let predicateView=null,predicateFrame=null;
+  for(let attempt=0;attempt<100&&!predicateView;attempt++){
+    const predicateTree=await command('Page.getFrameTree');
+    const predicateFrames=[];
+    const collectPredicateFrames=node=>{
+      if(!node)return;
+      predicateFrames.push(node.frame);
+      for(const child of node.childFrames??[])collectPredicateFrames(child);
+    };
+    collectPredicateFrames(predicateTree.frameTree);
+    for(const frame of predicateFrames.filter(item=>
+        item.url.includes('/webview/index.html')||item.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'predicate-designer-acceptance',grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:"({title:document.title,text:document.body?.innerText??'',predicates:document.querySelectorAll('details.predicate').length,ids:[...document.querySelectorAll('.predicate summary .pid')].map(x=>x.textContent.trim()),observations:document.querySelectorAll('.observation').length,status:document.querySelector('#status')?.textContent??''})"
+        });
+        const candidate=result.result?.value;
+        if(candidate?.title==='SKILL Predicate Visual'){
+          predicateView=candidate;predicateFrame=frame;break;
+        }
+      }catch{/* another webview frame may be disposed while tabs activate */}
+    }
+    if(!predicateView)await sleep(100);
+  }
+  if(!predicateView||!predicateFrame||
+     predicateView.predicates!==17||predicateView.observations<17||
+     !predicateView.text.includes('createdsession.ran.setup_accepted')||
+     !predicateView.text.includes('createdsession.udm.hold_bound')||
+     !predicateView.text.includes('skill.evaluate-udm-read')||
+     !predicateView.text.includes('Observation → Evaluator')||
+     !predicateView.text.includes('非运行结果'))
+    throw Error('Predicate Designer did not render the real PredicateSet declarations: '+
+      JSON.stringify(predicateView).slice(0,3000));
+  console.log('STUDIO_PREDICATE_DESIGNER_CHROMIUM',JSON.stringify({
+    title:predicateView.title,status:predicateView.status,
+    predicates:predicateView.predicates,observations:predicateView.observations,
+    realPredicateVisible:predicateView.ids.includes('createdsession.ran.setup_accepted'),
+    scriptEvaluatorVisible:predicateView.text.includes('skill.evaluate-udm-read'),
+    noLiveResultClaim:predicateView.text.includes('非运行结果')
+  }));
   // Native layout restoration must retain the CustomEditor across a reload.
   console.log("STUDIO_NATIVE_ACTION","reload");
   await sleep(1200);await command('Page.reload');await sleep(800);
