@@ -39,9 +39,6 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   if(!activity)throw Error('Package Overview Activity Bar entry missing');
   await click(activity.x,activity.y);
   await sleep(350);
-  await invoke('skillStudio.refreshPackages');
-  const scan=await evalJS('window.__skillStudioLastCommandResult??null');
-  console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(scan));
   let view=null;
   for(let attempt=0;attempt<100;attempt++){
     view=await evalJS(
@@ -54,6 +51,14 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     if(view?.rows?.some(x=>x.includes('establish-pdu-session')))break;
     await sleep(100);
   }
+  if(!view?.rows?.some(x=>x.includes('establish-pdu-session')))
+    throw Error('Package Overview did not populate when its native view was opened: '+
+      JSON.stringify(view));
+  // Read scan evidence only after verifying the user-opened view populated;
+  // this command refreshes inventory but does not open or reveal the view.
+  await invoke('skillStudio.refreshPackages');
+  const scan=await evalJS('window.__skillStudioLastCommandResult??null');
+  console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(scan));
   const packageRow=await evalJS(
     "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
     ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
