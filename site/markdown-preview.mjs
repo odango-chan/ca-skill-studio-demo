@@ -11,7 +11,21 @@ const safeHref=raw=>{
   if(/^#[a-z0-9._:-]+$/i.test(value))return value;
   return null;
 };
-function inline(src,depth=0){
+// Only path-shaped references can become host-mediated links. The extension
+// host still resolves and verifies every target stays inside the active Skill.
+function localPackagePath(raw){
+  const value=String(raw).trim();
+  if(!value||value.length>240||value.startsWith("/")||value.includes("\\")||
+     value.includes("?")||value.includes("#")||
+     !/^(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+\.(?:md|ya?ml|py|json)$/i.test(value))
+    return null;
+  const parts=value.split("/");
+  if(parts.some(part=>!part||part==="."))return null;
+  const parents=parts.filter(part=>part==="..").length;
+  if(parents>1||(parents===1&&(parts[0]!==".."||parts.length!==2)))return null;
+  return value;
+}
+function inline(src,depth=0,options={}){
   if(depth>5)return escapeHTML(src);
   const pattern=/(!?\[([^\]\r\n]+)\]\(([^)\s]+)(?:\s+"([^"\r\n]*)")?\)|\x60([^\x60\r\n]+)\x60|\*\*([^*\r\n]+)\*\*|__([^_\r\n]+)__|~~([^~\r\n]+)~~|\*([^*\r\n]+)\*|_([^_\r\n]+)_|<https?:\/\/[^>\s]+>)/g;
   let out="",offset=0,match;
@@ -22,10 +36,17 @@ function inline(src,depth=0){
       out+='<span class="md-image-ref" title="图片不会在本地预览中自动请求外部资源">图片：'+escapeHTML(match[2])+"</span>";
     }else if(raw.startsWith("[")){
       const href=safeHref(match[3]);
-      out+=href?'<a href="'+escapeHTML(href)+'" rel="noopener noreferrer" target="_blank">'+inline(match[2],depth+1)+"</a>":
-        '<span class="md-unresolved-link" title="'+escapeHTML(match[3])+'">'+inline(match[2],depth+1)+"</span>";
+      const localPath=options.localLinks?localPackagePath(match[3]):null;
+      out+=href?'<a href="'+escapeHTML(href)+'" rel="noopener noreferrer" target="_blank">'+inline(match[2],depth+1,options)+"</a>":
+        localPath?'<a class="md-local-link" href="#" data-local-path="'+escapeHTML(localPath)+
+          '" title="打开当前 Skill Package 内的文件">'+inline(match[2],depth+1,options)+"</a>":
+        '<span class="md-unresolved-link" title="'+escapeHTML(match[3])+'">'+inline(match[2],depth+1,options)+"</span>";
     }else if(raw.charCodeAt(0)===96){
-      out+="<code>"+escapeHTML(match[5])+"</code>";
+      const localPath=options.localLinks?localPackagePath(match[5]):null;
+      out+=localPath
+        ?'<a class="md-local-link" href="#" data-local-path="'+escapeHTML(localPath)+
+          '" title="打开当前 Skill Package 内的文件"><code>'+escapeHTML(match[5])+"</code></a>"
+        :"<code>"+escapeHTML(match[5])+"</code>";
     }else if(raw.startsWith("**")||raw.startsWith("__")){
       out+="<strong>"+inline(match[6]??match[7],depth+1)+"</strong>";
     }else if(raw.startsWith("~~")){
@@ -57,7 +78,7 @@ function startsBlock(lines,i){
   return Boolean(fenceStart(line)||heading(line)||hr(line)||quote(line)||listItem(line)||
     (i+1<lines.length&&line.includes("|")&&tableSeparator(lines[i+1])));
 }
-function renderList(lines,i,depth){
+function renderList(lines,i,depth,options={}){
   const first=listItem(lines[i]);const indent=first[1].length;
   const numbered=/^\d/.test(first[2]);
   const tag=numbered?"ol":"ul";
@@ -72,20 +93,20 @@ function renderList(lines,i,depth){
       const child=listItem(lines[i]);
       if(child&&child[1].length===indent)break;
       if(child&&child[1].length>indent){
-        const nested=renderList(lines,i,depth+1);
+        const nested=renderList(lines,i,depth+1,options);
         pieces.push(nested.html);i=nested.next;continue;
       }
       if(lines[i].match(/^\s{2,}/)&&!startsBlock(lines,i)){
-        pieces.push(inline(lines[i].trim()));i++;continue;
+        pieces.push(inline(lines[i].trim(),0,options));i++;continue;
       }
       break;
     }
-    out+="<li>"+inline(pieces[0])+pieces.slice(1).join(" ")+"</li>";
+    out+="<li>"+inline(pieces[0],0,options)+pieces.slice(1).join(" ")+"</li>";
   }
   out+="</"+tag+">";
   return {html:out,next:i};
 }
-function renderBlocks(lines,depth=0){
+function renderBlocks(lines,depth=0,options={}){
   if(depth>6)return "<pre>"+escapeHTML(lines.join("\n"))+"</pre>";
   let out="",i=0;
   while(i<lines.length){
@@ -104,13 +125,13 @@ function renderBlocks(lines,depth=0){
     const h=heading(lines[i]);
     if(h){
       const level=h[1].length;
-      out+="<h"+level+">"+inline(h[2])+"</h"+level+">";i++;continue;
+      out+="<h"+level+">"+inline(h[2],0,options)+"</h"+level+">";i++;continue;
     }
     if(hr(lines[i])){out+="<hr>";i++;continue;}
     if(quote(lines[i])){
       const quoted=[];
       while(i<lines.length&&quote(lines[i]))quoted.push(lines[i++].replace(/^\s{0,3}>\s?/,""));
-      out+="<blockquote>"+renderBlocks(quoted,depth+1)+"</blockquote>";
+      out+="<blockquote>"+renderBlocks(quoted,depth+1,options)+"</blockquote>";
       continue;
     }
     if(i+1<lines.length&&lines[i].includes("|")&&tableSeparator(lines[i+1])){
@@ -128,18 +149,18 @@ function renderBlocks(lines,depth=0){
       continue;
     }
     if(listItem(lines[i])){
-      const list=renderList(lines,i,depth);
+      const list=renderList(lines,i,depth,options);
       if(list.next>i){out+=list.html;i=list.next;continue;}
     }
     const paragraph=[lines[i++].trim()];
     while(i<lines.length&&lines[i].trim()&&!startsBlock(lines,i)){
       paragraph.push(lines[i++].trim());
     }
-    out+="<p>"+inline(paragraph.join(" "))+"</p>";
+    out+="<p>"+inline(paragraph.join(" "),0,options)+"</p>";
   }
   return out;
 }
-export function renderMarkdown(source,{maxChars=300000}={}){
+export function renderMarkdown(source,{maxChars=300000,localLinks=false}={}){
   if(typeof source!=="string")throw new TypeError("Markdown Source must be a string");
   if(source.length>maxChars)return {available:false,html:"",reason:"文件太大，无法安全预览"};
   const lines=source.replace(/\r\n?/g,"\n").split("\n");
@@ -152,5 +173,5 @@ export function renderMarkdown(source,{maxChars=300000}={}){
       lines.splice(0,end+2);
     }
   }
-  return {available:true,html:head+renderBlocks(lines)};
+  return {available:true,html:head+renderBlocks(lines,0,{localLinks})};
 }
