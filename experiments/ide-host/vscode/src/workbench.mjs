@@ -42,7 +42,7 @@ export function registerWorkbench(vscode,context){
     }catch{return {predicateSource:null,skillName};}
   }
   async function confirmAndApply({doc,source,version,preview,changes,verify}){
-    const message=[preview.summary,preview.diff].filter(Boolean).join("\\n\\n");
+    const message=[preview.summary,preview.diff].filter(Boolean).join("\n\n");
     const choice=await vscode.window.showInformationMessage(
       message||"确认修改当前 Source",
       {modal:true},
