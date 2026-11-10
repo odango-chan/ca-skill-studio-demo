@@ -228,5 +228,5 @@ main browser application remains available at `/classic/`.
 
 **安全边界：** 这是只读证据，不授权任何 binding / Producer / Consumer 写入；`authorizedWrites` 固定为 0，Runtime 仍为 NOT_RUN。跨 Producer ABI 写入、effectful Step 结构变更与 owner Outcome 合约仍需单独定义和审查。
 
-**验收：** PR #111 exact-head IDE Host / Theia Browser-Only / Theia Browser Host Chromium 待执行；未合并、未部署 Pages。
+**验收：** PR #111 exact HEAD `e189c3de40bb1f89302e255680ffbd9293b44d6e` 的四组门禁全部 PASS：IDE Host [#42761777293](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777293)、Theia Browser-Only [#42761777244](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777244)、Theia Browser Host / real Chromium [#42761777239](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777239)、PR Verify [#42761777251](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42761777251)。真实 Chromium 验证 Evidence 树展开并显示 Producer/Consumer 行、只读边界，以及原有 Phase Binding Undo、命名 Step / Verify、Node Focus、Route 和 Source 回归。PR 仍 OPEN，未合并、未部署 Pages；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
 
