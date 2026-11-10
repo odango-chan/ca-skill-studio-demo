@@ -61,3 +61,8 @@ The readiness check is generation-specific: the probe captures the Package gener
 ## Theia CompletionList result shape
 
 The real Theia 1.76 `vscode.executeCompletionItemProvider` command returns its completion list as `{ incomplete, suggestions }`, while the VS Code API commonly exposes `{ isIncomplete, items }`. The acceptance probe accepts both host result shapes and still requires the exact `EstablishmentSelectionInput` label. The browser run showed the Schema Hover provider already resolved the exact Schema; this was an acceptance adapter shape mismatch, not evidence of a missing Schema index.
+
+
+## Restore the workbench after provider probes
+
+The native provider probe opens the Python file to invoke its registered editor providers. Before returning, it reopens the Procedure through the existing `skillStudio.openProcedure` command. The outer Chromium smoke reacquires the live Procedure CustomEditor Webview context before continuing the existing Inspector/Undo regression. This keeps the LSP acceptance isolated and ensures the pre-existing authoring checks still target the visual Procedure editor.
