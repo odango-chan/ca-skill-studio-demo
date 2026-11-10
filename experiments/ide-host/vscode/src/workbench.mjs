@@ -8,6 +8,8 @@ import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from '../../../../site/node-create.mjs';
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from '../../../../site/node-delete.mjs';
 import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
+import {phaseOutputReferenceOptions,previewPhaseOutputReference,
+  applyPhaseOutputReference} from '../../../../site/phase-output-refs.mjs';
 import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
   previewAddPhaseVerify,applyAddPhaseVerify,
   previewDeletePhaseVerify,applyDeletePhaseVerify}
@@ -148,6 +150,44 @@ export function registerWorkbench(vscode,context){
       }],
       verify:text=>applyPhaseInputBinding(text,preview)
     });
+  }
+
+  async function editPhaseOutputReference(item,bindingKey,newValue){
+    if(item?.kind!=='phase-output-reference'||
+       typeof item.phaseName!=='string'||!Number.isSafeInteger(item.stepIndex))
+      throw Error("Select an eligible Phase output reference in the native Inspector");
+    const ctx=currentNode(item);
+    const options=phaseOutputReferenceOptions(ctx.source,ctx.procedureId,ctx.nodeId)
+      .filter(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex&&
+        x.bindingKey===(bindingKey??item.bindingKey));
+    if(options.length!==1)throw Error("Output reference is no longer uniquely eligible");
+    const reference=options[0];
+    let value=newValue;
+    if(typeof value!=='string'){
+      const picked=await vscode.window.showQuickPick(
+        reference.choices.filter(choice=>choice!==reference.value).map(choice=>({
+          label:choice,
+          description:choice.startsWith(reference.producerPhase+".")
+            ?"本地 Phase 引用":"完整 Node + Phase 引用",
+          detail:"同一生产 Node / Phase Step / output suffix"
+        })),{placeHolder:"选择同一生产 Step 的输出引用写法"});
+      value=typeof picked==='string'?picked:picked?.label;
+    }
+    if(typeof value!=='string'||!value.trim())return false;
+    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
+      throw Error("Source changed while choosing the output reference form");
+    const preview=previewPhaseOutputReference(ctx.source,ctx.procedureId,ctx.nodeId,
+      item.phaseName,item.stepIndex,reference.bindingKey,value);
+    const applied=await confirmAndApply({
+      ...ctx,preview,
+      changes:p=>[{
+        start:p.sourceSpan.start,end:p.sourceSpan.end,
+        oldValue:p.oldValue,newValue:p.newValue
+      }],
+      verify:text=>applyPhaseOutputReference(text,preview)
+    });
+    if(applied)update(ctx.doc);
+    return applied;
   }
 
   async function addPhaseVerify(item,predicate){
@@ -531,6 +571,15 @@ export function registerWorkbench(vscode,context){
           tree.stepValue=item.stepValue;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
+        if(item.kind==='phase-output-reference'&&id==='inspection'&&document){
+          tree.contextValue='skillStudio.phaseOutputReference';
+          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
+          for(const key of ['procedureId','nodeId','phaseName','stepIndex',
+            'bindingKey','currentValue','choices','producerPhase','producerStep',
+            'producerStepIndex','outputSuffix'])
+            tree[key]=item[key];
+          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
+        }
         if(document&&item.line)tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',arguments:[{...item,uri:item.uri??document.uri,version:document.version,sourceVersion:document.version,documentUri:document.uri.toString(),...(item.uri?{auditGeneration:generation}:{})}]};
         return tree;
       }};
@@ -709,6 +758,10 @@ export function registerWorkbench(vscode,context){
     vscode.commands.registerCommand('skillStudio.editPhaseInputBinding',async(item,bindingKey,newValue)=>{
       try{return await editPhaseInputBinding(item,bindingKey,newValue);}
       catch(error){await vscode.window.showWarningMessage('Phase Binding 修改未执行：'+error.message);return false;}
+    }),
+    vscode.commands.registerCommand('skillStudio.editPhaseOutputReference',async(item,bindingKey,newValue)=>{
+      try{return await editPhaseOutputReference(item,bindingKey,newValue);}
+      catch(error){await vscode.window.showWarningMessage('Phase Output Reference 修改未执行：'+error.message);return false;}
     }),
     vscode.commands.registerCommand('skillStudio.addPhaseVerify',async(item,predicate)=>{
       try{return await addPhaseVerify(item,predicate);}
