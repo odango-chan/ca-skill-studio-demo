@@ -1103,8 +1103,26 @@ export function registerWorkbench(vscode,context){
           ["python","scripts/select_establishment_configuration.py"]
         ];
         const entries=[];
+        const transientRead=error=>/\\b(?:EIO|ENOENT|EntryNotFound)\\b/i.test(
+          String(error?.message??error));
+        // OPFS-backed Theia can briefly fail a read or open during Package
+        // import/refresh. Retry ONLY the same read, at most three times. A
+        // missing or persistently faulty file still fails the real acceptance.
+        const readStable=async(operation,label)=>{
+          for(let attempt=0;attempt<3;attempt++){
+            try{return await operation();}
+            catch(error){
+              if(!transientRead(error)||attempt===2)
+                throw Error("L2-D3 "+label+" failed after "+(attempt+1)+
+                  " attempt(s): "+String(error?.message??error));
+              await new Promise(resolve=>setTimeout(resolve,100*(attempt+1)));
+            }
+          }
+          throw Error("L2-D3 Source read did not complete: "+label);
+        };
         const disk=async uri=>new TextDecoder("utf-8",{fatal:true}).decode(
-          await vscode.workspace.fs.readFile(uri));
+          await readStable(()=>vscode.workspace.fs.readFile(uri),
+            "persistent read "+uri.path));
         const replace=async(doc,value)=>{
           if(doc.getText()===value)return;
           const edit=new vscode.WorkspaceEdit();
@@ -1144,8 +1162,10 @@ export function registerWorkbench(vscode,context){
         try{
           for(const [name,path] of paths){
             const uri=vscode.Uri.joinPath(root.uri,...path.split("/"));
-            const doc=await vscode.workspace.openTextDocument(uri);
-            await openNativeSource(vscode,uri,{preview:true});
+            const doc=await readStable(
+              ()=>vscode.workspace.openTextDocument(uri),"open "+path);
+            await readStable(
+              ()=>openNativeSource(vscode,uri,{preview:true}),"editor "+path);
             const original=doc.getText();
             if(doc.isDirty||await disk(uri)!==original)
               throw Error("L2-D3: initial "+name+" Source is not clean");
