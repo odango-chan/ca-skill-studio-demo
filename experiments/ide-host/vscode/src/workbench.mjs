@@ -62,8 +62,14 @@ export function registerWorkbench(vscode,context){
           candidate=createSkillLanguageClient(vscode,context,{
             onStatus:status=>updateLanguageStatus(
               status.state,
-              status.reason||("Package "+status.rootUri+" · generation "+status.generation+
-                " · "+(status.publishedDiagnosticCount??0)+" diagnostics")
+              status.reason||(status.state==="PARTIAL" ?
+                ("Package "+status.rootUri+" · generation "+status.generation+
+                  " · Procedure "+(status.procedureState??"unknown")+
+                  " ("+(status.procedureDiagnosticCount??"?")+" diagnostics)"+
+                  " · Audit "+(status.packageAuditState??"unknown")+
+                  (status.packageAuditReason?" · "+status.packageAuditReason:"")) :
+                ("Package "+status.rootUri+" · generation "+status.generation+
+                  " · "+(status.publishedDiagnosticCount??0)+" diagnostics"))
             ),
             onError:error=>{
               console.warn("Skill Studio Language Service",error);
