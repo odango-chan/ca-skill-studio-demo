@@ -58,9 +58,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     })()`);
     console.log("STUDIO_OUTPUT_FIXTURE_EDITOR",JSON.stringify(direct));
     if(direct.method==='native-type-fallback'){
-      // Theia exposes a native Monaco textarea even when window.monaco is
-      // private. Explicitly focus that input and drive the real keyboard/CDP
-      // rather than invoking Theia's unrelated generic "type" command.
+      // Current Monaco may use native EditContext instead of a textarea.
+      // Focus its real editing surface and drive keyboard/CDP events; never
+      // require a legacy textarea that modern Chromium does not provide.
       const focus=await evalJS(`(()=>{
         const editors=[...document.querySelectorAll('.monaco-editor')]
           .filter(el=>el.getBoundingClientRect().width>200&&
@@ -68,7 +68,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         const editor=editors.find(el=>
           el.closest('.theia-editor')?.classList.contains('theia-mod-active'))??
           editors.at(-1);
-        const input=editor?.querySelector('textarea.inputarea');
+        const input=editor?.querySelector('.native-edit-context, textarea.inputarea');
         input?.focus();
         return {editorCount:editors.length,hasInput:Boolean(input),
           focusReady:document.activeElement===input,
