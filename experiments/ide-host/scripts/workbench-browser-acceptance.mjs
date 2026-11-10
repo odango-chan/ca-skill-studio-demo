@@ -77,13 +77,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await click(target.x,target.y);await sleep(250);
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
-  // In browser-only mode the Procedure Webview may be active while the
-  // workbench extension has not yet observed its Source TextEditor. Open the
-  // authoritative Source through the real Webview action before invoking
-  // host-side inspection/audit commands.
-  const sourceOpened=await evalWebviewJS(`(()=>{const button=document.querySelector('#openSource');if(!button)return false;button.click();return true;})()`);
-  if(!sourceOpened)throw Error('Procedure Webview did not expose its native Source action');
-  await sleep(500);
   const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
   await click(activity.x,activity.y);await sleep(500);
@@ -126,9 +119,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(stillPreview)throw Error("Double-click did not pin native preview tab");
   const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
-  // restore one from its workbench state. Run it only after the Explorer open.
-  // Browser-Only starts without an active editor, unlike Browser Host which may
-  // Package Audit requires the actual CustomEditor document to be active.
+  // Theia CustomEditor tabs do not necessarily activate a VS Code TextEditor.
+  // Package Audit consumes the active Procedure TextDocument, so open Source
+  // from this freshly reopened CustomEditor only now (after the Explorer path).
+  const sourceOpenedForAudit=await evalWebviewJS(`(()=>{const button=document.querySelector('#openSource');if(!button)return false;button.click();return true;})()`);
+  if(!sourceOpenedForAudit)throw Error('Reopened Procedure Webview did not expose its native Source action');
+  console.log('STUDIO_NATIVE_SOURCE_OPENED_FOR_AUDIT',sourceOpenedForAudit);
+  await sleep(500);
   await invoke('skillStudio.auditPackage');
   let audit='';
   for(let i=0;i<100;i++){
