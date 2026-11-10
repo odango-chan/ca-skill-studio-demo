@@ -123,6 +123,23 @@ export function registerWorkbench(vscode,context){
       updateLanguageStatus("ANALYZING","Analyzing "+snapshot.packageName+
         " · generation "+snapshot.generation);
       client.sendPackageSnapshot(snapshot);
+      // Workspace import can briefly enumerate a file before its content is
+      // readable. Preserve PARTIAL now, then retry with a NEW generation; never
+      // label the incomplete snapshot READY or spin indefinitely on real loss.
+      const transientReadFailure=snapshot.completeness==="partial"&&
+        /Unable to read file/.test(snapshot.reason??"")&&
+        /EntryNotFound|ENOENT: File not found/.test(snapshot.reason??"");
+      if(transientReadFailure&&state.transientReadRetries<3){
+        const attempt=++state.transientReadRetries;
+        const delayMs=100*attempt;
+        state.timer=setTimeout(()=>{
+          state.timer=null;
+          if(!state.disposed&&ticket===state.ticket&&!languageTransportFailure)
+            scheduleLanguagePackageRefresh(state,true,true);
+        },delayMs);
+      }else if(snapshot.completeness==="complete"){
+        state.transientReadRetries=0;
+      }
     }catch(error){
       if(state.disposed||ticket!==state.ticket)return;
       console.warn("Skill Studio Package analysis unavailable",error);
@@ -135,8 +152,9 @@ export function registerWorkbench(vscode,context){
       }
     }
   }
-  function scheduleLanguagePackageRefresh(state,immediate=false){
+  function scheduleLanguagePackageRefresh(state,immediate=false,fromReadRetry=false){
     if(state.disposed)return;
+    if(!fromReadRetry)state.transientReadRetries=0;
     const ticket=++state.ticket;
     const generation=++state.generation;
     clearTimeout(state.timer);
@@ -173,7 +191,8 @@ export function registerWorkbench(vscode,context){
     }else{
       state={
         root,key,procedureDocument:doc,refs:1,generation:0,ticket:0,
-        timer:null,disposed:false,subscriptions:[],lastSentSnapshot:null
+        timer:null,disposed:false,subscriptions:[],
+        lastSentSnapshot:null,transientReadRetries:0
       };
       languagePackages.set(key,state);
       const listen=(event,handler)=>{
