@@ -27,7 +27,8 @@
     "onCommand:skillStudio.insertNode",
     "onCommand:skillStudio.deleteNode",
     "onCommand:skillStudio.addPhaseVerify",
-    "onCommand:skillStudio.editPhaseVerifyStep"
+    "onCommand:skillStudio.editPhaseVerifyStep",
+    "onCommand:skillStudio.renameNamedPhaseStep"
   ],
   "contributes": {
     "commands": [
@@ -78,6 +79,10 @@
       {
         "command": "skillStudio.editPhaseVerifyStep",
         "title": "SKILL Studio: Edit Verify Step"
+      },
+      {
+        "command": "skillStudio.renameNamedPhaseStep",
+        "title": "SKILL Studio: Rename Named Phase Step"
       }
     ],
     "menus": {
@@ -165,6 +170,56 @@
           "command": "skillStudio.editPhaseVerifyStep",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStepAndVerify",
           "group": "5_phase"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedPhaseStep",
+          "group": "1_phase"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedPhaseStepAndBinding",
+          "group": "1_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedPhaseStepAndBinding",
+          "group": "2_phase"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStep",
+          "group": "1_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStep",
+          "group": "2_phase"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStepAndBinding",
+          "group": "1_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStepAndBinding",
+          "group": "2_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStepAndBinding",
+          "group": "3_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStepAndBinding",
+          "group": "3_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStepAndBinding",
+          "group": "4_phase"
         }
       ]
     },
