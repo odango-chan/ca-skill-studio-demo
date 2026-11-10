@@ -191,7 +191,6 @@ export function registerWorkbench(vscode,context){
           tree.contextValue='skillStudio.phaseStep';
           item.sourceVersion=document?.version;item.documentUri=document?.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          item.sourceVersion=document?.version;item.documentUri=document?.uri.toString();
           tree.phaseName=item.phaseName;tree.stepIndex=item.stepIndex;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
