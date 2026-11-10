@@ -62,7 +62,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       if(!editor)throw Error("Native Source editor is not available for the fixture round-trip: "+JSON.stringify(direct));
       await click(editor.x,editor.y);
       await invoke("editor.action.selectAll");
-      await invoke("type",{text});
+      // Theia generic "type" can hang; CDP inserts text into the focused
+      // native Monaco editor and retains the actual TextDocument semantics.
+      await command("Input.insertText",{text});
     }
     await sleep(450);
     const visible=await graph();
