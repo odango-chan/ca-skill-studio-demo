@@ -29,7 +29,8 @@ code --extensionDevelopmentPath="$PWD/experiments/ide-host/vscode" \
 The extension loads `dist/extension.cjs` and `media/procedure.js` produced
 by the isolated build. From Explorer, `assurance/procedure.yaml` opens the
 Procedure Visual editor; `assurance/contract.yaml` opens the Contract Designer;
-`assurance/predicates.yaml` opens the Predicate Designer.
+`assurance/predicates.yaml` opens the Predicate Designer; and
+`schemas/*.schema.yaml` opens the read-only Schema Designer (Draft 2020-12).
 The Contract view is read-only and source-backed: it shows identity, entry,
 inputs, resources, predicates, planning, dependencies and failure semantics.
 Contract references can open their actual Procedure, Schema or Predicate
@@ -37,7 +38,10 @@ Source. Predicate Designer shows each named Predicate as Observation →
 Evaluator, including scope, freshness and CEL/Script declaration. It never
 executes CEL or claims a live PASS/FAIL result. Use **打开 YAML Source** to edit
 the original document. Ordinary
-Python/YAML text editing remains native.
+Python/YAML text editing remains native. Schema Designer shows a field tree,
+required flags, type/const/range constraints, Source line navigation and
+safe local JSON Pointer references. Remote references are never fetched;
+complex keywords remain clearly PARTIAL or Source-only, not silently ignored.
 
 In the graph, choose a qualified Route, new target and **生成 Diff**. The
 confirm button sends a proposal; the extension independently validates the
