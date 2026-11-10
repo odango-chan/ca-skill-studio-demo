@@ -35,3 +35,7 @@ The test-only command splits publication and repair so Chromium can inspect the 
 
 - Exact-head Browser-Only Chromium must log STUDIO_LSP_DIAGNOSTICS_CHROMIUM with publication, repair, and native Problems clear evidence.
 - Existing Definition / Hover / References / Document Symbols / Completion, Procedure CustomEditor, Inspector, native Undo, Route authoring, and Classic/workbench regression gates must remain green.
+
+## Native Problems view identity (Theia 1.76)
+
+Theia markers supplies the built-in Problems widget with id `problems` via `ProblemContribution` and the command `problemsView:toggle`. Skill Studio separately contributes an activity-bar view named `skillStudio.problems` based on its own Package Audit/Procedure projection tree. The latter is **not** the LSP marker widget and does not display LanguageClient `publishDiagnostics`. Chromium acceptance opens the built-in widget when hidden, requires a nonzero visible widget rectangle, and checks that widget's own text for the malformed YAML diagnostic. A hidden, zero-sized tab or global body-text heuristic is not accepted as evidence. The exact command/id is grounded in Eclipse Theia 1.76 source (`packages/markers/src/browser/problem/problem-contribution.ts`).
