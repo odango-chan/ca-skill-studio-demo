@@ -655,7 +655,7 @@ try{
       const n4End=nextProcedure<0?ownerProcedure.length:nextProcedure;
       const candidates=ownerProcedure
         .map((x,i)=>i>=n4Start&&i<n4End&&
-          /^            DENIED: failed\s*$/.test(x)?i+1:null)
+          /^          DENIED: failed\s*$/.test(x)?i+1:null)
         .filter(Boolean);
       if(n4Start<0||candidates.length!==1)
         throw Error("Pinned owner N4 DENIED Route line is not unique");
