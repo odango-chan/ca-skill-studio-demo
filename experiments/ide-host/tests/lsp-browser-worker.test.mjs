@@ -71,6 +71,33 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
     assert.ok(published.params.diagnostics.some(item=>item.code==="PROCEDURE_PROJECTION"));
 
     worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageInvalidate",
+      params:{rootUri:"file:///workspace/skill",generation:2}
+    });
+    const invalidated=await waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics" &&
+      message.params?.uri==="file:///workspace/skill/assurance/procedure.yaml" &&
+      message.params?.diagnostics?.length===0
+    );
+    assert.equal(invalidated.params.version,undefined);
+    // A delayed old snapshot must not republish its diagnostic after invalidation.
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
+      params:packageSnapshot(1,"procedures: [\\n")
+    });
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
+      params:packageSnapshot(2,"procedures: [\\n")
+    });
+    const latest=await waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics" &&
+      message.params?.uri==="file:///workspace/skill/assurance/procedure.yaml" &&
+      message.params?.version===2 &&
+      message.params?.diagnostics?.some(item=>item.code==="PROCEDURE_PROJECTION")
+    );
+    assert.equal(latest.params.version,2);
+
+    worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageClose",
       params:{rootUri:"file:///workspace/skill"}
     });
