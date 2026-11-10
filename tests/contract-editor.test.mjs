@@ -60,7 +60,7 @@ test('Contract custom editor registers independently and renders a nonce-protect
   const webview = {
     options: null, html: '',
     postMessage: async message => {messages.push(message);return true;},
-    onDidReceiveMessage: handler => {messageHandler = handler;return {dispose() {};}}
+    onDidReceiveMessage: handler => {messageHandler = handler;return {dispose(){}};}
   };
   const panel = {webview, onDidDispose: handler => {disposeHandler = handler;}};
   await registrations.get('skillStudio.contractPreview').provider
