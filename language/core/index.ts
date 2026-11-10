@@ -14,6 +14,7 @@ import type {
   PythonOutlineSymbol,
   SchemaReference,
   ScriptReference,
+  SourceOffsetRange,
   SkillLanguageAnalysis
 } from "./types.js";
 
@@ -39,8 +40,14 @@ type LegacyAuditItem = {
 };
 type LegacyScriptReport = {
   status: "READY" | "UNAVAILABLE";
-  callers: Array<{ path: string; line: number; label: string }>;
-  schemas: Array<{ path: string; line: number; role: string; title: string }>;
+  callers: Array<{
+    path: string; line: number; label: string;
+    sourceRange?: SourceOffsetRange; targetRange?: SourceOffsetRange;
+  }>;
+  schemas: Array<{
+    path: string; line: number; role: string; title: string;
+    sourceRange?: SourceOffsetRange; targetRange?: SourceOffsetRange;
+  }>;
   warnings: string[];
 };
 type LegacyPythonOutline = {
@@ -50,6 +57,7 @@ type LegacyPythonOutline = {
     kind: "class" | "function";
     line: number;
     async: boolean;
+    range: SourceOffsetRange;
   }>;
   warnings: string[];
 };
