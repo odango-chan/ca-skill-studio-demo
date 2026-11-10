@@ -39,7 +39,8 @@
     "onCommand:skillStudio.openPredicates",
     "onCustomEditor:skillStudio.schemaPreview",
     "onCommand:skillStudio.openSchema",
-    "onCommand:skillStudio.refreshPackages"
+    "onCommand:skillStudio.refreshPackages",
+    "onView:skillStudio.packages"
   ],
   "contributes": {
     "commands": [
