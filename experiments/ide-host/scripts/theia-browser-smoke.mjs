@@ -1171,6 +1171,15 @@ try{
       patchEvidence.canvasToolbar?.allPaths?.edges!==46))
     throw Error("Native Source editor/undo did not restore the original Procedure projection: "+
       JSON.stringify(patchEvidence).slice(0,3000));
+  if(requireEditor&&(!workbenchEvidence?.namedStepRename?.accepted||
+      !workbenchEvidence.namedStepRename.applied||
+      !workbenchEvidence.namedStepRename.undo||
+      workbenchEvidence.namedStepRename.applied===workbenchEvidence.namedStepRename.undo||
+      !workbenchEvidence?.namedVerifyName?.applied||
+      !workbenchEvidence.namedVerifyName.undone||
+      workbenchEvidence.namedVerifyName.applied===workbenchEvidence.namedVerifyName.undone))
+    throw Error("Named Phase Step / Verify native authoring and Undo acceptance failed: "+
+      JSON.stringify(workbenchEvidence).slice(0,4000));
   if(requireEditor&&(!patchEvidence.nodeFocus?.open?.clicked||
       !patchEvidence.nodeFocus?.view?.visible||
       patchEvidence.nodeFocus.view.title!=="nudm-sdm-subscribe"||
@@ -1200,7 +1209,7 @@ try{
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
