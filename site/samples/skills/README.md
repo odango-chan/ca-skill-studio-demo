@@ -1,6 +1,6 @@
 # Current dual-SKILL studio demonstration
 
-Snapshot of the two runtime-used SKILL packages from `odango-chan/ca-agent-demo` at `f022319052f9c8a9a9b85a67ef485b135e416379` (November 10, 2026).
+Snapshot of the two runtime-used SKILL packages from `odango-chan/ca-agent-demo` at `9abb6b829d4466b42f0bc55ba26caa33abe8d7e3` (November 10, 2026).
 
 - `establish-pdu-session`
 - `establish-pdu-session-mas`
