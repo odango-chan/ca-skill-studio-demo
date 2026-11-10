@@ -15,8 +15,11 @@ const get = (node, ...path) => {
   }
   return current;
 };
-function field(node, counter, path, warnings) {
-  if (!node) return null;
+function field(node, counter, path, warnings, required = false) {
+  if (!node) {
+    if (required) warnings.push(path + ' is missing');
+    return null;
+  }
   if (!isScalar(node)) {
     warnings.push(path + ' is not a scalar');
     return null;
@@ -58,9 +61,9 @@ function projectObservation(name, node, counter, prefix, unknown, warnings) {
   return {
     name,
     line: nodeAt(node, counter),
-    ref: field(get(node, 'ref'), counter, prefix + 'ref', warnings),
-    scope: field(get(node, 'scope'), counter, prefix + 'scope', warnings),
-    freshness: field(get(node, 'freshness'), counter, prefix + 'freshness', warnings),
+    ref: field(get(node, 'ref'), counter, prefix + 'ref', warnings, true),
+    scope: field(get(node, 'scope'), counter, prefix + 'scope', warnings, true),
+    freshness: field(get(node, 'freshness'), counter, prefix + 'freshness', warnings, true),
     when: field(get(node, 'when'), counter, prefix + 'when', warnings)
   };
 }
@@ -93,7 +96,7 @@ function projectPredicate(id, node, counter, unknown, warnings) {
     warnings.push(prefix + 'evaluator is not a mapping');
   } else {
     const type = field(get(evaluatorNode, 'type'), counter,
-      prefix + 'evaluator.type', warnings);
+      prefix + 'evaluator.type', warnings, true);
     const known = type?.value === 'cel'
       ? new Set(['type', 'expression'])
       : type?.value === 'script' ? new Set(['type', 'ref']) : new Set(['type']);
@@ -102,10 +105,10 @@ function projectPredicate(id, node, counter, unknown, warnings) {
       type,
       expression: type?.value === 'cel'
         ? field(get(evaluatorNode, 'expression'), counter,
-          prefix + 'evaluator.expression', warnings) : null,
+          prefix + 'evaluator.expression', warnings, true) : null,
       ref: type?.value === 'script'
         ? field(get(evaluatorNode, 'ref'), counter,
-          prefix + 'evaluator.ref', warnings) : null,
+          prefix + 'evaluator.ref', warnings, true) : null,
       line: nodeAt(evaluatorNode, counter)
     };
     if (type?.value !== 'cel' && type?.value !== 'script')
@@ -151,7 +154,7 @@ export function projectPredicateSet(source) {
     predicates.push(projectPredicate(id, pair.value, counter, unknown, warnings));
   }
   if (!predicates.length) warnings.push('predicates is empty');
-  const skill = field(get(root, 'metadata', 'skill'), counter, 'metadata.skill', warnings);
+  const skill = field(get(root, 'metadata', 'skill'), counter, 'metadata.skill', warnings, true);
   const apiVersion = field(get(root, 'apiVersion'), counter, 'apiVersion', warnings);
   const state = unknown.length || warnings.length ? 'PARTIAL' : 'READY';
   return {
