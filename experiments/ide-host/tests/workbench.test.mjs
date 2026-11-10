@@ -23,12 +23,15 @@ test('Inspection preserves Classic node/phase/route source identity; unknown syn
     ['scripts/select_establishment_configuration.py',{text:script}],
     ['schemas/EstablishmentSelectionInput.schema.yaml',{text:`title: EstablishmentSelectionInput
 type: object
-required: [dnn, sNssai, requestedPduSessionType, requestedSscMode, udmResult]
+required: [dnn, slice, plmn, ingress-ref, lifecycle-ref, requested-type, requested-ssc, udmResult]
 properties:
   dnn: {type: string}
-  sNssai: {type: object}
-  requestedPduSessionType: {type: string}
-  requestedSscMode: {type: integer}
+  slice: {type: object}
+  plmn: {type: object}
+  ingress-ref: {type: string}
+  lifecycle-ref: {type: string}
+  requested-type: {type: string}
+  requested-ssc: {type: integer}
   udmResult: {type: object}
 `}]
   ]);
