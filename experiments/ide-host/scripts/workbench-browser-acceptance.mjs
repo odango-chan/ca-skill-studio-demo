@@ -151,7 +151,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       const hoverText=hovers.flatMap(item=>
         Array.isArray(item?.contents)?item.contents:[item?.contents])
         .map(item=>typeof item==="string"?item:item?.value??String(item??""))
-        .join("\\n");
+        .join(" ");
       if(!hoverText.includes("Skill Script")||
          !hoverText.includes("select-establishment-configuration"))
         throw Error("Native Hover provider did not return the declared Script metadata");
