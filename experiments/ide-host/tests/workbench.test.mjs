@@ -15,6 +15,32 @@ test('Inspection preserves Classic node/phase/route source identity; unknown syn
   assert.ok(selected.inspection.some(x=>x.label==='preconditions'&&x.children.length===5));
   assert.ok(selected.evidence.some(x=>x.label.includes('Runtime NOT_RUN')));
   assert.ok(selected.inspection.every(x=>x.line>0));
+  assert.ok(selected.dataflow.bindings.length>0,'selected Node exposes source-resolved Phase dependencies');
+  assert.equal(selected.consumerContracts.summary.authorizedWrites,0,
+    'read-only Evidence never grants ABI write authority');
+  const script=readFileSync(root+'scripts/select_establishment_configuration.py','utf8');
+  const schemas=new Map([
+    ['scripts/select_establishment_configuration.py',{text:script}],
+    ['schemas/EstablishmentSelectionInput.schema.yaml',{text:`title: EstablishmentSelectionInput
+type: object
+required: [dnn, sNssai, requestedPduSessionType, requestedSscMode, udmResult]
+properties:
+  dnn: {type: string}
+  sNssai: {type: object}
+  requestedPduSessionType: {type: string}
+  requestedSscMode: {type: integer}
+  udmResult: {type: object}
+`}]
+  ]);
+  const typed=inspectionSnapshot(source,{procedureId:proc.name,nodeId:'nudm-sdm-subscribe'},null,schemas);
+  assert.ok(typed.consumerContracts.bindings.some(x=>x.typeRelation==='TYPE_ONLY_MATCH'),
+    'Evidence distinguishes declared type-only matches from full ABI proof');
+  assert.ok(typed.consumerContracts.bindings.some(x=>x.typeRelation==='PRODUCER_TYPE_UNAVAILABLE'),
+    'Evidence keeps unknown producer output types explicit');
+  const flow=typed.evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
+  assert.ok(flow?.children.some(x=>x.label.includes('Consumer ABI')));
+  assert.ok(flow.children.every(x=>!x.writeAuthorized),
+    'dataflow evidence rows remain read-only');
   const invalid=inspectionSnapshot('procedures: [invalid]');
   assert.equal(invalid.model.state,'UNAVAILABLE');assert.equal(invalid.outline.length,0);assert.ok(invalid.problems.length);
 });
