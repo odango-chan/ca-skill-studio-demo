@@ -712,6 +712,59 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     for(const c of n.childFrames??[])await inspect(c);
   }
   await inspect(tree.frameTree);if(!markdown)throw Error('Shared safe Markdown Preview did not render');
+  // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
+  await invoke('skillStudio.openContract');
+  let contractView=null,contractFrame=null,contractContextId=null;
+  for(let attempt=0;attempt<100&&!contractView;attempt++){
+    const contractTree=await command('Page.getFrameTree');
+    const contractFrames=[];
+    const collectContractFrames=node=>{
+      if(!node)return;
+      contractFrames.push(node.frame);
+      for(const child of node.childFrames??[])collectContractFrames(child);
+    };
+    collectContractFrames(contractTree.frameTree);
+    for(const frame of contractFrames.filter(item=>
+        item.url.includes('/webview/index.html')||item.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'contract-designer-acceptance',grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:\`({
+            title:document.title,
+            text:document.body?.innerText??'',
+            cards:[...document.querySelectorAll('.card h2')].map(x=>x.textContent.trim()),
+            status:document.querySelector('#status')?.textContent??''
+          })\`
+        });
+        const candidate=result.result?.value;
+        if(candidate?.title==='SKILL Contract Visual'){
+          contractView=candidate;contractFrame=frame;
+          contractContextId=world.executionContextId;break;
+        }
+      }catch{/* another webview frame may be disposed while tabs activate */}
+    }
+    if(!contractView)await sleep(100);
+  }
+  const contractExpectedCards=['Skill Identity','Entry & Inputs','Required Context',
+    'Allowed Resources','Preconditions','Requirements','Postconditions',
+    'Planning','Failure Semantics','Dependencies'];
+  if(!contractView||!contractFrame||
+     !contractView.text.includes('establish-pdu-session')||
+     !contractView.text.includes('sbi.udm.sm_data.get')||
+     !contractView.text.includes('skill.evaluate-udm-read')||
+     !contractView.text.includes('createdsession.ran.setup_accepted')||
+     contractExpectedCards.some(title=>!contractView.cards.includes(title)))
+    throw Error('Contract Designer did not render the current Package Source: '+
+      JSON.stringify(contractView).slice(0,3000));
+  console.log('STUDIO_CONTRACT_DESIGNER_CHROMIUM',JSON.stringify({
+    title:contractView.title,status:contractView.status,cards:contractView.cards,
+    capabilityVisible:contractView.text.includes('sbi.udm.sm_data.get'),
+    predicateVisible:contractView.text.includes('createdsession.ran.setup_accepted'),
+    readOnly:contractView.text.includes('Source 是唯一真源')
+  }));
   // Native layout restoration must retain the CustomEditor across a reload.
   console.log("STUDIO_NATIVE_ACTION","reload");
   await sleep(1200);await command('Page.reload');await sleep(800);
