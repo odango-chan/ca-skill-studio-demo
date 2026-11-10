@@ -73,6 +73,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
   await invoke('skillStudio.refreshInspection');
+  await invoke('workbench.files.action.focusFilesExplorer');
+  await sleep(250);
   // Skill Studio views live inside the native Explorer container; do not
   // create a competing Activity Bar. Distinguish our semantic Procedure
   // Outline from Theia's built-in document-symbol Outline.
@@ -88,7 +90,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       throw Error('Native Explorer-contributed view missing: '+name+' · '+JSON.stringify(views.headers));
   if(views.skillStudioTab)
     throw Error('A separate Skill Studio Activity Bar container must not compete with Explorer');
-  const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
+  const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);el?.scrollIntoView({block:'center'});const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
   console.log('STUDIO_PROBLEMS_HEADERS',JSON.stringify(problemHeaderDiagnostics));
   if(problemsHeader?.collapsed){await click(problemsHeader.x,problemsHeader.y);await sleep(250);}
@@ -254,6 +256,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
       return ar.width*ar.height-br.width*br.height;
     })[0];
+    el?.scrollIntoView({block:'center',inline:'nearest'});
     const r=el?.getBoundingClientRect();
     const root=[...document.querySelectorAll('.theia-TreeNode')].some(x=>
       x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
