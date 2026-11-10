@@ -473,6 +473,7 @@ try{
         expression:`({
           rootMode:document.querySelector("#rootPathMode")?.value,
           nodes:document.querySelectorAll("#reactFlowRoot .react-flow__node").length,
+          edges:document.querySelectorAll("#reactFlowRoot .react-flow__edge").length,
           branchControls:document.querySelectorAll("#reactFlowRoot .designer-hidden-branches").length
         })`
       });
@@ -1159,9 +1160,15 @@ try{
       !/TextDocument v[2-9]/.test(patchEvidence.applied?.revision??"")))
     throw Error("Source-backed Patch preview/apply did not update the TextDocument: "+
       JSON.stringify(patchEvidence).slice(0,3000));
+  // The default Root view is the proven success path (9 nodes / 8 bundled
+  // edges); the old smoke asserted 46 full-graph edges even before switching
+  // to All Paths. Require both the default restored view and the full graph.
   if(requireEditor&&(!(patchEvidence.sourceEditor?.monacoEditors>0)||
       !/TextDocument v[3-9]/.test(patchEvidence.undo?.revision??"")||
-      patchEvidence.undo?.graphEdges!==46))
+      patchEvidence.undo?.graphNodes!==9||
+      patchEvidence.undo?.graphEdges!==8||
+      patchEvidence.canvasToolbar?.allPaths?.nodes!==17||
+      patchEvidence.canvasToolbar?.allPaths?.edges!==46))
     throw Error("Native Source editor/undo did not restore the original Procedure projection: "+
       JSON.stringify(patchEvidence).slice(0,3000));
   if(requireEditor&&(!patchEvidence.nodeFocus?.open?.clicked||
