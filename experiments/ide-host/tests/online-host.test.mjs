@@ -30,6 +30,7 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   assert.ok(workbenchViews.has("skillStudio.packages"),
     "multi-Package Overview must live in the Skill Studio activity bar");
   assert.ok(plugin.activationEvents.includes("onCommand:skillStudio.refreshPackages"));
+  assert.ok(plugin.activationEvents.includes("onView:skillStudio.packages"));
   assert.ok(plugin.contributes.menus["view/title"].some(x=>
     x.command==="skillStudio.refreshPackages"&&x.when==="view == skillStudio.packages"));
   assert.ok(plugin.contributes.customEditors.every(x=>x.priority==="default"));
