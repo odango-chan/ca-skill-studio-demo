@@ -2304,6 +2304,8 @@ export function registerWorkbench(vscode,context){
       }
       try{
         const stat=await vscode.workspace.fs.stat(targetUri);
+        if(stat.type&vscode.FileType.SymbolicLink)
+          throw new Error('符号链接不能作为 Package 内文件跳转目标');
         if(stat.type&vscode.FileType.Directory)
           throw new Error('目标是目录，不是文件');
         if(targetUri.path.toLowerCase().endsWith('.md'))
