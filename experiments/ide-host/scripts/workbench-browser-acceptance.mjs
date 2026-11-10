@@ -88,6 +88,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const expectedGroups=['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'];
   let groups=await readGroups();
   let expandedView=null;
+  let expansionMode='already-expanded';
   if(!expectedGroups.every(group=>groups.includes(group))){
     await click(packageRow.x,packageRow.y);
     await sleep(700);
@@ -104,6 +105,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       throw Error('Package Overview native TreeView expansion failed: '+
         JSON.stringify({groups,packageRow,expandedView}));
     }
+    expansionMode='native-mouse';
   }
   for(const group of expectedGroups)
     if(!groups.includes(group))
