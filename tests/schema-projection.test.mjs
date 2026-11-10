@@ -110,8 +110,8 @@ test('C3 fails closed on malformed/unsafe/unsupported or unbounded YAML', () => 
 });
 
 test('C3 rejects malformed recognized fields rather than claiming complete visualization',()=>{
-  const source = sample.replace('  sNssai:\n',
-    '  sNssai:\n    required: 5\n');
+  const source = sample.replace('    required:\n    - sst',
+    '    required: 5');
   const p = projectJsonSchema(source);
   assert.equal(p.state,'PARTIAL');
   assert.ok(p.projectionWarnings.some(x=>x.includes('/required must be an array')));
