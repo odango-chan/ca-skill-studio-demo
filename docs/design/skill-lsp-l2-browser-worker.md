@@ -74,19 +74,27 @@ line-only references as non-navigable.
 
 The automated Worker test runs the actual browser server bundle in a Worker
 GlobalScope-compatible harness and exercises initialize, diagnostics publish
-and Package close/clear. This validates the LSP message transport and server
-session, but **does not prove nested Worker creation in Theia 1.76's hosted
-plugin worker**. Before enabling this on the online editor, verify in the real
-Theia Pages host:
+and Package close/clear. In addition, the browser-only Theia 1.76 Chromium
+workflow now opens the real CustomEditor and requires the native status bar to
+reach `SKILL LSP: READY` after a Package snapshot. This proves nested Worker
+startup, the Pages base-path URL rewrite, LanguageClient initialization and
+one successful end-to-end Package analysis in the browser-only host.
 
-1. extension host starts the dedicated Worker from the staged plugin URI;
-2. the worker loads under the Pages base path and same-origin policy;
-3. Procedure YAML errors appear in native Problems and disappear after repair;
-4. edits in open unsaved contract/predicate/Python files refresh the Package;
-5. rapid edits discard older generations; close/reopen and Package switch clear
+The backend-backed Theia workflow uses a Node Extension Host, not the browser
+Worker host. This L2-B slice intentionally does not start the browser client
+there; it retains the existing host diagnostics and Source behavior. A Node
+LSP transport can be added separately if desktop/backend parity is required.
+
+Still required before broad language-feature acceptance:
+
+1. verify Procedure diagnostics appear in native Problems and disappear after
+   repair, not only in the Worker protocol test;
+2. verify edits in open unsaved contract/predicate/Python files refresh the
+   Package, including newly created unsaved files;
+3. rapid edits discard older generations; close/reopen and Package switch clear
    prior diagnostics;
-6. worker failure degrades visibly without blocking native YAML/Python editing;
-7. no duplicate Package Audit warnings and no change to Source/Visual Patch
+4. worker failure degrades visibly without blocking native YAML/Python editing;
+5. no duplicate Package Audit warnings and no change to Source/Visual Patch
    ownership.
 
 No production Pages deployment, PR merge, Runtime authority or 5GC operation is
