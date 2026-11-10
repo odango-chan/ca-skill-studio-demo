@@ -129,9 +129,18 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     if(!groups.includes(group))
       throw Error('Package Overview missing group '+group+': '+
         JSON.stringify({groups,packageRow,expandedView}));
+  // Take a post-expansion provider snapshot. The first refresh emits the tree
+  // change; the second reads counters after Theia has processed that change.
+  await invoke('skillStudio.refreshPackages');
+  await invoke('skillStudio.refreshPackages');
+  const postExpansion=await evalJS('window.__skillStudioLastCommandResult??null');
+  if(!postExpansion?.treeReadsByKind ||
+      postExpansion.treeReadsByKind.package < 1)
+    throw Error('Package Overview rendered groups without requesting Package children: '+
+      JSON.stringify({groups,postExpansion,expansionMode}));
   const evidence={package:'establish-pdu-session',core:'3/3',schemas:6,
     scripts:3,references:3,treeVisible:true,scanState:scan.state,
-    treeReadsByKind:scan.treeReadsByKind,expansionMode};
+    treeReadsByKind:postExpansion.treeReadsByKind,expansionMode};
   console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify(evidence));
   return evidence;
 }
