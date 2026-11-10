@@ -1,6 +1,19 @@
 # C4 — Package Overview
 
-Status: implementation and exact-head Theia acceptance pending.
+Status: implementation complete; exact-PR-head single-package Theia acceptance
+passes. Real-browser multi-package acceptance remains deferred until the
+two-owner sample workspace from PR #129 is integrated.
+
+Verified PR head: `3e29e9e2cc2bf17c87877efd4755e9ac8e985c95`.
+
+- Theia Browser-Only Online: PASS (run 42810666981).
+- Theia Browser Host Custom Editor: PASS (run 42810667063).
+- IDE Host Spike: PASS (run 42810666993).
+- Skill Studio pull-request verification: PASS (run 42810666987, attempt 2).
+- Real Chromium Package evidence: 16 files, 3/3 core files, 6 schemas,
+  3 scripts, 3 references; TreeView requested Package children twice.
+
+The pull request remains stacked on C3 and is intentionally still draft.
 
 ## Purpose
 
@@ -58,6 +71,7 @@ the three core files. Missing core files are explicit placeholder rows.
 3. Real Theia Chromium: current owner sample appears, groups show exact
    Assurance / Schema / Script / Reference counts, and the existing Procedure,
    Contract, Predicate, Schema and native Source flows remain intact.
-4. Multi-package fixture verifies the same workspace can list two or more
-   independent Skills. Re-run real browser acceptance against the two-owner
-   `site/samples/skills/` workspace when PR #129 is integrated.
+4. Unit fixtures verify multiple independent Skills, nested Package roots and
+   incomplete Packages in one workspace. Real-browser multi-package acceptance
+   remains pending: PR #129 (the two-owner `site/samples/skills/` workspace)
+   is still open and has not been integrated.
