@@ -178,6 +178,12 @@ test('C4 registers Packages view and renders package tree with source actions',a
   const schemaFiles=provider.getChildren(schemas);
   assert.equal(schemaFiles[0].label,'request.schema.yaml');
   assert.equal(schemaFiles[0].command.command,'skillStudio.openSchema');
+  assert.equal(provider.getParent(pkg),undefined);
+  assert.equal(provider.getParent(schemas).kind,'package');
+  const schemaParent=provider.getParent(schemaFiles[0]);
+  assert.equal(schemaParent.kind,'group');
+  assert.equal(schemaParent.key,'schemas');
+  assert.equal(schemaParent.packageRoot,pkg.rootPath);
   const treeItem=provider.getTreeItem(pkg);
   assert.equal(treeItem.label,'establish-pdu-session');
   assert.equal(treeItem.collapsibleState,1);
