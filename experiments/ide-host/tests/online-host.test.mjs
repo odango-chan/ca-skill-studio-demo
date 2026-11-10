@@ -34,8 +34,9 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     x.command==="skillStudio.loadExample"),
     "Explorer title toolbar must expose the demo project");
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","media/procedure.js","media/procedure.css",
-    "samples/establish-pdu-session/files.json",
-    "samples/establish-pdu-session/assurance/procedure.yaml"])
+    "samples/skills/files.json",
+    "samples/skills/establish-pdu-session/assurance/procedure.yaml",
+    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });
 test("Trial is isolated from existing Pages distribution",()=>{
