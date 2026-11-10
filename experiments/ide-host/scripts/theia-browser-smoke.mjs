@@ -13,6 +13,7 @@ const root=resolve("experiments/ide-host/theia-online/lib/frontend");
 const externalUrl=process.env.THEIA_URL;
 const basePath=(process.env.THEIA_BASE_PATH||"").replace(/\/+$/,"");
 const requireWebview=process.env.THEIA_REQUIRE_WEBVIEW==="1";
+const requireBrowserLsp=process.env.THEIA_REQUIRE_BROWSER_LSP==="1";
 const requireEditor=Boolean(externalUrl)||requireWebview;
 const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
@@ -1027,7 +1028,7 @@ try{
   }
   console.log("STUDIO_THEIA_STAGE","native-workbench");
   let workbenchEvidence;
-  try{workbenchEvidence=await runWorkbenchAcceptance({command,evalJS,sleep,requireEditor});}
+  try{workbenchEvidence=await runWorkbenchAcceptance({command,evalJS,sleep,requireEditor,requireBrowserLsp});}
   catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
