@@ -103,6 +103,27 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(stillPreview)throw Error("Double-click did not pin native preview tab");
   const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
+  // Guard the canvas controls that were present in Classic Studio but were
+  // previously omitted from the Theia CustomEditor migration.
+  const canvasToolbarEvidence=await evalWebviewJS(`(()=> {
+    const ids=["layoutDirection","rootPathMode","neighborsOnly","showAllLabels",
+      "centerSelection","zoomOut","zoomIn","fit","fitWidth","fitHeight",
+      "pathFailure","pathUncertain","pathRecovery"];
+    const controls=Object.fromEntries(ids.map(id=>[id,Boolean(document.getElementById(id))]));
+    const direction=document.getElementById("layoutDirection")?.value??null;
+    return {
+      visible:document.getElementById("graphTools")?.hidden===false,
+      direction,
+      rootPathToolbarVisible:document.getElementById("rootPathToolbar")?.hidden===false,
+      controls
+    };
+  })()`);
+  if(!canvasToolbarEvidence?.visible||canvasToolbarEvidence.direction!=="DOWN"||
+     !canvasToolbarEvidence.rootPathToolbarVisible||
+     Object.values(canvasToolbarEvidence.controls??{}).some(value=>!value))
+    throw Error("Theia Procedure canvas toolbar is incomplete or not vertically initialized: "+
+      JSON.stringify(canvasToolbarEvidence));
+  console.log("STUDIO_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbarEvidence));
   let languageServiceStatus="NOT_REQUIRED_NODE_HOST";
   if(requireBrowserLsp){
     languageServiceStatus="";
