@@ -400,6 +400,10 @@ export function registerWorkbench(vscode,context){
           if(languageDiagnosticAcceptance.has(key))
             throw Error("A live diagnostic acceptance is already active for this Procedure");
           const initialDocument=await vscode.workspace.openTextDocument(procedureUri);
+          const persistedInitial=new TextDecoder("utf-8",{fatal:true}).decode(
+            await vscode.workspace.fs.readFile(procedureUri));
+          if(initialDocument.isDirty||persistedInitial!==initialDocument.getText())
+            throw Error("L2-D2 requires a clean Procedure Source baseline");
           const packageRoot=packageRootForProcedure(vscode,initialDocument);
           const packageState=packageRoot?languagePackages.get(packageRoot.uri.toString()):null;
           if(!packageState)throw Error("Procedure Package has no active Language Service state");
@@ -459,11 +463,27 @@ export function registerWorkbench(vscode,context){
             const repaired=await waitForGeneration(state,beforeRepair,"READY",
               diagnostics=>lspProcedureDiagnostics(diagnostics).length===0,
               "Live Procedure diagnostic clear after repair");
-            if(currentDocument()?.getText()!==state.original)
+            const restoredDocument=currentDocument();
+            if(restoredDocument?.getText()!==state.original)
               throw Error("Procedure Source was not restored byte-for-byte after diagnostic acceptance");
+            // Theia can retain a dirty editor backup after a second WorkspaceEdit;
+            // opening another native editor then reloading may resurrect stale
+            // malformed YAML. Clean ONLY the original restored text, never the
+            // diagnostic test mutation, before another editor takes focus.
+            const diskBeforeClean=new TextDecoder("utf-8",{fatal:true}).decode(
+              await vscode.workspace.fs.readFile(procedureUri));
+            const cleanupSaved=restoredDocument.isDirty||diskBeforeClean!==state.original;
+            if(cleanupSaved&&!await restoredDocument.save())
+              throw Error("Native Procedure cleanup save was rejected");
+            const diskAfterClean=new TextDecoder("utf-8",{fatal:true}).decode(
+              await vscode.workspace.fs.readFile(procedureUri));
+            if(restoredDocument.isDirty||diskAfterClean!==state.original)
+              throw Error("Native Procedure persisted Source/dirty state was not restored");
             return {
               phase:"repair",cleared:true,restored:true,
-              generation:repaired.generation,packageAuditDuplicates:0
+              generation:repaired.generation,packageAuditDuplicates:0,
+              originalDiskRestored:true,cleanupSaved,
+              persistedDriftObserved:diskBeforeClean!==state.original
             };
           }finally{
             languageDiagnosticAcceptance.delete(key);
