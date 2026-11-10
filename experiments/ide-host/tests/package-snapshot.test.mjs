@@ -64,7 +64,7 @@ test("Package snapshot keeps exact root, required files, language ids and unsave
   assert.equal(byPath.get("scripts/prepare.py").text,"def unsaved(): pass\n");
   assert.equal(byPath.get("assurance/contract.yaml").version,0);
   assert.equal(byPath.get("schemas/request.json").languageId,"json");
-  assert.equal(byPath.get("scripts/new-unsaved.py").text,"def notYetSaved(): pass\\n");
+  assert.equal(byPath.get("scripts/new-unsaved.py").text,"def notYetSaved(): pass\n");
   assert.equal(byPath.get("scripts/new-unsaved.py").version,1);
 });
 
