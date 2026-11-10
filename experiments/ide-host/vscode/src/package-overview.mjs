@@ -197,7 +197,8 @@ export function registerPackageOverview(vscode,context) {
   async function refresh() {
     const ticket = ++generation;
     try {
-      const roots = packageScanRoots(folders,vscode.workspace.textDocuments??[]);
+      const roots = packageScanRoots(vscode.workspace.workspaceFolders??[],
+        vscode.workspace.textDocuments??[]);
       if (!roots.length) {
         packages=[];inventoryState='no-workspace';message='请先打开 Workspace 或一个 SKILL 文件';fire();return [];
       }
