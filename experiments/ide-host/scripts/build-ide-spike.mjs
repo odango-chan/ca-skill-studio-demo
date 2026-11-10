@@ -95,3 +95,4 @@ console.log("STUDIO_PREPARED_SAMPLE",JSON.stringify({
   sourceSha:sampleManifest.sourceSha
 }));
 console.log("IDE spike: built Node + browser extension entries and local ReactFlow webview (not installed or run)");
+// Owner Skill snapshots are pinned and validated; the demo does not auto-sync.
