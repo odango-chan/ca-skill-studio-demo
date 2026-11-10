@@ -165,12 +165,17 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
       const problemsTab=await evalJS(`(()=>{
         const el=[...document.querySelectorAll(".lm-TabBar-tab")].find(x=>
           x.textContent.trim().startsWith("Problems"));
-        const r=el?.getBoundingClientRect();
-        return r&&r.width>0?{x:r.x+r.width/2,y:r.y+r.height/2,
-          label:el.textContent.trim(),aria:el.getAttribute("aria-label")}:null;
+        if(!el)return null;
+        const label=el.textContent.trim(),aria=el.getAttribute("aria-label");
+        // Theia may keep the panel tab in the DOM while the bottom panel is
+        // collapsed, so use the actual tab action rather than requiring a
+        // non-zero bounding box before it can be revealed.
+        el.click();
+        const r=el.getBoundingClientRect();
+        return {label,aria,rect:{x:r.x,y:r.y,width:r.width,height:r.height}};
       })()`);
       if(!problemsTab)throw Error("Native Theia Problems panel tab is missing");
-      await click(problemsTab.x,problemsTab.y);await sleep(350);
+      await sleep(350);
       let problemsText="";
       for(let i=0;i<100;i++){
         problemsText=await evalJS("document.body.innerText");
