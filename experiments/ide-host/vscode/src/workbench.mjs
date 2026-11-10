@@ -290,6 +290,7 @@ export function registerWorkbench(vscode,context){
       getTreeItem(item){
         const tree=new vscode.TreeItem(item.label,item.children?.length?vscode.TreeItemCollapsibleState.Collapsed:vscode.TreeItemCollapsibleState.None);
         tree.description=item.description;tree.tooltip=item.label+(item.line?' · L'+item.line:'');
+        tree.kind=item.kind;
         if(item.kind==='node'){
           const deletable=id==='inspection'&&document&&
             deleteNodeOptions(document.getText(),item.procedureId,item.nodeId);
