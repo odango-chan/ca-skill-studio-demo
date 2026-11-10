@@ -19,15 +19,15 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     console.log("STUDIO_NATIVE_ACTION",id);
     await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
   }
-  async function confirmNativePreview(){
+  async function confirmNativePreview(oldText,newText){
     let target=null;
     for(let i=0;i<40&&!target;i++){
       target=await evalJS(`(()=>{const el=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='确认并应用'&&x.getBoundingClientRect().width>0);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,text:document.body.innerText}:null;})()`);
       if(!target)await sleep(100);
     }
     if(!target)throw Error('Native Inspector Diff confirmation dialog did not appear');
-    if(!target.text.includes('call: sbi.udm.sm_data.get')||!target.text.includes('sbi.udm.sm_data.get.preview'))
-      throw Error('Native Inspector confirmation did not show the expected Source Diff');
+    if(!target.text.includes(oldText)||!target.text.includes(newText))
+      throw Error('Native Inspector confirmation did not show the expected Source Diff: '+target.text.slice(-1200));
     await click(target.x,target.y);await sleep(250);
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
@@ -105,7 +105,7 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   await startNativeCommand('skillStudio.editNodeOperatorValue',{
     procedureId:selectionResult.result.value.procedure,nodeId:'nudm-sdm-get',sourceVersion
   },'sbi.udm.sm_data.get.preview');
-  await confirmNativePreview();
+  await confirmNativePreview('call: sbi.udm.sm_data.get','call: sbi.udm.sm_data.get.preview');
   const afterEdit=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
@@ -123,6 +123,42 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   console.log('STUDIO_INSPECTOR_AUTHORING_CHROMIUM',JSON.stringify({
     node:selectionResult.result.value.node,procedure:selectionResult.result.value.procedure,
     before:beforeEdit.result?.value,after:afterEdit.result?.value,undo:afterUndo.result?.value
+  }));
+  const bindingSelection=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Phase binding Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  });
+  if(!bindingSelection.result?.value?.node)throw Error('Could not select Phase binding Node');
+  await sleep(250);
+  const beforeBinding=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const bindingVersion=Number(/v(\d+)/.exec(beforeBinding.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(bindingVersion))throw Error('Could not read Source version before Phase binding edit');
+  await startNativeCommand('skillStudio.editPhaseInputBinding',{
+    kind:'phase-step',procedureId:bindingSelection.result.value.procedure,
+    nodeId:'nudm-sdm-subscribe',phaseName:'preconditions',stepIndex:0,
+    sourceVersion:bindingVersion
+  },'dnn','input.ue-ref');
+  await confirmNativePreview('from: input.dnn','from: input.ue-ref');
+  const afterBinding=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  const bindingResult=await evalJS(`window.__skillStudioCommandResult`);
+  if(bindingResult!==true||!afterBinding.result?.value||afterBinding.result.value===beforeBinding.result?.value)
+    throw Error('Native Phase Binding edit did not commit a Source revision');
+  await invoke('core.undo');
+  const afterBindingUndo=await command('Runtime.evaluate',{
+    contextId:graphContext,returnByValue:true,
+    expression:`document.querySelector('#revision')?.textContent`
+  });
+  if(!afterBindingUndo.result?.value||afterBindingUndo.result.value===afterBinding.result?.value)
+    throw Error('Native Phase Binding edit did not round-trip through native Undo');
+  console.log('STUDIO_PHASE_BINDING_CHROMIUM',JSON.stringify({
+    node:bindingSelection.result.value.node,procedure:bindingSelection.result.value.procedure,
+    before:beforeBinding.result?.value,after:afterBinding.result?.value,undo:afterBindingUndo.result?.value
   }));
   // Safe Markdown uses the actual native source document and shared renderer.
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
