@@ -553,16 +553,42 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('core.undo');
   const outcomeUndo=await waitForRevisionChange(graphContext,
     outcomeApplied.result?.value,'Native Phase Outcome repair Undo');
-  await invoke('core.undo');
-  const fixtureUndo=await waitForRevisionChange(graphContext,
-    outcomeUndo.result?.value,'Native typo fixture Undo');
+  const afterNativeUndo=await evalJS(`(()=>{
+    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
+    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
+  })()`);
+  if(!afterNativeUndo.includes('MISTYPED: finalize-failed'))
+    throw Error('Native Undo did not revert the Outcome repair back to the typed fixture: '+
+      afterNativeUndo.slice(-1200));
+  // The keyboard-created fixture can have its own Monaco edit/undo grouping.
+  // Restore the original Source explicitly with one native editor line edit;
+  // do not assume a second core.undo will undo exactly that fixture.
+  await click(nativeEditor.x+Math.min(90,nativeEditor.width/2),
+    nativeEditor.y+Math.min(24,nativeEditor.height/2));
+  await key('g','KeyG',2,71);await sleep(160);
+  await command('Input.insertText',{text:String(pcfOutcomeLine)});
+  await key('Enter','Enter',0,13);await sleep(160);
+  await key('Home','Home',0,36);await key('Home','Home',0,36);
+  await key('End','End',8,35);
+  await command('Input.insertText',{text:'            FAILED: finalize-failed'});
+  const fixtureRestored=await waitForRevisionChange(graphContext,
+    outcomeUndo.result?.value,'Native Phase Outcome fixture restoration');
+  const restoredText=await evalJS(`(()=>{
+    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
+    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
+  })()`);
+  if(!restoredText.includes('FAILED: finalize-failed')||
+     restoredText.includes('MISTYPED: finalize-failed'))
+    throw Error('Native Source fixture was not restored to its original scalar: '+
+      restoredText.slice(-1200));
   const outcomeRestored=await graph();
   if(!outcomeRestored?.revision||outcomeRestored.nodes!==beforeOutcomeFixture.nodes)
-    throw Error('Phase Outcome fixture was not restored by two native Undo steps');
+    throw Error('Phase Outcome restoration lost the original Procedure graph');
   const phaseOutcome={line:pcfOutcomeLine,
     before:beforeOutcomeFixture.revision,seed:afterTypo.result?.value,
     repaired:outcomeApplied.result?.value,undo:outcomeUndo.result?.value,
-    restored:fixtureUndo.result?.value};
+    restored:fixtureRestored.result?.value,
+    restoration:'native editor exact line replacement'};
   console.log('STUDIO_PHASE_OUTCOME_REPAIR_CHROMIUM',JSON.stringify(phaseOutcome));
   const graphHasNode=async id=>{
     const result=await command('Runtime.evaluate',{
