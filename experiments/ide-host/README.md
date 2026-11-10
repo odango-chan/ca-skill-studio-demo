@@ -1,6 +1,6 @@
 # SKILL Studio online host · Theia + optional VS Code desktop/web
 
-**Default online host direction (2026-11-09), canvas parity increment merged (2026-11-10).** Repo owner:
+**Default online host direction (2026-11-09), canvas and bounded Phase authoring parity increments merged (2026-11-10).** Repo owner:
 `ca-skill-studio-demo`. GitHub Pages now targets Theia browser-only at `/`;
 the previous full browser Studio is preserved at `/classic/`, and the former
 `/ide-preview/` path redirects to the new root. This is a host-shell switch,
@@ -29,6 +29,8 @@ The current spike imports the real projection, ReactFlow and ELK sources from
 custom visual editor on `**/assurance/procedure.yaml`. Ordinary YAML/Python
 stay in the host's default editors. New/rename/delete files work through
 the **host's Explorer**, not through separate Studio code. The Procedure CustomEditor also restores the Classic canvas toolbar and Root path focus (vertical/horizontal, fit/zoom, main/selected/all paths and anchored branch expand/collapse) via PR #106; these controls remain view-only.
+
+PR #108 also migrates closed-world named Phase Step rename (all proven same-Procedure `from` references in one WorkspaceEdit) and the safe named Verify lifecycle into the native Inspector. The current Evidence-view increment (PR #109) reuses Classic's `phase-dataflow`, `phase-consumer-contract` and evidence-copy modules to display producer provenance and consumer schema/type evidence from the bounded Package Audit snapshot. It is read-only: `TYPE_ONLY_MATCH` is not full ABI proof, `authorizedWrites` remains zero, and no Runtime evidence is implied.
 
 ## Shared theme · offline VS Code and online Theia
 
