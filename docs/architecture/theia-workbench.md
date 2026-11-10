@@ -1,6 +1,6 @@
 # Theia 工作台与 Classic 功能对照
 
-**Status: Stage One accepted; Inspector Node, Phase Input Binding, bounded Node insert/delete and bounded Phase Verify authoring merged into main; resulting-main Pages acceptance pending · Date: 2026-11-10**
+**Status: Stage One accepted; Inspector Node, Phase Input Binding, bounded Node insert/delete and bounded Phase Verify authoring merged into main; resulting-main Pages PASS (`main@5a5cb981`) · Date: 2026-11-10**
 
 第一阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；当前 Inspector Node authoring 见 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)；Phase Input Binding 首个增量见 [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97)；Node insert/delete 首个有界增量见 [PR #98](https://github.com/odango-chan/ca-skill-studio-demo/pull/98)；Phase Verify 受限增量见 [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99)。验收见 WORK / TRACEABILITY 与各自 exact-head PR CI。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
 
