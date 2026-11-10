@@ -160,6 +160,13 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     node:bindingSelection.result.value.node,procedure:bindingSelection.result.value.procedure,
     before:beforeBinding.result?.value,after:afterBinding.result?.value,undo:afterBindingUndo.result?.value
   }));
+  const graphHasNode=async id=>{
+    const result=await command('Runtime.evaluate',{
+      contextId:graphContext,returnByValue:true,
+      expression:`[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].some(x=>x.getAttribute('data-id')===${JSON.stringify(id)})`
+    });
+    return result.result?.value===true;
+  };
   const insertSelection=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
     expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-get');if(!node)throw Error('Node insertion source is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
@@ -188,8 +195,9 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   });
   await sleep(400);
   const insertedGraph=await graph();
+  const insertedPresent=await graphHasNode('ide-host-insert-probe');
   if(insertResult!==true||!afterInsert.result?.value||
-     afterInsert.result.value===beforeInsert.result?.value||insertedGraph?.nodes!==18)
+     afterInsert.result.value===beforeInsert.result?.value||insertedGraph?.nodes!==18||!insertedPresent)
     throw Error('Native Node insertion did not add one Source-backed Node: '+JSON.stringify({insertResult,before:beforeInsert.result?.value,after:afterInsert.result?.value,graph:insertedGraph}));
   const deleteSelection=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
@@ -215,8 +223,9 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   });
   await sleep(350);
   const deletedGraph=await graph();
+  const deletedPresent=await graphHasNode('ide-host-insert-probe');
   if(deleteResult!==true||!afterDelete.result?.value||
-     afterDelete.result.value===beforeDelete.result?.value||deletedGraph?.nodes!==17)
+     afterDelete.result.value===beforeDelete.result?.value||deletedGraph?.nodes!==17||deletedPresent)
     throw Error('Native Node deletion did not remove the Node and repair the Route: '+JSON.stringify({deleteResult,before:beforeDelete.result?.value,after:afterDelete.result?.value,graph:deletedGraph}));
   await invoke('core.undo');
   await sleep(350);
@@ -225,8 +234,9 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     expression:`document.querySelector('#revision')?.textContent`
   });
   const restoredInsertGraph=await graph();
+  const restoredInsertPresent=await graphHasNode('ide-host-insert-probe');
   if(!afterDeleteUndo.result?.value||afterDeleteUndo.result.value===afterDelete.result?.value||
-     restoredInsertGraph?.nodes!==18)
+     restoredInsertGraph?.nodes!==18||!restoredInsertPresent)
     throw Error('Native Undo did not restore the deleted Node');
   await invoke('core.undo');
   await sleep(350);
@@ -235,8 +245,9 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     expression:`document.querySelector('#revision')?.textContent`
   });
   const restoredOriginalGraph=await graph();
+  const originalAbsent=!(await graphHasNode('ide-host-insert-probe'));
   if(!afterInsertUndo.result?.value||afterInsertUndo.result.value===afterDeleteUndo.result?.value||
-     restoredOriginalGraph?.nodes!==17)
+     restoredOriginalGraph?.nodes!==17||!originalAbsent)
     throw Error('Native Undo did not remove the inserted Node and restore original graph');
   console.log('STUDIO_NODE_INSERT_DELETE_CHROMIUM',JSON.stringify({
     procedure:insertSelection.result.value.procedure,node:'ide-host-insert-probe',
@@ -244,7 +255,8 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     deleted:afterDelete.result?.value,undoDelete:afterDeleteUndo.result?.value,
     undoInsert:afterInsertUndo.result?.value,
     nodeCounts:[insertedGraph?.nodes,deletedGraph?.nodes,
-      restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes]
+      restoredInsertGraph?.nodes,restoredOriginalGraph?.nodes],
+    identity:[insertedPresent,deletedPresent,restoredInsertPresent,originalAbsent]
   }));
   // Safe Markdown uses the actual native source document and shared renderer.
   const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
