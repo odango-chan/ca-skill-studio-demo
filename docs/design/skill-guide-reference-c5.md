@@ -20,8 +20,8 @@ change the authoritative Markdown document.
 - Recognize explicit package-file references in Markdown links and inline-code path
   literals, such as `references/session-selection.md` and `../SKILL.md`.
 - Make those references host-mediated links. The extension host resolves the path against
-  the active Skill root, rejects absolute paths, traversal outside the root, unsupported
-  extensions, missing files and directories, then opens the target through the normal
+  the active Skill root, rejects absolute paths, traversal into sibling Skills, unsupported
+  extensions, missing files, directories and symbolic links, then opens the target through the normal
   editor association.
 - Markdown targets open the existing Markdown preview. YAML, Python and JSON targets use
   the normal `vscode.open` route, allowing an installed visual editor association to own
@@ -60,8 +60,8 @@ change the authoritative Markdown document.
    returns to `SKILL.md`, and verifies the MAS guide does not fabricate references.
 4. Existing Procedure, Contract, Predicate, Schema, Source and LSP acceptance remains
    unchanged.
-5. The host must reject a forged Webview message that attempts to leave the active
-   Package, even if it bypasses renderer-side path filtering.
+5. The host must reject a forged Webview message that attempts to open the sibling MAS
+   Skill from the conventional Skill, even if it bypasses renderer-side path filtering.
 
 C5 is independent of the still-stacked C1/C2/C3/C4 visual-editor integration. It is based
 on current `main` so the Markdown and LSP improvements can be reviewed without retargeting
