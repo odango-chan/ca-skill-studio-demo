@@ -122,7 +122,7 @@ export interface SchemaReference {
   readonly sourcePath: string;
   readonly targetUri: string;
   readonly targetPath: string;
-  readonly line: number;
+  readonly targetLine: number;
   readonly title: string;
   readonly sourceRange: null;
 }
