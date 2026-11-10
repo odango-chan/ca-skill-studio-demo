@@ -59,6 +59,19 @@ test("shared core adapts the current Package analyzers into one JSON-safe result
   assert.equal(result.schemaReferences.length,6);
   assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===true));
   assert.ok(result.schemaReferences.every(ref=>ref.packageContextComplete===true));
+  const byUri=new Map(snapshot.documents.map(document=>[document.uri,document.text]));
+  for(const ref of [...result.scriptReferences,...result.schemaReferences]){
+    assert.ok(ref.sourceRange&&ref.targetRange);
+    assert.ok(ref.sourceRange.start>=0&&ref.sourceRange.end>=ref.sourceRange.start);
+    assert.ok(ref.targetRange.start>=0&&ref.targetRange.end>=ref.targetRange.start);
+    assert.ok(byUri.get(ref.sourceUri).slice(ref.sourceRange.start,ref.sourceRange.end).length>0);
+    assert.ok(byUri.get(ref.targetUri).slice(ref.targetRange.start,ref.targetRange.end).length>0);
+  }
+  for(const symbol of result.documents.flatMap(document=>document.pythonSymbols)){
+    const source=byUri.get(symbol.uri);
+    assert.ok(symbol.navigable&&symbol.range);
+    assert.equal(source.slice(symbol.range.start,symbol.range.end),symbol.name);
+  }
   assert.equal(result.diagnostics.length,0);
   assert.equal(JSON.parse(JSON.stringify(result)).procedure.procedures.length,5);
   assert.deepEqual(snapshot.documents.map(document=>document.text),before,
