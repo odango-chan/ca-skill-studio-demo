@@ -38,3 +38,13 @@ This increment does not yet claim complete live Problems UX. Follow-up acceptanc
 - Language Service diagnostics do not duplicate Package Audit warnings.
 
 No merge, Pages deployment, Runtime qualification or 5GC operation is included.
+
+
+## Native language selector compatibility
+
+The Theia browser-only host can expose a workspace-backed `.yaml` / `.py` Source document with `languageId: plaintext` when a standalone language plugin does not own that editor. The browser LanguageClient therefore registers providers using both:
+
+- URI-scheme + path selectors for `file` workspace Package sources (`**/*.yaml`, `**/*.yml`, `**/*.py`);
+- language selectors for hosts that provide canonical `yaml` / `python` language IDs.
+
+The Package snapshot's bounded extension-to-language mapping remains the analysis input. URI selectors only determine which native documents can invoke the read-only provider; they do not infer DSL semantics or alter Source. The real Theia Chromium probe must still prove that native provider commands resolve exact Package targets.
