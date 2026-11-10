@@ -1004,6 +1004,8 @@ export function registerWorkbench(vscode,context){
             for(const release of [...prepared.releases].reverse())try{release();}catch{}
             await vscode.workspace.fs.delete(prepared.packageBContainer,
               {recursive:true,useTrash:false});
+            languagePackageGenerations.delete(prepared.packageBKey);
+            languagePackageStatuses.delete(prepared.packageBKey);
             return {phase,cleaned:true};
           }finally{languagePackageLifecycleAcceptance.delete(key);}
         }
@@ -1045,6 +1047,8 @@ export function registerWorkbench(vscode,context){
             for(const release of [...prepared.releases].reverse())try{release();}catch{}
             try{await vscode.workspace.fs.delete(prepared.packageBContainer,
               {recursive:true,useTrash:false});}catch{}
+            languagePackageGenerations.delete(prepared.packageBKey);
+            languagePackageStatuses.delete(prepared.packageBKey);
             languagePackageLifecycleAcceptance.delete(key);
           }
         }
