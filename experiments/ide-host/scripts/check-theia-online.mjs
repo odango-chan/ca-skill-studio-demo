@@ -44,11 +44,24 @@ if(missingThemeAssets.length)throw Error("Theia static preview is missing theme 
 // **/assurance/procedure.yaml takes a platform-separator fast path in Theia.
 const {match}=createRequire(import.meta.url)("../theia-online/node_modules/@theia/core/lib/common/glob.js");
 const manifest=JSON.parse(readFileSync("experiments/ide-host/vscode/package.json","utf8"));
-const pattern=manifest.contributes.customEditors[0].selector[0].filenamePattern;
-for(const path of ["file:/workspace/assurance/procedure.yaml","file:/C:/workspace/assurance/procedure.yaml","file:/.theia/globalStorage/demo/assurance/procedure.yaml"]){
-  if(!match(pattern,path))throw Error("Native CustomEditor selector failed: "+path);
+const editors=new Map(manifest.contributes.customEditors.map(x=>[
+  x.viewType,x.selector[0].filenamePattern
+]));
+const expected=[
+  ["skillStudio.procedurePreview","file:/workspace/assurance/procedure.yaml"],
+  ["skillStudio.contractPreview","file:/workspace/assurance/contract.yaml"],
+  ["skillStudio.predicatePreview","file:/workspace/assurance/predicates.yaml"]
+];
+for(const [view,path] of expected){
+  const pattern=editors.get(view);
+  if(!pattern)throw Error("Native CustomEditor selector missing: "+view);
+  for(const candidate of [path,path.replace("file:/workspace","file:/C:/workspace"),
+      path.replace("file:/workspace","file:/.theia/globalStorage/demo")]){
+    if(!match(pattern,candidate))throw Error("Native CustomEditor selector failed: "+view+" "+candidate);
+  }
+  for(const [,other] of expected.filter(([otherView])=>otherView!==view)){
+    const otherPattern=editors.get(other);
+    if(match(otherPattern,path))throw Error("CustomEditor selector overlap: "+view+" / "+other);
+  }
 }
-for(const path of ["file:/workspace/procedure.yaml","file:/workspace/assurance/contract.yaml"]){
-  if(match(pattern,path))throw Error("CustomEditor selector claimed unrelated Source: "+path);
-}
-console.log("STUDIO_NATIVE_EDITOR_ASSOCIATION_MATCH_PASS");
+console.log("STUDIO_NATIVE_EDITOR_ASSOCIATION_MATCH_PASS",JSON.stringify(expected.map(([view])=>view)));
