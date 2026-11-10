@@ -139,6 +139,10 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'ide-host-insert-probe'});
   const insertedNode=providers.get('skillStudio.inspection').getChildren().find(x=>x.kind==='node');
   assert.ok(insertedNode);
+  assert.equal(insertedNode.procedureId,routeProcedure);
+  assert.equal(insertedNode.nodeId,'ide-host-insert-probe');
+  assert.ok(deleteNodeOptions(doc.text,insertedNode.procedureId,insertedNode.nodeId),
+    'Inspector Node row carries the same eligible identity as the Source model');
   const insertedItem=providers.get('skillStudio.inspection').getTreeItem(insertedNode);
   assert.equal(insertedItem.contextValue,'skillStudio.deletableNode');
   assert.equal(insertedItem.kind,'node');
