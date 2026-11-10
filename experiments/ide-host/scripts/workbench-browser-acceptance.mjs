@@ -242,9 +242,9 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
     'createdsession.n4.initial_resources_ready',
     '新增','createdsession.n4.initial_resources_ready');
   const verifyName=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
-    {kind:'phase-step',phaseName:'preconditions',stepIndex:5,stepOperator:'verify'},
-    {action:'name',newName:'resource-ready-check'},
-    'verify: createdsession.n4.initial_resources_ready','name: resource-ready-check');
+    {kind:'phase-step',phaseName:'preconditions',stepIndex:3,stepOperator:'verify'},
+    {action:'name',newName:'ingress-eligibility'},
+    'verify: createdsession.ingress.eligible','name: ingress-eligibility');
   const verifyDelete=await nativeVerifyRoundTrip('skillStudio.editPhaseVerifyStep',
     {kind:'phase-step',phaseName:'preconditions',stepIndex:4,stepOperator:'verify'},
     'delete','删除','createdsession.lifecycle.ready');
