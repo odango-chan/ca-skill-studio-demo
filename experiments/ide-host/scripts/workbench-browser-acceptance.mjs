@@ -78,27 +78,28 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "return header?.closest('.part')?.innerText??'';})()");
   const expectedGroups=['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'];
   let groups=await readGroups();
-  let scanAfterExpand=null,expandedView=null;
+  let expandedView=null;
   if(!expectedGroups.every(group=>groups.includes(group))){
     await click(packageRow.x,packageRow.y);
-    await sleep(500);
+    await sleep(700);
     groups=await readGroups();
-    await invoke('skillStudio.refreshPackages');
-    scanAfterExpand=await evalJS('window.__skillStudioLastCommandResult??null');
     expandedView=await evalJS(
       "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
       ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
+      "const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(x=>"+
+      "x.innerText.includes('establish-pdu-session'));const toggle=row?.querySelector("+
+      "'.theia-TreeNodeContent [data-node-id]');"+
       "return {text:part?.innerText??'',rows:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(x=>({"+
-      "text:x.innerText.trim(),className:x.className}))};})()");
+      "text:x.innerText.trim(),className:x.className})),toggleClass:toggle?.className??null};})()");
     groups=await readGroups();
   }
   for(const group of expectedGroups)
     if(!groups.includes(group))
       throw Error('Package Overview missing group '+group+': '+
-        JSON.stringify({groups,packageRow,scanAfterExpand,expandedView}));
+        JSON.stringify({groups,packageRow,expandedView}));
   const evidence={package:'establish-pdu-session',core:'3/3',schemas:6,
     scripts:3,references:3,treeVisible:true,scanState:scan.state,
-    treeReadsByKind:scanAfterExpand?.treeReadsByKind??scan.treeReadsByKind};
+    treeReadsByKind:scan.treeReadsByKind};
   console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify(evidence));
   return evidence;
 }
