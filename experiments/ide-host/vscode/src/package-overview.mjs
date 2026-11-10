@@ -257,7 +257,18 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     fire();
   }
   const subscriptions = [
-    vscode.commands.registerCommand('skillStudio.refreshPackages',refresh),
+    vscode.commands.registerCommand('skillStudio.refreshPackages',async()=>{
+      const result=await refresh();
+      return {
+        state:inventoryState,message,
+        packages:result.map(pkg=>({
+          name:pkg.name,relativeRoot:pkg.relativeRoot,
+          fileCount:pkg.fileCount,corePresent:pkg.corePresent,
+          groups:pkg.groups.map(group=>({key:group.key,count:group.files.length,
+            missing:group.missing}))
+        }))
+      };
+    }),
     vscode.workspace.onDidChangeWorkspaceFolders?.(schedule),
     vscode.workspace.onDidCreateFiles?.(schedule),
     vscode.workspace.onDidDeleteFiles?.(schedule),
