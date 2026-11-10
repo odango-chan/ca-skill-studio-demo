@@ -17,6 +17,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:count});
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:count});
   };
+  const rightClick=async(x,y)=>{
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'right',clickCount:1});
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'right',clickCount:1});
+  };
   // Use the real native command registry for setup/actions. Explorer gestures
   // below remain actual Chromium input; no host or TextDocument is mocked.
   async function invoke(id,...args){
@@ -604,8 +609,47 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     return chosen??null;
   })()`);
   if(!nativeEditor)throw Error('No native Monaco Source editor for Outcome acceptance');
-  await click(nativeEditor.x+Math.min(90,nativeEditor.width/2),
-    nativeEditor.y+Math.min(24,nativeEditor.height/2));
+  const menuPoint={x:nativeEditor.x+Math.min(120,nativeEditor.width/2),
+    y:nativeEditor.y+Math.min(38,nativeEditor.height/2)};
+  await rightClick(menuPoint.x,menuPoint.y);await sleep(350);
+  const contextMenu=await evalJS(`(()=>{
+    const visible=el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+      return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden'&&
+        Number(s.opacity||1)>0;};
+    const selectors=['.context-view.monaco-menu-container',
+      '.monaco-menu-container','.lm-Menu','.theia-context-menu'];
+    const roots=[...new Set(selectors.flatMap(q=>[...document.querySelectorAll(q)]))]
+      .filter(visible);
+    const color=el=>{const s=getComputedStyle(el);return {
+      background:s.backgroundColor,foreground:s.color,border:s.borderColor};};
+    const rgba=value=>{
+      const m=/rgba?\\(([^)]+)\\)/.exec(value);if(!m)return null;
+      const p=m[1].split(',').map(x=>Number(x.trim()));
+      return {rgb:p.slice(0,3),alpha:p.length>3?p[3]:1};
+    };
+    const lum=value=>{
+      const c=rgba(value);if(!c)return null;
+      const v=c.rgb.map(x=>x/255).map(x=>x<=.04045?x/12.92:Math.pow((x+.055)/1.055,2.4));
+      return .2126*v[0]+.7152*v[1]+.0722*v[2];
+    };
+    const contrast=(a,b)=>{const x=lum(a),y=lum(b);if(x===null||y===null)return 0;
+      return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+    return roots.map(root=>{
+      const surface=root.querySelector('.monaco-menu,.lm-Menu-content')??root;
+      const rootStyle=color(root),surfaceStyle=color(surface);
+      const item=root.querySelector('.action-menu-item,.lm-Menu-item');
+      const itemStyle=item?color(item):null;
+      return {className:String(root.className),root:rootStyle,surface:surfaceStyle,
+        item:itemStyle,opaque:(rgba(surfaceStyle.background)?.alpha??0)>=.98,
+        contrast:contrast(surfaceStyle.foreground,surfaceStyle.background)};
+    });
+  })()`);
+  if(!contextMenu.length||!contextMenu.some(x=>x.opaque&&x.contrast>=4.5))
+    throw Error('Native YAML editor context menu is missing an opaque, readable themed surface: '+
+      JSON.stringify(contextMenu));
+  console.log('STUDIO_NATIVE_CONTEXT_MENU_CHROMIUM',JSON.stringify(contextMenu));
+  await key('Escape','Escape',0,27);await sleep(120);
+  await click(menuPoint.x,menuPoint.y);
   await key('g','KeyG',2,71);await sleep(200);
   await command('Input.insertText',{text:String(pcfOutcomeLine)});
   const gotoInput=await evalJS('document.activeElement?.value??""');
