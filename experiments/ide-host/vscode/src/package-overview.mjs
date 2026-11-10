@@ -199,8 +199,17 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       return treeNode(vscode,node);
     }
   };
-  const treeRegistration=vscode.window.registerTreeDataProvider(
-    'skillStudio.packages',provider);
+  // Theia's browser host can defer a contributed TreeView until its view
+  // container is activated. createTreeView eagerly owns the view lifecycle;
+  // registerTreeDataProvider alone left the Packages welcome page visible and
+  // never asked the provider for its first root children in real Chromium.
+  const treeView = vscode.window.createTreeView
+    ? vscode.window.createTreeView('skillStudio.packages',{
+        treeDataProvider:provider,showCollapseAll:true
+      })
+    : null;
+  const treeRegistration = treeView ??
+    vscode.window.registerTreeDataProvider('skillStudio.packages',provider);
   context.subscriptions.push(emitter,treeRegistration);
   async function refresh() {
     const ticket = ++generation;
@@ -243,6 +252,21 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
         ?'已扫描前 '+inventory.scannedFiles+' 个文件 · 结果可能不完整'
         :inventory.scannedFiles+' 个文件 · 仅清点，不做语义校验';
       fire();
+      // Force the first Package row into the native TreeView. This is a
+      // presentation refresh only; it does not expand child groups or steal
+      // editor focus.
+      if (packages.length && treeView?.reveal) {
+        const first = packages[0];
+        try {
+          await treeView.reveal({
+            ...first,kind:'package',label:first.name,
+            description:first.relativeRoot+' · '+first.corePresent+'/'+
+              first.coreTotal+' core · '+first.fileCount+' files'
+          },{select:false,focus:false,expand:0});
+        } catch {
+          // A view can be disposed while workspace scanning is in flight.
+        }
+      }
       return packages;
     } catch(error) {
       if (ticket !== generation) return packages;
