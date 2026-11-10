@@ -127,8 +127,7 @@ test('C4 registers Packages view and renders package tree with source actions',a
   const workspace={
     workspaceFolders:[],
     textDocuments:[
-      {uri:uri('/workspace/skills/establish-pdu-session/scripts/evaluate.py'),isDirty:true},
-      {uri:uri('/workspace/skills/establish-pdu-session/assurance/procedure.yaml'),isDirty:false}
+      {uri:uri('/workspace/skills/establish-pdu-session/scripts/evaluate.py'),isDirty:true}
     ],
     async findFiles(){return files;},
     asRelativePath(value){return value.path;},
@@ -145,7 +144,8 @@ test('C4 registers Packages view and renders package tree with source actions',a
     }
   };
   const context={subscriptions:[]};
-  registerPackageOverview(vscode,context);
+  const activeProcedure={uri:uri('/workspace/skills/establish-pdu-session/assurance/procedure.yaml'),isDirty:false};
+  registerPackageOverview(vscode,context,()=>activeProcedure);
   const refresh=commands.get('skillStudio.refreshPackages');
   assert.equal(typeof refresh,'function');
   await refresh();
