@@ -65,6 +65,25 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
   ])assert.ok(statSync(join(themeRoot,path)).size>80,path);
 });
 
+test("Theia bundles offline YAML and Python TextMate grammars independently of LSP",()=>{
+  const rootSyntax=join(root,"plugins/odango-chan.skill-studio-languages");
+  const manifest=JSON.parse(readFileSync(join(rootSyntax,"package.json"),"utf8"));
+  assert.equal(manifest.main,undefined);
+  assert.equal(manifest.browser,undefined);
+  for(const [id,suffix] of [["yaml",".yaml"],["python",".py"]]){
+    assert.ok(manifest.contributes.languages.some(x=>
+      x.id===id&&x.extensions.includes(suffix)),id+" language id");
+    assert.ok(manifest.contributes.grammars.some(x=>x.language===id),id+" grammar");
+  }
+  for(const grammar of manifest.contributes.grammars){
+    const path=join(rootSyntax,grammar.path);
+    const syntax=JSON.parse(readFileSync(path,"utf8"));
+    assert.equal(syntax.scopeName,grammar.scopeName);
+    assert.ok(statSync(path).size>100);
+  }
+  assert.ok(statSync(join(rootSyntax,"LICENSE.txt")).size>500);
+});
+
 test("Theia activity bar and shell toolbars render from the Classic icon registry",()=>{
   const css=buildClassicIconsCss();
   for(const name of ["files","search","source-control","debug-alt","extensions",
