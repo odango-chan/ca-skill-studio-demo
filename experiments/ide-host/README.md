@@ -134,7 +134,7 @@ References:
 | Theia browser-only with Web extension | Build-time bundled extension, sample import, Procedure CustomEditor, Patch, native Source/Undo, Node Focus and Source line reveal | **PASS** in real Chromium at the default Pages root; Classic composition and Pages deployment also PASS |
 | Local Runtime / 5GC | deliberately out of scope | **NOT_RUN** |
 
-The Pages host is now Theia browser-only. The Node Focus view is migrated; Route creation/reconnect, Phase Designer, full Inspector, Package Audit and Markdown preview remain Classic-only. Its GitHub Pages adapter changes
+The Pages host is now Theia browser-only. The Node Focus view and Route creation/reconnect are migrated. The current Inspector Node-authoring increment adds Node rename and Operator-value editing by reusing the existing Classic source-patch modules; its exact-head acceptance is pending in the follow-up PR. Node insertion/deletion, Phase Designer and full Phase Step authoring remain Classic-only. Package Audit and Markdown preview are already native Theia views. Its GitHub Pages adapter changes
 Theia's default per-Webview subdomain pattern to same-origin because Pages
 cannot provide wildcard Webview DNS/TLS. A persistent warning is shown:
 **do not open sensitive files or untrusted workspaces**. OPFS data stays in
