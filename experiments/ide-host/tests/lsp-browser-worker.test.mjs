@@ -144,13 +144,12 @@ function samplePackageSnapshot() {
     })
   };
 }
-function positionOf(text,needle) {
-  const offset=text.indexOf(needle);
-  assert.ok(offset>=0,"missing source token: "+needle);
-  const before=text.slice(0,offset);
-  const line=before.split(/\\r\\n|\\n|\\r/).length-1;
-  const lastBreak=Math.max(before.lastIndexOf("\\n"),before.lastIndexOf("\\r"));
-  return {line,character:offset-(lastBreak+1)};
+function positionOf(text,needle,offsetInNeedle=0) {
+  const start=text.indexOf(needle);
+  assert.ok(start>=0,"missing source token: "+needle);
+  const before=text.slice(0,start+offsetInNeedle);
+  const lines=before.split(/\r\n|\n|\r/);
+  return {line:lines.length-1,character:lines.at(-1).length};
 }
 async function lspRequest(worker,id,method,params) {
   const response=waitForMessage(worker,message=>message?.id===id);
@@ -207,7 +206,7 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     const nameNeedle="# name: select-establishment-configuration";
     const references=await lspRequest(worker,14,"textDocument/references",{
       textDocument:{uri:script.uri},
-      position:positionOf(script.text,nameNeedle),
+      position:positionOf(script.text,nameNeedle,"# name: ".length),
       context:{includeDeclaration:true}
     });
     assert.ok(references.some(item=>item.uri===procedure.uri));
@@ -220,16 +219,14 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
 
     const scriptCompletion=await lspRequest(worker,16,"textDocument/completion",{
       textDocument:{uri:procedure.uri},
-      position:positionOf(procedure.text,scriptNeedle)+
-        {line:0,character:scriptNeedle.length}
+      position:positionOf(procedure.text,scriptNeedle,scriptNeedle.length)
     });
     assert.ok(scriptCompletion.some(item=>item.label===script.relativePath));
 
     const schemaNeedle="# inputSchema: EstablishmentSelectionInput";
     const schemaCompletion=await lspRequest(worker,17,"textDocument/completion",{
       textDocument:{uri:script.uri},
-      position:positionOf(script.text,schemaNeedle)+
-        {line:0,character:schemaNeedle.length}
+      position:positionOf(script.text,schemaNeedle,schemaNeedle.length)
     });
     assert.ok(schemaCompletion.some(item=>item.label==="EstablishmentSelectionInput"));
     assert.ok(schema.uri.endsWith("selection-input.schema.yaml"));
