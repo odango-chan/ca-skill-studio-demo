@@ -157,11 +157,15 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
   let treeReads=0, revealError=null;
+  const treeReadsByKind={root:0,package:0,group:0,other:0};
   const fire = () => emitter.fire();
   const provider = {
     onDidChangeTreeData:emitter.event,
     getChildren(node) {
       treeReads++;
+      const readKind=node?.kind==='package'?'package':
+        node?.kind==='group'?'group':node?'other':'root';
+      treeReadsByKind[readKind]++;
       if (!node) {
         const summary = {
           kind:'summary',label:packages.length+' SKILL Package'+(packages.length===1?'':'s'),
@@ -318,7 +322,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     vscode.commands.registerCommand('skillStudio.refreshPackages',async()=>{
       const result=await refresh();
       return {
-        state:inventoryState,message,treeReads,treeApi,
+        state:inventoryState,message,treeReads,treeReadsByKind,treeApi,
         treeViewCreated:Boolean(treeView),revealError,
         packages:result.map(pkg=>({
           name:pkg.name,relativeRoot:pkg.relativeRoot,
