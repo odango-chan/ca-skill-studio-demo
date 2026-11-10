@@ -159,8 +159,9 @@ export function registerWorkbench(vscode,context){
       // readable. Preserve PARTIAL now, then retry with a NEW generation; never
       // label the incomplete snapshot READY or spin indefinitely on real loss.
       const transientReadFailure=snapshot.completeness==="partial"&&
-        /Unable to read file/.test(snapshot.reason??"")&&
-        /EntryNotFound|ENOENT: File not found/.test(snapshot.reason??"");
+        /(?:EntryNotFound|ENOENT|EIO)/i.test(snapshot.reason??"")&&
+        /(?:FileSystemError|Unable to read file|EntryNotFound|ENOENT|EIO)/i
+          .test(snapshot.reason??"");
       if(transientReadFailure&&state.transientReadRetries<3){
         const attempt=++state.transientReadRetries;
         const delayMs=100*attempt;
