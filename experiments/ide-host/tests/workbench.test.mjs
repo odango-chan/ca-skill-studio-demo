@@ -7,6 +7,14 @@ import {deleteNodeOptions,previewNodeDelete} from '../../../site/node-delete.mjs
 const root='site/samples/packages/establish-pdu-session/';
 const source=readFileSync(root+'assurance/procedure.yaml','utf8');
 const outputReferenceSource=readFileSync('tests/fixtures/establish-pre-hold/assurance/procedure.yaml','utf8');
+const phaseFull="          'on':\n            FAILED: failed\n            UNRESOLVED: unresolved\n";
+const phaseMissing="          'on':\n            UNRESOLVED: unresolved\n";
+const phasePcf="          'on':\n            FAILED: finalize-failed\n            UNRESOLVED: finalize-unresolved\n";
+const phaseTypo="          'on':\n            MISTYPED: finalize-failed\n            UNRESOLVED: finalize-unresolved\n";
+const missingOutcomeSource=source.replace(phaseFull,phaseMissing);
+const typoOutcomeSource=source.replace(phasePcf,phaseTypo);
+const extraOutcomeSource=source.replace(phaseFull,
+  "          'on':\n            FAILED: failed\n            UNRESOLVED: unresolved\n            EXTRA: failed\n");
 test('Inspection preserves Classic node/phase/route source identity; unknown syntax fails closed',()=>{
   const result=inspectionSnapshot(source,{procedureId:'establish-session',nodeId:'nudm-sdm-subscribe'});
   assert.equal(result.model.state,'READY');
@@ -99,6 +107,32 @@ test('Inspection exposes only Classic-qualified same-producer output reference n
     'namf-communication-n1n2-message-transfer.preconditions.resolve-effective-session-configuration.output.contextRef'
   ]);
   assert.equal(liveRef.producerStep,'resolve-effective-session-configuration');
+});
+
+test('Inspector exposes only owner-observed, Preview-qualified Outcome repairs',()=>{
+  const procedureId='ue-requested-pdu-session-establishment';
+  const findRepair=(text,nodeId)=>{
+    const view=inspectionSnapshot(text,{procedureId,nodeId});
+    return view.inspection.flatMap(row=>row.children)
+      .find(child=>child.kind==='phase-outcome-repair'&&
+        child.phaseName==='preconditions');
+  };
+  assert.equal(findRepair(source,'nudm-sdm-subscribe'),undefined,
+    'complete owner example has no Outcome repair command');
+  const addition=findRepair(missingOutcomeSource,'nudm-sdm-subscribe');
+  assert.ok(addition,'missing core Outcome with observed target is repairable');
+  assert.deepEqual([addition.addCount,addition.renameCount,addition.deleteCount],
+    [1,0,0]);
+  const typo=findRepair(typoOutcomeSource,'npcf-sm-policy-control-create');
+  assert.ok(typo,'uniquely misspelled noncore Outcome has repair eligibility');
+  assert.deepEqual([typo.addCount,typo.renameCount,typo.deleteCount],[0,1,0]);
+  const extra=findRepair(extraOutcomeSource,'nudm-sdm-subscribe');
+  assert.ok(extra,'isolated noncore Outcome may be safely deleted');
+  assert.deepEqual([extra.addCount,extra.renameCount,extra.deleteCount],[0,0,1]);
+  const quoted=missingOutcomeSource.replace('UNRESOLVED: unresolved',
+    "'UNRESOLVED': unresolved");
+  assert.equal(findRepair(quoted,'nudm-sdm-subscribe'),undefined,
+    'non-plain or ambiguous YAML fails closed');
 });
 
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
@@ -267,6 +301,66 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(doc.text,modifiedRoute);
   doc.text=source;doc.version++;changed({document:doc});
   workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+
+  // D4-A4b1: real Source-owner fixtures qualify three distinct operations.
+  assert.ok(commands.has('skillStudio.repairPhaseOutcome'));
+  const getOutcomeRow=()=>{
+    const phase=providers.get('skillStudio.inspection').getChildren()
+      .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+    const row=phase?.children.find(x=>x.kind==='phase-outcome-repair');
+    return row?providers.get('skillStudio.inspection').getTreeItem(row):null;
+  };
+  const selectOutcome=(text,nodeId)=>{
+    doc.text=text;doc.version++;changed({document:doc});
+    workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId});
+    return getOutcomeRow();
+  };
+  const noRepair=selectOutcome(source,'nudm-sdm-subscribe');
+  assert.equal(noRepair,null,'healthy Source should have no clickable repair row');
+  const addItem=selectOutcome(missingOutcomeSource,'nudm-sdm-subscribe');
+  assert.equal(addItem?.contextValue,'skillStudio.phaseOutcomeRepair');
+  assert.equal(addItem.sourceVersion,doc.version);
+  assert.equal(addItem.documentUri,doc.uri.toString());
+  const addAction={mode:'add',outcome:'FAILED',target:'finalize-failed'};
+  const missingBefore=doc.text,addVersion=doc.version;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.repairPhaseOutcome')(
+    addItem,addAction),false);
+  assert.equal(doc.text,missingBefore,'cancelled Phase Outcome add writes nothing');
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.repairPhaseOutcome')(
+    addItem,addAction),true);
+  assert.equal(doc.version,addVersion+1);
+  assert.ok(doc.text.includes("UNRESOLVED: unresolved\n            FAILED: finalize-failed\n"));
+  assert.equal(appliedEdits.at(-1).length,1);
+  assert.equal(appliedEdits.at(-1)[0].range.start.offset,
+    appliedEdits.at(-1)[0].range.end.offset,'core Outcome uses one native insertion');
+  const afterOutcomeAdd=doc.text;
+  assert.equal(await commands.get('skillStudio.repairPhaseOutcome')(
+    addItem,addAction),false,'stale Outcome repair item must be rejected');
+  assert.equal(doc.text,afterOutcomeAdd);
+  assert.equal(await commands.get('skillStudio.repairPhaseOutcome')(
+    {...addItem,sourceVersion:doc.version},{mode:'add',
+      outcome:'IMAGINED',target:'finalize-failed'}),false,
+    'unobserved Outcome is never authorized');
+
+  const typoItem=selectOutcome(typoOutcomeSource,'npcf-sm-policy-control-create');
+  assert.equal(typoItem?.contextValue,'skillStudio.phaseOutcomeRepair');
+  assert.equal(await commands.get('skillStudio.repairPhaseOutcome')(
+    typoItem,{mode:'rename',oldOutcome:'MISTYPED',
+      newOutcome:'FAILED',target:'finalize-failed'}),true);
+  assert.equal(doc.text,source,'Outcome spelling correction restores original Source');
+  assert.equal(appliedEdits.at(-1).length,1);
+  const extraItem=selectOutcome(extraOutcomeSource,'nudm-sdm-subscribe');
+  assert.equal(extraItem?.contextValue,'skillStudio.phaseOutcomeRepair');
+  assert.equal(await commands.get('skillStudio.repairPhaseOutcome')(
+    extraItem,{mode:'delete',outcome:'EXTRA',target:'failed'}),true);
+  assert.equal(doc.text,source,'safe noncore delete restores original Source');
+  assert.equal(appliedEdits.at(-1).length,1);
+  assert.equal(appliedEdits.at(-1)[0].value,'','noncore delete is exact line removal');
+  // Subsequent named Step / Verify regressions always start with the exact
+  // unchanged published Source.
+  selectOutcome(source,'nudm-sdm-subscribe');
 
   assert.ok(commands.has('skillStudio.addPhaseVerify'));
   assert.ok(commands.has('skillStudio.editPhaseVerifyStep'));
