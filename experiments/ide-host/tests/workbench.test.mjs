@@ -108,6 +108,68 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const writesAfterBinding=doc.text;
   await commands.get('skillStudio.editPhaseInputBinding')(phaseItem,'dnn','input.dnn');
   assert.equal(doc.text,writesAfterBinding,'stale Phase Step selection must not write');
+  assert.ok(commands.has('skillStudio.addPhaseVerify'));
+  assert.ok(commands.has('skillStudio.editPhaseVerifyStep'));
+  doc.text=source;doc.version++;changed({document:doc});
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const verifyPhaseRow=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  assert.ok(verifyPhaseRow,'Phase row exposes authoring identity');
+  const verifyPhaseItem=providers.get('skillStudio.inspection').getTreeItem(verifyPhaseRow);
+  const verifyPredicate='createdsession.n4.initial_resources_ready';
+  const beforeVerify=doc.text,verifyVersion=doc.version,editCount=appliedEdits.length;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.addPhaseVerify')(verifyPhaseItem,verifyPredicate),false);
+  assert.equal(doc.text,beforeVerify,'cancelled Verify addition must not touch Source');
+  assert.equal(appliedEdits.length,editCount);
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.addPhaseVerify')(verifyPhaseItem,verifyPredicate),true);
+  assert.equal(doc.version,verifyVersion+1);
+  assert.ok(doc.text.includes('            - verify: '+verifyPredicate+'\\n'));
+  assert.equal(appliedEdits.at(-1).length,1,'Verify addition uses a single bounded Source span');
+  assert.equal(appliedEdits.at(-1)[0].range.start.offset,appliedEdits.at(-1)[0].range.end.offset,
+    'Verify addition is a zero-width insertion');
+  const addedVerifySource=doc.text;
+  assert.equal(await commands.get('skillStudio.addPhaseVerify')(verifyPhaseItem,verifyPredicate),false);
+  assert.equal(doc.text,addedVerifySource,'stale Phase selection must not append twice');
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const addedPhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const addedStep=addedPhase.children.find(x=>x.stepIndex===5);
+  assert.equal(addedStep.stepValue,verifyPredicate);
+  const addedItem=providers.get('skillStudio.inspection').getTreeItem(addedStep);
+  assert.equal(addedItem.contextValue,'skillStudio.verifyStep');
+  const beforeMove=doc.text,moveVersion=doc.version;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(addedItem,'move-up'),false);
+  assert.equal(doc.text,beforeMove,'cancelled Verify reorder must not write');
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(addedItem,'move-up'),true);
+  assert.equal(doc.version,moveVersion+1);
+  assert.ok(doc.text.indexOf('            - verify: '+verifyPredicate)>
+    doc.text.indexOf('            - verify: createdsession.ingress.eligible'));
+  assert.ok(doc.text.indexOf('            - verify: '+verifyPredicate)<
+    doc.text.indexOf('            - verify: createdsession.lifecycle.ready'),
+    'one adjacent Verify was moved up without changing other Step order');
+  const movedSource=doc.text;
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(addedItem,'move-down'),false);
+  assert.equal(doc.text,movedSource,'stale Verify Step cannot reorder');
+  workbench.select(doc,{version:doc.version,procedureId:phaseProcedure,nodeId:phaseNode});
+  const reorderedPhase=providers.get('skillStudio.inspection').getChildren()
+    .find(x=>x.kind==='phase'&&x.phaseName==='preconditions');
+  const movedStep=reorderedPhase.children.find(x=>x.stepIndex===4);
+  assert.equal(movedStep.stepValue,verifyPredicate);
+  const movedItem=providers.get('skillStudio.inspection').getTreeItem(movedStep);
+  const deleteVerifyVersion=doc.version;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(movedItem,'delete'),false);
+  assert.equal(doc.version,deleteVerifyVersion);
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.editPhaseVerifyStep')(movedItem,'delete'),true);
+  assert.equal(doc.version,deleteVerifyVersion+1);
+  assert.equal(doc.text,source,'Verify insertion/reorder/deletion round-trip preserves exact original Source');
+  assert.equal(appliedEdits.at(-1).length,1,'Verify deletion uses one Source deletion');
+  assert.equal(appliedEdits.at(-1)[0].value,'');
   assert.ok(commands.has('skillStudio.insertNode'));
   assert.ok(commands.has('skillStudio.deleteNode'));
   doc.text=source;doc.version++;changed({document:doc});
