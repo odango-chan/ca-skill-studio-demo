@@ -696,6 +696,18 @@ export function registerWorkbench(vscode,context){
   }
 
 
+  // Local Chromium acceptance only: terminate the exact browser LanguageClient's
+  // owned dedicated Worker. The termination does not set UNAVAILABLE itself;
+  // real transport signals or the health timeout must detect it.
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.languageWorkerTerminationAcceptance",async()=>{
+        const client=await ensureLanguageClient();
+        return client?.terminateWorkerForAcceptance();
+      }
+    ));
+  }
+
   // L2-D4 real Chromium fault acceptance: after the browser closes the actual
   // language Worker target, native TextDocument/WorkspaceEdit must still work.
   // This command never terminates a Worker or fabricates a transport failure.
