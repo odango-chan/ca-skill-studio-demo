@@ -337,6 +337,110 @@ export function registerWorkbench(vscode,context){
     ));
   }
 
+  // Internal browser acceptance for the native Problems lifecycle. The edit
+  // is temporary, Source-owned by TextDocument/WorkspaceEdit, and always
+  // restored before the command returns.
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.languageDiagnosticsAcceptance",
+      async procedureUriValue=>{
+        const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
+        const initialDocument=await vscode.workspace.openTextDocument(procedureUri);
+        const packageRoot=packageRootForProcedure(vscode,initialDocument);
+        const packageState=packageRoot?languagePackages.get(packageRoot.uri.toString()):null;
+        if(!packageState)throw Error("Procedure Package has no active Language Service state");
+        const original=initialDocument.getText();
+        const malformed="procedures: ["+String.fromCharCode(10);
+        const currentDocument=()=>(
+          (vscode.workspace.textDocuments??[]).find(item=>
+            item.uri.toString()===procedureUri.toString())??initialDocument
+        );
+        const replaceSource=async nextText=>{
+          const current=currentDocument();
+          const edit=new vscode.WorkspaceEdit();
+          edit.replace(procedureUri,new vscode.Range(
+            current.positionAt(0),current.positionAt(current.getText().length)),nextText);
+          if(!await vscode.workspace.applyEdit(edit))
+            throw Error("Host rejected temporary Procedure diagnostic WorkspaceEdit");
+        };
+        const lspProcedureDiagnostics=items=>items.filter(item=>
+          String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"&&
+          item.source==="Skill Studio · procedure-projection");
+        const waitForGeneration=async(afterGeneration,expectedState,predicate,label)=>{
+          const started=Date.now();
+          let last=null;
+          while(Date.now()-started<15000){
+            const generation=packageState.generation;
+            const status=languageStatusItem?.text??"";
+            const tooltip=String(languageStatusItem?.tooltip??"");
+            const diagnostics=vscode.languages.getDiagnostics(procedureUri);
+            last={generation,status,tooltip,
+              procedureDiagnostics:lspProcedureDiagnostics(diagnostics).length,
+              allDiagnostics:diagnostics.length};
+            const currentGenerationReady=generation>afterGeneration&&
+              status==="SKILL LSP: "+expectedState&&
+              tooltip.includes("generation "+generation);
+            if(currentGenerationReady&&predicate(diagnostics))
+              return {generation,diagnostics};
+            if(status==="SKILL LSP: ERROR"||status==="SKILL LSP: UNAVAILABLE")
+              throw Error(label+" failed: "+tooltip);
+            await new Promise(resolve=>setTimeout(resolve,50));
+          }
+          throw Error(label+" timed out waiting for current Package generation: "+
+            JSON.stringify(last));
+        };
+
+        let temporarySourceApplied=false;
+        try{
+          const beforeInvalidEdit=packageState.generation;
+          await replaceSource(malformed);
+          temporarySourceApplied=true;
+          const invalid=await waitForGeneration(beforeInvalidEdit,"PARTIAL",
+            diagnostics=>lspProcedureDiagnostics(diagnostics).length===1,
+            "Live Procedure diagnostic publication");
+          const procedureDiagnostics=lspProcedureDiagnostics(invalid.diagnostics);
+          if(invalid.diagnostics.some(item=>
+            item.source==="Skill Studio · package-audit"||
+            String(item.code?.value??item.code??"")==="PACKAGE_AUDIT_UNAVAILABLE"))
+            throw Error("LSP duplicated Package Audit diagnostics in the native Problems collection");
+          const message=procedureDiagnostics[0].message;
+          if(!message.includes("YAML 解析失败"))
+            throw Error("Native Procedure diagnostic did not identify the malformed YAML: "+message);
+
+          const beforeRepair=packageState.generation;
+          await replaceSource(original);
+          temporarySourceApplied=false;
+          const repaired=await waitForGeneration(beforeRepair,"READY",
+            diagnostics=>lspProcedureDiagnostics(diagnostics).length===0,
+            "Live Procedure diagnostic clear after repair");
+          if(currentDocument().getText()!==original)
+            throw Error("Procedure Source was not restored byte-for-byte after diagnostic acceptance");
+          return {
+            appeared:true,
+            cleared:true,
+            code:"PROCEDURE_PROJECTION",
+            source:"Skill Studio · procedure-projection",
+            message,
+            invalidGeneration:invalid.generation,
+            repairedGeneration:repaired.generation,
+            packageAuditDuplicates:0,
+            restored:true
+          };
+        }finally{
+          if(temporarySourceApplied){
+            const beforeRestore=packageState.generation;
+            await replaceSource(original);
+            await waitForGeneration(beforeRestore,"READY",
+              diagnostics=>lspProcedureDiagnostics(diagnostics).length===0,
+              "Emergency Procedure Source restoration").catch(()=>{});
+          }
+          await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
+        }
+      }
+    ));
+  }
+
+
   function currentNode(item){
     if(!document||!isProcedurePath(document.uri.path))throw Error("No active Procedure Source");
     const doc=document,source=doc.getText(),version=doc.version;
