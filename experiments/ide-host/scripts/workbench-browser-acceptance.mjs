@@ -1,4 +1,10 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
+import {readFile} from "node:fs/promises";
+
+const outputReferenceFixture=await readFile(new URL(
+  "../../../tests/fixtures/establish-pre-hold/assurance/procedure.yaml",import.meta.url),"utf8");
+const originalPackageProcedure=await readFile(new URL(
+  "../../../site/samples/packages/establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
 export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
@@ -18,6 +24,14 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   async function startNativeCommand(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
     await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioPendingCommand=registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});return true;})()`);
+  }
+  async function replaceNativeProcedureSource(text){
+    const editor=await evalJS(`(()=>{const e=[...document.querySelectorAll('.monaco-editor')].find(x=>x.getBoundingClientRect().width>0);const target=e?.querySelector('.view-lines')??e;const r=target?.getBoundingClientRect();return r?{x:r.x+Math.min(90,r.width/2),y:r.y+Math.min(24,r.height/2)}:null;})()`);
+    if(!editor)throw Error("Native Source editor is not available for the fixture round-trip");
+    await click(editor.x,editor.y);
+    await invoke("editor.action.selectAll");
+    await command("Input.insertText",{text});
+    await sleep(450);
   }
   async function waitForRevisionChange(contextId,previous,label){
     let latest=null,refreshed=null;
@@ -388,6 +402,62 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   console.log('STUDIO_PHASE_VERIFY_CHROMIUM',JSON.stringify({
     append:verifyAppend,name:verifyName,delete:verifyDelete,reorder:verifyReorder
   }));
+  // The published sample intentionally has no same-Node local/qualified
+  // alias pair. Load the pinned predecessor fixture into the real native
+  // Source editor to exercise bounded D4-A2.1 normalization and Undo.
+  const beforeOutputFixture=await graph();
+  if(!beforeOutputFixture?.revision)throw Error('Output reference fixture has no initial Source revision');
+  await replaceNativeProcedureSource(outputReferenceFixture);
+  const fixtureRevision=await waitForRevisionChange(graphContext,beforeOutputFixture.revision,
+    'Output reference fixture load');
+  const fixtureGraph=await graph();
+  if(!fixtureGraph?.revision||fixtureGraph.revision===beforeOutputFixture.revision)
+    throw Error('Output reference fixture did not reach the live Procedure projection');
+  const fixtureVersion=Number(/v(\\d+)/.exec(fixtureGraph.revision)?.[1]);
+  if(!Number.isSafeInteger(fixtureVersion))throw Error('Could not read fixture TextDocument version');
+  const outputProcedure='ue-requested-pdu-session-establishment';
+  const outputNode='nudm-sdm-subscribe';
+  const localOutput='preconditions.select-subscription-configuration.output';
+  const qualifiedOutput=outputNode+'.'+localOutput;
+  const outputItem={kind:'phase-output-reference',procedureId:outputProcedure,
+    nodeId:outputNode,phaseName:'preconditions',stepIndex:1,
+    bindingKey:'selection',sourceVersion:fixtureVersion};
+  await startNativeCommand('skillStudio.editPhaseOutputReference',outputItem,
+    'selection',qualifiedOutput);
+  await confirmNativePreview(localOutput,qualifiedOutput);
+  const outputAccepted=await evalJS('window.__skillStudioCommandResult');
+  const afterOutput=await waitForRevisionChange(graphContext,fixtureGraph.revision,
+    'Phase output reference normalization');
+  if(outputAccepted!==true)throw Error('Phase output reference normalization was not accepted');
+  await invoke('core.undo');
+  const afterOutputUndo=await waitForRevisionChange(graphContext,
+    afterOutput.result?.value,'Phase output reference native Undo');
+  // Reapply after Undo to prove the original local spelling was restored and
+  // remains eligible; undo it again before restoring the real sample.
+  const undoVersion=Number(/v(\\d+)/.exec(afterOutputUndo.result?.value??'')?.[1]);
+  if(!Number.isSafeInteger(undoVersion))throw Error('Could not read Source version after output reference Undo');
+  await startNativeCommand('skillStudio.editPhaseOutputReference',{
+    ...outputItem,sourceVersion:undoVersion
+  },'selection',qualifiedOutput);
+  await confirmNativePreview(localOutput,qualifiedOutput);
+  const outputReapply=await evalJS('window.__skillStudioCommandResult');
+  const afterOutputReapply=await graph();
+  if(outputReapply!==true||!afterOutputReapply?.revision||
+     afterOutputReapply.revision===afterOutputUndo.result?.value)
+    throw Error('Output reference was not eligible again after native Undo');
+  await invoke('core.undo');
+  const afterOutputReapplyUndo=await waitForRevisionChange(graphContext,
+    afterOutputReapply.revision,'Phase output reference second Undo');
+  await replaceNativeProcedureSource(originalPackageProcedure);
+  await invoke('core.saveAll');
+  const restoredOutputGraph=await graph();
+  if(!restoredOutputGraph?.revision||restoredOutputGraph.nodes!==17)
+    throw Error('Original Package Procedure was not restored after output reference acceptance');
+  const outputReference={before:fixtureRevision.result?.value??beforeOutputFixture.revision,
+    applied:afterOutput.result?.value,undo:afterOutputUndo.result?.value,
+    reapplied:afterOutputReapply.revision,undoAgain:afterOutputReapplyUndo.result?.value,
+    restored:restoredOutputGraph.revision,localOutput,qualifiedOutput};
+  console.log('STUDIO_PHASE_OUTPUT_REFERENCE_CHROMIUM',JSON.stringify(outputReference));
   const graphHasNode=async id=>{
     const result=await command('Runtime.evaluate',{
       contextId:graphContext,returnByValue:true,
@@ -511,5 +581,5 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!restored)throw Error('Native workspace restore lost the Procedure CustomEditor');
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
-  return {views:true,packageAudit:true,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName};
+  return {views:true,packageAudit:true,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference};
 }
