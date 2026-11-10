@@ -434,6 +434,22 @@ try{
       if(initialToolbar?.layout!=="DOWN"||initialToolbar?.rootMode!=="normal"||
          !initialToolbar.rootVisible||!initialToolbar.toolbarVisible)
         throw Error("Missing/default-incorrect Theia toolbar: "+JSON.stringify(initialToolbar));
+      const canvasIcons=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,
+        expression:`[...document.querySelectorAll("#graphTools svg[data-icon]")]
+          .map(el=>{const r=el.getBoundingClientRect();return {
+            name:el.getAttribute("data-icon"),visible:r.width>0&&r.height>0,
+            color:getComputedStyle(el).color
+          };})`
+      });
+      const iconNames=canvasIcons.result?.value??[];
+      const expectedIcons=["columns-2","git-branch","network","eye","locate-fixed",
+        "zoom-out","zoom-in","maximize","fit-width","fit-height"];
+      if(expectedIcons.some(name=>!iconNames.some(x=>x.name===name&&x.visible)))
+        throw Error("Classic canvas icon artwork missing from native toolbar: "+
+          JSON.stringify({expectedIcons,iconNames}));
+      patchEvidence.canvasIcons=iconNames;
+      console.log("STUDIO_CANVAS_ICONS_CHROMIUM",JSON.stringify(iconNames));
       await command("Runtime.evaluate",{
         contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=>{const select=document.querySelector("#layoutDirection");
