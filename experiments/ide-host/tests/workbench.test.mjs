@@ -61,6 +61,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(inspectorItem.contextValue,'skillStudio.node');
   assert.equal(inspectorItem.nodeId,selectedNode.nodeId);
   assert.equal(inspectorItem.sourceVersion,doc.version);
+  assert.equal(inspectorNode.sourceVersion,doc.version);
+  assert.equal(inspectorNode.documentUri,doc.uri.toString());
   assert.ok(commands.has('skillStudio.renameNode'));
   assert.ok(commands.has('skillStudio.editNodeOperatorValue'));
   await commands.get(item.command.command)(...item.command.arguments);
