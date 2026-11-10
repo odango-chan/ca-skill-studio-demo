@@ -100,11 +100,11 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   await commands.get('skillStudio.editPhaseInputBinding')(phaseItem,'dnn','input.ue-ref');
   assert.equal(doc.text,beforeBinding,'cancelled Phase binding preview must not write');
   confirmChoice='确认并应用';
-  await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.ue-ref');
+  await commands.get('skillStudio.editPhaseInputBinding')(phaseItem,'dnn','input.ue-ref');
   assert.equal(doc.version,phaseVersion+1);
   assert.ok(doc.text.includes('dnn:\n                  from: input.ue-ref'));
   const writesAfterBinding=doc.text;
-  await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.dnn');
+  await commands.get('skillStudio.editPhaseInputBinding')(phaseItem,'dnn','input.dnn');
   assert.equal(doc.text,writesAfterBinding,'stale Phase Step selection must not write');
   assert.ok(commands.has('skillStudio.insertNode'));
   assert.ok(commands.has('skillStudio.deleteNode'));
@@ -123,7 +123,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(await commands.get('skillStudio.insertNode')(routeItem,insertSpec),false);
   assert.equal(doc.text,beforeInsert,'cancelled Node insertion must not write');
   confirmChoice='确认并应用';
-  assert.equal(await commands.get('skillStudio.insertNode')(routeRow,insertSpec),true);
+  assert.equal(await commands.get('skillStudio.insertNode')(routeItem,insertSpec),true);
   assert.equal(doc.version,insertVersion+1);
   assert.ok(doc.text.includes('PASS: ide-host-insert-probe'));
   assert.ok(doc.text.includes('ide-host-insert-probe:\n        call: sbi.demo.insert_probe'));
@@ -138,7 +138,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(await commands.get('skillStudio.deleteNode')(insertedItem,'nudm-sdm-subscribe'),false);
   assert.equal(doc.text,afterInsert,'cancelled Node deletion must not write');
   confirmChoice='确认并应用';
-  assert.equal(await commands.get('skillStudio.deleteNode')(insertedNode,'nudm-sdm-subscribe'),true);
+  assert.equal(await commands.get('skillStudio.deleteNode')(insertedItem,'nudm-sdm-subscribe'),true);
   assert.equal(doc.version,deleteVersion+1);
   assert.ok(!doc.text.includes('ide-host-insert-probe:'));
   assert.ok(doc.text.includes('PASS: nudm-sdm-subscribe'));
