@@ -19,7 +19,7 @@ test('Inspection preserves Classic node/phase/route source identity; unknown syn
 });
 
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
-  const commands=new Map(),providers=new Map(),changes=[],panels=[],diagnosticSets=[];
+  const commands=new Map(),providers=new Map(),changes=[],panels=[],diagnosticSets=[],appliedEdits=[];
   const disposable=()=>({dispose(){}});
   let confirmChoice='确认并应用';
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
@@ -41,6 +41,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
       findFiles:async()=>['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md'].map(p=>uri('/workspace/establish-pdu-session/'+p)),
       fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8'))},
       async applyEdit(edit){
+        appliedEdits.push([...edit.changes]);
         for(const change of [...edit.changes].sort((a,b)=>b.range.start.offset-a.range.start.offset))
           doc.text=doc.text.slice(0,change.range.start.offset)+change.value+doc.text.slice(change.range.end.offset);
         doc.version++;changed({document:doc});return true;
@@ -48,7 +49,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
       onDidChangeTextDocument(cb){changed=cb;return disposable();},openTextDocument:async()=>doc},
     window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
       onDidChangeActiveTextEditor:()=>disposable(),showTextDocument:async()=>{},
-      showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},showQuickPick:async items=>items[0],
+      showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},
+      showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation',
       createWebviewPanel(){const p={webview:{html:''},onDidDispose:()=>disposable()};panels.push(p);return p;}}
   };
   const context={subscriptions:[]},workbench=registerWorkbench(vscode,context),posted=[];
@@ -104,6 +106,50 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   const writesAfterBinding=doc.text;
   await commands.get('skillStudio.editPhaseInputBinding')(phaseStep,'dnn','input.dnn');
   assert.equal(doc.text,writesAfterBinding,'stale Phase Step selection must not write');
+  assert.ok(commands.has('skillStudio.insertNode'));
+  assert.ok(commands.has('skillStudio.deleteNode'));
+  doc.text=source;doc.version++;changed({document:doc});
+  const routeProcedure='ue-requested-pdu-session-establishment';
+  workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'nudm-sdm-get'});
+  const routeRow=providers.get('skillStudio.inspection').getChildren().find(x=>
+    x.kind==='route'&&x.routeId==='nudm-sdm-get:postconditions:PASS');
+  assert.ok(routeRow,'patchable Route identity is exposed');
+  const routeItem=providers.get('skillStudio.inspection').getTreeItem(routeRow);
+  assert.equal(routeItem.contextValue,'skillStudio.route');
+  const insertSpec={nodeId:'ide-host-insert-probe',operator:'call',
+    value:'sbi.demo.insert_probe',outcome:'COMMITTED'};
+  const beforeInsert=doc.text,insertVersion=doc.version;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.insertNode')(routeRow,insertSpec),false);
+  assert.equal(doc.text,beforeInsert,'cancelled Node insertion must not write');
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.insertNode')(routeRow,insertSpec),true);
+  assert.equal(doc.version,insertVersion+1);
+  assert.ok(doc.text.includes('PASS: ide-host-insert-probe'));
+  assert.ok(doc.text.includes('ide-host-insert-probe:\\n        call: sbi.demo.insert_probe'));
+  assert.equal(appliedEdits.at(-1).length,2,'Node insertion uses one two-span WorkspaceEdit');
+  workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'ide-host-insert-probe'});
+  const insertedNode=providers.get('skillStudio.inspection').getChildren().find(x=>x.kind==='node');
+  assert.ok(insertedNode);
+  const insertedItem=providers.get('skillStudio.inspection').getTreeItem(insertedNode);
+  assert.equal(insertedItem.contextValue,'skillStudio.deletableNode');
+  const afterInsert=doc.text,deleteVersion=doc.version;
+  confirmChoice='取消';
+  assert.equal(await commands.get('skillStudio.deleteNode')(insertedNode,'nudm-sdm-subscribe'),false);
+  assert.equal(doc.text,afterInsert,'cancelled Node deletion must not write');
+  confirmChoice='确认并应用';
+  assert.equal(await commands.get('skillStudio.deleteNode')(insertedNode,'nudm-sdm-subscribe'),true);
+  assert.equal(doc.version,deleteVersion+1);
+  assert.ok(!doc.text.includes('ide-host-insert-probe:'));
+  assert.ok(doc.text.includes('PASS: nudm-sdm-subscribe'));
+  assert.equal(appliedEdits.at(-1).length,2,'Node deletion repairs inbound Route and removes Node in one WorkspaceEdit');
+  const afterDelete=doc.text;
+  assert.equal(await commands.get('skillStudio.deleteNode')(insertedItem,'nudm-sdm-subscribe'),false);
+  assert.equal(doc.text,afterDelete,'stale Node selection cannot be deleted');
+  workbench.select(doc,{version:doc.version,procedureId:routeProcedure,nodeId:'nudm-sdm-subscribe'});
+  const protectedNode=providers.get('skillStudio.inspection').getChildren().find(x=>x.kind==='node');
+  assert.equal(providers.get('skillStudio.inspection').getTreeItem(protectedNode).contextValue,
+    'skillStudio.node','Phase-bearing Node does not expose deletion');
   await commands.get('skillStudio.auditPackage')();
   assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/editor warnings/);
   assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
