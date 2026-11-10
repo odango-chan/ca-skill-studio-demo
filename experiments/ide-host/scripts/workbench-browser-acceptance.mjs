@@ -163,6 +163,15 @@ export async function runWorkbenchAcceptance({command,evalJS,sleep,requireEditor
   });
   if(!bindingSelection.result?.value?.node)throw Error('Could not select Phase binding Node');
   await sleep(250);
+  const skillStudioTab=await evalJS(`(()=>{
+    const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>
+      x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
+    const r=el?.getBoundingClientRect();
+    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
+      active:el.classList.contains('lm-mod-current')}:null;
+  })()`);
+  if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
+  if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
   const evidenceHeader=await evalJS(`(()=>{
     const el=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&
       x.textContent.trim()==='Evidence'&&x.getBoundingClientRect().width>0&&
