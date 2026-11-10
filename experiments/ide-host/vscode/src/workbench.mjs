@@ -717,6 +717,11 @@ export function registerWorkbench(vscode,context){
         if(phase==="publish"){
           if(languageDiagnosticOwnershipAcceptance.has(key))
             throw Error("L2-D4b diagnostic ownership probe is already active");
+          const auditWaitStarted=Date.now();
+          while(/pending|running/.test(auditStatus)&&Date.now()-auditWaitStarted<15000)
+            await new Promise(resolve=>setTimeout(resolve,50));
+          if(/pending|running/.test(auditStatus))
+            throw Error("L2-D4b Package Audit did not settle before diagnostic ownership probe");
           const lsp=languageClient?.diagnosticsForAcceptance(uri.toString())??[];
           if(!lsp.some(item=>
             String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"))
@@ -810,6 +815,25 @@ export function registerWorkbench(vscode,context){
           });
           return {dirtyBufferPrepared:true,pythonVersion:doc.version,
             originalDiskUnchanged:true,marker:newName};
+        }
+        if(phase==="abort-and-restore"){
+          const key=procedureUri.toString();
+          const prepared=languageRecoveryAcceptance.get(key);
+          if(!prepared)return {phase,skipped:true,restored:true};
+          try{
+            if(prepared.doc.getText()!==prepared.original)
+              await replace(prepared.doc,prepared.original);
+            if(await disk()!==prepared.original)
+              throw Error("Python disk bytes changed before abort restoration");
+            if(prepared.doc.isDirty&&!await prepared.doc.save())
+              throw Error("Aborted recovery could not save restored Python Source");
+            if(prepared.doc.isDirty||await disk()!==prepared.original)
+              throw Error("Aborted recovery did not restore clean Python Source");
+            return {phase,restored:true,originalDiskUnchanged:true};
+          }finally{
+            languageRecoveryAcceptance.delete(key);
+            await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
+          }
         }
         if(phase==="verify-and-restore"){
           const key=procedureUri.toString();
