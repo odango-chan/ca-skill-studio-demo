@@ -33,13 +33,18 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     await evalJS(expression);
     await sleep(300);
   };
-  const activity=await evalJS(
+  const activityState=await evalJS(
     "(()=>{const tabs=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
     ".filter(x=>x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&"+
     "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&"+
-    "x.getBoundingClientRect().y<innerHeight);const el=tabs.find(x=>"+
-    "x.textContent.trim()==='Skill Studio');const r=el?.getBoundingClientRect();"+
-    "return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()");
+    "x.getBoundingClientRect().y<innerHeight);"+
+    "const active=tabs.find(x=>x.classList.contains('theia-mod-active'));" +
+    "const r=active?.getBoundingClientRect();"+
+    "const target=tabs.find(x=>x.textContent.trim()==='Skill Studio');"+
+    "const tr=target?.getBoundingClientRect();"+
+    "return {previous:active?{label:active.textContent.trim(),x:r.x+r.width/2,y:r.y+r.height/2}:null,"+
+    "activity:tr?{x:tr.x+tr.width/2,y:tr.y+tr.height/2}:null};})()");
+  const activity=activityState?.activity;
   if(!activity)throw Error('Package Overview Activity Bar entry missing');
   await click(activity.x,activity.y);
   await sleep(350);
@@ -113,9 +118,34 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       postExpansion.treeReadsByKind.package < 1)
     throw Error('Package Overview rendered groups without requesting Package children: '+
       JSON.stringify({groups,postExpansion,expansionMode}));
+  const previous=activityState?.previous;
+  let restoredActivity=null;
+  if(previous && previous.label!=='Skill Studio'){
+    restoredActivity=await evalJS(
+      "(()=>{const tabs=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
+      ".filter(x=>x.textContent.trim()==="+JSON.stringify(previous.label)+"&&"+
+      "x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&"+
+      "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&"+
+      "x.getBoundingClientRect().y<innerHeight);"+
+      "const el=tabs.sort((a,b)=>Math.abs(a.getBoundingClientRect().x+"+
+      "a.getBoundingClientRect().width/2-"+previous.x+")-"+
+      "Math.abs(b.getBoundingClientRect().x+b.getBoundingClientRect().width/2-"+previous.x+"))[0];"+
+      "const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,label:el.textContent.trim()}:null;})()");
+    if(restoredActivity){
+      await click(restoredActivity.x,restoredActivity.y);
+      await sleep(250);
+    }
+  }
+  const restored=await evalJS(
+    "(()=>[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
+    ".find(x=>x.classList.contains('theia-mod-active'))?.textContent.trim()??null)()");
+  if(previous && previous.label!=='Skill Studio' && restored!==previous.label)
+    throw Error('Package Overview did not restore the previous Activity Bar view: '+
+      JSON.stringify({previous,restored,restoredActivity}));
   const evidence={package:'establish-pdu-session',core:'3/3',schemas:6,
     scripts:3,references:3,treeVisible:true,scanState:scan.state,
-    treeReadsByKind:postExpansion.treeReadsByKind,expansionMode};
+    treeReadsByKind:postExpansion.treeReadsByKind,expansionMode,
+    restoredActivity:restored};
   console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify(evidence));
   return evidence;
 }
