@@ -37,7 +37,7 @@ Current language-related behavior is spread across independent modules. The modu
 | `experiments/ide-host/vscode/src/workbench.mjs` | Host-side document lifecycle, Package file enumeration, audit scheduling and DiagnosticCollection | Later become a thin LSP client + host filesystem adapter; do not modify while PRs #96–#99 are open |
 | Monaco E2 integration | Local `monaco-yaml` Worker and pinned Contract/Predicate schema completion/hover in Classic | Preserve as compatibility evidence; avoid two competing YAML diagnostic owners when LSP is integrated |
 
-The old `semantic.mjs` path and current `workspace.mjs` path are not interchangeable parsers. L0 must determine which callers still require the legacy projection and whether it can be retired. Do not make the new core depend on both as equal semantic authorities.
+The old `semantic.mjs` path and current `workspace.mjs` path are not interchangeable parsers. The inspected Classic app entry and Theia Inspector use `workspace.mjs`; `graph.mjs` re-exports the legacy `projectProcedure`, and `tests/graph.test.mjs` still characterizes that path. A repository-wide import/reachability check is still required before retirement. Do not make the new core depend on both as equal semantic authorities.
 
 ## 3. Layer boundaries
 
@@ -175,7 +175,7 @@ Do not add a backend server merely to make LSP work. A future backend may be con
 The browser Worker cannot independently read Theia's virtual workspace. The host must supply the current Package files.
 
 - Scope one analysis to one Package root and the current workspace folder.
-- Reuse the existing conservative limits initially: at most 500 files and 4 MiB of text for Package Audit. If a Package is partial, over limit, missing required files or unreadable, mark the relevant analysis `unavailable`; never turn missing data into “no problems”.
+- Reuse the existing conservative Package Audit guards initially: at most 500 files and a cumulative 4 MiB JavaScript text-length limit (the current implementation counts `String.length`, not UTF-8 bytes). The L1 extraction must make the unit explicit and preserve the existing limit behavior until separately reviewed. If a Package is partial, over limit, missing required files or unreadable, mark the relevant analysis `unavailable`; never turn missing data into “no problems”.
 - Open unsaved documents override saved file contents.
 - Package snapshot generations and document versions are monotonically tracked by the host/session. If a response refers to an older document version or Package generation, discard it.
 - Cancellation and disposal must prevent late diagnostics from an old file, old workspace or closed editor from reappearing.
