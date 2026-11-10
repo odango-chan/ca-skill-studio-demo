@@ -74,6 +74,46 @@ function normalizeRelativePath(input: string): string | null {
   return segments.join("/");
 }
 
+
+/**
+ * Parse a hierarchical editor URI without resolving dot segments.
+ * Decode exactly once, and reject escaped separators/dot traversal before
+ * URI normalization can hide an unsafe path. This is a lexical Package
+ * boundary, not an OS symlink or workspace-trust check.
+ */
+function packageUriLocation(uri: string): { scheme: string; authority: string; segments: string[] } | null {
+  const match = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^/?#]*)(\/[^?#]*)?$/.exec(uri);
+  if (!match || match[2].includes("@")) return null;
+  const rawSegments = (match[3] ?? "/").split("/").slice(1);
+  if (rawSegments.at(-1) === "") rawSegments.pop();
+  const segments: string[] = [];
+  for (const raw of rawSegments) {
+    if (!raw) return null;
+    let decoded: string;
+    try { decoded = decodeURIComponent(raw); }
+    catch { return null; }
+    if (!decoded || decoded === "." || decoded === ".." ||
+        decoded.includes("/") || decoded.includes("\\") ||
+        /[\u0000-\u001f\u007f]/.test(decoded)) return null;
+    segments.push(decoded);
+  }
+  return { scheme: match[1].toLowerCase(), authority: match[2], segments };
+}
+
+function belongsToPackage(
+  packageRoot: NonNullable<ReturnType<typeof packageUriLocation>>,
+  uri: string,
+  relativePath: string
+): boolean {
+  if (uri.endsWith("/")) return false;
+  const document = packageUriLocation(uri);
+  if (!document || document.scheme !== packageRoot.scheme ||
+      document.authority !== packageRoot.authority) return false;
+  const expected = [...packageRoot.segments, ...relativePath.split("/")];
+  return document.segments.length === expected.length &&
+    document.segments.every((part, index) => part === expected[index]);
+}
+
 function emptyProcedure(diagnostic?: LanguageDiagnostic): ProcedureProjection {
   return {
     state: "UNAVAILABLE",
@@ -150,6 +190,9 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
     return unavailable({}, "INVALID_PACKAGE_SNAPSHOT", "Package snapshot is missing");
   if (typeof snapshot.rootUri !== "string" || !snapshot.rootUri.trim())
     return unavailable(snapshot, "INVALID_PACKAGE_ROOT", "Package root URI is required");
+  const packageRoot = packageUriLocation(snapshot.rootUri);
+  if (!packageRoot)
+    return unavailable(snapshot, "INVALID_PACKAGE_ROOT_URI", "Package root must be a safe hierarchical URI without traversal");
   if (typeof snapshot.packageName !== "string" || !/^[A-Za-z0-9._-]{1,100}$/.test(snapshot.packageName))
     return unavailable(snapshot, "INVALID_PACKAGE_NAME", "Package name is invalid");
   if (!Number.isSafeInteger(snapshot.generation) || snapshot.generation < 0)
@@ -179,6 +222,8 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       return unavailable(snapshot, "INVALID_PACKAGE_PATH", "Package contains an unsafe relative path");
     if (paths.has(relativePath) || uris.has(document.uri))
       return unavailable(snapshot, "DUPLICATE_PACKAGE_DOCUMENT", "Package contains a duplicate path or document URI");
+    if (!belongsToPackage(packageRoot, document.uri, relativePath))
+      return unavailable(snapshot, "PACKAGE_DOCUMENT_URI_MISMATCH", "Document URI does not match its relative path inside Package root");
     if (document.text.includes("\u0000"))
       return unavailable(snapshot, "INVALID_PACKAGE_TEXT", "Package contains text with a NUL character");
     paths.add(relativePath);
@@ -252,6 +297,14 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
     packageAudit = {
       state: "UNAVAILABLE",
       reason: "Package Audit requires " + missingAuditFiles.join(", "),
+      diagnostics: []
+    };
+  } else if (procedure.state !== "READY") {
+    // Legacy Package Audit returns [] when Procedure projection fails.
+    // Do not misrepresent that skipped audit as READY with zero warnings.
+    packageAudit = {
+      state: "UNAVAILABLE",
+      reason: "Procedure projection is unavailable; Package Audit was not performed",
       diagnostics: []
     };
   } else {
