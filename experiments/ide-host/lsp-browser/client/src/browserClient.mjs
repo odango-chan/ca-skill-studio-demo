@@ -37,7 +37,15 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     "skillStudioLanguageService",
     "Skill Studio Language Service",
     {
+      // The Theia browser host can expose Package Source documents as
+      // languageId "plaintext" when no standalone YAML/Python language plugin
+      // owns that editor. Package snapshots still carry the authoritative
+      // languageId for analysis; register providers by the real workspace URI
+      // path as well, so native Definition/Hover/References commands reach LSP.
       documentSelector: [
+        { scheme: "file", pattern: "**/*.yaml" },
+        { scheme: "file", pattern: "**/*.yml" },
+        { scheme: "file", pattern: "**/*.py" },
         { language: "yaml" },
         { language: "python" }
       ],
