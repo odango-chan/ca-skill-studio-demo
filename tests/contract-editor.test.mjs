@@ -33,6 +33,8 @@ test('Contract custom editor registers independently and renders a nonce-protect
         registrations.set(view, {provider, options});
         return {dispose() {}};
       },
+    },
+    commands: {
       registerCommand: (name, handler) => {
         commands.set(name, handler);
         return {dispose() {}};
