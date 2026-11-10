@@ -455,7 +455,7 @@ try{
       })()`);
       console.log("STUDIO_NATIVE_PYTHON_SYNTAX_CHROMIUM",JSON.stringify(pythonSyntax));
       if(!(pythonSyntax?.tokenColors?.length>=3)||
-         !/def |import |from /.test(pythonSyntax.text))
+         !pythonSyntax.text.replace(/\u00a0/g," ").includes("def main"))
         throw Error("Native Python syntax tokenization not active: "+JSON.stringify(pythonSyntax));
       patchEvidence.pythonSyntax=pythonSyntax;
       // Return to the authoritative Procedure Source editor before testing Undo.
