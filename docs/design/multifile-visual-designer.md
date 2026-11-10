@@ -1,6 +1,6 @@
 # Multi-file Visual Designer · parallel workstream
 
-**Status: C1 Contract Designer implemented and real Theia Chromium accepted; C2 Predicate Designer next; 2026-11-10.**  
+**Status: C1 Contract Designer accepted; C2 Predicate Designer implementation in progress; C3 Schema Designer next; 2026-11-10.**  
 Owner: Skill Studio editor (not Skill DSL, Runtime, Agent Host or 5GC).
 
 ## Problem and objective
@@ -187,3 +187,37 @@ Contract UI acceptance.
 C2 Predicate Designer and C3 Schema Designer remain follow-up stages. No
 visual authoring mutations, Runtime qualification, LLM planning or 5GC
 execution semantics are introduced by C1.
+
+
+## C2 · Predicate Designer implementation (same parallel workstream)
+
+C2 is now implemented on this branch, pending its own four-workflow CI and
+real Theia browser evidence:
+
+- `site/predicate-projection.mjs` projects the pinned PredicateSet shape:
+  named predicates, one or more Observations, `ref`, `scope`, `freshness`,
+  optional `when`, and the declared CEL or Script evaluator.
+- The projection retains YAML source lines and observation-to-evaluator
+  ownership. Unsupported variants, missing required fields and unknown nested
+  keys are marked `PARTIAL`; unsafe YAML / unsupported kind falls back
+  to `SOURCE_ONLY`.
+- `experiments/ide-host/vscode/src/predicate-editor.mjs` registers a separate
+  read-only Predicate Custom Editor. The default view is a collapsible list of
+  Predicate cards, each showing Observation cards flowing to its evaluator.
+- CEL expressions are displayed as source text only. Script refs are shown
+  literally; the Designer does not infer a Python filename, load/execute a
+  script, evaluate CEL, or claim live PASS/FAIL/UNKNOWN evidence.
+- Theia editor association opens `assurance/predicates.yaml` in Predicate
+  Designer; native YAML Source remains one click away. Every displayed line
+  can reveal its original Source location.
+- Unit tests cover the 17 real owner Predicate declarations, CEL and Script
+  variants, nested unknowns, required fields, aliases, duplicate keys and
+  source-only fallback.
+- Real Theia Chromium acceptance now checks all 17 real Predicate cards,
+  their Observation count, a real CreatedSession Predicate and the Script
+  evaluator reference. Its run is pending for this head.
+
+C2 remains strictly a declaration viewer. Observation declarations do not
+prove an observation exists; freshness values are configuration, not evidence
+age; evaluator declarations do not prove the evaluator is installed, admitted
+or executed.
