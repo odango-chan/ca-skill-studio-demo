@@ -60,11 +60,18 @@ No Runtime, Python execution, Package mutation, deployment or 5GC behavior is in
 - Disk bytes must remain unchanged throughout recovery.
 - A failure during recovery must not discard, reload or replace the user's dirty editor buffers.
 
-## 5. Diagnostic ownership is a prerequisite
+## 5. Diagnostic ownership audit (exact pinned SDK)
 
-Before implementation, inspect the exact `vscode-languageclient` version used by the Theia Browser host and establish how its diagnostic collection is created, disposed and cleared on abrupt transport failure. Do not guess at private fields or clear every diagnostic collection by URI.
+The Browser LSP client package pins `vscode-languageclient@9.0.1` in its own lockfile. The matching upstream `release/client/9.0.1` source has been inspected:
 
-If the client API cannot safely clear only its own diagnostics, add an explicit host-owned diagnostic bridge with a unique collection owner/source and tests proving it cannot erase Package Audit or unrelated diagnostics. This is preferable to relying on implementation-private SDK state.
+- `LanguageClient.diagnostics` is a **public getter** over the client's own diagnostic collection ([client.ts](https://github.com/microsoft/vscode-languageserver-node/blob/release/client/9.0.1/client/src/common/client.ts#L673-L675)).
+- The collection is created by `start()` if absent ([client.ts](https://github.com/microsoft/vscode-languageserver-node/blob/release/client/9.0.1/client/src/common/client.ts#L1060-L1085)).
+- `cleanUp('stop')` disposes that collection and sets its reference to `undefined` ([client.ts](https://github.com/microsoft/vscode-languageserver-node/blob/release/client/9.0.1/client/src/common/client.ts#L1420-L1448)).
+- The `CloseAction.DoNotRestart` path calls `cleanUp('stop')`; `ErrorAction.Shutdown` calls `stop()`, which also performs that cleanup ([client.ts](https://github.com/microsoft/vscode-languageserver-node/blob/release/client/9.0.1/client/src/common/client.ts#L1590-L1630)).
+
+**Implication:** when the SDK's connection error/close path runs, it already disposes only the LSP client's own diagnostic collection. Do not add a broad URI-based clear and do not touch the Workbench's separate `diagnostics` collection (which may contain host-owned diagnostics).
+
+**Remaining D4b question:** D4a's independent heartbeat timeout calls the host's fatal callback, but does not itself guarantee the SDK enters `stop()`. D4b must make the silent-termination path converge on SDK-owned stop/cleanup safely, without double-stop races, and add a real Chromium assertion that stale LSP diagnostics disappear while Package Audit / unrelated host diagnostics remain intact. The SDK source audit is complete; lifecycle behavior still requires tests.
 
 ## 6. Acceptance matrix
 
