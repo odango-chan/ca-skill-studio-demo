@@ -1227,8 +1227,9 @@ try{
   if(!narrowBrand.present||narrowBrand.labelDisplay!=="none"||!narrowBrand.markVisible)
     throw Error("SKILL Studio brand did not compact cleanly on narrow screens: "+
       JSON.stringify(narrowBrand));
-  if(!afterImport.notificationText.some(message=>message.includes("示例 SKILL 已载入浏览器工作区"))||
-     !afterImport.bodyText.includes("establish-pdu-session")||
+  if(!afterImport.notificationText.some(message=>message.includes("两个示例 SKILL 已载入 skills/：27 个新文件"))||
+     !afterImport.bodyText.includes("skills")||
+      !afterImport.bodyText.includes("establish-pdu-session")||
      !afterImport.bodyText.includes("procedure.yaml"))
     throw Error("Theia sample import into browser workspace failed: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3000));
   if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
