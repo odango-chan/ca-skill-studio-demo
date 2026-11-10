@@ -712,12 +712,22 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         return caption?.innerText?.trim()??'';
       }).filter(Boolean);
       const c=window.theia?.container;
-      let manager=null,managerError=null;
+      const serviceKeys=[...(c?._bindingDictionary?._map?.keys()??[])];
+      const matchingServiceKeys=serviceKeys.filter(key=>
+        /WidgetManager|PluginViewRegistry/.test((key?.name??'')+' '+String(key))
+      ).map(key=>({name:key?.name??'',text:String(key).slice(0,180)}));
+      const findServiceKey=name=>serviceKeys.find(key=>
+        key?.name===name||String(key).includes(name));
+      let manager=null,managerError=null,registry=null,registryError=null;
       try{
-        const managerKey=[...(c?._bindingDictionary?._map?.keys()??[])]
-          .find(key=>key?.name==='WidgetManager');
-        manager=managerKey?c.get(managerKey):null;
+        const managerKey=findServiceKey('WidgetManager');
+        if(managerKey)manager=c.get(managerKey);
       }catch(error){managerError=String(error?.message??error);}
+      try{
+        const registryKey=findServiceKey('PluginViewRegistry');
+        if(registryKey)registry=c.get(registryKey);
+      }catch(error){registryError=String(error?.message??error);}
+      manager=manager??registry?.widgetManager??null;
       const treeWidgets=manager?.getWidgets('plugin-view-data')??[];
       const evidenceWidget=treeWidgets.find(widget=>widget.id==='skillStudio.evidence');
       let modelNode=null,modelError=null;
@@ -734,7 +744,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         treeWidgets:treeWidgets.map(widget=>({id:widget.id,type:widget.constructor?.name,
           disposed:widget.isDisposed,visible:widget.isVisible,attached:widget.isAttached})),
         evidenceWidgetFound:!!evidenceWidget,modelType:evidenceWidget?.model?.constructor?.name??null,
-        managerError,modelError,
+        managerError,registryError,matchingServiceKeys,
         modelNode:modelNode?{id:modelNode.id,name:modelNode.name,expanded:modelNode.expanded,
           childCount:modelNode.children?.length,parentId:modelNode.parent?.id??null,
           type:modelNode.constructor?.name??null}:null,
