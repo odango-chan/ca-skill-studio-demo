@@ -303,7 +303,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(commands.has('skillStudio.exportPackageZip'));
   // Package export uses the complete byte snapshot but overlays every open
   // TextDocument, so unsaved edits are included without writing to OPFS.
-  const exportSource=source+'\\n# unsaved-export-probe\\n';
+  const exportSource=source+'\n# unsaved-export-probe\n';
   doc.text=exportSource;doc.version++;changed({document:doc});
   const beforeZipMessages=posted.length;
   assert.equal(await commands.get('skillStudio.exportPackageZip')(),true);
