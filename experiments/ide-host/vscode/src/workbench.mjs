@@ -2643,7 +2643,8 @@ export function registerWorkbench(vscode,context){
       const exact=matches.filter(item=>item.path.endsWith('/'+name+'/SKILL.md'));
       if(exact.length!==1)
         throw Error('Expected exactly one '+name+' guide in the active Workspace');
-      return openNativeMarkdownPreview(exact[0]);
+      const opened=await openNativeMarkdownPreview(exact[0]);
+      return opened?exact[0].toString():null;
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.toggleMarkdownLayout',async uri=>{
