@@ -87,6 +87,10 @@
         "title": "SKILL Studio: Preview Markdown"
       },
       {
+        "command": "skillStudio.previewMarkdownNative",
+        "title": "SKILL Studio: Open Native Markdown Preview to the Side (Experiment)"
+      },
+      {
         "command": "skillStudio.toggleMarkdownLayout",
         "title": "SKILL Studio: Toggle Markdown Split"
       },
@@ -159,6 +163,11 @@
           "group": "navigation"
         },
         {
+          "command": "skillStudio.previewMarkdownNative",
+          "when": "resourceExtname == .md",
+          "group": "navigation@2"
+        },
+        {
           "command": "skillStudio.toggleMarkdownLayout",
           "when": "resourceExtname == .md",
           "group": "navigation"
@@ -189,6 +198,11 @@
           "command": "skillStudio.previewMarkdown",
           "when": "resourceExtname == .md",
           "group": "navigation"
+        },
+        {
+          "command": "skillStudio.previewMarkdownNative",
+          "when": "resourceExtname == .md",
+          "group": "navigation@2"
         }
       ],
       "view/title": [
