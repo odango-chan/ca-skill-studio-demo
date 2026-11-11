@@ -1,6 +1,6 @@
 # Skill Language Token Catalog Import
 
-This is the read-only build-time snapshot consumed by the online Monaco semantic-token provider.
+This is the read-only build-time snapshot consumed by the shared language-layer semantic-token engine (`language/semantic-tokens.mjs`) consumed by Monaco and the browser LSP Worker.
 
 - Canonical source: [odango-chan/ca-skills/spec/skill-language-tokens.yaml](https://github.com/odango-chan/ca-skills/blob/6742d4cae65c482accdf74c3cd1daf8350856d52/spec/skill-language-tokens.yaml)
 - Canonical repository commit: `6742d4cae65c482accdf74c3cd1daf8350856d52`
