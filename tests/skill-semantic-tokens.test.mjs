@@ -83,7 +83,7 @@ test("catalog IDs become a unique stable Monaco semantic-token legend",()=>{
 
 test("SkillContract source positions distinguish document identity and direct Operation grants",()=>{
   const text=readSample("assurance/contract.yaml");
-  const spans=semantic.collectSkillSemanticTokenSpans(text,"assurance/contract.yaml");
+  assert.match(backend,/collectSkillSemanticTokenSpans\(raw,model\.uri\?\.path\?\?""\)/);
   tokenFor(text,spans,"SkillContract","ca.document.kind");
   tokenFor(text,spans,"connectionagent.io/v1alpha1","ca.document.version");
   tokenFor(text,spans,"sbi.udm.sm_data.get","ca.reference.capability");
