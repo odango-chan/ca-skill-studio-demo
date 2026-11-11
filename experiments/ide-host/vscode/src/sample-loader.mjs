@@ -134,7 +134,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
     if(!(bytes instanceof Uint8Array))fail("Unrecognized sample file");
     phase="create-parent:"+file;
     if(segments.length>1)
-      await fileSystem.createDirectory(vscode.Uri.joinPath(root,...segments.slice(0,-1)));
+      await fileSystem.createDirectory(vscode.Uri.joinPath(skillsRoot,...segments.slice(0,-1)));
     // writeFile with create-only intent; a racing external write is guarded
     // by the second stat. The spike does not claim atomic multi-file import.
     try{await fileSystem.stat(destination);fail("Sample file changed during import");}
