@@ -8,7 +8,10 @@ in VS Code and Eclipse Theia.
 - **SKILL Studio Light** — workbench surfaces, editor chrome, terminal palette,
   YAML/Python/JSON/Markdown token colors and semantic highlighting.
 - **SKILL Studio File Icons** — file and folder SVGs use the same 24px
-  rounded-outline geometry and file-type mapping as Classic.
+  rounded-outline geometry and file-type mapping as Classic. Compiler-style
+  project roots use distinct icons: `skills/` (Source), `lib/` (lock), and
+  `output/` (generated artifacts). Icons signal ownership, not filesystem
+  permissions.
 - **Classic Theia Shell Icons** — Theia browser hosts map activity-bar,
   Navigator, menu and toolbar Codicon identifiers onto SVG artwork generated
   from `site/icons.mjs`. Theia still owns commands, click targets, tooltips,

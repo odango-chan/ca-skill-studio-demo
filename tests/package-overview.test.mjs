@@ -109,6 +109,87 @@ test('C4 reports bounded inventory instead of implying a complete scan',()=>{
   assert.ok(result.scannedFiles>0);
 });
 
+test('Compiler project Package Overview scans only skills, never lib or output',async()=>{
+  const inventoryFiles=[
+    '/project/skills/alpha/SKILL.md',
+    '/project/skills/alpha/assurance/contract.yaml',
+    '/project/skills/alpha/assurance/procedure.yaml',
+    '/project/skills/alpha/assurance/predicates.yaml',
+    '/project/lib/tool/SKILL.md',
+    '/project/lib/tool/assurance/contract.yaml',
+    '/project/output/alpha/SKILL.md',
+    '/project/output/alpha/assurance/procedure.yaml'
+  ].map(uri);
+  const commands=new Map();
+  let patternUsed=null,scanBase=null;
+  class Emitter {constructor(){this.event=()=>{};}fire(){}dispose(){}}
+  class Item {constructor(label,collapsibleState){this.label=label;this.collapsibleState=collapsibleState;}}
+  class RelativePattern {constructor(base,pattern){this.baseUri=base;this.pattern=pattern;}}
+  const noop=()=>({dispose(){}});
+  const vscode={
+    Uri:{joinPath:(base,...parts)=>uri(base.path+'/'+parts.join('/'))},
+    EventEmitter:Emitter,TreeItem:Item,RelativePattern,
+    TreeItemCollapsibleState:{Collapsed:1,None:0},
+    workspace:{
+      workspaceFolders:[{uri:uri('/project'),name:'project'}],textDocuments:[],
+      fs:{async stat(target){
+        if(target.path==='/project/skills')return {type:2};
+        throw Object.assign(Error('missing'),{code:'FileNotFound'});
+      }},
+      async findFiles(pattern){patternUsed=pattern.pattern;scanBase=pattern.baseUri.path;return inventoryFiles;},
+      asRelativePath:target=>target.path.slice('/project/'.length),
+      onDidChangeWorkspaceFolders:noop
+    },
+    window:{registerTreeDataProvider:()=>noop()},
+    commands:{registerCommand:(id,fn)=>{commands.set(id,fn);return noop();}}
+  };
+  const context={subscriptions:[]};
+  registerPackageOverview(vscode,context);
+  const scan=await commands.get('skillStudio.refreshPackages')();
+  assert.equal(patternUsed,'**/*');
+  assert.equal(scanBase,'/project/skills');
+  assert.deepEqual(scan.packages.map(pkg=>pkg.name),['alpha']);
+  assert.equal(scan.packages[0].fileCount,4);
+  assert.equal(scan.packages[0].corePresent,3);
+});
+
+test('Explicit example import can reveal both Packages without opening the view at startup',async()=>{
+  const commands=new Map(),revealed=[];
+  let registered=0;
+  class Emitter{constructor(){this.event=()=>{};}fire(){}dispose(){}}
+  class Item{constructor(label,state){this.label=label;this.collapsibleState=state;}}
+  class RelativePattern{constructor(base,pattern){this.baseUri=base;this.pattern=pattern;}}
+  const noop=()=>({dispose(){}});
+  const vscode={
+    EventEmitter:Emitter,TreeItem:Item,RelativePattern,
+    TreeItemCollapsibleState:{Collapsed:1,None:0},
+    workspace:{
+      workspaceFolders:[{uri:uri('/workspace/skills'),name:'skills'}],
+      textDocuments:[],
+      async findFiles(){return files;},
+      asRelativePath:value=>value.path,
+      onDidChangeWorkspaceFolders:noop
+    },
+    window:{createTreeView(id,{treeDataProvider}){
+      registered++;
+      assert.equal(id,'skillStudio.packages');
+      assert.ok(treeDataProvider);
+      return {async reveal(item,options){revealed.push({label:item.label,options});},dispose(){}};
+    }},
+    commands:{registerCommand(id,fn){commands.set(id,fn);return noop();}}
+  };
+  const context={subscriptions:[]};
+  const view=registerPackageOverview(vscode,context);
+  assert.equal(registered,1);
+  assert.equal(revealed.length,0,'registration must not steal focus');
+  assert.equal(await view.revealPackages(),true);
+  assert.deepEqual(revealed.map(item=>item.label),[
+    'establish-pdu-session','establish-pdu-session-mas','nested'
+  ]);
+  assert.ok(revealed.every(item=>item.options.expand===1&&
+    item.options.focus===false&&item.options.select===false));
+});
+
 test('C4 registers Packages view and renders package tree with source actions',async()=>{
   const treeProviders=new Map(),commands=new Map();
   let scans=0,openedDocument=null,closedDocument=null;

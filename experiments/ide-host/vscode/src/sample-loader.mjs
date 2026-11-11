@@ -1,6 +1,10 @@
 // Explicit user-triggered Sample Package import for VS Code desktop/web or
 // Theia browser-only OPFS. Never overwrite existing workspace files.
 const SRC=["samples","skills"];
+// A Skill Compiler project has one source workspace with three top-level
+// directories. The Studio demo may seed only skills/; it must not invent
+// Tool contracts in lib/ or build artifacts in output/.
+export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
 const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
 const decoder=new TextDecoder();
 const fail=reason=>{throw Error(reason);};
@@ -98,18 +102,25 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   }
   const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
   const files=manifest.files;
-  // Browser-only Theia OPFS exposes the extension's persistent storage.
-  // Keep the demonstration separate from any user workspace or existing
-  // project named skills: never use a user-selected project as the target.
+  // Reuse the existing browser-owned workspaces/skills Source in place,
+  // treating its parent as the compiler-style project root. This upgrades
+  // legacy demos without copying, hiding or overwriting edited SKILL files.
+  // No user-selected Workspace is ever used as an import destination.
   if(!storageUri)fail("No writable extension storage URI");
-  const root=vscode.Uri.joinPath(storageUri,"workspaces","skills");
+  const root=vscode.Uri.joinPath(storageUri,"workspaces");
+  const skillsRoot=vscode.Uri.joinPath(root,"skills");
+  const libraryRoot=vscode.Uri.joinPath(root,"lib");
+  const outputRoot=vscode.Uri.joinPath(root,"output");
   const current=vscode.workspace.workspaceFolders??[];
   let created=0,skipped=0;
-  phase="create-workspace-root";
+  phase="create-project-layout";
   await fileSystem.createDirectory(root);
+  await fileSystem.createDirectory(skillsRoot);
+  await fileSystem.createDirectory(libraryRoot);
+  await fileSystem.createDirectory(outputRoot);
   for(const file of files){
     const segments=file.split("/");
-    const destination=vscode.Uri.joinPath(root,...segments);
+    const destination=vscode.Uri.joinPath(skillsRoot,...segments);
     phase="stat-existing:"+file;
     let exists=false;
     try{await fileSystem.stat(destination);exists=true;}
@@ -123,7 +134,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
     if(!(bytes instanceof Uint8Array))fail("Unrecognized sample file");
     phase="create-parent:"+file;
     if(segments.length>1)
-      await fileSystem.createDirectory(vscode.Uri.joinPath(root,...segments.slice(0,-1)));
+      await fileSystem.createDirectory(vscode.Uri.joinPath(skillsRoot,...segments.slice(0,-1)));
     // writeFile with create-only intent; a racing external write is guarded
     // by the second stat. The spike does not claim atomic multi-file import.
     try{await fileSystem.stat(destination);fail("Sample file changed during import");}
@@ -135,14 +146,20 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   phase="workspace-update";
   let workspaceUpdated=false;
   if(!current.some(f=>f.uri.toString()===root.toString())){
+    // Replace only the old extension-owned skills/ workspace root. Do not
+    // remove a similarly named folder belonging to another user project.
+    const legacyIndex=current.findIndex(folder=>
+      folder.uri.toString()===skillsRoot.toString());
     workspaceUpdated=Boolean(vscode.workspace.updateWorkspaceFolders?.(
-      current.length,0,{uri:root,name:"skills"}));
+      legacyIndex>=0?legacyIndex:current.length,legacyIndex>=0?1:0,
+      {uri:root,name:EXAMPLE_PROJECT_NAME}));
     if(!workspaceUpdated)
-      fail("Cannot expose bundled SKILLs in the native Explorer");
+      fail("Cannot expose bundled SKILL project in the native Explorer");
   }
   const procedures=Object.fromEntries(SKILLS.map(name=>
-    [name,vscode.Uri.joinPath(root,name,"assurance","procedure.yaml")]));
-  return {root,procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
+    [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
+  return {root,skillsRoot,libraryRoot,outputRoot,
+    procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
     sourceSha:manifest.sourceSha,files:files.length,created,skipped,workspaceUpdated};
   }catch(error){
     throw Error(phase+": "+String(error?.message??error));

@@ -1,5 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
+import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
 import {renderMarkdown} from '../../../../site/markdown-preview.mjs';
@@ -594,7 +595,8 @@ export function registerWorkbench(vscode,context){
           const edit=new vscode.WorkspaceEdit();
           edit.replace(procedureUri,new vscode.Range(
             current.positionAt(0),current.positionAt(current.getText().length)),nextText);
-          if(!await vscode.workspace.applyEdit(edit))
+          assertStudioMutation(procedureUri,vscode.workspace.workspaceFolders??[],"edit");
+           if(!await vscode.workspace.applyEdit(edit))
             throw Error("Host rejected temporary Procedure diagnostic WorkspaceEdit");
         };
 
@@ -821,7 +823,8 @@ export function registerWorkbench(vscode,context){
           const edit=new vscode.WorkspaceEdit();
           edit.replace(doc.uri,new vscode.Range(doc.positionAt(0),
             doc.positionAt(doc.getText().length)),value);
-          if(!await vscode.workspace.applyEdit(edit))
+          assertStudioMutation(doc.uri,vscode.workspace.workspaceFolders??[],"edit");
+           if(!await vscode.workspace.applyEdit(edit))
             throw Error("L2-D4b native Python WorkspaceEdit was rejected");
         };
         if(phase==="prepare"){
@@ -1130,7 +1133,8 @@ export function registerWorkbench(vscode,context){
           const edit=new vscode.WorkspaceEdit();
           edit.replace(doc.uri,new vscode.Range(doc.positionAt(0),
             doc.positionAt(doc.getText().length)),value);
-          if(!await vscode.workspace.applyEdit(edit))
+          assertStudioMutation(doc.uri,vscode.workspace.workspaceFolders??[],"edit");
+           if(!await vscode.workspace.applyEdit(edit))
             throw Error("L2-D3: rejected native WorkspaceEdit for "+doc.uri);
         };
         const ready=async(before,phase)=>{
@@ -1293,7 +1297,8 @@ export function registerWorkbench(vscode,context){
           const transaction=new vscode.WorkspaceEdit();
           transaction.replace(uri,new vscode.Range(doc.positionAt(0),
             doc.positionAt(doc.getText().length)),value);
-          if(!await vscode.workspace.applyEdit(transaction))
+          assertStudioMutation(uri,vscode.workspace.workspaceFolders??[],"edit");
+           if(!await vscode.workspace.applyEdit(transaction))
             throw Error("L2-D4: native Source WorkspaceEdit was rejected");
         };
         let edited=false;
@@ -1405,7 +1410,8 @@ export function registerWorkbench(vscode,context){
       edit.replace(doc.uri,new vscode.Range(
         doc.positionAt(span.start),doc.positionAt(span.end)),span.newValue);
     }
-    const applied=await vscode.workspace.applyEdit(edit);
+    assertStudioMutation(doc.uri,vscode.workspace.workspaceFolders??[],"edit");
+     const applied=await vscode.workspace.applyEdit(edit);
     if(!applied)throw Error("Host rejected WorkspaceEdit");
     return true;
   }

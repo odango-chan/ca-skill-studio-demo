@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
 // workers. Do not import node:crypto: the online host has no Node APIs.
@@ -20,6 +21,9 @@ import {registerPredicateEditor} from "./predicate-editor.mjs";
 import {registerSchemaEditor} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
 const VIEW="skillStudio.procedurePreview";
+// Theia's browser-only static build can omit its Pages subpath when creating
+// webview resource URLs. Restrict the workaround to the same-origin static
+// plugin worker; normal VS Code and backend-backed Theia retain host URIs.
 function escaped(value){
   return String(value).replace(/[&<>"']/g,ch=>({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -202,6 +206,7 @@ export function activate(context){
           // Native TextDocument remains the only write owner. Existing Route
           // edits replace one scalar; new Route creation inserts one exact
           // source line at a zero-length CST span. Both use native Undo/Save.
+          assertStudioMutation(document.uri,vscode.workspace.workspaceFolders??[],"edit");
           const patch=new vscode.WorkspaceEdit();
           patch.replace(document.uri,new vscode.Range(
             document.positionAt(edit.start),document.positionAt(edit.end)),
@@ -227,11 +232,37 @@ export function activate(context){
       let stage="seed-example";
       try{
         const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri);
+        stage="show-packages";
+        // User-triggered import should end in the real native Packages view.
+        // View-container activation is a host command: fall back gracefully
+        // on VS Code/Theia variants that don't contribute that command.
+        let viewOpened=false;
+        for(const id of ["workbench.view.extension.skillStudio",
+          "skillStudio.packages.focus"]){
+          try{
+            await vscode.commands.executeCommand(id);
+            viewOpened=true;
+            break;
+          }catch{/* The alternative is optional, not a load failure. */}
+        }
+        let revealed=false;
+        try{revealed=await packageOverview.revealPackages();}
+        catch(error){
+          console.warn("SKILL Package reveal unavailable:",String(error?.message??error));
+          await packageOverview.refresh();
+        }
+        // Keep the visible Packages sidebar, but return keyboard focus to
+        // the real Procedure CustomEditor after the sidebar is prepared.
+        // This preserves Source editor shortcuts and native Go to Line.
         stage="open-procedure";
+        // Respect the registered default CustomEditor association (the working
+        // Theia first-run path); avoid opening a second explicit editor.
         await vscode.commands.executeCommand("vscode.open",result.procedure);
         void vscode.window.showInformationMessage(
-          "两个示例 SKILL 已载入 skills/："+result.created+" 个新文件，"+
-          result.skipped+" 个已有文件保留。可展开两个 Skill 的 assurance/procedure.yaml");
+          "示例项目已载入：skills/（传统 5GC + MAS）、lib/（待导入 Tool 契约）、"+
+          "output/（待生成编译产物）。新增 "+result.created+" 个文件，"+
+          "保留 "+result.skipped+" 个已有文件。"+
+          (viewOpened&&revealed?"已展开 Packages。":"请打开 Skill Studio → Packages 查看两个 SKILL。"));
       }catch(error){
         await vscode.window.showErrorMessage(
           "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
@@ -243,7 +274,7 @@ export function activate(context){
   // convenient shortcut for the online demo.
   if(!(vscode.workspace.workspaceFolders??[]).length){
     const welcome=vscode.window.showInformationMessage?.(
-      "欢迎使用 SKILL Studio。可以载入 skills/ 下的两个示例（传统 5GC 与 MAS）。",
+      "欢迎使用 SKILL Studio。可导入一个含 skills/、lib/、output/ 的演示项目（传统 5GC 与 MAS）。",
       "载入演示 SKILL 项目"
     );
     if(welcome&&typeof welcome.then==="function"){

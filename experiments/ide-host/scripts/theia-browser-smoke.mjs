@@ -716,14 +716,47 @@ try{
           windowsVirtualKeyCode:virtualKeyCode,nativeVirtualKeyCode:virtualKeyCode
         });
       };
-      const clickX=editorTarget.chosen.rect.x+Math.min(90,editorTarget.chosen.rect.width/2);
-      const clickY=editorTarget.chosen.rect.y+Math.min(24,editorTarget.chosen.rect.height/2);
+      const focusTarget=await evalJS(`(()=>{
+        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
+        const viewport=editor?.querySelector(".monaco-scrollable-element")??editor;
+        const r=viewport?.getBoundingClientRect();
+        if(!editor||!r)return {found:false};
+        const xs=[r.x+Math.min(90,r.width/3),r.x+r.width/2,
+          r.right-Math.min(90,r.width/3)];
+        const ys=[r.y+Math.min(24,r.height/3),r.y+r.height/2,
+          r.bottom-Math.min(24,r.height/3)];
+        const candidates=ys.flatMap(y=>xs.map(x=>({x,y})));
+        const hit=candidates.find(({x,y})=>x>0&&y>0&&x<innerWidth&&y<innerHeight&&
+          document.elementFromPoint(x,y)?.closest(".monaco-editor")===editor);
+        return {found:!!hit,point:hit??null,editorCount:document.querySelectorAll(".monaco-editor").length,
+          viewport:{x:r.x,y:r.y,width:r.width,height:r.height}};
+      })()`);
+      if(!focusTarget?.found)
+        throw Error("Visible Procedure Source is not hit-testable: "+
+          JSON.stringify({editorTarget,focusTarget}));
       await command("Input.dispatchMouseEvent",{
-        type:"mousePressed",x:clickX,y:clickY,button:"left",clickCount:1
+        type:"mouseMoved",x:focusTarget.point.x,y:focusTarget.point.y
       });
       await command("Input.dispatchMouseEvent",{
-        type:"mouseReleased",x:clickX,y:clickY,button:"left",clickCount:1
+        type:"mousePressed",x:focusTarget.point.x,y:focusTarget.point.y,button:"left",clickCount:1
       });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:focusTarget.point.x,y:focusTarget.point.y,button:"left",clickCount:1
+      });
+      const focusedSource=await evalJS(`(()=>{
+        const current=document.activeElement?.closest(".monaco-editor");
+        const editors=[...document.querySelectorAll(".monaco-editor")];
+        return {focusedIndex:editors.indexOf(current),
+          activeClass:document.activeElement?.className??null,
+          activeTag:document.activeElement?.tagName??null,
+          activeEditorCount:editors.length};
+      })()`);
+      console.log("STUDIO_GOTO_SOURCE_FOCUS",JSON.stringify({
+        expectedIndex:editorTarget.chosen.index,focusTarget,focusedSource
+      }));
+      if(focusedSource?.focusedIndex!==editorTarget.chosen.index)
+        throw Error("Clicked Procedure Source did not gain native keyboard focus: "+
+          JSON.stringify({editorTarget,focusTarget,focusedSource}));
       // Resolve the fixture line from the *same pinned owner Source* that
       // the browser actually imported. A numeric hard-coded line silently
       // breaks when a legitimate owner SKILL refresh adds comments/Steps.
@@ -763,18 +796,37 @@ try{
         throw Error("Native editor Go to Line did not receive fixture line "+n4RouteLine+": "+
           JSON.stringify({gotoState,gotoTyped}));
       await key("Enter","Enter",0,13);
-      await sleep(200);
-      const gotoLineView=await evalJS(`(()=> {
-        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
-        const lines=editor?.querySelector(".view-lines");
-        return {text:(lines?.innerText??"").replace(/\u00a0/g," "),editorVisible:Boolean(editor)};
-      })()`);
-      if(!gotoLineView.editorVisible||
-         !gotoLineView.text.includes("FAILED: unresolved")||
-         !gotoLineView.text.includes("UNKNOWN: unresolved")||
-         !gotoLineView.text.includes("DENIED: failed"))
+      // Theia can replace a native Source editor while Go to Line closes.
+      // Match the actual rendered Route fixture, not a stale Monaco DOM index.
+      let gotoLineView=null;
+      for(let attempt=0;attempt<30;attempt++){
+        gotoLineView=await evalJS(`(()=> {
+          const candidates=[...document.querySelectorAll(".monaco-editor")]
+            .map((editor,index)=>{
+              const viewport=editor.querySelector(".monaco-scrollable-element")??editor;
+              const rect=viewport.getBoundingClientRect();
+              const visible=rect.width>30&&rect.height>100&&
+                rect.bottom>0&&rect.top<innerHeight&&rect.right>0&&rect.left<innerWidth;
+              const text=(editor.querySelector(".view-lines")?.innerText??"")
+                .replaceAll(String.fromCharCode(160)," ");
+              return {index,visible,text};
+            });
+          const chosen=candidates.find(item=>item.visible&&
+            item.text.includes("FAILED: unresolved")&&
+            item.text.includes("UNKNOWN: unresolved")&&
+            item.text.includes("DENIED: failed"));
+          return chosen?{index:chosen.index,text:chosen.text,editorVisible:true}:
+            {editorVisible:false,candidates:candidates.map(item=>({
+              index:item.index,visible:item.visible,text:item.text.slice(0,1200)
+            }))};
+        })()`);
+        if(gotoLineView.editorVisible)break;
+        await sleep(100);
+      }
+      if(!gotoLineView?.editorVisible)
         throw Error("Go to Line did not land on the intended Route fixture: "+
-          JSON.stringify({gotoState,gotoTyped,gotoLineView}).slice(0,2200));
+          JSON.stringify({gotoState,gotoTyped,gotoLineView}).slice(0,3200));
+      editorTarget.chosen.index=gotoLineView.index;
       // Home twice is Monaco's stable route to column zero (first
       // non-whitespace, then physical line start); replace the whole line.
       await key("Home","Home",0,36);
@@ -838,6 +890,14 @@ try{
         })()`
       });
       await sleep(350);
+      // The Packages sidebar reduces the graph viewport on first import.
+      // Use the real Fit control so both handles are on screen before
+      // dispatching trusted Chromium pointer events.
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#fit")?.click(); true`
+      });
+      await sleep(500);
       const routeGestureInfo=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
@@ -1061,6 +1121,11 @@ try{
       if(!chooseReconnectValue?.ready||!chooseReconnectValue.targetOptions.includes("failed"))
         throw Error("Could not explicitly qualify the Route target change: "+JSON.stringify(chooseReconnectValue));
       await sleep(350);
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#fit")?.click(); true`
+      });
+      await sleep(500);
       const updaterInfo=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
@@ -1319,9 +1384,14 @@ try{
   if(!narrowBrand.present||narrowBrand.labelDisplay!=="none"||!narrowBrand.markVisible)
     throw Error("SKILL Studio brand did not compact cleanly on narrow screens: "+
       JSON.stringify(narrowBrand));
-  if(!afterImport.notificationText.some(message=>message.includes("两个示例 SKILL 已载入 skills/：27 个新文件"))||
+  if(!afterImport.notificationText.some(message=>
+       message.includes("示例项目已载入：skills/")&&
+       message.includes("lib/")&&message.includes("output/")&&
+       message.includes("新增 27 个文件"))||
      !afterImport.bodyText.includes("skills")||
-      !afterImport.bodyText.includes("establish-pdu-session")||
+     !afterImport.bodyText.includes("establish-pdu-session")||
+     !afterImport.bodyText.includes("lib/")||
+     !afterImport.bodyText.includes("output/")||
      !afterImport.bodyText.includes("procedure.yaml"))
     throw Error("Theia sample import into browser workspace failed: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3000));
   if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
