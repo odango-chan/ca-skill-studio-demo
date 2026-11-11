@@ -194,7 +194,11 @@ function currentLexemes(tokenId) {
 
 function addContextKeywords(root, context, spans) {
   if (!context || !root) return;
-  const structural = new Set(String(TOKEN_BY_ID.get("ca.keyword.structure")?.contexts?.[context] ?? "")
+  const contextEntries = TOKEN_BY_ID.get("ca.keyword.structure")?.contexts ?? [];
+  const contextText = contextEntries.find(entry =>
+    entry && typeof entry === "object" && Object.hasOwn(entry, context)
+  )?.[context] ?? "";
+  const structural = new Set(String(contextText)
     .split(",").map(value => value.trim()).filter(Boolean));
   const control = currentLexemes("ca.keyword.control");
   const condition = currentLexemes("ca.keyword.condition");
