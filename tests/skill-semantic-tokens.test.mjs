@@ -7,7 +7,7 @@ import {fileURLToPath,pathToFileURL} from "node:url";
 import {build} from "esbuild";
 import {standaloneSemanticTokenRules,semanticTokenDecorationClass,semanticTokenDecorationCss} from "../site/semantic-token-theme.mjs";
 
-const entry=fileURLToPath(new URL("../site/skill-semantic-tokens.mjs",import.meta.url));
+const entry=fileURLToPath(new URL("../language/semantic-tokens.mjs",import.meta.url));
 const scratchRoot=resolve(process.cwd(),".agent-tmp");
 mkdirSync(scratchRoot,{recursive:true});
 const scratch=await mkdtemp(join(scratchRoot,"skill-semantic-tokens-"));
