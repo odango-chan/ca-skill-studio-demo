@@ -44,7 +44,7 @@ function host(manifestOverride=null,existing=[]){
   };
   return {vscode,files,opened};
 }
-test("Sample creates both exact pinned owner SKILL packages beneath one skills root",async()=>{
+test("Sample creates both exact pinned owner SKILL packages in one Skill Compiler project root",async()=>{
   const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
   assert.equal(result.files,manifest.files.length);
   assert.equal(result.created,manifest.files.length);
@@ -54,17 +54,33 @@ test("Sample creates both exact pinned owner SKILL packages beneath one skills r
   assert.deepEqual(result.skills,["establish-pdu-session","establish-pdu-session-mas"]);
   assert.ok(result.workspaceUpdated);
   assert.equal(h.opened.length,1);
-  assert.equal(h.opened[0].folder.name,"skills");
-  assert.equal(result.root.path,"/global-storage/workspaces/skills");
+  assert.equal(h.opened[0].folder.name,"skill-studio-demo");
+  assert.equal(result.root.path,"/global-storage/workspaces/skill-studio-demo");
+  assert.equal(result.skillsRoot.path,result.root.path+"/skills");
+  assert.equal(result.libraryRoot.path,result.root.path+"/lib");
+  assert.equal(result.outputRoot.path,result.root.path+"/output");
+  assert.ok(h.files.has(result.procedures["establish-pdu-session"].path));
+  assert.ok(h.files.has(result.procedures["establish-pdu-session-mas"].path));
+  assert.ok(h.opened[0].folder.uri.path===result.root.path);
+  assert.equal(h.files.size,manifest.files.length,
+    "lib/ and output/ must never contain fabricated compiler inputs or outputs");
   for(const name of result.skills){
     const p=result.procedures[name].path;
     const text=new TextDecoder().decode(h.files.get(p));
     assert.match(text,/procedures:/);
-    assert.ok(h.files.has("/global-storage/workspaces/skills/"+name+"/SKILL.md"));
-    assert.ok(h.files.has("/global-storage/workspaces/skills/"+name+"/assurance/contract.yaml"));
+    assert.ok(h.files.has("/global-storage/workspaces/skill-studio-demo/skills/"+name+"/SKILL.md"));
+    assert.ok(h.files.has("/global-storage/workspaces/skill-studio-demo/skills/"+name+"/assurance/contract.yaml"));
   }
-  assert.ok(h.files.has("/global-storage/workspaces/skills/establish-pdu-session/scripts/build_n1n2_delivery.py"));
+  assert.ok(h.files.has("/global-storage/workspaces/skill-studio-demo/skills/establish-pdu-session/scripts/build_n1n2_delivery.py"));
   assert.equal(result.procedure.path,result.procedures["establish-pdu-session"].path);
+});
+test("New project keeps imported library and generated output empty and isolated",async()=>{
+  const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
+  for(const folder of [result.root,result.skillsRoot,result.libraryRoot,result.outputRoot])
+    assert.ok(h.vscode.workspace.fs.stat(folder));
+  assert.equal([...h.files.keys()].filter(path=>
+    path.startsWith(result.libraryRoot.path+"/")||path.startsWith(result.outputRoot.path+"/")).length,0);
+  assert.ok([...h.files.keys()].every(path=>path.startsWith(result.skillsRoot.path+"/")));
 });
 test("Repeated dual-SKILL import never overwrites user edits, including MAS",async()=>{
   const h=host(),base=uri("/extension"),storage=uri("/global-storage");
@@ -85,10 +101,18 @@ test("A user workspace named skills is not repurposed for the demo",async()=>{
   const userRoot={name:"skills",uri:uri("/user-project/skills")};
   const h=host(null,[userRoot]);
   const result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
-  assert.equal(result.root.path,"/global-storage/workspaces/skills");
+  assert.equal(result.root.path,"/global-storage/workspaces/skill-studio-demo");
+  assert.equal(result.skillsRoot.path,result.root.path+"/skills");
+  assert.equal(result.libraryRoot.path,result.root.path+"/lib");
+  assert.equal(result.outputRoot.path,result.root.path+"/output");
+  assert.ok(h.files.has(result.procedures["establish-pdu-session"].path));
+  assert.ok(h.files.has(result.procedures["establish-pdu-session-mas"].path));
+  assert.ok(h.opened[0].folder.uri.path===result.root.path);
+  assert.equal(h.files.size,manifest.files.length,
+    "lib/ and output/ must never contain fabricated compiler inputs or outputs");
   assert.equal(h.opened.length,1);
   assert.equal(h.opened[0].start,1);
-  assert.equal(h.opened[0].folder.name,"skills");
+  assert.equal(h.opened[0].folder.name,"skill-studio-demo");
   assert.equal(h.files.has("/user-project/skills/SKILL.md"),false);
 });
 test("Malformed, cross-package, traversing or duplicate manifests refuse writes",async()=>{
