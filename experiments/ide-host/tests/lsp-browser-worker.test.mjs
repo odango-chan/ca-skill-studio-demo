@@ -186,6 +186,10 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.equal(initialized.result.capabilities.referencesProvider,true);
     assert.equal(initialized.result.capabilities.hoverProvider,true);
     assert.equal(initialized.result.capabilities.documentSymbolProvider,true);
+    assert.equal(initialized.result.capabilities.semanticTokensProvider.full,true);
+    const semanticLegend=initialized.result.capabilities.semanticTokensProvider.legend;
+    assert.ok(semanticLegend.tokenTypes.includes("caReferenceOperation"));
+    assert.ok(semanticLegend.tokenTypes.includes("caKeywordControl"));
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
     const snapshot=samplePackageSnapshot();
@@ -213,6 +217,21 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     const schema=snapshot.documents.find(x=>
       x.relativePath==="schemas/selection-input.schema.yaml");
     assert.ok(procedure&&script&&schema);
+
+    // The native VS Code/Theia path must receive the same catalog-driven
+    // semantic identities through the actual LSP Worker, not just Monaco's
+    // standalone provider.
+    const semanticResult=await lspRequest(worker,23,"textDocument/semanticTokens/full",{
+      textDocument:{uri:procedure.uri}
+    });
+    assert.ok(Array.isArray(semanticResult.data)&&semanticResult.data.length>0);
+    assert.equal(semanticResult.data.length%5,0);
+    const emittedTypes=new Set();
+    for(let i=3;i<semanticResult.data.length;i+=5)emittedTypes.add(semanticResult.data[i]);
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caReferenceOperation")),
+      "Procedure call values are emitted as Operation references");
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caKeywordControl")),
+      "Procedure control keys are emitted as CA semantic tokens");
 
     const scriptNeedle="scripts/select_establishment_configuration.py";
     const definition=await lspRequest(worker,12,"textDocument/definition",{
