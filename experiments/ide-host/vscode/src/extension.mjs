@@ -227,8 +227,13 @@ export function activate(context){
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
     webviewOptions:{retainContextWhenHidden:true}
   }));
+  let exampleLoadPromise=null;
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
-    async()=>{
+    ()=>{
+      // The demo can auto-load just as someone clicks Load Example. Serialize
+      // both requests so the create-only loader never sees a false write race.
+      if(exampleLoadPromise)return exampleLoadPromise;
+      exampleLoadPromise=(async()=>{
       let stage="seed-example";
       try{
         const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri);
@@ -267,6 +272,8 @@ export function activate(context){
         await vscode.window.showErrorMessage(
           "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
       }
+      })().finally(()=>{exampleLoadPromise=null;});
+      return exampleLoadPromise;
     }));
   // The published browser-only workbench is a demo, not a blank IDE. Seed
   // the extension-owned example project on first launch; existing edited
