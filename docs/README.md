@@ -8,6 +8,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 2. [WORK](WORK.md) — **唯一当前实现与验收状态**
 3. [TRACEABILITY](TRACEABILITY.md) — Contract/设计 → 生产代码 → 测试 → 实际证据
 4. [Architecture](architecture/studio-boundaries.md) — ownership、Source authority
+5. [SKILL Project layout](architecture/skill-project-layout.md) — `skills/lib/output` 项目根、Compiler 集成边界
 5. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
 6. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
 7. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
@@ -29,6 +30,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | 主题 | Canonical |
 |---|---|
 | Owner / Authority / Source truth | [Architecture](architecture/studio-boundaries.md) |
+| Project 源码目录与未来 Compiler 适配 | [SKILL Project layout](architecture/skill-project-layout.md) |
 | 现有 UI 和 Source-backed 编辑契约 | [Workbench](design/authoring-workbench.md) |
 | Route 编辑 D3 设计 | [D3 Route Designer](design/route-designer.md) |
 | Phase Step 输入绑定与后续结构编辑 | [D4 Phase Designer](design/phase-designer.md) |
