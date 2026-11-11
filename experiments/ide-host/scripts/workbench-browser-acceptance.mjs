@@ -107,11 +107,15 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       const group=rows.slice(range.index+1,range.end).find(row=>
         row.visible&&row.text.includes('Assurance · 3/3 core'));
       if(group)return {rows,range};
-      const toggle=rows[range.index].togglePos;
+      const packageRow=rows[range.index];
+      const toggle=packageRow.togglePos;
       if(!toggle)throw Error('Package row has no visible expansion toggle: '+
-        JSON.stringify(rows[range.index]));
-      await click(toggle.x,toggle.y);
-      await sleep(450);
+        JSON.stringify(packageRow));
+      // A provider can publish the parent row before its children. Do not
+      // toggle an already-expanded Package closed while waiting for groups.
+      if(String(packageRow.toggleClass??'').includes('theia-mod-collapsed'))
+        await click(toggle.x,toggle.y);
+      await sleep(120);
     }
     throw Error('Package did not expand in the native TreeView: '+name+
       ' '+JSON.stringify(rows));
@@ -134,11 +138,16 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
         row.visible&&row.text.includes(filePath.split('/').at(-1))&&
         row.text.includes(filePath));
       if(file)return {rows,range,groupIndex,file};
-      const toggle=rows[groupIndex].togglePos;
+      const groupRow=rows[groupIndex];
+      const toggle=groupRow.togglePos;
       if(!toggle)throw Error('Assurance group has no visible expansion toggle: '+
-        JSON.stringify(rows[groupIndex]));
-      await click(toggle.x,toggle.y);
-      await sleep(450);
+        JSON.stringify(groupRow));
+      // TreeView children may arrive asynchronously after the expansion
+      // event. Only click while the row is still collapsed; otherwise wait
+      // for its real child rows instead of toggling it closed on each retry.
+      if(String(groupRow.toggleClass??'').includes('theia-mod-collapsed'))
+        await click(toggle.x,toggle.y);
+      await sleep(120);
     }
     throw Error('Package Assurance group did not reveal '+filePath+': '+name+
       ' '+JSON.stringify(rows));
@@ -822,12 +831,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify(evidenceTreeState));
   // Re-select the Phase Binding Node after activating the native Evidence
   // container; Theia may replace the active Webview context during the switch.
-  const evidenceBindingSelection=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Evidence binding Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
-  });
-  if(!evidenceBindingSelection.result?.value?.node)
-    throw Error('Could not re-select Phase binding Node for Evidence view');
+  // Resolve the active Procedure Webview again after activating the native
+  // Evidence container. The earlier graphContext can belong to a disposed or
+  // background CustomEditor when Theia has multiple procedure.yaml tabs.
+  const evidenceBindingSelection=await evalWebviewJS(
+    `(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Evidence binding Node is not in the active Procedure graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  );
+  if(!evidenceBindingSelection?.node)
+    throw Error('Could not re-select Phase binding Node in active Procedure Webview: '+
+      JSON.stringify(evidenceBindingSelection));
   await sleep(250);
   let phaseEvidenceText='';
   for(let i=0;i<100;i++){
