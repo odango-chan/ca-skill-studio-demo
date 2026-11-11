@@ -17,6 +17,7 @@ import {registerWorkbench} from "./workbench.mjs";
 import {registerContractEditor} from "./contract-editor.mjs";
 import {registerPredicateEditor} from "./predicate-editor.mjs";
 import {registerSchemaEditor} from "./schema-editor.mjs";
+import {registerPackageOverview} from "./package-overview.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
@@ -47,6 +48,8 @@ export function activate(context){
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
   registerSchemaEditor(vscode,context);
+  const packageOverview=registerPackageOverview(vscode,context,
+    ()=>workbench.getActiveDocument?.()??null);
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
@@ -56,6 +59,7 @@ export function activate(context){
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
+      void packageOverview.refresh();
       let wasActive=panel.active;
       const viewState=panel.onDidChangeViewState(()=>{
         const becameActive=panel.active&&!wasActive;wasActive=panel.active;
@@ -164,7 +168,13 @@ export function activate(context){
       });
       const incoming=webview.onDidReceiveMessage(async message=>{
         if(disposed||typeof message!=="object"||!message)return;
-        if(message.type==="selection"){if(panel.active)workbench.select(document,message);return;}
+        if(message.type==="selection"){
+          // A visible Procedure editor can lose active status when the user
+          // opens the Evidence sidebar. Its real graph selection still belongs
+          // to this editor; only hidden Webviews must be ignored.
+          if(panel.active||panel.visible)workbench.select(document,message);
+          return;
+        }
         if(message.type==="rendered"){
           if(message.version===document.version)console.log("STUDIO_OPEN_TIMING",JSON.stringify({version:document.version,hostToRenderMs:performance.now()-openedAt,projectionMs:message.projectionMs,layoutMs:message.layoutMs,cacheHit:message.cacheHit}));
           return;

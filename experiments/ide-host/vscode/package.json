@@ -39,10 +39,16 @@
     "onCustomEditor:skillStudio.predicatePreview",
     "onCommand:skillStudio.openPredicates",
     "onCustomEditor:skillStudio.schemaPreview",
-    "onCommand:skillStudio.openSchema"
+    "onCommand:skillStudio.openSchema",
+    "onCommand:skillStudio.refreshPackages",
+    "onView:skillStudio.packages"
   ],
   "contributes": {
     "commands": [
+      {
+        "command": "skillStudio.refreshPackages",
+        "title": "SKILL Studio: Refresh Packages"
+      },
       {
         "command": "skillStudio.openSchema",
         "title": "SKILL Studio: Open Schema Visual"
@@ -158,6 +164,11 @@
       ],
       "view/title": [
         {
+          "command": "skillStudio.refreshPackages",
+          "when": "view == skillStudio.packages",
+          "group": "navigation"
+        },
+        {
           "command": "skillStudio.loadExample",
           "when": "view == workbench.explorer.fileView",
           "group": "navigation"
@@ -174,6 +185,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "skillStudio.previewMarkdown",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.packageMarkdown",
+          "group": "navigation"
+        },
         {
           "command": "skillStudio.renameNode",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
@@ -365,6 +381,10 @@
     },
     "views": {
       "skillStudio": [
+        {
+          "id": "skillStudio.packages",
+          "name": "Packages"
+        },
         {
           "id": "skillStudio.inspection",
           "name": "Inspection / Inspector"

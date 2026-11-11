@@ -26,6 +26,13 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   const editorViews=new Set(plugin.contributes.customEditors.map(x=>x.viewType));
   for(const view of ["skillStudio.procedurePreview","skillStudio.contractPreview",
     "skillStudio.predicatePreview","skillStudio.schemaPreview"])assert.ok(editorViews.has(view),view);
+  const workbenchViews=new Set(plugin.contributes.views.skillStudio.map(x=>x.id));
+  assert.ok(workbenchViews.has("skillStudio.packages"),
+    "multi-Package Overview must live in the Skill Studio activity bar");
+  assert.ok(plugin.activationEvents.includes("onCommand:skillStudio.refreshPackages"));
+  assert.ok(plugin.activationEvents.includes("onView:skillStudio.packages"));
+  assert.ok(plugin.contributes.menus["view/title"].some(x=>
+    x.command==="skillStudio.refreshPackages"&&x.when==="view == skillStudio.packages"));
   assert.ok(plugin.contributes.customEditors.every(x=>x.priority==="default"));
   const associations=app.theia.frontend.config.preferences["workbench.editorAssociations"];
   assert.equal(associations["procedure.yaml"],"skillStudio.procedurePreview");

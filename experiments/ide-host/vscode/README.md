@@ -31,6 +31,11 @@ by the isolated build. From Explorer, `assurance/procedure.yaml` opens the
 Procedure Visual editor; `assurance/contract.yaml` opens the Contract Designer;
 `assurance/predicates.yaml` opens the Predicate Designer; and
 `schemas/*.schema.yaml` opens the read-only Schema Designer (Draft 2020-12).
+The Skill Studio activity bar also includes a **Packages** view. It discovers
+multiple SKILL roots in the current workspace, groups files by Definition,
+Assurance, Schemas, Scripts, References and Other, and opens the correct
+file-kind Designer. It is a bounded file inventory only; native Explorer
+remains the ordinary file tree and Package Audit remains the diagnostics owner.
 The Contract view is read-only and source-backed: it shows identity, entry,
 inputs, resources, predicates, planning, dependencies and failure semantics.
 Contract references can open their actual Procedure, Schema or Predicate

@@ -2257,5 +2257,5 @@ export function registerWorkbench(vscode,context){
     const rootInfo=packageRootForProcedure(vscode,doc);
     const state=rootInfo?languagePackages.get(rootInfo.uri.toString()):null;
     if(state){state.procedureDocument=doc;scheduleLanguagePackageRefresh(state);}
-  }};
+  },getActiveDocument(){return document;}};
 }

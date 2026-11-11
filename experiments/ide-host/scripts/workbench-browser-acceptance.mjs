@@ -9,6 +9,332 @@ if(pcfOutcomeStart<0)throw Error('Published PCF Outcome test anchor missing');
 const pcfOutcomeLine=publishedProcedure.slice(0,
   pcfOutcomeStart+pcfOutcomeHeader.indexOf('            FAILED:'))
   .split('\n').length;
+export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
+  if (!requireEditor) return {required:false};
+  const click=async(x,y,count=1)=>{
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1});
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,button:'none',buttons:0,pointerType:'mouse'});
+    await sleep(100);
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',buttons:1,clickCount:count,pointerType:'mouse'});
+    await sleep(100);
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:count,pointerType:'mouse'});
+    await sleep(180);
+  };
+  const invoke=async(id,...args)=>{
+    const expression="(async()=>{const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('Native command registry missing');"+
+      "const registry=c.get(key);window.__skillStudioLastCommandResult="+
+      "await registry.executeCommand("+JSON.stringify(id)+",..."+
+      JSON.stringify(args)+");return true;})()";
+    await evalJS(expression);
+    await sleep(320);
+  };
+  const activityState=await evalJS(
+    "(()=>{const tabs=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
+    ".filter(x=>x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&"+
+    "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&"+
+    "x.getBoundingClientRect().y<innerHeight);"+
+    "const active=tabs.find(x=>x.classList.contains('theia-mod-active'));"+
+    "const r=active?.getBoundingClientRect();"+
+    "const target=tabs.find(x=>x.textContent.trim()==='Skill Studio');"+
+    "const tr=target?.getBoundingClientRect();"+
+    "return {previous:active?{label:active.textContent.trim(),x:r.x+r.width/2,y:r.y+r.height/2}:null,"+
+    "activity:tr?{x:tr.x+tr.width/2,y:tr.y+tr.height/2}:null};})()");
+  const activity=activityState?.activity;
+  if(!activity)throw Error('Package Overview Activity Bar entry missing');
+  await click(activity.x,activity.y);
+  await sleep(400);
+  const readTreeRows=()=>evalJS(
+    "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
+    ".find(x=>x.textContent.trim().toLowerCase()==='packages'&&"+
+    "x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);"+
+    "const part=header?.closest('.part');"+
+    "return [...(part?.querySelectorAll('.theia-TreeNode')??[])].map((el,index)=>{"+
+    "const toggle=el.querySelector('.theia-ExpansionToggle');"+
+    "const content=el.querySelector('.theia-TreeNodeContent')??el;"+
+    "const r=(toggle??content).getBoundingClientRect();"+
+    "const cr=content.getBoundingClientRect();"+
+    "const hit=r.width>0&&r.height>0?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2):null;"+
+    "return {index,text:el.innerText.replace(/\\s+/g,' ').trim(),className:el.className,"+
+    "nodeIds:[...el.querySelectorAll('[data-node-id]')].map(x=>x.getAttribute('data-node-id')),"+
+    "hasToggle:Boolean(toggle),toggleClass:toggle?.className??null,"+
+    "hitWithinToggle:Boolean(toggle&&(hit===toggle||toggle.contains(hit))),"+
+    "hitTag:hit?.tagName??null,hitClass:typeof hit?.className==='string'?hit.className:'',"+
+    "togglePos:r.width>0&&r.height>0?{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}:null,"+
+    "contentPos:cr.width>0&&cr.height>0?{x:Math.round(cr.x+cr.width/2),y:Math.round(cr.y+cr.height/2)}:null,"+
+    "visible:cr.width>0&&cr.height>0&&cr.x<innerWidth&&cr.y<innerHeight&&cr.right>0&&cr.bottom>0};"+
+    "});})()");
+  // Resolve the exact live TreeView node after scrolling it into view. A
+  // stale centre point can hit an overlapping selected row instead of the
+  // requested Theia expansion toggle, particularly in the second Package.
+  async function clickVisibleToggle(row,label){
+    const id=row.nodeIds?.[0];
+    if(!id)throw Error('Native tree row has no node ID: '+label+' '+JSON.stringify(row));
+    const target=await evalJS(`(()=>{
+      const anchor=[...document.querySelectorAll('[data-node-id]')]
+        .find(el=>el.getAttribute('data-node-id')===${JSON.stringify(id)});
+      const toggle=anchor?.closest('.theia-TreeNode')?.querySelector('.theia-ExpansionToggle');
+      if(!toggle)return {found:false};
+      toggle.scrollIntoView({block:'center',inline:'nearest'});
+      const r=toggle.getBoundingClientRect();
+      const x=Math.round(r.x+r.width/2),y=Math.round(r.y+r.height/2);
+      const hit=document.elementFromPoint(x,y);
+      return {found:true,x,y,hitWithinToggle:hit===toggle||toggle.contains(hit),
+        hitClass:typeof hit?.className==='string'?hit.className:'',
+        toggleClass:toggle.className,nodeId:toggle.getAttribute('data-node-id'),
+        pointerEvents:getComputedStyle(toggle).pointerEvents};
+    })()`);
+    if(!target?.found||!target.hitWithinToggle)
+      throw Error('Native Package toggle is not reachable by mouse: '+label+' '+
+        JSON.stringify({target,row}));
+    await click(target.x,target.y);
+  }
+  let rows=[];
+  for(let attempt=0;attempt<100;attempt++){
+    rows=await readTreeRows();
+    if(rows.some(x=>x.visible&&x.text.includes('2 SKILL Packages'))&&
+       rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))break;
+    await sleep(100);
+  }
+  if(!rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))
+    throw Error('Package Overview did not populate after opening its native Activity Bar view: '+JSON.stringify(rows));
+  await invoke('skillStudio.refreshPackages');
+  const scan=await evalJS('window.__skillStudioLastCommandResult??null');
+  console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(scan));
+  await evalJS(`(()=>{
+    window.__packageOverviewClickEvents=[];
+    document.addEventListener('click',event=>{
+      const toggle=event.target?.closest?.('.theia-ExpansionToggle');
+      if(!toggle)return;
+      window.__packageOverviewClickEvents.push({
+        trusted:event.isTrusted,nodeId:toggle.getAttribute('data-node-id'),
+        className:toggle.className,defaultPrevented:event.defaultPrevented,
+        x:event.clientX,y:event.clientY
+      });
+      if(window.__packageOverviewClickEvents.length>60)
+        window.__packageOverviewClickEvents.shift();
+    },true);
+    return true;
+  })()`);
+  const expectedNames=['establish-pdu-session','establish-pdu-session-mas'];
+  const discovered=(scan?.packages??[]).map(x=>x.name).sort();
+  if(scan?.state!=='ready'||JSON.stringify(discovered)!==JSON.stringify(expectedNames.slice().sort()))
+    throw Error('Package Overview must discover both sample Skills in one Workspace: '+
+      JSON.stringify({scan,expectedNames}));
+  const classic=scan.packages.find(x=>x.name==='establish-pdu-session');
+  const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
+  if(classic?.fileCount!==22||classic?.corePresent!==3||
+     mas?.fileCount!==5||mas?.corePresent!==3)
+    throw Error('Two-SKILL inventory does not match the pinned sample manifest: '+
+      JSON.stringify({classic,mas}));
+  const packageNames=expectedNames;
+  const isPackageRow=row=>packageNames.some(name=>
+    row.text.includes(name+' · 3/3 core ·'));
+  const packageRange=(currentRows,name)=>{
+    const index=currentRows.findIndex(row=>row.visible&&
+      row.text.includes(name+' · 3/3 core ·'));
+    if(index<0)return null;
+    let end=currentRows.length;
+    for(let i=index+1;i<currentRows.length;i++)
+      if(currentRows[i].visible&&isPackageRow(currentRows[i])){end=i;break;}
+    return {index,end};
+  };
+  async function ensurePackageExpanded(name){
+    for(let attempt=0;attempt<24;attempt++){
+      rows=await readTreeRows();
+      const range=packageRange(rows,name);
+      if(!range){await sleep(120);continue;}
+      const group=rows.slice(range.index+1,range.end).find(row=>
+        row.visible&&row.text.includes('Assurance · 3/3 core'));
+      if(group)return {rows,range};
+      const packageRow=rows[range.index];
+      const toggle=packageRow.togglePos;
+      if(!toggle)throw Error('Package row has no visible expansion toggle: '+
+        JSON.stringify(packageRow));
+      // A provider can publish the parent row before its children. Do not
+      // toggle an already-expanded Package closed while waiting for groups.
+      if(String(packageRow.toggleClass??'').includes('theia-mod-collapsed'))
+        await clickVisibleToggle(packageRow,name);
+      await sleep(120);
+    }
+    throw Error('Package did not expand in the native TreeView: '+name+
+      ' '+JSON.stringify(rows));
+  }
+  async function ensureAssuranceFile(name,filePath){
+    for(let attempt=0;attempt<24;attempt++){
+      const expanded=await ensurePackageExpanded(name);
+      rows=expanded.rows;
+      const range=expanded.range;
+      const groupIndex=rows.findIndex((row,index)=>index>range.index&&index<range.end&&
+        row.visible&&row.text.includes('Assurance · 3/3 core'));
+      if(groupIndex<0){await sleep(120);continue;}
+      let nextGroup=range.end;
+      for(let i=groupIndex+1;i<range.end;i++){
+        if(rows[i].visible&&/^(Skill Definition|Assurance ·|Schemas ·|Scripts ·|References ·|Other ·)/.test(rows[i].text)){
+          nextGroup=i;break;
+        }
+      }
+      const file=rows.slice(groupIndex+1,nextGroup).find(row=>
+        row.visible&&row.text.includes(filePath.split('/').at(-1))&&
+        row.text.includes(filePath));
+      if(file)return {rows,range,groupIndex,file};
+      const groupRow=rows[groupIndex];
+      const toggle=groupRow.togglePos;
+      if(!toggle)throw Error('Assurance group has no visible expansion toggle: '+
+        JSON.stringify(groupRow));
+      // TreeView children may arrive asynchronously after the expansion
+      // event. If Theia reports the group expanded but publishes no children,
+      // force one collapse/re-expand cycle so the provider is asked again.
+      // Never repeatedly toggle a healthy expanded group while its rows load.
+      if(String(groupRow.toggleClass??'').includes('theia-mod-collapsed'))
+        await clickVisibleToggle(groupRow,name+' Assurance');
+      else if(attempt===0){
+        await clickVisibleToggle(groupRow,name+' Assurance recheck');
+        await sleep(120);
+        const collapsedRows=await readTreeRows();
+        const collapsedRange=packageRange(collapsedRows,name);
+        const current=collapsedRange?collapsedRows.slice(
+          collapsedRange.index+1,collapsedRange.end).find(row=>
+            row.visible&&row.text.includes('Assurance · 3/3 core')):null;
+        if(current&&String(current.toggleClass??'').includes('theia-mod-collapsed'))
+          await clickVisibleToggle(current,name+' Assurance retry');
+      }
+      await sleep(120);
+    }
+    const clickEvents=await evalJS('window.__packageOverviewClickEvents??[]');
+    throw Error('Package Assurance group did not reveal '+filePath+': '+name+
+      ' '+JSON.stringify({rows,clickEvents}));
+  }
+  async function readContractFrames(){
+    const tree=await command('Page.getFrameTree');
+    const frames=[];
+    const walk=node=>{
+      if(!node)return;
+      frames.push(node.frame);
+      for(const child of node.childFrames??[])walk(child);
+    };
+    walk(tree.frameTree);
+    const candidates=frames.filter(frame=>
+      frame.url.includes('/webview/index.html')||frame.url.includes('.webview.'));
+    const snapshots=[];
+    for(const frame of candidates){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'skill-studio-package-contract-acceptance',
+          grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+          expression:"(()=>({name:document.querySelector('#name')?.textContent?.trim()??'',"+
+            "title:document.title,heading:document.querySelector('h1')?.innerText??'',"+
+            "status:document.querySelector('#status')?.textContent??''}))()"
+        });
+        snapshots.push({frameUrl:frame.url,...(result.result?.value??{})});
+      }catch(error){snapshots.push({frameUrl:frame.url,error:String(error)});}
+    }
+    return snapshots;
+  }
+  async function openPackageContract(name){
+    const result=await ensureAssuranceFile(name,'assurance/contract.yaml');
+    const file=result.file;
+    if(!file.contentPos)
+      throw Error('Contract file row is not clickable: '+JSON.stringify(file));
+    await click(file.contentPos.x,file.contentPos.y);
+    let snapshot=null;
+    for(let attempt=0;attempt<35;attempt++){
+      const frames=await readContractFrames();
+      snapshot=frames.find(frame=>frame.name===name)??null;
+      if(snapshot)return {package:name,contractName:snapshot.name,
+        frameUrl:snapshot.frameUrl,fileRow:file.text,nodeIds:file.nodeIds};
+      await sleep(150);
+    }
+    // Some Theia TreeView hosts invoke TreeItem.command on the double-click
+    // open gesture. Retry once without changing the selected package context.
+    await click(file.contentPos.x,file.contentPos.y,2);
+    for(let attempt=0;attempt<35;attempt++){
+      const frames=await readContractFrames();
+      snapshot=frames.find(frame=>frame.name===name)??null;
+      if(snapshot)return {package:name,contractName:snapshot.name,
+        frameUrl:snapshot.frameUrl,fileRow:file.text,nodeIds:file.nodeIds};
+      await sleep(150);
+    }
+    throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Designer Source: '+
+      JSON.stringify({file,frames:await readContractFrames(),rows:await readTreeRows()}));
+  }
+  const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 10','Scripts · 5','References · 3'];
+  const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
+  const classicView=await ensurePackageExpanded('establish-pdu-session');
+  const classicRange=classicView.range;
+  const classicVisible=classicView.rows.slice(classicRange.index+1,classicRange.end)
+    .filter(row=>row.visible).map(row=>row.text);
+  for(const group of classicGroups)
+    if(!classicVisible.some(text=>text.includes(group)))
+      throw Error('Traditional 5GC Package is missing group '+group+': '+JSON.stringify(classicVisible));
+  const classicContract=await openPackageContract('establish-pdu-session');
+  const masView=await ensurePackageExpanded('establish-pdu-session-mas');
+  const masVisible=masView.rows.slice(masView.range.index+1,masView.range.end)
+    .filter(row=>row.visible).map(row=>row.text);
+  for(const group of masGroups)
+    if(!masVisible.some(text=>text.includes(group)))
+      throw Error('MAS Package is missing group '+group+': '+JSON.stringify(masVisible));
+  const masContract=await openPackageContract('establish-pdu-session-mas');
+  if(classicContract.contractName!=='establish-pdu-session'||
+     masContract.contractName!=='establish-pdu-session-mas'||
+     classicContract.contractName===masContract.contractName)
+    throw Error('Package file navigation did not preserve each exact Contract URI: '+
+      JSON.stringify({classicContract,masContract}));
+  await invoke('skillStudio.refreshPackages');
+  await invoke('skillStudio.refreshPackages');
+  const postExpansion=await evalJS('window.__skillStudioLastCommandResult??null');
+  if(!postExpansion?.treeReadsByKind||
+     postExpansion.treeReadsByKind.package<2||
+     postExpansion.treeReadsByKind.group<2)
+    throw Error('Both Package and Assurance children must be requested by Theia TreeView: '+
+      JSON.stringify({postExpansion,classicVisible,masVisible}));
+  const previous=activityState?.previous;
+  let restoredActivity=null;
+  if(previous&&previous.label!=='Skill Studio'){
+    restoredActivity=await evalJS(
+      "(()=>{const tabs=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
+      ".filter(x=>x.textContent.trim()==="+JSON.stringify(previous.label)+"&&"+
+      "x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&"+
+      "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&"+
+      "x.getBoundingClientRect().y<innerHeight);"+
+      "const el=tabs.sort((a,b)=>Math.abs(a.getBoundingClientRect().x+"+
+      "a.getBoundingClientRect().width/2-"+previous.x+")-"+
+      "Math.abs(b.getBoundingClientRect().x+b.getBoundingClientRect().width/2-"+previous.x+"))[0];"+
+      "const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,label:el.textContent.trim()}:null;})()");
+    if(restoredActivity){
+      await click(restoredActivity.x,restoredActivity.y);
+      await sleep(250);
+    }
+  }
+  const restored=await evalJS(
+    "(()=>[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
+    ".find(x=>x.classList.contains('theia-mod-active'))?.textContent.trim()??null)()");
+  if(previous&&previous.label!=='Skill Studio'&&restored!==previous.label)
+    throw Error('Package Overview did not restore the previous Activity Bar view: '+
+      JSON.stringify({previous,restored,restoredActivity}));
+  const evidence={
+    skills:[{
+      name:'establish-pdu-session',files:classic.fileCount,core:'3/3',
+      groups:classicGroups,contract:classicContract
+    },{
+      name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3',
+      groups:masGroups,contract:masContract
+    }],
+    treeVisible:true,scanState:scan.state,
+    treeReadsByKind:postExpansion.treeReadsByKind,
+    exactPackageUris:true,restoredActivity:restored
+  };
+  console.log('STUDIO_PACKAGE_OVERVIEW_TWO_SKILLS_CHROMIUM',JSON.stringify(evidence));
+  return {required:true,twoSkills:true,evidence};
+}
+
+
 export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
@@ -21,7 +347,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // below remain actual Chromium input; no host or TextDocument is mocked.
   async function invoke(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
-    try{await evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key),id=${JSON.stringify(id)};if(id==="navigator.reveal"){const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==="Symbol(OpenerService)");const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;if(!resource)throw Error("Procedure native resource missing");await registry.executeCommand(id,resource);}else await registry.executeCommand(id,...${JSON.stringify(args)});})()`);}
+    try{await evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key),id=${JSON.stringify(id)};if(id==="navigator.reveal"){const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==="Symbol(OpenerService)");const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;if(!resource)throw Error("Procedure native resource missing");await registry.executeCommand(id,resource);}else window.__skillStudioLastCommandResult=await registry.executeCommand(id,...${JSON.stringify(args)});})()`);}
     catch(error){throw Error("Native command "+id+": "+error.message);}
     await sleep(300);
   }
@@ -105,11 +431,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await click(target.x,target.y);await sleep(250);
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
-  const activity=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].find(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  const activity=await evalJS(`(()=>{const candidates=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].filter(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const el=candidates.find(x=>x.classList.contains('lm-mod-current'))??candidates[0];const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,active:el.classList.contains('lm-mod-current')}:null;})()`);
   if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
-  await click(activity.x,activity.y);await sleep(500);
+  // C4 may already have opened this Activity Bar container. Clicking an
+  // active Theia viewlet toggles it closed, so only open it when inactive.
+  if(!activity.active){await click(activity.x,activity.y);await sleep(500);}
   const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
-  for(const name of ['Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
+  for(const name of ['Packages','Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
   const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);el?.scrollIntoView({block:'center'});const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
   console.log('STUDIO_PROBLEMS_HEADERS',JSON.stringify(problemHeaderDiagnostics));
@@ -147,6 +475,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(stillPreview)throw Error("Double-click did not pin native preview tab");
   const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
+  // The preview/pin probe can leave both preview and pinned editors alive.
+  // Close that pair and reopen one pinned Procedure before Source/Evidence
+  // checks so the active Webview frame and its selection are unambiguous.
+  await invoke('core.close.all.main.tabs');
+  await invoke('workbench.files.action.focusFilesExplorer');
+  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  if(!file)throw Error('Procedure file disappeared after closing preview/pinned tabs');
+  await click(file.x,file.y,2);
+  let singlePinned=null;
+  for(let attempt=0;attempt<100&&!singlePinned;attempt++){
+    singlePinned=await graph('ue-requested-pdu-session-establishment');
+    if(!singlePinned)await sleep(100);
+  }
+  if(!singlePinned)throw Error('Could not reopen one pinned 5GC Procedure editor');
+  const remainingProcedureTabs=await evalJS(`[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>
+    tab.textContent.trim()==='procedure.yaml'&&tab.getBoundingClientRect().width>0).length`);
+  if(remainingProcedureTabs!==1)
+    throw Error('Procedure Source/Evidence acceptance requires one unambiguous editor tab: '+
+      JSON.stringify({remainingProcedureTabs,singlePinned}));
   // Theia CustomEditor tabs do not necessarily activate a VS Code TextEditor.
   // Package Audit consumes the active Procedure TextDocument, so open Source
   // from this freshly reopened CustomEditor only now (after the Explorer path).
@@ -194,80 +541,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await sleep(100);
   }
   if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not render within 10s: '+audit.slice(-1000));
-  // The online sample is a two-SKILL workspace. Prove the MAS sibling can be
-  // expanded and its own Procedure opened through the native Explorer, then
-  // restore the conventional 5GC Procedure for the remaining regression suite.
-  await invoke('workbench.files.action.focusFilesExplorer');
-  const explorerRow=async(label,which='last')=>evalJS(
-    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length};})()"
-  );
-  let masFolder=null;
-  for(let attempt=0;attempt<60;attempt++){
-    masFolder=await explorerRow('establish-pdu-session-mas');
-    if(masFolder?.found)break;
-    await evalJS("(()=>{for(const root of document.querySelectorAll('.theia-Tree')){let el=root;while(el){if(el.scrollHeight>el.clientHeight+4){el.scrollTop=el.scrollHeight;break;}el=el.parentElement;}}return true;})()");
-    await sleep(100);
-  }
-  if(!masFolder?.found)throw Error('MAS Skill folder missing from native Explorer: '+JSON.stringify(masFolder));
-  let assuranceRows=await explorerRow('assurance');
-  if((assuranceRows?.count??0)<2){
-    await click(masFolder.x,masFolder.y);
-    for(let attempt=0;attempt<60;attempt++){
-      assuranceRows=await explorerRow('assurance');
-      if((assuranceRows?.count??0)>=2)break;
-      await sleep(100);
-    }
-  }
-  if((assuranceRows?.count??0)<2)throw Error('MAS assurance folder did not expand in native Explorer: '+JSON.stringify({masFolder,assuranceRows}));
-  let procedureRows=await explorerRow('procedure.yaml');
-  if((procedureRows?.count??0)<2){
-    const masAssurance=await explorerRow('assurance','last');
-    if(!masAssurance?.found)throw Error('MAS assurance row missing after folder expansion');
-    await click(masAssurance.x,masAssurance.y);
-    for(let attempt=0;attempt<60;attempt++){
-      procedureRows=await explorerRow('procedure.yaml');
-      if((procedureRows?.count??0)>=2)break;
-      await sleep(100);
-    }
-  }
-  if((procedureRows?.count??0)<2)throw Error('Explorer did not expose both Skill procedure.yaml files: '+JSON.stringify(procedureRows));
-  const masProcedure=await explorerRow('procedure.yaml','last');
-  if(!masProcedure?.found)throw Error('MAS procedure.yaml row missing from Explorer');
-  await click(masProcedure.x,masProcedure.y);
-  let masProcedureGraph=null;
-  for(let attempt=0;attempt<100;attempt++){
-    masProcedureGraph=await graph('establish-session');
-    if(masProcedureGraph)break;
-    await sleep(100);
-  }
-  const masResourcePaths=await evalJS("(async()=>{const c=window.theia.container;const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').map(w=>w.resource?.path.toString()??'').filter(p=>p.includes('/establish-pdu-session-mas/'))??[];})()");
-  if(!masProcedureGraph||masProcedureGraph.procedureValue!=='establish-session'||!masProcedureGraph.bodyText?.includes('verify-eligible')||!masProcedureGraph.bodyText?.includes('validate-subscription')||!masResourcePaths.some(p=>p.endsWith('/establish-pdu-session-mas/assurance/procedure.yaml')))
-    throw Error('MAS Procedure did not open from native Explorer: '+JSON.stringify({masFolder,assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths}));
-  // Dispose both test editors before resuming the older regression suite.
-  // Several existing native-command probes intentionally expect one active
-  // Procedure resource, so keep the MAS proof isolated from those probes.
-  await invoke('core.close.all.main.tabs');
-  await invoke('workbench.files.action.focusFilesExplorer');
-  const conventionalProcedure=await explorerRow('procedure.yaml','first');
-  if(!conventionalProcedure?.found)throw Error('Conventional 5GC procedure.yaml row missing after MAS open');
-  await click(conventionalProcedure.x,conventionalProcedure.y);
-  let conventionalGraph=null;
-  for(let attempt=0;attempt<100;attempt++){
-    conventionalGraph=await graph('ue-requested-pdu-session-establishment');
-    if(conventionalGraph)break;
-    await sleep(100);
-  }
-  if(!conventionalGraph)throw Error('Could not restore conventional 5GC Procedure after MAS Explorer acceptance');
-  await click(conventionalProcedure.x,conventionalProcedure.y,2);
-  await sleep(250);
-  conventionalGraph=await graph('ue-requested-pdu-session-establishment');
-  if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
-  const dualSkillExplorer={
-    root:'skills',conventionalFolder:'establish-pdu-session',masFolder,
-    assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths,
-    conventionalProcedure,conventionalGraph
-  };
-  console.log('STUDIO_DUAL_SKILL_EXPLORER_CHROMIUM',JSON.stringify(dualSkillExplorer));
   // Guard the canvas controls that were present in Classic Studio but were
   // previously omitted from the Theia CustomEditor migration.
   const canvasToolbarEvidence=await evalWebviewJS(`(()=> {
@@ -581,7 +854,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
   // Resolve the Evidence part inside the exact Skill Studio view container.
   // Avoid matching an unrelated tab/label when Theia has multiple split panels.
-  const evidenceHeader=await evalJS(`(()=>{
+  const readEvidenceHeader=()=>evalJS(`(()=>{
     const container=[...document.querySelectorAll('.theia-view-container')]
       .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
     const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
@@ -593,15 +866,36 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const r=header.getBoundingClientRect(),part=header.closest('.part');
     const rootPresent=[...(part?.querySelectorAll('.theia-TreeNode')??[])].some(x=>
       x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
-    return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,
-      collapsed:part?.classList.contains('collapsed')??false,
+    // The last panel header can be partially covered by the status bar.
+    // Pick an on-screen, hit-tested point instead of assuming its centre is clickable.
+    const xs=[r.x+Math.min(12,r.width/4),r.x+r.width/2,r.right-Math.min(12,r.width/4)];
+    const ys=[r.y+Math.min(4,r.height/3),r.y+r.height/2,r.bottom-Math.min(4,r.height/3)];
+    const points=ys.flatMap(y=>xs.map(x=>({x,y})));
+    const point=points.find(({x,y})=>x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&
+      ((hit)=>hit===header||header.contains(hit))(document.elementFromPoint(x,y)));
+    return {found:true,x:point?.x??null,y:point?.y??null,
+      hitWithinHeader:!!point,collapsed:part?.classList.contains('collapsed')??false,
       rootPresent,partClass:part?.className??'',headerText:header.textContent.trim(),
-      containerId:container.id};
+      containerId:container.id,rect:{x:r.x,y:r.y,width:r.width,height:r.height},
+      viewportHeight:innerHeight};
   })()`);
-  if(!evidenceHeader?.found)
-    throw Error('Native Evidence view header is missing from Skill Studio container: '+
+  let evidenceHeader=null;
+  for(let attempt=0;attempt<12;attempt++){
+    evidenceHeader=await readEvidenceHeader();
+    if(!evidenceHeader?.found)
+      throw Error('Native Evidence view header is missing from Skill Studio container: '+
+        JSON.stringify(evidenceHeader));
+    if(!evidenceHeader.collapsed)break;
+    if(!evidenceHeader.hitWithinHeader)
+      throw Error('Native Evidence header is obscured and cannot be expanded by mouse: '+
+        JSON.stringify(evidenceHeader));
+    await click(evidenceHeader.x,evidenceHeader.y);
+    await sleep(200);
+  }
+  evidenceHeader=await readEvidenceHeader();
+  if(evidenceHeader?.collapsed)
+    throw Error('Native Evidence header stayed collapsed after trusted mouse clicks: '+
       JSON.stringify(evidenceHeader));
-  if(evidenceHeader.collapsed){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
   await invoke('skillStudio.auditPackage');
   // auditPackage publishes the refreshed owner-file snapshot. Its source
   // projection refreshes Evidence when that snapshot changes; wait for the
@@ -633,13 +927,28 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify(evidenceTreeState));
   // Re-select the Phase Binding Node after activating the native Evidence
   // container; Theia may replace the active Webview context during the switch.
-  const evidenceBindingSelection=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Evidence binding Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
-  });
-  if(!evidenceBindingSelection.result?.value?.node)
-    throw Error('Could not re-select Phase binding Node for Evidence view');
-  await sleep(250);
+  // Resolve the active Procedure Webview again after activating the native
+  // Evidence container. The earlier graphContext can belong to a disposed or
+  // background CustomEditor when Theia has multiple procedure.yaml tabs.
+  const evidenceNodeTarget=await evalWebviewJS(
+    `(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Evidence binding Node is not in the active Procedure graph');const r=node.getBoundingClientRect(),frame=window.frameElement?.getBoundingClientRect();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value,nodeRect:{x:r.x,y:r.y,width:r.width,height:r.height},frameRect:frame?{x:frame.x,y:frame.y,width:frame.width,height:frame.height}:null,point:frame?{x:frame.x+r.x+r.width/2,y:frame.y+r.y+r.height/2}:null};})()`
+  );
+  if(!evidenceNodeTarget?.node||!evidenceNodeTarget.point)
+    throw Error('Could not resolve the active 5GC Phase Binding node hit target: '+
+      JSON.stringify(evidenceNodeTarget));
+  // Use a real trusted Chromium click in the visible editor instead of
+  // HTMLElement.click(), so React Flow and the host selection bridge receive
+  // the same pointer/click sequence as a user action.
+  await command('Input.dispatchMouseEvent',{type:'mouseMoved',
+    x:evidenceNodeTarget.point.x,y:evidenceNodeTarget.point.y});
+  await command('Input.dispatchMouseEvent',{type:'mousePressed',
+    x:evidenceNodeTarget.point.x,y:evidenceNodeTarget.point.y,
+    button:'left',buttons:1,clickCount:1});
+  await command('Input.dispatchMouseEvent',{type:'mouseReleased',
+    x:evidenceNodeTarget.point.x,y:evidenceNodeTarget.point.y,
+    button:'left',buttons:0,clickCount:1});
+  console.log('STUDIO_EVIDENCE_NODE_TRUSTED_CLICK',JSON.stringify(evidenceNodeTarget));
+  await sleep(350);
   let phaseEvidenceText='';
   for(let i=0;i<100;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
@@ -664,9 +973,16 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       }).filter(row=>row.text.includes('Producer / Consumer dataflow')&&
         row.content?.getBoundingClientRect().height>0);
       const row=rows[0];
-      row?.content?.scrollIntoView({block:'center',inline:'nearest'});
-      const r=row?.content?.getBoundingClientRect();
-      const toggle=row?.node.querySelector('.theia-ExpansionToggle');
+      if(!row?.content)return {found:false,candidateCount:rows.length,
+        labels:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
+          const child=[...node.children].find(x=>x.classList?.contains('theia-TreeNodeContent'));
+          return child?.innerText?.trim()??'';
+        }).slice(-24),partClass:part?.className??''};
+      row.content.scrollIntoView({block:'center',inline:'nearest'});
+      const r=row.content.getBoundingClientRect();
+      if(!r.width||!r.height)return {found:false,candidateCount:rows.length,
+        rowText:row.text,partClass:part?.className??''};
+      const toggle=row.node.querySelector('.theia-ExpansionToggle');
       const tr=toggle?.getBoundingClientRect();
       const x=tr?tr.x+tr.width/2:r.x+12;
       const y=tr?tr.y+tr.height/2:r.y+r.height/2;
@@ -696,7 +1012,35 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         };
     })()`);
     if(evidenceRows?.found)dataflowTreeRow=evidenceRows;
-    else await sleep(100);
+    else {
+      // The Evidence root can be expanded while its Phase group remains
+      // collapsed. Expand that actual parent row before waiting for the
+      // nested Producer / Consumer dataflow item; do not mistake hidden
+      // descendants for a provider-refresh race.
+      const phaseGroup=await evalJS(`(()=>{
+        const container=[...document.querySelectorAll('.theia-view-container')]
+          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+          .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+        const part=header?.closest('.part');
+        const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
+          const content=[...node.children].find(child=>
+            child.classList?.contains('theia-TreeNodeContent'));
+          return content?.innerText?.replace(/\\s+/g,' ').trim()
+            .includes('await-initial-resources · postconditions');
+        });
+        const toggle=row?.querySelector('.theia-ExpansionToggle');
+        const r=toggle?.getBoundingClientRect();
+        return toggle&&r?.width&&r?.height&&
+          toggle.classList.contains('theia-mod-collapsed')
+          ?{x:r.x+r.width/2,y:r.y+r.height/2,label:row.innerText.trim()}
+          :null;
+      })()`);
+      if(phaseGroup){
+        await click(phaseGroup.x,phaseGroup.y);
+        await sleep(120);
+      }else await sleep(100);
+    }
   }
   if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after scoped readiness wait: '+
     JSON.stringify({evidenceHeader,evidenceTreeState,evidenceRows,
@@ -1302,16 +1646,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await command('Input.dispatchKeyEvent',{type:'keyUp',...event});
   };
   const beforeOutcomeFixture=await graph();
+  // The LSP regression intentionally opens native Python Source. Re-select
+  // the exact active Procedure's Source before the Outcome line/Undo probe;
+  // never pick the first Monaco editor merely because it is visible.
+  await evalWebviewJS(`document.querySelector("#openSource")?.click();true`);
+  await sleep(350);
   const nativeEditor=await evalJS(`(()=>{
     const editors=[...document.querySelectorAll('.monaco-editor')];
     const chosen=editors.map((node,index)=>{
       const rect=node.getBoundingClientRect();
-      return {index,x:rect.x,y:rect.y,width:rect.width,height:rect.height};
+      const text=node.querySelector('.view-lines')?.innerText??'';
+      return {index,x:rect.x,y:rect.y,width:rect.width,height:rect.height,text};
     }).find(rect=>rect.width>80&&rect.height>100&&rect.x>=0&&rect.y>=0&&
-      rect.x+rect.width/2<innerWidth&&rect.y+rect.height/2<innerHeight);
-    return chosen??null;
+      rect.x+rect.width/2<innerWidth&&rect.y+rect.height/2<innerHeight&&
+      rect.text.includes('ue-requested-pdu-session-establishment'));
+    return chosen?{index:chosen.index,x:chosen.x,y:chosen.y,
+      width:chosen.width,height:chosen.height,preview:chosen.text.slice(0,500)}:null;
   })()`);
-  if(!nativeEditor)throw Error('No native Monaco Source editor for Outcome acceptance');
+  if(!nativeEditor)throw Error('Exact 5GC Procedure YAML Source editor was not activated for Outcome acceptance: '+
+    JSON.stringify(await evalJS(`({tabs:[...document.querySelectorAll('.lm-TabBar-tab')].map(x=>({text:x.textContent.trim(),className:x.className})),editors:[...document.querySelectorAll('.monaco-editor')].map((node,index)=>({index,text:node.querySelector('.view-lines')?.innerText?.slice(0,300)??'',rect:(()=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))})`)));
   await click(nativeEditor.x+Math.min(90,nativeEditor.width/2),
     nativeEditor.y+Math.min(24,nativeEditor.height/2));
   await key('g','KeyG',2,71);await sleep(200);
@@ -1727,6 +2080,106 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       }
     }
   }
+  // Run dual-Skill Explorer acceptance last. Opening MAS switches the active
+  // Procedure CustomEditor; running it earlier can stale later 5GC Inspector
+  // selections even after the conventional editor has been restored.
+  await invoke('workbench.files.action.focusFilesExplorer');
+  const explorerRow=async(label,which='last')=>evalJS(
+    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();const toggle=row.node.querySelector('.theia-ExpansionToggle');const tr=toggle?.getBoundingClientRect();const tx=tr?tr.x+tr.width/2:null,ty=tr?tr.y+tr.height/2:null;const hit=tr?document.elementFromPoint(tx,ty):null;return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length,toggleX:tx,toggleY:ty,toggleHit:!!toggle&&(hit===toggle||toggle.contains(hit)),toggleClass:toggle?.className??null};})()"
+  );
+  let masFolder=null;
+  for(let attempt=0;attempt<60;attempt++){
+    masFolder=await explorerRow('establish-pdu-session-mas');
+    if(masFolder?.found)break;
+    await evalJS("(()=>{for(const root of document.querySelectorAll('.theia-Tree')){let el=root;while(el){if(el.scrollHeight>el.clientHeight+4){el.scrollTop=el.scrollHeight;break;}el=el.parentElement;}}return true;})()");
+    await sleep(100);
+  }
+  if(!masFolder?.found)throw Error('MAS Skill folder missing from native Explorer: '+JSON.stringify(masFolder));
+  let assuranceRows=await explorerRow('assurance');
+  if((assuranceRows?.count??0)<2){
+    // Theia Explorer can expand a directory from its row gesture even when
+    // its arrow receives a click without changing the tree model. Exercise
+    // that normal interaction first, then retry the arrow only if still collapsed.
+    await click(masFolder.x,masFolder.y);
+    for(let attempt=0;attempt<30;attempt++){
+      assuranceRows=await explorerRow('assurance');
+      if((assuranceRows?.count??0)>=2)break;
+      await sleep(100);
+    }
+    if((assuranceRows?.count??0)<2){
+      const current=await explorerRow('establish-pdu-session-mas');
+      if(current?.toggleHit&&
+         String(current.toggleClass).includes('theia-mod-collapsed')){
+        await click(current.toggleX,current.toggleY);
+        for(let attempt=0;attempt<30;attempt++){
+          assuranceRows=await explorerRow('assurance');
+          if((assuranceRows?.count??0)>=2)break;
+          await sleep(100);
+        }
+      }
+    }
+  }
+  if((assuranceRows?.count??0)<2)throw Error('MAS assurance folder did not expand in native Explorer: '+JSON.stringify({masFolder,assuranceRows}));
+  let procedureRows=await explorerRow('procedure.yaml');
+  if((procedureRows?.count??0)<2){
+    const masAssurance=await explorerRow('assurance','last');
+    if(!masAssurance?.found)throw Error('MAS assurance row missing after folder expansion');
+    await click(masAssurance.x,masAssurance.y);
+    for(let attempt=0;attempt<30;attempt++){
+      procedureRows=await explorerRow('procedure.yaml');
+      if((procedureRows?.count??0)>=2)break;
+      await sleep(100);
+    }
+    if((procedureRows?.count??0)<2){
+      const current=await explorerRow('assurance','last');
+      if(current?.toggleHit&&
+         String(current.toggleClass).includes('theia-mod-collapsed')){
+        await click(current.toggleX,current.toggleY);
+        for(let attempt=0;attempt<30;attempt++){
+          procedureRows=await explorerRow('procedure.yaml');
+          if((procedureRows?.count??0)>=2)break;
+          await sleep(100);
+        }
+      }
+    }
+  }
+  if((procedureRows?.count??0)<2)throw Error('Explorer did not expose both Skill procedure.yaml files: '+JSON.stringify(procedureRows));
+  const masProcedure=await explorerRow('procedure.yaml','last');
+  if(!masProcedure?.found)throw Error('MAS procedure.yaml row missing from Explorer');
+  await click(masProcedure.x,masProcedure.y);
+  let masProcedureGraph=null;
+  for(let attempt=0;attempt<100;attempt++){
+    masProcedureGraph=await graph('establish-session');
+    if(masProcedureGraph)break;
+    await sleep(100);
+  }
+  const masResourcePaths=await evalJS("(async()=>{const c=window.theia.container;const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').map(w=>w.resource?.path.toString()??'').filter(p=>p.includes('/establish-pdu-session-mas/'))??[];})()");
+  if(!masProcedureGraph||masProcedureGraph.procedureValue!=='establish-session'||!masProcedureGraph.bodyText?.includes('verify-eligible')||!masProcedureGraph.bodyText?.includes('validate-subscription')||!masResourcePaths.some(p=>p.endsWith('/establish-pdu-session-mas/assurance/procedure.yaml')))
+    throw Error('MAS Procedure did not open from native Explorer: '+JSON.stringify({masFolder,assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths}));
+  // Keep the Explorer proof isolated, then restore the conventional Procedure
+  // so the final browser session remains on the primary example.
+  await invoke('core.close.all.main.tabs');
+  await invoke('workbench.files.action.focusFilesExplorer');
+  const conventionalProcedure=await explorerRow('procedure.yaml','first');
+  if(!conventionalProcedure?.found)throw Error('Conventional 5GC procedure.yaml row missing after MAS open');
+  await click(conventionalProcedure.x,conventionalProcedure.y);
+  let conventionalGraph=null;
+  for(let attempt=0;attempt<100;attempt++){
+    conventionalGraph=await graph('ue-requested-pdu-session-establishment');
+    if(conventionalGraph)break;
+    await sleep(100);
+  }
+  if(!conventionalGraph)throw Error('Could not restore conventional 5GC Procedure after MAS Explorer acceptance');
+  await click(conventionalProcedure.x,conventionalProcedure.y,2);
+  await sleep(250);
+  conventionalGraph=await graph('ue-requested-pdu-session-establishment');
+  if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
+  const dualSkillExplorer={
+    root:'skills',conventionalFolder:'establish-pdu-session',masFolder,
+    assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths,
+    conventionalProcedure,conventionalGraph
+  };
+  console.log('STUDIO_DUAL_SKILL_EXPLORER_CHROMIUM',JSON.stringify(dualSkillExplorer));
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
   return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,dualSkillExplorer,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference,phaseRoute,phaseOutcome,workerFailureEvidence,recoveryEvidence};
