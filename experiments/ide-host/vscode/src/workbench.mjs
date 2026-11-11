@@ -37,7 +37,7 @@ export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
-  const providers=new Map(),sessions=new Map(),selections=new Map();
+  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2243,10 +2243,27 @@ export function registerWorkbench(vscode,context){
       }
     }),
     vscode.window.onDidChangeActiveTextEditor(editor=>{if(isProcedurePath(editor?.document.uri.path)){update(editor.document);scheduleAudit();}}));
+  const toggleMarkdownState=state=>{
+    state.singlePane=!state.singlePane;
+    state.panel.reveal(state.singlePane?vscode.ViewColumn.One:vscode.ViewColumn.Two);
+    void state.panel.webview.postMessage({type:'layoutState',singlePane:state.singlePane});
+  };
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.previewMarkdown',async uri=>{
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
+    const key=uri.toString();
+    // Source is always the authoritative native editor in column one.
+    // The read-only Webview is a paired second-column view of the same URI.
+    const sourceEditor=await vscode.window.showTextDocument(doc,{
+      viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:true
+    });
+    const existing=markdownPanels.get(key);
+    if(existing){
+      existing.editor=sourceEditor;
+      existing.panel.reveal(existing.singlePane?vscode.ViewColumn.One:vscode.ViewColumn.Two);
+      return existing.panel;
+    }
     const rootMarker='/references/';
     const referenceIndex=uri.path.lastIndexOf(rootMarker);
     const packageRootPath=uri.path.endsWith('/SKILL.md')
@@ -2260,7 +2277,7 @@ export function registerWorkbench(vscode,context){
       const currentDir=uri.path.slice(0,uri.path.lastIndexOf('/'));
       if(currentDir!==rootPath&&!currentDir.startsWith(rootPath+'/'))return null;
       const relativeDir=currentDir.slice(rootPath.length).split('/').filter(Boolean).join('/');
-      const segments=relativeDir?relativeDir.split('/'):[];
+      const segments=relativeDir?relativeDir.split('/').filter(Boolean):[];
       for(const part of rawPath.split('/')){
         if(!part||part==='.')continue;
         if(part==='..'){if(!segments.length)return null;segments.pop();continue;}
@@ -2301,36 +2318,83 @@ export function registerWorkbench(vscode,context){
     globalThis.crypto.getRandomValues(random);
     const nonce=[...random].map(value=>value.toString(16).padStart(2,'0')).join('');
     const panel=vscode.window.createWebviewPanel(
-      'skillStudio.markdown','Preview · '+uri.path.split('/').at(-1),
-      vscode.ViewColumn.Beside,{enableScripts:true}
+      'skillStudio.markdown','Markdown · '+uri.path.split('/').at(-1),
+      vscode.ViewColumn.Two,{enableScripts:true,retainContextWhenHidden:true}
     );
     const webview=panel.webview;
+    const state={panel,editor:sourceEditor,singlePane:false};
+    markdownPanels.set(key,state);
     const stylesheet=vscode.Uri.joinPath(context.extensionUri,'media','markdown-preview.css');
     const stylesheetHref=staticPreviewResourceUrl(
       webview.asWebviewUri(stylesheet),context.extensionUri);
-    // Render only source-verified package links. Resource loading stays scoped
-    // to the packaged stylesheet; only the nonce-protected click bridge runs.
     const csp="default-src 'none'; base-uri 'none'; form-action 'none'; "+
       "style-src "+webview.cspSource+"; script-src 'nonce-"+nonce+"'; "+
       "img-src 'none'; connect-src 'none';";
     const attr=value=>String(value).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-    const render=()=>{
+    const rendered=()=> {
       const preview=renderMarkdown(doc.getText(),{
         localLinks:Boolean(rootPath),localFiles,relativeDir
       });
-      webview.html='<!doctype html><html lang="zh"><head><meta charset="utf-8">'+
-        '<meta name="viewport" content="width=device-width, initial-scale=1">'+
-        '<meta http-equiv="Content-Security-Policy" content="'+attr(csp)+'">'+
-        '<link rel="stylesheet" href="'+attr(stylesheetHref)+'"></head>'+
-        '<body class="skill-studio-markdown-document"><article class="markdown-preview">'+
-        (preview.available?preview.html:'<p>预览不可用，请使用源码编辑器。</p>')+
-        '</article><script nonce="'+nonce+'">(()=>{const api=acquireVsCodeApi();'+
-        'document.addEventListener("click",event=>{const target=event.target;'+
-        'const link=target instanceof Element?target.closest("a[data-local-path]"):null;'+
-        'if(!link)return;event.preventDefault();api.postMessage({type:"openPackageFile",'+
-        'path:link.dataset.localPath});});})();</script></body></html>';
+      return preview.available?preview.html:'<p data-source-line="0">预览不可用，请使用源码编辑器。</p>';
     };
+    let latestHtml=rendered(),webviewReady=false,renderTimer=null,suppressEditorScroll=false,
+      suppressEditorTimer=null,pendingSourceLine=null,lastSourceLine=-1;
+    const postPreview=()=>{
+      latestHtml=rendered();
+      if(webviewReady)void webview.postMessage({type:'updatePreview',html:latestHtml});
+    };
+    const script=
+      '<script nonce="'+nonce+'">(()=>{'+
+      'const api=acquireVsCodeApi(),article=document.querySelector("article.markdown-preview"),'+
+      'layoutButton=document.querySelector("[data-action=toggle-layout]");'+
+      'let suppressScroll=false,scrollFrame=0,lastSentLine=-1;'+
+      'const sourceBlocks=()=>Array.from(article.querySelectorAll("[data-source-line]"));'+
+      'const lineOf=element=>Number(element?.getAttribute("data-source-line"));'+
+      'const blockForLine=line=>{let chosen=null;for(const element of sourceBlocks()){const value=lineOf(element);if(value<=line)chosen=element;else if(value>line)break;}return chosen??sourceBlocks()[0]??null;};'+
+      'const visibleAnchor=()=>{for(const element of sourceBlocks()){const rect=element.getBoundingClientRect();if(rect.bottom>28)return {line:lineOf(element),top:rect.top};}return null;};'+
+      'const scrollToLine=line=>{const target=blockForLine(Number(line));if(!target)return;suppressScroll=true;window.scrollTo(0,Math.max(0,window.scrollY+target.getBoundingClientRect().top-28));requestAnimationFrame(()=>{suppressScroll=false;});};'+
+      'const updateHtml=html=>{const anchor=visibleAnchor(),oldScroll=window.scrollY;article.innerHTML=html;if(anchor){const target=blockForLine(anchor.line);if(target)window.scrollTo(0,Math.max(0,oldScroll+target.getBoundingClientRect().top-anchor.top));else window.scrollTo(0,oldScroll);}else window.scrollTo(0,oldScroll);};'+
+      'const setSinglePane=single=>{layoutButton.textContent=single?"恢复双栏":"单栏预览";layoutButton.setAttribute("aria-pressed",String(single));};'+
+      'window.addEventListener("message",event=>{const data=event.data;if(data?.type==="updatePreview"&&typeof data.html==="string")updateHtml(data.html);if(data?.type==="scrollToLine"&&Number.isInteger(data.line))scrollToLine(data.line);if(data?.type==="layoutState")setSinglePane(Boolean(data.singlePane));});'+
+      'window.addEventListener("scroll",()=>{if(suppressScroll||scrollFrame)return;scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;const anchor=visibleAnchor();if(!anchor||!Number.isInteger(anchor.line)||anchor.line===lastSentLine)return;lastSentLine=anchor.line;api.postMessage({type:"scrollToSourceLine",line:anchor.line});});},{passive:true});'+
+      'document.addEventListener("click",event=>{const target=event.target instanceof Element?event.target:null;const link=target?.closest("a[data-local-path]");if(link){event.preventDefault();api.postMessage({type:"openPackageFile",path:link.dataset.localPath});return;}const toggle=target?.closest("[data-action=toggle-layout]");if(toggle)api.postMessage({type:"toggleLayout"});});'+
+      'api.postMessage({type:"ready"});})();</script>';
+    const initialPage='<!doctype html><html lang="zh"><head><meta charset="utf-8">'+
+      '<meta name="viewport" content="width=device-width, initial-scale=1">'+
+      '<meta http-equiv="Content-Security-Policy" content="'+attr(csp)+'">'+
+      '<link rel="stylesheet" href="'+attr(stylesheetHref)+'"></head>'+
+      '<body class="skill-studio-markdown-document">'+
+      '<div class="md-preview-toolbar"><strong>Markdown Preview</strong>'+
+      '<button type="button" data-action="toggle-layout" aria-pressed="false">单栏预览</button></div>'+
+      '<article class="markdown-preview">'+latestHtml+'</article>'+script+'</body></html>';
+    webview.html=initialPage;
     const incoming=webview.onDidReceiveMessage(async message=>{
+      if(message?.type==='ready'){
+        webviewReady=true;
+        if(pendingSourceLine!==null)
+          void webview.postMessage({type:'scrollToLine',line:pendingSourceLine});
+        return;
+      }
+      if(message?.type==='layoutStateRequest'){
+        void webview.postMessage({type:'layoutState',singlePane:state.singlePane});
+        return;
+      }
+      if(message?.type==='toggleLayout'){
+        toggleMarkdownState(state);
+        return;
+      }
+      if(message?.type==='scrollToSourceLine'&&Number.isInteger(message.line)&&message.line>=0){
+        const editor=vscode.window.visibleTextEditors?.find(item=>
+          item.document.uri.toString()===key)??state.editor;
+        if(editor){
+          suppressEditorScroll=true;
+          if(suppressEditorTimer)clearTimeout(suppressEditorTimer);
+          editor.revealRange(new vscode.Range(message.line,0,message.line,0),
+            vscode.TextEditorRevealType?.AtTop??1);
+          suppressEditorTimer=setTimeout(()=>{suppressEditorScroll=false;},120);
+        }
+        return;
+      }
       if(message?.type!=='openPackageFile'||typeof message.path!=='string')return;
       const targetUri=resolvePackageTarget(message.path);
       if(!targetUri){
@@ -2353,18 +2417,46 @@ export function registerWorkbench(vscode,context){
         if(targetUri.path.toLowerCase().endsWith('.md'))
           await vscode.commands.executeCommand('skillStudio.previewMarkdown',targetUri);
         else
-          await vscode.commands.executeCommand('vscode.open',targetUri);
+          await vscode.commands.executeCommand('vscode.open',targetUri,{
+            viewColumn:vscode.ViewColumn.One,preview:false
+          });
       }catch(error){
         void vscode.window.showWarningMessage(
           '无法打开 Package 文件 '+message.path+'：'+String(error?.message??error));
       }
     });
-    render();
-    const changed=vscode.workspace.onDidChangeTextDocument(e=>{
-      if(e.document.uri.toString()===uri.toString())render();
+    const sourceRanges=vscode.window.onDidChangeTextEditorVisibleRanges(event=>{
+      if(event.textEditor.document.uri.toString()!==key||suppressEditorScroll)return;
+      const line=event.visibleRanges?.[0]?.start?.line;
+      if(!Number.isInteger(line)||line===lastSourceLine)return;
+      lastSourceLine=line;pendingSourceLine=line;
+      if(webviewReady)void webview.postMessage({type:'scrollToLine',line});
     });
-    panel.onDidDispose(()=>{changed.dispose();incoming.dispose();});
+    const changed=vscode.workspace.onDidChangeTextDocument(event=>{
+      if(event.document.uri.toString()!==key)return;
+      if(renderTimer)clearTimeout(renderTimer);
+      renderTimer=setTimeout(postPreview,100);
+    });
+    panel.onDidDispose(()=>{
+      if(renderTimer)clearTimeout(renderTimer);
+      if(suppressEditorTimer)clearTimeout(suppressEditorTimer);
+      changed.dispose();incoming.dispose();sourceRanges.dispose();
+      if(markdownPanels.get(key)===state)markdownPanels.delete(key);
+    });
+    return panel;
   }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.toggleMarkdownLayout',async uri=>{
+      const target=uri??vscode.window.activeTextEditor?.document.uri;
+      const state=target?markdownPanels.get(target.toString()):[...markdownPanels.values()].at(-1);
+      if(!state){
+        if(target?.path?.toLowerCase().endsWith('.md'))
+          return vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
+        return false;
+      }
+      toggleMarkdownState(state);
+      return true;
+    }));
   // Internal real-browser acceptance opens the owner-pinned conventional guide
   // by exact workspace path; it is not a contributed user command.
   context.subscriptions.push(vscode.commands.registerCommand(
