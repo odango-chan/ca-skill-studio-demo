@@ -80,7 +80,7 @@ export function registerDependenciesView(vscode,context,{onLockChanged=()=>{}}={
           " · "+(node.operation.effect?.authority??"UNVERIFIED")+
           " (not Runtime READY)";
         item.command={command:"skillStudio.inspectDependencyContract",
-          title:"Inspect Contract",arguments:[node.dependency.id]};
+          title:"Inspect Contract",arguments:[node.dependency.id,node.operation.id]};
         return item;
       }
       const item=new vscode.TreeItem(node.dependency.id,state.Collapsed);
@@ -107,7 +107,7 @@ export function registerDependenciesView(vscode,context,{onLockChanged=()=>{}}={
     "skill-studio-dependency",{
       provideTextDocumentContent(uri){return previews.get(uri.path)??"";}
     }));
-  async function inspect(id){
+  async function inspect(id,operationId=null){
     const root=await ensureRoot(),resolved=await resolveLockedDependencies(vscode,root);
     const snap=resolved.snapshots.find(entry=>entry.id===id);
     if(!snap)throw Error("Locked contract missing or invalid; refusing to use remote latest");
@@ -117,7 +117,21 @@ export function registerDependenciesView(vscode,context,{onLockChanged=()=>{}}={
     previews.set(virtualPath,new TextDecoder().decode(decodeBase64(file.bytes)));
     const uri=vscode.Uri.from({scheme:"skill-studio-dependency",path:virtualPath});
     const document=await vscode.workspace.openTextDocument(uri);
-    await vscode.window.showTextDocument(document,{preview:true,preserveFocus:false});
+    const editor=await vscode.window.showTextDocument(document,
+      {preview:true,preserveFocus:false});
+    if(typeof operationId==="string"&&operationId){
+      const marker='"id":'+JSON.stringify(operationId);
+      const content=document.getText();
+      const offset=content.indexOf(marker);
+      if(offset>=0&&typeof document.positionAt==="function"){
+        const start=document.positionAt(offset+5);
+        const end=document.positionAt(offset+marker.length);
+        const selection=new vscode.Selection(start,end);
+        editor.selection=selection;
+        editor.revealRange?.(new vscode.Range(start,end),
+          vscode.TextEditorRevealType?.InCenter);
+      }
+    }
   }
   async function askAlias(){
     return vscode.window.showInputBox({
