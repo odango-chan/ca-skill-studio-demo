@@ -35,7 +35,7 @@ test("fenced code blocks and tables are rendered without interpreting HTML",()=>
   const html=renderMarkdown(source).html;
   assert.match(html,/<pre data-source-line="\d+"><code data-language="yaml">/);
   assert.match(html,/&lt;untrusted&gt;/);
-  assert.match(html,/<table><thead><tr data-source-line="\\d+"><th>Field<\/th><th>Status<\/th><\/tr>/);
+  assert.match(html,/<table><thead><tr data-source-line="\d+"><th>Field<\/th><th>Status<\/th><\/tr>/);
   assert.match(html,/<td>root<\/td>/);
 });
 test("untrusted raw HTML, dangerous links, and Markdown images cannot execute",()=>{
