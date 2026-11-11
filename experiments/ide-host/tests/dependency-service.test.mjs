@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {acquireBuiltin} from "../vscode/src/contract-acquisition.mjs";
+import {acquireBuiltin,acquireUpload} from "../vscode/src/contract-acquisition.mjs";
 import {applyDependency,refreshDependency,removeDependency,resolveLockedDependencies}
   from "../vscode/src/dependency-service.mjs";
 const uri=path=>({path,toString(){return "file://"+path;}});
@@ -112,4 +112,27 @@ test("config pair failure is UNCERTAIN, never READY",async()=>{
   await assert.rejects(applyDependency(h.vscode,h.root,"example",initial,
     {confirm:async()=>true}),/UNCERTAIN/);
   assert.equal((await resolveLockedDependencies(h.vscode,h.root)).status,"BLOCKED");
+});
+
+test("Upload Refresh observes drift but never mutates existing Lock",async()=>{
+  const h=host(),encoder=new TextEncoder();
+  const input=a=>encoder.encode(JSON.stringify({apiVersion:"skillc.tool/v0.1",
+    operations:[{id:a,inputSchema:{type:"object"},effect:{
+      classification:"UNKNOWN",authority:"UNVERIFIED"}}]}));
+  const initial=await acquireUpload({upload:"uploaded-tools",format:"json",
+    rawBytes:input("alpha")});
+  const changed=await acquireUpload({upload:"uploaded-tools",format:"json",
+    rawBytes:input("beta")});
+  await applyDependency(h.vscode,h.root,"uploaded",initial,{confirm:async()=>true});
+  const previous=JSON.stringify(h.values.dependencyLock),count=h.updates.length;
+  const inspected=await refreshDependency(h.vscode,h.root,"uploaded",async()=>changed);
+  assert.equal(inspected.status,"READY");
+  assert.equal(inspected.changed,true);
+  assert.notEqual(inspected.candidateLock.snapshotDigest,
+    h.values.dependencyLock.entries[0].snapshotDigest);
+  assert.equal(JSON.stringify(h.values.dependencyLock),previous);
+  assert.equal(h.updates.length,count);
+  await applyDependency(h.vscode,h.root,"uploaded",changed,{confirm:async()=>true});
+  assert.equal((await resolveLockedDependencies(h.vscode,h.root)).status,"READY");
+  assert.notEqual(JSON.stringify(h.values.dependencyLock),previous);
 });
