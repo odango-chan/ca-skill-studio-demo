@@ -149,6 +149,8 @@ test("no speculative coloring in descriptions, user keys, invalid or unrelated Y
   assert.equal(items.filter(t=>t.text==="PASS"&&t.type==="skillOutcome").length,1);
   assert.ok(!includesToken(items,"skillCapability","PASS"));
   assert.deepEqual(observed("procedures: [","skills/demo/assurance/procedure.yaml"),[]);
+  assert.ok(observed(source,"/workspace/skills/demo/assurance/procedure.yaml").length>5,
+    "native editor URI paths start with /");
   assert.deepEqual(observed(source,"unrelated/values.yaml"),[]);
   assert.deepEqual(observed(source,"skills/../demo/assurance/procedure.yaml"),[]);
 });

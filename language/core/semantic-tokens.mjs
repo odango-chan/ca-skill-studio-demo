@@ -33,7 +33,8 @@ function patternMatches(pattern, parts) {
 function profileFor(relativePath) {
   if (typeof relativePath !== "string" || !relativePath || relativePath.includes("\\"))
     return null;
-  const segments = relativePath.split("/");
+  const path = relativePath.startsWith("/") ? relativePath.slice(1) : relativePath;
+  const segments = path.split("/");
   if (segments.some(segment => !segment || segment === "." || segment === ".."))
     return null;
   for (const profile of Object.values(contract.profiles)) {
