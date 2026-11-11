@@ -2323,7 +2323,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(let attempt=0;attempt<60;attempt++){
     skillsFolder=await explorerRow('skills');
     if(!skillsFolder?.found)
-      skillsFolder=await explorerRow('skill-studio-example-v01/skills');
+      skillsFolder=await explorerRow('Skill Studio Example/skills');
     if(skillsFolder?.found)break;
     await sleep(100);
   }
@@ -2334,7 +2334,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await click(skillsFolder.x,skillsFolder.y);
     await sleep(180);
     const current=await explorerRow('skills').then(row=>row.found?row:
-      explorerRow('skill-studio-example-v01/skills'));
+      explorerRow('Skill Studio Example/skills'));
     if(current?.toggleHit&&String(current.toggleClass).includes('theia-mod-collapsed'))
       await click(current.toggleX,current.toggleY);
   }
@@ -2431,7 +2431,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   conventionalGraph=await graph('ue-requested-pdu-session-establishment');
   if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
   const dualSkillExplorer={
-    root:'skill-studio-example-v01/skills',conventionalFolder:'establish-pdu-session',masFolder,
+    root:'Skill Studio Example/skills',conventionalFolder:'establish-pdu-session',masFolder,
     assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths,
     conventionalProcedure,conventionalGraph
   };
