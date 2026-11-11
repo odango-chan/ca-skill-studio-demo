@@ -27,7 +27,7 @@ try{
         // Node workbench tests intentionally exercise the extension-host
         // fallback, not the browser Worker transport. Keep that lazy import
         // out of the test bundle; dedicated LSP tests cover it independently.
-        build.onResolve({filter:/browserClient\\.mjs$/},()=>({
+        build.onResolve({filter:/browserClient[.]mjs$/},()=>({
           path:'browser-client-test-stub',namespace:'workbench-test'
         }));
         build.onLoad({filter:/.*/,namespace:'workbench-test'},()=>({
