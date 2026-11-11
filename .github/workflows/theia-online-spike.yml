@@ -55,6 +55,7 @@ jobs:
           THEIA_BASE_PATH: "/ca-skill-studio-demo/ide-preview"
           THEIA_REQUIRE_WEBVIEW: "1"
           THEIA_REQUIRE_BROWSER_LSP: "1"
+          THEIA_REQUIRE_NATIVE_FS_PROTECTION: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       - name: Upload isolated online frontend preview artifact
         uses: actions/upload-artifact@v4
