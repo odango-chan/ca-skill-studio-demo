@@ -1,6 +1,7 @@
 // Lightweight local Markdown preview for SKILL.md and other .md files.
-// Raw HTML is escaped; no external assets or script execution.
-// Source textarea remains the only editable and authoritative document.
+// Raw HTML is escaped; source-provided scripts and images are never executed or fetched.
+// Optional local links are data-only; the extension host validates every navigation.
+// Native Source remains the only editable and authoritative document.
 const escapeHTML=value=>String(value).replace(/[&<>"']/g,ch=>({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&#39;"
 })[ch]);
@@ -11,7 +12,29 @@ const safeHref=raw=>{
   if(/^#[a-z0-9._:-]+$/i.test(value))return value;
   return null;
 };
-function inline(src,depth=0){
+// Only path-shaped references can become host-mediated links. The extension
+// host still resolves and verifies every target stays inside the active Skill.
+function localPackagePath(raw,options={}){
+  const value=String(raw).trim();
+  if(!value||value.length>240||value.startsWith("/")||value.includes("\\")||
+     value.includes("?")||value.includes("#")||
+     !/^(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+\.(?:md|ya?ml|py|json)$/i.test(value))
+    return null;
+  const parts=value.split("/");
+  if(parts.some(part=>!part||part==="."))return null;
+  const parents=parts.filter(part=>part==="..").length;
+  if(parents>1||(parents===1&&(parts[0]!==".."||parts.length!==2)))return null;
+  const inventory=options.localFiles;
+  if(!inventory||typeof inventory.has!=="function")return null;
+  const targetParts=String(options.relativeDir??"").split("/").filter(Boolean);
+  for(const part of parts){
+    if(part===".."){if(!targetParts.length)return null;targetParts.pop();}
+    else targetParts.push(part);
+  }
+  if(!options.localFiles.has(targetParts.join("/")))return null;
+  return value;
+}
+function inline(src,depth=0,options={}){
   if(depth>5)return escapeHTML(src);
   const pattern=/(!?\[([^\]\r\n]+)\]\(([^)\s]+)(?:\s+"([^"\r\n]*)")?\)|\x60([^\x60\r\n]+)\x60|\*\*([^*\r\n]+)\*\*|__([^_\r\n]+)__|~~([^~\r\n]+)~~|\*([^*\r\n]+)\*|_([^_\r\n]+)_|<https?:\/\/[^>\s]+>)/g;
   let out="",offset=0,match;
@@ -22,16 +45,23 @@ function inline(src,depth=0){
       out+='<span class="md-image-ref" title="图片不会在本地预览中自动请求外部资源">图片：'+escapeHTML(match[2])+"</span>";
     }else if(raw.startsWith("[")){
       const href=safeHref(match[3]);
-      out+=href?'<a href="'+escapeHTML(href)+'" rel="noopener noreferrer" target="_blank">'+inline(match[2],depth+1)+"</a>":
-        '<span class="md-unresolved-link" title="'+escapeHTML(match[3])+'">'+inline(match[2],depth+1)+"</span>";
+      const localPath=options.localLinks?localPackagePath(match[3],options):null;
+      out+=href?'<a href="'+escapeHTML(href)+'" rel="noopener noreferrer" target="_blank">'+inline(match[2],depth+1,options)+"</a>":
+        localPath?'<a class="md-local-link" href="#" data-local-path="'+escapeHTML(localPath)+
+          '" title="打开当前 Skill Package 内的文件">'+inline(match[2],depth+1,options)+"</a>":
+        '<span class="md-unresolved-link" title="'+escapeHTML(match[3])+'">'+inline(match[2],depth+1,options)+"</span>";
     }else if(raw.charCodeAt(0)===96){
-      out+="<code>"+escapeHTML(match[5])+"</code>";
+      const localPath=options.localLinks?localPackagePath(match[5],options):null;
+      out+=localPath
+        ?'<a class="md-local-link" href="#" data-local-path="'+escapeHTML(localPath)+
+          '" title="打开当前 Skill Package 内的文件"><code>'+escapeHTML(match[5])+"</code></a>"
+        :"<code>"+escapeHTML(match[5])+"</code>";
     }else if(raw.startsWith("**")||raw.startsWith("__")){
-      out+="<strong>"+inline(match[6]??match[7],depth+1)+"</strong>";
+      out+="<strong>"+inline(match[6]??match[7],depth+1,options)+"</strong>";
     }else if(raw.startsWith("~~")){
-      out+="<del>"+inline(match[8],depth+1)+"</del>";
+      out+="<del>"+inline(match[8],depth+1,options)+"</del>";
     }else if(raw.startsWith("*")||raw.startsWith("_")){
-      out+="<em>"+inline(match[9]??match[10],depth+1)+"</em>";
+      out+="<em>"+inline(match[9]??match[10],depth+1,options)+"</em>";
     }else if(raw.startsWith("<")){
       const href=safeHref(raw.slice(1,-1));
       out+=href?'<a href="'+escapeHTML(href)+'" rel="noopener noreferrer" target="_blank">'+escapeHTML(href)+"</a>":escapeHTML(raw);
@@ -42,6 +72,25 @@ function inline(src,depth=0){
 }
 const fenceStart=line=>line.match(/^\s{0,3}(\x60{3,}|\x7e{3,})([^\r\n]*)$/);
 const heading=line=>line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+function collectMarkdownHeadings(lines){
+  const items=[];let fence=null;
+  for(let i=0;i<lines.length;i++){
+    const marker=fenceStart(lines[i]);
+    if(marker){
+      const char=marker[1][0],length=marker[1].length;
+      if(!fence)fence={char,length};
+      else if(char===fence.char&&length>=fence.length)fence=null;
+      continue;
+    }
+    if(fence)continue;
+    const match=heading(lines[i]);
+    if(!match)continue;
+    const label=match[2].replace(/\[([^\]]+)\]\([^)]+\)/g,"$1")
+      .replace(/[*_~]/g,"").trim();
+    items.push({line:i,id:"md-heading-"+i,level:match[1].length,label});
+  }
+  return items;
+}
 const listItem=line=>line.match(/^(\s*)([-+*]|\d+[.)])\s+(.+)$/);
 const hr=line=>/^\s{0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/.test(line);
 const quote=line=>/^\s{0,3}>\s?/.test(line);
@@ -57,7 +106,7 @@ function startsBlock(lines,i){
   return Boolean(fenceStart(line)||heading(line)||hr(line)||quote(line)||listItem(line)||
     (i+1<lines.length&&line.includes("|")&&tableSeparator(lines[i+1])));
 }
-function renderList(lines,i,depth){
+function renderList(lines,i,depth,options={}){
   const first=listItem(lines[i]);const indent=first[1].length;
   const numbered=/^\d/.test(first[2]);
   const tag=numbered?"ol":"ul";
@@ -72,20 +121,20 @@ function renderList(lines,i,depth){
       const child=listItem(lines[i]);
       if(child&&child[1].length===indent)break;
       if(child&&child[1].length>indent){
-        const nested=renderList(lines,i,depth+1);
+        const nested=renderList(lines,i,depth+1,options);
         pieces.push(nested.html);i=nested.next;continue;
       }
       if(lines[i].match(/^\s{2,}/)&&!startsBlock(lines,i)){
-        pieces.push(inline(lines[i].trim()));i++;continue;
+        pieces.push(inline(lines[i].trim(),0,options));i++;continue;
       }
       break;
     }
-    out+="<li>"+inline(pieces[0])+pieces.slice(1).join(" ")+"</li>";
+    out+="<li>"+inline(pieces[0],0,options)+pieces.slice(1).join(" ")+"</li>";
   }
   out+="</"+tag+">";
   return {html:out,next:i};
 }
-function renderBlocks(lines,depth=0){
+function renderBlocks(lines,depth=0,options={}){
   if(depth>6)return "<pre>"+escapeHTML(lines.join("\n"))+"</pre>";
   let out="",i=0;
   while(i<lines.length){
@@ -104,18 +153,20 @@ function renderBlocks(lines,depth=0){
     const h=heading(lines[i]);
     if(h){
       const level=h[1].length;
-      out+="<h"+level+">"+inline(h[2])+"</h"+level+">";i++;continue;
+      const id=depth===0?options.headingIds?.get(i):null;
+      out+=(id?'<h'+level+' id="'+id+'">':"<h"+level+">")+
+        inline(h[2],0,options)+"</h"+level+">";i++;continue;
     }
     if(hr(lines[i])){out+="<hr>";i++;continue;}
     if(quote(lines[i])){
       const quoted=[];
       while(i<lines.length&&quote(lines[i]))quoted.push(lines[i++].replace(/^\s{0,3}>\s?/,""));
-      out+="<blockquote>"+renderBlocks(quoted,depth+1)+"</blockquote>";
+      out+="<blockquote>"+renderBlocks(quoted,depth+1,options)+"</blockquote>";
       continue;
     }
     if(i+1<lines.length&&lines[i].includes("|")&&tableSeparator(lines[i+1])){
       const headers=cells(lines[i]);
-      // Emit only fixed alignment classes, never source-controlled inline CSS.
+      // Only fixed alignment classes, never source-controlled style attributes.
       const alignment=cells(lines[i+1]).map(marker=>{
         const left=marker.startsWith(":"),right=marker.endsWith(":");
         return left&&right?' class="md-align-center"':
@@ -124,31 +175,31 @@ function renderBlocks(lines,depth=0){
       });
       i+=2;out+="<div class=\"md-table-wrap\"><table><thead><tr>";
       for(let j=0;j<headers.length;j++)
-        out+="<th"+(alignment[j]??"")+">"+inline(headers[j])+"</th>";
+        out+="<th"+(alignment[j]??"")+">"+inline(headers[j],0,options)+"</th>";
       out+="</tr></thead><tbody>";
       let rows=0;
       while(i<lines.length&&lines[i].trim()&&lines[i].includes("|")&&rows++<1000){
         const vals=cells(lines[i++]);out+="<tr>";
         for(let j=0;j<headers.length;j++)
-          out+="<td"+(alignment[j]??"")+">"+inline(vals[j]??"")+"</td>";
+          out+="<td"+(alignment[j]??"")+">"+inline(vals[j]??"",0,options)+"</td>";
         out+="</tr>";
       }
       out+="</tbody></table></div>";
       continue;
     }
     if(listItem(lines[i])){
-      const list=renderList(lines,i,depth);
+      const list=renderList(lines,i,depth,options);
       if(list.next>i){out+=list.html;i=list.next;continue;}
     }
     const paragraph=[lines[i++].trim()];
     while(i<lines.length&&lines[i].trim()&&!startsBlock(lines,i)){
       paragraph.push(lines[i++].trim());
     }
-    out+="<p>"+inline(paragraph.join(" "))+"</p>";
+    out+="<p>"+inline(paragraph.join(" "),0,options)+"</p>";
   }
   return out;
 }
-export function renderMarkdown(source,{maxChars=300000}={}){
+export function renderMarkdown(source,{maxChars=300000,localLinks=false,localFiles=null,relativeDir=""}={}){
   if(typeof source!=="string")throw new TypeError("Markdown Source must be a string");
   if(source.length>maxChars)return {available:false,html:"",reason:"文件太大，无法安全预览"};
   const lines=source.replace(/\r\n?/g,"\n").split("\n");
@@ -161,5 +212,12 @@ export function renderMarkdown(source,{maxChars=300000}={}){
       lines.splice(0,end+2);
     }
   }
-  return {available:true,html:head+renderBlocks(lines)};
+  const headings=collectMarkdownHeadings(lines);
+  const headingIds=new Map(headings.map(item=>[item.line,item.id]));
+  const toc=headings.length>1
+    ?'<details class="md-toc"><summary>目录 · '+headings.length+'</summary><ol>'+
+      headings.map(item=>'<li class="md-toc-level-'+item.level+'"><a href="#'+item.id+
+        '">'+escapeHTML(item.label)+'</a></li>').join("")+'</ol></details>'
+    :"";
+  return {available:true,html:head+toc+renderBlocks(lines,0,{localLinks,localFiles,relativeDir,headingIds})};
 }
