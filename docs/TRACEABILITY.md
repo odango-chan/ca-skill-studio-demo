@@ -1,5 +1,26 @@
 # Skill Studio 实施证据追溯
 
+## Plugin-managed Architecture v0.1 · Draft PR #152 (2026-11-11)
+
+This section is branch-only evidence; statuses below are **not** main/release claims. Canonical layout: [Skill Project layout](architecture/skill-project-layout.md). Compiler v0.1 machine contract is upstream [Compiler #4](https://github.com/odango-chan/ca-skill-compiler/pull/4); Studio design [#150](https://github.com/odango-chan/ca-skill-studio-demo/pull/150) remains Draft.
+
+| WP / status | Production | Actual focused test / gate |
+|---|---|---|
+| WP0 IMPLEMENTED | Branch and PR inventory; draft authority check | [PR #152](https://github.com/odango-chan/ca-skill-studio-demo/pull/152) |
+| WP1 IMPLEMENTED; Browser acceptance pending | `vscode/package.json`, `src/project-configuration.mjs` | `experiments/ide-host/tests/project-configuration.test.mjs` |
+| WP2 IMPLEMENTED; Browser acceptance pending | `src/sample-loader.mjs`, `src/project-policy.mjs` | `experiments/ide-host/tests/sample-loader.test.mjs`; `tests/project-policy.test.mjs` |
+| WP3 PARTIAL (snapshot/store and lock implemented; host persistence requires Chromium) | `src/dependency-snapshot.mjs`, `src/dependency-service.mjs` | Compiler #4 imported vectors; `dependency-snapshot.test.mjs`; `dependency-service.test.mjs` |
+| WP4 PARTIAL (GitHub browser adapter, MCP Streamable HTTP; limited host connectivity) | `src/contract-acquisition.mjs`, `src/acquisition-transports.mjs` | `contract-acquisition.test.mjs`; live external MCP/Git remote NOT_RUN |
+| WP5 IMPLEMENTED; browser behavior pending | `src/dependencies-view.mjs`, native Extension contributions | `plugin-views.test.mjs`; actual TreeView browser interaction pending |
+| WP6 PARTIAL / external ABI BLOCKED | `src/compiler-adapter.mjs`, `src/build-view.mjs` | `compiler-adapter.test.mjs`, `plugin-views.test.mjs`; `UNAVAILABLE` deliberate |
+| WP7 PARTIAL | `src/workbench.mjs` invalidation; shared Source/Lock Host Context; no full dependency-qualified LSP semantic resolver | Existing LSP Worker tests, exact-head Host/Chromium pending |
+| WP8 IN_PROGRESS | Native browser smoke and PR Verify actions | Initial [Host 62/63](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42996456059), [Browser-Only FAIL](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42996456164), [Backend FAIL](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42996456009), [PR Verify PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42996456021); final exact-head/browser/Pages TBD |
+
+**Blocking closure:** genuine v0.1 Go/WASM compiler ABI, dependency-qualified LSP semantics, successful exact-head Chromium and Pages acceptance, host persistence evidence. Until closed keep Draft and never merge. No Runtime/5GC verification claim.
+
+---
+
+
 **Status: Accepted · Date: 2026-11-10**
 
 `WORK` 回答 **现在到哪**；本页回答 **规范→代码→测试→何种证据**。下表不复制 owner Runtime 契约，也不把静态/Mock 宣告为 Live PASS。
