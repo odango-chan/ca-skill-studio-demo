@@ -14,6 +14,7 @@ const externalUrl=process.env.THEIA_URL;
 const basePath=(process.env.THEIA_BASE_PATH||"").replace(/\/+$/,"");
 const requireWebview=process.env.THEIA_REQUIRE_WEBVIEW==="1";
 const requireBrowserLsp=process.env.THEIA_REQUIRE_BROWSER_LSP==="1";
+const requireNativeProtection=process.env.THEIA_REQUIRE_NATIVE_FS_PROTECTION==="1";
 const requireEditor=Boolean(externalUrl)||requireWebview;
 const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
@@ -1344,6 +1345,76 @@ try{
       packageOverviewEvidence.evidence?.skills?.length!==2))
     throw Error("Two-SKILL Package Overview Chromium acceptance did not complete: "+
       JSON.stringify(packageOverviewEvidence));
+  // This runs against the real native Theia FileSystemProvider binding:
+  // Explorer, plugin workspace.fs and editor saves all delegate to this
+  // provider. Rejecting here is stronger than hiding an Explorer menu.
+  let nativeProtection=null;
+  if(requireNativeProtection){
+    for(let attempt=0;attempt<30;attempt++){
+      nativeProtection=await evalJS(`(async()=>{
+        const container=window.theia?.container;
+        const keys=[...(container?._bindingDictionary?._map?.keys?.()??[])];
+        const providerKey=keys.find(key=>typeof key==="symbol"&&
+          String(key)==="Symbol(FileSystemProvider)");
+        const workspaceKey=keys.find(key=>typeof key==="function"&&
+          key.name==="WorkspaceService"&&typeof key.prototype?.tryGetRoots==="function");
+        if(!providerKey||!workspaceKey)return {ready:false,reason:"Native provider/WorkspaceService not bound",
+          keys:keys.filter(key=>String(key).includes("FileSystemProvider")||
+            String(key).includes("WorkspaceService")).map(String)};
+        const provider=container.get(providerKey);
+        const workspace=container.get(workspaceKey);
+        const roots=workspace.tryGetRoots();
+        const project=roots.find(entry=>entry.resource?.path?.toString?.().endsWith("/workspaces"));
+        if(!project)return {ready:false,reason:"Browser sample project root not mounted",
+          roots:roots.map(entry=>entry.resource?.toString?.())};
+        const base=project.resource,root=base.path.toString().replace(/\\/$/,"");
+        const at=path=>base.withPath(root+"/"+path);
+        const roles={};
+        for(const role of ["skills","lib","output"]){
+          const info=await provider.stat(at(role));
+          roles[role]={type:info.type,readonly:info.permissions===1};
+        }
+        const denial=async(name,run)=>{
+          try{await run();return {name,denied:false};}
+          catch(error){return {name,denied:true,code:error?.code??error?.name??"",
+            message:String(error?.message??error).slice(0,180)};}
+        };
+        const probeName="__skill_studio_native_ro_probe__";
+        const checks=[];
+        checks.push(await denial("lib-write",()=>provider.writeFile(at("lib/"+probeName),
+          new Uint8Array([1]),{create:true,overwrite:true})));
+        checks.push(await denial("output-write",()=>provider.writeFile(at("output/"+probeName),
+          new Uint8Array([1]),{create:true,overwrite:true})));
+        checks.push(await denial("lib-mkdir",()=>provider.mkdir(at("lib/"+probeName))));
+        checks.push(await denial("output-mkdir",()=>provider.mkdir(at("output/"+probeName))));
+        checks.push(await denial("skills-root-rename",()=>provider.rename(
+          at("skills"),at("skills-renamed"),{overwrite:false})));
+        checks.push(await denial("output-root-delete",()=>provider.delete(at("output"),{recursive:true})));
+        const source=at("skills/establish-pdu-session/"+probeName);
+        let sourceWritable=false,sourceClean=false,sourceError=null;
+        try{
+          await provider.writeFile(source,new Uint8Array([1]),{create:true,overwrite:true});
+          sourceWritable=true;
+          await provider.delete(source,{recursive:false});
+          sourceClean=true;
+        }catch(error){sourceError=String(error?.message??error);}
+        const allDenied=checks.every(check=>check.denied&&
+          /(NoPermissions|permission|read.only|denied)/i.test(check.code+" "+check.message));
+        return {ready:true,allDenied,
+          roles,checks,sourceWritable,sourceClean,sourceError,root};
+      })()`);
+      if(nativeProtection?.ready)break;
+      await sleep(200);
+    }
+    console.log("STUDIO_NATIVE_OPFS_PROTECTION",JSON.stringify(nativeProtection));
+    if(!nativeProtection?.ready||!nativeProtection.allDenied||
+       !nativeProtection.sourceWritable||!nativeProtection.sourceClean||
+       !nativeProtection.roles?.skills?.readonly||
+       !nativeProtection.roles?.lib?.readonly||
+       !nativeProtection.roles?.output?.readonly)
+      throw Error("Native project filesystem protection acceptance failed: "+
+        JSON.stringify(nativeProtection).slice(0,4800));
+  }
   console.log("STUDIO_THEIA_STAGE","package-overview");
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
