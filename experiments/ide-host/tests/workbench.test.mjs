@@ -19,7 +19,7 @@ try{
   await build({
     entryPoints:[resolve('experiments/ide-host/vscode/src/workbench.mjs')],
     outfile:bundlePath,bundle:true,format:'esm',platform:'node',
-    target:'node24',packages:'external',loader:{'.yaml':'text'},
+    target:'node24',loader:{'.yaml':'text'},
     logLevel:'silent'
   });
   ({registerWorkbench}=await import(pathToFileURL(bundlePath).href));
