@@ -313,8 +313,8 @@ test("Native Markdown inventory excludes symlinks and rejects a symlinked source
     };
     extendMarkdownIt(md);
     const output=md.renderer.render([inline],{}, {currentDocument:skill});
-    assert.match(output,/link_open:references\\/safe\\.md/);
-    assert.doesNotMatch(output,/link_open:references\\/symlink\\.md/);
+    assert.match(output,/link_open:references\/safe\.md/);
+    assert.doesNotMatch(output,/link_open:references\/symlink\.md/);
     assert.equal(await prepareNativeMarkdownPackagePolicy(vscode,linked),false,
       "a symlinked Markdown source itself must not receive a native preview policy");
   }finally{
