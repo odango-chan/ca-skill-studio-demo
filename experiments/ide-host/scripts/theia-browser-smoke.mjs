@@ -421,6 +421,44 @@ try{
       if(!(yamlSyntax?.tokenColors?.length>=3))
         throw Error("Native YAML syntax tokenization not active: "+JSON.stringify(yamlSyntax));
       patchEvidence.yamlSyntax=yamlSyntax;
+
+      // The native VS Code/Theia editor must render the same CA semantic
+      // identities from the Language Worker's LSP stream and the installed
+      // Studio Light theme. TextMate colors alone do not satisfy this check.
+      let semanticLspRendering=null;
+      for(let attempt=0;attempt<35;attempt++){
+        semanticLspRendering=await evalJS(`(()=> {
+          const editor=[...document.querySelectorAll('.monaco-editor')]
+            .find(el=>el.getBoundingClientRect().width>150&&el.querySelector('.view-lines'));
+          const lines=[...(editor?.querySelectorAll('.view-line')??[])];
+          const line=lines.find(el=>el.textContent.replace(/\\u00a0/g,' ')
+            .includes('createdsession.ingress.eligible: PASS'));
+          const token=value=>[...(line?.querySelectorAll('span')??[])]
+            .find(el=>el.textContent===value);
+          const reference=token('createdsession.ingress.eligible');
+          const outcome=token('PASS');
+          return {
+            referenceColor:reference?getComputedStyle(reference).color:null,
+            outcomeColor:outcome?getComputedStyle(outcome).color:null,
+            referenceClass:reference?.className??null,
+            outcomeClass:outcome?.className??null,
+            line:line?.textContent??null,
+            lineHtml:line?.innerHTML??null,
+            visible:!!editor
+          };
+        })()`);
+        if(semanticLspRendering?.referenceColor==='rgb(123, 91, 167)'&&
+           semanticLspRendering?.outcomeColor==='rgb(173, 101, 23)')break;
+        await sleep(120);
+      }
+      console.log("STUDIO_NATIVE_LSP_SEMANTIC_COLORS_CHROMIUM",
+        JSON.stringify(semanticLspRendering));
+      if(semanticLspRendering?.referenceColor!=='rgb(123, 91, 167)'||
+         semanticLspRendering?.outcomeColor!=='rgb(173, 101, 23)')
+        throw Error("Native LSP semantic tokens were not rendered by Studio Light: "+
+          JSON.stringify(semanticLspRendering));
+      patchEvidence.lspSemanticColors=semanticLspRendering;
+
       // This probe opens a pinned owner script in the native workbench.
       // Open a real bundled Python source through Theia's native Quick Open.
       // This verifies the Python TextMate grammar in the same editor host.
