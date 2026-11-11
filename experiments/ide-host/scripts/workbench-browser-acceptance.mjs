@@ -2048,7 +2048,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!contractView||!contractFrame||
      !contractView.text.includes('establish-pdu-session')||
      !contractView.text.includes('sbi.udm.sm_data.get')||
-     !contractView.text.includes('skill.evaluate-udm-read')||
+     !contractView.text.includes('lib/host/subject.schema.yaml')||
      !contractView.text.includes('createdsession.ran.setup_accepted')||
      contractExpectedCards.some(title=>!contractView.cards.includes(title)))
     throw Error('Contract Designer did not render the current Package Source: '+
