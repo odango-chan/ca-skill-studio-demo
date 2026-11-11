@@ -246,10 +246,31 @@ export function activate(context){
       try{
         const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri);
         stage="open-procedure";
-        await vscode.commands.executeCommand("vscode.open",result.procedure);
+        await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
+        stage="show-packages";
+        // User-triggered import should end in the real native Packages view.
+        // View-container activation is a host command: fall back gracefully
+        // on VS Code/Theia variants that don't contribute that command.
+        let viewOpened=false;
+        for(const id of ["workbench.view.extension.skillStudio",
+          "skillStudio.packages.focus"]){
+          try{
+            await vscode.commands.executeCommand(id);
+            viewOpened=true;
+            break;
+          }catch{/* The alternative is optional, not a load failure. */}
+        }
+        let revealed=false;
+        try{revealed=await packageOverview.revealPackages();}
+        catch(error){
+          console.warn("SKILL Package reveal unavailable:",String(error?.message??error));
+          await packageOverview.refresh();
+        }
         void vscode.window.showInformationMessage(
-          "两个示例 SKILL 已载入 skills/："+result.created+" 个新文件，"+
-          result.skipped+" 个已有文件保留。可展开两个 Skill 的 assurance/procedure.yaml");
+          "示例项目已载入：skills/（传统 5GC + MAS）、lib/（待导入 Tool 契约）、"+
+          "output/（待生成编译产物）。新增 "+result.created+" 个文件，"+
+          "保留 "+result.skipped+" 个已有文件。"+
+          (viewOpened&&revealed?"已展开 Packages。":"请打开 Skill Studio → Packages 查看两个 SKILL。"));
       }catch(error){
         await vscode.window.showErrorMessage(
           "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
@@ -261,7 +282,7 @@ export function activate(context){
   // convenient shortcut for the online demo.
   if(!(vscode.workspace.workspaceFolders??[]).length){
     const welcome=vscode.window.showInformationMessage?.(
-      "欢迎使用 SKILL Studio。可以载入 skills/ 下的两个示例（传统 5GC 与 MAS）。",
+      "欢迎使用 SKILL Studio。可导入一个含 skills/、lib/、output/ 的演示项目（传统 5GC 与 MAS）。",
       "载入演示 SKILL 项目"
     );
     if(welcome&&typeof welcome.then==="function"){
