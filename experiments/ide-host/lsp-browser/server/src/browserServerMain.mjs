@@ -13,7 +13,7 @@ import {
   collectSkillSemanticTokenSpans,
   SKILL_SEMANTIC_TOKEN_TYPES,
   SKILL_SEMANTIC_TOKEN_MODIFIERS
-} from "../../../../../site/skill-semantic-tokens.mjs";
+} from "../../../../../language/semantic-tokens.mjs";
 import { parseDocument, isMap, isScalar } from "yaml";
 import { LanguageDiagnosticSession } from "../../../../../language/lsp/session.js";
 
