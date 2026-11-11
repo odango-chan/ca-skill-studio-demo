@@ -1358,9 +1358,30 @@ try{
     throw Error("Two-SKILL Package Overview Chromium acceptance did not complete: "+
       JSON.stringify(packageOverviewEvidence));
   console.log("STUDIO_THEIA_STAGE","package-overview");
+  // Real Chromium assertion: exercise native Extension Configuration writes,
+  // persisted immutable snapshot reload, dependency removal and unavailable
+  // Compiler Build through the installed Theia Web extension (no mocks).
+  let pluginManagedAcceptance=null;
+  if(requireEditor){
+    pluginManagedAcceptance=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      if(!key)throw Error("Browser v0.1 native command service unavailable");
+      return c.get(key).executeCommand("skillStudio.internal.pluginManagedAcceptance");
+    })()`);
+    console.log("STUDIO_PLUGIN_MANAGED_CHROMIUM",JSON.stringify(pluginManagedAcceptance));
+    if(pluginManagedAcceptance?.status!=="PASS"||
+       pluginManagedAcceptance.pinnedStatus!=="READY"||
+       pluginManagedAcceptance.buildStatus!=="UNAVAILABLE"||
+       pluginManagedAcceptance.declarationCount!==0)
+      throw Error("Plugin-managed v0.1 host acceptance failed: "+
+        JSON.stringify(pluginManagedAcceptance));
+  }
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
-  const evidence={shellReadyMs,workbenchEvidence,packageOverviewEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
+  const evidence={shellReadyMs,workbenchEvidence,packageOverviewEvidence,pluginManagedAcceptance,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
     frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrames,webviewFrame,webviewView,webviewFrameError,patchEvidence,
     extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500),
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
