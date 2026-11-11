@@ -1914,22 +1914,27 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!markdownEditor)throw Error('Native Markdown Source did not open beside the preview');
   await click(markdownEditor.x,markdownEditor.y);
   await key('Home','Home',2,36);
-  await command('Input.insertText',{text:'# Unsaved Markdown acceptance\n\n'});
-  const live=await waitMarkdown(view=>view.heading==='Unsaved Markdown acceptance','Unsaved Markdown edit');
-  if(live.view.contextId!==guideOpen.view.contextId)
-    throw Error('The Markdown Webview was recreated for an unsaved edit');
-  await evalJS(`(async()=>{
+  const markdownModelAction=action=>evalJS(`(async()=>{
     const container=window.theia.container;
     const managerKey=[...container._bindingDictionary._map.keys()].find(key=>
       typeof key==='function'&&typeof key.prototype?.getOrCreateByUri==='function'&&
       typeof key.prototype?.getByUri==='function');
     const editors=managerKey&&container.get(managerKey).all;
     const control=editors?.map(widget=>widget.editor?.getControl?.()).find(editor=>
-      editor?.getModel()?.uri.path.endsWith('/SKILL.md')&&
-      editor.getModel().getValue().includes('# Unsaved Markdown acceptance'));
-    if(!control)throw Error('Could not locate the edited native Markdown model');
-    await control.getModel().undo();
+      editor?.hasTextFocus()&&editor.getModel()?.uri.path.endsWith('/SKILL.md'));
+    if(!control)throw Error('Could not locate the focused native Markdown model');
+    const model=control.getModel();
+    model.pushStackElement();
+    if(${JSON.stringify(action)}==='undo')await model.undo();
+    return model.getValue();
   })()`);
+  const originalMarkdown=await markdownModelAction('start');
+  await command('Input.insertText',{text:'# Unsaved Markdown acceptance\n\n'});
+  const live=await waitMarkdown(view=>view.heading==='Unsaved Markdown acceptance','Unsaved Markdown edit');
+  if(live.view.contextId!==guideOpen.view.contextId)
+    throw Error('The Markdown Webview was recreated for an unsaved edit');
+  if(await markdownModelAction('undo')!==originalMarkdown)
+    throw Error('Native Markdown undo did not restore the original editor buffer');
   await waitMarkdown(view=>view.heading==='Establish PDU Session','Native Markdown undo');
   const previewScroll=async expression=>(await command('Runtime.evaluate',{
     contextId:guideOpen.view.contextId,returnByValue:true,expression
