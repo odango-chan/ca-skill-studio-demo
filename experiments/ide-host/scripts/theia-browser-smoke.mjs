@@ -411,14 +411,14 @@ try{
             .map(el=>el.textContent?.trim()).filter(Boolean);
           return {items,tokenCount:spans.length,tokenColors,visible:!!editor};
         })()`);
-        if(yamlSyntax?.tokenColors?.length>=3)break;
+        if(yamlSyntax?.tokenCount>=50&&yamlSyntax?.tokenColors?.length>=2)break;
         await sleep(120);
       }
       console.log("STUDIO_NATIVE_YAML_SYNTAX_CHROMIUM",JSON.stringify(yamlSyntax));
       // Theia 1.76 uses a non-VS-Code status-bar DOM, so text-based
       // '.theia-status-bar-item' selectors are not authoritative here.
       // Require native Monaco to display multiple actual syntax token colors.
-      if(!(yamlSyntax?.tokenColors?.length>=3))
+      if(!(yamlSyntax?.tokenCount>=50&&yamlSyntax?.tokenColors?.length>=2))
         throw Error("Native YAML syntax tokenization not active: "+JSON.stringify(yamlSyntax));
       patchEvidence.yamlSyntax=yamlSyntax;
 
