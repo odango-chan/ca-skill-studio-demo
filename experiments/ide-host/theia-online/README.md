@@ -11,6 +11,7 @@ npm ci
 node experiments/ide-host/scripts/build-ide-spike.mjs
 node experiments/ide-host/scripts/prepare-theia-online.mjs
 npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund
+npm run download:plugins --prefix experiments/ide-host/theia-online
 npm run build --prefix experiments/ide-host/theia-online
 ```
 
@@ -19,7 +20,9 @@ are not writes to the user's local disk or their GitHub repository. The
 `plugins/` folder contains the prepared Web entry (same extension source as
 VS Code desktop); Theia must include it as a built-in plugin at build time.
 
-The post-build `prepare-theia-shell-icons.mjs` step also installs the Classic
+The shared `SKILL Studio Theme` extension contributes `markdown.previewStyles` so the
+native Markdown preview uses the same heading accent, typography and table styling as
+the rest of Studio. The post-build `prepare-theia-shell-icons.mjs` step also installs the Classic
 SKILL Studio wordmark into the same Lumino menu-bar row as File/Edit. It adds
 a presentation-only sibling immediately before Lumino's native menu content
 node; it does not rewrite menu items, commands, shortcuts, or click handlers.
