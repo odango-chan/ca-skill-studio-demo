@@ -136,79 +136,92 @@ function renderList(lines,i,depth,options={}){
 }
 function renderBlocks(lines,depth=0,options={}){
   if(depth>6)return "<pre>"+escapeHTML(lines.join("\n"))+"</pre>";
-  let out="",i=0;
+  const blocks=[];let i=0;
   while(i<lines.length){
     if(!lines[i].trim()){i++;continue;}
-    const fence=fenceStart(lines[i]);
-    if(fence){
-      const marker=fence[1],type=marker.charAt(0),lang=fence[2].trim().split(/\s+/)[0];
-      i++;const block=[];
-      const close=new RegExp("^\\s{0,3}"+(type.charCodeAt(0)===96?"\\x60":"\\x7e")+"{"+marker.length+",}\\s*$");
-      while(i<lines.length&&!close.test(lines[i]))block.push(lines[i++]);
-      if(i<lines.length)i++;
-      const language=/^[a-z0-9_-]{1,28}$/i.test(lang)?' data-language="'+escapeHTML(lang)+'"':"";
-      out+="<pre><code"+language+">"+escapeHTML(block.join("\n"))+"</code></pre>";
-      continue;
-    }
-    const h=heading(lines[i]);
-    if(h){
-      const level=h[1].length;
-      const id=depth===0?options.headingIds?.get(i):null;
-      out+=(id?'<h'+level+' id="'+id+'">':"<h"+level+">")+
-        inline(h[2],0,options)+"</h"+level+">";i++;continue;
-    }
-    if(hr(lines[i])){out+="<hr>";i++;continue;}
-    if(quote(lines[i])){
-      const quoted=[];
-      while(i<lines.length&&quote(lines[i]))quoted.push(lines[i++].replace(/^\s{0,3}>\s?/,""));
-      out+="<blockquote>"+renderBlocks(quoted,depth+1,options)+"</blockquote>";
-      continue;
-    }
-    if(i+1<lines.length&&lines[i].includes("|")&&tableSeparator(lines[i+1])){
-      const headers=cells(lines[i]);
-      // Only fixed alignment classes, never source-controlled style attributes.
-      const alignment=cells(lines[i+1]).map(marker=>{
-        const left=marker.startsWith(":"),right=marker.endsWith(":");
-        return left&&right?' class="md-align-center"':
-          right?' class="md-align-right"':
-          left?' class="md-align-left"':"";
-      });
-      i+=2;out+="<div class=\"md-table-wrap\"><table><thead><tr>";
-      for(let j=0;j<headers.length;j++)
-        out+="<th"+(alignment[j]??"")+">"+inline(headers[j],0,options)+"</th>";
-      out+="</tr></thead><tbody>";
-      let rows=0;
-      while(i<lines.length&&lines[i].trim()&&lines[i].includes("|")&&rows++<1000){
-        const vals=cells(lines[i++]);out+="<tr>";
-        for(let j=0;j<headers.length;j++)
-          out+="<td"+(alignment[j]??"")+">"+inline(vals[j]??"",0,options)+"</td>";
-        out+="</tr>";
+    const start=i;
+    let out="";
+    try {
+      const fence=fenceStart(lines[i]);
+      if(fence){
+        const marker=fence[1],type=marker.charAt(0),lang=fence[2].trim().split(/\s+/)[0];
+        i++;const block=[];
+        const close=new RegExp("^\\s{0,3}"+(type.charCodeAt(0)===96?"\\x60":"\\x7e")+"{"+marker.length+",}\\s*$");
+        while(i<lines.length&&!close.test(lines[i]))block.push(lines[i++]);
+        if(i<lines.length)i++;
+        const language=/^[a-z0-9_-]{1,28}$/i.test(lang)?' data-language="'+escapeHTML(lang)+'"':"";
+        out+="<pre><code"+language+">"+escapeHTML(block.join("\n"))+"</code></pre>";
+        continue;
       }
-      out+="</tbody></table></div>";
-      continue;
+      const h=heading(lines[i]);
+      if(h){
+        const level=h[1].length;
+        const id=depth===0?options.headingIds?.get(i):null;
+        out+=(id?'<h'+level+' id="'+id+'">':"<h"+level+">")+
+          inline(h[2],0,options)+"</h"+level+">";i++;continue;
+      }
+      if(hr(lines[i])){out+="<hr>";i++;continue;}
+      if(quote(lines[i])){
+        const quoted=[];
+        while(i<lines.length&&quote(lines[i]))quoted.push(lines[i++].replace(/^\s{0,3}>\s?/,""));
+        out+="<blockquote>"+renderBlocks(quoted,depth+1,options)+"</blockquote>";
+        continue;
+      }
+      if(i+1<lines.length&&lines[i].includes("|")&&tableSeparator(lines[i+1])){
+        const headers=cells(lines[i]);
+        // Only fixed alignment classes, never source-controlled style attributes.
+        const alignment=cells(lines[i+1]).map(marker=>{
+          const left=marker.startsWith(":"),right=marker.endsWith(":");
+          return left&&right?' class="md-align-center"':
+            right?' class="md-align-right"':
+            left?' class="md-align-left"':"";
+        });
+        i+=2;out+="<div class=\"md-table-wrap\"><table><thead><tr>";
+        for(let j=0;j<headers.length;j++)
+          out+="<th"+(alignment[j]??"")+">"+inline(headers[j],0,options)+"</th>";
+        out+="</tr></thead><tbody>";
+        let rows=0;
+        while(i<lines.length&&lines[i].trim()&&lines[i].includes("|")&&rows++<1000){
+          const vals=cells(lines[i++]);out+="<tr>";
+          for(let j=0;j<headers.length;j++)
+            out+="<td"+(alignment[j]??"")+">"+inline(vals[j]??"",0,options)+"</td>";
+          out+="</tr>";
+        }
+        out+="</tbody></table></div>";
+        continue;
+      }
+      if(listItem(lines[i])){
+        const list=renderList(lines,i,depth,options);
+        if(list.next>i){out+=list.html;i=list.next;continue;}
+      }
+      const paragraph=[lines[i++].trim()];
+      while(i<lines.length&&lines[i].trim()&&!startsBlock(lines,i)){
+        paragraph.push(lines[i++].trim());
+      }
+      out+="<p>"+inline(paragraph.join(" "),0,options)+"</p>";
+    } finally {
+      if(options.sourceMap&&depth===0&&i>start){
+        const tagEnd=out.indexOf(">");
+        const first=options.lineOffset+start,last=options.lineOffset+i;
+        out=out.slice(0,tagEnd)+' data-source-start="'+first+'" data-source-end="'+last+'"'+out.slice(tagEnd);
+      }
+      blocks.push(out);
     }
-    if(listItem(lines[i])){
-      const list=renderList(lines,i,depth,options);
-      if(list.next>i){out+=list.html;i=list.next;continue;}
-    }
-    const paragraph=[lines[i++].trim()];
-    while(i<lines.length&&lines[i].trim()&&!startsBlock(lines,i)){
-      paragraph.push(lines[i++].trim());
-    }
-    out+="<p>"+inline(paragraph.join(" "),0,options)+"</p>";
   }
-  return out;
+  return blocks.join("");
 }
-export function renderMarkdown(source,{maxChars=300000,localLinks=false,localFiles=null,relativeDir=""}={}){
+export function renderMarkdown(source,{maxChars=300000,localLinks=false,localFiles=null,relativeDir="",sourceMap=false}={}){
   if(typeof source!=="string")throw new TypeError("Markdown Source must be a string");
   if(source.length>maxChars)return {available:false,html:"",reason:"文件太大，无法安全预览"};
   const lines=source.replace(/\r\n?/g,"\n").split("\n");
-  let head="";
+  let head="",lineOffset=0;
   if(lines[0]?.trim()==="---"){
     const end=lines.slice(1,130).findIndex(x=>x.trim()==="---");
     if(end>=0){
       const front=lines.slice(1,end+1).join("\n");
-      head='<details class="md-frontmatter"><summary>Front matter</summary><pre><code>'+escapeHTML(front)+"</code></pre></details>";
+      lineOffset=end+2;
+      const mapping=sourceMap?' data-source-start="0" data-source-end="'+lineOffset+'"':"";
+      head='<details class="md-frontmatter"'+mapping+'><summary>Front matter</summary><pre><code>'+escapeHTML(front)+"</code></pre></details>";
       lines.splice(0,end+2);
     }
   }
@@ -219,5 +232,5 @@ export function renderMarkdown(source,{maxChars=300000,localLinks=false,localFil
       headings.map(item=>'<li class="md-toc-level-'+item.level+'"><a href="#'+item.id+
         '">'+escapeHTML(item.label)+'</a></li>').join("")+'</ol></details>'
     :"";
-  return {available:true,html:head+toc+renderBlocks(lines,0,{localLinks,localFiles,relativeDir,headingIds})};
+  return {available:true,html:head+toc+renderBlocks(lines,0,{localLinks,localFiles,relativeDir,headingIds,sourceMap,lineOffset})};
 }

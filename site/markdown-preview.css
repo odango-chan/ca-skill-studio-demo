@@ -12,7 +12,7 @@
   --md-border:var(--vscode-panel-border,var(--border,#e1e7ef));
   --md-soft:var(--vscode-editorWidget-background,var(--surface,#fbfcfe));
   --md-raised:var(--vscode-sideBarSectionHeader-background,var(--raised,#edf3f9));
-  --md-accent:var(--vscode-focusBorder,var(--accent,#0c8e7b));
+  --md-accent:var(--accent,#0c8e7b);
   --md-link:var(--vscode-textLink-foreground,var(--accent,#087e72));
   --md-link-hover:var(--vscode-textLink-activeForeground,var(--blue,#317dc0));
   --md-hover:var(--vscode-list-hoverBackground,#eef5f8);
@@ -24,7 +24,7 @@
 .markdown-preview *{box-sizing:border-box}
 .markdown-preview h1,.markdown-preview h2,.markdown-preview h3,
 .markdown-preview h4,.markdown-preview h5,.markdown-preview h6{
-  color:var(--md-fg);line-height:1.4;font-weight:650;margin:1.5em 0 .55em;
+  color:var(--md-accent);line-height:1.4;font-weight:650;margin:1.5em 0 .55em;
 }
 .markdown-preview h1{font-size:24px;letter-spacing:-.02em;margin-top:.2em;
   padding-bottom:.4em;border-bottom:1px solid var(--md-border)}
@@ -116,4 +116,14 @@
   .markdown-preview h1{font-size:21px}
   .markdown-preview h2{font-size:17px}
   .markdown-preview th,.markdown-preview td{padding:8px 10px}
+}
+
+.skill-studio-markdown-document:is(.vscode-dark,.vscode-high-contrast){--accent:#83d9c4}
+.md-source-switch{display:none}
+@media(max-width:600px){
+  .md-source-switch{
+    display:block;position:sticky;top:0;z-index:1;margin:0 0 0 auto;padding:.45em .75em;
+    color:var(--vscode-button-foreground);background:var(--vscode-button-background);
+    border:1px solid var(--vscode-panel-border);cursor:pointer;
+  }
 }

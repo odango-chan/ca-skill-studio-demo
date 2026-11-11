@@ -185,3 +185,13 @@ test("the shared Markdown theme styles wide tables, sticky headings and host col
   assert.match(css,/\.md-align-right\s*\{/);
   assert.doesNotMatch(css,/@import\b|url\(/);
 });
+
+test('Source mappings cover original zero-based lines after front matter',()=>{
+  const source='---\r\ntitle: test\r\n---\r\n\r\n# Heading\r\n\r\nParagraph\r\ncontinued\r\n\r\n<script>fake</script>';
+  const preview=renderMarkdown(source,{sourceMap:true});
+  const ranges=[...preview.html.matchAll(/data-source-start="(\d+)" data-source-end="(\d+)"/g)]
+    .map(match=>match.slice(1).map(Number));
+  assert.deepEqual(ranges,[[0,3],[4,5],[6,8],[9,10]]);
+  assert.match(preview.html,/&lt;script&gt;/);
+  assert.doesNotMatch(renderMarkdown(source).html,/data-source-start/);
+});

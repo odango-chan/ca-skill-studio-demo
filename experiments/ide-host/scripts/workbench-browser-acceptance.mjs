@@ -1903,6 +1903,43 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      !guideOpen.view.localPaths.includes('assurance/procedure.yaml'))
     throw Error('SKILL.md outline or explicit Reference links are incomplete: '+
       JSON.stringify(guideOpen.view));
+  const markdownEditor=await evalJS(`(()=>{
+    for(const editor of document.querySelectorAll('.monaco-editor')){
+      if(!editor.getAttribute('data-uri')?.endsWith('/SKILL.md'))continue;
+      const box=editor.getBoundingClientRect();
+      if(box.width&&box.height)return {x:box.left+100,y:box.top+25};
+    }
+    return null;
+  })()`);
+  if(!markdownEditor)throw Error('Native Markdown Source did not open beside the preview');
+  await click(markdownEditor.x,markdownEditor.y);
+  await key('Home','Home',2,36);
+  await command('Input.insertText',{text:'# Unsaved Markdown acceptance\n\n'});
+  const live=await waitMarkdown(view=>view.heading==='Unsaved Markdown acceptance','Unsaved Markdown edit');
+  if(live.view.contextId!==guideOpen.view.contextId)
+    throw Error('The Markdown Webview was recreated for an unsaved edit');
+  await invoke('core.undo');
+  await waitMarkdown(view=>view.heading==='Establish PDU Session','Native Markdown undo');
+  const previewScroll=async expression=>(await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,expression
+  })).result?.value;
+  await key('End','End',2,35);
+  let sourceToPreview=false;
+  for(let attempt=0;attempt<40;attempt++){
+    if(await previewScroll('scrollY>100')){sourceToPreview=true;break;}
+    await sleep(100);
+  }
+  if(!sourceToPreview)throw Error('Native Source scrolling did not move the preview');
+  await previewScroll('scrollTo(0,0)');
+  let previewToSource=false;
+  for(let attempt=0;attempt<40;attempt++){
+    previewToSource=await evalJS(`[...document.querySelectorAll('.monaco-editor')]
+      .find(editor=>editor.getAttribute('data-uri')?.endsWith('/SKILL.md')&&editor.clientWidth)
+      ?.querySelector('.view-lines')?.innerText?.includes('name: establish-pdu-session')`);
+    if(previewToSource)break;
+    await sleep(100);
+  }
+  if(!previewToSource)throw Error('Preview scrolling did not reveal the start of native Source');
   const openReference=await command('Runtime.evaluate',{
     contextId:guideOpen.view.contextId,returnByValue:true,
     expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="references/3gpp-procedure.md");if(!link)return false;link.click();return true;})()'
@@ -1925,23 +1962,16 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const traversalBlocked=afterForgery.length===beforeForgery;
   if(!traversalBlocked)
     throw Error('Forged Webview message opened a file outside the active Skill Package');
-  const guideCountBeforeReturn=afterForgery.filter(
-    view=>view.heading==='Establish PDU Session').length;
   const returnToGuide=await command('Runtime.evaluate',{
     contextId:referenceOpen.view.contextId,returnByValue:true,
     expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="../SKILL.md");if(!link)return false;link.click();return true;})()'
   });
   if(returnToGuide.result?.value!==true)
     throw Error('Could not follow Reference → SKILL.md navigation');
-  let returnedGuides=[];
-  for(let attempt=0;attempt<80;attempt++){
-    returnedGuides=(await markdownViews()).filter(
-      view=>view.heading==='Establish PDU Session');
-    if(returnedGuides.length>guideCountBeforeReturn)break;
-    await sleep(100);
-  }
-  if(returnedGuides.length<=guideCountBeforeReturn)
-    throw Error('Reference → SKILL.md did not open a new guide preview');
+  const returned=await waitMarkdown(
+    view=>view.heading==='Establish PDU Session','Reference return to guide');
+  if(returned.views.filter(view=>view.heading==='Establish PDU Session').length!==1)
+    throw Error('Reference navigation duplicated the guide preview');
   await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session-mas');
   const masOpen=await waitMarkdown(
     view=>view.heading==='Establish PDU Session through SMF MAS'&&view.themeApplied,'Themed MAS SKILL.md preview');
@@ -1950,7 +1980,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify(masOpen.view));
   const markdownGuideEvidence={
     conventional:guideOpen.view,reference:referenceOpen.view,
-    returnedGuideCount:returnedGuides.length,mas:masOpen.view,traversalBlocked
+    returnedGuideCount:returned.views.filter(view=>view.heading==='Establish PDU Session').length,
+    liveUpdateRetainedFrame:true,sourceToPreview,previewToSource,mas:masOpen.view,traversalBlocked
   };
   console.log('STUDIO_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.

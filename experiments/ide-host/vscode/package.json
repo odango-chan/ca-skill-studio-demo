@@ -71,7 +71,7 @@
       },
       {
         "command": "skillStudio.previewMarkdown",
-        "title": "SKILL Studio: Preview Markdown"
+        "title": "SKILL Studio: Open Markdown Split"
       },
       {
         "command": "skillStudio.refreshInspection",
@@ -156,6 +156,13 @@
           "when": "resourceFilename == procedure.yaml",
           "group": "navigation"
         },
+        {
+          "command": "skillStudio.previewMarkdown",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
         {
           "command": "skillStudio.previewMarkdown",
           "when": "resourceExtname == .md",

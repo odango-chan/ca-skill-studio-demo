@@ -39,6 +39,8 @@ export function packageFileCommand(path, uri) {
     return {command:'skillStudio.openPredicates',title:'Open Predicate Designer',arguments:[uri]};
   if (/^schemas\/.+\.schema\.ya?ml$/i.test(path))
     return {command:'skillStudio.openSchema',title:'Open Schema Designer',arguments:[uri]};
+  if (/\.md$/i.test(path))
+    return {command:'skillStudio.previewMarkdown',title:'Open Markdown Split',arguments:[uri]};
   return {command:'vscode.open',title:'Open Source',arguments:[uri]};
 }
 

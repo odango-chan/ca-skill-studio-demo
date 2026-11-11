@@ -144,7 +144,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
   const file=uri('/workspace/establish-pdu-session/assurance/procedure.yaml');
   const doc={uri:file,version:1,text:source,getText(){return this.text;},positionAt(offset){return {offset};},get lineCount(){return this.text.split('\n').length;}};
-  let changed;
+  let changed, markdownMessage;
+  const previewMessages=[];
   const vscode={
     EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
     TreeItem:class {constructor(label,state){this.label=label;this.collapsibleState=state;}},
@@ -168,10 +169,10 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
       },
       onDidChangeTextDocument(cb){changed=cb;return disposable();},openTextDocument:async()=>doc},
     window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
-      onDidChangeActiveTextEditor:()=>disposable(),showTextDocument:async()=>{},
+      onDidChangeActiveTextEditor:()=>disposable(),onDidChangeTextEditorVisibleRanges:()=>disposable(),showTextDocument:async()=>{},
       showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},
       showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation',
-      createWebviewPanel(){const p={webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u,onDidReceiveMessage:()=>disposable()},onDidDispose:()=>disposable()};panels.push(p);return p;}}
+      createWebviewPanel(){const p={webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u,onDidReceiveMessage:callback=>{markdownMessage=callback;return disposable();},postMessage:message=>previewMessages.push(message)},onDidDispose:()=>disposable()};panels.push(p);return p;}}
   };
   const context={subscriptions:[],extensionUri:uri('/extension')},workbench=registerWorkbench(vscode,context),posted=[];
   workbench.attach(doc,m=>posted.push(m));
@@ -564,6 +565,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
   assert.match(dataflow.description,/no write authorization/);
   assert.ok(dataflow.children.some(x=>x.label.includes('Source lineage')));
+  doc.uri=uri('/workspace/SKILL.md');
   doc.text='# Preview title\n<script>alert(1)</script>';
   await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));
   assert.match(panels[0].webview.html,/Content-Security-Policy/);
@@ -572,10 +574,19 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.match(panels[0].webview.html,/img-src 'none'/);
   assert.match(panels[0].webview.html,/href="https:\/\/studio\.invalid\/media\/markdown-preview\.css"/);
   assert.match(panels[0].webview.html,/class="markdown-preview"/);
-  assert.match(panels[0].webview.html,/<h1(?: id="[^"]+")?>Preview title<\/h1>/);
+  assert.match(panels[0].webview.html,/<h1[^>]*>Preview title<\/h1>/);
   assert.match(panels[0].webview.html,/&lt;script&gt;/);
-  doc.text='x'.repeat(300001);changed({document:{...doc,uri:uri('/workspace/SKILL.md')}});
-  assert.match(panels[0].webview.html,/预览不可用/);
+  const initialHtml=panels[0].webview.html;
+  await markdownMessage({type:'markdownReady'});
+  assert.match(previewMessages.at(-1).html,/data-source-start="0"/);
+  doc.text='# Unsaved title';
+  doc.version++;changed({document:doc});
+  assert.match(previewMessages.at(-1).html,/Unsaved title/);
+  assert.equal(previewMessages.at(-1).version,doc.version);
+  doc.text='x'.repeat(300001);
+  doc.version++;changed({document:doc});
+  assert.doesNotMatch(previewMessages.at(-1).html,/data-source-start/);
+  assert.equal(panels[0].webview.html,initialHtml);
   assert.equal((panels[0].webview.html.match(/<script\b/gi)??[]).length,1,
     'only the nonce-protected local file navigation bridge is present');
   assert.match(panels[0].webview.html,/<script nonce="[a-f0-9]{32}">/);
