@@ -99,18 +99,14 @@ test("project detection starts only after complete triad exists, protects subseq
   await denied(provider.writeFile(uri("/project/lib/after.yaml"),new Uint8Array([1]),{create:true,overwrite:true}));
 });
 
-test("bulk OPFS createIndex cannot bypass the protected project boundary",async()=>{
+test("bulk OPFS createIndex is disabled until a scoped import capability exists",async()=>{
   const {provider,actions}=fixture();
-  await denied(provider.createIndex(new Map([
-    [uri("/project/lib/generated.py"),new Uint8Array([1])]
-  ])));
-  await denied(provider.createIndex(new Map([
-    [uri("/project/output/manifest.json"),new Uint8Array([1])]
-  ])));
-  await provider.createIndex(new Map([
-    [uri("/project/skills/one/generated.py"),new Uint8Array([1])]
-  ]));
-  assert.deepEqual(actions,[["createIndex","/project/skills/one/generated.py"]]);
+  for(const path of ["/project/lib/generated.py","/project/output/manifest.json",
+    "/project/skills/one/generated.py"]){
+    await denied(provider.createIndex(new Map([[uri(path),new Uint8Array([1])]])));
+  }
+  await denied(provider.createIndex(new Map()));
+  assert.deepEqual(actions,[]);
 });
 
 test("provider forbids native OPFS clear and has strict segment based roles",async()=>{
