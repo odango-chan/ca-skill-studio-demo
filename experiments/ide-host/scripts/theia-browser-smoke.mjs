@@ -422,26 +422,37 @@ try{
         throw Error("Native YAML syntax tokenization not active: "+JSON.stringify(yamlSyntax));
       patchEvidence.yamlSyntax=yamlSyntax;
       if(requireBrowserLsp){
-        // Evidence of the *rendered* native editor, not only a lexer count.
-        // Keep the diagnostic bounded: no semantic color is claimed until
-        // we can associate an exact visible source identity with its color.
-        const semanticColors=await evalJS(`(()=>{
-          const editor=[...document.querySelectorAll(".monaco-editor")]
-            .find(el=>el.getBoundingClientRect().width>150&&el.querySelector(".view-lines"));
-          const view=editor?.querySelector(".view-lines");
-          const spans=[...(view?.querySelectorAll("span")??[])];
-          const targets=["procedures","ue-requested-pdu-session-establishment",
-            "createdsession.ingress.eligible","call","sbi.udm.sm_data.get"];
-          return {
-            visibleText:(view?.innerText??"").replaceAll(String.fromCharCode(160)," ").slice(0,950),
-            targetSpans:spans.filter(s=>targets.some(t=>(s.textContent??"").includes(t)))
-              .map(s=>({text:(s.textContent??"").slice(0,120),
-                color:getComputedStyle(s).color})).slice(0,25),
-            colors:[...new Set(spans.map(s=>getComputedStyle(s).color))]
-          };
-        })()`);
+        // Assert real semantic overrides, rather than the mere presence of
+        // ordinary TextMate colors. Async providers can arrive after syntax.
+        let semanticColors=null;
+        for(let attempt=0;attempt<45;attempt++){
+          semanticColors=await evalJS(`(()=>{
+            const editor=[...document.querySelectorAll(".monaco-editor")]
+              .find(el=>el.getBoundingClientRect().width>150&&el.querySelector(".view-lines"));
+            const view=editor?.querySelector(".view-lines");
+            const spans=[...(view?.querySelectorAll("span")??[])];
+            const targets=["ue-requested-pdu-session-establishment",
+              "createdsession.ingress.eligible","call","sbi.udm.sm_data.get"];
+            const exact=Object.fromEntries(targets.map(target=>[
+              target,
+              [...spans].filter(s=>(s.textContent??"").trim()===target)
+                .map(s=>getComputedStyle(s).color)
+            ]));
+            return {
+              exact, tokenCount:spans.length,
+              colors:[...new Set(spans.map(s=>getComputedStyle(s).color))]
+            };
+          })()`);
+          if(semanticColors?.exact?.["ue-requested-pdu-session-establishment"]?.includes("rgb(173, 101, 23)")&&
+             semanticColors?.exact?.["sbi.udm.sm_data.get"]?.includes("rgb(123, 91, 167)"))
+            break;
+          await sleep(120);
+        }
         console.log("STUDIO_SKILL_SEMANTIC_DOM_CHROMIUM",JSON.stringify(semanticColors));
         patchEvidence.semanticDom=semanticColors;
+        if(!semanticColors?.exact?.["ue-requested-pdu-session-establishment"]?.includes("rgb(173, 101, 23)")||
+           !semanticColors?.exact?.["sbi.udm.sm_data.get"]?.includes("rgb(123, 91, 167)"))
+          throw Error("Native Skill semantic colors not rendered: "+JSON.stringify(semanticColors));
       }
       // This probe opens a pinned owner script in the native workbench.
       // Open a real bundled Python source through Theia's native Quick Open.

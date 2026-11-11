@@ -46,68 +46,68 @@
   ],
   "contributes": {
     "semanticTokenTypes": [
-          {
-                "id": "skillKeyword",
-                "description": "Skill structural keyword"
-          },
-          {
-                "id": "skillOperator",
-                "description": "Procedure operator"
-          },
-          {
-                "id": "skillProcedure",
-                "description": "Procedure name"
-          },
-          {
-                "id": "skillStep",
-                "description": "Procedure Node/Step name"
-          },
-          {
-                "id": "skillCapability",
-                "description": "External governed Capability reference"
-          },
-          {
-                "id": "skillTool",
-                "description": "Skill-local Tool reference"
-          },
-          {
-                "id": "skillPredicate",
-                "description": "Predicate name"
-          },
-          {
-                "id": "skillObservation",
-                "description": "Observation reference"
-          },
-          {
-                "id": "skillOutcome",
-                "description": "Outcome or verdict"
-          },
-          {
-                "id": "skillDataType",
-                "description": "Scalar data type"
-          },
-          {
-                "id": "skillSchema",
-                "description": "Schema reference"
-          },
-          {
-                "id": "skillReference",
-                "description": "Script or Reference path"
-          },
-          {
-                "id": "skillBinding",
-                "description": "Explicit binding reference"
-          }
+      {
+        "id": "skillKeyword",
+        "description": "Skill structural keyword"
+      },
+      {
+        "id": "skillOperator",
+        "description": "Procedure operator"
+      },
+      {
+        "id": "skillProcedure",
+        "description": "Procedure name"
+      },
+      {
+        "id": "skillStep",
+        "description": "Procedure Node/Step name"
+      },
+      {
+        "id": "skillCapability",
+        "description": "External governed Capability reference"
+      },
+      {
+        "id": "skillTool",
+        "description": "Skill-local Tool reference"
+      },
+      {
+        "id": "skillPredicate",
+        "description": "Predicate name"
+      },
+      {
+        "id": "skillObservation",
+        "description": "Observation reference"
+      },
+      {
+        "id": "skillOutcome",
+        "description": "Outcome or verdict"
+      },
+      {
+        "id": "skillDataType",
+        "description": "Scalar data type"
+      },
+      {
+        "id": "skillSchema",
+        "description": "Schema reference"
+      },
+      {
+        "id": "skillReference",
+        "description": "Script or Reference path"
+      },
+      {
+        "id": "skillBinding",
+        "description": "Explicit binding reference"
+      }
     ],
     "semanticTokenModifiers": [
-          {
-                "id": "reference",
-                "description": "Reference to a semantic object"
-          },
-          {
-                "id": "imported",
-                "description": "Read-only imported Library declaration"
-          }
+      {
+        "id": "reference",
+        "description": "Reference to a semantic object"
+      },
+      {
+        "id": "imported",
+        "description": "Read-only imported Library declaration"
+      }
     ],
     "colors": [
       {
@@ -500,6 +500,11 @@
           "name": "Problems"
         }
       ]
+    },
+    "configurationDefaults": {
+      "[yaml]": {
+        "editor.semanticHighlighting.enabled": true
+      }
     }
   },
   "scripts": {
