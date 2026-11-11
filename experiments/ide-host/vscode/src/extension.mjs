@@ -22,6 +22,10 @@ import {registerSchemaEditor} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
 import {registerDependenciesView} from "./dependencies-view.mjs";
 import {registerBuildView} from "./build-view.mjs";
+import {readProjectConfiguration} from "./project-configuration.mjs";
+import {applyDependency,removeDependency,resolveLockedDependencies}
+  from "./dependency-service.mjs";
+import {acquireBuiltin} from "./contract-acquisition.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
@@ -49,6 +53,53 @@ export function activate(context){
   buildView=registerBuildView(vscode,context,{
     getProjectRoot:()=>dependenciesView.getProjectRoot()
   });
+  // Browser acceptance command exercises actual native Settings, workspace.fs
+  // immutable storage and Build UI. Not contributed to the command palette;
+  // no execution/Runtime credentials or external requests.
+  if(typeof globalThis.location!=="undefined"&&
+      /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(globalThis.location.hostname)){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.pluginManagedAcceptance",async()=>{
+        const folders=vscode.workspace.workspaceFolders??[];
+        const folder=folders.find(f=>f.uri.path.endsWith("/skill-studio-example-v01"));
+        if(!folder)throw Error("Browser test Example project root not mounted");
+        const root=folder.uri,before=readProjectConfiguration(vscode,root);
+        if(before.settings.skillsRoot!=="skills"||
+           before.settings.dependencies.length!==0||
+           before.settings.dependencyLock.entries.length!==0)
+          throw Error("Browser Example should start with empty dependency settings");
+        const probeId="browser-v01-acceptance";
+        const acquired=await acquireBuiltin({
+          bundleId:"studio-example-tools",version:"1.0.0"});
+        const state=await applyDependency(vscode,root,probeId,acquired,
+          {confirm:async()=>true});
+        if(state.status!=="READY")throw Error("Browser pinned import did not resolve READY");
+        const locked=readProjectConfiguration(vscode,root);
+        if(locked.settings.dependencies.length!==1||
+           locked.settings.dependencyLock.entries.length!==1||
+           locked.settings.dependencies[0].id!==probeId)
+          throw Error("Browser native Workspace settings did not persist declaration and lock");
+        const restored=await resolveLockedDependencies(vscode,root);
+        if(restored.status!=="READY"||restored.snapshots.length!==1)
+          throw Error("Browser native file store failed immutable reload");
+        await vscode.commands.executeCommand("skillStudio.selectProjectRoot");
+        const compiler=await vscode.commands.executeCommand("skillStudio.checkProject");
+        if(compiler?.status!=="UNAVAILABLE")
+          throw Error("Browser Build must be UNAVAILABLE without v0.1 Core");
+        const removed=await removeDependency(vscode,root,probeId,
+          {confirm:async()=>true});
+        const after=readProjectConfiguration(vscode,root);
+        if(removed.status!=="READY"||after.settings.dependencies.length!==0||
+           after.settings.dependencyLock.entries.length!==0)
+          throw Error("Browser Workspace config did not persist dependency removal");
+        return {status:"PASS",workspaceRoot:root.toString(),
+          snapshotDigest:locked.settings.dependencyLock.entries[0].snapshotDigest,
+          pinnedStatus:restored.status,buildStatus:compiler.status,
+          declarationCount:after.settings.dependencies.length,
+          sourceRoot:before.settings.skillsRoot};
+      }
+    ));
+  }
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
