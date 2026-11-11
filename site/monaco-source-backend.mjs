@@ -9,7 +9,8 @@ import {createOwnerYamlSchemas} from "./yaml-owner-schemas.mjs";
 import {yamlSchemaCapability} from "./yaml-schema-policy.mjs";
 import {registerSkillSemanticTokens} from "./skill-semantic-tokens.mjs";
 import studioLightTheme from "../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
-import {standaloneSemanticTokenRules} from "./semantic-token-theme.mjs";
+import {standaloneSemanticTokenRules,semanticTokenDecorationClass,semanticTokenDecorationCss} from "./semantic-token-theme.mjs";
+import {collectSkillSemanticTokenSpans} from "./skill-semantic-tokens.mjs";
 const languageId = monacoLanguageForPath;
 let yamlLanguageService = null;
 let monacoWorkerCompatibilityInstalled = false;
@@ -99,13 +100,35 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
   // The private mirror supports existing DOM-based D4 regression probes.
   // It is hidden from the user once Monaco is mounted and cannot write except
   // through a deliberate input event; Monaco alone receives keyboard input.
-  let editor;
+  let editor,semanticDecorations=null,semanticStyle=null;
   const guarded=fn=>{suppress++;try{return fn();}finally{suppress--;}};
+  const applySemanticDecorations=()=>{
+    if(!model||!semanticDecorations)return;
+    const spans=collectSkillSemanticTokenSpans(raw,model.uri?.path??"");
+    const decorations=[];
+    for(const span of spans){
+      const first=model.getPositionAt(span.start);
+      const last=model.getPositionAt(span.end);
+      const inlineClassName=semanticTokenDecorationClass(span.type);
+      for(let lineNumber=first.lineNumber;lineNumber<=last.lineNumber;lineNumber++){
+        const startColumn=lineNumber===first.lineNumber?first.column:1;
+        const endColumn=lineNumber===last.lineNumber
+          ?last.column:model.getLineMaxColumn(lineNumber);
+        if(endColumn<=startColumn)continue;
+        decorations.push({
+          range:{startLineNumber:lineNumber,startColumn,endLineNumber:lineNumber,endColumn},
+          options:{inlineClassName}
+        });
+      }
+    }
+    semanticDecorations.set(decorations);
+  };
   const syncMirror=()=>{if(mirror.value!==raw)mirror.value=raw;};
   const onModelInput=()=>{
     if(suppress||disposed||!model)return;
     raw=model.getValue(monaco.editor.EndOfLinePreference.TextDefined,true);
     syncMirror();
+    applySemanticDecorations();
     for(const handler of [...callbacks.input])handler();
   };
   const onMirrorInput=()=>{
@@ -134,6 +157,14 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
       fixedOverflowWidgets:true,accessibilitySupport:"auto",
       ariaLabel:"当前文件源码 · Monaco Editor"
     });
+    semanticDecorations=editor.createDecorationsCollection();
+    semanticStyle=host.ownerDocument.createElement("style");
+    semanticStyle.dataset.semanticTokenStyles="studio-light";
+    semanticStyle.textContent=semanticTokenDecorationCss(studioLightTheme.semanticTokenColors??{});
+    const styleRoot=host.getRootNode?.();
+    const styleTarget=styleRoot?.nodeType===11?styleRoot:host.ownerDocument.head;
+    styleTarget?.appendChild(semanticStyle);
+    host.dataset.semanticTokenRenderer="standalone-decoration-adapter";
     const scrollSubscription=editor.onDidScrollChange(()=>{
       if(disposed||suppress)return;
       for(const handler of [...callbacks.scroll])handler();
@@ -158,6 +189,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           if(model && model.getValue(monaco.editor.EndOfLinePreference.TextDefined,true)!==next)
             model.setValue(next);
           syncMirror();
+          applySemanticDecorations();
         });
       },
       openDocument(path,text){
@@ -178,6 +210,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           editor.setModel(model);
           modelChange=model.onDidChangeContent(onModelInput);
           syncMirror();
+          applySemanticDecorations();
           editor.setScrollTop(0);
           editor.setScrollLeft(0);
         });
@@ -207,6 +240,8 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
         if(disposed)return;
         disposed=true;
         modelChange?.dispose();
+        semanticDecorations?.clear();
+        semanticStyle?.remove();
         editor.setModel(null);
         model?.dispose();
         for(const action of actions)action.dispose();
@@ -218,6 +253,8 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
     };
     return backend;
   }catch(error){
+    semanticDecorations?.clear();
+    semanticStyle?.remove();
     editor?.dispose();
     throw error;
   }
