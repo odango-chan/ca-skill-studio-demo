@@ -1,5 +1,5 @@
 import { parseDocument, isMap, isSeq, isScalar } from "yaml";
-import tokenCatalogSource from "../language/spec/skill-language-tokens.yaml";
+import tokenCatalogSource from "./spec/skill-language-tokens.yaml";
 
 const catalogDocument = parseDocument(tokenCatalogSource, {
   version: "1.2", schema: "core", strict: true, logLevel: "silent"
