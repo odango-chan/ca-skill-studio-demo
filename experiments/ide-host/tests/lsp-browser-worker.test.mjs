@@ -189,6 +189,8 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.equal(initialized.result.capabilities.semanticTokensProvider.full,true);
     const semanticLegend=initialized.result.capabilities.semanticTokensProvider.legend;
     assert.ok(semanticLegend.tokenTypes.includes("caReferenceOperation"));
+    assert.ok(semanticLegend.tokenTypes.includes("caReferencePredicate"));
+    assert.ok(semanticLegend.tokenTypes.includes("caValueOutcome"));
     assert.ok(semanticLegend.tokenTypes.includes("caKeywordControl"));
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
@@ -232,6 +234,10 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
       "Procedure call values are emitted as Operation references");
     assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caKeywordControl")),
       "Procedure control keys are emitted as CA semantic tokens");
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caReferencePredicate")),
+      "Predicate references are emitted as CA semantic tokens");
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caValueOutcome")),
+      "Outcome values are emitted as CA semantic tokens");
 
     const scriptNeedle="scripts/select_establishment_configuration.py";
     const definition=await lspRequest(worker,12,"textDocument/definition",{
