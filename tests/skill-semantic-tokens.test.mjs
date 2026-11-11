@@ -5,7 +5,7 @@ import {mkdtemp,rm} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 import {build} from "esbuild";
-import {standaloneSemanticTokenRules} from "../site/semantic-token-theme.mjs";
+import {standaloneSemanticTokenRules,semanticTokenDecorationClass,semanticTokenDecorationCss} from "../site/semantic-token-theme.mjs";
 
 const entry=fileURLToPath(new URL("../site/skill-semantic-tokens.mjs",import.meta.url));
 const scratchRoot=resolve(process.cwd(),".agent-tmp");
@@ -240,4 +240,10 @@ test("online and installed Studio Light themes expose every CA semantic token co
   assert.equal(standaloneRules.find(rule=>rule.token==="caReferencePredicate")?.foreground,"7B5BA7");
   assert.equal(standaloneRules.find(rule=>rule.token==="caValueOutcome")?.foreground,"AD6517");
   assert.deepEqual(standaloneRules.find(rule=>rule.token==="comment")?.fontStyle,"italic");
+  assert.equal(semanticTokenDecorationClass("caReferencePredicate"),"ca-semantic-token--caReferencePredicate");
+  const decorationCss=semanticTokenDecorationCss(theme.semanticTokenColors);
+  assert.match(decorationCss,/\.ca-semantic-token--caReferencePredicate\{color:#7B5BA7!important\}/);
+  assert.match(decorationCss,/\.ca-semantic-token--caValueOutcome\{color:#AD6517!important\}/);
+  assert.match(backend,/createDecorationsCollection\(\)/);
+  assert.match(backend,/collectSkillSemanticTokenSpans\(raw,model\.uri\?\.path\?\?" "/);
 });
