@@ -195,6 +195,14 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
     const snapshot=samplePackageSnapshot();
+    // Register for READY before posting the snapshot. Semantic token requests
+    // below are intentionally answered early, so READY can otherwise arrive
+    // while the test is still awaiting those responses.
+    const readyStatus=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus" &&
+      message.params?.rootUri===snapshot.rootUri &&
+      message.params?.state==="READY",15000
+    );
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot
     });
@@ -214,10 +222,7 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
       });
     assert.ok(earlySemanticTokens.data.length>0,
       "semantic tokens are available before Package analysis reaches READY");
-    const status=await waitForMessage(worker,message=>
-      message?.method==="skillStudio/analysisStatus" &&
-      message.params?.rootUri===snapshot.rootUri
-    );
+    const status=await readyStatus;
     assert.equal(status.params.state,"READY");
     // The liveness endpoint must answer on the real Worker JSON-RPC channel
     // without changing the Package analysis generation or Source.
