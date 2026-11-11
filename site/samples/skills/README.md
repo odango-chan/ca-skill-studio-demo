@@ -1,10 +1,23 @@
-# Current dual-SKILL studio demonstration
+# Studio example Skills (ca-skills)
 
-Snapshot of the two runtime-used SKILL packages from `odango-chan/ca-agent-demo` at `9abb6b829d4466b42f0bc55ba26caa33abe8d7e3` (November 10, 2026).
+The two built-in authoring examples are pinned byte-for-byte to
+[`odango-chan/ca-skills`](https://github.com/odango-chan/ca-skills) at
+`3fce09aca32b6a6faf6ec3e9a204d38cc129ec38` (November 11, 2026):
 
 - `establish-pdu-session`
 - `establish-pdu-session-mas`
 
-Only `SKILL.md`, `assurance/`, `references/`, `schemas/` and `scripts/` are copied. `cases/` and `design/` are deliberately excluded because the online Studio Demo focuses on runtime-used authoring assets, not case/test workspaces. Source copies are byte-identical to the pinned repository. Legacy `site/samples/packages/establish-pdu-session` remains intact for existing Classic regression fixtures.
+`files.json` is the allowlist for imported source files. It includes `SKILL.md`,
+`assurance/`, `references/`, `schemas/`, and `scripts/` that exist in the
+pinned `ca-skills` examples. `cases/` is excluded from this authoring
+demo; the runtime/contract example is not a test fixture or package manager.
 
-The browser loader creates both packages under one `skills/` workspace, preserving existing files and applying no implicit Runtime / 5GC execution.
+Previous `ca-agent-demo` snapshots and superseded schema files can remain
+in the repository for existing Classic regression tests, but are **not**
+automatically imported into a new Studio workspace.
+
+The browser loader creates `skills/`, `lib/` and `output/` under the
+extension-owned demo project. It never overwrites existing files, including
+user-edited versions of these two examples; reloading can add missing files
+but cannot silently upgrade existing source. User-controlled workspaces are
+not reused as the sample destination.

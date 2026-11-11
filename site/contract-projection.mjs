@@ -41,6 +41,28 @@ function listValues(root, counter, path, warnings) {
     line: nodeAt(node, counter)
   }));
 }
+function contextSchemaList(root, counter, warnings) {
+  const schemas = get(root, 'spec', 'context', 'schemas');
+  if (!schemas) return [];
+  if (!isMap(schemas)) {
+    warnings.push('spec.context.schemas is not a mapping');
+    return [];
+  }
+  return schemas.items.map(pair => {
+    const name = scalar(pair.key);
+    const value = scalar(pair.value);
+    if (typeof name !== 'string' || typeof value !== 'string' || !value.trim()) {
+      warnings.push('spec.context.schemas entries must have string keys and paths');
+      return null;
+    }
+    return {
+      name,
+      value,
+      path: 'spec.context.schemas.' + name,
+      line: nodeAt(pair.value, counter)
+    };
+  }).filter(Boolean);
+}
 function expectationList(root, counter, name, warnings, satisfiable = false) {
   const path = ['spec', name];
   const list = get(root, ...path);
@@ -87,7 +109,10 @@ function collectUnprojected(root) {
   const spec = get(root, 'spec');
   unknownFields(spec, SPEC_KEYS, 'spec.', paths);
   unknownFields(get(spec, 'inputs'), new Set(['requestSchema']), 'spec.inputs.', paths);
-  unknownFields(get(spec, 'context'), new Set(['requiredFacts']), 'spec.context.', paths);
+  unknownFields(get(spec, 'context'), new Set(['requiredFacts', 'schemas']), 'spec.context.', paths);
+  unknownFields(get(spec, 'context', 'schemas'),
+    new Set(['subject', 'facts', 'observations', 'evidence']),
+    'spec.context.schemas.', paths);
   unknownFields(get(spec, 'allowedResources'), new Set(['capabilities', 'localTools']),
     'spec.allowedResources.', paths);
   unknownFields(get(spec, 'planning'),
@@ -163,6 +188,7 @@ export function projectSkillContract(source) {
   const outcomeUnknown = get(failure, 'outcomeUnknown');
   const unknown = collectUnprojected(root);
   const requiredFacts = listValues(root, counter, ['spec', 'context', 'requiredFacts'], warnings);
+  const contextSchemas = contextSchemaList(root, counter, warnings);
   const capabilities = listValues(root, counter,
     ['spec', 'allowedResources', 'capabilities'], warnings);
   const localTools = listValues(root, counter,
@@ -182,6 +208,7 @@ export function projectSkillContract(source) {
     entryProcedure: field(root, counter, 'spec', 'entryProcedure'),
     requestSchema: field(root, counter, 'spec', 'inputs', 'requestSchema'),
     requiredFacts,
+    contextSchemas,
     capabilities,
     localTools,
     preconditions,

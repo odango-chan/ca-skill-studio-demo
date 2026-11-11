@@ -11,6 +11,10 @@ const contract = [
   '  skillType: executable',
   '  goal: demo.ready',
   '  entryProcedure: begin',
+  '  context:',
+  '    requiredFacts: [ingress]',
+  '    schemas:',
+  '      subject: lib/host/subject.schema.yaml',
   '  allowedResources:',
   '    capabilities: [tool.read]',
   '    localTools: [skill.lookup]',
@@ -74,12 +78,15 @@ test('Contract custom editor registers independently and renders a nonce-protect
   assert.match(webview.html, /Content-Security-Policy/);
   assert.doesNotMatch(webview.html, /unsafe-inline|https?:\/\//);
   assert.match(webview.html, /打开 YAML Source/);
+  assert.match(webview.html, /Context Schemas/);
 
   await messageHandler({type: 'ready'});
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(messages.at(-1).type, 'snapshot');
   assert.equal(messages.at(-1).projection.state, 'READY');
   assert.equal(messages.at(-1).projection.name.value, 'browser-contract-test');
+  assert.equal(messages.at(-1).projection.contextSchemas[0].value,
+    'lib/host/subject.schema.yaml');
 
   text = contract.replace('goal: demo.ready', 'goal: demo.updated');
   document.version = 2;

@@ -34,6 +34,12 @@ test("host colors reuse established Studio Light design tokens",()=>{
   assert.equal(theme.colors["sideBar.background"],"#FFFFFF");
   assert.equal(theme.colors["activityBar.activeBorder"],"#0C8E7B");
   assert.equal(theme.colors["icon.foreground"],"#57728B");
+  assert.equal(theme.colors["statusBar.background"],"#F5F7FB");
+  assert.equal(theme.colors["statusBar.noFolderBackground"],"#F5F7FB");
+  assert.equal(theme.colors["statusBar.debuggingBackground"],"#E5F6EF");
+  assert.equal(theme.colors["statusBar.foreground"],"#354C66");
+  assert.equal(theme.colors["statusBarItem.prominentBackground"],"#DFEEE9");
+  assert.notEqual(theme.colors["statusBar.noFolderBackground"],"#68217A");
   assert.ok(theme.tokenColors.length>=12&&theme.semanticTokenColors.function);
 });
 test("file icon theme maps SKILL assets and local SVGs",()=>{

@@ -12,6 +12,10 @@ spec:
     requiredFacts:
     - createdsession_ingress
     - createdsession_lifecycle
+    schemas:
+      subject: lib/host/subject.schema.yaml
+      facts: lib/host/facts.schema.yaml
+      observations: lib/observations/context-observations.schema.yaml
   allowedResources:
     capabilities:
     - ca.pdu_session.subscription.validate
@@ -23,17 +27,13 @@ spec:
     - ca.pdu_session.address.allocate
     - ca.pdu_session.policy.update
     - ca.pdu_session.charging.create
-    - ca.pdu_session.user_plane.establish
-    - ca.pdu_session.address.confirm
-    - ca.pdu_session.access.signal
-    - ca.pdu_session.user_plane.activate
-    - ca.pdu_session.events.emit
-    - ca.pdu_session.resources.finalize
-    - ca.pdu_session.resources.cleanup
-    localTools: []
-  preconditions:
-  - predicate: mas.establishment.eligible
-    expect: PASS
+    - ca.pdu_session.n4.initialize
+    - ca.pdu_session.n1n2.transfer
+    - ca.pdu_session.ran.await
+    - ca.pdu_session.n4.await
+    - ca.pdu_session.resource.finalize
+    - ca.pdu_session.cleanup
+    - ca.pdu_session.context.read
   postconditions:
   - predicate: mas.establishment.ran_accepted
     expect: PASS

@@ -37,6 +37,9 @@ import {
   SKILL_SEMANTIC_TOKEN_TYPES,
   SKILL_SEMANTIC_TOKEN_MODIFIERS
 } from "../../../../language/semantic-tokens.mjs";
+import studioLightTheme from "../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
+import {createSemanticTokenDecorationRenderer}
+  from "../../lsp-browser/client/src/semantic-token-decorations.mjs";
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
@@ -108,6 +111,20 @@ export function registerWorkbench(vscode,context){
       [...SKILL_SEMANTIC_TOKEN_TYPES],
       [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
     );
+    let renderer=null;
+    const isTheia=(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
+      /theia/i.test(String(vscode.env?.appName??""));
+    if(isTheia){
+      try{
+        renderer=createSemanticTokenDecorationRenderer(
+          vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
+        );
+        semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
+        context.subscriptions.push({dispose:()=>renderer?.dispose()});
+      }catch(error){
+        semanticTokenDiagnostics.renderError=String(error?.message??error);
+      }
+    }
     const provider={
       provideDocumentSemanticTokens(document,cancellationToken){
         if(cancellationToken?.isCancellationRequested)
@@ -121,6 +138,17 @@ export function registerWorkbench(vscode,context){
         const result=encodeNativeSemanticTokens(document,spans);
         semanticTokenDiagnostics.lastTokenCount=result.data.length/5;
         semanticTokenDiagnostics.lastError=null;
+        if(renderer){
+          try{
+            const rendered=renderer.render(document,result.data);
+            semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
+            semanticTokenDiagnostics.renderedTokenCount=rendered.tokenCount;
+            semanticTokenDiagnostics.renderedTypeCount=rendered.tokenTypeCount;
+            semanticTokenDiagnostics.renderError=null;
+          }catch(error){
+            semanticTokenDiagnostics.renderError=String(error?.message??error);
+          }
+        }
         return result;
       }
     };
@@ -596,8 +624,8 @@ export function registerWorkbench(vscode,context){
           .map(item=>typeof item==="string"?item:item?.value??String(item??""))
           .join(" ");
         if(!hoverText.includes("Skill Script")||
-           !hoverText.includes("select-establishment-configuration"))
-          throw Error("Hover provider did not return the declared Skill Script metadata");
+           !hoverText.includes(scriptPathValue))
+          throw Error("Hover provider did not return the exact Skill Script path");
         const packageRoot=packageRootForProcedure(vscode,procedureDocument);
         const packageState=packageRoot?languagePackages.get(packageRoot.uri.toString()):null;
         if(!packageState)throw Error("Active Procedure Package has no Language Service state");
@@ -608,8 +636,10 @@ export function registerWorkbench(vscode,context){
         const scriptLines=scriptDocument.getText().split(/\r\n|\n|\r/);
         const nameLine=scriptLines.findIndex(line=>line==="# name: select-establishment-configuration");
         const schemaLine=scriptLines.findIndex(line=>line==="# inputSchema: EstablishmentSelectionInput");
-        if(nameLine<0||schemaLine<0)
-          throw Error("Python Source is missing the declared name or inputSchema metadata");
+        const mainLine=scriptLines.findIndex(line=>/^(?:async )?def main\(/.test(line));
+        const legacyMetadata=nameLine>=0&&schemaLine>=0;
+        if(!legacyMetadata&&mainLine<0)
+          throw Error("Python Source has neither legacy metadata nor a canonical main() entrypoint");
         await openNativeSource(vscode,scriptUri,{preview:true});
         // Opening a previously closed Package Source must advance the Package
         // generation. Waiting only for READY can accidentally observe the old
@@ -638,7 +668,9 @@ export function registerWorkbench(vscode,context){
               sentSnapshot:packageState.lastSentSnapshot??null
             }));
         }
-        const referencePosition=new vscode.Position(nameLine,"# name: ".length);
+        const referencePosition=legacyMetadata
+          ?new vscode.Position(nameLine,"# name: ".length)
+          :new vscode.Position(mainLine,"def ".length);
         const referenceResult=await vscode.commands.executeCommand(
           "vscode.executeReferenceProvider",scriptUri,referencePosition);
         const references=Array.isArray(referenceResult)?referenceResult:[];
@@ -650,6 +682,12 @@ export function registerWorkbench(vscode,context){
         const symbols=Array.isArray(symbolResult)?symbolResult:[];
         if(!symbols.some(item=>item.name==="main"))
           throw Error("Python Document Symbols did not include main()");
+        // ca-skills now owns Python TypedDict/Annotated ABI definitions in
+        // source. The historical # inputSchema completion probe applies only
+        // to legacy metadata-based scripts; never invent a schema ref for the
+        // canonical form when no such file/annotation is declared.
+        let schemaCompletion="N/A: Python source annotations";
+        if(legacyMetadata){
         const schemaPosition=new vscode.Position(schemaLine,scriptLines[schemaLine].length);
         const schemaHoverResult=await vscode.commands.executeCommand(
           "vscode.executeHoverProvider",scriptUri,
@@ -677,6 +715,8 @@ export function registerWorkbench(vscode,context){
               packageGeneration:packageState.generation,
               languageStatus:languageStatusItem?.text??"missing",
               languageTooltip:languageStatusItem?.tooltip??""}));
+          schemaCompletion="EstablishmentSelectionInput";
+        }
         // The native provider probe opened a Python editor. Restore the
         // Procedure CustomEditor so subsequent workbench actions (notably
         // native Undo) continue to target the visual editor under test.
@@ -686,11 +726,11 @@ export function registerWorkbench(vscode,context){
           hover:hovers.length,
           references:references.length,
           symbols:symbols.map(item=>item.name),
-          schemaCompletion:"EstablishmentSelectionInput",
+          schemaCompletion,
           procedureLanguage:procedureDocument.languageId,
           scriptLanguage:scriptDocument.languageId,
           procedureLine,
-          nameLine,
+          nameLine:legacyMetadata?nameLine:mainLine,
           schemaLine
         };
       }
@@ -986,15 +1026,21 @@ export function registerWorkbench(vscode,context){
           if(doc.isDirty||persisted!==original)
             throw Error("L2-D4b Python recovery baseline is not clean");
           const oldName="# name: select-establishment-configuration";
-          const newName="# name: select-establishment-configuration-l2d4-recovered";
-          if(!original.includes(oldName))throw Error("L2-D4b Skill Script metadata is missing");
+          const legacyMetadata=original.includes(oldName);
+          const newName=legacyMetadata
+            ?"# name: select-establishment-configuration-l2d4-recovered"
+            :"# l2d4-recovered";
+          if(!legacyMetadata&&!/^(?:async )?def main\(/m.test(original))
+            throw Error("L2-D4b canonical Python main() is missing");
           if(languageRecoveryAcceptance.has(procedureUri.toString()))
             throw Error("L2-D4b dirty-buffer recovery probe is already active");
-          await replace(doc,original.replace(oldName,newName));
+          const modified=legacyMetadata?original.replace(oldName,newName)
+            :original+"\n"+newName+"\n";
+          await replace(doc,modified);
           if(!doc.isDirty||!doc.getText().includes(newName)||await disk()!==original)
             throw Error("L2-D4b failed to prepare an unsaved Python buffer");
           languageRecoveryAcceptance.set(procedureUri.toString(),{
-            procedure,doc,state,original,newName
+            procedure,doc,state,original,newName,legacyMetadata
           });
           return {dirtyBufferPrepared:true,pythonVersion:doc.version,
             originalDiskUnchanged:true,marker:newName};
@@ -1052,8 +1098,11 @@ export function registerWorkbench(vscode,context){
               .flatMap(item=>Array.isArray(item?.contents)?item.contents:[item?.contents])
               .map(item=>typeof item==="string"?item:item?.value??String(item??""))
               .join(" ");
-            if(!hoverText.includes(prepared.newName.slice("# name: ".length)))
-              throw Error("Replacement Worker Hover did not reflect the dirty Python buffer: "+
+            const expectedHover=prepared.legacyMetadata
+              ?prepared.newName.slice("# name: ".length)
+              :"scripts/select_establishment_configuration.py";
+            if(!hoverText.includes(expectedHover))
+              throw Error("Replacement Worker Hover did not resolve the current Python script: "+
                 hoverText.slice(0,500));
             evidence={
               recovered:true,packageState:status.state,
@@ -1313,7 +1362,7 @@ export function registerWorkbench(vscode,context){
             .flatMap(x=>Array.isArray(x?.contents)?x.contents:[x?.contents])
             .map(x=>typeof x==="string"?x:x?.value??String(x??"")).join(" ");
         };
-        let evidence=null;
+        let evidence=null,legacyMetadata=false;
         try{
           for(const [name,path] of paths){
             const uri=vscode.Uri.joinPath(root.uri,...path.split("/"));
@@ -1329,13 +1378,21 @@ export function registerWorkbench(vscode,context){
           const before=state.generation;
           const [contract,predicates,python]=entries;
           const old="# name: select-establishment-configuration";
-          const first="# name: select-establishment-configuration-l2d3-first";
-          const latest="# name: select-establishment-configuration-l2d3-latest";
-          if(!python.original.includes(old))throw Error("L2-D3: script metadata missing");
+          legacyMetadata=python.original.includes(old);
+          const first=legacyMetadata
+            ?"# name: select-establishment-configuration-l2d3-first"
+            :"# l2d3-first";
+          const latest=legacyMetadata
+            ?"# name: select-establishment-configuration-l2d3-latest"
+            :"# l2d3-latest";
+          if(!legacyMetadata&&!/^(?:async )?def main\(/m.test(python.original))
+            throw Error("L2-D3: canonical Python main() is missing");
           await replace(contract.doc,contract.original+"\n# l2d3 unsaved contract probe\n");
           await replace(predicates.doc,predicates.original+"\n# l2d3 unsaved predicate probe\n");
-          await replace(python.doc,python.original.replace(old,first));
-          await replace(python.doc,python.original.replace(old,latest));
+          await replace(python.doc,legacyMetadata?python.original.replace(old,first)
+            :python.original+"\n"+first+"\n");
+          await replace(python.doc,legacyMetadata?python.original.replace(old,latest)
+            :python.original+"\n"+latest+"\n");
           const generation=await ready(before,"cross-file edits");
           const snapshot=await collectPackageSnapshot(vscode,procedure,generation);
           if(snapshot.completeness!=="complete")
@@ -1349,8 +1406,11 @@ export function registerWorkbench(vscode,context){
             covered.push({name:entry.name,version:match.version,dirty:true});
           }
           const hover=await getHover();
-          if(!hover.includes("-l2d3-latest")||hover.includes("-l2d3-first"))
-            throw Error("L2-D3: stale native Hover after rapid Python edit: "+
+          const expectedHover=legacyMetadata
+            ?"-l2d3-latest":"scripts/select_establishment_configuration.py";
+          if(!hover.includes(expectedHover)||
+             (legacyMetadata&&hover.includes("-l2d3-first")))
+            throw Error("L2-D3: native Hover lost current Script identity after rapid Python edit: "+
               hover.slice(0,400));
           evidence={generationBefore:before,generationLatest:generation,covered,
             latestPythonHover:true,originalDiskUnchanged:true};
@@ -1370,9 +1430,12 @@ export function registerWorkbench(vscode,context){
               }
               if(evidence){
                 const hover=await getHover();
-                if(hover.includes("-l2d3-")||
-                   !hover.includes("select-establishment-configuration"))
-                  problems.push("native Hover retained stale Python name");
+                const expectedRestored=legacyMetadata
+                  ?"select-establishment-configuration"
+                  :"scripts/select_establishment_configuration.py";
+                if((legacyMetadata&&hover.includes("-l2d3-"))||
+                   !hover.includes(expectedRestored))
+                  problems.push("native Hover retained stale Script identity");
               }
             }catch(error){problems.push(String(error?.message??error));}
           }

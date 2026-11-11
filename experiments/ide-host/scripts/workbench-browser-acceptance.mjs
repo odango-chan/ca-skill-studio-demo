@@ -126,7 +126,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       JSON.stringify({scan,expectedNames}));
   const classic=scan.packages.find(x=>x.name==='establish-pdu-session');
   const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
-  if(classic?.fileCount!==22||classic?.corePresent!==3||
+  if(classic?.fileCount!==13||classic?.corePresent!==3||
      mas?.fileCount!==5||mas?.corePresent!==3)
     throw Error('Two-SKILL inventory does not match the pinned sample manifest: '+
       JSON.stringify({classic,mas}));
@@ -264,7 +264,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Designer Source: '+
       JSON.stringify({file,frames:await readContractFrames(),rows:await readTreeRows()}));
   }
-  const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 10','Scripts · 5','References · 3'];
+  const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1','Scripts · 5','References · 3'];
   const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
   const classicView=await ensurePackageExpanded('establish-pdu-session');
   const classicRange=classicView.range;
@@ -602,7 +602,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       !languageFeatureEvidence.hover||
       !languageFeatureEvidence.references||
       !languageFeatureEvidence.symbols?.includes("main")||
-      languageFeatureEvidence.schemaCompletion!=="EstablishmentSelectionInput")
+      !["EstablishmentSelectionInput","N/A: Python source annotations"].includes(
+        languageFeatureEvidence.schemaCompletion))
       throw Error("Theia public language-provider acceptance returned incomplete evidence: "+
         JSON.stringify(languageFeatureEvidence));
     console.log("STUDIO_LSP_EDITOR_FEATURES",JSON.stringify(languageFeatureEvidence));
@@ -2047,7 +2048,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!contractView||!contractFrame||
      !contractView.text.includes('establish-pdu-session')||
      !contractView.text.includes('sbi.udm.sm_data.get')||
-     !contractView.text.includes('skill.evaluate-udm-read')||
+     !contractView.text.includes('lib/host/subject.schema.yaml')||
      !contractView.text.includes('createdsession.ran.setup_accepted')||
      contractExpectedCards.some(title=>!contractView.cards.includes(title)))
     throw Error('Contract Designer did not render the current Package Source: '+
@@ -2092,7 +2093,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      predicateView.predicates!==17||predicateView.observations<17||
      !predicateView.text.includes('createdsession.ran.setup_accepted')||
      !predicateView.text.includes('createdsession.udm.hold_bound')||
-     !predicateView.text.includes('skill.evaluate-udm-read')||
+     !predicateView.text.includes('scripts/evaluate_udm_read.py')||
      !predicateView.text.includes('Observation → Evaluator')||
      !predicateView.text.includes('不是当前运行证据'))
     throw Error('Predicate Designer did not render the real PredicateSet declarations: '+
@@ -2101,7 +2102,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     title:predicateView.title,status:predicateView.status,
     predicates:predicateView.predicates,observations:predicateView.observations,
     realPredicateVisible:predicateView.ids.includes('createdsession.ran.setup_accepted'),
-    scriptEvaluatorVisible:predicateView.text.includes('skill.evaluate-udm-read'),
+    scriptEvaluatorVisible:predicateView.text.includes('scripts/evaluate_udm_read.py'),
     noLiveResultClaim:predicateView.text.includes('不是当前运行证据')
   }));
   // C3: real, source-backed JSON Schema field tree in the same Theia host.

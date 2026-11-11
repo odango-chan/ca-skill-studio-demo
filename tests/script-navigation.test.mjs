@@ -103,3 +103,36 @@ test("E3-A1 YAML and Python metadata references expose exact UTF-16 source and t
     assert.equal(target,schema.title);
   }
 });
+
+test("canonical ca-skills Python main() resolves exact Procedure and Predicate script paths",()=>{
+  const manifest=JSON.parse(readFileSync(new URL("../site/samples/skills/files.json",import.meta.url),"utf8"));
+  const current=new Map(manifest.files.filter(p=>p.startsWith("establish-pdu-session/"))
+    .map(p=>[p.slice("establish-pdu-session/".length),{
+      text:readFileSync(new URL("../site/samples/skills/"+p,import.meta.url),"utf8")
+    }]));
+  const procedure="scripts/select_establishment_configuration.py";
+  const report=scriptNavigationReport(current,procedure);
+  assert.equal(report.status,"READY");
+  assert.deepEqual(report.warnings,[]);
+  assert.deepEqual(report.schemas,[],"new Python annotations are not legacy Schema files");
+  const caller=report.callers.find(item=>item.path==="assurance/procedure.yaml");
+  assert.ok(caller?.sourceRange&&caller?.targetRange);
+  assert.equal(current.get(procedure).text.slice(caller.targetRange.start,caller.targetRange.end),"main");
+  assert.equal(current.get("assurance/procedure.yaml").text.slice(
+    caller.sourceRange.start,caller.sourceRange.end),procedure);
+
+  const evaluator="scripts/evaluate_transfer_start.py";
+  const predicateReport=scriptNavigationReport(current,evaluator);
+  assert.equal(predicateReport.status,"READY");
+  const predicateCaller=predicateReport.callers.find(item=>item.path==="assurance/predicates.yaml");
+  assert.ok(predicateCaller?.sourceRange&&predicateCaller?.targetRange);
+  assert.equal(current.get(evaluator).text.slice(
+    predicateCaller.targetRange.start,predicateCaller.targetRange.end),"main");
+  assert.equal(current.get("assurance/predicates.yaml").text.slice(
+    predicateCaller.sourceRange.start,predicateCaller.sourceRange.end),evaluator);
+
+  const copy=new Map(current);
+  copy.set(evaluator,{text:current.get(evaluator).text+"\ndef main(input: dict): pass\n"});
+  const duplicate=scriptNavigationReport(copy,evaluator);
+  assert.equal(duplicate.callers.length,0,"duplicate main() must not create ambiguous links");
+});

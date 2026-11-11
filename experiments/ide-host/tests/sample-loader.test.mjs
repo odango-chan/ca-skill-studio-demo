@@ -49,7 +49,8 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
   assert.equal(result.files,manifest.files.length);
   assert.equal(result.created,manifest.files.length);
   assert.equal(result.skipped,0);
-  assert.equal(manifest.sourceSha,"9abb6b829d4466b42f0bc55ba26caa33abe8d7e3");
+  assert.equal(manifest.sourceRepo,"odango-chan/ca-skills");
+  assert.equal(manifest.sourceSha,"3fce09aca32b6a6faf6ec3e9a204d38cc129ec38");
   assert.equal(result.sourceSha,manifest.sourceSha);
   assert.deepEqual(result.skills,["establish-pdu-session","establish-pdu-session-mas"]);
   assert.ok(result.workspaceUpdated);
@@ -61,6 +62,10 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
   assert.equal(result.outputRoot.path,result.root.path+"/output");
   assert.ok(h.files.has(result.procedures["establish-pdu-session"].path));
   assert.ok(h.files.has(result.procedures["establish-pdu-session-mas"].path));
+  assert.equal(manifest.files.length,18);
+  assert.ok(!manifest.files.some(p=>p.includes("/cases/")));
+  assert.ok(!manifest.files.some(p=>p.endsWith("n1n2-delivery.schema.yaml")),
+    "superseded ca-agent-demo Schemas must not be imported");
   assert.ok(h.opened[0].folder.uri.path===result.root.path);
   assert.equal(h.files.size,manifest.files.length,
     "lib/ and output/ must never contain fabricated compiler inputs or outputs");
@@ -134,7 +139,8 @@ test("Malformed, cross-package, traversing or duplicate manifests refuse writes"
     {...manifest,files:[...manifest.files,manifest.files[0]]},
     {...manifest,files:[...manifest.files,"third-skill/SKILL.md"]},
     {...manifest,skills:["establish-pdu-session"]},
-    {...manifest,sourceSha:"unknown"}
+    {...manifest,sourceSha:"unknown"},
+    {...manifest,sourceRepo:"odango-chan/ca-agent-demo"}
   ];
   for(const data of wrong){
     const h=host(data);

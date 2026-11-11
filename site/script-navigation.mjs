@@ -1,4 +1,5 @@
 import {LineCounter,isMap,isScalar,isSeq,parseDocument} from "yaml";
+import {pythonTopLevelOutline} from "./python-outline.mjs";
 
 // E3-A1: read-only, exact references in the active in-memory Package.
 // This is an editor index, not Python execution, ABI inference or qualification.
@@ -104,19 +105,33 @@ export function scriptNavigationReport(files,path) {
   if(!(files instanceof Map)||!SCRIPT_PATH.test(path??"")||
      source(files,path)===null)return empty;
   const warnings=[],callers=[],schemas=[];
-  const own=metadata(source(files,path));
-  if(!own)warnings.push("脚本缺少唯一的 connectionagent-tool name/inputSchema/outputSchema 声明");
+  const sourceText=source(files,path);
+  const own=metadata(sourceText);
+  // ca-skills v0.1 uses Python source annotations and a concrete main()
+  // entrypoint instead of the old comment-based connectionagent-tool header.
+  // Do not silently reinterpret a malformed legacy header as the new form.
+  const legacyHeader=sourceText.startsWith("# /// connectionagent-tool");
+  const outline=!legacyHeader&&!own?pythonTopLevelOutline(sourceText):null;
+  const main=outline?.status==="READY"
+    ?outline.symbols.find(symbol=>symbol.kind==="function"&&symbol.name==="main")
+    :null;
+  const entryRange=own?.nameRange??main?.range??null;
+  if(!entryRange){
+    warnings.push(legacyHeader?
+      "脚本缺少唯一的 connectionagent-tool name/inputSchema/outputSchema 声明":
+      "脚本缺少可唯一定位的顶层 main() 符号");
+  }
   const procedure=parse(files,"assurance/procedure.yaml",warnings);
   if(procedure){
     walk(procedure.root,(key,value)=>{
       if(key==="script"&&scalar(value)===path){
-        if(Array.isArray(value?.range)&&own?.nameRange){
+        if(Array.isArray(value?.range)&&entryRange){
           callers.push(freeze({
             path:"assurance/procedure.yaml",
             line:lineOf(value,procedure.lines),
             label:"Procedure · script: "+path,
             sourceRange:freeze({start:value.range[0],end:value.range[1]}),
-            targetRange:own.nameRange
+            targetRange:entryRange
           }));
         }
       }
@@ -158,6 +173,25 @@ export function scriptNavigationReport(files,path) {
         schemas.push(freeze({...matches[0],role,title,sourceRange}));
       else warnings.push(role+" Schema "+title+
         (matches.length?" 存在多个同名声明":" 未在 Package 中找到"));
+    }
+  }else if(main){
+    // New canonical ca-skills Predicate references carry an exact Package-
+    // relative script path, not the old skill.<tool-name> alias.
+    const predicates=parse(files,"assurance/predicates.yaml",warnings);
+    const records=field(predicates?.root,"predicates");
+    if(isMap(records))for(const pair of records.items){
+      const evaluator=field(pair.value,"evaluator");
+      const ref=field(evaluator,"ref");
+      if(scalar(field(evaluator,"type"))==="script"&&scalar(ref)===path&&
+         Array.isArray(ref?.range)){
+        callers.push(freeze({
+          path:"assurance/predicates.yaml",
+          line:lineOf(ref,predicates.lines),
+          label:"Predicate · "+scalar(pair.key),
+          sourceRange:freeze({start:ref.range[0],end:ref.range[1]}),
+          targetRange:entryRange
+        }));
+      }
     }
   }
   return freeze({status:"READY",callers:freeze(callers),

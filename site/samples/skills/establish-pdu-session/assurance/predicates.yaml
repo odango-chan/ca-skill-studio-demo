@@ -160,7 +160,7 @@ predicates:
         freshness: 1h
     evaluator:
       type: script
-      ref: skill.evaluate-transfer-start
+      ref: scripts/evaluate_transfer_start.py
   createdsession.ran.setup_accepted:
     observations:
       state:
@@ -202,7 +202,7 @@ predicates:
         freshness: 1h
     evaluator:
       type: script
-      ref: skill.evaluate-udm-read
+      ref: scripts/evaluate_udm_read.py
   createdsession.lifecycle.ready:
     observations:
       state:

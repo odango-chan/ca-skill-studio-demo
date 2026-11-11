@@ -227,8 +227,13 @@ export function activate(context){
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
     webviewOptions:{retainContextWhenHidden:true}
   }));
+  let exampleLoadPromise=null;
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
-    async()=>{
+    ()=>{
+      // The demo can auto-load just as someone clicks Load Example. Serialize
+      // both requests so the create-only loader never sees a false write race.
+      if(exampleLoadPromise)return exampleLoadPromise;
+      exampleLoadPromise=(async()=>{
       let stage="seed-example";
       try{
         const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri);
@@ -267,22 +272,36 @@ export function activate(context){
         await vscode.window.showErrorMessage(
           "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
       }
+      })().finally(()=>{exampleLoadPromise=null;});
+      return exampleLoadPromise;
     }));
-  // Make the first-run path discoverable without requiring users to know
-  // the command palette. The Explorer welcome content and toolbar provide
-  // persistent entry points; this one-time-per-empty-session prompt is a
-  // convenient shortcut for the online demo.
+  // The published browser-only workbench is a demo, not a blank IDE. Seed
+  // the extension-owned example project on first launch; existing edited
+  // files are never overwritten by seedExampleWorkspace. Desktop VS Code
+  // and user-selected workspaces keep the explicit opt-in command instead.
   if(!(vscode.workspace.workspaceFolders??[]).length){
-    const welcome=vscode.window.showInformationMessage?.(
-      "欢迎使用 SKILL Studio。可导入一个含 skills/、lib/、output/ 的演示项目（传统 5GC 与 MAS）。",
-      "载入演示 SKILL 项目"
-    );
-    if(welcome&&typeof welcome.then==="function"){
-      void welcome.then(choice=>{
-        if(choice==="载入演示 SKILL 项目")
-          return vscode.commands.executeCommand("skillStudio.loadExample");
-        return undefined;
-      });
+    const onlineDemo=typeof STUDIO_THEIA_HOST!=="undefined"&&
+      STUDIO_THEIA_HOST&&typeof Worker==="function";
+    if(onlineDemo){
+      // Let Theia finish activating its OPFS FileSystemProvider before the
+      // first workspace.fs request. Failure is surfaced by loadExample with
+      // the exact phase; the command remains available for an explicit retry.
+      setTimeout(()=>{
+        void vscode.commands.executeCommand("skillStudio.loadExample")
+          .catch(error=>console.error("Default Studio project failed:",error));
+      },400);
+    }else{
+      const welcome=vscode.window.showInformationMessage?.(
+        "欢迎使用 SKILL Studio。可导入一个含 skills/、lib/、output/ 的演示项目（传统 5GC 与 MAS）。",
+        "载入演示 SKILL 项目"
+      );
+      if(welcome&&typeof welcome.then==="function"){
+        void welcome.then(choice=>{
+          if(choice==="载入演示 SKILL 项目")
+            return vscode.commands.executeCommand("skillStudio.loadExample");
+          return undefined;
+        });
+      }
     }
   }
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.openProcedure",

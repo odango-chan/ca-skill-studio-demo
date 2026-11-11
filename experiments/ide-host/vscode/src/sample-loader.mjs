@@ -29,15 +29,14 @@ async function readBundledResource(vscode,uri){
     const origin=globalThis.location?.origin;
     if(!origin||url.origin!==origin)
       fail("Refusing cross-origin extension resource: "+url.origin);
-    // Browser-only Theia may expose extensionUri without the deployment
-    // subpath even though the worker bundle itself was loaded beneath it.
-    // Recover only that same-origin app prefix from the worker's own URL.
+
+    // In browser-only Theia, extensionUri can already include the GitHub
+    // Pages base path. Prefixing it again makes every sample fetch a 404.
+    // Some worker URLs instead omit that prefix; handle both exact same-origin
+    // paths without assuming a particular deployment directory.
     const workerPath=globalThis.location?.pathname??"";
     const hostedMarker="/hostedPlugin/";
     const markerAt=workerPath.indexOf(hostedMarker);
-    // Some Theia workers load from /context/plugin-vscode-init-fe.js,
-    // while extensionUri itself is root-relative. The context URL is still
-    // app-prefixed and provides the same trusted base without hardcoding it.
     const contextMarker="/context/";
     const contextAt=workerPath.indexOf(contextMarker);
     const workerFile="/plugin-worker.js";
@@ -46,19 +45,30 @@ async function readBundledResource(vscode,uri){
     const appPrefix=markerAt>=0?workerPath.slice(0,markerAt)
       :contextAt>=0?workerPath.slice(0,contextAt)
       :rootWorkerAt>=0?workerPath.slice(0,rootWorkerAt):"";
-    const resourcePath=appPrefix+url.pathname;
-    const resourceUrl=new URL(resourcePath+url.search,origin);
-    const response=await fetch(resourceUrl.href,{credentials:"same-origin"});
-    if(!response.ok)
-      fail("Extension resource HTTP "+response.status+": "+resourceUrl.pathname+
-        "; workerPath="+workerPath+"; appPrefix="+appPrefix);
-    return new Uint8Array(await response.arrayBuffer());
+    const resourcePath=url.pathname;
+    const alreadyPrefixed=Boolean(appPrefix)&&
+      (resourcePath===appPrefix||resourcePath.startsWith(appPrefix+"/"));
+    const candidates=alreadyPrefixed||!appPrefix
+      ?[resourcePath]
+      :[appPrefix+resourcePath,resourcePath];
+    const attempts=[];
+    for(const candidate of [...new Set(candidates)]){
+      const resourceUrl=new URL(candidate+url.search,origin);
+      const response=await fetch(resourceUrl.href,{credentials:"same-origin"});
+      if(response.ok)return new Uint8Array(await response.arrayBuffer());
+      attempts.push(response.status+" "+resourceUrl.pathname);
+      // A missing asset may have been published under an unprefixed path;
+      // other HTTP failures must not be masked by speculative fallbacks.
+      if(response.status!==404)break;
+    }
+    fail("Extension resource unavailable: "+attempts.join("; ")+
+      "; workerPath="+workerPath+"; appPrefix="+appPrefix);
   }
   return vscode.workspace.fs.readFile(uri);
 }
 function validate(manifest){
   if(manifest?.schemaVersion!==1||
-     manifest?.sourceRepo!=="odango-chan/ca-agent-demo"||
+     manifest?.sourceRepo!=="odango-chan/ca-skills"||
      !/^[a-f0-9]{40}$/.test(manifest?.sourceSha??"")||
      !Array.isArray(manifest.skills)||
      JSON.stringify(manifest.skills)!==JSON.stringify(SKILLS)||
