@@ -1,0 +1,19 @@
+{
+  "name": "@odango-chan/skill-studio-project-filesystem",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "theiaExtensions": [
+    {
+      "frontendOnly": "lib/browser-only/project-filesystem-module.mjs"
+    }
+  ],
+  "keywords": [
+    "theia-extension"
+  ],
+  "dependencies": {
+    "@theia/core": "1.76.0",
+    "@theia/filesystem": "1.76.0",
+    "@theia/workspace": "1.76.0"
+  }
+}
