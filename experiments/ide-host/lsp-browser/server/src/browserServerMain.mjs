@@ -270,10 +270,10 @@ connection.languages.semanticTokens.on(params=>{
   if(!value||value.analysis.state==="UNAVAILABLE")return {data:[]};
   const document=documentFor(value,params.textDocument.uri);
   if(!document)return {data:[]};
-  const analyzed=value.analysis.documents.find(item=>
-    item.uri===document.uri&&item.relativePath===document.relativePath&&
-    item.version===document.version);
-  if(!analyzed)return {data:[]};
+  // Semantic coloring is a source-AST projection. It must not depend on
+  // Python symbol analysis or on whether this YAML file produced an analysis
+  // document. The accepted Package snapshot already owns the exact source
+  // text/version for this URI.
   return semanticTokensForDocument(document);
 });
 
