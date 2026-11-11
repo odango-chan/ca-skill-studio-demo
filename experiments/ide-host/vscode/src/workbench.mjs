@@ -2339,6 +2339,7 @@ export function registerWorkbench(vscode,context){
     };
     let latestHtml=rendered(),webviewReady=false,renderTimer=null,suppressEditorScroll=false,
       suppressEditorTimer=null,pendingSourceLine=null,lastSourceLine=-1;
+    const initialHtml=latestHtml;
     const postPreview=()=>{
       latestHtml=rendered();
       if(webviewReady)void webview.postMessage({type:'updatePreview',html:latestHtml});
@@ -2371,6 +2372,8 @@ export function registerWorkbench(vscode,context){
     const incoming=webview.onDidReceiveMessage(async message=>{
       if(message?.type==='ready'){
         webviewReady=true;
+        if(latestHtml!==initialHtml)
+          void webview.postMessage({type:'updatePreview',html:latestHtml});
         if(pendingSourceLine!==null)
           void webview.postMessage({type:'scrollToLine',line:pendingSourceLine});
         return;
