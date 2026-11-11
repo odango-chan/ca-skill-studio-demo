@@ -35,7 +35,7 @@ test("fenced code blocks and tables are rendered without interpreting HTML",()=>
   const html=renderMarkdown(source).html;
   assert.match(html,/<pre data-source-line="\d+"><code data-language="yaml">/);
   assert.match(html,/&lt;untrusted&gt;/);
-  assert.match(html,/<table><thead><tr><th>Field<\/th><th>Status<\/th><\/tr>/);
+  assert.match(html,/<table><thead><tr data-source-line="0"><th>Field<\/th><th>Status<\/th><\/tr>/);
   assert.match(html,/<td>root<\/td>/);
 });
 test("untrusted raw HTML, dangerous links, and Markdown images cannot execute",()=>{
@@ -197,7 +197,7 @@ test("the shared Markdown theme styles wide tables, sticky headings and host col
   const css=readFileSync(new URL("../site/markdown-preview.css",import.meta.url),"utf8");
   assert.match(css,/--vscode-editor-background/);
   assert.match(css,/--vscode-skillStudio-markdownHeading/);
-  assert.match(css,/\.markdown-preview h1,.markdown-preview h2\\{color:var\\(--md-heading\\)\\}/);
+  assert.match(css,/\.markdown-preview h1,.markdown-preview h2\{color:var\(--md-heading\)\}/);
   assert.match(css,/\.md-table-wrap\s*\{/);
   assert.match(css,/max-height:65vh;overflow:auto/);
   assert.match(css,/position:sticky;top:0/);
