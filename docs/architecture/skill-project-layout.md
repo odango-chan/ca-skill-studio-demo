@@ -1,90 +1,69 @@
-# SKILL Project layout and future Compiler integration
+# Skill Studio Plugin-managed Project v0.1 — implementation boundary
 
-**Status:** Studio workspace layout implemented in the example importer; Compiler integration remains **NOT_IMPLEMENTED** (2026-11-11).
+**Status: PARTIAL · 2026-11-11 · Draft [Studio PR #152](https://github.com/odango-chan/ca-skill-studio-demo/pull/152) · not merged.**
 
-## Canonical editable project
+The semantic contract is **not defined in Studio**. The sole machine schema and digest authority is [Compiler PR #4](https://github.com/odango-chan/ca-skill-compiler/pull/4), including `project-settings`, `tool-contract`, `resolver-result`, `project-context`, `build-request` and the snapshot golden vectors. Studio's [configuration design PR #150](https://github.com/odango-chan/ca-skill-studio-demo/pull/150) is a draft specification. These PRs must not be treated as merged or as a released ABI.
+
+## Editable workspace
 
 ```text
-<project-root>/
-├── skills/
-│   ├── establish-pdu-session/
-│   │   ├── SKILL.md
-│   │   ├── assurance/
-│   │   ├── schemas/
-│   │   ├── scripts/
-│   │   └── references/
-│   └── establish-pdu-session-mas/
-│       ├── SKILL.md
-│       ├── assurance/
-│       └── schemas/
-├── lib/       # imported Tool contracts; user-selected, treated as read-only inputs
-└── output/    # compiler-generated output tree; never an editable Source input
+Skill Studio Example/          # fixed, independent extension-owned workspace
+└── skills/                     # only authored Source, both official Skills
+    ├── establish-pdu-session/
+    └── establish-pdu-session-mas/
 ```
 
-This layout intentionally matches the [`ca-skill-compiler` README](https://github.com/odango-chan/ca-skill-compiler): stateless project-root operations `skillc check <project>` and `skillc build <project> --out <directory>`.
+`skills/` is the only initial example directory. Both Skills have their pinned real owner files. `lib/` and `output/` are not project roles, are not created, and normal user files with those names remain editable. Older OPFS `workspaces/` is never overwritten or deleted; its exact legacy Explorer mount may be replaced with the new Example, **without removing the underlying files**. An unrelated user folder or multi-root entry must never be repurposed.
 
-### Ownership and lifecycle
+When a user explicitly adds dependencies, the project may acquire internal managed content:
 
-- `<project-root>` is the Workspace root. **Do not** open just `skills/` as the default Workspace.
-- `skills/` holds actual editable authoring Source (including each Skill's `assurance/`, `schemas/`, `scripts/`, and `references/`). The **top-level `skills/` directory itself is structural and protected** (no rename/move/delete via Studio-owned actions); its SKILL files and child directories remain editable. The two pinned owner Skills are imported here, with no implicit overwrite.
-- `lib/` is a **read-only, protected root** of imported Tool contract snapshots. Users can inspect but not hand-edit, rename, move, delete or create files inside it through Studio-owned commands. Only a future **explicit managed Tool import/sync** may replace its contents. The sample importer creates the empty directory and **does not write fake library contracts**.
-- `output/` is a **read-only, protected root** for generated `skillc build` results. Users can inspect, but not hand-edit, rename, move, delete or create files inside it through Studio-owned commands. Only the future Compiler adapter may write or clean output with its bounded capability. The sample importer creates the empty directory and **does not fake a build**, publish or execute anything.
-- Package Overview scans only the Source subtree `skills/` when a project root contains it; it cannot claim that `lib/` or `output/` contains additional authored SKILL Packages. Standalone and legacy folder workspaces remain supported.
-- The example project uses extension-owned `workspaces/` as its root, shown in Explorer as **skill-studio-demo**. The existing `workspaces/skills/` directory is reused in place as the project's `skills/` (no copying, deleting, renaming or overwriting user-edited Source); empty sibling `lib/` and `output/` directories are created. When the old extension-owned `skills/` root is already mounted as a Workspace, only that Workspace entry is replaced by its parent project root. Unrelated user workspaces are not repurposed or removed.
-- The bundled source fixture remains `site/samples/skills/` for packaging tests; it is **not** the runtime editable project root.
+```text
+<selected-workspace-root>/
+├── skills/
+├── .vscode/settings.json          # native Workspace Configuration where host persists it
+└── .skill-studio/
+    ├── staging/                    # temporary, incomplete writes are not valid locks
+    └── dependencies/
+        └── <64 lowercase sha256 hex>/
+            ├── manifest.json
+            └── tool-contract.json  # JCS canonical bytes for tool-catalog
+```
 
-## Protected project folders: implementation boundaries
+No `skill-project.yaml` or `skill.lock.yaml` is mandatory. The Settings API, not an invented Studio YAML file, owns declaration and lock persistence. Physical `.vscode/settings.json` representation depends on host. The Studio write preflight protects the managed snapshot area, **not every filesystem API**; host-native Explorer and external tools can bypass extension-side checks. Such UI policy is not a security guarantee.
 
-| Project path | User-owned Source edits | Studio structural operations | Managed owner |
-| --- | --- | --- | --- |
-| `skills/` itself | N/A | Rename / move / delete **denied** | Project layout |
-| `skills/<name>/**` | **allowed** | Normal authoring within Source | Studio editor |
-| `lib/` and descendants | **read-only** | Rename / move / delete / manual create **denied** | Imported Tool contracts |
-| `output/` and descendants | **read-only** | Rename / move / delete / manual create **denied** | Skill Compiler adapter |
+## Native configuration
 
-The icon theme distinguishes Source (`folder-skills`), read-only library
-(`folder-library` with lock), and generated output (`folder-output`).
-Icons are visual cues, not access controls.
+The `connectionAgent.skillStudio` namespace contributes:
 
-`project-policy.mjs` performs an exact project-root/URI check (including
-scheme/authority and lexical containment). Studio-owned Workbench and
-Procedure Source patches refuse writes to `lib/`, `output/` and the protected
-structural roots. Managed import/build operations have *distinct* authorized
-operation identities and cannot mutate the structural root itself.
+| Setting | Scope | Default | Meaning |
+|---|---|---|---|
+| `skillsRoot` | Workspace resource | `skills` | Compiler v0.1 source root |
+| `dependencies` | Workspace resource | `[]` | Compiler declaration values |
+| `dependencyLock` | Workspace resource | `skillc.lock/v0.1` with empty entries | Pinned content and source identity |
+| `defaultBuildTarget` | User/application | `all` | UI preference only |
 
-**Known enforcement gap:** the standard native Theia/VS Code Explorer and
-`workspace.fs` belong to the host. An extension-side guard cannot intercept
-every Explorer action, outside tool, direct FS call, or another plugin. The
-`files.readonlyInclude` preference is supported by VS Code but is not
-evidence of reliable enforcement by Theia 1.76. Until host-side filesystem
-permissions or a project-aware FS provider are implemented and verified,
-`lib/` and `output/` are **policy read-only, not a security boundary**.
-Do not claim hard write protection based solely on these icons and preflights.
+A multi-root project is never implicitly chosen. Dependency management uses a specialized native Dependencies TreeView; project configuration is read/updated with the native API. Credentials belong in SecretStorage, editable Source remains under `skills/**`, temporary UI state stays outside project authority.
 
-For the final enforcement gate, test native Explorer rename/move/delete/create,
-direct TextDocument edit/save, `workspace.applyEdit`, `workspace.fs`
-write/rename/delete, external imports and compiler-owned writes in the real
-Browser-Only host and desktop VS Code. A host-level denial must be observed
-before reporting "filesystem protected." Do not block managed Compiler output.
+## Resolver, authority, and acquisition
 
-## Compiler ownership boundary
+`dependency-snapshot.mjs` implements the exact Compiler v0.1 `skillc/snapshot/v1` SHA-256 frame: domain separator, NUL, U32BE file count, sorted UTF-8 filename lengths/bytes, U64BE byte lengths and each raw-file SHA-256 digest. Compiler PR #4 positive vectors are committed as test fixtures; reordering yields the same digest, corruption/path traversal rejects.
 
-`ca-skill-compiler` is the **sole owner** of multi-Skill compilation and linking semantics. Studio stays an IDE/authoring client. Existing Monaco/LSP services and Package Audit are editor hints, not substitutes for `skillc check`, and should not be renamed or presented as Compiler PASS.
+The Service never silently upgrades a pinned dependency. `LoadLocked`/build use exact bytes; `Refresh` only inspects drift; `Update Lock` requires explicit user confirmation. Missing snapshot is `BLOCKED`, invalid or tampered bytes `ERROR`, settings write partially failed is `UNCERTAIN` (not a success). The staging directory is not a valid Lock target. Unreferenced immutable snapshots are retained after Remove for shared-source safety.
 
-When the compiler implementation stabilizes, integrate one adapter with:
+Source acquisition adapters are `Upload` (YAML/JSON), `MCP` (`tools/list` only, never `tools/call`), `Git` (HTTPS GitHub browser adapter with complete pinned SHA), and a versioned `Built-in` example. The resulting semantic file is always Compiler `skillc.tool/v0.1`. Unverified effect is `UNKNOWN / UNVERIFIED`; MCP annotations never grant READ/MUTATION. Browser CORS/auth restrictions fail visibly, and unsupported Git providers are BLOCKED rather than silently proxied.
 
-1. **Project discovery:** use the active Workspace root, require a `skills/` directory, resolve `lib/` only as imported contracts and `output/` only as output. Never traverse or compile arbitrary `node_modules` or files outside the chosen project.
-2. **Compiler input:** snapshot the current Source-owned project files (including unsaved buffers explicitly, where supported); preserve exact URI, revision and source digests. Do not invent a second semantic compiler in JavaScript.
-3. **Commands:** expose user-initiated Check and Build backed by the upstream `skillc` core; no automatic build when merely editing or opening a file. Display `NOT_RUN` or `UNAVAILABLE` until a real compiler result exists.
-4. **Compiler output:** write only under an explicitly selected output directory (normally `output/`), with path containment, bounded inputs, no accidental overwrite of `skills/` or `lib/`, and stale-revision rejection. Build output is not imported back into source.
-5. **Diagnostics:** map versioned Compiler diagnostics into native Problems without taking ownership of Source files or conflating results with LSP/Package Audit. Exact schema, source span and status model remain pending upstream contract stabilization.
-6. **Two hosts:** desktop/Node may use a local Compiler CLI once defined; static GitHub Pages must use the upstream WASM-compatible core and cannot assume a server, local binary or filesystem permission. Same compiler semantics, platform-specific IO adapters.
-7. **Non-goals:** Skill execution, Runtime readiness, Qualification, release/publishing, 5GC operation and Tool invocation remain outside Studio and the stateless Compiler.
+`READY` for **dependency snapshot consistency** does not mean Tool Runtime READY. Runtime Provider binding, effect verification and executing Skills/Tools are not part of Studio.
 
-No compiler binary, WASM bundle, CLI subprocess or invented result JSON is shipped by this change. This is a **project layout and integration boundary**, not a completed Compiler integration.
+## Build, LSP and output
 
-## UX acceptance
+The one v0.1 Host Adapter constructs Compiler `ProjectContext` and `BuildRequest` from authored `skills/**` plus verified immutable dependency files. `sourceFiles` do not contain `lib`, `output`, `.vscode` or managed storage. The future local Go and online WASM implementations **must** bind to the same Core ABI. There is no Parser/Linker/Schema Generator in Studio.
 
-The import action is explicit. It creates/opens the isolated project root, opens the conventional 5GC visual Procedure, switches to the native Skill Studio Packages view when supported, then attempts to expand both Skill roots through the native TreeView API. The Packages title bar also offers the import action for sessions where the Explorer welcome page is not shown.
+**Currently Compiler #4 is a draft machine specification without an installed production v0.1 ABI.** The Build TreeView and Check/Build commands display `UNAVAILABLE` and must not call old `lib/` pathways or fake PASS. When Compiler returns actual output, generated files stay in the in-memory result and user-initiated ZIP/directory export only. An exported file is outside Source and freely editable.
 
-Browser and unit acceptance should verify both SKILLs are discoverable under `skills/`, `lib/` and `output/` are empty, duplicate imports preserve user edits, and Packaged Contract links still open each exact Source URI. Neither Source files nor the folder structure may imply a successful Compiler build.
+Current LSP editor diagnostics do not amount to Compiler diagnostics. Dependency changes invalidate active Package-language generations, but **dependency-qualified Definition/References and shared v0.1 semantic analysis are not fully implemented**. That remaining integration is BLOCKED/PARTIAL, not claimed PASS. Existing Procedure/Contract/Predicate/Schema editors, Markdown, Package/Inspection/Evidence remain in scope for regression.
+
+## Verification and release gates
+
+Focused tests live under `experiments/ide-host/tests/{project-configuration,sample-loader,dependency-snapshot,dependency-service,contract-acquisition,compiler-adapter,plugin-views}.test.mjs`, plus `tests/project-policy.test.mjs`. Browser checks use real Theia Chromium as deployed by the repo workflows. **A unit or static check is not proof of Browser-Only, persisted configuration or Pages deployment.** Exact-head workflow run links and statuses are in [WORK](../WORK.md) and [TRACEABILITY](../TRACEABILITY.md).
+
+This v0.1 migration deliberately abandons the old `skills/lib/output` three-root model. The old doc was superseded **within this same canonical file** to prevent two conflicting project authorities. Studio PR #152 stays Draft and `main` remains unchanged until required gates pass and Compiler ABI blockers are resolved or explicitly accepted as unavailable.
