@@ -59,7 +59,7 @@ export function activate(context){
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.pluginManagedAcceptance",async(phase)=>{
       const folder=(vscode.workspace.workspaceFolders??[]).find(f=>
-        f.uri.path.endsWith("/skill-studio-example-v01"));
+        f.uri.path.endsWith("/Skill Studio Example"));
       if(!folder)throw Error("Browser v0.1 acceptance: Example root is not mounted");
       const root=folder.uri,probeId="browser-v01-acceptance";
       if(phase==="pin"){
