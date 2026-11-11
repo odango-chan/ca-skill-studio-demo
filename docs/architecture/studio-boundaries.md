@@ -32,7 +32,7 @@ Graph、Edge、Node 位置、Selected Node、Collapsed Pane 不作为独立文�
 
 ## Source protection & scope
 
-- 在线 Theia 内置演示从 `site/samples/skills/` 导入到独立 `<project-root>/skills/`；同一个项目根目录还包含空的 `lib/` 与 `output/`。此前 `workspaces/skills` 的数据不迁移、不删除、不覆盖；Classic 历史夹具 `site/samples/packages` 保留为兼容与测试材料。
+- 在线 Theia 内置演示从 `site/samples/skills/` 导入到 `<project-root>/skills/`；同一项目根目录还包含空的 `lib/` 与 `output/`。原来的浏览器 `workspaces/skills/` 会直接作为项目的 `skills/` 复用，已有内容不迁移、不删除、不覆盖；Classic 历史夹具 `site/samples/packages` 保留为兼容与测试材料。
 - `skills/` 是可编辑 Source；`lib/` 仅供用户导入 Tool 契约；`output/` 只供未来 Compiler 生成。见 [SKILL Project layout](skill-project-layout.md)。
 - YAML `'on'` 是字符串键；必须保留 `operator.on`、`preconditions.on`、`postconditions.on` 及每个 Outcome 的原身份、行号。ELK 分组不等于业务合并。
 - Span/Revision、解析、Diff 和 Undo/Redo 是 Visual 修改的硬门禁；危险或未知语法 fall back Source-only。
