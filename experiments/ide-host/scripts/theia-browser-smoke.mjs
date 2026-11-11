@@ -1416,6 +1416,10 @@ try{
         checks.push(await denial("output-create-index",()=>provider.createIndex(new Map([
           [at("output/"+probeName),new Uint8Array([1])]
         ]))));
+        checks.push(await denial("skills-create-index",()=>provider.createIndex(new Map([
+          [at("skills/establish-pdu-session/"+probeName),new Uint8Array([1])]
+        ]))));
+        checks.push(await denial("empty-create-index",()=>provider.createIndex(new Map())));
         checks.push(await denial("clear",()=>provider.clear()));
         const source=at("skills/establish-pdu-session/"+probeName);
         let sourceWritable=false,sourceClean=false,sourceError=null;
