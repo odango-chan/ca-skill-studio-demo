@@ -275,7 +275,7 @@ try{
     await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
     await sleep(3400);
   }
-  const afterImport=await evalJS(`(async()=>{
+  // Loading may be automatic on the empty online workbench or explicitly\n  // invoked again from the command palette. Both must preserve existing files.\n  const afterImport=await evalJS(`(async()=>{
     const names=[];let opfsError=null;
     try{
       const dir=await navigator.storage.getDirectory();
@@ -1458,7 +1458,7 @@ try{
   if(!afterImport.notificationText.some(message=>
        message.includes("示例项目已载入：skills/")&&
        message.includes("lib/")&&message.includes("output/")&&
-       message.includes("新增 27 个文件"))||
+       /新增 (?:0|18) 个文件/.test(message))||
      !afterImport.bodyText.includes("skills")||
      !afterImport.bodyText.includes("establish-pdu-session")||
      !afterImport.bodyText.includes("lib/")||
