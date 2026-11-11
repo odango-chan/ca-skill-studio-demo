@@ -2250,9 +2250,12 @@ export function registerWorkbench(vscode,context){
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const key=uri.toString();
     const existing=markdownPanels.get(key);
-    if(existing){existing.reveal();return;}
+    if(existing){await existing.show();return;}
     const doc=await vscode.workspace.openTextDocument(uri);
     let sourceEditor=await vscode.window.showTextDocument(doc,{viewColumn:sourceColumn,preview:false});
+    const showSource=async()=>{
+      sourceEditor=await vscode.window.showTextDocument(doc,{viewColumn:sourceEditor?.viewColumn,preview:false});
+    };
     const rootMarker='/references/';
     const referenceIndex=uri.path.lastIndexOf(rootMarker);
     const packageRootPath=uri.path.endsWith('/SKILL.md')
@@ -2331,9 +2334,16 @@ export function registerWorkbench(vscode,context){
     });
     let sourceScrollTarget=null;
     const incoming=webview.onDidReceiveMessage(async message=>{
-      if(message?.type==='markdownReady'){sendRender();return;}
+      if(message?.type==='markdownReady'){
+        sendRender();
+        const line=sourceEditor?.visibleRanges?.[0]?.start.line;
+        if(line!==undefined)void webview.postMessage({type:'revealMarkdownLine',version:doc.version,line});
+        return;
+      }
       if(message?.type==='showMarkdownSource'){
-        sourceEditor=await vscode.window.showTextDocument(doc,{viewColumn:sourceEditor?.viewColumn,preview:false});
+        if(sourceEditor?.viewColumn!==undefined&&sourceEditor.viewColumn!==panel.viewColumn)
+          panel.reveal(sourceEditor.viewColumn,true);
+        await showSource();
         return;
       }
       if(message?.type==='markdownVisibleLine'){
@@ -2386,7 +2396,9 @@ export function registerWorkbench(vscode,context){
       if(echoed)return;
       void webview.postMessage({type:'revealMarkdownLine',version:doc.version,line});
     });
-    markdownPanels.set(key,panel);
+    markdownPanels.set(key,{
+      async show(){await showSource();panel.reveal();}
+    });
     panel.onDidDispose(()=>{
       markdownPanels.delete(key);
       changed.dispose();scrolled.dispose();incoming.dispose();

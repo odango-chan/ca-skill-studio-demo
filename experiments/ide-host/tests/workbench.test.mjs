@@ -144,8 +144,10 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
   const file=uri('/workspace/establish-pdu-session/assurance/procedure.yaml');
   const doc={uri:file,version:1,text:source,getText(){return this.text;},positionAt(offset){return {offset};},get lineCount(){return this.text.split('\n').length;}};
-  let changed, markdownMessage;
-  const previewMessages=[];
+  let changed, markdownMessage, markdownScrolled;
+  const previewMessages=[], nativeReveals=[];
+  const markdownEditor={document:doc,viewColumn:1,visibleRanges:[{start:{line:0}}],
+    revealRange:(...args)=>nativeReveals.push(args)};
   const vscode={
     EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
     TreeItem:class {constructor(label,state){this.label=label;this.collapsibleState=state;}},
@@ -154,7 +156,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     WorkspaceEdit:class {constructor(){this.changes=[];}replace(uri,range,value){this.changes.push({uri,range,value});}},
     Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
-    ViewColumn:{Beside:2},
+    ViewColumn:{Beside:2},TextEditorRevealType:{AtTop:3},
     Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
     commands:{executeCommand:async()=>{},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
@@ -169,7 +171,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
       },
       onDidChangeTextDocument(cb){changed=cb;return disposable();},openTextDocument:async()=>doc},
     window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
-      onDidChangeActiveTextEditor:()=>disposable(),onDidChangeTextEditorVisibleRanges:()=>disposable(),showTextDocument:async()=>{},
+      onDidChangeActiveTextEditor:()=>disposable(),onDidChangeTextEditorVisibleRanges:callback=>{markdownScrolled=callback;return disposable();},
+      showTextDocument:async()=>markdownEditor,
       showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},
       showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation',
       createWebviewPanel(){const p={webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u,onDidReceiveMessage:callback=>{markdownMessage=callback;return disposable();},postMessage:message=>previewMessages.push(message)},onDidDispose:()=>disposable()};panels.push(p);return p;}}
@@ -578,7 +581,19 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.match(panels[0].webview.html,/&lt;script&gt;/);
   const initialHtml=panels[0].webview.html;
   await markdownMessage({type:'markdownReady'});
-  assert.match(previewMessages.at(-1).html,/data-source-start="0"/);
+  assert.match(previewMessages.at(-2).html,/data-source-start="0"/);
+  const scrollMessage={type:'markdownVisibleLine',line:1,version:doc.version};
+  await markdownMessage({...scrollMessage,version:doc.version-1});
+  await markdownMessage({...scrollMessage,line:1000});
+  assert.equal(nativeReveals.length,0);
+  await markdownMessage(scrollMessage);
+  assert.equal(nativeReveals.length,1);
+  const scroll=(line)=>markdownScrolled({textEditor:markdownEditor,visibleRanges:[{start:{line}}]});
+  const beforeEcho=previewMessages.length;
+  scroll(1);
+  assert.equal(previewMessages.length,beforeEcho);
+  scroll(0);
+  assert.deepEqual(previewMessages.at(-1),{type:'revealMarkdownLine',version:doc.version,line:0});
   doc.text='# Unsaved title';
   doc.version++;changed({document:doc});
   assert.match(previewMessages.at(-1).html,/Unsaved title/);
