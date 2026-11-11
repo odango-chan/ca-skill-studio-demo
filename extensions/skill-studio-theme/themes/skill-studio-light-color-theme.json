@@ -133,7 +133,10 @@
     "statusBarItem.errorBackground": "#C65D5D",
     "statusBarItem.errorForeground": "#FFFFFF",
     "statusBarItem.warningBackground": "#AD6517",
-    "statusBarItem.warningForeground": "#FFFFFF"
+    "statusBarItem.warningForeground": "#FFFFFF",
+    "statusBar.noFolderBorder": "#E1E7EF",
+    "statusBar.offlineBackground": "#F5F7FB",
+    "statusBar.offlineForeground": "#354C66"
   },
   "tokenColors": [
     {
