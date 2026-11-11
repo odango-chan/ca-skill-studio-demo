@@ -203,12 +203,22 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
     ViewColumn:{One:1,Two:2,Beside:2},TextEditorRevealType:{AtTop:1},
+    FileType:{File:1,Directory:2,SymbolicLink:64},
     Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
     commands:{executeCommand:async(...args)=>{markdownCommandCalls.push(args);},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
     workspace:{textDocuments:[doc,markdownDoc],
-      findFiles:async()=>['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md'].map(p=>uri('/workspace/establish-pdu-session/'+p)),
-      fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8'))},
+      getWorkspaceFolder:()=>({uri:uri('/workspace')}),
+      findFiles:async pattern=>{
+        if(pattern==='**/SKILL.md'||pattern instanceof vscode.RelativePattern)
+          return [uri('/workspace/SKILL.md')];
+        return ['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md']
+          .map(p=>uri('/workspace/establish-pdu-session/'+p));
+      },
+      fs:{
+        readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8')),
+        stat:async u=>({type:u.path.endsWith('SKILL.md')?vscode.FileType.File:vscode.FileType.Directory})
+      },
       async applyEdit(edit){
         appliedEdits.push([...edit.changes]);
         for(const change of [...edit.changes].sort((a,b)=>b.range.start.offset-a.range.start.offset))
