@@ -11,6 +11,7 @@ if (!html.includes('src="./app.mjs"')) throw new Error("Unable to locate source 
 writeFileSync(join(dist, "index.html"), html.replace('src="./app.mjs"', 'src="./app.js"'));
 copyFileSync("site/studio.css", join(dist, "studio.css"));
 copyFileSync("site/light.css", join(dist, "light.css"));
+copyFileSync("site/markdown-preview.css", join(dist, "markdown-preview.css"));
 copyFileSync("site/samples/establish-pdu-session.procedure.yaml", join(dist, "samples/establish-pdu-session.procedure.yaml"));
 mkdirSync(join(dist, "samples", "packages"), { recursive: true });
 cpSync("site/samples/packages/establish-pdu-session",
