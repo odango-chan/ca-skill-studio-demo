@@ -716,14 +716,47 @@ try{
           windowsVirtualKeyCode:virtualKeyCode,nativeVirtualKeyCode:virtualKeyCode
         });
       };
-      const clickX=editorTarget.chosen.rect.x+Math.min(90,editorTarget.chosen.rect.width/2);
-      const clickY=editorTarget.chosen.rect.y+Math.min(24,editorTarget.chosen.rect.height/2);
+      const focusTarget=await evalJS(`(()=>{
+        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
+        const viewport=editor?.querySelector(".monaco-scrollable-element")??editor;
+        const r=viewport?.getBoundingClientRect();
+        if(!editor||!r)return {found:false};
+        const xs=[r.x+Math.min(90,r.width/3),r.x+r.width/2,
+          r.right-Math.min(90,r.width/3)];
+        const ys=[r.y+Math.min(24,r.height/3),r.y+r.height/2,
+          r.bottom-Math.min(24,r.height/3)];
+        const candidates=ys.flatMap(y=>xs.map(x=>({x,y})));
+        const hit=candidates.find(({x,y})=>x>0&&y>0&&x<innerWidth&&y<innerHeight&&
+          document.elementFromPoint(x,y)?.closest(".monaco-editor")===editor);
+        return {found:!!hit,point:hit??null,editorCount:document.querySelectorAll(".monaco-editor").length,
+          viewport:{x:r.x,y:r.y,width:r.width,height:r.height}};
+      })()`);
+      if(!focusTarget?.found)
+        throw Error("Visible Procedure Source is not hit-testable: "+
+          JSON.stringify({editorTarget,focusTarget}));
       await command("Input.dispatchMouseEvent",{
-        type:"mousePressed",x:clickX,y:clickY,button:"left",clickCount:1
+        type:"mouseMoved",x:focusTarget.point.x,y:focusTarget.point.y
       });
       await command("Input.dispatchMouseEvent",{
-        type:"mouseReleased",x:clickX,y:clickY,button:"left",clickCount:1
+        type:"mousePressed",x:focusTarget.point.x,y:focusTarget.point.y,button:"left",clickCount:1
       });
+      await command("Input.dispatchMouseEvent",{
+        type:"mouseReleased",x:focusTarget.point.x,y:focusTarget.point.y,button:"left",clickCount:1
+      });
+      const focusedSource=await evalJS(`(()=>{
+        const current=document.activeElement?.closest(".monaco-editor");
+        const editors=[...document.querySelectorAll(".monaco-editor")];
+        return {focusedIndex:editors.indexOf(current),
+          activeClass:document.activeElement?.className??null,
+          activeTag:document.activeElement?.tagName??null,
+          activeEditorCount:editors.length};
+      })()`);
+      console.log("STUDIO_GOTO_SOURCE_FOCUS",JSON.stringify({
+        expectedIndex:editorTarget.chosen.index,focusTarget,focusedSource
+      }));
+      if(focusedSource?.focusedIndex!==editorTarget.chosen.index)
+        throw Error("Clicked Procedure Source did not gain native keyboard focus: "+
+          JSON.stringify({editorTarget,focusTarget,focusedSource}));
       // Resolve the fixture line from the *same pinned owner Source* that
       // the browser actually imported. A numeric hard-coded line silently
       // breaks when a legitimate owner SKILL refresh adds comments/Steps.
