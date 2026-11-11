@@ -37,7 +37,7 @@ export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
-  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map();
+  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),markdownOpening=new Set();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2253,17 +2253,21 @@ export function registerWorkbench(vscode,context){
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
     const key=uri.toString();
-    // Source is always the authoritative native editor in column one.
-    // The read-only Webview is a paired second-column view of the same URI.
-    const sourceEditor=await vscode.window.showTextDocument(doc,{
-      viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:true
-    });
     const existing=markdownPanels.get(key);
     if(existing){
-      existing.editor=sourceEditor;
+      existing.editor=await vscode.window.showTextDocument(doc,{
+        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:true
+      });
       existing.panel.reveal(existing.singlePane?vscode.ViewColumn.One:vscode.ViewColumn.Two);
       return existing.panel;
     }
+    markdownOpening.add(key);
+    try{
+      // Source is always the authoritative native editor in column one.
+      // The read-only Webview is a paired second-column view of the same URI.
+      const sourceEditor=await vscode.window.showTextDocument(doc,{
+        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:true
+      });
     const rootMarker='/references/';
     const referenceIndex=uri.path.lastIndexOf(rootMarker);
     const packageRootPath=uri.path.endsWith('/SKILL.md')
@@ -2449,6 +2453,9 @@ export function registerWorkbench(vscode,context){
       if(markdownPanels.get(key)===state)markdownPanels.delete(key);
     });
     return panel;
+    }finally{
+      markdownOpening.delete(key);
+    }
   }));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.toggleMarkdownLayout',async uri=>{
@@ -2470,7 +2477,7 @@ export function registerWorkbench(vscode,context){
     if(!target||!target.path.toLowerCase().endsWith('.md'))return;
     const key=target.toString();
     setTimeout(()=>{
-      if(markdownPanels.has(key))return;
+      if(markdownPanels.has(key)||markdownOpening.has(key))return;
       if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
       void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
     },0);
