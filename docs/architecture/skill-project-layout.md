@@ -30,7 +30,7 @@ This layout intentionally matches the [`ca-skill-compiler` README](https://githu
 - `lib/` is reserved for user-imported Tool contract snapshots. The sample importer creates the empty directory and **does not write fake library contracts**. Read-only is an ownership policy, not a filesystem permission claim in the current browser host.
 - `output/` is reserved for `skillc build` results. The importer creates the empty directory and **does not fake a build**, publish or execute anything.
 - Package Overview scans only the Source subtree `skills/` when a project root contains it; it cannot claim that `lib/` or `output/` contains additional authored SKILL Packages. Standalone and legacy folder workspaces remain supported.
-- The example project is isolated at extension-owned `workspaces/skill-studio-demo`. Earlier `workspaces/skills` files are **left untouched**; no silent rename, migration, deletion or overwrite occurs. Existing user workspaces are not chosen as import targets. Users can manually move or import historical edits after inspecting them.
+- The example project uses extension-owned `workspaces/` as its root, shown in Explorer as **skill-studio-demo**. The existing `workspaces/skills/` directory is reused in place as the project's `skills/` (no copying, deleting, renaming or overwriting user-edited Source); empty sibling `lib/` and `output/` directories are created. When the old extension-owned `skills/` root is already mounted as a Workspace, only that Workspace entry is replaced by its parent project root. Unrelated user workspaces are not repurposed or removed.
 - The bundled source fixture remains `site/samples/skills/` for packaging tests; it is **not** the runtime editable project root.
 
 ## Compiler ownership boundary
