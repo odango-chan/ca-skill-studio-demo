@@ -21,7 +21,7 @@ See machine-readable [studio-settings-contributions.json](../../contracts/v0.1/s
 
 Only resource-scoped selected workspace-folder configuration is authoritative. In multi-root workspaces, ask which root owns a Skill Project, then load/update settings for that root. If the host cannot provide a durable workspace configuration write, fail visibly; **never** silently substitute User Settings, `globalState` or `workspaceState` for shareable dependencies. Theia Browser-only OPFS support must be proved by real browser tests. `contributes.configuration` cannot make JSON manually uneditable; invalid or unrecognized settings must be rejected by Service validation rather than treated as trusted.
 
-Schema semantics (declaration shape, locked source equality, paths, digest algorithm): Compiler's [v0.1 project settings machine contract](https://github.com/odango-chan/ca-skill-compiler/blob/docs/plugin-managed-contract-v01-20261111/contracts/v0.1/project-settings.schema.json). Avoid maintaining a conflicting parser/schema in this repository. The host converts separate setting values into the compiler-owned normalized projection.
+Input schema semantics (declaration shape, locked source equality, paths and digest encoding): Compiler's [v0.1 project settings machine contract](https://github.com/odango-chan/ca-skill-compiler/blob/docs/plugin-managed-contract-v01-20261111/contracts/v0.1/project-settings.schema.json). Avoid maintaining a conflicting parser/schema in this repository. The host converts separate setting values into the compiler-owned normalized input projection. The Compiler consumes pinned snapshots; it does not fetch, resolve, acquire or update them.
 
 ## Workspace project and persistence
 
