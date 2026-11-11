@@ -43,6 +43,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let clientStopPromise = null;
   let client = null;
   let semanticTokenRegistration = null;
+  let semanticTokenChangeEmitter = null;
   function stopClientAfterFailure() {
     if (!started || !client) return Promise.resolve();
     if (!clientStopPromise) {
@@ -90,7 +91,9 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       [...SKILL_SEMANTIC_TOKEN_TYPES],
       [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
     );
+    semanticTokenChangeEmitter=new vscode.EventEmitter();
     const provider={
+      onDidChangeSemanticTokens:semanticTokenChangeEmitter.event,
       async provideDocumentSemanticTokens(document,cancellationToken){
         if(stopped||terminalFailure||cancellationToken?.isCancellationRequested)
           return new vscode.SemanticTokens(new Uint32Array());
@@ -194,6 +197,9 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   });
   client.onNotification(ANALYSIS_STATUS_NOTIFICATION, status => {
     if (!terminalFailure) handlers.onStatus?.(status);
+    // The manual Theia provider is an adapter over the same LSP endpoint.
+    // Refresh it whenever the accepted Package generation changes state.
+    semanticTokenChangeEmitter?.fire();
     if (status?.state === "UNAVAILABLE" && status?.reason)
       output.appendLine("Analysis unavailable: " + status.reason);
   });
@@ -264,6 +270,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       } finally {
         semanticTokenRegistration?.dispose?.();
         semanticTokenRegistration=null;
+        semanticTokenChangeEmitter?.dispose?.();
+        semanticTokenChangeEmitter=null;
         worker.terminate();
         output.dispose();
       }
