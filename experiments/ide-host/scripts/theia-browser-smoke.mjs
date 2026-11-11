@@ -286,6 +286,13 @@ try{
     }catch(error){opfsError=String(error);}
     return {
       folders:names,opfsError,
+      statusBar:(()=>{
+        const element=document.querySelector("#theia-statusBar");
+        if(!element)return null;
+        const style=getComputedStyle(element);
+        return {background:style.backgroundColor,foreground:style.color,
+          noWorkspace:document.body.classList.contains("theia-no-open-workspace")};
+      })(),
       bodyText:document.body.innerText.slice(-1400),
       notificationText:[...document.querySelectorAll('.theia-notification-list-item,.theia-notification-message')]
         .map(x=>x.innerText).filter(Boolean).slice(0,7),
@@ -1457,6 +1464,12 @@ try{
   if(!narrowBrand.present||narrowBrand.labelDisplay!=="none"||!narrowBrand.markVisible)
     throw Error("SKILL Studio brand did not compact cleanly on narrow screens: "+
       JSON.stringify(narrowBrand));
+  console.log("STUDIO_STATUS_BAR_CHROMIUM",JSON.stringify(afterImport.statusBar));
+  if(!afterImport.statusBar||
+     !["rgb(245, 247, 251)","rgb(229, 246, 239)"].includes(
+       afterImport.statusBar.background))
+    throw Error("Theia status bar is not Studio Light: "+
+      JSON.stringify(afterImport.statusBar));
   if(!afterImport.notificationText.some(message=>
        message.includes("示例项目已载入：skills/")&&
        message.includes("lib/")&&message.includes("output/")&&
