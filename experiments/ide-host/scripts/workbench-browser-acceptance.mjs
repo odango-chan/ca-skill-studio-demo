@@ -2093,7 +2093,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      predicateView.predicates!==17||predicateView.observations<17||
      !predicateView.text.includes('createdsession.ran.setup_accepted')||
      !predicateView.text.includes('createdsession.udm.hold_bound')||
-     !predicateView.text.includes('skill.evaluate-udm-read')||
+     !predicateView.text.includes('scripts/evaluate_udm_read.py')||
      !predicateView.text.includes('Observation → Evaluator')||
      !predicateView.text.includes('不是当前运行证据'))
     throw Error('Predicate Designer did not render the real PredicateSet declarations: '+
