@@ -1116,6 +1116,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await evalJS(`(()=>{
       window.__skillStudioEvidenceClickEvents=[];
       window.__skillStudioEvidenceBubbleEvents=[];
+      window.__skillStudioEvidenceMouseEvents=[];
       const record=event=>{
         const toggle=event.target?.closest?.('.theia-ExpansionToggle');
         if(!toggle)return null;
@@ -1137,6 +1138,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         const detail=record(event);
         if(detail)window.__skillStudioEvidenceBubbleEvents.push(detail);
       },false);
+      for(const type of ['pointerdown','pointerup','mousedown','mouseup']){
+        document.addEventListener(type,event=>{
+          const detail=record(event);
+          if(detail)window.__skillStudioEvidenceMouseEvents.push({...detail,type});
+        },true);
+      }
     })()`);
     // Resolve the live target after any layout/scroll work. Do not hover a
     // stale coordinate: the mousemove itself can trigger Theia SplitPanel
@@ -1367,6 +1374,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         consumerAbi:labels.some(label=>label.includes('Consumer ABI')),
         clickEvents:window.__skillStudioEvidenceClickEvents??[],
         bubbleEvents:window.__skillStudioEvidenceBubbleEvents??[],
+        mouseEvents:window.__skillStudioEvidenceMouseEvents??[],
         modelCalls:window.__skillStudioEvidenceModelCalls??[],
         treeWidgets:treeWidgets.map(widget=>({id:widget.id,type:widget.constructor?.name,
           disposed:widget.isDisposed,visible:widget.isVisible,attached:widget.isAttached})),
