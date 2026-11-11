@@ -1,19 +1,23 @@
 # C4 — Package Overview
 
-Status: implementation complete; exact-PR-head single-package Theia acceptance
-passes. Real-browser multi-package acceptance remains deferred until the
-two-owner sample workspace from PR #129 is integrated.
+Status: implementation complete; final exact-head CI and real Chromium
+acceptance are in progress. PR #133 now targets `main` and includes the
+latest Contract / Predicate / Schema Designer integration.
 
-Verified PR head: `3e29e9e2cc2bf17c87877efd4755e9ac8e985c95`.
+Current verification head: `6546927847ef0e13671f477568841aa3ca3d5924`.
 
-- Theia Browser-Only Online: PASS (run 42810666981).
-- Theia Browser Host Custom Editor: PASS (run 42810667063).
-- IDE Host Spike: PASS (run 42810666993).
-- Skill Studio pull-request verification: PASS (run 42810666987, attempt 2).
-- Real Chromium Package evidence: 16 files, 3/3 core files, 6 schemas,
-  3 scripts, 3 references; TreeView requested Package children twice.
+- Package inventory unit tests cover multiple roots, nested roots, incomplete
+  packages, dirty counts, bounded scans, and exact file-kind routing.
+- The real Theia acceptance now opens the two shipped sample Skills in one
+  Workspace: traditional 5GC (22 files) and MAS (5 files).
+- Chromium acceptance checks both Package rows, each Package's Assurance
+  group, exact Contract URI routing for both Skills, and TreeView child reads.
+- The previous Browser Host run exposed a separate Evidence-tree test issue:
+  the Phase group could remain collapsed after its root appeared. The test now
+  explicitly expands that parent before asserting the nested dataflow row.
+  The corrected exact-head run is pending; no merge is authorized yet.
 
-The pull request remains stacked on C3 and is intentionally still draft.
+The pull request remains draft until all four exact-head workflows pass.
 
 ## Purpose
 
