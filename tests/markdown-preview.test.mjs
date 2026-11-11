@@ -105,11 +105,10 @@ test("current dual Skill guides render safely and expose only explicit Package-l
   assert.match(linked,/data-local-path="references\/3gpp-procedure\.md"/);
   assert.match(linked,/data-local-path="references\/session-selection\.md"/);
   assert.match(linked,/data-local-path="references\/failure-handling\.md"/);
-  // The guide also links to a repository-level design note. It must not be
-  // converted into a Package-local link because it escapes the Skill root.
+  // Do not couple the canonical guide to an obsolete repository-level link:
+  // an updated ca-skills SKILL.md may legitimately contain only local links.
   assert.doesNotMatch(linked,/data-local-path="\.\.\/\.\.\/docs/);
   assert.doesNotMatch(linked,/data-local-path="docs\/design\/llm-skill-execution-baseline\.md"/);
-  assert.match(linked,/md-unresolved-link/);
 });
 
 test("Reference Markdown can link back to SKILL.md, while local navigation is opt-in",()=>{
