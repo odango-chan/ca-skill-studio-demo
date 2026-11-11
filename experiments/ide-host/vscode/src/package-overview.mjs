@@ -229,10 +229,15 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       return undefined;
     }
   };
-  // Register the provider without revealing/opening the view. Package Overview
-  // must populate when the user opens its Activity Bar container, not steal
-  // focus or open a sidebar automatically during extension startup.
-  const treeRegistration = vscode.window.registerTreeDataProvider(
+  // Register without auto-opening the view. When supported, keep a real
+  // TreeView handle so an explicit example-import action can reveal both
+  // Skill roots without synthesizing mouse events or forcing initial focus.
+  const treeView = typeof vscode.window.createTreeView==='function'
+    ? vscode.window.createTreeView('skillStudio.packages',{
+        treeDataProvider:provider,showCollapseAll:true
+      })
+    : null;
+  const treeRegistration = treeView ?? vscode.window.registerTreeDataProvider(
     'skillStudio.packages',provider);
   context.subscriptions.push(emitter,treeRegistration);
   async function refresh() {
@@ -356,6 +361,17 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     {dispose(){clearTimeout(timer);generation++;}}
   ].filter(Boolean);
   context.subscriptions.push(...subscriptions);
+  async function revealPackages(){
+    const list=await refresh();
+    if(!treeView?.reveal)return false;
+    for(const pkg of list){
+      await treeView.reveal(packageNode(pkg),{
+        expand:1,focus:false,select:false
+      });
+    }
+    return list.length>0;
+  }
   void refresh();
-  return {refresh,dispose(){clearTimeout(timer);generation++;emitter.dispose?.();}};
+  return {refresh,revealPackages,
+    dispose(){clearTimeout(timer);generation++;emitter.dispose?.();}};
 }
