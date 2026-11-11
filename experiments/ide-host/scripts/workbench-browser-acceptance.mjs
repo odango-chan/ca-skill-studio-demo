@@ -2317,11 +2317,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const explorerRow=async(label,which='last')=>evalJS(
     "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();const toggle=row.node.querySelector('.theia-ExpansionToggle');const tr=toggle?.getBoundingClientRect();const tx=tr?tr.x+tr.width/2:null,ty=tr?tr.y+tr.height/2:null;const hit=tr?document.elementFromPoint(tx,ty):null;return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length,toggleX:tx,toggleY:ty,toggleHit:!!toggle&&(hit===toggle||toggle.contains(hit)),toggleClass:toggle?.className??null};})()"
   );
-  // Compiler-style project root: the Explorer owns skills/, lib/, output/.
-  // Expand only the source directory before looking for the two Skill folders.
+  // v0.1 Example is one isolated project with only skills/ initially.
+  // Theia's compact folder display can join project/skills into one TreeNode.
   let skillsFolder=null;
   for(let attempt=0;attempt<60;attempt++){
     skillsFolder=await explorerRow('skills');
+    if(!skillsFolder?.found)
+      skillsFolder=await explorerRow('skill-studio-example-v01/skills');
     if(skillsFolder?.found)break;
     await sleep(100);
   }
@@ -2331,7 +2333,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(String(skillsFolder.toggleClass).includes('theia-mod-collapsed')){
     await click(skillsFolder.x,skillsFolder.y);
     await sleep(180);
-    const current=await explorerRow('skills');
+    const current=await explorerRow('skills').then(row=>row.found?row:
+      explorerRow('skill-studio-example-v01/skills'));
     if(current?.toggleHit&&String(current.toggleClass).includes('theia-mod-collapsed'))
       await click(current.toggleX,current.toggleY);
   }
@@ -2428,7 +2431,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   conventionalGraph=await graph('ue-requested-pdu-session-establishment');
   if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
   const dualSkillExplorer={
-    root:'skill-studio-demo/skills',conventionalFolder:'establish-pdu-session',masFolder,
+    root:'skill-studio-example-v01/skills',conventionalFolder:'establish-pdu-session',masFolder,
     assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths,
     conventionalProcedure,conventionalGraph
   };
