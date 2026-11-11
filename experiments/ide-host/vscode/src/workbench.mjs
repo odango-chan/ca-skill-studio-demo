@@ -111,8 +111,8 @@ export function registerWorkbench(vscode,context){
       provideDocumentSemanticTokens(document,cancellationToken){
         if(cancellationToken?.isCancellationRequested)
           return new vscode.SemanticTokens(new Uint32Array());
-        const relativePath=vscode.workspace.asRelativePath?.(document.uri,false)||
-          document.uri.path.replace(/^\\/+/, "");
+        const uriPath=document.uri.path.split("/").filter(Boolean).join("/");
+        const relativePath=vscode.workspace.asRelativePath?.(document.uri,false)||uriPath;
         const spans=collectSkillSemanticTokenSpans(document.getText(),relativePath);
         semanticTokenDiagnostics.requests++;
         semanticTokenDiagnostics.lastUri=document.uri.toString();
