@@ -21,6 +21,7 @@
     "onCommand:skillStudio.auditPackage",
     "onCommand:skillStudio.exportPackageZip",
     "onCommand:skillStudio.previewMarkdown",
+    "onCommand:skillStudio.toggleMarkdownLayout",
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
     "onCommand:skillStudio.editNodeOperatorValue",
@@ -86,6 +87,10 @@
         "title": "SKILL Studio: Preview Markdown"
       },
       {
+        "command": "skillStudio.toggleMarkdownLayout",
+        "title": "SKILL Studio: Toggle Markdown Split"
+      },
+      {
         "command": "skillStudio.refreshInspection",
         "title": "SKILL Studio: Refresh Inspection"
       },
@@ -147,6 +152,18 @@
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "skillStudio.previewMarkdown",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.toggleMarkdownLayout",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        }
+      ],
       "explorer/context": [
         {
           "command": "skillStudio.openSchema",
