@@ -1248,8 +1248,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       throw Error('Evidence TreeWidget instrumentation could not resolve the live model: '+
         JSON.stringify(toggleInstrumentation));
     if(!liveToggle.expanded){
-      await command('Input.dispatchMouseEvent',{type:'mousePressed',x:liveToggle.x,y:liveToggle.y,button:'left',clickCount:1});
-      await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:liveToggle.x,y:liveToggle.y,button:'left',clickCount:1});
+      // CDP requires the pressed-button bitmask as well as the button name;
+      // without it Chromium emits no trusted click event for this native row.
+      await command('Input.dispatchMouseEvent',{type:'mousePressed',x:liveToggle.x,y:liveToggle.y,
+        button:'left',buttons:1,clickCount:1});
+      await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:liveToggle.x,y:liveToggle.y,
+        button:'left',buttons:0,clickCount:1});
     }
   }
   let dataflowExpansion=null;
@@ -1343,15 +1347,24 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const c=window.theia?.container,keys=[...(c?._bindingDictionary?._map?.keys()??[])];
       const key=keys.find(item=>typeof item==='function'&&typeof item.prototype?.getWidgets==='function'&&typeof item.prototype?.getOrCreateWidget==='function');
       const widget=key?c.get(key).getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence'):null;
-      const id=[...document.querySelectorAll('#skillStudio\\.evidence .theia-ExpansionToggle')]
-        .find(item=>item.getAttribute('data-node-id')?.includes('Producer // Consumer dataflow'))?.getAttribute('data-node-id');
-      const node=widget?.model?.getNode(id),before={expanded:node?.expanded??null,children:node?.children?.length??null,proxy:!!widget?.model?.tree?.proxy};
+      const container=[...document.querySelectorAll('.theia-view-container')]
+        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+      const part=header?.closest('.part');
+      const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(item=>{
+        const caption=[...item.children].find(child=>
+          child.classList?.contains('theia-TreeNodeContent'));
+        return caption?.innerText?.includes('Producer / Consumer dataflow');
+      });
+      const id=row?.querySelector('.theia-ExpansionToggle')?.getAttribute('data-node-id');
+      const node=widget?.model?.getNode(id),before={found:!!node,expanded:node?.expanded??null,children:node?.children?.length??null,proxy:!!widget?.model?.tree?.proxy};
       try{if(node)await widget.model.expandNode(node);return {before,after:{expanded:node?.expanded??null,children:node?.children?.length??null}};}
       catch(error){return {before,error:String(error?.message??error),after:{expanded:node?.expanded??null,children:node?.children?.length??null}};}
     })()`);
     const modelTrace=await evalJS('window.__skillStudioEvidenceModelTrace??null');
     throw Error('Native Evidence dataflow arrow did not expand: '+
-      JSON.stringify({dataflowTreeRow,dataflowExpansion,evidenceModelSetup,modelTrace,directExpansionDiagnostic}));
+      JSON.stringify({dataflowTreeRow,liveToggle,toggleInstrumentation,dataflowExpansion,evidenceModelSetup,modelTrace,directExpansionDiagnostic}));
   }
   for(let i=0;i<50;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
