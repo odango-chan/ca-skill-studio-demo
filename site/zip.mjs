@@ -19,8 +19,9 @@ function pathOK(path) {
     !path.startsWith("/")&&path.split("/").every(part=>part&&
     part!=="."&&part!==".."&&!/[\\\u0000-\u001f:<>|?*]/.test(part));
 }
-export function zipPackage(entries){
-  if(!Array.isArray(entries)||!entries.length||entries.length>64)
+export function zipPackage(entries,{maxFiles=64,maxFileBytes=1024*1024,
+  maxTotalBytes=8*1024*1024}={}){
+  if(!Array.isArray(entries)||!entries.length||entries.length>maxFiles)
     throw new Error("Package ZIP file count out of bounds");
   let bytesTotal=0;
   const names=new Set(),records=[];
@@ -38,9 +39,9 @@ export function zipPackage(entries){
     const data=opaque?opaque.slice():
       original&&item.text===item.originalText?original.slice():
       encoder.encode(item.text);
-    if(name.length>65535 || data.length>1024*1024)throw new Error("ZIP file too large");
+    if(name.length>65535 || data.length>maxFileBytes)throw new Error("ZIP file too large");
     bytesTotal+=data.length;
-    if(bytesTotal>8*1024*1024)throw new Error("ZIP payload too large");
+    if(bytesTotal>maxTotalBytes)throw new Error("ZIP payload too large");
     records.push({name,data,crc:crc32(data)});
   }
   const localSize=records.reduce((n,r)=>n+30+r.name.length+r.data.length,0);
