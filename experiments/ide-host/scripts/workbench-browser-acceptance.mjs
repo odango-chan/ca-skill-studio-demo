@@ -1761,34 +1761,250 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Return the native Explorer to the foreground: the evidence acceptance
   // opened the Skill Studio Activity Bar and intentionally kept it selected.
   await invoke('workbench.files.action.focusFilesExplorer');
-  // Safe Markdown uses the actual native source document and shared renderer.
-  const markdownFile=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='SKILL.md'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-  if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
-  await click(markdownFile.x,markdownFile.y,2);await sleep(400);
-  await invoke('skillStudio.previewMarkdown');
-  let markdown=false,markdownStyled=false,markdownStyleInfo=null;
-  async function inspect(n){
-    try{const w=await command('Page.createIsolatedWorld',{frameId:n.frame.id,worldName:'markdown-acceptance',grantUniveralAccess:true});
-      const r=await command('Runtime.evaluate',{contextId:w.executionContextId,returnByValue:true,expression:`Boolean(document.querySelector('article h1')&&!document.querySelector('article script,article img'))`});
-      markdown ||= r.result?.value===true;
-      const styled=await command('Runtime.evaluate',{contextId:w.executionContextId,returnByValue:true,
-        expression:`(()=>{const article=document.querySelector('article.markdown-preview');if(!article)return null;const css=getComputedStyle(article);const link=document.querySelector('link[href*="markdown-preview.css"]');return {href:link?.href??null,maxWidth:css.maxWidth,paddingLeft:css.paddingLeft,applied:Boolean(link&&css.maxWidth==='920px'&&parseFloat(css.paddingLeft)>0)};})()`});
-      const info=styled.result?.value;
-      if(info)markdownStyleInfo=info;
-      markdownStyled ||= info?.applied===true;
-    }catch{}
-    for(const c of n.childFrames??[])await inspect(c);
+  // Open the exact owner-pinned conventional Skill guide through the real
+  // Theia command registry, then exercise package-local navigation in Chromium.
+  await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session');
+  const markdownWorlds=new Map();
+  async function markdownViews(){
+    const tree=await command('Page.getFrameTree'),found=[];
+    async function walk(node){
+      try{
+        let contextId=markdownWorlds.get(node.frame.id);
+        if(!contextId){
+          const world=await command('Page.createIsolatedWorld',{
+            frameId:node.frame.id,worldName:'markdown-c5-acceptance',grantUniveralAccess:true
+          });
+          contextId=world.executionContextId;
+          markdownWorlds.set(node.frame.id,contextId);
+        }
+        const result=await command('Runtime.evaluate',{
+          contextId,returnByValue:true,
+          expression:'(()=>{const article=document.querySelector("article");if(!article)return null;const theme=getComputedStyle(article);const cssLink=[...document.querySelectorAll("link")].find(el=>el.href.includes("markdown-preview.css"));return {heading:article.querySelector("h1")?.textContent?.trim()??null,toc:!!article.querySelector(".md-toc"),tocLinks:[...article.querySelectorAll(".md-toc a")].filter(a=>(a.getAttribute("href")??"").startsWith("#md-heading-")).length,localPaths:[...article.querySelectorAll("a[data-local-path]")].map(a=>a.getAttribute("data-local-path")),themeApplied:Boolean(cssLink&&theme.maxWidth==="920px"&&parseFloat(theme.paddingLeft)>0)};})()'
+        });
+        if(result.result?.value?.heading)
+          found.push({contextId,...result.result.value});
+      }catch{
+        markdownWorlds.delete(node.frame.id);
+      }
+      for(const child of node.childFrames??[])await walk(child);
+    }
+    await walk(tree.frameTree);
+    return found;
   }
-  // Stylesheets load asynchronously in browser-only Theia. Wait for computed
-  // styles instead of trusting the mere presence of a <link> element.
-  for(let attempt=0;attempt<20&&!markdownStyled;attempt++){
-    const tree=await command('Page.getFrameTree');
-    await inspect(tree.frameTree);
-    if(!markdownStyled)await sleep(150);
+  async function waitMarkdown(predicate,label){
+    let views=[];
+    for(let attempt=0;attempt<80;attempt++){
+      views=await markdownViews();
+      const view=views.find(predicate);
+      if(view)return {view,views};
+      await sleep(100);
+    }
+    throw Error(label+' did not appear in a real Theia Webview: '+JSON.stringify(views));
   }
-  if(!markdown)throw Error('Shared safe Markdown Preview did not render');
-  if(!markdownStyled)throw Error('Theia Markdown preview did not apply packaged theme CSS: '+
-    JSON.stringify(markdownStyleInfo));
+  const guideOpen=await waitMarkdown(
+    view=>view.heading==='Establish PDU Session'&&view.themeApplied,'Themed conventional SKILL.md preview');
+  if(!guideOpen.view.toc||guideOpen.view.tocLinks<10||
+     !guideOpen.view.localPaths.includes('references/3gpp-procedure.md')||
+     !guideOpen.view.localPaths.includes('references/session-selection.md')||
+     !guideOpen.view.localPaths.includes('references/failure-handling.md')||
+     !guideOpen.view.localPaths.includes('assurance/procedure.yaml'))
+    throw Error('SKILL.md outline or explicit Reference links are incomplete: '+
+      JSON.stringify(guideOpen.view));
+  const openReference=await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="references/3gpp-procedure.md");if(!link)return false;link.click();return true;})()'
+  });
+  if(openReference.result?.value!==true)
+    throw Error('Could not click the explicit 3GPP Reference path in SKILL.md');
+  const referenceOpen=await waitMarkdown(
+    view=>view.heading==='PDU Session Establishment: actors and causal boundaries',
+    '3GPP Reference preview');
+  if(!referenceOpen.view.localPaths.includes('../SKILL.md'))
+    throw Error('Reference preview did not expose its explicit link back to SKILL.md: '+
+      JSON.stringify(referenceOpen.view));
+  const beforeForgery=(await markdownViews()).length;
+  await command('Runtime.evaluate',{
+    contextId:referenceOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{const link=document.createElement("a");link.href="#";link.dataset.localPath="../../establish-pdu-session-mas/SKILL.md";document.body.append(link);link.click();link.remove();return true;})()'
+  });
+  await sleep(300);
+  const afterForgery=await markdownViews();
+  const traversalBlocked=afterForgery.length===beforeForgery;
+  if(!traversalBlocked)
+    throw Error('Forged Webview message opened a file outside the active Skill Package');
+  const guideCountBeforeReturn=afterForgery.filter(
+    view=>view.heading==='Establish PDU Session').length;
+  const returnToGuide=await command('Runtime.evaluate',{
+    contextId:referenceOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="../SKILL.md");if(!link)return false;link.click();return true;})()'
+  });
+  if(returnToGuide.result?.value!==true)
+    throw Error('Could not follow Reference → SKILL.md navigation');
+  let returnedGuides=[];
+  for(let attempt=0;attempt<80;attempt++){
+    returnedGuides=(await markdownViews()).filter(
+      view=>view.heading==='Establish PDU Session');
+    if(returnedGuides.length>guideCountBeforeReturn)break;
+    await sleep(100);
+  }
+  if(returnedGuides.length<=guideCountBeforeReturn)
+    throw Error('Reference → SKILL.md did not open a new guide preview');
+  await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session-mas');
+  const masOpen=await waitMarkdown(
+    view=>view.heading==='Establish PDU Session through SMF MAS'&&view.themeApplied,'Themed MAS SKILL.md preview');
+  if(!masOpen.view.toc||masOpen.view.localPaths.length!==0)
+    throw Error('MAS Skill preview invented Package-local Reference links: '+
+      JSON.stringify(masOpen.view));
+  const markdownGuideEvidence={
+    conventional:guideOpen.view,reference:referenceOpen.view,
+    returnedGuideCount:returnedGuides.length,mas:masOpen.view,traversalBlocked
+  };
+  console.log('STUDIO_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
+  // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
+  await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
+  let contractView=null,contractFrame=null,contractContextId=null;
+  for(let attempt=0;attempt<100&&!contractView;attempt++){
+    const contractTree=await command('Page.getFrameTree');
+    const contractFrames=[];
+    const collectContractFrames=node=>{
+      if(!node)return;
+      contractFrames.push(node.frame);
+      for(const child of node.childFrames??[])collectContractFrames(child);
+    };
+    collectContractFrames(contractTree.frameTree);
+    for(const frame of contractFrames.filter(item=>
+        item.url.includes('/webview/index.html')||item.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'contract-designer-acceptance',grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:`({
+            title:document.title,
+            text:document.body?.innerText??'',
+            cards:[...document.querySelectorAll('.card h2')].map(x=>x.textContent.trim()),
+            status:document.querySelector('#status')?.textContent??''
+          })`
+        });
+        const candidate=result.result?.value;
+        if(candidate?.title==='SKILL Contract Visual'){
+          contractView=candidate;contractFrame=frame;
+          contractContextId=world.executionContextId;break;
+        }
+      }catch{/* another webview frame may be disposed while tabs activate */}
+    }
+    if(!contractView)await sleep(100);
+  }
+  const contractExpectedCards=['Skill Identity','Entry & Inputs','Required Context',
+    'Allowed Resources','Preconditions','Requirements','Postconditions',
+    'Planning','Failure Semantics','Dependencies'];
+  if(!contractView||!contractFrame||
+     !contractView.text.includes('establish-pdu-session')||
+     !contractView.text.includes('sbi.udm.sm_data.get')||
+     !contractView.text.includes('skill.evaluate-udm-read')||
+     !contractView.text.includes('createdsession.ran.setup_accepted')||
+     contractExpectedCards.some(title=>!contractView.cards.includes(title)))
+    throw Error('Contract Designer did not render the current Package Source: '+
+      JSON.stringify(contractView).slice(0,3000));
+  console.log('STUDIO_CONTRACT_DESIGNER_CHROMIUM',JSON.stringify({
+    title:contractView.title,status:contractView.status,cards:contractView.cards,
+    capabilityVisible:contractView.text.includes('sbi.udm.sm_data.get'),
+    predicateVisible:contractView.text.includes('createdsession.ran.setup_accepted'),
+    readOnly:contractView.text.includes('Source 是唯一真源')
+  }));
+  // PredicateSet uses its own Observation -> Evaluator visual, never a live result graph.
+  await invokeSkillPackageFile('skillStudio.openPredicates','assurance/predicates.yaml');
+  let predicateView=null,predicateFrame=null;
+  for(let attempt=0;attempt<100&&!predicateView;attempt++){
+    const predicateTree=await command('Page.getFrameTree');
+    const predicateFrames=[];
+    const collectPredicateFrames=node=>{
+      if(!node)return;
+      predicateFrames.push(node.frame);
+      for(const child of node.childFrames??[])collectPredicateFrames(child);
+    };
+    collectPredicateFrames(predicateTree.frameTree);
+    for(const frame of predicateFrames.filter(item=>
+        item.url.includes('/webview/index.html')||item.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'predicate-designer-acceptance',grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:"({title:document.title,text:document.body?.textContent??'',predicates:document.querySelectorAll('details.predicate').length,ids:[...document.querySelectorAll('.predicate summary .pid')].map(x=>x.textContent.trim()),observations:document.querySelectorAll('.observation').length,status:document.querySelector('#status')?.textContent??''})"
+        });
+        const candidate=result.result?.value;
+        if(candidate?.title==='SKILL Predicate Visual'){
+          predicateView=candidate;predicateFrame=frame;break;
+        }
+      }catch{/* another webview frame may be disposed while tabs activate */}
+    }
+    if(!predicateView)await sleep(100);
+  }
+  if(!predicateView||!predicateFrame||
+     predicateView.predicates!==17||predicateView.observations<17||
+     !predicateView.text.includes('createdsession.ran.setup_accepted')||
+     !predicateView.text.includes('createdsession.udm.hold_bound')||
+     !predicateView.text.includes('skill.evaluate-udm-read')||
+     !predicateView.text.includes('Observation → Evaluator')||
+     !predicateView.text.includes('不是当前运行证据'))
+    throw Error('Predicate Designer did not render the real PredicateSet declarations: '+
+      JSON.stringify(predicateView).slice(0,3000));
+  console.log('STUDIO_PREDICATE_DESIGNER_CHROMIUM',JSON.stringify({
+    title:predicateView.title,status:predicateView.status,
+    predicates:predicateView.predicates,observations:predicateView.observations,
+    realPredicateVisible:predicateView.ids.includes('createdsession.ran.setup_accepted'),
+    scriptEvaluatorVisible:predicateView.text.includes('skill.evaluate-udm-read'),
+    noLiveResultClaim:predicateView.text.includes('不是当前运行证据')
+  }));
+  // C3: real, source-backed JSON Schema field tree in the same Theia host.
+  await invokeSkillPackageFile('skillStudio.openSchema','schemas/establishment-request.schema.yaml');
+  let schemaView=null;
+  for(let attempt=0;attempt<100&&!schemaView;attempt++){
+    const schemaTree=await command('Page.getFrameTree');
+    const frames=[];
+    const collect=node=>{
+      if(!node)return;
+      frames.push(node.frame);
+      for(const child of node.childFrames??[])collect(child);
+    };
+    collect(schemaTree.frameTree);
+    for(const frame of frames.filter(x=>
+        x.url.includes('/webview/index.html')||x.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'schema-designer-acceptance',
+          grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:"({title:document.title,fields:document.querySelectorAll('.field').length,names:[...document.querySelectorAll('.field-name')].map(x=>x.textContent.trim()),required:document.querySelectorAll('.required').length,text:document.querySelector('#tree')?.textContent??'',status:document.querySelector('#status')?.textContent??''})"
+        });
+        const candidate=result.result?.value;
+        if(candidate?.title==='SKILL Schema Visual'&&candidate.fields>0){
+          schemaView=candidate;break;
+        }
+      }catch{/* webview frames can disappear during editor activation */}
+    }
+    if(!schemaView)await sleep(100);
+  }
+  if(!schemaView || schemaView.fields<12 || schemaView.required<8 ||
+     !schemaView.names.includes('sNssai') ||
+     !schemaView.names.includes('sst') ||
+     !schemaView.names.includes('requestedPduSessionType') ||
+     !schemaView.text.includes('maximum: 16777214') ||
+     !schemaView.text.includes('const: IPV4') ||
+     !schemaView.status.includes('SOURCE VERSION'))
+    throw Error('Schema Designer did not render real owner request fields: '+
+      JSON.stringify(schemaView).slice(0,3000));
+  console.log('STUDIO_SCHEMA_DESIGNER_CHROMIUM',JSON.stringify({
+    title:schemaView.title,fields:schemaView.fields,required:schemaView.required,
+    sourceVersion:schemaView.status,
+    nestedSst:schemaView.names.includes('sst'),
+    enumOrConst:schemaView.text.includes('const: IPV4')
+  }));
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
   await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
   let contractView=null,contractFrame=null,contractContextId=null;
