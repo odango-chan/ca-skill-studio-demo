@@ -819,12 +819,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!Number.isSafeInteger(sourceVersion))throw Error('Could not read native Source version');
   await startNativeCommand('skillStudio.editNodeOperatorValue',{
     procedureId:selectionResult.result.value.procedure,nodeId:'nudm-sdm-get',sourceVersion
-  },'sbi.udm.sm_data.get.preview');
-  await confirmNativePreview('call: sbi.udm.sm_data.get','call: sbi.udm.sm_data.get.preview');
-  const afterEdit=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
+  },'sbi.udm.sm_data.get');
+  await confirmNativePreview('call: sbi.udm.sm_data.get.preview','call: sbi.udm.sm_data.get');
+  const afterEdit=await waitForRevisionChange(graphContext,beforeEdit.result?.value,
+    'Native Inspector edit');
   const editResult=await evalJS(`window.__skillStudioCommandResult`);
   if(editResult!==true||!afterEdit.result?.value||afterEdit.result.value===beforeEdit.result?.value)
     throw Error('Native Inspector edit did not commit a Source revision: '+JSON.stringify({editResult,before:beforeEdit.result?.value,after:afterEdit.result?.value}));
