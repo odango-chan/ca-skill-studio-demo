@@ -42,7 +42,8 @@
     "onCustomEditor:skillStudio.schemaPreview",
     "onCommand:skillStudio.openSchema",
     "onCommand:skillStudio.refreshPackages",
-    "onView:skillStudio.packages"
+    "onView:skillStudio.packages",
+    "onCommand:skillStudio.previewMarkdownNative"
   ],
   "contributes": {
     "colors": [
@@ -450,7 +451,8 @@
           "name": "Problems"
         }
       ]
-    }
+    },
+    "markdown.markdownItPlugins": true
   },
   "scripts": {
     "build": "node ../scripts/build-ide-spike.mjs",
