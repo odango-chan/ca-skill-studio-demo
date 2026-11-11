@@ -8,6 +8,8 @@ await rm(join(root,"dist"),{recursive:true,force:true});
 await rm(join(root,"media"),{recursive:true,force:true});
 await mkdir(join(root,"dist"),{recursive:true});
 await mkdir(join(root,"media"),{recursive:true});
+// Reuse the exact Classic Markdown CSS in the sandboxed Theia/VS Code Webview.
+await cp("site/markdown-preview.css",join(root,"media/markdown-preview.css"));
 
 // The browser LSP server is a separate classic Worker bundle. It imports the
 // same transport-neutral LanguageDiagnosticSession as the host tests; no Node
