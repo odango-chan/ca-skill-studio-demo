@@ -177,7 +177,7 @@ test('Inspector exposes only owner-observed, Preview-qualified Outcome repairs',
 
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
   const commands=new Map(),providers=new Map(),changes=[],panels=[],diagnosticSets=[],appliedEdits=[];
-  const markdownMessages=[],markdownReveals=[],showDocumentCalls=[];
+  const markdownMessages=[],markdownReveals=[],showDocumentCalls=[],markdownCommandCalls=[];
   const disposable=()=>({dispose(){}});
   let confirmChoice='确认并应用',markdownMessage,visibleRangeChanged;
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
@@ -665,7 +665,15 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   markdownDoc.text='x'.repeat(300001);changed({document:markdownDoc});
   await new Promise(resolve=>setTimeout(resolve,140));
   assert.match(markdownMessages.at(-1).html,/预览不可用/);
-  
+
+  assert.equal(await commands.get('skillStudio.previewMarkdownNative')(markdownUri),true);
+  assert.equal(showDocumentCalls.at(-1).options.viewColumn,vscode.ViewColumn.One,
+    'native Markdown experiment keeps the editable Source in editor group one');
+  assert.equal(showDocumentCalls.at(-1).options.preview,false,
+    'native Markdown experiment pins the Source editor');
+  assert.deepEqual(markdownCommandCalls.at(-1),['markdown.showPreviewToSide',markdownUri],
+    'native preview is delegated to the built-in Markdown extension');
+
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
 });
