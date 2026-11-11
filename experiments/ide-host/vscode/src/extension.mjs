@@ -42,6 +42,7 @@ export function activate(context){
   const dependenciesView=registerDependenciesView(vscode,context,{
     onLockChanged:()=>{
       void packageOverview.refresh();
+      workbench.invalidateDependencyAnalysis();
       buildView?.reset();
     }
   });
