@@ -37,6 +37,9 @@ import {
   SKILL_SEMANTIC_TOKEN_TYPES,
   SKILL_SEMANTIC_TOKEN_MODIFIERS
 } from "../../../../language/semantic-tokens.mjs";
+import studioLightTheme from "../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
+import {createSemanticTokenDecorationRenderer}
+  from "../../lsp-browser/client/src/semantic-token-decorations.mjs";
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
@@ -108,6 +111,20 @@ export function registerWorkbench(vscode,context){
       [...SKILL_SEMANTIC_TOKEN_TYPES],
       [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
     );
+    let renderer=null;
+    const isTheia=(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
+      /theia/i.test(String(vscode.env?.appName??""));
+    if(isTheia){
+      try{
+        renderer=createSemanticTokenDecorationRenderer(
+          vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
+        );
+        semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
+        context.subscriptions.push({dispose:()=>renderer?.dispose()});
+      }catch(error){
+        semanticTokenDiagnostics.renderError=String(error?.message??error);
+      }
+    }
     const provider={
       provideDocumentSemanticTokens(document,cancellationToken){
         if(cancellationToken?.isCancellationRequested)
@@ -121,6 +138,17 @@ export function registerWorkbench(vscode,context){
         const result=encodeNativeSemanticTokens(document,spans);
         semanticTokenDiagnostics.lastTokenCount=result.data.length/5;
         semanticTokenDiagnostics.lastError=null;
+        if(renderer){
+          try{
+            const rendered=renderer.render(document,result.data);
+            semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
+            semanticTokenDiagnostics.renderedTokenCount=rendered.tokenCount;
+            semanticTokenDiagnostics.renderedTypeCount=rendered.tokenTypeCount;
+            semanticTokenDiagnostics.renderError=null;
+          }catch(error){
+            semanticTokenDiagnostics.renderError=String(error?.message??error);
+          }
+        }
         return result;
       }
     };
