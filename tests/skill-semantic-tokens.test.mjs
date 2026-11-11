@@ -233,4 +233,6 @@ test("online and installed Studio Light themes expose every CA semantic token co
   const backend=readFileSync(new URL("../site/monaco-source-backend.mjs",import.meta.url),"utf8");
   assert.match(backend,/registerSkillSemanticTokens\(monaco\)/);
   assert.match(backend,/semanticHighlighting:studioLightTheme\.semanticHighlighting===true/);
+  assert.match(backend,/"semanticHighlighting\.enabled":true/,
+    "Monaco standalone must explicitly enable semantic highlighting");
 });
