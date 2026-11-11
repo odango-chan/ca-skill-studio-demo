@@ -183,6 +183,25 @@ function documentFor(value, uri) {
   return value?.snapshot.documents.find(document => document.uri === uri) ?? null;
 }
 
+connection.onRequest("skillStudio/semanticTokenDiagnostics", params=>{
+  const uri=params?.uri;
+  const value=typeof uri==="string"?packageForUri(uri):null;
+  const document=value?documentFor(value,uri):null;
+  return {
+    packageCount:packageAnalyses.size,
+    packageFound:Boolean(value),
+    analysisState:value?.analysis.state??null,
+    generation:value?.snapshot.generation??null,
+    documentCount:value?.snapshot.documents.length??0,
+    documentFound:Boolean(document),
+    relativePath:document?.relativePath??null,
+    textLength:typeof document?.text==="string"?document.text.length:0,
+    spanCount:document?collectSkillSemanticTokenSpans(
+      document.text,document.relativePath
+    ).length:0
+  };
+});
+
 function allReferences(analysis) {
   return [...analysis.scriptReferences, ...analysis.schemaReferences];
 }
