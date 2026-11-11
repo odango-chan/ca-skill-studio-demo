@@ -45,7 +45,7 @@ jobs:
       - name: Build real Theia browser-only app
         shell: bash
         run: |
-          npm run build --prefix experiments/ide-host/theia-online &
+          timeout --signal=TERM --kill-after=30s 10m npm run build --prefix experiments/ide-host/theia-online &
           build_pid=$!
           while kill -0 "$build_pid" 2>/dev/null; do
             echo "THEIA_BROWSER_ONLY_BUILD_HEARTBEAT $(date -u +%FT%TZ)"
