@@ -256,10 +256,9 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       for (const root of roots) {
         const remaining = FILE_LIMIT+1-found.length;
         if (remaining <= 0) break;
-        // Compiler-style projects expose skills/, lib/ and output/ together.
-        // The Package inventory is strictly source-scoped: imported Tool
-        // contracts and generated build files must never appear as SKILLs.
-        // Standalone/legacy Skill folders still scan their full root.
+        // Plugin-managed v0.1 projects expose authored skills/ as Source.
+        // Neither .skill-studio/dependencies nor exported Build results are
+        // a SKILL package; a standalone opened Skill folder still works.
         let sourceRoot = null;
         if (vscode.Uri?.joinPath && vscode.workspace.fs?.stat) {
           const candidate = vscode.Uri.joinPath(root,'skills');
