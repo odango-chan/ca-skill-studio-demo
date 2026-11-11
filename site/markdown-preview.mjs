@@ -113,7 +113,7 @@ function renderList(lines,i,depth,options={}){
   const start=numbered?Number.parseInt(first[2],10):1;
   const attr=numbered&&start!==1&&start<100000?' start="'+start+'"':"";
   const listLine=(options.lineOffset??0)+i;
-  let out="<"+tag+attr+' data-source-line="'+listLine+'">";
+  let out="<"+tag+attr+' data-source-line="'+listLine+'">';
   while(i<lines.length){
     const m=listItem(lines[i]);
     if(!m||m[1].length!==indent||/^\d/.test(m[2])!==numbered)break;
