@@ -77,6 +77,14 @@
         "scopeName": "source.regexp.python",
         "path": "./upstream/python/syntaxes/MagicRegExp.tmLanguage.json"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "[yaml]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[python]": {
+        "editor.semanticHighlighting.enabled": true
+      }
+    }
   }
 }
