@@ -2253,6 +2253,7 @@ export function registerWorkbench(vscode,context){
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
     const key=uri.toString();
+    if(markdownOpening.has(key))return markdownPanels.get(key)?.panel;
     const existing=markdownPanels.get(key);
     if(existing){
       existing.editor=await vscode.window.showTextDocument(doc,{
