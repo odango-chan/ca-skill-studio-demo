@@ -465,7 +465,8 @@ try{
       if(semanticProviderDiagnostics?.registered!==true||
          !(semanticProviderDiagnostics?.requests>0)||
          !(semanticProviderDiagnostics?.lastTokenCount>0)||
-         semanticProviderDiagnostics?.semanticHighlightingEnabled!==true||
+         ![true,"configuredByTheme"].includes(
+           semanticProviderDiagnostics?.semanticHighlightingEnabled)||
          semanticLspRendering?.referenceColor!=='rgb(123, 91, 167)'||
          semanticLspRendering?.outcomeColor!=='rgb(173, 101, 23)')
         throw Error("Native LSP semantic tokens were not registered, requested and rendered by Studio Light: "+
