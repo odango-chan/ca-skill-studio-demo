@@ -19,8 +19,23 @@ try{
   await build({
     entryPoints:[resolve('experiments/ide-host/vscode/src/workbench.mjs')],
     outfile:bundlePath,bundle:true,format:'esm',platform:'node',
-    target:'node24',loader:{'.yaml':'text'},
-    logLevel:'silent'
+    target:'node24',packages:'external',loader:{'.yaml':'text'},
+    logLevel:'silent',
+    plugins:[{
+      name:'node-workbench-test-no-browser-worker',
+      setup(build){
+        // Node workbench tests intentionally exercise the extension-host
+        // fallback, not the browser Worker transport. Keep that lazy import
+        // out of the test bundle; dedicated LSP tests cover it independently.
+        build.onResolve({filter:/browserClient\\.mjs$/},()=>({
+          path:'browser-client-test-stub',namespace:'workbench-test'
+        }));
+        build.onLoad({filter:/.*/,namespace:'workbench-test'},()=>({
+          contents:'export function createSkillLanguageClient(){ throw new Error("Browser Worker client is not used in Node workbench tests"); }',
+          loader:'js'
+        }));
+      }
+    }]
   });
   ({registerWorkbench}=await import(pathToFileURL(bundlePath).href));
 }finally{
