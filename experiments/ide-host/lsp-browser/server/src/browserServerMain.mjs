@@ -267,13 +267,13 @@ connection.onRequest("skillStudio/health", () => ({alive:true}));
 
 connection.languages.semanticTokens.on(params=>{
   const value=packageForUri(params.textDocument.uri);
-  if(!value||value.analysis.state==="UNAVAILABLE")return {data:[]};
+  if(!value)return {data:[]};
   const document=documentFor(value,params.textDocument.uri);
   if(!document)return {data:[]};
   // Semantic coloring is a source-AST projection. It must not depend on
-  // Python symbol analysis or on whether this YAML file produced an analysis
-  // document. The accepted Package snapshot already owns the exact source
-  // text/version for this URI.
+  // Python symbol analysis, the Package's READY/PARTIAL state, or whether
+  // this YAML file produced an analysis document. The accepted Package
+  // snapshot owns the exact source text/version for this URI.
   return semanticTokensForDocument(document);
 });
 
