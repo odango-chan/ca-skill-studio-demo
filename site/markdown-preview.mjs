@@ -112,10 +112,12 @@ function renderList(lines,i,depth,options={}){
   const tag=numbered?"ol":"ul";
   const start=numbered?Number.parseInt(first[2],10):1;
   const attr=numbered&&start!==1&&start<100000?' start="'+start+'"':"";
-  let out="<"+tag+attr+">";
+  const listLine=(options.lineOffset??0)+i;
+  let out="<"+tag+attr+' data-source-line="'+listLine+'">";
   while(i<lines.length){
     const m=listItem(lines[i]);
     if(!m||m[1].length!==indent||/^\d/.test(m[2])!==numbered)break;
+    const itemLine=(options.lineOffset??0)+i;
     const pieces=[m[3]];i++;
     while(i<lines.length&&lines[i].trim()){
       const child=listItem(lines[i]);
@@ -129,7 +131,7 @@ function renderList(lines,i,depth,options={}){
       }
       break;
     }
-    out+="<li>"+inline(pieces[0],0,options)+pieces.slice(1).join(" ")+"</li>";
+    out+='<li data-source-line="'+itemLine+'">'+inline(pieces[0],0,options)+pieces.slice(1).join(" ")+"</li>";
   }
   out+="</"+tag+">";
   return {html:out,next:i};
@@ -141,27 +143,31 @@ function renderBlocks(lines,depth=0,options={}){
     if(!lines[i].trim()){i++;continue;}
     const fence=fenceStart(lines[i]);
     if(fence){
+      const sourceLine=(options.lineOffset??0)+i;
       const marker=fence[1],type=marker.charAt(0),lang=fence[2].trim().split(/\s+/)[0];
       i++;const block=[];
       const close=new RegExp("^\\s{0,3}"+(type.charCodeAt(0)===96?"\\x60":"\\x7e")+"{"+marker.length+",}\\s*$");
       while(i<lines.length&&!close.test(lines[i]))block.push(lines[i++]);
       if(i<lines.length)i++;
       const language=/^[a-z0-9_-]{1,28}$/i.test(lang)?' data-language="'+escapeHTML(lang)+'"':"";
-      out+="<pre><code"+language+">"+escapeHTML(block.join("\n"))+"</code></pre>";
+      out+='<pre data-source-line="'+sourceLine+'"><code'+language+">"+escapeHTML(block.join("\n"))+"</code></pre>";
       continue;
     }
     const h=heading(lines[i]);
     if(h){
       const level=h[1].length;
+      const sourceLine=(options.lineOffset??0)+i;
       const id=depth===0?options.headingIds?.get(i):null;
-      out+=(id?'<h'+level+' id="'+id+'">':"<h"+level+">")+
+      out+='<h'+level+(id?' id="'+id+'"':'')+' data-source-line="'+sourceLine+'">'+
         inline(h[2],0,options)+"</h"+level+">";i++;continue;
     }
-    if(hr(lines[i])){out+="<hr>";i++;continue;}
+    if(hr(lines[i])){out+='<hr data-source-line="'+((options.lineOffset??0)+i)+'">';i++;continue;}
     if(quote(lines[i])){
-      const quoted=[];
+      const quoteStart=i,quoted=[];
       while(i<lines.length&&quote(lines[i]))quoted.push(lines[i++].replace(/^\s{0,3}>\s?/,""));
-      out+="<blockquote>"+renderBlocks(quoted,depth+1,options)+"</blockquote>";
+      const lineOffset=(options.lineOffset??0)+quoteStart;
+      out+='<blockquote data-source-line="'+lineOffset+'">'+
+        renderBlocks(quoted,depth+1,{...options,lineOffset})+"</blockquote>";
       continue;
     }
     if(i+1<lines.length&&lines[i].includes("|")&&tableSeparator(lines[i+1])){
@@ -173,13 +179,15 @@ function renderBlocks(lines,depth=0,options={}){
           right?' class="md-align-right"':
           left?' class="md-align-left"':"";
       });
-      i+=2;out+="<div class=\"md-table-wrap\"><table><thead><tr>";
+      const tableLine=(options.lineOffset??0)+i;
+      i+=2;out+='<div class="md-table-wrap" data-source-line="'+tableLine+'"><table><thead><tr data-source-line="'+tableLine+'">';
       for(let j=0;j<headers.length;j++)
         out+="<th"+(alignment[j]??"")+">"+inline(headers[j],0,options)+"</th>";
       out+="</tr></thead><tbody>";
       let rows=0;
       while(i<lines.length&&lines[i].trim()&&lines[i].includes("|")&&rows++<1000){
-        const vals=cells(lines[i++]);out+="<tr>";
+        const rowLine=(options.lineOffset??0)+i;
+        const vals=cells(lines[i++]);out+='<tr data-source-line="'+rowLine+'">';
         for(let j=0;j<headers.length;j++)
           out+="<td"+(alignment[j]??"")+">"+inline(vals[j]??"",0,options)+"</td>";
         out+="</tr>";
@@ -191,11 +199,12 @@ function renderBlocks(lines,depth=0,options={}){
       const list=renderList(lines,i,depth,options);
       if(list.next>i){out+=list.html;i=list.next;continue;}
     }
+    const paragraphLine=(options.lineOffset??0)+i;
     const paragraph=[lines[i++].trim()];
     while(i<lines.length&&lines[i].trim()&&!startsBlock(lines,i)){
       paragraph.push(lines[i++].trim());
     }
-    out+="<p>"+inline(paragraph.join(" "),0,options)+"</p>";
+    out+='<p data-source-line="'+paragraphLine+'">'+inline(paragraph.join(" "),0,options)+"</p>";
   }
   return out;
 }
@@ -203,13 +212,13 @@ export function renderMarkdown(source,{maxChars=300000,localLinks=false,localFil
   if(typeof source!=="string")throw new TypeError("Markdown Source must be a string");
   if(source.length>maxChars)return {available:false,html:"",reason:"文件太大，无法安全预览"};
   const lines=source.replace(/\r\n?/g,"\n").split("\n");
-  let head="";
+  let head="",lineOffset=0;
   if(lines[0]?.trim()==="---"){
     const end=lines.slice(1,130).findIndex(x=>x.trim()==="---");
     if(end>=0){
       const front=lines.slice(1,end+1).join("\n");
-      head='<details class="md-frontmatter"><summary>Front matter</summary><pre><code>'+escapeHTML(front)+"</code></pre></details>";
-      lines.splice(0,end+2);
+      head='<details class="md-frontmatter" data-source-line="0"><summary>Front matter</summary><pre><code>'+escapeHTML(front)+"</code></pre></details>";
+      lines.splice(0,end+2);lineOffset=end+2;
     }
   }
   const headings=collectMarkdownHeadings(lines);
@@ -219,5 +228,5 @@ export function renderMarkdown(source,{maxChars=300000,localLinks=false,localFil
       headings.map(item=>'<li class="md-toc-level-'+item.level+'"><a href="#'+item.id+
         '">'+escapeHTML(item.label)+'</a></li>').join("")+'</ol></details>'
     :"";
-  return {available:true,html:head+toc+renderBlocks(lines,0,{localLinks,localFiles,relativeDir,headingIds})};
+  return {available:true,html:head+toc+renderBlocks(lines,0,{localLinks,localFiles,relativeDir,headingIds,lineOffset})};
 }
