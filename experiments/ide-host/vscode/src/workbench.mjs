@@ -1,6 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
-import {prepareNativeMarkdownPackagePolicy} from "./markdown-link-policy.mjs";
+import {prepareNativeMarkdownPackagePolicy,clearNativeMarkdownPackagePolicies} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
@@ -2664,6 +2664,54 @@ export function registerWorkbench(vscode,context){
         throw Error('Expected exactly one '+name+' guide in the active Workspace');
       const opened=await openNativeMarkdownPreview(exact[0]);
       return opened?exact[0].toString():null;
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
+      const matches=await vscode.workspace.findFiles(
+        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith(
+        '/establish-pdu-session/SKILL.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one 5GC Skill package for the security probe');
+      const rootPath=exact[0].path.slice(0,-'/SKILL.md'.length);
+      const probe=exact[0].with({
+        path:rootPath+'/references/__native-markdown-security.md'
+      });
+      try{
+        await vscode.workspace.fs.stat(probe);
+        throw Error('Refusing to overwrite an existing Markdown security fixture');
+      }catch(error){
+        if(String(error?.message??error).includes('Refusing to overwrite'))throw error;
+      }
+      const source=[
+        '# Native Markdown Security Probe',
+        '',
+        '<script>window.skillStudioNativeMarkdownXss = true;</script>',
+        '<img src="https://example.invalid/raw-html-pixel.png" onerror="window.skillStudioNativeMarkdownXss = true">',
+        '',
+        '[Safe package reference](3gpp-procedure.md)',
+        '[Escaping package link](../../outside.md)',
+        '[Missing package link](missing.md)',
+        '![Remote pixel](https://example.invalid/markdown-pixel.png)',
+        ''
+      ].join('\n');
+      await vscode.workspace.fs.writeFile(probe,new TextEncoder().encode(source));
+      const opened=await openNativeMarkdownPreview(probe);
+      if(!opened){
+        await vscode.workspace.fs.delete(probe,{useTrash:false});
+        throw Error('Native Markdown security probe could not establish a safe Package inventory');
+      }
+      return probe.toString();
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
+      const suffix='/establish-pdu-session/references/__native-markdown-security.md';
+      if(!target.path.endsWith(suffix))
+        throw Error('Refusing to delete a non-fixture Markdown file');
+      clearNativeMarkdownPackagePolicies([target]);
+      await vscode.workspace.fs.delete(target,{useTrash:false});
+      return true;
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.toggleMarkdownLayout',async uri=>{
