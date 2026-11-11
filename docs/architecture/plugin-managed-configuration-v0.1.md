@@ -17,7 +17,7 @@ See machine-readable [studio-settings-contributions.json](../../contracts/v0.1/s
 | `connectionAgent.skillStudio.skillsRoot` | resource/workspace-folder | `skills` | User via Settings (v0.1 fixed value) |
 | `connectionAgent.skillStudio.dependencies` | resource/workspace-folder | `[]` | Dependencies view + validated edit |
 | `connectionAgent.skillStudio.dependencyLock` | resource/workspace-folder | `{version:"skillc.lock/v0.1",entries:[]}` | Resolver explicit Add / Update Lock |
-| `connectionAgent.skillStudio.defaultBuildTarget` | user/window | `all` | User via Settings |
+| `connectionAgent.skillStudio.defaultBuildTarget` | user/application | `all` | User via Settings |
 
 Only resource-scoped selected workspace-folder configuration is authoritative. In multi-root workspaces, ask which root owns a Skill Project, then load/update settings for that root. If the host cannot provide a durable workspace configuration write, fail visibly; **never** silently substitute User Settings, `globalState` or `workspaceState` for shareable dependencies. Theia Browser-only OPFS support must be proved by real browser tests. `contributes.configuration` cannot make JSON manually uneditable; invalid or unrecognized settings must be rejected by Service validation rather than treated as trusted.
 
@@ -31,7 +31,7 @@ Skill Studio Example/                   # display name, not a mandatory disk fol
     establish-pdu-session/
     establish-pdu-session-mas/
   .vscode/settings.json                 # typical VS Code workspace configuration, host-specific
-  .skill-studio/dependencies/<digest>/   # created on first lock; managed immutable snapshots
+  .skill-studio/dependencies/<64-hex-digest>/   # created on first lock; managed immutable snapshots
 ```
 
 No mandatory `lib/`, `output/`, `skill-project.yaml`, `skill.lock.yaml`. `.vscode/` is an IDE storage convention, not a source file requiring hand editing. The managed `.skill-studio/` store is not a source root, nor a publicly exposed language import path. It is created only when importing a dependency and is included when producing a portable project export; the exact location is a Storage Adapter detail, but its content bytes must be recoverable without credentials. User Settings contain layout/default target only; `workspaceState` retains selection/expansion and other disposable UI state; Extension Storage is a *rebuildable* cache; SecretStorage holds credentials.

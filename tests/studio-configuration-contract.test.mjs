@@ -20,7 +20,7 @@ test('v0.1 Studio plugin settings names and scope are stable',()=>{
   for(const key of ['skillsRoot','dependencies','dependencyLock']){
     assert.equal(props['connectionAgent.skillStudio.'+key].scope,'resource');
   }
-  assert.equal(props['connectionAgent.skillStudio.defaultBuildTarget'].scope,'window');
+  assert.equal(props['connectionAgent.skillStudio.defaultBuildTarget'].scope,'application');
 });
 
 test('v0.1 treats dependencies as managed workspace inputs, not required lib/output directories',()=>{

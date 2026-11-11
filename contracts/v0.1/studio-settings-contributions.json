@@ -36,7 +36,7 @@
         "all"
       ],
       "default": "all",
-      "scope": "window",
+      "scope": "application",
       "markdownDescription": "Default user-facing build target; does not affect the Compiler Core unless explicitly requested."
     }
   }
