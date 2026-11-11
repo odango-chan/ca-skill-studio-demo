@@ -104,7 +104,6 @@ export function activate(context){
       throw Error("Unknown Browser v0.1 acceptance phase");
     }
   ));
-  }
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
