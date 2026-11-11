@@ -188,10 +188,12 @@ export function registerWorkbench(vscode,context){
             onSemanticTokenProviderRegistered:status=>{
               semanticTokenDiagnostics.registered=status?.registered===true;
               semanticTokenDiagnostics.tokenTypeCount=status?.tokenTypeCount??0;
+              semanticTokenDiagnostics.transport="browser-lsp";
             },
             onSemanticTokenRequest:uri=>{
               semanticTokenDiagnostics.requests++;
               semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.transport="browser-lsp";
             },
             onSemanticTokenResult:(uri,count)=>{
               semanticTokenDiagnostics.lastUri=uri;
