@@ -20,7 +20,8 @@
             "contract.yaml": "skillStudio.contractPreview",
             "predicates.yaml": "skillStudio.predicatePreview",
             "*.schema.yaml": "skillStudio.schemaPreview"
-          }
+          },
+          "editor.semanticHighlighting.enabled": true
         },
         "warnOnPotentiallyInsecureHostPattern": false
       }
