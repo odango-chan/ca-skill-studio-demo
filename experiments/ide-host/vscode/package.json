@@ -170,6 +170,11 @@
         },
         {
           "command": "skillStudio.loadExample",
+          "when": "view == skillStudio.packages",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.loadExample",
           "when": "view == workbench.explorer.fileView",
           "group": "navigation"
         },
@@ -367,7 +372,7 @@
     "viewsWelcome": [
       {
         "view": "workbench.explorer.fileView",
-        "contents": "**欢迎使用 SKILL Studio**\\n\\n还没有打开项目？可以先载入内置演示项目，体验 SKILL 文件树、YAML / Python 编辑，以及 Procedure 可视化。\\n\\n[载入演示 SKILL 项目](command:skillStudio.loadExample)\\n\\n演示项目会复制到浏览器工作区，不会覆盖已有文件。"
+        "contents": "**欢迎使用 SKILL Studio**\\n\\n还没有打开项目？可以载入 skills/、lib/、output/ 三目录的演示项目，包含传统 5GC 和 MAS 两个 SKILL，并体验可视化编辑。\\n\\n[载入演示 SKILL 项目](command:skillStudio.loadExample)\\n\\n导入会创建独立的 skill-studio-demo 项目，不会覆盖已有文件；lib/ 和 output/ 暂为空。"
       }
     ],
     "viewsContainers": {
