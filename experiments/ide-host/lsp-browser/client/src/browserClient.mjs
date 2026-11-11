@@ -1,4 +1,5 @@
 import { LanguageClient, ErrorAction, CloseAction, State } from "vscode-languageclient/browser";
+import { SKILL_SEMANTIC_TOKEN_TYPES, SKILL_SEMANTIC_TOKEN_MODIFIERS } from "../../../../../language/semantic-tokens.mjs";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
 export const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
@@ -41,6 +42,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let heartbeatTimer = null;
   let clientStopPromise = null;
   let client = null;
+  let semanticTokenRegistration = null;
   function stopClientAfterFailure() {
     if (!started || !client) return Promise.resolve();
     if (!clientStopPromise) {
@@ -76,6 +78,55 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   worker.addEventListener("messageerror", () => {
     fatal("Browser language Worker message could not be decoded", { stopClient: true });
   });
+  function registerTheiaSemanticTokenProvider(){
+    if(!handlers.manualSemanticTokens||semanticTokenRegistration)return;
+    if(typeof vscode.languages?.registerDocumentSemanticTokensProvider!=="function"||
+       typeof vscode.SemanticTokensLegend!=="function"||
+       typeof vscode.SemanticTokens!=="function"){
+      output.appendLine("Native semantic-token API unavailable in this host");
+      return;
+    }
+    const legend=new vscode.SemanticTokensLegend(
+      [...SKILL_SEMANTIC_TOKEN_TYPES],
+      [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
+    );
+    const provider={
+      async provideDocumentSemanticTokens(document,cancellationToken){
+        if(stopped||terminalFailure||cancellationToken?.isCancellationRequested)
+          return new vscode.SemanticTokens(new Uint32Array());
+        try{
+          const result=await client.sendRequest(
+            "textDocument/semanticTokens/full",
+            {textDocument:{uri:document.uri.toString()}},
+            cancellationToken
+          );
+          if(cancellationToken?.isCancellationRequested)
+            return new vscode.SemanticTokens(new Uint32Array());
+          return new vscode.SemanticTokens(
+            Uint32Array.from(result?.data??[]),
+            result?.resultId
+          );
+        }catch(error){
+          if(!stopped&&!terminalFailure)
+            output.appendLine("Semantic token request failed: "+
+              String(error?.message??error));
+          return new vscode.SemanticTokens(new Uint32Array());
+        }
+      }
+    };
+    semanticTokenRegistration=vscode.languages.registerDocumentSemanticTokensProvider(
+      [
+        {scheme:"file",pattern:"**/*.yaml"},
+        {scheme:"file",pattern:"**/*.yml"},
+        {scheme:"file",pattern:"**/*.py"},
+        {scheme:"file",pattern:"**/SKILL.md"}
+      ],
+      provider,
+      legend
+    );
+    output.appendLine("Registered Theia semantic-token adapter from the canonical Skill Language catalog");
+  }
+
   client = new LanguageClient(
     "skillStudioLanguageService",
     "Skill Studio Language Service",
@@ -151,6 +202,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       if (!startPromise) {
         startPromise = client.start().then(() => {
           started = true;
+          registerTheiaSemanticTokenProvider();
           scheduleHeartbeat();
         });
       }
@@ -204,6 +256,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
           }
         }
       } finally {
+        semanticTokenRegistration?.dispose?.();
+        semanticTokenRegistration=null;
         worker.terminate();
         output.dispose();
       }
