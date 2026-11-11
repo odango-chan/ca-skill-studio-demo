@@ -148,8 +148,15 @@ export function registerDependenciesView(vscode,context,{onLockChanged=()=>{}}={
         return acquireMcp({...source,selectedTools:source.tools,
           toolsList:()=>discoverMcpHttpTools({endpoint,token})});
       }
-      case "upload":
-        throw Error("Upload is pinned by original raw bytes; reupload via Add/Update");
+      case "upload":{
+        const picked=await vscode.window.showOpenDialog({canSelectMany:false,
+          canSelectFiles:true,canSelectFolders:false,
+          filters:{"Tool Contracts":["yaml","yml","json"]}});
+        if(!picked?.length)throw Error("Upload Refresh/Update needs the selected new file");
+        const format=picked[0].path.toLowerCase().endsWith(".json")?"json":"yaml";
+        return acquireUpload({upload:source.upload,format,
+          rawBytes:await vscode.workspace.fs.readFile(picked[0])});
+      }
       default:throw Error("Unrecognized dependency source");
     }
   }
