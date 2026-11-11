@@ -139,11 +139,17 @@ test('Inspector exposes only owner-observed, Preview-qualified Outcome repairs',
 
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
   const commands=new Map(),providers=new Map(),changes=[],panels=[],diagnosticSets=[],appliedEdits=[];
+  const markdownMessages=[],markdownReveals=[],showDocumentCalls=[];
   const disposable=()=>({dispose(){}});
-  let confirmChoice='确认并应用';
+  let confirmChoice='确认并应用',markdownMessage,visibleRangeChanged;
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
   const file=uri('/workspace/establish-pdu-session/assurance/procedure.yaml');
   const doc={uri:file,version:1,text:source,getText(){return this.text;},positionAt(offset){return {offset};},get lineCount(){return this.text.split('\n').length;}};
+  const markdownUri=uri('/workspace/SKILL.md');
+  const markdownDoc={uri:markdownUri,version:1,text:'# Preview title\n<script>alert(1)</script>',
+    getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
+  const markdownEditor={document:markdownDoc,visibleRanges:[{start:{line:0},end:{line:5}}],
+    revealRange(range,type){markdownReveals.push({range,type});}};
   let changed;
   const vscode={
     EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
@@ -153,11 +159,11 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     WorkspaceEdit:class {constructor(){this.changes=[];}replace(uri,range,value){this.changes.push({uri,range,value});}},
     Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
-    ViewColumn:{Beside:2},
+    ViewColumn:{One:1,Two:2,Beside:2},TextEditorRevealType:{AtTop:1},
     Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
     commands:{executeCommand:async()=>{},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
-    workspace:{textDocuments:[doc],
+    workspace:{textDocuments:[doc,markdownDoc],
       findFiles:async()=>['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md'].map(p=>uri('/workspace/establish-pdu-session/'+p)),
       fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8'))},
       async applyEdit(edit){
@@ -166,12 +172,20 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
           doc.text=doc.text.slice(0,change.range.start.offset)+change.value+doc.text.slice(change.range.end.offset);
         doc.version++;changed({document:doc});return true;
       },
-      onDidChangeTextDocument(cb){changed=cb;return disposable();},openTextDocument:async()=>doc},
+      onDidChangeTextDocument(cb){changed=cb;return disposable();},
+      openTextDocument:async target=>target.path==='/workspace/SKILL.md'?markdownDoc:doc},
     window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
-      onDidChangeActiveTextEditor:()=>disposable(),showTextDocument:async()=>{},
+      onDidChangeActiveTextEditor:()=>disposable(),
+      onDidChangeTextEditorVisibleRanges(cb){visibleRangeChanged=cb;return disposable();},
+      visibleTextEditors:[markdownEditor],
+      showTextDocument:async(document,options)=>{showDocumentCalls.push({document,options});return markdownEditor;},
       showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},
       showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation',
-      createWebviewPanel(){const p={webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u,onDidReceiveMessage:()=>disposable()},onDidDispose:()=>disposable()};panels.push(p);return p;}}
+      createWebviewPanel(_type,_title,column){const p={column,reveal(nextColumn){this.column=nextColumn;},
+        webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u,
+          onDidReceiveMessage(cb){markdownMessage=cb;return disposable();},
+          postMessage(message){markdownMessages.push(message);return Promise.resolve(true);}},
+        onDidDispose:()=>disposable()};panels.push(p);return p;}}
   };
   const context={subscriptions:[],extensionUri:uri('/extension')},workbench=registerWorkbench(vscode,context),posted=[];
   workbench.attach(doc,m=>posted.push(m));
@@ -564,21 +578,51 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
   assert.match(dataflow.description,/no write authorization/);
   assert.ok(dataflow.children.some(x=>x.label.includes('Source lineage')));
-  doc.text='# Preview title\n<script>alert(1)</script>';
-  await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));
+  await commands.get('skillStudio.previewMarkdown')(markdownUri);
+  assert.equal(showDocumentCalls.at(-1).options.viewColumn,vscode.ViewColumn.One,
+    'native Markdown Source is opened in the first editor column');
+  assert.equal(showDocumentCalls.at(-1).options.preview,false,
+    'native Markdown Source is a persistent editor, not a preview tab');
+  assert.equal(panels[0].column,vscode.ViewColumn.Two,
+    'read-only Markdown Preview is paired in the second editor column');
   assert.match(panels[0].webview.html,/Content-Security-Policy/);
   assert.match(panels[0].webview.html,/style-src https:\/\/studio\.invalid/);
   assert.match(panels[0].webview.html,/script-src 'nonce-[a-f0-9]{32}'/);
   assert.match(panels[0].webview.html,/img-src 'none'/);
   assert.match(panels[0].webview.html,/href="https:\/\/studio\.invalid\/media\/markdown-preview\.css"/);
+  assert.match(panels[0].webview.html,/class="md-preview-toolbar"/);
   assert.match(panels[0].webview.html,/class="markdown-preview"/);
-  assert.match(panels[0].webview.html,/<h1(?: id="[^"]+")?>Preview title<\/h1>/);
+  assert.match(panels[0].webview.html,/<h1(?: id="[^"]+")? data-source-line="0">Preview title<\/h1>/);
   assert.match(panels[0].webview.html,/&lt;script&gt;/);
-  doc.text='x'.repeat(300001);changed({document:{...doc,uri:uri('/workspace/SKILL.md')}});
-  assert.match(panels[0].webview.html,/预览不可用/);
   assert.equal((panels[0].webview.html.match(/<script\b/gi)??[]).length,1,
     'only the nonce-protected local file navigation bridge is present');
   assert.match(panels[0].webview.html,/<script nonce="[a-f0-9]{32}">/);
+  await markdownMessage({type:'ready'});
+  markdownDoc.text='# Updated title\n\n## Details\n\nA live edit.';
+  changed({document:markdownDoc});
+  await new Promise(resolve=>setTimeout(resolve,140));
+  assert.equal(markdownMessages.at(-1).type,'updatePreview',
+    'unsaved native edits update the existing Webview rather than replacing its HTML');
+  assert.match(markdownMessages.at(-1).html,/Updated title/);
+  assert.match(markdownMessages.at(-1).html,/data-source-line="2"/);
+  visibleRangeChanged({textEditor:markdownEditor,
+    visibleRanges:[{start:{line:7},end:{line:12}}]});
+  assert.deepEqual(markdownMessages.at(-1),{type:'scrollToLine',line:7},
+    'native Source scrolling sends a source-line anchor to Preview');
+  await markdownMessage({type:'scrollToSourceLine',line:6});
+  assert.equal(markdownReveals.at(-1).range.start.line,6,
+    'Preview scrolling reveals the matching native Source line');
+  assert.equal(markdownReveals.at(-1).type,vscode.TextEditorRevealType.AtTop);
+  await markdownMessage({type:'toggleLayout'});
+  assert.equal(panels[0].column,vscode.ViewColumn.One,
+    'small-screen single-pane mode places Preview in the Source group');
+  await markdownMessage({type:'toggleLayout'});
+  assert.equal(panels[0].column,vscode.ViewColumn.Two,
+    'the toolbar can restore the side-by-side layout');
+  markdownDoc.text='x'.repeat(300001);changed({document:markdownDoc});
+  await new Promise(resolve=>setTimeout(resolve,140));
+  assert.match(markdownMessages.at(-1).html,/预览不可用/);
+  
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
 });
