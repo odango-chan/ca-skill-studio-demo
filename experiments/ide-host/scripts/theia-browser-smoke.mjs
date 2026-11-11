@@ -421,6 +421,28 @@ try{
       if(!(yamlSyntax?.tokenColors?.length>=3))
         throw Error("Native YAML syntax tokenization not active: "+JSON.stringify(yamlSyntax));
       patchEvidence.yamlSyntax=yamlSyntax;
+      if(requireBrowserLsp){
+        // Evidence of the *rendered* native editor, not only a lexer count.
+        // Keep the diagnostic bounded: no semantic color is claimed until
+        // we can associate an exact visible source identity with its color.
+        const semanticColors=await evalJS(`(()=>{
+          const editor=[...document.querySelectorAll(".monaco-editor")]
+            .find(el=>el.getBoundingClientRect().width>150&&el.querySelector(".view-lines"));
+          const view=editor?.querySelector(".view-lines");
+          const spans=[...(view?.querySelectorAll("span")??[])];
+          const targets=["procedures","ue-requested-pdu-session-establishment",
+            "createdsession.ingress.eligible","call","sbi.udm.sm_data.get"];
+          return {
+            visibleText:(view?.innerText??"").replaceAll(String.fromCharCode(160)," ").slice(0,950),
+            targetSpans:spans.filter(s=>targets.some(t=>(s.textContent??"").includes(t)))
+              .map(s=>({text:(s.textContent??"").slice(0,120),
+                color:getComputedStyle(s).color})).slice(0,25),
+            colors:[...new Set(spans.map(s=>getComputedStyle(s).color))]
+          };
+        })()`);
+        console.log("STUDIO_SKILL_SEMANTIC_DOM_CHROMIUM",JSON.stringify(semanticColors));
+        patchEvidence.semanticDom=semanticColors;
+      }
       // This probe opens a pinned owner script in the native workbench.
       // Open a real bundled Python source through Theia's native Quick Open.
       // This verifies the Python TextMate grammar in the same editor host.
