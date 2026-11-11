@@ -2462,6 +2462,19 @@ export function registerWorkbench(vscode,context){
       toggleMarkdownState(state);
       return true;
     }));
+  // Opening Markdown in the native Explorer/editor automatically creates its
+  // paired read-only Preview. The timer lets an explicit Preview command finish
+  // first; its panel is then already registered and no duplicate is opened.
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
+    const target=editor?.document?.uri;
+    if(!target||!target.path.toLowerCase().endsWith('.md'))return;
+    const key=target.toString();
+    setTimeout(()=>{
+      if(markdownPanels.has(key))return;
+      if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
+      void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
+    },0);
+  }));
   // Internal real-browser acceptance opens the owner-pinned conventional guide
   // by exact workspace path; it is not a contributed user command.
   context.subscriptions.push(vscode.commands.registerCommand(
@@ -2473,7 +2486,9 @@ export function registerWorkbench(vscode,context){
       const exact=matches.filter(item=>item.path.endsWith('/'+name+'/SKILL.md'));
       if(exact.length!==1)
         throw Error('Expected exactly one '+name+' guide in the active Workspace');
-      await vscode.commands.executeCommand('skillStudio.previewMarkdown',exact[0]);
+      await vscode.commands.executeCommand('vscode.open',exact[0],{
+        viewColumn:vscode.ViewColumn.One,preview:false
+      });
       return exact[0].toString();
     }));
   return {attach(doc,post){
