@@ -21,6 +21,7 @@
     "onCommand:skillStudio.auditPackage",
     "onCommand:skillStudio.exportPackageZip",
     "onCommand:skillStudio.previewMarkdown",
+    "onCommand:skillStudio.toggleMarkdownLayout",
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
     "onCommand:skillStudio.editNodeOperatorValue",
@@ -44,6 +45,18 @@
     "onView:skillStudio.packages"
   ],
   "contributes": {
+    "colors": [
+      {
+        "id": "skillStudio.markdownHeading",
+        "description": "SKILL Studio Markdown heading accent, following the active Classic light/dark theme.",
+        "defaults": {
+          "light": "#0c8e7b",
+          "dark": "#83d9c4",
+          "highContrastLight": "#075f55",
+          "highContrast": "#a8f0df"
+        }
+      }
+    ],
     "commands": [
       {
         "command": "skillStudio.refreshPackages",
@@ -72,6 +85,10 @@
       {
         "command": "skillStudio.previewMarkdown",
         "title": "SKILL Studio: Preview Markdown"
+      },
+      {
+        "command": "skillStudio.toggleMarkdownLayout",
+        "title": "SKILL Studio: Toggle Markdown Split"
       },
       {
         "command": "skillStudio.refreshInspection",
@@ -135,6 +152,18 @@
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "skillStudio.previewMarkdown",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.toggleMarkdownLayout",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        }
+      ],
       "explorer/context": [
         {
           "command": "skillStudio.openSchema",

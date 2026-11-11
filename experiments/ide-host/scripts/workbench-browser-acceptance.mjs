@@ -1872,7 +1872,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         }
         const result=await command('Runtime.evaluate',{
           contextId,returnByValue:true,
-          expression:'(()=>{const article=document.querySelector("article");if(!article)return null;const theme=getComputedStyle(article);const cssLink=[...document.querySelectorAll("link")].find(el=>el.href.includes("markdown-preview.css"));return {heading:article.querySelector("h1")?.textContent?.trim()??null,toc:!!article.querySelector(".md-toc"),tocLinks:[...article.querySelectorAll(".md-toc a")].filter(a=>(a.getAttribute("href")??"").startsWith("#md-heading-")).length,localPaths:[...article.querySelectorAll("a[data-local-path]")].map(a=>a.getAttribute("data-local-path")),themeApplied:Boolean(cssLink&&theme.maxWidth==="920px"&&parseFloat(theme.paddingLeft)>0)};})()'
+          expression:'(()=>{const article=document.querySelector("article.markdown-preview");if(!article)return null;const theme=getComputedStyle(article),heading=article.querySelector("h1"),headingColor=heading?getComputedStyle(heading).color:"",bodyColor=theme.color;const cssLink=[...document.querySelectorAll("link")].find(el=>el.href.includes("markdown-preview.css"));const mappedBlocks=article.querySelectorAll("[data-source-line]").length;const splitToolbar=Boolean(document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]"));return {heading:heading?.textContent?.trim()??null,toc:!!article.querySelector(".md-toc"),tocLinks:[...article.querySelectorAll(".md-toc a")].filter(a=>(a.getAttribute("href")??"").startsWith("#md-heading-")).length,localPaths:[...article.querySelectorAll("a[data-local-path]")].map(a=>a.getAttribute("data-local-path")),headingColor,bodyColor,mappedBlocks,splitToolbar,themeApplied:Boolean(cssLink&&theme.maxWidth==="920px"&&parseFloat(theme.paddingLeft)>0&&headingColor&&headingColor!==bodyColor&&mappedBlocks>5&&splitToolbar)};})()'
         });
         if(result.result?.value?.heading)
           found.push({contextId,...result.result.value});
@@ -1903,6 +1903,56 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      !guideOpen.view.localPaths.includes('assurance/procedure.yaml'))
     throw Error('SKILL.md outline or explicit Reference links are incomplete: '+
       JSON.stringify(guideOpen.view));
+  const markdownTabGroups=()=>evalJS(
+    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>{"+
+    "const label=tab.textContent.trim();return label==='SKILL.md'||(label.includes('Markdown')&&label.includes('SKILL.md'));});"+
+    "const groups=new Map();for(const tab of tabs){const bar=tab.parentElement;if(!groups.has(bar)){"+
+    "const r=bar.getBoundingClientRect();groups.set(bar,{index:groups.size,labels:[],"+
+    "rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}groups.get(bar).labels.push(tab.textContent.trim());}"+
+    "return [...groups.values()];})()");
+  let splitGroups=await markdownTabGroups();
+  const sourceGroup=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
+  const previewGroup=splitGroups.find(group=>group.labels.some(label=>
+    label.includes('Markdown')&&label.includes('SKILL.md')));
+  if(!sourceGroup||!previewGroup||sourceGroup.index===previewGroup.index)
+    throw Error('Markdown must open native SKILL.md Source and read-only Preview in two editor groups: '+
+      JSON.stringify(splitGroups));
+  const singlePaneClick=await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{const button=document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]");if(!button)return false;button.click();return true;})()'
+  });
+  if(singlePaneClick.result?.value!==true)
+    throw Error('Markdown single-pane toggle button is missing');
+  await sleep(350);
+  splitGroups=await markdownTabGroups();
+  const sourceSingle=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
+  const previewSingle=splitGroups.find(group=>group.labels.some(label=>
+    label.includes('Markdown')&&label.includes('SKILL.md')));
+  if(!sourceSingle||!previewSingle||sourceSingle.index!==previewSingle.index)
+    throw Error('Markdown single-pane toggle did not move Preview into the Source editor group: '+
+      JSON.stringify(splitGroups));
+  const singlePaneGuide=await waitMarkdown(
+    view=>view.heading==='Establish PDU Session'&&view.splitToolbar,
+    'Markdown Preview after moving into a single editor group');
+  const restoreClick=await command('Runtime.evaluate',{
+    contextId:singlePaneGuide.view.contextId,returnByValue:true,
+    expression:'(()=>{const button=document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]");if(!button)return false;button.click();return true;})()'
+  });
+  if(restoreClick.result?.value!==true)
+    throw Error('Markdown restore-split toolbar button is missing');
+  await sleep(350);
+  splitGroups=await markdownTabGroups();
+  const sourceRestored=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
+  const previewRestored=splitGroups.find(group=>group.labels.some(label=>
+    label.includes('Markdown')&&label.includes('SKILL.md')));
+  if(!sourceRestored||!previewRestored||sourceRestored.index===previewRestored.index)
+    throw Error('Markdown restore-split toggle did not restore two editor groups: '+
+      JSON.stringify(splitGroups));
+  console.log('STUDIO_MARKDOWN_SPLIT_CHROMIUM',JSON.stringify({
+    initialSourceGroup:sourceGroup.index,initialPreviewGroup:previewGroup.index,
+    singlePaneGroup:sourceSingle.index,restoredSourceGroup:sourceRestored.index,
+    restoredPreviewGroup:previewRestored.index
+  }));
   const openReference=await command('Runtime.evaluate',{
     contextId:guideOpen.view.contextId,returnByValue:true,
     expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="references/3gpp-procedure.md");if(!link)return false;link.click();return true;})()'
@@ -1925,23 +1975,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const traversalBlocked=afterForgery.length===beforeForgery;
   if(!traversalBlocked)
     throw Error('Forged Webview message opened a file outside the active Skill Package');
-  const guideCountBeforeReturn=afterForgery.filter(
-    view=>view.heading==='Establish PDU Session').length;
+  const guidePreviewActive=()=>evalJS(
+    `[...document.querySelectorAll('.lm-TabBar-tab.lm-mod-current')]
+      .some(tab=>tab.textContent.trim()==='Markdown · SKILL.md')`);
+  if(await guidePreviewActive())
+    throw Error('Reference navigation did not select the Reference preview');
   const returnToGuide=await command('Runtime.evaluate',{
     contextId:referenceOpen.view.contextId,returnByValue:true,
     expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="../SKILL.md");if(!link)return false;link.click();return true;})()'
   });
   if(returnToGuide.result?.value!==true)
     throw Error('Could not follow Reference → SKILL.md navigation');
-  let returnedGuides=[];
+  let returnedGuideActive=false;
   for(let attempt=0;attempt<80;attempt++){
-    returnedGuides=(await markdownViews()).filter(
-      view=>view.heading==='Establish PDU Session');
-    if(returnedGuides.length>guideCountBeforeReturn)break;
+    returnedGuideActive=await guidePreviewActive();
+    if(returnedGuideActive)break;
     await sleep(100);
   }
-  if(returnedGuides.length<=guideCountBeforeReturn)
-    throw Error('Reference → SKILL.md did not open a new guide preview');
+  if(!returnedGuideActive)
+    throw Error('Reference → SKILL.md did not select the guide preview');
   await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session-mas');
   const masOpen=await waitMarkdown(
     view=>view.heading==='Establish PDU Session through SMF MAS'&&view.themeApplied,'Themed MAS SKILL.md preview');
@@ -1950,7 +2002,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify(masOpen.view));
   const markdownGuideEvidence={
     conventional:guideOpen.view,reference:referenceOpen.view,
-    returnedGuideCount:returnedGuides.length,mas:masOpen.view,traversalBlocked
+    returnedGuideActive,mas:masOpen.view,traversalBlocked
   };
   console.log('STUDIO_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
