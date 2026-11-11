@@ -48,6 +48,16 @@ test("Theia OPFS provider guards read-only project roots on direct writes",async
   assert.deepEqual(actions,[["writeFile","/project/skills/one/other.py"]]);
 });
 
+test("non-canonical OPFS path aliases fail closed before storage normalization",async()=>{
+  const {provider,actions}=fixture();
+  for(const path of ["//project/lib/tool.yaml","/project//lib/tool.yaml",
+    "///project/output/manifest.json"]){
+    await denied(provider.writeFile(uri(path),new Uint8Array([1]),{create:true,overwrite:true}));
+    await denied(provider.delete(uri(path),{recursive:true}));
+  }
+  assert.deepEqual(actions,[]);
+});
+
 test("native OPFS rename/copy/mkdir cannot change protected structures or destinations",async()=>{
   const {provider,actions}=fixture();
   await denied(provider.rename(uri("/project/lib/tool.yaml"),uri("/project/skills/one/tool.yaml"),{overwrite:true}));
