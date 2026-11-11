@@ -998,15 +998,21 @@ export function registerWorkbench(vscode,context){
           if(doc.isDirty||persisted!==original)
             throw Error("L2-D4b Python recovery baseline is not clean");
           const oldName="# name: select-establishment-configuration";
-          const newName="# name: select-establishment-configuration-l2d4-recovered";
-          if(!original.includes(oldName))throw Error("L2-D4b Skill Script metadata is missing");
+          const legacyMetadata=original.includes(oldName);
+          const newName=legacyMetadata
+            ?"# name: select-establishment-configuration-l2d4-recovered"
+            :"# l2d4-recovered";
+          if(!legacyMetadata&&!/^(?:async )?def main\(/m.test(original))
+            throw Error("L2-D4b canonical Python main() is missing");
           if(languageRecoveryAcceptance.has(procedureUri.toString()))
             throw Error("L2-D4b dirty-buffer recovery probe is already active");
-          await replace(doc,original.replace(oldName,newName));
+          const modified=legacyMetadata?original.replace(oldName,newName)
+            :original+"\n"+newName+"\n";
+          await replace(doc,modified);
           if(!doc.isDirty||!doc.getText().includes(newName)||await disk()!==original)
             throw Error("L2-D4b failed to prepare an unsaved Python buffer");
           languageRecoveryAcceptance.set(procedureUri.toString(),{
-            procedure,doc,state,original,newName
+            procedure,doc,state,original,newName,legacyMetadata
           });
           return {dirtyBufferPrepared:true,pythonVersion:doc.version,
             originalDiskUnchanged:true,marker:newName};
@@ -1064,8 +1070,11 @@ export function registerWorkbench(vscode,context){
               .flatMap(item=>Array.isArray(item?.contents)?item.contents:[item?.contents])
               .map(item=>typeof item==="string"?item:item?.value??String(item??""))
               .join(" ");
-            if(!hoverText.includes(prepared.newName.slice("# name: ".length)))
-              throw Error("Replacement Worker Hover did not reflect the dirty Python buffer: "+
+            const expectedHover=prepared.legacyMetadata
+              ?prepared.newName.slice("# name: ".length)
+              :"scripts/select_establishment_configuration.py";
+            if(!hoverText.includes(expectedHover))
+              throw Error("Replacement Worker Hover did not resolve the current Python script: "+
                 hoverText.slice(0,500));
             evidence={
               recovered:true,packageState:status.state,
@@ -1341,13 +1350,21 @@ export function registerWorkbench(vscode,context){
           const before=state.generation;
           const [contract,predicates,python]=entries;
           const old="# name: select-establishment-configuration";
-          const first="# name: select-establishment-configuration-l2d3-first";
-          const latest="# name: select-establishment-configuration-l2d3-latest";
-          if(!python.original.includes(old))throw Error("L2-D3: script metadata missing");
+          const legacyMetadata=python.original.includes(old);
+          const first=legacyMetadata
+            ?"# name: select-establishment-configuration-l2d3-first"
+            :"# l2d3-first";
+          const latest=legacyMetadata
+            ?"# name: select-establishment-configuration-l2d3-latest"
+            :"# l2d3-latest";
+          if(!legacyMetadata&&!/^(?:async )?def main\(/m.test(python.original))
+            throw Error("L2-D3: canonical Python main() is missing");
           await replace(contract.doc,contract.original+"\n# l2d3 unsaved contract probe\n");
           await replace(predicates.doc,predicates.original+"\n# l2d3 unsaved predicate probe\n");
-          await replace(python.doc,python.original.replace(old,first));
-          await replace(python.doc,python.original.replace(old,latest));
+          await replace(python.doc,legacyMetadata?python.original.replace(old,first)
+            :python.original+"\n"+first+"\n");
+          await replace(python.doc,legacyMetadata?python.original.replace(old,latest)
+            :python.original+"\n"+latest+"\n");
           const generation=await ready(before,"cross-file edits");
           const snapshot=await collectPackageSnapshot(vscode,procedure,generation);
           if(snapshot.completeness!=="complete")
@@ -1361,8 +1378,11 @@ export function registerWorkbench(vscode,context){
             covered.push({name:entry.name,version:match.version,dirty:true});
           }
           const hover=await getHover();
-          if(!hover.includes("-l2d3-latest")||hover.includes("-l2d3-first"))
-            throw Error("L2-D3: stale native Hover after rapid Python edit: "+
+          const expectedHover=legacyMetadata
+            ?"-l2d3-latest":"scripts/select_establishment_configuration.py";
+          if(!hover.includes(expectedHover)||
+             (legacyMetadata&&hover.includes("-l2d3-first")))
+            throw Error("L2-D3: native Hover lost current Script identity after rapid Python edit: "+
               hover.slice(0,400));
           evidence={generationBefore:before,generationLatest:generation,covered,
             latestPythonHover:true,originalDiskUnchanged:true};
@@ -1382,9 +1402,12 @@ export function registerWorkbench(vscode,context){
               }
               if(evidence){
                 const hover=await getHover();
-                if(hover.includes("-l2d3-")||
-                   !hover.includes("select-establishment-configuration"))
-                  problems.push("native Hover retained stale Python name");
+                const expectedRestored=legacyMetadata
+                  ?"select-establishment-configuration"
+                  :"scripts/select_establishment_configuration.py";
+                if((legacyMetadata&&hover.includes("-l2d3-"))||
+                   !hover.includes(expectedRestored))
+                  problems.push("native Hover retained stale Script identity");
               }
             }catch(error){problems.push(String(error?.message??error));}
           }
