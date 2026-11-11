@@ -2161,7 +2161,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       }
     }
   }
-  if((procedureRows?.count??0)<2)throw Error('Explorer did not expose both Skill procedure.yaml files: '+JSON.stringify(procedureRows));
+  // A nested project can virtualize the first Skill's file row off-screen.
+  // Do not require both identical filenames to be mounted in the DOM at once;
+  // the opened CustomEditor URI and MAS graph below prove exact ownership.
+  if(!procedureRows?.found)
+    throw Error('Explorer did not expose a visible procedure.yaml file: '+
+      JSON.stringify({masFolder,assuranceRows,procedureRows}));
   const masProcedure=await explorerRow('procedure.yaml','last');
   if(!masProcedure?.found)throw Error('MAS procedure.yaml row missing from Explorer');
   await click(masProcedure.x,masProcedure.y);
