@@ -1,0 +1,43 @@
+{
+  "id": "connectionAgent.skillStudio",
+  "title": "Skill Studio",
+  "type": "object",
+  "properties": {
+    "connectionAgent.skillStudio.skillsRoot": {
+      "type": "string",
+      "enum": [
+        "skills"
+      ],
+      "default": "skills",
+      "scope": "resource",
+      "markdownDescription": "Project Skill source root (v0.1 supports skills/ only; future relative paths require a versioned compiler contract)."
+    },
+    "connectionAgent.skillStudio.dependencies": {
+      "type": "array",
+      "default": [],
+      "scope": "resource",
+      "items": {
+        "type": "object"
+      },
+      "markdownDescription": "Project dependency declarations. Manage through Skill Studio Dependencies view; exact model is owned by ca-skill-compiler v0.1."
+    },
+    "connectionAgent.skillStudio.dependencyLock": {
+      "type": "object",
+      "default": {
+        "version": "skillc.lock/v0.1",
+        "entries": []
+      },
+      "scope": "resource",
+      "markdownDescription": "Managed pinned dependency lock; update using explicit Update Lock, not Refresh. Validated against the compiler contract."
+    },
+    "connectionAgent.skillStudio.defaultBuildTarget": {
+      "type": "string",
+      "enum": [
+        "all"
+      ],
+      "default": "all",
+      "scope": "window",
+      "markdownDescription": "Default user-facing build target; does not affect the Compiler Core unless explicitly requested."
+    }
+  }
+}
