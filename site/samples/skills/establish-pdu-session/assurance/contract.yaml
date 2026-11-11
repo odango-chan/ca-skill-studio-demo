@@ -12,6 +12,11 @@ spec:
     requiredFacts:
     - createdsession_ingress
     - createdsession_lifecycle
+    schemas:
+      subject: lib/host/subject.schema.yaml
+      facts: lib/host/facts.schema.yaml
+      observations: lib/observations/context-observations.schema.yaml
+      evidence: lib/host/evidence.schema.yaml
   allowedResources:
     capabilities:
     - sbi.udm.sm_data.get
@@ -26,12 +31,6 @@ spec:
     - ca.session.resource_responsibility.transfer
     - ca.session.evidence.await
     - ca.session.establishment_response.prepare
-    localTools:
-    - skill.select-establishment-configuration
-    - skill.evaluate-udm-read
-    - skill.evaluate-transfer-start
-    - skill.build-pcf-policy-inputs
-    - skill.build-n1n2-delivery
   postconditions:
   - predicate: createdsession.ran.setup_accepted
     expect: PASS
