@@ -2,8 +2,19 @@
  * Source/Skill semantics remain in site/markdown-preview.mjs.
  * The Webview loads this file via asWebviewUri and its CSP; no inline styles. */
 .skill-studio-markdown-document{
+  --md-bg:var(--vscode-editor-background,var(--panel,#ffffff));
+  --md-fg:var(--vscode-editor-foreground,var(--text,#20314a));
+  --md-muted:var(--vscode-descriptionForeground,var(--muted,#697e97));
+  --md-border:var(--vscode-panel-border,var(--border,#e1e7ef));
+  --md-soft:var(--vscode-editorWidget-background,var(--surface,#fbfcfe));
+  --md-raised:var(--vscode-sideBarSectionHeader-background,var(--raised,#edf3f9));
+  --md-accent:var(--vscode-focusBorder,var(--accent,#0c8e7b));
+  --md-heading:var(--vscode-skillStudio-markdownHeading,var(--accent,#0c8e7b));
+  --md-link:var(--vscode-textLink-foreground,var(--accent,#087e72));
+  --md-link-hover:var(--vscode-textLink-activeForeground,var(--blue,#317dc0));
+  --md-hover:var(--vscode-list-hoverBackground,#eef5f8);
   margin:0;min-width:0;min-height:100vh;
-  background:var(--vscode-editor-background,#ffffff);
+  color:var(--md-fg);background:var(--md-bg);
 }
 .markdown-preview{
   --md-bg:var(--vscode-editor-background,var(--panel,#ffffff));
