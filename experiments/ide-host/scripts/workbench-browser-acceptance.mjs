@@ -11,15 +11,14 @@ const pcfOutcomeLine=publishedProcedure.slice(0,
   .split('\n').length;
 export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
   if (!requireEditor) return {required:false};
-  const click=async(x,y)=>{
-    // Reset any stale button state left by an earlier workbench gesture.
+  const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1});
     await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,button:'none',buttons:0,pointerType:'mouse'});
-    await sleep(120);
-    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',buttons:1,clickCount:1,pointerType:'mouse'});
     await sleep(100);
-    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1,pointerType:'mouse'});
-    await sleep(120);
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',buttons:1,clickCount:count,pointerType:'mouse'});
+    await sleep(100);
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:count,pointerType:'mouse'});
+    await sleep(180);
   };
   const invoke=async(id,...args)=>{
     const expression="(async()=>{const c=window.theia.container;"+
@@ -31,14 +30,14 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       "await registry.executeCommand("+JSON.stringify(id)+",..."+
       JSON.stringify(args)+");return true;})()";
     await evalJS(expression);
-    await sleep(300);
+    await sleep(320);
   };
   const activityState=await evalJS(
     "(()=>{const tabs=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
     ".filter(x=>x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&"+
     "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&"+
     "x.getBoundingClientRect().y<innerHeight);"+
-    "const active=tabs.find(x=>x.classList.contains('theia-mod-active'));" +
+    "const active=tabs.find(x=>x.classList.contains('theia-mod-active'));"+
     "const r=active?.getBoundingClientRect();"+
     "const target=tabs.find(x=>x.textContent.trim()==='Skill Studio');"+
     "const tr=target?.getBoundingClientRect();"+
@@ -47,101 +46,192 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const activity=activityState?.activity;
   if(!activity)throw Error('Package Overview Activity Bar entry missing');
   await click(activity.x,activity.y);
-  await sleep(350);
-  let view=null;
+  await sleep(400);
+  const readTreeRows=()=>evalJS(
+    "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
+    ".find(x=>x.textContent.trim().toLowerCase()==='packages'&&"+
+    "x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);"+
+    "const part=header?.closest('.part');"+
+    "return [...(part?.querySelectorAll('.theia-TreeNode')??[])].map((el,index)=>{"+
+    "const toggle=el.querySelector('.theia-ExpansionToggle');"+
+    "const content=el.querySelector('.theia-TreeNodeContent')??el;"+
+    "const r=(toggle??content).getBoundingClientRect();"+
+    "const cr=content.getBoundingClientRect();"+
+    "return {index,text:el.innerText.replace(/\\\\s+/g,' ').trim(),className:el.className,"+
+    "nodeIds:[...el.querySelectorAll('[data-node-id]')].map(x=>x.getAttribute('data-node-id')),"+
+    "hasToggle:Boolean(toggle),toggleClass:toggle?.className??null,"+
+    "togglePos:r.width>0&&r.height>0?{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}:null,"+
+    "contentPos:cr.width>0&&cr.height>0?{x:Math.round(cr.x+cr.width/2),y:Math.round(cr.y+cr.height/2)}:null,"+
+    "visible:cr.width>0&&cr.height>0&&cr.x<innerWidth&&cr.y<innerHeight&&cr.right>0&&cr.bottom>0};"+
+    "});})()");
+  let rows=[];
   for(let attempt=0;attempt<100;attempt++){
-    view=await evalJS(
-      "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
-      ".find(x=>x.textContent.trim().toLowerCase()==='packages'&&"+
-      "x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);"+
-      "const part=header?.closest('.part');return {header:Boolean(header),text:part?.innerText??'',"+
-      "rows:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(x=>x.innerText.trim()),"+
-      "rect:(()=>{const r=part?.getBoundingClientRect();return r?{x:r.x,y:r.y,w:r.width,h:r.height}:null;})()};})()");
-    if(view?.rows?.some(x=>x.includes('establish-pdu-session')))break;
+    rows=await readTreeRows();
+    if(rows.some(x=>x.visible&&x.text.includes('2 SKILL Packages'))&&
+       rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))break;
     await sleep(100);
   }
-  if(!view?.rows?.some(x=>x.includes('establish-pdu-session')))
-    throw Error('Package Overview did not populate when its native view was opened: '+
-      JSON.stringify(view));
-  // Read scan evidence only after verifying the user-opened view populated;
-  // this command refreshes inventory but does not open or reveal the view.
+  if(!rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))
+    throw Error('Package Overview did not populate after opening its native Activity Bar view: '+JSON.stringify(rows));
   await invoke('skillStudio.refreshPackages');
   const scan=await evalJS('window.__skillStudioLastCommandResult??null');
   console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(scan));
-  const packageRow=await evalJS(
-    "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
-    ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
-    "const el=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(x=>"+
-    "x.innerText.includes('establish-pdu-session')&&x.getBoundingClientRect().width>0&&"+
-    "x.getBoundingClientRect().x>=0);"+
-    "const toggle=el?.querySelector('.theia-TreeNodeContent [data-node-id]');"+
-    "const target=toggle??el;const r=target?.getBoundingClientRect();"+
-    "return r?{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),"+
-    "target:toggle?'expansion-toggle':'row',rowClass:el?.className,toggleClass:toggle?.className}:null;})()");
-  const ownerPackage=scan?.packages?.find(x=>x.name==='establish-pdu-session');
-  if(!ownerPackage||!packageRow)
-    throw Error('Package Overview TreeView did not render discovered Package: '+
-      JSON.stringify({scan,view}));
-  const readGroups=()=>evalJS(
-    "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
-    ".find(x=>x.textContent.trim().toLowerCase()==='packages');"+
-    "return header?.closest('.part')?.innerText??'';})()");
-  // The owner Skill sample can evolve independently of the Package tree.
-  // Derive visible group labels and file counts from the exact inventory
-  // snapshot returned by the real provider instead of pinning old sample sizes.
-  const groupLabels={
-    definition:()=> 'Skill Definition',
-    assurance:()=> 'Assurance · '+ownerPackage.corePresent+'/3 core',
-    schemas:group=>'Schemas · '+group.count,
-    scripts:group=>'Scripts · '+group.count,
-    references:group=>'References · '+group.count,
-    other:group=>'Other · '+group.count
+  const expectedNames=['establish-pdu-session','establish-pdu-session-mas'];
+  const discovered=(scan?.packages??[]).map(x=>x.name).sort();
+  if(scan?.state!=='ready'||JSON.stringify(discovered)!==JSON.stringify(expectedNames.slice().sort()))
+    throw Error('Package Overview must discover both sample Skills in one Workspace: '+
+      JSON.stringify({scan,expectedNames}));
+  const classic=scan.packages.find(x=>x.name==='establish-pdu-session');
+  const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
+  if(classic?.fileCount!==22||classic?.corePresent!==3||
+     mas?.fileCount!==5||mas?.corePresent!==3)
+    throw Error('Two-SKILL inventory does not match the pinned sample manifest: '+
+      JSON.stringify({classic,mas}));
+  const packageNames=expectedNames;
+  const isPackageRow=row=>packageNames.some(name=>
+    row.text.includes(name+' · 3/3 core ·'));
+  const packageRange=(currentRows,name)=>{
+    const index=currentRows.findIndex(row=>row.visible&&
+      row.text.includes(name+' · 3/3 core ·'));
+    if(index<0)return null;
+    let end=currentRows.length;
+    for(let i=index+1;i<currentRows.length;i++)
+      if(currentRows[i].visible&&isPackageRow(currentRows[i])){end=i;break;}
+    return {index,end};
   };
-  const expectedGroups=ownerPackage.groups.map(group=>{
-    const label=groupLabels[group.key];
-    if(!label)throw Error('Package Overview returned an unknown group: '+group.key);
-    return label(group);
-  });
-  if(!expectedGroups.length)
-    throw Error('Package Overview inventory returned no visible groups: '+
-      JSON.stringify(ownerPackage));
-  let groups=await readGroups();
-  let expandedView=null;
-  let expansionMode='already-expanded';
-  if(!expectedGroups.every(group=>groups.includes(group))){
-    await click(packageRow.x,packageRow.y);
-    await sleep(700);
-    groups=await readGroups();
-    if(!expectedGroups.every(group=>groups.includes(group))){
-      expandedView=await evalJS(
-        "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
-        ".find(x=>x.textContent.trim().toLowerCase()==='packages');const part=header?.closest('.part');"+
-        "const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(x=>"+
-        "x.innerText.includes('establish-pdu-session'));const toggle=row?.querySelector("+
-        "'.theia-TreeNodeContent [data-node-id]');"+
-        "return {text:part?.innerText??'',rows:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(x=>({"+
-        "text:x.innerText.trim(),className:x.className})),toggleClass:toggle?.className??null};})()");
-      throw Error('Package Overview native TreeView expansion failed: '+
-        JSON.stringify({expectedGroups,groups,packageRow,expandedView}));
+  async function ensurePackageExpanded(name){
+    for(let attempt=0;attempt<24;attempt++){
+      rows=await readTreeRows();
+      const range=packageRange(rows,name);
+      if(!range){await sleep(120);continue;}
+      const group=rows.slice(range.index+1,range.end).find(row=>
+        row.visible&&row.text.includes('Assurance · 3/3 core'));
+      if(group)return {rows,range};
+      const toggle=rows[range.index].togglePos;
+      if(!toggle)throw Error('Package row has no visible expansion toggle: '+
+        JSON.stringify(rows[range.index]));
+      await click(toggle.x,toggle.y);
+      await sleep(450);
     }
-    expansionMode='native-mouse';
+    throw Error('Package did not expand in the native TreeView: '+name+
+      ' '+JSON.stringify(rows));
   }
-  for(const group of expectedGroups)
-    if(!groups.includes(group))
-      throw Error('Package Overview missing group '+group+': '+
-        JSON.stringify({groups,packageRow,expandedView}));
-  // Take a post-expansion provider snapshot. The first refresh emits the tree
-  // change; the second reads counters after Theia has processed that change.
+  async function ensureAssuranceFile(name,filePath){
+    for(let attempt=0;attempt<24;attempt++){
+      const expanded=await ensurePackageExpanded(name);
+      rows=expanded.rows;
+      const range=expanded.range;
+      const groupIndex=rows.findIndex((row,index)=>index>range.index&&index<range.end&&
+        row.visible&&row.text.includes('Assurance · 3/3 core'));
+      if(groupIndex<0){await sleep(120);continue;}
+      let nextGroup=range.end;
+      for(let i=groupIndex+1;i<range.end;i++){
+        if(rows[i].visible&&/^(Skill Definition|Assurance ·|Schemas ·|Scripts ·|References ·|Other ·)/.test(rows[i].text)){
+          nextGroup=i;break;
+        }
+      }
+      const file=rows.slice(groupIndex+1,nextGroup).find(row=>
+        row.visible&&row.text.includes(filePath.split('/').at(-1))&&
+        row.text.includes(filePath));
+      if(file)return {rows,range,groupIndex,file};
+      const toggle=rows[groupIndex].togglePos;
+      if(!toggle)throw Error('Assurance group has no visible expansion toggle: '+
+        JSON.stringify(rows[groupIndex]));
+      await click(toggle.x,toggle.y);
+      await sleep(450);
+    }
+    throw Error('Package Assurance group did not reveal '+filePath+': '+name+
+      ' '+JSON.stringify(rows));
+  }
+  async function readContractFrames(){
+    const tree=await command('Page.getFrameTree');
+    const frames=[];
+    const walk=node=>{
+      if(!node)return;
+      frames.push(node.frame);
+      for(const child of node.childFrames??[])walk(child);
+    };
+    walk(tree.frameTree);
+    const candidates=frames.filter(frame=>
+      frame.url.includes('/webview/index.html')||frame.url.includes('.webview.'));
+    const snapshots=[];
+    for(const frame of candidates){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'skill-studio-package-contract-acceptance',
+          grantUniveralAccess:true
+        });
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+          expression:"(()=>({name:document.querySelector('#name')?.textContent?.trim()??'',"+
+            "title:document.title,heading:document.querySelector('h1')?.innerText??'',"+
+            "status:document.querySelector('#status')?.textContent??''}))()"
+        });
+        snapshots.push({frameUrl:frame.url,...(result.result?.value??{})});
+      }catch(error){snapshots.push({frameUrl:frame.url,error:String(error)});}
+    }
+    return snapshots;
+  }
+  async function openPackageContract(name){
+    const result=await ensureAssuranceFile(name,'assurance/contract.yaml');
+    const file=result.file;
+    if(!file.contentPos)
+      throw Error('Contract file row is not clickable: '+JSON.stringify(file));
+    await click(file.contentPos.x,file.contentPos.y);
+    let snapshot=null;
+    for(let attempt=0;attempt<35;attempt++){
+      const frames=await readContractFrames();
+      snapshot=frames.find(frame=>frame.name===name)??null;
+      if(snapshot)return {package:name,contractName:snapshot.name,
+        frameUrl:snapshot.frameUrl,fileRow:file.text,nodeIds:file.nodeIds};
+      await sleep(150);
+    }
+    // Some Theia TreeView hosts invoke TreeItem.command on the double-click
+    // open gesture. Retry once without changing the selected package context.
+    await click(file.contentPos.x,file.contentPos.y,2);
+    for(let attempt=0;attempt<35;attempt++){
+      const frames=await readContractFrames();
+      snapshot=frames.find(frame=>frame.name===name)??null;
+      if(snapshot)return {package:name,contractName:snapshot.name,
+        frameUrl:snapshot.frameUrl,fileRow:file.text,nodeIds:file.nodeIds};
+      await sleep(150);
+    }
+    throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Designer Source: '+
+      JSON.stringify({file,frames:await readContractFrames(),rows:await readTreeRows()}));
+  }
+  const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 10','Scripts · 5','References · 3'];
+  const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
+  const classicView=await ensurePackageExpanded('establish-pdu-session');
+  const classicRange=classicView.range;
+  const classicVisible=classicView.rows.slice(classicRange.index+1,classicRange.end)
+    .filter(row=>row.visible).map(row=>row.text);
+  for(const group of classicGroups)
+    if(!classicVisible.some(text=>text.includes(group)))
+      throw Error('Traditional 5GC Package is missing group '+group+': '+JSON.stringify(classicVisible));
+  const classicContract=await openPackageContract('establish-pdu-session');
+  const masView=await ensurePackageExpanded('establish-pdu-session-mas');
+  const masVisible=masView.rows.slice(masView.range.index+1,masView.range.end)
+    .filter(row=>row.visible).map(row=>row.text);
+  for(const group of masGroups)
+    if(!masVisible.some(text=>text.includes(group)))
+      throw Error('MAS Package is missing group '+group+': '+JSON.stringify(masVisible));
+  const masContract=await openPackageContract('establish-pdu-session-mas');
+  if(classicContract.contractName!=='establish-pdu-session'||
+     masContract.contractName!=='establish-pdu-session-mas'||
+     classicContract.contractName===masContract.contractName)
+    throw Error('Package file navigation did not preserve each exact Contract URI: '+
+      JSON.stringify({classicContract,masContract}));
   await invoke('skillStudio.refreshPackages');
   await invoke('skillStudio.refreshPackages');
   const postExpansion=await evalJS('window.__skillStudioLastCommandResult??null');
-  if(!postExpansion?.treeReadsByKind ||
-      postExpansion.treeReadsByKind.package < 1)
-    throw Error('Package Overview rendered groups without requesting Package children: '+
-      JSON.stringify({groups,postExpansion,expansionMode}));
+  if(!postExpansion?.treeReadsByKind||
+     postExpansion.treeReadsByKind.package<2||
+     postExpansion.treeReadsByKind.group<2)
+    throw Error('Both Package and Assurance children must be requested by Theia TreeView: '+
+      JSON.stringify({postExpansion,classicVisible,masVisible}));
   const previous=activityState?.previous;
   let restoredActivity=null;
-  if(previous && previous.label!=='Skill Studio'){
+  if(previous&&previous.label!=='Skill Studio'){
     restoredActivity=await evalJS(
       "(()=>{const tabs=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
       ".filter(x=>x.textContent.trim()==="+JSON.stringify(previous.label)+"&&"+
@@ -160,18 +250,23 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const restored=await evalJS(
     "(()=>[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
     ".find(x=>x.classList.contains('theia-mod-active'))?.textContent.trim()??null)()");
-  if(previous && previous.label!=='Skill Studio' && restored!==previous.label)
+  if(previous&&previous.label!=='Skill Studio'&&restored!==previous.label)
     throw Error('Package Overview did not restore the previous Activity Bar view: '+
       JSON.stringify({previous,restored,restoredActivity}));
-  const groupCount=key=>ownerPackage.groups.find(group=>group.key===key)?.count??0;
-  const evidence={package:ownerPackage.name,
-    core:ownerPackage.corePresent+'/3',
-    schemas:groupCount('schemas'),scripts:groupCount('scripts'),
-    references:groupCount('references'),treeVisible:true,scanState:scan.state,
-    treeReadsByKind:postExpansion.treeReadsByKind,expansionMode,
-    restoredActivity:restored};
-  console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify(evidence));
-  return evidence;
+  const evidence={
+    skills:[{
+      name:'establish-pdu-session',files:classic.fileCount,core:'3/3',
+      groups:classicGroups,contract:classicContract
+    },{
+      name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3',
+      groups:masGroups,contract:masContract
+    }],
+    treeVisible:true,scanState:scan.state,
+    treeReadsByKind:postExpansion.treeReadsByKind,
+    exactPackageUris:true,restoredActivity:restored
+  };
+  console.log('STUDIO_PACKAGE_OVERVIEW_TWO_SKILLS_CHROMIUM',JSON.stringify(evidence));
+  return {required:true,twoSkills:true,evidence};
 }
 
 
