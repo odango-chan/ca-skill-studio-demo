@@ -4,6 +4,10 @@
 
 [新版在线工作台（Theia）](https://odango-chan.github.io/ca-skill-studio-demo/) · [原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) · [当前实现与验收](docs/WORK.md) · [开发文档地图](docs/README.md)
 
+## Plugin-managed Architecture v0.1（Draft · 未合并）
+
+[实现 PR #152](https://github.com/odango-chan/ca-skill-studio-demo/pull/152) 从当前 `main` 独立开发 VS Code Extension Configuration、两份正式 Skill 的独立 `Skill Studio Example`、依赖快照/Lock、Dependencies 与 Build 原生视图。目标架构无需预置 `lib/` 或 `output/`，旧 OPFS 工作空间文件保留。Compiler `skillc.build/v0.1` 尚未提供正式 ABI，Build 会显示 `UNAVAILABLE`；**PR 未合并、在线正式 Pages 暂未更新**。唯一 [项目结构与集成边界](docs/architecture/skill-project-layout.md)、[当前验收状态](docs/WORK.md)。
+
 ## 在线入口
 
 GitHub Pages 根入口为 Theia 插件版；[原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) 保留旧功能，`/ide-preview/` 跳转新版。插件迁移尚未追平：Node Focus 与 Route 创建/重连已迁移；本阶段新增原生只读 Inspection/Outline/Evidence/Problems、Package Audit 和 Markdown Preview，完整 Inspector/Phase Designer 等剩余缺口见 [功能对照](docs/architecture/theia-workbench.md)。Theia 在线版使用同源 Webview，仅用于公开/示例工作区，不要打开敏感文件；OPFS 不等于本地磁盘或 GitHub 同步，也不执行 Python、Runtime 或 5GC。
