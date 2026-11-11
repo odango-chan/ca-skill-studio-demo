@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
 // workers. Do not import node:crypto: the online host has no Node APIs.
@@ -220,6 +221,7 @@ export function activate(context){
           // Native TextDocument remains the only write owner. Existing Route
           // edits replace one scalar; new Route creation inserts one exact
           // source line at a zero-length CST span. Both use native Undo/Save.
+          assertStudioMutation(document.uri,vscode.workspace.workspaceFolders??[],"edit");
           const patch=new vscode.WorkspaceEdit();
           patch.replace(document.uri,new vscode.Range(
             document.positionAt(edit.start),document.positionAt(edit.end)),
