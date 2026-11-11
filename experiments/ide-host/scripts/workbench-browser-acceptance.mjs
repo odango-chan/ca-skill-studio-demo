@@ -1918,7 +1918,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const live=await waitMarkdown(view=>view.heading==='Unsaved Markdown acceptance','Unsaved Markdown edit');
   if(live.view.contextId!==guideOpen.view.contextId)
     throw Error('The Markdown Webview was recreated for an unsaved edit');
-  await invoke('core.undo');
+  await key('z','KeyZ',2,90);
   await waitMarkdown(view=>view.heading==='Establish PDU Session','Native Markdown undo');
   const previewScroll=async expression=>(await command('Runtime.evaluate',{
     contextId:guideOpen.view.contextId,returnByValue:true,expression
