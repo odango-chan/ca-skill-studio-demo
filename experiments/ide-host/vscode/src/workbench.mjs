@@ -1,5 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
+import {prepareNativeMarkdownPackagePolicy} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
@@ -2412,6 +2413,9 @@ export function registerWorkbench(vscode,context){
       await vscode.window.showTextDocument(doc,{
         viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:true
       });
+      // Resolve the exact Skill Package root, inventory local files, and reject
+      // symlinked targets before the native Markdown engine renders any links.
+      await prepareNativeMarkdownPackagePolicy(vscode,uri);
       // Do not await the host Preview command: some Theia PluginHost builds
       // resolve it only after the Webview has completed its first render. The
       // command itself must return promptly so callers can observe that render.
