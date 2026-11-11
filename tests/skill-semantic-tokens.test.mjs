@@ -90,7 +90,8 @@ test("SkillContract source positions distinguish document identity and direct Op
     text.slice(item.start,item.end)==="sbi.udm.sm_data.get"),false,
     "allowedResources values are grants, not Procedure call references");
   assert.ok(spans.some(item=>item.tokenId==="ca.keyword.structure"&&
-    text.slice(item.start,item.end)==="allowedResources"));
+    text.slice(item.start,item.end)==="allowedResources"),
+    "Contract structural keys: "+JSON.stringify(spans.filter(item=>item.tokenId.startsWith("ca.keyword")).map(item=>text.slice(item.start,item.end))));
 });
 
 test("Procedure AST selectors distinguish definitions, references, keywords and values",()=>{
