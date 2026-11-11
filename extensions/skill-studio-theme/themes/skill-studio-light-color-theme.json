@@ -289,6 +289,34 @@
     "comment": {
       "foreground": "#8FA0B4",
       "italic": true
-    }
+    },
+    "caDocumentKind": "#317DC0",
+    "caDocumentVersion": "#317DC0",
+    "caKeywordStructure": "#0C8E7B",
+    "caKeywordControl": "#7B5BA7",
+    "caKeywordCondition": "#0C8E7B",
+    "caKeywordBinding": "#317DC0",
+    "caSymbolSkillDefinition": "#0C8E7B",
+    "caSymbolProcedureDefinition": "#0C8E7B",
+    "caSymbolNodeDefinition": "#0C8E7B",
+    "caSymbolPredicateDefinition": "#0C8E7B",
+    "caSymbolCaseDefinition": "#0C8E7B",
+    "caSymbolLocalToolDefinition": "#0C8E7B",
+    "caSymbolCapabilityDefinition": "#0C8E7B",
+    "caSymbolOperationDefinition": "#0C8E7B",
+    "caReferenceCapability": "#278A98",
+    "caReferenceOperation": "#286CA8",
+    "caReferencePredicate": "#7B5BA7",
+    "caReferenceProcedure": "#317DC0",
+    "caReferenceNode": "#317DC0",
+    "caReferenceLocalTool": "#278A98",
+    "caReferenceScript": "#16846F",
+    "caReferenceSchema": "#278A98",
+    "caReferenceBindingPath": "#697E97",
+    "caValueOutcome": "#AD6517",
+    "caValueEffect": "#AD6517",
+    "caValueType": "#317DC0",
+    "caExpressionCel": "#7B5BA7",
+    "caIdentifierUserDefined": "#20314A"
   }
 }
