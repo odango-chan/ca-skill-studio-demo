@@ -34,12 +34,15 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     EventEmitter:class {event=()=>({dispose(){}});fire(){}dispose(){}},
     languages:{createDiagnosticCollection:()=>({dispose(){},clear(){},set(){}})},
     TreeItem:class {},TreeItemCollapsibleState:{None:0,Collapsed:1},
+    ThemeIcon:class {constructor(id){this.id=id;}},
     ViewColumn:{Beside:2},
     Uri:{joinPath(base,...parts){return {path:base.path+"/"+parts.join("/")};}},
     Range,Position,Selection,WorkspaceEdit,
     TextEditorRevealType:{InCenter:1},
     workspace:{
       textDocuments:[document],
+      registerTextDocumentContentProvider:()=>({dispose(){}}),
+      onDidChangeConfiguration:()=>({dispose(){}}),
       onDidChangeTextDocument(cb){listeners.add(cb);return {dispose(){listeners.delete(cb);}};},
       async applyEdit(edit){
         const changes=edit.changes??[edit.change];
@@ -59,6 +62,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     window:{
       visibleTextEditors:[textEditor],
       registerTreeDataProvider:()=>({dispose(){}}),
+      createTreeView:()=>({dispose(){}}),
       onDidChangeActiveTextEditor:()=>({dispose(){}}),
       activeTextEditor:{document},
       registerCustomEditorProvider(_name,p){provider=p;return{dispose(){}};},
