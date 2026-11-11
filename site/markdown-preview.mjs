@@ -114,14 +114,23 @@ function renderBlocks(lines,depth=0){
       continue;
     }
     if(i+1<lines.length&&lines[i].includes("|")&&tableSeparator(lines[i+1])){
-      const headers=cells(lines[i]),align=cells(lines[i+1]);
+      const headers=cells(lines[i]);
+      // Emit only fixed alignment classes, never source-controlled inline CSS.
+      const alignment=cells(lines[i+1]).map(marker=>{
+        const left=marker.startsWith(":"),right=marker.endsWith(":");
+        return left&&right?' class="md-align-center"':
+          right?' class="md-align-right"':
+          left?' class="md-align-left"':"";
+      });
       i+=2;out+="<div class=\"md-table-wrap\"><table><thead><tr>";
-      for(let j=0;j<headers.length;j++)out+="<th>"+inline(headers[j])+"</th>";
+      for(let j=0;j<headers.length;j++)
+        out+="<th"+(alignment[j]??"")+">"+inline(headers[j])+"</th>";
       out+="</tr></thead><tbody>";
       let rows=0;
       while(i<lines.length&&lines[i].trim()&&lines[i].includes("|")&&rows++<1000){
         const vals=cells(lines[i++]);out+="<tr>";
-        for(let j=0;j<headers.length;j++)out+="<td>"+inline(vals[j]??"")+"</td>";
+        for(let j=0;j<headers.length;j++)
+          out+="<td"+(alignment[j]??"")+">"+inline(vals[j]??"")+"</td>";
         out+="</tr>";
       }
       out+="</tbody></table></div>";

@@ -154,6 +154,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
     ViewColumn:{Beside:2},
+    Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
     commands:{executeCommand:async()=>{},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
     workspace:{textDocuments:[doc],
@@ -170,9 +171,9 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
       onDidChangeActiveTextEditor:()=>disposable(),showTextDocument:async()=>{},
       showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},
       showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation',
-      createWebviewPanel(){const p={webview:{html:''},onDidDispose:()=>disposable()};panels.push(p);return p;}}
+      createWebviewPanel(){const p={webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u},onDidDispose:()=>disposable()};panels.push(p);return p;}}
   };
-  const context={subscriptions:[]},workbench=registerWorkbench(vscode,context),posted=[];
+  const context={subscriptions:[],extensionUri:uri('/extension')},workbench=registerWorkbench(vscode,context),posted=[];
   workbench.attach(doc,m=>posted.push(m));
   assert.equal(providers.size,4);
   const beforeActivation=changes.length;workbench.activate(doc);workbench.activate(doc);
@@ -566,6 +567,11 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   doc.text='# Preview title\n<script>alert(1)</script>';
   await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));
   assert.match(panels[0].webview.html,/Content-Security-Policy/);
+  assert.match(panels[0].webview.html,/style-src https:\/\/studio\.invalid/);
+  assert.match(panels[0].webview.html,/script-src 'none'/);
+  assert.match(panels[0].webview.html,/img-src 'none'/);
+  assert.match(panels[0].webview.html,/href="https:\/\/studio\.invalid\/media\/markdown-preview\.css"/);
+  assert.match(panels[0].webview.html,/class="markdown-preview"/);
   assert.match(panels[0].webview.html,/<h1>Preview title<\/h1>/);
   assert.match(panels[0].webview.html,/&lt;script&gt;/);
   doc.text='x'.repeat(300001);changed({document:{...doc,uri:uri('/workspace/SKILL.md')}});
