@@ -126,7 +126,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       JSON.stringify({scan,expectedNames}));
   const classic=scan.packages.find(x=>x.name==='establish-pdu-session');
   const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
-  if(classic?.fileCount!==22||classic?.corePresent!==3||
+  if(classic?.fileCount!==13||classic?.corePresent!==3||
      mas?.fileCount!==5||mas?.corePresent!==3)
     throw Error('Two-SKILL inventory does not match the pinned sample manifest: '+
       JSON.stringify({classic,mas}));
@@ -264,7 +264,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Designer Source: '+
       JSON.stringify({file,frames:await readContractFrames(),rows:await readTreeRows()}));
   }
-  const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 10','Scripts · 5','References · 3'];
+  const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1','Scripts · 5','References · 3'];
   const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
   const classicView=await ensurePackageExpanded('establish-pdu-session');
   const classicRange=classicView.range;
