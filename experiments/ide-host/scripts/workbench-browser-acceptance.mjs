@@ -854,7 +854,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
   // Resolve the Evidence part inside the exact Skill Studio view container.
   // Avoid matching an unrelated tab/label when Theia has multiple split panels.
-  const evidenceHeader=await evalJS(`(()=>{
+  const readEvidenceHeader=()=>evalJS(`(()=>{
     const container=[...document.querySelectorAll('.theia-view-container')]
       .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
     const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
@@ -866,15 +866,36 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const r=header.getBoundingClientRect(),part=header.closest('.part');
     const rootPresent=[...(part?.querySelectorAll('.theia-TreeNode')??[])].some(x=>
       x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
-    return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,
-      collapsed:part?.classList.contains('collapsed')??false,
+    // The last panel header can be partially covered by the status bar.
+    // Pick an on-screen, hit-tested point instead of assuming its centre is clickable.
+    const xs=[r.x+Math.min(12,r.width/4),r.x+r.width/2,r.right-Math.min(12,r.width/4)];
+    const ys=[r.y+Math.min(4,r.height/3),r.y+r.height/2,r.bottom-Math.min(4,r.height/3)];
+    const points=ys.flatMap(y=>xs.map(x=>({x,y})));
+    const point=points.find(({x,y})=>x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&
+      ((hit)=>hit===header||header.contains(hit))(document.elementFromPoint(x,y)));
+    return {found:true,x:point?.x??null,y:point?.y??null,
+      hitWithinHeader:!!point,collapsed:part?.classList.contains('collapsed')??false,
       rootPresent,partClass:part?.className??'',headerText:header.textContent.trim(),
-      containerId:container.id};
+      containerId:container.id,rect:{x:r.x,y:r.y,width:r.width,height:r.height},
+      viewportHeight:innerHeight};
   })()`);
-  if(!evidenceHeader?.found)
-    throw Error('Native Evidence view header is missing from Skill Studio container: '+
+  let evidenceHeader=null;
+  for(let attempt=0;attempt<12;attempt++){
+    evidenceHeader=await readEvidenceHeader();
+    if(!evidenceHeader?.found)
+      throw Error('Native Evidence view header is missing from Skill Studio container: '+
+        JSON.stringify(evidenceHeader));
+    if(!evidenceHeader.collapsed)break;
+    if(!evidenceHeader.hitWithinHeader)
+      throw Error('Native Evidence header is obscured and cannot be expanded by mouse: '+
+        JSON.stringify(evidenceHeader));
+    await click(evidenceHeader.x,evidenceHeader.y);
+    await sleep(200);
+  }
+  evidenceHeader=await readEvidenceHeader();
+  if(evidenceHeader?.collapsed)
+    throw Error('Native Evidence header stayed collapsed after trusted mouse clicks: '+
       JSON.stringify(evidenceHeader));
-  if(evidenceHeader.collapsed){await click(evidenceHeader.x,evidenceHeader.y);await sleep(250);}
   await invoke('skillStudio.auditPackage');
   // auditPackage publishes the refreshed owner-file snapshot. Its source
   // projection refreshes Evidence when that snapshot changes; wait for the
