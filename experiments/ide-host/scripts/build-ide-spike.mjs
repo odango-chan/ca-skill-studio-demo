@@ -18,6 +18,7 @@ await build({
   entryPoints:["experiments/ide-host/lsp-browser/server/src/browserServerMain.mjs"],
   outfile:join(root,"dist","skill-language-server.js"),
   bundle:true,format:"iife",platform:"browser",target:"es2022",
+  loader:{".yaml":"text",".yml":"text"},
   logLevel:"info"
 });
 await build({
