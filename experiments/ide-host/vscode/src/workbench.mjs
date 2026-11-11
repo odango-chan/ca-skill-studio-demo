@@ -2241,7 +2241,21 @@ export function registerWorkbench(vscode,context){
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
     const panel=vscode.window.createWebviewPanel('skillStudio.markdown','Preview · '+uri.path.split('/').at(-1),vscode.ViewColumn.Beside,{enableScripts:false});
-    const render=()=>{const preview=renderMarkdown(doc.getText());panel.webview.html='<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;none&#39;;"></head><body><article>'+(preview.available?preview.html:'<p>预览不可用，请使用源码编辑器。</p>')+'</article></body></html>';};
+    const stylesheet=vscode.Uri.joinPath(context.extensionUri,'media','markdown-preview.css');
+    const stylesheetHref=panel.webview.asWebviewUri(stylesheet).toString();
+    // Allow only the locally packaged stylesheet; no scripts or remote images.
+    const csp="default-src 'none'; img-src 'none'; style-src "+
+      panel.webview.cspSource+"; script-src 'none'; connect-src 'none';";
+    const attr=value=>String(value).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    const render=()=>{
+      const preview=renderMarkdown(doc.getText());
+      panel.webview.html='<!doctype html><html lang="zh"><head><meta charset="utf-8">'+
+        '<meta http-equiv="Content-Security-Policy" content="'+attr(csp)+'">'+
+        '<link rel="stylesheet" href="'+attr(stylesheetHref)+'"></head>'+
+        '<body class="skill-studio-markdown-document"><article class="markdown-preview">'+
+        (preview.available?preview.html:'<p>预览不可用，请使用源码编辑器。</p>')+
+        '</article></body></html>';
+    };
     render();const changed=vscode.workspace.onDidChangeTextDocument(e=>{if(e.document.uri.toString()===uri.toString())render();});panel.onDidDispose(()=>changed.dispose());
   }));
   return {attach(doc,post){
