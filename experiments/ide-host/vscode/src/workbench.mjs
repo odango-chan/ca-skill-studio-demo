@@ -2512,5 +2512,15 @@ export function registerWorkbench(vscode,context){
     const rootInfo=packageRootForProcedure(vscode,doc);
     const state=rootInfo?languagePackages.get(rootInfo.uri.toString()):null;
     if(state){state.procedureDocument=doc;scheduleLanguagePackageRefresh(state);}
+  },invalidateDependencyAnalysis(){
+    // Dependency Lock changes cannot leave prior Package-language generations
+    // cached as current. This refresh still performs editor-only analysis; it
+    // must not claim Compiler v0.1 dependency-qualified Definition or PASS.
+    languagePackageStatuses.clear();
+    for(const state of languagePackages.values()){
+      if(!state.disposed)scheduleLanguagePackageRefresh(state,true);
+    }
+    updateLanguageStatus("ANALYZING",
+      "Dependency configuration changed; editor analysis invalidated");
   },getActiveDocument(){return document;}};
 }
