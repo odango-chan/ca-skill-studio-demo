@@ -1,26 +1,22 @@
-# /// connectionagent-tool
-# name: build-n1n2-delivery
-# inputSchema: N1N2DeliveryInput
-# outputSchema: N1N2Delivery
-# effect: local_compute
-# sandbox:
-#   network: denied
-# timeout: 1s
-# ///
+from typing import Annotated, Literal, TypedDict
 
-import json
 
-class N1N2DeliveryInput(dict):
-    pass
+class N1N2DeliveryOutput(TypedDict):
+    profileRef: Literal["createdsession-n1n2-sm@0.1.0"]
+    responseArtifactRef: Annotated[str, {"pattern": r"^csa:v1:[0-9a-f]{64}$"}]
+    artifactDigest: Annotated[str, {"pattern": r"^sha256:[0-9a-f]{64}$"}]
+    nasDigest: Annotated[str, {"pattern": r"^sha256:[0-9a-f]{64}$"}]
+    n2Digest: Annotated[str, {"pattern": r"^sha256:[0-9a-f]{64}$"}]
+    validUntil: Annotated[str, {"minLength": 1}]
+    operationContextRef: Annotated[str, {"minLength": 1}]
+    policyResultRef: Annotated[str, {"minLength": 1}]
 
-class N1N2Delivery(dict):
-    pass
 
-def main(input: N1N2DeliveryInput) -> N1N2Delivery:
+def main(input: dict) -> N1N2DeliveryOutput:
     # The Skill decides which prepared N1/N2 material is delivered for this
-    # attempt: the admitted SM profile and an IPv4 PDU session.  The Tool input
+    # attempt: the admitted SM profile and an IPv4 PDU session. The Tool input
     # schema validates the complete request, and the transfer adapter proves
-    # every selected value against its durable prepared-response record.  This
+    # every selected value against its durable prepared-response record. This
     # Script holds no address, credential, deadline, operation identity or send.
     prepared = input["preparedResponse"]
     if prepared.get("profileRef") != "createdsession-n1n2-sm@0.1.0":
