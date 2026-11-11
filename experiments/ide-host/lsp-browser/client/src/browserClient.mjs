@@ -47,6 +47,16 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let semanticTokenRegistration = null;
   let semanticTokenChangeEmitter = null;
   let semanticTokenRenderer = null;
+  let semanticTokenRefreshQueued = false;
+  function refreshTheiaSemanticTokens() {
+    if (stopped || terminalFailure || !semanticTokenChangeEmitter ||
+        semanticTokenRefreshQueued) return;
+    semanticTokenRefreshQueued = true;
+    queueMicrotask(() => {
+      semanticTokenRefreshQueued = false;
+      if (!stopped && !terminalFailure) semanticTokenChangeEmitter?.fire();
+    });
+  }
   function stopClientAfterFailure() {
     if (!started || !client) return Promise.resolve();
     if (!clientStopPromise) {
@@ -234,7 +244,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     if (!terminalFailure) handlers.onStatus?.(status);
     // The manual Theia provider is an adapter over the same LSP endpoint.
     // Refresh it whenever the accepted Package generation changes state.
-    semanticTokenChangeEmitter?.fire();
+    refreshTheiaSemanticTokens();
     if (status?.state === "UNAVAILABLE" && status?.reason)
       output.appendLine("Analysis unavailable: " + status.reason);
   });
@@ -259,15 +269,22 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     invalidatePackage(rootUri, generation) {
       if (!started || stopped || terminalFailure) return;
       client.sendNotification(PACKAGE_INVALIDATE_NOTIFICATION, { rootUri, generation });
+      refreshTheiaSemanticTokens();
     },
     sendPackageSnapshot(snapshot) {
       if (!started || stopped || terminalFailure)
         throw new Error("Language Worker unavailable: " + (terminalFailure ?? "not running"));
       client.sendNotification(PACKAGE_SNAPSHOT_NOTIFICATION, snapshot);
+      // The editor may request tokens before the first Package snapshot exists.
+      // Refresh after posting the snapshot so the next provider request is
+      // ordered behind it on the same Worker message channel; the server stores
+      // the snapshot before awaiting its independent analysis session.
+      refreshTheiaSemanticTokens();
     },
     closePackage(rootUri) {
       if (!started || stopped || terminalFailure) return;
       client.sendNotification(PACKAGE_CLOSE_NOTIFICATION, { rootUri });
+      refreshTheiaSemanticTokens();
     },
     hasDiagnosticCollectionForAcceptance(){
       return Boolean(client.diagnostics);
