@@ -4,8 +4,9 @@ import {readFileSync,statSync,readdirSync,existsSync} from "node:fs";
 import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
-import {extendMarkdownIt,setNativeMarkdownPackagePolicies,
-  isAllowedPackageRelativeLink} from "../vscode/src/markdown-link-policy.mjs";
+import {extendMarkdownIt,setNativeMarkdownPackagePolicies,clearNativeMarkdownPackagePolicies,
+  isAllowedPackageRelativeLink,prepareNativeMarkdownPackagePolicy}
+  from "../vscode/src/markdown-link-policy.mjs";
 import {buildClassicIconsCss,THEIA_CLASSIC_ICON_MAP} from "../scripts/classic-icons-css.mjs";
 import {buildSkillStudioBrandCss,buildSkillStudioBrandScript,prepareTheiaBrand}
   from "../scripts/prepare-theia-brand.mjs";
@@ -261,4 +262,62 @@ test("Native Markdown renderer strips raw HTML and images and restores cached to
   assert.equal(safeOpen.type,"link_open","cached tokens must be restored after rendering");
   assert.equal(blockedOpen.type,"link_open","cached tokens must not be permanently mutated");
   assert.equal(remoteImage.type,"image","cached image tokens must be restored after rendering");
+});
+
+
+test("Native Markdown inventory excludes symlinks and rejects a symlinked source document",async()=>{
+  const root="/workspace/skills/example";
+  const makeUri=path=>({
+    path,toString(){return "file://"+path;},
+    with(change){return makeUri(change.path);}
+  });
+  const skill=makeUri(root+"/SKILL.md");
+  const safe=makeUri(root+"/references/safe.md");
+  const linked=makeUri(root+"/references/symlink.md");
+  const files=[skill,safe,linked];
+  const vscode={
+    RelativePattern:class{constructor(base,pattern){this.base=base;this.pattern=pattern;}},
+    FileType:{File:1,Directory:2,SymbolicLink:64},
+    workspace:{
+      getWorkspaceFolder:()=>({uri:makeUri("/workspace")}),
+      findFiles:async pattern=>pattern==="**/SKILL.md"?[skill]:files,
+      fs:{stat:async uri=>{
+        if(uri.path==="/workspace/skills"||uri.path===root||
+           uri.path===root+"/references")return {type:2};
+        if(uri.path===linked.path)return {type:64};
+        return {type:1};
+      }}
+    }
+  };
+  try{
+    assert.equal(await prepareNativeMarkdownPackagePolicy(vscode,skill),true);
+    const makeLink=(type,href)=>({
+      type,tag:"a",attrs:href?[["href",href]]:null,content:"",
+      nesting:type==="link_open"?1:-1,children:null,
+      attrGet(name){return this.attrs?.find(([key])=>key===name)?.[1]??null;}
+    });
+    const safeOpen=makeLink("link_open","references/safe.md");
+    const safeClose=makeLink("link_close");
+    const symlinkOpen=makeLink("link_open","references/symlink.md");
+    const symlinkClose=makeLink("link_close");
+    const inline={type:"inline",children:[
+      safeOpen,{type:"text",content:"safe"},safeClose,
+      symlinkOpen,{type:"text",content:"symlink"},symlinkClose
+    ]};
+    const md={
+      set(){},
+      renderer:{render(tokens){
+        return tokens[0].children.map(token=>
+          token.type+":"+String(token.attrGet?.("href")??"")).join("|");
+      }}
+    };
+    extendMarkdownIt(md);
+    const output=md.renderer.render([inline],{}, {currentDocument:skill});
+    assert.match(output,/link_open:references\\/safe\\.md/);
+    assert.doesNotMatch(output,/link_open:references\\/symlink\\.md/);
+    assert.equal(await prepareNativeMarkdownPackagePolicy(vscode,linked),false,
+      "a symlinked Markdown source itself must not receive a native preview policy");
+  }finally{
+    clearNativeMarkdownPackagePolicies(files);
+  }
 });
