@@ -86,7 +86,7 @@
       },
       {
         "command": "skillStudio.loadExample",
-        "title": "Skill Studio: Load Example Workspace"
+        "title": "SKILL Studio: Load Example Workspace"
       },
       {
         "command": "skillStudio.auditPackage",
