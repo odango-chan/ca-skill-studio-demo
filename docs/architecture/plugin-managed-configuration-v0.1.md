@@ -6,7 +6,7 @@
 
 Skill Studio is a **VS Code-compatible IDE extension**, not a project/Tool Runtime registry. Author-facing settings come from the host's native Extension Configuration with native Settings Editor; complex dependency operations use a native TreeView + Command/QuickPick instead of a new mandatory `skill-project.yaml` or a custom configuration Webview. Dependencies, locks and source bytes are distinct from User preferences, transient Workspace UI state, cached content and Build output.
 
-**Contract owner:** Compiler defines normalized dependency/tool/snapshot/build wire schemas and language references; Studio defines extension setting keys, host adapters, acquisition UX, persisted snapshots and export UX; Agent Host owns Provider Binding / runtime connection / authorization / admission / Tool execution. Studio does not infer READY from MCP discovery or Tool descriptions.
+**Contract owner:** Compiler defines only the canonical input wire schemas, language references and deterministic snapshot-digest contract consumed by Check/Build; it does not implement dependency acquisition, resolution, lock management, refresh, package storage or a package-manager lifecycle. Studio owns extension setting keys, host adapters, source acquisition, normalization, immutable snapshot persistence, lock management, refresh/Update Lock and export UX. Agent Host owns Provider Binding / runtime connection / authorization / admission / Tool execution. Studio does not infer READY from MCP discovery or Tool descriptions.
 
 ## Extension configuration keys (target, not yet activated)
 
@@ -16,7 +16,7 @@ See machine-readable [studio-settings-contributions.json](../../contracts/v0.1/s
 | --- | --- | --- | --- |
 | `connectionAgent.skillStudio.skillsRoot` | resource/workspace-folder | `skills` | User via Settings (v0.1 fixed value) |
 | `connectionAgent.skillStudio.dependencies` | resource/workspace-folder | `[]` | Dependencies view + validated edit |
-| `connectionAgent.skillStudio.dependencyLock` | resource/workspace-folder | `{version:"skillc.lock/v0.1",entries:[]}` | Resolver explicit Add / Update Lock |
+| `connectionAgent.skillStudio.dependencyLock` | resource/workspace-folder | `{version:"skillc.lock/v0.1",entries:[]}` | Studio Dependency Service explicit Add / Update Lock |
 | `connectionAgent.skillStudio.defaultBuildTarget` | user/application | `all` | User via Settings |
 
 Only resource-scoped selected workspace-folder configuration is authoritative. In multi-root workspaces, ask which root owns a Skill Project, then load/update settings for that root. If the host cannot provide a durable workspace configuration write, fail visibly; **never** silently substitute User Settings, `globalState` or `workspaceState` for shareable dependencies. Theia Browser-only OPFS support must be proved by real browser tests. `contributes.configuration` cannot make JSON manually uneditable; invalid or unrecognized settings must be rejected by Service validation rather than treated as trusted.
@@ -52,7 +52,7 @@ The default example imports exactly two pinned current owner Skills to an isolat
 
 Direct URL, Registry and arbitrary Local-path provider executables are out of v0.1 acquisition scope. Private MCP/Git discovery is capability-gated by host origin/CORS, network access and credentials. Failure is BLOCKED, not a fake successful import.
 
-The Resolver and snapshot digest algorithm are **owned by Compiler contract**. Source Adapter code may differ (Browser Fetch vs local Git/file), but Normalize + Snapshot+Lock semantics must have the same cross-host golden vectors. Never fetch live network dependencies during LSP analyze, Check or Build.
+Studio owns the Dependency Service lifecycle: source acquisition, normalization, immutable snapshot creation, lock persistence, refresh and explicit Update Lock. Compiler owns only the deterministic digest definition and canonical input validation contract (including cross-language golden vectors); Studio implements that digest contract. Source adapters may differ (Browser Fetch vs local Git/file), but the resulting immutable ProjectContext must have the same digest across hosts. The Compiler must not grow a Resolver or package-manager lifecycle. Never fetch live network dependencies during LSP analyze, Check or Build.
 
 ## Views, commands and user-facing status
 
@@ -68,7 +68,7 @@ All write actions through the Studio extension require explicit validated source
 
 1. **Compiler first:** merge v0.1 Go API, native CLI, WASM worker, exact logical Tool/Schema refs and cross-language hash golden vectors; no `lib/` fallback. Existing Compiler Draft #2/#3 still pre-v0.1, so do not pretend Studio can call the new API yet.
 2. **Settings:** contribute native Settings to actual `experiments/ide-host/vscode/package.json` and test scope/round trip in both VS Code and real Theia Browser-Only. This document's machine-readable contribution object is NOT installed by itself.
-3. **Resolver/store:** upload and MCP discovery must preserve lock and snapshots across reload, clone/export and cache deletion. Test duplicate aliases, selected tool IDs, tampering, no credentials on disk, and stalled/partial update state.
+3. **Studio Dependency Service/store:** upload and MCP discovery must preserve lock and snapshots across reload, clone/export and cache deletion. Test duplicate aliases, selected tool IDs, tampering, no credentials on disk, and stalled/partial update state. This lifecycle remains in Studio, not the Compiler.
 4. **Views:** TreeView/commands interact with the same Services; no alternate config state kept in UI. An MCP source can only be refreshed with a fresh discovery connection, but locked snapshots remain compilable when offline.
 5. **Build/LSP:** both read the exact same revision and content digest of dependency snapshots; the Compiler remains Go Core authority for syntax and linking; LSP is editor feedback, not a compiler pass.
 6. **Example:** show `Skill Studio Example` with only current two Skills; old browser workspaces kept untouched, not mounted; no fake `lib/output` folders.
