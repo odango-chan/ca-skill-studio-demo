@@ -1975,23 +1975,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const traversalBlocked=afterForgery.length===beforeForgery;
   if(!traversalBlocked)
     throw Error('Forged Webview message opened a file outside the active Skill Package');
-  const guideCountBeforeReturn=afterForgery.filter(
-    view=>view.heading==='Establish PDU Session').length;
+  const guidePreviewActive=()=>evalJS(
+    `[...document.querySelectorAll('.lm-TabBar-tab.lm-mod-current')]
+      .some(tab=>tab.textContent.trim()==='Markdown · SKILL.md')`);
+  if(await guidePreviewActive())
+    throw Error('Reference navigation did not select the Reference preview');
   const returnToGuide=await command('Runtime.evaluate',{
     contextId:referenceOpen.view.contextId,returnByValue:true,
     expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="../SKILL.md");if(!link)return false;link.click();return true;})()'
   });
   if(returnToGuide.result?.value!==true)
     throw Error('Could not follow Reference → SKILL.md navigation');
-  let returnedGuides=[];
+  let returnedGuideActive=false;
   for(let attempt=0;attempt<80;attempt++){
-    returnedGuides=(await markdownViews()).filter(
-      view=>view.heading==='Establish PDU Session');
-    if(returnedGuides.length>guideCountBeforeReturn)break;
+    returnedGuideActive=await guidePreviewActive();
+    if(returnedGuideActive)break;
     await sleep(100);
   }
-  if(returnedGuides.length<=guideCountBeforeReturn)
-    throw Error('Reference → SKILL.md did not open a new guide preview');
+  if(!returnedGuideActive)
+    throw Error('Reference → SKILL.md did not select the guide preview');
   await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session-mas');
   const masOpen=await waitMarkdown(
     view=>view.heading==='Establish PDU Session through SMF MAS'&&view.themeApplied,'Themed MAS SKILL.md preview');
@@ -2000,7 +2002,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify(masOpen.view));
   const markdownGuideEvidence={
     conventional:guideOpen.view,reference:referenceOpen.view,
-    returnedGuideCount:returnedGuides.length,mas:masOpen.view,traversalBlocked
+    returnedGuideActive,mas:masOpen.view,traversalBlocked
   };
   console.log('STUDIO_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
