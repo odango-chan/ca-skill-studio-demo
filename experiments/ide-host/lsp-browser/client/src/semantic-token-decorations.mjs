@@ -117,16 +117,20 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
       const tokenTypeIndex = Number(data[index + 3]);
 
       if (!Number.isSafeInteger(deltaLine) || deltaLine < 0 ||
-          !Number.isSafeInteger(deltaCharacter) || deltaCharacter < 0 ||
-          !Number.isSafeInteger(length) || length <= 0 ||
-          !Number.isSafeInteger(tokenTypeIndex) ||
-          tokenTypeIndex < 0 || tokenTypeIndex >= tokenTypes.length) continue;
+          !Number.isSafeInteger(deltaCharacter) || deltaCharacter < 0) continue;
 
+      // Delta positions advance for every encoded token, including one whose
+      // type or range is later rejected. Never let a malformed entry shift all
+      // following tokens to the wrong source positions.
       if (deltaLine === 0) character += deltaCharacter;
       else {
         line += deltaLine;
         character = deltaCharacter;
       }
+
+      if (!Number.isSafeInteger(length) || length <= 0 ||
+          !Number.isSafeInteger(tokenTypeIndex) ||
+          tokenTypeIndex < 0 || tokenTypeIndex >= tokenTypes.length) continue;
 
       const tokenType = tokenTypes[tokenTypeIndex];
       if (!decorationTypes.has(tokenType) || line < 0 || line >= document.lineCount) continue;
