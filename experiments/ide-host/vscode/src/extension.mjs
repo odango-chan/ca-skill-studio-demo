@@ -272,8 +272,8 @@ export function activate(context){
         // Theia first-run path); avoid opening a second explicit editor.
         await vscode.commands.executeCommand("vscode.open",result.procedure);
         void vscode.window.showInformationMessage(
-          "示例项目已载入：skills/（传统 5GC + MAS）、lib/（待导入 Tool 契约）、"+
-          "output/（待生成编译产物）。新增 "+result.created+" 个文件，"+
+          "Skill Studio Example 已载入：仅包含两个正式 Skill 的 skills/ 源码。新增 "+
+          result.created+" 个文件，"+
           "保留 "+result.skipped+" 个已有文件。"+
           (viewOpened&&revealed?"已展开 Packages。":"请打开 Skill Studio → Packages 查看两个 SKILL。"));
       }catch(error){
