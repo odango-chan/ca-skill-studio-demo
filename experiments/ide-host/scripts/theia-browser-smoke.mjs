@@ -423,11 +423,12 @@ try{
       patchEvidence.yamlSyntax=yamlSyntax;
 
       // The native VS Code/Theia editor must render the same CA semantic
-      // identities from the Language Worker's LSP stream and the installed
-      // Studio Light theme. TextMate colors alone do not satisfy this check.
-      let semanticLspRendering=null;
+      // identities from the shared source classifier. Browser extension hosts
+      // use its LSP adapter; Node extension hosts use the same engine directly.
+      // TextMate colors alone do not satisfy this check.
+      let semanticRendering=null;
       for(let attempt=0;attempt<35;attempt++){
-        semanticLspRendering=await evalJS(`(()=> {
+        semanticRendering=await evalJS(`(()=> {
           const editor=[...document.querySelectorAll('.monaco-editor')]
             .find(el=>el.getBoundingClientRect().width>150&&el.querySelector('.view-lines'));
           const lines=[...(editor?.querySelectorAll('.view-line')??[])];
@@ -447,8 +448,8 @@ try{
             visible:!!editor
           };
         })()`);
-        if(semanticLspRendering?.referenceColor==='rgb(123, 91, 167)'&&
-           semanticLspRendering?.outcomeColor==='rgb(173, 101, 23)')break;
+        if(semanticRendering?.referenceColor==='rgb(123, 91, 167)'&&
+           semanticRendering?.outcomeColor==='rgb(173, 101, 23)')break;
         await sleep(120);
       }
       const semanticProviderDiagnostics=await evalJS(`(async()=>{
@@ -459,19 +460,19 @@ try{
         if(!key)throw Error('Native command registry missing');
         return c.get(key).executeCommand('skillStudio.internal.semanticTokenDiagnostics');
       })()`);
-      semanticLspRendering.diagnostics=semanticProviderDiagnostics;
-      console.log("STUDIO_NATIVE_LSP_SEMANTIC_COLORS_CHROMIUM",
-        JSON.stringify(semanticLspRendering));
+      semanticRendering.diagnostics=semanticProviderDiagnostics;
+      console.log("STUDIO_NATIVE_SEMANTIC_COLORS_CHROMIUM",
+        JSON.stringify(semanticRendering));
       if(semanticProviderDiagnostics?.registered!==true||
          !(semanticProviderDiagnostics?.requests>0)||
          !(semanticProviderDiagnostics?.lastTokenCount>0)||
          ![true,"configuredByTheme"].includes(
            semanticProviderDiagnostics?.semanticHighlightingEnabled)||
-         semanticLspRendering?.referenceColor!=='rgb(123, 91, 167)'||
-         semanticLspRendering?.outcomeColor!=='rgb(173, 101, 23)')
-        throw Error("Native LSP semantic tokens were not registered, requested and rendered by Studio Light: "+
-          JSON.stringify(semanticLspRendering));
-      patchEvidence.lspSemanticColors=semanticLspRendering;
+         semanticRendering?.referenceColor!=='rgb(123, 91, 167)'||
+         semanticRendering?.outcomeColor!=='rgb(173, 101, 23)')
+        throw Error("Native semantic tokens were not registered, requested and rendered by Studio Light: "+
+          JSON.stringify(semanticRendering));
+      patchEvidence.lspSemanticColors=semanticRendering;
 
       // This probe opens a pinned owner script in the native workbench.
       // Open a real bundled Python source through Theia's native Quick Open.
