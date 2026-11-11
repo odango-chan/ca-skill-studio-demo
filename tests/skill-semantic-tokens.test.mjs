@@ -171,7 +171,7 @@ test("documented-but-unverified forms are not promoted to current semantic keywo
   for(const needle of ["tool","procedure","for","when"]){
     const start=text.indexOf(needle+":");
     const token=spans.find(item=>item.start<=start&&item.end>=start+needle.length);
-    assert.equal(token?.tokenId,"ca.keyword.structure"===token?.tokenId?token.tokenId:undefined,
+    assert.equal(token,undefined,
       needle+" remains outside the current keyword contract");
   }
 });
