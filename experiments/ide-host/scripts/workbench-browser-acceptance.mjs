@@ -457,80 +457,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await sleep(100);
   }
   if(!/Package Audit · \d+ editor warnings/.test(audit))throw Error('Package Audit did not render within 10s: '+audit.slice(-1000));
-  // The online sample is a two-SKILL workspace. Prove the MAS sibling can be
-  // expanded and its own Procedure opened through the native Explorer, then
-  // restore the conventional 5GC Procedure for the remaining regression suite.
-  await invoke('workbench.files.action.focusFilesExplorer');
-  const explorerRow=async(label,which='last')=>evalJS(
-    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length};})()"
-  );
-  let masFolder=null;
-  for(let attempt=0;attempt<60;attempt++){
-    masFolder=await explorerRow('establish-pdu-session-mas');
-    if(masFolder?.found)break;
-    await evalJS("(()=>{for(const root of document.querySelectorAll('.theia-Tree')){let el=root;while(el){if(el.scrollHeight>el.clientHeight+4){el.scrollTop=el.scrollHeight;break;}el=el.parentElement;}}return true;})()");
-    await sleep(100);
-  }
-  if(!masFolder?.found)throw Error('MAS Skill folder missing from native Explorer: '+JSON.stringify(masFolder));
-  let assuranceRows=await explorerRow('assurance');
-  if((assuranceRows?.count??0)<2){
-    await click(masFolder.x,masFolder.y);
-    for(let attempt=0;attempt<60;attempt++){
-      assuranceRows=await explorerRow('assurance');
-      if((assuranceRows?.count??0)>=2)break;
-      await sleep(100);
-    }
-  }
-  if((assuranceRows?.count??0)<2)throw Error('MAS assurance folder did not expand in native Explorer: '+JSON.stringify({masFolder,assuranceRows}));
-  let procedureRows=await explorerRow('procedure.yaml');
-  if((procedureRows?.count??0)<2){
-    const masAssurance=await explorerRow('assurance','last');
-    if(!masAssurance?.found)throw Error('MAS assurance row missing after folder expansion');
-    await click(masAssurance.x,masAssurance.y);
-    for(let attempt=0;attempt<60;attempt++){
-      procedureRows=await explorerRow('procedure.yaml');
-      if((procedureRows?.count??0)>=2)break;
-      await sleep(100);
-    }
-  }
-  if((procedureRows?.count??0)<2)throw Error('Explorer did not expose both Skill procedure.yaml files: '+JSON.stringify(procedureRows));
-  const masProcedure=await explorerRow('procedure.yaml','last');
-  if(!masProcedure?.found)throw Error('MAS procedure.yaml row missing from Explorer');
-  await click(masProcedure.x,masProcedure.y);
-  let masProcedureGraph=null;
-  for(let attempt=0;attempt<100;attempt++){
-    masProcedureGraph=await graph('establish-session');
-    if(masProcedureGraph)break;
-    await sleep(100);
-  }
-  const masResourcePaths=await evalJS("(async()=>{const c=window.theia.container;const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').map(w=>w.resource?.path.toString()??'').filter(p=>p.includes('/establish-pdu-session-mas/'))??[];})()");
-  if(!masProcedureGraph||masProcedureGraph.procedureValue!=='establish-session'||!masProcedureGraph.bodyText?.includes('verify-eligible')||!masProcedureGraph.bodyText?.includes('validate-subscription')||!masResourcePaths.some(p=>p.endsWith('/establish-pdu-session-mas/assurance/procedure.yaml')))
-    throw Error('MAS Procedure did not open from native Explorer: '+JSON.stringify({masFolder,assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths}));
-  // Dispose both test editors before resuming the older regression suite.
-  // Several existing native-command probes intentionally expect one active
-  // Procedure resource, so keep the MAS proof isolated from those probes.
-  await invoke('core.close.all.main.tabs');
-  await invoke('workbench.files.action.focusFilesExplorer');
-  const conventionalProcedure=await explorerRow('procedure.yaml','first');
-  if(!conventionalProcedure?.found)throw Error('Conventional 5GC procedure.yaml row missing after MAS open');
-  await click(conventionalProcedure.x,conventionalProcedure.y);
-  let conventionalGraph=null;
-  for(let attempt=0;attempt<100;attempt++){
-    conventionalGraph=await graph('ue-requested-pdu-session-establishment');
-    if(conventionalGraph)break;
-    await sleep(100);
-  }
-  if(!conventionalGraph)throw Error('Could not restore conventional 5GC Procedure after MAS Explorer acceptance');
-  await click(conventionalProcedure.x,conventionalProcedure.y,2);
-  await sleep(250);
-  conventionalGraph=await graph('ue-requested-pdu-session-establishment');
-  if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
-  const dualSkillExplorer={
-    root:'skills',conventionalFolder:'establish-pdu-session',masFolder,
-    assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths,
-    conventionalProcedure,conventionalGraph
-  };
-  console.log('STUDIO_DUAL_SKILL_EXPLORER_CHROMIUM',JSON.stringify(dualSkillExplorer));
   // Guard the canvas controls that were present in Classic Studio but were
   // previously omitted from the Theia CustomEditor migration.
   const canvasToolbarEvidence=await evalWebviewJS(`(()=> {
@@ -1990,6 +1916,79 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       }
     }
   }
+  // Run dual-Skill Explorer acceptance last. Opening MAS switches the active
+  // Procedure CustomEditor; running it earlier can stale later 5GC Inspector
+  // selections even after the conventional editor has been restored.
+  await invoke('workbench.files.action.focusFilesExplorer');
+  const explorerRow=async(label,which='last')=>evalJS(
+    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length};})()"
+  );
+  let masFolder=null;
+  for(let attempt=0;attempt<60;attempt++){
+    masFolder=await explorerRow('establish-pdu-session-mas');
+    if(masFolder?.found)break;
+    await evalJS("(()=>{for(const root of document.querySelectorAll('.theia-Tree')){let el=root;while(el){if(el.scrollHeight>el.clientHeight+4){el.scrollTop=el.scrollHeight;break;}el=el.parentElement;}}return true;})()");
+    await sleep(100);
+  }
+  if(!masFolder?.found)throw Error('MAS Skill folder missing from native Explorer: '+JSON.stringify(masFolder));
+  let assuranceRows=await explorerRow('assurance');
+  if((assuranceRows?.count??0)<2){
+    await click(masFolder.x,masFolder.y);
+    for(let attempt=0;attempt<60;attempt++){
+      assuranceRows=await explorerRow('assurance');
+      if((assuranceRows?.count??0)>=2)break;
+      await sleep(100);
+    }
+  }
+  if((assuranceRows?.count??0)<2)throw Error('MAS assurance folder did not expand in native Explorer: '+JSON.stringify({masFolder,assuranceRows}));
+  let procedureRows=await explorerRow('procedure.yaml');
+  if((procedureRows?.count??0)<2){
+    const masAssurance=await explorerRow('assurance','last');
+    if(!masAssurance?.found)throw Error('MAS assurance row missing after folder expansion');
+    await click(masAssurance.x,masAssurance.y);
+    for(let attempt=0;attempt<60;attempt++){
+      procedureRows=await explorerRow('procedure.yaml');
+      if((procedureRows?.count??0)>=2)break;
+      await sleep(100);
+    }
+  }
+  if((procedureRows?.count??0)<2)throw Error('Explorer did not expose both Skill procedure.yaml files: '+JSON.stringify(procedureRows));
+  const masProcedure=await explorerRow('procedure.yaml','last');
+  if(!masProcedure?.found)throw Error('MAS procedure.yaml row missing from Explorer');
+  await click(masProcedure.x,masProcedure.y);
+  let masProcedureGraph=null;
+  for(let attempt=0;attempt<100;attempt++){
+    masProcedureGraph=await graph('establish-session');
+    if(masProcedureGraph)break;
+    await sleep(100);
+  }
+  const masResourcePaths=await evalJS("(async()=>{const c=window.theia.container;const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').map(w=>w.resource?.path.toString()??'').filter(p=>p.includes('/establish-pdu-session-mas/'))??[];})()");
+  if(!masProcedureGraph||masProcedureGraph.procedureValue!=='establish-session'||!masProcedureGraph.bodyText?.includes('verify-eligible')||!masProcedureGraph.bodyText?.includes('validate-subscription')||!masResourcePaths.some(p=>p.endsWith('/establish-pdu-session-mas/assurance/procedure.yaml')))
+    throw Error('MAS Procedure did not open from native Explorer: '+JSON.stringify({masFolder,assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths}));
+  // Keep the Explorer proof isolated, then restore the conventional Procedure
+  // so the final browser session remains on the primary example.
+  await invoke('core.close.all.main.tabs');
+  await invoke('workbench.files.action.focusFilesExplorer');
+  const conventionalProcedure=await explorerRow('procedure.yaml','first');
+  if(!conventionalProcedure?.found)throw Error('Conventional 5GC procedure.yaml row missing after MAS open');
+  await click(conventionalProcedure.x,conventionalProcedure.y);
+  let conventionalGraph=null;
+  for(let attempt=0;attempt<100;attempt++){
+    conventionalGraph=await graph('ue-requested-pdu-session-establishment');
+    if(conventionalGraph)break;
+    await sleep(100);
+  }
+  if(!conventionalGraph)throw Error('Could not restore conventional 5GC Procedure after MAS Explorer acceptance');
+  await click(conventionalProcedure.x,conventionalProcedure.y,2);
+  await sleep(250);
+  conventionalGraph=await graph('ue-requested-pdu-session-establishment');
+  if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
+  const dualSkillExplorer={
+    root:'skills',conventionalFolder:'establish-pdu-session',masFolder,
+    assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths,
+    conventionalProcedure,conventionalGraph
+  };
+  console.log('STUDIO_DUAL_SKILL_EXPLORER_CHROMIUM',JSON.stringify(dualSkillExplorer));
   console.log('STUDIO_LAYOUT_TIMING',JSON.stringify({initialTiming,warmTiming}));
   console.log('STUDIO_WORKBENCH_CHROMIUM' ,JSON.stringify({views:true,packageAudit:true,languageServiceStatus,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs}));
   return {views:true,packageAudit:true,languageServiceStatus,phaseEvidence,packageZip:packageZipEvidence,markdown:true,restored,initialTiming,warmTiming,nativeSingleClick:opened,nativeDoubleClick:pinned,reopenMs:openMs,dualSkillExplorer,namedStepRename:{accepted:namedRenameAccepted,applied:afterNamedRename.result?.value,undo:afterNamedRenameUndo.result?.value,oldStepName,newStepName},namedVerifyName:verifyName,outputReference,phaseRoute,phaseOutcome,workerFailureEvidence,recoveryEvidence};
