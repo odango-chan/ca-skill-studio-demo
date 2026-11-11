@@ -128,7 +128,7 @@ export async function prepareNativeMarkdownPackagePolicy(vscode,uri){
   try{
     const workspaceFolder=vscode.workspace.getWorkspaceFolder(uri);
     if(!workspaceFolder)return deny();
-    const workspaceRoot=workspaceFolder.uri.path.replace(/\\/$/,"");
+    const workspaceRoot=workspaceFolder.uri.path.replace(/\/$/,"");
     let rootPath=workspaceRoot;
     const skillFiles=await vscode.workspace.findFiles(
       "**/SKILL.md","**/node_modules/**",5001);
