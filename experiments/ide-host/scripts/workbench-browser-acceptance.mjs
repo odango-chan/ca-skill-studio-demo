@@ -78,14 +78,33 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "const target=toggle??el;const r=target?.getBoundingClientRect();"+
     "return r?{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),"+
     "target:toggle?'expansion-toggle':'row',rowClass:el?.className,toggleClass:toggle?.className}:null;})()");
-  if(!scan?.packages?.some(x=>x.name==='establish-pdu-session')||!packageRow)
+  const ownerPackage=scan?.packages?.find(x=>x.name==='establish-pdu-session');
+  if(!ownerPackage||!packageRow)
     throw Error('Package Overview TreeView did not render discovered Package: '+
       JSON.stringify({scan,view}));
   const readGroups=()=>evalJS(
     "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
     ".find(x=>x.textContent.trim().toLowerCase()==='packages');"+
     "return header?.closest('.part')?.innerText??'';})()");
-  const expectedGroups=['Assurance · 3/3 core','Schemas · 6','Scripts · 3','References · 3'];
+  // The owner Skill sample can evolve independently of the Package tree.
+  // Derive visible group labels and file counts from the exact inventory
+  // snapshot returned by the real provider instead of pinning old sample sizes.
+  const groupLabels={
+    definition:()=> 'Skill Definition',
+    assurance:()=> 'Assurance · '+ownerPackage.corePresent+'/3 core',
+    schemas:group=>'Schemas · '+group.count,
+    scripts:group=>'Scripts · '+group.count,
+    references:group=>'References · '+group.count,
+    other:group=>'Other · '+group.count
+  };
+  const expectedGroups=ownerPackage.groups.map(group=>{
+    const label=groupLabels[group.key];
+    if(!label)throw Error('Package Overview returned an unknown group: '+group.key);
+    return label(group);
+  });
+  if(!expectedGroups.length)
+    throw Error('Package Overview inventory returned no visible groups: '+
+      JSON.stringify(ownerPackage));
   let groups=await readGroups();
   let expandedView=null;
   let expansionMode='already-expanded';
@@ -103,7 +122,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
         "return {text:part?.innerText??'',rows:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(x=>({"+
         "text:x.innerText.trim(),className:x.className})),toggleClass:toggle?.className??null};})()");
       throw Error('Package Overview native TreeView expansion failed: '+
-        JSON.stringify({groups,packageRow,expandedView}));
+        JSON.stringify({expectedGroups,groups,packageRow,expandedView}));
     }
     expansionMode='native-mouse';
   }
@@ -144,8 +163,11 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   if(previous && previous.label!=='Skill Studio' && restored!==previous.label)
     throw Error('Package Overview did not restore the previous Activity Bar view: '+
       JSON.stringify({previous,restored,restoredActivity}));
-  const evidence={package:'establish-pdu-session',core:'3/3',schemas:6,
-    scripts:3,references:3,treeVisible:true,scanState:scan.state,
+  const groupCount=key=>ownerPackage.groups.find(group=>group.key===key)?.count??0;
+  const evidence={package:ownerPackage.name,
+    core:ownerPackage.corePresent+'/3',
+    schemas:groupCount('schemas'),scripts:groupCount('scripts'),
+    references:groupCount('references'),treeVisible:true,scanState:scan.state,
     treeReadsByKind:postExpansion.treeReadsByKind,expansionMode,
     restoredActivity:restored};
   console.log('STUDIO_PACKAGE_OVERVIEW_CHROMIUM',JSON.stringify(evidence));
