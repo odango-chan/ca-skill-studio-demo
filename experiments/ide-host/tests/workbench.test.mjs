@@ -171,7 +171,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
       onDidChangeActiveTextEditor:()=>disposable(),showTextDocument:async()=>{},
       showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},
       showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation',
-      createWebviewPanel(){const p={webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u},onDidDispose:()=>disposable()};panels.push(p);return p;}}
+      createWebviewPanel(){const p={webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u,onDidReceiveMessage:()=>disposable()},onDidDispose:()=>disposable()};panels.push(p);return p;}}
   };
   const context={subscriptions:[],extensionUri:uri('/extension')},workbench=registerWorkbench(vscode,context),posted=[];
   workbench.attach(doc,m=>posted.push(m));
@@ -568,15 +568,17 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   await commands.get('skillStudio.previewMarkdown')(uri('/workspace/SKILL.md'));
   assert.match(panels[0].webview.html,/Content-Security-Policy/);
   assert.match(panels[0].webview.html,/style-src https:\/\/studio\.invalid/);
-  assert.match(panels[0].webview.html,/script-src 'none'/);
+  assert.match(panels[0].webview.html,/script-src 'nonce-[a-f0-9]{32}'/);
   assert.match(panels[0].webview.html,/img-src 'none'/);
   assert.match(panels[0].webview.html,/href="https:\/\/studio\.invalid\/media\/markdown-preview\.css"/);
   assert.match(panels[0].webview.html,/class="markdown-preview"/);
-  assert.match(panels[0].webview.html,/<h1>Preview title<\/h1>/);
+  assert.match(panels[0].webview.html,/<h1(?: id="[^"]+")?>Preview title<\/h1>/);
   assert.match(panels[0].webview.html,/&lt;script&gt;/);
   doc.text='x'.repeat(300001);changed({document:{...doc,uri:uri('/workspace/SKILL.md')}});
   assert.match(panels[0].webview.html,/预览不可用/);
-  assert.doesNotMatch(panels[0].webview.html,/<script/i);
+  assert.equal((panels[0].webview.html.match(/<script\b/gi)??[]).length,1,
+    'only the nonce-protected local file navigation bridge is present');
+  assert.match(panels[0].webview.html,/<script nonce="[a-f0-9]{32}">/);
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
 });
