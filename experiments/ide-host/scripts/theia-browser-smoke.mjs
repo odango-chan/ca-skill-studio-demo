@@ -1403,6 +1403,20 @@ try{
         checks.push(await denial("skills-root-rename",()=>provider.rename(
           at("skills"),at("skills-renamed"),{overwrite:false})));
         checks.push(await denial("output-root-delete",()=>provider.delete(at("output"),{recursive:true})));
+        checks.push(await denial("lib-update",()=>provider.updateFile(at("lib/"+probeName),[],{})));
+        checks.push(await denial("lib-open-create",()=>provider.open(at("lib/"+probeName),{create:true})));
+        checks.push(await denial("output-open-create",()=>provider.open(at("output/"+probeName),{create:true})));
+        checks.push(await denial("lib-copy-destination",()=>provider.copy(
+          at("skills/establish-pdu-session/SKILL.md"),at("lib/"+probeName),{overwrite:true})));
+        checks.push(await denial("lib-rename-source",()=>provider.rename(
+          at("lib/"+probeName),at("skills/establish-pdu-session/"+probeName),{overwrite:true})));
+        checks.push(await denial("lib-create-index",()=>provider.createIndex(new Map([
+          [at("lib/"+probeName),new Uint8Array([1])]
+        ]))));
+        checks.push(await denial("output-create-index",()=>provider.createIndex(new Map([
+          [at("output/"+probeName),new Uint8Array([1])]
+        ]))));
+        checks.push(await denial("clear",()=>provider.clear()));
         const source=at("skills/establish-pdu-session/"+probeName);
         let sourceWritable=false,sourceClean=false,sourceError=null;
         try{
