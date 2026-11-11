@@ -1931,8 +1931,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!sourceSingle||!previewSingle||sourceSingle.index!==previewSingle.index)
     throw Error('Markdown single-pane toggle did not move Preview into the Source editor group: '+
       JSON.stringify(splitGroups));
+  const singlePaneGuide=await waitMarkdown(
+    view=>view.heading==='Establish PDU Session'&&view.splitToolbar,
+    'Markdown Preview after moving into a single editor group');
   const restoreClick=await command('Runtime.evaluate',{
-    contextId:guideOpen.view.contextId,returnByValue:true,
+    contextId:singlePaneGuide.view.contextId,returnByValue:true,
     expression:'(()=>{const button=document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]");if(!button)return false;button.click();return true;})()'
   });
   if(restoreClick.result?.value!==true)
