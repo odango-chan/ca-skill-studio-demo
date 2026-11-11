@@ -143,10 +143,21 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       if(!toggle)throw Error('Assurance group has no visible expansion toggle: '+
         JSON.stringify(groupRow));
       // TreeView children may arrive asynchronously after the expansion
-      // event. Only click while the row is still collapsed; otherwise wait
-      // for its real child rows instead of toggling it closed on each retry.
+      // event. If Theia reports the group expanded but publishes no children,
+      // force one collapse/re-expand cycle so the provider is asked again.
+      // Never repeatedly toggle a healthy expanded group while its rows load.
       if(String(groupRow.toggleClass??'').includes('theia-mod-collapsed'))
         await click(toggle.x,toggle.y);
+      else if(attempt===0){
+        await click(toggle.x,toggle.y);
+        await sleep(120);
+        const collapsedRows=await readTreeRows();
+        const current=collapsedRows.find(row=>row.visible&&
+          row.text.includes('Assurance · 3/3 core'));
+        if(current?.togglePos&&
+           String(current.toggleClass??'').includes('theia-mod-collapsed'))
+          await click(current.togglePos.x,current.togglePos.y);
+      }
       await sleep(120);
     }
     throw Error('Package Assurance group did not reveal '+filePath+': '+name+
