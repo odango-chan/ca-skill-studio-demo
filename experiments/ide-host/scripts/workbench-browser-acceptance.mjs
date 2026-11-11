@@ -1904,9 +1904,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     throw Error('SKILL.md outline or explicit Reference links are incomplete: '+
       JSON.stringify(guideOpen.view));
   const markdownTabGroups=()=>evalJS(
-    "(()=>[...document.querySelectorAll('.theia-app-sides .lm-TabBar')].map((bar,index)=>"+
-    "({index,labels:[...bar.querySelectorAll('.lm-TabBar-tab')].map(tab=>tab.textContent.trim()),"+
-    "rect:(()=>{const r=bar.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()})) )()");
+    "(()=>{const bars=[...document.querySelectorAll('.theia-app-sides .lm-TabBar')];"+
+    "return bars.map((bar,index)=>{const r=bar.getBoundingClientRect();return {index,"+
+    "labels:[...bar.querySelectorAll('.lm-TabBar-tab')].map(tab=>tab.textContent.trim()),"+
+    "rect:{x:r.x,y:r.y,width:r.width,height:r.height}};});})()");
   let splitGroups=await markdownTabGroups();
   const sourceGroup=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
   const previewGroup=splitGroups.find(group=>group.labels.some(label=>
