@@ -5,8 +5,11 @@ const ROLES=new Set(["skills","lib","output"]);
 const posix=uri=>{
   const raw=uri?.path;
   const path=typeof raw==="string"?raw:raw?.toString?.();
-  if(typeof path!=="string"||!path.startsWith("/")||
-     path.split("/").some(s=>s==="."||s===".."||/%2e/i.test(s)))return null;
+  // OPFS normalizes repeated separators by dropping empty segments. Reject
+  // aliases before classifying, otherwise //project/lib/file can resolve to
+  // /project/lib/file below this boundary while appearing outside this root.
+  if(typeof path!=="string"||!path.startsWith("/")||path.includes("//")||path.includes("\\")||
+     path.split("/").some(s=>s==="."||s===".."||/%(?:2e|2f|5c)/i.test(s)))return null;
   return path.replace(/\/+$/,"")||"/";
 };
 const parent=path=>path.slice(0,path.lastIndexOf("/"))||"/";
