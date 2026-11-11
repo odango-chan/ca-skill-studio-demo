@@ -2208,14 +2208,18 @@ export function registerWorkbench(vscode,context){
     auditStatus="Package Audit · running";fireProblems();
     const files=new Map(),uris=new Map();
     try{
-      const base=doc.uri.with({path:doc.uri.path.slice(0,-'assurance/procedure.yaml'.length)});
+      const basePath=doc.uri.path.slice(0,-'assurance/procedure.yaml'.length).replace(/\/$/,'');
+      const base=doc.uri.with({path:basePath});
+      const prefix=basePath+'/';
       // Bounded by file count and aggregate bytes; never crawl another Package.
+      // OPFS findFiles can omit descendants when RelativePattern.base has a
+      // trailing slash, so normalize the Package root before scanning.
       const found=await vscode.workspace.findFiles(new vscode.RelativePattern(base,'**/*'),'**/node_modules/**',501);
       if(found.length>500)throw Error('Package exceeds 500-file audit limit');
       let bytes=0;
       for(const uri of found){
-        if(!uri.path.startsWith(base.path))continue;
-        const path=uri.path.slice(base.path.length);uris.set(path,uri);
+        if(!uri.path.startsWith(prefix))continue;
+        const path=uri.path.slice(prefix.length);uris.set(path,uri);
         if(!/\.(yaml|json|py|md)$/.test(path)){files.set(path,{text:''});continue;}
         const open=vscode.workspace.textDocuments.find(d=>d.uri.toString()===uri.toString());
         const text=open?open.getText():new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
@@ -2262,22 +2266,23 @@ export function registerWorkbench(vscode,context){
     const doc=document,suffix='assurance/procedure.yaml';
     if(!doc||!isProcedurePath(doc.uri.path)||!doc.uri.path.endsWith(suffix))
       throw Error('请先打开当前 Package 的 Procedure 可视化编辑器');
-    const basePath=doc.uri.path.slice(0,-suffix.length);
+    const basePath=doc.uri.path.slice(0,-suffix.length).replace(/\/$/,'');
     const base=doc.uri.with({path:basePath});
-    const name=basePath.replace(/\/$/,'').split('/').at(-1);
+    const prefix=basePath+'/';
+    const name=basePath.split('/').at(-1);
     if(!name)throw Error('无法确定 Package 根目录名称');
     const sourceVersion=doc.version,sourceText=doc.getText();
     const opened=(vscode.workspace.textDocuments??[])
-      .filter(item=>item.uri.path.startsWith(basePath))
-      .map(item=>({item,path:item.uri.path.slice(basePath.length),
+      .filter(item=>item.uri.path.startsWith(prefix))
+      .map(item=>({item,path:item.uri.path.slice(prefix.length),
         version:item.version,text:item.getText()}));
     const pattern=new vscode.RelativePattern(base,'**/*');
     const found=await vscode.workspace.findFiles(pattern,'**/node_modules/**',65);
     if(found.length>64)throw Error('Package 超过 ZIP 导出的 64 文件上限');
     const files=[],uris=new Map();
     for(const uri of found){
-      if(!uri.path.startsWith(basePath))continue;
-      const path=uri.path.slice(basePath.length);
+      if(!uri.path.startsWith(prefix))continue;
+      const path=uri.path.slice(prefix.length);
       if(!path)continue;
       const bytes=await vscode.workspace.fs.readFile(uri);
       if(!(bytes instanceof Uint8Array))throw Error('无法读取 Package 文件：'+path);
@@ -2294,8 +2299,8 @@ export function registerWorkbench(vscode,context){
         throw Error('Package Source 在导出期间发生变化：'+entry.path);
     }
     const after=await vscode.workspace.findFiles(pattern,'**/node_modules/**',65);
-    const afterPaths=after.filter(uri=>uri.path.startsWith(basePath))
-      .map(uri=>uri.path.slice(basePath.length)).filter(Boolean).sort();
+    const afterPaths=after.filter(uri=>uri.path.startsWith(prefix))
+      .map(uri=>uri.path.slice(prefix.length)).filter(Boolean).sort();
     const beforePaths=files.map(file=>file.path).sort();
     if(after.length>64||JSON.stringify(afterPaths)!==JSON.stringify(beforePaths))
       throw Error('Package 文件集合在导出期间发生变化；请重新导出');
