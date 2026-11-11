@@ -110,7 +110,8 @@ export function registerBuildView(vscode,context,{getProjectRoot,adapter=
     const file=await vscode.window.showSaveDialog({
       saveLabel:"Export generated ZIP",filters:{"ZIP":["zip"]}});
     if(!file)return;
-    const bytes=zipPackage(entries);
+    const bytes=zipPackage(entries,{maxFiles:512,
+      maxFileBytes:2097152,maxTotalBytes:16777216});
     await vscode.workspace.fs.writeFile(file,bytes);
     return true;
   });
