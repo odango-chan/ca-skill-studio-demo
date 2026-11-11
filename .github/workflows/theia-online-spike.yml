@@ -43,7 +43,16 @@ jobs:
       - name: Install isolated pinned Theia 1.76 dependencies
         run: npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
       - name: Build real Theia browser-only app
-        run: npm run build --prefix experiments/ide-host/theia-online
+        shell: bash
+        run: |
+          npm run build --prefix experiments/ide-host/theia-online &
+          build_pid=$!
+          while kill -0 "$build_pid" 2>/dev/null; do
+            echo "THEIA_BROWSER_ONLY_BUILD_HEARTBEAT $(date -u +%FT%TZ)"
+            ps -eo pid,ppid,stat,etime,%cpu,%mem,args --sort=-%cpu | head -n 18
+            sleep 30
+          done
+          wait "$build_pid"
       - name: Prepare same-origin Webview assets for static demo preview
         run: node experiments/ide-host/scripts/prepare-theia-static-preview.mjs
       - name: Inventory generated frontend and bundled web plugin
