@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
 import {renderMarkdown} from '../../../../site/markdown-preview.mjs';
@@ -2242,7 +2243,8 @@ export function registerWorkbench(vscode,context){
     const doc=await vscode.workspace.openTextDocument(uri);
     const panel=vscode.window.createWebviewPanel('skillStudio.markdown','Preview · '+uri.path.split('/').at(-1),vscode.ViewColumn.Beside,{enableScripts:false});
     const stylesheet=vscode.Uri.joinPath(context.extensionUri,'media','markdown-preview.css');
-    const stylesheetHref=panel.webview.asWebviewUri(stylesheet).toString();
+    const stylesheetHref=staticPreviewResourceUrl(
+      panel.webview.asWebviewUri(stylesheet),context.extensionUri);
     // Allow only the locally packaged stylesheet; no scripts or remote images.
     const csp="default-src 'none'; img-src 'none'; style-src "+
       panel.webview.cspSource+"; script-src 'none'; connect-src 'none';";
