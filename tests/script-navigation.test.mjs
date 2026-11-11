@@ -132,7 +132,7 @@ test("canonical ca-skills Python main() resolves exact Procedure and Predicate s
     predicateCaller.sourceRange.start,predicateCaller.sourceRange.end),evaluator);
 
   const copy=new Map(current);
-  copy.set(evaluator,{text:current.get(evaluator).text+"\\ndef main(input: dict): pass\\n"});
+  copy.set(evaluator,{text:current.get(evaluator).text+"\ndef main(input: dict): pass\n"});
   const duplicate=scriptNavigationReport(copy,evaluator);
   assert.equal(duplicate.callers.length,0,"duplicate main() must not create ambiguous links");
 });
