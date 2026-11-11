@@ -1918,7 +1918,18 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const live=await waitMarkdown(view=>view.heading==='Unsaved Markdown acceptance','Unsaved Markdown edit');
   if(live.view.contextId!==guideOpen.view.contextId)
     throw Error('The Markdown Webview was recreated for an unsaved edit');
-  await key('z','KeyZ',2,90);
+  await evalJS(`(async()=>{
+    const container=window.theia.container;
+    const managerKey=[...container._bindingDictionary._map.keys()].find(key=>
+      typeof key==='function'&&typeof key.prototype?.getOrCreateByUri==='function'&&
+      typeof key.prototype?.getByUri==='function');
+    const editors=managerKey&&container.get(managerKey).all;
+    const control=editors?.map(widget=>widget.editor?.getControl?.()).find(editor=>
+      editor?.getModel()?.uri.path.endsWith('/SKILL.md')&&
+      editor.getModel().getValue().includes('# Unsaved Markdown acceptance'));
+    if(!control)throw Error('Could not locate the edited native Markdown model');
+    await control.getModel().undo();
+  })()`);
   await waitMarkdown(view=>view.heading==='Establish PDU Session','Native Markdown undo');
   const previewScroll=async expression=>(await command('Runtime.evaluate',{
     contextId:guideOpen.view.contextId,returnByValue:true,expression
