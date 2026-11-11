@@ -127,7 +127,7 @@ test('Current ca-skills 5GC and MAS contracts project context schemas completely
       unknown:projection.unprojectedPaths,warnings:projection.projectionWarnings
     }));
     assert.equal(projection.name.value,skill);
-    assert.deepEqual(projection.contextSchemas.map(item=>item.name).sort(),expected);
+    assert.deepEqual(projection.contextSchemas.map(item=>item.name).sort(),[...expected].sort());
     assert.ok(projection.contextSchemas.every(item=>item.value.startsWith('lib/')));
     assert.ok(projection.contextSchemas.every(item=>item.line>0));
   }
