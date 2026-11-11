@@ -46,6 +46,9 @@ export function registerWorkbench(vscode,context){
   let languageClientEpoch=0;
   let languageClient=null,languageClientPromise=null,languageClientFailureShown=false,
     languageStatusItem=null,languageTransportFailure=null;
+  const semanticTokenDiagnostics={
+    registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null
+  };
   function updateLanguageStatus(state,detail){
     // A terminal Worker failure must never be overwritten by stale READY or
     // another scheduled ANALYZING refresh. Native Source editing is separate.
@@ -61,6 +64,17 @@ export function registerWorkbench(vscode,context){
     languageStatusItem.command=state==="UNAVAILABLE"?
       "skillStudio.restartLanguageService":undefined;
     languageStatusItem.show();
+  }
+
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&
+     /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(globalThis.location.hostname)){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.semanticTokenDiagnostics",()=>({
+        ...semanticTokenDiagnostics,
+        semanticHighlightingEnabled:vscode.workspace.getConfiguration("editor")
+          .get("semanticHighlighting.enabled")
+      })
+    ));
   }
 
   function languagePackageContains(root,uri){
@@ -81,6 +95,23 @@ export function registerWorkbench(vscode,context){
             // server-advertised semantic tokens. Register the native provider
             // explicitly, but keep VS Code's normal LSP feature path unchanged.
             manualSemanticTokens:typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST,
+            onSemanticTokenProviderRegistered:status=>{
+              semanticTokenDiagnostics.registered=status?.registered===true;
+              semanticTokenDiagnostics.tokenTypeCount=status?.tokenTypeCount??0;
+            },
+            onSemanticTokenRequest:uri=>{
+              semanticTokenDiagnostics.requests++;
+              semanticTokenDiagnostics.lastUri=uri;
+            },
+            onSemanticTokenResult:(uri,count)=>{
+              semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.lastTokenCount=count;
+              semanticTokenDiagnostics.lastError=null;
+            },
+            onSemanticTokenError:(uri,error)=>{
+              semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.lastError=error;
+            },
             onStatus:status=>{
               if(epoch!==languageClientEpoch)return;
               const state=languagePackages.get(status?.rootUri);
