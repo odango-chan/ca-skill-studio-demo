@@ -4,7 +4,7 @@
 
 ## User experience
 
-- Opening `SKILL.md` or a Package-local Markdown Reference opens the native editable Source document in editor column one and its read-only Markdown Preview in column two.
+- Opening a Markdown file from the native Explorer/editor automatically pairs the editable Source document in editor column one with its read-only Preview in column two. The explicit Preview command and Package-local Markdown links use the same path.
 - Source remains the only document authority. Preview consumes the current `TextDocument.getText()`, including unsaved edits.
 - The preview is created once. Source changes are debounced briefly and delivered as `updatePreview` Webview messages; the host does not replace `webview.html` for every keystroke.
 - A compact Preview toolbar offers a single-pane toggle for narrow workspaces. It moves the Preview into the Source editor group; toggling again restores the split. The command palette/editor title also exposes the layout toggle.
