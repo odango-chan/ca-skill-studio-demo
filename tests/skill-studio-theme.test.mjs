@@ -39,6 +39,10 @@ test("host colors reuse established Studio Light design tokens",()=>{
 test("file icon theme maps SKILL assets and local SVGs",()=>{
   assert.equal(icons.fileNames["SKILL.md"],"_skill");
   assert.equal(icons.fileNames["procedure.yaml"],"_yaml");
+  assert.equal(icons.folderNames.skills,"_folder_skills");
+  assert.equal(icons.folderNames.lib,"_folder_library");
+  assert.equal(icons.folderNames.output,"_folder_output");
+  assert.deepEqual(icons.folderNamesExpanded,icons.folderNames);
   assert.equal(icons.fileExtensions.py,"_python");
   assert.equal(icons.fileExtensions.md,"_markdown");
   assert.equal(icons.fileExtensions.markdown,"_markdown");
@@ -81,6 +85,9 @@ test("Theia file icon SVGs are generated from the exact Classic file-icon shapes
     "file.svg":{icon:fileIconSpec("unknown.bin").icon,color:"#71889c"},
     "folder.svg":{icon:"folder",color:"#6c8198"},
     "folder-open.svg":{icon:"folder-open",color:"#6c8198"},
+    "folder-skills.svg":{icon:"folder-skills",color:"#0c8e7b"},
+    "folder-library.svg":{icon:"folder-library",color:"#697e97"},
+    "folder-output.svg":{icon:"folder-output",color:"#75889c"},
     "skill.svg":{icon:"file-text",color:"#7483a0"},
     "yaml.svg":{icon:fileIconSpec("procedure.yaml").icon,color:"#678a9a"},
     "markdown.svg":{icon:fileIconSpec("SKILL.md").icon,color:"#7483a0"},
