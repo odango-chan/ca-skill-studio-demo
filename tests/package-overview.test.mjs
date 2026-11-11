@@ -111,6 +111,7 @@ test('C4 reports bounded inventory instead of implying a complete scan',()=>{
 
 test('C4 registers Packages view and renders package tree with source actions',async()=>{
   const treeProviders=new Map(),commands=new Map();
+  let scans=0,openedDocument=null,closedDocument=null;
   class Emitter {
     constructor(){this.event=()=>{};}
     fire(){}
@@ -129,9 +130,11 @@ test('C4 registers Packages view and renders package tree with source actions',a
     textDocuments:[
       {uri:uri('/workspace/skills/establish-pdu-session/scripts/evaluate.py'),isDirty:true}
     ],
-    async findFiles(){return files;},
+    async findFiles(){scans++;return files;},
     asRelativePath(value){return value.path;},
-    onDidChangeWorkspaceFolders:noop
+    onDidChangeWorkspaceFolders:noop,
+    onDidOpenTextDocument(handler){openedDocument=handler;return noop();},
+    onDidCloseTextDocument(handler){closedDocument=handler;return noop();}
   };
   const vscode={
     EventEmitter:Emitter,TreeItem:Item,ThemeIcon:Icon,RelativePattern,
@@ -171,6 +174,13 @@ test('C4 registers Packages view and renders package tree with source actions',a
   assert.equal(schemaParent.kind,'group');
   assert.equal(schemaParent.key,'schemas');
   assert.equal(schemaParent.packageRoot,pkg.rootPath);
+  assert.equal(typeof openedDocument,'function');
+  assert.equal(typeof closedDocument,'function');
+  const beforeOpen=scans;
+  openedDocument({uri:uri('/workspace/skills/establish-pdu-session/assurance/contract.yaml')});
+  closedDocument({uri:uri('/workspace/skills/establish-pdu-session/scripts/evaluate.py')});
+  await new Promise(resolve=>setTimeout(resolve,320));
+  assert.equal(scans,beforeOpen,'opening and closing files under unchanged scan roots must not rebuild an expanded TreeView');
   const treeItem=provider.getTreeItem(pkg);
   assert.equal(treeItem.label,'establish-pdu-session');
   assert.equal(treeItem.collapsibleState,1);
