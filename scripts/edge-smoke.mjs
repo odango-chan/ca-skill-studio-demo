@@ -624,6 +624,36 @@ try{
   ].join("\n"));
   if(!focused?.visible)
     throw Error("E1 Monaco Source surface hidden: "+JSON.stringify(focused));
+
+  // Semantic tokens must be emitted by the registered provider AND painted by
+  // the active Studio Light Monaco theme. A provider-only unit test is not enough.
+  const semanticRendering=await evaluate([
+    "(async()=>{",
+    " const host=document.getElementById('monacoHost');",
+    " const lines=[...host.querySelectorAll('.view-line')];",
+    " const line=lines.find(item=>item.textContent.replace(/\\u00a0/g,' ').includes('createdsession.ingress.eligible: PASS'));",
+    " const token=(value)=>[...(line?.querySelectorAll('span')||[])]",
+    "  .find(item=>item.textContent===value);",
+    " const reference=token('createdsession.ingress.eligible'),outcome=token('PASS');",
+    " const referenceColor=reference?getComputedStyle(reference).color:null;",
+    " const outcomeColor=outcome?getComputedStyle(outcome).color:null;",
+    " return {ok:host.dataset.language==='yaml'&&",
+    "   host.dataset.semanticTokenRenderer==='standalone-decoration-adapter'&&!!line&&",
+    "   reference?.classList.contains('ca-semantic-token--caReferencePredicate')&&",
+    "   outcome?.classList.contains('ca-semantic-token--caValueOutcome')&&",
+    "   referenceColor==='rgb(123, 91, 167)'&&outcomeColor==='rgb(173, 101, 23)',",
+    "  referenceColor,outcomeColor,line:line?.textContent,",
+    "  referenceHtml:reference?.outerHTML,outcomeHtml:outcome?.outerHTML,lineHtml:line?.innerHTML,",
+    "  fileName:document.getElementById('fileName')?.textContent,",
+    "  sourceStart:document.getElementById('source')?.value.slice(0,420),",
+    "  renderedLineTexts:lines.slice(0,24).map(item=>item.textContent),",
+    "  renderedLines:lines.length,theme:getComputedStyle(host).color};",
+    "})()"
+  ].join("\n"));
+  console.log("E1_MONACO_SEMANTIC_TOKEN_RENDERING",JSON.stringify(semanticRendering));
+  if(!semanticRendering?.ok)
+    throw Error("Monaco semantic token registration/rendering FAIL: "+JSON.stringify(semanticRendering));
+
   // Trusted CDP click activates Monaco's own input controller, unlike DOM focus.
   const pos=await evaluate("(()=>{const r=document.getElementById('monacoHost').getBoundingClientRect();return {x:r.x+120,y:r.y+60,width:r.width,height:r.height}})()");
   if(pos.width<200||pos.height<120)throw Error("Monaco canvas has no editable bounds");

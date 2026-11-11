@@ -77,6 +77,162 @@
         "scopeName": "source.regexp.python",
         "path": "./upstream/python/syntaxes/MagicRegExp.tmLanguage.json"
       }
+    ],
+    "configurationDefaults": {
+      "[yaml]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[python]": {
+        "editor.semanticHighlighting.enabled": true
+      }
+    },
+    "semanticTokenTypes": [
+      {
+        "id": "caDocumentKind",
+        "superType": "keyword",
+        "description": "Value of the top-level YAML document kind."
+      },
+      {
+        "id": "caDocumentVersion",
+        "superType": "keyword",
+        "description": "Value of apiVersion in a CA source document."
+      },
+      {
+        "id": "caKeywordStructure",
+        "superType": "keyword",
+        "description": "CA structural keys in their artifact-specific positions."
+      },
+      {
+        "id": "caKeywordControl",
+        "superType": "keyword",
+        "description": "Procedure node-intent keys."
+      },
+      {
+        "id": "caKeywordCondition",
+        "superType": "keyword",
+        "description": "Condition, phase and result-routing keys."
+      },
+      {
+        "id": "caKeywordBinding",
+        "superType": "keyword",
+        "description": "Explicit Procedure binding keys."
+      },
+      {
+        "id": "caSymbolSkillDefinition",
+        "superType": "type",
+        "description": "Skill identity declared in SKILL.md frontmatter."
+      },
+      {
+        "id": "caSymbolProcedureDefinition",
+        "superType": "type",
+        "description": "Procedure ID declared as a map key."
+      },
+      {
+        "id": "caSymbolNodeDefinition",
+        "superType": "type",
+        "description": "Procedure node ID declared as a map key."
+      },
+      {
+        "id": "caSymbolPredicateDefinition",
+        "superType": "type",
+        "description": "Predicate ID declared as a map key."
+      },
+      {
+        "id": "caSymbolCaseDefinition",
+        "superType": "type",
+        "description": "Qualification Case identity."
+      },
+      {
+        "id": "caSymbolLocalToolDefinition",
+        "superType": "type",
+        "description": "Local Tool identity declared in a governed Script metadata block."
+      },
+      {
+        "id": "caSymbolCapabilityDefinition",
+        "superType": "type",
+        "description": "Capability identity declared by an imported deployment-owned CapabilityContracts snapshot."
+      },
+      {
+        "id": "caSymbolOperationDefinition",
+        "superType": "type",
+        "description": "Operation identity declared by an imported ToolCatalog."
+      },
+      {
+        "id": "caReferenceCapability",
+        "superType": "variable",
+        "description": "Resource-grant reference in allowedResources.capabilities; target may be a Capability ID or a direct Operation ID."
+      },
+      {
+        "id": "caReferenceOperation",
+        "superType": "variable",
+        "description": "Exact Operation identity referenced by a Procedure call."
+      },
+      {
+        "id": "caReferencePredicate",
+        "superType": "variable",
+        "description": "Reference to a Predicate definition."
+      },
+      {
+        "id": "caReferenceProcedure",
+        "superType": "variable",
+        "description": "Reference to another Procedure definition or Skill entry Procedure."
+      },
+      {
+        "id": "caReferenceNode",
+        "superType": "variable",
+        "description": "Reference to a node in the same Procedure."
+      },
+      {
+        "id": "caReferenceLocalTool",
+        "superType": "variable",
+        "description": "Reference to a Skill-local governed Tool identity."
+      },
+      {
+        "id": "caReferenceScript",
+        "superType": "variable",
+        "description": "Package-relative path to a governed Script."
+      },
+      {
+        "id": "caReferenceSchema",
+        "superType": "variable",
+        "description": "Skill-owned schema path or schema registry reference."
+      },
+      {
+        "id": "caReferenceBindingPath",
+        "superType": "variable",
+        "description": "Explicit source path used by a from binding."
+      },
+      {
+        "id": "caValueOutcome",
+        "superType": "enumMember",
+        "description": "Result-domain value in an outcome or expectation position."
+      },
+      {
+        "id": "caValueEffect",
+        "superType": "enumMember",
+        "description": "Effect value declared by an imported Operation, Script or Case resource."
+      },
+      {
+        "id": "caValueType",
+        "superType": "enumMember",
+        "description": "Primitive type value in Procedure input declarations."
+      },
+      {
+        "id": "caExpressionCel",
+        "superType": "macro",
+        "description": "CEL expression in a Predicate evaluator."
+      },
+      {
+        "id": "caIdentifierUserDefined",
+        "superType": "variable",
+        "description": "User-defined names not classified as a keyword or a known symbol/reference."
+      }
+    ],
+    "semanticTokenModifiers": [
+      {
+        "id": "userDefined",
+        "description": "A source identifier authored by the Skill package."
+      }
     ]
   }
 }

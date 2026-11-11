@@ -18,12 +18,14 @@ await build({
   entryPoints:["experiments/ide-host/lsp-browser/server/src/browserServerMain.mjs"],
   outfile:join(root,"dist","skill-language-server.js"),
   bundle:true,format:"iife",platform:"browser",target:"es2022",
+  loader:{".yaml":"text",".yml":"text"},
   logLevel:"info"
 });
 await build({
   entryPoints:[join(root,"src/extension.mjs")],
   outfile:join(root,"dist/extension.cjs"),
   bundle:true,format:"cjs",platform:"node",target:"node20",
+  loader:{".yaml":"text",".yml":"text"},
   external:["vscode"],logLevel:"info"
 });
 // The same source also builds as a VS Code Web extension: no Node APIs.
@@ -33,6 +35,7 @@ await build({
   entryPoints:[join(root,"src/extension.mjs")],
   outfile:join(root,"dist/extension-web.cjs"),
   bundle:true,format:"cjs",platform:"browser",target:"es2022",
+  loader:{".yaml":"text",".yml":"text"},
   external:["vscode"],logLevel:"info"
 });
 // Theia 1.76's browser-only PluginWorker calls importScripts(), then reads
@@ -47,6 +50,7 @@ await build({
   define:{STUDIO_THEIA_HOST:"true"},
   bundle:true,format:"iife",globalName:"__skillStudioTheiaModule",
   platform:"browser",target:"es2022",logLevel:"info",
+  loader:{".yaml":"text",".yml":"text"},
   plugins:[{
     name:"theia-worker-vscode-api",
     setup(build){

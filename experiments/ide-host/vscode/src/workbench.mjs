@@ -32,6 +32,11 @@ import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
   from '../../../../site/phase-named-verify.mjs';
 import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export.mjs';
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
+import {
+  collectSkillSemanticTokenSpans,
+  SKILL_SEMANTIC_TOKEN_TYPES,
+  SKILL_SEMANTIC_TOKEN_MODIFIERS
+} from "../../../../language/semantic-tokens.mjs";
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
@@ -46,6 +51,94 @@ export function registerWorkbench(vscode,context){
   let languageClientEpoch=0;
   let languageClient=null,languageClientPromise=null,languageClientFailureShown=false,
     languageStatusItem=null,languageTransportFailure=null;
+  const semanticTokenDiagnostics={
+    registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null,
+    renderer:null,renderedTokenCount:0,renderedTypeCount:0,renderError:null,
+    server:null,transport:null
+  };
+  function encodeNativeSemanticTokens(document,spans){
+    const segments=[];
+    const text=document.getText();
+    for(const span of spans){
+      if(!Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
+         span.start<0||span.end<=span.start||span.end>text.length||
+         !Number.isSafeInteger(span.tokenType)||span.tokenType<0||
+         span.tokenType>=SKILL_SEMANTIC_TOKEN_TYPES.length||
+         !Number.isSafeInteger(span.tokenModifiers))continue;
+      const first=document.positionAt(span.start);
+      const last=document.positionAt(span.end);
+      for(let line=first.line;line<=last.line;line++){
+        const lineStart=document.offsetAt(new vscode.Position(line,0));
+        const lineEnd=lineStart+document.lineAt(line).text.length;
+        const start=Math.max(span.start,lineStart);
+        const end=Math.min(span.end,lineEnd);
+        if(end<=start)continue;
+        segments.push({
+          line,character:start-lineStart,length:end-start,
+          tokenType:span.tokenType,tokenModifiers:span.tokenModifiers
+        });
+      }
+    }
+    segments.sort((a,b)=>a.line-b.line||a.character-b.character);
+    const data=[];
+    let previousLine=0,previousCharacter=0;
+    for(const item of segments){
+      const deltaLine=item.line-previousLine;
+      const deltaCharacter=deltaLine===0
+        ?item.character-previousCharacter:item.character;
+      data.push(deltaLine,deltaCharacter,item.length,item.tokenType,item.tokenModifiers);
+      previousLine=item.line;
+      previousCharacter=item.character;
+    }
+    return new vscode.SemanticTokens(Uint32Array.from(data));
+  }
+  function registerExtensionHostSemanticTokens(){
+    // Browser extension hosts use the LSP-backed adapter in browserClient.mjs.
+    // Node extension hosts (VS Code desktop / backend-backed Theia) have no
+    // browser Worker transport; they use this adapter over the SAME canonical
+    // source classifier, rather than silently losing CA semantic colors.
+    if(typeof Worker==="function"&&typeof globalThis.location!=="undefined")return;
+    if(typeof vscode.languages?.registerDocumentSemanticTokensProvider!=="function"||
+       typeof vscode.SemanticTokensLegend!=="function"||
+       typeof vscode.SemanticTokens!=="function"){
+      semanticTokenDiagnostics.lastError="Native semantic-token API unavailable";
+      return;
+    }
+    const legend=new vscode.SemanticTokensLegend(
+      [...SKILL_SEMANTIC_TOKEN_TYPES],
+      [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
+    );
+    const provider={
+      provideDocumentSemanticTokens(document,cancellationToken){
+        if(cancellationToken?.isCancellationRequested)
+          return new vscode.SemanticTokens(new Uint32Array());
+        const uriPath=document.uri.path.split("/").filter(Boolean).join("/");
+        const relativePath=vscode.workspace.asRelativePath?.(document.uri,false)||uriPath;
+        const spans=collectSkillSemanticTokenSpans(document.getText(),relativePath);
+        semanticTokenDiagnostics.requests++;
+        semanticTokenDiagnostics.lastUri=document.uri.toString();
+        semanticTokenDiagnostics.transport="extension-host";
+        const result=encodeNativeSemanticTokens(document,spans);
+        semanticTokenDiagnostics.lastTokenCount=result.data.length/5;
+        semanticTokenDiagnostics.lastError=null;
+        return result;
+      }
+    };
+    const registration=vscode.languages.registerDocumentSemanticTokensProvider(
+      [
+        {scheme:"file",pattern:"**/*.yaml"},
+        {scheme:"file",pattern:"**/*.yml"},
+        {scheme:"file",pattern:"**/*.py"},
+        {scheme:"file",pattern:"**/SKILL.md"}
+      ],
+      provider,
+      legend
+    );
+    semanticTokenDiagnostics.registered=true;
+    semanticTokenDiagnostics.tokenTypeCount=SKILL_SEMANTIC_TOKEN_TYPES.length;
+    semanticTokenDiagnostics.transport="extension-host";
+    context.subscriptions.push(registration);
+  }
   function updateLanguageStatus(state,detail){
     // A terminal Worker failure must never be overwritten by stale READY or
     // another scheduled ANALYZING refresh. Native Source editing is separate.
@@ -63,6 +156,18 @@ export function registerWorkbench(vscode,context){
     languageStatusItem.show();
   }
 
+  // Acceptance-only diagnostics are deliberately not contributed to the
+  // Command Palette. The Chromium harness queries this internal command in
+  // both browser-Worker and Node extension-host variants.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.semanticTokenDiagnostics",()=>({
+      ...semanticTokenDiagnostics,
+      semanticHighlightingEnabled:vscode.workspace.getConfiguration("editor")
+        .get("semanticHighlighting.enabled")
+    })
+  ));
+  registerExtensionHostSemanticTokens();
+
   function languagePackageContains(root,uri){
     if(!uri||uri.scheme!==root.scheme||uri.authority!==root.authority)return false;
     const base=root.path.replace(/\/$/,"");
@@ -77,6 +182,50 @@ export function registerWorkbench(vscode,context){
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
           const epoch=++languageClientEpoch;
           candidate=createSkillLanguageClient(vscode,context,{
+            // Theia 1.76's browser plugin host does not consistently register
+            // server-advertised semantic tokens. Register the native provider
+            // explicitly, but keep VS Code's normal LSP feature path unchanged.
+            manualSemanticTokens:typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST,
+            onSemanticTokenProviderRegistered:status=>{
+              semanticTokenDiagnostics.registered=status?.registered===true;
+              semanticTokenDiagnostics.tokenTypeCount=status?.tokenTypeCount??0;
+              semanticTokenDiagnostics.transport="browser-lsp";
+            },
+            onSemanticTokenRendererRegistered:status=>{
+              semanticTokenDiagnostics.renderer=status?.renderer??null;
+              semanticTokenDiagnostics.renderError=null;
+            },
+            onSemanticTokenRendererUnavailable:error=>{
+              semanticTokenDiagnostics.renderError=String(error);
+            },
+            onSemanticTokenRendered:(uri,result)=>{
+              semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
+              semanticTokenDiagnostics.renderedTokenCount=result?.tokenCount??0;
+              semanticTokenDiagnostics.renderedTypeCount=result?.tokenTypeCount??0;
+              semanticTokenDiagnostics.renderError=null;
+            },
+            onSemanticTokenRenderError:(uri,error)=>{
+              semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.renderError=String(error);
+            },
+            onSemanticTokenRequest:uri=>{
+              semanticTokenDiagnostics.requests++;
+              semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.transport="browser-lsp";
+            },
+            onSemanticTokenResult:(uri,count)=>{
+              semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.lastTokenCount=count;
+              semanticTokenDiagnostics.lastError=null;
+            },
+            onSemanticTokenServerDiagnostics:diagnostics=>{
+              semanticTokenDiagnostics.server=diagnostics;
+            },
+            onSemanticTokenError:(uri,error)=>{
+              semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.lastError=error;
+            },
             onStatus:status=>{
               if(epoch!==languageClientEpoch)return;
               const state=languagePackages.get(status?.rootUri);

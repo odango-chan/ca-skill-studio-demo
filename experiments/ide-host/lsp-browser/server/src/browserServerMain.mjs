@@ -6,8 +6,14 @@ import {
 import {
   TextDocumentSyncKind,
   CompletionItemKind,
-  SymbolKind
+  SymbolKind,
+  SemanticTokensBuilder
 } from "vscode-languageserver";
+import {
+  collectSkillSemanticTokenSpans,
+  SKILL_SEMANTIC_TOKEN_TYPES,
+  SKILL_SEMANTIC_TOKEN_MODIFIERS
+} from "../../../../../language/semantic-tokens.mjs";
 import { parseDocument, isMap, isScalar } from "yaml";
 import { LanguageDiagnosticSession } from "../../../../../language/lsp/session.js";
 
@@ -23,6 +29,7 @@ const connection = createConnection(
 );
 const sessions = new Map();
 const packageAnalyses = new Map();
+const packageSnapshots = new Map();
 const requestedGeneration = new Map();
 
 function reportError(message, rootUri = undefined) {
@@ -74,6 +81,7 @@ function createSession(rootUri) {
     analysis(snapshot, analysis) {
       if (requestedGeneration.get(rootUri) === snapshot.generation)
         packageAnalyses.set(rootUri, { snapshot, analysis });
+      refreshSemanticTokens();
     }
   });
 }
@@ -99,6 +107,39 @@ function positionAt(starts, offset) {
     else high = mid - 1;
   }
   return { line: high, character: offset - starts[high] };
+}
+
+function semanticTokensForDocument(document) {
+  const spans=collectSkillSemanticTokenSpans(document.text,document.relativePath);
+  const starts=lineStarts(document.text);
+  const builder=new SemanticTokensBuilder();
+  for(const span of spans){
+    if(!Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
+       span.start<0||span.end<=span.start||span.end>document.text.length||
+       !Number.isSafeInteger(span.tokenType)||!Number.isSafeInteger(span.tokenModifiers))
+      continue;
+    const first=positionAt(starts,span.start);
+    const last=positionAt(starts,span.end);
+    for(let line=first.line;line<=last.line;line++){
+      const lineStart=starts[line];
+      let lineEnd=line+1<starts.length?starts[line+1]:document.text.length;
+      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\\n")lineEnd--;
+      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\\r")lineEnd--;
+      const segmentStart=Math.max(span.start,lineStart);
+      const segmentEnd=Math.min(span.end,lineEnd);
+      if(segmentEnd<=segmentStart)continue;
+      builder.push(line,segmentStart-lineStart,segmentEnd-segmentStart,
+        span.tokenType,span.tokenModifiers);
+    }
+  }
+  return builder.build();
+}
+
+function refreshSemanticTokens(){
+  try{
+    const refresh=connection.languages?.semanticTokens?.refresh;
+    if(typeof refresh==="function")void refresh().catch(()=>{});
+  }catch{/* Older clients may not support workspace semantic-token refresh. */}
 }
 
 function offsetAt(text, position) {
@@ -139,9 +180,42 @@ function packageForUri(uri) {
   return null;
 }
 
+function packageSnapshotForUri(uri) {
+  for (const snapshot of packageSnapshots.values()) {
+    if (Array.isArray(snapshot.documents) &&
+        snapshot.documents.some(document => document?.uri === uri))
+      return snapshot;
+  }
+  return null;
+}
+
+function snapshotDocumentFor(snapshot, uri) {
+  return snapshot?.documents?.find(document => document?.uri === uri) ?? null;
+}
+
 function documentFor(value, uri) {
   return value?.snapshot.documents.find(document => document.uri === uri) ?? null;
 }
+
+connection.onRequest("skillStudio/semanticTokenDiagnostics", params=>{
+  const uri=params?.uri;
+  const snapshot=typeof uri==="string"?packageSnapshotForUri(uri):null;
+  const value=snapshot?packageAnalyses.get(snapshot.rootUri):null;
+  const document=snapshot?snapshotDocumentFor(snapshot,uri):null;
+  return {
+    packageCount:packageSnapshots.size,
+    packageFound:Boolean(snapshot),
+    analysisState:value?.analysis.state??null,
+    generation:snapshot?.generation??null,
+    documentCount:snapshot?.documents.length??0,
+    documentFound:Boolean(document),
+    relativePath:document?.relativePath??null,
+    textLength:typeof document?.text==="string"?document.text.length:0,
+    spanCount:document?collectSkillSemanticTokenSpans(
+      document.text,document.relativePath
+    ).length:0
+  };
+});
 
 function allReferences(analysis) {
   return [...analysis.scriptReferences, ...analysis.schemaReferences];
@@ -200,6 +274,14 @@ connection.onInitialize(() => ({
     textDocumentSync: TextDocumentSyncKind.None,
     definitionProvider: true,
     referencesProvider: true,
+    semanticTokensProvider: {
+      legend: {
+        tokenTypes: [...SKILL_SEMANTIC_TOKEN_TYPES],
+        tokenModifiers: [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
+      },
+      full: true,
+      range: false
+    },
     hoverProvider: true,
     documentSymbolProvider: true,
     completionProvider: {
@@ -216,6 +298,18 @@ connection.onInitialize(() => ({
 // Health is a read-only transport liveness check. It does not inspect or
 // mutate Package Source or claim an analysis generation is READY.
 connection.onRequest("skillStudio/health", () => ({alive:true}));
+
+connection.languages.semanticTokens.on(params=>{
+  const snapshot=packageSnapshotForUri(params.textDocument.uri);
+  if(!snapshot)return {data:[]};
+  const document=snapshotDocumentFor(snapshot,params.textDocument.uri);
+  if(!document)return {data:[]};
+  // Semantic coloring is a source-AST projection. It must not depend on
+  // Python symbol analysis, the Package's READY/PARTIAL state, or whether
+  // this YAML file produced an analysis document. The latest accepted
+  // Package snapshot owns the exact source text/version for this URI.
+  return semanticTokensForDocument(document);
+});
 
 connection.onDefinition(params => {
   const value = packageForUri(params.textDocument.uri);
@@ -396,14 +490,17 @@ connection.onNotification(PACKAGE_INVALIDATE_NOTIFICATION, params => {
   if (generation > knownGeneration) {
     requestedGeneration.set(rootUri, generation);
     packageAnalyses.delete(rootUri);
+    packageSnapshots.delete(rootUri);
     sessions.get(rootUri)?.reset();
+    refreshSemanticTokens();
   }
 });
 
 connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
   if (!snapshot || typeof snapshot !== "object" ||
       typeof snapshot.rootUri !== "string" || !snapshot.rootUri.trim() ||
-      !Number.isSafeInteger(snapshot.generation) || snapshot.generation < 0) {
+      !Number.isSafeInteger(snapshot.generation) || snapshot.generation < 0 ||
+      !Array.isArray(snapshot.documents)) {
     reportError("Rejected Package snapshot without a valid root URI or generation");
     return;
   }
@@ -413,7 +510,12 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
   if (snapshot.generation > knownGeneration) {
     requestedGeneration.set(rootUri, snapshot.generation);
     packageAnalyses.delete(rootUri);
+    packageSnapshots.delete(rootUri);
   }
+  // Publish the exact source snapshot to semantic-token requests immediately.
+  // LanguageDiagnosticSession analysis may still be pending or PARTIAL; color
+  // projection must not wait for Python indexing or diagnostics completion.
+  packageSnapshots.set(rootUri, snapshot);
   let session = sessions.get(rootUri);
   if (!session) {
     session = createSession(rootUri);
@@ -425,10 +527,14 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
         result.reason !== "STALE_GENERATION" &&
         result.reason !== "STALE_DOCUMENT") {
       packageAnalyses.delete(rootUri);
+      if(packageSnapshots.get(rootUri)===snapshot)packageSnapshots.delete(rootUri);
+      refreshSemanticTokens();
       reportError("Package analysis rejected: " + result.reason, rootUri);
     }
   } catch (error) {
     packageAnalyses.delete(rootUri);
+    if(packageSnapshots.get(rootUri)===snapshot)packageSnapshots.delete(rootUri);
+    refreshSemanticTokens();
     reportError(error?.message ?? error, rootUri);
   }
 });
@@ -442,13 +548,16 @@ connection.onNotification(PACKAGE_CLOSE_NOTIFICATION, params => {
     sessions.delete(rootUri);
   }
   packageAnalyses.delete(rootUri);
+  packageSnapshots.delete(rootUri);
   requestedGeneration.delete(rootUri);
+  refreshSemanticTokens();
 });
 
 connection.onShutdown(() => {
   for (const session of sessions.values()) session.dispose();
   sessions.clear();
   packageAnalyses.clear();
+  packageSnapshots.clear();
   requestedGeneration.clear();
 });
 

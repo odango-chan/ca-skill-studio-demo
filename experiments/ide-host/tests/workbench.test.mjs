@@ -1,8 +1,46 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdirSync} from 'node:fs';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {build} from 'esbuild';
 import {inspectionSnapshot} from '../vscode/src/inspection.mjs';
-import {registerWorkbench} from '../vscode/src/workbench.mjs';
+
+// Workbench now consumes the canonical YAML token catalog. Bundle it with the
+// same explicit YAML text loader used by the production extension build;
+// Node's native ESM loader does not import .yaml files directly.
+const scratchRoot=resolve(process.cwd(),'.agent-tmp');
+mkdirSync(scratchRoot,{recursive:true});
+const scratch=await mkdtemp(join(scratchRoot,'workbench-test-'));
+const bundlePath=join(scratch,'workbench.mjs');
+let registerWorkbench;
+try{
+  await build({
+    entryPoints:[resolve('experiments/ide-host/vscode/src/workbench.mjs')],
+    outfile:bundlePath,bundle:true,format:'esm',platform:'node',
+    target:'node24',packages:'external',loader:{'.yaml':'text'},
+    logLevel:'silent',
+    plugins:[{
+      name:'node-workbench-test-no-browser-worker',
+      setup(build){
+        // Node workbench tests intentionally exercise the extension-host
+        // fallback, not the browser Worker transport. Keep that lazy import
+        // out of the test bundle; dedicated LSP tests cover it independently.
+        build.onResolve({filter:/browserClient[.]mjs$/},()=>({
+          path:'browser-client-test-stub',namespace:'workbench-test'
+        }));
+        build.onLoad({filter:/.*/,namespace:'workbench-test'},()=>({
+          contents:'export function createSkillLanguageClient(){ throw new Error("Browser Worker client is not used in Node workbench tests"); }',
+          loader:'js'
+        }));
+      }
+    }]
+  });
+  ({registerWorkbench}=await import(pathToFileURL(bundlePath).href));
+}finally{
+  await rm(scratch,{recursive:true,force:true});
+}
 import {deleteNodeOptions,previewNodeDelete} from '../../../site/node-delete.mjs';
 const root='site/samples/packages/establish-pdu-session/';
 const source=readFileSync(root+'assurance/procedure.yaml','utf8');

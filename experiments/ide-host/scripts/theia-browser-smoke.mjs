@@ -411,16 +411,74 @@ try{
             .map(el=>el.textContent?.trim()).filter(Boolean);
           return {items,tokenCount:spans.length,tokenColors,visible:!!editor};
         })()`);
-        if(yamlSyntax?.tokenColors?.length>=3)break;
+        if(yamlSyntax?.tokenCount>=50&&yamlSyntax?.tokenColors?.length>=2)break;
         await sleep(120);
       }
       console.log("STUDIO_NATIVE_YAML_SYNTAX_CHROMIUM",JSON.stringify(yamlSyntax));
       // Theia 1.76 uses a non-VS-Code status-bar DOM, so text-based
       // '.theia-status-bar-item' selectors are not authoritative here.
       // Require native Monaco to display multiple actual syntax token colors.
-      if(!(yamlSyntax?.tokenColors?.length>=3))
+      if(!(yamlSyntax?.tokenCount>=50&&yamlSyntax?.tokenColors?.length>=2))
         throw Error("Native YAML syntax tokenization not active: "+JSON.stringify(yamlSyntax));
       patchEvidence.yamlSyntax=yamlSyntax;
+
+      // The native VS Code/Theia editor must render the same CA semantic
+      // identities from the shared source classifier. Theia 1.76 receives the
+      // LSP SemanticTokens, then the extension-host adapter projects those
+      // exact ranges through TextEditor decorations using the shared theme.
+      // TextMate colors or provider registration alone do not satisfy this check.
+      let semanticRendering=null;
+      for(let attempt=0;attempt<35;attempt++){
+        semanticRendering=await evalJS(`(()=> {
+          const editor=[...document.querySelectorAll('.monaco-editor')]
+            .find(el=>el.getBoundingClientRect().width>150&&el.querySelector('.view-lines'));
+          const lines=[...(editor?.querySelectorAll('.view-line')??[])];
+          const line=lines.find(el=>el.textContent.replace(/\\u00a0/g,' ')
+            .includes('createdsession.ingress.eligible: PASS'));
+          const token=value=>[...(line?.querySelectorAll('span')??[])]
+            .find(el=>el.textContent===value);
+          const reference=token('createdsession.ingress.eligible');
+          const outcome=token('PASS');
+          return {
+            referenceColor:reference?getComputedStyle(reference).color:null,
+            outcomeColor:outcome?getComputedStyle(outcome).color:null,
+            referenceClass:reference?.className??null,
+            outcomeClass:outcome?.className??null,
+            line:line?.textContent??null,
+            lineHtml:line?.innerHTML??null,
+            visible:!!editor
+          };
+        })()`);
+        if(semanticRendering?.referenceColor==='rgb(123, 91, 167)'&&
+           semanticRendering?.outcomeColor==='rgb(173, 101, 23)')break;
+        await sleep(120);
+      }
+      const semanticProviderDiagnostics=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==='function'&&k.prototype?.executeCommand&&
+          k.prototype?.registerCommand&&k.prototype?.getCommand);
+        if(!key)throw Error('Native command registry missing');
+        return c.get(key).executeCommand('skillStudio.internal.semanticTokenDiagnostics');
+      })()`);
+      semanticRendering.diagnostics=semanticProviderDiagnostics;
+      console.log("STUDIO_NATIVE_SEMANTIC_COLORS_CHROMIUM",
+        JSON.stringify(semanticRendering));
+      if(semanticProviderDiagnostics?.registered!==true||
+         !(semanticProviderDiagnostics?.requests>0)||
+         !(semanticProviderDiagnostics?.lastTokenCount>0)||
+         semanticProviderDiagnostics?.renderer!=="theia-text-editor-decoration"||
+         !(semanticProviderDiagnostics?.renderedTokenCount>0)||
+         !(semanticProviderDiagnostics?.renderedTypeCount>=2)||
+         semanticProviderDiagnostics?.renderError||
+         ![true,"configuredByTheme"].includes(
+           semanticProviderDiagnostics?.semanticHighlightingEnabled)||
+         semanticRendering?.referenceColor!=='rgb(123, 91, 167)'||
+         semanticRendering?.outcomeColor!=='rgb(173, 101, 23)')
+        throw Error("Native semantic tokens were not registered, requested and rendered by Studio Light: "+
+          JSON.stringify(semanticRendering));
+      patchEvidence.lspSemanticColors=semanticRendering;
+
       // This probe opens a pinned owner script in the native workbench.
       // Open a real bundled Python source through Theia's native Quick Open.
       // This verifies the Python TextMate grammar in the same editor host.

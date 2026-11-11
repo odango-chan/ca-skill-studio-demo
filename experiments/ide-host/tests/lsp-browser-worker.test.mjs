@@ -186,16 +186,43 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.equal(initialized.result.capabilities.referencesProvider,true);
     assert.equal(initialized.result.capabilities.hoverProvider,true);
     assert.equal(initialized.result.capabilities.documentSymbolProvider,true);
+    assert.equal(initialized.result.capabilities.semanticTokensProvider.full,true);
+    const semanticLegend=initialized.result.capabilities.semanticTokensProvider.legend;
+    assert.ok(semanticLegend.tokenTypes.includes("caReferenceOperation"));
+    assert.ok(semanticLegend.tokenTypes.includes("caReferencePredicate"));
+    assert.ok(semanticLegend.tokenTypes.includes("caValueOutcome"));
+    assert.ok(semanticLegend.tokenTypes.includes("caKeywordControl"));
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
     const snapshot=samplePackageSnapshot();
+    // Register for READY before posting the snapshot. Semantic token requests
+    // below are intentionally answered early, so READY can otherwise arrive
+    // while the test is still awaiting those responses.
+    const readyStatus=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus" &&
+      message.params?.rootUri===snapshot.rootUri &&
+      message.params?.state==="READY",15000
+    );
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot
     });
-    const status=await waitForMessage(worker,message=>
-      message?.method==="skillStudio/analysisStatus" &&
-      message.params?.rootUri===snapshot.rootUri
-    );
+    const procedureBeforeAnalysis=snapshot.documents.find(item=>
+      item.relativePath==="assurance/procedure.yaml");
+    assert.ok(procedureBeforeAnalysis);
+    // Semantic-token lookup must use the accepted Source snapshot immediately;
+    // it must not wait for Python indexing or Package READY diagnostics.
+    const earlyTokenDiagnostics=await lspRequest(worker,93,
+      "skillStudio/semanticTokenDiagnostics",{uri:procedureBeforeAnalysis.uri});
+    assert.equal(earlyTokenDiagnostics.packageFound,true);
+    assert.equal(earlyTokenDiagnostics.documentFound,true);
+    assert.ok(earlyTokenDiagnostics.spanCount>0);
+    const earlySemanticTokens=await lspRequest(worker,94,
+      "textDocument/semanticTokens/full",{
+        textDocument:{uri:procedureBeforeAnalysis.uri}
+      });
+    assert.ok(earlySemanticTokens.data.length>0,
+      "semantic tokens are available before Package analysis reaches READY");
+    const status=await readyStatus;
     assert.equal(status.params.state,"READY");
     // The liveness endpoint must answer on the real Worker JSON-RPC channel
     // without changing the Package analysis generation or Source.
@@ -213,6 +240,25 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     const schema=snapshot.documents.find(x=>
       x.relativePath==="schemas/selection-input.schema.yaml");
     assert.ok(procedure&&script&&schema);
+
+    // The native VS Code/Theia path must receive the same catalog-driven
+    // semantic identities through the actual LSP Worker, not just Monaco's
+    // standalone provider.
+    const semanticResult=await lspRequest(worker,23,"textDocument/semanticTokens/full",{
+      textDocument:{uri:procedure.uri}
+    });
+    assert.ok(Array.isArray(semanticResult.data)&&semanticResult.data.length>0);
+    assert.equal(semanticResult.data.length%5,0);
+    const emittedTypes=new Set();
+    for(let i=3;i<semanticResult.data.length;i+=5)emittedTypes.add(semanticResult.data[i]);
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caReferenceOperation")),
+      "Procedure call values are emitted as Operation references");
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caKeywordControl")),
+      "Procedure control keys are emitted as CA semantic tokens");
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caReferencePredicate")),
+      "Predicate references are emitted as CA semantic tokens");
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caValueOutcome")),
+      "Outcome values are emitted as CA semantic tokens");
 
     const scriptNeedle="scripts/select_establishment_configuration.py";
     const definition=await lspRequest(worker,12,"textDocument/definition",{

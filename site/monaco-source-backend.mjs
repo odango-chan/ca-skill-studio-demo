@@ -7,6 +7,10 @@ import {monacoLanguageForPath} from "./monaco-language.mjs";
 import {configureMonacoYaml} from "monaco-yaml";
 import {createOwnerYamlSchemas} from "./yaml-owner-schemas.mjs";
 import {yamlSchemaCapability} from "./yaml-schema-policy.mjs";
+import {registerSkillSemanticTokens} from "../language/semantic-tokens.mjs";
+import studioLightTheme from "../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
+import {standaloneSemanticTokenRules,semanticTokenDecorationClass,semanticTokenDecorationCss} from "./semantic-token-theme.mjs";
+import {collectSkillSemanticTokenSpans} from "../language/semantic-tokens.mjs";
 const languageId = monacoLanguageForPath;
 let yamlLanguageService = null;
 let monacoWorkerCompatibilityInstalled = false;
@@ -54,7 +58,13 @@ function ensureMonacoWorkerCompatibility() {
 // reach those layers; ordinary site CSS alone cannot reliably paint them.
 function ensureStudioLightTheme(){
   monaco.editor.defineTheme("studio-light",{
-    base:"vs",inherit:true,rules:[],colors:{
+    base:"vs",
+    inherit:true,
+    // Monaco Standalone resolves semantic token styles from TokenTheme rules,
+    // not the VS Code-only semanticTokenColors field.
+    rules:standaloneSemanticTokenRules(studioLightTheme.semanticTokenColors??{}),
+    colors:{
+      ...studioLightTheme.colors,
       "menu.background":"#ffffff",
       "menu.foreground":"#294259",
       "menu.selectionBackground":"#e8f4f0",
@@ -90,13 +100,35 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
   // The private mirror supports existing DOM-based D4 regression probes.
   // It is hidden from the user once Monaco is mounted and cannot write except
   // through a deliberate input event; Monaco alone receives keyboard input.
-  let editor;
+  let editor,semanticDecorations=null,semanticStyle=null;
   const guarded=fn=>{suppress++;try{return fn();}finally{suppress--;}};
+  const applySemanticDecorations=()=>{
+    if(!model||!semanticDecorations)return;
+    const spans=collectSkillSemanticTokenSpans(raw,model.uri?.path??"");
+    const decorations=[];
+    for(const span of spans){
+      const first=model.getPositionAt(span.start);
+      const last=model.getPositionAt(span.end);
+      const inlineClassName=semanticTokenDecorationClass(span.type);
+      for(let lineNumber=first.lineNumber;lineNumber<=last.lineNumber;lineNumber++){
+        const startColumn=lineNumber===first.lineNumber?first.column:1;
+        const endColumn=lineNumber===last.lineNumber
+          ?last.column:model.getLineMaxColumn(lineNumber);
+        if(endColumn<=startColumn)continue;
+        decorations.push({
+          range:{startLineNumber:lineNumber,startColumn,endLineNumber:lineNumber,endColumn},
+          options:{inlineClassName}
+        });
+      }
+    }
+    semanticDecorations.set(decorations);
+  };
   const syncMirror=()=>{if(mirror.value!==raw)mirror.value=raw;};
   const onModelInput=()=>{
     if(suppress||disposed||!model)return;
     raw=model.getValue(monaco.editor.EndOfLinePreference.TextDefined,true);
     syncMirror();
+    applySemanticDecorations();
     for(const handler of [...callbacks.input])handler();
   };
   const onMirrorInput=()=>{
@@ -110,16 +142,29 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
   try {
     ensureMonacoWorkerCompatibility();
     ensureYamlLanguage();
+    registerSkillSemanticTokens(monaco);
     ensureStudioLightTheme();
     host.dataset.yamlSchemaEngine="monaco-yaml@5.5.1";
     editor=monaco.editor.create(host,{
-      model:null,theme:"studio-light",automaticLayout:true,minimap:{enabled:false},
+      model:null,theme:"studio-light",
+      // Monaco's standalone default can leave semantic highlighting disabled
+      // even when the active theme declares semanticHighlighting=true.
+      "semanticHighlighting.enabled":true,
+      automaticLayout:true,minimap:{enabled:false},
       fontSize:12,lineHeight:21,tabSize:2,insertSpaces:true,
       scrollBeyondLastLine:false,renderWhitespace:"selection",
       wordWrap:"off",overviewRulerLanes:0,
       fixedOverflowWidgets:true,accessibilitySupport:"auto",
       ariaLabel:"当前文件源码 · Monaco Editor"
     });
+    semanticDecorations=editor.createDecorationsCollection();
+    semanticStyle=host.ownerDocument.createElement("style");
+    semanticStyle.dataset.semanticTokenStyles="studio-light";
+    semanticStyle.textContent=semanticTokenDecorationCss(studioLightTheme.semanticTokenColors??{});
+    const styleRoot=host.getRootNode?.();
+    const styleTarget=styleRoot?.nodeType===11?styleRoot:host.ownerDocument.head;
+    styleTarget?.appendChild(semanticStyle);
+    host.dataset.semanticTokenRenderer="standalone-decoration-adapter";
     const scrollSubscription=editor.onDidScrollChange(()=>{
       if(disposed||suppress)return;
       for(const handler of [...callbacks.scroll])handler();
@@ -144,6 +189,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           if(model && model.getValue(monaco.editor.EndOfLinePreference.TextDefined,true)!==next)
             model.setValue(next);
           syncMirror();
+          applySemanticDecorations();
         });
       },
       openDocument(path,text){
@@ -164,6 +210,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
           editor.setModel(model);
           modelChange=model.onDidChangeContent(onModelInput);
           syncMirror();
+          applySemanticDecorations();
           editor.setScrollTop(0);
           editor.setScrollLeft(0);
         });
@@ -193,6 +240,8 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
         if(disposed)return;
         disposed=true;
         modelChange?.dispose();
+        semanticDecorations?.clear();
+        semanticStyle?.remove();
         editor.setModel(null);
         model?.dispose();
         for(const action of actions)action.dispose();
@@ -204,6 +253,8 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
     };
     return backend;
   }catch(error){
+    semanticDecorations?.clear();
+    semanticStyle?.remove();
     editor?.dispose();
     throw error;
   }
