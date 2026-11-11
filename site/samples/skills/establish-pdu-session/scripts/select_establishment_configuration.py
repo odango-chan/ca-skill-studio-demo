@@ -1,22 +1,68 @@
-# /// connectionagent-tool
-# name: select-establishment-configuration
-# inputSchema: EstablishmentSelectionInput
-# outputSchema: EstablishmentSelection
-# effect: local_compute
-# sandbox:
-#   network: denied
-# timeout: 1s
-# ///
-
 import json
+from typing import Annotated, Literal, NotRequired, TypedDict
 
-class EstablishmentSelectionInput(dict):
-    pass
 
-class EstablishmentSelection(dict):
-    pass
+class Snssai(TypedDict):
+    sst: Annotated[int, {"minimum": 0, "maximum": 255}]
+    sd: NotRequired[Annotated[int, {"minimum": 0, "maximum": 16777214}]]
 
-def main(input: EstablishmentSelectionInput) -> EstablishmentSelection:
+
+class PduSessionTypes(TypedDict):
+    defaultSessionType: Literal["IPV4", "IPV6", "IPV4V6"]
+    allowedSessionTypes: NotRequired[
+        Annotated[list[Literal["IPV4", "IPV6", "IPV4V6"]], {"minItems": 1, "uniqueItems": True}]
+    ]
+
+
+class SscModes(TypedDict):
+    defaultSscMode: Annotated[int, {"minimum": 1, "maximum": 3}]
+    allowedSscModes: NotRequired[
+        Annotated[list[Annotated[int, {"minimum": 1, "maximum": 3}]], {"minItems": 1, "maxItems": 3, "uniqueItems": True}]
+    ]
+
+
+class SessionAmbr(TypedDict):
+    uplink: Annotated[str, {"pattern": r"^[0-9]+(\.[0-9]+)? (bps|Kbps|Mbps|Gbps|Tbps)$"}]
+    downlink: Annotated[str, {"pattern": r"^[0-9]+(\.[0-9]+)? (bps|Kbps|Mbps|Gbps|Tbps)$"}]
+
+
+class Arp(TypedDict):
+    priorityLevel: Annotated[int, {"minimum": 1, "maximum": 15}]
+    preemptCap: Literal["MAY_PREEMPT", "NOT_PREEMPT"]
+    preemptVuln: Literal["PREEMPTABLE", "NOT_PREEMPTABLE"]
+
+
+class DefaultQos(TypedDict):
+    fiveQi: Annotated[int, {"minimum": 0, "maximum": 255}]
+    arp: Arp
+
+
+class SubscriptionData(TypedDict):
+    sNssai: Snssai
+    dnn: Annotated[str, {"minLength": 1, "pattern": r"^[a-z0-9][a-z0-9.-]*$"}]
+    pduSessionTypes: PduSessionTypes
+    sscModes: SscModes
+    sessionAmbr: SessionAmbr
+    defaultQos: DefaultQos
+
+
+class SubscriptionSource(TypedDict):
+    transactionRef: Annotated[str, {"minLength": 1}]
+    requestRef: Annotated[str, {"minLength": 1}]
+    fabricRecordRef: Annotated[str, {"minLength": 1}]
+    fabricRecordDigest: Annotated[str, {"pattern": r"^sha256:[0-9a-f]{64}$"}]
+
+
+class EstablishmentSelectionOutput(TypedDict):
+    dnn: Annotated[str, {"minLength": 1, "pattern": r"^[a-z0-9][a-z0-9.-]*$"}]
+    sNssai: Snssai
+    pduSessionType: Literal["IPV4"]
+    sscMode: Literal[1]
+    subscriptionData: SubscriptionData
+    subscriptionSource: SubscriptionSource
+
+
+def main(input: dict) -> EstablishmentSelectionOutput:
     request = input
     result = input["udmResult"]
     subscription = result["subscription"]
