@@ -21,7 +21,11 @@
           },
           "workbench.colorTheme": "SKILL Studio Light",
           "workbench.iconTheme": "skill-studio-file-icons",
-          "editor.semanticHighlighting.enabled": true
+          "editor.semanticHighlighting.enabled": true,
+          "markdown.preview.scrollPreviewWithEditor": true,
+          "markdown.preview.scrollEditorWithPreview": true,
+          "markdown.preview.markEditorSelection": true,
+          "markdown.preview.openMarkdownLinks": "inPreview"
         },
         "warnOnPotentiallyInsecureHostPattern": false
       }
@@ -58,6 +62,10 @@
   },
   "scripts": {
     "build": "theia build --mode production",
-    "start": "theia start --hostname 127.0.0.1 --port 3000"
+    "start": "theia start --hostname 127.0.0.1 --port 3000",
+    "download:plugins": "theia download:plugins"
+  },
+  "theiaPlugins": {
+    "vscode.markdown-language-features": "https://open-vsx.org/api/vscode/markdown-language-features/1.95.3/file/vscode.markdown-language-features-1.95.3.vsix"
   }
 }
