@@ -57,7 +57,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "const content=el.querySelector('.theia-TreeNodeContent')??el;"+
     "const r=(toggle??content).getBoundingClientRect();"+
     "const cr=content.getBoundingClientRect();"+
-    "return {index,text:el.innerText.replace(/\\\\s+/g,' ').trim(),className:el.className,"+
+    "return {index,text:el.innerText.replace(/\\s+/g,' ').trim(),className:el.className,"+
     "nodeIds:[...el.querySelectorAll('[data-node-id]')].map(x=>x.getAttribute('data-node-id')),"+
     "hasToggle:Boolean(toggle),toggleClass:toggle?.className??null,"+
     "togglePos:r.width>0&&r.height>0?{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}:null,"+
