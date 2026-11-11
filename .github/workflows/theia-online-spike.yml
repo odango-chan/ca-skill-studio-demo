@@ -15,7 +15,7 @@ permissions:
 jobs:
   theia-browser-only:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
     env:
       PUPPETEER_SKIP_DOWNLOAD: "1"
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
