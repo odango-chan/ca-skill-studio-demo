@@ -451,11 +451,24 @@ try{
            semanticLspRendering?.outcomeColor==='rgb(173, 101, 23)')break;
         await sleep(120);
       }
+      const semanticProviderDiagnostics=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==='function'&&k.prototype?.executeCommand&&
+          k.prototype?.registerCommand&&k.prototype?.getCommand);
+        if(!key)throw Error('Native command registry missing');
+        return c.get(key).executeCommand('skillStudio.internal.semanticTokenDiagnostics');
+      })()`);
+      semanticLspRendering.diagnostics=semanticProviderDiagnostics;
       console.log("STUDIO_NATIVE_LSP_SEMANTIC_COLORS_CHROMIUM",
         JSON.stringify(semanticLspRendering));
-      if(semanticLspRendering?.referenceColor!=='rgb(123, 91, 167)'||
+      if(semanticProviderDiagnostics?.registered!==true||
+         !(semanticProviderDiagnostics?.requests>0)||
+         !(semanticProviderDiagnostics?.lastTokenCount>0)||
+         semanticProviderDiagnostics?.semanticHighlightingEnabled!==true||
+         semanticLspRendering?.referenceColor!=='rgb(123, 91, 167)'||
          semanticLspRendering?.outcomeColor!=='rgb(173, 101, 23)')
-        throw Error("Native LSP semantic tokens were not rendered by Studio Light: "+
+        throw Error("Native LSP semantic tokens were not registered, requested and rendered by Studio Light: "+
           JSON.stringify(semanticLspRendering));
       patchEvidence.lspSemanticColors=semanticLspRendering;
 
