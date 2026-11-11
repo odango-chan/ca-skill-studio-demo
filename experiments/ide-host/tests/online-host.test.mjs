@@ -16,6 +16,9 @@ test("Theia online target is a real backend-free 1.76 browser-only app",()=>{
   assert.equal(app.dependencies["@theia/filesystem"],"1.76.0");
   assert.equal(app.dependencies["@theia/navigator"],"1.76.0");
   assert.equal(app.theiaPluginsDir,"plugins");
+  assert.equal(app.theiaPlugins["vscode.markdown-language-features"],
+    "https://open-vsx.org/api/vscode/markdown-language-features/1.95.3/file/vscode.markdown-language-features-1.95.3.vsix");
+  assert.equal(app.scripts["download:plugins"],"theia download:plugins");
   assert.ok(!app.dependencies["@theia/terminal"]);
   assert.equal(app.scripts.build,"theia build --mode production");
 });
@@ -73,12 +76,30 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
   assert.equal(manifest.publisher,"odango-chan");
   assert.equal(manifest.contributes.themes[0].label,"SKILL Studio Light");
   assert.equal(manifest.contributes.iconThemes[0].id,"skill-studio-file-icons");
+  assert.deepEqual(manifest.contributes["markdown.previewStyles"],["./styles/markdown-preview.css"]);
   for(const path of [
     "themes/skill-studio-light-color-theme.json","icons/skill-studio-file-icon-theme.json",
+    "styles/markdown-preview.css",
     "icons/skill.svg","icons/yaml.svg","icons/markdown.svg","icons/python.svg",
     "icons/json.svg","icons/shell.svg","icons/text.svg",
     "icons/file.svg","icons/folder.svg","icons/folder-open.svg","icons/code.svg"
   ])assert.ok(statSync(join(themeRoot,path)).size>80,path);
+  const markdownCss=readFileSync(join(themeRoot,"styles/markdown-preview.css"),"utf8");
+  assert.match(markdownCss,/--vscode-skillstudio-markdownheading/);
+  assert.match(markdownCss,/thead th/);
+  assert.match(markdownCss,/max-height: 65vh/);
+});
+
+test("Theia preinstalls the pinned native Markdown language-features plugin",()=>{
+  const pluginRoot=join(root,"plugins/vscode.markdown-language-features");
+  const manifest=JSON.parse(readFileSync(join(pluginRoot,"package.json"),"utf8"));
+  assert.equal(manifest.publisher,"vscode");
+  assert.equal(manifest.name,"markdown-language-features");
+  assert.ok(manifest.browser,"browser preview entry is required in browser-only Theia");
+  assert.ok(manifest.contributes.commands.some(x=>x.command==="markdown.showPreviewToSide"),
+    "native side-by-side Markdown Preview command must be available");
+  assert.ok(manifest.contributes["markdown.previewStyles"],
+    "native extension must support shared Markdown preview styles");
 });
 
 test("Theia bundles offline YAML and Python TextMate grammars independently of LSP",()=>{
