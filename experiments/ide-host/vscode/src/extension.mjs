@@ -268,7 +268,9 @@ export function activate(context){
         // the real Procedure CustomEditor after the sidebar is prepared.
         // This preserves Source editor shortcuts and native Go to Line.
         stage="open-procedure";
-        await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
+        // Respect the registered default CustomEditor association (the working
+        // Theia first-run path); avoid opening a second explicit editor.
+        await vscode.commands.executeCommand("vscode.open",result.procedure);
         void vscode.window.showInformationMessage(
           "示例项目已载入：skills/（传统 5GC + MAS）、lib/（待导入 Tool 契约）、"+
           "output/（待生成编译产物）。新增 "+result.created+" 个文件，"+
