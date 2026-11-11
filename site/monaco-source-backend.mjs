@@ -9,6 +9,7 @@ import {createOwnerYamlSchemas} from "./yaml-owner-schemas.mjs";
 import {yamlSchemaCapability} from "./yaml-schema-policy.mjs";
 import {registerSkillSemanticTokens} from "./skill-semantic-tokens.mjs";
 import studioLightTheme from "../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
+import {standaloneSemanticTokenRules} from "./semantic-token-theme.mjs";
 const languageId = monacoLanguageForPath;
 let yamlLanguageService = null;
 let monacoWorkerCompatibilityInstalled = false;
@@ -58,9 +59,9 @@ function ensureStudioLightTheme(){
   monaco.editor.defineTheme("studio-light",{
     base:"vs",
     inherit:true,
-    semanticHighlighting:studioLightTheme.semanticHighlighting===true,
-    rules:[],
-    semanticTokenColors:studioLightTheme.semanticTokenColors??{},
+    // Monaco Standalone resolves semantic token styles from TokenTheme rules,
+    // not the VS Code-only semanticTokenColors field.
+    rules:standaloneSemanticTokenRules(studioLightTheme.semanticTokenColors??{}),
     colors:{
       ...studioLightTheme.colors,
       "menu.background":"#ffffff",
