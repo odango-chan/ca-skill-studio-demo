@@ -1903,6 +1903,50 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      !guideOpen.view.localPaths.includes('assurance/procedure.yaml'))
     throw Error('SKILL.md outline or explicit Reference links are incomplete: '+
       JSON.stringify(guideOpen.view));
+  const markdownTabGroups=()=>evalJS(
+    "(()=>[...document.querySelectorAll('.theia-app-sides .lm-TabBar')].map((bar,index)=>"+
+    "({index,labels:[...bar.querySelectorAll('.lm-TabBar-tab')].map(tab=>tab.textContent.trim()),"+
+    "rect:(()=>{const r=bar.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()})) )()");
+  let splitGroups=await markdownTabGroups();
+  const sourceGroup=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
+  const previewGroup=splitGroups.find(group=>group.labels.some(label=>
+    label.includes('Markdown')&&label.includes('SKILL.md')));
+  if(!sourceGroup||!previewGroup||sourceGroup.index===previewGroup.index)
+    throw Error('Markdown must open native SKILL.md Source and read-only Preview in two editor groups: '+
+      JSON.stringify(splitGroups));
+  const singlePaneClick=await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{const button=document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]");if(!button)return false;button.click();return true;})()'
+  });
+  if(singlePaneClick.result?.value!==true)
+    throw Error('Markdown single-pane toggle button is missing');
+  await sleep(350);
+  splitGroups=await markdownTabGroups();
+  const sourceSingle=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
+  const previewSingle=splitGroups.find(group=>group.labels.some(label=>
+    label.includes('Markdown')&&label.includes('SKILL.md')));
+  if(!sourceSingle||!previewSingle||sourceSingle.index!==previewSingle.index)
+    throw Error('Markdown single-pane toggle did not move Preview into the Source editor group: '+
+      JSON.stringify(splitGroups));
+  const restoreClick=await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{const button=document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]");if(!button)return false;button.click();return true;})()'
+  });
+  if(restoreClick.result?.value!==true)
+    throw Error('Markdown restore-split toolbar button is missing');
+  await sleep(350);
+  splitGroups=await markdownTabGroups();
+  const sourceRestored=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
+  const previewRestored=splitGroups.find(group=>group.labels.some(label=>
+    label.includes('Markdown')&&label.includes('SKILL.md')));
+  if(!sourceRestored||!previewRestored||sourceRestored.index===previewRestored.index)
+    throw Error('Markdown restore-split toggle did not restore two editor groups: '+
+      JSON.stringify(splitGroups));
+  console.log('STUDIO_MARKDOWN_SPLIT_CHROMIUM',JSON.stringify({
+    initialSourceGroup:sourceGroup.index,initialPreviewGroup:previewGroup.index,
+    singlePaneGroup:sourceSingle.index,restoredSourceGroup:sourceRestored.index,
+    restoredPreviewGroup:previewRestored.index
+  }));
   const openReference=await command('Runtime.evaluate',{
     contextId:guideOpen.view.contextId,returnByValue:true,
     expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="references/3gpp-procedure.md");if(!link)return false;link.click();return true;})()'
