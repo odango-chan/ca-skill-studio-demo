@@ -1,33 +1,35 @@
 # C4 — Package Overview
 
-Status: implementation is present and the dual-Skill inventory has been
-observed in real Chromium, but PR #133 is **not ready to merge**. The full
-Theia Browser Host acceptance currently stops in earlier Workbench / Evidence
-regressions before the final Package Overview expansion checks can complete.
+## Integration and browser evidence
 
-Current verification head: `3dd4b93a3f7f03275ac4a12231eb45c2c525e54c`.
+C4 is implemented on PR #133, targeting `main`. The earlier C1–C3
+visual-editor PRs and the two-Skill samples in PR #129 have been integrated.
 
-Verified on this head:
+A fully passing **exact-head baseline** was recorded on
+`04614d92b96b44686c14c8960b9ccc96d3e6b573` (2026-11-11):
 
 - IDE Host Spike: PASS.
-- Skill Studio PR verification (unit tests, typecheck, build, Chromium smoke): PASS.
-- Real Theia Package scan: PASS — both sample Skills discovered in one
-  Workspace; traditional 5GC has 22 files / 3 of 3 core files, MAS has
-  5 files / 3 of 3 core files.
-- Browser-Only Chromium: BLOCKED before Package Overview completion because
-  Package Audit became unavailable while reopening
-  `schemas/selection.schema.yaml` after the LSP worker recovery scenario.
-- Theia Browser Host Chromium: BLOCKED before Package Overview completion
-  because the earlier Evidence regression did not resolve the selected
-  Phase binding into Producer / Consumer dataflow evidence.
-- The Assurance expansion acceptance now retries a collapse/re-expand when
-  Theia reports an expanded group but has not published its child rows. This
-  fix has not yet been exercised because the earlier Workbench checks stop
-  the current browser runs first.
+- Skill Studio pull-request verification (tests, typecheck, build, Chromium
+  smoke): PASS.
+- Theia Browser-Only real Chromium: PASS.
+- Theia Browser Host real Chromium: PASS.
+- Both real Theia hosts emitted
+  `STUDIO_PACKAGE_OVERVIEW_TWO_SKILLS_CHROMIUM`: two Skills / 27 files,
+  traditional 5GC 22 files and MAS 5 files, both with 3/3 Assurance core.
+- The browser acceptance expanded both Packages and their Assurance groups,
+  opened each Package's own Contract Designer with its **exact Source URI**,
+  and checked native TreeView child-provider reads.
+- Original Workbench, Evidence, Inspector, Procedure, Python/YAML Source and
+  designer regressions ran before the C4-specific acceptance.
 
-The PR remains draft. Do not merge until both browser workflows pass on the
-same exact PR head and the two-Skill Package / Assurance / exact-URI checks
-complete in the real Theia Browser Host.
+Later changes to mouse interaction, Explorer navigation, and regression
+coverage must also pass all four workflows on **the same final PR head**
+before merge. These checks are not replaced by successful tests on the
+earlier baseline. Pages deployment follows integration into `main`.
+
+The Package view remains an inventory and navigation aid only; neither
+these browser tests nor the displayed core-file counts certify Compiler
+qualification, Runtime readiness, authorization, or live 5GC execution.
 
 ## Purpose
 
@@ -86,6 +88,8 @@ the three core files. Missing core files are explicit placeholder rows.
    Assurance / Schema / Script / Reference counts, and the existing Procedure,
    Contract, Predicate, Schema and native Source flows remain intact.
 4. Unit fixtures verify multiple independent Skills, nested Package roots and
-   incomplete Packages in one workspace. Real-browser multi-package acceptance
-   remains pending: PR #129 (the two-owner `site/samples/skills/` workspace)
-   is still open and has not been integrated.
+   incomplete Packages in one workspace. The two-owner
+   `site/samples/skills/` workspace from PR #129 is integrated; both Skills
+   must also pass exact-URI Contract navigation in real Theia Chromium.
+5. Changing an open file without changing the scan roots must not cause
+   needless native Package-tree rebuilds or discard expansion state.
