@@ -1,8 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdirSync} from 'node:fs';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {build} from 'esbuild';
 import {inspectionSnapshot} from '../vscode/src/inspection.mjs';
-import {registerWorkbench} from '../vscode/src/workbench.mjs';
+
+// Workbench now consumes the canonical YAML token catalog. Bundle it with the
+// same explicit YAML text loader used by the production extension build;
+// Node's native ESM loader does not import .yaml files directly.
+const scratchRoot=resolve(process.cwd(),'.agent-tmp');
+mkdirSync(scratchRoot,{recursive:true});
+const scratch=await mkdtemp(join(scratchRoot,'workbench-test-'));
+const bundlePath=join(scratch,'workbench.mjs');
+let registerWorkbench;
+try{
+  await build({
+    entryPoints:[resolve('experiments/ide-host/vscode/src/workbench.mjs')],
+    outfile:bundlePath,bundle:true,format:'esm',platform:'node',
+    target:'node24',packages:'external',loader:{'.yaml':'text'},
+    logLevel:'silent'
+  });
+  ({registerWorkbench}=await import(pathToFileURL(bundlePath).href));
+}finally{
+  await rm(scratch,{recursive:true,force:true});
+}
 import {deleteNodeOptions,previewNodeDelete} from '../../../site/node-delete.mjs';
 const root='site/samples/packages/establish-pdu-session/';
 const source=readFileSync(root+'assurance/procedure.yaml','utf8');
