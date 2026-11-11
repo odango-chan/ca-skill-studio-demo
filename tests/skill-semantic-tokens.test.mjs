@@ -5,6 +5,7 @@ import {mkdtemp,rm} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 import {build} from "esbuild";
+import {standaloneSemanticTokenRules} from "../site/semantic-token-theme.mjs";
 
 const entry=fileURLToPath(new URL("../site/skill-semantic-tokens.mjs",import.meta.url));
 const scratchRoot=resolve(process.cwd(),".agent-tmp");
@@ -232,7 +233,11 @@ test("online and installed Studio Light themes expose every CA semantic token co
   }
   const backend=readFileSync(new URL("../site/monaco-source-backend.mjs",import.meta.url),"utf8");
   assert.match(backend,/registerSkillSemanticTokens\(monaco\)/);
-  assert.match(backend,/semanticHighlighting:studioLightTheme\.semanticHighlighting===true/);
+  assert.match(backend,/rules:standaloneSemanticTokenRules\(studioLightTheme\.semanticTokenColors\?\?\{\}\)/);
   assert.match(backend,/"semanticHighlighting\.enabled":true/,
     "Monaco standalone must explicitly enable semantic highlighting");
+  const standaloneRules=standaloneSemanticTokenRules(theme.semanticTokenColors);
+  assert.equal(standaloneRules.find(rule=>rule.token==="caReferencePredicate")?.foreground,"7B5BA7");
+  assert.equal(standaloneRules.find(rule=>rule.token==="caValueOutcome")?.foreground,"AD6517");
+  assert.deepEqual(standaloneRules.find(rule=>rule.token==="comment")?.fontStyle,"italic");
 });
