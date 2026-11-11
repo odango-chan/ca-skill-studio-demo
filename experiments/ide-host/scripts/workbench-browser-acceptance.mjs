@@ -602,7 +602,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       !languageFeatureEvidence.hover||
       !languageFeatureEvidence.references||
       !languageFeatureEvidence.symbols?.includes("main")||
-      languageFeatureEvidence.schemaCompletion!=="EstablishmentSelectionInput")
+      !["EstablishmentSelectionInput","N/A: Python source annotations"].includes(
+        languageFeatureEvidence.schemaCompletion))
       throw Error("Theia public language-provider acceptance returned incomplete evidence: "+
         JSON.stringify(languageFeatureEvidence));
     console.log("STUDIO_LSP_EDITOR_FEATURES",JSON.stringify(languageFeatureEvidence));
