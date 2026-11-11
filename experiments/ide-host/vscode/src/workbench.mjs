@@ -1334,7 +1334,7 @@ export function registerWorkbench(vscode,context){
             .flatMap(x=>Array.isArray(x?.contents)?x.contents:[x?.contents])
             .map(x=>typeof x==="string"?x:x?.value??String(x??"")).join(" ");
         };
-        let evidence=null;
+        let evidence=null,legacyMetadata=false;
         try{
           for(const [name,path] of paths){
             const uri=vscode.Uri.joinPath(root.uri,...path.split("/"));
@@ -1350,7 +1350,7 @@ export function registerWorkbench(vscode,context){
           const before=state.generation;
           const [contract,predicates,python]=entries;
           const old="# name: select-establishment-configuration";
-          const legacyMetadata=python.original.includes(old);
+          legacyMetadata=python.original.includes(old);
           const first=legacyMetadata
             ?"# name: select-establishment-configuration-l2d3-first"
             :"# l2d3-first";
