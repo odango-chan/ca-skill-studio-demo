@@ -763,18 +763,37 @@ try{
         throw Error("Native editor Go to Line did not receive fixture line "+n4RouteLine+": "+
           JSON.stringify({gotoState,gotoTyped}));
       await key("Enter","Enter",0,13);
-      await sleep(200);
-      const gotoLineView=await evalJS(`(()=> {
-        const editor=document.querySelectorAll(".monaco-editor")[${editorTarget.chosen.index}];
-        const lines=editor?.querySelector(".view-lines");
-        return {text:(lines?.innerText??"").replace(/\u00a0/g," "),editorVisible:Boolean(editor)};
-      })()`);
-      if(!gotoLineView.editorVisible||
-         !gotoLineView.text.includes("FAILED: unresolved")||
-         !gotoLineView.text.includes("UNKNOWN: unresolved")||
-         !gotoLineView.text.includes("DENIED: failed"))
+      // Theia can replace a native Source editor while Go to Line closes.
+      // Match the actual rendered Route fixture, not a stale Monaco DOM index.
+      let gotoLineView=null;
+      for(let attempt=0;attempt<30;attempt++){
+        gotoLineView=await evalJS(`(()=> {
+          const candidates=[...document.querySelectorAll(".monaco-editor")]
+            .map((editor,index)=>{
+              const viewport=editor.querySelector(".monaco-scrollable-element")??editor;
+              const rect=viewport.getBoundingClientRect();
+              const visible=rect.width>30&&rect.height>100&&
+                rect.bottom>0&&rect.top<innerHeight&&rect.right>0&&rect.left<innerWidth;
+              const text=(editor.querySelector(".view-lines")?.innerText??"")
+                .replaceAll(String.fromCharCode(160)," ");
+              return {index,visible,text};
+            });
+          const chosen=candidates.find(item=>item.visible&&
+            item.text.includes("FAILED: unresolved")&&
+            item.text.includes("UNKNOWN: unresolved")&&
+            item.text.includes("DENIED: failed"));
+          return chosen?{index:chosen.index,text:chosen.text,editorVisible:true}:
+            {editorVisible:false,candidates:candidates.map(item=>({
+              index:item.index,visible:item.visible,text:item.text.slice(0,1200)
+            }))};
+        })()`);
+        if(gotoLineView.editorVisible)break;
+        await sleep(100);
+      }
+      if(!gotoLineView?.editorVisible)
         throw Error("Go to Line did not land on the intended Route fixture: "+
-          JSON.stringify({gotoState,gotoTyped,gotoLineView}).slice(0,2200));
+          JSON.stringify({gotoState,gotoTyped,gotoLineView}).slice(0,3200));
+      editorTarget.chosen.index=gotoLineView.index;
       // Home twice is Monaco's stable route to column zero (first
       // non-whitespace, then physical line start); replace the whole line.
       await key("Home","Home",0,36);
