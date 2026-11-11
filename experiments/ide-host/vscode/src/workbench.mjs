@@ -2241,25 +2241,138 @@ export function registerWorkbench(vscode,context){
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
-    const panel=vscode.window.createWebviewPanel('skillStudio.markdown','Preview · '+uri.path.split('/').at(-1),vscode.ViewColumn.Beside,{enableScripts:false});
+    const rootMarker='/references/';
+    const referenceIndex=uri.path.lastIndexOf(rootMarker);
+    const packageRootPath=uri.path.endsWith('/SKILL.md')
+      ?uri.path.slice(0,-'/SKILL.md'.length)
+      :referenceIndex>=0?uri.path.slice(0,referenceIndex):null;
+    const rootPath=packageRootPath?.replace(/\/$/,'')??null;
+    const resolvePackageTarget=rawPath=>{
+      if(!rootPath||typeof rawPath!=='string'||rawPath.length>240||
+         rawPath.startsWith('/')||rawPath.includes('\\')||rawPath.includes('?')||
+         rawPath.includes('#'))return null;
+      const currentDir=uri.path.slice(0,uri.path.lastIndexOf('/'));
+      if(currentDir!==rootPath&&!currentDir.startsWith(rootPath+'/'))return null;
+      const relativeDir=currentDir.slice(rootPath.length).split('/').filter(Boolean).join('/');
+      const segments=relativeDir?relativeDir.split('/'):[];
+      for(const part of rawPath.split('/')){
+        if(!part||part==='.')continue;
+        if(part==='..'){if(!segments.length)return null;segments.pop();continue;}
+        if(!/^[A-Za-z0-9_.-]+$/.test(part))return null;
+        segments.push(part);
+      }
+      if(!segments.length)return null;
+      const targetPath=rootPath+'/'+segments.join('/');
+      const lowerTarget=targetPath.toLowerCase();
+      if(!targetPath.startsWith(rootPath+'/')||
+         !['.md','.yaml','.yml','.py','.json'].some(ext=>lowerTarget.endsWith(ext)))return null;
+      return uri.with({path:targetPath});
+    };
+    const localFiles=new Set();
+    let relativeDir='';
+    if(rootPath){
+      const currentDir=uri.path.slice(0,uri.path.lastIndexOf('/'));
+      relativeDir=currentDir.slice(rootPath.length).split('/').filter(Boolean).join('/');
+      try{
+        const packageRoot=uri.with({path:rootPath});
+        const files=await vscode.workspace.findFiles(
+          new vscode.RelativePattern(packageRoot,'**/*'),'**/node_modules/**',5000);
+        for(const file of files)
+          if(file.path.startsWith(rootPath+'/'))
+            localFiles.add(file.path.slice(rootPath.length+1));
+      }catch{
+        // Fail closed: without an exact package inventory, path literals stay plain code.
+      }
+      for(const openDocument of vscode.workspace.textDocuments)
+        if(openDocument.uri.path.startsWith(rootPath+'/'))
+          localFiles.add(openDocument.uri.path.slice(rootPath.length+1));
+      if(uri.path.startsWith(rootPath+'/'))
+        localFiles.add(uri.path.slice(rootPath.length+1));
+    }
+    const random=new Uint8Array(16);
+    if(typeof globalThis.crypto?.getRandomValues!=='function')
+      throw new Error('Secure randomness unavailable: refusing to render Markdown Webview');
+    globalThis.crypto.getRandomValues(random);
+    const nonce=[...random].map(value=>value.toString(16).padStart(2,'0')).join('');
+    const panel=vscode.window.createWebviewPanel(
+      'skillStudio.markdown','Preview · '+uri.path.split('/').at(-1),
+      vscode.ViewColumn.Beside,{enableScripts:true}
+    );
+    const webview=panel.webview;
     const stylesheet=vscode.Uri.joinPath(context.extensionUri,'media','markdown-preview.css');
     const stylesheetHref=staticPreviewResourceUrl(
-      panel.webview.asWebviewUri(stylesheet),context.extensionUri);
-    // Allow only the locally packaged stylesheet; no scripts or remote images.
-    const csp="default-src 'none'; img-src 'none'; style-src "+
-      panel.webview.cspSource+"; script-src 'none'; connect-src 'none';";
+      webview.asWebviewUri(stylesheet),context.extensionUri);
+    // Render only source-verified package links. Resource loading stays scoped
+    // to the packaged stylesheet; only the nonce-protected click bridge runs.
+    const csp="default-src 'none'; base-uri 'none'; form-action 'none'; "+
+      "style-src "+webview.cspSource+"; script-src 'nonce-"+nonce+"'; "+
+      "img-src 'none'; connect-src 'none';";
     const attr=value=>String(value).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     const render=()=>{
-      const preview=renderMarkdown(doc.getText());
-      panel.webview.html='<!doctype html><html lang="zh"><head><meta charset="utf-8">'+
+      const preview=renderMarkdown(doc.getText(),{
+        localLinks:Boolean(rootPath),localFiles,relativeDir
+      });
+      webview.html='<!doctype html><html lang="zh"><head><meta charset="utf-8">'+
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'+
         '<meta http-equiv="Content-Security-Policy" content="'+attr(csp)+'">'+
         '<link rel="stylesheet" href="'+attr(stylesheetHref)+'"></head>'+
         '<body class="skill-studio-markdown-document"><article class="markdown-preview">'+
         (preview.available?preview.html:'<p>预览不可用，请使用源码编辑器。</p>')+
-        '</article></body></html>';
+        '</article><script nonce="'+nonce+'">(()=>{const api=acquireVsCodeApi();'+
+        'document.addEventListener("click",event=>{const target=event.target;'+
+        'const link=target instanceof Element?target.closest("a[data-local-path]"):null;'+
+        'if(!link)return;event.preventDefault();api.postMessage({type:"openPackageFile",'+
+        'path:link.dataset.localPath});});})();</script></body></html>';
     };
-    render();const changed=vscode.workspace.onDidChangeTextDocument(e=>{if(e.document.uri.toString()===uri.toString())render();});panel.onDidDispose(()=>changed.dispose());
+    const incoming=webview.onDidReceiveMessage(async message=>{
+      if(message?.type!=='openPackageFile'||typeof message.path!=='string')return;
+      const targetUri=resolvePackageTarget(message.path);
+      if(!targetUri){
+        void vscode.window.showWarningMessage('链接目标不在当前 Skill Package 内，已阻止打开。');
+        return;
+      }
+      try{
+        const relativeSegments=targetUri.path.slice(rootPath.length+1).split('/');
+        let prefix=rootPath,stat;
+        for(let index=0;index<relativeSegments.length;index++){
+          prefix+='/'+relativeSegments[index];
+          stat=await vscode.workspace.fs.stat(uri.with({path:prefix}));
+          if(stat.type&vscode.FileType.SymbolicLink)
+            throw new Error('Package 路径中不能包含符号链接');
+          if(index<relativeSegments.length-1&&!(stat.type&vscode.FileType.Directory))
+            throw new Error('Package 路径的中间节点不是目录');
+        }
+        if(stat.type&vscode.FileType.Directory)
+          throw new Error('目标是目录，不是文件');
+        if(targetUri.path.toLowerCase().endsWith('.md'))
+          await vscode.commands.executeCommand('skillStudio.previewMarkdown',targetUri);
+        else
+          await vscode.commands.executeCommand('vscode.open',targetUri);
+      }catch(error){
+        void vscode.window.showWarningMessage(
+          '无法打开 Package 文件 '+message.path+'：'+String(error?.message??error));
+      }
+    });
+    render();
+    const changed=vscode.workspace.onDidChangeTextDocument(e=>{
+      if(e.document.uri.toString()===uri.toString())render();
+    });
+    panel.onDidDispose(()=>{changed.dispose();incoming.dispose();});
   }));
+  // Internal real-browser acceptance opens the owner-pinned conventional guide
+  // by exact workspace path; it is not a contributed user command.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.markdownNavigationAcceptance',async skillName=>{
+      const name=typeof skillName==='string'?skillName:'establish-pdu-session';
+      if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
+      const matches=await vscode.workspace.findFiles(
+        '**/'+name+'/SKILL.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith('/'+name+'/SKILL.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one '+name+' guide in the active Workspace');
+      await vscode.commands.executeCommand('skillStudio.previewMarkdown',exact[0]);
+      return exact[0].toString();
+    }));
   return {attach(doc,post){
     sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();
     const releaseLanguagePackage=attachLanguagePackage(doc);
