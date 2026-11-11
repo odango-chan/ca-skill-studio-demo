@@ -38,10 +38,12 @@ jobs:
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
       - name: Stage web plugin for browser-only Theia
         run: node experiments/ide-host/scripts/prepare-theia-online.mjs
-      - name: Validate trial package manifest and prepared plugin
-        run: node --test experiments/ide-host/tests/online-host.test.mjs
       - name: Install isolated pinned Theia 1.76 dependencies
         run: npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
+      - name: Download pinned built-in Markdown extension from Open VSX
+        run: npm run download:plugins --prefix experiments/ide-host/theia-online
+      - name: Validate trial package manifest and prepared plugins
+        run: node --test experiments/ide-host/tests/online-host.test.mjs
       - name: Build real Theia browser-only app
         run: npm run build --prefix experiments/ide-host/theia-online
       - name: Prepare same-origin Webview assets for static demo preview
