@@ -2097,12 +2097,26 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!masFolder?.found)throw Error('MAS Skill folder missing from native Explorer: '+JSON.stringify(masFolder));
   let assuranceRows=await explorerRow('assurance');
   if((assuranceRows?.count??0)<2){
-    if(!masFolder.toggleHit)throw Error('MAS native Explorer folder expansion toggle is obscured: '+JSON.stringify(masFolder));
-    await click(masFolder.toggleX,masFolder.toggleY);
-    for(let attempt=0;attempt<60;attempt++){
+    // Theia Explorer can expand a directory from its row gesture even when
+    // its arrow receives a click without changing the tree model. Exercise
+    // that normal interaction first, then retry the arrow only if still collapsed.
+    await click(masFolder.x,masFolder.y);
+    for(let attempt=0;attempt<30;attempt++){
       assuranceRows=await explorerRow('assurance');
       if((assuranceRows?.count??0)>=2)break;
       await sleep(100);
+    }
+    if((assuranceRows?.count??0)<2){
+      const current=await explorerRow('establish-pdu-session-mas');
+      if(current?.toggleHit&&
+         String(current.toggleClass).includes('theia-mod-collapsed')){
+        await click(current.toggleX,current.toggleY);
+        for(let attempt=0;attempt<30;attempt++){
+          assuranceRows=await explorerRow('assurance');
+          if((assuranceRows?.count??0)>=2)break;
+          await sleep(100);
+        }
+      }
     }
   }
   if((assuranceRows?.count??0)<2)throw Error('MAS assurance folder did not expand in native Explorer: '+JSON.stringify({masFolder,assuranceRows}));
@@ -2110,12 +2124,23 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if((procedureRows?.count??0)<2){
     const masAssurance=await explorerRow('assurance','last');
     if(!masAssurance?.found)throw Error('MAS assurance row missing after folder expansion');
-    if(!masAssurance.toggleHit)throw Error('MAS native Explorer Assurance toggle is obscured: '+JSON.stringify(masAssurance));
-    await click(masAssurance.toggleX,masAssurance.toggleY);
-    for(let attempt=0;attempt<60;attempt++){
+    await click(masAssurance.x,masAssurance.y);
+    for(let attempt=0;attempt<30;attempt++){
       procedureRows=await explorerRow('procedure.yaml');
       if((procedureRows?.count??0)>=2)break;
       await sleep(100);
+    }
+    if((procedureRows?.count??0)<2){
+      const current=await explorerRow('assurance','last');
+      if(current?.toggleHit&&
+         String(current.toggleClass).includes('theia-mod-collapsed')){
+        await click(current.toggleX,current.toggleY);
+        for(let attempt=0;attempt<30;attempt++){
+          procedureRows=await explorerRow('procedure.yaml');
+          if((procedureRows?.count??0)>=2)break;
+          await sleep(100);
+        }
+      }
     }
   }
   if((procedureRows?.count??0)<2)throw Error('Explorer did not expose both Skill procedure.yaml files: '+JSON.stringify(procedureRows));
