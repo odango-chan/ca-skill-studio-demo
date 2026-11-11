@@ -24,6 +24,14 @@ const defs={
   folder:[p("M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z")],
   "folder-open":[p("M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v2H6a3 3 0 0 0-3 2Z"),
     p("M3 20l2.5-7h16L19 20Z")],
+  // Project source, imported contracts and compiler artifacts have different
+  // ownership. The icon is a hint, never an authorization mechanism.
+  "folder-skills":[p("M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"),
+    poly("9 12 7 14 9 16"),poly("15 12 17 14 15 16"),line(13,12,11,16)],
+  "folder-library":[p("M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"),
+    rect(10,13,7,5,1),p("M11.5 13v-1a2 2 0 0 1 4 0v1")],
+  "folder-output":[p("M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"),
+    line(12,11,12,17),poly("9 14 12 17 15 14")],
   file:[p("M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Z"),
     poly("13 3 13 10 20 10")],
   "file-text":[p("M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Z"),
