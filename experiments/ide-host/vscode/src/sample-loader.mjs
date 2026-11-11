@@ -4,7 +4,7 @@ const SRC=["samples","skills"];
 // The v0.1 Example has its own stable root. Never reuse the legacy OPFS
 // workspaces/ directory, which may contain user-edited or unrelated files.
 export const EXAMPLE_PROJECT_NAME="Skill Studio Example";
-export const EXAMPLE_PROJECT_DIRECTORY="skill-studio-example-v01";
+export const EXAMPLE_PROJECT_DIRECTORY="Skill Studio Example";
 const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
 const decoder=new TextDecoder();
 const fail=reason=>{throw Error(reason);};
