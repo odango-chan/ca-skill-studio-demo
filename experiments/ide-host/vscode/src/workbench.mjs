@@ -2348,13 +2348,14 @@ export function registerWorkbench(vscode,context){
       '<script nonce="'+nonce+'">(()=>{'+
       'const api=acquireVsCodeApi(),article=document.querySelector("article.markdown-preview"),'+
       'layoutButton=document.querySelector("[data-action=toggle-layout]");'+
-      'let suppressScroll=false,scrollFrame=0,lastSentLine=-1;'+
+      'let suppressScroll=false,scrollFrame=0,lastSentLine=-1,suppressScrollTimer=null;'+
       'const sourceBlocks=()=>Array.from(article.querySelectorAll("[data-source-line]"));'+
       'const lineOf=element=>Number(element?.getAttribute("data-source-line"));'+
       'const blockForLine=line=>{let chosen=null;for(const element of sourceBlocks()){const value=lineOf(element);if(value<=line)chosen=element;else if(value>line)break;}return chosen??sourceBlocks()[0]??null;};'+
       'const visibleAnchor=()=>{for(const element of sourceBlocks()){const rect=element.getBoundingClientRect();if(rect.bottom>28)return {line:lineOf(element),top:rect.top};}return null;};'+
-      'const scrollToLine=line=>{const target=blockForLine(Number(line));if(!target)return;suppressScroll=true;window.scrollTo(0,Math.max(0,window.scrollY+target.getBoundingClientRect().top-28));requestAnimationFrame(()=>{suppressScroll=false;});};'+
-      'const updateHtml=html=>{const anchor=visibleAnchor(),oldScroll=window.scrollY;article.innerHTML=html;if(anchor){const target=blockForLine(anchor.line);if(target)window.scrollTo(0,Math.max(0,oldScroll+target.getBoundingClientRect().top-anchor.top));else window.scrollTo(0,oldScroll);}else window.scrollTo(0,oldScroll);};'+
+      'const holdScroll=()=>{suppressScroll=true;if(suppressScrollTimer)clearTimeout(suppressScrollTimer);suppressScrollTimer=setTimeout(()=>{suppressScroll=false;},100);};'+
+      'const scrollToLine=line=>{const target=blockForLine(Number(line));if(!target)return;holdScroll();window.scrollTo(0,Math.max(0,window.scrollY+target.getBoundingClientRect().top-28));};'+
+      'const updateHtml=html=>{const anchor=visibleAnchor(),oldScroll=window.scrollY;holdScroll();article.innerHTML=html;if(anchor){const target=blockForLine(anchor.line);if(target)window.scrollTo(0,Math.max(0,oldScroll+target.getBoundingClientRect().top-anchor.top));else window.scrollTo(0,oldScroll);}else window.scrollTo(0,oldScroll);};'+
       'const setSinglePane=single=>{layoutButton.textContent=single?"恢复双栏":"单栏预览";layoutButton.setAttribute("aria-pressed",String(single));};'+
       'window.addEventListener("message",event=>{const data=event.data;if(data?.type==="updatePreview"&&typeof data.html==="string")updateHtml(data.html);if(data?.type==="scrollToLine"&&Number.isInteger(data.line))scrollToLine(data.line);if(data?.type==="layoutState")setSinglePane(Boolean(data.singlePane));});'+
       'window.addEventListener("scroll",()=>{if(suppressScroll||scrollFrame)return;scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;const anchor=visibleAnchor();if(!anchor||!Number.isInteger(anchor.line)||anchor.line===lastSentLine)return;lastSentLine=anchor.line;api.postMessage({type:"scrollToSourceLine",line:anchor.line});});},{passive:true});'+
@@ -2390,6 +2391,7 @@ export function registerWorkbench(vscode,context){
         const editor=vscode.window.visibleTextEditors?.find(item=>
           item.document.uri.toString()===key)??state.editor;
         if(editor){
+          lastSourceLine=message.line;
           suppressEditorScroll=true;
           if(suppressEditorTimer)clearTimeout(suppressEditorTimer);
           editor.revealRange(new vscode.Range(message.line,0,message.line,0),
