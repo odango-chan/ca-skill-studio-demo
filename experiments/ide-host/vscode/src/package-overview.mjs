@@ -251,10 +251,27 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       for (const root of roots) {
         const remaining = FILE_LIMIT+1-found.length;
         if (remaining <= 0) break;
-        const pattern = new vscode.RelativePattern(root,'**/*');
+        // Compiler-style projects expose skills/, lib/ and output/ together.
+        // The Package inventory is strictly source-scoped: imported Tool
+        // contracts and generated build files must never appear as SKILLs.
+        // Standalone/legacy Skill folders still scan their full root.
+        let sourceRoot = null;
+        if (vscode.Uri?.joinPath && vscode.workspace.fs?.stat) {
+          const candidate = vscode.Uri.joinPath(root,'skills');
+          try {
+            await vscode.workspace.fs.stat(candidate);
+            sourceRoot = candidate;
+          } catch(error) {
+            if(error?.code!=='FileNotFound')throw error;
+          }
+        }
+        const pattern = new vscode.RelativePattern(
+          root,sourceRoot?'skills/**/*':'**/*');
         const batch = await vscode.workspace.findFiles(
           pattern,'**/node_modules/**',remaining);
+        const sourcePrefix = sourceRoot?.path ? sourceRoot.path.replace(/\\/$/,'')+'/' : null;
         for (const uri of batch) {
+          if(sourcePrefix&&!uri.path.startsWith(sourcePrefix))continue;
           const key = uri.toString();
           if (!seen.has(key)) {seen.add(key);found.push(uri);}
         }
