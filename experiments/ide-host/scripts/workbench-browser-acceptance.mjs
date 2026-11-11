@@ -1250,10 +1250,51 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!liveToggle.expanded){
       // CDP requires the pressed-button bitmask as well as the button name;
       // without it Chromium emits no trusted click event for this native row.
-      await command('Input.dispatchMouseEvent',{type:'mousePressed',x:liveToggle.x,y:liveToggle.y,
-        button:'left',buttons:1,clickCount:1});
       await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:liveToggle.x,y:liveToggle.y,
-        button:'left',buttons:0,clickCount:1});
+        button:'left',buttons:0,clickCount:1,pointerType:'mouse'});
+      await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:liveToggle.x,y:liveToggle.y,
+        button:'none',buttons:0,pointerType:'mouse'});
+      await sleep(100);
+      const postHoverToggle=await evalJS(`(()=>{
+        const container=[...document.querySelectorAll('.theia-view-container')]
+          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+          .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+        const part=header?.closest('.part');
+        const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
+          const caption=[...node.children].find(child=>
+            child.classList?.contains('theia-TreeNodeContent'));
+          return caption?.innerText?.includes('Producer / Consumer dataflow');
+        });
+        const toggle=row?.querySelector('.theia-ExpansionToggle');
+        const rect=toggle?.getBoundingClientRect();
+        const x=rect?rect.x+rect.width/2:0,y=rect?rect.y+rect.height/2:0;
+        const hit=rect?document.elementFromPoint(x,y):null;
+        const ancestors=[];
+        for(let element=toggle;element;element=element.parentElement){
+          const style=getComputedStyle(element),box=element.getBoundingClientRect();
+          if(element.scrollHeight>element.clientHeight+1||
+             /auto|scroll|overlay/.test(style.overflowY))
+            ancestors.push({tag:element.tagName,id:element.id,
+              className:typeof element.className==='string'?element.className:'',
+              top:box.top,bottom:box.bottom,height:box.height,
+              scrollTop:element.scrollTop,scrollHeight:element.scrollHeight,
+              clientHeight:element.clientHeight,overflowY:style.overflowY});
+        }
+        return {x,y,expanded:!toggle?.classList.contains('theia-mod-collapsed'),
+          hitWithinToggle:!!toggle&&(hit===toggle||toggle.contains(hit)),
+          hitTag:hit?.tagName??null,hitClass:typeof hit?.className==='string'?hit.className:'',
+          ancestors};
+      })()`);
+      if(!postHoverToggle?.hitWithinToggle)
+        throw Error('Evidence toggle moved out of hit target after hover: '+
+          JSON.stringify({liveToggle,postHoverToggle}));
+      liveToggle=postHoverToggle;
+      await command('Input.dispatchMouseEvent',{type:'mousePressed',x:liveToggle.x,y:liveToggle.y,
+        button:'left',buttons:1,clickCount:1,pointerType:'mouse'});
+      await sleep(60);
+      await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:liveToggle.x,y:liveToggle.y,
+        button:'left',buttons:0,clickCount:1,pointerType:'mouse'});
     }
   }
   let dataflowExpansion=null;
