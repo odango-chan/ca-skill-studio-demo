@@ -890,6 +890,14 @@ try{
         })()`
       });
       await sleep(350);
+      // The Packages sidebar reduces the graph viewport on first import.
+      // Use the real Fit control so both handles are on screen before
+      // dispatching trusted Chromium pointer events.
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#fit")?.click(); true`
+      });
+      await sleep(500);
       const routeGestureInfo=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
@@ -1113,6 +1121,11 @@ try{
       if(!chooseReconnectValue?.ready||!chooseReconnectValue.targetOptions.includes("failed"))
         throw Error("Could not explicitly qualify the Route target change: "+JSON.stringify(chooseReconnectValue));
       await sleep(350);
+      await command("Runtime.evaluate",{
+        contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`document.querySelector("#fit")?.click(); true`
+      });
+      await sleep(500);
       const updaterInfo=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
