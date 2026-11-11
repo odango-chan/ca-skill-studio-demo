@@ -7,6 +7,8 @@ import {monacoLanguageForPath} from "./monaco-language.mjs";
 import {configureMonacoYaml} from "monaco-yaml";
 import {createOwnerYamlSchemas} from "./yaml-owner-schemas.mjs";
 import {yamlSchemaCapability} from "./yaml-schema-policy.mjs";
+import {registerSkillSemanticTokens} from "./skill-semantic-tokens.mjs";
+import studioLightTheme from "../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
 const languageId = monacoLanguageForPath;
 let yamlLanguageService = null;
 let monacoWorkerCompatibilityInstalled = false;
@@ -54,7 +56,13 @@ function ensureMonacoWorkerCompatibility() {
 // reach those layers; ordinary site CSS alone cannot reliably paint them.
 function ensureStudioLightTheme(){
   monaco.editor.defineTheme("studio-light",{
-    base:"vs",inherit:true,rules:[],colors:{
+    base:"vs",
+    inherit:true,
+    semanticHighlighting:studioLightTheme.semanticHighlighting===true,
+    rules:[],
+    semanticTokenColors:studioLightTheme.semanticTokenColors??{},
+    colors:{
+      ...studioLightTheme.colors,
       "menu.background":"#ffffff",
       "menu.foreground":"#294259",
       "menu.selectionBackground":"#e8f4f0",
@@ -110,6 +118,7 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
   try {
     ensureMonacoWorkerCompatibility();
     ensureYamlLanguage();
+    registerSkillSemanticTokens(monaco);
     ensureStudioLightTheme();
     host.dataset.yamlSchemaEngine="monaco-yaml@5.5.1";
     editor=monaco.editor.create(host,{
