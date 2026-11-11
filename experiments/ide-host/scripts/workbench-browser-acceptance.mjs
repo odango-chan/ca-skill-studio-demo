@@ -853,9 +853,16 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       }).filter(row=>row.text.includes('Producer / Consumer dataflow')&&
         row.content?.getBoundingClientRect().height>0);
       const row=rows[0];
-      row?.content?.scrollIntoView({block:'center',inline:'nearest'});
-      const r=row?.content?.getBoundingClientRect();
-      const toggle=row?.node.querySelector('.theia-ExpansionToggle');
+      if(!row?.content)return {found:false,candidateCount:rows.length,
+        labels:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
+          const child=[...node.children].find(x=>x.classList?.contains('theia-TreeNodeContent'));
+          return child?.innerText?.trim()??'';
+        }).slice(-24),partClass:part?.className??''};
+      row.content.scrollIntoView({block:'center',inline:'nearest'});
+      const r=row.content.getBoundingClientRect();
+      if(!r.width||!r.height)return {found:false,candidateCount:rows.length,
+        rowText:row.text,partClass:part?.className??''};
+      const toggle=row.node.querySelector('.theia-ExpansionToggle');
       const tr=toggle?.getBoundingClientRect();
       const x=tr?tr.x+tr.width/2:r.x+12;
       const y=tr?tr.y+tr.height/2:r.y+r.height/2;
@@ -1491,16 +1498,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await command('Input.dispatchKeyEvent',{type:'keyUp',...event});
   };
   const beforeOutcomeFixture=await graph();
+  // The LSP regression intentionally opens native Python Source. Re-select
+  // the exact active Procedure's Source before the Outcome line/Undo probe;
+  // never pick the first Monaco editor merely because it is visible.
+  await evalWebviewJS(`document.querySelector("#openSource")?.click();true`);
+  await sleep(350);
   const nativeEditor=await evalJS(`(()=>{
     const editors=[...document.querySelectorAll('.monaco-editor')];
     const chosen=editors.map((node,index)=>{
       const rect=node.getBoundingClientRect();
-      return {index,x:rect.x,y:rect.y,width:rect.width,height:rect.height};
+      const text=node.querySelector('.view-lines')?.innerText??'';
+      return {index,x:rect.x,y:rect.y,width:rect.width,height:rect.height,text};
     }).find(rect=>rect.width>80&&rect.height>100&&rect.x>=0&&rect.y>=0&&
-      rect.x+rect.width/2<innerWidth&&rect.y+rect.height/2<innerHeight);
-    return chosen??null;
+      rect.x+rect.width/2<innerWidth&&rect.y+rect.height/2<innerHeight&&
+      rect.text.includes('ue-requested-pdu-session-establishment'));
+    return chosen?{index:chosen.index,x:chosen.x,y:chosen.y,
+      width:chosen.width,height:chosen.height,preview:chosen.text.slice(0,500)}:null;
   })()`);
-  if(!nativeEditor)throw Error('No native Monaco Source editor for Outcome acceptance');
+  if(!nativeEditor)throw Error('Exact 5GC Procedure YAML Source editor was not activated for Outcome acceptance: '+
+    JSON.stringify(await evalJS(`({tabs:[...document.querySelectorAll('.lm-TabBar-tab')].map(x=>({text:x.textContent.trim(),className:x.className})),editors:[...document.querySelectorAll('.monaco-editor')].map((node,index)=>({index,text:node.querySelector('.view-lines')?.innerText?.slice(0,300)??'',rect:(()=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))})`)));
   await click(nativeEditor.x+Math.min(90,nativeEditor.width/2),
     nativeEditor.y+Math.min(24,nativeEditor.height/2));
   await key('g','KeyG',2,71);await sleep(200);
