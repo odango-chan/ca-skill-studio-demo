@@ -1766,15 +1766,19 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
   await click(markdownFile.x,markdownFile.y,2);await sleep(400);
   await invoke('skillStudio.previewMarkdown');
-  const tree=await command('Page.getFrameTree');let markdown=false;
+  const tree=await command('Page.getFrameTree');let markdown=false,markdownStyled=false;
   async function inspect(n){
     try{const w=await command('Page.createIsolatedWorld',{frameId:n.frame.id,worldName:'markdown-acceptance',grantUniveralAccess:true});
       const r=await command('Runtime.evaluate',{contextId:w.executionContextId,returnByValue:true,expression:`Boolean(document.querySelector('article h1')&&!document.querySelector('article script,article img'))`});
       markdown ||= r.result?.value===true;
+      const styled=await command('Runtime.evaluate',{contextId:w.executionContextId,returnByValue:true,
+        expression:`(()=>{const article=document.querySelector('article.markdown-preview');if(!article)return false;const css=getComputedStyle(article);return Boolean(document.querySelector('link[href*="markdown-preview.css"]')&&css.maxWidth==='920px'&&parseFloat(css.paddingLeft)>0);})()`});
+      markdownStyled ||= styled.result?.value===true;
     }catch{}
     for(const c of n.childFrames??[])await inspect(c);
   }
   await inspect(tree.frameTree);if(!markdown)throw Error('Shared safe Markdown Preview did not render');
+  if(!markdownStyled)throw Error('Theia Markdown preview did not apply packaged theme CSS');
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
   await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
   let contractView=null,contractFrame=null,contractContextId=null;
