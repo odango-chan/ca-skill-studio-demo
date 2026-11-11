@@ -1,5 +1,7 @@
 import { LanguageClient, ErrorAction, CloseAction, State } from "vscode-languageclient/browser";
 import { SKILL_SEMANTIC_TOKEN_TYPES, SKILL_SEMANTIC_TOKEN_MODIFIERS } from "../../../../../language/semantic-tokens.mjs";
+import studioLightTheme from "../../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
+import { createSemanticTokenDecorationRenderer } from "./semantic-token-decorations.mjs";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
 export const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
@@ -44,6 +46,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let client = null;
   let semanticTokenRegistration = null;
   let semanticTokenChangeEmitter = null;
+  let semanticTokenRenderer = null;
   function stopClientAfterFailure() {
     if (!started || !client) return Promise.resolve();
     if (!clientStopPromise) {
@@ -91,6 +94,20 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       [...SKILL_SEMANTIC_TOKEN_TYPES],
       [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
     );
+    try{
+      semanticTokenRenderer=createSemanticTokenDecorationRenderer(
+        vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
+      );
+      handlers.onSemanticTokenRendererRegistered?.({
+        renderer:"theia-text-editor-decoration",
+        tokenTypeCount:SKILL_SEMANTIC_TOKEN_TYPES.length
+      });
+    }catch(error){
+      semanticTokenRenderer=null;
+      handlers.onSemanticTokenRendererUnavailable?.(String(error?.message??error));
+      output.appendLine("Theia semantic decoration adapter unavailable: "+
+        String(error?.message??error));
+    }
     semanticTokenChangeEmitter=new vscode.EventEmitter();
     const provider={
       onDidChangeSemanticTokens:semanticTokenChangeEmitter.event,
@@ -109,6 +126,16 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
             return new vscode.SemanticTokens(new Uint32Array());
           const data=Uint32Array.from(result?.data??[]);
           handlers.onSemanticTokenResult?.(uri,data.length/5);
+          if(semanticTokenRenderer){
+            try{
+              const rendering=semanticTokenRenderer.render(document,data);
+              handlers.onSemanticTokenRendered?.(uri,rendering);
+            }catch(error){
+              handlers.onSemanticTokenRenderError?.(uri,String(error?.message??error));
+              output.appendLine("Semantic token decoration failed: "+
+                String(error?.message??error));
+            }
+          }
           if(data.length===0){
             try{
               const diagnostics=await client.sendRequest(
@@ -278,6 +305,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       } finally {
         semanticTokenRegistration?.dispose?.();
         semanticTokenRegistration=null;
+        semanticTokenRenderer?.dispose?.();
+        semanticTokenRenderer=null;
         semanticTokenChangeEmitter?.dispose?.();
         semanticTokenChangeEmitter=null;
         worker.terminate();
