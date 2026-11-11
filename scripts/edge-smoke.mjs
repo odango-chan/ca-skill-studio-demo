@@ -631,7 +631,7 @@ try{
     "(async()=>{",
     " const host=document.getElementById('monacoHost');",
     " const lines=[...host.querySelectorAll('.view-line')];",
-    " const line=lines.find(item=>item.textContent.includes('createdsession.ingress.eligible: PASS'));",
+    " const line=lines.find(item=>item.textContent.replace(/\\u00a0/g,' ').includes('createdsession.ingress.eligible: PASS'));",
     " const token=(value)=>[...(line?.querySelectorAll('span')||[])]",
     "  .find(item=>item.textContent===value);",
     " const reference=token('createdsession.ingress.eligible'),outcome=token('PASS');",
