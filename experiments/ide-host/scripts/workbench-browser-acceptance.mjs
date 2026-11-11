@@ -904,7 +904,35 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         };
     })()`);
     if(evidenceRows?.found)dataflowTreeRow=evidenceRows;
-    else await sleep(100);
+    else {
+      // The Evidence root can be expanded while its Phase group remains
+      // collapsed. Expand that actual parent row before waiting for the
+      // nested Producer / Consumer dataflow item; do not mistake hidden
+      // descendants for a provider-refresh race.
+      const phaseGroup=await evalJS(`(()=>{
+        const container=[...document.querySelectorAll('.theia-view-container')]
+          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+          .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+        const part=header?.closest('.part');
+        const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
+          const content=[...node.children].find(child=>
+            child.classList?.contains('theia-TreeNodeContent'));
+          return content?.innerText?.replace(/\\s+/g,' ').trim()
+            .includes('await-initial-resources · postconditions');
+        });
+        const toggle=row?.querySelector('.theia-ExpansionToggle');
+        const r=toggle?.getBoundingClientRect();
+        return toggle&&r?.width&&r?.height&&
+          toggle.classList.contains('theia-mod-collapsed')
+          ?{x:r.x+r.width/2,y:r.y+r.height/2,label:row.innerText.trim()}
+          :null;
+      })()`);
+      if(phaseGroup){
+        await click(phaseGroup.x,phaseGroup.y);
+        await sleep(120);
+      }else await sleep(100);
+    }
   }
   if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after scoped readiness wait: '+
     JSON.stringify({evidenceHeader,evidenceTreeState,evidenceRows,
