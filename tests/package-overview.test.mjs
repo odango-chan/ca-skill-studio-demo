@@ -88,7 +88,7 @@ test('C4 keeps incomplete packages visible when only assurance markers exist',()
     'assurance/predicates.yaml'));
 });
 
-test('C4 uses exact file-kind Designer commands and native Source for other files',()=>{
+test('C4 opens the Markdown split and preserves Designer and native Source routing',()=>{
   const file=uri('/workspace/skill/schemas/request.schema.yaml');
   assert.equal(packageFileCommand('assurance/procedure.yaml',file).command,
     'skillStudio.openProcedure');
@@ -99,7 +99,9 @@ test('C4 uses exact file-kind Designer commands and native Source for other file
   assert.equal(packageFileCommand('schemas/request.schema.yaml',file).command,
     'skillStudio.openSchema');
   assert.equal(packageFileCommand('scripts/evaluate.py',file).command,'vscode.open');
-  assert.equal(packageFileCommand('references/3gpp.md',file).command,'vscode.open');
+  assert.equal(packageFileCommand('references/3gpp.md',file).command,'skillStudio.previewMarkdown');
+  assert.equal(packageFileCommand('SKILL.md',file).command,'skillStudio.previewMarkdown');
+  assert.equal(packageFileCommand('references/3gpp.md.json',file).command,'vscode.open');
   assert.deepEqual(packageFileCommand('assurance/contract.yaml',file).arguments,[file]);
 });
 
