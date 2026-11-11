@@ -89,3 +89,22 @@ export function watchProjectConfiguration(vscode,onChange) {
       onChange();
   });
 }
+
+
+export async function writeDependencySettingsPair(vscode,selectedUri,dependencies,dependencyLock){
+  const current=readProjectConfiguration(vscode,selectedUri);
+  // Validate the complete desired pair; intermediate host writes are explicitly
+  // not interpreted as a validated project during an update.
+  validateProjectConfiguration({...current.settings,dependencies,dependencyLock});
+  if(vscode.ConfigurationTarget?.WorkspaceFolder===undefined)
+    fail("workspace-folder configuration writes are unavailable in this host");
+  const config=vscode.workspace.getConfiguration(CONFIG_NAMESPACE,current.workspaceRoot);
+  try{
+    await config.update("dependencies",dependencies,vscode.ConfigurationTarget.WorkspaceFolder);
+    await config.update("dependencyLock",dependencyLock,vscode.ConfigurationTarget.WorkspaceFolder);
+  }catch(error){
+    fail("UNCERTAIN: multi-setting transaction was not atomic: "+
+      String(error?.message??error));
+  }
+  return readProjectConfiguration(vscode,current.workspaceRoot);
+}
