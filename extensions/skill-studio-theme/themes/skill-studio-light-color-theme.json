@@ -289,6 +289,19 @@
     "comment": {
       "foreground": "#8FA0B4",
       "italic": true
-    }
+    },
+    "skillKeyword": "#0C8E7B",
+    "skillOperator": "#7B5BA7",
+    "skillProcedure": "#AD6517",
+    "skillStep": "#AD6517",
+    "skillCapability": "#7B5BA7",
+    "skillTool": "#9565AF",
+    "skillPredicate": "#317DC0",
+    "skillObservation": "#287D9B",
+    "skillOutcome": "#AD6517",
+    "skillDataType": "#317DC0",
+    "skillSchema": "#287D9B",
+    "skillReference": "#287D9B",
+    "skillBinding": "#596F84"
   }
 }

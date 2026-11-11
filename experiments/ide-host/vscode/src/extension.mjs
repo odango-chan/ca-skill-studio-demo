@@ -20,6 +20,7 @@ import {registerContractEditor} from "./contract-editor.mjs";
 import {registerPredicateEditor} from "./predicate-editor.mjs";
 import {registerSchemaEditor} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
+import {registerSkillSemanticHighlighting} from "./semantic-highlighting.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
@@ -30,6 +31,8 @@ function escaped(value){
   }[ch]));
 }
 export function activate(context){
+  const semanticTokens = registerSkillSemanticHighlighting(vscode);
+  if (semanticTokens) context.subscriptions.push(semanticTokens);
   const workbench=registerWorkbench(vscode,context);
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
