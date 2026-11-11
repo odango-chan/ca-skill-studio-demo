@@ -162,6 +162,7 @@ test("Theia decoration adapter preserves delta positions and clears stale ranges
   assert.equal(editor.calls.at(-1).ranges.length,0,
     "an older decoration set is cleared when the document advances");
 
+  editor.document=newerDocument;
   renderer.render(newerDocument,semanticData(newerDocument.lineAt(1).text));
   const renderedCalls=editor.calls.length;
   host.change(newerDocument);
