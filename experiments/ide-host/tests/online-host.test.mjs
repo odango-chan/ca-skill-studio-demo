@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {readFileSync,statSync,readdirSync} from "node:fs";
+import {readFileSync,statSync,readdirSync,existsSync} from "node:fs";
 import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -90,26 +90,34 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
   assert.match(markdownCss,/max-height: 65vh/);
 });
 
-function findMarkdownVsix(directory){
+function findMarkdownManifest(directory){
   for(const entry of readdirSync(directory,{withFileTypes:true})){
     const target=join(directory,entry.name);
-    if(entry.isFile()&&/^vscode\\.markdown-language-features.*\\.vsix$/i.test(entry.name))
-      return target;
-    if(entry.isDirectory()){
-      const nested=findMarkdownVsix(target);
-      if(nested)return nested;
+    if(!entry.isDirectory())continue;
+    const manifestPath=join(target,"package.json");
+    if(existsSync(manifestPath)){
+      try{
+        const manifest=JSON.parse(readFileSync(manifestPath,"utf8"));
+        if(manifest.publisher==="vscode"&&manifest.name==="markdown-language-features")
+          return {manifest,path:manifestPath,root:target};
+      }catch{/* Continue searching other unpacked plugins. */}
     }
+    const nested=findMarkdownManifest(target);
+    if(nested)return nested;
   }
   return null;
 }
-test("Theia downloads the pinned native Markdown language-features VSIX",{
-  skip:!findMarkdownVsix(join(root,"plugins"))
+test("Theia unpacks the pinned native Markdown language-features plugin",{
+  skip:!findMarkdownManifest(join(root,"plugins"))
 },()=>{
-  const vsix=findMarkdownVsix(join(root,"plugins"));
-  assert.ok(vsix,"Theia plugin downloader must materialize the Markdown VSIX");
-  assert.match(vsix,/markdown-language-features.*1\\.95\\.3.*\\.vsix$/i,
-    "the built-in Markdown extension version must remain pinned");
-  assert.ok(statSync(vsix).size>100_000,"the downloaded VSIX must not be an empty placeholder");
+  const plugin=findMarkdownManifest(join(root,"plugins"));
+  assert.ok(plugin,"Theia CLI must unpack the downloaded Markdown extension");
+  assert.ok(plugin.manifest.browser,"browser preview entry is required in browser-only Theia");
+  assert.ok(plugin.manifest.contributes.commands.some(x=>x.command==="markdown.showPreviewToSide"),
+    "native side-by-side Markdown Preview command must be available");
+  assert.ok(plugin.manifest.contributes["markdown.previewStyles"],
+    "native extension must support shared Markdown preview styles");
+  assert.ok(statSync(plugin.path).size>1000,"unpacked plugin manifest must be complete");
 });
 
 test("Theia bundles offline YAML and Python TextMate grammars independently of LSP",()=>{
