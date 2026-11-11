@@ -94,6 +94,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       async provideDocumentSemanticTokens(document,cancellationToken){
         if(stopped||terminalFailure||cancellationToken?.isCancellationRequested)
           return new vscode.SemanticTokens(new Uint32Array());
+        const uri=document.uri.toString();
+        handlers.onSemanticTokenRequest?.(uri);
         try{
           const result=await client.sendRequest(
             "textDocument/semanticTokens/full",
@@ -102,14 +104,15 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
           );
           if(cancellationToken?.isCancellationRequested)
             return new vscode.SemanticTokens(new Uint32Array());
-          return new vscode.SemanticTokens(
-            Uint32Array.from(result?.data??[]),
-            result?.resultId
-          );
+          const data=Uint32Array.from(result?.data??[]);
+          handlers.onSemanticTokenResult?.(uri,data.length/5);
+          return new vscode.SemanticTokens(data,result?.resultId);
         }catch(error){
-          if(!stopped&&!terminalFailure)
+          if(!stopped&&!terminalFailure){
+            handlers.onSemanticTokenError?.(uri,String(error?.message??error));
             output.appendLine("Semantic token request failed: "+
               String(error?.message??error));
+          }
           return new vscode.SemanticTokens(new Uint32Array());
         }
       }
@@ -124,6 +127,9 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       provider,
       legend
     );
+    handlers.onSemanticTokenProviderRegistered?.({
+      registered:true,tokenTypeCount:SKILL_SEMANTIC_TOKEN_TYPES.length
+    });
     output.appendLine("Registered Theia semantic-token adapter from the canonical Skill Language catalog");
   }
 
