@@ -9,6 +9,8 @@ on:
       - '.gitignore'
       - 'tests/**'
       - 'extensions/skill-studio-languages/**'
+      - 'extensions/skill-studio-theme/**'
+      - 'language/**'
       - 'experiments/ide-host/**'
       - 'scripts/**'
       - 'package.json'
