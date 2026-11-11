@@ -2,7 +2,7 @@
  * Source/Skill semantics remain in site/markdown-preview.mjs.
  * The Webview loads this file via asWebviewUri and its CSP; no inline styles. */
 .skill-studio-markdown-document{
-  margin:0;min-width:0;min-height:100%;
+  margin:0;min-width:0;min-height:100vh;
   background:var(--vscode-editor-background,#ffffff);
 }
 .markdown-preview{
@@ -13,6 +13,7 @@
   --md-soft:var(--vscode-editorWidget-background,var(--surface,#fbfcfe));
   --md-raised:var(--vscode-sideBarSectionHeader-background,var(--raised,#edf3f9));
   --md-accent:var(--vscode-focusBorder,var(--accent,#0c8e7b));
+  --md-heading:var(--vscode-skillStudio-markdownHeading,var(--accent,#0c8e7b));
   --md-link:var(--vscode-textLink-foreground,var(--accent,#087e72));
   --md-link-hover:var(--vscode-textLink-activeForeground,var(--blue,#317dc0));
   --md-hover:var(--vscode-list-hoverBackground,#eef5f8);
@@ -26,12 +27,27 @@
 .markdown-preview h4,.markdown-preview h5,.markdown-preview h6{
   color:var(--md-fg);line-height:1.4;font-weight:650;margin:1.5em 0 .55em;
 }
+.markdown-preview h1,.markdown-preview h2{color:var(--md-heading)}
 .markdown-preview h1{font-size:24px;letter-spacing:-.02em;margin-top:.2em;
   padding-bottom:.4em;border-bottom:1px solid var(--md-border)}
 .markdown-preview h2{font-size:19px;padding-bottom:.32em;
   border-bottom:1px solid var(--md-border)}
-.markdown-preview h3{font-size:16px}
+.markdown-preview h3{font-size:16px;padding-left:.65em;
+  border-left:2px solid var(--md-heading)}
 .markdown-preview h4,.markdown-preview h5,.markdown-preview h6{font-size:14px}
+.md-preview-toolbar{
+  position:sticky;top:0;z-index:5;display:flex;align-items:center;
+  justify-content:space-between;gap:12px;padding:8px 14px;
+  border-bottom:1px solid var(--md-border);background:var(--md-bg);
+  color:var(--md-muted);font:11px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.md-preview-toolbar strong{color:var(--md-fg);font-weight:650}
+.md-preview-toolbar button{
+  border:1px solid var(--md-border);border-radius:6px;padding:5px 9px;
+  color:var(--md-heading);background:var(--md-soft);font:inherit;font-weight:600;
+}
+.md-preview-toolbar button:hover{border-color:var(--md-heading);background:var(--md-hover)}
+.md-preview-toolbar button:focus-visible{outline:2px solid var(--md-heading);outline-offset:2px}
 .markdown-preview p{margin:.65em 0 1em}
 .markdown-preview ul,.markdown-preview ol{margin:.5em 0 1.1em;padding-left:1.7em}
 .markdown-preview li{margin:.22em 0}
