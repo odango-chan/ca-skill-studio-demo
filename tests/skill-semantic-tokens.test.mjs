@@ -222,6 +222,23 @@ test("Monaco registers one shared provider for YAML, Markdown and Python",()=>{
   first.dispose();
 });
 
+test("language extension registers every canonical CA semantic token type and modifier",()=>{
+  const manifest=JSON.parse(readFileSync(new URL(
+    "../extensions/skill-studio-languages/package.json",import.meta.url
+  ),"utf8"));
+  assert.deepEqual(
+    manifest.contributes.semanticTokenTypes.map(item=>item.id),
+    semantic.SKILL_SEMANTIC_TOKEN_TYPES
+  );
+  assert.deepEqual(
+    manifest.contributes.semanticTokenModifiers.map(item=>item.id),
+    ["userDefined"]
+  );
+  for(const item of manifest.contributes.semanticTokenTypes){
+    assert.ok(item.superType,item.id+" declares a semantic superType");
+  }
+});
+
 test("online and installed Studio Light themes expose every CA semantic token color",()=>{
   const theme=JSON.parse(readFileSync(new URL(
     "../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json",
