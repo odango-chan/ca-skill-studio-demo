@@ -1127,11 +1127,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         if(detail)window.__skillStudioEvidenceBubbleEvents.push(detail);
       },false);
     })()`);
-    // Use the verified on-screen hit target. Recompute after the hover frame
-    // because Theia can rerender virtualized tree rows between pointer move
-    // and press; do not click stale coordinates.
-    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:dataflowTreeRow.x,y:dataflowTreeRow.y});
-    await sleep(100);
+    // Resolve the live target after any layout/scroll work. Do not hover a
+    // stale coordinate: the mousemove itself can trigger Theia SplitPanel
+    // reflow and move the virtualized Evidence row underneath the pointer.
     let liveToggle=null,stableHit=0,lastPos=null;
     // Mouse hover and native SplitPanel resize may move the Evidence part
     // after the first successful hit-test. Only press once the live toggle
@@ -1169,9 +1167,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       else stableHit=0;
       if(liveToggle?.hitWithinToggle&&stableHit>=1)break;
       lastPos=liveToggle?.hitWithinToggle?{x:liveToggle.x,y:liveToggle.y}:null;
-      if(liveToggle?.hitWithinToggle)
-        await command('Input.dispatchMouseEvent',{
-          type:'mouseMoved',x:liveToggle.x,y:liveToggle.y});
+      // Keep the pointer untouched until the final press/release. This
+      // avoids a hover-induced resize between hit-test and click.
       await sleep(120);
     }
     if(!liveToggle?.hitWithinToggle||stableHit<1)
