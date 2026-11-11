@@ -1132,28 +1132,51 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     // and press; do not click stale coordinates.
     await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:dataflowTreeRow.x,y:dataflowTreeRow.y});
     await sleep(100);
-    const liveToggle=await evalJS(`(()=>{
-      const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
-      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-      const part=header?.closest('.part');
-      const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
-        const caption=[...node.children].find(child=>
-          child.classList?.contains('theia-TreeNodeContent'));
-        return caption?.innerText?.includes('Producer / Consumer dataflow');
-      });
-      const toggle=row?.querySelector('.theia-ExpansionToggle');
-      const rect=toggle?.getBoundingClientRect();
-      const hit=rect?document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2):null;
-      return rect?{x:rect.x+rect.width/2,y:rect.y+rect.height/2,
-        expanded:!toggle.classList.contains('theia-mod-collapsed'),
-        hitWithinToggle:hit===toggle||toggle.contains(hit),
-        hitTag:hit?.tagName??null,hitClass:typeof hit?.className==='string'?hit.className:''}:null;
-    })()`);
-    if(!liveToggle?.hitWithinToggle)
-      throw Error('Native Evidence expansion toggle lost hit target before click: '+
-        JSON.stringify({dataflowTreeRow,liveToggle}));
+    let liveToggle=null,stableHit=0,lastPos=null;
+    // Mouse hover and native SplitPanel resize may move the Evidence part
+    // after the first successful hit-test. Only press once the live toggle
+    // remains visible and hit-testable in consecutive browser frames.
+    for(let attempt=0;attempt<24;attempt++){
+      liveToggle=await evalJS(`(()=>{
+        const container=[...document.querySelectorAll('.theia-view-container')]
+          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+          .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+        const part=header?.closest('.part');
+        const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
+          const caption=[...node.children].find(child=>
+            child.classList?.contains('theia-TreeNodeContent'));
+          return caption?.innerText?.includes('Producer / Consumer dataflow');
+        });
+        const toggle=row?.querySelector('.theia-ExpansionToggle');
+        if(!toggle)return null;
+        const before=toggle.getBoundingClientRect();
+        const firstHit=document.elementFromPoint(
+          before.x+before.width/2,before.y+before.height/2);
+        if(firstHit!==toggle&&!toggle.contains(firstHit))
+          toggle.scrollIntoView({block:'center',inline:'nearest'});
+        const rect=toggle.getBoundingClientRect();
+        const x=rect.x+rect.width/2,y=rect.y+rect.height/2;
+        const hit=document.elementFromPoint(x,y);
+        return {x,y,expanded:!toggle.classList.contains('theia-mod-collapsed'),
+          hitWithinToggle:hit===toggle||toggle.contains(hit),
+          hitTag:hit?.tagName??null,hitClass:typeof hit?.className==='string'?hit.className:'',
+          viewport:{width:innerWidth,height:innerHeight}};
+      })()`);
+      if(liveToggle?.hitWithinToggle&&
+        lastPos&&Math.abs(liveToggle.x-lastPos.x)<1&&
+        Math.abs(liveToggle.y-lastPos.y)<1)stableHit++;
+      else stableHit=0;
+      if(liveToggle?.hitWithinToggle&&stableHit>=1)break;
+      lastPos=liveToggle?.hitWithinToggle?{x:liveToggle.x,y:liveToggle.y}:null;
+      if(liveToggle?.hitWithinToggle)
+        await command('Input.dispatchMouseEvent',{
+          type:'mouseMoved',x:liveToggle.x,y:liveToggle.y});
+      await sleep(120);
+    }
+    if(!liveToggle?.hitWithinToggle||stableHit<1)
+      throw Error('Native Evidence expansion toggle remained obstructed after scroll/hover stabilization: '+
+        JSON.stringify({dataflowTreeRow,liveToggle,stableHit}));
     const toggleInstrumentation=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
         .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
