@@ -89,7 +89,9 @@ export function createSemanticTokenDecorationRenderer(vscode, tokenTypes, semant
 
   function applyVisible(uri, entry) {
     for (const editor of vscode.window.visibleTextEditors ?? []) {
-      if (uriKey(editor.document?.uri) === uri) setEditorRanges(editor, uri, entry);
+      if (uriKey(editor.document?.uri) !== uri) continue;
+      const current = entry && entry.version === editor.document.version ? entry : null;
+      setEditorRanges(editor, uri, current);
     }
   }
 
