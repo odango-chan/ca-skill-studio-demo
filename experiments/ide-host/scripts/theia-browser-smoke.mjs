@@ -49,7 +49,16 @@ const url=externalUrl||("http://127.0.0.1:"+server.address().port+basePath+"/");
 const profile=await mkdtemp(join(tmpdir(),"theia-online-chrome-"));
 const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",
   "--disable-dev-shm-usage","--no-first-run","--no-default-browser-check",
-  "--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],{stdio:"ignore"});
+  "--disable-background-networking","--disable-extensions",
+  "--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],
+  {stdio:["ignore","ignore","pipe"]});
+let chromeStderr="";
+child.stderr?.on("data",chunk=>{
+  chromeStderr=(chromeStderr+chunk.toString()).slice(-5000);
+});
+child.on("error",error=>{
+  chromeStderr=(chromeStderr+"\\nspawn error: "+String(error)).slice(-5000);
+});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[];
 const command=(method,params={})=>new Promise((resolve,reject)=>{
@@ -65,12 +74,16 @@ const evalJS=async expression=>{
 };
 try{
   let port=null;
-  for(let i=0;i<250;i++){
+  for(let i=0;i<600;i++){
     try{port=Number((await readFile(join(profile,"DevToolsActivePort"),"utf8")).split("\n")[0]);break;}
-    catch{if(child.exitCode!==null&&child.exitCode!==0)throw Error("Chrome exited "+child.exitCode);}
+    catch{
+      if(child.exitCode!==null)throw Error("Chrome exited before DevTools startup "+
+        JSON.stringify({code:child.exitCode,signal:child.signalCode,stderr:chromeStderr}));
+    }
     await sleep(100);
   }
-  if(!port)throw Error("Chrome DevTools debugging port unavailable");
+  if(!port)throw Error("Chrome DevTools debugging port unavailable: "+
+    JSON.stringify({code:child.exitCode,signal:child.signalCode,stderr:chromeStderr}));
   const tabs=await(await fetch("http://127.0.0.1:"+port+"/json")).json();
   const page=tabs.find(t=>t.type==="page");
   if(!page)throw Error("Chromium page target absent");

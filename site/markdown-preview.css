@@ -42,6 +42,11 @@
 }
 .markdown-preview a{color:var(--md-link);text-decoration:underline;text-underline-offset:2px}
 .markdown-preview a:hover{color:var(--md-link-hover)}
+.markdown-preview a.md-local-link{
+  font-weight:600;text-decoration-line:underline;text-decoration-style:dotted;
+  text-underline-offset:3px;
+}
+.markdown-preview a.md-local-link code{color:var(--md-link)}
 .markdown-preview a:focus-visible,.markdown-preview summary:focus-visible{
   outline:2px solid var(--md-accent);outline-offset:3px;border-radius:3px;
 }
