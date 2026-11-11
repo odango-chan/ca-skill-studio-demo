@@ -87,6 +87,33 @@ console.log("STUDIO_THEIA_STATIC_THEME_ASSETS",JSON.stringify({
   themePluginTarget,assets:["package.json","themes/**","icons/**"],offlinePackage:true,
   classicShellIconCss:classicIconTheme.cssBytes
 }));
+// The static frontend's hostedPlugin copier omits arbitrary declarative
+// extension assets just as it does for the theme package. Stage the pinned
+// TextMate grammar package explicitly; otherwise YAML/Python documents fall
+// back to plain-text tokenization even though the plugin manifest is listed.
+const syntaxPluginSource=resolve("experiments/ide-host/theia-online/plugins/odango-chan.skill-studio-languages");
+const syntaxPluginTarget=join(root,"hostedPlugin","odango_chan_skill_studio_languages");
+const syntaxManifest=JSON.parse(await readFile(join(syntaxPluginSource,"package.json"),"utf8"));
+if(syntaxManifest.main||syntaxManifest.browser)
+  throw Error("Static syntax extension must remain declarative");
+await mkdir(syntaxPluginTarget,{recursive:true});
+await copyFile(join(syntaxPluginSource,"package.json"),join(syntaxPluginTarget,"package.json"));
+await cp(join(syntaxPluginSource,"upstream"),join(syntaxPluginTarget,"upstream"),
+  {recursive:true,force:true});
+const missingSyntaxAssets=[];
+for(const grammar of syntaxManifest.contributes?.grammars??[]){
+  const asset=join(syntaxPluginTarget,grammar.path);
+  try{
+    const info=await stat(asset);
+    if(!info.isFile()||info.size<100)missingSyntaxAssets.push(grammar.path);
+  }catch{missingSyntaxAssets.push(grammar.path);}
+}
+if(missingSyntaxAssets.length)
+  throw Error("Static hosted syntax grammar assets missing: "+missingSyntaxAssets.join(", "));
+console.log("STUDIO_THEIA_STATIC_SYNTAX_ASSETS",JSON.stringify({
+  syntaxPluginTarget,languages:syntaxManifest.contributes.languages.map(item=>item.id),
+  grammarCount:syntaxManifest.contributes.grammars.length,offlinePackage:true
+}));
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,
   webviewAssets:copied,target
