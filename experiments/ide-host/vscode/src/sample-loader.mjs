@@ -1,6 +1,10 @@
 // Explicit user-triggered Sample Package import for VS Code desktop/web or
 // Theia browser-only OPFS. Never overwrite existing workspace files.
 const SRC=["samples","skills"];
+// A Skill Compiler project has one source workspace with three top-level
+// directories. The Studio demo may seed only skills/; it must not invent
+// Tool contracts in lib/ or build artifacts in output/.
+export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
 const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
 const decoder=new TextDecoder();
 const fail=reason=>{throw Error(reason);};
@@ -98,18 +102,25 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   }
   const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
   const files=manifest.files;
-  // Browser-only Theia OPFS exposes the extension's persistent storage.
-  // Keep the demonstration separate from any user workspace or existing
-  // project named skills: never use a user-selected project as the target.
+  // Isolate the sample under a single project root, not a workspace folder
+  // named skills/. Never seed into a user-selected project. Older demos under
+  // workspaces/skills remain untouched; importing this sample creates a
+  // separate project rather than silently moving or overwriting those files.
   if(!storageUri)fail("No writable extension storage URI");
-  const root=vscode.Uri.joinPath(storageUri,"workspaces","skills");
+  const root=vscode.Uri.joinPath(storageUri,"workspaces",EXAMPLE_PROJECT_NAME);
+  const skillsRoot=vscode.Uri.joinPath(root,"skills");
+  const libraryRoot=vscode.Uri.joinPath(root,"lib");
+  const outputRoot=vscode.Uri.joinPath(root,"output");
   const current=vscode.workspace.workspaceFolders??[];
   let created=0,skipped=0;
-  phase="create-workspace-root";
+  phase="create-project-layout";
   await fileSystem.createDirectory(root);
+  await fileSystem.createDirectory(skillsRoot);
+  await fileSystem.createDirectory(libraryRoot);
+  await fileSystem.createDirectory(outputRoot);
   for(const file of files){
     const segments=file.split("/");
-    const destination=vscode.Uri.joinPath(root,...segments);
+    const destination=vscode.Uri.joinPath(skillsRoot,...segments);
     phase="stat-existing:"+file;
     let exists=false;
     try{await fileSystem.stat(destination);exists=true;}
@@ -136,13 +147,14 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   let workspaceUpdated=false;
   if(!current.some(f=>f.uri.toString()===root.toString())){
     workspaceUpdated=Boolean(vscode.workspace.updateWorkspaceFolders?.(
-      current.length,0,{uri:root,name:"skills"}));
+      current.length,0,{uri:root,name:EXAMPLE_PROJECT_NAME}));
     if(!workspaceUpdated)
       fail("Cannot expose bundled SKILLs in the native Explorer");
   }
   const procedures=Object.fromEntries(SKILLS.map(name=>
-    [name,vscode.Uri.joinPath(root,name,"assurance","procedure.yaml")]));
-  return {root,procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
+    [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
+  return {root,skillsRoot,libraryRoot,outputRoot,
+    procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
     sourceSha:manifest.sourceSha,files:files.length,created,skipped,workspaceUpdated};
   }catch(error){
     throw Error(phase+": "+String(error?.message??error));
