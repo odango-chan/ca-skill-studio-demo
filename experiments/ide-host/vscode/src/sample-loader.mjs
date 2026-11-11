@@ -1,10 +1,10 @@
 // Explicit user-triggered Sample Package import for VS Code desktop/web or
 // Theia browser-only OPFS. Never overwrite existing workspace files.
 const SRC=["samples","skills"];
-// A Skill Compiler project has one source workspace with three top-level
-// directories. The Studio demo may seed only skills/; it must not invent
-// Tool contracts in lib/ or build artifacts in output/.
-export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
+// The v0.1 Example has its own stable root. Never reuse the legacy OPFS
+// workspaces/ directory, which may contain user-edited or unrelated files.
+export const EXAMPLE_PROJECT_NAME="Skill Studio Example";
+export const EXAMPLE_PROJECT_DIRECTORY="skill-studio-example-v01";
 const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
 const decoder=new TextDecoder();
 const fail=reason=>{throw Error(reason);};
@@ -102,22 +102,17 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   }
   const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
   const files=manifest.files;
-  // Reuse the existing browser-owned workspaces/skills Source in place,
-  // treating its parent as the compiler-style project root. This upgrades
-  // legacy demos without copying, hiding or overwriting edited SKILL files.
-  // No user-selected Workspace is ever used as an import destination.
+  // A fresh, isolated namespace: legacy workspaces/ is never written to.
   if(!storageUri)fail("No writable extension storage URI");
-  const root=vscode.Uri.joinPath(storageUri,"workspaces");
+  const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_DIRECTORY);
   const skillsRoot=vscode.Uri.joinPath(root,"skills");
-  const libraryRoot=vscode.Uri.joinPath(root,"lib");
-  const outputRoot=vscode.Uri.joinPath(root,"output");
+  const legacyRoot=vscode.Uri.joinPath(storageUri,"workspaces");
+  const legacySkillsRoot=vscode.Uri.joinPath(legacyRoot,"skills");
   const current=vscode.workspace.workspaceFolders??[];
   let created=0,skipped=0;
   phase="create-project-layout";
   await fileSystem.createDirectory(root);
   await fileSystem.createDirectory(skillsRoot);
-  await fileSystem.createDirectory(libraryRoot);
-  await fileSystem.createDirectory(outputRoot);
   for(const file of files){
     const segments=file.split("/");
     const destination=vscode.Uri.joinPath(skillsRoot,...segments);
@@ -146,10 +141,10 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   phase="workspace-update";
   let workspaceUpdated=false;
   if(!current.some(f=>f.uri.toString()===root.toString())){
-    // Replace only the old extension-owned skills/ workspace root. Do not
-    // remove a similarly named folder belonging to another user project.
+    // Replace only the exact extension-owned legacy mount. Its OPFS contents
+    // remain untouched; never remove or repurpose a user-selected folder.
     const legacyIndex=current.findIndex(folder=>
-      folder.uri.toString()===skillsRoot.toString());
+      [legacyRoot.toString(),legacySkillsRoot.toString()].includes(folder.uri.toString()));
     workspaceUpdated=Boolean(vscode.workspace.updateWorkspaceFolders?.(
       legacyIndex>=0?legacyIndex:current.length,legacyIndex>=0?1:0,
       {uri:root,name:EXAMPLE_PROJECT_NAME}));
@@ -158,7 +153,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   }
   const procedures=Object.fromEntries(SKILLS.map(name=>
     [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
-  return {root,skillsRoot,libraryRoot,outputRoot,
+  return {root,skillsRoot,
     procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
     sourceSha:manifest.sourceSha,files:files.length,created,skipped,workspaceUpdated};
   }catch(error){
