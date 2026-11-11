@@ -37,7 +37,7 @@ function host(manifestOverride=null,existing=[]){
       },
       updateWorkspaceFolders(start,count,folder){
         opened.push({start,count,folder});
-        vscode.workspace.workspaceFolders.push(folder);
+        vscode.workspace.workspaceFolders.splice(start,count,folder);
         return true;
       }
     }
@@ -55,7 +55,7 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
   assert.ok(result.workspaceUpdated);
   assert.equal(h.opened.length,1);
   assert.equal(h.opened[0].folder.name,"skill-studio-demo");
-  assert.equal(result.root.path,"/global-storage/workspaces/skill-studio-demo");
+  assert.equal(result.root.path,"/global-storage/workspaces");
   assert.equal(result.skillsRoot.path,result.root.path+"/skills");
   assert.equal(result.libraryRoot.path,result.root.path+"/lib");
   assert.equal(result.outputRoot.path,result.root.path+"/output");
@@ -68,10 +68,10 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
     const p=result.procedures[name].path;
     const text=new TextDecoder().decode(h.files.get(p));
     assert.match(text,/procedures:/);
-    assert.ok(h.files.has("/global-storage/workspaces/skill-studio-demo/skills/"+name+"/SKILL.md"));
-    assert.ok(h.files.has("/global-storage/workspaces/skill-studio-demo/skills/"+name+"/assurance/contract.yaml"));
+    assert.ok(h.files.has("/global-storage/workspaces/skills/"+name+"/SKILL.md"));
+    assert.ok(h.files.has("/global-storage/workspaces/skills/"+name+"/assurance/contract.yaml"));
   }
-  assert.ok(h.files.has("/global-storage/workspaces/skill-studio-demo/skills/establish-pdu-session/scripts/build_n1n2_delivery.py"));
+  assert.ok(h.files.has("/global-storage/workspaces/skills/establish-pdu-session/scripts/build_n1n2_delivery.py"));
   assert.equal(result.procedure.path,result.procedures["establish-pdu-session"].path);
 });
 test("New project keeps imported library and generated output empty and isolated",async()=>{
@@ -101,13 +101,32 @@ test("A user workspace named skills is not repurposed for the demo",async()=>{
   const userRoot={name:"skills",uri:uri("/user-project/skills")};
   const h=host(null,[userRoot]);
   const result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
-  assert.equal(result.root.path,"/global-storage/workspaces/skill-studio-demo");
+  assert.equal(result.root.path,"/global-storage/workspaces");
   assert.equal(result.skillsRoot.path,result.root.path+"/skills");
   assert.equal(h.opened.length,1);
   assert.equal(h.opened[0].start,1);
   assert.equal(h.opened[0].folder.name,"skill-studio-demo");
   assert.equal(h.files.has("/user-project/skills/SKILL.md"),false);
 });
+test("Existing legacy skills Workspace is upgraded in place without losing edited Source",async()=>{
+  const oldSkills=uri("/global-storage/workspaces/skills");
+  const h=host(null,[{name:"skills",uri:oldSkills}]);
+  const edited="/global-storage/workspaces/skills/establish-pdu-session/SKILL.md";
+  const custom=new TextEncoder().encode("# keep my edited SKILL content");
+  h.files.set(edited,custom);
+  const result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
+  assert.equal(result.root.path,"/global-storage/workspaces");
+  assert.equal(result.skillsRoot.path,oldSkills.path);
+  assert.equal(result.created,manifest.files.length-1);
+  assert.equal(result.skipped,1);
+  assert.equal(result.workspaceUpdated,true);
+  assert.deepEqual(h.opened.map(x=>({start:x.start,count:x.count})),[{start:0,count:1}]);
+  assert.deepEqual(h.vscode.workspace.workspaceFolders.map(x=>x.uri.path),[result.root.path]);
+  assert.deepEqual(h.files.get(edited),custom);
+  assert.ok(await h.vscode.workspace.fs.stat(result.libraryRoot));
+  assert.ok(await h.vscode.workspace.fs.stat(result.outputRoot));
+});
+
 test("Malformed, cross-package, traversing or duplicate manifests refuse writes",async()=>{
   const wrong=[
     {...manifest,files:[...manifest.files,"../outside"]},
