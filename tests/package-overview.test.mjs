@@ -121,7 +121,7 @@ test('Compiler project Package Overview scans only skills, never lib or output',
     '/project/output/alpha/assurance/procedure.yaml'
   ].map(uri);
   const commands=new Map();
-  let patternUsed=null;
+  let patternUsed=null,scanBase=null;
   class Emitter {constructor(){this.event=()=>{};}fire(){}dispose(){}}
   class Item {constructor(label,collapsibleState){this.label=label;this.collapsibleState=collapsibleState;}}
   class RelativePattern {constructor(base,pattern){this.baseUri=base;this.pattern=pattern;}}
@@ -136,7 +136,7 @@ test('Compiler project Package Overview scans only skills, never lib or output',
         if(target.path==='/project/skills')return {type:2};
         throw Object.assign(Error('missing'),{code:'FileNotFound'});
       }},
-      async findFiles(pattern){patternUsed=pattern.pattern;return inventoryFiles;},
+      async findFiles(pattern){patternUsed=pattern.pattern;scanBase=pattern.baseUri.path;return inventoryFiles;},
       asRelativePath:target=>target.path.slice('/project/'.length),
       onDidChangeWorkspaceFolders:noop
     },
@@ -146,7 +146,8 @@ test('Compiler project Package Overview scans only skills, never lib or output',
   const context={subscriptions:[]};
   registerPackageOverview(vscode,context);
   const scan=await commands.get('skillStudio.refreshPackages')();
-  assert.equal(patternUsed,'skills/**/*');
+  assert.equal(patternUsed,'**/*');
+  assert.equal(scanBase,'/project/skills');
   assert.deepEqual(scan.packages.map(pkg=>pkg.name),['alpha']);
   assert.equal(scan.packages[0].fileCount,4);
   assert.equal(scan.packages[0].corePresent,3);
