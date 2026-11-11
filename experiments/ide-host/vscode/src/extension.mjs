@@ -168,7 +168,13 @@ export function activate(context){
       });
       const incoming=webview.onDidReceiveMessage(async message=>{
         if(disposed||typeof message!=="object"||!message)return;
-        if(message.type==="selection"){if(panel.active)workbench.select(document,message);return;}
+        if(message.type==="selection"){
+          // A visible Procedure editor can lose active status when the user
+          // opens the Evidence sidebar. Its real graph selection still belongs
+          // to this editor; only hidden Webviews must be ignored.
+          if(panel.active||panel.visible)workbench.select(document,message);
+          return;
+        }
         if(message.type==="rendered"){
           if(message.version===document.version)console.log("STUDIO_OPEN_TIMING",JSON.stringify({version:document.version,hostToRenderMs:performance.now()-openedAt,projectionMs:message.projectionMs,layoutMs:message.layoutMs,cacheHit:message.cacheHit}));
           return;
