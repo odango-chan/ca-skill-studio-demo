@@ -31,7 +31,7 @@ export function isAllowedPackageRelativeLink(href,currentDirRelative,allowedFile
   if(/^(?:https?:|mailto:|tel:)/i.test(href))return true;
   if(/^[A-Za-z][A-Za-z0-9+.-]*:/.test(href)||href.startsWith("//"))return false;
   const rawPath=href.split(/[?#]/,1)[0];
-  if(!rawPath||rawPath.startsWith("/")||rawPath.includes("\\\\")||
+  if(!rawPath||rawPath.startsWith("/")||rawPath.includes("\\")||
      /%(?:2f|5c)/i.test(rawPath))return false;
   const segments=(currentDirRelative??"").split("/").filter(Boolean);
   try{
@@ -163,7 +163,7 @@ export async function prepareNativeMarkdownPackagePolicy(vscode,uri){
     for(const file of files){
       if(!file.path.startsWith(rootPath+"/"))continue;
       const relative=file.path.slice(rootPath.length+1);
-      if(relative.toLowerCase().endsWith(".md"))markdownUris.push(file);
+      if(relative.toLowerCase().endsWith(".md")&&allowedExtensions.has(".md"))markdownUris.push(file);
       const extension=relative.slice(relative.lastIndexOf(".")).toLowerCase();
       if(!allowedExtensions.has(extension))continue;
       const segments=relative.split("/");
@@ -181,6 +181,8 @@ export async function prepareNativeMarkdownPackagePolicy(vscode,uri){
       }
       if(safe)allowedFiles.add(relative);
     }
+    const currentRelative=uri.path.slice(rootPath.length+1);
+    if(!allowedFiles.has(currentRelative))return deny();
     if(!markdownUris.some(file=>file.toString()===uri.toString()))
       markdownUris.push(uri);
     setNativeMarkdownPackagePolicies(markdownUris,{
