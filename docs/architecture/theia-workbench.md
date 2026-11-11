@@ -1,6 +1,8 @@
 # Theia 工作台与 Classic 功能对照
 
-**Status: D4-A2.1 Output Reference (#116), D4-A4a Phase Route (#118) and D4-A4b1 observed Phase Outcome repair (#119) merged on main@a19f9886; all three have exact-head four-gate CI PASS · Date: 2026-11-10**
+**Status: Functional migration history · Current view placement and naming are superseded by [ADR-0003](../decisions/0003-native-workbench-and-markdown.md) · Date: 2026-11-11**
+
+本文件保留功能迁移与实现边界记录；不要再把这里的旧 Activity Bar / Evidence 视图名称当作最终工作台布局。当前决策：Inspector 位于右侧原生 Secondary Sidebar；原 Evidence 视图是静态 Source Data Flow，改为 Inspector 内的 Data Flow 区域；Outline / Problems 收敛到宿主原生视图。
 
 第一阶段跟踪 [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)。剩余完整迁移跟踪 [#95](https://github.com/odango-chan/ca-skill-studio-demo/issues/95)。此表描述代码范围；Inspector Node authoring 见 [PR #96](https://github.com/odango-chan/ca-skill-studio-demo/pull/96)；Phase Input Binding 见 [PR #97](https://github.com/odango-chan/ca-skill-studio-demo/pull/97)；Node insert/delete 见 [PR #98](https://github.com/odango-chan/ca-skill-studio-demo/pull/98)；Phase Verify 受限编辑见 [PR #99](https://github.com/odango-chan/ca-skill-studio-demo/pull/99)；画布工具栏与 Root 路径筛选见 [PR #106](https://github.com/odango-chan/ca-skill-studio-demo/pull/106)；命名 Step / Verify 生命周期见 [PR #108](https://github.com/odango-chan/ca-skill-studio-demo/pull/108)；只读 Producer/Consumer Evidence 见已合并的 [PR #111](https://github.com/odango-chan/ca-skill-studio-demo/pull/111)（merge `50eb16d5`）；Package ZIP export 见已合并的 [PR #114](https://github.com/odango-chan/ca-skill-studio-demo/pull/114)（merge `1401530b`）。Classic 完整保留在 `/classic/`，不删除功能或复制业务规则。
 
@@ -11,7 +13,7 @@
 | 单击 / 双击 | 自有导航 | 委托 Theia 原生 Explorer | 预览 / 固定行为由宿主控制，不拦截树事件；真实 Chromium 门禁检查原生文件打开和预览标签晋升 |
 | Inspection / Inspector | 选择详情及有界编辑 | 原生树视图；Node 重命名/Operator 值（#96 MERGED）与 Node 插入/删除（#98 MERGED）已迁移 | 复用 workspace、node-designer、node-attributes、node-create、node-delete；宿主以 Source revision 校验、Diff/显式确认和 WorkspaceEdit 写入；复杂 Node 仍 fail-closed |
 | Outline | Procedure / Node 导航 | 原生树视图 | 所有 Procedure / Node；点击定位 Source 并同步图中 Node Focus；版本失效拒绝旧导航 |
-| Evidence | Phase 输入/输出与消费者合同 | 源码 Child / Phase / Step + 选中 Node 的 Producer/Consumer dataflow 与 Consumer ABI 证据（#111 MERGED） | 复用 `phase-dataflow`、`phase-consumer-contract`、`phase-evidence-copy`；只显示 Source 可证明的生产者来源、消费者字段/类型与不确定原因；TYPE_ONLY_MATCH 仅表示类型一致，不是完整 ABI 证明；authorizedWrites 恒为 0；不表示 Runtime evidence |
+| Data Flow（旧 Evidence 视图名） | Phase 输入/输出与消费者合同 | 源码 Child / Phase / Step + 选中 Node 的 Producer/Consumer dataflow 与 Consumer ABI 声明（#111 MERGED） | 复用 `phase-dataflow`、`phase-consumer-contract`、`phase-evidence-copy`；只显示 Source 可证明的生产者来源、消费者字段/类型与不确定原因；TYPE_ONLY_MATCH 仅表示类型一致，不是完整 ABI 证明；authorizedWrites 恒为 0；不表示 Runtime Evidence 或 live Observation；按 ADR-0003 收敛为 Inspector 内的 Data Flow 区域 |
 | Problems / Package Audit | 编辑期跨文件提醒 | 原生视图及宿主诊断 collection | 直接复用 package-audit；读取当前 Package 和已打开的未保存文档；缺必要文件明确 unavailable |
 | Markdown Preview | 安全只读预览 | 原生命令 / Explorer 右键预览 | 直接复用 markdown-preview；无脚本、无外部图像；随文档变化刷新 |
 | Route 创建 / 重连 / Diff / Apply / Undo | 有界实现 | 已有且保留 | 复用 route-connect / route-target、原生 WorkspaceEdit；仍要求 Diff 后显式确认 |
