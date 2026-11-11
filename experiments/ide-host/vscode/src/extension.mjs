@@ -57,7 +57,7 @@ export function activate(context){
   // immutable storage and Build UI. Not contributed to the command palette;
   // no execution/Runtime credentials or external requests.
   if(typeof globalThis.location!=="undefined"&&
-      /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(globalThis.location.hostname)){
+      ["localhost","127.0.0.1"].includes(globalThis.location.hostname)){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.pluginManagedAcceptance",async()=>{
         const folders=vscode.workspace.workspaceFolders??[];
