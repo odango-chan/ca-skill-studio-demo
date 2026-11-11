@@ -1,0 +1,152 @@
+/* Native VS Code/Theia Markdown preview skin.
+ * Kept in the shared theme extension so browser Theia and desktop VS Code
+ * use the same visual contract. The Markdown extension owns rendering. */
+:root {
+  color-scheme: light;
+}
+html {
+  background: var(--vscode-editor-background, #ffffff);
+}
+body {
+  box-sizing: border-box;
+  max-width: 980px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 28px clamp(18px, 4vw, 52px) 64px;
+  color: var(--vscode-editor-foreground, #20314a);
+  background: var(--vscode-editor-background, #ffffff);
+  font-family: var(--vscode-editor-font-family, system-ui, -apple-system, "Segoe UI", sans-serif);
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+h1, h2, h3, h4, h5, h6 {
+  color: var(--vscode-editor-foreground, #20314a);
+  line-height: 1.4;
+  font-weight: 650;
+  margin: 1.5em 0 .55em;
+}
+h1, h2 {
+  color: var(--vscode-skillstudio-markdownheading, #0c8e7b);
+}
+h1 {
+  font-size: 24px;
+  letter-spacing: -.02em;
+  margin-top: .2em;
+  padding-bottom: .4em;
+  border-bottom: 1px solid var(--vscode-panel-border, #e1e7ef);
+}
+h2 {
+  font-size: 19px;
+  padding-bottom: .32em;
+  border-bottom: 1px solid var(--vscode-panel-border, #e1e7ef);
+}
+h3 {
+  font-size: 16px;
+  padding-left: .65em;
+  border-left: 2px solid var(--vscode-skillstudio-markdownheading, #0c8e7b);
+}
+h4, h5, h6 { font-size: 14px; }
+p { margin: .65em 0 1em; }
+ul, ol { margin: .5em 0 1.1em; padding-left: 1.7em; }
+li { margin: .22em 0; }
+blockquote {
+  margin: 1.1em 0;
+  padding: .25em 1em;
+  border-left: 3px solid var(--vscode-focusBorder, #0c8e7b);
+  color: var(--vscode-descriptionForeground, #697e97);
+  background: var(--vscode-editorWidget-background, #fbfcfe);
+  border-radius: 0 6px 6px 0;
+}
+a {
+  color: var(--vscode-textLink-foreground, #087e72);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+a:hover { color: var(--vscode-textLink-activeForeground, #317dc0); }
+a:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder, #0c8e7b);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+code {
+  font-family: var(--vscode-editor-font-family, ui-monospace, Consolas, monospace);
+  font-size: .92em;
+  background: var(--vscode-editorWidget-background, #edf3f9);
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: var(--vscode-editor-foreground, #20314a);
+  overflow-wrap: anywhere;
+}
+pre {
+  overflow: auto;
+  max-width: 100%;
+  margin: 1.1em 0 1.4em;
+  padding: 13px 16px;
+  border: 1px solid var(--vscode-panel-border, #e1e7ef);
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background, #fbfcfe);
+  white-space: pre;
+  line-height: 1.55;
+}
+pre code {
+  color: var(--vscode-editor-foreground, #20314a);
+  font-size: 12.5px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+table {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  max-width: 100%;
+  max-height: 65vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 1.1em 0 1.4em;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--vscode-panel-border, #e1e7ef);
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+th, td {
+  padding: 9px 12px;
+  min-width: 72px;
+  max-width: 460px;
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: anywhere;
+  border-right: 1px solid var(--vscode-panel-border, #e1e7ef);
+  border-bottom: 1px solid var(--vscode-panel-border, #e1e7ef);
+}
+th:last-child, td:last-child { border-right: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--vscode-sideBarSectionHeader-background, #edf3f9);
+  color: var(--vscode-editor-foreground, #20314a);
+  font-weight: 650;
+}
+tbody tr:nth-child(even) { background: var(--vscode-editorWidget-background, #fbfcfe); }
+tbody tr:hover { background: var(--vscode-list-hoverBackground, #eef5f8); }
+hr {
+  border: 0;
+  border-top: 1px solid var(--vscode-panel-border, #e1e7ef);
+  margin: 1.6em 0;
+}
+@media (max-width: 680px) {
+  body { padding: 22px 16px 48px; font-size: 13px; }
+  h1 { font-size: 21px; }
+  h2 { font-size: 17px; }
+  th, td { padding: 8px 10px; }
+}
