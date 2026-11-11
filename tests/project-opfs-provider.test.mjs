@@ -24,6 +24,7 @@ function fixture(){
     async open(target){const id=fd++;descriptors.set(id,norm(target));return id;},
     async write(id){actions.push(["write",id]);return 1;},
     async close(id){descriptors.delete(id);},
+    async createIndex(entries){actions.push(["createIndex",...entries.keys()].map(norm));},
     async clear(){actions.push(["clear"]);nodes.clear();}
   };
   const provider=protectOpfsProvider(base);
@@ -86,6 +87,20 @@ test("project detection starts only after complete triad exists, protects subseq
   await provider.writeFile(uri("/project/lib/seed.yaml"),new Uint8Array([1]),{create:true,overwrite:true});
   await provider.mkdir(uri("/project/output"));
   await denied(provider.writeFile(uri("/project/lib/after.yaml"),new Uint8Array([1]),{create:true,overwrite:true}));
+});
+
+test("bulk OPFS createIndex cannot bypass the protected project boundary",async()=>{
+  const {provider,actions}=fixture();
+  await denied(provider.createIndex(new Map([
+    [uri("/project/lib/generated.py"),new Uint8Array([1])]
+  ])));
+  await denied(provider.createIndex(new Map([
+    [uri("/project/output/manifest.json"),new Uint8Array([1])]
+  ])));
+  await provider.createIndex(new Map([
+    [uri("/project/skills/one/generated.py"),new Uint8Array([1])]
+  ]));
+  assert.deepEqual(actions,[["createIndex","/project/skills/one/generated.py"]]);
 });
 
 test("provider forbids native OPFS clear and has strict segment based roles",async()=>{
