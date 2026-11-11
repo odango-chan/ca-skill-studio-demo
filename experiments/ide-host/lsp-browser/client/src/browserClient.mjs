@@ -109,6 +109,14 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
             return new vscode.SemanticTokens(new Uint32Array());
           const data=Uint32Array.from(result?.data??[]);
           handlers.onSemanticTokenResult?.(uri,data.length/5);
+          if(data.length===0){
+            try{
+              const diagnostics=await client.sendRequest(
+                "skillStudio/semanticTokenDiagnostics",{uri}
+              );
+              handlers.onSemanticTokenServerDiagnostics?.(diagnostics);
+            }catch{/* Diagnostic request is acceptance-only and optional. */}
+          }
           return new vscode.SemanticTokens(data,result?.resultId);
         }catch(error){
           if(!stopped&&!terminalFailure){
