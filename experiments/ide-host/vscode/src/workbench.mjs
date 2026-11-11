@@ -53,6 +53,7 @@ export function registerWorkbench(vscode,context){
     languageStatusItem=null,languageTransportFailure=null;
   const semanticTokenDiagnostics={
     registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null,
+    renderer:null,renderedTokenCount:0,renderedTypeCount:0,renderError:null,
     server:null,transport:null
   };
   function encodeNativeSemanticTokens(document,spans){
@@ -189,6 +190,24 @@ export function registerWorkbench(vscode,context){
               semanticTokenDiagnostics.registered=status?.registered===true;
               semanticTokenDiagnostics.tokenTypeCount=status?.tokenTypeCount??0;
               semanticTokenDiagnostics.transport="browser-lsp";
+            },
+            onSemanticTokenRendererRegistered:status=>{
+              semanticTokenDiagnostics.renderer=status?.renderer??null;
+              semanticTokenDiagnostics.renderError=null;
+            },
+            onSemanticTokenRendererUnavailable:error=>{
+              semanticTokenDiagnostics.renderError=String(error);
+            },
+            onSemanticTokenRendered:(uri,result)=>{
+              semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
+              semanticTokenDiagnostics.renderedTokenCount=result?.tokenCount??0;
+              semanticTokenDiagnostics.renderedTypeCount=result?.tokenTypeCount??0;
+              semanticTokenDiagnostics.renderError=null;
+            },
+            onSemanticTokenRenderError:(uri,error)=>{
+              semanticTokenDiagnostics.lastUri=uri;
+              semanticTokenDiagnostics.renderError=String(error);
             },
             onSemanticTokenRequest:uri=>{
               semanticTokenDiagnostics.requests++;
