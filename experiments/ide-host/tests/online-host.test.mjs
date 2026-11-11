@@ -91,6 +91,7 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
 });
 
 function findMarkdownManifest(directory){
+  if(!existsSync(directory))return null;
   for(const entry of readdirSync(directory,{withFileTypes:true})){
     const target=join(directory,entry.name);
     if(!entry.isDirectory())continue;
