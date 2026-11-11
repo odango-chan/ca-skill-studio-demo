@@ -270,8 +270,10 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
             if(error?.code!=='FileNotFound')throw error;
           }
         }
-        const pattern = new vscode.RelativePattern(
-          root,sourceRoot?'skills/**/*':'**/*');
+        // Theia's OPFS findFiles implementation expects the RelativePattern
+        // base URI to be the directory actually traversed. Anchoring a
+        // 'skills/**/*' glob at the parent project root can return no files.
+        const pattern = new vscode.RelativePattern(sourceRoot??root,'**/*');
         const batch = await vscode.workspace.findFiles(
           pattern,'**/node_modules/**',remaining);
         const sourcePrefix = sourceRoot?.path ? (sourceRoot.path.endsWith('/') ? sourceRoot.path : sourceRoot.path+'/') : null;
