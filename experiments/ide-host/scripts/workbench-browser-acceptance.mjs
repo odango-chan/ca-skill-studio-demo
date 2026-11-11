@@ -2005,6 +2005,82 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     returnedGuideActive,mas:masOpen.view,traversalBlocked
   };
   console.log('STUDIO_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
+
+  // Isolated native Markdown preview experiment. The custom preview remains
+  // the default/fallback in this branch; this command proves the built-in
+  // Markdown extension can render beside the authoritative native Source.
+  const nativeMarkdownWorlds=new Map();
+  async function nativeMarkdownViews(){
+    const tree=await command('Page.getFrameTree'),found=[];
+    async function walk(node){
+      try{
+        let contextId=nativeMarkdownWorlds.get(node.frame.id);
+        if(!contextId){
+          const world=await command('Page.createIsolatedWorld',{
+            frameId:node.frame.id,worldName:'native-markdown-spike-acceptance',
+            grantUniveralAccess:true
+          });
+          contextId=world.executionContextId;
+          nativeMarkdownWorlds.set(node.frame.id,contextId);
+        }
+        const result=await command('Runtime.evaluate',{
+          contextId,returnByValue:true,
+          expression:'(()=>{const heading=document.querySelector("h1");if(!heading)return null;const body=getComputedStyle(document.body),title=getComputedStyle(heading),styles=[...document.querySelectorAll("link[rel=stylesheet]")].map(x=>x.href),table=document.querySelector("table");return {heading:heading.textContent.trim(),headingColor:title.color,bodyColor:body.color,maxWidth:body.maxWidth,styles,tableCount:document.querySelectorAll("table").length,tableDisplay:table?getComputedStyle(table).display:null,tableMaxHeight:table?getComputedStyle(table).maxHeight:null};})()'
+        });
+        if(result.result?.value?.heading)
+          found.push({contextId,frameUrl:node.frame.url,...result.result.value});
+      }catch{
+        nativeMarkdownWorlds.delete(node.frame.id);
+      }
+      for(const child of node.childFrames??[])await walk(child);
+    }
+    await walk(tree.frameTree);
+    return found;
+  }
+  async function waitNativeMarkdown(predicate,label){
+    let views=[];
+    for(let attempt=0;attempt<80;attempt++){
+      views=await nativeMarkdownViews();
+      const view=views.find(predicate);
+      if(view)return {view,views};
+      await sleep(100);
+    }
+    throw Error(label+' did not appear in a real Theia Markdown Webview: '+JSON.stringify(views));
+  }
+  const nativeMarkdownUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance','establish-pdu-session');
+  if(typeof nativeMarkdownUri!=='string'||!nativeMarkdownUri.endsWith('/SKILL.md'))
+    throw Error('Native Markdown preview command did not open the exact Skill Source URI: '+
+      JSON.stringify(nativeMarkdownUri));
+  const nativeMarkdown=await waitNativeMarkdown(view=>
+    view.heading==='Establish PDU Session'&&
+    view.styles.some(url=>url.includes('odango_chan_skill_studio_theme')&&
+      url.includes('markdown-preview.css')),
+    'Studio-themed native Markdown preview');
+  if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||
+     nativeMarkdown.view.maxWidth!=='980px')
+    throw Error('Native Markdown preview did not apply the shared Studio theme: '+
+      JSON.stringify(nativeMarkdown.view));
+  const nativeMarkdownGroups=await evalJS(
+    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>"+
+    "tab.textContent.trim().includes('SKILL.md'));const groups=new Map();for(const tab of tabs){"+
+    "const bar=tab.parentElement;if(!groups.has(bar)){const r=bar.getBoundingClientRect();"+
+    "groups.set(bar,{index:groups.size,labels:[],rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}"+
+    "groups.get(bar).labels.push(tab.textContent.trim());}return [...groups.values()];})()");
+  const nativeSourceGroup=nativeMarkdownGroups.find(group=>
+    group.labels.some(label=>label==='SKILL.md'));
+  const nativePreviewGroup=nativeMarkdownGroups.find(group=>
+    group.labels.some(label=>label!=='SKILL.md'));
+  if(!nativeSourceGroup||!nativePreviewGroup||
+     nativeSourceGroup.index===nativePreviewGroup.index)
+    throw Error('Native Markdown must keep editable Source and Preview in separate editor groups: '+
+      JSON.stringify(nativeMarkdownGroups));
+  const nativeMarkdownEvidence={
+    uri:nativeMarkdownUri,preview:nativeMarkdown.view,
+    sourceGroup:nativeSourceGroup,previewGroup:nativePreviewGroup
+  };
+  console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
+
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
   await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
   let contractView=null,contractFrame=null,contractContextId=null;
