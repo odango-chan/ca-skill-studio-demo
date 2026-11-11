@@ -245,8 +245,6 @@ export function activate(context){
       let stage="seed-example";
       try{
         const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri);
-        stage="open-procedure";
-        await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
         stage="show-packages";
         // User-triggered import should end in the real native Packages view.
         // View-container activation is a host command: fall back gracefully
@@ -266,6 +264,11 @@ export function activate(context){
           console.warn("SKILL Package reveal unavailable:",String(error?.message??error));
           await packageOverview.refresh();
         }
+        // Keep the visible Packages sidebar, but return keyboard focus to
+        // the real Procedure CustomEditor after the sidebar is prepared.
+        // This preserves Source editor shortcuts and native Go to Line.
+        stage="open-procedure";
+        await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
         void vscode.window.showInformationMessage(
           "示例项目已载入：skills/（传统 5GC + MAS）、lib/（待导入 Tool 契约）、"+
           "output/（待生成编译产物）。新增 "+result.created+" 个文件，"+
