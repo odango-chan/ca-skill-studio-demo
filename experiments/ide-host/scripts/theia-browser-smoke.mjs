@@ -1214,12 +1214,6 @@ try{
       patchEvidence={preview:previewEvidence,applied:null};
     }
   }
-  // Run the new Package Overview sidebar acceptance after the existing
-  // canvas Route gestures. Opening a new Activity Bar container resizes and
-  // refocuses the workbench; it must not perturb the preceding graph gestures.
-  const packageOverviewEvidence=await runPackageOverviewAcceptance({
-    command,evalJS,sleep,requireEditor
-  });
   console.log("STUDIO_THEIA_STAGE","native-workbench");
   const evalWebviewJS=async expression=>{
     // Native editor interactions above can recreate the Webview iframe.
@@ -1276,6 +1270,16 @@ try{
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp
   });}
   catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
+  // Run Package Overview last: opening the second Skill's visual Source must
+  // not alter the Procedure Webview used by the preceding authoring regression.
+  const packageOverviewEvidence=await runPackageOverviewAcceptance({
+    command,evalJS,sleep,requireEditor
+  });
+  if(requireEditor&&(!packageOverviewEvidence?.twoSkills||
+      packageOverviewEvidence.evidence?.skills?.length!==2))
+    throw Error("Two-SKILL Package Overview Chromium acceptance did not complete: "+
+      JSON.stringify(packageOverviewEvidence));
+  console.log("STUDIO_THEIA_STAGE","package-overview");
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={shellReadyMs,workbenchEvidence,packageOverviewEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
@@ -1384,7 +1388,7 @@ try{
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; PHASE_DATAFLOW_EVIDENCE_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; PHASE_DATAFLOW_EVIDENCE_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS; PACKAGE_OVERVIEW_TWO_SKILLS_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }finally{
