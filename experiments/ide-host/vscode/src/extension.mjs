@@ -53,52 +53,57 @@ export function activate(context){
   buildView=registerBuildView(vscode,context,{
     getProjectRoot:()=>dependenciesView.getProjectRoot()
   });
-  // Browser acceptance command exercises actual native Settings, workspace.fs
-  // immutable storage and Build UI. Not contributed to the command palette;
-  // no execution/Runtime credentials or external requests.
-  if(typeof globalThis.location!=="undefined"&&
-      ["localhost","127.0.0.1"].includes(globalThis.location.hostname)){
-    context.subscriptions.push(vscode.commands.registerCommand(
-      "skillStudio.internal.pluginManagedAcceptance",async()=>{
-        const folders=vscode.workspace.workspaceFolders??[];
-        const folder=folders.find(f=>f.uri.path.endsWith("/skill-studio-example-v01"));
-        if(!folder)throw Error("Browser test Example project root not mounted");
-        const root=folder.uri,before=readProjectConfiguration(vscode,root);
+  // Hidden browser regression command: exercises actual Theia Extension APIs.
+  // The CI harness invokes each stage separately to locate a failing host
+  // operation; no normal user command or auto-run is introduced.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.pluginManagedAcceptance",async(phase)=>{
+      const folder=(vscode.workspace.workspaceFolders??[]).find(f=>
+        f.uri.path.endsWith("/skill-studio-example-v01"));
+      if(!folder)throw Error("Browser v0.1 acceptance: Example root is not mounted");
+      const root=folder.uri,probeId="browser-v01-acceptance";
+      if(phase==="pin"){
+        const before=readProjectConfiguration(vscode,root);
         if(before.settings.skillsRoot!=="skills"||
            before.settings.dependencies.length!==0||
            before.settings.dependencyLock.entries.length!==0)
-          throw Error("Browser Example should start with empty dependency settings");
-        const probeId="browser-v01-acceptance";
+          throw Error("Browser Example must start with empty dependency settings");
         const acquired=await acquireBuiltin({
           bundleId:"studio-example-tools",version:"1.0.0"});
         const state=await applyDependency(vscode,root,probeId,acquired,
           {confirm:async()=>true});
-        if(state.status!=="READY")throw Error("Browser pinned import did not resolve READY");
-        const locked=readProjectConfiguration(vscode,root);
-        if(locked.settings.dependencies.length!==1||
-           locked.settings.dependencyLock.entries.length!==1||
-           locked.settings.dependencies[0].id!==probeId)
-          throw Error("Browser native Workspace settings did not persist declaration and lock");
+        if(state.status!=="READY")
+          throw Error("Browser pinned dependency import did not resolve READY");
+        return {phase,status:"PASS",pinnedStatus:state.status};
+      }
+      if(phase==="verify"){
+        const project=readProjectConfiguration(vscode,root);
+        if(project.settings.dependencies.length!==1||
+           project.settings.dependencyLock.entries.length!==1||
+           project.settings.dependencies[0].id!==probeId)
+          throw Error("Workspace configuration did not persist declaration and lock");
         const restored=await resolveLockedDependencies(vscode,root);
         if(restored.status!=="READY"||restored.snapshots.length!==1)
-          throw Error("Browser native file store failed immutable reload");
+          throw Error("Native Workspace fs failed pinned snapshot reload");
         await vscode.commands.executeCommand("skillStudio.selectProjectRoot");
-        const compiler=await vscode.commands.executeCommand("skillStudio.checkProject");
-        if(compiler?.status!=="UNAVAILABLE")
-          throw Error("Browser Build must be UNAVAILABLE without v0.1 Core");
+        const build=await vscode.commands.executeCommand("skillStudio.checkProject");
+        if(build?.status!=="UNAVAILABLE")
+          throw Error("Real Compiler v0.1 ABI not installed: Build must be UNAVAILABLE");
+        return {phase,status:"PASS",pinnedStatus:restored.status,
+          buildStatus:build.status,snapshotDigest:restored.snapshots[0].snapshotDigest};
+      }
+      if(phase==="remove"){
         const removed=await removeDependency(vscode,root,probeId,
           {confirm:async()=>true});
         const after=readProjectConfiguration(vscode,root);
         if(removed.status!=="READY"||after.settings.dependencies.length!==0||
            after.settings.dependencyLock.entries.length!==0)
-          throw Error("Browser Workspace config did not persist dependency removal");
-        return {status:"PASS",workspaceRoot:root.toString(),
-          snapshotDigest:locked.settings.dependencyLock.entries[0].snapshotDigest,
-          pinnedStatus:restored.status,buildStatus:compiler.status,
-          declarationCount:after.settings.dependencies.length,
-          sourceRoot:before.settings.skillsRoot};
+          throw Error("Dependency removal did not persist in Workspace Configuration");
+        return {phase,status:"PASS",declarationCount:0};
       }
-    ));
+      throw Error("Unknown Browser v0.1 acceptance phase");
+    }
+  ));
   }
   const provider={
     async resolveCustomTextEditor(document,panel){
