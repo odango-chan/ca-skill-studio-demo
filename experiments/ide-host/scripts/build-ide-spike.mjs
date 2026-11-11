@@ -2,7 +2,7 @@
 // No change to the existing Pages app or its dist/ output.
 import {build} from "esbuild";
 import {mkdir,rm,cp,readdir,readFile,appendFile} from "node:fs/promises";
-import {join} from "node:path";
+import {dirname,join} from "node:path";
 const root="experiments/ide-host/vscode";
 await rm(join(root,"dist"),{recursive:true,force:true});
 await rm(join(root,"media"),{recursive:true,force:true});
