@@ -45,7 +45,8 @@
     "@theia/search-in-workspace": "1.76.0",
     "@theia/outline-view": "1.76.0",
     "@theia/variable-resolver": "1.76.0",
-    "@theia/userstorage": "1.76.0"
+    "@theia/userstorage": "1.76.0",
+    "@odango-chan/skill-studio-project-filesystem": "file:../project-filesystem"
   },
   "devDependencies": {
     "@theia/cli": "1.76.0"
