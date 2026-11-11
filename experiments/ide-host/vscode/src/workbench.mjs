@@ -596,8 +596,8 @@ export function registerWorkbench(vscode,context){
           .map(item=>typeof item==="string"?item:item?.value??String(item??""))
           .join(" ");
         if(!hoverText.includes("Skill Script")||
-           !hoverText.includes("select-establishment-configuration"))
-          throw Error("Hover provider did not return the declared Skill Script metadata");
+           !hoverText.includes(scriptPathValue))
+          throw Error("Hover provider did not return the exact Skill Script path");
         const packageRoot=packageRootForProcedure(vscode,procedureDocument);
         const packageState=packageRoot?languagePackages.get(packageRoot.uri.toString()):null;
         if(!packageState)throw Error("Active Procedure Package has no Language Service state");
@@ -608,8 +608,10 @@ export function registerWorkbench(vscode,context){
         const scriptLines=scriptDocument.getText().split(/\r\n|\n|\r/);
         const nameLine=scriptLines.findIndex(line=>line==="# name: select-establishment-configuration");
         const schemaLine=scriptLines.findIndex(line=>line==="# inputSchema: EstablishmentSelectionInput");
-        if(nameLine<0||schemaLine<0)
-          throw Error("Python Source is missing the declared name or inputSchema metadata");
+        const mainLine=scriptLines.findIndex(line=>/^(?:async )?def main\(/.test(line));
+        const legacyMetadata=nameLine>=0&&schemaLine>=0;
+        if(!legacyMetadata&&mainLine<0)
+          throw Error("Python Source has neither legacy metadata nor a canonical main() entrypoint");
         await openNativeSource(vscode,scriptUri,{preview:true});
         // Opening a previously closed Package Source must advance the Package
         // generation. Waiting only for READY can accidentally observe the old
@@ -638,7 +640,9 @@ export function registerWorkbench(vscode,context){
               sentSnapshot:packageState.lastSentSnapshot??null
             }));
         }
-        const referencePosition=new vscode.Position(nameLine,"# name: ".length);
+        const referencePosition=legacyMetadata
+          ?new vscode.Position(nameLine,"# name: ".length)
+          :new vscode.Position(mainLine,"def ".length);
         const referenceResult=await vscode.commands.executeCommand(
           "vscode.executeReferenceProvider",scriptUri,referencePosition);
         const references=Array.isArray(referenceResult)?referenceResult:[];
@@ -650,6 +654,12 @@ export function registerWorkbench(vscode,context){
         const symbols=Array.isArray(symbolResult)?symbolResult:[];
         if(!symbols.some(item=>item.name==="main"))
           throw Error("Python Document Symbols did not include main()");
+        // ca-skills now owns Python TypedDict/Annotated ABI definitions in
+        // source. The historical # inputSchema completion probe applies only
+        // to legacy metadata-based scripts; never invent a schema ref for the
+        // canonical form when no such file/annotation is declared.
+        let schemaCompletion="N/A: Python source annotations";
+        if(legacyMetadata){
         const schemaPosition=new vscode.Position(schemaLine,scriptLines[schemaLine].length);
         const schemaHoverResult=await vscode.commands.executeCommand(
           "vscode.executeHoverProvider",scriptUri,
@@ -677,6 +687,8 @@ export function registerWorkbench(vscode,context){
               packageGeneration:packageState.generation,
               languageStatus:languageStatusItem?.text??"missing",
               languageTooltip:languageStatusItem?.tooltip??""}));
+          schemaCompletion="EstablishmentSelectionInput";
+        }
         // The native provider probe opened a Python editor. Restore the
         // Procedure CustomEditor so subsequent workbench actions (notably
         // native Undo) continue to target the visual editor under test.
@@ -686,11 +698,11 @@ export function registerWorkbench(vscode,context){
           hover:hovers.length,
           references:references.length,
           symbols:symbols.map(item=>item.name),
-          schemaCompletion:"EstablishmentSelectionInput",
+          schemaCompletion,
           procedureLanguage:procedureDocument.languageId,
           scriptLanguage:scriptDocument.languageId,
           procedureLine,
-          nameLine,
+          nameLine:legacyMetadata?nameLine:mainLine,
           schemaLine
         };
       }
