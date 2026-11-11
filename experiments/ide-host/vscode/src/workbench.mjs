@@ -2412,14 +2412,24 @@ export function registerWorkbench(vscode,context){
       await vscode.window.showTextDocument(doc,{
         viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:true
       });
-      await vscode.commands.executeCommand('markdown.showPreviewToSide',uri);
+      // Do not await the host Preview command: some Theia PluginHost builds
+      // resolve it only after the Webview has completed its first render. The
+      // command itself must return promptly so callers can observe that render.
+      const opening=vscode.commands.executeCommand('markdown.showPreviewToSide',uri);
       paired=true;
+      void Promise.resolve(opening).then(
+        ()=>setTimeout(()=>nativeMarkdownOpening.delete(key),500),
+        error=>{
+          nativeMarkdownOpening.delete(key);
+          void vscode.window.showWarningMessage(
+            '原生 Markdown 预览未能打开：'+String(error?.message??error));
+        }
+      );
       return true;
     }finally{
-      // The normal custom-preview auto-opener is deliberately suppressed only
-      // for this URI while the native command is creating its paired Preview.
-      if(paired)setTimeout(()=>nativeMarkdownOpening.delete(key),0);
-      else nativeMarkdownOpening.delete(key);
+      // The native Preview command owns the suppression lifetime after it has
+      // been started. Failed Source preparation still releases it immediately.
+      if(!paired)nativeMarkdownOpening.delete(key);
     }
   }
   context.subscriptions.push(
