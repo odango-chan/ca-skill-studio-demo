@@ -239,7 +239,7 @@ function addUserDefinedFallback(root, context, spans) {
       for (const pair of node.items) {
         const key = scalarText(pair.key);
         const parentIsInputMap = path[0] === "procedures" &&
-          path.length === 2 && path[1] === "inputs";
+          path.length === 3 && path[2] === "inputs";
         const parentIsWithMap = path[0] === "procedures" &&
           path.includes("with") &&
           (path.includes("nodes") || path.includes("steps"));
@@ -315,7 +315,8 @@ function addYamlSelectors(root, paths, spans) {
   if (!root) return;
   for (const token of catalog.spec.tokens) {
     for (const selector of token.selectors ?? []) {
-      if (!selector.yamlPath || !selectorMatches(selector, paths)) continue;
+      if (!selector.yamlPath || !selectorMatches(selector, paths) ||
+          (selector.supportStatus && selector.supportStatus !== "current")) continue;
       const selected = selectYamlPath(root, selector.yamlPath, selector.mapKey === true);
       for (const node of selected) {
         if (selector.scalarValue === true && !isScalar(node)) continue;
@@ -338,10 +339,13 @@ export function collectSkillSemanticTokenSpans(text, path = "") {
     addYamlSelectors(root, paths, spans);
     addUserDefinedFallback(root, context, spans);
   }
-  return [...spans.values()]
-    .sort((a, b) => a.start - b.start || a.end - b.end || b.priority - a.priority)
-    .filter((span, index, all) =>
-      index === 0 || span.start >= all[index - 1].end);
+  const accepted = [];
+  for (const candidate of [...spans.values()]
+    .sort((a, b) => b.priority - a.priority || a.start - b.start || a.end - b.end)) {
+    if (accepted.some(item => candidate.start < item.end && item.start < candidate.end)) continue;
+    accepted.push(candidate);
+  }
+  return accepted.sort((a, b) => a.start - b.start || a.end - b.end);
 }
 
 export function encodeSkillSemanticTokens(model, spans) {
