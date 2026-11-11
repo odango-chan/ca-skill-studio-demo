@@ -2054,8 +2054,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify(nativeMarkdownUri));
   const nativeMarkdown=await waitNativeMarkdown(view=>
     view.heading==='Establish PDU Session'&&
-    view.styles.some(url=>url.includes('odango_chan_skill_studio_theme')&&
-      url.includes('markdown-preview.css')),
+    view.styles.some(url=>url.includes('/styles/markdown-preview.css')),
     'Studio-themed native Markdown preview');
   if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||
      nativeMarkdown.view.maxWidth!=='980px')
