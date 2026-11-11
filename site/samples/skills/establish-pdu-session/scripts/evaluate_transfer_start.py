@@ -1,20 +1,13 @@
-# /// connectionagent-tool
-# name: evaluate-transfer-start
-# inputSchema: TransferStartEvaluationInput
-# outputSchema: PredicateEvaluationResult
-# effect: local_compute
-# sandbox:
-#   network: denied
-# timeout: 1s
-# ///
+from typing import Annotated, Literal, TypedDict
 
-class TransferStartEvaluationInput(dict):
-    pass
 
-class PredicateEvaluationResult(dict):
-    pass
+class PredicateEvaluationResult(TypedDict):
+    result: Literal["PASS", "FAIL", "UNKNOWN"]
+    reasonCode: Annotated[str, {"pattern": r"^[A-Z][A-Z0-9_]*$"}]
+    evidenceUsed: Annotated[list[Annotated[str, {"minLength": 1}]], {"uniqueItems": True}]
 
-def main(input: TransferStartEvaluationInput) -> PredicateEvaluationResult:
+
+def main(input: dict) -> PredicateEvaluationResult:
     response = input["observations"]["response"]
     refs = []
     for metadata in input.get("evidence", {}).values():
