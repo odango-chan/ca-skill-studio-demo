@@ -640,6 +640,9 @@ try{
     " return {ok:host.dataset.language==='yaml'&&!!line&&",
     "   referenceColor==='rgb(123, 91, 167)'&&outcomeColor==='rgb(173, 101, 23)',",
     "  referenceColor,outcomeColor,line:line?.textContent,",
+    "  fileName:document.getElementById('fileName')?.textContent,",
+    "  sourceStart:document.getElementById('source')?.value.slice(0,420),",
+    "  renderedLineTexts:lines.slice(0,24).map(item=>item.textContent),",
     "  renderedLines:lines.length,theme:getComputedStyle(host).color};",
     "})()"
   ].join("\n"));
