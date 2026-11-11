@@ -2102,7 +2102,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     title:predicateView.title,status:predicateView.status,
     predicates:predicateView.predicates,observations:predicateView.observations,
     realPredicateVisible:predicateView.ids.includes('createdsession.ran.setup_accepted'),
-    scriptEvaluatorVisible:predicateView.text.includes('skill.evaluate-udm-read'),
+    scriptEvaluatorVisible:predicateView.text.includes('scripts/evaluate_udm_read.py'),
     noLiveResultClaim:predicateView.text.includes('不是当前运行证据')
   }));
   // C3: real, source-backed JSON Schema field tree in the same Theia host.
