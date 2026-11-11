@@ -155,7 +155,12 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
     TreeItem:class {constructor(label,state){this.label=label;this.collapsibleState=state;}},
     TreeItemCollapsibleState:{None:0,Collapsed:1},
-    Range:class {constructor(start,end){this.start=start;this.end=end;}},
+    Range:class {constructor(start,startCharacter,end,endCharacter){
+      if(typeof start==='number'){
+        this.start={line:start,character:startCharacter};
+        this.end={line:end,character:endCharacter};
+      }else{this.start=start;this.end=startCharacter;}
+    }},
     WorkspaceEdit:class {constructor(){this.changes=[];}replace(uri,range,value){this.changes.push({uri,range,value});}},
     Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
