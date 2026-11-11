@@ -1357,7 +1357,7 @@ try{
         const providerKey=keys.find(key=>typeof key==="symbol"&&
           String(key)==="Symbol(FileSystemProvider)");
         const workspaceKey=keys.find(key=>typeof key==="function"&&
-          key.name==="WorkspaceService"&&typeof key.prototype?.tryGetRoots==="function");
+          typeof key.prototype?.tryGetRoots==="function");
         if(!providerKey||!workspaceKey)return {ready:false,reason:"Native provider/WorkspaceService not bound",
           keys:keys.filter(key=>String(key).includes("FileSystemProvider")||
             String(key).includes("WorkspaceService")).map(String)};
