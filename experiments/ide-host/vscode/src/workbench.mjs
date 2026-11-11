@@ -2415,7 +2415,12 @@ export function registerWorkbench(vscode,context){
       });
       // Resolve the exact Skill Package root, inventory local files, and reject
       // symlinked targets before the native Markdown engine renders any links.
-      await prepareNativeMarkdownPackagePolicy(vscode,uri);
+      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,uri);
+      if(!policyReady){
+        void vscode.window.showWarningMessage(
+          '无法验证当前 Markdown 文件所属 Package 或文件清单，已拒绝打开原生预览。');
+        return false;
+      }
       // Do not await the host Preview command: some Theia PluginHost builds
       // resolve it only after the Webview has completed its first render. The
       // command itself must return promptly so callers can observe that render.
