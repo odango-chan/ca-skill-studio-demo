@@ -20,7 +20,7 @@ function fixture(){
     async mkdir(target){actions.push(["mkdir",norm(target)]);nodes.set(norm(target),{type:2,size:0});},
     async delete(target){actions.push(["delete",norm(target)]);nodes.delete(norm(target));},
     async rename(from,to){actions.push(["rename",norm(from),norm(to)]);nodes.set(norm(to),nodes.get(norm(from)));nodes.delete(norm(from));},
-    async copy(from,to){actions.push(["copy",norm(from),norm(to)]);nodes.set(norm(to),nodes.get(norm(from));},
+    async copy(from,to){actions.push(["copy",norm(from),norm(to)]);nodes.set(norm(to),nodes.get(norm(from)));},
     async open(target){const id=fd++;descriptors.set(id,norm(target));return id;},
     async write(id){actions.push(["write",id]);return 1;},
     async close(id){descriptors.delete(id);},
