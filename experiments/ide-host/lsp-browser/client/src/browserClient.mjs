@@ -153,6 +153,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
               );
               handlers.onSemanticTokenServerDiagnostics?.(diagnostics);
             }catch{/* Diagnostic request is acceptance-only and optional. */}
+          }else{
+            handlers.onSemanticTokenServerDiagnostics?.(null);
           }
           return new vscode.SemanticTokens(data,result?.resultId);
         }catch(error){
