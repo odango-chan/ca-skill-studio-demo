@@ -26,12 +26,46 @@ This layout intentionally matches the [`ca-skill-compiler` README](https://githu
 ### Ownership and lifecycle
 
 - `<project-root>` is the Workspace root. **Do not** open just `skills/` as the default Workspace.
-- `skills/` holds actual editable authoring Source (including each Skill's `assurance/`, `schemas/`, `scripts/`, and `references/`). The two pinned owner Skills are imported here, with no implicit overwrite.
-- `lib/` is reserved for user-imported Tool contract snapshots. The sample importer creates the empty directory and **does not write fake library contracts**. Read-only is an ownership policy, not a filesystem permission claim in the current browser host.
-- `output/` is reserved for `skillc build` results. The importer creates the empty directory and **does not fake a build**, publish or execute anything.
+- `skills/` holds actual editable authoring Source (including each Skill's `assurance/`, `schemas/`, `scripts/`, and `references/`). The **top-level `skills/` directory itself is structural and protected** (no rename/move/delete via Studio-owned actions); its SKILL files and child directories remain editable. The two pinned owner Skills are imported here, with no implicit overwrite.
+- `lib/` is a **read-only, protected root** of imported Tool contract snapshots. Users can inspect but not hand-edit, rename, move, delete or create files inside it through Studio-owned commands. Only a future **explicit managed Tool import/sync** may replace its contents. The sample importer creates the empty directory and **does not write fake library contracts**.
+- `output/` is a **read-only, protected root** for generated `skillc build` results. Users can inspect, but not hand-edit, rename, move, delete or create files inside it through Studio-owned commands. Only the future Compiler adapter may write or clean output with its bounded capability. The sample importer creates the empty directory and **does not fake a build**, publish or execute anything.
 - Package Overview scans only the Source subtree `skills/` when a project root contains it; it cannot claim that `lib/` or `output/` contains additional authored SKILL Packages. Standalone and legacy folder workspaces remain supported.
 - The example project uses extension-owned `workspaces/` as its root, shown in Explorer as **skill-studio-demo**. The existing `workspaces/skills/` directory is reused in place as the project's `skills/` (no copying, deleting, renaming or overwriting user-edited Source); empty sibling `lib/` and `output/` directories are created. When the old extension-owned `skills/` root is already mounted as a Workspace, only that Workspace entry is replaced by its parent project root. Unrelated user workspaces are not repurposed or removed.
 - The bundled source fixture remains `site/samples/skills/` for packaging tests; it is **not** the runtime editable project root.
+
+## Protected project folders: implementation boundaries
+
+| Project path | User-owned Source edits | Studio structural operations | Managed owner |
+| --- | --- | --- | --- |
+| `skills/` itself | N/A | Rename / move / delete **denied** | Project layout |
+| `skills/<name>/**` | **allowed** | Normal authoring within Source | Studio editor |
+| `lib/` and descendants | **read-only** | Rename / move / delete / manual create **denied** | Imported Tool contracts |
+| `output/` and descendants | **read-only** | Rename / move / delete / manual create **denied** | Skill Compiler adapter |
+
+The icon theme distinguishes Source (`folder-skills`), read-only library
+(`folder-library` with lock), and generated output (`folder-output`).
+Icons are visual cues, not access controls.
+
+`project-policy.mjs` performs an exact project-root/URI check (including
+scheme/authority and lexical containment). Studio-owned Workbench and
+Procedure Source patches refuse writes to `lib/`, `output/` and the protected
+structural roots. Managed import/build operations have *distinct* authorized
+operation identities and cannot mutate the structural root itself.
+
+**Known enforcement gap:** the standard native Theia/VS Code Explorer and
+`workspace.fs` belong to the host. An extension-side guard cannot intercept
+every Explorer action, outside tool, direct FS call, or another plugin. The
+`files.readonlyInclude` preference is supported by VS Code but is not
+evidence of reliable enforcement by Theia 1.76. Until host-side filesystem
+permissions or a project-aware FS provider are implemented and verified,
+`lib/` and `output/` are **policy read-only, not a security boundary**.
+Do not claim hard write protection based solely on these icons and preflights.
+
+For the final enforcement gate, test native Explorer rename/move/delete/create,
+direct TextDocument edit/save, `workspace.applyEdit`, `workspace.fs`
+write/rename/delete, external imports and compiler-owned writes in the real
+Browser-Only host and desktop VS Code. A host-level denial must be observed
+before reporting "filesystem protected." Do not block managed Compiler output.
 
 ## Compiler ownership boundary
 
