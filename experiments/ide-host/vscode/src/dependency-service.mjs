@@ -2,7 +2,7 @@
 // occurs on read, LSP or Build; a missing/tampered lock stays BLOCKED/ERROR.
 import {calculateSnapshot,decodeBase64,base64Bytes,verifyLockedFiles,
   validateSnapshotPath,canonicalJson} from "./dependency-snapshot.mjs";
-import {readProjectConfiguration,updateProjectConfiguration} from "./project-configuration.mjs";
+import {readProjectConfiguration,writeDependencySettingsPair} from "./project-configuration.mjs";
 const enc=new TextEncoder(),dec=new TextDecoder("utf-8",{fatal:true});
 const fail=(code,message)=>{throw Object.assign(Error(message),{code});};
 const pathFor=(vscode,root,...pieces)=>vscode.Uri.joinPath(root,...pieces);
@@ -167,8 +167,7 @@ export async function applyDependency(vscode,selectedRoot,id,acquired,{confirm}=
   const deps=project.settings.dependencies.filter(d=>d.id!==id).concat(declaration);
   const locks=project.settings.dependencyLock.entries.filter(e=>e.id!==id).concat(entry);
   try{
-    await updateProjectConfiguration(vscode,project.workspaceRoot,"dependencies",deps);
-    await updateProjectConfiguration(vscode,project.workspaceRoot,"dependencyLock",{
+    await writeDependencySettingsPair(vscode,project.workspaceRoot,deps,{
       version:"skillc.lock/v0.1",entries:locks});
   }catch(error){
     // Two host Settings writes cannot be assumed atomic; do not claim READY.
@@ -187,8 +186,7 @@ export async function removeDependency(vscode,selectedRoot,id,{confirm}={}){
   const dependencyLock={version:"skillc.lock/v0.1",
     entries:project.settings.dependencyLock.entries.filter(item=>item.id!==id)};
   try{
-    await updateProjectConfiguration(vscode,project.workspaceRoot,"dependencyLock",dependencyLock);
-    await updateProjectConfiguration(vscode,project.workspaceRoot,"dependencies",dependencies);
+    await writeDependencySettingsPair(vscode,project.workspaceRoot,dependencies,dependencyLock);
   }catch(error){fail("UNCERTAIN","Dependency removal partly failed: "+String(error?.message??error));}
   // Immutable unreferenced bytes are kept until separate explicit GC. Never
   // delete a snapshot shared by another locked dependency.
