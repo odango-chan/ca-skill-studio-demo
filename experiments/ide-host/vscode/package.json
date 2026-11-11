@@ -42,7 +42,21 @@
     "onCustomEditor:skillStudio.schemaPreview",
     "onCommand:skillStudio.openSchema",
     "onCommand:skillStudio.refreshPackages",
-    "onView:skillStudio.packages"
+    "onView:skillStudio.packages",
+    "onCommand:skillStudio.selectProjectRoot",
+    "onCommand:skillStudio.addDependency",
+    "onCommand:skillStudio.refreshDependencies",
+    "onCommand:skillStudio.refreshDependency",
+    "onCommand:skillStudio.updateDependencyLock",
+    "onCommand:skillStudio.removeDependency",
+    "onCommand:skillStudio.inspectDependencyContract",
+    "onCommand:skillStudio.checkProject",
+    "onCommand:skillStudio.buildProject",
+    "onCommand:skillStudio.previewBuildFile",
+    "onCommand:skillStudio.exportBuildZip",
+    "onCommand:skillStudio.exportBuildDirectory",
+    "onView:skillStudio.dependencies",
+    "onView:skillStudio.build"
   ],
   "contributes": {
     "colors": [
@@ -149,6 +163,54 @@
       {
         "command": "skillStudio.openContract",
         "title": "SKILL Studio: Open Contract Visual"
+      },
+      {
+        "command": "skillStudio.selectProjectRoot",
+        "title": "Skill Studio: Select Project Root"
+      },
+      {
+        "command": "skillStudio.addDependency",
+        "title": "Skill Studio: Add Dependency"
+      },
+      {
+        "command": "skillStudio.refreshDependencies",
+        "title": "Skill Studio: Refresh Dependency Status"
+      },
+      {
+        "command": "skillStudio.refreshDependency",
+        "title": "Skill Studio: Refresh Upstream Dependency"
+      },
+      {
+        "command": "skillStudio.updateDependencyLock",
+        "title": "Skill Studio: Update Dependency Lock"
+      },
+      {
+        "command": "skillStudio.removeDependency",
+        "title": "Skill Studio: Remove Dependency"
+      },
+      {
+        "command": "skillStudio.inspectDependencyContract",
+        "title": "Skill Studio: Inspect Locked Contract"
+      },
+      {
+        "command": "skillStudio.checkProject",
+        "title": "Skill Studio: Check Project"
+      },
+      {
+        "command": "skillStudio.buildProject",
+        "title": "Skill Studio: Build Project"
+      },
+      {
+        "command": "skillStudio.previewBuildFile",
+        "title": "Skill Studio: Preview Generated File"
+      },
+      {
+        "command": "skillStudio.exportBuildZip",
+        "title": "Skill Studio: Export Build ZIP"
+      },
+      {
+        "command": "skillStudio.exportBuildDirectory",
+        "title": "Skill Studio: Export Build Directory"
       }
     ],
     "menus": {
@@ -216,6 +278,41 @@
           "command": "skillStudio.refreshInspection",
           "when": "view == skillStudio.inspection",
           "group": "navigation"
+        },
+        {
+          "command": "skillStudio.addDependency",
+          "when": "view == skillStudio.dependencies",
+          "group": "navigation@1"
+        },
+        {
+          "command": "skillStudio.refreshDependencies",
+          "when": "view == skillStudio.dependencies",
+          "group": "navigation@2"
+        },
+        {
+          "command": "skillStudio.selectProjectRoot",
+          "when": "view == skillStudio.dependencies",
+          "group": "navigation@3"
+        },
+        {
+          "command": "skillStudio.checkProject",
+          "when": "view == skillStudio.build",
+          "group": "navigation@1"
+        },
+        {
+          "command": "skillStudio.buildProject",
+          "when": "view == skillStudio.build",
+          "group": "navigation@2"
+        },
+        {
+          "command": "skillStudio.exportBuildZip",
+          "when": "view == skillStudio.build",
+          "group": "navigation@3"
+        },
+        {
+          "command": "skillStudio.exportBuildDirectory",
+          "when": "view == skillStudio.build",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -353,6 +450,26 @@
           "command": "skillStudio.editPhaseOutputReference",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseOutputReference",
           "group": "4_phase"
+        },
+        {
+          "command": "skillStudio.inspectDependencyContract",
+          "when": "view == skillStudio.dependencies && viewItem == skillStudio.dependency",
+          "group": "1_inspect"
+        },
+        {
+          "command": "skillStudio.refreshDependency",
+          "when": "view == skillStudio.dependencies && viewItem == skillStudio.dependency",
+          "group": "2_refresh"
+        },
+        {
+          "command": "skillStudio.updateDependencyLock",
+          "when": "view == skillStudio.dependencies && viewItem == skillStudio.dependency",
+          "group": "3_update"
+        },
+        {
+          "command": "skillStudio.removeDependency",
+          "when": "view == skillStudio.dependencies && viewItem == skillStudio.dependency",
+          "group": "4_remove"
         }
       ]
     },
@@ -434,6 +551,14 @@
         {
           "id": "skillStudio.problems",
           "name": "Problems"
+        },
+        {
+          "id": "skillStudio.dependencies",
+          "name": "Dependencies"
+        },
+        {
+          "id": "skillStudio.build",
+          "name": "Build / Export"
         }
       ]
     },
