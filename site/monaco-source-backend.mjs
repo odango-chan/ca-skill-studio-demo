@@ -122,7 +122,11 @@ export function createMonacoSourceBackend(host,{mirror,onUndo,onRedo,onSave}={})
     ensureStudioLightTheme();
     host.dataset.yamlSchemaEngine="monaco-yaml@5.5.1";
     editor=monaco.editor.create(host,{
-      model:null,theme:"studio-light",automaticLayout:true,minimap:{enabled:false},
+      model:null,theme:"studio-light",
+      // Monaco's standalone default can leave semantic highlighting disabled
+      // even when the active theme declares semanticHighlighting=true.
+      "semanticHighlighting.enabled":true,
+      automaticLayout:true,minimap:{enabled:false},
       fontSize:12,lineHeight:21,tabSize:2,insertSpaces:true,
       scrollBeyondLastLine:false,renderWhitespace:"selection",
       wordWrap:"off",overviewRulerLanes:0,
