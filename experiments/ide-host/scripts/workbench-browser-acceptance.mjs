@@ -67,6 +67,31 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "contentPos:cr.width>0&&cr.height>0?{x:Math.round(cr.x+cr.width/2),y:Math.round(cr.y+cr.height/2)}:null,"+
     "visible:cr.width>0&&cr.height>0&&cr.x<innerWidth&&cr.y<innerHeight&&cr.right>0&&cr.bottom>0};"+
     "});})()");
+  // Resolve the exact live TreeView node after scrolling it into view. A
+  // stale centre point can hit an overlapping selected row instead of the
+  // requested Theia expansion toggle, particularly in the second Package.
+  async function clickVisibleToggle(row,label){
+    const id=row.nodeIds?.[0];
+    if(!id)throw Error('Native tree row has no node ID: '+label+' '+JSON.stringify(row));
+    const target=await evalJS(`(()=>{
+      const anchor=[...document.querySelectorAll('[data-node-id]')]
+        .find(el=>el.getAttribute('data-node-id')===${JSON.stringify(id)});
+      const toggle=anchor?.closest('.theia-TreeNode')?.querySelector('.theia-ExpansionToggle');
+      if(!toggle)return {found:false};
+      toggle.scrollIntoView({block:'center',inline:'nearest'});
+      const r=toggle.getBoundingClientRect();
+      const x=Math.round(r.x+r.width/2),y=Math.round(r.y+r.height/2);
+      const hit=document.elementFromPoint(x,y);
+      return {found:true,x,y,hitWithinToggle:hit===toggle||toggle.contains(hit),
+        hitClass:typeof hit?.className==='string'?hit.className:'',
+        toggleClass:toggle.className,nodeId:toggle.getAttribute('data-node-id'),
+        pointerEvents:getComputedStyle(toggle).pointerEvents};
+    })()`);
+    if(!target?.found||!target.hitWithinToggle)
+      throw Error('Native Package toggle is not reachable by mouse: '+label+' '+
+        JSON.stringify({target,row}));
+    await click(target.x,target.y);
+  }
   let rows=[];
   for(let attempt=0;attempt<100;attempt++){
     rows=await readTreeRows();
@@ -132,7 +157,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       // A provider can publish the parent row before its children. Do not
       // toggle an already-expanded Package closed while waiting for groups.
       if(String(packageRow.toggleClass??'').includes('theia-mod-collapsed'))
-        await click(toggle.x,toggle.y);
+        await clickVisibleToggle(packageRow,name);
       await sleep(120);
     }
     throw Error('Package did not expand in the native TreeView: '+name+
@@ -165,16 +190,17 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       // force one collapse/re-expand cycle so the provider is asked again.
       // Never repeatedly toggle a healthy expanded group while its rows load.
       if(String(groupRow.toggleClass??'').includes('theia-mod-collapsed'))
-        await click(toggle.x,toggle.y);
+        await clickVisibleToggle(groupRow,name+' Assurance');
       else if(attempt===0){
-        await click(toggle.x,toggle.y);
+        await clickVisibleToggle(groupRow,name+' Assurance recheck');
         await sleep(120);
         const collapsedRows=await readTreeRows();
-        const current=collapsedRows.find(row=>row.visible&&
-          row.text.includes('Assurance · 3/3 core'));
-        if(current?.togglePos&&
-           String(current.toggleClass??'').includes('theia-mod-collapsed'))
-          await click(current.togglePos.x,current.togglePos.y);
+        const collapsedRange=packageRange(collapsedRows,name);
+        const current=collapsedRange?collapsedRows.slice(
+          collapsedRange.index+1,collapsedRange.end).find(row=>
+            row.visible&&row.text.includes('Assurance · 3/3 core')):null;
+        if(current&&String(current.toggleClass??'').includes('theia-mod-collapsed'))
+          await clickVisibleToggle(current,name+' Assurance retry');
       }
       await sleep(120);
     }
