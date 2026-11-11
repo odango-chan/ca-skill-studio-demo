@@ -275,7 +275,9 @@ try{
     await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
     await sleep(3400);
   }
-  // Loading may be automatic on the empty online workbench or explicitly\n  // invoked again from the command palette. Both must preserve existing files.\n  const afterImport=await evalJS(`(async()=>{
+  // Loading may be automatic on the empty online workbench or explicitly
+  // invoked again from the command palette. Both must preserve existing files.
+  const afterImport=await evalJS(`(async()=>{
     const names=[];let opfsError=null;
     try{
       const dir=await navigator.storage.getDirectory();
