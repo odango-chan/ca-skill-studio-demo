@@ -47,7 +47,8 @@ export function registerWorkbench(vscode,context){
   let languageClient=null,languageClientPromise=null,languageClientFailureShown=false,
     languageStatusItem=null,languageTransportFailure=null;
   const semanticTokenDiagnostics={
-    registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null
+    registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null,
+    server:null
   };
   function updateLanguageStatus(state,detail){
     // A terminal Worker failure must never be overwritten by stale READY or
@@ -107,6 +108,9 @@ export function registerWorkbench(vscode,context){
               semanticTokenDiagnostics.lastUri=uri;
               semanticTokenDiagnostics.lastTokenCount=count;
               semanticTokenDiagnostics.lastError=null;
+            },
+            onSemanticTokenServerDiagnostics:diagnostics=>{
+              semanticTokenDiagnostics.server=diagnostics;
             },
             onSemanticTokenError:(uri,error)=>{
               semanticTokenDiagnostics.lastUri=uri;
