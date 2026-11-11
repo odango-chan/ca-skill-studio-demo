@@ -1,5 +1,6 @@
 // Host-native project configuration. The Compiler v0.1 Project Settings schema
 // is the wire authority; this module owns only VS Code resource scoping.
+import {canonicalJson} from "./dependency-snapshot.mjs";
 export const CONFIG_NAMESPACE = "connectionAgent.skillStudio";
 export const PROJECT_SCHEMA_VERSION = "skillc.project/v0.1";
 export const EMPTY_DEPENDENCY_LOCK = Object.freeze({version:"skillc.lock/v0.1",entries:[]});
@@ -48,7 +49,7 @@ export function validateProjectConfiguration(settings) {
       fail("lock entry must match one declared dependency with a SHA-256 digest");
     const declaration=settings.dependencies.find(dep=>dep.id===entry.id);
     if(entry.kind!==declaration.kind||
-       JSON.stringify(entry.source)!==JSON.stringify(declaration.source))
+       canonicalJson(entry.source)!==canonicalJson(declaration.source))
       fail("lock entry source and kind must equal declaration");
     locked.add(entry.id);
   }
