@@ -274,7 +274,7 @@ export function activate(context){
   // convenient shortcut for the online demo.
   if(!(vscode.workspace.workspaceFolders??[]).length){
     const welcome=vscode.window.showInformationMessage?.(
-      "欢迎使用 SKILL Studio。可导入一个含 skills/、lib/、output/ 的演示项目（传统 5GC 与 MAS）。",
+      "欢迎使用 Skill Studio。可导入仅含两份正式 Skill 源码的独立示例工作空间。",
       "载入演示 SKILL 项目"
     );
     if(welcome&&typeof welcome.then==="function"){
