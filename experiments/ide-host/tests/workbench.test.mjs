@@ -205,7 +205,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     ViewColumn:{One:1,Two:2,Beside:2},TextEditorRevealType:{AtTop:1},
     Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
-    commands:{executeCommand:async()=>{},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
+    commands:{executeCommand:async(...args)=>{markdownCommandCalls.push(args);},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
     workspace:{textDocuments:[doc,markdownDoc],
       findFiles:async()=>['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md'].map(p=>uri('/workspace/establish-pdu-session/'+p)),
       fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8'))},
