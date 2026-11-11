@@ -67,7 +67,7 @@ export function registerWorkbench(vscode,context){
   }
 
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&
-     /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(globalThis.location.hostname)){
+     /^(localhost|127(?:\.\d{1,3}){3})$/.test(globalThis.location.hostname)){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.semanticTokenDiagnostics",()=>({
         ...semanticTokenDiagnostics,
