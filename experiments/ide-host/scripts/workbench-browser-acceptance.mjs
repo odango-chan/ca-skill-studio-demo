@@ -57,9 +57,12 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "const content=el.querySelector('.theia-TreeNodeContent')??el;"+
     "const r=(toggle??content).getBoundingClientRect();"+
     "const cr=content.getBoundingClientRect();"+
+    "const hit=r.width>0&&r.height>0?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2):null;"+
     "return {index,text:el.innerText.replace(/\\s+/g,' ').trim(),className:el.className,"+
     "nodeIds:[...el.querySelectorAll('[data-node-id]')].map(x=>x.getAttribute('data-node-id')),"+
     "hasToggle:Boolean(toggle),toggleClass:toggle?.className??null,"+
+    "hitWithinToggle:Boolean(toggle&&(hit===toggle||toggle.contains(hit))),"+
+    "hitTag:hit?.tagName??null,hitClass:typeof hit?.className==='string'?hit.className:'',"+
     "togglePos:r.width>0&&r.height>0?{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}:null,"+
     "contentPos:cr.width>0&&cr.height>0?{x:Math.round(cr.x+cr.width/2),y:Math.round(cr.y+cr.height/2)}:null,"+
     "visible:cr.width>0&&cr.height>0&&cr.x<innerWidth&&cr.y<innerHeight&&cr.right>0&&cr.bottom>0};"+
@@ -76,6 +79,21 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   await invoke('skillStudio.refreshPackages');
   const scan=await evalJS('window.__skillStudioLastCommandResult??null');
   console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(scan));
+  await evalJS(`(()=>{
+    window.__packageOverviewClickEvents=[];
+    document.addEventListener('click',event=>{
+      const toggle=event.target?.closest?.('.theia-ExpansionToggle');
+      if(!toggle)return;
+      window.__packageOverviewClickEvents.push({
+        trusted:event.isTrusted,nodeId:toggle.getAttribute('data-node-id'),
+        className:toggle.className,defaultPrevented:event.defaultPrevented,
+        x:event.clientX,y:event.clientY
+      });
+      if(window.__packageOverviewClickEvents.length>60)
+        window.__packageOverviewClickEvents.shift();
+    },true);
+    return true;
+  })()`);
   const expectedNames=['establish-pdu-session','establish-pdu-session-mas'];
   const discovered=(scan?.packages??[]).map(x=>x.name).sort();
   if(scan?.state!=='ready'||JSON.stringify(discovered)!==JSON.stringify(expectedNames.slice().sort()))
@@ -160,8 +178,9 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       }
       await sleep(120);
     }
+    const clickEvents=await evalJS('window.__packageOverviewClickEvents??[]');
     throw Error('Package Assurance group did not reveal '+filePath+': '+name+
-      ' '+JSON.stringify(rows));
+      ' '+JSON.stringify({rows,clickEvents}));
   }
   async function readContractFrames(){
     const tree=await command('Page.getFrameTree');
@@ -430,6 +449,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(stillPreview)throw Error("Double-click did not pin native preview tab");
   const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
+  // The preview/pin probe can leave both preview and pinned editors alive.
+  // Close that pair and reopen one pinned Procedure before Source/Evidence
+  // checks so the active Webview frame and its selection are unambiguous.
+  await invoke('core.close.all.main.tabs');
+  await invoke('workbench.files.action.focusFilesExplorer');
+  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  if(!file)throw Error('Procedure file disappeared after closing preview/pinned tabs');
+  await click(file.x,file.y,2);
+  let singlePinned=null;
+  for(let attempt=0;attempt<100&&!singlePinned;attempt++){
+    singlePinned=await graph('ue-requested-pdu-session-establishment');
+    if(!singlePinned)await sleep(100);
+  }
+  if(!singlePinned)throw Error('Could not reopen one pinned 5GC Procedure editor');
+  const remainingProcedureTabs=await evalJS(`[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>
+    tab.textContent.trim()==='procedure.yaml'&&tab.getBoundingClientRect().width>0).length`);
+  if(remainingProcedureTabs!==1)
+    throw Error('Procedure Source/Evidence acceptance requires one unambiguous editor tab: '+
+      JSON.stringify({remainingProcedureTabs,singlePinned}));
   // Theia CustomEditor tabs do not necessarily activate a VS Code TextEditor.
   // Package Audit consumes the active Procedure TextDocument, so open Source
   // from this freshly reopened CustomEditor only now (after the Explorer path).
@@ -845,13 +883,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Resolve the active Procedure Webview again after activating the native
   // Evidence container. The earlier graphContext can belong to a disposed or
   // background CustomEditor when Theia has multiple procedure.yaml tabs.
-  const evidenceBindingSelection=await evalWebviewJS(
-    `(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Evidence binding Node is not in the active Procedure graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+  const evidenceNodeTarget=await evalWebviewJS(
+    `(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Evidence binding Node is not in the active Procedure graph');const r=node.getBoundingClientRect(),frame=window.frameElement?.getBoundingClientRect();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value,nodeRect:{x:r.x,y:r.y,width:r.width,height:r.height},frameRect:frame?{x:frame.x,y:frame.y,width:frame.width,height:frame.height}:null,point:frame?{x:frame.x+r.x+r.width/2,y:frame.y+r.y+r.height/2}:null};})()`
   );
-  if(!evidenceBindingSelection?.node)
-    throw Error('Could not re-select Phase binding Node in active Procedure Webview: '+
-      JSON.stringify(evidenceBindingSelection));
-  await sleep(250);
+  if(!evidenceNodeTarget?.node||!evidenceNodeTarget.point)
+    throw Error('Could not resolve the active 5GC Phase Binding node hit target: '+
+      JSON.stringify(evidenceNodeTarget));
+  // Use a real trusted Chromium click in the visible editor instead of
+  // HTMLElement.click(), so React Flow and the host selection bridge receive
+  // the same pointer/click sequence as a user action.
+  await command('Input.dispatchMouseEvent',{type:'mouseMoved',
+    x:evidenceNodeTarget.point.x,y:evidenceNodeTarget.point.y});
+  await command('Input.dispatchMouseEvent',{type:'mousePressed',
+    x:evidenceNodeTarget.point.x,y:evidenceNodeTarget.point.y,
+    button:'left',buttons:1,clickCount:1});
+  await command('Input.dispatchMouseEvent',{type:'mouseReleased',
+    x:evidenceNodeTarget.point.x,y:evidenceNodeTarget.point.y,
+    button:'left',buttons:0,clickCount:1});
+  console.log('STUDIO_EVIDENCE_NODE_TRUSTED_CLICK',JSON.stringify(evidenceNodeTarget));
+  await sleep(350);
   let phaseEvidenceText='';
   for(let i=0;i<100;i++){
     phaseEvidenceText=await evalJS('document.body.innerText');
