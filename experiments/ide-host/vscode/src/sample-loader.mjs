@@ -102,12 +102,12 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   }
   const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
   const files=manifest.files;
-  // Isolate the sample under a single project root, not a workspace folder
-  // named skills/. Never seed into a user-selected project. Older demos under
-  // workspaces/skills remain untouched; importing this sample creates a
-  // separate project rather than silently moving or overwriting those files.
+  // Reuse the existing browser-owned workspaces/skills Source in place,
+  // treating its parent as the compiler-style project root. This upgrades
+  // legacy demos without copying, hiding or overwriting edited SKILL files.
+  // No user-selected Workspace is ever used as an import destination.
   if(!storageUri)fail("No writable extension storage URI");
-  const root=vscode.Uri.joinPath(storageUri,"workspaces",EXAMPLE_PROJECT_NAME);
+  const root=vscode.Uri.joinPath(storageUri,"workspaces");
   const skillsRoot=vscode.Uri.joinPath(root,"skills");
   const libraryRoot=vscode.Uri.joinPath(root,"lib");
   const outputRoot=vscode.Uri.joinPath(root,"output");
@@ -146,10 +146,15 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   phase="workspace-update";
   let workspaceUpdated=false;
   if(!current.some(f=>f.uri.toString()===root.toString())){
+    // Replace only the old extension-owned skills/ workspace root. Do not
+    // remove a similarly named folder belonging to another user project.
+    const legacyIndex=current.findIndex(folder=>
+      folder.uri.toString()===skillsRoot.toString());
     workspaceUpdated=Boolean(vscode.workspace.updateWorkspaceFolders?.(
-      current.length,0,{uri:root,name:EXAMPLE_PROJECT_NAME}));
+      legacyIndex>=0?legacyIndex:current.length,legacyIndex>=0?1:0,
+      {uri:root,name:EXAMPLE_PROJECT_NAME}));
     if(!workspaceUpdated)
-      fail("Cannot expose bundled SKILLs in the native Explorer");
+      fail("Cannot expose bundled SKILL project in the native Explorer");
   }
   const procedures=Object.fromEntries(SKILLS.map(name=>
     [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
