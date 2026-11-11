@@ -32,6 +32,15 @@
     },
     "_code": {
       "iconPath": "./code.svg"
+    },
+    "_folder_skills": {
+      "iconPath": "./folder-skills.svg"
+    },
+    "_folder_library": {
+      "iconPath": "./folder-library.svg"
+    },
+    "_folder_output": {
+      "iconPath": "./folder-output.svg"
     }
   },
   "file": "_file",
@@ -72,5 +81,15 @@
     "css": "_code",
     "html": "_code",
     "jsx": "_code"
+  },
+  "folderNames": {
+    "skills": "_folder_skills",
+    "lib": "_folder_library",
+    "output": "_folder_output"
+  },
+  "folderNamesExpanded": {
+    "skills": "_folder_skills",
+    "lib": "_folder_library",
+    "output": "_folder_output"
   }
 }
