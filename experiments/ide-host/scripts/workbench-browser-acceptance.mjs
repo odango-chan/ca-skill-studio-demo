@@ -2064,7 +2064,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // selections even after the conventional editor has been restored.
   await invoke('workbench.files.action.focusFilesExplorer');
   const explorerRow=async(label,which='last')=>evalJS(
-    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length};})()"
+    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();const toggle=row.node.querySelector('.theia-ExpansionToggle');const tr=toggle?.getBoundingClientRect();const tx=tr?tr.x+tr.width/2:null,ty=tr?tr.y+tr.height/2:null;const hit=tr?document.elementFromPoint(tx,ty):null;return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length,toggleX:tx,toggleY:ty,toggleHit:!!toggle&&(hit===toggle||toggle.contains(hit)),toggleClass:toggle?.className??null};})()"
   );
   let masFolder=null;
   for(let attempt=0;attempt<60;attempt++){
@@ -2076,7 +2076,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!masFolder?.found)throw Error('MAS Skill folder missing from native Explorer: '+JSON.stringify(masFolder));
   let assuranceRows=await explorerRow('assurance');
   if((assuranceRows?.count??0)<2){
-    await click(masFolder.x,masFolder.y);
+    if(!masFolder.toggleHit)throw Error('MAS native Explorer folder expansion toggle is obscured: '+JSON.stringify(masFolder));
+    await click(masFolder.toggleX,masFolder.toggleY);
     for(let attempt=0;attempt<60;attempt++){
       assuranceRows=await explorerRow('assurance');
       if((assuranceRows?.count??0)>=2)break;
@@ -2088,7 +2089,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if((procedureRows?.count??0)<2){
     const masAssurance=await explorerRow('assurance','last');
     if(!masAssurance?.found)throw Error('MAS assurance row missing after folder expansion');
-    await click(masAssurance.x,masAssurance.y);
+    if(!masAssurance.toggleHit)throw Error('MAS native Explorer Assurance toggle is obscured: '+JSON.stringify(masAssurance));
+    await click(masAssurance.toggleX,masAssurance.toggleY);
     for(let attempt=0;attempt<60;attempt++){
       procedureRows=await explorerRow('procedure.yaml');
       if((procedureRows?.count??0)>=2)break;
