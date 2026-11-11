@@ -423,9 +423,10 @@ try{
       patchEvidence.yamlSyntax=yamlSyntax;
 
       // The native VS Code/Theia editor must render the same CA semantic
-      // identities from the shared source classifier. Browser extension hosts
-      // use its LSP adapter; Node extension hosts use the same engine directly.
-      // TextMate colors alone do not satisfy this check.
+      // identities from the shared source classifier. Theia 1.76 receives the
+      // LSP SemanticTokens, then the extension-host adapter projects those
+      // exact ranges through TextEditor decorations using the shared theme.
+      // TextMate colors or provider registration alone do not satisfy this check.
       let semanticRendering=null;
       for(let attempt=0;attempt<35;attempt++){
         semanticRendering=await evalJS(`(()=> {
@@ -466,6 +467,10 @@ try{
       if(semanticProviderDiagnostics?.registered!==true||
          !(semanticProviderDiagnostics?.requests>0)||
          !(semanticProviderDiagnostics?.lastTokenCount>0)||
+         semanticProviderDiagnostics?.renderer!=="theia-text-editor-decoration"||
+         !(semanticProviderDiagnostics?.renderedTokenCount>0)||
+         !(semanticProviderDiagnostics?.renderedTypeCount>=2)||
+         semanticProviderDiagnostics?.renderError||
          ![true,"configuredByTheme"].includes(
            semanticProviderDiagnostics?.semanticHighlightingEnabled)||
          semanticRendering?.referenceColor!=='rgb(123, 91, 167)'||
