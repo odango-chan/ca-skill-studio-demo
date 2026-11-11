@@ -1766,15 +1766,29 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!markdownFile)throw Error('SKILL.md missing from native Explorer');
   await click(markdownFile.x,markdownFile.y,2);await sleep(400);
   await invoke('skillStudio.previewMarkdown');
-  const tree=await command('Page.getFrameTree');let markdown=false;
+  let markdown=false,markdownStyled=false,markdownStyleInfo=null;
   async function inspect(n){
     try{const w=await command('Page.createIsolatedWorld',{frameId:n.frame.id,worldName:'markdown-acceptance',grantUniveralAccess:true});
       const r=await command('Runtime.evaluate',{contextId:w.executionContextId,returnByValue:true,expression:`Boolean(document.querySelector('article h1')&&!document.querySelector('article script,article img'))`});
       markdown ||= r.result?.value===true;
+      const styled=await command('Runtime.evaluate',{contextId:w.executionContextId,returnByValue:true,
+        expression:`(()=>{const article=document.querySelector('article.markdown-preview');if(!article)return null;const css=getComputedStyle(article);const link=document.querySelector('link[href*="markdown-preview.css"]');return {href:link?.href??null,maxWidth:css.maxWidth,paddingLeft:css.paddingLeft,applied:Boolean(link&&css.maxWidth==='920px'&&parseFloat(css.paddingLeft)>0)};})()`});
+      const info=styled.result?.value;
+      if(info)markdownStyleInfo=info;
+      markdownStyled ||= info?.applied===true;
     }catch{}
     for(const c of n.childFrames??[])await inspect(c);
   }
-  await inspect(tree.frameTree);if(!markdown)throw Error('Shared safe Markdown Preview did not render');
+  // Stylesheets load asynchronously in browser-only Theia. Wait for computed
+  // styles instead of trusting the mere presence of a <link> element.
+  for(let attempt=0;attempt<20&&!markdownStyled;attempt++){
+    const tree=await command('Page.getFrameTree');
+    await inspect(tree.frameTree);
+    if(!markdownStyled)await sleep(150);
+  }
+  if(!markdown)throw Error('Shared safe Markdown Preview did not render');
+  if(!markdownStyled)throw Error('Theia Markdown preview did not apply packaged theme CSS: '+
+    JSON.stringify(markdownStyleInfo));
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
   await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
   let contractView=null,contractFrame=null,contractContextId=null;

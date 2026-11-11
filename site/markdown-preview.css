@@ -1,0 +1,114 @@
+/* Shared, offline-only Markdown reading surface for Classic and Theia/VS Code.
+ * Source/Skill semantics remain in site/markdown-preview.mjs.
+ * The Webview loads this file via asWebviewUri and its CSP; no inline styles. */
+.skill-studio-markdown-document{
+  margin:0;min-width:0;min-height:100%;
+  background:var(--vscode-editor-background,#ffffff);
+}
+.markdown-preview{
+  --md-bg:var(--vscode-editor-background,var(--panel,#ffffff));
+  --md-fg:var(--vscode-editor-foreground,var(--text,#20314a));
+  --md-muted:var(--vscode-descriptionForeground,var(--muted,#697e97));
+  --md-border:var(--vscode-panel-border,var(--border,#e1e7ef));
+  --md-soft:var(--vscode-editorWidget-background,var(--surface,#fbfcfe));
+  --md-raised:var(--vscode-sideBarSectionHeader-background,var(--raised,#edf3f9));
+  --md-accent:var(--vscode-focusBorder,var(--accent,#0c8e7b));
+  --md-link:var(--vscode-textLink-foreground,var(--accent,#087e72));
+  --md-link-hover:var(--vscode-textLink-activeForeground,var(--blue,#317dc0));
+  --md-hover:var(--vscode-list-hoverBackground,#eef5f8);
+  box-sizing:border-box;max-width:920px;min-width:0;margin:0 auto;
+  padding:28px clamp(18px,4vw,52px) 64px;
+  color:var(--md-fg);font:14px/1.7 system-ui,-apple-system,"Segoe UI",sans-serif;
+  overflow-wrap:anywhere;word-break:normal;
+}
+.markdown-preview *{box-sizing:border-box}
+.markdown-preview h1,.markdown-preview h2,.markdown-preview h3,
+.markdown-preview h4,.markdown-preview h5,.markdown-preview h6{
+  color:var(--md-fg);line-height:1.4;font-weight:650;margin:1.5em 0 .55em;
+}
+.markdown-preview h1{font-size:24px;letter-spacing:-.02em;margin-top:.2em;
+  padding-bottom:.4em;border-bottom:1px solid var(--md-border)}
+.markdown-preview h2{font-size:19px;padding-bottom:.32em;
+  border-bottom:1px solid var(--md-border)}
+.markdown-preview h3{font-size:16px}
+.markdown-preview h4,.markdown-preview h5,.markdown-preview h6{font-size:14px}
+.markdown-preview p{margin:.65em 0 1em}
+.markdown-preview ul,.markdown-preview ol{margin:.5em 0 1.1em;padding-left:1.7em}
+.markdown-preview li{margin:.22em 0}
+.markdown-preview li>ul,.markdown-preview li>ol{margin:.2em 0}
+.markdown-preview blockquote{
+  margin:1.1em 0;padding:.25em 1em;border-left:3px solid var(--md-accent);
+  color:var(--md-muted);background:var(--md-soft);border-radius:0 6px 6px 0;
+}
+.markdown-preview a{color:var(--md-link);text-decoration:underline;text-underline-offset:2px}
+.markdown-preview a:hover{color:var(--md-link-hover)}
+.markdown-preview a:focus-visible,.markdown-preview summary:focus-visible{
+  outline:2px solid var(--md-accent);outline-offset:3px;border-radius:3px;
+}
+.markdown-preview code{
+  font:12.5px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;
+  background:var(--md-raised);border-radius:4px;padding:2px 5px;
+  color:var(--md-fg);overflow-wrap:anywhere;
+}
+.markdown-preview pre{
+  overflow:auto;max-width:100%;margin:1.1em 0 1.4em;padding:13px 16px;
+  border:1px solid var(--md-border);border-radius:8px;background:var(--md-soft);
+  white-space:pre;line-height:1.55;
+}
+.markdown-preview pre code{
+  color:var(--md-fg);font-size:12.5px;padding:0;background:transparent;
+  border-radius:0;white-space:pre;word-break:normal;overflow-wrap:normal;
+}
+.markdown-preview .md-table-wrap{
+  max-width:100%;max-height:65vh;overflow:auto;overscroll-behavior:contain;
+  margin:1.1em 0 1.4em;border:1px solid var(--md-border);border-radius:8px;
+}
+.markdown-preview table{
+  width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;
+  font-size:12.5px;line-height:1.5;font-variant-numeric:tabular-nums;
+}
+.markdown-preview th,.markdown-preview td{
+  padding:9px 12px;min-width:72px;max-width:460px;vertical-align:top;
+  text-align:left;overflow-wrap:anywhere;
+  border-right:1px solid var(--md-border);border-bottom:1px solid var(--md-border);
+}
+.markdown-preview th:last-child,.markdown-preview td:last-child{border-right:0}
+.markdown-preview tbody tr:last-child td{border-bottom:0}
+.markdown-preview thead th{
+  position:sticky;top:0;z-index:1;background:var(--md-raised);
+  color:var(--md-fg);font-weight:650;
+}
+.markdown-preview tbody tr:nth-child(even){background:var(--md-soft)}
+.markdown-preview tbody tr:hover{background:var(--md-hover)}
+.markdown-preview :is(th,td).md-align-left{text-align:left}
+.markdown-preview :is(th,td).md-align-center{text-align:center}
+.markdown-preview :is(th,td).md-align-right{text-align:right}
+.markdown-preview td code{white-space:nowrap}
+.markdown-preview hr{border:0;border-top:1px solid var(--md-border);margin:1.6em 0}
+.markdown-preview .md-frontmatter,.markdown-preview .md-toc{
+  color:var(--md-muted);font-size:12.5px;margin:0 0 20px;
+  background:var(--md-soft);border:1px solid var(--md-border);border-radius:8px;
+}
+.markdown-preview .md-frontmatter summary,.markdown-preview .md-toc summary{
+  cursor:pointer;padding:9px 12px;font-weight:600;
+}
+.markdown-preview .md-frontmatter pre{
+  margin:0;border:0;border-top:1px solid var(--md-border);
+  border-radius:0;background:var(--md-bg);
+}
+.markdown-preview .md-toc ol{
+  margin:0;padding:5px 16px 12px 32px;border-top:1px solid var(--md-border);
+}
+.markdown-preview .md-toc li{margin:.15em 0}
+.markdown-preview .md-toc-level-3,.markdown-preview .md-toc-level-4,
+.markdown-preview .md-toc-level-5,.markdown-preview .md-toc-level-6{margin-left:1em}
+.markdown-preview .md-image-ref,.markdown-preview .md-unresolved-link{
+  color:var(--md-muted);
+}
+.markdown-preview .md-unresolved-link{border-bottom:1px dotted var(--md-border)}
+@media(max-width:680px){
+  .markdown-preview{padding:22px 16px 48px;font-size:13px}
+  .markdown-preview h1{font-size:21px}
+  .markdown-preview h2{font-size:17px}
+  .markdown-preview th,.markdown-preview td{padding:8px 10px}
+}

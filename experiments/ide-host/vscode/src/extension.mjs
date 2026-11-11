@@ -15,6 +15,7 @@ import {isProcedurePath,validateRouteProposal,
 import {seedExampleWorkspace} from "./sample-loader.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
+import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {registerContractEditor} from "./contract-editor.mjs";
 import {registerPredicateEditor} from "./predicate-editor.mjs";
 import {registerSchemaEditor} from "./schema-editor.mjs";
@@ -23,22 +24,6 @@ const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
 // plugin worker; normal VS Code and backend-backed Theia retain host URIs.
-function staticPreviewResourceUrl(uri,extensionUri){
-  const value=uri.toString();
-  const path=globalThis.location?.pathname??"";
-  if(!path.endsWith("/plugin-worker.js")||
-     (extensionUri.scheme!=="http"&&extensionUri.scheme!=="https"))
-    return value;
-  const base=path.slice(0,-"/plugin-worker.js".length);
-  if(!base)return value;
-  try{
-    const origin=globalThis.location.origin;
-    const parsed=new URL(value,origin);
-    if(parsed.origin!==origin||!parsed.pathname.startsWith("/hostedPlugin/"))
-      return value;
-    return base+parsed.pathname+parsed.search+parsed.hash;
-  }catch{return value;}
-}
 function escaped(value){
   return String(value).replace(/[&<>"']/g,ch=>({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"

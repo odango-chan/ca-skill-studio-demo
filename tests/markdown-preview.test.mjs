@@ -81,3 +81,30 @@ test("all three current CreatedSession business References render safely in Mark
   assert.match(gpp.html,/md-unresolved-link/);
   assert.doesNotMatch(gpp.html,/href="\.\.\/SKILL.md"/);
 });
+
+
+test("GFM table alignment is applied to header and body cells without inline styles",()=>{
+  const html=renderMarkdown([
+    "| Name | Count | Result | Plain |",
+    "| :--- | ---: | :---: | --- |",
+    "| a\\|b | 12 | <unsafe> | yes |"
+  ].join("\n")).html;
+  assert.match(html,/<th class="md-align-left">Name<\/th>/);
+  assert.match(html,/<th class="md-align-right">Count<\/th>/);
+  assert.match(html,/<th class="md-align-center">Result<\/th>/);
+  assert.match(html,/<th>Plain<\/th>/);
+  assert.match(html,/<td class="md-align-left">a\|b<\/td>/);
+  assert.match(html,/<td class="md-align-right">12<\/td>/);
+  assert.match(html,/<td class="md-align-center">&lt;unsafe&gt;<\/td>/);
+  assert.doesNotMatch(html,/<(?:th|td)[^>]*\sstyle=|<unsafe>/i);
+});
+
+test("the shared Markdown theme styles wide tables, sticky headings and host colors",()=>{
+  const css=readFileSync(new URL("../site/markdown-preview.css",import.meta.url),"utf8");
+  assert.match(css,/--vscode-editor-background/);
+  assert.match(css,/\.md-table-wrap\s*\{/);
+  assert.match(css,/max-height:65vh;overflow:auto/);
+  assert.match(css,/position:sticky;top:0/);
+  assert.match(css,/\.md-align-right\s*\{/);
+  assert.doesNotMatch(css,/@import\b|url\(/);
+});
