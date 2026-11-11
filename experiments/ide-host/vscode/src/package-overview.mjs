@@ -269,7 +269,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
           root,sourceRoot?'skills/**/*':'**/*');
         const batch = await vscode.workspace.findFiles(
           pattern,'**/node_modules/**',remaining);
-        const sourcePrefix = sourceRoot?.path ? sourceRoot.path.replace(/\\/$/,'')+'/' : null;
+        const sourcePrefix = sourceRoot?.path ? (sourceRoot.path.endsWith('/') ? sourceRoot.path : sourceRoot.path+'/') : null;
         for (const uri of batch) {
           if(sourcePrefix&&!uri.path.startsWith(sourcePrefix))continue;
           const key = uri.toString();
