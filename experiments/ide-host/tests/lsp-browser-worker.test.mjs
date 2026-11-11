@@ -198,6 +198,22 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot
     });
+    const procedureBeforeAnalysis=snapshot.documents.find(item=>
+      item.relativePath==="assurance/procedure.yaml");
+    assert.ok(procedureBeforeAnalysis);
+    // Semantic-token lookup must use the accepted Source snapshot immediately;
+    // it must not wait for Python indexing or Package READY diagnostics.
+    const earlyTokenDiagnostics=await lspRequest(worker,93,
+      "skillStudio/semanticTokenDiagnostics",{uri:procedureBeforeAnalysis.uri});
+    assert.equal(earlyTokenDiagnostics.packageFound,true);
+    assert.equal(earlyTokenDiagnostics.documentFound,true);
+    assert.ok(earlyTokenDiagnostics.spanCount>0);
+    const earlySemanticTokens=await lspRequest(worker,94,
+      "textDocument/semanticTokens/full",{
+        textDocument:{uri:procedureBeforeAnalysis.uri}
+      });
+    assert.ok(earlySemanticTokens.data.length>0,
+      "semantic tokens are available before Package analysis reaches READY");
     const status=await waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus" &&
       message.params?.rootUri===snapshot.rootUri
