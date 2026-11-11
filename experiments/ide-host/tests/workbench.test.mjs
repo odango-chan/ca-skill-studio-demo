@@ -210,7 +210,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     workspace:{textDocuments:[doc,markdownDoc],
       getWorkspaceFolder:()=>({uri:uri('/workspace')}),
       findFiles:async pattern=>{
-        if(pattern==='**/SKILL.md'||pattern instanceof vscode.RelativePattern)
+        if(pattern==='**/SKILL.md'||
+           (pattern instanceof vscode.RelativePattern&&pattern.base.path==='/workspace'))
           return [uri('/workspace/SKILL.md')];
         return ['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md']
           .map(p=>uri('/workspace/establish-pdu-session/'+p));
