@@ -1048,7 +1048,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!dataflowTreeRow.toggleFound)
     throw Error('Native Evidence dataflow row has no Theia expansion toggle: '+
       JSON.stringify(dataflowTreeRow));
-  let evidenceModelSetup=null;
+  let evidenceModelSetup=null,liveToggle=null,toggleInstrumentation=null;
   if(!dataflowTreeRow.expanded){
     if(!dataflowTreeRow.hitWithinToggle)
       throw Error('Native Evidence toggle is obscured at its click point: '+JSON.stringify(dataflowTreeRow));
@@ -1141,7 +1141,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     // Resolve the live target after any layout/scroll work. Do not hover a
     // stale coordinate: the mousemove itself can trigger Theia SplitPanel
     // reflow and move the virtualized Evidence row underneath the pointer.
-    let liveToggle=null,stableHit=0,lastPos=null;
+    let stableHit=0,lastPos=null;
     // Mouse hover and native SplitPanel resize may move the Evidence part
     // after the first successful hit-test. Only press once the live toggle
     // remains visible and hit-testable in consecutive browser frames.
@@ -1185,7 +1185,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!liveToggle?.hitWithinToggle||stableHit<1)
       throw Error('Native Evidence expansion toggle remained obstructed after scroll/hover stabilization: '+
         JSON.stringify({dataflowTreeRow,liveToggle,stableHit}));
-    const toggleInstrumentation=await evalJS(`(()=>{
+    toggleInstrumentation=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
         .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
