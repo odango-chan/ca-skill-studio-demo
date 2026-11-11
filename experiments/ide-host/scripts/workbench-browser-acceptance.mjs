@@ -2025,7 +2025,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         }
         const result=await command('Runtime.evaluate',{
           contextId,returnByValue:true,
-          expression:'(()=>{const heading=document.querySelector("h1");if(!heading)return null;const body=getComputedStyle(document.body),title=getComputedStyle(heading),styles=[...document.querySelectorAll("link[rel=stylesheet]")].map(x=>x.href),table=document.querySelector("table"),csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content??"";return {heading:heading.textContent.trim(),headingColor:title.color,bodyColor:body.color,maxWidth:body.maxWidth,styles,tableCount:document.querySelectorAll("table").length,tableDisplay:table?getComputedStyle(table).display:null,tableMaxHeight:table?getComputedStyle(table).maxHeight:null,csp,imageCount:document.querySelectorAll("img").length,scriptMarkers:[...document.querySelectorAll("script")].filter(x=>x.textContent.includes("skillStudioNativeMarkdownXss")).length,bodyHasScriptMarker:document.body.innerText.includes("skillStudioNativeMarkdownXss"),anchorHrefs:[...document.querySelectorAll("a[href]")].map(x=>x.getAttribute("href")),scrollTop:window.scrollY,scrollHeight:document.documentElement.scrollHeight};})()'
+          expression:'(()=>{const heading=document.querySelector("h1");if(!heading)return null;const body=getComputedStyle(document.body),title=getComputedStyle(heading),styles=[...document.querySelectorAll("link[rel=stylesheet]")].map(x=>x.href),table=document.querySelector("table"),csp=document.querySelector("meta[http-equiv=Content-Security-Policy]")?.content??"";return {heading:heading.textContent.trim(),headingColor:title.color,bodyColor:body.color,maxWidth:body.maxWidth,styles,tableCount:document.querySelectorAll("table").length,tableDisplay:table?getComputedStyle(table).display:null,tableMaxHeight:table?getComputedStyle(table).maxHeight:null,csp,imageCount:document.querySelectorAll("img").length,scriptMarkers:[...document.querySelectorAll("script")].filter(x=>x.textContent.includes("skillStudioNativeMarkdownXss")).length,bodyHasScriptMarker:document.body.innerText.includes("skillStudioNativeMarkdownXss"),anchorHrefs:[...document.querySelectorAll("a[href]")].map(x=>x.getAttribute("href")),scrollTop:window.scrollY,scrollHeight:document.documentElement.scrollHeight};})()'
         });
         if(result.result?.value?.heading)
           found.push({contextId,frameUrl:node.frame.url,...result.result.value});
@@ -2067,9 +2067,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     "groups.set(bar,{index:groups.size,labels:[],rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}"+
     "groups.get(bar).labels.push(tab.textContent.trim());}return [...groups.values()];})()");
   const nativeSourceGroup=nativeMarkdownGroups.find(group=>
-    group.labels.some(label=>/^SKILL\\.md/.test(label)));
+    group.labels.some(label=>/^SKILL\.md/.test(label)));
   const nativePreviewGroup=nativeMarkdownGroups.find(group=>
-    group.labels.some(label=>/Preview.*SKILL\\.md|SKILL\\.md.*Preview/i.test(label)));
+    group.labels.some(label=>/Preview.*SKILL\.md|SKILL\.md.*Preview/i.test(label)));
   if(!nativeSourceGroup||!nativePreviewGroup||
      nativeSourceGroup.index===nativePreviewGroup.index)
     throw Error('Native Markdown must keep editable Source and Preview in separate editor groups: '+
