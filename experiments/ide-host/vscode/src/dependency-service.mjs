@@ -147,8 +147,12 @@ export async function refreshDependency(vscode,selectedRoot,id,acquire){
   if(!old)fail("ERROR","Unknown dependency alias");
   if(typeof acquire!=="function")fail("BLOCKED","Source acquisition adapter unavailable");
   const candidate=await lockCandidate(vscode,selectedRoot,id,await acquire(old.source));
-  if(!metadataMatches(candidate.declaration.source,old.source))
-    fail("ERROR","Refresh must preserve declaration source");
+  const sameSource=metadataMatches(candidate.declaration.source,old.source);
+  const uploadReimport=old.source.type==="upload"&&
+    candidate.declaration.source.type==="upload"&&
+    candidate.declaration.source.upload===old.source.upload;
+  if(!sameSource&&!uploadReimport)
+    fail("ERROR","Refresh must preserve source identity (Upload may change content digest)");
   const locked=project.settings.dependencyLock.entries.find(x=>x.id===id);
   // Observation only. No FS writes and no settings changes.
   return {status:"READY",changed:!locked||
