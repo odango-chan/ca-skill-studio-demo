@@ -29,6 +29,7 @@ const connection = createConnection(
 );
 const sessions = new Map();
 const packageAnalyses = new Map();
+const packageSnapshots = new Map();
 const requestedGeneration = new Map();
 
 function reportError(message, rootUri = undefined) {
@@ -179,20 +180,34 @@ function packageForUri(uri) {
   return null;
 }
 
+function packageSnapshotForUri(uri) {
+  for (const snapshot of packageSnapshots.values()) {
+    if (Array.isArray(snapshot.documents) &&
+        snapshot.documents.some(document => document?.uri === uri))
+      return snapshot;
+  }
+  return null;
+}
+
+function snapshotDocumentFor(snapshot, uri) {
+  return snapshot?.documents?.find(document => document?.uri === uri) ?? null;
+}
+
 function documentFor(value, uri) {
   return value?.snapshot.documents.find(document => document.uri === uri) ?? null;
 }
 
 connection.onRequest("skillStudio/semanticTokenDiagnostics", params=>{
   const uri=params?.uri;
-  const value=typeof uri==="string"?packageForUri(uri):null;
-  const document=value?documentFor(value,uri):null;
+  const snapshot=typeof uri==="string"?packageSnapshotForUri(uri):null;
+  const value=snapshot?packageAnalyses.get(snapshot.rootUri):null;
+  const document=snapshot?snapshotDocumentFor(snapshot,uri):null;
   return {
-    packageCount:packageAnalyses.size,
-    packageFound:Boolean(value),
+    packageCount:packageSnapshots.size,
+    packageFound:Boolean(snapshot),
     analysisState:value?.analysis.state??null,
-    generation:value?.snapshot.generation??null,
-    documentCount:value?.snapshot.documents.length??0,
+    generation:snapshot?.generation??null,
+    documentCount:snapshot?.documents.length??0,
     documentFound:Boolean(document),
     relativePath:document?.relativePath??null,
     textLength:typeof document?.text==="string"?document.text.length:0,
@@ -285,14 +300,14 @@ connection.onInitialize(() => ({
 connection.onRequest("skillStudio/health", () => ({alive:true}));
 
 connection.languages.semanticTokens.on(params=>{
-  const value=packageForUri(params.textDocument.uri);
-  if(!value)return {data:[]};
-  const document=documentFor(value,params.textDocument.uri);
+  const snapshot=packageSnapshotForUri(params.textDocument.uri);
+  if(!snapshot)return {data:[]};
+  const document=snapshotDocumentFor(snapshot,params.textDocument.uri);
   if(!document)return {data:[]};
   // Semantic coloring is a source-AST projection. It must not depend on
   // Python symbol analysis, the Package's READY/PARTIAL state, or whether
-  // this YAML file produced an analysis document. The accepted Package
-  // snapshot owns the exact source text/version for this URI.
+  // this YAML file produced an analysis document. The latest accepted
+  // Package snapshot owns the exact source text/version for this URI.
   return semanticTokensForDocument(document);
 });
 
@@ -475,6 +490,7 @@ connection.onNotification(PACKAGE_INVALIDATE_NOTIFICATION, params => {
   if (generation > knownGeneration) {
     requestedGeneration.set(rootUri, generation);
     packageAnalyses.delete(rootUri);
+    packageSnapshots.delete(rootUri);
     sessions.get(rootUri)?.reset();
     refreshSemanticTokens();
   }
@@ -483,7 +499,8 @@ connection.onNotification(PACKAGE_INVALIDATE_NOTIFICATION, params => {
 connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
   if (!snapshot || typeof snapshot !== "object" ||
       typeof snapshot.rootUri !== "string" || !snapshot.rootUri.trim() ||
-      !Number.isSafeInteger(snapshot.generation) || snapshot.generation < 0) {
+      !Number.isSafeInteger(snapshot.generation) || snapshot.generation < 0 ||
+      !Array.isArray(snapshot.documents)) {
     reportError("Rejected Package snapshot without a valid root URI or generation");
     return;
   }
@@ -493,7 +510,12 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
   if (snapshot.generation > knownGeneration) {
     requestedGeneration.set(rootUri, snapshot.generation);
     packageAnalyses.delete(rootUri);
+    packageSnapshots.delete(rootUri);
   }
+  // Publish the exact source snapshot to semantic-token requests immediately.
+  // LanguageDiagnosticSession analysis may still be pending or PARTIAL; color
+  // projection must not wait for Python indexing or diagnostics completion.
+  packageSnapshots.set(rootUri, snapshot);
   let session = sessions.get(rootUri);
   if (!session) {
     session = createSession(rootUri);
@@ -505,11 +527,13 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
         result.reason !== "STALE_GENERATION" &&
         result.reason !== "STALE_DOCUMENT") {
       packageAnalyses.delete(rootUri);
+      if(packageSnapshots.get(rootUri)===snapshot)packageSnapshots.delete(rootUri);
       refreshSemanticTokens();
       reportError("Package analysis rejected: " + result.reason, rootUri);
     }
   } catch (error) {
     packageAnalyses.delete(rootUri);
+    if(packageSnapshots.get(rootUri)===snapshot)packageSnapshots.delete(rootUri);
     refreshSemanticTokens();
     reportError(error?.message ?? error, rootUri);
   }
@@ -524,6 +548,7 @@ connection.onNotification(PACKAGE_CLOSE_NOTIFICATION, params => {
     sessions.delete(rootUri);
   }
   packageAnalyses.delete(rootUri);
+  packageSnapshots.delete(rootUri);
   requestedGeneration.delete(rootUri);
   refreshSemanticTokens();
 });
@@ -532,6 +557,7 @@ connection.onShutdown(() => {
   for (const session of sessions.values()) session.dispose();
   sessions.clear();
   packageAnalyses.clear();
+  packageSnapshots.clear();
   requestedGeneration.clear();
 });
 
