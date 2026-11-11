@@ -1358,25 +1358,33 @@ try{
     throw Error("Two-SKILL Package Overview Chromium acceptance did not complete: "+
       JSON.stringify(packageOverviewEvidence));
   console.log("STUDIO_THEIA_STAGE","package-overview");
-  // Real Chromium assertion: exercise native Extension Configuration writes,
-  // persisted immutable snapshot reload, dependency removal and unavailable
-  // Compiler Build through the installed Theia Web extension (no mocks).
+  // Real native Theia Workspace Configuration / persistent snapshot acceptance.
+  // Separate async calls expose the exact failing stage (rather than hitting
+  // Chromium's 30-second command cap with no actionable evidence).
   let pluginManagedAcceptance=null;
   if(requireEditor){
-    pluginManagedAcceptance=await evalJS(`(async()=>{
-      const c=window.theia.container;
-      const key=[...c._bindingDictionary._map.keys()].find(k=>
-        typeof k==='function'&&k.prototype?.executeCommand&&
-        k.prototype?.registerCommand&&k.prototype?.getCommand);
-      if(!key)throw Error("Browser v0.1 native command service unavailable");
-      return c.get(key).executeCommand("skillStudio.internal.pluginManagedAcceptance");
-    })()`);
-    console.log("STUDIO_PLUGIN_MANAGED_CHROMIUM",JSON.stringify(pluginManagedAcceptance));
-    if(pluginManagedAcceptance?.status!=="PASS"||
-       pluginManagedAcceptance.pinnedStatus!=="READY"||
-       pluginManagedAcceptance.buildStatus!=="UNAVAILABLE"||
-       pluginManagedAcceptance.declarationCount!==0)
-      throw Error("Plugin-managed v0.1 host acceptance failed: "+
+    const stages=[];
+    for(const phase of ["pin","verify","remove"]){
+      const result=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==='function'&&k.prototype?.executeCommand&&
+          k.prototype?.registerCommand&&k.prototype?.getCommand);
+        if(!key)throw Error("Browser v0.1 native command service unavailable");
+        return c.get(key).executeCommand("skillStudio.internal.pluginManagedAcceptance",
+          ${JSON.stringify(phase)});
+      })()`);
+      console.log("STUDIO_PLUGIN_MANAGED_PHASE",JSON.stringify({phase,result}));
+      if(result?.status!=="PASS"||result.phase!==phase)
+        throw Error("Plugin-managed "+phase+" failed: "+JSON.stringify(result));
+      stages.push(result);
+    }
+    pluginManagedAcceptance={status:"PASS",stages};
+    if(stages[0].pinnedStatus!=="READY"||
+       stages[1].pinnedStatus!=="READY"||
+       stages[1].buildStatus!=="UNAVAILABLE"||
+       stages[2].declarationCount!==0)
+      throw Error("v0.1 native configuration/Build result mismatch: "+
         JSON.stringify(pluginManagedAcceptance));
   }
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
