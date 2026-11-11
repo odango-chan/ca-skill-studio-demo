@@ -62,7 +62,7 @@ jobs:
           test -s "$HOME/.theia/plugins/odango-chan.skill-studio-theme/package.json"
           cp -R experiments/ide-host/theia-online/plugins/odango-chan.skill-studio-languages "$HOME/.theia/plugins/"
           test -s "$HOME/.theia/plugins/odango-chan.skill-studio-languages/package.json"
-          markdown_manifest=$(find experiments/ide-host/theia-online/plugins -mindepth 2 -maxdepth 5 -type f -name package.json -print | while IFS= read -r file; do grep -q '"name"[[:space:]]*:[[:space:]]*"markdown-language-features"' "$file" && { printf '%s\\n' "$file"; break; }; done)
+          markdown_manifest=$(find experiments/ide-host/theia-online/plugins -mindepth 2 -maxdepth 5 -type f -name package.json -print | while IFS= read -r file; do grep -q '"name"[[:space:]]*:[[:space:]]*"markdown-language-features"' "$file" && { echo "$file"; break; }; done)
           test -n "$markdown_manifest"
           cp -R "$(dirname "$markdown_manifest")" "$HOME/.theia/plugins/"
       - name: Start Theia backend for Webview endpoint
