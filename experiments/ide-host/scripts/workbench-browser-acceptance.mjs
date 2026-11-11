@@ -1048,10 +1048,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!dataflowTreeRow.toggleFound)
     throw Error('Native Evidence dataflow row has no Theia expansion toggle: '+
       JSON.stringify(dataflowTreeRow));
+  let evidenceModelSetup=null;
   if(!dataflowTreeRow.expanded){
     if(!dataflowTreeRow.hitWithinToggle)
       throw Error('Native Evidence toggle is obscured at its click point: '+JSON.stringify(dataflowTreeRow));
-    const evidenceModelSetup=await evalJS(`(()=>{
+    evidenceModelSetup=await evalJS(`(()=>{
       const c=window.theia?.container;
       const serviceKeys=[...(c?._bindingDictionary?._map?.keys()??[])];
       const managerKey=serviceKeys.find(key=>typeof key==='function'&&
@@ -1061,8 +1062,17 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const manager=c.get(managerKey);
       const widget=manager.getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence');
       if(!widget)return {found:false,reason:'Evidence widget unavailable'};
-      const toggle=[...document.querySelectorAll('#skillStudio\\.evidence .theia-ExpansionToggle')]
-        .find(item=>item.getAttribute('data-node-id')?.includes('Producer // Consumer dataflow'));
+      const container=[...document.querySelectorAll('.theia-view-container')]
+        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
+        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
+      const part=header?.closest('.part');
+      const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(item=>{
+        const caption=[...item.children].find(child=>
+          child.classList?.contains('theia-TreeNodeContent'));
+        return caption?.innerText?.includes('Producer / Consumer dataflow');
+      });
+      const toggle=row?.querySelector('.theia-ExpansionToggle');
       const node=widget.model?.getNode(toggle?.getAttribute('data-node-id'));
       const model=widget.model,tree=model?.tree;
       const trace=window.__skillStudioEvidenceModelTrace={
@@ -1102,6 +1112,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         nodeId:node?.id??null,nodeExpanded:node?.expanded??null,nodeChildren:node?.children?.length??null};
     })()`);
     console.log('STUDIO_EVIDENCE_MODEL_SETUP',JSON.stringify(evidenceModelSetup));
+    if(!evidenceModelSetup?.nodeFound)throw Error('Native Evidence TreeView row could not be resolved to its live model node: '+JSON.stringify(evidenceModelSetup));
     await evalJS(`(()=>{
       window.__skillStudioEvidenceClickEvents=[];
       window.__skillStudioEvidenceBubbleEvents=[];
