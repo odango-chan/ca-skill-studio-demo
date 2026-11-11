@@ -116,11 +116,10 @@ export function protectOpfsProvider(base,{
     },
     async close(fd,...args){try{return await base.close.call(proxy,fd,...args);}
       finally{fds.delete(fd);}},
-    async createIndex(entries,...args){
-      if(!(entries instanceof Map))deny("OPFS index import requires an explicit URI map");
-      for(const [uri] of entries)await allowed(uri,"createIndex");
-      return base.createIndex.call(proxy,entries,...args);
-    },
+    // createIndex is an opaque bulk-index operation, not a normal per-file
+    // mutation. Until a scoped importer exists, do not let a caller replace
+    // or rebuild the project index even when its submitted paths look safe.
+    async createIndex(){deny("Bulk OPFS index replacement requires a scoped import capability");},
     async clear(){deny("Direct OPFS clear is not allowed in Skill Studio");}
   };
   proxy=new Proxy(base,{get(target,key){
