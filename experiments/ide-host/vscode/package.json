@@ -72,7 +72,7 @@
       },
       {
         "command": "skillStudio.loadExample",
-        "title": "SKILL Studio: Load Example Package (browser workspace)"
+        "title": "Skill Studio: Load Example Workspace"
       },
       {
         "command": "skillStudio.auditPackage",
@@ -401,7 +401,7 @@
     "viewsWelcome": [
       {
         "view": "workbench.explorer.fileView",
-        "contents": "**欢迎使用 SKILL Studio**\\n\\n还没有打开项目？可以载入 skills/、lib/、output/ 三目录的演示项目，包含传统 5GC 和 MAS 两个 SKILL，并体验可视化编辑。\\n\\n[载入演示 SKILL 项目](command:skillStudio.loadExample)\\n\\n导入会在原有 skills/ 同级补齐 lib/、output/，打开项目根，不覆盖已有文件。"
+        "contents": "**欢迎使用 Skill Studio**\\n\\n点击载入仅含两个正式 Skill 的独立示例工作空间。旧 OPFS 工作空间与用户文件不被覆盖。\\n\\n[载入 Skill Studio Example](command:skillStudio.loadExample)"
       }
     ],
     "viewsContainers": {
