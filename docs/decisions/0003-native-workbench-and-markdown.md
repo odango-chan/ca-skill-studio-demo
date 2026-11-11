@@ -56,7 +56,7 @@ These are native host views. They must not require a dedicated Skill Studio Acti
 - It displays the current selected Source-backed Node, Phase, Step, Route, Contract or Predicate properties and only exposes already-qualified bounded edits.
 - It may contain a contextual **Data Flow** section for the selected Step / consumer. Data Flow is not a separate permanent Evidence panel.
 
-The right-side placement is the product decision. Prefer the native secondarySidebar / secondary-side-bar location. Verify actual support in the pinned Theia 1.76 host and in desktop VS Code. If a host cannot attach an extension-contributed view there, use the host's native movable view/container mechanism; do not implement a custom right dock or a Theia-only property UI.
+The right-side placement is the product decision. Use the native secondarySidebar contribution. Theia 1.76's plugin contribution normalizer explicitly maps secondarySidebar to its right-side location (see [Theia v1.76.0 normalize-contributions.ts](https://github.com/eclipse-theia/theia/blob/v1.76.0/packages/plugin-utils/src/node/normalize-contributions.ts#L92-L96)); desktop VS Code exposes the same contribution point. The implementation still requires real Theia Chromium and desktop VS Code placement acceptance. If a host runtime does not attach the view as expected, use the host's native movable view/container mechanism; do not implement a custom right dock or a Theia-only property UI.
 
 **Bottom Panel:**
 
