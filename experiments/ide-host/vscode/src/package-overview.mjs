@@ -156,6 +156,7 @@ function treeNode(vscode, node) {
 export function registerPackageOverview(vscode,context,getActiveDocument=()=>null) {
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
+  let observedRootSignature = null;
   let treeReads=0;
   const treeReadsByKind={root:0,package:0,group:0,other:0};
   const fire = () => emitter.fire();
@@ -241,7 +242,9 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       const openDocuments = [...(vscode.workspace.textDocuments??[]),
         ...(activeDocument?[activeDocument]:[])];
       const roots = packageScanRoots(vscode.workspace.workspaceFolders??[],openDocuments);
+      const rootSignature = roots.map(root=>root.toString()).sort().join('\n');
       if (!roots.length) {
+        observedRootSignature=rootSignature;
         packages=[];inventoryState='no-workspace';message='请先打开 Workspace 或一个 SKILL 文件';fire();return [];
       }
       const found = [], seen = new Set();
@@ -257,6 +260,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
         }
       }
       if (ticket !== generation) return packages;
+      observedRootSignature=rootSignature;
       const truncated = found.length > FILE_LIMIT;
       const visible = found.slice(0,FILE_LIMIT);
       const dirty = new Set((vscode.workspace.textDocuments??[])
@@ -288,13 +292,28 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     clearTimeout(timer);
     timer=setTimeout(()=>void refresh(),250);
   }
+  // Opening a Source document does not alter the inventory when its scan
+  // roots are unchanged. Do not discard expanded native TreeView nodes for
+  // a file-open notification (notably when navigating to a second Skill).
+  function scheduleIfRootsChanged() {
+    const activeDocument=getActiveDocument?.();
+    const openDocuments=[...(vscode.workspace.textDocuments??[]),
+      ...(activeDocument?[activeDocument]:[])];
+    const roots=packageScanRoots(vscode.workspace.workspaceFolders??[],openDocuments);
+    const signature=roots.map(root=>root.toString()).sort().join('\n');
+    if(signature!==observedRootSignature)schedule();
+  }
   function refreshDirty() {
     const dirty = new Set((vscode.workspace.textDocuments??[])
       .filter(doc=>doc.isDirty).map(doc=>doc.uri.path));
-    packages=packages.map(pkg=>({...pkg,
+    const next=packages.map(pkg=>({...pkg,
       dirtyCount:pkg.files.filter(file=>dirty.has(file.uri.path)).length
     }));
-    fire();
+    // Avoid a root tree refresh when only the document contents changed.
+    if(next.some((pkg,index)=>pkg.dirtyCount!==packages[index].dirtyCount)){
+      packages=next;
+      fire();
+    }
   }
   const subscriptions = [
     vscode.commands.registerCommand('skillStudio.refreshPackages',async()=>{
@@ -313,8 +332,8 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     vscode.workspace.onDidCreateFiles?.(schedule),
     vscode.workspace.onDidDeleteFiles?.(schedule),
     vscode.workspace.onDidRenameFiles?.(schedule),
-    vscode.workspace.onDidOpenTextDocument?.(schedule),
-    vscode.workspace.onDidCloseTextDocument?.(schedule),
+    vscode.workspace.onDidOpenTextDocument?.(scheduleIfRootsChanged),
+    vscode.workspace.onDidCloseTextDocument?.(scheduleIfRootsChanged),
     vscode.workspace.onDidChangeTextDocument?.(refreshDirty),
     vscode.workspace.onDidSaveTextDocument?.(refreshDirty),
     {dispose(){clearTimeout(timer);generation++;}}
