@@ -44,6 +44,18 @@
     "onView:skillStudio.packages"
   ],
   "contributes": {
+    "colors": [
+      {
+        "id": "skillStudio.markdownHeading",
+        "description": "SKILL Studio Markdown heading accent, following the active Classic light/dark theme.",
+        "defaults": {
+          "light": "#0c8e7b",
+          "dark": "#83d9c4",
+          "highContrastLight": "#075f55",
+          "highContrast": "#a8f0df"
+        }
+      }
+    ],
     "commands": [
       {
         "command": "skillStudio.refreshPackages",
