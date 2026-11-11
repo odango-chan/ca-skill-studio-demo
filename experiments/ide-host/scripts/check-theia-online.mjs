@@ -39,6 +39,27 @@ console.log("STUDIO_THEIA_FRONTEND_ARTIFACT",JSON.stringify({
 if(!hasProcedurePlugin)throw Error("Theia browser-only build lacks prepared SKILL Studio Web extension");
 if(!hasThemePlugin)throw Error("Theia browser-only build lacks the built-in Skill Studio theme extension");
 if(missingThemeAssets.length)throw Error("Theia static preview is missing theme assets: "+missingThemeAssets.join(", "));
+const syntaxPluginRoot=join(root,"hostedPlugin/odango_chan_skill_studio_languages");
+const syntaxManifestPath=join(syntaxPluginRoot,"package.json");
+if(!existsSync(syntaxManifestPath))
+  throw Error("Theia static preview lacks the built-in YAML/Python syntax extension manifest");
+const syntaxManifest=JSON.parse(readFileSync(syntaxManifestPath,"utf8"));
+const syntaxAssets=(syntaxManifest.contributes?.grammars??[]).map(item=>
+  join(syntaxPluginRoot,item.path));
+const missingSyntaxAssets=syntaxAssets.filter(path=>
+  !existsSync(path)||statSync(path).size<100);
+if(missingSyntaxAssets.length)
+  throw Error("Theia static preview lacks pinned TextMate grammar assets: "+
+    missingSyntaxAssets.join(", "));
+for(const language of ["yaml","python"]){
+  if(!syntaxManifest.contributes?.languages?.some(item=>item.id===language)||
+     !syntaxManifest.contributes?.grammars?.some(item=>item.language===language))
+    throw Error("Theia static preview syntax extension is missing "+language);
+}
+console.log("STUDIO_THEIA_STATIC_SYNTAX_EXTENSION",JSON.stringify({
+  syntaxPluginRoot,languages:syntaxManifest.contributes.languages.map(item=>item.id),
+  grammarCount:syntaxAssets.length
+}));
 const languageServerWorker=join(root,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js");
 if(!existsSync(languageServerWorker)||statSync(languageServerWorker).size<1000)
   throw Error("Theia static preview is missing the bundled browser LSP Worker");
