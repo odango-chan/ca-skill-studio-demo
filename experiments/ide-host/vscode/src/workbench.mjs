@@ -42,7 +42,8 @@ export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
-  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),markdownOpening=new Set();
+  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),
+    markdownOpening=new Set(),nativeMarkdownOpening=new Set();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2397,7 +2398,33 @@ export function registerWorkbench(vscode,context){
     state.panel.reveal(state.singlePane?vscode.ViewColumn.One:vscode.ViewColumn.Two);
     void state.panel.webview.postMessage({type:'layoutState',singlePane:state.singlePane});
   };
-  context.subscriptions.push(vscode.commands.registerCommand('skillStudio.previewMarkdown',async uri=>{
+  async function openNativeMarkdownPreview(uri){
+    uri=uri??vscode.window.activeTextEditor?.document.uri;
+    if(!uri||!uri.path?.toLowerCase().endsWith('.md'))return false;
+    const key=uri.toString();
+    if(nativeMarkdownOpening.has(key))return true;
+    nativeMarkdownOpening.add(key);
+    let paired=false;
+    try{
+      const doc=await vscode.workspace.openTextDocument(uri);
+      // Keep Source as the editable authority in the first editor group.
+      // The built-in Markdown extension owns the read-only Preview in group two.
+      await vscode.window.showTextDocument(doc,{
+        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:true
+      });
+      await vscode.commands.executeCommand('markdown.showPreviewToSide',uri);
+      paired=true;
+      return true;
+    }finally{
+      // The normal custom-preview auto-opener is deliberately suppressed only
+      // for this URI while the native command is creating its paired Preview.
+      if(paired)setTimeout(()=>nativeMarkdownOpening.delete(key),0);
+      else nativeMarkdownOpening.delete(key);
+    }
+  }
+  context.subscriptions.push(
+    vscode.commands.registerCommand('skillStudio.previewMarkdownNative',openNativeMarkdownPreview),
+    vscode.commands.registerCommand('skillStudio.previewMarkdown',async uri=>{
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
@@ -2608,6 +2635,17 @@ export function registerWorkbench(vscode,context){
     }
   }));
   context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async skillName=>{
+      const name=typeof skillName==='string'?skillName:'establish-pdu-session';
+      if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
+      const matches=await vscode.workspace.findFiles(
+        '**/'+name+'/SKILL.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith('/'+name+'/SKILL.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one '+name+' guide in the active Workspace');
+      return openNativeMarkdownPreview(exact[0]);
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.toggleMarkdownLayout',async uri=>{
       const target=uri??vscode.window.activeTextEditor?.document.uri;
       const state=target?markdownPanels.get(target.toString()):[...markdownPanels.values()].at(-1);
@@ -2627,7 +2665,7 @@ export function registerWorkbench(vscode,context){
     if(!target||!target.path.toLowerCase().endsWith('.md'))return;
     const key=target.toString();
     setTimeout(()=>{
-      if(markdownPanels.has(key)||markdownOpening.has(key))return;
+      if(markdownPanels.has(key)||markdownOpening.has(key)||nativeMarkdownOpening.has(key))return;
       if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
       void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
     },0);
