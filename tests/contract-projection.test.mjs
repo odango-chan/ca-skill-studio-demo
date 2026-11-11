@@ -113,3 +113,30 @@ test('Unknown nested fields and malformed known sections are explicitly partial'
   assert.equal(partial.state, 'PARTIAL');
   assert.ok(partial.projectionWarnings.includes('spec.context.requiredFacts is not a sequence'));
 });
+
+test('Current ca-skills 5GC and MAS contracts project context schemas completely',()=>{
+  const examples=[
+    ['establish-pdu-session',['subject','facts','observations','evidence']],
+    ['establish-pdu-session-mas',['subject','facts','observations']]
+  ];
+  for(const [skill,expected] of examples){
+    const source=readFileSync(new URL(
+      '../site/samples/skills/'+skill+'/assurance/contract.yaml',import.meta.url),'utf8');
+    const projection=projectSkillContract(source);
+    assert.equal(projection.state,'READY',JSON.stringify({
+      unknown:projection.unprojectedPaths,warnings:projection.projectionWarnings
+    }));
+    assert.equal(projection.name.value,skill);
+    assert.deepEqual(projection.contextSchemas.map(item=>item.name).sort(),expected);
+    assert.ok(projection.contextSchemas.every(item=>item.value.startsWith('lib/')));
+    assert.ok(projection.contextSchemas.every(item=>item.line>0));
+  }
+});
+
+test('Unknown context schema roles remain visible as partial instead of being discarded',()=>{
+  const source=contract.replace('    - ingress',
+    '    - ingress\n    schemas:\n      futureRole: lib/host/future.schema.yaml');
+  const projection=projectSkillContract(source);
+  assert.equal(projection.state,'PARTIAL');
+  assert.ok(projection.unprojectedPaths.includes('spec.context.schemas.futureRole'));
+});
