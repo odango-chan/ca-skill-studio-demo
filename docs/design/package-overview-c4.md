@@ -1,23 +1,33 @@
 # C4 — Package Overview
 
-Status: implementation complete; final exact-head CI and real Chromium
-acceptance are in progress. PR #133 now targets `main` and includes the
-latest Contract / Predicate / Schema Designer integration.
+Status: implementation is present and the dual-Skill inventory has been
+observed in real Chromium, but PR #133 is **not ready to merge**. The full
+Theia Browser Host acceptance currently stops in earlier Workbench / Evidence
+regressions before the final Package Overview expansion checks can complete.
 
-Current verification head: `6546927847ef0e13671f477568841aa3ca3d5924`.
+Current verification head: `3dd4b93a3f7f03275ac4a12231eb45c2c525e54c`.
 
-- Package inventory unit tests cover multiple roots, nested roots, incomplete
-  packages, dirty counts, bounded scans, and exact file-kind routing.
-- The real Theia acceptance now opens the two shipped sample Skills in one
-  Workspace: traditional 5GC (22 files) and MAS (5 files).
-- Chromium acceptance checks both Package rows, each Package's Assurance
-  group, exact Contract URI routing for both Skills, and TreeView child reads.
-- The previous Browser Host run exposed a separate Evidence-tree test issue:
-  the Phase group could remain collapsed after its root appeared. The test now
-  explicitly expands that parent before asserting the nested dataflow row.
-  The corrected exact-head run is pending; no merge is authorized yet.
+Verified on this head:
 
-The pull request remains draft until all four exact-head workflows pass.
+- IDE Host Spike: PASS.
+- Skill Studio PR verification (unit tests, typecheck, build, Chromium smoke): PASS.
+- Real Theia Package scan: PASS — both sample Skills discovered in one
+  Workspace; traditional 5GC has 22 files / 3 of 3 core files, MAS has
+  5 files / 3 of 3 core files.
+- Browser-Only Chromium: BLOCKED before Package Overview completion because
+  Package Audit became unavailable while reopening
+  `schemas/selection.schema.yaml` after the LSP worker recovery scenario.
+- Theia Browser Host Chromium: BLOCKED before Package Overview completion
+  because the earlier Evidence regression did not resolve the selected
+  Phase binding into Producer / Consumer dataflow evidence.
+- The Assurance expansion acceptance now retries a collapse/re-expand when
+  Theia reports an expanded group but has not published its child rows. This
+  fix has not yet been exercised because the earlier Workbench checks stop
+  the current browser runs first.
+
+The PR remains draft. Do not merge until both browser workflows pass on the
+same exact PR head and the two-Skill Package / Assurance / exact-URI checks
+complete in the real Theia Browser Host.
 
 ## Purpose
 
