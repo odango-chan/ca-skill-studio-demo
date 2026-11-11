@@ -113,6 +113,11 @@ export function protectOpfsProvider(base,{
     },
     async close(fd,...args){try{return await base.close.call(proxy,fd,...args);}
       finally{fds.delete(fd);}},
+    async createIndex(entries,...args){
+      if(!(entries instanceof Map))deny("OPFS index import requires an explicit URI map");
+      for(const [uri] of entries)await allowed(uri,"createIndex");
+      return base.createIndex.call(proxy,entries,...args);
+    },
     async clear(){deny("Direct OPFS clear is not allowed in Skill Studio");}
   };
   proxy=new Proxy(base,{get(target,key){
