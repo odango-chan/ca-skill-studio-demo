@@ -83,7 +83,7 @@ test("catalog IDs become a unique stable Monaco semantic-token legend",()=>{
 
 test("SkillContract source positions distinguish document identity and direct Operation grants",()=>{
   const text=readSample("assurance/contract.yaml");
-  assert.match(backend,/collectSkillSemanticTokenSpans\(raw,model\.uri\?\.path\?\?""\)/);
+  const spans=semantic.collectSkillSemanticTokenSpans(text,"assurance/contract.yaml");
   tokenFor(text,spans,"SkillContract","ca.document.kind");
   tokenFor(text,spans,"connectionagent.io/v1alpha1","ca.document.version");
   tokenFor(text,spans,"sbi.udm.sm_data.get","ca.reference.capability");
@@ -245,5 +245,5 @@ test("online and installed Studio Light themes expose every CA semantic token co
   assert.match(decorationCss,/\.ca-semantic-token--caReferencePredicate\{color:#7B5BA7!important\}/);
   assert.match(decorationCss,/\.ca-semantic-token--caValueOutcome\{color:#AD6517!important\}/);
   assert.match(backend,/createDecorationsCollection\(\)/);
-  assert.match(backend,/collectSkillSemanticTokenSpans\(raw,model\.uri\?\.path\?\?" "/);
+  assert.match(backend,/collectSkillSemanticTokenSpans\(raw,model\.uri\?\.path\?\?""\)/);
 });
