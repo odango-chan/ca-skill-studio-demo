@@ -2025,7 +2025,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         }
         const result=await command('Runtime.evaluate',{
           contextId,returnByValue:true,
-          expression:'(()=>{const heading=document.querySelector("h1");if(!heading)return null;const body=getComputedStyle(document.body),title=getComputedStyle(heading),styles=[...document.querySelectorAll("link[rel=stylesheet]")].map(x=>x.href),table=document.querySelector("table"),csp=document.querySelector("meta[http-equiv=Content-Security-Policy]")?.content??"";return {heading:heading.textContent.trim(),headingColor:title.color,bodyColor:body.color,maxWidth:body.maxWidth,styles,tableCount:document.querySelectorAll("table").length,tableDisplay:table?getComputedStyle(table).display:null,tableMaxHeight:table?getComputedStyle(table).maxHeight:null,csp,imageCount:document.querySelectorAll("img").length,scriptMarkers:[...document.querySelectorAll("script")].filter(x=>x.textContent.includes("skillStudioNativeMarkdownXss")).length,bodyHasScriptMarker:document.body.innerText.includes("skillStudioNativeMarkdownXss"),anchorHrefs:[...document.querySelectorAll("a[href]")].map(x=>x.getAttribute("href")),scrollTop:window.scrollY,scrollHeight:document.documentElement.scrollHeight};})()'
+          expression:'(()=>{const heading=document.querySelector("h1");if(!heading)return null;const body=getComputedStyle(document.body),title=getComputedStyle(heading),styles=[...document.querySelectorAll("link[rel=stylesheet]")].map(x=>x.href),table=document.querySelector("table"),csp=document.querySelector("meta[http-equiv=Content-Security-Policy]")?.content??"";return {heading:heading.textContent.trim(),headingColor:title.color,bodyColor:body.color,maxWidth:body.maxWidth,styles,tableCount:document.querySelectorAll("table").length,tableDisplay:table?getComputedStyle(table).display:null,tableMaxHeight:table?getComputedStyle(table).maxHeight:null,csp,imageCount:document.querySelectorAll("img").length,scriptMarkers:[...document.querySelectorAll("script")].filter(x=>x.textContent.includes("skillStudioNativeMarkdownXss")).length,bodyHasScriptMarker:document.body.innerText.includes("skillStudioNativeMarkdownXss"),scriptExecuted:Boolean(window.skillStudioNativeMarkdownXss),anchorHrefs:[...document.querySelectorAll("a[href]")].map(x=>x.getAttribute("href")),scrollTop:window.scrollY,scrollHeight:document.documentElement.scrollHeight};})()'
         });
         if(result.result?.value?.heading)
           found.push({contextId,frameUrl:node.frame.url,...result.result.value});
@@ -2079,6 +2079,32 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     sourceGroup:nativeSourceGroup,previewGroup:nativePreviewGroup
   };
   console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
+
+  const nativeSecurityUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownSecurityAcceptance');
+  if(typeof nativeSecurityUri!=='string'||
+     !nativeSecurityUri.endsWith('/references/__native-markdown-security.md'))
+    throw Error('Native Markdown security fixture was not created inside the 5GC Skill Package');
+  try{
+    const nativeSecurity=await waitNativeMarkdown(view=>
+      view.heading==='Native Markdown Security Probe',
+      'native Markdown Package security probe');
+    const evidence=nativeSecurity.view;
+    if(evidence.imageCount!==0||evidence.scriptMarkers!==0||evidence.scriptExecuted)
+      throw Error('Native Markdown allowed raw HTML or an image fetch: '+JSON.stringify(evidence));
+    if(!evidence.anchorHrefs.some(href=>href.includes('3gpp-procedure.md'))||
+       evidence.anchorHrefs.some(href=>href.includes('../../outside.md'))||
+       evidence.anchorHrefs.some(href=>href.includes('missing.md')))
+      throw Error('Native Markdown Package link containment failed: '+JSON.stringify(evidence));
+    if(!evidence.csp.includes("default-src 'none'")||
+       /script-src[^;]*unsafe-inline/.test(evidence.csp))
+      throw Error('Native Markdown preview is not using a strict script Content Security Policy: '+
+        JSON.stringify(evidence.csp));
+    console.log('STUDIO_NATIVE_MARKDOWN_SECURITY_CHROMIUM',JSON.stringify(evidence));
+  }finally{
+    await nativeCommand(
+      'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',nativeSecurityUri);
+  }
 
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
   await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
