@@ -1,5 +1,18 @@
 # Skill Studio 当前工作状态
 
+## Current Goal · Plugin-managed Architecture v0.1 (Draft #152 · 2026-11-11)
+
+**Implementation:** PARTIAL · [Studio PR #152](https://github.com/odango-chan/ca-skill-studio-demo/pull/152) is OPEN/Draft on `feat/plugin-managed-architecture-v01-20261111` from `main@2b34a375`; **not merged**. Contract sources: Studio [#150](https://github.com/odango-chan/ca-skill-studio-demo/pull/150) Draft and Compiler [#4](https://github.com/odango-chan/ca-skill-compiler/pull/4) Draft. [Canonical project layout](architecture/skill-project-layout.md) supersedes the old three-directory model within this implementation branch; historical entries below describe earlier baselines, not the v0.1 target.
+
+**Implemented in Draft:** Native VS Code settings, explicit multi-root folder selection, isolated two-Skill Example (legacy OPFS bytes untouched), Compiler v0.1 snapshot framing and golden-vector tests, immutable dependency storage/load/reject, Upload/MCP-discovery/GitHub-Git/Built-in acquisition, explicit Lock update and nonmutating Refresh, native Dependencies and Build views, v0.1 ProjectContext/BuildRequest Adapter with honest ABI `UNAVAILABLE`, and language analysis generation invalidation on Lock changes. Real Compiler-owned Linker and schema generation are not duplicated in Studio.
+
+**Acceptance:** `npm test`/typecheck/build and real Theia Browser-Only / Backend Chromium gates are **IN_PROGRESS** for Draft head. Initial host run [#42996456059](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42996456059) had 62/63 tests (mock missing native TreeView), fixed in branch. Initial Browser-Only [#42996456164](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42996456164) / Backend [#42996456009](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42996456009) failed at old Example command label; second Chromium reached real editing and Explorer but old harness missed Theia compact root label; fixed in branch, **not yet marked PASS**. [PR Verify #42996456021](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42996456021) PASS applies only to its own gate. Exact-head final acceptance is pending. Resulting-main Pages deploy: **NOT_RUN**. Real local VS Code GUI: **NOT_RUN**.
+
+**External blocker:** Compiler #4 defines the v0.1 ABI/schema but no production Go/WASM `skillc.build/v0.1` Core yet; Build shows `UNAVAILABLE` rather than faking a Compiler PASS. Full LSP dependency-qualified Definition/References/diagnostics sharing and full host-persisted Settings roundtrip remain **PARTIAL / awaiting integration evidence**. Runtime/Tool execution/5GC: **NOT_RUN / out of scope**.
+
+---
+
+
 **Updated: 2026-11-10**  
 **Theia host migration merge:** `b2f4e991e5e273ebb98419ba0b66453bdd0f72cf` (PR #86 Squash Merge; Theia is now the default Pages host).  
 **Node Focus merge baseline:** `b9c1c38cd286526d742dd254646a9ec3c2489562` (PR #89 Node Focus migration merged; resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727)).  
