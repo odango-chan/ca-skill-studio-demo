@@ -232,7 +232,7 @@ test("Native Markdown renderer strips raw HTML and images and restores cached to
     type,tag:"a",attrs:href?[["href",href]]:null,content:"",nesting:type==="link_open"?1:-1,
     children:null,attrGet(name){return this.attrs?.find(([key])=>key===name)?.[1]??null;}
   });
-  const safeOpen=makeLink("link_open","../3gpp-procedure.md");
+  const safeOpen=makeLink("link_open","3gpp-procedure.md");
   const safeClose=makeLink("link_close");
   const blockedOpen=makeLink("link_open","../../outside.md");
   const blockedClose=makeLink("link_close");
