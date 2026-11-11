@@ -44,3 +44,28 @@ export function standaloneSemanticTokenRules(semanticTokenColors = {}) {
   }
   return rules;
 }
+
+export function semanticTokenDecorationClass(type) {
+  if (typeof type !== "string" || !/^[A-Za-z][A-Za-z0-9.]*$/.test(type)) {
+    throw new TypeError("Invalid semantic token type");
+  }
+  return "ca-semantic-token--" + type.replace(/\./g, "-");
+}
+
+export function semanticTokenDecorationCss(semanticTokenColors = {}) {
+  const rules = standaloneSemanticTokenRules(semanticTokenColors);
+  return rules.filter(rule => rule.token.startsWith("ca")).map(rule => {
+    const declarations = [];
+    if (rule.foreground) declarations.push("color:#" + rule.foreground + "!important");
+    if (rule.background) declarations.push("background-color:#" + rule.background + "!important");
+    if (rule.fontStyle?.includes("italic")) declarations.push("font-style:italic!important");
+    if (rule.fontStyle?.includes("bold")) declarations.push("font-weight:700!important");
+    const decorations = [];
+    if (rule.fontStyle?.includes("underline")) decorations.push("underline");
+    if (rule.fontStyle?.includes("strikethrough")) decorations.push("line-through");
+    if (decorations.length) declarations.push("text-decoration:" + decorations.join(" ") + "!important");
+    if (!declarations.length) return "";
+    return ".monaco-editor ." + semanticTokenDecorationClass(rule.token) +
+      "{" + declarations.join(";") + "}";
+  }).filter(Boolean).join("\n");
+}
