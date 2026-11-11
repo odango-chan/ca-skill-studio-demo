@@ -624,6 +624,29 @@ try{
   ].join("\n"));
   if(!focused?.visible)
     throw Error("E1 Monaco Source surface hidden: "+JSON.stringify(focused));
+
+  // Semantic tokens must be emitted by the registered provider AND painted by
+  // the active Studio Light Monaco theme. A provider-only unit test is not enough.
+  const semanticRendering=await evaluate([
+    "(async()=>{",
+    " const host=document.getElementById('monacoHost');",
+    " const lines=[...host.querySelectorAll('.view-line')];",
+    " const line=lines.find(item=>item.textContent.includes('call: sbi.udm.sm_data.get'));",
+    " const token=(value)=>[...(line?.querySelectorAll('span')||[])]",
+    "  .find(item=>item.textContent===value);",
+    " const call=token('call'),operation=token('sbi.udm.sm_data.get');",
+    " const callColor=call?getComputedStyle(call).color:null;",
+    " const operationColor=operation?getComputedStyle(operation).color:null;",
+    " return {ok:host.dataset.language==='yaml'&&!!line&&",
+    "   callColor==='rgb(123, 91, 167)'&&operationColor==='rgb(40, 108, 168)',",
+    "  callColor,operationColor,line:line?.textContent,",
+    "  renderedLines:lines.length,theme:getComputedStyle(host).color};",
+    "})()"
+  ].join("\n"));
+  console.log("E1_MONACO_SEMANTIC_TOKEN_RENDERING",JSON.stringify(semanticRendering));
+  if(!semanticRendering?.ok)
+    throw Error("Monaco semantic token registration/rendering FAIL: "+JSON.stringify(semanticRendering));
+
   // Trusted CDP click activates Monaco's own input controller, unlike DOM focus.
   const pos=await evaluate("(()=>{const r=document.getElementById('monacoHost').getBoundingClientRect();return {x:r.x+120,y:r.y+60,width:r.width,height:r.height}})()");
   if(pos.width<200||pos.height<120)throw Error("Monaco canvas has no editable bounds");
