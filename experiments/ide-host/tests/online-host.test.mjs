@@ -4,6 +4,8 @@ import {readFileSync,statSync,readdirSync,existsSync} from "node:fs";
 import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
+import {extendMarkdownIt,setNativeMarkdownPackagePolicies,
+  isAllowedPackageRelativeLink} from "../vscode/src/markdown-link-policy.mjs";
 import {buildClassicIconsCss,THEIA_CLASSIC_ICON_MAP} from "../scripts/classic-icons-css.mjs";
 import {buildSkillStudioBrandCss,buildSkillStudioBrandScript,prepareTheiaBrand}
   from "../scripts/prepare-theia-brand.mjs";
@@ -29,6 +31,8 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   const editorViews=new Set(plugin.contributes.customEditors.map(x=>x.viewType));
   for(const view of ["skillStudio.procedurePreview","skillStudio.contractPreview",
     "skillStudio.predicatePreview","skillStudio.schemaPreview"])assert.ok(editorViews.has(view),view);
+  assert.equal(plugin.contributes["markdown.markdownItPlugins"],true,
+    "the native Markdown engine must load Studio package-link policy");
   const workbenchViews=new Set(plugin.contributes.views.skillStudio.map(x=>x.id));
   assert.ok(workbenchViews.has("skillStudio.packages"),
     "multi-Package Overview must live in the Skill Studio activity bar");
@@ -190,4 +194,71 @@ test("SKILL Studio wordmark sits beside the native menu list and compacts on nar
   }finally{
     await rm(temp,{recursive:true,force:true});
   }
+});
+
+
+test("Native Markdown package links stay inside the exact Skill Package inventory",()=>{
+  const files=new Set([
+    "SKILL.md","references/session-selection.md",
+    "references/3gpp-procedure.md","assurance/procedure.yaml"
+  ]);
+  assert.equal(isAllowedPackageRelativeLink("../SKILL.md","references",files),true);
+  assert.equal(isAllowedPackageRelativeLink("../references/3gpp-procedure.md","references",files),true);
+  assert.equal(isAllowedPackageRelativeLink("#purpose","references",files),true);
+  assert.equal(isAllowedPackageRelativeLink("https://example.invalid/docs","references",files),true);
+  assert.equal(isAllowedPackageRelativeLink("mailto:docs@example.invalid","references",files),true);
+  assert.equal(isAllowedPackageRelativeLink("../../outside.md","references",files),false);
+  assert.equal(isAllowedPackageRelativeLink("%2e%2e/%2e%2e/outside.md","references",files),false);
+  assert.equal(isAllowedPackageRelativeLink("..%2f..%2foutside.md","references",files),false);
+  assert.equal(isAllowedPackageRelativeLink("../missing.md","references",files),false);
+  assert.equal(isAllowedPackageRelativeLink("../procedure.yaml","references",files),false);
+  assert.equal(isAllowedPackageRelativeLink("..\\\\outside.md","references",files),false);
+  assert.equal(isAllowedPackageRelativeLink("javascript:alert(1)","references",files),false);
+  assert.equal(isAllowedPackageRelativeLink("data:text/html,unsafe","references",files),false);
+  assert.equal(isAllowedPackageRelativeLink("//example.invalid/outside.md","references",files),false);
+});
+
+test("Native Markdown renderer strips raw HTML and images and restores cached tokens",()=>{
+  const uri={
+    path:"/workspace/skills/example/references/guide.md",
+    toString(){return "file:///workspace/skills/example/references/guide.md";}
+  };
+  setNativeMarkdownPackagePolicies([uri],{
+    rootPath:"/workspace/skills/example",
+    allowedFiles:new Set(["SKILL.md","references/guide.md","references/3gpp-procedure.md"]),
+    denyAll:false
+  });
+  const makeLink=(type,href)=>({
+    type,tag:"a",attrs:href?[["href",href]]:null,content:"",nesting:type==="link_open"?1:-1,
+    children:null,attrGet(name){return this.attrs?.find(([key])=>key===name)?.[1]??null;}
+  });
+  const safeOpen=makeLink("link_open","../3gpp-procedure.md");
+  const safeClose=makeLink("link_close");
+  const blockedOpen=makeLink("link_open","../../outside.md");
+  const blockedClose=makeLink("link_close");
+  const remoteImage={
+    type:"image",tag:"img",attrs:[["src","https://example.invalid/pixel.png"]],
+    content:"tracking pixel",nesting:0,children:[]
+  };
+  const inline={type:"inline",children:[
+    safeOpen,{type:"text",content:"safe reference"},safeClose,
+    blockedOpen,{type:"text",content:"escape attempt"},blockedClose,
+    remoteImage
+  ]};
+  const md={
+    options:{},
+    set(options){Object.assign(this.options,options);},
+    renderer:{render(tokens){
+      return tokens[0].children.map(token=>token.type+":"+String(token.content??"")).join("|");
+    }}
+  };
+  extendMarkdownIt(md);
+  const output=md.renderer.render([inline],{}, {currentDocument:uri});
+  assert.equal(md.options.html,false,"raw HTML rendering must remain disabled");
+  assert.match(output,/link_open/,"an inventoried package-local link remains clickable");
+  assert.doesNotMatch(output,/image:/,"image tokens must not render or fetch");
+  assert.doesNotMatch(output,/link_open:.*outside/,"an escaping link must lose its anchor");
+  assert.equal(safeOpen.type,"link_open","cached tokens must be restored after rendering");
+  assert.equal(blockedOpen.type,"link_open","cached tokens must not be permanently mutated");
+  assert.equal(remoteImage.type,"image","cached image tokens must be restored after rendering");
 });
