@@ -320,7 +320,7 @@ connection.onInitialize(() => ({
     documentSymbolProvider: true,
     completionProvider: {
       resolveProvider: false,
-      triggerCharacters: [":", "/"]
+      triggerCharacters: [":", "/", "."]
     }
   },
   serverInfo: {
