@@ -291,8 +291,8 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.equal(inspectorNode.documentUri,doc.uri.toString());
   assert.ok(commands.has('skillStudio.renameNode'));
   assert.ok(commands.has('skillStudio.editNodeOperatorValue'));
-  assert.ok(commands.has('skillStudio.previewMarkdownNative'),
-    'the native Markdown preview command is registered');
+  assert.equal(commands.has('skillStudio.previewMarkdownNative'),false,
+    'only the user-facing Package Preview command is registered');
   assert.ok(commands.has('skillStudio.previewMarkdown'),
     'normal Markdown opening delegates to the native preview');
   assert.ok(commands.has('skillStudio.internal.nativeMarkdownPreviewAcceptance'));
