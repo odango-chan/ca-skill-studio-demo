@@ -512,7 +512,14 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const root=document.querySelector('.theia-Files')??document;
     const nodes=[...root.querySelectorAll('.theia-TreeNode')];
     const normalize=value=>value.replace(/\\s+/g,' ').trim();
-    const el=nodes.find(node=>normalize(node.innerText)==='procedure.yaml'&&
+    const labelOf=node=>{
+      const content=node.querySelector('.theia-TreeNodeContent')??node;
+      const segment=content.querySelector('.theia-TreeNodeSegment')??
+        content.querySelector('.theia-TreeNodeSegmentGrow');
+      return normalize(segment?.textContent??content.innerText??'')
+        .replace(/\\s+\\d+$/,'');
+    };
+    const el=nodes.find(node=>labelOf(node)==='procedure.yaml'&&
       node.getBoundingClientRect().width>0);
     if(!el)return {found:false,nodeCount:nodes.length,
       fileRows:nodes.map(node=>normalize(node.innerText)).filter(name=>name.includes('procedure.yaml')).slice(0,12)};
