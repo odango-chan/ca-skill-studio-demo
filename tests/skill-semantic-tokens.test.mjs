@@ -84,7 +84,7 @@ test("Studio consumes the exact current ca-skills v0.2.0 semantic projection",()
       "../language/contracts/source/"+name,import.meta.url
     ),"utf8");
     const actual=createHash("sha1")
-      .update("blob "+Buffer.byteLength(content)+"\\0")
+      .update("blob "+Buffer.byteLength(content)+"\0")
       .update(content).digest("hex");
     assert.equal(actual,expected,name+" must remain byte-identical to ca-skills");
   }
@@ -114,7 +114,7 @@ test("5GC Procedure uses exact v0.2 AST selectors for declarations, operators, r
   const items=observed(source,"skills/establish-pdu-session/assurance/procedure.yaml");
   assert.ok(items.length>100);
   tokenFor(source,items,"ue-requested-pdu-session-establishment","skillProcedure","declaration");
-  tokenFor(source,items,"nudm-sdm-get","skillStep","declaration");
+  tokenFor(source,items,"nudm-sdm-get","skillStep","declaration",source.indexOf("nodes:"));
   tokenFor(source,items,"call","skillOperator");
   tokenFor(source,items,"sbi.udm.sm_data.get","skillOperation","reference");
   tokenFor(source,items,"createdsession.ingress.eligible","skillPredicate","reference");
@@ -129,7 +129,7 @@ test("MAS Procedure receives the same canonical language projection",()=>{
   const source=sample("establish-pdu-session-mas","assurance/procedure.yaml");
   const items=observed(source,"skills/establish-pdu-session-mas/assurance/procedure.yaml");
   tokenFor(source,items,"establish-session","skillProcedure","declaration");
-  tokenFor(source,items,"verify-eligible","skillStep","declaration");
+  tokenFor(source,items,"verify-eligible","skillStep","declaration",source.indexOf("nodes:"));
   tokenFor(source,items,"verify","skillOperator");
   tokenFor(source,items,"mas.establishment.eligible","skillPredicate","reference");
   tokenFor(source,items,"PASS","skillOutcome");
