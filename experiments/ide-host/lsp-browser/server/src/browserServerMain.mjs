@@ -353,7 +353,11 @@ connection.onDefinition(params => {
   const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
   const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
   if(symbolHit){
-    if(snapshot.completeness!=="complete"||index?.generation!==snapshot.generation)
+    const needsProjectLibrary=symbolHit.token.type==="skillOperation"||
+      symbolHit.token.type==="skillCapability"||
+      (symbolHit.token.type==="skillSchema"&&symbolHit.token.name.startsWith("lib/"));
+    if(snapshot.completeness!=="complete"||index?.generation!==snapshot.generation||
+       (needsProjectLibrary&&snapshot.libraryInventory!=="complete"))
       return null;
     const declaration=uniqueSkillSymbolDeclaration(symbolHit);
     if(!declaration)return null;
@@ -385,7 +389,11 @@ connection.onReferences(params => {
   const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
   const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
   if(symbolHit){
+    const needsProjectLibrary=symbolHit.token.type==="skillOperation"||
+      symbolHit.token.type==="skillCapability"||
+      (symbolHit.token.type==="skillSchema"&&symbolHit.token.name.startsWith("lib/"));
     if(snapshot.completeness!=="complete"||index?.generation!==snapshot.generation||
+       (needsProjectLibrary&&snapshot.libraryInventory!=="complete")||
        !uniqueSkillSymbolDeclaration(symbolHit))return [];
     return skillSymbolOccurrences(symbolHit,params.context?.includeDeclaration===true)
       .map(item=>location(item.uri,snapshotDocumentFor(snapshot,item.uri),item.range))
@@ -428,11 +436,18 @@ connection.onHover(params => {
       skillSchema:"Schema",
       skillReference:"Script / Reference"
     })[symbolHit.token.type]??"Skill symbol";
-    const resolved=Boolean(declaration&&snapshot.completeness==="complete"&&
-      index?.generation===snapshot.generation);
-    const body=resolved
-      ? "**"+kind+"** `"+symbolHit.token.name+"`\n\nDeclared in `"+declaration.relativePath+"`"
-      : "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nNo unique declaration is available in the current complete Package snapshot.";
+    const needsProjectLibrary=symbolHit.token.type==="skillOperation"||
+      symbolHit.token.type==="skillCapability"||
+      (symbolHit.token.type==="skillSchema"&&symbolHit.token.name.startsWith("lib/"));
+    const libraryUnavailable=needsProjectLibrary&&snapshot.libraryInventory!=="complete";
+    const resolved=Boolean(declaration&&!libraryUnavailable&&
+      snapshot.completeness==="complete"&&index?.generation===snapshot.generation);
+    const body=libraryUnavailable
+      ? "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nProject lib inventory is "+
+        (snapshot.libraryInventory??"unavailable")+"; exact cross-file resolution is suppressed."
+      : resolved
+        ? "**"+kind+"** `"+symbolHit.token.name+"`\n\nDeclared in `"+declaration.relativePath+"`"
+        : "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nNo unique declaration is available in the current complete Package snapshot.";
     return {contents:{kind:"markdown",value:body},
       range:toLspRange(source.text,symbolHit.token.range)};
   }
@@ -554,6 +569,14 @@ connection.onCompletion(params => {
   // synthesize grammar fields, dependencies, Capabilities or Schema contents.
   const context=skillSymbolCompletions(index,uri,offset);
   if(context){
+    // Project lib completeness is separate from Skill Package completeness.
+    // Never offer imported Operations or Owner Schemas from a partial inventory.
+    if(snapshot.libraryInventory!=="complete"){
+      if(context.token.type==="skillOperation"||context.token.type==="skillCapability")
+        return [];
+      if(context.token.type==="skillSchema")
+        context.items=context.items.filter(item=>!item.relativePath.startsWith("lib/"));
+    }
     const range=toLspRange(document.text,context.token.range);
     const kindFor={
       skillSchema:CompletionItemKind.File,
