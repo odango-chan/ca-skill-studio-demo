@@ -1,9 +1,37 @@
 // Stage the Procedure, Contract, Predicate and Schema Web extension plus standalone theme into
 // the isolated Theia browser-only application. Both are built-in plugins.
 import {cp,mkdir,readFile,rm,stat,writeFile} from "node:fs/promises";
+import {execFileSync} from "node:child_process";
 import {join} from "node:path";
 const app="experiments/ide-host/theia-online";
 const ext="experiments/ide-host/vscode";
+// Theia 1.76 removed @theia/preview. Bundle the official VS Code Markdown
+// language-features and language-basics extensions at build time for both
+// backend-backed and browser-only hosts.
+execFileSync(process.platform==="win32"?"npm.cmd":"npm",["run","download:plugins"],{
+  cwd:app,stdio:"inherit"
+});
+for(const [folder,id] of [
+  ["vscode.markdown","vscode.markdown"],
+  ["vscode.markdown-language-features","vscode.markdown-language-features"]
+]){
+  const manifest=JSON.parse(await readFile(join(app,"plugins",folder,"package.json"),"utf8"));
+  if(manifest.publisher+"."+manifest.name!==id)
+    throw Error("Unexpected native Markdown plugin identity: "+folder);
+  if(id==="vscode.markdown-language-features"){
+    if(!manifest.browser||!manifest.contributes?.commands?.some(x=>
+      x.command==="markdown.showPreviewToSide"))
+      throw Error("Native Markdown preview extension is missing its browser entry or side-preview command");
+    const browserPath=join(app,"plugins",folder,manifest.browser);
+    const info=await stat(browserPath);
+    if(!info.isFile()||info.size<1000)
+      throw Error("Native Markdown browser extension bundle missing: "+browserPath);
+  }
+}
+console.log("STUDIO_THEIA_PREPARED_NATIVE_MARKDOWN",JSON.stringify({
+  extensions:["vscode.markdown","vscode.markdown-language-features"],
+  version:"1.95.3",preview:"markdown.showPreviewToSide"
+}));
 const target=join(app,"plugins","odango-chan.ca-skill-studio-ide-spike");
 const manifest=JSON.parse(await readFile(join(ext,"package.json"),"utf8"));
 if(!manifest.browser||!manifest.contributes?.customEditors?.length)
