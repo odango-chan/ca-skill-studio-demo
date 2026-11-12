@@ -15,10 +15,12 @@ test("native Markdown permits only exact inventoried Package-relative targets",(
   const files=new Set([
     "SKILL.md",
     "references/guide.md",
+    "references/3gpp-procedure.md",
     "assurance/procedure.yaml",
     "scripts/select.py"
   ]);
   assert.equal(isAllowedPackageRelativeLink("../SKILL.md","references",files),true);
+  assert.equal(isAllowedPackageRelativeLink("references/3gpp-procedure.md","",files),true);
   assert.equal(isAllowedPackageRelativeLink("../assurance/procedure.yaml","references",files),true);
   assert.equal(isAllowedPackageRelativeLink("../scripts/select.py","references",files),true);
   assert.equal(isAllowedPackageRelativeLink("../../outside.md","references",files),false);
