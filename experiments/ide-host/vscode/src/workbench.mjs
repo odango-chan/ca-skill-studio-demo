@@ -2495,6 +2495,18 @@ export function registerWorkbench(vscode,context){
       if(doc.languageId!=='markdown'&&
          typeof vscode.languages.setTextDocumentLanguage==='function')
         doc=await vscode.languages.setTextDocumentLanguage(doc,'markdown');
+      // Theia's browser plugin host does not consistently activate contributed
+      // Markdown preview commands from their implicit activation events. Load
+      // the exact pinned built-in extension and verify its command registration
+      // before treating a successful Source open as a native Preview launch.
+      const markdownExtension=vscode.extensions?.getExtension?.(
+        'vscode.markdown-language-features');
+      if(!markdownExtension)
+        throw Error('Pinned built-in vscode.markdown-language-features extension is not installed');
+      await markdownExtension.activate();
+      const markdownCommands=await vscode.commands.getCommands(true);
+      if(!markdownCommands.includes('markdown.showPreviewToSide'))
+        throw Error('Built-in Markdown extension activated without registering markdown.showPreviewToSide');
       // Keep Source as the editable authority in the first editor group.
       // The built-in Markdown extension owns the read-only Preview in group two.
       await vscode.window.showTextDocument(doc,{
