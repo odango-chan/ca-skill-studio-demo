@@ -45,7 +45,7 @@ spec:
 `)
   ];
   return {rootUri,packageName:"establish-pdu-session",generation:1,
-    completeness:"complete",documents:[...docs,...extra]};
+    completeness:"complete",libraryInventory:"complete",documents:[...docs,...extra]};
 }
 function offsetOf(text,needle,from=0){
   const value=text.indexOf(needle,from);
@@ -305,9 +305,15 @@ test("v0.2 link diagnostics report exact unresolved and ambiguous references but
     item.code==="SKILL_LINK_UNRESOLVED"&&
     contract.text.slice(item.range.start,item.range.end)==="lib/host/subject.schema.yaml"));
   assert.ok(!diagnostics.some(item=>item.code==="SKILL_LINK_UNRESOLVED"&&
+    item.uri===contract.uri&&
     /ca\.session\.operation_context\.read/.test(
-      snapshot.documents.find(doc=>doc.uri===item.uri)?.text.slice(item.range.start,item.range.end)??"")),
+      contract.text.slice(item.range.start,item.range.end))),
     "unmatched allowedResources Capability IDs remain deployment-owned");
+  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  assert.ok(!diagnostics.some(item=>item.code==="SKILL_LINK_UNRESOLVED"&&
+    item.uri===procedure.uri&&
+    procedure.text.slice(item.range.start,item.range.end).startsWith("sbi.")),
+    "missing Operation IDs are not diagnosed without a complete Tool integration inventory");
 
   const duplicate=document("lib/tools/another.tool.yaml",`apiVersion: connectionagent.io/v1alpha1
 kind: ToolCatalog
@@ -327,6 +333,28 @@ spec:
     JSON.stringify({declarations:duplicateIndex.declarations.get(duplicateHit.token.key),
       references:duplicateIndex.references.get(duplicateHit.token.key),
       diagnostics:duplicateDiagnostics}));
+});
+
+test("external Owner Schema diagnostics require a complete project lib inventory",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const partialLibrary={...snapshot,libraryInventory:"partial"};
+  const diagnostics=symbols.skillSymbolLinkDiagnostics(index,partialLibrary);
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  assert.ok(!diagnostics.some(item=>item.uri===contract.uri&&
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    contract.text.slice(item.range.start,item.range.end)==="lib/host/subject.schema.yaml"));
+
+  const localText=contract.text.replace(
+    "schemas/establishment-request.schema.yaml","schemas/missing-request.schema.yaml");
+  const localSnapshot={...snapshot,documents:snapshot.documents.map(item=>
+    item.uri===contract.uri?{...item,text:localText}:item)};
+  const localIndex=symbols.buildSkillSymbolIndex(localSnapshot);
+  const localDiagnostics=symbols.skillSymbolLinkDiagnostics(localIndex,localSnapshot);
+  assert.ok(localDiagnostics.some(item=>item.uri===contract.uri&&
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    localText.slice(item.range.start,item.range.end)==="schemas/missing-request.schema.yaml"),
+    "missing Package-owned schemas are still diagnosed");
 });
 
 test("v0.2 link diagnostics are suppressed for incomplete or stale Package snapshots",()=>{
