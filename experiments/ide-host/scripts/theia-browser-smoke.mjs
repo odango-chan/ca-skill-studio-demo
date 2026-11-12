@@ -493,7 +493,7 @@ try{
             visible:!!editor
           };
         })()`);
-        if(semanticRendering?.referenceColor==='rgb(123, 91, 167)'&&
+        if(semanticRendering?.referenceColor==='rgb(49, 125, 192)'&&
            semanticRendering?.outcomeColor==='rgb(173, 101, 23)')break;
         await sleep(120);
       }
@@ -517,7 +517,7 @@ try{
          semanticProviderDiagnostics?.renderError||
          ![true,"configuredByTheme"].includes(
            semanticProviderDiagnostics?.semanticHighlightingEnabled)||
-         semanticRendering?.referenceColor!=='rgb(123, 91, 167)'||
+         semanticRendering?.referenceColor!=='rgb(49, 125, 192)'||
          semanticRendering?.outcomeColor!=='rgb(173, 101, 23)')
         throw Error("Native semantic tokens were not registered, requested and rendered by Studio Light: "+
           JSON.stringify(semanticRendering));

@@ -54,7 +54,7 @@ export function semanticTokenDecorationClass(type) {
 
 export function semanticTokenDecorationCss(semanticTokenColors = {}) {
   const rules = standaloneSemanticTokenRules(semanticTokenColors);
-  return rules.filter(rule => rule.token.startsWith("ca")).map(rule => {
+  return rules.filter(rule => rule.token.startsWith("skill")).map(rule => {
     const declarations = [];
     if (rule.foreground) declarations.push("color:#" + rule.foreground + "!important");
     if (rule.background) declarations.push("background-color:#" + rule.background + "!important");

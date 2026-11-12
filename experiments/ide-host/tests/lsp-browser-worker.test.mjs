@@ -188,10 +188,10 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.equal(initialized.result.capabilities.documentSymbolProvider,true);
     assert.equal(initialized.result.capabilities.semanticTokensProvider.full,true);
     const semanticLegend=initialized.result.capabilities.semanticTokensProvider.legend;
-    assert.ok(semanticLegend.tokenTypes.includes("caReferenceOperation"));
-    assert.ok(semanticLegend.tokenTypes.includes("caReferencePredicate"));
-    assert.ok(semanticLegend.tokenTypes.includes("caValueOutcome"));
-    assert.ok(semanticLegend.tokenTypes.includes("caKeywordControl"));
+    assert.ok(semanticLegend.tokenTypes.includes("skillOperation"));
+    assert.ok(semanticLegend.tokenTypes.includes("skillPredicate"));
+    assert.ok(semanticLegend.tokenTypes.includes("skillOutcome"));
+    assert.ok(semanticLegend.tokenTypes.includes("skillOperator"));
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
     const snapshot=samplePackageSnapshot();
@@ -251,13 +251,13 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.equal(semanticResult.data.length%5,0);
     const emittedTypes=new Set();
     for(let i=3;i<semanticResult.data.length;i+=5)emittedTypes.add(semanticResult.data[i]);
-    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caReferenceOperation")),
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillOperation")),
       "Procedure call values are emitted as Operation references");
-    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caKeywordControl")),
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillOperator")),
       "Procedure control keys are emitted as CA semantic tokens");
-    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caReferencePredicate")),
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillPredicate")),
       "Predicate references are emitted as CA semantic tokens");
-    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("caValueOutcome")),
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillOutcome")),
       "Outcome values are emitted as CA semantic tokens");
 
     const scriptNeedle="scripts/select_establishment_configuration.py";

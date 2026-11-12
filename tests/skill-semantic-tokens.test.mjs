@@ -1,266 +1,231 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {readFileSync,mkdirSync} from "node:fs";
 import {mkdtemp,rm} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 import {build} from "esbuild";
-import {standaloneSemanticTokenRules,semanticTokenDecorationClass,semanticTokenDecorationCss} from "../site/semantic-token-theme.mjs";
+import {
+  standaloneSemanticTokenRules,
+  semanticTokenDecorationClass,
+  semanticTokenDecorationCss
+} from "../site/semantic-token-theme.mjs";
 
-const entry=fileURLToPath(new URL("../language/semantic-tokens.mjs",import.meta.url));
+const contractText=readFileSync(new URL(
+  "../language/contracts/semantic-tokens.v1.json",import.meta.url
+),"utf8");
+const contract=JSON.parse(contractText);
+const manifest=JSON.parse(readFileSync(new URL(
+  "../extensions/skill-studio-languages/package.json",import.meta.url
+),"utf8"));
+const theme=JSON.parse(readFileSync(new URL(
+  "../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json",
+  import.meta.url
+),"utf8"));
 const scratchRoot=resolve(process.cwd(),".agent-tmp");
 mkdirSync(scratchRoot,{recursive:true});
-const scratch=await mkdtemp(join(scratchRoot,"skill-semantic-tokens-"));
-const bundlePath=join(scratch,"semantic-tokens.mjs");
+const scratch=await mkdtemp(join(scratchRoot,"skill-semantic-tokens-v02-"));
 let semantic;
 try{
+  const entry=fileURLToPath(new URL("../language/semantic-tokens.mjs",import.meta.url));
+  const bundle=join(scratch,"semantic-tokens.mjs");
   await build({
-    entryPoints:[entry],
-    outfile:bundlePath,
-    bundle:true,
-    format:"esm",
-    platform:"node",
-    target:"node24",
-    packages:"external",
-    loader:{".yaml":"text"},
-    logLevel:"silent"
+    entryPoints:[entry],outfile:bundle,bundle:true,format:"esm",
+    platform:"node",target:"node24",packages:"external",logLevel:"silent"
   });
-  semantic=await import(pathToFileURL(bundlePath).href);
+  semantic=await import(pathToFileURL(bundle).href);
 }finally{
   await rm(scratch,{recursive:true,force:true});
 }
 
-const sampleRoot=new URL("../site/samples/packages/establish-pdu-session/",import.meta.url);
-const readSample=path=>readFileSync(new URL(path,sampleRoot),"utf8");
-function tokenFor(text,spans,needle,tokenId,from=0){
-  const start=text.indexOf(needle,from);
-  assert.notEqual(start,-1,"fixture contains "+needle);
-  const token=spans.find(item=>item.start<=start&&item.end>=start+needle.length);
-  assert.ok(token,"semantic token covers "+needle);
-  assert.equal(token.tokenId,tokenId,"semantic identity for "+needle);
-  return token;
+function sample(skill,path){
+  return readFileSync(new URL(
+    "../site/samples/skills/"+skill+"/"+path,import.meta.url
+  ),"utf8");
 }
-function fakeModel(text,path){
-  const starts=[0];
-  for(let i=0;i<text.length;i++)if(text[i]==="\n")starts.push(i+1);
-  const positionAt=offset=>{
-    let low=0,high=starts.length-1;
-    while(low<=high){
-      const mid=(low+high)>>1;
-      if(starts[mid]<=offset)low=mid+1;else high=mid-1;
-    }
-    const line=Math.max(0,high);
-    return {lineNumber:line+1,column:offset-starts[line]+1};
+function observed(source,path){
+  return semantic.classifySkillSemanticTokens(source,path).map(token=>({
+    ...token,text:source.slice(token.start,token.end)
+  }));
+}
+function has(items,type,text,modifier){
+  return items.some(item=>item.type===type&&item.text===text&&
+    (!modifier||item.modifiers.includes(modifier)));
+}
+function tokenFor(source,items,text,type,modifier,from=0){
+  const start=source.indexOf(text,from);
+  assert.notEqual(start,-1,"fixture contains "+text);
+  const found=items.find(item=>item.start<=start&&item.end>=start+text.length&&
+    item.type===type&&(!modifier||item.modifiers.includes(modifier)));
+  assert.ok(found,"expected "+type+" token for "+text);
+  return found;
+}
+
+test("Studio consumes the exact current ca-skills v0.2.0 semantic projection",()=>{
+  const blobSha=createHash("sha1")
+    .update("blob "+Buffer.byteLength(contractText)+"\0")
+    .update(contractText).digest("hex");
+  assert.equal(blobSha,"618c5c671f2c18785ecc10f84b9d549f88b4b138",
+    "refresh the pinned snapshot and source metadata together");
+  const sourcePins={
+    "skill-language-spec.md":"bc81fb340827521da3452074974f9e3663043b10",
+    "skill-language-spec.zh-CN.md":"23f242740ad7671e3dab9f313cce53ac03322419",
+    "script-contract.md":"b663977ef56d95538a50c13cda9301f28079697c",
+    "schema-ownership.md":"95900448bd7409b7a07faaa0337aebb872ee0e66",
+    "authoring-model.md":"250f2eb1557f9432380596026e7b1a7103ffc501"
   };
-  const offsetAt=({lineNumber,column})=>Math.min(
-    text.length,(starts[lineNumber-1]??text.length)+column-1
+  const sourceReadme=readFileSync(new URL(
+    "../language/contracts/README.md",import.meta.url
+  ),"utf8");
+  assert.ok(sourceReadme.includes("3fce09aca32b6a6faf6ec3e9a204d38cc129ec38"));
+  for(const [name,expected] of Object.entries(sourcePins)){
+    const content=readFileSync(new URL(
+      "../language/contracts/source/"+name,import.meta.url
+    ),"utf8");
+    const actual=createHash("sha1")
+      .update("blob "+Buffer.byteLength(content)+"\0")
+      .update(content).digest("hex");
+    assert.equal(actual,expected,name+" must remain byte-identical to ca-skills");
+  }
+  assert.equal(contract.id,"connectionagent.skill.semantic-tokens");
+  assert.equal(contract.schemaVersion,1);
+  assert.equal(contract.version,"0.2.0");
+  assert.equal(contract.status,"current");
+  assert.match(contract.authority.semantics,/Skill Language v0\.2/);
+  const types=contract.legend.tokenTypes.map(item=>item.id);
+  const modifiers=contract.legend.tokenModifiers.map(item=>item.id);
+  assert.deepEqual(semantic.SKILL_SEMANTIC_TOKEN_TYPES,types);
+  assert.deepEqual(semantic.SKILL_SEMANTIC_TOKEN_MODIFIERS,modifiers);
+  assert.deepEqual(manifest.contributes.semanticTokenTypes.map(item=>item.id),types);
+  assert.deepEqual(
+    manifest.contributes.semanticTokenModifiers.map(item=>item.id).sort(),
+    modifiers.filter(item=>item!=="declaration").sort()
   );
-  return {
-    uri:{path:"/"+path},
-    getValue:()=>text,
-    getValueLength:()=>text.length,
-    getPositionAt:positionAt,
-    getOffsetAt:offsetAt,
-    getLineMaxColumn:lineNumber=>{
-      const start=starts[lineNumber-1]??text.length;
-      const next=starts[lineNumber]??text.length;
-      const line=text.slice(start,next).replace(/\r?\n$/,"");
-      return line.length+1;
-    }
-  };
-}
-
-test("catalog IDs become a unique stable Monaco semantic-token legend",()=>{
-  const types=semantic.SKILL_SEMANTIC_TOKEN_TYPES;
-  assert.equal(types.length,28);
-  assert.equal(new Set(types).size,types.length);
-  assert.ok(types.includes("caKeywordStructure"));
-  assert.ok(types.includes("caReferenceOperation"));
-  assert.ok(types.includes("caSymbolCapabilityDefinition"));
-  assert.deepEqual(semantic.SKILL_SEMANTIC_TOKEN_MODIFIERS,
-    ["declaration","reference","userDefined"]);
+  assert.equal(theme.semanticHighlighting,true);
+  for(const type of types)
+    assert.match(theme.semanticTokenColors[type],/^#[0-9a-f]{6}$/i,type);
+  assert.ok(!/#[0-9a-f]{6}/i.test(contractText),
+    "colors are theme-owned, not language-contract data");
 });
 
-test("SkillContract source positions distinguish document identity and direct Operation grants",()=>{
-  const text=readSample("assurance/contract.yaml");
-  const spans=semantic.collectSkillSemanticTokenSpans(text,"assurance/contract.yaml");
-  tokenFor(text,spans,"SkillContract","ca.document.kind");
-  tokenFor(text,spans,"connectionagent.io/v1alpha1","ca.document.version");
-  tokenFor(text,spans,"sbi.udm.sm_data.get","ca.reference.capability");
-  assert.equal(spans.some(item=>item.tokenId==="ca.reference.operation"&&
-    text.slice(item.start,item.end)==="sbi.udm.sm_data.get"),false,
-    "allowedResources values are grants, not Procedure call references");
-  assert.ok(spans.some(item=>item.tokenId==="ca.keyword.structure"&&
-    text.slice(item.start,item.end)==="allowedResources"),
-    "Contract structural keys: "+JSON.stringify(spans.filter(item=>item.tokenId.startsWith("ca.keyword")).map(item=>text.slice(item.start,item.end))));
+test("5GC Procedure uses exact v0.2 AST selectors for declarations, operators, references and bindings",()=>{
+  const source=sample("establish-pdu-session","assurance/procedure.yaml");
+  const items=observed(source,"skills/establish-pdu-session/assurance/procedure.yaml");
+  assert.ok(items.length>100);
+  tokenFor(source,items,"ue-requested-pdu-session-establishment","skillProcedure","declaration");
+  tokenFor(source,items,"nudm-sdm-get","skillStep","declaration",source.indexOf("nodes:"));
+  tokenFor(source,items,"call","skillOperator");
+  tokenFor(source,items,"sbi.udm.sm_data.get","skillOperation","reference");
+  tokenFor(source,items,"createdsession.ingress.eligible","skillPredicate","reference");
+  tokenFor(source,items,"PASS","skillOutcome");
+  tokenFor(source,items,"string","skillDataType");
+  tokenFor(source,items,"context.subject.ueRef","skillBinding","reference");
+  assert.ok(items.every(item=>item.start>=0&&item.end<=source.length&&item.start<item.end));
+  assert.ok(!items.some(item=>item.type.startsWith("ca")));
 });
 
-test("Procedure AST selectors distinguish definitions, references, keywords and values",()=>{
-  const text=readSample("assurance/procedure.yaml");
-  const spans=semantic.collectSkillSemanticTokenSpans(text,"assurance/procedure.yaml");
-  tokenFor(text,spans,"ue-requested-pdu-session-establishment","ca.symbol.procedure-definition");
-  tokenFor(text,spans,"nudm-sdm-get","ca.reference.node");
-  const nodeKey=/^      nudm-sdm-get:/m.exec(text);
-  assert.ok(nodeKey);
-  tokenFor(text,spans,"nudm-sdm-get","ca.symbol.node-definition",nodeKey.index);
-  tokenFor(text,spans,"sbi.udm.sm_data.get","ca.reference.operation");
-  tokenFor(text,spans,"call","ca.keyword.control");
-  tokenFor(text,spans,"with","ca.keyword.binding");
-  tokenFor(text,spans,"from","ca.keyword.binding");
-  tokenFor(text,spans,"string","ca.value.type");
-  tokenFor(text,spans,"context.subject.ueRef","ca.reference.binding-path");
-  tokenFor(text,spans,"createdsession.ingress.eligible","ca.reference.predicate");
-  tokenFor(text,spans,"PASS","ca.value.outcome");
-  assert.ok(spans.some(item=>item.tokenId==="ca.identifier.user-defined"&&
-    text.slice(item.start,item.end)==="ue-ref"));
+test("MAS Procedure receives the same canonical language projection",()=>{
+  const source=sample("establish-pdu-session-mas","assurance/procedure.yaml");
+  const items=observed(source,"skills/establish-pdu-session-mas/assurance/procedure.yaml");
+  tokenFor(source,items,"establish-session","skillProcedure","declaration");
+  tokenFor(source,items,"verify-eligible","skillStep","declaration",source.indexOf("nodes:"));
+  tokenFor(source,items,"verify","skillOperator",undefined,source.indexOf("verify:"));
+  tokenFor(source,items,"mas.establishment.eligible","skillPredicate","reference");
+  tokenFor(source,items,"PASS","skillOutcome");
 });
 
-test("PredicateSet selectors classify Predicate definitions and CEL expressions",()=>{
-  const text=readSample("assurance/predicates.yaml");
-  const spans=semantic.collectSkillSemanticTokenSpans(text,"assurance/predicates.yaml");
-  tokenFor(text,spans,"PredicateSet","ca.document.kind");
-  tokenFor(text,spans,"createdsession.ingress.eligible","ca.symbol.predicate-definition");
-  tokenFor(text,spans,"observations.state.requestType == request.requestType","ca.expression.cel");
+test("Contract and PredicateSet source positions follow their own profiles",()=>{
+  const contractSource=sample("establish-pdu-session","assurance/contract.yaml");
+  const c=observed(contractSource,"skills/establish-pdu-session/assurance/contract.yaml");
+  tokenFor(contractSource,c,"entryProcedure","skillKeyword");
+  tokenFor(contractSource,c,"ue-requested-pdu-session-establishment","skillProcedure","reference");
+  tokenFor(contractSource,c,"schemas/establishment-request.schema.yaml","skillSchema","reference");
+  tokenFor(contractSource,c,"sbi.udm.sm_data.get","skillCapability","reference");
+
+  const predicateSource=sample("establish-pdu-session","assurance/predicates.yaml");
+  const p=observed(predicateSource,"skills/establish-pdu-session/assurance/predicates.yaml");
+  tokenFor(predicateSource,p,"createdsession.ingress.eligible","skillPredicate","declaration");
+  tokenFor(predicateSource,p,"createdsession.procedure_context","skillObservation","reference");
 });
 
-test("frontmatter and governed Python metadata use the same catalog identities",()=>{
-  const markdown=readSample("SKILL.md");
-  const markdownSpans=semantic.collectSkillSemanticTokenSpans(markdown,"SKILL.md");
-  tokenFor(markdown,markdownSpans,"establish-pdu-session","ca.symbol.skill-definition");
-  const python=readSample("scripts/evaluate_transfer_start.py");
-  const pythonSpans=semantic.collectSkillSemanticTokenSpans(python,"scripts/evaluate_transfer_start.py");
-  tokenFor(python,pythonSpans,"evaluate-transfer-start","ca.symbol.local-tool-definition");
-  tokenFor(python,pythonSpans,"local_compute","ca.value.effect");
+test("Skill-owned JSON Schema positions use canonical type and schema references",()=>{
+  const source=sample("establish-pdu-session","schemas/establishment-request.schema.yaml");
+  const items=observed(source,"skills/establish-pdu-session/schemas/establishment-request.schema.yaml");
+  tokenFor(source,items,"object","skillDataType");
 });
 
-test("optional imported CapabilityContracts and ToolCatalog definitions are navigable",()=>{
-  const capability=`apiVersion: ca-agent-host.capability-contracts/v1
-kind: CapabilityContracts
-spec:
-  capabilities:
-    - capability: pdu-session-management
-      owner: 5gc
-      operations:
-        - operation: sbi.udm.sm_data.get
-          effect: read
-`;
-  const capSpans=semantic.collectSkillSemanticTokenSpans(
-    capability,"lib/capabilities/pdu-session.yaml");
-  tokenFor(capability,capSpans,"pdu-session-management","ca.symbol.capability-definition");
-  const tools=`apiVersion: connectionagent.io/v1alpha1
+test("imported ToolCatalog operations are declarations, not fabricated resolved links",()=>{
+  const source=`apiVersion: connectionagent.io/v1alpha1
 kind: ToolCatalog
 spec:
   contracts:
     - operation: sbi.udm.sm_data.get
       effect: READ
 `;
-  const toolSpans=semantic.collectSkillSemanticTokenSpans(tools,"lib/tools/tools.yaml");
-  tokenFor(tools,toolSpans,"sbi.udm.sm_data.get","ca.symbol.operation-definition");
-  tokenFor(tools,toolSpans,"READ","ca.value.effect");
+  const items=observed(source,"lib/tools/example.tool.yaml");
+  tokenFor(source,items,"sbi.udm.sm_data.get","skillOperation","declaration");
+  const imported=items.find(item=>item.text==="sbi.udm.sm_data.get");
+  assert.ok(imported.modifiers.includes("imported"));
 });
 
-test("documented-but-unverified forms are not promoted to current semantic keywords",()=>{
-  const text=`procedures:
-  example:
-    nodes:
-      action:
-        tool: skill.some-tool
-        procedure: child-procedure
-        for: item in items
-        when: request.enabled
-`;
-  const spans=semantic.collectSkillSemanticTokenSpans(text,"assurance/procedure.yaml");
-  for(const needle of ["tool","procedure","for","when"]){
-    const start=text.indexOf(needle+":");
-    const token=spans.find(item=>item.start<=start&&item.end>=start+needle.length);
-    assert.equal(token,undefined,
-      needle+" remains outside the current keyword contract");
-  }
+test("invalid YAML, unrelated paths and traversal paths produce no speculative tokens",()=>{
+  const source="procedures:\n  p:\n    nodes:\n      n:\n        call: ca.sample.read\n        description: PASS\n";
+  assert.deepEqual(observed("procedures: [","skills/demo/assurance/procedure.yaml"),[]);
+  assert.deepEqual(observed(source,"unrelated/values.yaml"),[]);
+  assert.deepEqual(observed(source,"skills/../demo/assurance/procedure.yaml"),[]);
+  assert.deepEqual(observed(source,"skills/demo/assurance\\procedure.yaml"),[]);
 });
 
-test("semantic-token encoding follows Monaco's five-integer delta format",()=>{
-  const text=readSample("assurance/contract.yaml");
-  const model=fakeModel(text,"skills/establish-pdu-session/assurance/contract.yaml");
-  const spans=semantic.collectSkillSemanticTokenSpans(text,model.uri.path);
-  const data=semantic.encodeSkillSemanticTokens(model,spans);
-  assert.ok(data instanceof Uint32Array);
-  assert.equal(data.length%5,0);
-  assert.ok(data.length>0);
-  let line=0,character=0;
-  for(let i=0;i<data.length;i+=5){
-    const deltaLine=data[i],deltaCharacter=data[i+1];
-    line+=deltaLine;
-    character=deltaLine===0?character+deltaCharacter:deltaCharacter;
-    assert.ok(data[i+2]>0,"token length must be positive");
-    assert.ok(data[i+3]<semantic.SKILL_SEMANTIC_TOKEN_TYPES.length,"token type index is in legend");
-    assert.ok(line<text.split("\n").length,"token line is in document");
-  }
-});
-
-test("Monaco registers one shared provider for YAML, Markdown and Python",()=>{
+test("Monaco provider encodes the canonical legend and registers only the YAML profile",()=>{
   const registrations=[];
-  const monaco={
-    languages:{
-      registerDocumentSemanticTokensProvider(language,provider){
-        registrations.push({language,provider});
-        return {dispose(){}};
-      }
+  const monaco={languages:{
+    registerDocumentSemanticTokensProvider(language,provider){
+      registrations.push({language,provider});
+      return {dispose(){}};
     }
-  };
+  }};
   const first=semantic.registerSkillSemanticTokens(monaco);
   const second=semantic.registerSkillSemanticTokens(monaco);
   assert.equal(first,second,"registration is idempotent");
-  assert.deepEqual(registrations.map(item=>item.language),["yaml","markdown","python"]);
-  const legend=registrations[0].provider.getLegend();
-  assert.deepEqual(legend.tokenTypes,semantic.SKILL_SEMANTIC_TOKEN_TYPES);
-  assert.deepEqual(legend.tokenModifiers,semantic.SKILL_SEMANTIC_TOKEN_MODIFIERS);
-  const text=readSample("assurance/contract.yaml");
-  const response=registrations[0].provider.provideDocumentSemanticTokens(
-    fakeModel(text,"skills/establish-pdu-session/assurance/contract.yaml"),
-    null,{isCancellationRequested:false});
-  assert.ok(response.data.length>0,"registered provider emits semantic token data");
+  assert.deepEqual(registrations.map(item=>item.language),["yaml"]);
+  const provider=registrations[0].provider;
+  assert.deepEqual(provider.getLegend().tokenTypes,semantic.SKILL_SEMANTIC_TOKEN_TYPES);
+  assert.deepEqual(provider.getLegend().tokenModifiers,semantic.SKILL_SEMANTIC_TOKEN_MODIFIERS);
+  const source=sample("establish-pdu-session","assurance/contract.yaml");
+  const model={
+    uri:{path:"/workspace/skills/establish-pdu-session/assurance/contract.yaml"},
+    getValue:()=>source,getValueLength:()=>source.length,
+    getPositionAt(offset){
+      const before=source.slice(0,offset),lines=before.split("\n");
+      return {lineNumber:lines.length,column:lines.at(-1).length+1};
+    },
+    getOffsetAt({lineNumber,column}){
+      const lines=source.split("\n");
+      let offset=0;for(let i=0;i<lineNumber-1;i++)offset+=lines[i].length+1;
+      return offset+column-1;
+    },
+    getLineMaxColumn(lineNumber){return source.split("\n")[lineNumber-1].length+1;}
+  };
+  const result=provider.provideDocumentSemanticTokens(model,null,{isCancellationRequested:false});
+  assert.ok(result.data instanceof Uint32Array);
+  assert.ok(result.data.length>0);
+  assert.equal(result.data.length%5,0);
+  assert.deepEqual(provider.provideDocumentSemanticTokens(model,null,{isCancellationRequested:true}).data,new Uint32Array());
   first.dispose();
 });
 
-test("language extension registers every canonical CA semantic token type and modifier",()=>{
-  const manifest=JSON.parse(readFileSync(new URL(
-    "../extensions/skill-studio-languages/package.json",import.meta.url
-  ),"utf8"));
-  assert.deepEqual(
-    manifest.contributes.semanticTokenTypes.map(item=>item.id),
-    semantic.SKILL_SEMANTIC_TOKEN_TYPES
-  );
-  assert.deepEqual(
-    manifest.contributes.semanticTokenModifiers.map(item=>item.id),
-    ["userDefined"]
-  );
-  for(const item of manifest.contributes.semanticTokenTypes){
-    assert.ok(item.superType,item.id+" declares a semantic superType");
-  }
-});
-
-test("online and installed Studio Light themes expose every CA semantic token color",()=>{
-  const theme=JSON.parse(readFileSync(new URL(
-    "../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json",
-    import.meta.url
-  ),"utf8"));
+test("Studio Light and Monaco decoration adapter render every canonical token identity",()=>{
   assert.equal(theme.semanticHighlighting,true);
-  for(const type of semantic.SKILL_SEMANTIC_TOKEN_TYPES){
-    assert.ok(theme.semanticTokenColors[type],type+" has a Studio Light color");
-  }
-  const backend=readFileSync(new URL("../site/monaco-source-backend.mjs",import.meta.url),"utf8");
-  assert.match(backend,/registerSkillSemanticTokens\(monaco\)/);
-  assert.match(backend,/rules:standaloneSemanticTokenRules\(studioLightTheme\.semanticTokenColors\?\?\{\}\)/);
-  assert.match(backend,/"semanticHighlighting\.enabled":true/,
-    "Monaco standalone must explicitly enable semantic highlighting");
-  const standaloneRules=standaloneSemanticTokenRules(theme.semanticTokenColors);
-  assert.equal(standaloneRules.find(rule=>rule.token==="caReferencePredicate")?.foreground,"7B5BA7");
-  assert.equal(standaloneRules.find(rule=>rule.token==="caValueOutcome")?.foreground,"AD6517");
-  assert.deepEqual(standaloneRules.find(rule=>rule.token==="comment")?.fontStyle,"italic");
-  assert.equal(semanticTokenDecorationClass("caReferencePredicate"),"ca-semantic-token--caReferencePredicate");
-  const decorationCss=semanticTokenDecorationCss(theme.semanticTokenColors);
-  assert.match(decorationCss,/\.ca-semantic-token--caReferencePredicate\{color:#7B5BA7!important\}/);
-  assert.match(decorationCss,/\.ca-semantic-token--caValueOutcome\{color:#AD6517!important\}/);
-  assert.match(backend,/createDecorationsCollection\(\)/);
-  assert.match(backend,/collectSkillSemanticTokenSpans\(raw,model\.uri\?\.path\?\?""\)/);
+  for(const type of semantic.SKILL_SEMANTIC_TOKEN_TYPES)
+    assert.ok(theme.semanticTokenColors[type],type+" has a theme color");
+  const rules=standaloneSemanticTokenRules(theme.semanticTokenColors);
+  assert.equal(rules.find(rule=>rule.token==="skillPredicate")?.foreground,"317DC0");
+  assert.equal(rules.find(rule=>rule.token==="skillOutcome")?.foreground,"AD6517");
+  assert.equal(semanticTokenDecorationClass("skillPredicate"),
+    "ca-semantic-token--skillPredicate");
+  const css=semanticTokenDecorationCss(theme.semanticTokenColors);
+  assert.match(css,/\.ca-semantic-token--skillPredicate\{color:#317DC0!important\}/);
+  assert.match(css,/\.ca-semantic-token--skillOutcome\{color:#AD6517!important\}/);
+  assert.doesNotMatch(css,/caReferencePredicate|caValueOutcome/);
 });
