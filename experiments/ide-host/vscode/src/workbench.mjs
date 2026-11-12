@@ -736,11 +736,21 @@ export function registerWorkbench(vscode,context){
         if(!schemaDefinition.some(item=>
           (item?.uri??item?.targetUri)?.path?.endsWith("/"+requestSchemaPath)))
           throw Error("Contract requestSchema did not resolve to its Package-owned Schema file");
+        // Theia's public completion command resolves the target model through
+        // the active editor. Opening a TextDocument alone is insufficient:
+        // it can silently dispatch the active Procedure cursor for a hidden
+        // Contract document. Activate the exact document before requesting.
+        const contractCompletionPosition=sourcePosition(
+          contractDocument,contractText,requestSchemaPath,9);
+        const contractCompletionEditor=await vscode.window.showTextDocument(
+          contractDocument,{preview:false});
+        if(contractCompletionEditor.document.uri.toString()!==relatedUris.contract.toString())
+          throw Error("Contract Completion target did not become the active editor");
         const completionProviderBefore=await vscode.commands.executeCommand(
           "skillStudio.internal.semanticTokenDiagnostics");
         const requestSchemaCompletionResult=await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",relatedUris.contract,
-          sourcePosition(contractDocument,contractText,requestSchemaPath,9));
+          contractCompletionPosition);
         const completionProviderAfter=await vscode.commands.executeCommand(
           "skillStudio.internal.semanticTokenDiagnostics");
         if(!completionProviderAfter?.completionProvider?.registered||
@@ -780,6 +790,10 @@ export function registerWorkbench(vscode,context){
               rawSuggestionCount:requestSchemaCompletionResult?.suggestions?.length??null,
               position:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
               requestSchemaPath}));
+        const procedureCompletionEditor=await vscode.window.showTextDocument(
+          procedureDocument,{preview:false});
+        if(procedureCompletionEditor.document.uri.toString()!==procedureUri.toString())
+          throw Error("Procedure Completion target did not become the active editor");
         const predicateCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
           sourcePosition(procedureDocument,procedureText,predicateName,5)));
