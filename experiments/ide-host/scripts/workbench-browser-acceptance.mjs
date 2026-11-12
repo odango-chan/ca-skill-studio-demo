@@ -2322,16 +2322,17 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const evidence=nativeSecurity.view;
     if(evidence.imageCount!==0||evidence.scriptMarkers!==0||evidence.scriptExecuted)
       throw Error('Native Markdown allowed raw HTML or an image fetch: '+JSON.stringify(evidence));
-    const packageLinks=evidence.anchorDetails.filter(anchor=>anchor.dataset?.localPath);
-    const safeLink=packageLinks.find(anchor=>anchor.dataset.localPath==='../SKILL.md');
-    const escapingLink=packageLinks.find(anchor=>anchor.dataset.localPath==='../../outside.md');
-    const missingLink=packageLinks.find(anchor=>anchor.dataset.localPath==='missing.md');
-    if(packageLinks.length!==1||!safeLink||escapingLink||missingLink||
-       packageLinks.some(anchor=>anchor.href!=='#'))
-      throw Error('Native Markdown must retain only safe Package-local links as inert host-routed anchors and omit escaping/missing targets: '+JSON.stringify({packageLinks,evidence}));
+    const safeLink=evidence.anchorDetails.find(anchor=>
+      anchor.text==='Safe package reference');
+    const blockedLinks=evidence.anchorDetails.filter(anchor=>
+      anchor.text==='Escaping package link'||anchor.text==='Missing package link');
+    if(!safeLink||!safeLink.href||safeLink.href==='#'||blockedLinks.length)
+      throw Error('Native Markdown must retain the exact safe Package-local link and omit escaping/missing targets: '+
+        JSON.stringify({safeLink,blockedLinks,evidence}));
     const safePackageLinkClick=await command('Runtime.evaluate',{
       contextId:evidence.contextId,returnByValue:true,
-      expression:`(()=>{const link=[...document.querySelectorAll('a[data-local-path]')].find(a=>a.dataset.localPath==='../SKILL.md');if(!link)return false;link.click();return true;})()`
+      expression:`(()=>{const link=[...document.querySelectorAll('a')].find(a=>
+        a.textContent.trim()==='Safe package reference');if(!link)return false;link.click();return true;})()`
     });
     if(safePackageLinkClick.result?.value!==true)
       throw Error('Could not follow the safe Package-local link from the native Markdown preview');
