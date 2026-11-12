@@ -455,6 +455,19 @@
     "markdown.markdownItPlugins": true,
     "markdown.previewStyles": [
       "./media/markdown-preview.css"
+    ],
+    "languages": [
+      {
+        "id": "markdown",
+        "aliases": [
+          "Markdown",
+          "markdown"
+        ],
+        "extensions": [
+          ".md",
+          ".markdown"
+        ]
+      }
     ]
   },
   "scripts": {
