@@ -904,20 +904,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     hasDataFlow:true,containerRect:inspectorDataFlow.containerRect,
     visibleRows:inspectorDataFlow.rows.filter(x=>x.visible).length
   }));
-  const skillStudioTab=await evalJS(`(()=>{
-    const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>
-      x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
-    const r=el?.getBoundingClientRect();
-    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
-      active:el.classList.contains('lm-mod-current')}:null;
-  })()`);
-  if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
-  if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
-  // Resolve the Evidence part inside the exact Skill Studio view container.
+  // Evidence is now an Explorer-contributed view. Focus the native
+  // Explorer instead of selecting a retired Skill Studio Activity Bar tab.
+  await invoke('workbench.files.action.focusFilesExplorer');
+  await sleep(350);
+  // Resolve the Evidence part inside the exact native Explorer container.
   // Avoid matching an unrelated tab/label when Theia has multiple split panels.
   const readEvidenceHeader=()=>evalJS(`(()=>{
     const container=[...document.querySelectorAll('.theia-view-container')]
-      .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+      .find(x=>x.id==='explorer-view-container');
     const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
       .find(x=>x.textContent.trim().toLowerCase()==='evidence');
     if(!container||!header)return {found:false,containerFound:!!container,
@@ -944,7 +939,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(let attempt=0;attempt<12;attempt++){
     evidenceHeader=await readEvidenceHeader();
     if(!evidenceHeader?.found)
-      throw Error('Native Evidence view header is missing from Skill Studio container: '+
+      throw Error('Native Evidence view header is missing from Explorer: '+
         JSON.stringify(evidenceHeader));
     if(!evidenceHeader.collapsed)break;
     if(!evidenceHeader.hitWithinHeader)
@@ -965,7 +960,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(let attempt=0;attempt<100;attempt++){
     evidenceTreeState=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1023,7 +1018,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(let attempt=0;attempt<100&&!dataflowTreeRow;attempt++){
     evidenceRows=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1080,7 +1075,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       // descendants for a provider-refresh race.
       const phaseGroup=await evalJS(`(()=>{
         const container=[...document.querySelectorAll('.theia-view-container')]
-          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+          .find(x=>x.id==='explorer-view-container');
         const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
           .find(x=>x.textContent.trim().toLowerCase()==='evidence');
         const part=header?.closest('.part');
@@ -1124,7 +1119,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const widget=manager.getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence');
       if(!widget)return {found:false,reason:'Evidence widget unavailable'};
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1216,7 +1211,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     for(let attempt=0;attempt<24;attempt++){
       liveToggle=await evalJS(`(()=>{
         const container=[...document.querySelectorAll('.theia-view-container')]
-          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+          .find(x=>x.id==='explorer-view-container');
         const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
           .find(x=>x.textContent.trim().toLowerCase()==='evidence');
         const part=header?.closest('.part');
@@ -1255,7 +1250,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         JSON.stringify({dataflowTreeRow,liveToggle,stableHit}));
     toggleInstrumentation=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1325,7 +1320,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       await sleep(100);
       const postHoverToggle=await evalJS(`(()=>{
         const container=[...document.querySelectorAll('.theia-view-container')]
-          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+          .find(x=>x.id==='explorer-view-container');
         const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
           .find(x=>x.textContent.trim().toLowerCase()==='evidence');
         const part=header?.closest('.part');
@@ -1369,7 +1364,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(let attempt=0;attempt<50;attempt++){
     dataflowExpansion=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1458,7 +1453,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const key=keys.find(item=>typeof item==='function'&&typeof item.prototype?.getWidgets==='function'&&typeof item.prototype?.getOrCreateWidget==='function');
       const widget=key?c.get(key).getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence'):null;
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1916,7 +1911,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     restoration:'native editor exact line replacement'};
   console.log('STUDIO_PHASE_OUTCOME_REPAIR_CHROMIUM',JSON.stringify(phaseOutcome));
   // Return the native Explorer to the foreground: the evidence acceptance
-  // opened the Skill Studio Activity Bar and intentionally kept it selected.
+  // opened the native Explorer and intentionally kept it selected.
   await invoke('workbench.files.action.focusFilesExplorer');
   // Open the exact owner-pinned conventional Skill guide through the real
   // Theia command registry, then exercise package-local navigation in Chromium.
