@@ -192,12 +192,12 @@ export function skillSymbolCompletions(index,uri,offset){
   if(token.type==="skillSchema"){
     for(const values of index.documentTargets.values())
       for(const item of values)
-        if(item.type==="skillSchema"&&/^(?:schemas|lib)\\/.+\\.schema\\.ya?ml$/.test(item.relativePath))
+        if(item.type==="skillSchema"&&/^(?:schemas|lib)\/.+\.schema\.ya?ml$/.test(item.relativePath))
           candidates.push(item);
   }else if(token.type==="skillReference"){
     for(const values of index.documentTargets.values())
       for(const item of values)
-        if(item.type==="skillReference"&&/^scripts\\/.+\\.py$/.test(item.relativePath))
+        if(item.type==="skillReference"&&/^scripts\/.+\.py$/.test(item.relativePath))
           candidates.push(item);
   }else if(token.type==="skillStep"){
     const procedure=token.path?.[0]==="procedures"?token.path[1]:null;
@@ -205,17 +205,10 @@ export function skillSymbolCompletions(index,uri,offset){
       for(const item of values)
         if(item.type==="skillStep"&&item.path?.[1]===procedure)candidates.push(item);
   }else{
-    const key=symbolKey(token,token.name);
-    if(key){
-      const values=index.declarations.get(key)??[];
-      candidates=values.filter(item=>
-        token.type!=="skillCapability"||item.type==="skillOperation");
-    }else if(token.type==="skillProcedure"||token.type==="skillPredicate"||
-             token.type==="skillOperation"||token.type==="skillCapability"){
-      for(const values of index.declarations.values())
-        for(const item of values)
-          if(item.type===token.type)candidates.push(item);
-    }
+    const candidateType=token.type==="skillCapability"?"skillOperation":token.type;
+    for(const values of index.declarations.values())
+      for(const item of values)
+        if(item.type===candidateType)candidates.push(item);
   }
   const prefix=token.name.slice(0,Math.max(0,Math.min(
     token.name.length,offset-token.range.start)));
