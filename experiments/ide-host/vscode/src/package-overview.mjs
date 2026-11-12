@@ -137,62 +137,101 @@ function groupNode(pkg, group) {
   };
 }
 function treeNode(vscode, node) {
-  const collapsible = node.kind === 'package' || node.kind === 'group'
-    ? vscode.TreeItemCollapsibleState.Collapsed
-    : vscode.TreeItemCollapsibleState.None;
+  const collapsible = node.kind==='section'
+    ?(node.section==='skills'?vscode.TreeItemCollapsibleState.Expanded:
+      vscode.TreeItemCollapsibleState.Collapsed)
+    :node.kind==='package'||node.kind==='group'
+      ?vscode.TreeItemCollapsibleState.Collapsed
+      :vscode.TreeItemCollapsibleState.None;
   const item = new vscode.TreeItem(node.label,collapsible);
   if (node.description) item.description = node.description;
   if (node.tooltip) item.tooltip = node.tooltip;
   if (node.contextValue) item.contextValue = node.contextValue;
   if (node.icon && vscode.ThemeIcon) item.iconPath = new vscode.ThemeIcon(node.icon);
   if (node.command) item.command = node.command;
-  if (node.kind==='package') item.id='package:'+node.rootPath;
+  if (node.kind==='section') item.id='section:'+node.section;
+  else if (node.kind==='package') item.id='package:'+node.rootPath;
   else if (node.kind==='group') item.id='group:'+node.packageRoot+':'+node.key;
   else if (node.kind==='file') item.id='file:'+node.uri.toString();
   else if (node.kind==='missing') item.id='missing:'+node.packageRoot+':'+node.groupKey+':'+node.label;
   else item.id=node.kind;
   return item;
 }
-export function registerPackageOverview(vscode,context,getActiveDocument=()=>null) {
+export function registerPackageOverview(vscode,context,getActiveDocument=()=>null,
+  {dependenciesProvider=null,getProjectRoot=()=>null}={}) {
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
   let observedRootSignature = null;
   let treeReads=0;
-  const treeReadsByKind={root:0,package:0,group:0,other:0};
+  const treeReadsByKind={root:0,section:0,package:0,group:0,dependency:0,other:0};
   const fire = () => emitter.fire();
+  const skillsSection=()=>({
+    kind:'section',section:'skills',label:'Skills',
+    description:packages.length+' Skill Package'+(packages.length===1?'':'s'),
+    icon:'package',contextValue:'skillStudio.skillsSection'
+  });
+  const dependenciesSection=()=>({
+    kind:'section',section:'dependencies',label:'Dependencies',
+    description:'Plugin-managed snapshots and contracts',
+    icon:'library',contextValue:'skillStudio.dependenciesSection'
+  });
+  const decorateDependencyNodes=(items,parentNode=null)=>(items??[]).map(item=>({
+    ...item,sourceSection:'dependencies',...(parentNode?{parentNode}:{})
+  }));
+  const skillsChildren=()=>{
+    const summary={
+      kind:'summary',label:packages.length+' SKILL Package'+(packages.length===1?'':'s'),
+      description:message,icon:'layers',
+      tooltip:'文件清点，不代表 SKILL 内容已通过语义校验'
+    };
+    if(!packages.length){
+      const notice=inventoryState==='no-workspace'
+        ?{label:'请先打开 Workspace',description:'然后刷新 Package 清单'}
+        :inventoryState==='select-project-root'
+          ?{label:'请选择 Project Root',description:'多根工作区需要明确选择项目根目录'}
+        :inventoryState==='unavailable'
+          ?{label:'Package 清单不可用',description:message}
+          :inventoryState==='truncated-empty'
+            ?{label:'扫描范围内未发现 SKILL Package',description:'文件数量达到上限，无法判断剩余文件'}
+            :{label:'未发现 SKILL Package',description:'需要 SKILL.md 或 assurance/*.yaml'};
+      return [summary,{kind:'notice',...notice,icon:'info',
+        tooltip:'Package Explorer 只清点文件，不做语义校验'}];
+    }
+    return [summary,...packages.map(packageNode)];
+  };
   const provider = {
     onDidChangeTreeData:emitter.event,
-    getChildren(node) {
+    async getChildren(node) {
       treeReads++;
       const readKind=node?.kind==='package'?'package':
-        node?.kind==='group'?'group':node?'other':'root';
-      treeReadsByKind[readKind]++;
-      if (!node) {
-        const summary = {
-          kind:'summary',label:packages.length+' SKILL Package'+(packages.length===1?'':'s'),
-          description:message,icon:'layers',tooltip:'文件清点，不代表 SKILL 内容已通过语义校验'
-        };
-        if (!packages.length) {
-          const notice = inventoryState === 'no-workspace'
-            ? {label:'请先打开 Workspace',description:'然后刷新 Package 清单'}
-            : inventoryState === 'unavailable'
-              ? {label:'Package 清单不可用',description:message}
-              : inventoryState === 'truncated-empty'
-                ? {label:'扫描范围内未发现 SKILL Package',description:'文件数量达到上限，无法判断剩余文件'}
-                : {label:'未发现 SKILL Package',description:'需要 SKILL.md 或 assurance/*.yaml'};
-          return [summary,{kind:'notice',...notice,icon:'info',
-            tooltip:'Package Overview 只清点文件，不做语义校验'}];
+        node?.kind==='group'?'group':node?.kind==='section'?'section':
+        node?.sourceSection==='dependencies'?'dependency':
+        node?'other':'root';
+      treeReadsByKind[readKind]=(treeReadsByKind[readKind]??0)+1;
+      if(!node)return [skillsSection(),dependenciesSection()];
+      if(node.kind==='section'){
+        if(node.section==='skills')return skillsChildren();
+        if(node.section==='dependencies'){
+          if(!dependenciesProvider)return [{
+            kind:'message',text:'Dependency Service unavailable',
+            sourceSection:'dependencies'
+          }];
+          return decorateDependencyNodes(await dependenciesProvider.getChildren());
         }
-        return [summary,...packages.map(packageNode)];
+        return [];
       }
-      if (node.kind === 'package') {
+      if(node.sourceSection==='dependencies'){
+        if(!dependenciesProvider)return [];
+        return decorateDependencyNodes(await dependenciesProvider.getChildren(node),node);
+      }
+      if(node.kind==='package'){
         const pkg=packages.find(item=>item.rootPath===node.rootPath);
-        return pkg ? pkg.groups.map(group=>groupNode(pkg,group)) : [];
+        return pkg?pkg.groups.map(group=>groupNode(pkg,group)):[];
       }
-      if (node.kind === 'group') {
-        const files = node.files.map(file=>{
-          const label = basename(file.path);
-          const isMarkdown = /\.md$/i.test(file.path);
+      if(node.kind==='group'){
+        const files=node.files.map(file=>{
+          const label=basename(file.path);
+          const isMarkdown=/\.md$/i.test(file.path);
           return {
             kind:'file',label,description:file.path,uri:file.uri,
             packageRoot:node.packageRoot,groupKey:node.key,
@@ -203,7 +242,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
               isMarkdown?'markdown':'file'
           };
         });
-        const missing = node.missing.map(path=>({
+        const missing=node.missing.map(path=>({
           kind:'missing',label:'Missing · '+path,description:'Not found in Package',
           packageRoot:node.packageRoot,groupKey:node.key,
           tooltip:'当前文件清单中未发现该核心文件',icon:'warning'
@@ -212,19 +251,29 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       }
       return [];
     },
-    getTreeItem(node) {
+    getTreeItem(node){
+      if(node.kind==='section')return treeNode(vscode,node);
+      if(node.sourceSection==='dependencies')
+        return dependenciesProvider?.getTreeItem(node)??treeNode(vscode,{
+          ...node,label:node.label??node.text??'Dependency'
+        });
       return treeNode(vscode,node);
     },
-    // Theia's TreeView.reveal requires a parent chain. Returning real parent
-    // nodes also makes reveal work when the UI has not fetched descendants yet.
-    getParent(node) {
-      if (!node || node.kind==='package') return undefined;
+    // Explicit parent relationships keep TreeView.reveal stable across both
+    // authored Skill nodes and Plugin-owned Dependency operation nodes.
+    getParent(node){
+      if(!node||node.kind==='section')return undefined;
+      if(node.sourceSection==='dependencies'){
+        if(node.kind==='dependency'||node.kind==='message')return dependenciesSection();
+        if(node.kind==='operation')return node.parentNode??dependenciesSection();
+      }
+      if(node.kind==='package')return skillsSection();
       const pkg=packages.find(item=>item.rootPath===node.packageRoot);
-      if (!pkg) return undefined;
-      if (node.kind==='group') return packageNode(pkg);
-      if (node.kind==='file' || node.kind==='missing') {
+      if(!pkg)return node.kind==='summary'||node.kind==='notice'?skillsSection():undefined;
+      if(node.kind==='group')return packageNode(pkg);
+      if(node.kind==='file'||node.kind==='missing'){
         const group=pkg.groups.find(item=>item.key===node.groupKey);
-        return group ? groupNode(pkg,group) : packageNode(pkg);
+        return group?groupNode(pkg,group):packageNode(pkg);
       }
       return undefined;
     }
@@ -246,7 +295,14 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       const activeDocument = getActiveDocument?.();
       const openDocuments = [...(vscode.workspace.textDocuments??[]),
         ...(activeDocument?[activeDocument]:[])];
-      const roots = packageScanRoots(vscode.workspace.workspaceFolders??[],openDocuments);
+      const workspaceFolders=vscode.workspace.workspaceFolders??[];
+      const selectedRoot=getProjectRoot?.()??null;
+      if(workspaceFolders.length>1&&!selectedRoot){
+        observedRootSignature='';packages=[];inventoryState='select-project-root';
+        message='Multi-root workspace · select a Project Root';fire();return [];
+      }
+      const scanFolders=selectedRoot?[{uri:selectedRoot}]:workspaceFolders;
+      const roots = packageScanRoots(scanFolders,openDocuments);
       const rootSignature = roots.map(root=>root.toString()).sort().join('\n');
       if (!roots.length) {
         observedRootSignature=rootSignature;
@@ -256,10 +312,8 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       for (const root of roots) {
         const remaining = FILE_LIMIT+1-found.length;
         if (remaining <= 0) break;
-        // Compiler-style projects expose skills/, lib/ and output/ together.
-        // The Package inventory is strictly source-scoped: imported Tool
-        // contracts and generated build files must never appear as SKILLs.
-        // Standalone/legacy Skill folders still scan their full root.
+        // The Package inventory is strictly source-scoped: imported dependency
+        // snapshots and generated BuildResults never appear as authored Skills.
         let sourceRoot = null;
         if (vscode.Uri?.joinPath && vscode.workspace.fs?.stat) {
           const candidate = vscode.Uri.joinPath(root,'skills');
@@ -323,7 +377,10 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     const activeDocument=getActiveDocument?.();
     const openDocuments=[...(vscode.workspace.textDocuments??[]),
       ...(activeDocument?[activeDocument]:[])];
-    const roots=packageScanRoots(vscode.workspace.workspaceFolders??[],openDocuments);
+    const workspaceFolders=vscode.workspace.workspaceFolders??[];
+    const selectedRoot=getProjectRoot?.()??null;
+    const roots=workspaceFolders.length>1&&!selectedRoot?[]:
+      packageScanRoots(selectedRoot?[{uri:selectedRoot}]:workspaceFolders,openDocuments);
     const signature=roots.map(root=>root.toString()).sort().join('\n');
     if(signature!==observedRootSignature)schedule();
   }
@@ -363,6 +420,8 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     {dispose(){clearTimeout(timer);generation++;}}
   ].filter(Boolean);
   context.subscriptions.push(...subscriptions);
+  const dependencyChanged=dependenciesProvider?.onDidChangeTreeData?.(()=>fire());
+  if(dependencyChanged)context.subscriptions.push(dependencyChanged);
   async function revealPackages(){
     const list=await refresh();
     if(!treeView?.reveal)return false;

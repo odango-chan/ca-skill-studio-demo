@@ -45,7 +45,14 @@
     "onView:skillStudio.packages",
     "onView:skillStudio.outline",
     "onView:skillStudio.problems",
-    "onView:skillStudio.inspection"
+    "onView:skillStudio.inspection",
+    "onCommand:skillStudio.selectProjectRoot",
+    "onCommand:skillStudio.addDependency",
+    "onCommand:skillStudio.refreshDependencies",
+    "onCommand:skillStudio.refreshDependency",
+    "onCommand:skillStudio.updateDependencyLock",
+    "onCommand:skillStudio.removeDependency",
+    "onCommand:skillStudio.inspectDependencyContract"
   ],
   "contributes": {
     "colors": [
@@ -152,6 +159,34 @@
       {
         "command": "skillStudio.openContract",
         "title": "SKILL Studio: Open Contract Visual"
+      },
+      {
+        "command": "skillStudio.selectProjectRoot",
+        "title": "Skill Studio: Select Project Root"
+      },
+      {
+        "command": "skillStudio.addDependency",
+        "title": "Skill Studio: Add Dependency"
+      },
+      {
+        "command": "skillStudio.refreshDependencies",
+        "title": "Skill Studio: Refresh Dependencies"
+      },
+      {
+        "command": "skillStudio.refreshDependency",
+        "title": "Skill Studio: Refresh Upstream Dependency"
+      },
+      {
+        "command": "skillStudio.updateDependencyLock",
+        "title": "Skill Studio: Update Dependency Lock"
+      },
+      {
+        "command": "skillStudio.removeDependency",
+        "title": "Skill Studio: Remove Dependency"
+      },
+      {
+        "command": "skillStudio.inspectDependencyContract",
+        "title": "Skill Studio: Inspect Locked Contract"
       }
     ],
     "menus": {
@@ -219,6 +254,21 @@
           "command": "skillStudio.refreshInspection",
           "when": "view == skillStudio.inspection",
           "group": "navigation"
+        },
+        {
+          "command": "skillStudio.addDependency",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@3"
+        },
+        {
+          "command": "skillStudio.refreshDependencies",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@4"
+        },
+        {
+          "command": "skillStudio.selectProjectRoot",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [
@@ -356,6 +406,26 @@
           "command": "skillStudio.editPhaseOutputReference",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseOutputReference",
           "group": "4_phase"
+        },
+        {
+          "command": "skillStudio.inspectDependencyContract",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
+          "group": "1_inspect"
+        },
+        {
+          "command": "skillStudio.refreshDependency",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
+          "group": "2_refresh"
+        },
+        {
+          "command": "skillStudio.updateDependencyLock",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
+          "group": "3_update"
+        },
+        {
+          "command": "skillStudio.removeDependency",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
+          "group": "4_remove"
         }
       ]
     },
@@ -426,7 +496,8 @@
       "explorer": [
         {
           "id": "skillStudio.packages",
-          "name": "Packages"
+          "name": "Package Explorer",
+          "visibility": "visible"
         },
         {
           "id": "skillStudio.outline",
@@ -437,6 +508,49 @@
           "name": "Problems"
         }
       ]
+    },
+    "configuration": {
+      "id": "connectionAgent.skillStudio",
+      "title": "Skill Studio",
+      "type": "object",
+      "properties": {
+        "connectionAgent.skillStudio.skillsRoot": {
+          "type": "string",
+          "enum": [
+            "skills"
+          ],
+          "default": "skills",
+          "scope": "resource",
+          "markdownDescription": "Project Skill source root. Compiler v0.1 currently accepts skills/."
+        },
+        "connectionAgent.skillStudio.dependencies": {
+          "type": "array",
+          "default": [],
+          "scope": "resource",
+          "items": {
+            "type": "object"
+          },
+          "markdownDescription": "Project dependency declarations. Manage through Package Explorer; source schema is owned by the Compiler contract."
+        },
+        "connectionAgent.skillStudio.dependencyLock": {
+          "type": "object",
+          "default": {
+            "version": "skillc.lock/v0.1",
+            "entries": []
+          },
+          "scope": "resource",
+          "markdownDescription": "Managed pinned dependency lock. Refresh observes drift; Update Lock explicitly changes the pin."
+        },
+        "connectionAgent.skillStudio.defaultBuildTarget": {
+          "type": "string",
+          "enum": [
+            "all"
+          ],
+          "default": "all",
+          "scope": "application",
+          "markdownDescription": "Default target for a future Compiler adapter; does not imply a Build is available."
+        }
+      }
     }
   },
   "scripts": {
