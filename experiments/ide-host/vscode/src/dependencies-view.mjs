@@ -11,7 +11,7 @@ import {discoverMcpHttpTools,readGitHubPinnedFile}
 import {decodeBase64} from "./dependency-snapshot.mjs";
 const aliasPattern=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 export function registerDependenciesView(vscode,context,{onLockChanged=()=>{},
-  onProjectRootChanged=()=>{},treeViewId=null}={}){
+  onProjectRootChanged=()=>{}}={}){
   const emitter=new vscode.EventEmitter();
   const previews=new Map();
   let selectedRoot=null,latest=null;
@@ -97,9 +97,7 @@ export function registerDependenciesView(vscode,context,{onLockChanged=()=>{},
       return item;
     }
   };
-  const view=treeViewId&&typeof vscode.window.createTreeView==="function"
-    ?vscode.window.createTreeView(treeViewId,{treeDataProvider:provider}):null;
-  context.subscriptions.push(emitter,...(view?[view]:[]),
+  context.subscriptions.push(emitter,
     watchProjectConfiguration(vscode,()=>{refresh();onLockChanged();}));
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders?.(()=>{
     if(selectedRoot&&!roots().some(folder=>folder.uri.toString()===selectedRoot.toString())){
