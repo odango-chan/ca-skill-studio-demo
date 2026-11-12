@@ -368,7 +368,7 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
 });
 
 
-function currentV02PackageSnapshot(generation=1,completeness="complete"){
+function currentV02PackageSnapshot(generation=1,completeness="complete",libraryInventory="complete"){
   const rootUri="file:///workspace/establish-pdu-session";
   const paths=[
     "assurance/contract.yaml",
@@ -395,7 +395,7 @@ spec:
 `
   });
   return {rootUri,packageName:"establish-pdu-session",generation,completeness,
-    libraryInventory:"complete",documents};
+    libraryInventory,documents};
 }
 
 test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported ToolCatalog symbols",async()=>{
@@ -559,6 +559,56 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     });
     assert.deepEqual(partialDiagnostics,[],
       "non-Procedure YAML documents have no fabricated Outline symbols");
+
+    // A complete Skill Package can still have an incomplete project-level
+    // lib/ inventory. Imported links must remain fail-closed independently.
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageInvalidate",
+      params:{rootUri:snapshot.rootUri,generation:3}
+    });
+    const libraryPartial=currentV02PackageSnapshot(3,"complete","partial");
+    const libraryPartialContract=libraryPartial.documents.find(x=>
+      x.relativePath==="assurance/contract.yaml");
+    const libraryPartialProcedure=libraryPartial.documents.find(x=>
+      x.relativePath==="assurance/procedure.yaml");
+    const libraryDiagnostics=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===libraryPartialContract.uri,15000);
+    const libraryReady=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===snapshot.rootUri&&
+      message.params?.generation===3,15000);
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
+      params:libraryPartial});
+    const libraryStatus=await libraryReady;
+    assert.equal(libraryStatus.params.state,"READY",
+      "project lib inventory is tracked separately from Skill Package completeness");
+    const blockedOperation=await lspRequest(worker,317,"textDocument/definition",{
+      textDocument:{uri:libraryPartialProcedure.uri},
+      position:positionOf(libraryPartialProcedure.text,operationName)
+    });
+    assert.equal(blockedOperation,null,
+      "a discovered Operation is not uniquely linkable while project lib inventory is partial");
+    const blockedOperationCompletion=await lspRequest(worker,318,"textDocument/completion",{
+      textDocument:{uri:libraryPartialProcedure.uri},
+      position:positionOf(libraryPartialProcedure.text,operationName,4)
+    });
+    assert.deepEqual(blockedOperationCompletion,[],
+      "partial project lib inventory cannot offer imported Operation completions");
+    const ownerSchemaPath="lib/host/subject.schema.yaml";
+    const ownerSchemaCompletion=await lspRequest(worker,319,"textDocument/completion",{
+      textDocument:{uri:libraryPartialContract.uri},
+      position:positionOf(libraryPartialContract.text,ownerSchemaPath,9)
+    });
+    assert.ok(ownerSchemaCompletion.some(item=>item.label==="schemas/establishment-request.schema.yaml"));
+    assert.ok(ownerSchemaCompletion.every(item=>!item.label.startsWith("lib/")),
+      "partial project lib inventory cannot offer Owner Schema completions");
+    const libraryDiagnosticMessage=await libraryDiagnostics;
+    assert.ok(!libraryDiagnosticMessage.params.diagnostics.some(item=>
+      item.code==="SKILL_LINK_UNRESOLVED"&&
+      libraryPartialContract.text.split(/\\r\\n|\\n|\\r/)[item.range.start.line]
+        ?.slice(item.range.start.character,item.range.end.character)===ownerSchemaPath),
+      "missing Owner Schema diagnostics are suppressed when project lib inventory is partial");
   }finally{
     await worker.terminate();
   }
