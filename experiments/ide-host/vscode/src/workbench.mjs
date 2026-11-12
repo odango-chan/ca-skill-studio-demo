@@ -47,7 +47,7 @@ export function registerWorkbench(vscode,context){
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
   const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),
-    nativeMarkdownSecurityOriginals=new Map(),
+    nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
     markdownOpening=new Set(),nativeMarkdownOpening=new Set();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
@@ -2751,6 +2751,53 @@ export function registerWorkbench(vscode,context){
         throw Error('Expected exactly one '+name+' guide in the active Workspace');
       const opened=await openNativeMarkdownPreview(exact[0]);
       return opened?exact[0].toString():null;
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',async()=>{
+      const matches=await vscode.workspace.findFiles(
+        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith('/establish-pdu-session/SKILL.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one conventional 5GC Skill guide for live-update acceptance');
+      const target=exact[0],key=target.toString();
+      const doc=await vscode.workspace.openTextDocument(target);
+      if(doc.languageId!=='markdown')
+        throw Error('The conventional Skill guide is not registered as Markdown: '+doc.languageId);
+      if(nativeMarkdownLiveOriginals.has(key))
+        throw Error('Native Markdown live-update acceptance is already active');
+      const original=doc.getText();
+      nativeMarkdownLiveOriginals.set(key,original);
+      const longTail=Array.from({length:80},(_,index)=>
+        '## Native Markdown Scroll Section '+(index+1)+'\n\n'+
+        'This paragraph provides stable source lines and preview height for real bidirectional scroll synchronization acceptance.\n'
+      ).join('\n');
+      const source='# Native Markdown Live Update Probe\n\n'+original+'\n\n'+longTail;
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(original.length)),source);
+      const applied=await vscode.workspace.applyEdit(edit);
+      if(!applied){
+        nativeMarkdownLiveOriginals.delete(key);
+        throw Error('Could not apply the temporary native Markdown live-update fixture');
+      }
+      return key;
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
+      const suffix='/establish-pdu-session/SKILL.md';
+      if(!target.path.endsWith(suffix))
+        throw Error('Refusing to restore a non-fixture Markdown guide');
+      const key=target.toString();
+      const original=nativeMarkdownLiveOriginals.get(key);
+      if(typeof original!=='string')
+        throw Error('No original Markdown content is recorded for the live-update fixture');
+      const doc=await vscode.workspace.openTextDocument(target);
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
+      const restored=await vscode.workspace.applyEdit(edit);
+      if(!restored)throw Error('Could not restore the original Skill guide after live-update acceptance');
+      nativeMarkdownLiveOriginals.delete(key);
+      return true;
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
