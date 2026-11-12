@@ -2111,7 +2111,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         typeof key.prototype?.getByUri==='function');
       const editors=managerKey&&c.get(managerKey).all;
       const control=editors?.map(widget=>widget.editor?.getControl?.()).find(editor=>
-        editor?.getModel()?.uri.path.endsWith('/SKILL.md'));
+        editor?.getModel()?.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
       if(!control)throw Error('Native Markdown Source Monaco editor is unavailable');
       control.setScrollTop(${Number(top)});
       return {scrollTop:control.getScrollTop(),scrollHeight:control.getScrollHeight(),
