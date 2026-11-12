@@ -433,10 +433,10 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const evidence={
     skills:[{
       name:'establish-pdu-session',files:classic.fileCount,core:'3/3',
-      groups:classicGroups,contract:classicContract
+      groups:classic.groups.map(group=>({key:group.key,count:group.count})),contract:classicContract
     },{
       name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3',
-      groups:masGroups,contract:masContract
+      groups:mas.groups.map(group=>({key:group.key,count:group.count})),contract:masContract
     }],
     treeVisible:true,scanState:scan.state,
     composite:compositeEvidence,
