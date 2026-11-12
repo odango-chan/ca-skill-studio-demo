@@ -2342,7 +2342,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const initialSource=await readSourceScroll();
     await previewScroll(`(()=>{
       if(!window.__studioNativeMarkdownScrollProbe){
-        window.__studioNativeMarkdownScrollProbe={events:[]};
+        window.__studioNativeMarkdownScrollProbe={events:[],resizes:[]};
         window.addEventListener('scroll',()=>{
           window.__studioNativeMarkdownScrollProbe.events.push({
             y:window.scrollY,at:performance.now(),
@@ -2350,6 +2350,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           });
           if(window.__studioNativeMarkdownScrollProbe.events.length>40)
             window.__studioNativeMarkdownScrollProbe.events.shift();
+        },true);
+        window.addEventListener('resize',()=>{
+          window.__studioNativeMarkdownScrollProbe.resizes.push({
+            at:performance.now(),width:innerWidth,height:innerHeight
+          });
+          if(window.__studioNativeMarkdownScrollProbe.resizes.length>40)
+            window.__studioNativeMarkdownScrollProbe.resizes.shift();
         },true);
       }
       window.__studioNativeMarkdownScrollProbe.events.length=0;
