@@ -81,7 +81,7 @@ export function buildSkillSymbolIndex(snapshot){
   for(const document of snapshot.documents){
     if(typeof document?.uri==="string"&&typeof document?.relativePath==="string"){
       const key="document::"+document.relativePath;
-      if(/^(?:schemas\/.*\.schema\.ya?ml|lib\/.*\.ya?ml|scripts\/.*\.py|references\/.*\.md)$/.test(document.relativePath)){
+      if(/^(?:schemas\/.*\.ya?ml|lib\/.*\.schema\.ya?ml|scripts\/.*\.py|references\/.*\.md)$/.test(document.relativePath)){
         const targets=documentTargets.get(key)??[];
         targets.push({
           key,name:document.relativePath,
