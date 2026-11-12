@@ -451,10 +451,19 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
 export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
-    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
+    // Match the verified Package Explorer gesture: clear any stale button
+    // state, move with an explicit pointer type, then send a complete press/release.
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,
+      button:'left',buttons:0,clickCount:1});
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,
+      button:'none',buttons:0,pointerType:'mouse'});
     await sleep(100);
-    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:count});
-    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:count});
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,
+      button:'left',buttons:1,clickCount:count,pointerType:'mouse'});
+    await sleep(100);
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,
+      button:'left',buttons:0,clickCount:count,pointerType:'mouse'});
+    await sleep(180);
   };
   // Use the real native command registry for setup/actions. Explorer gestures
   // below remain actual Chromium input; no host or TextDocument is mocked.
@@ -1233,7 +1242,36 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!inspectorFlowState.toggleHit)
       throw Error('Native Inspector Data Flow expansion arrow is obscured: '+
         JSON.stringify(inspectorFlowState));
+    await evalJS(`(()=>{
+      window.__inspectorDataFlowClicks=[];
+      document.addEventListener('click',event=>{
+        const toggle=event.target?.closest?.('.theia-ExpansionToggle');
+        const node=toggle?.closest('.theia-TreeNode');
+        if(!toggle||!node?.innerText?.includes('Data Flow · Producer / Consumer'))return;
+        window.__inspectorDataFlowClicks.push({trusted:event.isTrusted,
+          toggleClass:toggle.className,nodeText:node.innerText.replace(/\\s+/g,' ').trim()});
+      },true);
+      return true;
+    })()`);
     await click(inspectorFlowState.togglePoint.x,inspectorFlowState.togglePoint.y);
+    let expandedAfterClick=false;
+    for(let attempt=0;attempt<30;attempt++){
+      expandedAfterClick=await evalJS(`(()=>{
+        const container=document.getElementById(
+          'plugin-view-container:workbench.view.extension.skillStudioInspector');
+        const row=[...(container?.querySelectorAll('.theia-TreeNode')??[])].find(node=>
+          node.innerText.replace(/\\s+/g,' ').includes('Data Flow · Producer / Consumer'));
+        const toggle=row?.querySelector('.theia-ExpansionToggle');
+        return !!toggle&&!toggle.classList.contains('theia-mod-collapsed');
+      })()`);
+      if(expandedAfterClick)break;
+      await sleep(100);
+    }
+    if(!expandedAfterClick){
+      const clicks=await evalJS('window.__inspectorDataFlowClicks??[]');
+      throw Error('Trusted Inspector Data Flow click did not expand the row: '+
+        JSON.stringify({inspectorFlowState,clicks}));
+    }
   }
   let phaseEvidenceText='';
   for(let attempt=0;attempt<100;attempt++){
