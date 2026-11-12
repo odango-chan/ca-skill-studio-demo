@@ -29,8 +29,19 @@ function host(manifestOverride=null,existing=[]){
         },
         async createDirectory(target){folders.add(target.path);},
         async stat(target){
-          if(files.has(target.path)||folders.has(target.path))return {type:1};
+          if(files.has(target.path)||folders.has(target.path)||
+             [...files.keys()].some(path=>path.startsWith(target.path+"/"))||
+             [...folders].some(path=>path.startsWith(target.path+"/")))return {type:1};
           throw Object.assign(Error("missing"),{code:"FileNotFound"});
+        },
+        async delete(target){
+          const prefix=target.path+"/";
+          let found=false;
+          for(const path of [...files.keys()])
+            if(path===target.path||path.startsWith(prefix)){files.delete(path);found=true;}
+          for(const path of [...folders])
+            if(path===target.path||path.startsWith(prefix)){folders.delete(path);found=true;}
+          if(!found)throw Object.assign(Error("missing"),{code:"FileNotFound"});
         },
         async writeFile(target,bytes){
           assert.ok(folders.has(target.path.slice(0,target.path.lastIndexOf("/"))));
@@ -64,7 +75,7 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
   assert.ok(result.workspaceUpdated);
   assert.equal(h.opened.length,1);
   assert.equal(h.opened[0].folder.name,"skill-studio-demo");
-  assert.equal(result.root.path,"/global-storage/workspaces");
+  assert.equal(result.root.path,"/global-storage/skill-studio-demo");
   assert.equal(result.skillsRoot.path,result.root.path+"/skills");
   assert.equal(result.libraryRoot.path,result.root.path+"/lib");
   assert.equal(result.outputRoot.path,result.root.path+"/output");
@@ -83,10 +94,10 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
     const p=result.procedures[name].path;
     const text=new TextDecoder().decode(h.files.get(p));
     assert.match(text,/procedures:/);
-    assert.ok(h.files.has("/global-storage/workspaces/skills/"+name+"/SKILL.md"));
-    assert.ok(h.files.has("/global-storage/workspaces/skills/"+name+"/assurance/contract.yaml"));
+    assert.ok(h.files.has(result.skillsRoot.path+"/"+name+"/SKILL.md"));
+    assert.ok(h.files.has(result.skillsRoot.path+"/"+name+"/assurance/contract.yaml"));
   }
-  assert.ok(h.files.has("/global-storage/workspaces/skills/establish-pdu-session/scripts/build_n1n2_delivery.py"));
+  assert.ok(h.files.has(result.skillsRoot.path+"/establish-pdu-session/scripts/build_n1n2_delivery.py"));
   assert.equal(result.procedure.path,result.procedures["establish-pdu-session"].path);
 });
 test("New project keeps imported library and generated output empty and isolated",async()=>{
@@ -123,23 +134,49 @@ test("A user workspace named skills is not repurposed for the demo",async()=>{
   assert.equal(h.opened[0].folder.name,"skill-studio-demo");
   assert.equal(h.files.has("/user-project/skills/SKILL.md"),false);
 });
-test("Existing legacy skills Workspace is upgraded in place without losing edited Source",async()=>{
+test("Reset replaces the legacy Skills workspace with the canonical named project",async()=>{
   const oldSkills=uri("/global-storage/workspaces/skills");
   const h=host(null,[{name:"skills",uri:oldSkills}]);
-  const edited="/global-storage/workspaces/skills/establish-pdu-session/SKILL.md";
-  const custom=new TextEncoder().encode("# keep my edited SKILL content");
+  h.folders.add(oldSkills.path);
+  h.folders.add(oldSkills.path+"/establish-pdu-session");
+  const edited=oldSkills.path+"/establish-pdu-session/SKILL.md";
+  const custom=new TextEncoder().encode("# user edits must be cleared");
   h.files.set(edited,custom);
-  const result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
-  assert.equal(result.root.path,"/global-storage/workspaces");
-  assert.equal(result.skillsRoot.path,oldSkills.path);
-  assert.equal(result.created,manifest.files.length-1);
-  assert.equal(result.skipped,1);
+  const result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"),{
+    resetExisting:true
+  });
+  assert.equal(result.root.path,"/global-storage/skill-studio-demo");
+  assert.equal(result.skillsRoot.path,result.root.path+"/skills");
+  assert.equal(result.created,manifest.files.length);
+  assert.equal(result.skipped,0);
+  assert.equal(result.resetExisting,true);
+  assert.equal(result.resetPackages,1);
   assert.equal(result.workspaceUpdated,true);
   assert.deepEqual(h.opened.map(x=>({start:x.start,count:x.count})),[{start:0,count:1}]);
   assert.deepEqual(h.vscode.workspace.workspaceFolders.map(x=>x.uri.path),[result.root.path]);
-  assert.deepEqual(h.files.get(edited),custom);
+  assert.equal(h.files.has(edited),false,"legacy edited package must be removed from the old location");
+  assert.ok(h.files.has(result.skillsRoot.path+"/establish-pdu-session/SKILL.md"));
   assert.ok(await h.vscode.workspace.fs.stat(result.libraryRoot));
   assert.ok(await h.vscode.workspace.fs.stat(result.outputRoot));
+});
+test("Explicit online-demo reset overwrites both bundled Skills and removes package-local extras",async()=>{
+  const h=host(),base=uri("/extension"),storage=uri("/global-storage");
+  const first=await seedExampleWorkspace(h.vscode,base,storage);
+  const editedMain=first.procedure.path;
+  const editedMas=first.procedures["establish-pdu-session-mas"].path;
+  h.files.set(editedMain,new TextEncoder().encode("# modified procedure"));
+  h.files.set(editedMas,new TextEncoder().encode("# modified MAS"));
+  const extra=first.skillsRoot.path+"/establish-pdu-session/notes.local.md";
+  h.files.set(extra,new TextEncoder().encode("local extra"));
+  const reset=await seedExampleWorkspace(h.vscode,base,storage,{resetExisting:true});
+  assert.equal(reset.resetPackages,2);
+  assert.equal(reset.created,manifest.files.length);
+  assert.equal(reset.skipped,0);
+  assert.equal(h.files.has(extra),false);
+  assert.deepEqual(h.files.get(editedMain),new Uint8Array(readFileSync(
+    sampleRoot+"establish-pdu-session/assurance/procedure.yaml")));
+  assert.deepEqual(h.files.get(editedMas),new Uint8Array(readFileSync(
+    sampleRoot+"establish-pdu-session-mas/assurance/procedure.yaml")));
 });
 
 test("Malformed, cross-package, traversing or duplicate manifests refuse writes",async()=>{
