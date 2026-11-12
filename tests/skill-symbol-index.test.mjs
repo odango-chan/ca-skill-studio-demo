@@ -35,6 +35,7 @@ function packageSnapshot(extra=[]){
     document("assurance/predicates.yaml",read("assurance/predicates.yaml")),
     document("assurance/procedure.yaml",read("assurance/procedure.yaml")),
     document("schemas/establishment-request.schema.yaml",read("schemas/establishment-request.schema.yaml")),
+    document("scripts/select_establishment_configuration.py",read("scripts/select_establishment_configuration.py")),
     document("lib/tools/udm.tool.yaml",`apiVersion: connectionagent.io/v1alpha1
 kind: ToolCatalog
 spec:
@@ -250,7 +251,10 @@ test("v0.2 completion uses canonical reference token context and exact Package d
   const scriptOffset=offsetOf(procedure.text,scriptPath)+9;
   const scriptCompletions=symbols.skillSymbolCompletions(index,procedure.uri,scriptOffset);
   assert.equal(scriptCompletions.token.type,"skillReference");
-  assert.ok(scriptCompletions.items.some(item=>item.name===scriptPath));
+  assert.ok(scriptCompletions.items.some(item=>item.name===scriptPath),
+    JSON.stringify({token:scriptCompletions.token,items:scriptCompletions.items,
+      scriptDocuments:snapshot.documents.filter(item=>item.relativePath.startsWith("scripts/"))
+        .map(item=>item.relativePath)}));
 });
 
 test("v0.2 link diagnostics report exact unresolved and ambiguous references but not deployment Capabilities",()=>{
@@ -273,7 +277,10 @@ test("v0.2 link diagnostics report exact unresolved and ambiguous references but
   const procedure=duplicateSnapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
   assert.ok(duplicateDiagnostics.some(item=>item.uri===procedure.uri&&
     item.code==="SKILL_LINK_AMBIGUOUS"&&
-    procedure.text.slice(item.range.start,item.range.end)==="sbi.udm.sm_data.get"));
+    procedure.text.slice(item.range.start,item.range.end)==="sbi.udm.sm_data.get"),
+    JSON.stringify({declarations:duplicateIndex.declarations.get(hit.token.key),
+      references:duplicateIndex.references.get(hit.token.key),
+      diagnostics:duplicateDiagnostics}));
 });
 
 test("v0.2 link diagnostics are suppressed for incomplete or stale Package snapshots",()=>{
