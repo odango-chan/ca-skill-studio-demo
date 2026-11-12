@@ -264,6 +264,24 @@ test("v0.2 completion uses canonical reference token context and exact Package d
         .map(item=>item.relativePath)}));
 });
 
+test("Schema references cannot resolve to ordinary lib YAML such as ToolCatalog",()=>{
+  const base=packageSnapshot();
+  const original=base.documents.find(item=>item.relativePath==="assurance/contract.yaml");
+  const text=original.text.replace(
+    "schemas/establishment-request.schema.yaml","lib/tools/udm.tool.yaml");
+  const snapshot={...base,documents:base.documents.map(item=>
+    item.uri===original.uri?{...item,text}:item)};
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const hit=at(index,original.uri,text,"lib/tools/udm.tool.yaml");
+  assert.ok(hit,"invalid Schema path remains a source-backed reference");
+  assert.equal(symbols.uniqueSkillSymbolDeclaration(hit),null,
+    "ordinary ToolCatalog YAML is not a Schema declaration");
+  const diagnostics=symbols.skillSymbolLinkDiagnostics(index,snapshot);
+  assert.ok(diagnostics.some(item=>item.uri===original.uri&&
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    text.slice(item.range.start,item.range.end)==="lib/tools/udm.tool.yaml"));
+});
+
 test("v0.2 Procedure, Predicate, node and direct-grant completions stay in their semantic scopes",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
