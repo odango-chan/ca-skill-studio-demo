@@ -257,6 +257,38 @@ test("v0.2 completion uses canonical reference token context and exact Package d
         .map(item=>item.relativePath)}));
 });
 
+test("v0.2 Procedure, Predicate, node and direct-grant completions stay in their semantic scopes",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const entry="ue-requested-pdu-session-establishment";
+  const entryItems=symbols.skillSymbolCompletions(index,contract.uri,
+    offsetOf(contract.text,entry)+4);
+  assert.equal(entryItems.token.type,"skillProcedure");
+  assert.ok(entryItems.items.some(item=>item.name===entry));
+
+  const predicate="createdsession.ingress.eligible";
+  const predicateItems=symbols.skillSymbolCompletions(index,procedure.uri,
+    offsetOf(procedure.text,predicate)+5);
+  assert.equal(predicateItems.token.type,"skillPredicate");
+  assert.ok(predicateItems.items.some(item=>item.name===predicate));
+
+  const node="nudm-sdm-get";
+  const nodeItems=symbols.skillSymbolCompletions(index,procedure.uri,
+    offsetOf(procedure.text,node)+3);
+  assert.equal(nodeItems.token.type,"skillStep");
+  assert.ok(nodeItems.items.some(item=>item.name===node));
+  assert.ok(nodeItems.items.every(item=>item.path?.[2]==="nodes"&&item.path.length===4),
+    "node completion excludes locally scoped PRE/POST phase steps");
+
+  const directGrant="sbi.udm.sm_data.get";
+  const grantItems=symbols.skillSymbolCompletions(index,contract.uri,
+    offsetOf(contract.text,directGrant)+4);
+  assert.equal(grantItems.token.type,"skillCapability");
+  assert.ok(grantItems.items.some(item=>item.name===directGrant));
+});
+
 test("v0.2 link diagnostics report exact unresolved and ambiguous references but not deployment Capabilities",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
