@@ -746,6 +746,8 @@ export function registerWorkbench(vscode,context){
           contractDocument,{preview:false});
         if(contractCompletionEditor.document.uri.toString()!==relatedUris.contract.toString())
           throw Error("Contract Completion target did not become the active editor");
+        contractCompletionEditor.selection=new vscode.Selection(
+          contractCompletionPosition,contractCompletionPosition);
         const completionProviderBefore=await vscode.commands.executeCommand(
           "skillStudio.internal.semanticTokenDiagnostics");
         const requestSchemaCompletionResult=await vscode.commands.executeCommand(
@@ -794,22 +796,34 @@ export function registerWorkbench(vscode,context){
           procedureDocument,{preview:false});
         if(procedureCompletionEditor.document.uri.toString()!==procedureUri.toString())
           throw Error("Procedure Completion target did not become the active editor");
+        const predicateCompletionPosition=sourcePosition(
+          procedureDocument,procedureText,predicateName,5);
+        procedureCompletionEditor.selection=new vscode.Selection(
+          predicateCompletionPosition,predicateCompletionPosition);
         const predicateCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
-          sourcePosition(procedureDocument,procedureText,predicateName,5)));
+          predicateCompletionPosition));
         if(!predicateCompletion.some(item=>
           (typeof item.label==="string"?item.label:item.label?.label)===predicateName))
           throw Error("v0.2 Procedure Predicate completion did not return the Package declaration");
+        const nodeCompletionPosition=sourcePosition(
+          procedureDocument,procedureText,nodeName,3);
+        procedureCompletionEditor.selection=new vscode.Selection(
+          nodeCompletionPosition,nodeCompletionPosition);
         const nodeCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
-          sourcePosition(procedureDocument,procedureText,nodeName,3)));
+          nodeCompletionPosition));
         if(!nodeCompletion.some(item=>
           (typeof item.label==="string"?item.label:item.label?.label)===nodeName))
           throw Error("v0.2 Procedure node completion did not return the scoped node declaration");
         const scriptCompletionPath="scripts/select_establishment_configuration.py";
+        const scriptCompletionPosition=sourcePosition(
+          procedureDocument,procedureText,scriptCompletionPath,9);
+        procedureCompletionEditor.selection=new vscode.Selection(
+          scriptCompletionPosition,scriptCompletionPosition);
         const scriptCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
-          sourcePosition(procedureDocument,procedureText,scriptCompletionPath,9)));
+          scriptCompletionPosition));
         if(!scriptCompletion.some(item=>
           (typeof item.label==="string"?item.label:item.label?.label)===scriptCompletionPath))
           throw Error("v0.2 Procedure Script completion did not return the Package-local Script path");
