@@ -678,6 +678,16 @@ export function registerWorkbench(vscode,context){
         if(!references.some(item=>item?.uri?.toString()===procedureUri.toString()))
           throw Error("References provider did not return the Procedure caller: "+
             JSON.stringify(references.map(item=>item?.uri?.toString?.()??null)));
+        // Exercise the public native Definition provider in the reverse
+        // direction. This is what Monaco/Theia's standard Ctrl/Cmd-click,
+        // F12 and Peek Definition gestures consume.
+        const reverseDefinitionResult=await vscode.commands.executeCommand(
+          "vscode.executeDefinitionProvider",scriptUri,referencePosition);
+        const reverseDefinitions=Array.isArray(reverseDefinitionResult)
+          ?reverseDefinitionResult:reverseDefinitionResult?[reverseDefinitionResult]:[];
+        if(!reverseDefinitions.some(item=>item?.uri?.toString()===procedureUri.toString()))
+          throw Error("Python main() Definition provider did not return its YAML caller: "+
+            JSON.stringify(reverseDefinitions.map(item=>item?.uri?.toString?.()??null)));
         const symbolResult=await vscode.commands.executeCommand(
           "vscode.executeDocumentSymbolProvider",scriptUri);
         const symbols=Array.isArray(symbolResult)?symbolResult:[];
@@ -724,6 +734,8 @@ export function registerWorkbench(vscode,context){
         await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
         return {
           definition:scriptPath,
+          reverseDefinition:reverseDefinitions.length,
+          reverseDefinitionTargets:reverseDefinitions.map(item=>item.uri?.toString?.()??""),
           hover:hovers.length,
           references:references.length,
           symbols:symbols.map(item=>item.name),

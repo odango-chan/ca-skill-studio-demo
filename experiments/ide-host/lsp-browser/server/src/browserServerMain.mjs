@@ -320,9 +320,21 @@ connection.onDefinition(params => {
   if (offset === null) return null;
   const hit = referenceAt(value, document.uri, offset);
   if (!hit || !hit.reference.packageContextComplete) return null;
-  if (hit.side !== "source") return null;
-  const target = documentFor(value, hit.reference.targetUri);
-  return location(hit.reference.targetUri, target, hit.reference.targetRange);
+  if (hit.side === "source") {
+    const target = documentFor(value, hit.reference.targetUri);
+    return location(hit.reference.targetUri, target, hit.reference.targetRange);
+  }
+
+  // Reverse navigation is the other half of ordinary IDE Definition. When
+  // the cursor is on a Python entrypoint (or a referenced Schema declaration),
+  // return the exact YAML caller/reference locations from this same complete
+  // Package generation. Monaco/Theia then provides its native Go to Definition,
+  // Ctrl/Cmd-click and Peek Definition interactions without a custom editor UI.
+  return allReferences(value.analysis)
+    .filter(item => item.packageContextComplete && sameTarget(item, hit.reference))
+    .map(item => location(item.sourceUri,
+      documentFor(value, item.sourceUri), item.sourceRange))
+    .filter(Boolean);
 });
 
 connection.onReferences(params => {

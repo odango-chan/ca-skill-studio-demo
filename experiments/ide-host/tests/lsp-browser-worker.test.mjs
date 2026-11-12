@@ -282,6 +282,22 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.ok(references.some(item=>item.uri===procedure.uri));
     assert.ok(references.some(item=>item.uri===script.uri));
 
+    // Definition must work in the reverse direction too: from the Python
+    // main() entrypoint back to the exact YAML caller. This is the LSP
+    // primitive used by native Monaco/Theia Ctrl/Cmd-click and Peek Definition.
+    // This fixture uses the legacy metadata entry symbol; the canonical
+    // ca-skills form uses main() and is covered by the Theia browser probe.
+    const reverseDefinition=await lspRequest(worker,24,"textDocument/definition",{
+      textDocument:{uri:script.uri},
+      position:positionOf(script.text,nameNeedle,"# name: ".length)
+    });
+    const reverseDefinitions=Array.isArray(reverseDefinition)
+      ?reverseDefinition:reverseDefinition?[reverseDefinition]:[];
+    assert.ok(reverseDefinitions.some(item=>item.uri===procedure.uri),
+      "Python main() Definition resolves back to its Procedure caller");
+    assert.ok(reverseDefinitions.every(item=>item.range?.start&&item.range?.end),
+      "reverse Definition returns exact source ranges");
+
     const schemaNeedle="# inputSchema: EstablishmentSelectionInput";
     const schemaDefinition=await lspRequest(worker,20,"textDocument/definition",{
       textDocument:{uri:script.uri},
