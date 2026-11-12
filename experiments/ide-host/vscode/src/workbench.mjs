@@ -2490,7 +2490,7 @@ export function registerWorkbench(vscode,context){
       // Keep Source as the editable authority in the first editor group.
       // The built-in Markdown extension owns the read-only Preview in group two.
       await vscode.window.showTextDocument(doc,{
-        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:true
+        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:false
       });
       // Resolve the exact Skill Package root, inventory local files, and reject
       // symlinked targets before the native Markdown engine renders any links.
