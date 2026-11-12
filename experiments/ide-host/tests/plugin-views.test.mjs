@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {registerDependenciesView} from "../vscode/src/dependencies-view.mjs";
+import {registerDependencyIntegration} from "../vscode/src/dependency-integration.mjs";
 const uri=path=>({scheme:"file",authority:"",path,
   toString(){return "file://"+path;}});
 class EventEmitter{
@@ -66,9 +66,9 @@ function fixture({multiRoot=false}={}){
   return {vscode,commands,messages,selected,roots};
 }
 
-test("Dependencies provider is composed into Package Explorer and does not create another view",async()=>{
+test("Dependency integration composes its provider into Package Explorer without creating another view",async()=>{
   const h=fixture(),context={subscriptions:[],secrets:{get:async()=>undefined}};
-  const view=registerDependenciesView(h.vscode,context,{
+  const integration=registerDependencyIntegration(h.vscode,context,{
     onProjectRootChanged:root=>h.selected.push(root?.path??null)
   });
   assert.equal(h.commands.has("skillStudio.addDependency"),true);
@@ -76,23 +76,23 @@ test("Dependencies provider is composed into Package Explorer and does not creat
   assert.equal(h.commands.has("skillStudio.updateDependencyLock"),true);
   assert.equal(h.commands.has("skillStudio.removeDependency"),true);
   assert.equal(h.commands.has("skillStudio.selectProjectRoot"),true);
-  assert.equal(view.getProjectRoot().path,h.roots[0].path);
-  const rows=await view.provider.getChildren();
+  assert.equal(integration.getProjectRoot().path,h.roots[0].path);
+  const rows=await integration.provider.getChildren();
   assert.match(rows[0].text,/No dependencies/);
-  assert.equal(view.provider.getTreeItem(rows[0]).label,rows[0].text);
+  assert.equal(integration.provider.getTreeItem(rows[0]).label,rows[0].text);
 });
 
 test("multi-root Dependency operations require explicit project selection",async()=>{
   const h=fixture({multiRoot:true}),context={subscriptions:[],secrets:{get:async()=>undefined}};
-  const view=registerDependenciesView(h.vscode,context,{
+  const integration=registerDependencyIntegration(h.vscode,context,{
     onProjectRootChanged:root=>h.selected.push(root?.path??null)
   });
-  assert.equal(view.getProjectRoot(),null);
-  const before=await view.provider.getChildren();
+  assert.equal(integration.getProjectRoot(),null);
+  const before=await integration.provider.getChildren();
   assert.match(before[0].text,/Select a project root/);
   await h.commands.get("skillStudio.selectProjectRoot")();
-  assert.equal(view.getProjectRoot().path,h.roots[1].path);
+  assert.equal(integration.getProjectRoot().path,h.roots[1].path);
   assert.deepEqual(h.selected,[h.roots[1].path]);
-  const after=await view.provider.getChildren();
+  const after=await integration.provider.getChildren();
   assert.match(after[0].text,/No dependencies/);
 });
