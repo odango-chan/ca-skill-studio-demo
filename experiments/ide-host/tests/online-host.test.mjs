@@ -27,8 +27,16 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   for(const view of ["skillStudio.procedurePreview","skillStudio.contractPreview",
     "skillStudio.predicatePreview","skillStudio.schemaPreview"])assert.ok(editorViews.has(view),view);
   const workbenchViews=new Set(plugin.contributes.views.skillStudio.map(x=>x.id));
+  const secondaryViews=new Set(plugin.contributes.views.secondarySidebar.map(x=>x.id));
   assert.ok(workbenchViews.has("skillStudio.packages"),
-    "multi-Package Overview must live in the Skill Studio activity bar");
+    "multi-Package Overview remains available in the current migration container");
+  assert.ok(secondaryViews.has("skillStudio.inspection"),
+    "Inspector must be contributed to the native right-side secondary sidebar");
+  assert.ok(!workbenchViews.has("skillStudio.inspection"),
+    "Inspector must not remain duplicated in the primary Skill Studio container");
+  assert.ok(plugin.contributes.views.skillStudio.some(x=>x.id==="skillStudio.outline"&&
+    x.name==="Procedure Outline"),
+    "domain Procedure Outline must remain distinct while native Outline parity is evaluated");
   assert.ok(plugin.activationEvents.includes("onCommand:skillStudio.refreshPackages"));
   assert.ok(plugin.activationEvents.includes("onView:skillStudio.packages"));
   assert.ok(plugin.contributes.menus["view/title"].some(x=>
