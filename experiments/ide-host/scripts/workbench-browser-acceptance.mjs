@@ -635,6 +635,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         "ue-requested-pdu-session-establishment")||
       !languageFeatureEvidence.yamlPredicateOutline?.includes(
         "createdsession.ingress.eligible")||
+      !languageFeatureEvidence.yamlCompletions?.requestSchema||
+      !languageFeatureEvidence.yamlCompletions?.operation||
+      !languageFeatureEvidence.yamlCompletions?.script||
       !languageFeatureEvidence.hover||
       !languageFeatureEvidence.references||
       !languageFeatureEvidence.reverseDefinition||
