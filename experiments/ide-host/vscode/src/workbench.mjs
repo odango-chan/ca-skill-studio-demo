@@ -743,7 +743,7 @@ export function registerWorkbench(vscode,context){
         const contractCompletionPosition=sourcePosition(
           contractDocument,contractText,requestSchemaPath,9);
         const contractCompletionEditor=await vscode.window.showTextDocument(
-          contractDocument,{preview:false});
+          relatedUris.contract,{preview:false});
         if(contractCompletionEditor.document.uri.toString()!==relatedUris.contract.toString())
           throw Error("Contract Completion target did not become the active editor");
         contractCompletionEditor.selection=new vscode.Selection(
@@ -793,7 +793,7 @@ export function registerWorkbench(vscode,context){
               position:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
               requestSchemaPath}));
         const procedureCompletionEditor=await vscode.window.showTextDocument(
-          procedureDocument,{preview:false});
+          procedureUri,{preview:false});
         if(procedureCompletionEditor.document.uri.toString()!==procedureUri.toString())
           throw Error("Procedure Completion target did not become the active editor");
         const predicateCompletionPosition=sourcePosition(
