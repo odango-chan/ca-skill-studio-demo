@@ -2121,8 +2121,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const followedSafePackageLink=await waitNativeMarkdown(
       view=>view.heading==='Establish PDU Session',
       'native Markdown safe Package-local link navigation');
-    if(followedSafePackageLink.uri!==nativeMarkdownUri)
-      throw Error('Native Markdown safe link escaped the owning Skill Package: '+followedSafePackageLink.uri);
+    const safeLinkPreviewActive=await evalJS(
+      `[...document.querySelectorAll('.lm-TabBar-tab.lm-mod-current')]
+        .some(tab=>tab.textContent.trim()==='Markdown · SKILL.md')`);
+    if(followedSafePackageLink.view.heading!=='Establish PDU Session'||!safeLinkPreviewActive)
+      throw Error('Native Markdown safe Package-local link did not activate the owning Skill guide preview: '+JSON.stringify({view:followedSafePackageLink.view,safeLinkPreviewActive}));
     if(!evidence.csp.includes("default-src 'none'")||
        /script-src[^;]*unsafe-inline/.test(evidence.csp))
       throw Error('Native Markdown preview is not using a strict script Content Security Policy: '+
