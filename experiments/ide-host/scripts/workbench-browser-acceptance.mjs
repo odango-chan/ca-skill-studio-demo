@@ -508,8 +508,37 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('core.saveAll');
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-  if(!file)throw Error('Procedure file not available in native Explorer');
+  let file=await evalJS(`(()=>{
+    const root=document.querySelector('.theia-Files')??document;
+    const nodes=[...root.querySelectorAll('.theia-TreeNode')];
+    const normalize=value=>value.replace(/\\s+/g,' ').trim();
+    const el=nodes.find(node=>normalize(node.innerText)==='procedure.yaml'&&
+      node.getBoundingClientRect().width>0);
+    if(!el)return {found:false,nodeCount:nodes.length,
+      fileRows:nodes.map(node=>normalize(node.innerText)).filter(name=>name.includes('procedure.yaml')).slice(0,12)};
+    el.scrollIntoView({block:'center',inline:'nearest'});
+    // Click the actual label segment, not the indentation/icon gutter.
+    const content=el.querySelector('.theia-TreeNodeSegmentGrow')??
+      el.querySelector('.theia-TreeNodeContent')??el;
+    const r=content.getBoundingClientRect();
+    const points=[.5,.65,.8,.9].map(f=>({
+      x:Math.round(r.x+r.width*f),y:Math.round(r.y+r.height/2)
+    }));
+    const point=points.find(({x,y})=>{
+      if(x<0||y<0||x>=innerWidth||y>=innerHeight)return false;
+      const hit=document.elementFromPoint(x,y);
+      return hit&&(hit===el||el.contains(hit))&&!hit.closest('.lm-SplitPanel-handle');
+    });
+    return {found:true,point:point??null,rect:{x:r.x,y:r.y,width:r.width,height:r.height},
+      nodeClass:el.className,
+      hitClass:point?document.elementFromPoint(point.x,point.y)?.className??'':null,
+      ancestorLabels:[...nodes].filter(node=>node.compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING)
+        .slice(-4).map(node=>normalize(node.innerText))};
+  })()`);
+  if(!file?.found||!file.point)
+    throw Error('Procedure file has no unobstructed native Explorer click target: '+JSON.stringify(file));
+  console.log('STUDIO_EXPLORER_FILE_CLICK_TARGET',JSON.stringify(file));
+  file={x:file.point.x,y:file.point.y};
   // Measure the actual Explorer click → CustomEditor render path. Do not
   // insert a fixed sleep before polling; it would dominate the reported time.
   const start=performance.now();await click(file.x,file.y);
