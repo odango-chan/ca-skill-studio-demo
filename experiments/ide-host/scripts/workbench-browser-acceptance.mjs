@@ -636,7 +636,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       !languageFeatureEvidence.yamlPredicateOutline?.includes(
         "createdsession.ingress.eligible")||
       !languageFeatureEvidence.yamlCompletions?.requestSchema||
-      !languageFeatureEvidence.yamlCompletions?.operation||
+      !languageFeatureEvidence.yamlCompletions?.predicate||
+      !languageFeatureEvidence.yamlCompletions?.node||
       !languageFeatureEvidence.yamlCompletions?.script||
       !languageFeatureEvidence.hover||
       !languageFeatureEvidence.references||
