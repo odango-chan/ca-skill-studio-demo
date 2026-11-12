@@ -555,15 +555,59 @@ connection.onCompletion(params => {
   const value=snapshot?packageAnalyses.get(snapshot.rootUri):null;
   const document=snapshot?snapshotDocumentFor(snapshot,uri):null;
   const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
+  const debugEnabled=params?.context?.skillStudioDiagnostics===true;
+  const debug={
+    snapshotFound:Boolean(snapshot),
+    completeness:snapshot?.completeness??null,
+    libraryInventory:snapshot?.libraryInventory??null,
+    generation:snapshot?.generation??null,
+    analysisState:value?.analysis?.state??null,
+    indexGeneration:index?.generation??null,
+    sourcePath:document?.relativePath??null,
+    sourceVersion:document?.version??null,
+    documentCount:snapshot?.documents?.length??0,
+    schemaDocuments:snapshot?.documents?.filter(item=>
+      item.relativePath.startsWith("schemas/")||
+      (item.relativePath.startsWith("lib/")&&
+       (item.relativePath.endsWith(".schema.yaml")||
+        item.relativePath.endsWith(".schema.yml"))))
+      .map(item=>item.relativePath)??[],
+    schemaTokens:[],
+    cursorOffset:null,
+    analysisDocumentFound:false,
+    analysisDocumentVersion:null,
+    completionContext:null,
+    reason:null
+  };
+  const finish=items=>{
+    if(debugEnabled)connection.sendNotification("skillStudio/completionDiagnostics",debug);
+    return items;
+  };
   if(!snapshot||!value||!document||!index||
      snapshot.completeness!=="complete"||value.analysis.state!=="READY"||
      value.snapshot.generation!==snapshot.generation||
-     index.generation!==snapshot.generation||
-     !value.analysis.documents.some(item=>
-       item.uri===document.uri&&item.version===document.version))return [];
+     index.generation!==snapshot.generation){
+    debug.reason="Package snapshot, analysis or symbol index is not READY for the same complete generation";
+    return finish([]);
+  }
+  const analyzedDocument=value.analysis.documents.find(item=>
+    item.uri===document.uri&&item.version===document.version);
+  debug.analysisDocumentFound=Boolean(analyzedDocument);
+  debug.analysisDocumentVersion=analyzedDocument?.version??null;
+  if(!analyzedDocument){
+    debug.reason="The source document version is not present in the accepted analysis generation";
+    return finish([]);
+  }
   const offset=offsetAt(document.text,params.position);
-  if(offset===null)return [];
-
+  debug.cursorOffset=offset;
+  if(offset===null){
+    debug.reason="Cursor position is outside the source document";
+    return finish([]);
+  }
+  debug.schemaTokens=(index.tokensByUri.get(uri)??[])
+    .filter(item=>item.type==="skillSchema")
+    .map(item=>({name:item.name,range:item.range,path:item.path,part:item.part,
+      modifiers:item.modifiers}));
   // v0.2 completions use the exact canonical AST token selector and the
   // declarations/files already present in this Package snapshot. They do not
   // synthesize grammar fields, dependencies, Capabilities or Schema contents.
@@ -572,11 +616,19 @@ connection.onCompletion(params => {
     // Project lib completeness is separate from Skill Package completeness.
     // Never offer imported Operations or Owner Schemas from a partial inventory.
     if(snapshot.libraryInventory!=="complete"){
-      if(context.token.type==="skillOperation"||context.token.type==="skillCapability")
-        return [];
+      if(context.token.type==="skillOperation"||context.token.type==="skillCapability"){
+        debug.reason="Project lib inventory is not complete";
+        debug.completionContext={type:context.token.type,name:context.token.name,
+          range:context.token.range,prefix:context.prefix,candidates:[]};
+        return finish([]);
+      }
       if(context.token.type==="skillSchema")
         context.items=context.items.filter(item=>!item.relativePath.startsWith("lib/"));
     }
+    debug.completionContext={
+      type:context.token.type,name:context.token.name,range:context.token.range,
+      prefix:context.prefix,candidates:context.items.map(item=>item.relativePath??item.name)
+    };
     const range=toLspRange(document.text,context.token.range);
     const kindFor={
       skillSchema:CompletionItemKind.File,
@@ -587,7 +639,7 @@ connection.onCompletion(params => {
       skillStep:CompletionItemKind.Reference,
       skillPredicate:CompletionItemKind.Reference
     };
-    return context.items.map(item=>({
+    return finish(context.items.map(item=>({
       label:item.name,
       kind:kindFor[context.token.type]??CompletionItemKind.Text,
       insertText:item.name,
@@ -598,7 +650,7 @@ connection.onCompletion(params => {
         :item.relativePath
           ?"Package declaration · "+item.relativePath
           :"Package declaration"
-    }));
+    })));
   }
 
   // Legacy metadata-only Python completion remains isolated from canonical
@@ -607,24 +659,25 @@ connection.onCompletion(params => {
     const starts=lineStarts(document.text);
     const lineStart=starts[params.position.line];
     const prefix=document.text.slice(lineStart,offset);
-    if(/^\s*# (?:inputSchema|outputSchema):\s*[^#]*$/.test(prefix)){
+    if(/^\\s*# (?:inputSchema|outputSchema):\\s*[^#]*$/.test(prefix)){
       const colon=prefix.indexOf(":");
       const rawValue=prefix.slice(colon+1);
       const leading=rawValue.length-rawValue.trimStart().length;
       const typed=rawValue.trim();
       const start=lineStart+colon+1+leading;
       const editRange=toLspRange(document.text,{start,end:offset});
-      return schemaTitleCatalog(snapshot)
+      return finish(schemaTitleCatalog(snapshot)
         .filter(item=>item.title.startsWith(typed))
         .map(item=>({
           label:item.title,kind:CompletionItemKind.Reference,
           insertText:item.title,filterText:item.title,
           ...(editRange?{textEdit:{range:editRange,newText:item.title}}:{}),
           detail:"Legacy Package Schema · "+item.path
-        }));
+        })));
     }
   }
-  return [];
+  debug.reason="No canonical completion token matched the current cursor position";
+  return finish([]);
 });
 
 connection.onRequest("skillStudio/completionDiagnostics",params=>{
