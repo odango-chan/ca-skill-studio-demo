@@ -8,9 +8,7 @@ await rm(join(root,"dist"),{recursive:true,force:true});
 await rm(join(root,"media"),{recursive:true,force:true});
 await mkdir(join(root,"dist"),{recursive:true});
 await mkdir(join(root,"media"),{recursive:true});
-// Keep the existing Markdown fallback exactly unchanged for regression parity.
-await cp("site/markdown-preview.css",join(root,"media/markdown-preview.css"));
-// Native Markdown is an isolated experiment with a distinct stylesheet.
+// The pinned native Markdown extension owns Preview rendering; Studio supplies its shared theme.
 await cp("extensions/skill-studio-theme/styles/markdown-preview.css",
   join(root,"media/native-markdown-preview.css"));
 
