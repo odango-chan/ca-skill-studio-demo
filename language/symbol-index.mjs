@@ -96,14 +96,12 @@ export function buildSkillSymbolIndex(snapshot){
       continue;
     const tokens=[];
     for(const span of collectSkillSemanticTokenSpans(document.text,document.relativePath)){
-      if(!SYMBOL_TYPES.has(span.type)||
-         !Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
+      if(!Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
          span.start<0||span.end<=span.start||span.end>document.text.length)
         continue;
       const name=document.text.slice(span.start,span.end);
       if(!name)continue;
-      const key=symbolKey(span,name);
-      if(!key)continue;
+      const key=SYMBOL_TYPES.has(span.type)?symbolKey(span,name):null;
       const item={
         key,name,type:span.type,uri:document.uri,
         relativePath:document.relativePath,
@@ -112,7 +110,10 @@ export function buildSkillSymbolIndex(snapshot){
         part:span.part??null,
         modifiers:[...(span.modifiers??[])]
       };
+      // Keep the complete canonical token projection for context-aware
+      // completion, but only the explicit symbol types participate in links.
       tokens.push(item);
+      if(!SYMBOL_TYPES.has(span.type)||!key)continue;
       if(modifier(span,"declaration"))append(declarations,key,item);
       if(modifier(span,"reference"))append(references,key,item);
     }
@@ -133,7 +134,7 @@ export function skillSymbolAt(index,uri,offset){
   if(!index||typeof uri!=="string"||!Number.isSafeInteger(offset)||offset<0)
     return null;
   const token=(index.tokensByUri.get(uri)??[]).find(item=>
-    offset>=item.range.start&&offset<item.range.end);
+    SYMBOL_TYPES.has(item.type)&&offset>=item.range.start&&offset<item.range.end);
   if(!token)return null;
   const declarations=index.declarations.get(token.key)??index.documentTargets.get(token.key)??[];
   const references=index.references.get(token.key)??[];
@@ -168,4 +169,112 @@ export function skillSymbolDeclarationsForDocument(index,uri){
   for(const values of index.declarations.values())
     for(const item of values)if(item.uri===uri)result.push(item);
   return result.sort((a,b)=>a.range.start-b.range.start);
+}
+
+const COMPLETION_TYPES=new Set([
+  "skillProcedure","skillStep","skillPredicate","skillOperation",
+  "skillCapability","skillSchema","skillReference"
+]);
+
+/**
+ * Context-limited candidates for a reference token. The token path/type and
+ * exact replacement range come from ca-skills' semantic-token projection;
+ * candidates come only from declarations/files in this Package snapshot.
+ */
+export function skillSymbolCompletions(index,uri,offset){
+  if(!index||typeof uri!=="string"||!Number.isSafeInteger(offset)||offset<0)
+    return null;
+  const token=(index.tokensByUri.get(uri)??[]).find(item=>
+    COMPLETION_TYPES.has(item.type)&&modifier(item,"reference")&&
+    offset>=item.range.start&&offset<=item.range.end);
+  if(!token)return null;
+  let candidates=[];
+  if(token.type==="skillSchema"){
+    for(const values of index.documentTargets.values())
+      for(const item of values)
+        if(item.type==="skillSchema"&&/^(?:schemas|lib)\\/.+\\.schema\\.ya?ml$/.test(item.relativePath))
+          candidates.push(item);
+  }else if(token.type==="skillReference"){
+    for(const values of index.documentTargets.values())
+      for(const item of values)
+        if(item.type==="skillReference"&&/^scripts\\/.+\\.py$/.test(item.relativePath))
+          candidates.push(item);
+  }else if(token.type==="skillStep"){
+    const procedure=token.path?.[0]==="procedures"?token.path[1]:null;
+    for(const values of index.declarations.values())
+      for(const item of values)
+        if(item.type==="skillStep"&&item.path?.[1]===procedure)candidates.push(item);
+  }else{
+    const key=symbolKey(token,token.name);
+    if(key){
+      const values=index.declarations.get(key)??[];
+      candidates=values.filter(item=>
+        token.type!=="skillCapability"||item.type==="skillOperation");
+    }else if(token.type==="skillProcedure"||token.type==="skillPredicate"||
+             token.type==="skillOperation"||token.type==="skillCapability"){
+      for(const values of index.declarations.values())
+        for(const item of values)
+          if(item.type===token.type)candidates.push(item);
+    }
+  }
+  const prefix=token.name.slice(0,Math.max(0,Math.min(
+    token.name.length,offset-token.range.start)));
+  const seen=new Set();
+  const items=candidates.filter(item=>{
+    if(!item.name.startsWith(prefix))return false;
+    const identity=item.type+"\\u0000"+item.name+"\\u0000"+item.relativePath;
+    if(seen.has(identity))return false;
+    seen.add(identity);
+    return true;
+  }).sort((a,b)=>a.name.localeCompare(b.name)||a.relativePath.localeCompare(b.relativePath));
+  return {token,prefix,items};
+}
+
+/**
+ * Exact unresolved/ambiguous links for editor Problems. These are advisory
+ * source diagnostics only: Compiler Build remains authoritative. Unknown
+ * deployment Capability IDs are intentionally not diagnosed as missing.
+ */
+export function skillSymbolLinkDiagnostics(index,snapshot){
+  if(!index||!snapshot||snapshot.completeness!=="complete"||
+     index.rootUri!==snapshot.rootUri||index.generation!==snapshot.generation)
+    return [];
+  const result=[];
+  const labels={
+    skillProcedure:"Procedure",
+    skillStep:"Procedure node",
+    skillPredicate:"Predicate",
+    skillOperation:"Tool Operation",
+    skillCapability:"Operation grant",
+    skillSchema:"Schema"
+  };
+  const push=(item,code,message)=>result.push({
+    uri:item.uri,range:{...item.range},severity:1,code,message
+  });
+  for(const [key,items] of index.declarations){
+    if(items.length>1){
+      for(const item of items)
+        push(item,"SKILL_LINK_DUPLICATE_DECLARATION",
+          "Ambiguous "+(labels[item.type]??"Skill symbol")+
+          ' declaration "'+item.name+'": '+items.length+" declarations share this identity.");
+    }
+  }
+  for(const [key,items] of index.references){
+    const token=items[0];
+    const declarations=index.declarations.get(key)??index.documentTargets.get(key)??[];
+    if(declarations.length===0){
+      if(token.type==="skillCapability")continue;
+      for(const item of items)
+        push(item,"SKILL_LINK_UNRESOLVED",
+          "Unresolved "+(labels[item.type]??"Skill reference")+
+          ' "'+item.name+'": no matching declaration or Package file exists.');
+    }else if(declarations.length>1){
+      for(const item of items)
+        push(item,"SKILL_LINK_AMBIGUOUS",
+          "Ambiguous "+(labels[item.type]??"Skill reference")+
+          ' "'+item.name+'": '+declarations.length+" matching declarations exist.");
+    }
+  }
+  return result.sort((a,b)=>a.uri.localeCompare(b.uri)||
+    a.range.start-b.range.start||a.range.end-b.range.end);
 }
