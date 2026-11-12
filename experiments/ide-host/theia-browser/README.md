@@ -14,6 +14,7 @@ npm ci
 node experiments/ide-host/scripts/build-ide-spike.mjs
 node experiments/ide-host/scripts/prepare-theia-online.mjs
 npm install --prefix experiments/ide-host/theia-browser --no-audit --no-fund
+npm run download:plugins --prefix experiments/ide-host/theia-browser
 npm run build --prefix experiments/ide-host/theia-browser
 THEIA_WEBVIEW_EXTERNAL_ENDPOINT='{{hostname}}' npm run start --prefix experiments/ide-host/theia-browser
 ```

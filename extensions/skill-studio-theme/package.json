@@ -37,7 +37,8 @@
   "files": [
     "themes/**",
     "icons/**",
-    "README.md"
+    "README.md",
+    "styles/**"
   ],
   "repository": {
     "type": "git",

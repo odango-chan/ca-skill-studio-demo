@@ -1,5 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
+import {prepareNativeMarkdownPackagePolicy,clearNativeMarkdownPackagePolicies} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
@@ -45,7 +46,8 @@ export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
-  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),markdownOpening=new Set();
+  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),
+    markdownOpening=new Set(),nativeMarkdownOpening=new Set();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2280,14 +2282,18 @@ export function registerWorkbench(vscode,context){
     auditStatus="Package Audit · running";fireProblems();
     const files=new Map(),uris=new Map();
     try{
-      const base=doc.uri.with({path:doc.uri.path.slice(0,-'assurance/procedure.yaml'.length)});
+      const basePath=doc.uri.path.slice(0,-'assurance/procedure.yaml'.length).replace(/\/$/,'');
+      const base=doc.uri.with({path:basePath});
+      const prefix=basePath+'/';
       // Bounded by file count and aggregate bytes; never crawl another Package.
+      // OPFS findFiles can omit descendants when RelativePattern.base has a
+      // trailing slash, so normalize the Package root before scanning.
       const found=await vscode.workspace.findFiles(new vscode.RelativePattern(base,'**/*'),'**/node_modules/**',501);
       if(found.length>500)throw Error('Package exceeds 500-file audit limit');
       let bytes=0;
       for(const uri of found){
-        if(!uri.path.startsWith(base.path))continue;
-        const path=uri.path.slice(base.path.length);uris.set(path,uri);
+        if(!uri.path.startsWith(prefix))continue;
+        const path=uri.path.slice(prefix.length);uris.set(path,uri);
         if(!/\.(yaml|json|py|md)$/.test(path)){files.set(path,{text:''});continue;}
         const open=vscode.workspace.textDocuments.find(d=>d.uri.toString()===uri.toString());
         const text=open?open.getText():new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
@@ -2334,22 +2340,23 @@ export function registerWorkbench(vscode,context){
     const doc=document,suffix='assurance/procedure.yaml';
     if(!doc||!isProcedurePath(doc.uri.path)||!doc.uri.path.endsWith(suffix))
       throw Error('请先打开当前 Package 的 Procedure 可视化编辑器');
-    const basePath=doc.uri.path.slice(0,-suffix.length);
+    const basePath=doc.uri.path.slice(0,-suffix.length).replace(/\/$/,'');
     const base=doc.uri.with({path:basePath});
-    const name=basePath.replace(/\/$/,'').split('/').at(-1);
+    const prefix=basePath+'/';
+    const name=basePath.split('/').at(-1);
     if(!name)throw Error('无法确定 Package 根目录名称');
     const sourceVersion=doc.version,sourceText=doc.getText();
     const opened=(vscode.workspace.textDocuments??[])
-      .filter(item=>item.uri.path.startsWith(basePath))
-      .map(item=>({item,path:item.uri.path.slice(basePath.length),
+      .filter(item=>item.uri.path.startsWith(prefix))
+      .map(item=>({item,path:item.uri.path.slice(prefix.length),
         version:item.version,text:item.getText()}));
     const pattern=new vscode.RelativePattern(base,'**/*');
     const found=await vscode.workspace.findFiles(pattern,'**/node_modules/**',65);
     if(found.length>64)throw Error('Package 超过 ZIP 导出的 64 文件上限');
     const files=[],uris=new Map();
     for(const uri of found){
-      if(!uri.path.startsWith(basePath))continue;
-      const path=uri.path.slice(basePath.length);
+      if(!uri.path.startsWith(prefix))continue;
+      const path=uri.path.slice(prefix.length);
       if(!path)continue;
       const bytes=await vscode.workspace.fs.readFile(uri);
       if(!(bytes instanceof Uint8Array))throw Error('无法读取 Package 文件：'+path);
@@ -2366,8 +2373,8 @@ export function registerWorkbench(vscode,context){
         throw Error('Package Source 在导出期间发生变化：'+entry.path);
     }
     const after=await vscode.workspace.findFiles(pattern,'**/node_modules/**',65);
-    const afterPaths=after.filter(uri=>uri.path.startsWith(basePath))
-      .map(uri=>uri.path.slice(basePath.length)).filter(Boolean).sort();
+    const afterPaths=after.filter(uri=>uri.path.startsWith(prefix))
+      .map(uri=>uri.path.slice(prefix.length)).filter(Boolean).sort();
     const beforePaths=files.map(file=>file.path).sort();
     if(after.length>64||JSON.stringify(afterPaths)!==JSON.stringify(beforePaths))
       throw Error('Package 文件集合在导出期间发生变化；请重新导出');
@@ -2471,7 +2478,51 @@ export function registerWorkbench(vscode,context){
     state.panel.reveal(state.singlePane?vscode.ViewColumn.One:vscode.ViewColumn.Two);
     void state.panel.webview.postMessage({type:'layoutState',singlePane:state.singlePane});
   };
-  context.subscriptions.push(vscode.commands.registerCommand('skillStudio.previewMarkdown',async uri=>{
+  async function openNativeMarkdownPreview(uri){
+    uri=uri??vscode.window.activeTextEditor?.document.uri;
+    if(!uri||!uri.path?.toLowerCase().endsWith('.md'))return false;
+    const key=uri.toString();
+    if(nativeMarkdownOpening.has(key))return true;
+    nativeMarkdownOpening.add(key);
+    let paired=false;
+    try{
+      const doc=await vscode.workspace.openTextDocument(uri);
+      // Keep Source as the editable authority in the first editor group.
+      // The built-in Markdown extension owns the read-only Preview in group two.
+      await vscode.window.showTextDocument(doc,{
+        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:true
+      });
+      // Resolve the exact Skill Package root, inventory local files, and reject
+      // symlinked targets before the native Markdown engine renders any links.
+      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,uri);
+      if(!policyReady){
+        void vscode.window.showWarningMessage(
+          '无法验证当前 Markdown 文件所属 Package 或文件清单，已拒绝打开原生预览。');
+        return false;
+      }
+      // Do not await the host Preview command: some Theia PluginHost builds
+      // resolve it only after the Webview has completed its first render. The
+      // command itself must return promptly so callers can observe that render.
+      const opening=vscode.commands.executeCommand('markdown.showPreviewToSide',uri);
+      paired=true;
+      void Promise.resolve(opening).then(
+        ()=>setTimeout(()=>nativeMarkdownOpening.delete(key),500),
+        error=>{
+          nativeMarkdownOpening.delete(key);
+          void vscode.window.showWarningMessage(
+            '原生 Markdown 预览未能打开：'+String(error?.message??error));
+        }
+      );
+      return true;
+    }finally{
+      // The native Preview command owns the suppression lifetime after it has
+      // been started. Failed Source preparation still releases it immediately.
+      if(!paired)nativeMarkdownOpening.delete(key);
+    }
+  }
+  context.subscriptions.push(
+    vscode.commands.registerCommand('skillStudio.previewMarkdownNative',openNativeMarkdownPreview),
+    vscode.commands.registerCommand('skillStudio.previewMarkdown',async uri=>{
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
@@ -2682,6 +2733,66 @@ export function registerWorkbench(vscode,context){
     }
   }));
   context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async skillName=>{
+      const name=typeof skillName==='string'?skillName:'establish-pdu-session';
+      if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
+      const matches=await vscode.workspace.findFiles(
+        '**/'+name+'/SKILL.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith('/'+name+'/SKILL.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one '+name+' guide in the active Workspace');
+      const opened=await openNativeMarkdownPreview(exact[0]);
+      return opened?exact[0].toString():null;
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
+      const matches=await vscode.workspace.findFiles(
+        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith(
+        '/establish-pdu-session/SKILL.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one 5GC Skill package for the security probe');
+      const rootPath=exact[0].path.slice(0,-'/SKILL.md'.length);
+      const probe=exact[0].with({
+        path:rootPath+'/references/__native-markdown-security.md'
+      });
+      try{
+        await vscode.workspace.fs.stat(probe);
+        throw Error('Refusing to overwrite an existing Markdown security fixture');
+      }catch(error){
+        if(String(error?.message??error).includes('Refusing to overwrite'))throw error;
+      }
+      const source=[
+        '# Native Markdown Security Probe',
+        '',
+        '<script>window.skillStudioNativeMarkdownXss = true;</script>',
+        '<img src="https://example.invalid/raw-html-pixel.png" onerror="window.skillStudioNativeMarkdownXss = true">',
+        '',
+        '[Safe package reference](3gpp-procedure.md)',
+        '[Escaping package link](../../outside.md)',
+        '[Missing package link](missing.md)',
+        '![Remote pixel](https://example.invalid/markdown-pixel.png)',
+        ''
+      ].join('\n');
+      await vscode.workspace.fs.writeFile(probe,new TextEncoder().encode(source));
+      const opened=await openNativeMarkdownPreview(probe);
+      if(!opened){
+        await vscode.workspace.fs.delete(probe,{useTrash:false});
+        throw Error('Native Markdown security probe could not establish a safe Package inventory');
+      }
+      return probe.toString();
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
+      const suffix='/establish-pdu-session/references/__native-markdown-security.md';
+      if(!target.path.endsWith(suffix))
+        throw Error('Refusing to delete a non-fixture Markdown file');
+      clearNativeMarkdownPackagePolicies([target]);
+      await vscode.workspace.fs.delete(target,{useTrash:false});
+      return true;
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.toggleMarkdownLayout',async uri=>{
       const target=uri??vscode.window.activeTextEditor?.document.uri;
       const state=target?markdownPanels.get(target.toString()):[...markdownPanels.values()].at(-1);
@@ -2701,7 +2812,7 @@ export function registerWorkbench(vscode,context){
     if(!target||!target.path.toLowerCase().endsWith('.md'))return;
     const key=target.toString();
     setTimeout(()=>{
-      if(markdownPanels.has(key)||markdownOpening.has(key))return;
+      if(markdownPanels.has(key)||markdownOpening.has(key)||nativeMarkdownOpening.has(key))return;
       if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
       void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
     },0);

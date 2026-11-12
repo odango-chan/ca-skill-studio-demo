@@ -13,6 +13,7 @@ function newNonce(){
 import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
 import {EXAMPLE_PROJECT_NAME,seedExampleWorkspace} from "./sample-loader.mjs";
+import {extendMarkdownIt} from "./markdown-link-policy.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
@@ -369,5 +370,6 @@ export function activate(context){
       if(!isProcedurePath(target.path))return;
       await vscode.commands.executeCommand("vscode.openWith",target,VIEW);
     }));
+  return {extendMarkdownIt};
 }
 export function deactivate(){}

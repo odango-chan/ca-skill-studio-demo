@@ -177,7 +177,7 @@ test('Inspector exposes only owner-observed, Preview-qualified Outcome repairs',
 
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
   const commands=new Map(),providers=new Map(),changes=[],panels=[],diagnosticSets=[],appliedEdits=[];
-  const markdownMessages=[],markdownReveals=[],showDocumentCalls=[];
+  const markdownMessages=[],markdownReveals=[],showDocumentCalls=[],markdownCommandCalls=[];
   const disposable=()=>({dispose(){}});
   let confirmChoice='确认并应用',markdownMessage,visibleRangeChanged;
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
@@ -203,12 +203,23 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
     ViewColumn:{One:1,Two:2,Beside:2},TextEditorRevealType:{AtTop:1},
+    FileType:{File:1,Directory:2,SymbolicLink:64},
     Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
-    commands:{executeCommand:async()=>{},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
+    commands:{executeCommand:async(...args)=>{markdownCommandCalls.push(args);},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
     workspace:{textDocuments:[doc,markdownDoc],
-      findFiles:async()=>['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md'].map(p=>uri('/workspace/establish-pdu-session/'+p)),
-      fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8'))},
+      getWorkspaceFolder:()=>({uri:uri('/workspace')}),
+      findFiles:async pattern=>{
+        if(pattern==='**/SKILL.md'||
+           (pattern instanceof vscode.RelativePattern&&pattern.base.path==='/workspace'))
+          return [uri('/workspace/SKILL.md')];
+        return ['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md']
+          .map(p=>uri('/workspace/establish-pdu-session/'+p));
+      },
+      fs:{
+        readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8')),
+        stat:async u=>({type:u.path.endsWith('SKILL.md')?vscode.FileType.File:vscode.FileType.Directory})
+      },
       async applyEdit(edit){
         appliedEdits.push([...edit.changes]);
         for(const change of [...edit.changes].sort((a,b)=>b.range.start.offset-a.range.start.offset))
@@ -665,7 +676,15 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   markdownDoc.text='x'.repeat(300001);changed({document:markdownDoc});
   await new Promise(resolve=>setTimeout(resolve,140));
   assert.match(markdownMessages.at(-1).html,/预览不可用/);
-  
+
+  assert.equal(await commands.get('skillStudio.previewMarkdownNative')(markdownUri),true);
+  assert.equal(showDocumentCalls.at(-1).options.viewColumn,vscode.ViewColumn.One,
+    'native Markdown experiment keeps the editable Source in editor group one');
+  assert.equal(showDocumentCalls.at(-1).options.preview,false,
+    'native Markdown experiment pins the Source editor');
+  assert.deepEqual(markdownCommandCalls.at(-1),['markdown.showPreviewToSide',markdownUri],
+    'native preview is delegated to the built-in Markdown extension');
+
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
 });

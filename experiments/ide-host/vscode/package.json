@@ -42,7 +42,8 @@
     "onCustomEditor:skillStudio.schemaPreview",
     "onCommand:skillStudio.openSchema",
     "onCommand:skillStudio.refreshPackages",
-    "onView:skillStudio.packages"
+    "onView:skillStudio.packages",
+    "onCommand:skillStudio.previewMarkdownNative"
   ],
   "contributes": {
     "colors": [
@@ -85,6 +86,10 @@
       {
         "command": "skillStudio.previewMarkdown",
         "title": "SKILL Studio: Preview Markdown"
+      },
+      {
+        "command": "skillStudio.previewMarkdownNative",
+        "title": "SKILL Studio: Open Native Markdown Preview to the Side (Experiment)"
       },
       {
         "command": "skillStudio.toggleMarkdownLayout",
@@ -159,6 +164,11 @@
           "group": "navigation"
         },
         {
+          "command": "skillStudio.previewMarkdownNative",
+          "when": "resourceExtname == .md",
+          "group": "navigation@2"
+        },
+        {
           "command": "skillStudio.toggleMarkdownLayout",
           "when": "resourceExtname == .md",
           "group": "navigation"
@@ -189,6 +199,11 @@
           "command": "skillStudio.previewMarkdown",
           "when": "resourceExtname == .md",
           "group": "navigation"
+        },
+        {
+          "command": "skillStudio.previewMarkdownNative",
+          "when": "resourceExtname == .md",
+          "group": "navigation@2"
         }
       ],
       "view/title": [
@@ -436,7 +451,11 @@
           "name": "Problems"
         }
       ]
-    }
+    },
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/markdown-preview.css"
+    ]
   },
   "scripts": {
     "build": "node ../scripts/build-ide-spike.mjs",

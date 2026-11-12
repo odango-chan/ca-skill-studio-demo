@@ -28,7 +28,8 @@ const themeAssets=[
   "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
   "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
   "hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg",
-  "hostedPlugin/odango_chan_skill_studio_theme/icons/yaml.svg"
+  "hostedPlugin/odango_chan_skill_studio_theme/icons/yaml.svg",
+  "hostedPlugin/odango_chan_skill_studio_theme/styles/markdown-preview.css"
 ].map(p=>join(root,p));
 const missingThemeAssets=themeAssets.filter(p=>!existsSync(p));
 console.log("STUDIO_THEIA_FRONTEND_ARTIFACT",JSON.stringify({

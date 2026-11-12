@@ -1876,7 +1876,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         }
         const result=await command('Runtime.evaluate',{
           contextId,returnByValue:true,
-          expression:'(()=>{const article=document.querySelector("article.markdown-preview");if(!article)return null;const theme=getComputedStyle(article),heading=article.querySelector("h1"),headingColor=heading?getComputedStyle(heading).color:"",bodyColor=theme.color;const cssLink=[...document.querySelectorAll("link")].find(el=>el.href.includes("markdown-preview.css"));const mappedBlocks=article.querySelectorAll("[data-source-line]").length;const splitToolbar=Boolean(document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]"));return {heading:heading?.textContent?.trim()??null,toc:!!article.querySelector(".md-toc"),tocLinks:[...article.querySelectorAll(".md-toc a")].filter(a=>(a.getAttribute("href")??"").startsWith("#md-heading-")).length,localPaths:[...article.querySelectorAll("a[data-local-path]")].map(a=>a.getAttribute("data-local-path")),headingColor,bodyColor,mappedBlocks,splitToolbar,themeApplied:Boolean(cssLink&&theme.maxWidth==="920px"&&parseFloat(theme.paddingLeft)>0&&headingColor&&headingColor!==bodyColor&&mappedBlocks>5&&splitToolbar)};})()'
+          expression:'(()=>{const article=document.querySelector("article.markdown-preview");if(!article)return null;const theme=getComputedStyle(document.body),heading=article.querySelector("h1"),headingColor=heading?getComputedStyle(heading).color:"",bodyColor=theme.color;const stylesheetLinks=[...document.querySelectorAll("link[rel=stylesheet]")].map(el=>el.href);const mappedBlocks=article.querySelectorAll("[data-source-line]").length;const splitToolbar=Boolean(document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]"));const bodyMaxWidth=theme.maxWidth,bodyPadding=theme.paddingLeft;return {heading:heading?.textContent?.trim()??null,toc:!!article.querySelector(".md-toc"),tocLinks:[...article.querySelectorAll(".md-toc a")].filter(a=>(a.getAttribute("href")??"").startsWith("#md-heading-")).length,localPaths:[...article.querySelectorAll("a[data-local-path]")].map(a=>a.getAttribute("data-local-path")),headingColor,bodyColor,bodyMaxWidth,bodyPadding,stylesheetLinks,mappedBlocks,splitToolbar,themeApplied:Boolean(bodyMaxWidth==="920px"&&parseFloat(bodyPadding)>0&&headingColor&&headingColor!==bodyColor&&mappedBlocks>5&&splitToolbar)};})()'
         });
         if(result.result?.value?.heading)
           found.push({contextId,...result.result.value});
@@ -2009,6 +2009,107 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     returnedGuideActive,mas:masOpen.view,traversalBlocked
   };
   console.log('STUDIO_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
+
+  // Isolated native Markdown preview experiment. The custom preview remains
+  // the default/fallback in this branch; this command proves the built-in
+  // Markdown extension can render beside the authoritative native Source.
+  const nativeMarkdownWorlds=new Map();
+  async function nativeMarkdownViews(){
+    const tree=await command('Page.getFrameTree'),found=[];
+    async function walk(node){
+      try{
+        let contextId=nativeMarkdownWorlds.get(node.frame.id);
+        if(!contextId){
+          const world=await command('Page.createIsolatedWorld',{
+            frameId:node.frame.id,worldName:'native-markdown-spike-acceptance',
+            grantUniveralAccess:true
+          });
+          contextId=world.executionContextId;
+          nativeMarkdownWorlds.set(node.frame.id,contextId);
+        }
+        const result=await command('Runtime.evaluate',{
+          contextId,returnByValue:true,
+          expression:'(()=>{const heading=document.querySelector("h1");if(!heading)return null;const body=getComputedStyle(document.body),title=getComputedStyle(heading),styles=[...document.querySelectorAll("link[rel=stylesheet]")].map(x=>x.href),table=document.querySelector("table"),csp=document.querySelector("meta[http-equiv=Content-Security-Policy]")?.content??"";return {heading:heading.textContent.trim(),headingColor:title.color,bodyColor:body.color,maxWidth:body.maxWidth,styles,tableCount:document.querySelectorAll("table").length,tableDisplay:table?getComputedStyle(table).display:null,tableMaxHeight:table?getComputedStyle(table).maxHeight:null,csp,imageCount:document.querySelectorAll("img").length,scriptMarkers:[...document.querySelectorAll("script")].filter(x=>x.textContent.includes("skillStudioNativeMarkdownXss")).length,bodyHasScriptMarker:document.body.innerText.includes("skillStudioNativeMarkdownXss"),scriptExecuted:Boolean(window.skillStudioNativeMarkdownXss),anchorHrefs:[...document.querySelectorAll("a[href]")].map(x=>x.getAttribute("href")),scrollTop:window.scrollY,scrollHeight:document.documentElement.scrollHeight};})()'
+        });
+        if(result.result?.value?.heading)
+          found.push({contextId,frameUrl:node.frame.url,...result.result.value});
+      }catch{
+        nativeMarkdownWorlds.delete(node.frame.id);
+      }
+      for(const child of node.childFrames??[])await walk(child);
+    }
+    await walk(tree.frameTree);
+    return found;
+  }
+  async function waitNativeMarkdown(predicate,label){
+    let views=[];
+    for(let attempt=0;attempt<80;attempt++){
+      views=await nativeMarkdownViews();
+      const view=views.find(predicate);
+      if(view)return {view,views};
+      await sleep(100);
+    }
+    throw Error(label+' did not appear in a real Theia Markdown Webview: '+JSON.stringify(views));
+  }
+  const nativeMarkdownUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance','establish-pdu-session');
+  if(typeof nativeMarkdownUri!=='string'||!nativeMarkdownUri.endsWith('/SKILL.md'))
+    throw Error('Native Markdown preview command did not open the exact Skill Source URI: '+
+      JSON.stringify(nativeMarkdownUri));
+  const nativeMarkdown=await waitNativeMarkdown(view=>
+    view.heading==='Establish PDU Session'&&
+    view.styles.some(url=>url.includes('/styles/markdown-preview.css')),
+    'Studio-themed native Markdown preview');
+  if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||
+     nativeMarkdown.view.maxWidth!=='980px')
+    throw Error('Native Markdown preview did not apply the shared Studio theme: '+
+      JSON.stringify(nativeMarkdown.view));
+  const nativeMarkdownGroups=await evalJS(
+    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>"+
+    "tab.textContent.trim().includes('SKILL.md'));const groups=new Map();for(const tab of tabs){"+
+    "const bar=tab.parentElement;if(!groups.has(bar)){const r=bar.getBoundingClientRect();"+
+    "groups.set(bar,{index:groups.size,labels:[],rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}"+
+    "groups.get(bar).labels.push(tab.textContent.trim());}return [...groups.values()];})()");
+  const nativeSourceGroup=nativeMarkdownGroups.find(group=>
+    group.labels.some(label=>/^SKILL\.md/.test(label)));
+  const nativePreviewGroup=nativeMarkdownGroups.find(group=>
+    group.labels.some(label=>/Preview.*SKILL\.md|SKILL\.md.*Preview/i.test(label)));
+  if(!nativeSourceGroup||!nativePreviewGroup||
+     nativeSourceGroup.index===nativePreviewGroup.index)
+    throw Error('Native Markdown must keep editable Source and Preview in separate editor groups: '+
+      JSON.stringify(nativeMarkdownGroups));
+  const nativeMarkdownEvidence={
+    uri:nativeMarkdownUri,preview:nativeMarkdown.view,
+    sourceGroup:nativeSourceGroup,previewGroup:nativePreviewGroup
+  };
+  console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
+
+  const nativeSecurityUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownSecurityAcceptance');
+  if(typeof nativeSecurityUri!=='string'||
+     !nativeSecurityUri.endsWith('/references/__native-markdown-security.md'))
+    throw Error('Native Markdown security fixture was not created inside the 5GC Skill Package');
+  try{
+    const nativeSecurity=await waitNativeMarkdown(view=>
+      view.heading==='Native Markdown Security Probe',
+      'native Markdown Package security probe');
+    const evidence=nativeSecurity.view;
+    if(evidence.imageCount!==0||evidence.scriptMarkers!==0||evidence.scriptExecuted)
+      throw Error('Native Markdown allowed raw HTML or an image fetch: '+JSON.stringify(evidence));
+    if(!evidence.anchorHrefs.some(href=>href.includes('3gpp-procedure.md'))||
+       evidence.anchorHrefs.some(href=>href.includes('../../outside.md'))||
+       evidence.anchorHrefs.some(href=>href.includes('missing.md')))
+      throw Error('Native Markdown Package link containment failed: '+JSON.stringify(evidence));
+    if(!evidence.csp.includes("default-src 'none'")||
+       /script-src[^;]*unsafe-inline/.test(evidence.csp))
+      throw Error('Native Markdown preview is not using a strict script Content Security Policy: '+
+        JSON.stringify(evidence.csp));
+    console.log('STUDIO_NATIVE_MARKDOWN_SECURITY_CHROMIUM',JSON.stringify(evidence));
+  }finally{
+    await nativeCommand(
+      'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',nativeSecurityUri);
+  }
+
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
   await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
   let contractView=null,contractFrame=null,contractContextId=null;
