@@ -195,7 +195,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       {scheme:"file"},
       {
         async provideCompletionItems(document,position,cancellationToken){
-          if(!/\\.ya?ml$/i.test(document?.uri?.path??"")&&document?.languageId!=="yaml")
+          if(!/\.ya?ml$/i.test(document?.uri?.path??"")&&document?.languageId!=="yaml")
             return undefined;
           if(stopped||terminalFailure||!started||
              cancellationToken?.isCancellationRequested)return undefined;
