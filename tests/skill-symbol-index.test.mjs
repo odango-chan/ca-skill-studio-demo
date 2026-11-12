@@ -168,6 +168,10 @@ spec:
   const hit=at(index,procedure.uri,procedure.text,"sbi.udm.sm_data.get");
   assert.equal(hit.declarations.length,2);
   assert.equal(symbols.uniqueSkillSymbolDeclaration(hit),null);
+  const completions=symbols.skillSymbolCompletions(index,procedure.uri,
+    hit.token.range.start+4);
+  assert.ok(!completions.items.some(item=>item.name==="sbi.udm.sm_data.get"),
+    "ambiguous Operation declarations are not suggested as a unique completion");
 });
 
 test("unresolved Operation and missing Owner Schema never become invented declarations",()=>{
