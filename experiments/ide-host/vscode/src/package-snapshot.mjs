@@ -1,3 +1,4 @@
+import {projectRoots} from "./project-policy.mjs";
 const PROCEDURE_SUFFIX = "/assurance/procedure.yaml";
 const MAX_PACKAGE_FILES = 500;
 const MAX_FILE_BYTES = 1024 * 1024;
