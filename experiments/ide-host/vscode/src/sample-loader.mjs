@@ -173,7 +173,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
   if(!storageUri)fail("No writable extension storage URI");
   const legacyRoot=vscode.Uri.joinPath(storageUri,"workspaces");
   const legacySkillsRoot=vscode.Uri.joinPath(legacyRoot,"skills");
-  const root=vscode.Uri.joinPath(legacyRoot,EXAMPLE_PROJECT_NAME);
+  const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
   const skillsRoot=vscode.Uri.joinPath(root,"skills");
   const libraryRoot=vscode.Uri.joinPath(root,"lib");
   const outputRoot=vscode.Uri.joinPath(root,"output");
@@ -183,6 +183,25 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
   await fileSystem.createDirectory(skillsRoot);
   await fileSystem.createDirectory(libraryRoot);
   await fileSystem.createDirectory(outputRoot);
+  if(resetExisting){
+    // Reset only the two known bundled Skill package directories. This clears
+    // edited and untracked files inside those packages, but leaves other Skills,
+    // lib/, output/, and every unrelated/user-selected workspace untouched.
+    for(const skill of SKILLS){
+      for(const packageRoot of [
+        vscode.Uri.joinPath(skillsRoot,skill),
+        vscode.Uri.joinPath(legacySkillsRoot,skill)
+      ]){
+        phase="reset-package:"+skill;
+        try{
+          await fileSystem.stat(packageRoot);
+          await fileSystem.delete(packageRoot,{recursive:true,useTrash:false});
+        }catch(error){
+          if(error?.code!=="FileNotFound")throw error;
+        }
+      }
+    }
+  }
   for(const file of files){
     const segments=file.split("/");
     const destination=vscode.Uri.joinPath(skillsRoot,...segments);
