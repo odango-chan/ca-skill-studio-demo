@@ -76,20 +76,22 @@ await cp(markdownPluginSource,markdownPluginTarget,{recursive:true,force:true});
 const markdownManifest=JSON.parse(await readFile(
   join(markdownPluginTarget,"package.json"),"utf8"));
 const markdownBrowserEntry=markdownManifest.browser?.replace(/^\.\//,"");
+const markdownWorker=join(markdownPluginTarget,"dist","browser","serverWorkerMain.js");
 const markdownAssets=[
   join(markdownPluginTarget,"package.json"),
   join(markdownPluginTarget,markdownBrowserEntry??""),
-  join(markdownPluginTarget,"dist","browser","serverWorkerMain.js")
+  markdownWorker
 ];
+let markdownWorkerBytes=0;
 for(const required of markdownAssets){
   const info=await stat(required);
   if(!info.isFile()||info.size<100)
     throw Error("Static hosted native Markdown asset missing or empty: "+required);
+  if(required===markdownWorker)markdownWorkerBytes=info.size;
 }
 console.log("STUDIO_THEIA_STATIC_MARKDOWN_ASSETS",JSON.stringify({
   markdownPluginTarget,browser:markdownManifest.browser,
-  worker:join(markdownPluginTarget,"dist","browser","serverWorkerMain.js"),
-  workerBytes:statSync(join(markdownPluginTarget,"dist","browser","serverWorkerMain.js")).size,
+  worker:markdownWorker,workerBytes:markdownWorkerBytes,
   pinnedVersion:markdownManifest.version
 }));
 // Theia does not copy arbitrary extension assets into hostedPlugin.
