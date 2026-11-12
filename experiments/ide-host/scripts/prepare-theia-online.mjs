@@ -22,10 +22,16 @@ for(const [folder,id] of [
     if(!manifest.browser||!manifest.contributes?.commands?.some(x=>
       x.command==="markdown.showPreviewToSide"))
       throw Error("Native Markdown preview extension is missing its browser entry or side-preview command");
-    const browserPath=join(app,"plugins",folder,manifest.browser);
-    const info=await stat(browserPath);
-    if(!info.isFile()||info.size<1000)
-      throw Error("Native Markdown browser extension bundle missing: "+browserPath);
+    const browserBase=join(app,"plugins",folder,manifest.browser);
+    let browserPath=null;
+    for(const candidate of [browserBase,browserBase+".js",join(browserBase,"index.js")]){
+      try{
+        const info=await stat(candidate);
+        if(info.isFile()&&info.size>=1000){browserPath=candidate;break;}
+      }catch{/* try the next Node-style extension resolution candidate */}
+    }
+    if(!browserPath)
+      throw Error("Native Markdown browser extension bundle missing: "+browserBase);
   }
 }
 console.log("STUDIO_THEIA_PREPARED_NATIVE_MARKDOWN",JSON.stringify({
