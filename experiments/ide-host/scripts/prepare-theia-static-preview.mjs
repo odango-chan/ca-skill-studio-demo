@@ -72,10 +72,13 @@ await cp(join(themePluginSource,"package.json"),join(themePluginTarget,"package.
 for(const name of ["themes","icons"]){
   await cp(join(themePluginSource,name),join(themePluginTarget,name),{recursive:true,force:true});
 }
+await copyFile(join(themePluginSource,"markdown-preview.css"),
+  join(themePluginTarget,"markdown-preview.css"));
 for(const required of [
   join(themePluginTarget,"package.json"),
   join(themePluginTarget,"themes","skill-studio-light-color-theme.json"),
   join(themePluginTarget,"icons","skill-studio-file-icon-theme.json"),
+  join(themePluginTarget,"markdown-preview.css"),
   ...["skill","yaml","markdown","python","json","shell","text","file","folder","folder-open","code"]
     .map(name=>join(themePluginTarget,"icons",name+".svg"))
 ]){
@@ -114,6 +117,24 @@ console.log("STUDIO_THEIA_STATIC_SYNTAX_ASSETS",JSON.stringify({
   syntaxPluginTarget,languages:syntaxManifest.contributes.languages.map(item=>item.id),
   grammarCount:syntaxManifest.contributes.grammars.length,offlinePackage:true
 }));
+// Preserve the native Markdown extensions' browser entry points and webview
+// assets in the browser-only hostedPlugin tree. Theia's static copier bundles
+// the worker, but omits arbitrary extension files required by the preview.
+for(const folder of ["vscode.markdown","vscode.markdown-language-features"]){
+  const source=resolve("experiments/ide-host/theia-online/plugins/"+folder);
+  const manifest=JSON.parse(await readFile(join(source,"package.json"),"utf8"));
+  const target=join(root,"hostedPlugin",folder.replaceAll(".","_"));
+  await mkdir(target,{recursive:true});
+  await cp(source,target,{recursive:true,force:false,errorOnExist:false});
+  for(const required of ["package.json",manifest.browser].filter(Boolean)){
+    const info=await stat(join(target,required));
+    if(!info.isFile()||info.size<100)
+      throw Error("Static native Markdown plugin asset missing: "+folder+"/"+required);
+  }
+  console.log("STUDIO_THEIA_STATIC_NATIVE_MARKDOWN",JSON.stringify({
+    id:manifest.publisher+"."+manifest.name,target,browser:manifest.browser??null
+  }));
+}
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,
   webviewAssets:copied,target
