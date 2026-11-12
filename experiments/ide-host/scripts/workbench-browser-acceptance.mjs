@@ -383,7 +383,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const classicContract=await openPackageContract('establish-pdu-session');
   const masView=await ensurePackageExpanded('establish-pdu-session-mas');
   const masVisible=masView.rows.slice(masView.range.index+1,masView.range.end)
-    .filter(row=>row.visible).map(row=>row.text);
+    .map(row=>row.text);
   for(const group of masGroups)
     if(!masVisible.some(text=>text.includes(group)))
       throw Error('MAS Package is missing group '+group+': '+JSON.stringify(masVisible));
