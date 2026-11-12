@@ -2109,9 +2109,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const safeLink=packageLinks.find(anchor=>anchor.dataset.localPath==='3gpp-procedure.md');
     const escapingLink=packageLinks.find(anchor=>anchor.dataset.localPath==='../../outside.md');
     const missingLink=packageLinks.find(anchor=>anchor.dataset.localPath==='missing.md');
-    if(packageLinks.length!==3||!safeLink||!escapingLink||!missingLink||
+    if(packageLinks.length!==1||!safeLink||escapingLink||missingLink||
        packageLinks.some(anchor=>anchor.href!=='#'))
-      throw Error('Native Markdown links must be inert anchors carrying exact Package-relative paths for host-side containment: '+JSON.stringify({packageLinks,evidence}));
+      throw Error('Native Markdown must retain only safe Package-local links as inert host-routed anchors and omit escaping/missing targets: '+JSON.stringify({packageLinks,evidence}));
     if(!evidence.csp.includes("default-src 'none'")||
        /script-src[^;]*unsafe-inline/.test(evidence.csp))
       throw Error('Native Markdown preview is not using a strict script Content Security Policy: '+
