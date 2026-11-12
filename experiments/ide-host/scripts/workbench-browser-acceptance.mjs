@@ -495,6 +495,81 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   async function nativeCommand(id,...args){
     return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
   }
+  async function waitNativeMarkdown(predicate,label,attempts=100){
+    let latest={frames:[],candidates:[]};
+    for(let attempt=0;attempt<attempts;attempt++){
+      try{
+        const tree=await command('Page.getFrameTree');
+        const frames=[];
+        const walk=node=>{
+          if(!node)return;
+          frames.push(node.frame);
+          for(const child of node.childFrames??[])walk(child);
+        };
+        walk(tree.frameTree);
+        latest={frames:frames.map(frame=>({id:frame.id,url:frame.url})),candidates:[]};
+        for(const frame of frames.filter(item=>/webview/i.test(item.url??''))){
+          try{
+            const world=await command('Page.createIsolatedWorld',{
+              frameId:frame.id,worldName:'studio-native-markdown-acceptance',
+              grantUniveralAccess:true
+            });
+            const evaluated=await command('Runtime.evaluate',{
+              contextId:world.executionContextId,returnByValue:true,
+              expression:`(()=> {
+                const styles=[...document.querySelectorAll('link[rel~="stylesheet"]')]
+                  .map(link=>link.href||link.getAttribute('href')||'');
+                const headingNode=document.querySelector('h1');
+                const heading=headingNode?.textContent?.trim()??null;
+                const body=document.body;
+                const csp=document.querySelector('meta[http-equiv="Content-Security-Policy" i]')?.content??'';
+                return {
+                  url:location.href,
+                  heading,
+                  nativePreviewRoot:Boolean(body&&styles.some(url=>url.includes('/media/native-markdown-preview.css'))),
+                  styles,
+                  headingColor:headingNode?getComputedStyle(headingNode).color:null,
+                  maxWidth:body?getComputedStyle(body).maxWidth:null,
+                  anchorDetails:[...document.querySelectorAll('a')].map(anchor=>({
+                    text:anchor.textContent.trim(),
+                    href:anchor.getAttribute('href'),
+                    resolvedHref:anchor.href
+                  })),
+                  imageCount:document.querySelectorAll('img').length,
+                  scriptMarkers:[...document.scripts].filter(script=>
+                    script.textContent.includes('skillStudioNativeMarkdownXss')).length,
+                  scriptExecuted:window.skillStudioNativeMarkdownXss===true,
+                  csp
+                };
+              })()`
+            });
+            const view=evaluated.result?.value;
+            if(!view)continue;
+            view.contextId=world.executionContextId;
+            view.frameId=frame.id;
+            latest.candidates.push({
+              url:frame.url,heading:view.heading,nativePreviewRoot:view.nativePreviewRoot,
+              styles:view.styles
+            });
+            if(predicate(view)){
+              try{
+                view.previewSettings=await nativeCommand(
+                  'skillStudio.internal.nativeMarkdownSettingsAcceptance');
+              }catch(error){
+                view.previewSettings={error:String(error?.message??error)};
+              }
+              return {view,contextId:world.executionContextId,frameId:frame.id};
+            }
+          }catch{/* Preview frames can be replaced while Theia activates the extension. */}
+        }
+      }catch(error){
+        latest.error=String(error?.message??error);
+      }
+      await sleep(100);
+    }
+    throw Error(label+' did not produce the expected native Markdown Preview in real Chromium: '+
+      JSON.stringify(latest));
+  }
   async function startNativeCommand(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
     await evalJS(`(()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');const registry=c.get(key);window.__skillStudioCommandState={status:"pending",id:${JSON.stringify(id)}};window.__skillStudioPendingCommand=Promise.resolve(registry.executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)})).then(value=>{window.__skillStudioCommandState={status:"resolved",id:${JSON.stringify(id)},value};return value;},error=>{window.__skillStudioCommandState={status:"rejected",id:${JSON.stringify(id)},error:String(error?.message??error)};throw error;});return true;})()`);
