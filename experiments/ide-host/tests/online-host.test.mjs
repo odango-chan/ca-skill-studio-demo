@@ -30,7 +30,7 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   const plugin=JSON.parse(readFileSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike/package.json"),"utf8"));
   assert.ok(plugin.browser?.endsWith("extension-theia.js"));
   assert.equal(plugin.contributes["markdown.markdownItPlugins"],true);
-  assert.deepEqual(plugin.contributes["markdown.previewStyles"],["./media/markdown-preview.css"]);
+  assert.deepEqual(plugin.contributes["markdown.previewStyles"],["./media/native-markdown-preview.css"]);
   const editorViews=new Set(plugin.contributes.customEditors.map(x=>x.viewType));
   for(const view of ["skillStudio.procedurePreview","skillStudio.contractPreview",
     "skillStudio.predicatePreview","skillStudio.schemaPreview"])assert.ok(editorViews.has(view),view);
@@ -73,7 +73,7 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js","media/procedure.js","media/procedure.css",
     "samples/skills/files.json",
     "samples/skills/establish-pdu-session/assurance/procedure.yaml",
-    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml","media/markdown-preview.css"])
+    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml","media/markdown-preview.css","media/native-markdown-preview.css"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });
 test("Trial is isolated from existing Pages distribution",()=>{
