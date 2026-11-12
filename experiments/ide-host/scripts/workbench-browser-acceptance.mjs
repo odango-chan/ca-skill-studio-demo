@@ -353,6 +353,24 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   }
   const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1','Scripts · 5','References · 3'];
   const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
+  // The Dependencies interaction above scrolls the shared TreeView to its
+  // lower section. Return the conventional Package row to the top before
+  // checking its visible group rows; otherwise a viewport-only assertion
+  // would mistake off-screen groups for missing inventory.
+  const conventionalPackageTop=await evalJS(`(()=>{
+    const header=[...document.querySelectorAll('.theia-view-container-part-header')]
+      .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
+        x.getBoundingClientRect().width>0);
+    const part=header?.closest('.part');
+    const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(el=>
+      el.innerText.replace(/\\s+/g,' ').includes(
+        'establish-pdu-session · 3/3 core ·'));
+    row?.scrollIntoView({block:'start',inline:'nearest'});
+    return Boolean(row);
+  })()`);
+  if(!conventionalPackageTop)
+    throw Error('Traditional 5GC Package row disappeared after Dependencies interaction');
+  await sleep(150);
   const classicView=await ensurePackageExpanded('establish-pdu-session');
   const classicRange=classicView.range;
   const classicVisible=classicView.rows.slice(classicRange.index+1,classicRange.end)
