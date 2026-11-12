@@ -442,10 +442,18 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const rightInspector=inspectorPlacement.tabs.find(x=>x.x>inspectorPlacement.viewportWidth/2);
   if(!rightInspector)throw Error('Inspector was not placed in the native right-side secondary sidebar: '+JSON.stringify(inspectorPlacement));
   await click(rightInspector.x,rightInspector.y);await sleep(300);
-  const rightPanelState=await evalJS(`(()=>{const panel=document.querySelector('#theia-right-content-panel');const r=panel?.getBoundingClientRect();return {found:!!panel,width:r?.width??0,height:r?.height??0};})()`);
+  const readRightPanel=()=>evalJS(`(()=>{const panel=document.querySelector('#theia-right-content-panel');const r=panel?.getBoundingClientRect();const content=panel?.querySelector('.theia-side-panel');const cr=content?.getBoundingClientRect();return {found:!!panel,width:r?.width??0,height:r?.height??0,className:panel?.className??'',contentWidth:cr?.width??0,contentClass:content?.className??''};})()`);
+  let rightPanelState=await readRightPanel();
   if(!rightPanelState.found)throw Error('Theia right-side panel shell is missing: '+JSON.stringify(rightPanelState));
-  if(rightPanelState.width<120)await invoke('core.toggle.right.panel');
-  await sleep(250);
+  if(rightPanelState.width<120||rightPanelState.contentWidth<100){
+    await invoke('core.toggle.right.panel');
+    await sleep(350);
+    rightPanelState=await readRightPanel();
+  }
+  console.log('STUDIO_INSPECTOR_RIGHT_PANEL_STATE',JSON.stringify(rightPanelState));
+  if(rightPanelState.width<120||rightPanelState.contentWidth<100)
+    throw Error('Theia secondary sidebar remains collapsed after core.toggle.right.panel: '+JSON.stringify(rightPanelState));
+  await click(rightInspector.x,rightInspector.y);await sleep(250);
   console.log('STUDIO_INSPECTOR_SECONDARY_SIDEBAR_CHROMIUM',JSON.stringify({found:true,rightInspector,viewportWidth:inspectorPlacement.viewportWidth}));
   const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);el?.scrollIntoView({block:'center'});const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
