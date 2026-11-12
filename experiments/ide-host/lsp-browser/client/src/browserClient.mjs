@@ -189,6 +189,59 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   // location first so native Go to Definition / Ctrl-click / Peek prefers
   // the Skill declaration over a Python provider's same-file symbol result.
   // Returning undefined preserves ordinary Python Definition behavior.
+  let nativeCompletionRegistration=null;
+  if(typeof vscode.languages?.registerCompletionItemProvider==="function"){
+    nativeCompletionRegistration=vscode.languages.registerCompletionItemProvider(
+      [
+        {scheme:"file",pattern:"**/*.yaml"},
+        {scheme:"file",pattern:"**/*.yml"},
+        {language:"yaml"}
+      ],
+      {
+        async provideCompletionItems(document,position,cancellationToken){
+          if(stopped||terminalFailure||!started||
+             cancellationToken?.isCancellationRequested)return undefined;
+          try{
+            const result=await client.sendRequest("textDocument/completion",{
+              textDocument:{uri:document.uri.toString()},
+              position:{line:position.line,character:position.character}
+            },cancellationToken);
+            if(cancellationToken?.isCancellationRequested)return undefined;
+            const source=Array.isArray(result)?result:
+              Array.isArray(result?.items)?result.items:[];
+            if(!source.length)return undefined;
+            const items=source.map(item=>{
+              const completion=new vscode.CompletionItem(
+                item.label,item.kind??vscode.CompletionItemKind.Text);
+              if(item.textEdit?.range&&typeof item.textEdit.newText==="string"){
+                const range=item.textEdit.range;
+                completion.textEdit=vscode.TextEdit.replace(
+                  new vscode.Range(range.start.line,range.start.character,
+                    range.end.line,range.end.character),item.textEdit.newText);
+              }else if(typeof item.insertText==="string"){
+                completion.insertText=item.insertText;
+              }
+              if(typeof item.detail==="string")completion.detail=item.detail;
+              if(typeof item.filterText==="string")completion.filterText=item.filterText;
+              if(typeof item.sortText==="string")completion.sortText=item.sortText;
+              if(item.preselect===true)completion.preselect=true;
+              return completion;
+            });
+            return items.length?items:undefined;
+          }catch(error){
+            if(!stopped&&!terminalFailure)
+              output.appendLine("Native Skill Language Completion request failed: "+
+                String(error?.message??error));
+            return undefined;
+          }
+        }
+      },":","/","."
+    );
+    handlers.onCompletionProviderRegistered?.({registered:true,
+      triggerCharacters:[":","/","."]});
+    output.appendLine("Registered native Theia Completion adapter over the canonical Skill Language Worker");
+  }
+
   let crossLanguageDefinitionRegistration = null;
   if (typeof vscode.languages?.registerDefinitionProvider === "function") {
     crossLanguageDefinitionRegistration = vscode.languages.registerDefinitionProvider(
@@ -363,6 +416,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
           }
         }
       } finally {
+        nativeCompletionRegistration?.dispose?.();
+        nativeCompletionRegistration=null;
         crossLanguageDefinitionRegistration?.dispose?.();
         crossLanguageDefinitionRegistration=null;
         semanticTokenRegistration?.dispose?.();
