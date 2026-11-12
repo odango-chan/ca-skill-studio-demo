@@ -411,6 +411,13 @@
           "title": "Skill Studio",
           "icon": "icons/skill-studio.svg"
         }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "skillStudioInspector",
+          "title": "Inspector",
+          "icon": "icons/skill-studio.svg"
+        }
       ]
     },
     "views": {
@@ -432,7 +439,7 @@
           "name": "Problems"
         }
       ],
-      "secondarySidebar": [
+      "skillStudioInspector": [
         {
           "id": "skillStudio.inspection",
           "name": "Inspector"
