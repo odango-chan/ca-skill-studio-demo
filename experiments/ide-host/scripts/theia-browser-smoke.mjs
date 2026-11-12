@@ -303,8 +303,11 @@ try{
           noWorkspace:document.body.classList.contains("theia-no-open-workspace")};
       })(),
       bodyText:document.body.innerText.slice(-2200),
-      noFolderPrompt:document.body.innerText.includes('You have not yet opened a folder.'),
-      workspaceRootVisible:document.body.innerText.includes('skill-studio-demo'),
+      explorerText:document.querySelector('.theia-navigator-container')?.innerText??'',
+      noFolderPrompt:(document.querySelector('.theia-navigator-container')?.innerText??'')
+        .includes('You have not yet opened a folder.'),
+      workspaceRootVisible:(document.querySelector('.theia-navigator-container')?.innerText??'')
+        .includes('skill-studio-demo'),
       notificationText:[...document.querySelectorAll('.theia-notification-list-item,.theia-notification-message')]
         .map(x=>x.innerText).filter(Boolean).slice(0,7),
       visibleEditors:document.querySelectorAll('.monaco-editor').length,
