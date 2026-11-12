@@ -2337,6 +2337,21 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       }
     };
     const initialSource=await readSourceScroll();
+    await previewScroll(`(()=>{
+      if(!window.__studioNativeMarkdownScrollProbe){
+        window.__studioNativeMarkdownScrollProbe={events:[]};
+        window.addEventListener('scroll',()=>{
+          window.__studioNativeMarkdownScrollProbe.events.push({
+            y:window.scrollY,at:performance.now(),
+            target:document.scrollingElement?.tagName??null
+          });
+          if(window.__studioNativeMarkdownScrollProbe.events.length>40)
+            window.__studioNativeMarkdownScrollProbe.events.shift();
+        },true);
+      }
+      window.__studioNativeMarkdownScrollProbe.events.length=0;
+      return {y:window.scrollY,target:document.scrollingElement?.tagName??null};
+    })()`);
     if(initialSource.lineCount<=100)
       throw Error('Native Markdown scroll fixture is not tall enough to test bidirectional synchronization: '+
         JSON.stringify(initialSource));
@@ -2360,8 +2375,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       await waitForSourceScroll(value=>value.topLine!==null&&value.topLine>100,
         'Native Preview → Source bottom scroll');
     }catch(error){
+      const scrollEvents=await previewScroll(
+        'window.__studioNativeMarkdownScrollProbe??null');
       throw Error(error.message+'; previewBottom='+JSON.stringify(previewBottom)+
-        '; previewMetrics='+JSON.stringify(previewScrollDiagnostics));
+        '; previewMetrics='+JSON.stringify(previewScrollDiagnostics)+
+        '; previewScrollEvents='+JSON.stringify(scrollEvents));
     }
     const sourceTop=await sourceScroll('top');
     await waitForScroll(()=>previewScroll('window.scrollY'),value=>value<50,
