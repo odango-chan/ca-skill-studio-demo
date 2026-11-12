@@ -645,8 +645,22 @@ export function registerWorkbench(vscode,context){
           if(offset<0)throw Error("Expected Skill Language symbol is missing: "+needle);
           return document.positionAt(offset+delta);
         };
-        const completionItems=result=>Array.isArray(result)?result:
-          result?.items??result?.suggestions??[];
+        const completionItems=result=>{
+          if(Array.isArray(result))return result;
+          const values=[
+            ...(Array.isArray(result?.items)?result.items:[]),
+            ...(Array.isArray(result?.suggestions)?result.suggestions:[])
+          ];
+          const seen=new Set();
+          return values.filter(item=>{
+            const label=typeof item?.label==="string"?item.label:
+              item?.label?.label??item?.insertText??"";
+            const key=String(label)+"\\u0000"+String(item?.insertText??"");
+            if(seen.has(key))return false;
+            seen.add(key);
+            return true;
+          });
+        };
         const locations=result=>Array.isArray(result)?result:result?[result]:[];
         const entryName="ue-requested-pdu-session-establishment";
         const entryDefinition=locations(await vscode.commands.executeCommand(
@@ -679,15 +693,19 @@ export function registerWorkbench(vscode,context){
         if(!schemaDefinition.some(item=>
           (item?.uri??item?.targetUri)?.path?.endsWith("/"+requestSchemaPath)))
           throw Error("Contract requestSchema did not resolve to its Package-owned Schema file");
-        const requestSchemaCompletion=completionItems(await vscode.commands.executeCommand(
+        const requestSchemaCompletionResult=await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",relatedUris.contract,
-          sourcePosition(contractDocument,contractText,requestSchemaPath,9)));
+          sourcePosition(contractDocument,contractText,requestSchemaPath,9));
+        const requestSchemaCompletion=completionItems(requestSchemaCompletionResult);
         if(!requestSchemaCompletion.some(item=>
           (typeof item.label==="string"?item.label:item.label?.label)===requestSchemaPath))
           throw Error("v0.2 Contract Schema completion did not return the exact Package path: "+
             JSON.stringify({labels:requestSchemaCompletion.map(item=>
               typeof item.label==="string"?item.label:item.label?.label??String(item.label??"")),
               count:requestSchemaCompletion.length,
+              rawKeys:Object.keys(requestSchemaCompletionResult??{}),
+              rawItemCount:requestSchemaCompletionResult?.items?.length??null,
+              rawSuggestionCount:requestSchemaCompletionResult?.suggestions?.length??null,
               position:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
               requestSchemaPath}));
         const operationName="sbi.udm.sm_data.get";
