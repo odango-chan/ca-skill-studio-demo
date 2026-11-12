@@ -2006,6 +2006,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('core.undo');
   const outcomeUndo=await waitForRevisionChange(graphContext,
     outcomeApplied.result?.value,'Native Phase Outcome repair Undo');
+  // Undo may restore the graph CustomEditor as the active tab and hide the
+  // native Source editor. Re-open the exact Procedure Source before inspecting
+  // its visible Monaco model; never reuse a detached editor index.
+  await evalWebviewJS(`document.querySelector("#openSource")?.click();true`);
+  await sleep(350);
   const nativeEditorAfterUndo=await evalJS(`(()=>{
     const editors=[...document.querySelectorAll('.monaco-editor')];
     const chosen=editors.map(node=>{
