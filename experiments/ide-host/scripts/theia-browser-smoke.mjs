@@ -1543,14 +1543,14 @@ try{
       JSON.stringify(afterImport.statusBar));
   if(!afterImport.notificationText.some(message=>
        message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
-       message.includes("默认已打开传统 5GC Procedure.")&&
-       /新增 (?:0|18) 个文件/.test(message))||
+       message.includes("默认已打开传统 5GC Procedure")&&
+       message.includes("同步 18 个官方文件"))||
      afterImport.noFolderPrompt||!afterImport.workspaceRootVisible||
-     !afterImport.bodyText.includes("skills")||
-     !afterImport.bodyText.includes("establish-pdu-session")||
-     !afterImport.bodyText.includes("lib/")||
-     !afterImport.bodyText.includes("output/")||
-     !afterImport.bodyText.includes("procedure.yaml"))
+     !afterImport.explorerText.includes("skills")||
+     !afterImport.explorerText.includes("establish-pdu-session")||
+     !afterImport.explorerText.includes("lib")||
+     !afterImport.explorerText.includes("output")||
+     !afterImport.explorerText.includes("procedure.yaml"))
     throw Error("Theia did not open the real default project workspace: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
   if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1||
       webviewView.procedureValue!=="ue-requested-pdu-session-establishment"))
