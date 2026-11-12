@@ -261,7 +261,7 @@ test('C4 registers Package Explorer and renders Skills under the unified tree',a
   assert.ok(masPkg);
   const masGroups=await provider.getChildren(masPkg);
   assert.deepEqual(masGroups.map(group=>group.key),
-    ['definition','assurance','schemas','scripts','references','other']);
+    ['definition','assurance','schemas','scripts']);
   assert.equal(masGroups.find(group=>group.key==='scripts').files.length,1);
   assert.equal(masGroups.find(group=>group.key==='references').files.length,0);
   assert.equal(masGroups.find(group=>group.key==='other').files.length,0);
