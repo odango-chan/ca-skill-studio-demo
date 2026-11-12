@@ -21,7 +21,9 @@ import {
   skillSymbolAt,
   uniqueSkillSymbolDeclaration,
   skillSymbolOccurrences,
-  skillSymbolDeclarationsForDocument
+  skillSymbolDeclarationsForDocument,
+  skillSymbolCompletions,
+  skillSymbolLinkDiagnostics
 } from "../../../../../language/symbol-index.mjs";
 
 const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
@@ -57,6 +59,26 @@ function createSession(rootUri) {
         item.code !== "PACKAGE_AUDIT_UNAVAILABLE" &&
         item.source !== "Skill Studio · package-audit"
       );
+      // Add exact v0.2 cross-file link findings only for the same complete,
+      // READY Package generation. Package Audit remains host-owned.
+      const current=packageAnalyses.get(rootUri);
+      const index=symbolIndexes.get(rootUri);
+      const source=current?.snapshot.documents.find(item=>item.uri===result.uri);
+      if(current&&source&&current.snapshot.completeness==="complete"&&
+         current.analysis.state==="READY"&&
+         current.snapshot.generation===result.generation&&
+         index?.generation===result.generation){
+        for(const item of skillSymbolLinkDiagnostics(index,current.snapshot)){
+          if(item.uri!==result.uri)continue;
+          const range=toLspRange(source.text,item.range);
+          if(!range)continue;
+          diagnostics.push({
+            range,severity:item.severity,code:item.code,
+            source:"Skill Studio · Skill Language link",
+            message:item.message
+          });
+        }
+      }
       published.set(result.uri, diagnostics.length);
       connection.sendDiagnostics({
         uri: result.uri,
@@ -298,7 +320,7 @@ connection.onInitialize(() => ({
     documentSymbolProvider: true,
     completionProvider: {
       resolveProvider: false,
-      triggerCharacters: [":", "/"]
+      triggerCharacters: [":", "/", "."]
     }
   },
   serverInfo: {
@@ -331,7 +353,11 @@ connection.onDefinition(params => {
   const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
   const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
   if(symbolHit){
-    if(snapshot.completeness!=="complete"||index?.generation!==snapshot.generation)
+    const needsProjectLibrary=symbolHit.token.type==="skillOperation"||
+      symbolHit.token.type==="skillCapability"||
+      (symbolHit.token.type==="skillSchema"&&symbolHit.token.name.startsWith("lib/"));
+    if(snapshot.completeness!=="complete"||index?.generation!==snapshot.generation||
+       (needsProjectLibrary&&snapshot.libraryInventory!=="complete"))
       return null;
     const declaration=uniqueSkillSymbolDeclaration(symbolHit);
     if(!declaration)return null;
@@ -363,7 +389,11 @@ connection.onReferences(params => {
   const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
   const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
   if(symbolHit){
+    const needsProjectLibrary=symbolHit.token.type==="skillOperation"||
+      symbolHit.token.type==="skillCapability"||
+      (symbolHit.token.type==="skillSchema"&&symbolHit.token.name.startsWith("lib/"));
     if(snapshot.completeness!=="complete"||index?.generation!==snapshot.generation||
+       (needsProjectLibrary&&snapshot.libraryInventory!=="complete")||
        !uniqueSkillSymbolDeclaration(symbolHit))return [];
     return skillSymbolOccurrences(symbolHit,params.context?.includeDeclaration===true)
       .map(item=>location(item.uri,snapshotDocumentFor(snapshot,item.uri),item.range))
@@ -406,11 +436,18 @@ connection.onHover(params => {
       skillSchema:"Schema",
       skillReference:"Script / Reference"
     })[symbolHit.token.type]??"Skill symbol";
-    const resolved=Boolean(declaration&&snapshot.completeness==="complete"&&
-      index?.generation===snapshot.generation);
-    const body=resolved
-      ? "**"+kind+"** `"+symbolHit.token.name+"`\n\nDeclared in `"+declaration.relativePath+"`"
-      : "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nNo unique declaration is available in the current complete Package snapshot.";
+    const needsProjectLibrary=symbolHit.token.type==="skillOperation"||
+      symbolHit.token.type==="skillCapability"||
+      (symbolHit.token.type==="skillSchema"&&symbolHit.token.name.startsWith("lib/"));
+    const libraryUnavailable=needsProjectLibrary&&snapshot.libraryInventory!=="complete";
+    const resolved=Boolean(declaration&&!libraryUnavailable&&
+      snapshot.completeness==="complete"&&index?.generation===snapshot.generation);
+    const body=libraryUnavailable
+      ? "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nProject lib inventory is "+
+        (snapshot.libraryInventory??"unavailable")+"; exact cross-file resolution is suppressed."
+      : resolved
+        ? "**"+kind+"** `"+symbolHit.token.name+"`\n\nDeclared in `"+declaration.relativePath+"`"
+        : "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nNo unique declaration is available in the current complete Package snapshot.";
     return {contents:{kind:"markdown",value:body},
       range:toLspRange(source.text,symbolHit.token.range)};
   }
@@ -513,63 +550,145 @@ connection.onDocumentSymbol(params => {
 });
 
 connection.onCompletion(params => {
-  const value = packageForUri(params.textDocument.uri);
-  if (!value || value.analysis.state === "UNAVAILABLE" ||
-      !value.analysis.documents.length) return [];
-  const document = documentFor(value, params.textDocument.uri);
-  if (!document || !value.analysis.documents.some(item =>
-      item.uri === document.uri && item.version === document.version)) return [];
-  const offset = offsetAt(document.text, params.position);
-  if (offset === null) return [];
-  const starts = lineStarts(document.text);
-  const lineStart = starts[params.position.line];
-  const prefix = document.text.slice(lineStart, offset);
-
-  if (document.relativePath === "assurance/procedure.yaml" &&
-      /^\s*script:\s*[^#]*$/.test(prefix) &&
-      value.analysis.state === "READY" &&
-      value.snapshot.completeness === "complete") {
-    const colon = prefix.indexOf(":");
-    const rawValue = prefix.slice(colon + 1);
-    const leading = rawValue.length - rawValue.trimStart().length;
-    const typed = rawValue.trim();
-    const start = lineStart + colon + 1 + leading;
-    const editRange = toLspRange(document.text, { start, end: offset });
-    return value.snapshot.documents
-      .filter(item => /^scripts\/[A-Za-z0-9_.-]+\.py$/.test(item.relativePath) &&
-        item.relativePath.startsWith(typed))
-      .map(item => ({
-        label: item.relativePath,
-        kind: CompletionItemKind.File,
-        insertText: item.relativePath,
-        filterText: item.relativePath,
-        ...(editRange ? { textEdit: { range: editRange, newText: item.relativePath } } : {}),
-        detail: "Package-local Python script"
-      }));
+  const uri=params?.textDocument?.uri;
+  const snapshot=typeof uri==="string"?packageSnapshotForUri(uri):null;
+  const value=snapshot?packageAnalyses.get(snapshot.rootUri):null;
+  const document=snapshot?snapshotDocumentFor(snapshot,uri):null;
+  const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
+  const debugEnabled=params?.context?.skillStudioDiagnostics===true;
+  const debug={
+    snapshotFound:Boolean(snapshot),
+    completeness:snapshot?.completeness??null,
+    libraryInventory:snapshot?.libraryInventory??null,
+    generation:snapshot?.generation??null,
+    analysisState:value?.analysis?.state??null,
+    indexGeneration:index?.generation??null,
+    sourcePath:document?.relativePath??null,
+    sourceVersion:document?.version??null,
+    documentCount:snapshot?.documents?.length??0,
+    schemaDocuments:snapshot?.documents?.filter(item=>
+      item.relativePath.startsWith("schemas/")||
+      (item.relativePath.startsWith("lib/")&&
+       (item.relativePath.endsWith(".schema.yaml")||
+        item.relativePath.endsWith(".schema.yml"))))
+      .map(item=>item.relativePath)??[],
+    schemaTokens:[],
+    cursorOffset:null,
+    analysisDocumentFound:false,
+    analysisDocumentVersion:null,
+    completionContext:null,
+    reason:null
+  };
+  const finish=items=>{
+    if(debugEnabled)connection.sendNotification("skillStudio/completionDiagnostics",debug);
+    return items;
+  };
+  if(!snapshot||!value||!document||!index||
+     snapshot.completeness!=="complete"||value.analysis.state!=="READY"||
+     value.snapshot.generation!==snapshot.generation||
+     index.generation!==snapshot.generation){
+    debug.reason="Package snapshot, analysis or symbol index is not READY for the same complete generation";
+    return finish([]);
+  }
+  const analyzedDocument=value.analysis.documents.find(item=>
+    item.uri===document.uri&&item.version===document.version);
+  debug.analysisDocumentFound=Boolean(analyzedDocument);
+  debug.analysisDocumentVersion=analyzedDocument?.version??null;
+  if(!analyzedDocument){
+    debug.reason="The source document version is not present in the accepted analysis generation";
+    return finish([]);
+  }
+  const offset=offsetAt(document.text,params.position);
+  debug.cursorOffset=offset;
+  const sourceLineStarts=lineStarts(document.text);
+  const sourceLineStart=sourceLineStarts[params.position?.line];
+  debug.sourceTextLength=document.text.length;
+  debug.cursorLineStart=Number.isSafeInteger(sourceLineStart)?sourceLineStart:null;
+  debug.cursorLineText=Number.isSafeInteger(sourceLineStart)
+    ?document.text.slice(sourceLineStart,
+      sourceLineStarts[params.position.line+1]??document.text.length)
+    :null;
+  debug.cursorLineTextLength=typeof debug.cursorLineText==="string"
+    ?debug.cursorLineText.length:null;
+  debug.cursorPositionRoundTrip=offset===null?null:positionAt(sourceLineStarts,offset);
+  if(offset===null){
+    debug.reason="Cursor position is outside the source document";
+    return finish([]);
+  }
+  debug.schemaTokens=(index.tokensByUri.get(uri)??[])
+    .filter(item=>item.type==="skillSchema")
+    .map(item=>({name:item.name,range:item.range,path:item.path,part:item.part,
+      modifiers:item.modifiers}));
+  // v0.2 completions use the exact canonical AST token selector and the
+  // declarations/files already present in this Package snapshot. They do not
+  // synthesize grammar fields, dependencies, Capabilities or Schema contents.
+  const context=skillSymbolCompletions(index,uri,offset);
+  if(context){
+    // Project lib completeness is separate from Skill Package completeness.
+    // Never offer imported Operations or Owner Schemas from a partial inventory.
+    if(snapshot.libraryInventory!=="complete"){
+      if(context.token.type==="skillOperation"||context.token.type==="skillCapability"){
+        debug.reason="Project lib inventory is not complete";
+        debug.completionContext={type:context.token.type,name:context.token.name,
+          range:context.token.range,prefix:context.prefix,candidates:[]};
+        return finish([]);
+      }
+      if(context.token.type==="skillSchema")
+        context.items=context.items.filter(item=>!item.relativePath.startsWith("lib/"));
+    }
+    debug.completionContext={
+      type:context.token.type,name:context.token.name,range:context.token.range,
+      prefix:context.prefix,candidates:context.items.map(item=>item.relativePath??item.name)
+    };
+    const range=toLspRange(document.text,context.token.range);
+    const kindFor={
+      skillSchema:CompletionItemKind.File,
+      skillReference:CompletionItemKind.File,
+      skillOperation:CompletionItemKind.Reference,
+      skillCapability:CompletionItemKind.Reference,
+      skillProcedure:CompletionItemKind.Reference,
+      skillStep:CompletionItemKind.Reference,
+      skillPredicate:CompletionItemKind.Reference
+    };
+    return finish(context.items.map(item=>({
+      label:item.name,
+      kind:kindFor[context.token.type]??CompletionItemKind.Text,
+      insertText:item.name,
+      filterText:item.name,
+      ...(range?{textEdit:{range,newText:item.name}}:{}),
+      detail:context.token.type==="skillCapability"
+        ?"Direct Operation grant from imported ToolCatalog; deployment Capability IDs are not enumerated"
+        :item.relativePath
+          ?"Package declaration · "+item.relativePath
+          :"Package declaration"
+    })));
   }
 
-  if (document.languageId === "python" &&
-      /^\s*# (?:inputSchema|outputSchema):\s*[^#]*$/.test(prefix) &&
-      value.analysis.state === "READY" &&
-      value.snapshot.completeness === "complete") {
-    const colon = prefix.indexOf(":");
-    const rawValue = prefix.slice(colon + 1);
-    const leading = rawValue.length - rawValue.trimStart().length;
-    const typed = rawValue.trim();
-    const start = lineStart + colon + 1 + leading;
-    const editRange = toLspRange(document.text, { start, end: offset });
-    return schemaTitleCatalog(value.snapshot)
-      .filter(item => item.title.startsWith(typed))
-      .map(item => ({
-        label: item.title,
-        kind: CompletionItemKind.Reference,
-        insertText: item.title,
-        filterText: item.title,
-        ...(editRange ? { textEdit: { range: editRange, newText: item.title } } : {}),
-        detail: "Package Schema · " + item.path
-      }));
+  // Legacy metadata-only Python completion remains isolated from canonical
+  // v0.2 Script Contract sources, which use TypedDict annotations instead.
+  if(document.languageId==="python"){
+    const starts=lineStarts(document.text);
+    const lineStart=starts[params.position.line];
+    const prefix=document.text.slice(lineStart,offset);
+    if(/^\s*# (?:inputSchema|outputSchema):\s*[^#]*$/.test(prefix)){
+      const colon=prefix.indexOf(":");
+      const rawValue=prefix.slice(colon+1);
+      const leading=rawValue.length-rawValue.trimStart().length;
+      const typed=rawValue.trim();
+      const start=lineStart+colon+1+leading;
+      const editRange=toLspRange(document.text,{start,end:offset});
+      return finish(schemaTitleCatalog(snapshot)
+        .filter(item=>item.title.startsWith(typed))
+        .map(item=>({
+          label:item.title,kind:CompletionItemKind.Reference,
+          insertText:item.title,filterText:item.title,
+          ...(editRange?{textEdit:{range:editRange,newText:item.title}}:{}),
+          detail:"Legacy Package Schema · "+item.path
+        })));
+    }
   }
-  return [];
+  debug.reason="No canonical completion token matched the current cursor position";
+  return finish([]);
 });
 
 connection.onNotification(PACKAGE_INVALIDATE_NOTIFICATION, params => {

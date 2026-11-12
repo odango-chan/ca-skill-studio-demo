@@ -368,13 +368,14 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
 });
 
 
-function currentV02PackageSnapshot(generation=1,completeness="complete"){
+function currentV02PackageSnapshot(generation=1,completeness="complete",libraryInventory="complete"){
   const rootUri="file:///workspace/establish-pdu-session";
   const paths=[
     "assurance/contract.yaml",
     "assurance/predicates.yaml",
     "assurance/procedure.yaml",
-    "schemas/establishment-request.schema.yaml"
+    "schemas/establishment-request.schema.yaml",
+    "scripts/select_establishment_configuration.py"
   ];
   const documents=paths.map(relativePath=>({
     uri:rootUri+"/"+relativePath,relativePath,languageId:"yaml",
@@ -393,7 +394,8 @@ spec:
       effect: READ
 `
   });
-  return {rootUri,packageName:"establish-pdu-session",generation,completeness,documents};
+  return {rootUri,packageName:"establish-pdu-session",generation,completeness,
+    libraryInventory,documents};
 }
 
 test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported ToolCatalog symbols",async()=>{
@@ -408,20 +410,27 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.equal(initialized.result.capabilities.referencesProvider,true);
     assert.equal(initialized.result.capabilities.hoverProvider,true);
     assert.equal(initialized.result.capabilities.documentSymbolProvider,true);
+    assert.equal(initialized.result.capabilities.completionProvider.resolveProvider,false);
+    assert.ok(initialized.result.capabilities.completionProvider.triggerCharacters.includes("."));
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
     const snapshot=currentV02PackageSnapshot();
+    const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+    const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+    const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
+    const linkDiagnostic=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===contract.uri&&
+      message.params?.diagnostics?.some(item=>item.code==="SKILL_LINK_UNRESOLVED"),15000);
     const ready=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===snapshot.rootUri&&
       message.params?.generation===1,15000);
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
     const status=await ready;
-    assert.notEqual(status.params.state,"UNAVAILABLE");
+    assert.equal(status.params.state,"READY",
+      "v0.2 completions and link diagnostics require an accepted complete Package");
 
-    const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
-    const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
-    const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
     const tools=snapshot.documents.find(x=>x.relativePath==="lib/tools/udm.tool.yaml");
     assert.ok(contract&&procedure&&predicates&&tools);
 
@@ -469,6 +478,47 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.match(predicateHover.contents.value,/Predicate/);
     assert.ok(predicateHover.contents.value.includes(predicateName));
 
+    const completionDiagnostics=waitForMessage(worker,message=>
+      message?.method==="skillStudio/completionDiagnostics"&&
+      message.params?.sourcePath==="assurance/contract.yaml",5000);
+    const schemaCompletions=await lspRequest(worker,312,"textDocument/completion",{
+      textDocument:{uri:contract.uri},
+      position:positionOf(contract.text,schemaPath,9),
+      context:{triggerKind:1,skillStudioDiagnostics:true}
+    });
+    assert.ok(schemaCompletions.some(item=>item.label===schemaPath),
+      "Contract Schema path completion uses Package-owned Schema files");
+    const completionDebug=await completionDiagnostics;
+    assert.equal(completionDebug.params.snapshotFound,true);
+    assert.ok(completionDebug.params.schemaDocuments.includes(schemaPath));
+    assert.equal(completionDebug.params.completionContext?.type,"skillSchema");
+    assert.ok(completionDebug.params.completionContext.candidates.includes(schemaPath));
+    const operationCompletions=await lspRequest(worker,313,"textDocument/completion",{
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,operationName,4)
+    });
+    assert.ok(operationCompletions.some(item=>item.label===operationName),
+      "Procedure Operation completion uses imported ToolCatalog declarations");
+    const scriptPath="scripts/select_establishment_configuration.py";
+    const scriptCompletions=await lspRequest(worker,314,"textDocument/completion",{
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,scriptPath,9)
+    });
+    assert.ok(scriptCompletions.some(item=>item.label===scriptPath),
+      "Procedure Script completion uses Package-local Script files");
+
+    const unresolvedOwner=await linkDiagnostic;
+    const missingOwnerPath="lib/host/subject.schema.yaml";
+    const unresolvedSchema=unresolvedOwner.params.diagnostics.find(item=>
+      item.code==="SKILL_LINK_UNRESOLVED"&&
+      item.range?.start?.line===item.range?.end?.line&&
+      contract.text.split(/\r\n|\n|\r/)[item.range.start.line]
+        ?.slice(item.range.start.character,item.range.end.character)===missingOwnerPath);
+    assert.ok(unresolvedSchema,
+      "missing authoritative Owner Schema is published at its exact source token: "+
+      JSON.stringify({diagnostics:unresolvedOwner.params.diagnostics,
+        expected:missingOwnerPath,contractLine:contract.text.split(/\r\n|\n|\r/)[
+          unresolvedOwner.params.diagnostics[0]?.range?.start?.line??0]}));
     const predicateReferences=await lspRequest(worker,307,"textDocument/references",{
       textDocument:{uri:predicates.uri},
       position:positionOf(predicates.text,predicateName),
@@ -507,6 +557,66 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       textDocument:{uri:contract.uri},position:positionOf(contract.text,entryName)
     });
     assert.equal(blocked,null);
+    const partialCompletion=await lspRequest(worker,315,"textDocument/completion",{
+      textDocument:{uri:contract.uri},
+      position:positionOf(contract.text,"schemas/establishment-request.schema.yaml",9)
+    });
+    assert.deepEqual(partialCompletion,[],
+      "partial Package must not offer cross-file completion candidates");
+    const partialDiagnostics=await lspRequest(worker,316,"textDocument/documentSymbol",{
+      textDocument:{uri:contract.uri}
+    });
+    assert.deepEqual(partialDiagnostics,[],
+      "non-Procedure YAML documents have no fabricated Outline symbols");
+
+    // A complete Skill Package can still have an incomplete project-level
+    // lib/ inventory. Imported links must remain fail-closed independently.
+    worker.postMessage({
+      jsonrpc:"2.0",method:"skillStudio/packageInvalidate",
+      params:{rootUri:snapshot.rootUri,generation:3}
+    });
+    const libraryPartial=currentV02PackageSnapshot(3,"complete","partial");
+    const libraryPartialContract=libraryPartial.documents.find(x=>
+      x.relativePath==="assurance/contract.yaml");
+    const libraryPartialProcedure=libraryPartial.documents.find(x=>
+      x.relativePath==="assurance/procedure.yaml");
+    const libraryDiagnostics=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===libraryPartialContract.uri,15000);
+    const libraryReady=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===snapshot.rootUri&&
+      message.params?.generation===3,15000);
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
+      params:libraryPartial});
+    const libraryStatus=await libraryReady;
+    assert.equal(libraryStatus.params.state,"READY",
+      "project lib inventory is tracked separately from Skill Package completeness");
+    const blockedOperation=await lspRequest(worker,317,"textDocument/definition",{
+      textDocument:{uri:libraryPartialProcedure.uri},
+      position:positionOf(libraryPartialProcedure.text,operationName)
+    });
+    assert.equal(blockedOperation,null,
+      "a discovered Operation is not uniquely linkable while project lib inventory is partial");
+    const blockedOperationCompletion=await lspRequest(worker,318,"textDocument/completion",{
+      textDocument:{uri:libraryPartialProcedure.uri},
+      position:positionOf(libraryPartialProcedure.text,operationName,4)
+    });
+    assert.deepEqual(blockedOperationCompletion,[],
+      "partial project lib inventory cannot offer imported Operation completions");
+    const ownerSchemaPath="lib/host/subject.schema.yaml";
+    const ownerSchemaCompletion=await lspRequest(worker,319,"textDocument/completion",{
+      textDocument:{uri:libraryPartialContract.uri},
+      position:positionOf(libraryPartialContract.text,ownerSchemaPath,9)
+    });
+    assert.deepEqual(ownerSchemaCompletion,[],
+      "prefix lib/host cannot suggest Skill-local schemas or partial library files");
+    const libraryDiagnosticMessage=await libraryDiagnostics;
+    assert.ok(!libraryDiagnosticMessage.params.diagnostics.some(item=>
+      item.code==="SKILL_LINK_UNRESOLVED"&&
+      libraryPartialContract.text.split(/\r\n|\n|\r/)[item.range.start.line]
+        ?.slice(item.range.start.character,item.range.end.character)===ownerSchemaPath),
+      "missing Owner Schema diagnostics are suppressed when project lib inventory is partial");
   }finally{
     await worker.terminate();
   }
