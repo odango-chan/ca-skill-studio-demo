@@ -219,16 +219,12 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
       openTextDocument:async target=>target.path==='/workspace/SKILL.md'?markdownDoc:doc},
     window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
       onDidChangeActiveTextEditor(cb){activeEditorChanged=cb;return disposable();},
-      onDidChangeTextEditorVisibleRanges(cb){visibleRangeChanged=cb;return disposable();},
+      onDidChangeTextEditorVisibleRanges:()=>disposable(),
       visibleTextEditors:[markdownEditor],activeTextEditor:markdownEditor,
       showTextDocument:async(document,options)=>{showDocumentCalls.push({document,options});return markdownEditor;},
       showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},
       showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation',
-      createWebviewPanel(_type,_title,column){const p={column,reveal(nextColumn){this.column=nextColumn;},
-        webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u,
-          onDidReceiveMessage(cb){markdownMessage=cb;return disposable();},
-          postMessage(message){markdownMessages.push(message);return Promise.resolve(true);}},
-        onDidDispose:()=>disposable()};panels.push(p);return p;}}
+      createWebviewPanel(){throw Error("Markdown must use the native preview extension");}}
   };
   const context={subscriptions:[],extensionUri:uri('/extension')},workbench=registerWorkbench(vscode,context),posted=[];
   workbench.attach(doc,m=>posted.push(m));
