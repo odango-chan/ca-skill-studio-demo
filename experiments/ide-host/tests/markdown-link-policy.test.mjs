@@ -71,6 +71,9 @@ test("native Markdown Package inventory rejects symlinked roots and descendants"
     }
   });
   assert.equal(await prepareNativeMarkdownPackagePolicy(makeVscode(null),source),true);
+  assert.equal(await prepareNativeMarkdownPackagePolicy(makeVscode(root),source),false,
+    "a symlinked Package root is rejected");
   assert.equal(await prepareNativeMarkdownPackagePolicy(
-    makeVscode(root+"/references"),source),false);
+    makeVscode(root+"/references"),source),false,
+    "a symlinked descendant directory is rejected");
 });

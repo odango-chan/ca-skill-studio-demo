@@ -139,7 +139,7 @@ The old `site/markdown-preview.mjs` renderer and its stylesheet remain for the p
 
 #### Native Markdown acceptance gates
 
-The implementation is merged and is the default. Cleanup PR [#177](https://github.com/odango-chan/ca-skill-studio-demo/pull/177) replaces the retired custom-renderer fixture and probes the actual native Preview frame in both Chromium hosts. The previous automated probe used a programmatic Source `revealRange` helper rather than a real user scroll gesture, so it could not establish bidirectional behavior. Scroll synchronization is removed from automated acceptance and awaits manual user inspection. Do not restore the custom renderer or add a custom scroll bridge.
+The implementation is merged and is the default. Cleanup PR [#177](https://github.com/odango-chan/ca-skill-studio-demo/pull/177) replaces the retired custom-renderer fixture and probes the actual native Preview frame in both Chromium hosts. The previous automated probe used a programmatic Source `revealRange` helper rather than a real user scroll gesture, so it could not establish bidirectional behavior. Synthetic scroll instrumentation is removed from the workbench and scroll synchronization is removed from automated acceptance. Tests record only current preferences and visible viewport state; manual user inspection remains pending. Do not restore the custom renderer or add a custom scroll bridge.
 
 The real-host acceptance must prove:
 
