@@ -21,7 +21,9 @@ import {
   skillSymbolAt,
   uniqueSkillSymbolDeclaration,
   skillSymbolOccurrences,
-  skillSymbolDeclarationsForDocument
+  skillSymbolDeclarationsForDocument,
+  skillSymbolCompletions,
+  skillSymbolLinkDiagnostics
 } from "../../../../../language/symbol-index.mjs";
 
 const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
@@ -57,6 +59,26 @@ function createSession(rootUri) {
         item.code !== "PACKAGE_AUDIT_UNAVAILABLE" &&
         item.source !== "Skill Studio · package-audit"
       );
+      // Add exact v0.2 cross-file link findings only for the same complete,
+      // READY Package generation. Package Audit remains host-owned.
+      const current=packageAnalyses.get(rootUri);
+      const index=symbolIndexes.get(rootUri);
+      const source=current?.snapshot.documents.find(item=>item.uri===result.uri);
+      if(current&&source&&current.snapshot.completeness==="complete"&&
+         current.analysis.state==="READY"&&
+         current.snapshot.generation===result.generation&&
+         index?.generation===result.generation){
+        for(const item of skillSymbolLinkDiagnostics(index,current.snapshot)){
+          if(item.uri!==result.uri)continue;
+          const range=toLspRange(source.text,item.range);
+          if(!range)continue;
+          diagnostics.push({
+            range,severity:item.severity,code:item.code,
+            source:"Skill Studio · Skill Language link",
+            message:item.message
+          });
+        }
+      }
       published.set(result.uri, diagnostics.length);
       connection.sendDiagnostics({
         uri: result.uri,
@@ -513,61 +535,71 @@ connection.onDocumentSymbol(params => {
 });
 
 connection.onCompletion(params => {
-  const value = packageForUri(params.textDocument.uri);
-  if (!value || value.analysis.state === "UNAVAILABLE" ||
-      !value.analysis.documents.length) return [];
-  const document = documentFor(value, params.textDocument.uri);
-  if (!document || !value.analysis.documents.some(item =>
-      item.uri === document.uri && item.version === document.version)) return [];
-  const offset = offsetAt(document.text, params.position);
-  if (offset === null) return [];
-  const starts = lineStarts(document.text);
-  const lineStart = starts[params.position.line];
-  const prefix = document.text.slice(lineStart, offset);
+  const uri=params?.textDocument?.uri;
+  const snapshot=typeof uri==="string"?packageSnapshotForUri(uri):null;
+  const value=snapshot?packageAnalyses.get(snapshot.rootUri):null;
+  const document=snapshot?snapshotDocumentFor(snapshot,uri):null;
+  const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
+  if(!snapshot||!value||!document||!index||
+     snapshot.completeness!=="complete"||value.analysis.state!=="READY"||
+     value.snapshot.generation!==snapshot.generation||
+     index.generation!==snapshot.generation||
+     !value.analysis.documents.some(item=>
+       item.uri===document.uri&&item.version===document.version))return [];
+  const offset=offsetAt(document.text,params.position);
+  if(offset===null)return [];
 
-  if (document.relativePath === "assurance/procedure.yaml" &&
-      /^\s*script:\s*[^#]*$/.test(prefix) &&
-      value.analysis.state === "READY" &&
-      value.snapshot.completeness === "complete") {
-    const colon = prefix.indexOf(":");
-    const rawValue = prefix.slice(colon + 1);
-    const leading = rawValue.length - rawValue.trimStart().length;
-    const typed = rawValue.trim();
-    const start = lineStart + colon + 1 + leading;
-    const editRange = toLspRange(document.text, { start, end: offset });
-    return value.snapshot.documents
-      .filter(item => /^scripts\/[A-Za-z0-9_.-]+\.py$/.test(item.relativePath) &&
-        item.relativePath.startsWith(typed))
-      .map(item => ({
-        label: item.relativePath,
-        kind: CompletionItemKind.File,
-        insertText: item.relativePath,
-        filterText: item.relativePath,
-        ...(editRange ? { textEdit: { range: editRange, newText: item.relativePath } } : {}),
-        detail: "Package-local Python script"
-      }));
+  // v0.2 completions use the exact canonical AST token selector and the
+  // declarations/files already present in this Package snapshot. They do not
+  // synthesize grammar fields, dependencies, Capabilities or Schema contents.
+  const context=skillSymbolCompletions(index,uri,offset);
+  if(context){
+    const range=toLspRange(document.text,context.token.range);
+    const kindFor={
+      skillSchema:CompletionItemKind.File,
+      skillReference:CompletionItemKind.File,
+      skillOperation:CompletionItemKind.Reference,
+      skillCapability:CompletionItemKind.Reference,
+      skillProcedure:CompletionItemKind.Reference,
+      skillStep:CompletionItemKind.Reference,
+      skillPredicate:CompletionItemKind.Reference
+    };
+    return context.items.map(item=>({
+      label:item.name,
+      kind:kindFor[context.token.type]??CompletionItemKind.Text,
+      insertText:item.name,
+      filterText:item.name,
+      ...(range?{textEdit:{range,newText:item.name}}:{}),
+      detail:context.token.type==="skillCapability"
+        ?"Direct Operation grant from imported ToolCatalog; deployment Capability IDs are not enumerated"
+        :item.relativePath
+          ?"Package declaration · "+item.relativePath
+          :"Package declaration"
+    }));
   }
 
-  if (document.languageId === "python" &&
-      /^\s*# (?:inputSchema|outputSchema):\s*[^#]*$/.test(prefix) &&
-      value.analysis.state === "READY" &&
-      value.snapshot.completeness === "complete") {
-    const colon = prefix.indexOf(":");
-    const rawValue = prefix.slice(colon + 1);
-    const leading = rawValue.length - rawValue.trimStart().length;
-    const typed = rawValue.trim();
-    const start = lineStart + colon + 1 + leading;
-    const editRange = toLspRange(document.text, { start, end: offset });
-    return schemaTitleCatalog(value.snapshot)
-      .filter(item => item.title.startsWith(typed))
-      .map(item => ({
-        label: item.title,
-        kind: CompletionItemKind.Reference,
-        insertText: item.title,
-        filterText: item.title,
-        ...(editRange ? { textEdit: { range: editRange, newText: item.title } } : {}),
-        detail: "Package Schema · " + item.path
-      }));
+  // Legacy metadata-only Python completion remains isolated from canonical
+  // v0.2 Script Contract sources, which use TypedDict annotations instead.
+  if(document.languageId==="python"){
+    const starts=lineStarts(document.text);
+    const lineStart=starts[params.position.line];
+    const prefix=document.text.slice(lineStart,offset);
+    if(/^\s*# (?:inputSchema|outputSchema):\s*[^#]*$/.test(prefix)){
+      const colon=prefix.indexOf(":");
+      const rawValue=prefix.slice(colon+1);
+      const leading=rawValue.length-rawValue.trimStart().length;
+      const typed=rawValue.trim();
+      const start=lineStart+colon+1+leading;
+      const editRange=toLspRange(document.text,{start,end:offset});
+      return schemaTitleCatalog(snapshot)
+        .filter(item=>item.title.startsWith(typed))
+        .map(item=>({
+          label:item.title,kind:CompletionItemKind.Reference,
+          insertText:item.title,filterText:item.title,
+          ...(editRange?{textEdit:{range:editRange,newText:item.title}}:{}),
+          detail:"Legacy Package Schema · "+item.path
+        }));
+    }
   }
   return [];
 });
