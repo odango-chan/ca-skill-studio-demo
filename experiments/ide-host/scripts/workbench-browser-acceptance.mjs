@@ -577,7 +577,32 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // checks so the active Webview frame and its selection are unambiguous.
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  file=await evalJS(`(()=>{
+    const root=document.querySelector('.theia-Files')??document;
+    const nodes=[...root.querySelectorAll('.theia-TreeNode')];
+    const normalize=value=>value.replace(/\\s+/g,' ').trim();
+    const labelOf=node=>{
+      const content=node.querySelector('.theia-TreeNodeContent')??node;
+      const segment=content.querySelector('.theia-TreeNodeSegment')??
+        content.querySelector('.theia-TreeNodeSegmentGrow');
+      return normalize(segment?.textContent??content.innerText??'')
+        .replace(/\\s+\\d+$/,'');
+    };
+    const el=nodes.find(node=>labelOf(node)==='procedure.yaml'&&
+      node.getBoundingClientRect().width>0);
+    if(!el)return null;
+    el.scrollIntoView({block:'center',inline:'nearest'});
+    const content=el.querySelector('.theia-TreeNodeSegmentGrow')??
+      el.querySelector('.theia-TreeNodeContent')??el;
+    const r=content.getBoundingClientRect();
+    const points=[.5,.65,.8,.9].map(f=>({x:Math.round(r.x+r.width*f),
+      y:Math.round(r.y+r.height/2)}));
+    return points.find(({x,y})=>{
+      if(x<0||y<0||x>=innerWidth||y>=innerHeight)return false;
+      const hit=document.elementFromPoint(x,y);
+      return hit&&(hit===el||el.contains(hit))&&!hit.closest('.lm-SplitPanel-handle');
+    })??null;
+  })()`);
   if(!file)throw Error('Procedure file disappeared after closing preview/pinned tabs');
   await click(file.x,file.y,2);
   let singlePinned=null;
