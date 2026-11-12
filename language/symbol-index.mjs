@@ -16,7 +16,7 @@ function modifier(token,name){
 
 function packageFilePath(value){
   if(typeof value!=="string"||!value||
-     value.startsWith("#")||value.includes("://")||value.startsWith("/")||
+     value.includes("#")||value.includes("://")||value.startsWith("/")||
      value.includes("\\\\")||value.includes("?")||value.includes("%")||
      /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value))return null;
   // Skill Language paths are rooted in the logical BuildRequest file set.
