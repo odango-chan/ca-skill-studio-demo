@@ -14,23 +14,20 @@ function modifier(token,name){
   return Array.isArray(token.modifiers)&&token.modifiers.includes(name);
 }
 
-function packageFilePath(value,sourcePath){
-  if(typeof value!=="string"||!value||value.startsWith("#")||
-     value.includes("://")||value.startsWith("/")||value.includes("\\")||
-     value.includes("?")||value.includes("%")||
+function packageFilePath(value){
+  if(typeof value!=="string"||!value||
+     value.startsWith("#")||value.includes("://")||value.startsWith("/")||
+     value.includes("\\\\")||value.includes("?")||value.includes("%")||
      /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value))return null;
+  // Skill Language paths are rooted in the logical BuildRequest file set.
+  // Reject relative traversal, URL references and fragment-only refs rather
+  // than normalizing them into a guessed Package destination.
   const raw=value.split("#",1)[0];
-  if(!raw)return null;
-  const relative=raw.startsWith("./");
-  if(!relative&&!/^(?:schemas|lib|scripts|references)\\//.test(raw))return null;
-  const parts=relative?sourcePath.split("/").slice(0,-1):[];
-  for(const part of raw.split("/")){
-    if(!part||part===".")continue;
-    // Parent traversal is intentionally not normalized into a Package path.
-    if(part===".."||/[\u0000-\u001f:<>|?*]/.test(part))return null;
-    parts.push(part);
-  }
-  return parts.length?parts.join("/"):null;
+  if(!/^(?:schemas|lib|scripts|references)\\//.test(raw))return null;
+  const parts=raw.split("/");
+  if(parts.some(part=>!part||part==="."||part===".."||
+    /[\\u0000-\\u001f:<>|?*]/.test(part)))return null;
+  return parts.join("/");
 }
 
 function symbolKey(token,name,relativePath){
@@ -54,7 +51,7 @@ function symbolKey(token,name,relativePath){
       return "operation\u0000"+name;
     case "skillSchema":
     case "skillReference":{
-      const targetPath=packageFilePath(name,relativePath);
+      const targetPath=packageFilePath(name);
       return targetPath?"document::"+targetPath:null;
     }
     default:
