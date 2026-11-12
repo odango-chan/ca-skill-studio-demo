@@ -2011,26 +2011,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // its visible Monaco model; never reuse a detached editor index.
   await evalWebviewJS(`document.querySelector("#openSource")?.click();true`);
   await sleep(350);
-  const nativeEditorAfterUndo=await evalJS(`(()=>{
-    const editors=[...document.querySelectorAll('.monaco-editor')];
-    const chosen=editors.map(node=>{
-      const rect=node.getBoundingClientRect();
-      const text=(node.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
-      return {x:rect.x,y:rect.y,width:rect.width,height:rect.height,text};
-    }).find(item=>item.width>80&&item.height>100&&item.x>=0&&item.y>=0&&
-      item.x+item.width/2<innerWidth&&item.y+item.height/2<innerHeight&&
-      item.text.includes('ue-requested-pdu-session-establishment'));
-    return chosen??null;
+  const readProcedureModel=()=>evalJS(`(()=>{
+    const c=window.theia.container;
+    const managerKey=[...c._bindingDictionary._map.keys()].find(key=>
+      typeof key==='function'&&typeof key.prototype?.getOrCreateByUri==='function'&&
+      typeof key.prototype?.getByUri==='function');
+    const editors=managerKey&&c.get(managerKey).all;
+    const control=editors?.map(widget=>widget.editor?.getControl?.()).find(editor=>
+      editor?.getModel()?.uri.path.endsWith('/assurance/procedure.yaml'));
+    return control?.getModel()?.getValue()??'';
   })()`);
-  const afterNativeUndo=nativeEditorAfterUndo?.text??'';
-  if(!nativeEditorAfterUndo||!afterNativeUndo.includes('MISTYPED: finalize-failed'))
-    throw Error('Native Undo did not revert the Outcome repair in the visible Procedure Source: '+
-      JSON.stringify({editorFound:!!nativeEditorAfterUndo,text:afterNativeUndo.slice(-1200)}));
+  const afterNativeUndo=await readProcedureModel();
+  if(!afterNativeUndo.includes('MISTYPED: finalize-failed'))
+    throw Error('Native Undo did not revert the Outcome repair in the Procedure Source model: '+
+      afterNativeUndo.slice(-1200));
   // The keyboard-created fixture can have its own Monaco edit/undo grouping.
   // Restore the original Source explicitly with one native editor line edit;
   // do not assume a second core.undo will undo exactly that fixture.
-  await click(nativeEditorAfterUndo.x+Math.min(90,nativeEditorAfterUndo.width/2),
-    nativeEditorAfterUndo.y+Math.min(24,nativeEditorAfterUndo.height/2));
+  await click(nativeEditor.x+Math.min(90,nativeEditor.width/2),
+    nativeEditor.y+Math.min(24,nativeEditor.height/2));
   await key('g','KeyG',2,71);await sleep(160);
   await command('Input.insertText',{text:String(pcfOutcomeLine)});
   await key('Enter','Enter',0,13);await sleep(160);
@@ -2039,19 +2038,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await command('Input.insertText',{text:'            FAILED: finalize-failed'});
   const fixtureRestored=await waitForRevisionChange(graphContext,
     outcomeUndo.result?.value,'Native Phase Outcome fixture restoration');
-  const restoredText=await evalJS(`(()=>{
-    const editors=[...document.querySelectorAll('.monaco-editor')];
-    const chosen=editors.map(node=>{
-      const rect=node.getBoundingClientRect();
-      const text=(node.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
-      return {rect,text};
-    }).find(item=>item.rect.width>80&&item.rect.height>100&&
-      item.rect.x>=0&&item.rect.y>=0&&
-      item.rect.x+item.rect.width/2<innerWidth&&
-      item.rect.y+item.rect.height/2<innerHeight&&
-      item.text.includes('ue-requested-pdu-session-establishment'));
-    return chosen?.text??'';
-  })()`);
+  const restoredText=await readProcedureModel();
   if(!restoredText.includes('FAILED: finalize-failed')||
      restoredText.includes('MISTYPED: finalize-failed'))
     throw Error('Native Source fixture was not restored to its original scalar: '+
