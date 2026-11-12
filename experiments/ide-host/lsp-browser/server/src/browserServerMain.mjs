@@ -641,7 +641,11 @@ connection.onRequest("skillStudio/completionDiagnostics",params=>{
     libraryInventory:snapshot?.libraryInventory??null,
     generation:snapshot?.generation??null,
     analysisState:value?.analysis?.state??null,
+    analysisGeneration:value?.snapshot?.generation??null,
     indexGeneration:index?.generation??null,
+    indexHasSource:Boolean(index?.tokensByUri.has(uri)),
+    analysisDocumentVersion:value?.analysis?.documents?.find(item=>
+      item.uri===source?.uri)?.version??null,
     sourcePath:source?.relativePath??null,
     sourceVersion:source?.version??null,
     documentCount:snapshot?.documents?.length??0,
