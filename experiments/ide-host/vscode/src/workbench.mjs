@@ -3040,7 +3040,14 @@ export function registerWorkbench(vscode,context){
       scrollPreviewWithEditor:vscode.workspace.getConfiguration('markdown.preview')
         .get('scrollPreviewWithEditor'),
       markEditorSelection:vscode.workspace.getConfiguration('markdown.preview')
-        .get('markEditorSelection')
+        .get('markEditorSelection'),
+      activeEditor:vscode.window.activeTextEditor?.document.uri.toString()??null,
+      visibleEditors:vscode.window.visibleTextEditors.map(editor=>({
+        uri:editor.document.uri.toString(),viewColumn:editor.viewColumn,
+        visibleRanges:editor.visibleRanges.map(range=>({
+          start:range.start.line,end:range.end.line
+        }))
+      }))
     })));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.toggleMarkdownLayout',async uri=>{
