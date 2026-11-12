@@ -2778,9 +2778,9 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
       const matches=await vscode.workspace.findFiles(
-        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
+        '**/establish-pdu-session/references/3gpp-procedure.md','**/node_modules/**',5);
       const exact=matches.filter(item=>item.path.endsWith(
-        '/establish-pdu-session/SKILL.md'));
+        '/establish-pdu-session/references/3gpp-procedure.md'));
       if(exact.length!==1)
         throw Error('Expected exactly one existing Skill guide for the security probe');
       const target=exact[0];
@@ -2824,9 +2824,9 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      const suffix='/establish-pdu-session/SKILL.md';
+      const suffix='/establish-pdu-session/references/3gpp-procedure.md';
       if(!target.path.endsWith(suffix))
-        throw Error('Refusing to restore a non-fixture Skill guide');
+        throw Error('Refusing to restore a non-fixture Reference document');
       const original=nativeMarkdownSecurityOriginals.get(target.toString());
       if(typeof original!=='string')
         throw Error('No original Skill guide content is recorded for this security probe');
