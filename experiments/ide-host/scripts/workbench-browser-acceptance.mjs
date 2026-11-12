@@ -887,6 +887,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await sleep(100);
   }
   console.log('STUDIO_INSPECTOR_SELECTION_STATE_CHROMIUM',JSON.stringify({bindingClick:bindingClick.result?.value,graphSelectionPayload,selectionState}));
+  if(selectionState?.nodeId!=='nudm-sdm-subscribe'||
+     selectionState?.procedureId!==selectionResult.result.value.procedure)
+    throw Error('Host did not retain the exact selected Phase binding Node: '+JSON.stringify(selectionState));
+  const bindingSelection={result:{value:{
+    procedure:selectionState.procedureId,node:selectionState.nodeId
+  }}};
   let inspectorDataFlow=null;
   for(let attempt=0;attempt<60;attempt++){
     inspectorDataFlow=await evalJS(`(()=>{const container=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');const r=container?.getBoundingClientRect();const rows=[...(container?.querySelectorAll('.theia-TreeNode')??[])].map(x=>{const b=x.getBoundingClientRect();return {text:x.innerText.replace(/\\s+/g,' ').trim(),visible:b.width>0&&b.height>0&&b.x<innerWidth&&b.right>0&&b.y<innerHeight&&b.bottom>0};});return {found:!!container,rightSide:!!r&&r.x>innerWidth/2,containerRect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,text:container?.innerText??'',rows};})()`);
