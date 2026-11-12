@@ -124,6 +124,11 @@ test("Theia unpacks the pinned native Markdown language-features plugin",{
   const plugin=findMarkdownManifest(join(root,"plugins"));
   assert.ok(plugin,"Theia CLI must unpack the downloaded Markdown extension");
   assert.ok(plugin.manifest.browser,"browser preview entry is required in browser-only Theia");
+  const browserEntry=join(plugin.root,plugin.manifest.browser.replace(/^\.\//,"")+".js");
+  const workerEntry=join(plugin.root,"dist/browser/serverWorkerMain.js");
+  assert.ok(existsSync(browserEntry),"browser Markdown extension entry must be packaged");
+  assert.ok(existsSync(workerEntry)&&statSync(workerEntry).size>1000,
+    "browser Markdown language-server Worker must be packaged beside the extension");
   assert.ok(plugin.manifest.contributes.commands.some(x=>x.command==="markdown.showPreviewToSide"),
     "native side-by-side Markdown Preview command must be available");
   assert.ok(plugin.manifest.contributes["markdown.previewStyles"],
