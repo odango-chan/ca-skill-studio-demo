@@ -289,35 +289,23 @@ export function activate(context){
   // the extension-owned example project on first launch; existing edited
   // files are never overwritten by seedExampleWorkspace. Desktop VS Code
   // and user-selected workspaces keep the explicit opt-in command instead.
-  if(!(vscode.workspace.workspaceFolders??[]).length){
-    // This bundle is explicitly marked by the Theia-only esbuild entry.
-    // The plugin host is itself a Worker; requiring a nested Worker constructor
-    // here incorrectly disables first-run loading on some Theia hosts.
-    const onlineDemo=typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST;
-    console.log("STUDIO_DEFAULT_LOAD_GATE",JSON.stringify({
-      onlineDemo,workspaceFolderCount:(vscode.workspace.workspaceFolders??[]).length
-    }));
-    if(onlineDemo){
-      // Let Theia finish activating its OPFS FileSystemProvider before the
-      // first workspace.fs request. Failure is surfaced by loadExample with
-      // the exact phase; the command remains available for an explicit retry.
-      setTimeout(()=>{
-        void vscode.commands.executeCommand("skillStudio.loadExample")
-          .catch(error=>console.error("Default Studio project failed:",error));
-      },400);
-    }else{
-      const welcome=vscode.window.showInformationMessage?.(
-        "欢迎使用 SKILL Studio。可导入一个含 skills/、lib/、output/ 的演示项目（传统 5GC 与 MAS）。",
-        "载入演示 SKILL 项目"
-      );
-      if(welcome&&typeof welcome.then==="function"){
-        void welcome.then(choice=>{
-          if(choice==="载入演示 SKILL 项目")
-            return vscode.commands.executeCommand("skillStudio.loadExample");
-          return undefined;
-        });
-      }
-    }
+  const onlineDemo=typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST;
+  const workspaceName=vscode.workspace.name??null;
+  console.log("STUDIO_DEFAULT_LOAD_GATE",JSON.stringify({
+    onlineDemo,workspaceName,
+    workspaceFolderCount:(vscode.workspace.workspaceFolders??[]).length
+  }));
+  // Theia's workspaceFolders can be transient while an Untitled workspace
+  // file exists. workspace.name is the authoritative signal for a real root.
+  // An empty/Untitled workspace gets the demo; a named user workspace is kept.
+  if(onlineDemo&&!workspaceName){
+    setTimeout(()=>{
+      void vscode.commands.executeCommand("skillStudio.loadExample")
+        .catch(error=>console.error("Default Studio project failed:",error));
+    },400);
+  }else if(onlineDemo&&workspaceName){
+    void vscode.window.showInformationMessage(
+      "检测到已有工作区，已保留现有项目；如需示例，可使用 SKILL Studio → Load Example。");
   }
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.openProcedure",
     async uri=>{
