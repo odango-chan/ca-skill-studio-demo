@@ -75,6 +75,8 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
   assert.ok(!manifest.files.some(p=>p.endsWith("n1n2-delivery.schema.yaml")),
     "superseded ca-agent-demo Schemas must not be imported");
   assert.ok(h.opened[0].folder.uri.path===result.root.path);
+  assert.deepEqual(h.workspace.workspaceFolders.map(folder=>folder.uri.path),
+    [result.root.path],"seed must wait until Theia reports the real project root");
   assert.equal(h.files.size,manifest.files.length,
     "lib/ and output/ must never contain fabricated compiler inputs or outputs");
   for(const name of result.skills){
