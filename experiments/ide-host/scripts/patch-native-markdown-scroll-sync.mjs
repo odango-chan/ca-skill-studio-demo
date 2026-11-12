@@ -25,10 +25,13 @@ if(script.includes(marker)){
   }));
   process.exit(0);
 }
-const scrollStart=script.search(/window\\.addEventListener\\(["']scroll["']/);
+// Open VSX ships the minified webview bundle, so the source-level variable
+// name scrollDisabledCount is not stable. Derive its minified identifier from
+// the actual scroll handler's decrement branch instead.
+const scrollStart=script.search(/window\.addEventListener\(["']scroll["']/);
 if(scrollStart<0)throw Error("Pinned Markdown Preview runtime has no window scroll listener");
 const scrollSegment=script.slice(scrollStart,scrollStart+2400);
-const counterMatch=scrollSegment.match(/if\\(([A-Za-z_$][\\w$]*)>0\\)\\1-=1;else\\{/);
+const counterMatch=scrollSegment.match(/if\(([A-Za-z_$][\w$]*)>0\)\1-=1;else\{/);
 if(!counterMatch){
   console.log("STUDIO_NATIVE_MARKDOWN_SCROLL_RUNTIME_DIAGNOSTIC",JSON.stringify({
     bytes:script.length,scrollSnippet:scrollSegment.slice(0,1400)
@@ -36,23 +39,24 @@ if(!counterMatch){
   throw Error("Pinned Markdown Preview scroll listener no longer has its expected suppression-counter branch");
 }
 const counterName=counterMatch[1];
-const reset=`
-// STUDIO_NATIVE_MARKDOWN_USER_SCROLL_RESET: a real user gesture supersedes stale programmatic-scroll suppression.
-const studioResetNativeMarkdownScrollSuppression = () => { ${counterName} = 0; };
-window.addEventListener("wheel", studioResetNativeMarkdownScrollSuppression, {capture:true, passive:true});
-window.addEventListener("touchstart", studioResetNativeMarkdownScrollSuppression, {capture:true, passive:true});
-window.addEventListener("pointerdown", studioResetNativeMarkdownScrollSuppression, true);
-window.addEventListener("keydown", event => {
-  if (["ArrowUp","ArrowDown","PageUp","PageDown","Home","End"," "].includes(event.key))
-    studioResetNativeMarkdownScrollSuppression();
-}, true);
-`;
-
-`;
+const reset=[
+  "",
+  "// STUDIO_NATIVE_MARKDOWN_USER_SCROLL_RESET: a real user gesture supersedes stale programmatic-scroll suppression.",
+  "const studioResetNativeMarkdownScrollSuppression = () => { "+counterName+" = 0; };",
+  'window.addEventListener("wheel", studioResetNativeMarkdownScrollSuppression, {capture:true, passive:true});',
+  'window.addEventListener("touchstart", studioResetNativeMarkdownScrollSuppression, {capture:true, passive:true});',
+  'window.addEventListener("pointerdown", studioResetNativeMarkdownScrollSuppression, true);',
+  'window.addEventListener("keydown", event => {',
+  '  if (["ArrowUp","ArrowDown","PageUp","PageDown","Home","End"," "].includes(event.key))',
+  "    studioResetNativeMarkdownScrollSuppression();",
+  "}, true);",
+  ""
+].join("\n");
 script=script.slice(0,scrollStart)+reset+script.slice(scrollStart);
 if(!script.includes(marker)||!script.includes('addEventListener("wheel"'))
   throw Error("Native Markdown user-scroll compatibility patch did not apply");
 await writeFile(scriptPath,script);
 console.log("STUDIO_NATIVE_MARKDOWN_SCROLL_PATCH",JSON.stringify({
-  root,version:manifest.version,alreadyPatched:false,bytesBefore:info.size,bytesAfter:script.length
+  root,version:manifest.version,counterName,alreadyPatched:false,
+  bytesBefore:info.size,bytesAfter:script.length
 }));
