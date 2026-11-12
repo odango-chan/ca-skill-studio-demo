@@ -716,9 +716,19 @@ export function registerWorkbench(vscode,context){
         if(!schemaDefinition.some(item=>
           (item?.uri??item?.targetUri)?.path?.endsWith("/"+requestSchemaPath)))
           throw Error("Contract requestSchema did not resolve to its Package-owned Schema file");
+        const completionProviderBefore=await vscode.commands.executeCommand(
+          "skillStudio.internal.semanticTokenDiagnostics");
         const requestSchemaCompletionResult=await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",relatedUris.contract,
           sourcePosition(contractDocument,contractText,requestSchemaPath,9));
+        const completionProviderAfter=await vscode.commands.executeCommand(
+          "skillStudio.internal.semanticTokenDiagnostics");
+        if(!completionProviderAfter?.completionProvider?.registered||
+           completionProviderAfter.completionProvider.requests<=
+             (completionProviderBefore?.completionProvider?.requests??0)||
+           !completionProviderAfter.completionProvider.lastLabels?.includes(requestSchemaPath))
+          throw Error("Native Theia Completion adapter did not return the exact Package Schema candidate: "+
+            JSON.stringify(completionProviderAfter?.completionProvider??null));
         const requestSchemaCompletion=completionItems(requestSchemaCompletionResult);
         if(!requestSchemaCompletion.some(item=>
           (typeof item.label==="string"?item.label:item.label?.label)===requestSchemaPath))
