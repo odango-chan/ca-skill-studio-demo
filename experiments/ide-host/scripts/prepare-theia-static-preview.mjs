@@ -73,7 +73,8 @@ await mkdir(markdownPluginTarget,{recursive:true});
 await cp(markdownPluginSource,markdownPluginTarget,{recursive:true,force:true});
 const markdownManifest=JSON.parse(await readFile(
   join(markdownPluginTarget,"package.json"),"utf8"));
-const markdownBrowserEntry=markdownManifest.browser?.replace(/^\\.\\//,"");
+const markdownBrowserEntry=String(markdownManifest.browser??"").startsWith("./")
+  ?markdownManifest.browser.slice(2):markdownManifest.browser;
 const markdownWorker=join(markdownPluginTarget,"dist","browser","serverWorkerMain.js");
 for(const required of [
   join(markdownPluginTarget,"package.json"),
