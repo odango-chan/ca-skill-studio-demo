@@ -290,8 +290,13 @@ export function activate(context){
   // files are never overwritten by seedExampleWorkspace. Desktop VS Code
   // and user-selected workspaces keep the explicit opt-in command instead.
   if(!(vscode.workspace.workspaceFolders??[]).length){
-    const onlineDemo=typeof STUDIO_THEIA_HOST!=="undefined"&&
-      STUDIO_THEIA_HOST&&typeof Worker==="function";
+    // This bundle is explicitly marked by the Theia-only esbuild entry.
+    // The plugin host is itself a Worker; requiring a nested Worker constructor
+    // here incorrectly disables first-run loading on some Theia hosts.
+    const onlineDemo=typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST;
+    console.log("STUDIO_DEFAULT_LOAD_GATE",JSON.stringify({
+      onlineDemo,workspaceFolderCount:(vscode.workspace.workspaceFolders??[]).length
+    }));
     if(onlineDemo){
       // Let Theia finish activating its OPFS FileSystemProvider before the
       // first workspace.fs request. Failure is surfaced by loadExample with
