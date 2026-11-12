@@ -517,9 +517,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!el)return {found:false,nodeCount:nodes.length,
       fileRows:nodes.map(node=>normalize(node.innerText)).filter(name=>name.includes('procedure.yaml')).slice(0,12)};
     el.scrollIntoView({block:'center',inline:'nearest'});
-    const content=el.querySelector('.theia-TreeNodeContent')??el;
+    // Click the actual label segment, not the indentation/icon gutter.
+    const content=el.querySelector('.theia-TreeNodeSegmentGrow')??
+      el.querySelector('.theia-TreeNodeContent')??el;
     const r=content.getBoundingClientRect();
-    const points=[.3,.45,.6,.75,.9].map(f=>({
+    const points=[.5,.65,.8,.9].map(f=>({
       x:Math.round(r.x+r.width*f),y:Math.round(r.y+r.height/2)
     }));
     const point=points.find(({x,y})=>{
@@ -535,6 +537,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   })()`);
   if(!file?.found||!file.point)
     throw Error('Procedure file has no unobstructed native Explorer click target: '+JSON.stringify(file));
+  console.log('STUDIO_EXPLORER_FILE_CLICK_TARGET',JSON.stringify(file));
   file={x:file.point.x,y:file.point.y};
   // Measure the actual Explorer click → CustomEditor render path. Do not
   // insert a fixed sleep before polling; it would dominate the reported time.
