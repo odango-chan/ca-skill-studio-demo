@@ -411,6 +411,13 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
     const snapshot=currentV02PackageSnapshot();
+    const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+    const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+    const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
+    const linkDiagnostic=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===contract.uri&&
+      message.params?.diagnostics?.some(item=>item.code==="SKILL_LINK_UNRESOLVED"),15000);
     const ready=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===snapshot.rootUri&&
@@ -419,9 +426,6 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     const status=await ready;
     assert.notEqual(status.params.state,"UNAVAILABLE");
 
-    const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
-    const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
-    const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
     const tools=snapshot.documents.find(x=>x.relativePath==="lib/tools/udm.tool.yaml");
     assert.ok(contract&&procedure&&predicates&&tools);
 
@@ -469,6 +473,32 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.match(predicateHover.contents.value,/Predicate/);
     assert.ok(predicateHover.contents.value.includes(predicateName));
 
+    const schemaPath="schemas/establishment-request.schema.yaml";
+    const schemaCompletions=await lspRequest(worker,312,"textDocument/completion",{
+      textDocument:{uri:contract.uri},
+      position:positionOf(contract.text,schemaPath,9)
+    });
+    assert.ok(schemaCompletions.some(item=>item.label===schemaPath),
+      "Contract Schema path completion uses Package-owned Schema files");
+    const operationCompletions=await lspRequest(worker,313,"textDocument/completion",{
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,operationName,4)
+    });
+    assert.ok(operationCompletions.some(item=>item.label===operationName),
+      "Procedure Operation completion uses imported ToolCatalog declarations");
+    const scriptPath="scripts/select_establishment_configuration.py";
+    const scriptCompletions=await lspRequest(worker,314,"textDocument/completion",{
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,scriptPath,9)
+    });
+    assert.ok(scriptCompletions.some(item=>item.label===scriptPath),
+      "Procedure Script completion uses Package-local Script files");
+
+    const unresolvedOwner=await linkDiagnostic;
+    assert.ok(unresolvedOwner.params.diagnostics.some(item=>
+      item.code==="SKILL_LINK_UNRESOLVED"&&
+      contract.text.slice(
+        contract.offsetAt?0:0,0)==="never"));
     const predicateReferences=await lspRequest(worker,307,"textDocument/references",{
       textDocument:{uri:predicates.uri},
       position:positionOf(predicates.text,predicateName),
