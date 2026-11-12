@@ -105,7 +105,7 @@ test("Theia decoration adapter renders LSP token ranges with the canonical Studi
   const host=fakeHost();
   const renderer=createSemanticTokenDecorationRenderer(
     host.vscode,
-    ["caReferencePredicate","caValueOutcome"],
+    ["skillPredicate","skillOutcome"],
     theme.semanticTokenColors
   );
 
@@ -116,9 +116,9 @@ test("Theia decoration adapter renders LSP token ranges with the canonical Studi
 
   host.showEditors([editor]);
   assert.equal(editor.calls.length,2);
-  const predicate=editor.calls.find(call=>call.decoration.options.color==="#7B5BA7");
+  const predicate=editor.calls.find(call=>call.decoration.options.color==="#317DC0");
   const outcome=editor.calls.find(call=>call.decoration.options.color==="#AD6517");
-  assert.ok(predicate,"Predicate reference uses the canonical purple");
+  assert.ok(predicate,"Predicate reference uses the canonical blue");
   assert.ok(outcome,"PASS outcome uses the canonical orange");
   assert.deepEqual(predicate.ranges[0],new FakeRange(
     1,line.indexOf("createdsession.ingress.eligible"),
@@ -139,7 +139,7 @@ test("Theia decoration adapter preserves delta positions and clears stale ranges
   const host=fakeHost([editor]);
   const renderer=createSemanticTokenDecorationRenderer(
     host.vscode,
-    ["caReferencePredicate","caValueOutcome"],
+    ["skillPredicate","skillOutcome"],
     theme.semanticTokenColors
   );
 
