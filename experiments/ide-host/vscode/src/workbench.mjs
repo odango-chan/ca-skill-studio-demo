@@ -752,6 +752,15 @@ export function registerWorkbench(vscode,context){
               provider:completionProviderAfter?.completionProvider??null,
               sourceOffset:contractText.indexOf(requestSchemaPath)+9,
               sourcePosition:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
+              editorTextLength:contractText.length,
+              editorTokenOffset:contractText.indexOf(requestSchemaPath),
+              editorLineStart:contractText.lastIndexOf("\\n",contractText.indexOf(requestSchemaPath))+1,
+              editorLineText:contractText.slice(
+                contractText.lastIndexOf("\\n",contractText.indexOf(requestSchemaPath))+1,
+                contractText.indexOf("\\n",contractText.indexOf(requestSchemaPath))<0
+                  ?contractText.length:contractText.indexOf("\\n",contractText.indexOf(requestSchemaPath))),
+              editorPositionRoundTrip:contractDocument.positionAt(
+                contractText.indexOf(requestSchemaPath)+9),
               sourceVersion:contractDocument.version,
               acceptedGeneration:packageStateForYaml.generation,
               acceptedSnapshotSource:packageStateForYaml.lastSentSnapshot?.documents?.find(item=>
