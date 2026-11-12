@@ -229,9 +229,18 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
               if(item.preselect===true)completion.preselect=true;
               return completion;
             });
+            let debug=null;
+            if(!items.length){
+              try{
+                debug=await client.sendRequest("skillStudio/completionDiagnostics",{
+                  textDocument:{uri:document.uri.toString()},
+                  position:{line:position.line,character:position.character}
+                });
+              }catch(error){debug={error:String(error?.message??error)};}
+            }
             handlers.onCompletionProviderResult?.({
               uri:document.uri.toString(),count:items.length,
-              labels:items.map(item=>item.label)
+              labels:items.map(item=>item.label),debug
             });
             return items.length?items:undefined;
           }catch(error){
