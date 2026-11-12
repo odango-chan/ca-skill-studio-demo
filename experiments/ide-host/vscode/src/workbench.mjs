@@ -2779,7 +2779,7 @@ export function registerWorkbench(vscode,context){
         '[Missing package link](missing.md)',
         '![Remote pixel](https://example.invalid/markdown-pixel.png)',
         ''
-      ].join('\\n');
+      ].join('\n');
       const edit=new vscode.WorkspaceEdit();
       edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(original.length)),source);
       const applied=await vscode.workspace.applyEdit(edit);
