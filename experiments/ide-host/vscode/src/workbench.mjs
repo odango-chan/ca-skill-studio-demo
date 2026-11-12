@@ -640,10 +640,26 @@ export function registerWorkbench(vscode,context){
         const contractText=contractDocument.getText();
         const predicatesText=predicatesDocument.getText();
         const schemaText=schemaDocument.getText();
-        const sourcePosition=(document,text,needle)=>{
+        const sourcePosition=(document,text,needle,delta=0)=>{
           const offset=text.indexOf(needle);
           if(offset<0)throw Error("Expected Skill Language symbol is missing: "+needle);
-          return document.positionAt(offset);
+          return document.positionAt(offset+delta);
+        };
+        const completionItems=result=>{
+          if(Array.isArray(result))return result;
+          const values=[
+            ...(Array.isArray(result?.items)?result.items:[]),
+            ...(Array.isArray(result?.suggestions)?result.suggestions:[])
+          ];
+          const seen=new Set();
+          return values.filter(item=>{
+            const label=typeof item?.label==="string"?item.label:
+              item?.label?.label??item?.insertText??"";
+            const key=String(label)+"\\u0000"+String(item?.insertText??"");
+            if(seen.has(key))return false;
+            seen.add(key);
+            return true;
+          });
         };
         const locations=result=>Array.isArray(result)?result:result?[result]:[];
         const entryName="ue-requested-pdu-session-establishment";
@@ -677,6 +693,40 @@ export function registerWorkbench(vscode,context){
         if(!schemaDefinition.some(item=>
           (item?.uri??item?.targetUri)?.path?.endsWith("/"+requestSchemaPath)))
           throw Error("Contract requestSchema did not resolve to its Package-owned Schema file");
+        const requestSchemaCompletionResult=await vscode.commands.executeCommand(
+          "vscode.executeCompletionItemProvider",relatedUris.contract,
+          sourcePosition(contractDocument,contractText,requestSchemaPath,9));
+        const requestSchemaCompletion=completionItems(requestSchemaCompletionResult);
+        if(!requestSchemaCompletion.some(item=>
+          (typeof item.label==="string"?item.label:item.label?.label)===requestSchemaPath))
+          throw Error("v0.2 Contract Schema completion did not return the exact Package path: "+
+            JSON.stringify({labels:requestSchemaCompletion.map(item=>
+              typeof item.label==="string"?item.label:item.label?.label??String(item.label??"")),
+              count:requestSchemaCompletion.length,
+              rawKeys:Object.keys(requestSchemaCompletionResult??{}),
+              rawItemCount:requestSchemaCompletionResult?.items?.length??null,
+              rawSuggestionCount:requestSchemaCompletionResult?.suggestions?.length??null,
+              position:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
+              requestSchemaPath}));
+        const predicateCompletion=completionItems(await vscode.commands.executeCommand(
+          "vscode.executeCompletionItemProvider",procedureUri,
+          sourcePosition(procedureDocument,procedureText,predicateName,5)));
+        if(!predicateCompletion.some(item=>
+          (typeof item.label==="string"?item.label:item.label?.label)===predicateName))
+          throw Error("v0.2 Procedure Predicate completion did not return the Package declaration");
+        const nodeCompletion=completionItems(await vscode.commands.executeCommand(
+          "vscode.executeCompletionItemProvider",procedureUri,
+          sourcePosition(procedureDocument,procedureText,nodeName,3)));
+        if(!nodeCompletion.some(item=>
+          (typeof item.label==="string"?item.label:item.label?.label)===nodeName))
+          throw Error("v0.2 Procedure node completion did not return the scoped node declaration");
+        const scriptCompletionPath="scripts/select_establishment_configuration.py";
+        const scriptCompletion=completionItems(await vscode.commands.executeCommand(
+          "vscode.executeCompletionItemProvider",procedureUri,
+          sourcePosition(procedureDocument,procedureText,scriptCompletionPath,9)));
+        if(!scriptCompletion.some(item=>
+          (typeof item.label==="string"?item.label:item.label?.label)===scriptCompletionPath))
+          throw Error("v0.2 Procedure Script completion did not return the Package-local Script path");
         const predicateHoverResult=await vscode.commands.executeCommand(
           "vscode.executeHoverProvider",procedureUri,
           sourcePosition(procedureDocument,procedureText,predicateName));
@@ -858,6 +908,12 @@ export function registerWorkbench(vscode,context){
           yamlReferences:predicateReferences.length,
           yamlProcedureOutline:locations(yamlProcedureSymbols).map(item=>item.name),
           yamlPredicateOutline:locations(yamlPredicateSymbols).map(item=>item.name),
+          yamlCompletions:{
+            requestSchema:requestSchemaCompletion.length,
+            predicate:predicateCompletion.length,
+            node:nodeCompletion.length,
+            script:scriptCompletion.length
+          },
           reverseDefinition:reverseDefinitions.length,
           reverseDefinitionTargets:reverseDefinitions.map(item=>item.uri?.toString?.()??""),
           hover:hovers.length,
