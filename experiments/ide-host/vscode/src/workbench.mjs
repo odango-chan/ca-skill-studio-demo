@@ -640,11 +640,13 @@ export function registerWorkbench(vscode,context){
         const contractText=contractDocument.getText();
         const predicatesText=predicatesDocument.getText();
         const schemaText=schemaDocument.getText();
-        const sourcePosition=(document,text,needle)=>{
+        const sourcePosition=(document,text,needle,delta=0)=>{
           const offset=text.indexOf(needle);
           if(offset<0)throw Error("Expected Skill Language symbol is missing: "+needle);
-          return document.positionAt(offset);
+          return document.positionAt(offset+delta);
         };
+        const completionItems=result=>Array.isArray(result)?result:
+          result?.items??result?.suggestions??[];
         const locations=result=>Array.isArray(result)?result:result?[result]:[];
         const entryName="ue-requested-pdu-session-establishment";
         const entryDefinition=locations(await vscode.commands.executeCommand(
@@ -677,6 +679,26 @@ export function registerWorkbench(vscode,context){
         if(!schemaDefinition.some(item=>
           (item?.uri??item?.targetUri)?.path?.endsWith("/"+requestSchemaPath)))
           throw Error("Contract requestSchema did not resolve to its Package-owned Schema file");
+        const requestSchemaCompletion=completionItems(await vscode.commands.executeCommand(
+          "vscode.executeCompletionItemProvider",relatedUris.contract,
+          sourcePosition(contractDocument,contractText,requestSchemaPath,9)));
+        if(!requestSchemaCompletion.some(item=>
+          (typeof item.label==="string"?item.label:item.label?.label)===requestSchemaPath))
+          throw Error("v0.2 Contract Schema completion did not return the exact Package path");
+        const operationName="sbi.udm.sm_data.get";
+        const operationCompletion=completionItems(await vscode.commands.executeCommand(
+          "vscode.executeCompletionItemProvider",procedureUri,
+          sourcePosition(procedureDocument,procedureText,operationName,4)));
+        if(!operationCompletion.some(item=>
+          (typeof item.label==="string"?item.label:item.label?.label)===operationName))
+          throw Error("v0.2 Procedure Operation completion did not return the imported ToolCatalog ID");
+        const scriptPathValue="scripts/select_establishment_configuration.py";
+        const scriptCompletion=completionItems(await vscode.commands.executeCommand(
+          "vscode.executeCompletionItemProvider",procedureUri,
+          sourcePosition(procedureDocument,procedureText,scriptPathValue,9)));
+        if(!scriptCompletion.some(item=>
+          (typeof item.label==="string"?item.label:item.label?.label)===scriptPathValue))
+          throw Error("v0.2 Procedure Script completion did not return the Package-local Script path");
         const predicateHoverResult=await vscode.commands.executeCommand(
           "vscode.executeHoverProvider",procedureUri,
           sourcePosition(procedureDocument,procedureText,predicateName));
@@ -858,6 +880,11 @@ export function registerWorkbench(vscode,context){
           yamlReferences:predicateReferences.length,
           yamlProcedureOutline:locations(yamlProcedureSymbols).map(item=>item.name),
           yamlPredicateOutline:locations(yamlPredicateSymbols).map(item=>item.name),
+          yamlCompletions:{
+            requestSchema:requestSchemaCompletion.length,
+            operation:operationCompletion.length,
+            script:scriptCompletion.length
+          },
           reverseDefinition:reverseDefinitions.length,
           reverseDefinitionTargets:reverseDefinitions.map(item=>item.uri?.toString?.()??""),
           hover:hovers.length,
