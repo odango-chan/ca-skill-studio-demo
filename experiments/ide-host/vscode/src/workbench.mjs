@@ -597,7 +597,112 @@ export function registerWorkbench(vscode,context){
       async procedureUriValue=>{
         const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
         const procedureDocument=await vscode.workspace.openTextDocument(procedureUri);
-        const procedureLines=procedureDocument.getText().split(/\r\n|\n|\r/);
+        const packagePath=procedureUri.path.replace(/\/assurance\/procedure\.yaml$/,"");
+        if(packagePath===procedureUri.path)
+          throw Error("Procedure URI does not identify a Package assurance/procedure.yaml");
+        const relatedUris={
+          contract:procedureUri.with({path:packagePath+"/assurance/contract.yaml"}),
+          predicates:procedureUri.with({path:packagePath+"/assurance/predicates.yaml"}),
+          schema:procedureUri.with({path:packagePath+"/schemas/establishment-request.schema.yaml"})
+        };
+        const packageRootForYaml=packageRootForProcedure(vscode,procedureDocument);
+        const packageStateForYaml=packageRootForYaml?
+          languagePackages.get(packageRootForYaml.uri.toString()):null;
+        if(!packageStateForYaml)
+          throw Error("Active Procedure Package has no Language Service state");
+        const generationBeforeYamlOpen=packageStateForYaml.generation;
+        const openBeforeYaml=new Set((vscode.workspace.textDocuments??[])
+          .map(item=>item.uri.toString()));
+        const [contractDocument,predicatesDocument,schemaDocument]=await Promise.all([
+          vscode.workspace.openTextDocument(relatedUris.contract),
+          vscode.workspace.openTextDocument(relatedUris.predicates),
+          vscode.workspace.openTextDocument(relatedUris.schema)
+        ]);
+        const openedYamlSources=[contractDocument,predicatesDocument,schemaDocument]
+          .filter(item=>!openBeforeYaml.has(item.uri.toString())).length;
+        const yamlAnalysisStarted=Date.now();
+        while(Date.now()-yamlAnalysisStarted<15000){
+          const generation=packageStateForYaml.generation;
+          const ready=languageStatusItem?.text==="SKILL LSP: READY"&&
+            String(languageStatusItem?.tooltip??"").includes("generation "+generation);
+          if(ready&&(!openedYamlSources||generation>generationBeforeYamlOpen))break;
+          if(languageStatusItem?.text==="SKILL LSP: ERROR"||
+             languageStatusItem?.text==="SKILL LSP: UNAVAILABLE")
+            throw Error("Package re-analysis failed before YAML symbol acceptance: "+
+              String(languageStatusItem.tooltip??""));
+          await new Promise(resolve=>setTimeout(resolve,100));
+        }
+        if(languageStatusItem?.text!=="SKILL LSP: READY"||
+           !String(languageStatusItem?.tooltip??"").includes(
+             "generation "+packageStateForYaml.generation))
+          throw Error("YAML symbol Package generation did not reach READY");
+        const procedureText=procedureDocument.getText();
+        const contractText=contractDocument.getText();
+        const predicatesText=predicatesDocument.getText();
+        const schemaText=schemaDocument.getText();
+        const sourcePosition=(document,text,needle)=>{
+          const offset=text.indexOf(needle);
+          if(offset<0)throw Error("Expected Skill Language symbol is missing: "+needle);
+          return document.positionAt(offset);
+        };
+        const locations=result=>Array.isArray(result)?result:result?[result]:[];
+        const entryName="ue-requested-pdu-session-establishment";
+        const entryDefinition=locations(await vscode.commands.executeCommand(
+          "vscode.executeDefinitionProvider",relatedUris.contract,
+          sourcePosition(contractDocument,contractText,entryName)));
+        const entryTarget=entryDefinition.find(item=>
+          (item?.uri??item?.targetUri)?.toString()===procedureUri.toString());
+        if(!entryTarget)
+          throw Error("Contract entryProcedure did not resolve to the unique Procedure declaration: "+
+            JSON.stringify(entryDefinition.map(item=>(item?.uri??item?.targetUri)?.toString?.()??null)));
+        const predicateName="createdsession.ingress.eligible";
+        const predicateDefinition=locations(await vscode.commands.executeCommand(
+          "vscode.executeDefinitionProvider",procedureUri,
+          sourcePosition(procedureDocument,procedureText,predicateName)));
+        const predicateTarget=predicateDefinition.find(item=>
+          (item?.uri??item?.targetUri)?.toString()===relatedUris.predicates.toString());
+        if(!predicateTarget)
+          throw Error("Procedure Predicate did not resolve to its PredicateSet declaration");
+        const nodeName="nudm-sdm-get";
+        const nodeDefinition=locations(await vscode.commands.executeCommand(
+          "vscode.executeDefinitionProvider",procedureUri,
+          sourcePosition(procedureDocument,procedureText,nodeName)));
+        if(!nodeDefinition.some(item=>
+          (item?.uri??item?.targetUri)?.toString()===procedureUri.toString()))
+          throw Error("Procedure start did not resolve to its exact node declaration");
+        const requestSchemaPath="schemas/establishment-request.schema.yaml";
+        const schemaDefinition=locations(await vscode.commands.executeCommand(
+          "vscode.executeDefinitionProvider",relatedUris.contract,
+          sourcePosition(contractDocument,contractText,requestSchemaPath)));
+        if(!schemaDefinition.some(item=>
+          (item?.uri??item?.targetUri)?.path?.endsWith("/"+requestSchemaPath)))
+          throw Error("Contract requestSchema did not resolve to its Package-owned Schema file");
+        const predicateHoverResult=await vscode.commands.executeCommand(
+          "vscode.executeHoverProvider",procedureUri,
+          sourcePosition(procedureDocument,procedureText,predicateName));
+        const predicateHoverText=locations(predicateHoverResult).flatMap(item=>
+          Array.isArray(item?.contents)?item.contents:[item?.contents])
+          .map(item=>typeof item==="string"?item:item?.value??String(item??""))
+          .join(" ");
+        if(!predicateHoverText.includes("Predicate")||
+           !predicateHoverText.includes(predicateName))
+          throw Error("Predicate Hover did not expose the canonical symbol identity");
+        const predicateReferences=locations(await vscode.commands.executeCommand(
+          "vscode.executeReferenceProvider",relatedUris.predicates,
+          sourcePosition(predicatesDocument,predicatesText,predicateName),{includeDeclaration:true}));
+        if(!predicateReferences.some(item=>
+            (item?.uri??item?.targetUri)?.toString()===procedureUri.toString()))
+          throw Error("Predicate References did not return the exact Procedure use");
+        const yamlProcedureSymbols=await vscode.commands.executeCommand(
+          "vscode.executeDocumentSymbolProvider",procedureUri);
+        const yamlPredicateSymbols=await vscode.commands.executeCommand(
+          "vscode.executeDocumentSymbolProvider",relatedUris.predicates);
+        const procedureSymbol=locations(yamlProcedureSymbols).find(item=>item.name===entryName);
+        if(!procedureSymbol||!procedureSymbol.children?.some(item=>item.name===nodeName))
+          throw Error("Native Outline did not expose Procedure and nested node declarations");
+        if(!locations(yamlPredicateSymbols).some(item=>item.name===predicateName))
+          throw Error("Native Outline did not expose PredicateSet declarations");
+        const procedureLines=procedureText.split(/\r\n|\n|\r/);
         const scriptPathValue="scripts/select_establishment_configuration.py";
         const procedureLine=procedureLines.findIndex(line=>line.includes("script: "+scriptPathValue));
         if(procedureLine<0)throw Error("Procedure Source does not contain the expected declared script path");
@@ -734,6 +839,16 @@ export function registerWorkbench(vscode,context){
         await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
         return {
           definition:scriptPath,
+          yamlDefinitions:{
+            entryProcedure:entryTarget.uri?.toString?.()??entryTarget.targetUri?.toString?.()??"",
+            predicate:predicateTarget.uri?.toString?.()??predicateTarget.targetUri?.toString?.()??"",
+            node:nodeDefinition.length,
+            schema:schemaDefinition.length
+          },
+          yamlHover:predicateHoverText.includes(predicateName),
+          yamlReferences:predicateReferences.length,
+          yamlProcedureOutline:locations(yamlProcedureSymbols).map(item=>item.name),
+          yamlPredicateOutline:locations(yamlPredicateSymbols).map(item=>item.name),
           reverseDefinition:reverseDefinitions.length,
           reverseDefinitionTargets:reverseDefinitions.map(item=>item.uri?.toString?.()??""),
           hover:hovers.length,

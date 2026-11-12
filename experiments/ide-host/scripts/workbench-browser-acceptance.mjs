@@ -623,6 +623,18 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     })()`);
     if(!languageFeatureEvidence?.definition?.endsWith(
       "/scripts/select_establishment_configuration.py")||
+      !languageFeatureEvidence.yamlDefinitions?.entryProcedure?.endsWith(
+        "/assurance/procedure.yaml")||
+      !languageFeatureEvidence.yamlDefinitions?.predicate?.endsWith(
+        "/assurance/predicates.yaml")||
+      !languageFeatureEvidence.yamlDefinitions?.schema||
+      !languageFeatureEvidence.yamlHover||
+      !languageFeatureEvidence.yamlReferences||
+      !languageFeatureEvidence.yamlProcedureOutline?.length||
+      !languageFeatureEvidence.yamlProcedureOutline.includes(
+        "ue-requested-pdu-session-establishment")||
+      !languageFeatureEvidence.yamlPredicateOutline?.includes(
+        "createdsession.ingress.eligible")||
       !languageFeatureEvidence.hover||
       !languageFeatureEvidence.references||
       !languageFeatureEvidence.reverseDefinition||
