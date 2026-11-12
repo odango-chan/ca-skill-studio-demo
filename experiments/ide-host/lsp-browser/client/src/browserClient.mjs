@@ -206,7 +206,9 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
           try{
             const result=await client.sendRequest("textDocument/completion",{
               textDocument:{uri:document.uri.toString()},
-              position:{line:position.line,character:position.character}
+              position:{line:position.line,character:position.character},
+              context:{triggerKind:1,
+                skillStudioDiagnostics:handlers.debugCompletionDiagnostics===true}
             },cancellationToken);
             if(cancellationToken?.isCancellationRequested)return undefined;
             const source=Array.isArray(result)?result:
@@ -231,18 +233,9 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
               if(item.preselect===true)completion.preselect=true;
               return completion;
             });
-            let debug=null;
-            if(!items.length){
-              try{
-                debug=await client.sendRequest("skillStudio/completionDiagnostics",{
-                  textDocument:{uri:document.uri.toString()},
-                  position:{line:position.line,character:position.character}
-                });
-              }catch(error){debug={error:String(error?.message??error)};}
-            }
             handlers.onCompletionProviderResult?.({
               uri:document.uri.toString(),count:items.length,
-              labels:items.map(item=>item.label),debug
+              labels:items.map(item=>item.label)
             });
             return items.length?items:undefined;
           }catch(error){
@@ -356,6 +349,9 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   client.onDidChangeState(event => {
     if (started && !stopped && event.newState === State.Stopped)
       fatal("Browser LanguageClient stopped unexpectedly");
+  });
+  client.onNotification("skillStudio/completionDiagnostics",diagnostics=>{
+    handlers.onCompletionProviderDiagnostics?.(diagnostics);
   });
   client.onNotification(ANALYSIS_STATUS_NOTIFICATION, status => {
     if (!terminalFailure) handlers.onStatus?.(status);
