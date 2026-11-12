@@ -17,16 +17,16 @@ function modifier(token,name){
 function packageFilePath(value){
   if(typeof value!=="string"||!value||
      value.includes("#")||value.includes("://")||value.startsWith("/")||
-     value.includes("\\\\")||value.includes("?")||value.includes("%")||
+     value.includes(String.fromCharCode(92))||value.includes("?")||value.includes("%")||
      /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value))return null;
   // Skill Language paths are rooted in the logical BuildRequest file set.
-  // Reject relative traversal, URL references and fragment-only refs rather
-  // than normalizing them into a guessed Package destination.
-  const raw=value.split("#",1)[0];
-  if(!/^(?:schemas|lib|scripts|references)\\//.test(raw))return null;
+  // Reject traversal, external URLs and fragments without exact AST ranges.
+  const raw=value;
+  if(!(raw.startsWith("schemas/")||raw.startsWith("lib/")||
+       raw.startsWith("scripts/")||raw.startsWith("references/")))return null;
   const parts=raw.split("/");
   if(parts.some(part=>!part||part==="."||part===".."||
-    /[\\u0000-\\u001f:<>|?*]/.test(part)))return null;
+    /[:<>|?*]/.test(part)||[...part].some(char=>char.charCodeAt(0)<32)))return null;
   return parts.join("/");
 }
 
