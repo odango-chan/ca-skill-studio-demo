@@ -2261,31 +2261,22 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(nativeLive.view.contextId!==nativeMarkdown.view.contextId)
       throw Error('Native Markdown recreated its Preview webview instead of updating it in place: '+
         JSON.stringify({before:nativeMarkdown.view.contextId,after:nativeLive.view.contextId}));
-    const readSourceScroll=async()=>evalJS(`(()=>{const c=window.theia.container;
-      const managerKey=[...c._bindingDictionary._map.keys()].find(key=>
-        typeof key==='function'&&typeof key.prototype?.getOrCreateByUri==='function'&&
-        typeof key.prototype?.getByUri==='function');
-      const editors=managerKey&&c.get(managerKey).all;
-      const control=editors?.map(widget=>widget.editor?.getControl?.()).find(editor=>
-        editor?.getModel()?.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
-      if(!control)throw Error('Native Markdown Source Monaco editor is unavailable');
-      return {scrollTop:control.getScrollTop(),scrollHeight:control.getScrollHeight(),
-        clientHeight:control.getLayoutInfo().height};
-    })()`);
-    const sourceScroll=async top=>{
-      const result=await evalJS(`(()=>{const c=window.theia.container;
-        const managerKey=[...c._bindingDictionary._map.keys()].find(key=>
-          typeof key==='function'&&typeof key.prototype?.getOrCreateByUri==='function'&&
-          typeof key.prototype?.getByUri==='function');
-        const editors=managerKey&&c.get(managerKey).all;
-        const control=editors?.map(widget=>widget.editor?.getControl?.()).find(editor=>
-          editor?.getModel()?.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
-        if(!control)throw Error('Native Markdown Source Monaco editor is unavailable');
-        control.setScrollTop(${Number(top)});
-        return {scrollTop:control.getScrollTop(),scrollHeight:control.getScrollHeight(),
-          clientHeight:control.getLayoutInfo().height};
-      })()`);
-      return result;
+    const readSourceScroll=async()=>{
+      const state=await nativeCommand(
+        'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance');
+      if(!state?.editorFound||state.uri!==nativeMarkdownUri)
+        throw Error('Native Markdown visible Source editor is unavailable: '+JSON.stringify(state));
+      return {lineCount:state.lineCount,
+        visibleRanges:state.after??state.before??[],
+        topLine:state.after?.[0]?.start??state.before?.[0]?.start??null};
+    };
+    const sourceScroll=async direction=>{
+      const state=await nativeCommand(
+        'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',direction);
+      if(!state?.editorFound||state.uri!==nativeMarkdownUri)
+        throw Error('Native Markdown visible Source editor is unavailable: '+JSON.stringify(state));
+      return {lineCount:state.lineCount,visibleRanges:state.after??[],
+        topLine:state.after?.[0]?.start??null};
     };
     const previewScroll=async expression=>(await command('Runtime.evaluate',{
       contextId:nativeLive.view.contextId,returnByValue:true,expression
@@ -2330,15 +2321,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           '; revealRangeProbe='+JSON.stringify(revealProbe));
       }
     };
-    const initialSource=await sourceScroll(0);
-    if(initialSource.scrollHeight<=initialSource.clientHeight+100)
+    const initialSource=await readSourceScroll();
+    if(initialSource.lineCount<=100)
       throw Error('Native Markdown scroll fixture is not tall enough to test bidirectional synchronization: '+
         JSON.stringify(initialSource));
-    const sourceBottom=await sourceScroll(initialSource.scrollHeight);
+    const sourceBottom=await sourceScroll('bottom');
     await waitForScroll(()=>previewScroll('window.scrollY'),
       value=>value>100,'Native Source → Preview scroll');
     const previewTop=await scrollPreviewByWheel(-12000);
-    await waitForSourceScroll(value=>value.scrollTop<40,
+    await waitForSourceScroll(value=>value.topLine!==null&&value.topLine<3,
       'Native Preview → Source top scroll');
     const previewBottom=await scrollPreviewByWheel(12000);
     const previewScrollDiagnostics=await previewScroll(
@@ -2350,13 +2341,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       'id:el.id,className:String(el.className??""),top:el.scrollTop,height:el.scrollHeight,'+
       'client:el.clientHeight,overflow:getComputedStyle(el).overflowY})).slice(0,20)}))()');
     try{
-      await waitForSourceScroll(value=>value.scrollTop>100,
+      await waitForSourceScroll(value=>value.topLine!==null&&value.topLine>100,
         'Native Preview → Source bottom scroll');
     }catch(error){
       throw Error(error.message+'; previewBottom='+JSON.stringify(previewBottom)+
         '; previewMetrics='+JSON.stringify(previewScrollDiagnostics));
     }
-    const sourceTop=await sourceScroll(0);
+    const sourceTop=await sourceScroll('top');
     await waitForScroll(()=>previewScroll('window.scrollY'),value=>value<50,
       'Native Source → Preview top scroll');
     const nativeMarkdownLiveEvidence={
