@@ -198,6 +198,24 @@ test("Document Symbols expose Procedures, nested nodes and Predicates from exact
     x.name==="createdsession.ingress.eligible"));
 });
 
+test("PRE/POST local phase-step names are not Procedure node targets",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const declarations=symbols.skillSymbolDeclarationsForDocument(index,procedure.uri)
+    .filter(item=>item.type==="skillStep");
+  assert.ok(declarations.length>0);
+  assert.ok(declarations.every(item=>item.part==="key"&&
+    item.path?.[0]==="procedures"&&item.path?.[2]==="nodes"&&
+    item.path.length===4));
+  const localPhaseStep=(index.tokensByUri.get(procedure.uri)??[]).find(item=>
+    item.type==="skillStep"&&item.modifiers.includes("declaration")&&
+    (item.path??[]).includes("preconditions"));
+  assert.ok(localPhaseStep,"fixture contains a local PRE phase-step declaration");
+  assert.equal(symbols.skillSymbolAt(index,procedure.uri,localPhaseStep.range.start),null,
+    "local PRE step is not mistaken for a Procedure node");
+});
+
 test("symbol index remains package- and generation-scoped",()=>{
   const first=packageSnapshot();
   const second={...first,generation:2,rootUri:"file:///workspace/other"};
