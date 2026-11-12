@@ -1,5 +1,6 @@
-// Explicit user-triggered Sample Package import for VS Code desktop/web or
-// Theia browser-only OPFS. Never overwrite existing workspace files.
+// Explicit Sample Package import for VS Code desktop/web or Theia browser-only OPFS.
+// Online demo reset replaces the two bundled SKILL packages with their pinned
+// source; desktop/user workspaces remain create-only unless reset is explicit.
 const SRC=["samples","skills"];
 // A Skill Compiler project has one source workspace with three top-level
 // directories. The Studio demo may seed only skills/; it must not invent
@@ -66,6 +67,61 @@ async function readBundledResource(vscode,uri){
   }
   return vscode.workspace.fs.readFile(uri);
 }
+function workspaceHasRoot(workspace,root){
+  const target=root.toString();
+  return (workspace.workspaceFolders??[]).some(folder=>
+    folder?.uri?.toString?.()===target);
+}
+async function exposeWorkspaceRoot(workspace,root,legacyRoots=[]){
+  if(workspaceHasRoot(workspace,root))return false;
+  if(typeof workspace.updateWorkspaceFolders!=="function"||
+     typeof workspace.onDidChangeWorkspaceFolders!=="function")
+    fail("Host cannot open a native workspace folder");
+  const folders=workspace.workspaceFolders??[];
+  const legacySet=new Set(legacyRoots.map(uri=>uri.toString()));
+  const legacyIndex=folders.findIndex(folder=>
+    legacySet.has(folder?.uri?.toString?.()));
+  const start=legacyIndex>=0?legacyIndex:folders.length;
+  const deleteCount=legacyIndex>=0?1:0;
+  let subscription=null,timer=null,settled=false;
+  const waitForRoot=new Promise((resolve,reject)=>{
+    const finish=(error)=>{
+      if(settled)return;
+      settled=true;
+      subscription?.dispose?.();
+      if(timer!==null)clearTimeout(timer);
+      if(error)reject(error);else resolve(true);
+    };
+    subscription=workspace.onDidChangeWorkspaceFolders(()=>{
+      if(workspaceHasRoot(workspace,root))finish();
+    });
+    timer=setTimeout(()=>{
+      const current=(workspace.workspaceFolders??[]).map(folder=>
+        folder?.uri?.toString?.()??"<invalid-uri>");
+      finish(Error("Timed out waiting for Theia to open project root "+
+        root.toString()+"; current workspace folders: "+JSON.stringify(current)));
+    },15000);
+    let accepted=false;
+    try{
+      accepted=workspace.updateWorkspaceFolders(start,deleteCount,{uri:root});
+    }catch(error){
+      finish(Error("Workspace update request failed: "+String(error?.message??error)));
+      return;
+    }
+    if(!accepted){
+      if(workspaceHasRoot(workspace,root))finish();
+      else finish(Error("Theia rejected the project workspace root update"));
+      return;
+    }
+    // Some hosts publish the new folder before returning from the API call;
+    // others report it only through onDidChangeWorkspaceFolders.
+    if(workspaceHasRoot(workspace,root))finish();
+  });
+  await waitForRoot;
+  if(!workspaceHasRoot(workspace,root))
+    fail("Workspace change event arrived without the requested project root");
+  return true;
+}
 function validate(manifest){
   if(manifest?.schemaVersion!==1||
      manifest?.sourceRepo!=="odango-chan/ca-skills"||
@@ -92,7 +148,7 @@ function validate(manifest){
       fail("Missing required "+skill+" package files");
   return manifest;
 }
-export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
+export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{resetExisting=false}={}){
   let phase="initial";
   try{
   if(!vscode?.workspace?.fs||!vscode.Uri?.file||!vscode.Uri.joinPath)
@@ -112,22 +168,43 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   }
   const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
   const files=manifest.files;
-  // Reuse the existing browser-owned workspaces/skills Source in place,
-  // treating its parent as the compiler-style project root. This upgrades
-  // legacy demos without copying, hiding or overwriting edited SKILL files.
-  // No user-selected Workspace is ever used as an import destination.
+  // The actual folder basename must be the project name: Theia 1.76
+  // ignores WorkspaceFolder.name passed to updateWorkspaceFolders().
   if(!storageUri)fail("No writable extension storage URI");
-  const root=vscode.Uri.joinPath(storageUri,"workspaces");
+  const legacyRoot=vscode.Uri.joinPath(storageUri,"workspaces");
+  const legacySkillsRoot=vscode.Uri.joinPath(legacyRoot,"skills");
+  const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
   const skillsRoot=vscode.Uri.joinPath(root,"skills");
   const libraryRoot=vscode.Uri.joinPath(root,"lib");
   const outputRoot=vscode.Uri.joinPath(root,"output");
-  const current=vscode.workspace.workspaceFolders??[];
-  let created=0,skipped=0;
+  let created=0,skipped=0,overwritten=0,resetPackages=0;
   phase="create-project-layout";
   await fileSystem.createDirectory(root);
   await fileSystem.createDirectory(skillsRoot);
   await fileSystem.createDirectory(libraryRoot);
   await fileSystem.createDirectory(outputRoot);
+  if(resetExisting){
+    // Reset only the two known bundled Skill package directories. This clears
+    // edited and untracked files inside those packages, but leaves other Skills,
+    // lib/, output/, and every unrelated/user-selected workspace untouched.
+    for(const skill of SKILLS){
+      let found=false;
+      for(const packageRoot of [
+        vscode.Uri.joinPath(skillsRoot,skill),
+        vscode.Uri.joinPath(legacySkillsRoot,skill)
+      ]){
+        phase="reset-package:"+skill;
+        try{
+          await fileSystem.stat(packageRoot);
+          found=true;
+          await fileSystem.delete(packageRoot,{recursive:true,useTrash:false});
+        }catch(error){
+          if(error?.code!=="FileNotFound")throw error;
+        }
+      }
+      if(found)resetPackages++;
+    }
+  }
   for(const file of files){
     const segments=file.split("/");
     const destination=vscode.Uri.joinPath(skillsRoot,...segments);
@@ -137,7 +214,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
     catch(error){
       if(error?.code!=="FileNotFound")throw error;
     }
-    if(exists){skipped++;continue;}
+    if(exists&&!resetExisting){skipped++;continue;}
     const source=vscode.Uri.joinPath(extensionUri,...SRC,...segments);
     phase="read-bundled-file:"+file;
     const bytes=await readBundledResource(vscode,source);
@@ -145,32 +222,40 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
     phase="create-parent:"+file;
     if(segments.length>1)
       await fileSystem.createDirectory(vscode.Uri.joinPath(skillsRoot,...segments.slice(0,-1)));
-    // writeFile with create-only intent; a racing external write is guarded
-    // by the second stat. The spike does not claim atomic multi-file import.
-    try{await fileSystem.stat(destination);fail("Sample file changed during import");}
-    catch(error){if(error?.code!=="FileNotFound")throw error;}
+    // Normal imports remain create-only. The online demo's explicit reset
+    // intentionally replaces every pinned manifest file with canonical bytes.
+    if(!exists){
+      try{await fileSystem.stat(destination);fail("Sample file changed during import");}
+      catch(error){if(error?.code!=="FileNotFound")throw error;}
+    }
     phase="write-file:"+file;
     await fileSystem.writeFile(destination,bytes);
-    created++;
+    if(exists)overwritten++;else created++;
   }
-  phase="workspace-update";
-  let workspaceUpdated=false;
-  if(!current.some(f=>f.uri.toString()===root.toString())){
-    // Replace only the old extension-owned skills/ workspace root. Do not
-    // remove a similarly named folder belonging to another user project.
-    const legacyIndex=current.findIndex(folder=>
-      folder.uri.toString()===skillsRoot.toString());
-    workspaceUpdated=Boolean(vscode.workspace.updateWorkspaceFolders?.(
-      legacyIndex>=0?legacyIndex:current.length,legacyIndex>=0?1:0,
-      {uri:root,name:EXAMPLE_PROJECT_NAME}));
-    if(!workspaceUpdated)
-      fail("Cannot expose bundled SKILL project in the native Explorer");
+  phase="workspace-update-confirmation";
+  const workspaceUpdated=await exposeWorkspaceRoot(vscode.workspace,root,[
+    legacyRoot,legacySkillsRoot
+  ]);
+  if(resetExisting){
+    // Remove only the two legacy bundled package directories from the previous
+    // extension-owned workspace location. Other Skills and unrelated data stay.
+    for(const skill of SKILLS){
+      const legacyPackage=vscode.Uri.joinPath(legacySkillsRoot,skill);
+      phase="clear-legacy-package:"+skill;
+      try{
+        await fileSystem.stat(legacyPackage);
+        await fileSystem.delete(legacyPackage,{recursive:true,useTrash:false});
+      }catch(error){
+        if(error?.code!=="FileNotFound")throw error;
+      }
+    }
   }
   const procedures=Object.fromEntries(SKILLS.map(name=>
     [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
   return {root,skillsRoot,libraryRoot,outputRoot,
     procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
-    sourceSha:manifest.sourceSha,files:files.length,created,skipped,workspaceUpdated};
+    sourceSha:manifest.sourceSha,files:files.length,created,skipped,overwritten,
+    resetPackages,resetExisting,workspaceUpdated};
   }catch(error){
     throw Error(phase+": "+String(error?.message??error));
   }

@@ -1350,6 +1350,19 @@ export function registerWorkbench(vscode,context){
           throw Error("L2-D3 "+phase+" stale or unready generation "+state.generation+
             " / "+languageStatusItem?.text);
         };
+        const collectStableSnapshot=async generation=>{
+          for(let attempt=0;attempt<3;attempt++){
+            const snapshot=await collectPackageSnapshot(vscode,procedure,generation);
+            if(snapshot.completeness==="complete")return snapshot;
+            if(!transientRead(snapshot.reason)||attempt===2)
+              throw Error("L2-D3: incomplete Package snapshot after "+
+                (attempt+1)+" attempt(s): "+snapshot.reason);
+            // OPFS may enumerate a just-written reference before its bytes are
+            // readable. Retry the same generation only for transient FS errors.
+            await new Promise(resolve=>setTimeout(resolve,100*(attempt+1)));
+          }
+          throw Error("L2-D3: Package snapshot did not become complete");
+        };
         const getHover=async()=>{
           const lines=procedure.getText().split(/\r\n|\n|\r/);
           const target="scripts/select_establishment_configuration.py";
@@ -1394,9 +1407,7 @@ export function registerWorkbench(vscode,context){
           await replace(python.doc,legacyMetadata?python.original.replace(old,latest)
             :python.original+"\n"+latest+"\n");
           const generation=await ready(before,"cross-file edits");
-          const snapshot=await collectPackageSnapshot(vscode,procedure,generation);
-          if(snapshot.completeness!=="complete")
-            throw Error("L2-D3: incomplete Package snapshot "+snapshot.reason);
+          const snapshot=await collectStableSnapshot(generation);
           const covered=[];
           for(const entry of entries){
             const match=snapshot.documents.find(x=>x.relativePath===entry.path);
@@ -2695,6 +2706,13 @@ export function registerWorkbench(vscode,context){
       void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
     },0);
   }));
+  // Internal acceptance probe reports the authoritative VS Code TextDocument
+  // version; the custom-editor webview's display revision is not that version.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.sourceVersionAcceptance',()=>({
+      uri:document?.uri.toString()??null,
+      version:document?.version??null
+    })));
   // Internal real-browser acceptance opens the owner-pinned conventional guide
   // by exact workspace path; it is not a contributed user command.
   context.subscriptions.push(vscode.commands.registerCommand(

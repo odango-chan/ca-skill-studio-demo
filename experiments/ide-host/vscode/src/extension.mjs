@@ -12,7 +12,7 @@ function newNonce(){
 }
 import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
-import {seedExampleWorkspace} from "./sample-loader.mjs";
+import {EXAMPLE_PROJECT_NAME,seedExampleWorkspace} from "./sample-loader.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
@@ -227,16 +227,31 @@ export function activate(context){
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
     webviewOptions:{retainContextWhenHidden:true}
   }));
+  const onlineDemo=typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST;
+  const demoResetStateKey="skillStudio.defaultExampleResetVersion";
+  const demoResetVersion="2026-11-12-v1";
+  // One-time migration reset: restore the currently deployed demo once, then
+  // preserve future user edits across reloads. A later explicit reset can bump
+  // this version without changing desktop/user-workspace behavior.
+  let resetExistingOnLoad=onlineDemo&&
+    context.globalState?.get?.(demoResetStateKey)!==demoResetVersion;
   let exampleLoadPromise=null;
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
     ()=>{
       // The demo can auto-load just as someone clicks Load Example. Serialize
-      // both requests so the create-only loader never sees a false write race.
+      // both requests so automatic reset and explicit import cannot race.
       if(exampleLoadPromise)return exampleLoadPromise;
       exampleLoadPromise=(async()=>{
       let stage="seed-example";
       try{
-        const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri);
+        const resetExisting=resetExistingOnLoad;
+        const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri,{
+          resetExisting
+        });
+        if(resetExisting){
+          await context.globalState?.update?.(demoResetStateKey,demoResetVersion);
+          resetExistingOnLoad=false;
+        }
         stage="show-packages";
         // User-triggered import should end in the real native Packages view.
         // View-container activation is a host command: fall back gracefully
@@ -262,12 +277,25 @@ export function activate(context){
         stage="open-procedure";
         // Respect the registered default CustomEditor association (the working
         // Theia first-run path); avoid opening a second explicit editor.
-        await vscode.commands.executeCommand("vscode.open",result.procedure);
+        const confirmedFolders=(vscode.workspace.workspaceFolders??[])
+          .map(folder=>folder.uri.toString());
+        if(!confirmedFolders.includes(result.root.toString()))
+          throw Error("Theia has not confirmed the skill-studio-demo workspace root");
+        await vscode.commands.executeCommand("vscode.openWith",result.procedure,VIEW);
+        console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
+          root:result.root.toString(),
+          workspaceFolders:confirmedFolders,
+          defaultProcedure:result.procedure.toString(),
+          editor:VIEW
+        }));
+        const resetSummary=resetExisting
+          ?"已重置 "+result.resetPackages+" 个官方 SKILL 包。"
+          :"保留 "+result.skipped+" 个已有文件。";
         void vscode.window.showInformationMessage(
-          "示例项目已载入：skills/（传统 5GC + MAS）、lib/（待导入 Tool 契约）、"+
-          "output/（待生成编译产物）。新增 "+result.created+" 个文件，"+
-          "保留 "+result.skipped+" 个已有文件。"+
-          (viewOpened&&revealed?"已展开 Packages。":"请打开 Skill Studio → Packages 查看两个 SKILL。"));
+          "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+
+          "同步 "+result.files+" 个官方文件；"+resetSummary+
+          (viewOpened&&revealed?"已展开 Packages（含传统 5GC + MAS）。":
+            "可在 Skill Studio → Packages 查看两个 SKILL。"));
       }catch(error){
         await vscode.window.showErrorMessage(
           "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
@@ -275,34 +303,45 @@ export function activate(context){
       })().finally(()=>{exampleLoadPromise=null;});
       return exampleLoadPromise;
     }));
-  // The published browser-only workbench is a demo, not a blank IDE. Seed
-  // the extension-owned example project on first launch; existing edited
-  // files are never overwritten by seedExampleWorkspace. Desktop VS Code
-  // and user-selected workspaces keep the explicit opt-in command instead.
-  if(!(vscode.workspace.workspaceFolders??[]).length){
-    const onlineDemo=typeof STUDIO_THEIA_HOST!=="undefined"&&
-      STUDIO_THEIA_HOST&&typeof Worker==="function";
-    if(onlineDemo){
-      // Let Theia finish activating its OPFS FileSystemProvider before the
-      // first workspace.fs request. Failure is surfaced by loadExample with
-      // the exact phase; the command remains available for an explicit retry.
-      setTimeout(()=>{
+  // The browser-only Pages host owns one default demo workspace. The first
+  // activation after this migration resets the two pinned sample Skills once;
+  // later visits preserve edits. Unrelated/user-selected workspaces are kept.
+  // Desktop VS Code and backend Theia keep create-only Load Example behavior.
+  const workspaceName=vscode.workspace.name??null;
+  const legacyDemoRoot=vscode.Uri.joinPath(context.globalStorageUri,"workspaces");
+  const demoRoot=vscode.Uri.joinPath(legacyDemoRoot,EXAMPLE_PROJECT_NAME);
+  const legacySkillsRoot=vscode.Uri.joinPath(legacyDemoRoot,"skills");
+  const managedRoots=new Set([
+    legacyDemoRoot.toString(),demoRoot.toString(),legacySkillsRoot.toString()
+  ]);
+  const currentWorkspaceUris=()=>(vscode.workspace.workspaceFolders??[])
+    .map(folder=>folder.uri.toString());
+  const isManagedDemoWorkspace=()=>{
+    const folders=currentWorkspaceUris();
+    return folders.length>0&&folders.every(uri=>managedRoots.has(uri));
+  };
+  const isEmptyWorkspace=()=>{
+    const name=String(vscode.workspace.name??"").trim().toLowerCase();
+    const untitled=!name||name==="untitled"||name==="untitled (workspace)";
+    return currentWorkspaceUris().length===0&&untitled;
+  };
+  console.log("STUDIO_DEFAULT_LOAD_GATE",JSON.stringify({
+    onlineDemo,workspaceName,
+    workspaceFolders:currentWorkspaceUris(),
+    isManagedDemoWorkspace:isManagedDemoWorkspace()
+  }));
+  if(onlineDemo){
+    // Let Theia finish restoring its workspace before deciding whether it is
+    // the managed demo or a real user project. Never replace foreign roots.
+    setTimeout(()=>{
+      if(isEmptyWorkspace()||isManagedDemoWorkspace()){
         void vscode.commands.executeCommand("skillStudio.loadExample")
           .catch(error=>console.error("Default Studio project failed:",error));
-      },400);
-    }else{
-      const welcome=vscode.window.showInformationMessage?.(
-        "欢迎使用 SKILL Studio。可导入一个含 skills/、lib/、output/ 的演示项目（传统 5GC 与 MAS）。",
-        "载入演示 SKILL 项目"
-      );
-      if(welcome&&typeof welcome.then==="function"){
-        void welcome.then(choice=>{
-          if(choice==="载入演示 SKILL 项目")
-            return vscode.commands.executeCommand("skillStudio.loadExample");
-          return undefined;
-        });
+      }else{
+        void vscode.window.showInformationMessage(
+          "检测到其他工作区，已保留现有项目；如需重置示例，可使用 SKILL Studio → Load Example。");
       }
-    }
+    },700);
   }
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.openProcedure",
     async uri=>{

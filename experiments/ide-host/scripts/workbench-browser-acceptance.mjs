@@ -1779,8 +1779,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await command('Input.insertText',{text:'            MISTYPED: finalize-failed'});
   const afterTypo=await waitForRevisionChange(graphContext,
     beforeOutcomeFixture.revision,'Native Phase Outcome typo fixture');
-  const typoVersion=Number(/v(\d+)/.exec(afterTypo.result?.value??'')?.[1]);
-  if(!Number.isSafeInteger(typoVersion))throw Error('Outcome typo lost native Source version');
+  const sourceVersionProbe=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  const typoVersion=sourceVersionProbe?.version;
+  if(!Number.isSafeInteger(typoVersion)||!sourceVersionProbe.uri)
+    throw Error('Outcome typo lost authoritative VS Code TextDocument version: '+
+      JSON.stringify({sourceVersionProbe,displayRevision:afterTypo.result?.value}));
   const typoItem={kind:'phase-outcome-repair',
     procedureId:'ue-requested-pdu-session-establishment',
     nodeId:'npcf-sm-policy-control-create',

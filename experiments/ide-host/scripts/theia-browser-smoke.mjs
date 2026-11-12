@@ -269,14 +269,42 @@ try{
     if(!node)return null;const r=node.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2,text:node.innerText};
   })()`);
-  if(loadExampleRow){
+  // The browser-only Pages demo must auto-load on first entry. The normal
+  // backend Theia host is not the public demo, so exercise its explicit command.
+  if(externalUrl){
+    if(!loadExampleRow)
+      throw Error("Theia backend host does not expose the explicit Load Example command");
     await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:loadExampleRow.x,y:loadExampleRow.y});
     await command("Input.dispatchMouseEvent",{type:"mousePressed",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
     await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
-    await sleep(3400);
+    await sleep(350);
   }
-  // Loading may be automatic on the empty online workbench or explicitly
-  // invoked again from the command palette. Both must preserve existing files.
+  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+  // Public Pages proves automatic loading; backend Theia proves the explicit
+  // import command. Both must end with a confirmed workspace and 5GC Procedure.
+  let exampleLoadReady=false;
+  for(let attempt=0;attempt<100;attempt++){
+    exampleLoadReady=await evalJS(`[...document.querySelectorAll(
+      '.theia-notification-list-item,.theia-notification-message'
+    )].some(node=>node.innerText.includes(
+      '示例项目已载入并打开工作区：skill-studio-demo/'
+    )&&node.innerText.includes('默认已打开传统 5GC Procedure'))`);
+    if(exampleLoadReady)break;
+    await sleep(150);
+  }
+  if(!exampleLoadReady){
+    const startupDiagnostics=await evalJS(`({
+      title:document.title,
+      notifications:[...document.querySelectorAll(
+        '.theia-notification-list-item,.theia-notification-message'
+      )].map(node=>node.innerText).filter(Boolean).slice(0,12),
+      explorer:document.querySelector('.theia-Files')?.innerText??'',
+      body:document.body.innerText.slice(-1600)
+    })`);
+    throw Error("The default online workspace did not auto-open its project and 5GC Procedure: "+
+      JSON.stringify(startupDiagnostics).slice(0,3200));
+  }
   const afterImport=await evalJS(`(async()=>{
     const names=[];let opfsError=null;
     try{
@@ -293,7 +321,14 @@ try{
         return {background:style.backgroundColor,foreground:style.color,
           noWorkspace:document.body.classList.contains("theia-no-open-workspace")};
       })(),
-      bodyText:document.body.innerText.slice(-1400),
+      bodyText:document.body.innerText.slice(-2200),
+      explorerText:document.querySelector('.theia-Files')?.innerText??'',
+      noFolderPrompt:(document.querySelector('.theia-Files')?.innerText??'')
+        .includes('You have not yet opened a folder.')||
+        (document.querySelector('.theia-Files')?.innerText??'')
+        .includes('You have not yet added a folder to the workspace.'),
+      workspaceRootVisible:(document.querySelector('.theia-Files')?.innerText??'')
+        .includes('skill-studio-demo'),
       notificationText:[...document.querySelectorAll('.theia-notification-list-item,.theia-notification-message')]
         .map(x=>x.innerText).filter(Boolean).slice(0,7),
       visibleEditors:document.querySelectorAll('.monaco-editor').length,
@@ -1425,6 +1460,42 @@ try{
     throw Error("Two-SKILL Package Overview Chromium acceptance did not complete: "+
       JSON.stringify(packageOverviewEvidence));
   console.log("STUDIO_THEIA_STAGE","package-overview");
+  // Inspect the native Explorer itself, not Package Overview's fallback scan
+  // over open documents. This is the regression that the old smoke missed.
+  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"F1",code:"F1",windowsVirtualKeyCode:112});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"F1",code:"F1",windowsVirtualKeyCode:112});
+  await sleep(300);
+  await command("Input.insertText",{text:"Focus on Files Explorer"});
+  await sleep(500);
+  const focusExplorerRow=await evalJS(`(()=>{
+    const node=[...document.querySelectorAll('.monaco-list-row')].find(x=>
+      x.innerText.includes('Focus on Files Explorer'));
+    if(!node)return null;
+    const r=node.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2,text:node.innerText};
+  })()`);
+  if(!focusExplorerRow)
+    throw Error("The native Focus on Files Explorer command is unavailable");
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:focusExplorerRow.x,y:focusExplorerRow.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:focusExplorerRow.x,y:focusExplorerRow.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:focusExplorerRow.x,y:focusExplorerRow.y,button:"left",clickCount:1});
+  await sleep(500);
+  const nativeExplorer=await evalJS(`(()=>{
+    const explorer=document.querySelector('.theia-Files');
+    const text=explorer?.innerText??'';
+    return {visible:Boolean(explorer),text,
+      noFolderPrompt:text.includes('You have not yet opened a folder.')||
+        text.includes('You have not yet added a folder to the workspace.'),
+      rootVisible:text.includes('skill-studio-demo')};
+  })()`);
+  afterImport.explorerText=nativeExplorer.text;
+  afterImport.noFolderPrompt=nativeExplorer.noFolderPrompt;
+  afterImport.workspaceRootVisible=nativeExplorer.rootVisible;
+  afterImport.explorerVisible=nativeExplorer.visible;
+  if(!afterImport.statusBar||afterImport.statusBar.noWorkspace||
+     !nativeExplorer.visible||nativeExplorer.noFolderPrompt||!nativeExplorer.rootVisible)
+    throw Error("The native Explorer still has no default project root: "+
+      JSON.stringify({statusBar:afterImport.statusBar,nativeExplorer}));
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={shellReadyMs,workbenchEvidence,packageOverviewEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
@@ -1471,16 +1542,18 @@ try{
     throw Error("Theia status bar is not Studio Light: "+
       JSON.stringify(afterImport.statusBar));
   if(!afterImport.notificationText.some(message=>
-       message.includes("示例项目已载入：skills/")&&
-       message.includes("lib/")&&message.includes("output/")&&
-       /新增 (?:0|18) 个文件/.test(message))||
-     !afterImport.bodyText.includes("skills")||
-     !afterImport.bodyText.includes("establish-pdu-session")||
-     !afterImport.bodyText.includes("lib/")||
-     !afterImport.bodyText.includes("output/")||
-     !afterImport.bodyText.includes("procedure.yaml"))
-    throw Error("Theia sample import into browser workspace failed: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3000));
-  if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
+       message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
+       message.includes("默认已打开传统 5GC Procedure")&&
+       message.includes("同步 18 个官方文件"))||
+     afterImport.noFolderPrompt||!afterImport.workspaceRootVisible||
+     !afterImport.explorerText.includes("skills")||
+     !afterImport.explorerText.includes("establish-pdu-session")||
+     !afterImport.explorerText.includes("lib")||
+     !afterImport.explorerText.includes("output")||
+     !afterImport.explorerText.includes("procedure.yaml"))
+    throw Error("Theia did not open the real default project workspace: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
+  if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1||
+      webviewView.procedureValue!=="ue-requested-pdu-session-establishment"))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
   if(requireEditor&&(!patchEvidence?.preview?.ready||
