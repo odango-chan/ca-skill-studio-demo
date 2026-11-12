@@ -4,6 +4,8 @@
 
 **Supersedes:** the view-placement and duplicate-view assumptions in the earlier Theia migration notes. It does not supersede the Source-first authority or existing bounded-edit contracts in ADR-0001.
 
+> **Partial supersession:** ADR-0004 now defines Package-first ordering and the unified Package Explorer projection in the primary sidebar. All other decisions in this ADR remain in force.
+
 ## Context
 
 Theia is the default online host and the same VS Code extension is intended to remain usable in desktop VS Code. The current extension contributes a separate Skill Studio Activity Bar container with Packages, Inspection, Outline, Evidence and Problems views. This duplicates several capabilities already owned by the host:
