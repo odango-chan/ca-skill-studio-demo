@@ -633,7 +633,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }
   if(!singlePinned)throw Error('Could not reopen one pinned 5GC Procedure editor');
   const remainingProcedureTabs=await evalJS(`[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>
-    tab.textContent.trim()==='procedure.yaml'&&tab.getBoundingClientRect().width>0).length`);
+    tab.textContent.trim().replace(/[0-9]+$/,'').trim()==='procedure.yaml'&&
+    tab.getBoundingClientRect().width>0).length`);
   if(remainingProcedureTabs!==1)
     throw Error('Procedure Source/Evidence acceptance requires one unambiguous editor tab: '+
       JSON.stringify({remainingProcedureTabs,singlePinned}));
