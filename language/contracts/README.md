@@ -17,6 +17,6 @@ This directory contains read-only, build-time snapshots imported from the sole l
 | Authoring Model | `docs/authoring-model.md` | `250f2eb1557f9432380596026e7b1a7103ffc501` |
 | Semantic Token Projection | `language/semantic-tokens.v1.json` | `618c5c671f2c18785ecc10f84b9d549f88b4b138` |
 
-The canonical source-language specification and supporting contracts define authoring semantics. The semantic-token JSON defines only editor source-position projection; it is not a grammar, parser, linker, compiler schema, or proof that a reference resolves.
+The exact read-only source copies are stored under `source/` (including the Chinese Skill Language specification). The canonical source-language specification and supporting contracts define authoring semantics. The semantic-token JSON defines only editor source-position projection; it is not a grammar, parser, linker, compiler schema, or proof that a reference resolves.
 
 Do not edit these snapshots independently. Refresh them from an explicitly selected `ca-skills` commit and update the recorded commit/blob SHAs together. A contract drift test verifies the semantic-token snapshot's Git blob SHA, version and legend. Compiler Build remains authoritative for parse/link/binding validation; Studio's editor-time language services must not invent missing Owner Schemas or Tool Operations.
