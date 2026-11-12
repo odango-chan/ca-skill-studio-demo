@@ -177,7 +177,7 @@ test('Inspector exposes only owner-observed, Preview-qualified Outcome repairs',
 
 test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
   const commands=new Map(),providers=new Map(),changes=[],panels=[],diagnosticSets=[],appliedEdits=[];
-  const markdownMessages=[],markdownReveals=[],showDocumentCalls=[],markdownCommandCalls=[];
+  const markdownMessages=[],markdownReveals=[],showDocumentCalls=[],markdownCommandCalls=[],markdownActivationCalls=[];
   const disposable=()=>({dispose(){}});
   let confirmChoice='确认并应用',markdownMessage,visibleRangeChanged;
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
@@ -206,7 +206,12 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     FileType:{File:1,Directory:2,SymbolicLink:64},
     Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
-    commands:{executeCommand:async(...args)=>{markdownCommandCalls.push(args);},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
+    extensions:{getExtension(id){return id==='vscode.markdown-language-features'?{
+      activate:async()=>markdownActivationCalls.push(id)
+    }:undefined;}},
+    commands:{executeCommand:async(...args)=>{markdownCommandCalls.push(args);},
+      getCommands:async()=>['markdown.showPreviewToSide'],
+      registerCommand(name,cb){commands.set(name,cb);return disposable();}},
     workspace:{textDocuments:[doc,markdownDoc],
       getWorkspaceFolder:()=>({uri:uri('/workspace')}),
       findFiles:async pattern=>{
@@ -684,6 +689,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     'native Markdown experiment pins the Source editor');
   assert.deepEqual(markdownCommandCalls.at(-1),['markdown.showPreviewToSide',markdownUri],
     'native preview is delegated to the built-in Markdown extension');
+  assert.deepEqual(markdownActivationCalls,['vscode.markdown-language-features'],
+    'native preview explicitly activates the pinned built-in Markdown extension');
 
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
