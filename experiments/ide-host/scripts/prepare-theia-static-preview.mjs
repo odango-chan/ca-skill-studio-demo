@@ -63,6 +63,35 @@ for(const required of [
 console.log("STUDIO_THEIA_STATIC_PLUGIN_ASSETS",JSON.stringify({
   pluginTarget,assets:["samples/**","media/**","icons/**"],sameOriginOnly:true
 }));
+// The built-in Markdown extension starts its language server in a browser
+// Worker relative to extensionUri. Theia's static hostedPlugin copier omits
+// arbitrary third-party plugin assets, so stage the complete pinned extension
+// (including dist/browser/serverWorkerMain.js) at the exact normalized plugin
+// URI. Without this, extension activation stalls before preview commands register.
+const markdownPluginSource=resolve(
+  "experiments/ide-host/theia-online/plugins/vscode.markdown-language-features");
+const markdownPluginTarget=join(root,"hostedPlugin","vscode_markdown_language_features");
+await mkdir(markdownPluginTarget,{recursive:true});
+await cp(markdownPluginSource,markdownPluginTarget,{recursive:true,force:true});
+const markdownManifest=JSON.parse(await readFile(
+  join(markdownPluginTarget,"package.json"),"utf8"));
+const markdownBrowserEntry=markdownManifest.browser?.replace(/^\.\//,"");
+const markdownAssets=[
+  join(markdownPluginTarget,"package.json"),
+  join(markdownPluginTarget,markdownBrowserEntry??""),
+  join(markdownPluginTarget,"dist","browser","serverWorkerMain.js")
+];
+for(const required of markdownAssets){
+  const info=await stat(required);
+  if(!info.isFile()||info.size<100)
+    throw Error("Static hosted native Markdown asset missing or empty: "+required);
+}
+console.log("STUDIO_THEIA_STATIC_MARKDOWN_ASSETS",JSON.stringify({
+  markdownPluginTarget,browser:markdownManifest.browser,
+  worker:join(markdownPluginTarget,"dist","browser","serverWorkerMain.js"),
+  workerBytes:statSync(join(markdownPluginTarget,"dist","browser","serverWorkerMain.js")).size,
+  pinnedVersion:markdownManifest.version
+}));
 // Theia does not copy arbitrary extension assets into hostedPlugin.
 // Preserve the exact theme package paths referenced by its contribution JSON.
 const themePluginSource=resolve("experiments/ide-host/theia-online/plugins/odango-chan.skill-studio-theme");
