@@ -873,8 +873,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }));
   // Use a trusted browser click so React Flow and the host selection bridge
   // publish the same Source-backed selection a user would make.
-  const bindingTarget=await evalWebviewJS(`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Phase binding Node is not in the active graph');const r=node.getBoundingClientRect(),frame=window.frameElement?.getBoundingClientRect();return frame?{node:node.getAttribute('data-id'),point:{x:frame.x+r.x+r.width/2,y:frame.y+r.y+r.height/2}}:null;})()`);
+  const bindingTarget=await evalWebviewJS(`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Phase binding Node is not in the active graph');const r=node.getBoundingClientRect(),frame=window.frameElement?.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return frame?{node:node.getAttribute('data-id'),nodeRect:{x:r.x,y:r.y,width:r.width,height:r.height},frameRect:{x:frame.x,y:frame.y,width:frame.width,height:frame.height},localHitNode:hit?.closest('.react-flow__node')?.getAttribute('data-id')??null,point:{x:frame.x+r.x+r.width/2,y:frame.y+r.y+r.height/2}}:null;})()`);
   if(!bindingTarget?.node||!bindingTarget.point)throw Error('Could not resolve active Phase binding Node for Inspector Data Flow');
+  const browserHit=await evalJS(`(()=>{const hit=document.elementFromPoint(${bindingTarget.point.x},${bindingTarget.point.y});return {tag:hit?.tagName??null,className:typeof hit?.className==='string'?hit.className:'',frame:hit?.tagName==='IFRAME'?'iframe':hit?.closest('iframe')?.getAttribute('title')??null};})()`);
+  console.log('STUDIO_INSPECTOR_GRAPH_HIT_TEST',JSON.stringify({bindingTarget,browserHit}));
   await click(bindingTarget.point.x,bindingTarget.point.y);
   const graphSelectionPayload=await evalWebviewJS('document.body.dataset.studioSelection??null');
   const selectionState=await nativeCommand('skillStudio.internal.selectionAcceptance');
