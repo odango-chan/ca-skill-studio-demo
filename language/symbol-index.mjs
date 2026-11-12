@@ -16,7 +16,8 @@ function modifier(token,name){
 
 function packageFilePath(value,sourcePath){
   if(typeof value!=="string"||!value||value.startsWith("#")||
-     value.includes("://")||value.startsWith("/")||value.includes("\\\\")||
+     value.includes("://")||value.startsWith("/")||value.includes("\\")||
+     value.includes("?")||value.includes("%")||
      /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value))return null;
   const raw=value.split("#",1)[0];
   if(!raw)return null;
@@ -25,7 +26,7 @@ function packageFilePath(value,sourcePath){
   for(const part of raw.split("/")){
     if(!part||part===".")continue;
     // Parent traversal is intentionally not normalized into a Package path.
-    if(part===".."||/[\\u0000-\\u001f:<>|?*]/.test(part))return null;
+    if(part===".."||/[\u0000-\u001f:<>|?*]/.test(part))return null;
     parts.push(part);
   }
   return parts.length?parts.join("/"):null;
@@ -34,27 +35,31 @@ function packageFilePath(value,sourcePath){
 function symbolKey(token,name,relativePath){
   switch(token.type){
     case "skillProcedure":
-      return "procedure\u0000"+name;
+      return "procedure\\u0000"+name;
     case "skillStep":{
       const procedure=token.path?.[0]==="procedures"?token.path[1]:null;
       return typeof procedure==="string"&&procedure
-        ? "step\u0000"+procedure+"\u0000"+name
+        ? "step\\u0000"+procedure+"\\u0000"+name
         : null;
     }
     case "skillPredicate":
-      return "predicate\u0000"+name;
+      return "predicate\\u0000"+name;
     case "skillOperation":
-      return "operation\u0000"+name;
+      return "operation\\u0000"+name;
     // allowedResources.capabilities may grant a Capability or a direct
     // Operation. The v0.2 projection has no local Capability declaration
     // profile, so resolve this only when an exact imported Operation exists.
     case "skillCapability":
-      return "operation\u0000"+name;
+      return "operation\\u0000"+name;
+    case "skillSchema":
+    case "skillReference":{
+      const targetPath=packageFilePath(name,relativePath);
+      return targetPath?"document::"+targetPath:null;
+    }
     default:
       return null;
   }
 }
-
 function append(map,key,value){
   const values=map.get(key)??[];
   values.push(value);
@@ -78,11 +83,12 @@ export function buildSkillSymbolIndex(snapshot){
   const tokensByUri=new Map();
   for(const document of snapshot.documents){
     if(typeof document?.uri==="string"&&typeof document?.relativePath==="string"){
-      const key="document\\u0000"+document.relativePath;
-      if(/^(?:schemas\\/.*\\.schema\\.ya?ml|lib\\/.*\\.ya?ml|scripts\\/.*\\.py)$/.test(document.relativePath)){
+      const key="document::"+document.relativePath;
+      if(/^(?:schemas\\/.*\\.schema\\.ya?ml|lib\\/.*\\.ya?ml|scripts\\/.*\\.py|references\\/.*\\.md)$/.test(document.relativePath)){
         const targets=documentTargets.get(key)??[];
         targets.push({
-          key,name:document.relativePath,type:"skillSchema",
+          key,name:document.relativePath,
+          type:/\\.py$|^references\\//.test(document.relativePath)?"skillReference":"skillSchema",
           uri:document.uri,relativePath:document.relativePath,
           range:{start:0,end:0},path:[],part:"document",modifiers:[]
         });
