@@ -625,6 +625,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       "/scripts/select_establishment_configuration.py")||
       !languageFeatureEvidence.hover||
       !languageFeatureEvidence.references||
+      !languageFeatureEvidence.reverseDefinition||
+      !languageFeatureEvidence.reverseDefinitionTargets?.some(uri=>
+        uri.endsWith("/assurance/procedure.yaml"))||
       !languageFeatureEvidence.symbols?.includes("main")||
       !["EstablishmentSelectionInput","N/A: Python source annotations"].includes(
         languageFeatureEvidence.schemaCompletion))
