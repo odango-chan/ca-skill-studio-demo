@@ -385,7 +385,13 @@ function currentV02PackageSnapshot(generation=1,completeness="complete"){
   documents.push({
     uri:rootUri+"/lib/tools/udm.tool.yaml",
     relativePath:"lib/tools/udm.tool.yaml",languageId:"yaml",version:0,
-    text:"apiVersion: connectionagent.io/v1alpha1\\nkind: ToolCatalog\\nspec:\\n  contracts:\\n    - operation: sbi.udm.sm_data.get\\n      effect: READ\\n"
+    text:`apiVersion: connectionagent.io/v1alpha1
+kind: ToolCatalog
+spec:
+  contracts:
+    - operation: sbi.udm.sm_data.get
+      effect: READ
+`
   });
   return {rootUri,packageName:"establish-pdu-session",generation,completeness,documents};
 }
