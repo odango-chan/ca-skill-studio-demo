@@ -60,6 +60,10 @@ export function registerWorkbench(vscode,context){
     renderer:null,renderedTokenCount:0,renderedTypeCount:0,renderError:null,
     server:null,transport:null
   };
+  const completionProviderDiagnostics={
+    registered:false,triggerCharacters:[],requests:0,lastUri:null,
+    lastCount:0,lastLabels:[],lastError:null,lastDebug:null
+  };
   function encodeNativeSemanticTokens(document,spans){
     const segments=[];
     const text=document.getText();
@@ -188,9 +192,22 @@ export function registerWorkbench(vscode,context){
   // Acceptance-only diagnostics are deliberately not contributed to the
   // Command Palette. The Chromium harness queries this internal command in
   // both browser-Worker and Node extension-host variants.
+  // Browser acceptance runs in an ephemeral Theia workspace. Make the
+  // Explorer interaction mode explicit so the single-click CustomEditor
+  // assertion does not depend on a runner's inherited user preferences.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.setExplorerOpenMode",async mode=>{
+      if(mode!=="singleClick")throw Error("Only singleClick is supported by this acceptance probe");
+      const configuration=vscode.workspace.getConfiguration("workbench.list");
+      const before=configuration.get("openMode");
+      await configuration.update("openMode",mode,vscode.ConfigurationTarget.Workspace);
+      return {before,after:configuration.get("openMode")};
+    }
+  ));
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
+      completionProvider:{...completionProviderDiagnostics},
       semanticHighlightingEnabled:vscode.workspace.getConfiguration("editor")
         .get("semanticHighlighting.enabled")
     })
@@ -211,6 +228,11 @@ export function registerWorkbench(vscode,context){
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
           const epoch=++languageClientEpoch;
           candidate=createSkillLanguageClient(vscode,context,{
+            debugCompletionDiagnostics:Boolean(
+              typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST&&
+              /^(localhost|127(?:\.\d{1,3}){3})$/.test(
+                globalThis.location?.hostname??"")
+            ),
             // Theia 1.76's browser plugin host does not consistently register
             // server-advertised semantic tokens. Register the native provider
             // explicitly, but keep VS Code's normal LSP feature path unchanged.
@@ -254,6 +276,27 @@ export function registerWorkbench(vscode,context){
             onSemanticTokenError:(uri,error)=>{
               semanticTokenDiagnostics.lastUri=uri;
               semanticTokenDiagnostics.lastError=error;
+            },
+            onCompletionProviderRegistered:status=>{
+              completionProviderDiagnostics.registered=status?.registered===true;
+              completionProviderDiagnostics.triggerCharacters=status?.triggerCharacters??[];
+            },
+            onCompletionProviderRequest:request=>{
+              completionProviderDiagnostics.requests++;
+              completionProviderDiagnostics.lastUri=request?.uri??null;
+            },
+            onCompletionProviderResult:result=>{
+              completionProviderDiagnostics.lastUri=result?.uri??null;
+              completionProviderDiagnostics.lastCount=result?.count??0;
+              completionProviderDiagnostics.lastLabels=result?.labels??[];
+              completionProviderDiagnostics.lastError=null;
+            },
+            onCompletionProviderDiagnostics:result=>{
+              completionProviderDiagnostics.lastDebug=result??null;
+            },
+            onCompletionProviderError:error=>{
+              completionProviderDiagnostics.lastUri=error?.uri??null;
+              completionProviderDiagnostics.lastError=String(error?.message??error);
             },
             onStatus:status=>{
               if(epoch!==languageClientEpoch)return;
@@ -640,10 +683,26 @@ export function registerWorkbench(vscode,context){
         const contractText=contractDocument.getText();
         const predicatesText=predicatesDocument.getText();
         const schemaText=schemaDocument.getText();
-        const sourcePosition=(document,text,needle)=>{
+        const sourcePosition=(document,text,needle,delta=0)=>{
           const offset=text.indexOf(needle);
           if(offset<0)throw Error("Expected Skill Language symbol is missing: "+needle);
-          return document.positionAt(offset);
+          return document.positionAt(offset+delta);
+        };
+        const completionItems=result=>{
+          if(Array.isArray(result))return result;
+          const values=[
+            ...(Array.isArray(result?.items)?result.items:[]),
+            ...(Array.isArray(result?.suggestions)?result.suggestions:[])
+          ];
+          const seen=new Set();
+          return values.filter(item=>{
+            const label=typeof item?.label==="string"?item.label:
+              item?.label?.label??item?.insertText??"";
+            const key=String(label)+"\\u0000"+String(item?.insertText??"");
+            if(seen.has(key))return false;
+            seen.add(key);
+            return true;
+          });
         };
         const locations=result=>Array.isArray(result)?result:result?[result]:[];
         const entryName="ue-requested-pdu-session-establishment";
@@ -677,6 +736,91 @@ export function registerWorkbench(vscode,context){
         if(!schemaDefinition.some(item=>
           (item?.uri??item?.targetUri)?.path?.endsWith("/"+requestSchemaPath)))
           throw Error("Contract requestSchema did not resolve to its Package-owned Schema file");
+        // Theia's public completion command resolves the target model through
+        // the active editor. Opening a TextDocument alone is insufficient:
+        // it can silently dispatch the active Procedure cursor for a hidden
+        // Contract document. Activate the exact document before requesting.
+        const contractCompletionPosition=sourcePosition(
+          contractDocument,contractText,requestSchemaPath,9);
+        await openNativeSource(vscode,relatedUris.contract,{
+          preview:false,
+          selection:new vscode.Range(
+            contractCompletionPosition,contractCompletionPosition)
+        });
+        const contractCompletionEditor=vscode.window.activeTextEditor;
+        if(contractCompletionEditor?.document.uri.toString()!==relatedUris.contract.toString())
+          throw Error("Contract Completion target did not become the active native editor");
+        contractCompletionEditor.selection=new vscode.Selection(
+          contractCompletionPosition,contractCompletionPosition);
+        if(contractCompletionEditor.selection.active.line!==contractCompletionPosition.line||
+           contractCompletionEditor.selection.active.character!==contractCompletionPosition.character)
+          throw Error("Contract Completion native editor rejected the requested cursor position");
+        const requestNativeCompletion=async(editor,uri,position,expectedLabel)=>{
+          await vscode.commands.executeCommand("hideSuggestWidget");
+          editor.selection=new vscode.Selection(position,position);
+          const before=await vscode.commands.executeCommand(
+            "skillStudio.internal.semanticTokenDiagnostics");
+          await vscode.commands.executeCommand("editor.action.triggerSuggest");
+          let after=await vscode.commands.executeCommand(
+            "skillStudio.internal.semanticTokenDiagnostics");
+          for(let attempt=0;attempt<100;attempt++){
+            if(after?.completionProvider?.requests>(before?.completionProvider?.requests??0)&&
+               after.completionProvider.lastUri===uri.toString()&&
+               after.completionProvider.lastLabels?.includes(expectedLabel))return after;
+            await new Promise(resolve=>setTimeout(resolve,50));
+            after=await vscode.commands.executeCommand(
+              "skillStudio.internal.semanticTokenDiagnostics");
+          }
+          return after;
+        };
+        const completionProviderAfter=await requestNativeCompletion(
+          contractCompletionEditor,relatedUris.contract,
+          contractCompletionPosition,requestSchemaPath);
+        if(!completionProviderAfter?.completionProvider?.registered||
+           completionProviderAfter.completionProvider.lastUri!==relatedUris.contract.toString()||
+           !completionProviderAfter.completionProvider.lastLabels?.includes(requestSchemaPath))
+          throw Error("Native Theia Suggest did not return the exact Package Schema candidate: "+
+            JSON.stringify({
+              provider:completionProviderAfter?.completionProvider??null,
+              sourcePosition:contractCompletionPosition,
+              expected:requestSchemaPath
+            }));
+        const predicateCompletionPosition=sourcePosition(
+          procedureDocument,procedureText,predicateName,5);
+        await openNativeSource(vscode,procedureUri,{
+          preview:false,
+          selection:new vscode.Range(
+            predicateCompletionPosition,predicateCompletionPosition)
+        });
+        const procedureCompletionEditor=vscode.window.activeTextEditor;
+        if(procedureCompletionEditor?.document.uri.toString()!==procedureUri.toString())
+          throw Error("Procedure Completion target did not become the active native editor");
+        procedureCompletionEditor.selection=new vscode.Selection(
+          predicateCompletionPosition,predicateCompletionPosition);
+        if(procedureCompletionEditor.selection.active.line!==predicateCompletionPosition.line||
+           procedureCompletionEditor.selection.active.character!==predicateCompletionPosition.character)
+          throw Error("Procedure Completion native editor rejected the requested cursor position");
+        const predicateCompletionDiagnostics=await requestNativeCompletion(
+          procedureCompletionEditor,procedureUri,predicateCompletionPosition,predicateName);
+        if(!predicateCompletionDiagnostics?.completionProvider?.lastLabels?.includes(predicateName))
+          throw Error("v0.2 Procedure Predicate native completion did not return the Package declaration");
+        const nodeCompletionPosition=sourcePosition(
+          procedureDocument,procedureText,nodeName,3);
+        procedureCompletionEditor.selection=new vscode.Selection(
+          nodeCompletionPosition,nodeCompletionPosition);
+        const nodeCompletionDiagnostics=await requestNativeCompletion(
+          procedureCompletionEditor,procedureUri,nodeCompletionPosition,nodeName);
+        if(!nodeCompletionDiagnostics?.completionProvider?.lastLabels?.includes(nodeName))
+          throw Error("v0.2 Procedure node native completion did not return the scoped node declaration");
+        const scriptCompletionPath="scripts/select_establishment_configuration.py";
+        const scriptCompletionPosition=sourcePosition(
+          procedureDocument,procedureText,scriptCompletionPath,9);
+        procedureCompletionEditor.selection=new vscode.Selection(
+          scriptCompletionPosition,scriptCompletionPosition);
+        const scriptCompletionDiagnostics=await requestNativeCompletion(
+          procedureCompletionEditor,procedureUri,scriptCompletionPosition,scriptCompletionPath);
+        if(!scriptCompletionDiagnostics?.completionProvider?.lastLabels?.includes(scriptCompletionPath))
+          throw Error("v0.2 Procedure Script native completion did not return the Package-local Script path");
         const predicateHoverResult=await vscode.commands.executeCommand(
           "vscode.executeHoverProvider",procedureUri,
           sourcePosition(procedureDocument,procedureText,predicateName));
@@ -858,6 +1002,12 @@ export function registerWorkbench(vscode,context){
           yamlReferences:predicateReferences.length,
           yamlProcedureOutline:locations(yamlProcedureSymbols).map(item=>item.name),
           yamlPredicateOutline:locations(yamlPredicateSymbols).map(item=>item.name),
+          yamlCompletions:{
+            requestSchema:completionProviderAfter.completionProvider.lastLabels.includes(requestSchemaPath),
+            predicate:predicateCompletionDiagnostics.completionProvider.lastLabels.includes(predicateName),
+            node:nodeCompletionDiagnostics.completionProvider.lastLabels.includes(nodeName),
+            script:scriptCompletionDiagnostics.completionProvider.lastLabels.includes(scriptCompletionPath)
+          },
           reverseDefinition:reverseDefinitions.length,
           reverseDefinitionTargets:reverseDefinitions.map(item=>item.uri?.toString?.()??""),
           hover:hovers.length,

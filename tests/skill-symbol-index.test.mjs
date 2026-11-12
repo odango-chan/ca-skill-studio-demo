@@ -35,6 +35,7 @@ function packageSnapshot(extra=[]){
     document("assurance/predicates.yaml",read("assurance/predicates.yaml")),
     document("assurance/procedure.yaml",read("assurance/procedure.yaml")),
     document("schemas/establishment-request.schema.yaml",read("schemas/establishment-request.schema.yaml")),
+    document("scripts/select_establishment_configuration.py",read("scripts/select_establishment_configuration.py")),
     document("lib/tools/udm.tool.yaml",`apiVersion: connectionagent.io/v1alpha1
 kind: ToolCatalog
 spec:
@@ -44,7 +45,7 @@ spec:
 `)
   ];
   return {rootUri,packageName:"establish-pdu-session",generation:1,
-    completeness:"complete",documents:[...docs,...extra]};
+    completeness:"complete",libraryInventory:"complete",documents:[...docs,...extra]};
 }
 function offsetOf(text,needle,from=0){
   const value=text.indexOf(needle,from);
@@ -168,6 +169,10 @@ spec:
   const hit=at(index,procedure.uri,procedure.text,"sbi.udm.sm_data.get");
   assert.equal(hit.declarations.length,2);
   assert.equal(symbols.uniqueSkillSymbolDeclaration(hit),null);
+  const completions=symbols.skillSymbolCompletions(index,procedure.uri,
+    hit.token.range.start+4);
+  assert.ok(!completions.items.some(item=>item.name==="sbi.udm.sm_data.get"),
+    "ambiguous Operation declarations are not suggested as a unique completion");
 });
 
 test("unresolved Operation and missing Owner Schema never become invented declarations",()=>{
@@ -194,6 +199,24 @@ test("Document Symbols expose Procedures, nested nodes and Predicates from exact
     x.name==="createdsession.ingress.eligible"));
 });
 
+test("PRE/POST local phase-step names are not Procedure node targets",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const declarations=symbols.skillSymbolDeclarationsForDocument(index,procedure.uri)
+    .filter(item=>item.type==="skillStep");
+  assert.ok(declarations.length>0);
+  assert.ok(declarations.every(item=>item.part==="key"&&
+    item.path?.[0]==="procedures"&&item.path?.[2]==="nodes"&&
+    item.path.length===4));
+  const localPhaseStep=(index.tokensByUri.get(procedure.uri)??[]).find(item=>
+    item.type==="skillStep"&&item.modifiers.includes("declaration")&&
+    (item.path??[]).includes("preconditions"));
+  assert.ok(localPhaseStep,"fixture contains a local PRE phase-step declaration");
+  assert.equal(symbols.skillSymbolAt(index,procedure.uri,localPhaseStep.range.start),null,
+    "local PRE step is not mistaken for a Procedure node");
+});
+
 test("symbol index remains package- and generation-scoped",()=>{
   const first=packageSnapshot();
   const second={...first,generation:2,rootUri:"file:///workspace/other"};
@@ -204,4 +227,184 @@ test("symbol index remains package- and generation-scoped",()=>{
   assert.equal(b.rootUri,second.rootUri);
   assert.equal(b.generation,2);
   assert.notEqual(a.tokensByUri,b.tokensByUri);
+});
+
+
+test("v0.2 completion uses canonical reference token context and exact Package declarations",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  const operation="sbi.udm.sm_data.get";
+  const operationOffset=offsetOf(procedure.text,operation)+4;
+  const operationCompletions=symbols.skillSymbolCompletions(index,procedure.uri,operationOffset);
+  assert.equal(operationCompletions.token.type,"skillOperation");
+  assert.ok(operationCompletions.items.some(item=>item.name===operation));
+
+  const schemaPath="schemas/establishment-request.schema.yaml";
+  const schemaOffset=offsetOf(contract.text,schemaPath)+9;
+  const schemaCompletions=symbols.skillSymbolCompletions(index,contract.uri,schemaOffset);
+  assert.equal(schemaCompletions.token.type,"skillSchema");
+  assert.ok(schemaCompletions.items.some(item=>item.name===schemaPath));
+  assert.ok(schemaCompletions.items.every(item=>
+    item.relativePath.startsWith("schemas/")||/\.schema\.ya?ml$/.test(item.relativePath)),
+    "Schema completion excludes ordinary Package YAML files");
+  assert.ok(!schemaCompletions.items.some(item=>
+    item.relativePath==="lib/tools/udm.tool.yaml"));
+  assert.equal(index.documentTargets.has("document::lib/tools/udm.tool.yaml"),false,
+    "ToolCatalog files are not indexed as Schema Owner documents");
+
+  const scriptPath="scripts/select_establishment_configuration.py";
+  const scriptOffset=offsetOf(procedure.text,scriptPath)+9;
+  const scriptCompletions=symbols.skillSymbolCompletions(index,procedure.uri,scriptOffset);
+  assert.equal(scriptCompletions.token.type,"skillReference");
+  assert.ok(scriptCompletions.items.some(item=>item.name===scriptPath),
+    JSON.stringify({token:scriptCompletions.token,items:scriptCompletions.items,
+      scriptDocuments:snapshot.documents.filter(item=>item.relativePath.startsWith("scripts/"))
+        .map(item=>item.relativePath)}));
+});
+
+test("Schema references cannot resolve to ordinary lib YAML such as ToolCatalog",()=>{
+  const base=packageSnapshot();
+  const original=base.documents.find(item=>item.relativePath==="assurance/contract.yaml");
+  const text=original.text.replace(
+    "schemas/establishment-request.schema.yaml","lib/tools/udm.tool.yaml");
+  const snapshot={...base,documents:base.documents.map(item=>
+    item.uri===original.uri?{...item,text}:item)};
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const hit=at(index,original.uri,text,"lib/tools/udm.tool.yaml");
+  assert.ok(hit,"invalid Schema path remains a source-backed reference");
+  assert.equal(symbols.uniqueSkillSymbolDeclaration(hit),null,
+    "ordinary ToolCatalog YAML is not a Schema declaration");
+  const diagnostics=symbols.skillSymbolLinkDiagnostics(index,snapshot);
+  assert.ok(diagnostics.some(item=>item.uri===original.uri&&
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    text.slice(item.range.start,item.range.end)==="lib/tools/udm.tool.yaml"));
+});
+
+test("v0.2 Procedure, Predicate, node and direct-grant completions stay in their semantic scopes",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const entry="ue-requested-pdu-session-establishment";
+  const entryItems=symbols.skillSymbolCompletions(index,contract.uri,
+    offsetOf(contract.text,entry)+4);
+  assert.equal(entryItems.token.type,"skillProcedure");
+  assert.ok(entryItems.items.some(item=>item.name===entry));
+
+  const predicate="createdsession.ingress.eligible";
+  const predicateItems=symbols.skillSymbolCompletions(index,procedure.uri,
+    offsetOf(procedure.text,predicate)+5);
+  assert.equal(predicateItems.token.type,"skillPredicate");
+  assert.ok(predicateItems.items.some(item=>item.name===predicate));
+
+  const node="nudm-sdm-get";
+  const nodeItems=symbols.skillSymbolCompletions(index,procedure.uri,
+    offsetOf(procedure.text,node)+3);
+  assert.equal(nodeItems.token.type,"skillStep");
+  assert.ok(nodeItems.items.some(item=>item.name===node));
+  assert.ok(nodeItems.items.every(item=>item.path?.[2]==="nodes"&&item.path.length===4),
+    "node completion excludes locally scoped PRE/POST phase steps");
+
+  const directGrant="sbi.udm.sm_data.get";
+  const grantItems=symbols.skillSymbolCompletions(index,contract.uri,
+    offsetOf(contract.text,directGrant)+4);
+  assert.equal(grantItems.token.type,"skillCapability");
+  assert.ok(grantItems.items.some(item=>item.name===directGrant));
+});
+
+test("v0.2 link diagnostics report exact unresolved and ambiguous references but not deployment Capabilities",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const diagnostics=symbols.skillSymbolLinkDiagnostics(index,snapshot);
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  assert.ok(diagnostics.some(item=>item.uri===contract.uri&&
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    contract.text.slice(item.range.start,item.range.end)==="lib/host/subject.schema.yaml"));
+  assert.ok(!diagnostics.some(item=>item.code==="SKILL_LINK_UNRESOLVED"&&
+    item.uri===contract.uri&&
+    /ca\.session\.operation_context\.read/.test(
+      contract.text.slice(item.range.start,item.range.end))),
+    "unmatched allowedResources Capability IDs remain deployment-owned");
+  const procedureForUnresolved=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  assert.ok(!diagnostics.some(item=>item.code==="SKILL_LINK_UNRESOLVED"&&
+    item.uri===procedureForUnresolved.uri&&
+    procedureForUnresolved.text.slice(item.range.start,item.range.end).startsWith("sbi.")),
+    "missing Operation IDs are not diagnosed without a complete Tool integration inventory");
+
+  const duplicate=document("lib/tools/another.tool.yaml",`apiVersion: connectionagent.io/v1alpha1
+kind: ToolCatalog
+spec:
+  contracts:
+    - operation: sbi.udm.sm_data.get
+      effect: READ
+`);
+  const duplicateSnapshot=packageSnapshot([duplicate]);
+  const duplicateIndex=symbols.buildSkillSymbolIndex(duplicateSnapshot);
+  const duplicateDiagnostics=symbols.skillSymbolLinkDiagnostics(duplicateIndex,duplicateSnapshot);
+  const procedureForDuplicate=duplicateSnapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const duplicateHit=at(duplicateIndex,procedureForDuplicate.uri,procedureForDuplicate.text,"sbi.udm.sm_data.get");
+  assert.ok(duplicateDiagnostics.some(item=>item.uri===procedureForDuplicate.uri&&
+    item.code==="SKILL_LINK_AMBIGUOUS"&&
+    procedureForDuplicate.text.slice(item.range.start,item.range.end)==="sbi.udm.sm_data.get"),
+    JSON.stringify({declarations:duplicateIndex.declarations.get(duplicateHit.token.key),
+      references:duplicateIndex.references.get(duplicateHit.token.key),
+      diagnostics:duplicateDiagnostics}));
+});
+
+test("external Owner Schema diagnostics require a complete project lib inventory",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const partialLibrary={...snapshot,libraryInventory:"partial"};
+  const diagnostics=symbols.skillSymbolLinkDiagnostics(index,partialLibrary);
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  assert.ok(!diagnostics.some(item=>item.uri===contract.uri&&
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    contract.text.slice(item.range.start,item.range.end)==="lib/host/subject.schema.yaml"));
+
+  const localText=contract.text.replace(
+    "schemas/establishment-request.schema.yaml","schemas/missing-request.schema.yaml");
+  const localSnapshot={...snapshot,documents:snapshot.documents.map(item=>
+    item.uri===contract.uri?{...item,text:localText}:item)};
+  const localIndex=symbols.buildSkillSymbolIndex(localSnapshot);
+  const localDiagnostics=symbols.skillSymbolLinkDiagnostics(localIndex,localSnapshot);
+  assert.ok(localDiagnostics.some(item=>item.uri===contract.uri&&
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    localText.slice(item.range.start,item.range.end)==="schemas/missing-request.schema.yaml"),
+    "missing Package-owned schemas are still diagnosed");
+});
+
+test("partial project lib inventory suppresses imported Operation and Owner Schema missing-link claims",()=>{
+  const base=packageSnapshot();
+  const procedure=base.documents.find(item=>item.relativePath==="assurance/procedure.yaml");
+  const text=procedure.text.replace("sbi.udm.sm_data.get","sbi.missing.operation");
+  const partial={...base,libraryInventory:"partial",documents:base.documents.map(item=>
+    item.uri===procedure.uri?{...item,text}:item)};
+  const partialIndex=symbols.buildSkillSymbolIndex(partial);
+  const partialDiagnostics=symbols.skillSymbolLinkDiagnostics(partialIndex,partial);
+  assert.ok(!partialDiagnostics.some(item=>
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    text.slice(item.range.start,item.range.end)==="sbi.missing.operation"),
+    "an incomplete project lib inventory cannot prove an Operation is missing");
+  assert.ok(!partialDiagnostics.some(item=>item.code==="SKILL_LINK_UNRESOLVED"&&
+    item.uri.endsWith("/assurance/contract.yaml")&&
+    partial.documents.find(doc=>doc.uri===item.uri)
+      .text.slice(item.range.start,item.range.end)==="lib/host/subject.schema.yaml"),
+    "an incomplete project lib inventory cannot prove an Owner Schema is missing");
+
+  const complete={...partial,libraryInventory:"complete"};
+  const completeIndex=symbols.buildSkillSymbolIndex(complete);
+  const completeDiagnostics=symbols.skillSymbolLinkDiagnostics(completeIndex,complete);
+  assert.ok(completeDiagnostics.some(item=>
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    text.slice(item.range.start,item.range.end)==="sbi.missing.operation"),
+    "a complete ToolCatalog inventory makes an unresolved Procedure.call diagnosable");
+});
+
+test("v0.2 link diagnostics are suppressed for incomplete or stale Package snapshots",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  assert.deepEqual(symbols.skillSymbolLinkDiagnostics(index,{...snapshot,completeness:"partial"}),[]);
+  assert.deepEqual(symbols.skillSymbolLinkDiagnostics(index,{...snapshot,generation:2}),[]);
 });

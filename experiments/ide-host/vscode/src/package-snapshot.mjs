@@ -1,3 +1,4 @@
+import {projectRoots} from "./project-policy.mjs";
 const PROCEDURE_SUFFIX = "/assurance/procedure.yaml";
 const MAX_PACKAGE_FILES = 500;
 const MAX_FILE_BYTES = 1024 * 1024;
@@ -163,11 +164,107 @@ export async function collectPackageSnapshot(vscode, procedureDocument, generati
     });
   }
 
+  // Project-level lib/ is read-only dependency input shared by Skills/.
+  // Capture it as logical lib/... paths so the v0.2 symbol index can resolve
+  // imported ToolCatalogs and Owner Schemas without making Studio a resolver.
+  let libraryInventory="unavailable";
+  let libraryReason=null;
+  const projectRoot=projectRoots(vscode.workspace.workspaceFolders).find(entry=>{
+    const path=entry.path.replace(/\/$/,"");
+    return rootUri.scheme===entry.uri.scheme&&
+      rootUri.authority===entry.uri.authority&&
+      rootUri.path.startsWith(path+"/skills/");
+  });
+  if(projectRoot){
+    const libraryRoot=projectRoot.uri.with({path:projectRoot.path+"/lib"});
+    const libraryPath=libraryRoot.path.replace(/\/$/,"");
+    const libraryCandidates=new Map();
+    const libraryReasons=[];
+    try{
+      await vscode.workspace.fs.stat(libraryRoot);
+      const foundLibrary=await vscode.workspace.findFiles(
+        new vscode.RelativePattern(libraryRoot,"**/*"),
+        EXCLUDE,MAX_PACKAGE_FILES+1
+      );
+      for(const uri of foundLibrary){
+        if(!insideRoot(libraryRoot,uri)){
+          libraryReasons.push("Ignored a library file outside project lib/");
+          continue;
+        }
+        const relative=uri.path.slice(libraryPath.length).replace(/^\//,"");
+        if(!relative||relative.includes("\\")||
+           relative.split("/").some(part=>!part||part==="."||part==="..")){
+          libraryReasons.push("Ignored an unsafe project lib/ path");
+          continue;
+        }
+        libraryCandidates.set(uri.toString(),{uri,relativePath:"lib/"+relative});
+      }
+      for(const document of openDocuments.values()){
+        const uri=document.uri;
+        if(!insideRoot(libraryRoot,uri))continue;
+        const relative=uri.path.slice(libraryPath.length).replace(/^\//,"");
+        if(!relative||relative.includes("\\")||
+           relative.split("/").some(part=>!part||part==="."||part==="..")){
+          libraryReasons.push("Ignored an unsafe open project lib/ path");
+          continue;
+        }
+        libraryCandidates.set(uri.toString(),{uri,relativePath:"lib/"+relative});
+      }
+      let libraryEntries=[...libraryCandidates.values()].sort((a,b)=>
+        a.relativePath.localeCompare(b.relativePath));
+      if(foundLibrary.length>MAX_PACKAGE_FILES||
+         documents.length+libraryEntries.length>MAX_PACKAGE_FILES){
+        libraryReasons.push("Project lib/ exceeds the shared 500-file LSP snapshot limit");
+        libraryEntries=libraryEntries.slice(0,Math.max(0,MAX_PACKAGE_FILES-documents.length));
+      }
+      for(const entry of libraryEntries){
+        if(!TEXT_FILE.test(entry.relativePath))continue;
+        const open=openDocuments.get(entry.uri.toString());
+        try{
+          let text="";
+          if(open){
+            text=open.getText();
+            if(text.length>MAX_FILE_BYTES)throw Error("file exceeds 1 MiB");
+          }else{
+            const stat=await vscode.workspace.fs.stat(entry.uri);
+            if(Number.isFinite(stat.size)&&stat.size>MAX_FILE_BYTES)
+              throw Error("file exceeds 1 MiB");
+            const bytes=await vscode.workspace.fs.readFile(entry.uri);
+            if(bytes.byteLength>MAX_FILE_BYTES)throw Error("file exceeds 1 MiB");
+            text=new TextDecoder("utf-8",{fatal:true}).decode(bytes);
+          }
+          if(totalTextLength+text.length>MAX_PACKAGE_TEXT_LENGTH)
+            throw Error("combined Package and lib/ text exceeds 4 MiB");
+          totalTextLength+=text.length;
+          documents.push({
+            uri:entry.uri.toString(),relativePath:entry.relativePath,
+            languageId:languageId(entry.relativePath),
+            version:open&&Number.isSafeInteger(open.version)&&open.version>=0
+              ?open.version:0,
+            text
+          });
+        }catch(error){
+          libraryReasons.push(entry.relativePath+": "+String(error?.message??error));
+        }
+      }
+      libraryInventory=libraryReasons.length?"partial":"complete";
+      if(libraryReasons.length)
+        libraryReason=[...new Set(libraryReasons)].join("; ").slice(0,2000);
+    }catch(error){
+      libraryInventory="unavailable";
+      libraryReason="Project lib/ inventory unavailable: "+String(error?.message??error);
+    }
+  }else{
+    libraryReason="No exact Skill Compiler project root contains this Package under skills/";
+  }
+
   return {
     rootUri: rootUri.toString(),
     packageName: root.name,
     generation,
     completeness,
+    libraryInventory,
+    ...(libraryReason?{libraryReason}:{}),
     documents,
     ...(reasons.length ? { reason: [...new Set(reasons)].join("; ").slice(0, 2000) } : {})
   };

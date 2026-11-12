@@ -9,23 +9,35 @@ function makeUri(path, scheme = "file", authority = "") {
     with(change) { return makeUri(change.path ?? path, change.scheme ?? scheme, change.authority ?? authority); }
   };
 }
-function makeVscode({files,open=[],failReads=new Set(),enumerationError=null,largeFiles=new Set()}={}) {
+function makeVscode({files,open=[],failReads=new Set(),enumerationError=null,largeFiles=new Set(),
+  workspaceFolders=[],libraryFiles=[],libraryEnumerationError=null,libraryStatError=null}={}) {
   const uris=files??[];
-  const reads=new Map(uris.map(uri=>[uri.toString(),new TextEncoder().encode("disk:"+uri.path)]));
+  const libUris=libraryFiles??[];
+  const reads=new Map([...uris,...libUris].map(uri=>
+    [uri.toString(),new TextEncoder().encode("disk:"+uri.path)]));
   return {
     RelativePattern: class RelativePattern {
       constructor(base,pattern){this.base=base;this.pattern=pattern;}
     },
     workspace: {
       textDocuments:open,
+      workspaceFolders,
       async findFiles(pattern,exclude,limit){
         assert.equal(pattern.pattern,"**/*");
         assert.ok(pattern.base);
+        if(pattern.base.path.endsWith("/lib")){
+          if(libraryEnumerationError)throw libraryEnumerationError;
+          return libUris.slice(0,limit);
+        }
         if(enumerationError)throw enumerationError;
         return uris.slice(0,limit);
       },
       fs:{
-        async stat(uri){return {size:largeFiles.has(uri.toString())?1024*1024+1:(reads.get(uri.toString())?.length??0)};},
+        async stat(uri){
+          if(uri.path.endsWith("/lib")&&libraryStatError)throw libraryStatError;
+          return {type:uri.path.endsWith("/lib")?2:1,
+            size:largeFiles.has(uri.toString())?1024*1024+1:(reads.get(uri.toString())?.length??0)};
+        },
         async readFile(uri){
           if(failReads.has(uri.toString()))throw new Error("permission denied");
           return reads.get(uri.toString())??new TextEncoder().encode("");
@@ -56,6 +68,7 @@ test("Package snapshot keeps exact root, required files, language ids and unsave
   assert.equal(snapshot.packageName,"my-skill");
   assert.equal(snapshot.generation,12);
   assert.equal(snapshot.completeness,"complete");
+  assert.equal(snapshot.libraryInventory,"unavailable");
   assert.equal(snapshot.documents.length,6);
   const byPath=new Map(snapshot.documents.map(x=>[x.relativePath,x]));
   assert.equal(byPath.get("assurance/procedure.yaml").text,"procedures: {unsaved: true}\n");
@@ -66,6 +79,51 @@ test("Package snapshot keeps exact root, required files, language ids and unsave
   assert.equal(byPath.get("schemas/request.json").languageId,"json");
   assert.equal(byPath.get("scripts/new-unsaved.py").text,"def notYetSaved(): pass\n");
   assert.equal(byPath.get("scripts/new-unsaved.py").version,1);
+});
+
+test("Package snapshot includes the exact project lib/ inventory as read-only LSP inputs",async()=>{
+  const projectRoot=makeUri("/workspace/project");
+  const packageRoot="/workspace/project/skills/my-skill";
+  const procedure=makeUri(packageRoot+"/assurance/procedure.yaml");
+  const contract=makeUri(packageRoot+"/assurance/contract.yaml");
+  const predicates=makeUri(packageRoot+"/assurance/predicates.yaml");
+  const tool=makeUri("/workspace/project/lib/tools/udm.tool.yaml");
+  const ownerSchema=makeUri("/workspace/project/lib/host/subject.schema.yaml");
+  const openProcedure=openDoc(procedure,"procedures: {}\\n",2);
+  const openTool=openDoc(tool,"kind: ToolCatalog\\n",7);
+  const vscode=makeVscode({
+    files:[procedure,contract,predicates],
+    libraryFiles:[tool,ownerSchema],
+    open:[openProcedure,openTool],
+    workspaceFolders:[{uri:projectRoot}]
+  });
+  const snapshot=await collectPackageSnapshot(vscode,openProcedure,5);
+  assert.equal(snapshot.completeness,"complete");
+  assert.equal(snapshot.libraryInventory,"complete");
+  const byPath=new Map(snapshot.documents.map(item=>[item.relativePath,item]));
+  assert.equal(byPath.get("lib/tools/udm.tool.yaml").text,"kind: ToolCatalog\\n");
+  assert.equal(byPath.get("lib/tools/udm.tool.yaml").version,7);
+  assert.equal(byPath.get("lib/host/subject.schema.yaml").text,
+    "disk:/workspace/project/lib/host/subject.schema.yaml");
+});
+
+test("incomplete project lib/ inventory does not downgrade Package completeness or prove missing dependencies",async()=>{
+  const projectRoot=makeUri("/workspace/project");
+  const packageRoot="/workspace/project/skills/my-skill";
+  const procedure=makeUri(packageRoot+"/assurance/procedure.yaml");
+  const contract=makeUri(packageRoot+"/assurance/contract.yaml");
+  const predicates=makeUri(packageRoot+"/assurance/predicates.yaml");
+  const tool=makeUri("/workspace/project/lib/tools/udm.tool.yaml");
+  const openProcedure=openDoc(procedure,"procedures: {}\\n",2);
+  const vscode=makeVscode({
+    files:[procedure,contract,predicates],libraryFiles:[tool],
+    failReads:new Set([tool.toString()]),open:[openProcedure],
+    workspaceFolders:[{uri:projectRoot}]
+  });
+  const snapshot=await collectPackageSnapshot(vscode,openProcedure,6);
+  assert.equal(snapshot.completeness,"complete");
+  assert.equal(snapshot.libraryInventory,"partial");
+  assert.match(snapshot.libraryReason,/permission denied/);
 });
 
 test("Package file enumeration over limit is partial and prioritizes required assurance files",async()=>{

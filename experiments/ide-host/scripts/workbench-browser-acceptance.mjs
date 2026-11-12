@@ -512,7 +512,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const root=document.querySelector('.theia-Files')??document;
     const nodes=[...root.querySelectorAll('.theia-TreeNode')];
     const normalize=value=>value.replace(/\\s+/g,' ').trim();
-    const el=nodes.find(node=>normalize(node.innerText)==='procedure.yaml'&&
+    const el=nodes.find(node=>normalize(node.innerText).replace(/\\s+\\d+$/,'')==='procedure.yaml'&&
       node.getBoundingClientRect().width>0);
     if(!el)return {found:false,nodeCount:nodes.length,
       fileRows:nodes.map(node=>normalize(node.innerText)).filter(name=>name.includes('procedure.yaml')).slice(0,12)};
@@ -568,7 +568,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const roots=[...document.querySelectorAll('.theia-Files')];
       const rows=(roots.length?roots:[document]).flatMap(root=>
         [...root.querySelectorAll('.theia-TreeNode')]);
-      const row=rows.find(node=>node.innerText.replace(/\\s+/g,' ').trim()==='procedure.yaml'&&
+      const row=rows.find(node=>node.innerText.replace(/\\s+/g,' ').trim().replace(/\\s+\\d+$/,'')==='procedure.yaml'&&
         node.getBoundingClientRect().width>0);
       if(!row)return {found:false,reason:'procedure row unavailable'};
       row.scrollIntoView({block:'center',inline:'nearest'});
@@ -604,7 +604,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // checks so the active Webview frame and its selection are unambiguous.
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.replace(/\\s+\\d+$/,'').trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file disappeared after closing preview/pinned tabs');
   await click(file.x,file.y,2);
   let singlePinned=null;
@@ -724,6 +724,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         "ue-requested-pdu-session-establishment")||
       !languageFeatureEvidence.yamlPredicateOutline?.includes(
         "createdsession.ingress.eligible")||
+      !languageFeatureEvidence.yamlCompletions?.requestSchema||
+      !languageFeatureEvidence.yamlCompletions?.predicate||
+      !languageFeatureEvidence.yamlCompletions?.node||
+      !languageFeatureEvidence.yamlCompletions?.script||
       !languageFeatureEvidence.hover||
       !languageFeatureEvidence.references||
       !languageFeatureEvidence.reverseDefinition||
@@ -1481,12 +1485,24 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('core.undo');
   const outcomeUndo=await waitForRevisionChange(graphContext,
     outcomeApplied.result?.value,'Native Phase Outcome repair Undo');
-  const afterNativeUndo=await evalJS(`(()=>{
-    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
-    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
+  // Undo may restore the graph CustomEditor as the active tab and hide the
+  // native Source editor. Re-open the exact Procedure Source before inspecting
+  // its visible Monaco model; never reuse a detached editor index.
+  await evalWebviewJS(`document.querySelector("#openSource")?.click();true`);
+  await sleep(350);
+  const readProcedureModel=()=>evalJS(`(()=>{
+    const c=window.theia.container;
+    const managerKey=[...c._bindingDictionary._map.keys()].find(key=>
+      typeof key==='function'&&typeof key.prototype?.getOrCreateByUri==='function'&&
+      typeof key.prototype?.getByUri==='function');
+    const editors=managerKey&&c.get(managerKey).all;
+    const control=editors?.map(widget=>widget.editor?.getControl?.()).find(editor=>
+      editor?.getModel()?.uri.path.endsWith('/assurance/procedure.yaml'));
+    return control?.getModel()?.getValue()??'';
   })()`);
+  const afterNativeUndo=await readProcedureModel();
   if(!afterNativeUndo.includes('MISTYPED: finalize-failed'))
-    throw Error('Native Undo did not revert the Outcome repair back to the typed fixture: '+
+    throw Error('Native Undo did not revert the Outcome repair in the Procedure Source model: '+
       afterNativeUndo.slice(-1200));
   // The keyboard-created fixture can have its own Monaco edit/undo grouping.
   // Restore the original Source explicitly with one native editor line edit;
@@ -1501,10 +1517,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await command('Input.insertText',{text:'            FAILED: finalize-failed'});
   const fixtureRestored=await waitForRevisionChange(graphContext,
     outcomeUndo.result?.value,'Native Phase Outcome fixture restoration');
-  const restoredText=await evalJS(`(()=>{
-    const editor=document.querySelectorAll('.monaco-editor')[${nativeEditor.index}];
-    return (editor?.querySelector('.view-lines')?.innerText??'').replace(/\\u00a0/g,' ');
-  })()`);
+  const restoredText=await readProcedureModel();
   if(!restoredText.includes('FAILED: finalize-failed')||
      restoredText.includes('MISTYPED: finalize-failed'))
     throw Error('Native Source fixture was not restored to its original scalar: '+
@@ -1822,7 +1835,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await sleep(1200);await command('Page.reload');await sleep(800);
   let restored=null;
   for(let i=0;i<120&&!restored;i++){
-    const tab=await evalJS(`(()=>{const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>x.textContent.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+    const tab=await evalJS(`(()=>{const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>x.textContent.trim().replace(/[0-9]+$/,'').trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().y<innerHeight);const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
     if(tab){await click(tab.x,tab.y);restored=await graph();}
     if(!restored)await sleep(150);
   }
@@ -1982,7 +1995,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // selections even after the conventional editor has been restored.
   await invoke('workbench.files.action.focusFilesExplorer');
   const explorerRow=async(label,which='last')=>evalJS(
-    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();const toggle=row.node.querySelector('.theia-ExpansionToggle');const tr=toggle?.getBoundingClientRect();const tx=tr?tr.x+tr.width/2:null,ty=tr?tr.y+tr.height/2:null;const hit=tr?document.elementFromPoint(tx,ty):null;return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length,toggleX:tx,toggleY:ty,toggleHit:!!toggle&&(hit===toggle||toggle.contains(hit)),toggleClass:toggle?.className??null};})()"
+    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label||row.text.replace(/\\s*\\d+$/,'').trim()===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();const toggle=row.node.querySelector('.theia-ExpansionToggle');const tr=toggle?.getBoundingClientRect();const tx=tr?tr.x+tr.width/2:null,ty=tr?tr.y+tr.height/2:null;const hit=tr?document.elementFromPoint(tx,ty):null;return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length,toggleX:tx,toggleY:ty,toggleHit:!!toggle&&(hit===toggle||toggle.contains(hit)),toggleClass:toggle?.className??null};})()"
   );
   // Compiler-style project root: the Explorer owns skills/, lib/, output/.
   // Expand only the source directory before looking for the two Skill folders.
