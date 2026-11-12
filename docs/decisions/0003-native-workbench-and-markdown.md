@@ -174,30 +174,35 @@ Do not remove site/ wholesale. Its current modules still contain shared Procedur
 4. **Problems and Data Flow:** consolidate diagnostics into native Problems; rename the old Evidence view and move its source-derived dataflow / ABI content into Inspector.
 5. **Classic retirement:** only after the preceding host and feature-parity gates pass.
 
-## Data Flow migration checkpoint (2026-11-12)
+## Data Flow migration closeout (2026-11-12)
 
-The Source-derived Producer / Consumer analysis already appears contextually inside the
-right-side Inspector. This migration is intentionally **not complete** merely because
-the Data Flow section exists.
+**Status: COMPLETE for the standalone Evidence view retirement.**
+The implementation was accepted in [PR #170](https://github.com/odango-chan/ca-skill-studio-demo/pull/170)
+and [PR #171](https://github.com/odango-chan/ca-skill-studio-demo/pull/171).
+Both PR heads passed Verify, IDE Host Spike, Browser-Only real Chromium and
+backend Theia real Chromium before merging to `main`.
 
-- **Implemented:** Inspector presents selected-node Source lineage, producer status,
-  output schema/type, Consumer ABI declarations, unresolved/type-only states, and
-  explicit Runtime NOT_RUN / no-write-authority boundaries. The Source projection
-  remains read-only; qualified edits continue through existing bounded edit commands.
-- **Migration gate:** Exercise selected Node → Inspector Data Flow, expanded binding
-  details, stale-Source rejection, Package Audit refresh, and Source/Canvas focus in
-  real browser-only and backend Theia Chromium. Distinguish source-derived facts
-  from actual Runtime Evidence and keep all missing-schema cases fail-closed.
-- **Retirement gate:** Only after equivalent Inspector behavior is verified, remove
-  `skillStudio.evidence` from extension contributions, its TreeDataProvider,
-  activation event, and the duplicate Explorer acceptance sequence. Replace those
-  assertions with actual Inspector Data Flow expansion and data-flow detail checks;
-  do not merely delete test coverage.
-- **Non-goals:** No new Evidence / Observation DSL, no Host evidence fabrication, and
-  no replacement of the canonical `ca-skills` language authority.
+- **Right-side Inspector:** the selected Source-backed Node displays contextual
+  Data Flow, including Producer / Consumer lineage, output contract/schema and
+  type, Consumer ABI declaration, and unresolved/type-only state.
+- **Semantic boundary:** this remains static Source analysis. It explicitly
+  labels Runtime `NOT_RUN`, missing producer/consumer proof and lack of write
+  authority. It never fabricates Runtime Evidence or Observation results.
+- **Old view removed:** `skillStudio.evidence` is no longer contributed to the
+  Explorer, activated as a TreeView, or registered as a DataProvider. Source
+  projection helpers can still be shared internally; this is not an additional
+  visible Runtime Evidence surface.
+- **Regression coverage migrated:** real Chromium checks Inspector placement,
+  contextual Data Flow, expandability, Source lineage and Consumer ABI; native
+  Source edit, Undo and Package Audit behavior remain in the same acceptance
+  suite. The retired Explorer Evidence header is asserted absent.
+- **Future scope:** actual Runtime Evidence belongs to an execution/Trace
+  inspector only after the Host supplies occurrence-pinned provenance. No new
+  Studio Evidence DSL or Observation schema is introduced.
 
-The old Evidence view is a temporary compatibility/acceptance surface, **not** a
-second product concept. Do not mark Classic retirement complete while it remains.
+**Important:** completing this migration does **not** close overall Classic
+retirement. Native Markdown replacement and remaining host-native view
+consolidations retain their own acceptance gates.
 
 ## Alternatives rejected
 
