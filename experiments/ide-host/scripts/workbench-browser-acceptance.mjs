@@ -2093,6 +2093,77 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   };
   console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
 
+  // Prove native Markdown refreshes the existing preview from an unsaved
+  // Source edit, then exercise both scroll-sync directions through Monaco and
+  // the actual Markdown webview in Chromium.
+  const nativeLiveUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance');
+  try{
+    const nativeLive=await waitNativeMarkdown(
+      view=>view.heading==='Native Markdown Live Update Probe',
+      'native Markdown unsaved Source edit');
+    if(nativeLive.view.contextId!==nativeMarkdown.view.contextId)
+      throw Error('Native Markdown recreated its Preview webview instead of updating it in place: '+
+        JSON.stringify({before:nativeMarkdown.view.contextId,after:nativeLive.view.contextId}));
+    const sourceScroll=async top=>evalJS(`(()=>{const c=window.theia.container;
+      const managerKey=[...c._bindingDictionary._map.keys()].find(key=>
+        typeof key==='function'&&typeof key.prototype?.getOrCreateByUri==='function'&&
+        typeof key.prototype?.getByUri==='function');
+      const editors=managerKey&&c.get(managerKey).all;
+      const control=editors?.map(widget=>widget.editor?.getControl?.()).find(editor=>
+        editor?.getModel()?.uri.path.endsWith('/SKILL.md'));
+      if(!control)throw Error('Native Markdown Source Monaco editor is unavailable');
+      control.setScrollTop(${Number(top)});
+      return {scrollTop:control.getScrollTop(),scrollHeight:control.getScrollHeight(),
+        clientHeight:control.getLayoutInfo().height};
+    })()`);
+    const previewScroll=async expression=>(await command('Runtime.evaluate',{
+      contextId:nativeLive.view.contextId,returnByValue:true,expression
+    })).result?.value;
+    const waitForScroll=async(read,predicate,label)=>{
+      let value=null;
+      for(let attempt=0;attempt<60;attempt++){
+        value=await read();
+        if(predicate(value))return value;
+        await sleep(100);
+      }
+      throw Error(label+' did not synchronize in real Chromium: '+JSON.stringify(value));
+    };
+    const initialSource=await sourceScroll(0);
+    if(initialSource.scrollHeight<=initialSource.clientHeight+100)
+      throw Error('Native Markdown scroll fixture is not tall enough to test bidirectional synchronization: '+
+        JSON.stringify(initialSource));
+    const sourceBottom=await sourceScroll(initialSource.scrollHeight);
+    await waitForScroll(()=>previewScroll('window.scrollY'),
+      value=>value>100,'Native Source → Preview scroll');
+    const previewTop=await previewScroll('window.scrollTo(0,0);window.scrollY');
+    await waitForScroll(()=>sourceScroll(0),value=>value.scrollTop<40,
+      'Native Preview → Source top scroll');
+    const previewBottom=await previewScroll(
+      'window.scrollTo(0,document.documentElement.scrollHeight);window.scrollY');
+    await waitForScroll(()=>sourceScroll(0),value=>value.scrollTop>100,
+      'Native Preview → Source bottom scroll');
+    const sourceTop=await sourceScroll(0);
+    await waitForScroll(()=>previewScroll('window.scrollY'),value=>value<50,
+      'Native Source → Preview top scroll');
+    const nativeMarkdownLiveEvidence={
+      previewContextRetained:true,
+      initialSource,sourceBottom,previewAtTop:previewTop,
+      previewAtBottom:previewBottom,sourceAtTop:sourceTop,
+      finalPreviewScroll:await previewScroll('window.scrollY')
+    };
+    console.log('STUDIO_NATIVE_MARKDOWN_LIVE_SYNC_CHROMIUM',
+      JSON.stringify(nativeMarkdownLiveEvidence));
+  }finally{
+    await nativeCommand(
+      'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',nativeLiveUri);
+  }
+  const restoredNativeMarkdown=await waitNativeMarkdown(
+    view=>view.heading==='Establish PDU Session',
+    'native Markdown Source restoration');
+  if(restoredNativeMarkdown.view.contextId!==nativeMarkdown.view.contextId)
+    throw Error('Restoring the Markdown Source recreated the existing Preview webview');
+
   const nativeSecurityUri=await nativeCommand(
     'skillStudio.internal.nativeMarkdownSecurityAcceptance');
   if(typeof nativeSecurityUri!=='string'||
