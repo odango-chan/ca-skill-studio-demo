@@ -205,7 +205,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
             if (cancellationToken?.isCancellationRequested) return undefined;
             const locations = (Array.isArray(result) ? result : result ? [result] : [])
               .filter(item => typeof item?.uri === "string" &&
-                /\\.ya?ml$/i.test(item.uri) && item.range?.start && item.range?.end)
+                /\.ya?ml$/i.test(item.uri) && item.range?.start && item.range?.end)
               .map(item => new vscode.Location(
                 vscode.Uri.parse(item.uri),
                 new vscode.Range(
