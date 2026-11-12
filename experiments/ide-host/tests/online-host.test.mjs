@@ -34,6 +34,8 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     "skillStudio.predicatePreview","skillStudio.schemaPreview"])assert.ok(editorViews.has(view),view);
   assert.equal(plugin.contributes["markdown.markdownItPlugins"],true,
     "the native Markdown engine must load Studio package-link policy");
+  assert.deepEqual(plugin.contributes["markdown.previewStyles"],["./media/markdown-preview.css"],
+    "the extension that opens native Markdown Preview must own its stylesheet contribution");
   const workbenchViews=new Set(plugin.contributes.views.skillStudio.map(x=>x.id));
   assert.ok(workbenchViews.has("skillStudio.packages"),
     "multi-Package Overview must live in the Skill Studio activity bar");
@@ -81,7 +83,6 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
   assert.equal(manifest.publisher,"odango-chan");
   assert.equal(manifest.contributes.themes[0].label,"SKILL Studio Light");
   assert.equal(manifest.contributes.iconThemes[0].id,"skill-studio-file-icons");
-  assert.deepEqual(manifest.contributes["markdown.previewStyles"],["./styles/markdown-preview.css"]);
   for(const path of [
     "themes/skill-studio-light-color-theme.json","icons/skill-studio-file-icon-theme.json",
     "styles/markdown-preview.css",
