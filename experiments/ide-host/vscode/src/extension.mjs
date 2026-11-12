@@ -66,7 +66,7 @@ export function activate(context){
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
-        vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported in this spike");
+        vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
         return;
       }
       const openedAt=performance.now();
@@ -170,7 +170,7 @@ export function activate(context){
         if(disposed||!ready)return;
         const text=document.getText();
         if(text.length>MAX_SOURCE_BYTES){
-          void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB spike limit"});
+          void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB Procedure editor limit"});
           return;
         }
         void webview.postMessage({type:"snapshot",text,version:document.version,
@@ -183,7 +183,7 @@ export function activate(context){
         if(disposed||typeof message!=="object"||!message)return;
         if(message.type==="selection"){
           // A visible Procedure editor can lose active status when the user
-          // opens the Evidence sidebar. Its real graph selection still belongs
+          // opens the Inspector sidebar. Its real graph selection still belongs
           // to this editor; only hidden Webviews must be ignored.
           if(panel.active||panel.visible)workbench.select(document,message);
           return;
