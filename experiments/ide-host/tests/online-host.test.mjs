@@ -61,7 +61,8 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js","media/procedure.js","media/procedure.css",
     "samples/skills/files.json",
     "samples/skills/establish-pdu-session/assurance/procedure.yaml",
-    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml"])
+    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml",
+    "media/markdown-preview.css"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });
 test("Trial is isolated from existing Pages distribution",()=>{
@@ -94,6 +95,9 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
   assert.match(markdownCss,/--vscode-skillstudio-markdownheading/);
   assert.match(markdownCss,/thead th/);
   assert.match(markdownCss,/max-height: 65vh/);
+  const packagedPreviewCss=readFileSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike/media/markdown-preview.css"),"utf8");
+  assert.equal(packagedPreviewCss,markdownCss,
+    "Theia/VS Code preview owner must package the exact shared theme stylesheet");
 });
 
 function findMarkdownManifest(directory){
