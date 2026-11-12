@@ -2105,10 +2105,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const evidence=nativeSecurity.view;
     if(evidence.imageCount!==0||evidence.scriptMarkers!==0||evidence.scriptExecuted)
       throw Error('Native Markdown allowed raw HTML or an image fetch: '+JSON.stringify(evidence));
-    if(!evidence.anchorHrefs.some(href=>href.includes('3gpp-procedure.md'))||
-       evidence.anchorHrefs.some(href=>href.includes('../../outside.md'))||
-       evidence.anchorHrefs.some(href=>href.includes('missing.md')))
-      throw Error('Native Markdown Package link containment failed: '+JSON.stringify(evidence));
+    const packageLinks=evidence.anchorDetails.filter(anchor=>anchor.dataset?.localPath);
+    const safeLink=packageLinks.find(anchor=>anchor.dataset.localPath==='3gpp-procedure.md');
+    const escapingLink=packageLinks.find(anchor=>anchor.dataset.localPath==='../../outside.md');
+    const missingLink=packageLinks.find(anchor=>anchor.dataset.localPath==='missing.md');
+    if(packageLinks.length!==3||!safeLink||!escapingLink||!missingLink||
+       packageLinks.some(anchor=>anchor.href!=='#'))
+      throw Error('Native Markdown links must be inert anchors carrying exact Package-relative paths for host-side containment: '+JSON.stringify({packageLinks,evidence}));
     if(!evidence.csp.includes("default-src 'none'")||
        /script-src[^;]*unsafe-inline/.test(evidence.csp))
       throw Error('Native Markdown preview is not using a strict script Content Security Policy: '+
