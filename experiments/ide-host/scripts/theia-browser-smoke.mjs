@@ -303,14 +303,14 @@ try{
           noWorkspace:document.body.classList.contains("theia-no-open-workspace")};
       })(),
       bodyText:document.body.innerText.slice(-2200),
-      explorerText:document.querySelector('.theia-navigator-container')?.innerText??'',
-      noFolderPrompt:(document.querySelector('.theia-navigator-container')?.innerText??'')
+      explorerText:document.querySelector('.theia-Files')?.innerText??'',
+      noFolderPrompt:(document.querySelector('.theia-Files')?.innerText??'')
         .includes('You have not yet opened a folder.')||
-        (document.querySelector('.theia-navigator-container')?.innerText??'')
+        (document.querySelector('.theia-Files')?.innerText??'')
         .includes('You have not yet added a folder to the workspace.'),
-      workspaceRootVisible:(document.querySelector('.theia-navigator-container')?.innerText??'')
+      workspaceRootVisible:(document.querySelector('.theia-Files')?.innerText??'')
         .includes('workspaces')||
-        (document.querySelector('.theia-navigator-container')?.innerText??'')
+        (document.querySelector('.theia-Files')?.innerText??'')
         .includes('skills'),
       notificationText:[...document.querySelectorAll('.theia-notification-list-item,.theia-notification-message')]
         .map(x=>x.innerText).filter(Boolean).slice(0,7),
@@ -1464,7 +1464,7 @@ try{
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:focusExplorerRow.x,y:focusExplorerRow.y,button:"left",clickCount:1});
   await sleep(500);
   const nativeExplorer=await evalJS(`(()=>{
-    const explorer=document.querySelector('.theia-navigator-container');
+    const explorer=document.querySelector('.theia-Files');
     const text=explorer?.innerText??'';
     return {visible:Boolean(explorer),text,
       noFolderPrompt:text.includes('You have not yet opened a folder.')||
