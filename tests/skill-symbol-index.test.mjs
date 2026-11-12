@@ -275,11 +275,12 @@ test("v0.2 link diagnostics report exact unresolved and ambiguous references but
   const duplicateIndex=symbols.buildSkillSymbolIndex(duplicateSnapshot);
   const duplicateDiagnostics=symbols.skillSymbolLinkDiagnostics(duplicateIndex,duplicateSnapshot);
   const procedure=duplicateSnapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const duplicateHit=at(duplicateIndex,procedure.uri,procedure.text,"sbi.udm.sm_data.get");
   assert.ok(duplicateDiagnostics.some(item=>item.uri===procedure.uri&&
     item.code==="SKILL_LINK_AMBIGUOUS"&&
     procedure.text.slice(item.range.start,item.range.end)==="sbi.udm.sm_data.get"),
-    JSON.stringify({declarations:duplicateIndex.declarations.get(hit.token.key),
-      references:duplicateIndex.references.get(hit.token.key),
+    JSON.stringify({declarations:duplicateIndex.declarations.get(duplicateHit.token.key),
+      references:duplicateIndex.references.get(duplicateHit.token.key),
       diagnostics:duplicateDiagnostics}));
 });
 
