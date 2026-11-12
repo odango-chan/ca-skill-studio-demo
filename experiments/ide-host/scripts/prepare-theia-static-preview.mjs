@@ -126,11 +126,20 @@ for(const folder of ["vscode.markdown","vscode.markdown-language-features"]){
   const target=join(root,"hostedPlugin",folder.replaceAll(".","_"));
   await mkdir(target,{recursive:true});
   await cp(source,target,{recursive:true,force:false,errorOnExist:false});
-  for(const required of ["package.json",manifest.browser].filter(Boolean)){
-    const info=await stat(join(target,required));
-    if(!info.isFile()||info.size<100)
-      throw Error("Static native Markdown plugin asset missing: "+folder+"/"+required);
+  const browserBase=manifest.browser?join(target,manifest.browser):null;
+  let browserBundle=null;
+  if(browserBase){
+    for(const candidate of [browserBase,browserBase+".js",join(browserBase,"index.js")]){
+      try{
+        const info=await stat(candidate);
+        if(info.isFile()&&info.size>=100){browserBundle=candidate;break;}
+      }catch{/* try the next Node-style extension resolution candidate */}
+    }
   }
+  const packageInfo=await stat(join(target,"package.json"));
+  if(!packageInfo.isFile()||!browserBundle)
+    throw Error("Static native Markdown plugin package or browser bundle missing: "+folder);
+
   console.log("STUDIO_THEIA_STATIC_NATIVE_MARKDOWN",JSON.stringify({
     id:manifest.publisher+"."+manifest.name,target,browser:manifest.browser??null
   }));
