@@ -40,7 +40,12 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     TextEditorRevealType:{InCenter:1},
     workspace:{
       textDocuments:[document],
+      workspaceFolders:[],
       onDidChangeTextDocument(cb){listeners.add(cb);return {dispose(){listeners.delete(cb);}};},
+      onDidChangeConfiguration(){return {dispose(){}};},
+      onDidChangeWorkspaceFolders(){return {dispose(){}};},
+      registerTextDocumentContentProvider(){return {dispose(){}};},
+      getConfiguration(){return {get:(_key,fallback)=>fallback,update:async()=>{}};},
       async applyEdit(edit){
         const changes=edit.changes??[edit.change];
         for(const change of changes)assert.equal(change.file,document.uri);
