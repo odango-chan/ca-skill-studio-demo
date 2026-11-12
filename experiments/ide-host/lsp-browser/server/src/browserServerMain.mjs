@@ -16,6 +16,13 @@ import {
 } from "../../../../../language/semantic-tokens.mjs";
 import { parseDocument, isMap, isScalar } from "yaml";
 import { LanguageDiagnosticSession } from "../../../../../language/lsp/session.js";
+import {
+  buildSkillSymbolIndex,
+  skillSymbolAt,
+  uniqueSkillSymbolDeclaration,
+  skillSymbolOccurrences,
+  skillSymbolDeclarationsForDocument
+} from "../../../../../language/symbol-index.mjs";
 
 const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
 const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
@@ -30,6 +37,7 @@ const connection = createConnection(
 const sessions = new Map();
 const packageAnalyses = new Map();
 const packageSnapshots = new Map();
+const symbolIndexes = new Map();
 const requestedGeneration = new Map();
 
 function reportError(message, rootUri = undefined) {
@@ -312,12 +320,24 @@ connection.languages.semanticTokens.on(params=>{
 });
 
 connection.onDefinition(params => {
-  const value = packageForUri(params.textDocument.uri);
+  const uri=params.textDocument.uri;
+  const snapshot=packageSnapshotForUri(uri);
+  const source=snapshot?snapshotDocumentFor(snapshot,uri):null;
+  const offset=source?offsetAt(source.text,params.position):null;
+  const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
+  const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
+  if(symbolHit){
+    if(snapshot.completeness!=="complete"||index?.generation!==snapshot.generation)
+      return null;
+    const declaration=uniqueSkillSymbolDeclaration(symbolHit);
+    if(!declaration)return null;
+    const target=snapshotDocumentFor(snapshot,declaration.uri);
+    return location(declaration.uri,target,declaration.range);
+  }
+  const value = packageForUri(uri);
   if (!value || value.analysis.state === "UNAVAILABLE") return null;
-  const document = documentFor(value, params.textDocument.uri);
-  if (!document) return null;
-  const offset = offsetAt(document.text, params.position);
-  if (offset === null) return null;
+  const document = documentFor(value, uri);
+  if (!document || offset===null) return null;
   const hit = referenceAt(value, document.uri, offset);
   if (!hit || !hit.reference.packageContextComplete) return null;
   if (hit.side !== "source") return null;
@@ -326,12 +346,23 @@ connection.onDefinition(params => {
 });
 
 connection.onReferences(params => {
-  const value = packageForUri(params.textDocument.uri);
+  const uri=params.textDocument.uri;
+  const snapshot=packageSnapshotForUri(uri);
+  const source=snapshot?snapshotDocumentFor(snapshot,uri):null;
+  const offset=source?offsetAt(source.text,params.position):null;
+  const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
+  const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
+  if(symbolHit){
+    if(snapshot.completeness!=="complete"||index?.generation!==snapshot.generation||
+       !uniqueSkillSymbolDeclaration(symbolHit))return [];
+    return skillSymbolOccurrences(symbolHit,params.context?.includeDeclaration===true)
+      .map(item=>location(item.uri,snapshotDocumentFor(snapshot,item.uri),item.range))
+      .filter(Boolean);
+  }
+  const value = packageForUri(uri);
   if (!value || value.analysis.state === "UNAVAILABLE") return [];
-  const document = documentFor(value, params.textDocument.uri);
-  if (!document) return [];
-  const offset = offsetAt(document.text, params.position);
-  if (offset === null) return [];
+  const document = documentFor(value, uri);
+  if (!document || offset===null) return [];
   const hit = referenceAt(value, document.uri, offset);
   if (!hit || !hit.reference.packageContextComplete) return [];
   const references = allReferences(value.analysis).filter(item =>
@@ -348,12 +379,33 @@ connection.onReferences(params => {
 });
 
 connection.onHover(params => {
-  const value = packageForUri(params.textDocument.uri);
+  const uri=params.textDocument.uri;
+  const snapshot=packageSnapshotForUri(uri);
+  const source=snapshot?snapshotDocumentFor(snapshot,uri):null;
+  const offset=source?offsetAt(source.text,params.position):null;
+  const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
+  const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
+  if(symbolHit){
+    const declaration=uniqueSkillSymbolDeclaration(symbolHit);
+    const kind=({
+      skillProcedure:"Procedure",
+      skillStep:"Procedure node",
+      skillPredicate:"Predicate",
+      skillOperation:"Tool Operation",
+      skillCapability:"Capability / Operation resource grant"
+    })[symbolHit.token.type]??"Skill symbol";
+    const resolved=declaration&&snapshot.completeness==="complete"&&
+      index?.generation===snapshot.generation;
+    const body=resolved
+      ? "**"+kind+"** `"+symbolHit.token.name+"`\\n\\nDeclared in `"+declaration.relativePath+"`"
+      : "**"+kind+" reference** `"+symbolHit.token.name+"`\\n\\nNo unique declaration is available in the current complete Package snapshot.";
+    return {contents:{kind:"markdown",value:body},
+      range:toLspRange(source.text,symbolHit.token.range)};
+  }
+  const value = packageForUri(uri);
   if (!value || value.analysis.state === "UNAVAILABLE") return null;
-  const document = documentFor(value, params.textDocument.uri);
-  if (!document) return null;
-  const offset = offsetAt(document.text, params.position);
-  if (offset === null) return null;
+  const document = documentFor(value, uri);
+  if (!document || offset===null) return null;
   const hit = referenceAt(value, document.uri, offset);
   if (hit && hit.reference.packageContextComplete) {
     const reference = hit.reference;
@@ -408,17 +460,52 @@ connection.onHover(params => {
 });
 
 connection.onDocumentSymbol(params => {
-  const value = packageForUri(params.textDocument.uri);
+  const uri=params.textDocument.uri;
+  const snapshot=packageSnapshotForUri(uri);
+  const source=snapshot?snapshotDocumentFor(snapshot,uri):null;
+  const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
+  if(source&&index?.generation===snapshot.generation){
+    const declarations=skillSymbolDeclarationsForDocument(index,uri);
+    const procedures=declarations.filter(item=>item.type==="skillProcedure");
+    const steps=declarations.filter(item=>item.type==="skillStep");
+    const symbols=[];
+    for(const procedure of procedures){
+      const children=steps.filter(item=>item.path?.[1]===procedure.name)
+        .map(item=>({
+          name:item.name,kind:SymbolKind.Method,
+          range:toLspRange(source.text,item.range),
+          selectionRange:toLspRange(source.text,item.range)
+        })).filter(item=>item.range&&item.selectionRange);
+      const range=toLspRange(source.text,procedure.range);
+      if(range)symbols.push({
+        name:procedure.name,kind:SymbolKind.Function,range,
+        selectionRange:range,children
+      });
+    }
+    for(const item of declarations.filter(item=>
+      item.type==="skillPredicate"||item.type==="skillOperation")){
+      const range=toLspRange(source.text,item.range);
+      if(range)symbols.push({
+        name:item.name,
+        kind:item.type==="skillPredicate"?SymbolKind.Function:SymbolKind.Function,
+        range,selectionRange:range
+      });
+    }
+    if(symbols.length)return symbols;
+  }
+  const value = packageForUri(uri);
   if (!value || value.analysis.state === "UNAVAILABLE") return [];
-  const document = documentFor(value, params.textDocument.uri);
+  const document = documentFor(value, uri);
   if (!document) return [];
   const documentAnalysis = value.analysis.documents.find(item => item.uri === document.uri);
   return (documentAnalysis?.pythonSymbols ?? []).filter(symbol => symbol.range)
     .map(symbol => ({
       name: symbol.name,
       kind: symbol.kind === "class" ? SymbolKind.Class : SymbolKind.Function,
-      location: location(document.uri, document, symbol.range)
-    })).filter(symbol => symbol.location);
+      location: location(document.uri, document, symbol.range),
+      range:toLspRange(document.text,symbol.range),
+      selectionRange:toLspRange(document.text,symbol.range)
+    })).filter(symbol => symbol.range&&symbol.selectionRange);
 });
 
 connection.onCompletion(params => {
@@ -491,6 +578,7 @@ connection.onNotification(PACKAGE_INVALIDATE_NOTIFICATION, params => {
     requestedGeneration.set(rootUri, generation);
     packageAnalyses.delete(rootUri);
     packageSnapshots.delete(rootUri);
+    symbolIndexes.delete(rootUri);
     sessions.get(rootUri)?.reset();
     refreshSemanticTokens();
   }
@@ -511,11 +599,13 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
     requestedGeneration.set(rootUri, snapshot.generation);
     packageAnalyses.delete(rootUri);
     packageSnapshots.delete(rootUri);
+    symbolIndexes.delete(rootUri);
   }
   // Publish the exact source snapshot to semantic-token requests immediately.
   // LanguageDiagnosticSession analysis may still be pending or PARTIAL; color
   // projection must not wait for Python indexing or diagnostics completion.
   packageSnapshots.set(rootUri, snapshot);
+  symbolIndexes.set(rootUri,buildSkillSymbolIndex(snapshot));
   let session = sessions.get(rootUri);
   if (!session) {
     session = createSession(rootUri);
@@ -527,13 +617,19 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
         result.reason !== "STALE_GENERATION" &&
         result.reason !== "STALE_DOCUMENT") {
       packageAnalyses.delete(rootUri);
-      if(packageSnapshots.get(rootUri)===snapshot)packageSnapshots.delete(rootUri);
+      if(packageSnapshots.get(rootUri)===snapshot){
+        packageSnapshots.delete(rootUri);
+        symbolIndexes.delete(rootUri);
+      }
       refreshSemanticTokens();
       reportError("Package analysis rejected: " + result.reason, rootUri);
     }
   } catch (error) {
     packageAnalyses.delete(rootUri);
-    if(packageSnapshots.get(rootUri)===snapshot)packageSnapshots.delete(rootUri);
+    if(packageSnapshots.get(rootUri)===snapshot){
+      packageSnapshots.delete(rootUri);
+      symbolIndexes.delete(rootUri);
+    }
     refreshSemanticTokens();
     reportError(error?.message ?? error, rootUri);
   }
@@ -549,6 +645,7 @@ connection.onNotification(PACKAGE_CLOSE_NOTIFICATION, params => {
   }
   packageAnalyses.delete(rootUri);
   packageSnapshots.delete(rootUri);
+  symbolIndexes.delete(rootUri);
   requestedGeneration.delete(rootUri);
   refreshSemanticTokens();
 });
@@ -558,6 +655,7 @@ connection.onShutdown(() => {
   sessions.clear();
   packageAnalyses.clear();
   packageSnapshots.clear();
+  symbolIndexes.clear();
   requestedGeneration.clear();
 });
 
