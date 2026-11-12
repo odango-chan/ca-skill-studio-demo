@@ -1,6 +1,6 @@
 # Skill Studio 实施证据追溯
 
-**Status: Accepted · Date: 2026-11-10**
+**Status: Accepted · Date: 2026-11-12**
 
 `WORK` 回答 **现在到哪**；本页回答 **规范→代码→测试→何种证据**。下表不复制 owner Runtime 契约，也不把静态/Mock 宣告为 Live PASS。
 

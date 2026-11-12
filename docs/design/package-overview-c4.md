@@ -29,19 +29,18 @@ coverage must also pass all four workflows on **the same final PR head**
 before merge. These checks are not replaced by successful tests on the
 earlier baseline. Pages deployment follows integration into `main`.
 
-The Package view remains an inventory and navigation aid only; neither
+The C4 Skills inventory remains an inventory and navigation aid only; neither
 these browser tests nor the displayed core-file counts certify Compiler
 qualification, Runtime readiness, authorization, or live 5GC execution.
 
-## Purpose
+## Purpose and current presentation
 
-Add a package-oriented inventory view to the existing Skill Studio activity bar.
-This is not another file Explorer and not another Package Audit.
+The original C4 implementation introduced a Package Overview inventory as a domain-specific TreeView. Its initial Activity Bar placement and inventory-only role are superseded by [ADR-0004](../decisions/0004-package-first-workspace.md). In the target workbench, this inventory is the **Skills** section of the default Package Explorer, composed with Plugin-managed Dependencies and actual Compiler Build Artifacts.
 
-- Native Explorer remains the ordinary workspace file tree and file creation surface.
-- Existing Package Audit remains the source of its bounded editor diagnostics.
-- Package Overview discovers multiple Skill roots in the active Workspace and
-  groups their existing files by role.
+- The native Files view remains the general-purpose physical workspace file tree.
+- Package Explorer provides Package-aware Source operations, but delegates physical file creation / rename / move / delete to the host filesystem API; it does not implement a second filesystem.
+- Existing Package Audit remains the source of bounded editor diagnostics.
+- The Skills inventory discovers multiple Skill roots in the active Project and groups their existing files by role.
 - File rows open the already-owned visual editor for Procedure, Contract,
   PredicateSet and Schema; Python, Markdown and other files remain native Source.
 - Dirty count comes from currently open TextDocuments. It is a convenience
@@ -70,7 +69,7 @@ the three core files. Missing core files are explicit placeholder rows.
   Runtime readiness, capability authorization or 5GC execution claims.
 - Bounded workspace scan: first 1,000 files. If the result exceeds the bound,
   the view explicitly says the inventory may be incomplete.
-- No Source writes. Clicking a row opens the matching Designer or native Source.
+- The C4 inventory itself performs no Source content writes. Package-aware filesystem operations are defined by ADR-0004. Clicking a row opens the matching Designer or native Source.
 - Existing Package Audit and diagnostics remain the only owner of current
   editor audit findings.
 - Package Overview is provider-backed and intentionally has no `viewsWelcome`
