@@ -22,6 +22,7 @@ function packageFilePath(value,sourcePath){
   const raw=value.split("#",1)[0];
   if(!raw)return null;
   const relative=raw.startsWith("./");
+  if(!relative&&!/^(?:schemas|lib|scripts|references)\\//.test(raw))return null;
   const parts=relative?sourcePath.split("/").slice(0,-1):[];
   for(const part of raw.split("/")){
     if(!part||part===".")continue;
