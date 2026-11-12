@@ -175,7 +175,6 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   const skillsRoot=vscode.Uri.joinPath(root,"skills");
   const libraryRoot=vscode.Uri.joinPath(root,"lib");
   const outputRoot=vscode.Uri.joinPath(root,"output");
-  const current=vscode.workspace.workspaceFolders??[];
   let created=0,skipped=0;
   phase="create-project-layout";
   await fileSystem.createDirectory(root);
