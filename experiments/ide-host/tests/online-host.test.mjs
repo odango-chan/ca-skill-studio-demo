@@ -20,8 +20,11 @@ test("Theia online target is a real backend-free 1.76 browser-only app",()=>{
   assert.ok(!app.dependencies["@theia/terminal"]);
   assert.equal(app.scripts.build,"theia build --mode production");
   assert.equal(app.scripts["download:plugins"],"theia download:plugins");
-  assert.equal(app.theiaPlugins["vscode.markdown-language-features"],
-    "https://open-vsx.org/api/vscode/markdown-language-features/1.95.3/file/vscode.markdown-language-features-1.95.3.vsix");
+  const markdownPlugin="https://open-vsx.org/api/vscode/markdown-language-features/1.119.0/file/vscode.markdown-language-features-1.119.0.vsix";
+  assert.equal(app.theiaPlugins["vscode.markdown-language-features"],markdownPlugin);
+  const browserApp=JSON.parse(readFileSync(join(root,"../theia-browser/package.json"),"utf8"));
+  assert.equal(browserApp.theiaPlugins["vscode.markdown-language-features"],markdownPlugin,
+    "Browser-Only and backend Theia must use the same scroll-sync-fixed Markdown extension");
   assert.equal(app.theia.frontend.config.preferences["markdown.preview.scrollEditorWithPreview"],true);
   assert.equal(app.theia.frontend.config.preferences["markdown.preview.scrollPreviewWithEditor"],true);
 });
