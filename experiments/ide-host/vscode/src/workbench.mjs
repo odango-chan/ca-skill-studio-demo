@@ -4,7 +4,6 @@ import {prepareNativeMarkdownPackagePolicy,clearNativeMarkdownPackagePolicies} f
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
-import {renderMarkdown} from '../../../../site/markdown-preview.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
@@ -47,35 +46,6 @@ export function registerWorkbench(vscode,context){
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer,
     lastSelectionMessage=null;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
-  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),
-    nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
-    markdownOpening=new Set(),nativeMarkdownOpening=new Set(),nativeMarkdownPaired=new Set();
-  const nativeMarkdownWebviewMessages=[];
-  let nativeMarkdownMessageTapInstalled=false;
-  const installNativeMarkdownMessageTap=()=>{
-    if(nativeMarkdownMessageTapInstalled||
-       typeof vscode.window.createWebviewPanel!=='function')return;
-    const original=vscode.window.createWebviewPanel;
-    vscode.window.createWebviewPanel=function(...args){
-      const panel=original.apply(this,args);
-      if(args[0]==='markdown.preview'&&
-         typeof panel?.webview?.onDidReceiveMessage==='function'){
-        context.subscriptions.push(panel.webview.onDidReceiveMessage(message=>{
-          nativeMarkdownWebviewMessages.push({
-            type:message?.type??typeof message,
-            source:message?.source??null,
-            line:typeof message?.line==='number'?message.line:null
-          });
-          if(nativeMarkdownWebviewMessages.length>30)nativeMarkdownWebviewMessages.shift();
-        }));
-      }
-      return panel;
-    };
-    nativeMarkdownMessageTapInstalled=true;
-  };
-  // Install before any Markdown editor can auto-open its preview, so the
-  // native panel is observed even when the acceptance later reuses it.
-  installNativeMarkdownMessageTap();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2631,13 +2601,7 @@ export function registerWorkbench(vscode,context){
       }
     }),
     vscode.window.onDidChangeActiveTextEditor(editor=>{if(isProcedurePath(editor?.document.uri.path)){update(editor.document);scheduleAudit();}}));
-  const toggleMarkdownState=state=>{
-    state.singlePane=!state.singlePane;
-    state.panel.reveal(state.singlePane?vscode.ViewColumn.One:vscode.ViewColumn.Two);
-    void state.panel.webview.postMessage({type:'layoutState',singlePane:state.singlePane});
-  };
   async function openNativeMarkdownPreview(uri){
-    installNativeMarkdownMessageTap();
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path?.toLowerCase().endsWith('.md'))return false;
     const key=uri.toString();
@@ -2869,10 +2833,8 @@ export function registerWorkbench(vscode,context){
         item.document.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
       if(direction==='clear'){
         nativeMarkdownScrollEvents.length=0;
-        nativeMarkdownWebviewMessages.length=0;
       }
-      if(!editor)return {editorFound:false,recentEvents:[...nativeMarkdownScrollEvents]};
-      const before=editor.visibleRanges.map(range=>({
+        const before=editor.visibleRanges.map(range=>({
         start:range.start.line,end:range.end.line
       }));
       const line=direction==='bottom'?Math.max(0,editor.document.lineCount-1):0;
@@ -2887,7 +2849,6 @@ export function registerWorkbench(vscode,context){
         })),
         activeEditor:vscode.window.activeTextEditor?.document.uri.toString()??null,
         recentEvents:[...nativeMarkdownScrollEvents],
-        recentMessages:[...nativeMarkdownWebviewMessages],
         config:vscode.workspace.getConfiguration('markdown.preview')
           .get('scrollEditorWithPreview')
       };
@@ -2909,18 +2870,6 @@ export function registerWorkbench(vscode,context){
         }))
       }))
     })));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.toggleMarkdownLayout',async uri=>{
-      const target=uri??vscode.window.activeTextEditor?.document.uri;
-      const state=target?markdownPanels.get(target.toString()):[...markdownPanels.values()].at(-1);
-      if(!state){
-        if(target?.path?.toLowerCase().endsWith('.md'))
-          return vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
-        return false;
-      }
-      toggleMarkdownState(state);
-      return true;
-    }));
   // Opening Markdown in the native Explorer/editor automatically creates its
   // paired read-only Preview. The timer lets an explicit Preview command finish
   // first; its panel is then already registered and no duplicate is opened.
@@ -2929,9 +2878,6 @@ export function registerWorkbench(vscode,context){
     if(!target||!target.path.toLowerCase().endsWith('.md'))return;
     const key=target.toString();
     setTimeout(()=>{
-      if(markdownPanels.has(key)||markdownOpening.has(key)||nativeMarkdownOpening.has(key)||nativeMarkdownPaired.has(key))return;
-      if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
-      void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
     },0);
   }));
   // Internal acceptance probe reports the authoritative VS Code TextDocument
