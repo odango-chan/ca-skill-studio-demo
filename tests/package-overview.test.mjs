@@ -249,7 +249,7 @@ test('C4 registers Package Explorer and renders Skills under the unified tree',a
   assert.equal(skills[0].label,'3 SKILL Packages');
   const pkg=skills.find(x=>x.kind==='package'&&x.name==='establish-pdu-session');
   assert.ok(pkg);
-  assert.match(pkg.description,/3\\/3 core/);
+  assert.match(pkg.description,/3\/3 core/);
   assert.match(pkg.description,/1 modified/);
   const groups=await provider.getChildren(pkg);
   const schemas=groups.find(x=>x.key==='schemas');
