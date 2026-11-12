@@ -364,6 +364,11 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
 
 export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false}){
   if(!requireEditor)return {required:false};
+  const explorerMode=await command("skillStudio.internal.setExplorerOpenMode","singleClick");
+  if(explorerMode?.after!=="singleClick")
+    throw Error("Theia Explorer did not accept explicit singleClick mode: "+
+      JSON.stringify(explorerMode));
+  console.log("STUDIO_EXPLORER_OPEN_MODE",JSON.stringify(explorerMode));
   const click=async(x,y,count=1)=>{
     // Match the already accepted Package TreeView interaction sequence:
     // release any stale CDP pointer state, then allow native pressed/released
