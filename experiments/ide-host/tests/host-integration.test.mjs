@@ -112,6 +112,16 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     "rootPathFilters","pathFailure","pathUncertain","pathRecovery"]){
     assert.match(webview.html,new RegExp('id="'+id+'"'),id+" must be in the native graph toolbar");
   }
+  for(const [id,name] of [
+    ["neighborsOnly","network"],["showAllLabels","eye"],["centerSelection","locate-fixed"],
+    ["zoomOut","zoom-out"],["zoomIn","zoom-in"],["fit","maximize"],
+    ["fitWidth","fit-width"],["fitHeight","fit-height"]
+  ]){
+    assert.match(webview.html,new RegExp('id="'+id+'"[^>]*aria-label="[^"]+"'),
+      id+" must retain an accessible label");
+    assert.ok(webview.html.includes('data-icon="'+name+'"'),
+      id+" must use the shared Classic icon "+name);
+  }
   assert.ok(webview.html.includes('<option value="DOWN" selected>垂直</option>'));
   assert.doesNotMatch(webview.html,/unsafe-inline/);
   assert.ok(typeof onMessage==="function");
