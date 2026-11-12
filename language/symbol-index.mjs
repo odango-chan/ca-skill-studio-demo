@@ -21,8 +21,8 @@ function packageFilePath(value){
   // Skill Language paths are rooted in the logical BuildRequest file set.
   // Reject traversal, external URLs and fragments without exact AST ranges.
   const raw=value;
-  const schemaPath=raw.startsWith("schemas/")&&/\\.ya?ml$/.test(raw);
-  const ownerSchemaPath=raw.startsWith("lib/")&&/\\.schema\\.ya?ml$/.test(raw);
+  const schemaPath=raw.startsWith("schemas/")&&/\.ya?ml$/.test(raw);
+  const ownerSchemaPath=raw.startsWith("lib/")&&/\.schema\.ya?ml$/.test(raw);
   if(!schemaPath&&!ownerSchemaPath)return null;
   const parts=raw.split("/");
   if(parts.some(part=>!part||part==="."||part===".."||
