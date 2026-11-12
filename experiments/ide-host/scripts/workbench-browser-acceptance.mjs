@@ -204,6 +204,34 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     throw Error('Package Assurance group did not reveal '+filePath+': '+name+
       ' '+JSON.stringify({rows,clickEvents}));
   }
+  async function clickTreeContent(row,label,count=1){
+    const target=await evalJS(`(()=>{
+      const header=[...document.querySelectorAll('.theia-view-container-part-header')]
+        .find(x=>x.textContent.trim().toLowerCase()==='packages'&&
+          x.getBoundingClientRect().width>0);
+      const part=header?.closest('.part');
+      const nodes=[...(part?.querySelectorAll('.theia-TreeNode')??[])];
+      const normalize=value=>value.replace(/\\s+/g,' ').trim();
+      const el=nodes.find(node=>normalize(node.innerText)===${JSON.stringify(row.text)});
+      if(!el)return {found:false,rows:nodes.map(node=>normalize(node.innerText)).slice(-12)};
+      el.scrollIntoView({block:'center',inline:'nearest'});
+      const content=el.querySelector('.theia-TreeNodeContent')??el;
+      const r=content.getBoundingClientRect();
+      const fractions=[.2,.35,.5,.65,.8];
+      const points=fractions.map(f=>({x:Math.round(r.x+r.width*f),y:Math.round(r.y+r.height/2)}));
+      const point=points.find(({x,y})=>{
+        if(x<0||y<0||x>=innerWidth||y>=innerHeight)return false;
+        const hit=document.elementFromPoint(x,y);
+        return hit&&(hit===el||el.contains(hit))&&!hit.closest('.lm-SplitPanel-handle');
+      });
+      return {found:true,point:point??null,rect:{x:r.x,y:r.y,width:r.width,height:r.height},
+        className:el.className,hitClass:point?document.elementFromPoint(point.x,point.y)?.className??'':null};
+    })()`);
+    if(!target?.found||!target.point)
+      throw Error('Package file row has no unobstructed native click target: '+label+' '+
+        JSON.stringify({target,row}));
+    await click(target.point.x,target.point.y,count);
+  }
   async function readContractFrames(){
     const tree=await command('Page.getFrameTree');
     const frames=[];
@@ -238,7 +266,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     const file=result.file;
     if(!file.contentPos)
       throw Error('Contract file row is not clickable: '+JSON.stringify(file));
-    await click(file.contentPos.x,file.contentPos.y);
+    await clickTreeContent(file,name+' Contract');
     let snapshot=null;
     for(let attempt=0;attempt<35;attempt++){
       const frames=await readContractFrames();
@@ -249,7 +277,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     }
     // Some Theia TreeView hosts invoke TreeItem.command on the double-click
     // open gesture. Retry once without changing the selected package context.
-    await click(file.contentPos.x,file.contentPos.y,2);
+    await clickTreeContent(file,name+' Contract retry',2);
     for(let attempt=0;attempt<35;attempt++){
       const frames=await readContractFrames();
       snapshot=frames.find(frame=>frame.name===name)??null;
