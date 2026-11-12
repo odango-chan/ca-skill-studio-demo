@@ -60,6 +60,10 @@ export function registerWorkbench(vscode,context){
     renderer:null,renderedTokenCount:0,renderedTypeCount:0,renderError:null,
     server:null,transport:null
   };
+  const completionProviderDiagnostics={
+    registered:false,triggerCharacters:[],requests:0,lastUri:null,
+    lastCount:0,lastLabels:[],lastError:null
+  };
   function encodeNativeSemanticTokens(document,spans){
     const segments=[];
     const text=document.getText();
@@ -191,6 +195,7 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
+      completionProvider:{...completionProviderDiagnostics},
       semanticHighlightingEnabled:vscode.workspace.getConfiguration("editor")
         .get("semanticHighlighting.enabled")
     })
@@ -254,6 +259,24 @@ export function registerWorkbench(vscode,context){
             onSemanticTokenError:(uri,error)=>{
               semanticTokenDiagnostics.lastUri=uri;
               semanticTokenDiagnostics.lastError=error;
+            },
+            onCompletionProviderRegistered:status=>{
+              completionProviderDiagnostics.registered=status?.registered===true;
+              completionProviderDiagnostics.triggerCharacters=status?.triggerCharacters??[];
+            },
+            onCompletionProviderRequest:request=>{
+              completionProviderDiagnostics.requests++;
+              completionProviderDiagnostics.lastUri=request?.uri??null;
+            },
+            onCompletionProviderResult:result=>{
+              completionProviderDiagnostics.lastUri=result?.uri??null;
+              completionProviderDiagnostics.lastCount=result?.count??0;
+              completionProviderDiagnostics.lastLabels=result?.labels??[];
+              completionProviderDiagnostics.lastError=null;
+            },
+            onCompletionProviderError:error=>{
+              completionProviderDiagnostics.lastUri=error?.uri??null;
+              completionProviderDiagnostics.lastError=String(error?.message??error);
             },
             onStatus:status=>{
               if(epoch!==languageClientEpoch)return;
