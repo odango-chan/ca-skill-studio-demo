@@ -1,5 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
+import {prepareNativeMarkdownPackagePolicy,clearNativeMarkdownPackagePolicies} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
@@ -46,7 +47,35 @@ export function registerWorkbench(vscode,context){
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer,
     lastSelectionMessage=null;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
-  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),markdownOpening=new Set();
+  const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),
+    nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
+    markdownOpening=new Set(),nativeMarkdownOpening=new Set(),nativeMarkdownPaired=new Set();
+  const nativeMarkdownWebviewMessages=[];
+  let nativeMarkdownMessageTapInstalled=false;
+  const installNativeMarkdownMessageTap=()=>{
+    if(nativeMarkdownMessageTapInstalled||
+       typeof vscode.window.createWebviewPanel!=='function')return;
+    const original=vscode.window.createWebviewPanel;
+    vscode.window.createWebviewPanel=function(...args){
+      const panel=original.apply(this,args);
+      if(args[0]==='markdown.preview'&&
+         typeof panel?.webview?.onDidReceiveMessage==='function'){
+        context.subscriptions.push(panel.webview.onDidReceiveMessage(message=>{
+          nativeMarkdownWebviewMessages.push({
+            type:message?.type??typeof message,
+            source:message?.source??null,
+            line:typeof message?.line==='number'?message.line:null
+          });
+          if(nativeMarkdownWebviewMessages.length>30)nativeMarkdownWebviewMessages.shift();
+        }));
+      }
+      return panel;
+    };
+    nativeMarkdownMessageTapInstalled=true;
+  };
+  // Install before any Markdown editor can auto-open its preview, so the
+  // native panel is observed even when the acceptance later reuses it.
+  installNativeMarkdownMessageTap();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2607,7 +2636,97 @@ export function registerWorkbench(vscode,context){
     state.panel.reveal(state.singlePane?vscode.ViewColumn.One:vscode.ViewColumn.Two);
     void state.panel.webview.postMessage({type:'layoutState',singlePane:state.singlePane});
   };
-  context.subscriptions.push(vscode.commands.registerCommand('skillStudio.previewMarkdown',async uri=>{
+  async function openNativeMarkdownPreview(uri){
+    installNativeMarkdownMessageTap();
+    uri=uri??vscode.window.activeTextEditor?.document.uri;
+    if(!uri||!uri.path?.toLowerCase().endsWith('.md'))return false;
+    const key=uri.toString();
+    if(nativeMarkdownPaired.has(key)||nativeMarkdownOpening.has(key))return true;
+    nativeMarkdownOpening.add(key);
+    let paired=false;
+    try{
+      let doc=await vscode.workspace.openTextDocument(uri);
+      // Newly imported or just-created Markdown files can briefly be classified
+      // as Plain Text by browser-only Theia before its file-type association
+      // catches up. Set the language explicitly before invoking the built-in
+      // Markdown Preview command.
+      if(doc.languageId!=='markdown'&&
+         typeof vscode.languages.setTextDocumentLanguage==='function')
+        doc=await vscode.languages.setTextDocumentLanguage(doc,'markdown');
+      // Theia's browser plugin host does not consistently activate contributed
+      // Markdown preview commands from their implicit activation events. Load
+      // the exact pinned built-in extension and verify its command registration
+      // before treating a successful Source open as a native Preview launch.
+      const markdownExtension=vscode.extensions?.getExtension?.(
+        'vscode.markdown-language-features');
+      if(!markdownExtension)
+        throw Error('Pinned built-in vscode.markdown-language-features extension is not installed');
+      let workerProbe='not-applicable';
+      if(typeof Worker==='function'&&typeof globalThis.location!=='undefined'){
+        const workerUri=vscode.Uri.joinPath(markdownExtension.extensionUri,
+          'dist','browser','serverWorkerMain.js');
+        try{
+          const response=await fetch(workerUri.toString(),{method:'HEAD'});
+          workerProbe={uri:workerUri.toString(),status:response.status,ok:response.ok};
+        }catch(error){
+          workerProbe={uri:workerUri.toString(),error:String(error?.message??error)};
+        }
+      }
+      let activationState='pending',activationError=null;
+      const activation=Promise.resolve(markdownExtension.activate()).then(
+        ()=>{activationState='ready';},
+        error=>{activationState='failed';activationError=String(error?.message??error);}
+      );
+      const activationResult=await Promise.race([
+        activation.then(()=>activationState),
+        new Promise(resolve=>setTimeout(()=>resolve('timeout'),5000))
+      ]);
+      if(activationResult!=='ready')
+        throw Error('Built-in Markdown extension activation '+activationResult+
+          '; isActive='+String(markdownExtension.isActive)+
+          '; worker='+JSON.stringify(workerProbe)+
+          '; error='+String(activationError??'none'));
+      const markdownCommands=await vscode.commands.getCommands(true);
+      if(!markdownCommands.includes('markdown.showPreviewToSide'))
+        throw Error('Built-in Markdown extension activated without registering markdown.showPreviewToSide');
+      // Keep Source as the editable authority in the first editor group.
+      // The built-in Markdown extension owns the read-only Preview in group two.
+      await vscode.window.showTextDocument(doc,{
+        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:false
+      });
+      // Resolve the exact Skill Package root, inventory local files, and reject
+      // symlinked targets before the native Markdown engine renders any links.
+      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,uri);
+      if(!policyReady){
+        void vscode.window.showWarningMessage(
+          '无法验证当前 Markdown 文件所属 Package 或文件清单，已拒绝打开原生预览。');
+        return false;
+      }
+      // Do not await the host Preview command: some Theia PluginHost builds
+      // resolve it only after the Webview has completed its first render. The
+      // command itself must return promptly so callers can observe that render.
+      const opening=vscode.commands.executeCommand('markdown.showPreviewToSide',uri);
+      paired=true;
+      nativeMarkdownPaired.add(key);
+      void Promise.resolve(opening).then(
+        ()=>setTimeout(()=>nativeMarkdownOpening.delete(key),500),
+        error=>{
+          nativeMarkdownPaired.delete(key);
+          nativeMarkdownOpening.delete(key);
+          void vscode.window.showWarningMessage(
+            '原生 Markdown 预览未能打开：'+String(error?.message??error));
+        }
+      );
+      return true;
+    }finally{
+      // The native Preview command owns the suppression lifetime after it has
+      // been started. Failed Source preparation still releases it immediately.
+      if(!paired)nativeMarkdownOpening.delete(key);
+    }
+  }
+  context.subscriptions.push(
+    vscode.commands.registerCommand('skillStudio.previewMarkdownNative',openNativeMarkdownPreview),
+    vscode.commands.registerCommand('skillStudio.previewMarkdown',async uri=>{
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path.toLowerCase().endsWith('.md'))return;
     const doc=await vscode.workspace.openTextDocument(uri);
@@ -2818,6 +2937,187 @@ export function registerWorkbench(vscode,context){
     }
   }));
   context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async skillName=>{
+      const name=typeof skillName==='string'?skillName:'establish-pdu-session';
+      if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
+      const matches=await vscode.workspace.findFiles(
+        '**/'+name+'/SKILL.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith('/'+name+'/SKILL.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one '+name+' guide in the active Workspace');
+      const opened=await openNativeMarkdownPreview(exact[0]);
+      return opened?exact[0].toString():null;
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',async()=>{
+      const matches=await vscode.workspace.findFiles(
+        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith('/establish-pdu-session/SKILL.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one conventional 5GC Skill guide for live-update acceptance');
+      const target=exact[0],key=target.toString();
+      const doc=await vscode.workspace.openTextDocument(target);
+      if(doc.languageId!=='markdown')
+        throw Error('The conventional Skill guide is not registered as Markdown: '+doc.languageId);
+      if(nativeMarkdownLiveOriginals.has(key))
+        throw Error('Native Markdown live-update acceptance is already active');
+      const original=doc.getText();
+      nativeMarkdownLiveOriginals.set(key,original);
+      const longTail=Array.from({length:80},(_,index)=>
+        '## Native Markdown Scroll Section '+(index+1)+'\n\n'+
+        'This paragraph provides stable source lines and preview height for real bidirectional scroll synchronization acceptance.\n'
+      ).join('\n');
+      const source='# Native Markdown Live Update Probe\n\n'+original+'\n\n'+longTail;
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(original.length)),source);
+      const applied=await vscode.workspace.applyEdit(edit);
+      if(!applied){
+        nativeMarkdownLiveOriginals.delete(key);
+        throw Error('Could not apply the temporary native Markdown live-update fixture');
+      }
+      return key;
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
+      const suffix='/establish-pdu-session/SKILL.md';
+      if(!target.path.endsWith(suffix))
+        throw Error('Refusing to restore a non-fixture Markdown guide');
+      const key=target.toString();
+      const original=nativeMarkdownLiveOriginals.get(key);
+      if(typeof original!=='string')
+        throw Error('No original Markdown content is recorded for the live-update fixture');
+      const doc=await vscode.workspace.openTextDocument(target);
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
+      const restored=await vscode.workspace.applyEdit(edit);
+      if(!restored)throw Error('Could not restore the original Skill guide after live-update acceptance');
+      nativeMarkdownLiveOriginals.delete(key);
+      return true;
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
+      const matches=await vscode.workspace.findFiles(
+        '**/establish-pdu-session/references/3gpp-procedure.md','**/node_modules/**',5);
+      const exact=matches.filter(item=>item.path.endsWith(
+        '/establish-pdu-session/references/3gpp-procedure.md'));
+      if(exact.length!==1)
+        throw Error('Expected exactly one existing Markdown reference for the security probe');
+      const target=exact[0];
+      const doc=await vscode.workspace.openTextDocument(target);
+      if(doc.languageId!=='markdown')
+        throw Error('Existing reference is not registered as Markdown: '+doc.languageId);
+      const original=doc.getText();
+      if(nativeMarkdownSecurityOriginals.has(target.toString()))
+        throw Error('Native Markdown security probe is already active');
+      nativeMarkdownSecurityOriginals.set(target.toString(),original);
+      const source=[
+        '# Native Markdown Security Probe',
+        '',
+        '<script>window.skillStudioNativeMarkdownXss = true;</script>',
+        '<img src="https://example.invalid/raw-html-pixel.png" onerror="window.skillStudioNativeMarkdownXss = true">',
+        '',
+        '[Safe package reference](../SKILL.md)',
+        '[Escaping package link](../../outside.md)',
+        '[Missing package link](missing.md)',
+        '![Remote pixel](https://example.invalid/markdown-pixel.png)',
+        ''
+      ].join('\n');
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(original.length)),source);
+      const applied=await vscode.workspace.applyEdit(edit);
+      if(!applied){
+        nativeMarkdownSecurityOriginals.delete(target.toString());
+        throw Error('Could not apply the temporary native Markdown security probe');
+      }
+      const opened=await openNativeMarkdownPreview(target);
+      if(!opened){
+        const restore=new vscode.WorkspaceEdit();
+        const changed=await vscode.workspace.openTextDocument(target);
+        restore.replace(target,new vscode.Range(changed.positionAt(0),changed.positionAt(changed.getText().length)),original);
+        await vscode.workspace.applyEdit(restore);
+        nativeMarkdownSecurityOriginals.delete(target.toString());
+        throw Error('Native Markdown security probe could not establish a safe Package inventory');
+      }
+      return target.toString();
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
+      const suffix='/establish-pdu-session/references/3gpp-procedure.md';
+      if(!target.path.endsWith(suffix))
+        throw Error('Refusing to restore a non-fixture Markdown file');
+      const original=nativeMarkdownSecurityOriginals.get(target.toString());
+      if(typeof original!=='string')
+        throw Error('No original Markdown content is recorded for this security probe');
+      const doc=await vscode.workspace.openTextDocument(target);
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
+      const restored=await vscode.workspace.applyEdit(edit);
+      if(!restored)throw Error('Could not restore the original Markdown reference after security probe');
+      nativeMarkdownSecurityOriginals.delete(target.toString());
+      clearNativeMarkdownPackagePolicies([target]);
+      return true;
+    }));
+  const nativeMarkdownScrollEvents=[];
+  if(typeof vscode.window.onDidChangeTextEditorVisibleRanges==='function'){
+    context.subscriptions.push(vscode.window.onDidChangeTextEditorVisibleRanges(event=>{
+      if(event.textEditor.document.uri.path.endsWith('/establish-pdu-session/SKILL.md')){
+        nativeMarkdownScrollEvents.push({
+          ranges:event.visibleRanges.map(range=>({start:range.start.line,end:range.end.line})),
+          active:vscode.window.activeTextEditor?.document.uri.toString()??null
+        });
+        if(nativeMarkdownScrollEvents.length>20)nativeMarkdownScrollEvents.shift();
+      }
+    }));
+  }
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',async direction=>{
+      const editor=vscode.window.visibleTextEditors.find(item=>
+        item.document.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
+      if(direction==='clear'){
+        nativeMarkdownScrollEvents.length=0;
+        nativeMarkdownWebviewMessages.length=0;
+      }
+      if(!editor)return {editorFound:false,recentEvents:[...nativeMarkdownScrollEvents]};
+      const before=editor.visibleRanges.map(range=>({
+        start:range.start.line,end:range.end.line
+      }));
+      const line=direction==='bottom'?Math.max(0,editor.document.lineCount-1):0;
+      if(direction==='top'||direction==='bottom')
+        editor.revealRange(new vscode.Range(line,0,line,0),vscode.TextEditorRevealType.AtTop);
+      await new Promise(resolve=>setTimeout(resolve,100));
+      return {
+        editorFound:true,uri:editor.document.uri.toString(),
+        viewColumn:editor.viewColumn,lineCount:editor.document.lineCount,
+        before,after:editor.visibleRanges.map(range=>({
+          start:range.start.line,end:range.end.line
+        })),
+        activeEditor:vscode.window.activeTextEditor?.document.uri.toString()??null,
+        recentEvents:[...nativeMarkdownScrollEvents],
+        recentMessages:[...nativeMarkdownWebviewMessages],
+        config:vscode.workspace.getConfiguration('markdown.preview')
+          .get('scrollEditorWithPreview')
+      };
+    }));
+
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownSettingsAcceptance',()=>({
+      scrollEditorWithPreview:vscode.workspace.getConfiguration('markdown.preview')
+        .get('scrollEditorWithPreview'),
+      scrollPreviewWithEditor:vscode.workspace.getConfiguration('markdown.preview')
+        .get('scrollPreviewWithEditor'),
+      markEditorSelection:vscode.workspace.getConfiguration('markdown.preview')
+        .get('markEditorSelection'),
+      activeEditor:vscode.window.activeTextEditor?.document.uri.toString()??null,
+      visibleEditors:vscode.window.visibleTextEditors.map(editor=>({
+        uri:editor.document.uri.toString(),viewColumn:editor.viewColumn,
+        visibleRanges:editor.visibleRanges.map(range=>({
+          start:range.start.line,end:range.end.line
+        }))
+      }))
+    })));
+  context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.toggleMarkdownLayout',async uri=>{
       const target=uri??vscode.window.activeTextEditor?.document.uri;
       const state=target?markdownPanels.get(target.toString()):[...markdownPanels.values()].at(-1);
@@ -2837,7 +3137,7 @@ export function registerWorkbench(vscode,context){
     if(!target||!target.path.toLowerCase().endsWith('.md'))return;
     const key=target.toString();
     setTimeout(()=>{
-      if(markdownPanels.has(key)||markdownOpening.has(key))return;
+      if(markdownPanels.has(key)||markdownOpening.has(key)||nativeMarkdownOpening.has(key)||nativeMarkdownPaired.has(key))return;
       if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
       void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
     },0);

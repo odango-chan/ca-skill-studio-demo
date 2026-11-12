@@ -268,6 +268,10 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.equal(inspectorNode.documentUri,doc.uri.toString());
   assert.ok(commands.has('skillStudio.renameNode'));
   assert.ok(commands.has('skillStudio.editNodeOperatorValue'));
+  assert.ok(commands.has('skillStudio.previewMarkdownNative'),
+    'the isolated native Markdown spike must expose its own preview command');
+  assert.ok(commands.has('skillStudio.internal.nativeMarkdownPreviewAcceptance'));
+  assert.ok(commands.has('skillStudio.internal.nativeMarkdownSettingsAcceptance'));
   await commands.get(item.command.command)(...item.command.arguments);
   assert.equal(posted.at(-1).type,'focusNode');
   doc.version++;doc.text='procedures: [broken]';changed({document:doc});
