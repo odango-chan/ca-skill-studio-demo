@@ -230,7 +230,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
               return completion;
             });
             handlers.onCompletionProviderResult?.({
-              uri:document.uri.toString(),count:items.length
+              uri:document.uri.toString(),count:items.length,
+              labels:items.map(item=>item.label)
             });
             return items.length?items:undefined;
           }catch(error){
