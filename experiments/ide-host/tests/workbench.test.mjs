@@ -211,7 +211,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
   const file=uri('/workspace/establish-pdu-session/assurance/procedure.yaml');
   const doc={uri:file,version:1,text:source,getText(){return this.text;},positionAt(offset){return {offset};},get lineCount(){return this.text.split('\n').length;}};
-  const markdownUri=uri('/workspace/SKILL.md');
+  const markdownUri=uri('/workspace/establish-pdu-session/SKILL.md');
   const markdownDoc={uri:markdownUri,version:1,languageId:'markdown',
     text:'# Preview title\n\nA native Markdown source.',
     getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
@@ -245,14 +245,14 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     workspace:{textDocuments:[doc,markdownDoc],
       getWorkspaceFolder:()=>({uri:uri('/workspace')}),
       findFiles:async pattern=>{
-        if(pattern==='**/SKILL.md'||(pattern?.pattern==='**/*'&&pattern.base?.path==='/workspace'))return [markdownUri];
+        if(pattern==='**/SKILL.md')return [markdownUri];
         return ['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md']
           .map(p=>uri('/workspace/establish-pdu-session/'+p));
       },
       getConfiguration:()=>({get:key=>({scrollEditorWithPreview:true,
         scrollPreviewWithEditor:true,markEditorSelection:true})[key]}),
       fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8')),
-        stat:async()=>({type:1})},
+        stat:async target=>({type:target.path==='/workspace/establish-pdu-session'||target.path==='/workspace/establish-pdu-session/assurance'?2:1})},
       async applyEdit(edit){
         appliedEdits.push([...edit.changes]);
         for(const change of [...edit.changes].sort((a,b)=>b.range.start.offset-a.range.start.offset))
@@ -260,7 +260,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
         doc.version++;changed({document:doc});return true;
       },
       onDidChangeTextDocument(cb){changed=cb;return disposable();},
-      openTextDocument:async target=>target.path==='/workspace/SKILL.md'?markdownDoc:doc},
+      openTextDocument:async target=>target.path.endsWith('/establish-pdu-session/SKILL.md')?markdownDoc:doc},
     window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
       onDidChangeActiveTextEditor:()=>disposable(),
       onDidChangeTextEditorVisibleRanges(){return disposable();},
