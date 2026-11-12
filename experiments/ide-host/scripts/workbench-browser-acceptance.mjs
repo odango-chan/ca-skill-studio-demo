@@ -1858,19 +1858,21 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     // extension's Preview → Source synchronization is recorded as diagnostic
     // evidence, not a CI gate: users will inspect that behavior in the deployed
     // workbench, and a setting value alone is not proof of synchronization.
+    const previewBefore=await previewScroll('window.scrollY');
     const previewTop=await scrollPreviewByWheel(-12000);
-    if(previewTop>50)
-      throw Error('Native Markdown Preview did not respond to real wheel input at the top: '+
-        JSON.stringify({previewTop}));
+    if(previewTop>=previewBefore)
+      throw Error('Native Markdown Preview did not move upward after real wheel input: '+
+        JSON.stringify({previewBefore,previewTop}));
     const sourceAtPreviewTop=await observeSourceScroll(
       value=>value.topLine!==null&&value.topLine<3);
     const previewBottom=await scrollPreviewByWheel(12000);
-    if(previewBottom<=100)
-      throw Error('Native Markdown Preview did not respond to real wheel input at the bottom: '+
-        JSON.stringify({previewBottom}));
+    if(previewBottom<=previewTop)
+      throw Error('Native Markdown Preview did not move downward after real wheel input: '+
+        JSON.stringify({previewTop,previewBottom}));
     const sourceAtPreviewBottom=await observeSourceScroll(
       value=>value.topLine!==null&&value.topLine>100);
     const previewToSourceDiagnostics={
+      previewBefore,previewTop,previewBottom,
       top:sourceAtPreviewTop,
       bottom:sourceAtPreviewBottom,
       acceptance:'diagnostic-only; manual user inspection required'
