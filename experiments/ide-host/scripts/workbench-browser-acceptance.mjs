@@ -439,10 +439,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       .some(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
     return {text:document.body.innerText,headers,trees:document.querySelectorAll('.theia-Tree').length,studioActivity};
   })()`);
-  const explorerHeaders=views.headers.filter(x=>
-    x.view.includes('workbench.view.explorer')||x.view.includes('explorer'));
   for(const name of ['Packages','Procedure Outline','Evidence','Problems'])
-    if(!explorerHeaders.some(x=>x.name.toLowerCase()===name.toLowerCase()))
+    if(!views.headers.some(x=>x.name.toLowerCase()===name.toLowerCase()))
       throw Error('Native Explorer view missing '+name+': '+JSON.stringify(views));
   if(views.studioActivity)
     throw Error('A separate Skill Studio Activity Bar container must not compete with Explorer');
