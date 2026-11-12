@@ -205,3 +205,58 @@ test("symbol index remains package- and generation-scoped",()=>{
   assert.equal(b.generation,2);
   assert.notEqual(a.tokensByUri,b.tokensByUri);
 });
+
+
+test("v0.2 completion uses canonical reference token context and exact Package declarations",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  const operation="sbi.udm.sm_data.get";
+  const operationOffset=offsetOf(procedure.text,operation)+4;
+  const operationCompletions=symbols.skillSymbolCompletions(index,procedure.uri,operationOffset);
+  assert.equal(operationCompletions.token.type,"skillOperation");
+  assert.ok(operationCompletions.items.some(item=>item.name===operation));
+
+  const schemaPath="schemas/establishment-request.schema.yaml";
+  const schemaOffset=offsetOf(contract.text,schemaPath)+9;
+  const schemaCompletions=symbols.skillSymbolCompletions(index,contract.uri,schemaOffset);
+  assert.equal(schemaCompletions.token.type,"skillSchema");
+  assert.ok(schemaCompletions.items.some(item=>item.name===schemaPath));
+
+  const scriptPath="scripts/select_establishment_configuration.py";
+  const scriptOffset=offsetOf(procedure.text,scriptPath)+9;
+  const scriptCompletions=symbols.skillSymbolCompletions(index,procedure.uri,scriptOffset);
+  assert.equal(scriptCompletions.token.type,"skillReference");
+  assert.ok(scriptCompletions.items.some(item=>item.name===scriptPath));
+});
+
+test("v0.2 link diagnostics report exact unresolved and ambiguous references but not deployment Capabilities",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const diagnostics=symbols.skillSymbolLinkDiagnostics(index,snapshot);
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  assert.ok(diagnostics.some(item=>item.uri===contract.uri&&
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    contract.text.slice(item.range.start,item.range.end)==="lib/host/subject.schema.yaml"));
+  assert.ok(!diagnostics.some(item=>item.code==="SKILL_LINK_UNRESOLVED"&&
+    /ca\.session\.operation_context\.read/.test(
+      snapshot.documents.find(doc=>doc.uri===item.uri)?.text.slice(item.range.start,item.range.end)??"")),
+    "unmatched allowedResources Capability IDs remain deployment-owned");
+
+  const duplicate=document("lib/tools/another.tool.yaml","apiVersion: connectionagent.io/v1alpha1\\nkind: ToolCatalog\\nspec:\\n  contracts:\\n    - operation: sbi.udm.sm_data.get\\n      effect: READ\\n");
+  const duplicateSnapshot=packageSnapshot([duplicate]);
+  const duplicateIndex=symbols.buildSkillSymbolIndex(duplicateSnapshot);
+  const duplicateDiagnostics=symbols.skillSymbolLinkDiagnostics(duplicateIndex,duplicateSnapshot);
+  const procedure=duplicateSnapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  assert.ok(duplicateDiagnostics.some(item=>item.uri===procedure.uri&&
+    item.code==="SKILL_LINK_AMBIGUOUS"&&
+    procedure.text.slice(item.range.start,item.range.end)==="sbi.udm.sm_data.get"));
+});
+
+test("v0.2 link diagnostics are suppressed for incomplete or stale Package snapshots",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  assert.deepEqual(symbols.skillSymbolLinkDiagnostics(index,{...snapshot,completeness:"partial"}),[]);
+  assert.deepEqual(symbols.skillSymbolLinkDiagnostics(index,{...snapshot,generation:2}),[]);
+});
