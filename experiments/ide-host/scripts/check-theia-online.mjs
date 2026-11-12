@@ -52,7 +52,6 @@ if(markdownManifest.publisher!=="vscode"||
 const markdownBrowserPath=String(markdownManifest.browser??"").startsWith("./")
   ?markdownManifest.browser.slice(2):markdownManifest.browser;
 const markdownBrowser=join(markdownPluginRoot,markdownBrowserPath);
-  ?markdownManifest.browser.slice(2):markdownManifest.browser;
 const markdownWorker=join(markdownPluginRoot,"dist/browser/serverWorkerMain.js");
 for(const asset of [markdownBrowser,markdownWorker])
   if(!existsSync(asset)||statSync(asset).size<100)
