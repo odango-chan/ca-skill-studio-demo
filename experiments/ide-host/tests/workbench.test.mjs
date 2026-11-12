@@ -632,8 +632,8 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   doc.text=source;doc.version++;changed({document:doc});
   assert.ok(!providers.has('skillStudio.evidence'),
     'standalone Evidence TreeView must be retired');
-  const inspector=providers.get('skillStudio.inspection').getChildren();
-  const dataflow=inspector.find(x=>x.kind==='data-flow');
+  const inspectorDataFlowRows=providers.get('skillStudio.inspection').getChildren();
+  const dataflow=inspectorDataFlowRows.find(x=>x.kind==='data-flow');
   assert.ok(dataflow,'bounded Package Audit hydrates selected-Node Inspector Data Flow');
   assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
   assert.match(dataflow.description,/Runtime NOT_RUN/);
