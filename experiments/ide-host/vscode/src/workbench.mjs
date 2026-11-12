@@ -2260,7 +2260,7 @@ export function registerWorkbench(vscode,context){
   }
 
   context.subscriptions.push(diagnostics);
-  for(const id of ['inspection','outline','evidence','problems']){
+  for(const id of ['inspection','outline','problems']){
     const emitter=new vscode.EventEmitter();
     const provider={onDidChangeTreeData:emitter.event,
       getChildren:item=>item?.children??(id==='problems'
@@ -2377,9 +2377,8 @@ export function registerWorkbench(vscode,context){
     context.subscriptions.push(emitter,vscode.window.registerTreeDataProvider('skillStudio.'+id,provider));
   }
   const fire=()=>{for(const p of providers.values())p.fire();};
-  // Audit status belongs to Problems. Do not refresh every source tree for
-  // status-only changes: concurrent root refreshes can invalidate an expanded
-  // Evidence node while its lazy children are being resolved.
+  // Audit status belongs to Problems. Do not refresh Inspector/Outline for
+  // status-only changes: their Source-backed selection must remain stable.
   const fireProblems=()=>providers.get('problems')?.fire();
   function update(doc,choice){
     if(!isProcedurePath(doc?.uri.path))return;
