@@ -20,7 +20,7 @@ test("Theia online target is a real backend-free 1.76 browser-only app",()=>{
   assert.ok(!app.dependencies["@theia/terminal"]);
   assert.equal(app.scripts.build,"theia build --mode production");
   assert.equal(app.scripts["download:plugins"],"theia download:plugins");
-  const markdownPlugin="https://open-vsx.org/api/vscode/markdown-language-features/1.119.0/file/vscode.markdown-language-features-1.119.0.vsix";
+  const markdownPlugin="https://open-vsx.org/api/vscode/markdown-language-features/1.95.3/file/vscode.markdown-language-features-1.95.3.vsix";
   assert.equal(app.theiaPlugins["vscode.markdown-language-features"],markdownPlugin);
   const browserApp=JSON.parse(readFileSync(join(root,"../theia-browser/package.json"),"utf8"));
   assert.equal(browserApp.theiaPlugins["vscode.markdown-language-features"],markdownPlugin,
