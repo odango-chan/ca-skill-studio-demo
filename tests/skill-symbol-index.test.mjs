@@ -270,7 +270,13 @@ test("v0.2 link diagnostics report exact unresolved and ambiguous references but
       snapshot.documents.find(doc=>doc.uri===item.uri)?.text.slice(item.range.start,item.range.end)??"")),
     "unmatched allowedResources Capability IDs remain deployment-owned");
 
-  const duplicate=document("lib/tools/another.tool.yaml","apiVersion: connectionagent.io/v1alpha1\\nkind: ToolCatalog\\nspec:\\n  contracts:\\n    - operation: sbi.udm.sm_data.get\\n      effect: READ\\n");
+  const duplicate=document("lib/tools/another.tool.yaml",`apiVersion: connectionagent.io/v1alpha1
+kind: ToolCatalog
+spec:
+  contracts:
+    - operation: sbi.udm.sm_data.get
+      effect: READ
+`);
   const duplicateSnapshot=packageSnapshot([duplicate]);
   const duplicateIndex=symbols.buildSkillSymbolIndex(duplicateSnapshot);
   const duplicateDiagnostics=symbols.skillSymbolLinkDiagnostics(duplicateIndex,duplicateSnapshot);
