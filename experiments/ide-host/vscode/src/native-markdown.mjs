@@ -1,5 +1,3 @@
-import * as vscode from "vscode";
-
 /**
  * Experimental adapter over Theia 1.76's supported VS Code Markdown extension.
  * Markdown source remains a native TextDocument; rendering, preview security,
