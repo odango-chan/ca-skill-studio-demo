@@ -61,10 +61,12 @@ export function registerWorkbench(vscode,context){
       if(args[0]==='markdown.preview'&&
          typeof panel?.webview?.onDidReceiveMessage==='function'){
         context.subscriptions.push(panel.webview.onDidReceiveMessage(message=>{
-          if(message?.type==='revealLine'){
-            nativeMarkdownWebviewMessages.push({type:message.type,line:message.line});
-            if(nativeMarkdownWebviewMessages.length>30)nativeMarkdownWebviewMessages.shift();
-          }
+          nativeMarkdownWebviewMessages.push({
+            type:message?.type??typeof message,
+            source:message?.source??null,
+            line:typeof message?.line==='number'?message.line:null
+          });
+          if(nativeMarkdownWebviewMessages.length>30)nativeMarkdownWebviewMessages.shift();
         }));
       }
       return panel;
