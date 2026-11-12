@@ -750,6 +750,11 @@ export function registerWorkbench(vscode,context){
         const contractCompletionEditor=vscode.window.activeTextEditor;
         if(contractCompletionEditor?.document.uri.toString()!==relatedUris.contract.toString())
           throw Error("Contract Completion target did not become the active native editor");
+        contractCompletionEditor.selection=new vscode.Selection(
+          contractCompletionPosition,contractCompletionPosition);
+        if(contractCompletionEditor.selection.active.line!==contractCompletionPosition.line||
+           contractCompletionEditor.selection.active.character!==contractCompletionPosition.character)
+          throw Error("Contract Completion native editor rejected the requested cursor position");
         const completionProviderBefore=await vscode.commands.executeCommand(
           "skillStudio.internal.semanticTokenDiagnostics");
         const requestSchemaCompletionResult=await vscode.commands.executeCommand(
@@ -804,6 +809,11 @@ export function registerWorkbench(vscode,context){
         const procedureCompletionEditor=vscode.window.activeTextEditor;
         if(procedureCompletionEditor?.document.uri.toString()!==procedureUri.toString())
           throw Error("Procedure Completion target did not become the active native editor");
+        procedureCompletionEditor.selection=new vscode.Selection(
+          predicateCompletionPosition,predicateCompletionPosition);
+        if(procedureCompletionEditor.selection.active.line!==predicateCompletionPosition.line||
+           procedureCompletionEditor.selection.active.character!==predicateCompletionPosition.character)
+          throw Error("Procedure Completion native editor rejected the requested cursor position");
         const predicateCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
           predicateCompletionPosition));
