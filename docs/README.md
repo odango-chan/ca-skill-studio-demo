@@ -9,17 +9,17 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 3. [TRACEABILITY](TRACEABILITY.md) — Contract/设计 → 生产代码 → 测试 → 实际证据
 4. [Architecture](architecture/studio-boundaries.md) — ownership、Source authority
 5. [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) — 原生 Settings、Dependency Snapshot / Lock、Compiler 输入与所有权边界
-5. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
-6. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
-7. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
-8. [E Source Editor](design/source-editor-workstream.md) — Monaco / shared D4 history and E2–E4 scope
-9. [Application Shell](design/application-shell.md) — Web/Local 共用菜单命令与未来本地执行边界
-10. [Skill Language Core / Browser LSP · L2-D1](design/skill-lsp-l2d-editor-acceptance.md) — 共享语言分析、Browser Worker 与真实 Theia 编辑器 Provider 验收边界
-11. [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) — 原生 Problems 诊断出现、修复清除与 Package generation 验收
-11. [ADR-0002 Theia default online host + Classic fallback](decisions/0002-ide-host-spike.md) — Theia 默认在线宿主与功能迁移背景
-12. [ADR-0003 Native Workbench / Inspector / Markdown](decisions/0003-native-workbench-and-markdown.md) — 原生视图、右侧 Inspector、Data Flow 与 Markdown 决策
-13. [ADR-0004 Package-first Workspace](decisions/0004-package-first-workspace.md) — Package Explorer 默认入口、Dependencies / Build Artifacts 组合及资源所有权
-14. [Documentation Governance](DOCUMENTATION.md) — canonical source map
+6. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
+7. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
+8. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
+9. [E Source Editor](design/source-editor-workstream.md) — Monaco / shared D4 history and E2–E4 scope
+10. [Application Shell](design/application-shell.md) — Web/Local 共用菜单命令与未来本地执行边界
+11. [Skill Language Core / Browser LSP · L2-D1](design/skill-lsp-l2d-editor-acceptance.md) — 共享语言分析、Browser Worker 与真实 Theia 编辑器 Provider 验收边界
+12. [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) — 原生 Problems 诊断出现、修复清除与 Package generation 验收
+13. [ADR-0002 Theia default online host + Classic fallback](decisions/0002-ide-host-spike.md) — Theia 默认在线宿主与功能迁移背景
+14. [ADR-0003 Native Workbench / Inspector / Markdown](decisions/0003-native-workbench-and-markdown.md) — 原生视图、右侧 Inspector、Data Flow 与 Markdown 决策
+15. [ADR-0004 Package-first Workspace](decisions/0004-package-first-workspace.md) — Package Explorer 默认入口、Dependencies / Build Artifacts 组合及资源所有权
+16. [Documentation Governance](DOCUMENTATION.md) — canonical source map
 
 ## 已完成阶段技术记录
 
