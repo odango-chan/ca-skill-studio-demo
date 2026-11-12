@@ -2096,7 +2096,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const nativeSecurityUri=await nativeCommand(
     'skillStudio.internal.nativeMarkdownSecurityAcceptance');
   if(typeof nativeSecurityUri!=='string'||
-     !nativeSecurityUri.endsWith('/references/__native-markdown-security.md'))
+     !nativeSecurityUri.endsWith('/references/3gpp-procedure.md'))
     throw Error('Native Markdown security fixture was not created inside the 5GC Skill Package');
   try{
     const nativeSecurity=await waitNativeMarkdown(view=>
