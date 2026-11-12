@@ -1,5 +1,6 @@
-// Explicit user-triggered Sample Package import for VS Code desktop/web or
-// Theia browser-only OPFS. Never overwrite existing workspace files.
+// Explicit Sample Package import for VS Code desktop/web or Theia browser-only OPFS.
+// Online demo reset replaces the two bundled SKILL packages with their pinned
+// source; desktop/user workspaces remain create-only unless reset is explicit.
 const SRC=["samples","skills"];
 // A Skill Compiler project has one source workspace with three top-level
 // directories. The Studio demo may seed only skills/; it must not invent
@@ -71,14 +72,15 @@ function workspaceHasRoot(workspace,root){
   return (workspace.workspaceFolders??[]).some(folder=>
     folder?.uri?.toString?.()===target);
 }
-async function exposeWorkspaceRoot(workspace,root,name){
+async function exposeWorkspaceRoot(workspace,root,legacyRoots=[]){
   if(workspaceHasRoot(workspace,root))return false;
   if(typeof workspace.updateWorkspaceFolders!=="function"||
      typeof workspace.onDidChangeWorkspaceFolders!=="function")
     fail("Host cannot open a native workspace folder");
   const folders=workspace.workspaceFolders??[];
+  const legacySet=new Set(legacyRoots.map(uri=>uri.toString()));
   const legacyIndex=folders.findIndex(folder=>
-    folder?.uri?.toString?.()===root.toString()+"/skills");
+    legacySet.has(folder?.uri?.toString?.()));
   const start=legacyIndex>=0?legacyIndex:folders.length;
   const deleteCount=legacyIndex>=0?1:0;
   let subscription=null,timer=null,settled=false;
@@ -146,7 +148,7 @@ function validate(manifest){
       fail("Missing required "+skill+" package files");
   return manifest;
 }
-export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
+export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{resetExisting=false}={}){
   let phase="initial";
   try{
   if(!vscode?.workspace?.fs||!vscode.Uri?.file||!vscode.Uri.joinPath)
@@ -166,16 +168,16 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
   }
   const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
   const files=manifest.files;
-  // Reuse the existing browser-owned workspaces/skills Source in place,
-  // treating its parent as the compiler-style project root. This upgrades
-  // legacy demos without copying, hiding or overwriting edited SKILL files.
-  // No user-selected Workspace is ever used as an import destination.
+  // The actual folder basename must be the project name: Theia 1.76
+  // ignores WorkspaceFolder.name passed to updateWorkspaceFolders().
   if(!storageUri)fail("No writable extension storage URI");
-  const root=vscode.Uri.joinPath(storageUri,"workspaces");
+  const legacyRoot=vscode.Uri.joinPath(storageUri,"workspaces");
+  const legacySkillsRoot=vscode.Uri.joinPath(legacyRoot,"skills");
+  const root=vscode.Uri.joinPath(legacyRoot,EXAMPLE_PROJECT_NAME);
   const skillsRoot=vscode.Uri.joinPath(root,"skills");
   const libraryRoot=vscode.Uri.joinPath(root,"lib");
   const outputRoot=vscode.Uri.joinPath(root,"output");
-  let created=0,skipped=0;
+  let created=0,skipped=0,overwritten=0;
   phase="create-project-layout";
   await fileSystem.createDirectory(root);
   await fileSystem.createDirectory(skillsRoot);
@@ -190,7 +192,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
     catch(error){
       if(error?.code!=="FileNotFound")throw error;
     }
-    if(exists){skipped++;continue;}
+    if(exists&&!resetExisting){skipped++;continue;}
     const source=vscode.Uri.joinPath(extensionUri,...SRC,...segments);
     phase="read-bundled-file:"+file;
     const bytes=await readBundledResource(vscode,source);
@@ -198,22 +200,26 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri){
     phase="create-parent:"+file;
     if(segments.length>1)
       await fileSystem.createDirectory(vscode.Uri.joinPath(skillsRoot,...segments.slice(0,-1)));
-    // writeFile with create-only intent; a racing external write is guarded
-    // by the second stat. The spike does not claim atomic multi-file import.
-    try{await fileSystem.stat(destination);fail("Sample file changed during import");}
-    catch(error){if(error?.code!=="FileNotFound")throw error;}
+    // Normal imports remain create-only. The online demo's explicit reset
+    // intentionally replaces every pinned manifest file with canonical bytes.
+    if(!exists){
+      try{await fileSystem.stat(destination);fail("Sample file changed during import");}
+      catch(error){if(error?.code!=="FileNotFound")throw error;}
+    }
     phase="write-file:"+file;
     await fileSystem.writeFile(destination,bytes);
-    created++;
+    if(exists)overwritten++;else created++;
   }
   phase="workspace-update-confirmation";
-  const workspaceUpdated=await exposeWorkspaceRoot(
-    vscode.workspace,root,EXAMPLE_PROJECT_NAME);
+  const workspaceUpdated=await exposeWorkspaceRoot(vscode.workspace,root,[
+    legacyRoot,legacySkillsRoot
+  ]);
   const procedures=Object.fromEntries(SKILLS.map(name=>
     [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
   return {root,skillsRoot,libraryRoot,outputRoot,
     procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
-    sourceSha:manifest.sourceSha,files:files.length,created,skipped,workspaceUpdated};
+    sourceSha:manifest.sourceSha,files:files.length,created,skipped,overwritten,
+    resetExisting,workspaceUpdated};
   }catch(error){
     throw Error(phase+": "+String(error?.message??error));
   }
