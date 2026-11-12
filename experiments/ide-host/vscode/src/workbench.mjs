@@ -43,7 +43,8 @@ import {createSemanticTokenDecorationRenderer}
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
-    predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
+    predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer,
+    lastSelectionMessage=null;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
   const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),markdownOpening=new Set();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
@@ -2719,7 +2720,8 @@ export function registerWorkbench(vscode,context){
       version:document?.version??null,
       procedureId:selection?.procedureId??null,
       nodeId:selection?.nodeId??null,
-      snapshotState:snapshot?.model?.state??null
+      snapshotState:snapshot?.model?.state??null,
+      lastSelectionMessage
     })));
   // Internal real-browser acceptance opens the owner-pinned conventional guide
   // by exact workspace path; it is not a contributed user command.
@@ -2742,6 +2744,11 @@ export function registerWorkbench(vscode,context){
     const releaseLanguagePackage=attachLanguagePackage(doc);
     return ()=>{sessions.delete(doc.uri.toString());releaseLanguagePackage();};
   },select(doc,message){
+    lastSelectionMessage={
+      messageVersion:message.version,documentVersion:doc.version,
+      procedureId:message.procedureId??null,nodeId:message.nodeId??null,
+      accepted:message.version===doc.version&&typeof message.procedureId==='string'
+    };
     if(message.version!==doc.version||typeof message.procedureId!=='string')return;
     update(doc,{procedureId:message.procedureId,nodeId:typeof message.nodeId==='string'?message.nodeId:null});
   },activate(doc){
