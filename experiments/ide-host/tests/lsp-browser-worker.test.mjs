@@ -374,7 +374,8 @@ function currentV02PackageSnapshot(generation=1,completeness="complete"){
     "assurance/contract.yaml",
     "assurance/predicates.yaml",
     "assurance/procedure.yaml",
-    "schemas/establishment-request.schema.yaml"
+    "schemas/establishment-request.schema.yaml",
+    "scripts/select_establishment_configuration.py"
   ];
   const documents=paths.map(relativePath=>({
     uri:rootUri+"/"+relativePath,relativePath,languageId:"yaml",
@@ -473,7 +474,6 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.match(predicateHover.contents.value,/Predicate/);
     assert.ok(predicateHover.contents.value.includes(predicateName));
 
-    const schemaPath="schemas/establishment-request.schema.yaml";
     const schemaCompletions=await lspRequest(worker,312,"textDocument/completion",{
       textDocument:{uri:contract.uri},
       position:positionOf(contract.text,schemaPath,9)
@@ -495,10 +495,14 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       "Procedure Script completion uses Package-local Script files");
 
     const unresolvedOwner=await linkDiagnostic;
-    assert.ok(unresolvedOwner.params.diagnostics.some(item=>
+    const missingOwnerPath="lib/host/subject.schema.yaml";
+    const unresolvedSchema=unresolvedOwner.params.diagnostics.find(item=>
       item.code==="SKILL_LINK_UNRESOLVED"&&
-      contract.text.slice(
-        contract.offsetAt?0:0,0)==="never"));
+      item.range?.start?.line===item.range?.end?.line&&
+      contract.text.split(/\\r\\n|\\n|\\r/)[item.range.start.line]
+        ?.slice(item.range.start.character,item.range.end.character)===missingOwnerPath);
+    assert.ok(unresolvedSchema,
+      "missing authoritative Owner Schema is published at its exact source token");
     const predicateReferences=await lspRequest(worker,307,"textDocument/references",{
       textDocument:{uri:predicates.uri},
       position:positionOf(predicates.text,predicateName),
