@@ -411,6 +411,16 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.equal(entryDefinition.uri,procedure.uri,
       "Contract entryProcedure resolves to the Procedure declaration");
 
+    const schemaPath="schemas/establishment-request.schema.yaml";
+    const schema=snapshot.documents.find(x=>x.relativePath===schemaPath);
+    assert.ok(schema);
+    const schemaDefinition=await lspRequest(worker,311,"textDocument/definition",{
+      textDocument:{uri:contract.uri},position:positionOf(contract.text,schemaPath)
+    });
+    assert.equal(schemaDefinition.uri,schema.uri,
+      "Contract requestSchema resolves to the exact Package-owned Schema file");
+    assert.deepEqual(schemaDefinition.range.start,{line:0,character:0});
+
     const predicateName="createdsession.ingress.eligible";
     const predicateDefinition=await lspRequest(worker,303,"textDocument/definition",{
       textDocument:{uri:procedure.uri},position:positionOf(procedure.text,predicateName)
