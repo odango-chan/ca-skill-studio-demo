@@ -327,10 +327,10 @@ test("v0.2 link diagnostics report exact unresolved and ambiguous references but
     /ca\.session\.operation_context\.read/.test(
       contract.text.slice(item.range.start,item.range.end))),
     "unmatched allowedResources Capability IDs remain deployment-owned");
-  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const procedureForUnresolved=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
   assert.ok(!diagnostics.some(item=>item.code==="SKILL_LINK_UNRESOLVED"&&
-    item.uri===procedure.uri&&
-    procedure.text.slice(item.range.start,item.range.end).startsWith("sbi.")),
+    item.uri===procedureForUnresolved.uri&&
+    procedureForUnresolved.text.slice(item.range.start,item.range.end).startsWith("sbi.")),
     "missing Operation IDs are not diagnosed without a complete Tool integration inventory");
 
   const duplicate=document("lib/tools/another.tool.yaml",`apiVersion: connectionagent.io/v1alpha1
@@ -343,11 +343,11 @@ spec:
   const duplicateSnapshot=packageSnapshot([duplicate]);
   const duplicateIndex=symbols.buildSkillSymbolIndex(duplicateSnapshot);
   const duplicateDiagnostics=symbols.skillSymbolLinkDiagnostics(duplicateIndex,duplicateSnapshot);
-  const procedure=duplicateSnapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
-  const duplicateHit=at(duplicateIndex,procedure.uri,procedure.text,"sbi.udm.sm_data.get");
-  assert.ok(duplicateDiagnostics.some(item=>item.uri===procedure.uri&&
+  const procedureForDuplicate=duplicateSnapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+  const duplicateHit=at(duplicateIndex,procedureForDuplicate.uri,procedureForDuplicate.text,"sbi.udm.sm_data.get");
+  assert.ok(duplicateDiagnostics.some(item=>item.uri===procedureForDuplicate.uri&&
     item.code==="SKILL_LINK_AMBIGUOUS"&&
-    procedure.text.slice(item.range.start,item.range.end)==="sbi.udm.sm_data.get"),
+    procedureForDuplicate.text.slice(item.range.start,item.range.end)==="sbi.udm.sm_data.get"),
     JSON.stringify({declarations:duplicateIndex.declarations.get(duplicateHit.token.key),
       references:duplicateIndex.references.get(duplicateHit.token.key),
       diagnostics:duplicateDiagnostics}));
