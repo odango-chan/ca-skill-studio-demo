@@ -38,6 +38,8 @@ Completion is reference-context-only and derives both the cursor context and can
 
 The editor replaces only the exact scalar value range and preserves YAML quoting. Completion does not synthesize structural field names, import dependencies, add missing files, guess Capability IDs, generate Schema contents, or complete Python types. Empty-value / structural-key completion is deferred until ca-skills exposes a machine-readable grammar/schema source that can be consumed without reimplementing the language.
 
+Project-level `lib/` inventory is tracked separately from Skill Package completeness. Imported Operation and `lib/**` Owner Schema Definition, References and Completion require `libraryInventory: complete`. If inventory is partial or unavailable, the editor suppresses imported Operation candidates and links, excludes `lib/` Owner Schema candidates, and does not claim a missing Operation or Owner Schema. Package-local `schemas/**` links remain available from a complete Skill Package. A complete `lib/` inventory makes an unresolved Procedure `call` diagnosable; an unmatched `allowedResources.capabilities[]` value remains non-diagnostic because it may be a deployment Capability ID.
+
 The legacy `# inputSchema` / `# outputSchema` completion remains isolated to legacy metadata files. Canonical Script Contract v0 uses Python `TypedDict` declarations and does not have those comment keys.
 
 ## v0.2 link Diagnostics
