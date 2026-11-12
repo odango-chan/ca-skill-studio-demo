@@ -62,7 +62,7 @@ export function registerWorkbench(vscode,context){
   };
   const completionProviderDiagnostics={
     registered:false,triggerCharacters:[],requests:0,lastUri:null,
-    lastCount:0,lastLabels:[],lastError:null
+    lastCount:0,lastLabels:[],lastError:null,lastDebug:null
   };
   function encodeNativeSemanticTokens(document,spans){
     const segments=[];
@@ -284,6 +284,7 @@ export function registerWorkbench(vscode,context){
               completionProviderDiagnostics.lastUri=result?.uri??null;
               completionProviderDiagnostics.lastCount=result?.count??0;
               completionProviderDiagnostics.lastLabels=result?.labels??[];
+              completionProviderDiagnostics.lastDebug=result?.debug??null;
               completionProviderDiagnostics.lastError=null;
             },
             onCompletionProviderError:error=>{
