@@ -131,7 +131,7 @@ test("A user workspace named skills is not repurposed for the demo",async()=>{
   assert.equal(result.skillsRoot.path,result.root.path+"/skills");
   assert.equal(h.opened.length,1);
   assert.equal(h.opened[0].start,1);
-  assert.equal(h.opened[0].folder.name,"skill-studio-demo");
+  assert.equal(h.opened[0].folder.uri.path.split("/").at(-1),"skill-studio-demo");
   assert.equal(h.files.has("/user-project/skills/SKILL.md"),false);
 });
 test("Reset replaces the legacy Skills workspace with the canonical named project",async()=>{
