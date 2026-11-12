@@ -246,6 +246,13 @@ test("v0.2 completion uses canonical reference token context and exact Package d
   const schemaCompletions=symbols.skillSymbolCompletions(index,contract.uri,schemaOffset);
   assert.equal(schemaCompletions.token.type,"skillSchema");
   assert.ok(schemaCompletions.items.some(item=>item.name===schemaPath));
+  assert.ok(schemaCompletions.items.every(item=>
+    item.relativePath.startsWith("schemas/")||/\\.schema\\.ya?ml$/.test(item.relativePath)),
+    "Schema completion excludes ordinary Package YAML files");
+  assert.ok(!schemaCompletions.items.some(item=>
+    item.relativePath==="lib/tools/udm.tool.yaml"));
+  assert.equal(index.documentTargets.has("document::lib/tools/udm.tool.yaml"),false,
+    "ToolCatalog files are not indexed as Schema Owner documents");
 
   const scriptPath="scripts/select_establishment_configuration.py";
   const scriptOffset=offsetOf(procedure.text,scriptPath)+9;
