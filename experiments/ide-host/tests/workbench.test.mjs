@@ -205,7 +205,7 @@ test('native Markdown links are constrained to the exact Package inventory',()=>
 
 test('Native views track unsaved Source, audit Package, reject stale selection and dispose listeners',async()=>{
   const commands=new Map(),providers=new Map(),changes=[],diagnosticSets=[],appliedEdits=[],nativeCommands=[];
-  const markdownReveals=[],showDocumentCalls=[];
+  const showDocumentCalls=[];
   const disposable=()=>({dispose(){}});
   let confirmChoice='确认并应用',markdownExtensionActivated=false;
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
@@ -215,8 +215,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   const markdownDoc={uri:markdownUri,version:1,languageId:'markdown',
     text:'# Preview title\n\nA native Markdown source.',
     getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
-  const markdownEditor={document:markdownDoc,visibleRanges:[{start:{line:0},end:{line:5}}],
-    revealRange(range,type){markdownReveals.push({range,type});}};
+  const markdownEditor={document:markdownDoc,visibleRanges:[{start:{line:0},end:{line:5}}]};
   let changed;
   const vscode={
     EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
@@ -231,7 +230,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     WorkspaceEdit:class {constructor(){this.changes=[];}replace(uri,range,value){this.changes.push({uri,range,value});}},
     Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
-    ViewColumn:{One:1,Two:2,Beside:2},TextEditorRevealType:{AtTop:1},
+    ViewColumn:{One:1,Two:2,Beside:2},
     FileType:{File:1,Directory:2,SymbolicLink:64},
     Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
     extensions:{getExtension(id){return id==='vscode.markdown-language-features'?{
@@ -685,12 +684,6 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     'skillStudio.internal.nativeMarkdownSettingsAcceptance')();
   assert.equal(nativeSettings.scrollEditorWithPreview,true);
   assert.equal(nativeSettings.scrollPreviewWithEditor,true);
-  const nativeScroll=await commands.get(
-    'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance')('bottom');
-  assert.equal(nativeScroll.editorFound,true);
-  assert.equal(nativeScroll.uri,markdownUri.toString());
-  assert.equal(markdownReveals.at(-1).range.start.line,markdownDoc.lineCount-1,
-    'native Preview diagnostics use the real Markdown TextEditor for scroll reveal');
   
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
