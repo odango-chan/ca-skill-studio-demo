@@ -2778,11 +2778,11 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
       const matches=await vscode.workspace.findFiles(
-        '**/establish-pdu-session/references/3gpp-procedure.md','**/node_modules/**',5);
+        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
       const exact=matches.filter(item=>item.path.endsWith(
-        '/establish-pdu-session/references/3gpp-procedure.md'));
+        '/establish-pdu-session/SKILL.md'));
       if(exact.length!==1)
-        throw Error('Expected exactly one existing Reference document for the security probe');
+        throw Error('Expected exactly one existing Skill guide for the security probe');
       const target=exact[0];
       const doc=await vscode.workspace.openTextDocument(target);
       if(doc.languageId!=='markdown')
@@ -2797,7 +2797,7 @@ export function registerWorkbench(vscode,context){
         '<script>window.skillStudioNativeMarkdownXss = true;</script>',
         '<img src="https://example.invalid/raw-html-pixel.png" onerror="window.skillStudioNativeMarkdownXss = true">',
         '',
-        '[Safe package reference](3gpp-procedure.md)',
+        '[Safe package reference](references/3gpp-procedure.md)',
         '[Escaping package link](../../outside.md)',
         '[Missing package link](missing.md)',
         '![Remote pixel](https://example.invalid/markdown-pixel.png)',
@@ -2824,17 +2824,17 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      const suffix='/establish-pdu-session/references/3gpp-procedure.md';
+      const suffix='/establish-pdu-session/SKILL.md';
       if(!target.path.endsWith(suffix))
-        throw Error('Refusing to restore a non-fixture Reference document');
+        throw Error('Refusing to restore a non-fixture Skill guide');
       const original=nativeMarkdownSecurityOriginals.get(target.toString());
       if(typeof original!=='string')
-        throw Error('No original Reference content is recorded for this security probe');
+        throw Error('No original Skill guide content is recorded for this security probe');
       const doc=await vscode.workspace.openTextDocument(target);
       const edit=new vscode.WorkspaceEdit();
       edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
       const restored=await vscode.workspace.applyEdit(edit);
-      if(!restored)throw Error('Could not restore the original Reference after security probe');
+      if(!restored)throw Error('Could not restore the original Skill guide after security probe');
       nativeMarkdownSecurityOriginals.delete(target.toString());
       const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,target);
       if(!policyReady)throw Error('Could not restore the Package link policy for the original Skill guide');
