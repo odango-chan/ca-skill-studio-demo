@@ -8,12 +8,14 @@ const manifest=JSON.parse(readFileSync(sampleRoot+"files.json","utf8"));
 const uri=path=>({path,toString(){return "file://"+path;}});
 const joinPath=(base,...paths)=>uri([base.path,...paths].join("/"));
 function host(manifestOverride=null,existing=[]){
-  const files=new Map(),folders=new Set(),opened=[];
-  const vscode={
-    Uri:{file:uri,joinPath},
-    workspace:{
-      workspaceFolders:[...existing],
-      fs:{
+  const files=new Map(),folders=new Set(),opened=[],folderListeners=new Set();
+  const workspace={
+    workspaceFolders:[...existing],
+    onDidChangeWorkspaceFolders(listener){
+      folderListeners.add(listener);
+      return {dispose(){folderListeners.delete(listener);}};
+    },
+    fs:{
         async readFile(target){
           if(target.path==="/extension/samples/skills/files.json"&&manifestOverride!==null)
             return new TextEncoder().encode(JSON.stringify(manifestOverride));
@@ -35,14 +37,20 @@ function host(manifestOverride=null,existing=[]){
           files.set(target.path,new Uint8Array(bytes));
         }
       },
-      updateWorkspaceFolders(start,count,folder){
-        opened.push({start,count,folder});
-        vscode.workspace.workspaceFolders.splice(start,count,folder);
-        return true;
-      }
+    updateWorkspaceFolders(start,count,folder){
+      opened.push({start,count,folder});
+      // Theia's API returns before the main-side workspace update completes.
+      // Model the real asynchronous onDidChangeWorkspaceFolders confirmation.
+      setTimeout(()=>{
+        workspace.workspaceFolders.splice(start,count,folder);
+        for(const listener of folderListeners)
+          listener({added:[folder],removed:[],changed:[]});
+      },5);
+      return true;
     }
   };
-  return {vscode,files,opened};
+  const vscode={Uri:{file:uri,joinPath},workspace};
+  return {vscode,files,opened,workspace};
 }
 test("Sample creates both exact pinned owner SKILL packages in one Skill Compiler project root",async()=>{
   const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
