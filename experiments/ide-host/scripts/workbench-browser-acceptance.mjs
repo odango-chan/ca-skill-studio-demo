@@ -471,7 +471,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('core.saveAll');
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  let file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>{const content=x.querySelector('.theia-TreeNodeContent')??x;const segment=content.querySelector('.theia-TreeNodeSegment');const label=(segment?.textContent??content.innerText??'').replace(/\\s+\\d+$/,'').trim();const r=content.getBoundingClientRect();return label==='procedure.yaml'&&r.width>0&&r.height>0&&r.x>=0&&r.x<innerWidth;});if(!el)return null;const content=el.querySelector('.theia-TreeNodeContent')??el;content.scrollIntoView({block:'center',inline:'nearest'});const r=content.getBoundingClientRect();return r?{x:r.x+r.width*.65,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file not available in native Explorer');
   // Measure the actual Explorer click → CustomEditor render path. Do not
   // insert a fixed sleep before polling; it would dominate the reported time.
@@ -504,7 +504,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // checks so the active Webview frame and its selection are unambiguous.
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>{const content=x.querySelector('.theia-TreeNodeContent')??x;const segment=content.querySelector('.theia-TreeNodeSegment');const label=(segment?.textContent??content.innerText??'').replace(/\\s+\\d+$/,'').trim();const r=content.getBoundingClientRect();return label==='procedure.yaml'&&r.width>0&&r.height>0&&r.x>=0&&r.x<innerWidth;});if(!el)return null;const content=el.querySelector('.theia-TreeNodeContent')??el;content.scrollIntoView({block:'center',inline:'nearest'});const r=content.getBoundingClientRect();return r?{x:r.x+r.width*.65,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file disappeared after closing preview/pinned tabs');
   await click(file.x,file.y,2);
   let singlePinned=null;
