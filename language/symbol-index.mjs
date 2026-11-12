@@ -29,7 +29,7 @@ function packageFilePath(value){
   return parts.join("/");
 }
 
-function symbolKey(token,name,relativePath){
+function symbolKey(token,name){
   switch(token.type){
     case "skillProcedure":
       return "procedure\u0000"+name;
@@ -102,7 +102,7 @@ export function buildSkillSymbolIndex(snapshot){
         continue;
       const name=document.text.slice(span.start,span.end);
       if(!name)continue;
-      const key=symbolKey(span,name,document.relativePath);
+      const key=symbolKey(span,name);
       if(!key)continue;
       const item={
         key,name,type:span.type,uri:document.uri,
