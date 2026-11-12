@@ -21,6 +21,7 @@
     "onCommand:skillStudio.auditPackage",
     "onCommand:skillStudio.exportPackageZip",
     "onCommand:skillStudio.previewMarkdown",
+    "onCommand:skillStudio.previewMarkdownNative",
     "onCommand:skillStudio.toggleMarkdownLayout",
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
@@ -154,6 +155,10 @@
         "command": "skillStudio.openContract",
         "title": "SKILL Studio: Open Contract Visual"
       }
+    ],
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/markdown-preview.css"
     ],
     "menus": {
       "editor/title": [
