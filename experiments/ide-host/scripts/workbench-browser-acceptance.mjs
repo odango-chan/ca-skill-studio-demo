@@ -353,31 +353,36 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   }
   const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1','Scripts · 5','References · 3'];
   const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
-  async function packageTreeScroll(fraction){
-    const result=await evalJS(`(()=>{
+  async function packageTreeScroll(deltaY){
+    const target=await evalJS(`(()=>{
       const header=[...document.querySelectorAll('.theia-view-container-part-header')]
         .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
           x.getBoundingClientRect().width>0);
       const part=header?.closest('.part');
-      if(!part)return {found:false,reason:'Package Explorer part not found'};
-      const candidates=[...part.querySelectorAll('*')].filter(el=>
-        el.clientHeight>80&&el.scrollHeight>el.clientHeight+8);
-      if(part.clientHeight>80&&part.scrollHeight>part.clientHeight+8)candidates.push(part);
-      candidates.sort((a,b)=>a.clientHeight-b.clientHeight);
-      const scroller=candidates[0];
-      if(!scroller)return {found:false,reason:'Package Explorer has no scrollable tree container'};
-      scroller.scrollTop=Math.round((scroller.scrollHeight-scroller.clientHeight)*${fraction});
-      return {found:true,scrollTop:scroller.scrollTop,scrollHeight:scroller.scrollHeight,
-        clientHeight:scroller.clientHeight,className:String(scroller.className??'')};
+      const tree=part?.querySelector('.theia-Tree');
+      const element=tree??part;
+      const rect=element?.getBoundingClientRect();
+      if(!rect||rect.width<80||rect.height<80)
+        return {found:false,reason:'Package Explorer tree viewport is unavailable'};
+      return {found:true,x:Math.round(rect.left+rect.width/2),
+        y:Math.round(rect.top+Math.min(rect.height-12,rect.height/2)),
+        width:rect.width,height:rect.height,
+        className:String(element.className??'')};
     })()`);
-    if(!result?.found)throw Error('Could not scroll Package Explorer TreeView: '+JSON.stringify(result));
-    await sleep(140);
-    return result;
+    if(!target?.found)
+      throw Error('Could not locate Package Explorer scroll viewport: '+JSON.stringify(target));
+    // Theia virtualizes TreeView rows. Scroll through the actual viewport using
+    // trusted Chromium wheel input; there may be no full-height DOM scroller.
+    await command('Input.dispatchMouseEvent',{
+      type:'mouseWheel',x:target.x,y:target.y,deltaX:0,deltaY
+    });
+    await sleep(160);
+    return {...target,deltaY};
   }
   async function collectPackageRowsAcrossScroll(){
     const rows=[],scrollStates=[];
-    for(const fraction of [0,.5,1]){
-      scrollStates.push(await packageTreeScroll(fraction));
+    for(const deltaY of [-1800,420,420,420]){
+      scrollStates.push(await packageTreeScroll(deltaY));
       rows.push(...await readTreeRows());
     }
     return {rows,scrollStates};
@@ -416,7 +421,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
           top:classicTopRows,scrollStates:classicScroll.scrollStates,
           rows:classicScroll.rows.map(row=>({text:row.text,visible:row.visible}))
         }));
-  await packageTreeScroll(0);
+  await packageTreeScroll(-1800);
   const conventionalPackageRestored=await evalJS(`(()=>{
     const header=[...document.querySelectorAll('.theia-view-container-part-header')]
       .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
