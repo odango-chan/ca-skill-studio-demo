@@ -454,7 +454,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(rightPanelState.width<120||rightPanelState.contentWidth<100)
     throw Error('Theia secondary sidebar remains collapsed after core.toggle.right.panel: '+JSON.stringify(rightPanelState));
   await click(rightInspector.x,rightInspector.y);await sleep(250);
-  await invoke('workbench.action.openView','skillStudio.inspection');
+  await invoke('skillStudio.inspection.open');
   await sleep(300);
   console.log('STUDIO_INSPECTOR_SECONDARY_SIDEBAR_CHROMIUM',JSON.stringify({found:true,rightInspector,viewportWidth:inspectorPlacement.viewportWidth}));
   const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);el?.scrollIntoView({block:'center'});const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
