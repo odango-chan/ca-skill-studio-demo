@@ -6,6 +6,7 @@ import {join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {build} from 'esbuild';
 import {inspectionSnapshot} from '../vscode/src/inspection.mjs';
+import {isAllowedPackageRelativeLink} from '../vscode/src/markdown-link-policy.mjs';
 
 // Workbench now consumes the canonical YAML token catalog. Bundle it with the
 // same explicit YAML text loader used by the production extension build;
@@ -191,16 +192,28 @@ test('Inspector exposes only owner-observed, Preview-qualified Outcome repairs',
     'non-plain or ambiguous YAML fails closed');
 });
 
-test('Native views track unsaved Source, audit Classic package, reject stale selection and dispose listeners',async()=>{
-  const commands=new Map(),providers=new Map(),changes=[],panels=[],diagnosticSets=[],appliedEdits=[];
-  const markdownMessages=[],markdownReveals=[],showDocumentCalls=[];
+test('native Markdown links are constrained to the exact Package inventory',()=>{
+  const allowed=new Set(['SKILL.md','references/3gpp-procedure.md','schemas/request.yaml']);
+  assert.equal(isAllowedPackageRelativeLink('../SKILL.md','references',allowed),true);
+  assert.equal(isAllowedPackageRelativeLink('../../outside.md','references',allowed),false);
+  assert.equal(isAllowedPackageRelativeLink('missing.md','references',allowed),false);
+  assert.equal(isAllowedPackageRelativeLink('//example.invalid/escape.md','references',allowed),false);
+  assert.equal(isAllowedPackageRelativeLink('javascript:alert(1)','references',allowed),false);
+  assert.equal(isAllowedPackageRelativeLink('#section','references',allowed),true);
+  assert.equal(isAllowedPackageRelativeLink('https://example.invalid/docs','references',allowed),true);
+});
+
+test('Native views track unsaved Source, audit Package, reject stale selection and dispose listeners',async()=>{
+  const commands=new Map(),providers=new Map(),changes=[],diagnosticSets=[],appliedEdits=[],nativeCommands=[];
+  const markdownReveals=[],showDocumentCalls=[];
   const disposable=()=>({dispose(){}});
-  let confirmChoice='确认并应用',markdownMessage,visibleRangeChanged;
+  let confirmChoice='确认并应用',markdownExtensionActivated=false;
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
   const file=uri('/workspace/establish-pdu-session/assurance/procedure.yaml');
   const doc={uri:file,version:1,text:source,getText(){return this.text;},positionAt(offset){return {offset};},get lineCount(){return this.text.split('\n').length;}};
   const markdownUri=uri('/workspace/SKILL.md');
-  const markdownDoc={uri:markdownUri,version:1,text:'# Preview title\n<script>alert(1)</script>',
+  const markdownDoc={uri:markdownUri,version:1,languageId:'markdown',
+    text:'# Preview title\n\nA native Markdown source.',
     getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
   const markdownEditor={document:markdownDoc,visibleRanges:[{start:{line:0},end:{line:5}}],
     revealRange(range,type){markdownReveals.push({range,type});}};
@@ -219,12 +232,27 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
     Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
     ViewColumn:{One:1,Two:2,Beside:2},TextEditorRevealType:{AtTop:1},
+    FileType:{File:1,Directory:2,SymbolicLink:64},
     Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
+    extensions:{getExtension(id){return id==='vscode.markdown-language-features'?{
+      extensionUri:uri('/extensions/vscode.markdown-language-features'),isActive:markdownExtensionActivated,
+      async activate(){markdownExtensionActivated=true;this.isActive=true;return {};}
+    }:null;}},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
-    commands:{executeCommand:async()=>{},registerCommand(name,cb){commands.set(name,cb);return disposable();}},
+    commands:{async executeCommand(id,...args){nativeCommands.push({id,args});return true;},
+      async getCommands(){return ['markdown.showPreviewToSide'];},
+      registerCommand(name,cb){commands.set(name,cb);return disposable();}},
     workspace:{textDocuments:[doc,markdownDoc],
-      findFiles:async()=>['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md'].map(p=>uri('/workspace/establish-pdu-session/'+p)),
-      fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8'))},
+      getWorkspaceFolder:()=>({uri:uri('/workspace')}),
+      findFiles:async pattern=>{
+        if(pattern==='**/SKILL.md'||(pattern?.pattern==='**/*'&&pattern.base?.path==='/workspace'))return [markdownUri];
+        return ['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md']
+          .map(p=>uri('/workspace/establish-pdu-session/'+p));
+      },
+      getConfiguration:()=>({get:key=>({scrollEditorWithPreview:true,
+        scrollPreviewWithEditor:true,markEditorSelection:true})[key]}),
+      fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8')),
+        stat:async()=>({type:1})},
       async applyEdit(edit){
         appliedEdits.push([...edit.changes]);
         for(const change of [...edit.changes].sort((a,b)=>b.range.start.offset-a.range.start.offset))
@@ -235,16 +263,11 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
       openTextDocument:async target=>target.path==='/workspace/SKILL.md'?markdownDoc:doc},
     window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
       onDidChangeActiveTextEditor:()=>disposable(),
-      onDidChangeTextEditorVisibleRanges(cb){visibleRangeChanged=cb;return disposable();},
+      onDidChangeTextEditorVisibleRanges(){return disposable();},
       visibleTextEditors:[markdownEditor],
       showTextDocument:async(document,options)=>{showDocumentCalls.push({document,options});return markdownEditor;},
       showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},
-      showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation',
-      createWebviewPanel(_type,_title,column){const p={column,reveal(nextColumn){this.column=nextColumn;},
-        webview:{html:'',cspSource:'https://studio.invalid',asWebviewUri:u=>u,
-          onDidReceiveMessage(cb){markdownMessage=cb;return disposable();},
-          postMessage(message){markdownMessages.push(message);return Promise.resolve(true);}},
-        onDidDispose:()=>disposable()};panels.push(p);return p;}}
+      showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation'}
   };
   const context={subscriptions:[],extensionUri:uri('/extension')},workbench=registerWorkbench(vscode,context),posted=[];
   workbench.attach(doc,m=>posted.push(m));
@@ -269,7 +292,9 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(commands.has('skillStudio.renameNode'));
   assert.ok(commands.has('skillStudio.editNodeOperatorValue'));
   assert.ok(commands.has('skillStudio.previewMarkdownNative'),
-    'the isolated native Markdown spike must expose its own preview command');
+    'the native Markdown preview command is registered');
+  assert.ok(commands.has('skillStudio.previewMarkdown'),
+    'normal Markdown opening delegates to the native preview');
   assert.ok(commands.has('skillStudio.internal.nativeMarkdownPreviewAcceptance'));
   assert.ok(commands.has('skillStudio.internal.nativeMarkdownSettingsAcceptance'));
   await commands.get(item.command.command)(...item.command.arguments);
@@ -642,50 +667,28 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
   assert.match(dataflow.description,/Runtime NOT_RUN/);
   assert.ok(dataflow.children.some(x=>x.label.includes('Source lineage')));
-  await commands.get('skillStudio.previewMarkdown')(markdownUri);
+  const previewOpened=await commands.get('skillStudio.previewMarkdown')(markdownUri);
+  assert.equal(previewOpened,true,'normal Markdown opening succeeds through the native extension');
+  assert.equal(showDocumentCalls.at(-1).document,markdownDoc);
   assert.equal(showDocumentCalls.at(-1).options.viewColumn,vscode.ViewColumn.One,
-    'native Markdown Source is opened in the first editor column');
+    'editable Markdown Source stays in the first editor column');
   assert.equal(showDocumentCalls.at(-1).options.preview,false,
-    'native Markdown Source is a persistent editor, not a preview tab');
-  assert.equal(panels[0].column,vscode.ViewColumn.Two,
-    'read-only Markdown Preview is paired in the second editor column');
-  assert.match(panels[0].webview.html,/Content-Security-Policy/);
-  assert.match(panels[0].webview.html,/style-src https:\/\/studio\.invalid/);
-  assert.match(panels[0].webview.html,/script-src 'nonce-[a-f0-9]{32}'/);
-  assert.match(panels[0].webview.html,/img-src 'none'/);
-  assert.match(panels[0].webview.html,/href="https:\/\/studio\.invalid\/media\/markdown-preview\.css"/);
-  assert.match(panels[0].webview.html,/class="md-preview-toolbar"/);
-  assert.match(panels[0].webview.html,/class="markdown-preview"/);
-  assert.match(panels[0].webview.html,/<h1(?: id="[^"]+")? data-source-line="0">Preview title<\/h1>/);
-  assert.match(panels[0].webview.html,/&lt;script&gt;/);
-  assert.equal((panels[0].webview.html.match(/<script\b/gi)??[]).length,1,
-    'only the nonce-protected local file navigation bridge is present');
-  assert.match(panels[0].webview.html,/<script nonce="[a-f0-9]{32}">/);
-  await markdownMessage({type:'ready'});
-  markdownDoc.text='# Updated title\n\n## Details\n\nA live edit.';
-  changed({document:markdownDoc});
-  await new Promise(resolve=>setTimeout(resolve,140));
-  assert.equal(markdownMessages.at(-1).type,'updatePreview',
-    'unsaved native edits update the existing Webview rather than replacing its HTML');
-  assert.match(markdownMessages.at(-1).html,/Updated title/);
-  assert.match(markdownMessages.at(-1).html,/data-source-line="2"/);
-  visibleRangeChanged({textEditor:markdownEditor,
-    visibleRanges:[{start:{line:7},end:{line:12}}]});
-  assert.deepEqual(markdownMessages.at(-1),{type:'scrollToLine',line:7},
-    'native Source scrolling sends a source-line anchor to Preview');
-  await markdownMessage({type:'scrollToSourceLine',line:6});
-  assert.equal(markdownReveals.at(-1).range.start.line,6,
-    'Preview scrolling reveals the matching native Source line');
-  assert.equal(markdownReveals.at(-1).type,vscode.TextEditorRevealType.AtTop);
-  await markdownMessage({type:'toggleLayout'});
-  assert.equal(panels[0].column,vscode.ViewColumn.One,
-    'small-screen single-pane mode places Preview in the Source group');
-  await markdownMessage({type:'toggleLayout'});
-  assert.equal(panels[0].column,vscode.ViewColumn.Two,
-    'the toolbar can restore the side-by-side layout');
-  markdownDoc.text='x'.repeat(300001);changed({document:markdownDoc});
-  await new Promise(resolve=>setTimeout(resolve,140));
-  assert.match(markdownMessages.at(-1).html,/预览不可用/);
+    'Markdown Source is persistent, not a transient preview tab');
+  assert.equal(markdownExtensionActivated,true,
+    'the exact pinned Markdown extension is activated before its command is used');
+  assert.ok(nativeCommands.some(call=>call.id==='markdown.showPreviewToSide'&&
+    call.args[0]===markdownUri),
+    'the built-in Markdown Preview command owns rendering in the second editor group');
+  const nativeSettings=await commands.get(
+    'skillStudio.internal.nativeMarkdownSettingsAcceptance')();
+  assert.equal(nativeSettings.scrollEditorWithPreview,true);
+  assert.equal(nativeSettings.scrollPreviewWithEditor,true);
+  const nativeScroll=await commands.get(
+    'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance')('bottom');
+  assert.equal(nativeScroll.editorFound,true);
+  assert.equal(nativeScroll.uri,markdownUri.toString());
+  assert.equal(markdownReveals.at(-1).range.start.line,markdownDoc.lineCount-1,
+    'native Preview diagnostics use the real Markdown TextEditor for scroll reveal');
   
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
