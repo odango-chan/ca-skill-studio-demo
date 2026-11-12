@@ -103,7 +103,7 @@ async function exposeWorkspaceRoot(workspace,root,legacyRoots=[]){
     },15000);
     let accepted=false;
     try{
-      accepted=workspace.updateWorkspaceFolders(start,deleteCount,{uri:root,name});
+      accepted=workspace.updateWorkspaceFolders(start,deleteCount,{uri:root});
     }catch(error){
       finish(Error("Workspace update request failed: "+String(error?.message??error)));
       return;
