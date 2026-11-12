@@ -21,7 +21,7 @@ import {registerContractEditor} from "./contract-editor.mjs";
 import {registerPredicateEditor} from "./predicate-editor.mjs";
 import {registerSchemaEditor} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
-import {registerDependenciesView} from "./dependencies-view.mjs";
+import {registerDependencyIntegration} from "./dependency-integration.mjs";
 import {iconShapes} from "../../../../site/icons.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
@@ -54,14 +54,14 @@ export function activate(context){
   registerPredicateEditor(vscode,context);
   registerSchemaEditor(vscode,context);
   let packageOverview=null;
-  const dependenciesView=registerDependenciesView(vscode,context,{
+  const dependencyIntegration=registerDependencyIntegration(vscode,context,{
     onLockChanged:()=>workbench.invalidateDependencyAnalysis?.(),
     onProjectRootChanged:()=>void packageOverview?.refresh()
   });
   packageOverview=registerPackageOverview(vscode,context,
     ()=>workbench.getActiveDocument?.()??null,{
-      dependenciesProvider:dependenciesView.provider,
-      getProjectRoot:dependenciesView.getProjectRoot
+      dependenciesProvider:dependencyIntegration.provider,
+      getProjectRoot:dependencyIntegration.getProjectRoot
     });
   const provider={
     async resolveCustomTextEditor(document,panel){
