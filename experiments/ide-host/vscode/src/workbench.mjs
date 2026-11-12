@@ -2839,45 +2839,6 @@ export function registerWorkbench(vscode,context){
       clearNativeMarkdownPackagePolicies([target]);
       return true;
     }));
-  const nativeMarkdownScrollEvents=[];
-  if(typeof vscode.window.onDidChangeTextEditorVisibleRanges==='function'){
-    context.subscriptions.push(vscode.window.onDidChangeTextEditorVisibleRanges(event=>{
-      if(event.textEditor.document.uri.path.endsWith('/establish-pdu-session/SKILL.md')){
-        nativeMarkdownScrollEvents.push({
-          ranges:event.visibleRanges.map(range=>({start:range.start.line,end:range.end.line})),
-          active:vscode.window.activeTextEditor?.document.uri.toString()??null
-        });
-        if(nativeMarkdownScrollEvents.length>20)nativeMarkdownScrollEvents.shift();
-      }
-    }));
-  }
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',async direction=>{
-      const editor=vscode.window.visibleTextEditors.find(item=>
-        item.document.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
-      if(direction==='clear'){
-        nativeMarkdownScrollEvents.length=0;
-      }
-        const before=editor.visibleRanges.map(range=>({
-        start:range.start.line,end:range.end.line
-      }));
-      const line=direction==='bottom'?Math.max(0,editor.document.lineCount-1):0;
-      if(direction==='top'||direction==='bottom')
-        editor.revealRange(new vscode.Range(line,0,line,0),vscode.TextEditorRevealType.AtTop);
-      await new Promise(resolve=>setTimeout(resolve,100));
-      return {
-        editorFound:true,uri:editor.document.uri.toString(),
-        viewColumn:editor.viewColumn,lineCount:editor.document.lineCount,
-        before,after:editor.visibleRanges.map(range=>({
-          start:range.start.line,end:range.end.line
-        })),
-        activeEditor:vscode.window.activeTextEditor?.document.uri.toString()??null,
-        recentEvents:[...nativeMarkdownScrollEvents],
-        config:vscode.workspace.getConfiguration('markdown.preview')
-          .get('scrollEditorWithPreview')
-      };
-    }));
-
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownSettingsAcceptance',()=>({
       scrollEditorWithPreview:vscode.workspace.getConfiguration('markdown.preview')

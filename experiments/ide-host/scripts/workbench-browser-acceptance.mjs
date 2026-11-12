@@ -1759,21 +1759,16 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(nativeLive.view.contextId!==nativeMarkdown.view.contextId)
       throw Error('Native Markdown recreated its Preview webview instead of updating it in place: '+
         JSON.stringify({before:nativeMarkdown.view.contextId,after:nativeLive.view.contextId}));
-    const readSourceViewport=async()=>{
-      const state=await nativeCommand(
-        'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance');
-      if(!state?.editorFound||state.uri!==nativeMarkdownUri)
-        throw Error('Native Markdown visible Source editor is unavailable: '+JSON.stringify(state));
-      return {lineCount:state.lineCount,
-        visibleRanges:state.after??state.before??[],
-        topLine:state.after?.[0]?.start??state.before?.[0]?.start??null};
-    };
+    const sourceViewport=nativeSettings.visibleEditors?.find(
+      editor=>editor.uri===nativeMarkdownUri)??null;
+    if(!sourceViewport)
+      throw Error('Native Markdown Source is not present in the host visible-editor snapshot: '+
+        JSON.stringify(nativeSettings.visibleEditors));
     const readPreviewViewport=async()=>(await command('Runtime.evaluate',{
       contextId:nativeLive.view.contextId,returnByValue:true,
       expression:'({scrollY:window.scrollY,scrollHeight:document.scrollingElement?.scrollHeight??0,'+
         'clientHeight:document.scrollingElement?.clientHeight??0})'
     })).result?.value;
-    const sourceViewport=await readSourceViewport();
     const previewViewport=await readPreviewViewport();
     const nativeMarkdownScrollEvidence={
       sourceViewport,previewViewport,
