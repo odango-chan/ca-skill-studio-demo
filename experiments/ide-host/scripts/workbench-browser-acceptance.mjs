@@ -125,6 +125,22 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
      mas?.fileCount!==5||mas?.corePresent!==3)
     throw Error('Two-SKILL inventory does not match the pinned sample manifest: '+
       JSON.stringify({classic,mas}));
+  function assertGroupInventory(result,packageName,expected){
+    const pkg=result?.packages?.find(item=>item.name===packageName);
+    if(!pkg)throw Error('Package scan omitted '+packageName);
+    const actual=Object.fromEntries((pkg.groups??[]).map(group=>[group.key,group.count]));
+    const missing=(pkg.groups??[]).flatMap(group=>
+      (group.missing??[]).map(file=>group.key+'/'+file));
+    if(JSON.stringify(actual)!==JSON.stringify(expected)||missing.length)
+      throw Error('Package group inventory mismatch for '+packageName+': '+
+        JSON.stringify({actual,expected,missing}));
+  }
+  assertGroupInventory(scan,'establish-pdu-session',{
+    definition:1,assurance:3,schemas:1,scripts:5,references:3
+  });
+  assertGroupInventory(scan,'establish-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1
+  });
 
   // Dependencies must be a real section in the same native TreeView in both
   // backend and browser-only Theia. It starts collapsed and expands to the
@@ -351,37 +367,10 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Designer Source: '+
       JSON.stringify({file,frames:await readContractFrames(),rows:await readTreeRows()}));
   }
-  const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1','Scripts · 5','References · 3'];
-  const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
-  async function packageTreeScroll(deltaY){
-    const visibleRows=await readTreeRows();
-    const target=visibleRows.find(row=>row.visible&&row.contentPos);
-    if(!target)
-      throw Error('Package Explorer has no visible TreeView row for wheel input: '+
-        JSON.stringify(visibleRows));
-    // Theia virtualizes TreeView rows. Send trusted wheel input over a real
-    // visible row so the host's scroll container receives the gesture.
-    await command('Input.dispatchMouseEvent',{
-      type:'mouseWheel',x:target.contentPos.x,y:target.contentPos.y,
-      deltaX:0,deltaY
-    });
-    await sleep(180);
-    const after=await readTreeRows();
-    return {deltaY,target:target.text,
-      visibleRows:after.filter(row=>row.visible).map(row=>row.text)};
-  }
-  async function collectPackageRowsAcrossScroll(){
-    const rows=[],scrollStates=[];
-    for(const deltaY of [-1800,420,420,420]){
-      scrollStates.push(await packageTreeScroll(deltaY));
-      rows.push(...await readTreeRows());
-    }
-    return {rows,scrollStates};
-  }
-  // The Dependencies interaction above scrolls the shared TreeView to its
-  // lower section. Return the conventional Package row to the top before
-  // checking its visible group rows; otherwise a viewport-only assertion
-  // would mistake off-screen groups for missing inventory.
+  // Group membership and counts are asserted from the Package scan model
+  // above. Theia virtualizes TreeView rows, so DOM visibility is not a
+  // completeness signal. Here we verify the real Package row and Assurance
+  // navigation path only.
   const conventionalPackageTop=await evalJS(`(()=>{
     const header=[...document.querySelectorAll('.theia-view-container-part-header')]
       .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
@@ -396,43 +385,9 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   if(!conventionalPackageTop)
     throw Error('Traditional 5GC Package row disappeared after Dependencies interaction');
   await sleep(150);
-  const classicView=await ensurePackageExpanded('establish-pdu-session');
-  const classicRange=classicView.range;
-  // The tree may render valid rows outside the current viewport. Inventory
-  // membership is about the native TreeView model, not simultaneous visibility.
-  const classicTopRows=classicView.rows.slice(classicRange.index+1,classicRange.end)
-    .map(row=>row.text);
-  const classicScroll=await collectPackageRowsAcrossScroll();
-  const classicAllRows=[...classicTopRows,...classicScroll.rows.map(row=>row.text)];
-  const classicVisible=[...new Set(classicAllRows)];
-  for(const group of classicGroups)
-    if(!classicVisible.some(text=>text.includes(group)))
-      throw Error('Traditional 5GC Package is missing group '+group+
-        ' after scrolling the virtualized TreeView: '+JSON.stringify({
-          top:classicTopRows,scrollStates:classicScroll.scrollStates,
-          rows:classicScroll.rows.map(row=>({text:row.text,visible:row.visible}))
-        }));
-  await packageTreeScroll(-1800);
-  const conventionalPackageRestored=await evalJS(`(()=>{
-    const header=[...document.querySelectorAll('.theia-view-container-part-header')]
-      .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
-        x.getBoundingClientRect().width>0);
-    const part=header?.closest('.part');
-    const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(el=>
-      el.innerText.replace(/\\s+/g,' ').includes('establish-pdu-session · 3/3 core ·'));
-    row?.scrollIntoView({block:'start',inline:'nearest'});
-    return Boolean(row);
-  })()`);
-  if(!conventionalPackageRestored)
-    throw Error('Traditional 5GC Package row did not return after virtualized group inspection');
-  await sleep(120);
+  await ensurePackageExpanded('establish-pdu-session');
   const classicContract=await openPackageContract('establish-pdu-session');
-  const masView=await ensurePackageExpanded('establish-pdu-session-mas');
-  const masVisible=masView.rows.slice(masView.range.index+1,masView.range.end)
-    .map(row=>row.text);
-  for(const group of masGroups)
-    if(!masVisible.some(text=>text.includes(group)))
-      throw Error('MAS Package is missing group '+group+': '+JSON.stringify(masVisible));
+  await ensurePackageExpanded('establish-pdu-session-mas');
   const masContract=await openPackageContract('establish-pdu-session-mas');
   if(classicContract.contractName!=='establish-pdu-session'||
      masContract.contractName!=='establish-pdu-session-mas'||
@@ -442,11 +397,15 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   await invoke('skillStudio.refreshPackages');
   await invoke('skillStudio.refreshPackages');
   const postExpansion=await evalJS('window.__skillStudioLastCommandResult??null');
-  if(!postExpansion?.treeReadsByKind||
-     postExpansion.treeReadsByKind.package<2||
-     postExpansion.treeReadsByKind.group<2)
-    throw Error('Both Package and Assurance children must be requested by Theia TreeView: '+
-      JSON.stringify({postExpansion,classicVisible,masVisible}));
+  if(postExpansion?.state!=='ready'||postExpansion.packages?.length!==2)
+    throw Error('Package Explorer refresh did not preserve both Package inventories: '+
+      JSON.stringify(postExpansion));
+  assertGroupInventory(postExpansion,'establish-pdu-session',{
+    definition:1,assurance:3,schemas:1,scripts:5,references:3
+  });
+  assertGroupInventory(postExpansion,'establish-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1
+  });
   const previous=activityState?.previous;
   let restoredActivity=null;
   if(previous&&previous.label!=='Skill Studio'){
