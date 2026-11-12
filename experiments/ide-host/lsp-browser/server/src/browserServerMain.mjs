@@ -396,7 +396,9 @@ connection.onHover(params => {
       skillStep:"Procedure node",
       skillPredicate:"Predicate",
       skillOperation:"Tool Operation",
-      skillCapability:"Capability / Operation resource grant"
+      skillCapability:"Capability / Operation resource grant",
+      skillSchema:"Skill Schema file",
+      skillReference:"Skill Script / Reference file"
     })[symbolHit.token.type]??"Skill symbol";
     const resolved=declaration&&snapshot.completeness==="complete"&&
       index?.generation===snapshot.generation;
