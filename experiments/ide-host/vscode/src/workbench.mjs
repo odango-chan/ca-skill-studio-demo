@@ -3062,7 +3062,7 @@ export function registerWorkbench(vscode,context){
     if(!target||!target.path.toLowerCase().endsWith('.md'))return;
     const key=target.toString();
     setTimeout(()=>{
-      if(markdownPanels.has(key)||markdownOpening.has(key))return;
+      if(markdownPanels.has(key)||markdownOpening.has(key)||nativeMarkdownOpening.has(key)||nativeMarkdownPaired.has(key))return;
       if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
       void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
     },0);
