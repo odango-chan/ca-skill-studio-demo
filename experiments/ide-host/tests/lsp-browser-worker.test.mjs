@@ -467,7 +467,7 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       textDocument:{uri:procedure.uri},position:positionOf(procedure.text,predicateName)
     });
     assert.match(predicateHover.contents.value,/Predicate/);
-    assert.match(predicateHover.contents.value,/createdsession\\.ingress\\.eligible/);
+    assert.ok(predicateHover.contents.value.includes(predicateName));
 
     const predicateReferences=await lspRequest(worker,307,"textDocument/references",{
       textDocument:{uri:predicates.uri},
