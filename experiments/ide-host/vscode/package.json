@@ -209,7 +209,7 @@
         },
         {
           "command": "skillStudio.auditPackage",
-          "when": "view == skillStudio.problems",
+          "when": "view == skillStudio.inspection || view == skillStudio.problems",
           "group": "navigation"
         },
         {
@@ -420,12 +420,8 @@
           "name": "Packages"
         },
         {
-          "id": "skillStudio.inspection",
-          "name": "Inspection / Inspector"
-        },
-        {
           "id": "skillStudio.outline",
-          "name": "Outline"
+          "name": "Procedure Outline"
         },
         {
           "id": "skillStudio.evidence",
@@ -434,6 +430,12 @@
         {
           "id": "skillStudio.problems",
           "name": "Problems"
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "skillStudio.inspection",
+          "name": "Inspector"
         }
       ]
     }
