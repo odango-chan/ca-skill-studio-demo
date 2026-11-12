@@ -25,19 +25,20 @@ if(script.includes(marker)){
   }));
   process.exit(0);
 }
-const declaration=/\\bscrollDisabledCount\\s*=\\s*0\\b/;
-const match=script.match(declaration);
-if(!match){
-  const reveal=script.indexOf("revealLine");
+const scrollStart=script.search(/window\\.addEventListener\\(["']scroll["']/);
+if(scrollStart<0)throw Error("Pinned Markdown Preview runtime has no window scroll listener");
+const scrollSegment=script.slice(scrollStart,scrollStart+2400);
+const counterMatch=scrollSegment.match(/if\\(([A-Za-z_$][\\w$]*)>0\\)\\1-=1;else\\{/);
+if(!counterMatch){
   console.log("STUDIO_NATIVE_MARKDOWN_SCROLL_RUNTIME_DIAGNOSTIC",JSON.stringify({
-    bytes:script.length,hasCounter:script.includes("scrollDisabledCount"),
-    revealSnippet:reveal>=0?script.slice(Math.max(0,reveal-900),Math.min(script.length,reveal+250)):"revealLine token not found"
+    bytes:script.length,scrollSnippet:scrollSegment.slice(0,1400)
   }));
-  throw Error("Pinned Markdown Preview runtime no longer exposes its expected scroll suppression counter");
+  throw Error("Pinned Markdown Preview scroll listener no longer has its expected suppression-counter branch");
 }
+const counterName=counterMatch[1];
 const reset=`
 // STUDIO_NATIVE_MARKDOWN_USER_SCROLL_RESET: a real user gesture supersedes stale programmatic-scroll suppression.
-const studioResetNativeMarkdownScrollSuppression = () => { scrollDisabledCount = 0; };
+const studioResetNativeMarkdownScrollSuppression = () => { ${counterName} = 0; };
 window.addEventListener("wheel", studioResetNativeMarkdownScrollSuppression, {capture:true, passive:true});
 window.addEventListener("touchstart", studioResetNativeMarkdownScrollSuppression, {capture:true, passive:true});
 window.addEventListener("pointerdown", studioResetNativeMarkdownScrollSuppression, true);
@@ -46,8 +47,9 @@ window.addEventListener("keydown", event => {
     studioResetNativeMarkdownScrollSuppression();
 }, true);
 `;
-const insertionAt=match.index+match[0].length;
-script=script.slice(0,insertionAt)+reset+script.slice(insertionAt);
+
+`;
+script=script.slice(0,scrollStart)+reset+script.slice(scrollStart);
 if(!script.includes(marker)||!script.includes('addEventListener("wheel"'))
   throw Error("Native Markdown user-scroll compatibility patch did not apply");
 await writeFile(scriptPath,script);
