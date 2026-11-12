@@ -158,7 +158,7 @@
     ],
     "markdown.markdownItPlugins": true,
     "markdown.previewStyles": [
-      "./media/markdown-preview.css"
+      "./media/native-markdown-preview.css"
     ],
     "menus": {
       "editor/title": [
