@@ -148,6 +148,17 @@ test("missing Owner Schema and fragment-only refs never produce guessed destinat
   assert.equal(fragment,null,"fragment target needs exact AST range support");
 });
 
+test("Contract direct Operation grants resolve only when the exact ToolCatalog Operation exists",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  const operation="sbi.udm.sm_data.get";
+  const hit=at(index,contract.uri,contract.text,operation);
+  const declaration=symbols.uniqueSkillSymbolDeclaration(hit);
+  assert.equal(declaration.relativePath,"lib/tools/udm.tool.yaml");
+  assert.ok(declaration.modifiers.includes("imported"));
+});
+
 test("Procedure Operation references resolve only to an exact imported ToolCatalog declaration",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
