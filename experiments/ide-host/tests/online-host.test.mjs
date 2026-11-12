@@ -4,6 +4,7 @@ import {readFileSync,statSync} from "node:fs";
 import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
+import {isAllowedPackageRelativeLink} from "../vscode/src/markdown-link-policy.mjs";
 import {buildClassicIconsCss,THEIA_CLASSIC_ICON_MAP} from "../scripts/classic-icons-css.mjs";
 import {buildSkillStudioBrandCss,buildSkillStudioBrandScript,prepareTheiaBrand}
   from "../scripts/prepare-theia-brand.mjs";
@@ -18,11 +19,18 @@ test("Theia online target is a real backend-free 1.76 browser-only app",()=>{
   assert.equal(app.theiaPluginsDir,"plugins");
   assert.ok(!app.dependencies["@theia/terminal"]);
   assert.equal(app.scripts.build,"theia build --mode production");
+  assert.equal(app.scripts["download:plugins"],"theia download:plugins");
+  assert.equal(app.theiaPlugins["vscode.markdown-language-features"],
+    "https://open-vsx.org/api/vscode/markdown-language-features/1.95.3/file/vscode.markdown-language-features-1.95.3.vsix");
+  assert.equal(app.theia.frontend.config.preferences["markdown.preview.scrollEditorWithPreview"],true);
+  assert.equal(app.theia.frontend.config.preferences["markdown.preview.scrollPreviewWithEditor"],true);
 });
 test("Theia plugin is the exact Web extension, with native editor + view contributions",()=>{
   const app=JSON.parse(readFileSync(join(root,"package.json"),"utf8"));
   const plugin=JSON.parse(readFileSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike/package.json"),"utf8"));
   assert.ok(plugin.browser?.endsWith("extension-theia.js"));
+  assert.equal(plugin.contributes["markdown.markdownItPlugins"],true);
+  assert.deepEqual(plugin.contributes["markdown.previewStyles"],["./media/markdown-preview.css"]);
   const editorViews=new Set(plugin.contributes.customEditors.map(x=>x.viewType));
   for(const view of ["skillStudio.procedurePreview","skillStudio.contractPreview",
     "skillStudio.predicatePreview","skillStudio.schemaPreview"])assert.ok(editorViews.has(view),view);
@@ -65,7 +73,7 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js","media/procedure.js","media/procedure.css",
     "samples/skills/files.json",
     "samples/skills/establish-pdu-session/assurance/procedure.yaml",
-    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml"])
+    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml","media/markdown-preview.css"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });
 test("Trial is isolated from existing Pages distribution",()=>{
@@ -164,4 +172,20 @@ test("SKILL Studio wordmark sits beside the native menu list and compacts on nar
   }finally{
     await rm(temp,{recursive:true,force:true});
   }
+});
+
+test("Native Markdown links are constrained to the exact inventoried Skill Package",()=>{
+  const allowed=new Set([
+    "SKILL.md","references/3gpp-procedure.md",
+    "assurance/procedure.yaml","scripts/select.py"
+  ]);
+  assert.equal(isAllowedPackageRelativeLink("../SKILL.md","references",allowed),true);
+  assert.equal(isAllowedPackageRelativeLink("../assurance/procedure.yaml","references",allowed),true);
+  assert.equal(isAllowedPackageRelativeLink("../../outside.md","references",allowed),false);
+  assert.equal(isAllowedPackageRelativeLink("missing.md","references",allowed),false);
+  assert.equal(isAllowedPackageRelativeLink("../../../outside.md","references",allowed),false);
+  assert.equal(isAllowedPackageRelativeLink("%2e%2e/%2e%2e/outside.md","references",allowed),false);
+  assert.equal(isAllowedPackageRelativeLink("//example.invalid/pixel.png","references",allowed),false);
+  assert.equal(isAllowedPackageRelativeLink("https://example.invalid/","references",allowed),true,
+    "external navigation is not fetched by the preview; raw images remain blocked");
 });
