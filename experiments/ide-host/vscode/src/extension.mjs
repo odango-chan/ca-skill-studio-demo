@@ -309,8 +309,11 @@ export function activate(context){
     const folders=currentWorkspaceUris();
     return folders.length>0&&folders.every(uri=>managedRoots.has(uri));
   };
-  const isEmptyWorkspace=()=>currentWorkspaceUris().length===0&&
-    !(vscode.workspace.name??null);
+  const isEmptyWorkspace=()=>{
+    const name=String(vscode.workspace.name??"").trim().toLowerCase();
+    const untitled=!name||name==="untitled"||name==="untitled (workspace)";
+    return currentWorkspaceUris().length===0&&untitled;
+  };
   console.log("STUDIO_DEFAULT_LOAD_GATE",JSON.stringify({
     onlineDemo,workspaceName,
     workspaceFolders:currentWorkspaceUris(),
