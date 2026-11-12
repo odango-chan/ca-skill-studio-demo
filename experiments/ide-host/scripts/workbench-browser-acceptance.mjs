@@ -470,7 +470,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       .some(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
     return {text:document.body.innerText,headers,trees:document.querySelectorAll('.theia-Tree').length,studioActivity};
   })()`);
-  for(const name of ['Packages','Procedure Outline','Evidence','Problems'])
+  for(const name of ['Packages','Procedure Outline','Problems'])
     if(!views.headers.some(x=>x.name.toLowerCase()===name.toLowerCase()))
       throw Error('Native Explorer view missing '+name+': '+JSON.stringify(views));
   if(views.studioActivity)
@@ -976,589 +976,92 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     hasDataFlow:true,containerRect:inspectorDataFlow.containerRect,
     visibleRows:inspectorDataFlow.rows.filter(x=>x.visible).length
   }));
-  // Evidence is now an Explorer-contributed view. Focus the native
-  // Explorer instead of selecting a retired Skill Studio Activity Bar tab.
-  await invoke('workbench.files.action.focusFilesExplorer');
-  await sleep(350);
-  // Resolve the Evidence part inside the exact native Explorer container.
-  // Avoid matching an unrelated tab/label when Theia has multiple split panels.
-  const readEvidenceHeader=()=>evalJS(`(()=>{
-    const container=[...document.querySelectorAll('.theia-view-container')]
-      .find(x=>x.id==='explorer-view-container');
-    const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-      .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-    if(!container||!header)return {found:false,containerFound:!!container,
-      headers:[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-        .map(x=>x.textContent.trim())};
-    header.scrollIntoView({block:'center',inline:'nearest'});
-    const r=header.getBoundingClientRect(),part=header.closest('.part');
-    const rootPresent=[...(part?.querySelectorAll('.theia-TreeNode')??[])].some(x=>
-      x.innerText.includes('Source evidence only')&&x.getBoundingClientRect().height>0);
-    // The last panel header can be partially covered by the status bar.
-    // Pick an on-screen, hit-tested point instead of assuming its centre is clickable.
-    const xs=[r.x+Math.min(12,r.width/4),r.x+r.width/2,r.right-Math.min(12,r.width/4)];
-    const ys=[r.y+Math.min(4,r.height/3),r.y+r.height/2,r.bottom-Math.min(4,r.height/3)];
-    const points=ys.flatMap(y=>xs.map(x=>({x,y})));
-    const point=points.find(({x,y})=>x>=0&&y>=0&&x<innerWidth&&y<innerHeight&&
-      ((hit)=>hit===header||header.contains(hit))(document.elementFromPoint(x,y)));
-    return {found:true,x:point?.x??null,y:point?.y??null,
-      hitWithinHeader:!!point,collapsed:part?.classList.contains('collapsed')??false,
-      rootPresent,partClass:part?.className??'',headerText:header.textContent.trim(),
-      containerId:container.id,rect:{x:r.x,y:r.y,width:r.width,height:r.height},
-      viewportHeight:innerHeight};
-  })()`);
-  let evidenceHeader=null;
-  for(let attempt=0;attempt<12;attempt++){
-    evidenceHeader=await readEvidenceHeader();
-    if(!evidenceHeader?.found)
-      throw Error('Native Evidence view header is missing from Explorer: '+
-        JSON.stringify(evidenceHeader));
-    if(!evidenceHeader.collapsed)break;
-    if(!evidenceHeader.hitWithinHeader)
-      throw Error('Native Evidence header is obscured and cannot be expanded by mouse: '+
-        JSON.stringify(evidenceHeader));
-    await click(evidenceHeader.x,evidenceHeader.y);
-    await sleep(200);
-  }
-  evidenceHeader=await readEvidenceHeader();
-  if(evidenceHeader?.collapsed)
-    throw Error('Native Evidence header stayed collapsed after trusted mouse clicks: '+
-      JSON.stringify(evidenceHeader));
+  // The duplicate Explorer Evidence view is retired. Verify the exact same
+  // Source-derived Producer / Consumer and ABI information inside the native
+  // right-side Inspector, without confusing it with Runtime Evidence.
   await invoke('skillStudio.auditPackage');
-  // auditPackage publishes the refreshed owner-file snapshot. Its source
-  // projection refreshes Evidence when that snapshot changes; wait for the
-  // Evidence root and dataflow row rather than scheduling another audit.
-  let evidenceTreeState=null;
+  let inspectorFlowState=null;
   for(let attempt=0;attempt<100;attempt++){
-    evidenceTreeState=await evalJS(`(()=>{
-      const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='explorer-view-container');
-      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-      const part=header?.closest('.part');
-      const rows=[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
+    inspectorFlowState=await evalJS(`(()=>{
+      const container=document.getElementById(
+        'plugin-view-container:workbench.view.extension.skillStudioInspector');
+      const rect=container?.getBoundingClientRect();
+      const rows=[...(container?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
         const content=[...node.children].find(child=>
           child.classList?.contains('theia-TreeNodeContent'));
-        return {node,content,text:content?.innerText?.trim()??''};
-      }).filter(row=>row.content?.getBoundingClientRect().height>0);
-      return {containerFound:!!container,headerFound:!!header,
-        partClass:part?.className??'',rootPresent:rows.some(row=>
-          row.text.includes('Source evidence only')),
-        labels:rows.map(row=>row.text).slice(-24),
-        partText:part?.innerText?.slice(-1800)??''};
+        const text=content?.innerText?.replace(/\\s+/g,' ').trim()??'';
+        const b=content?.getBoundingClientRect();
+        return {node,content,text,b,
+          visible:!!b&&b.width>0&&b.height>0};
+      });
+      const dataflow=rows.find(row=>row.text.includes('Data Flow · Producer / Consumer'));
+      const toggle=dataflow?.node?.querySelector('.theia-ExpansionToggle');
+      if(dataflow?.content)dataflow.content.scrollIntoView({block:'center',inline:'nearest'});
+      const t=toggle?.getBoundingClientRect();
+      const x=t?t.x+t.width/2:null,y=t?t.y+t.height/2:null;
+      const hit=x!==null&&y!==null?document.elementFromPoint(x,y):null;
+      return {
+        containerPresent:!!container,rightSide:!!rect&&rect.x>innerWidth/2,
+        hasDataflow:!!dataflow,hasToggle:!!toggle,
+        expanded:!!toggle&&!toggle.classList.contains('theia-mod-collapsed'),
+        toggleHit:!!toggle&&(hit===toggle||toggle.contains(hit)),
+        togglePoint:{x,y},
+        labels:rows.filter(row=>row.visible).map(row=>row.text).slice(-60),
+        containsAbi:rows.some(row=>row.visible&&row.text.includes('Consumer ABI')),
+        containsLineage:rows.some(row=>row.visible&&row.text.includes('Source lineage')),
+        sourceBoundary:container?.innerText?.includes('Runtime NOT_RUN')??false
+      };
     })()`);
-    if(evidenceTreeState?.rootPresent)break;
+    if(inspectorFlowState?.rightSide&&inspectorFlowState.hasDataflow)break;
     await sleep(100);
   }
-  if(!evidenceTreeState?.rootPresent)
-    throw Error('Native Evidence tree root did not appear after refresh: '+
-      JSON.stringify(evidenceTreeState));
-  // Re-select the Phase Binding Node after activating the native Evidence
-  // container; Theia may replace the active Webview context during the switch.
-  // Resolve the active Procedure Webview again after activating the native
-  // Evidence container. The earlier graphContext can belong to a disposed or
-  // background CustomEditor when Theia has multiple procedure.yaml tabs.
-  const evidenceNodeTarget=await evalWebviewJS(
-    `(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Evidence binding Node is not in the active Procedure graph');const r=node.getBoundingClientRect(),frame=window.frameElement?.getBoundingClientRect();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value,nodeRect:{x:r.x,y:r.y,width:r.width,height:r.height},frameRect:frame?{x:frame.x,y:frame.y,width:frame.width,height:frame.height}:null,point:frame?{x:frame.x+r.x+r.width/2,y:frame.y+r.y+r.height/2}:null};})()`
-  );
-  if(!evidenceNodeTarget?.node||!evidenceNodeTarget.point)
-    throw Error('Could not resolve the active 5GC Phase Binding node hit target: '+
-      JSON.stringify(evidenceNodeTarget));
-  // Use a real trusted Chromium click in the visible editor instead of
-  // HTMLElement.click(), so React Flow and the host selection bridge receive
-  // the same pointer/click sequence as a user action.
-  await command('Input.dispatchMouseEvent',{type:'mouseMoved',
-    x:evidenceNodeTarget.point.x,y:evidenceNodeTarget.point.y});
-  await command('Input.dispatchMouseEvent',{type:'mousePressed',
-    x:evidenceNodeTarget.point.x,y:evidenceNodeTarget.point.y,
-    button:'left',buttons:1,clickCount:1});
-  await command('Input.dispatchMouseEvent',{type:'mouseReleased',
-    x:evidenceNodeTarget.point.x,y:evidenceNodeTarget.point.y,
-    button:'left',buttons:0,clickCount:1});
-  console.log('STUDIO_EVIDENCE_NODE_TRUSTED_CLICK',JSON.stringify(evidenceNodeTarget));
-  await sleep(350);
+  if(!inspectorFlowState?.rightSide||!inspectorFlowState.hasDataflow||
+     !inspectorFlowState.hasToggle)
+    throw Error('Native right-side Inspector Data Flow root unavailable after scoped Audit: '+
+      JSON.stringify(inspectorFlowState));
+  if(!inspectorFlowState.expanded){
+    if(!inspectorFlowState.toggleHit)
+      throw Error('Native Inspector Data Flow expansion arrow is obscured: '+
+        JSON.stringify(inspectorFlowState));
+    await click(inspectorFlowState.togglePoint.x,inspectorFlowState.togglePoint.y);
+  }
   let phaseEvidenceText='';
-  for(let i=0;i<100;i++){
-    phaseEvidenceText=await evalJS('document.body.innerText');
-    if(phaseEvidenceText.includes('Producer / Consumer dataflow'))break;
-    await sleep(100);
-  }
-  // The native TreeDataProvider can publish its rows after the visible
-  // summary text. Await the actual row inside the Evidence part, not another
-  // TreeView that happens to contain similarly named items.
-  let dataflowTreeRow=null,evidenceRows=null;
-  for(let attempt=0;attempt<100&&!dataflowTreeRow;attempt++){
-    evidenceRows=await evalJS(`(()=>{
-      const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='explorer-view-container');
-      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-      const part=header?.closest('.part');
-      const rows=[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
-        const content=[...node.children].find(child=>
-          child.classList?.contains('theia-TreeNodeContent'));
-        return {node,content,text:content?.innerText?.trim()??''};
-      }).filter(row=>row.text.includes('Producer / Consumer dataflow')&&
-        row.content?.getBoundingClientRect().height>0);
-      const row=rows[0];
-      if(!row?.content)return {found:false,candidateCount:rows.length,
-        labels:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
-          const child=[...node.children].find(x=>x.classList?.contains('theia-TreeNodeContent'));
-          return child?.innerText?.trim()??'';
-        }).slice(-24),partClass:part?.className??''};
-      row.content.scrollIntoView({block:'center',inline:'nearest'});
-      const r=row.content.getBoundingClientRect();
-      if(!r.width||!r.height)return {found:false,candidateCount:rows.length,
-        rowText:row.text,partClass:part?.className??''};
-      const toggle=row.node.querySelector('.theia-ExpansionToggle');
-      const tr=toggle?.getBoundingClientRect();
-      const x=tr?tr.x+tr.width/2:r.x+12;
-      const y=tr?tr.y+tr.height/2:r.y+r.height/2;
-      const hit=document.elementFromPoint(x,y);
-      const describe=element=>{
-        if(!element)return null;
-        const style=getComputedStyle(element),box=element.getBoundingClientRect();
-        return {tag:element.tagName,id:element.id,className:typeof element.className==='string'?element.className:'',
-          nodeId:element.getAttribute('data-node-id'),text:element.textContent?.trim().slice(0,100)??'',
-          pointerEvents:style.pointerEvents,visibility:style.visibility,display:style.display,
-          zIndex:style.zIndex,rect:{x:box.x,y:box.y,width:box.width,height:box.height}};
-      };
-      return r?{found:true,x,y,
-        toggleFound:!!toggle,toggleClass:toggle?.className??null,
-        toggleRect:tr?{x:tr.x,y:tr.y,width:tr.width,height:tr.height}:null,
-        hit:describe(hit),hitIsToggle:hit===toggle,hitWithinToggle:!!toggle&&toggle.contains(hit),
-        hitStack:document.elementsFromPoint(x,y).slice(0,6).map(describe),
-        expanded:!!toggle&&!toggle.classList.contains('theia-mod-collapsed'),
-        rowHeight:r.height,rowText:row.text,viewportHeight:innerHeight,
-        candidateCount:rows.length}:{
-          found:false,candidateCount:rows.length,
-          labels:[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(node=>{
-            const child=[...node.children].find(x=>x.classList?.contains('theia-TreeNodeContent'));
-            return child?.innerText?.trim()??'';
-          }).slice(-24),
-          partClass:part?.className??''
-        };
+  for(let attempt=0;attempt<100;attempt++){
+    const detail=await evalJS(`(()=>{
+      const container=document.getElementById(
+        'plugin-view-container:workbench.view.extension.skillStudioInspector');
+      const text=container?.innerText??'';
+      const visible=[...(container?.querySelectorAll('.theia-TreeNode')??[])].filter(node=>{
+        const r=node.getBoundingClientRect();return r.width>0&&r.height>0;
+      }).map(node=>node.innerText.replace(/\\s+/g,' ').trim());
+      return {text,visible};
     })()`);
-    if(evidenceRows?.found)dataflowTreeRow=evidenceRows;
-    else {
-      // The Evidence root can be expanded while its Phase group remains
-      // collapsed. Expand that actual parent row before waiting for the
-      // nested Producer / Consumer dataflow item; do not mistake hidden
-      // descendants for a provider-refresh race.
-      const phaseGroup=await evalJS(`(()=>{
-        const container=[...document.querySelectorAll('.theia-view-container')]
-          .find(x=>x.id==='explorer-view-container');
-        const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-          .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-        const part=header?.closest('.part');
-        const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
-          const content=[...node.children].find(child=>
-            child.classList?.contains('theia-TreeNodeContent'));
-          return content?.innerText?.replace(/\\s+/g,' ').trim()
-            .includes('await-initial-resources · postconditions');
-        });
-        const toggle=row?.querySelector('.theia-ExpansionToggle');
-        const r=toggle?.getBoundingClientRect();
-        return toggle&&r?.width&&r?.height&&
-          toggle.classList.contains('theia-mod-collapsed')
-          ?{x:r.x+r.width/2,y:r.y+r.height/2,label:row.innerText.trim()}
-          :null;
-      })()`);
-      if(phaseGroup){
-        await click(phaseGroup.x,phaseGroup.y);
-        await sleep(120);
-      }else await sleep(100);
-    }
-  }
-  if(!dataflowTreeRow)throw Error('Native Evidence dataflow row is missing after scoped readiness wait: '+
-    JSON.stringify({evidenceHeader,evidenceTreeState,evidenceRows,
-      bodyTail:(await evalJS('document.body.innerText')).slice(-1600)}));
-  if(!dataflowTreeRow.toggleFound)
-    throw Error('Native Evidence dataflow row has no Theia expansion toggle: '+
-      JSON.stringify(dataflowTreeRow));
-  let evidenceModelSetup=null,liveToggle=null,toggleInstrumentation=null;
-  if(!dataflowTreeRow.expanded){
-    if(!dataflowTreeRow.hitWithinToggle)
-      throw Error('Native Evidence toggle is obscured at its click point: '+JSON.stringify(dataflowTreeRow));
-    evidenceModelSetup=await evalJS(`(()=>{
-      const c=window.theia?.container;
-      const serviceKeys=[...(c?._bindingDictionary?._map?.keys()??[])];
-      const managerKey=serviceKeys.find(key=>typeof key==='function'&&
-        typeof key.prototype?.getWidgets==='function'&&
-        typeof key.prototype?.getOrCreateWidget==='function');
-      if(!managerKey)return {found:false,reason:'WidgetManager unavailable'};
-      const manager=c.get(managerKey);
-      const widget=manager.getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence');
-      if(!widget)return {found:false,reason:'Evidence widget unavailable'};
-      const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='explorer-view-container');
-      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-      const part=header?.closest('.part');
-      const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(item=>{
-        const caption=[...item.children].find(child=>
-          child.classList?.contains('theia-TreeNodeContent'));
-        return caption?.innerText?.includes('Producer / Consumer dataflow');
-      });
-      const toggle=row?.querySelector('.theia-ExpansionToggle');
-      const node=widget.model?.getNode(toggle?.getAttribute('data-node-id'));
-      const model=widget.model,tree=model?.tree;
-      const trace=window.__skillStudioEvidenceModelTrace={
-        toggleCalls:[],refreshCalls:[],fetchCalls:[],expansionEvents:[]
-      };
-      if(model&&typeof model.toggleNodeExpansion==='function'){
-        const original=model.toggleNodeExpansion.bind(model);
-        model.toggleNodeExpansion=async function(target){
-          const record={id:target?.id??null,before:target?.expanded??null,
-            sameNode:target===node,expandOnly:widget.props?.expandOnlyOnExpansionToggleClick};
-          trace.toggleCalls.push(record);
-          try{await original(target);record.after=target?.expanded??null;record.childCount=target?.children?.length??null;}
-          catch(error){record.error=String(error?.message??error);throw error;}
-        };
-      }
-      if(tree&&typeof tree.refresh==='function'){
-        const original=tree.refresh.bind(tree);
-        tree.refresh=async function(parent,...args){
-          const record={id:parent?.id??null,before:parent?.expanded??null,childCount:parent?.children?.length??null};
-          trace.refreshCalls.push({...record,stage:'start'});
-          try{const result=await original(parent,...args);trace.refreshCalls.push({...record,stage:'end',result:!!result,after:parent?.expanded??null,afterChildren:parent?.children?.length??null});return result;}
-          catch(error){trace.refreshCalls.push({...record,stage:'error',error:String(error?.message??error)});throw error;}
-        };
-      }
-      if(tree&&typeof tree.fetchChildren==='function'){
-        const original=tree.fetchChildren.bind(tree);
-        tree.fetchChildren=async function(proxy,parent,...args){
-          const record={id:parent?.id??null,hasProxy:!!proxy};
-          trace.fetchCalls.push({...record,stage:'start'});
-          try{const children=await original(proxy,parent,...args);trace.fetchCalls.push({...record,stage:'end',count:children?.length??null,labels:(children??[]).map(item=>item.label??item.name??'').slice(0,8)});return children;}
-          catch(error){trace.fetchCalls.push({...record,stage:'error',error:String(error?.message??error)});throw error;}
-        };
-      }
-      model?.onExpansionChanged?.(target=>trace.expansionEvents.push({id:target?.id??null,expanded:target?.expanded??null,childCount:target?.children?.length??null}));
-      return {found:true,widgetId:widget.id,expandOnlyOnExpansionToggleClick:widget.props?.expandOnlyOnExpansionToggleClick??null,
-        hasProxy:!!tree?.proxy,nodeFound:!!node,nodeExpandable:!!node&&'children'in node&&'expanded'in node,
-        nodeId:node?.id??null,nodeExpanded:node?.expanded??null,nodeChildren:node?.children?.length??null};
-    })()`);
-    console.log('STUDIO_EVIDENCE_MODEL_SETUP',JSON.stringify(evidenceModelSetup));
-    if(!evidenceModelSetup?.nodeFound)throw Error('Native Evidence TreeView row could not be resolved to its live model node: '+JSON.stringify(evidenceModelSetup));
-    await evalJS(`(()=>{
-      window.__skillStudioEvidenceClickEvents=[];
-      window.__skillStudioEvidenceBubbleEvents=[];
-      window.__skillStudioEvidenceMouseEvents=[];
-      const record=event=>{
-        const toggle=event.target?.closest?.('.theia-ExpansionToggle');
-        if(!toggle)return null;
-        return {
-          trusted:event.isTrusted,button:event.button,x:event.clientX,y:event.clientY,
-          nodeId:toggle.getAttribute('data-node-id'),className:toggle.className,
-          defaultPrevented:event.defaultPrevented,
-          path:[...event.composedPath()].slice(0,10).map(item=>({
-            tag:item?.tagName??'',id:item?.id??'',
-            className:typeof item?.className==='string'?item.className:''
-          }))
-        };
-      };
-      document.addEventListener('click',event=>{
-        const detail=record(event);
-        if(detail)window.__skillStudioEvidenceClickEvents.push(detail);
-      },true);
-      document.addEventListener('click',event=>{
-        const detail=record(event);
-        if(detail)window.__skillStudioEvidenceBubbleEvents.push(detail);
-      },false);
-      for(const type of ['pointerdown','pointerup','mousedown','mouseup']){
-        document.addEventListener(type,event=>{
-          const detail=record(event);
-          if(detail)window.__skillStudioEvidenceMouseEvents.push({...detail,type});
-        },true);
-      }
-    })()`);
-    // Resolve the live target after any layout/scroll work. Do not hover a
-    // stale coordinate: the mousemove itself can trigger Theia SplitPanel
-    // reflow and move the virtualized Evidence row underneath the pointer.
-    let stableHit=0,lastPos=null;
-    // Mouse hover and native SplitPanel resize may move the Evidence part
-    // after the first successful hit-test. Only press once the live toggle
-    // remains visible and hit-testable in consecutive browser frames.
-    for(let attempt=0;attempt<24;attempt++){
-      liveToggle=await evalJS(`(()=>{
-        const container=[...document.querySelectorAll('.theia-view-container')]
-          .find(x=>x.id==='explorer-view-container');
-        const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-          .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-        const part=header?.closest('.part');
-        const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
-          const caption=[...node.children].find(child=>
-            child.classList?.contains('theia-TreeNodeContent'));
-          return caption?.innerText?.includes('Producer / Consumer dataflow');
-        });
-        const toggle=row?.querySelector('.theia-ExpansionToggle');
-        if(!toggle)return null;
-        const before=toggle.getBoundingClientRect();
-        const firstHit=document.elementFromPoint(
-          before.x+before.width/2,before.y+before.height/2);
-        if(firstHit!==toggle&&!toggle.contains(firstHit))
-          toggle.scrollIntoView({block:'center',inline:'nearest'});
-        const rect=toggle.getBoundingClientRect();
-        const x=rect.x+rect.width/2,y=rect.y+rect.height/2;
-        const hit=document.elementFromPoint(x,y);
-        return {x,y,expanded:!toggle.classList.contains('theia-mod-collapsed'),
-          hitWithinToggle:hit===toggle||toggle.contains(hit),
-          hitTag:hit?.tagName??null,hitClass:typeof hit?.className==='string'?hit.className:'',
-          viewport:{width:innerWidth,height:innerHeight}};
-      })()`);
-      if(liveToggle?.hitWithinToggle&&
-        lastPos&&Math.abs(liveToggle.x-lastPos.x)<1&&
-        Math.abs(liveToggle.y-lastPos.y)<1)stableHit++;
-      else stableHit=0;
-      if(liveToggle?.hitWithinToggle&&stableHit>=1)break;
-      lastPos=liveToggle?.hitWithinToggle?{x:liveToggle.x,y:liveToggle.y}:null;
-      // Keep the pointer untouched until the final press/release. This
-      // avoids a hover-induced resize between hit-test and click.
-      await sleep(120);
-    }
-    if(!liveToggle?.hitWithinToggle||stableHit<1)
-      throw Error('Native Evidence expansion toggle remained obstructed after scroll/hover stabilization: '+
-        JSON.stringify({dataflowTreeRow,liveToggle,stableHit}));
-    toggleInstrumentation=await evalJS(`(()=>{
-      const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='explorer-view-container');
-      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-      const part=header?.closest('.part');
-      const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
-        const caption=[...node.children].find(child=>
-          child.classList?.contains('theia-TreeNodeContent'));
-        return caption?.innerText?.includes('Producer / Consumer dataflow');
-      });
-      const toggle=row?.querySelector('.theia-ExpansionToggle');
-      const c=window.theia?.container,keys=[...(c?._bindingDictionary?._map?.keys()??[])];
-      const managerKey=keys.find(key=>typeof key==='function'&&
-        typeof key.prototype?.getWidgets==='function'&&
-        typeof key.prototype?.getOrCreateWidget==='function');
-      const manager=managerKey?c.get(managerKey):null;
-      const widget=manager?.getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence');
-      const model=widget?.model,id=toggle?.getAttribute('data-node-id');
-      const originalGet=model?.getNode?.bind(model);
-      const originalToggle=model?.toggleNodeExpansion?.bind(model);
-      window.__skillStudioEvidenceModelCalls=[];
-      if(model&&originalGet)model.getNode=function(nodeId){
-        const value=originalGet(nodeId);
-        if(nodeId===id)window.__skillStudioEvidenceModelCalls.push({
-          method:'getNode',found:!!value,expanded:value?.expanded,
-          childCount:value?.children?.length??null
-        });
-        return value;
-      };
-      if(model&&originalToggle)model.toggleNodeExpansion=function(node){
-        const record={method:'toggleNodeExpansion',nodeId:node?.id??null,
-          expandedBefore:node?.expanded??null,childCountBefore:node?.children?.length??null};
-        window.__skillStudioEvidenceModelCalls.push(record);
-        let result;
-        try{result=originalToggle(node);}
-        catch(error){record.error=String(error?.message??error);throw error;}
-        return Promise.resolve(result).then(value=>{
-          record.resolved=true;record.value=value;
-          const latest=originalGet(node?.id);
-          record.expandedAfter=latest?.expanded??null;
-          record.childCountAfter=latest?.children?.length??null;
-          return value;
-        },error=>{
-          record.rejected=String(error?.message??error);throw error;
-        });
-      };
-      return {widgetFound:!!widget,widgetType:widget?.constructor?.name??null,
-        props:{expandOnlyOnExpansionToggleClick:widget?.props?.expandOnlyOnExpansionToggleClick,
-          multiSelect:widget?.props?.multiSelect},
-        nodeFound:!!originalGet?.(id),nodeId:id,
-        node:{expanded:originalGet?.(id)?.expanded,
-          childCount:originalGet?.(id)?.children?.length??null,
-          hasExpanded:'expanded' in (originalGet?.(id)??{})},
-        methods:{getNode:typeof model?.getNode,toggleNodeExpansion:typeof model?.toggleNodeExpansion,
-          isExpandable:typeof widget?.isExpandable},
-        isExpandable:typeof widget?.isExpandable==='function'
-          ?widget.isExpandable(originalGet?.(id)):null};
-    })()`);
-    if(!toggleInstrumentation.widgetFound||!toggleInstrumentation.nodeFound)
-      throw Error('Evidence TreeWidget instrumentation could not resolve the live model: '+
-        JSON.stringify(toggleInstrumentation));
-    if(!liveToggle.expanded){
-      // CDP requires the pressed-button bitmask as well as the button name;
-      // without it Chromium emits no trusted click event for this native row.
-      await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:liveToggle.x,y:liveToggle.y,
-        button:'left',buttons:0,clickCount:1,pointerType:'mouse'});
-      await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:liveToggle.x,y:liveToggle.y,
-        button:'none',buttons:0,pointerType:'mouse'});
-      await sleep(100);
-      const postHoverToggle=await evalJS(`(()=>{
-        const container=[...document.querySelectorAll('.theia-view-container')]
-          .find(x=>x.id==='explorer-view-container');
-        const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-          .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-        const part=header?.closest('.part');
-        const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(node=>{
-          const caption=[...node.children].find(child=>
-            child.classList?.contains('theia-TreeNodeContent'));
-          return caption?.innerText?.includes('Producer / Consumer dataflow');
-        });
-        const toggle=row?.querySelector('.theia-ExpansionToggle');
-        const rect=toggle?.getBoundingClientRect();
-        const x=rect?rect.x+rect.width/2:0,y=rect?rect.y+rect.height/2:0;
-        const hit=rect?document.elementFromPoint(x,y):null;
-        const ancestors=[];
-        for(let element=toggle;element;element=element.parentElement){
-          const style=getComputedStyle(element),box=element.getBoundingClientRect();
-          if(element.scrollHeight>element.clientHeight+1||
-             /auto|scroll|overlay/.test(style.overflowY))
-            ancestors.push({tag:element.tagName,id:element.id,
-              className:typeof element.className==='string'?element.className:'',
-              top:box.top,bottom:box.bottom,height:box.height,
-              scrollTop:element.scrollTop,scrollHeight:element.scrollHeight,
-              clientHeight:element.clientHeight,overflowY:style.overflowY});
-        }
-        return {x,y,expanded:!toggle?.classList.contains('theia-mod-collapsed'),
-          hitWithinToggle:!!toggle&&(hit===toggle||toggle.contains(hit)),
-          hitTag:hit?.tagName??null,hitClass:typeof hit?.className==='string'?hit.className:'',
-          ancestors};
-      })()`);
-      if(!postHoverToggle?.hitWithinToggle)
-        throw Error('Evidence toggle moved out of hit target after hover: '+
-          JSON.stringify({liveToggle,postHoverToggle}));
-      liveToggle=postHoverToggle;
-      await command('Input.dispatchMouseEvent',{type:'mousePressed',x:liveToggle.x,y:liveToggle.y,
-        button:'left',buttons:1,clickCount:1,pointerType:'mouse'});
-      await sleep(60);
-      await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:liveToggle.x,y:liveToggle.y,
-        button:'left',buttons:0,clickCount:1,pointerType:'mouse'});
-    }
-  }
-  let dataflowExpansion=null;
-  for(let attempt=0;attempt<50;attempt++){
-    dataflowExpansion=await evalJS(`(()=>{
-      const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='explorer-view-container');
-      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-      const part=header?.closest('.part');
-      const node=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(item=>{
-        const caption=[...item.children].find(child=>
-          child.classList?.contains('theia-TreeNodeContent'));
-        return caption?.innerText?.includes('Producer / Consumer dataflow');
-      });
-      const toggle=node?.querySelector('.theia-ExpansionToggle');
-      const labels=[...(part?.querySelectorAll('.theia-TreeNode')??[])].map(item=>{
-        const caption=[...item.children].find(child=>
-          child.classList?.contains('theia-TreeNodeContent'));
-        return caption?.innerText?.trim()??'';
-      }).filter(Boolean);
-      const c=window.theia?.container;
-      let serviceKeys=[],matchingServiceKeys=[],manager=null,managerError=null;
-      let registry=null,registryError=null,treeWidgets=[],treeWidgetsError=null;
-      let evidenceWidget=null,modelNode=null,modelError=null,reactPropsKey=null,reactProps=null;
-      try{serviceKeys=[...(c?._bindingDictionary?._map?.keys()??[])];}
-      catch(error){managerError='service keys: '+String(error?.message??error);}
-      try{
-        matchingServiceKeys=serviceKeys.filter(key=>
-          /WidgetManager|PluginViewRegistry/.test((key?.name??'')+' '+String(key))
-        ).map(key=>({name:key?.name??'',text:String(key).slice(0,180)}));
-      }catch(error){managerError='service key match: '+String(error?.message??error);}
-      try{
-        // The production bundle minifies DI class names, so locate the real
-        // WidgetManager by its public method rather than constructor.name.
-        const managerKey=serviceKeys.find(key=>
-          typeof key==='function'&&typeof key.prototype?.getWidgets==='function'&&
-          typeof key.prototype?.getOrCreateWidget==='function');
-        if(managerKey){
-          manager=c.get(managerKey);
-          matchingServiceKeys.push({name:managerKey.name??'',text:'WidgetManager#getWidgets'});
-        }
-      }catch(error){managerError=String(error?.message??error);}
-      try{
-        const registryKey=serviceKeys.find(key=>
-          typeof key==='function'&&typeof key.prototype?.getView==='function');
-        if(registryKey){
-          registry=c.get(registryKey);
-          matchingServiceKeys.push({name:registryKey.name??'',text:'PluginViewRegistry#getView'});
-        }
-      }catch(error){registryError=String(error?.message??error);}
-      try{manager=manager??registry?.widgetManager??null;}
-      catch(error){registryError='widgetManager: '+String(error?.message??error);}
-      try{
-        if(manager&&typeof manager.getWidgets==='function')
-          treeWidgets=manager.getWidgets('plugin-view-data')??[];
-        else treeWidgetsError='WidgetManager/getWidgets unavailable';
-      }catch(error){treeWidgetsError=String(error?.message??error);}
-      try{evidenceWidget=treeWidgets.find(widget=>widget.id==='skillStudio.evidence')??null;}
-      catch(error){treeWidgetsError='find Evidence widget: '+String(error?.message??error);}
-      try{modelNode=evidenceWidget?.model?.getNode(toggle?.getAttribute('data-node-id'))??null;}
-      catch(error){modelError=String(error?.message??error);}
-      try{
-        reactPropsKey=toggle&&Object.keys(toggle).find(key=>key.startsWith('__reactProps$'));
-        reactProps=reactPropsKey?toggle[reactPropsKey]:null;
-      }catch(error){modelError='React props: '+String(error?.message??error);}
-      return {found:!!node,toggleFound:!!toggle,
-        toggleClass:toggle?.className??null,
-        expanded:!!toggle&&!toggle.classList.contains('theia-mod-collapsed'),
-        consumerAbi:labels.some(label=>label.includes('Consumer ABI')),
-        clickEvents:window.__skillStudioEvidenceClickEvents??[],
-        bubbleEvents:window.__skillStudioEvidenceBubbleEvents??[],
-        mouseEvents:window.__skillStudioEvidenceMouseEvents??[],
-        modelCalls:window.__skillStudioEvidenceModelCalls??[],
-        treeWidgets:treeWidgets.map(widget=>({id:widget.id,type:widget.constructor?.name,
-          disposed:widget.isDisposed,visible:widget.isVisible,attached:widget.isAttached})),
-        evidenceWidgetFound:!!evidenceWidget,modelType:evidenceWidget?.model?.constructor?.name??null,
-        managerError,registryError,treeWidgetsError,matchingServiceKeys,
-        modelNode:modelNode?{id:modelNode.id,name:modelNode.name,expanded:modelNode.expanded,
-          childCount:modelNode.children?.length,parentId:modelNode.parent?.id??null,
-          type:modelNode.constructor?.name??null}:null,
-        reactPropsKey:reactPropsKey??null,reactOnClick:typeof reactProps?.onClick,
-        labels:labels.slice(-16)};
-    })()`);
-    phaseEvidenceText=await evalJS('document.body.innerText');
-    if(dataflowExpansion?.expanded&&
-       (dataflowExpansion.consumerAbi||phaseEvidenceText.includes('Consumer ABI')))break;
-    await sleep(100);
-  }
-  if(!dataflowExpansion?.expanded){
-    const directExpansionDiagnostic=await evalJS(`(async()=>{
-      const c=window.theia?.container,keys=[...(c?._bindingDictionary?._map?.keys()??[])];
-      const key=keys.find(item=>typeof item==='function'&&typeof item.prototype?.getWidgets==='function'&&typeof item.prototype?.getOrCreateWidget==='function');
-      const widget=key?c.get(key).getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence'):null;
-      const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='explorer-view-container');
-      const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
-        .find(x=>x.textContent.trim().toLowerCase()==='evidence');
-      const part=header?.closest('.part');
-      const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(item=>{
-        const caption=[...item.children].find(child=>
-          child.classList?.contains('theia-TreeNodeContent'));
-        return caption?.innerText?.includes('Producer / Consumer dataflow');
-      });
-      const id=row?.querySelector('.theia-ExpansionToggle')?.getAttribute('data-node-id');
-      const node=widget?.model?.getNode(id),before={found:!!node,expanded:node?.expanded??null,children:node?.children?.length??null,proxy:!!widget?.model?.tree?.proxy};
-      try{if(node)await widget.model.expandNode(node);return {before,after:{expanded:node?.expanded??null,children:node?.children?.length??null}};}
-      catch(error){return {before,error:String(error?.message??error),after:{expanded:node?.expanded??null,children:node?.children?.length??null}};}
-    })()`);
-    const modelTrace=await evalJS('window.__skillStudioEvidenceModelTrace??null');
-    throw Error('Native Evidence dataflow arrow did not expand: '+
-      JSON.stringify({dataflowTreeRow,liveToggle,toggleInstrumentation,dataflowExpansion,evidenceModelSetup,modelTrace,directExpansionDiagnostic}));
-  }
-  for(let i=0;i<50;i++){
-    phaseEvidenceText=await evalJS('document.body.innerText');
-    if(phaseEvidenceText.includes('Consumer ABI'))break;
+    phaseEvidenceText=detail.text;
+    if(detail.visible.some(x=>x.includes('Source lineage'))&&
+       detail.visible.some(x=>x.includes('Consumer ABI')))break;
     await sleep(100);
   }
   const phaseEvidence={
-    ready:phaseEvidenceText.includes('Producer / Consumer dataflow')&&
-      phaseEvidenceText.includes('Consumer ABI'),
-    dataflowRows:(phaseEvidenceText.match(/Producer \/ Consumer dataflow/g)||[]).length,
+    ready:phaseEvidenceText.includes('Data Flow · Producer / Consumer')&&
+      phaseEvidenceText.includes('Consumer ABI')&&
+      phaseEvidenceText.includes('Source lineage'),
+    dataflowRows:(phaseEvidenceText.match(/Data Flow · Producer \\/ Consumer/g)||[]).length,
     consumerAbiRows:(phaseEvidenceText.match(/Consumer ABI/g)||[]).length,
-    readOnly:phaseEvidenceText.includes('no write authority')
+    readOnly:phaseEvidenceText.includes('no write authority')&&
+      phaseEvidenceText.includes('Runtime NOT_RUN')
   };
-  if(!phaseEvidence.ready||!phaseEvidence.dataflowRows||!phaseEvidence.consumerAbiRows||
-     !phaseEvidence.readOnly)
-    throw Error('Native Evidence view did not render bounded read-only Producer / Consumer evidence: '+
-      JSON.stringify({phaseEvidence,dataflowTreeRow})+' · '+phaseEvidenceText.slice(-1400));
+  if(!phaseEvidence.ready||!phaseEvidence.readOnly)
+    throw Error('Inspector Data Flow lost read-only Producer / Consumer / ABI parity: '+
+      JSON.stringify({phaseEvidence,inspectorFlowState})+' · '+
+      phaseEvidenceText.slice(-1500));
+  const oldEvidenceHeader=await evalJS(`[...document.querySelectorAll(
+    '#explorer-view-container .theia-view-container-part-header')]
+    .some(header=>header.textContent.trim().toLowerCase()==='evidence')`);
+  if(oldEvidenceHeader)
+    throw Error('Retired standalone Evidence view still appears in Explorer');
+  console.log('STUDIO_INSPECTOR_DATA_FLOW_PARITY_CHROMIUM',JSON.stringify({
+    ...phaseEvidence,rightSide:true,retiredEvidenceAbsent:true
+  }));
   // A prior TextDocument edit may have scheduled a debounced Package Audit.
   // Do not start another native edit while that audit still owns the current
   // snapshot; wait for the exact Package Audit terminal state first.
@@ -1576,9 +1079,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   console.log('STUDIO_PHASE_DATAFLOW_EVIDENCE_CHROMIUM',JSON.stringify({
     ...phaseEvidence,auditReady:true
   }));
-  // Expanding the native Evidence tree moves focus away from the editor. Open
-  // the authoritative Source editor before testing native Undo so the host's
-  // undo command is bound to the edited TextDocument, not the tree widget.
+  // After native Inspector Data Flow expansion, reopen the authoritative
+  // Source editor before testing bounded edits and native Undo.
   await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,awaitPromise:true,
     expression:`document.querySelector('#openSource')?.click();true`
