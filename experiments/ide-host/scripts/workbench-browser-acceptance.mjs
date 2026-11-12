@@ -212,12 +212,15 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       const part=header?.closest('.part');
       const nodes=[...(part?.querySelectorAll('.theia-TreeNode')??[])];
       const normalize=value=>value.replace(/\\s+/g,' ').trim();
-      const el=nodes.find(node=>normalize(node.innerText)===${JSON.stringify(row.text)});
-      if(!el)return {found:false,rows:nodes.map(node=>normalize(node.innerText)).slice(-12)};
+      const indexed=Number.isSafeInteger(${JSON.stringify(0)})?nodes[${JSON.stringify(row.index)}]:null;
+      const el=indexed&&normalize(indexed.innerText)===${JSON.stringify(row.text)}
+        ?indexed:nodes.find(node=>normalize(node.innerText)===${JSON.stringify(row.text)});
+      if(!el)return {found:false,index:${JSON.stringify(row.index)},
+        rows:nodes.map(node=>normalize(node.innerText)).slice(-12)};
       el.scrollIntoView({block:'center',inline:'nearest'});
       const content=el.querySelector('.theia-TreeNodeContent')??el;
       const r=content.getBoundingClientRect();
-      const fractions=[.2,.35,.5,.65,.8];
+      const fractions=[.4,.55,.7,.85];
       const points=fractions.map(f=>({x:Math.round(r.x+r.width*f),y:Math.round(r.y+r.height/2)}));
       const point=points.find(({x,y})=>{
         if(x<0||y<0||x>=innerWidth||y>=innerHeight)return false;
