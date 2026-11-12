@@ -8,7 +8,8 @@
 - `language/contracts/source/` is a read-only pinned copy of those contracts. Refresh it only from an explicitly selected ca-skills commit.
 - The semantic-token registry defines source-position selectors and token identities. It is **not** a grammar, schema validator, linker contract or proof that a reference resolves.
 - Compiler Build remains authoritative for parsing, linking, bindings and generated Script Output Schemas. Studio LSP provides responsive editor guidance; it must not invent missing Owner Schemas, Tool Operations or deployment Capability identities.
-- The LSP Worker is read-only and receives bounded Package snapshots from the Theia extension host. It does not own workspace IO, write Source, execute Python, access Runtime or run 5GC operations.
+- The LSP Worker is read-only and receives bounded Package snapshots from the Theia extension host. When the Package is under a recognized Skill Compiler project root, the snapshot also carries the project-level `lib/` directory as logical `lib/...` documents. This is a read-only inventory projection, not dependency acquisition or resolution.
+- The Package and project-library inventories have separate completeness. An incomplete `lib/` inventory does not invalidate Package-local navigation, but it suppresses claims that an absent Owner Schema is missing. The Worker does not infer project roots or library paths when the workspace does not expose the exact `skills/`, `lib/`, `output/` layout.
 - Cross-file results require the same complete Package generation. Incomplete, stale or mismatched snapshots produce no guessed navigation, completion or link diagnostics.
 
 ## Implemented navigation
@@ -43,11 +44,12 @@ The legacy `# inputSchema` / `# outputSchema` completion remains isolated to leg
 
 For a syntactically valid complete Package and the exact current generation, the LSP projects source-token diagnostics for:
 
-- unresolved Procedure, node, Predicate, Operation and Schema references;
-- ambiguous references with multiple exact declarations;
+- unresolved Package-local Procedure, node, Predicate and Schema references;
+- unresolved `lib/**` Owner Schema references only when the project library inventory is complete;
+- ambiguous references with multiple exact declarations, including Operations when multiple imported ToolCatalog declarations collide;
 - duplicate declarations for a shared symbol identity.
 
-Unknown `allowedResources.capabilities[]` values are **not** diagnosed as missing when they do not match an imported Operation: they may be deployment-owned Capability IDs. A matching direct Operation is linked only by exact identity.
+Missing `call:` Operation IDs are **not** diagnosed as unresolved: Operations may be supplied by Built-in or MCP integrations that are not represented by ToolCatalog files. Exact imported ToolCatalog declarations can still be navigated, completed and checked for ambiguity. Unknown `allowedResources.capabilities[]` values are also **not** diagnosed as missing when they do not match an imported Operation: they may be deployment-owned Capability IDs. A matching direct Operation is linked only by exact identity.
 
 Diagnostics use exact UTF-16 AST token ranges and are published through the existing LanguageDiagnosticSession generation gate. They are suppressed for incomplete/stale Packages. Existing Package Audit remains host-owned and is not duplicated by the LSP. These editor findings are advisory; Compiler Build remains the final parse/link/validation authority.
 
