@@ -49,6 +49,8 @@ jobs:
         run: npm install --prefix experiments/ide-host/theia-browser --no-audit --no-fund
       - name: Download pinned built-in Markdown extension from Open VSX
         run: npm run download:plugins --prefix experiments/ide-host/theia-browser
+      - name: Patch native Markdown scroll suppression for real user input
+        run: node experiments/ide-host/scripts/patch-native-markdown-scroll-sync.mjs experiments/ide-host/theia-online/plugins/vscode.markdown-language-features
       - name: Build normal Theia browser app with backend
         run: npm run build --prefix experiments/ide-host/theia-browser
       - name: Apply Classic shell icons and SKILL Studio menu branding
