@@ -600,7 +600,8 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       textDocument:{uri:libraryPartialContract.uri},
       position:positionOf(libraryPartialContract.text,ownerSchemaPath,9)
     });
-    assert.ok(ownerSchemaCompletion.some(item=>item.label==="schemas/establishment-request.schema.yaml"));
+    assert.deepEqual(ownerSchemaCompletion,[],
+      "prefix lib/host cannot suggest Skill-local schemas or partial library files");
     assert.ok(ownerSchemaCompletion.every(item=>!item.label.startsWith("lib/")),
       "partial project lib inventory cannot offer Owner Schema completions");
     const libraryDiagnosticMessage=await libraryDiagnostics;
