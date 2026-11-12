@@ -691,10 +691,8 @@ export function registerWorkbench(vscode,context){
           "vscode.executeReferenceProvider",relatedUris.predicates,
           sourcePosition(predicatesDocument,predicatesText,predicateName),{includeDeclaration:true}));
         if(!predicateReferences.some(item=>
-            (item?.uri??item?.targetUri)?.toString()===procedureUri.toString())||
-           !predicateReferences.some(item=>
-            (item?.uri??item?.targetUri)?.toString()===relatedUris.predicates.toString()))
-          throw Error("Predicate References did not return its declaration and Procedure uses");
+            (item?.uri??item?.targetUri)?.toString()===procedureUri.toString()))
+          throw Error("Predicate References did not return the exact Procedure use");
         const yamlProcedureSymbols=await vscode.commands.executeCommand(
           "vscode.executeDocumentSymbolProvider",procedureUri);
         const yamlPredicateSymbols=await vscode.commands.executeCommand(
