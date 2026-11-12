@@ -1,3 +1,5 @@
+> **Current v0 implementation, superseded as a target design.** The frozen [Plugin-managed Studio v0.1 contract](plugin-managed-configuration-v0.1.md) removes required `lib/output` directories. Existing code and tests still use the earlier layout; this file describes the *current* implementation, not v0.1. Do not treat this note as a deployed change.
+
 # SKILL Project layout and future Compiler integration
 
 **Status:** Studio workspace layout implemented in the example importer; Compiler integration remains **NOT_IMPLEMENTED** (2026-11-11).
