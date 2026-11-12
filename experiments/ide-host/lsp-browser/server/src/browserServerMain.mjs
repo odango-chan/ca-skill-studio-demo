@@ -659,7 +659,7 @@ connection.onCompletion(params => {
     const starts=lineStarts(document.text);
     const lineStart=starts[params.position.line];
     const prefix=document.text.slice(lineStart,offset);
-    if(/^\\s*# (?:inputSchema|outputSchema):\\s*[^#]*$/.test(prefix)){
+    if(/^\s*# (?:inputSchema|outputSchema):\s*[^#]*$/.test(prefix)){
       const colon=prefix.indexOf(":");
       const rawValue=prefix.slice(colon+1);
       const leading=rawValue.length-rawValue.trimStart().length;
