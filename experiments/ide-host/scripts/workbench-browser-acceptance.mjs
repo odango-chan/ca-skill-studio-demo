@@ -39,13 +39,9 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "x.getBoundingClientRect().y<innerHeight);"+
     "const active=tabs.find(x=>x.classList.contains('theia-mod-active'));"+
     "const r=active?.getBoundingClientRect();"+
-    "const target=tabs.find(x=>x.textContent.trim()==='Skill Studio');"+
-    "const tr=target?.getBoundingClientRect();"+
-    "return {previous:active?{label:active.textContent.trim(),x:r.x+r.width/2,y:r.y+r.height/2}:null,"+
-    "activity:tr?{x:tr.x+tr.width/2,y:tr.y+tr.height/2}:null};})()");
-  const activity=activityState?.activity;
-  if(!activity)throw Error('Package Overview Activity Bar entry missing');
-  await click(activity.x,activity.y);
+    "return {previous:active?{label:active.textContent.trim(),x:r.x+r.width/2,y:r.y+r.height/2}:null};})()");
+  // Packages now belongs to the native Explorer, not a custom Activity Bar.
+  await invoke('workbench.files.action.focusFilesExplorer');
   await sleep(400);
   const readTreeRows=()=>evalJS(
     "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
@@ -100,7 +96,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     await sleep(100);
   }
   if(!rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))
-    throw Error('Package Overview did not populate after opening its native Activity Bar view: '+JSON.stringify(rows));
+    throw Error('Package Overview did not populate inside the native Explorer: '+JSON.stringify(rows));
   await invoke('skillStudio.refreshPackages');
   const scan=await evalJS('window.__skillStudioLastCommandResult??null');
   console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(scan));
@@ -431,13 +427,25 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await click(target.x,target.y);await sleep(250);
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
-  const activity=await evalJS(`(()=>{const candidates=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].filter(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const el=candidates.find(x=>x.classList.contains('lm-mod-current'))??candidates[0];const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,active:el.classList.contains('lm-mod-current')}:null;})()`);
-  if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
-  // C4 may already have opened this Activity Bar container. Clicking an
-  // active Theia viewlet toggles it closed, so only open it when inactive.
-  if(!activity.active){await click(activity.x,activity.y);await sleep(500);}
-  const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
-  for(const name of ['Packages','Procedure Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
+  await invoke('workbench.files.action.focusFilesExplorer');
+  await sleep(350);
+  // Authoring views belong to native Explorer; semantic Procedure Outline
+  // remains distinct from Theia's built-in document-symbol Outline.
+  const views=await evalJS(`(()=>{
+    const headers=[...document.querySelectorAll('.theia-view-container-part-header')]
+      .map(x=>({name:x.textContent.trim(),view:x.closest('.theia-view-container')?.id??''}))
+      .filter(x=>x.name);
+    const studioActivity=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]
+      .some(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
+    return {text:document.body.innerText,headers,trees:document.querySelectorAll('.theia-Tree').length,studioActivity};
+  })()`);
+  const explorerHeaders=views.headers.filter(x=>
+    x.view.includes('workbench.view.explorer')||x.view.includes('explorer'));
+  for(const name of ['Packages','Procedure Outline','Evidence','Problems'])
+    if(!explorerHeaders.some(x=>x.name.toLowerCase()===name.toLowerCase()))
+      throw Error('Native Explorer view missing '+name+': '+JSON.stringify(views));
+  if(views.studioActivity)
+    throw Error('A separate Skill Studio Activity Bar container must not compete with Explorer');
   const inspectorPlacement=await evalJS(`(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(x=>x.textContent.trim().toLowerCase()==='inspector').map(x=>{const r=x.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height,parent:x.parentElement?.className??'',container:x.closest('.theia-view-container')?.id??null};}).filter(x=>x.width>0);return {found:tabs.some(x=>x.x>innerWidth/2),tabs,viewportWidth:innerWidth};})()`);
   const rightInspector=inspectorPlacement.tabs.find(x=>x.x>inspectorPlacement.viewportWidth/2);
   if(!rightInspector)throw Error('Inspector was not placed in the native right-side secondary sidebar: '+JSON.stringify(inspectorPlacement));
