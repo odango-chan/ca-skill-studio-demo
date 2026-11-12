@@ -212,11 +212,11 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       const part=header?.closest('.part');
       const nodes=[...(part?.querySelectorAll('.theia-TreeNode')??[])];
       const normalize=value=>value.replace(/\\s+/g,' ').trim();
-      const indexed=Number.isSafeInteger(${JSON.stringify(0)})?nodes[${JSON.stringify(row.index)}]:null;
-      const el=indexed&&normalize(indexed.innerText)===${JSON.stringify(row.text)}
-        ?indexed:nodes.find(node=>normalize(node.innerText)===${JSON.stringify(row.text)});
-      if(!el)return {found:false,index:${JSON.stringify(row.index)},
-        rows:nodes.map(node=>normalize(node.innerText)).slice(-12)};
+      const el=nodes[${JSON.stringify(row.index)}];
+      if(!el||normalize(el.innerText)!==${JSON.stringify(row.text)})
+        return {found:false,index:${JSON.stringify(row.index)},
+          actual:el?normalize(el.innerText):null,
+          rows:nodes.map(node=>normalize(node.innerText)).slice(-12)};
       el.scrollIntoView({block:'center',inline:'nearest'});
       const content=el.querySelector('.theia-TreeNodeContent')??el;
       const r=content.getBoundingClientRect();
