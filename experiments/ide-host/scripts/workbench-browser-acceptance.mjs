@@ -2321,8 +2321,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         return await waitForScroll(()=>readSourceScroll(),predicate,label);
       }catch(error){
         const host=await nativeCommand('skillStudio.internal.nativeMarkdownSettingsAcceptance');
+        const scrollProbe=await nativeCommand(
+          'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance');
         throw Error(error.message+'; hostEditorState='+JSON.stringify(host)+
-          '; nativePreviewSettings='+JSON.stringify(nativeLive.view.previewSettings));
+          '; nativePreviewSettings='+JSON.stringify(nativeLive.view.previewSettings)+
+          '; sourceScrollEvents='+JSON.stringify(scrollProbe));
       }
     };
     const initialSource=await readSourceScroll();
