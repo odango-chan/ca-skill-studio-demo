@@ -51,7 +51,9 @@ function symbolKey(token,name){
       return "operation\u0000"+name;
     case "skillSchema":{
       const targetPath=packageFilePath(name);
-      return targetPath?"document::"+targetPath:null;
+      // Keep invalid schema references diagnosable, but never map them to a
+      // Package file target. Only packageFilePath-approved Schema paths link.
+      return targetPath?"document::"+targetPath:"document::invalid::"+name;
     }
     default:
       return null;
