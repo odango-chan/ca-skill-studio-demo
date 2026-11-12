@@ -5,14 +5,33 @@ const SYMBOL_TYPES=new Set([
   "skillStep",
   "skillPredicate",
   "skillOperation",
-  "skillCapability"
+  "skillCapability",
+  "skillSchema",
+  "skillReference"
 ]);
 
 function modifier(token,name){
   return Array.isArray(token.modifiers)&&token.modifiers.includes(name);
 }
 
-function symbolKey(token,name){
+function packageFilePath(value,sourcePath){
+  if(typeof value!=="string"||!value||value.startsWith("#")||
+     value.includes("://")||value.startsWith("/")||value.includes("\\\\")||
+     /^[A-Za-z][A-Za-z0-9+.-]*:/.test(value))return null;
+  const raw=value.split("#",1)[0];
+  if(!raw)return null;
+  const relative=raw.startsWith("./");
+  const parts=relative?sourcePath.split("/").slice(0,-1):[];
+  for(const part of raw.split("/")){
+    if(!part||part===".")continue;
+    // Parent traversal is intentionally not normalized into a Package path.
+    if(part===".."||/[\\u0000-\\u001f:<>|?*]/.test(part))return null;
+    parts.push(part);
+  }
+  return parts.length?parts.join("/"):null;
+}
+
+function symbolKey(token,name,relativePath){
   switch(token.type){
     case "skillProcedure":
       return "procedure\u0000"+name;
@@ -55,8 +74,21 @@ export function buildSkillSymbolIndex(snapshot){
     return null;
   const declarations=new Map();
   const references=new Map();
+  const documentTargets=new Map();
   const tokensByUri=new Map();
   for(const document of snapshot.documents){
+    if(typeof document?.uri==="string"&&typeof document?.relativePath==="string"){
+      const key="document\\u0000"+document.relativePath;
+      if(/^(?:schemas\\/.*\\.schema\\.ya?ml|lib\\/.*\\.ya?ml|scripts\\/.*\\.py)$/.test(document.relativePath)){
+        const targets=documentTargets.get(key)??[];
+        targets.push({
+          key,name:document.relativePath,type:"skillSchema",
+          uri:document.uri,relativePath:document.relativePath,
+          range:{start:0,end:0},path:[],part:"document",modifiers:[]
+        });
+        documentTargets.set(key,targets);
+      }
+    }
     if(!document||typeof document.uri!=="string"||
        typeof document.relativePath!=="string"||typeof document.text!=="string")
       continue;
@@ -68,7 +100,7 @@ export function buildSkillSymbolIndex(snapshot){
         continue;
       const name=document.text.slice(span.start,span.end);
       if(!name)continue;
-      const key=symbolKey(span,name);
+      const key=symbolKey(span,name,document.relativePath);
       if(!key)continue;
       const item={
         key,name,type:span.type,uri:document.uri,
@@ -89,6 +121,7 @@ export function buildSkillSymbolIndex(snapshot){
     generation:snapshot.generation,
     declarations,
     references,
+    documentTargets,
     tokensByUri
   };
 }
@@ -100,7 +133,7 @@ export function skillSymbolAt(index,uri,offset){
   const token=(index.tokensByUri.get(uri)??[]).find(item=>
     offset>=item.range.start&&offset<item.range.end);
   if(!token)return null;
-  const declarations=index.declarations.get(token.key)??[];
+  const declarations=index.declarations.get(token.key)??index.documentTargets.get(token.key)??[];
   const references=index.references.get(token.key)??[];
   return {token,declarations,references};
 }
