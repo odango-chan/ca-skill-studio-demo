@@ -32,9 +32,6 @@
         "label": "SKILL Studio File Icons",
         "path": "./icons/skill-studio-file-icon-theme.json"
       }
-    ],
-    "markdown.previewStyles": [
-      "./styles/markdown-preview.css"
     ]
   },
   "files": [
