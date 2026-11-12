@@ -68,6 +68,7 @@ test("Package snapshot keeps exact root, required files, language ids and unsave
   assert.equal(snapshot.packageName,"my-skill");
   assert.equal(snapshot.generation,12);
   assert.equal(snapshot.completeness,"complete");
+  assert.equal(snapshot.libraryInventory,"unavailable");
   assert.equal(snapshot.documents.length,6);
   const byPath=new Map(snapshot.documents.map(x=>[x.relativePath,x]));
   assert.equal(byPath.get("assurance/procedure.yaml").text,"procedures: {unsaved: true}\n");
