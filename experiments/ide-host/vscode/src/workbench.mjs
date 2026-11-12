@@ -1003,10 +1003,10 @@ export function registerWorkbench(vscode,context){
           yamlProcedureOutline:locations(yamlProcedureSymbols).map(item=>item.name),
           yamlPredicateOutline:locations(yamlPredicateSymbols).map(item=>item.name),
           yamlCompletions:{
-            requestSchema:requestSchemaCompletion.length,
-            predicate:predicateCompletion.length,
-            node:nodeCompletion.length,
-            script:scriptCompletion.length
+            requestSchema:completionProviderAfter.completionProvider.lastLabels.includes(requestSchemaPath),
+            predicate:predicateCompletionDiagnostics.completionProvider.lastLabels.includes(predicateName),
+            node:nodeCompletionDiagnostics.completionProvider.lastLabels.includes(nodeName),
+            script:scriptCompletionDiagnostics.completionProvider.lastLabels.includes(scriptCompletionPath)
           },
           reverseDefinition:reverseDefinitions.length,
           reverseDefinitionTargets:reverseDefinitions.map(item=>item.uri?.toString?.()??""),
