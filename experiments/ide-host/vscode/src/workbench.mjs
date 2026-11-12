@@ -3034,17 +3034,20 @@ export function registerWorkbench(vscode,context){
       return true;
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',async()=>{
+    'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',async direction=>{
       const editor=vscode.window.visibleTextEditors.find(item=>
         item.document.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
       if(!editor)return {editorFound:false};
       const before=editor.visibleRanges.map(range=>({
         start:range.start.line,end:range.end.line
       }));
-      editor.revealRange(new vscode.Range(0,0,0,0),vscode.TextEditorRevealType.AtTop);
+      const line=direction==='bottom'?Math.max(0,editor.document.lineCount-1):0;
+      if(direction==='top'||direction==='bottom')
+        editor.revealRange(new vscode.Range(line,0,line,0),vscode.TextEditorRevealType.AtTop);
       await new Promise(resolve=>setTimeout(resolve,100));
       return {
-        editorFound:true,viewColumn:editor.viewColumn,
+        editorFound:true,uri:editor.document.uri.toString(),
+        viewColumn:editor.viewColumn,lineCount:editor.document.lineCount,
         before,after:editor.visibleRanges.map(range=>({
           start:range.start.line,end:range.end.line
         })),
