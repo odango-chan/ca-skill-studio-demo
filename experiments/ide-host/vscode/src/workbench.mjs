@@ -755,13 +755,27 @@ export function registerWorkbench(vscode,context){
         if(contractCompletionEditor.selection.active.line!==contractCompletionPosition.line||
            contractCompletionEditor.selection.active.character!==contractCompletionPosition.character)
           throw Error("Contract Completion native editor rejected the requested cursor position");
-        const completionProviderBefore=await vscode.commands.executeCommand(
-          "skillStudio.internal.semanticTokenDiagnostics");
-        const requestSchemaCompletionResult=await vscode.commands.executeCommand(
-          "vscode.executeCompletionItemProvider",relatedUris.contract,
-          contractCompletionPosition);
-        const completionProviderAfter=await vscode.commands.executeCommand(
-          "skillStudio.internal.semanticTokenDiagnostics");
+        const requestNativeCompletion=async(editor,uri,position,expectedLabel)=>{
+          await vscode.commands.executeCommand("hideSuggestWidget");
+          editor.selection=new vscode.Selection(position,position);
+          const before=await vscode.commands.executeCommand(
+            "skillStudio.internal.semanticTokenDiagnostics");
+          await vscode.commands.executeCommand("editor.action.triggerSuggest");
+          let after=await vscode.commands.executeCommand(
+            "skillStudio.internal.semanticTokenDiagnostics");
+          for(let attempt=0;attempt<100;attempt++){
+            if(after?.completionProvider?.requests>(before?.completionProvider?.requests??0)&&
+               after.completionProvider.lastUri===uri.toString()&&
+               after.completionProvider.lastLabels?.includes(expectedLabel))return after;
+            await new Promise(resolve=>setTimeout(resolve,50));
+            after=await vscode.commands.executeCommand(
+              "skillStudio.internal.semanticTokenDiagnostics");
+          }
+          return after;
+        };
+        const completionProviderAfter=await requestNativeCompletion(
+          contractCompletionEditor,relatedUris.contract,
+          contractCompletionPosition,requestSchemaPath);
         if(!completionProviderAfter?.completionProvider?.registered||
            completionProviderAfter.completionProvider.requests<=
              (completionProviderBefore?.completionProvider?.requests??0)||
@@ -814,33 +828,27 @@ export function registerWorkbench(vscode,context){
         if(procedureCompletionEditor.selection.active.line!==predicateCompletionPosition.line||
            procedureCompletionEditor.selection.active.character!==predicateCompletionPosition.character)
           throw Error("Procedure Completion native editor rejected the requested cursor position");
-        const predicateCompletion=completionItems(await vscode.commands.executeCommand(
-          "vscode.executeCompletionItemProvider",procedureUri,
-          predicateCompletionPosition));
-        if(!predicateCompletion.some(item=>
-          (typeof item.label==="string"?item.label:item.label?.label)===predicateName))
-          throw Error("v0.2 Procedure Predicate completion did not return the Package declaration");
+        const predicateCompletionDiagnostics=await requestNativeCompletion(
+          procedureCompletionEditor,procedureUri,predicateCompletionPosition,predicateName);
+        if(!predicateCompletionDiagnostics?.completionProvider?.lastLabels?.includes(predicateName))
+          throw Error("v0.2 Procedure Predicate native completion did not return the Package declaration");
         const nodeCompletionPosition=sourcePosition(
           procedureDocument,procedureText,nodeName,3);
         procedureCompletionEditor.selection=new vscode.Selection(
           nodeCompletionPosition,nodeCompletionPosition);
-        const nodeCompletion=completionItems(await vscode.commands.executeCommand(
-          "vscode.executeCompletionItemProvider",procedureUri,
-          nodeCompletionPosition));
-        if(!nodeCompletion.some(item=>
-          (typeof item.label==="string"?item.label:item.label?.label)===nodeName))
-          throw Error("v0.2 Procedure node completion did not return the scoped node declaration");
+        const nodeCompletionDiagnostics=await requestNativeCompletion(
+          procedureCompletionEditor,procedureUri,nodeCompletionPosition,nodeName);
+        if(!nodeCompletionDiagnostics?.completionProvider?.lastLabels?.includes(nodeName))
+          throw Error("v0.2 Procedure node native completion did not return the scoped node declaration");
         const scriptCompletionPath="scripts/select_establishment_configuration.py";
         const scriptCompletionPosition=sourcePosition(
           procedureDocument,procedureText,scriptCompletionPath,9);
         procedureCompletionEditor.selection=new vscode.Selection(
           scriptCompletionPosition,scriptCompletionPosition);
-        const scriptCompletion=completionItems(await vscode.commands.executeCommand(
-          "vscode.executeCompletionItemProvider",procedureUri,
-          scriptCompletionPosition));
-        if(!scriptCompletion.some(item=>
-          (typeof item.label==="string"?item.label:item.label?.label)===scriptCompletionPath))
-          throw Error("v0.2 Procedure Script completion did not return the Package-local Script path");
+        const scriptCompletionDiagnostics=await requestNativeCompletion(
+          procedureCompletionEditor,procedureUri,scriptCompletionPosition,scriptCompletionPath);
+        if(!scriptCompletionDiagnostics?.completionProvider?.lastLabels?.includes(scriptCompletionPath))
+          throw Error("v0.2 Procedure Script native completion did not return the Package-local Script path");
         const predicateHoverResult=await vscode.commands.executeCommand(
           "vscode.executeHoverProvider",procedureUri,
           sourcePosition(procedureDocument,procedureText,predicateName));
