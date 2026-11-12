@@ -1045,7 +1045,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     ready:phaseEvidenceText.includes('Data Flow · Producer / Consumer')&&
       phaseEvidenceText.includes('Consumer ABI')&&
       phaseEvidenceText.includes('Source lineage'),
-    dataflowRows:(phaseEvidenceText.match(/Data Flow · Producer \\/ Consumer/g)||[]).length,
+    dataflowRows:phaseEvidenceText.split('Data Flow · Producer / Consumer').length-1,
     consumerAbiRows:(phaseEvidenceText.match(/Consumer ABI/g)||[]).length,
     readOnly:phaseEvidenceText.includes('no write authority')&&
       phaseEvidenceText.includes('Runtime NOT_RUN')
