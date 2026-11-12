@@ -1,21 +1,24 @@
-# Theia browser (backend) host trial
+# Theia backend-backed Chromium acceptance host
 
-This is the comparison host for the browser-only Theia experiment.
+This is a separate Theia 1.76 browser frontend plus Node backend used to verify the VS Code-compatible extension against a real Theia Webview endpoint. It is a compatibility and regression target for `.github/workflows/theia-browser-host-spike.yml`; it is not the GitHub Pages deployment target.
 
-- Target: `browser` (normal Theia frontend + Node backend).
-- The same prebuilt SKILL Studio VS Code Web extension is bundled at build time.
-- The backend supplies Theia's `/webview` endpoint for VS Code CustomTextEditor.
-- CI sets `THEIA_WEBVIEW_EXTERNAL_ENDPOINT={{hostname}}` only for local smoke testing. This removes per-webview subdomain isolation; it is **not** a production security setting.
-- A real deployment should retain per-webview subdomains and configure wildcard DNS + TLS + reverse proxy.
+## Build and smoke test
 
-Build/run (Node 24):
+Use Node.js 24 from the repository root. The workflow is the canonical pinned sequence:
+
 ```sh
 npm ci
 node experiments/ide-host/scripts/build-ide-spike.mjs
 node experiments/ide-host/scripts/prepare-theia-online.mjs
 npm install --prefix experiments/ide-host/theia-browser --no-audit --no-fund
+npm run download:plugins --prefix experiments/ide-host/theia-browser
 npm run build --prefix experiments/ide-host/theia-browser
-THEIA_WEBVIEW_EXTERNAL_ENDPOINT='{{hostname}}' npm run start --prefix experiments/ide-host/theia-browser
 ```
 
-This trial is isolated from GitHub Pages and from the existing browser-only app.
+The backend supplies Theia's `/webview` endpoint for the CustomEditors. CI sets `THEIA_WEBVIEW_EXTERNAL_ENDPOINT={{hostname}}` only for its local smoke test. This removes per-Webview subdomain isolation to avoid requiring wildcard DNS/TLS in the test runner; it is **not** a production security setting.
+
+## Production boundary
+
+A secured backend-backed deployment should retain per-Webview subdomains and configure wildcard DNS, TLS and a reverse proxy. The current Pages product instead uses the browser-only static adapter described in [`../theia-online/README.md`](../theia-online/README.md), with an explicit warning because that adapter weakens Webview origin isolation.
+
+The Browser Host workflow runs the shared real Chromium acceptance against this backend-backed host. It does not establish desktop VS Code GUI acceptance or Runtime / 5GC execution.
