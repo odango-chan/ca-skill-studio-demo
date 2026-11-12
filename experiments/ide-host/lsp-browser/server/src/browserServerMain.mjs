@@ -646,7 +646,10 @@ connection.onRequest("skillStudio/completionDiagnostics",params=>{
     sourceVersion:source?.version??null,
     documentCount:snapshot?.documents?.length??0,
     schemaDocuments:snapshot?.documents?.filter(item=>
-      /^(?:schemas\\/.*\\.ya?ml|lib\\/.*\\.schema\\.ya?ml)$/.test(item.relativePath))
+      item.relativePath.startsWith("schemas/")||
+      (item.relativePath.startsWith("lib/")&&
+       (item.relativePath.endsWith(".schema.yaml")||
+        item.relativePath.endsWith(".schema.yml"))))
       .map(item=>item.relativePath)??[],
     schemaTokens:(index?.tokensByUri.get(uri)??[])
       .filter(item=>item.type==="skillSchema")
