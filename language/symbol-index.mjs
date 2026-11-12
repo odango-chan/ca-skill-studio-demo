@@ -39,7 +39,7 @@ function symbolKey(token,name,relativePath){
     case "skillStep":{
       const procedure=token.path?.[0]==="procedures"?token.path[1]:null;
       return typeof procedure==="string"&&procedure
-        ? "step\u0000"+procedure+"\\u0000"+name
+        ? "step\u0000"+procedure+"\u0000"+name
         : null;
     }
     case "skillPredicate":
@@ -84,11 +84,11 @@ export function buildSkillSymbolIndex(snapshot){
   for(const document of snapshot.documents){
     if(typeof document?.uri==="string"&&typeof document?.relativePath==="string"){
       const key="document::"+document.relativePath;
-      if(/^(?:schemas\\/.*\\.schema\\.ya?ml|lib\\/.*\\.ya?ml|scripts\\/.*\\.py|references\\/.*\\.md)$/.test(document.relativePath)){
+      if(/^(?:schemas\/.*\.schema\.ya?ml|lib\/.*\.ya?ml|scripts\/.*\.py|references\/.*\.md)$/.test(document.relativePath)){
         const targets=documentTargets.get(key)??[];
         targets.push({
           key,name:document.relativePath,
-          type:/\\.py$|^references\\//.test(document.relativePath)?"skillReference":"skillSchema",
+          type:/\.py$|^references\//.test(document.relativePath)?"skillReference":"skillSchema",
           uri:document.uri,relativePath:document.relativePath,
           range:{start:0,end:0},path:[],part:"document",modifiers:[]
         });
