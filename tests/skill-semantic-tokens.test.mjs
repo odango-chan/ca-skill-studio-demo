@@ -130,7 +130,7 @@ test("MAS Procedure receives the same canonical language projection",()=>{
   const items=observed(source,"skills/establish-pdu-session-mas/assurance/procedure.yaml");
   tokenFor(source,items,"establish-session","skillProcedure","declaration");
   tokenFor(source,items,"verify-eligible","skillStep","declaration",source.indexOf("nodes:"));
-  tokenFor(source,items,"verify","skillOperator");
+  tokenFor(source,items,"verify","skillOperator",undefined,source.indexOf("verify:"));
   tokenFor(source,items,"mas.establishment.eligible","skillPredicate","reference");
   tokenFor(source,items,"PASS","skillOutcome");
 });
