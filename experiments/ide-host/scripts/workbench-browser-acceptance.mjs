@@ -2141,8 +2141,21 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       'Native Preview → Source top scroll');
     const previewBottom=await previewScroll(
       'window.scrollTo(0,document.documentElement.scrollHeight);window.scrollY');
-    await waitForScroll(()=>sourceScroll(0),value=>value.scrollTop>100,
-      'Native Preview → Source bottom scroll');
+    const previewScrollDiagnostics=await previewScroll(
+      '(()=>({y:window.scrollY,innerHeight,bodyTop:document.body?.scrollTop??null,'+
+      'bodyHeight:document.body?.scrollHeight??null,rootTop:document.documentElement.scrollTop,'+
+      'rootHeight:document.documentElement.scrollHeight,scroller:document.scrollingElement?.tagName,'+
+      'scrollables:[...document.querySelectorAll("*")].filter(el=>el.scrollHeight>el.clientHeight+4&&'+
+      '/auto|scroll|overlay/.test(getComputedStyle(el).overflowY)).map(el=>({tag:el.tagName,'+
+      'id:el.id,className:String(el.className??""),top:el.scrollTop,height:el.scrollHeight,'+
+      'client:el.clientHeight,overflow:getComputedStyle(el).overflowY})).slice(0,20)}))()');
+    try{
+      await waitForScroll(()=>sourceScroll(0),value=>value.scrollTop>100,
+        'Native Preview → Source bottom scroll');
+    }catch(error){
+      throw Error(error.message+'; previewBottom='+JSON.stringify(previewBottom)+
+        '; previewMetrics='+JSON.stringify(previewScrollDiagnostics));
+    }
     const sourceTop=await sourceScroll(0);
     await waitForScroll(()=>previewScroll('window.scrollY'),value=>value<50,
       'Native Source → Preview top scroll');
