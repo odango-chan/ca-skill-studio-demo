@@ -825,32 +825,32 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
   });
-  const sourceVersionProbe=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
-  const sourceVersion=sourceVersionProbe?.version;
-  if(!Number.isSafeInteger(sourceVersion)||!sourceVersionProbe.uri)
-    throw Error('Could not read authoritative native Source version: '+JSON.stringify(sourceVersionProbe));
+  const inspectorSourceVersionProbe=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  const sourceVersion=inspectorSourceVersionProbe?.version;
+  if(!Number.isSafeInteger(sourceVersion)||!inspectorSourceVersionProbe.uri)
+    throw Error('Could not read authoritative native Source version: '+JSON.stringify(inspectorSourceVersionProbe));
   await startNativeCommand('skillStudio.editNodeOperatorValue',{
     procedureId:selectionResult.result.value.procedure,nodeId:'nudm-sdm-get',sourceVersion
   },'sbi.udm.sm_data.get.preview');
   await confirmNativePreview('call: sbi.udm.sm_data.get','call: sbi.udm.sm_data.get.preview');
   const afterEdit=await waitForRevisionChange(graphContext,beforeEdit.result?.value,
     'Native Inspector edit');
-  const afterSourceVersion=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  const inspectorAfterSourceVersion=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
   const editResult=await evalJS(`window.__skillStudioCommandResult`);
-  if(editResult!==true||!afterEdit.result?.value||afterSourceVersion?.version<=sourceVersion)
+  if(editResult!==true||!afterEdit.result?.value||inspectorAfterSourceVersion?.version<=sourceVersion)
     throw Error('Native Inspector edit did not commit a Source revision: '+JSON.stringify({
       editResult,before:beforeEdit.result?.value,after:afterEdit.result?.value,
-      sourceVersion,afterSourceVersion
+      sourceVersion,inspectorAfterSourceVersion
     }));
   await invoke('core.undo');
   const afterUndo=await waitForRevisionChange(graphContext,afterEdit.result?.value,
     'Native Inspector Undo');
-  const undoSourceVersion=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  const inspectorUndoSourceVersion=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
   if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value||
-     undoSourceVersion?.version<=afterSourceVersion?.version)
+     inspectorUndoSourceVersion?.version<=inspectorAfterSourceVersion?.version)
     throw Error('Native Inspector edit did not round-trip through native Undo: '+JSON.stringify({
       after:afterEdit.result?.value,undo:afterUndo.result?.value,
-      afterSourceVersion,undoSourceVersion
+      inspectorAfterSourceVersion,inspectorUndoSourceVersion
     }));
   console.log('STUDIO_INSPECTOR_AUTHORING_CHROMIUM',JSON.stringify({
     node:selectionResult.result.value.node,procedure:selectionResult.result.value.procedure,
