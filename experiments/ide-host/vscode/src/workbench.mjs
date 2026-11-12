@@ -228,6 +228,11 @@ export function registerWorkbench(vscode,context){
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
           const epoch=++languageClientEpoch;
           candidate=createSkillLanguageClient(vscode,context,{
+            debugCompletionDiagnostics:Boolean(
+              typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST&&
+              /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(
+                globalThis.location?.hostname??"")
+            ),
             // Theia 1.76's browser plugin host does not consistently register
             // server-advertised semantic tokens. Register the native provider
             // explicitly, but keep VS Code's normal LSP feature path unchanged.
@@ -284,8 +289,10 @@ export function registerWorkbench(vscode,context){
               completionProviderDiagnostics.lastUri=result?.uri??null;
               completionProviderDiagnostics.lastCount=result?.count??0;
               completionProviderDiagnostics.lastLabels=result?.labels??[];
-              completionProviderDiagnostics.lastDebug=result?.debug??null;
               completionProviderDiagnostics.lastError=null;
+            },
+            onCompletionProviderDiagnostics:result=>{
+              completionProviderDiagnostics.lastDebug=result??null;
             },
             onCompletionProviderError:error=>{
               completionProviderDiagnostics.lastUri=error?.uri??null;
