@@ -232,7 +232,7 @@ export function activate(context){
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
     ()=>{
       // The demo can auto-load just as someone clicks Load Example. Serialize
-      // both requests so the create-only loader never sees a false write race.
+      // both requests so automatic reset and explicit import cannot race.
       if(exampleLoadPromise)return exampleLoadPromise;
       exampleLoadPromise=(async()=>{
       let stage="seed-example";
@@ -276,10 +276,12 @@ export function activate(context){
           defaultProcedure:result.procedure.toString(),
           editor:VIEW
         }));
+        const resetSummary=onlineDemo
+          ?"已重置 "+result.resetPackages+" 个官方 SKILL 包。"
+          :"保留 "+result.skipped+" 个已有文件。";
         void vscode.window.showInformationMessage(
           "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+
-          "新增 "+result.created+" 个文件，重置 "+result.overwritten+
-          " 个已有文件，保留 "+result.skipped+" 个未管理文件。"+
+          "同步 "+result.files+" 个官方文件；"+resetSummary+
           (viewOpened&&revealed?"已展开 Packages（含传统 5GC + MAS）。":
             "可在 Skill Studio → Packages 查看两个 SKILL。"));
       }catch(error){
