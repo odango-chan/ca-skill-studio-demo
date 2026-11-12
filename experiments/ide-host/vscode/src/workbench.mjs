@@ -681,10 +681,8 @@ export function registerWorkbench(vscode,context){
         // Exercise the public native Definition provider in the reverse
         // direction. This is what Monaco/Theia's standard Ctrl/Cmd-click,
         // F12 and Peek Definition gestures consume.
-        const mainPosition=new vscode.Position(
-          mainLine,scriptLines[mainLine].indexOf("main"));
         const reverseDefinitionResult=await vscode.commands.executeCommand(
-          "vscode.executeDefinitionProvider",scriptUri,mainPosition);
+          "vscode.executeDefinitionProvider",scriptUri,referencePosition);
         const reverseDefinitions=Array.isArray(reverseDefinitionResult)
           ?reverseDefinitionResult:reverseDefinitionResult?[reverseDefinitionResult]:[];
         if(!reverseDefinitions.some(item=>item?.uri?.toString()===procedureUri.toString()))
