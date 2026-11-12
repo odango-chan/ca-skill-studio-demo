@@ -230,7 +230,7 @@ export function registerWorkbench(vscode,context){
           candidate=createSkillLanguageClient(vscode,context,{
             debugCompletionDiagnostics:Boolean(
               typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST&&
-              /^(localhost|127(?:\\.\\d{1,3}){3})$/.test(
+              /^(localhost|127(?:\.\\d{1,3}){3})$/.test(
                 globalThis.location?.hostname??"")
             ),
             // Theia 1.76's browser plugin host does not consistently register
