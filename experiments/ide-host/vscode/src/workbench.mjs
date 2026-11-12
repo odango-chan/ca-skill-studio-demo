@@ -48,7 +48,7 @@ export function registerWorkbench(vscode,context){
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
   const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),
     nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
-    markdownOpening=new Set(),nativeMarkdownOpening=new Set();
+    markdownOpening=new Set(),nativeMarkdownOpening=new Set(),nativeMarkdownPaired=new Set();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2483,7 +2483,7 @@ export function registerWorkbench(vscode,context){
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path?.toLowerCase().endsWith('.md'))return false;
     const key=uri.toString();
-    if(nativeMarkdownOpening.has(key))return true;
+    if(nativeMarkdownPaired.has(key)||nativeMarkdownOpening.has(key))return true;
     nativeMarkdownOpening.add(key);
     let paired=false;
     try{
@@ -2513,9 +2513,11 @@ export function registerWorkbench(vscode,context){
       // command itself must return promptly so callers can observe that render.
       const opening=vscode.commands.executeCommand('markdown.showPreviewToSide',uri);
       paired=true;
+      nativeMarkdownPaired.add(key);
       void Promise.resolve(opening).then(
         ()=>setTimeout(()=>nativeMarkdownOpening.delete(key),500),
         error=>{
+          nativeMarkdownPaired.delete(key);
           nativeMarkdownOpening.delete(key);
           void vscode.window.showWarningMessage(
             '原生 Markdown 预览未能打开：'+String(error?.message??error));
@@ -2883,7 +2885,7 @@ export function registerWorkbench(vscode,context){
     if(!target||!target.path.toLowerCase().endsWith('.md'))return;
     const key=target.toString();
     setTimeout(()=>{
-      if(markdownPanels.has(key)||markdownOpening.has(key)||nativeMarkdownOpening.has(key))return;
+      if(markdownPanels.has(key)||markdownOpening.has(key)||nativeMarkdownOpening.has(key)||nativeMarkdownPaired.has(key))return;
       if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
       void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
     },0);
