@@ -748,7 +748,17 @@ export function registerWorkbench(vscode,context){
              (completionProviderBefore?.completionProvider?.requests??0)||
            !completionProviderAfter.completionProvider.lastLabels?.includes(requestSchemaPath))
           throw Error("Native Theia Completion adapter did not return the exact Package Schema candidate: "+
-            JSON.stringify(completionProviderAfter?.completionProvider??null));
+            JSON.stringify({
+              provider:completionProviderAfter?.completionProvider??null,
+              sourceOffset:contractText.indexOf(requestSchemaPath)+9,
+              sourcePosition:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
+              sourceVersion:contractDocument.version,
+              acceptedGeneration:packageStateForYaml.generation,
+              acceptedSnapshotSource:packageStateForYaml.lastSentSnapshot?.documents?.find(item=>
+                item.uri===relatedUris.contract.toString())?.text?.indexOf(requestSchemaPath)??null,
+              acceptedSnapshotVersion:packageStateForYaml.lastSentSnapshot?.documents?.find(item=>
+                item.uri===relatedUris.contract.toString())?.version??null
+            }));
         const requestSchemaCompletion=completionItems(requestSchemaCompletionResult);
         if(!requestSchemaCompletion.some(item=>
           (typeof item.label==="string"?item.label:item.label?.label)===requestSchemaPath))
