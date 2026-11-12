@@ -373,8 +373,10 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   await sleep(150);
   const classicView=await ensurePackageExpanded('establish-pdu-session');
   const classicRange=classicView.range;
+  // The tree may render valid rows outside the current viewport. Inventory
+  // membership is about the native TreeView model, not simultaneous visibility.
   const classicVisible=classicView.rows.slice(classicRange.index+1,classicRange.end)
-    .filter(row=>row.visible).map(row=>row.text);
+    .map(row=>row.text);
   for(const group of classicGroups)
     if(!classicVisible.some(text=>text.includes(group)))
       throw Error('Traditional 5GC Package is missing group '+group+': '+JSON.stringify(classicVisible));
