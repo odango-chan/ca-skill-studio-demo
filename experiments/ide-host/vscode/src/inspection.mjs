@@ -104,12 +104,12 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
       row('Producer output schema · '+display(binding.contractStatus),binding.line,[],{
         description:display(binding.contractSchema)+' · output type '+display(binding.outputType)
       }),
-      row('Consumer ABI evidence',binding.line,consumerDetails.map(detail=>
+      row('Consumer ABI declaration',binding.line,consumerDetails.map(detail=>
         row(detail,binding.line)),{
         description:contract?.typeRelation==='TYPE_ONLY_MATCH'
           ?'仅类型一致；不是完整 ABI 证明':display(contract?.consumerStatus)
       }),
-      row('Evidence boundary',binding.line,[],{description:explanation.reason})
+      row('Source / Runtime boundary',binding.line,[],{description:explanation.reason})
     ];
     return row(binding.phaseName+' · Step '+(binding.stepIndex+1)+' · '+binding.bindingKey,
       binding.line,children,{description:binding.value+' · '+display(binding.status)});
@@ -128,13 +128,14 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
           ' · authorized writes '+(consumerContracts?.summary?.authorizedWrites??0)
       }),
       ...dataflowRows
-    ],{description:'Read-only Source evidence · no Runtime evidence · no write authorization'}
+    ],{description:'Static Source analysis only · Runtime NOT_RUN · no write authorization'}
   ):null;
   // Contextual Data Flow is a Source-derived Inspector section. Keep the old
   // Evidence view temporarily until right-sidebar parity is accepted.
   if(node&&dataflowSummary)inspection.push(row(
     'Data Flow · Producer / Consumer · '+dataflow.bindings.length+' bindings',
     node.line,dataflowSummary.children,{
+      kind:'data-flow',procedureId:procedure.name,nodeId:node.id,
       description:'Source-derived only · Runtime NOT_RUN · no write authority'
     }));
   const evidence=[row('Source evidence only · Runtime NOT_RUN · no write authority',1),

@@ -174,6 +174,31 @@ Do not remove site/ wholesale. Its current modules still contain shared Procedur
 4. **Problems and Data Flow:** consolidate diagnostics into native Problems; rename the old Evidence view and move its source-derived dataflow / ABI content into Inspector.
 5. **Classic retirement:** only after the preceding host and feature-parity gates pass.
 
+## Data Flow migration checkpoint (2026-11-12)
+
+The Source-derived Producer / Consumer analysis already appears contextually inside the
+right-side Inspector. This migration is intentionally **not complete** merely because
+the Data Flow section exists.
+
+- **Implemented:** Inspector presents selected-node Source lineage, producer status,
+  output schema/type, Consumer ABI declarations, unresolved/type-only states, and
+  explicit Runtime NOT_RUN / no-write-authority boundaries. The Source projection
+  remains read-only; qualified edits continue through existing bounded edit commands.
+- **Migration gate:** Exercise selected Node → Inspector Data Flow, expanded binding
+  details, stale-Source rejection, Package Audit refresh, and Source/Canvas focus in
+  real browser-only and backend Theia Chromium. Distinguish source-derived facts
+  from actual Runtime Evidence and keep all missing-schema cases fail-closed.
+- **Retirement gate:** Only after equivalent Inspector behavior is verified, remove
+  `skillStudio.evidence` from extension contributions, its TreeDataProvider,
+  activation event, and the duplicate Explorer acceptance sequence. Replace those
+  assertions with actual Inspector Data Flow expansion and data-flow detail checks;
+  do not merely delete test coverage.
+- **Non-goals:** No new Evidence / Observation DSL, no Host evidence fabrication, and
+  no replacement of the canonical `ca-skills` language authority.
+
+The old Evidence view is a temporary compatibility/acceptance surface, **not** a
+second product concept. Do not mark Classic retirement complete while it remains.
+
 ## Alternatives rejected
 
 - Keeping a dedicated Skill Studio Activity Bar as the permanent home for generic IDE functions.
