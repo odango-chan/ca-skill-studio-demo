@@ -3033,11 +3033,22 @@ export function registerWorkbench(vscode,context){
       clearNativeMarkdownPackagePolicies([target]);
       return true;
     }));
+  const nativeMarkdownScrollEvents=[];
+  context.subscriptions.push(vscode.window.onDidChangeTextEditorVisibleRanges(event=>{
+    if(event.textEditor.document.uri.path.endsWith('/establish-pdu-session/SKILL.md')){
+      nativeMarkdownScrollEvents.push({
+        ranges:event.visibleRanges.map(range=>({start:range.start.line,end:range.end.line})),
+        active:vscode.window.activeTextEditor?.document.uri.toString()??null
+      });
+      if(nativeMarkdownScrollEvents.length>20)nativeMarkdownScrollEvents.shift();
+    }
+  }));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',async direction=>{
       const editor=vscode.window.visibleTextEditors.find(item=>
         item.document.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
-      if(!editor)return {editorFound:false};
+      if(direction==='clear')nativeMarkdownScrollEvents.length=0;
+      if(!editor)return {editorFound:false,recentEvents:[...nativeMarkdownScrollEvents]};
       const before=editor.visibleRanges.map(range=>({
         start:range.start.line,end:range.end.line
       }));
@@ -3052,6 +3063,7 @@ export function registerWorkbench(vscode,context){
           start:range.start.line,end:range.end.line
         })),
         activeEditor:vscode.window.activeTextEditor?.document.uri.toString()??null,
+        recentEvents:[...nativeMarkdownScrollEvents],
         config:vscode.workspace.getConfiguration('markdown.preview')
           .get('scrollEditorWithPreview')
       };
