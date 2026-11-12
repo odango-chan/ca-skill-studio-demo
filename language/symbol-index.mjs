@@ -114,7 +114,14 @@ export function buildSkillSymbolIndex(snapshot){
       // completion, but only the explicit symbol types participate in links.
       tokens.push(item);
       if(!SYMBOL_TYPES.has(span.type)||!key)continue;
-      if(modifier(span,"declaration"))append(declarations,key,item);
+      // Skill Language uses skillStep for both Procedure node identities and
+      // locally named PRE/POST phase steps. Only node-map keys are Procedure
+      // targets for start/on navigation; phase-step declarations stay local.
+      const nodeDeclaration=span.type!=="skillStep"||
+        (span.part==="key"&&span.path?.[0]==="procedures"&&
+         span.path?.[2]==="nodes"&&span.path.length===4);
+      if(modifier(span,"declaration")&&nodeDeclaration)
+        append(declarations,key,item);
       if(modifier(span,"reference"))append(references,key,item);
     }
     tokensByUri.set(document.uri,tokens);
