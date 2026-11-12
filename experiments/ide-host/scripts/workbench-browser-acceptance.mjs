@@ -2106,12 +2106,23 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(evidence.imageCount!==0||evidence.scriptMarkers!==0||evidence.scriptExecuted)
       throw Error('Native Markdown allowed raw HTML or an image fetch: '+JSON.stringify(evidence));
     const packageLinks=evidence.anchorDetails.filter(anchor=>anchor.dataset?.localPath);
-    const safeLink=packageLinks.find(anchor=>anchor.dataset.localPath==='3gpp-procedure.md');
+    const safeLink=packageLinks.find(anchor=>anchor.dataset.localPath==='../SKILL.md');
     const escapingLink=packageLinks.find(anchor=>anchor.dataset.localPath==='../../outside.md');
     const missingLink=packageLinks.find(anchor=>anchor.dataset.localPath==='missing.md');
     if(packageLinks.length!==1||!safeLink||escapingLink||missingLink||
        packageLinks.some(anchor=>anchor.href!=='#'))
       throw Error('Native Markdown must retain only safe Package-local links as inert host-routed anchors and omit escaping/missing targets: '+JSON.stringify({packageLinks,evidence}));
+    const safePackageLinkClick=await command('Runtime.evaluate',{
+      contextId:evidence.contextId,returnByValue:true,
+      expression:`(()=>{const link=[...document.querySelectorAll('a[data-local-path]')].find(a=>a.dataset.localPath==='../SKILL.md');if(!link)return false;link.click();return true;})()`
+    });
+    if(safePackageLinkClick.result?.value!==true)
+      throw Error('Could not follow the safe Package-local link from the native Markdown preview');
+    const followedSafePackageLink=await waitNativeMarkdown(
+      view=>view.heading==='Establish PDU Session',
+      'native Markdown safe Package-local link navigation');
+    if(followedSafePackageLink.uri!==nativeMarkdownUri)
+      throw Error('Native Markdown safe link escaped the owning Skill Package: '+followedSafePackageLink.uri);
     if(!evidence.csp.includes("default-src 'none'")||
        /script-src[^;]*unsafe-inline/.test(evidence.csp))
       throw Error('Native Markdown preview is not using a strict script Content Security Policy: '+
