@@ -40,12 +40,12 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "const active=tabs.find(x=>x.classList.contains('theia-mod-active'));"+
     "const r=active?.getBoundingClientRect();"+
     "return {previous:active?{label:active.textContent.trim(),x:r.x+r.width/2,y:r.y+r.height/2}:null};})()");
-  // Packages now belongs to the native Explorer, not a custom Activity Bar.
+  // Package Explorer now belongs to the native Explorer, not a custom Activity Bar.
   await invoke('workbench.files.action.focusFilesExplorer');
   await sleep(400);
   const readTreeRows=()=>evalJS(
     "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
-    ".find(x=>x.textContent.trim().toLowerCase()==='packages'&&"+
+    ".find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&"+
     "x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);"+
     "const part=header?.closest('.part');"+
     "return [...(part?.querySelectorAll('.theia-TreeNode')??[])].map((el,index)=>{"+
@@ -207,7 +207,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   async function clickTreeContent(row,label,count=1){
     const target=await evalJS(`(()=>{
       const header=[...document.querySelectorAll('.theia-view-container-part-header')]
-        .find(x=>x.textContent.trim().toLowerCase()==='packages'&&
+        .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
           x.getBoundingClientRect().width>0);
       const part=header?.closest('.part');
       const nodes=[...(part?.querySelectorAll('.theia-TreeNode')??[])];
@@ -470,7 +470,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       .some(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
     return {text:document.body.innerText,headers,trees:document.querySelectorAll('.theia-Tree').length,studioActivity};
   })()`);
-  for(const name of ['Packages','Procedure Outline','Problems'])
+  for(const name of ['Package Explorer','Procedure Outline','Problems'])
     if(!views.headers.some(x=>x.name.toLowerCase()===name.toLowerCase()))
       throw Error('Native Explorer view missing '+name+': '+JSON.stringify(views));
   if(views.studioActivity)

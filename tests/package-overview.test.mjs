@@ -190,7 +190,7 @@ test('Explicit example import can reveal both Packages without opening the view 
     item.options.focus===false&&item.options.select===false));
 });
 
-test('C4 registers Packages view and renders package tree with source actions',async()=>{
+test('C4 registers Package Explorer and renders Skills under the unified tree',async()=>{
   const treeProviders=new Map(),commands=new Map();
   let scans=0,openedDocument=null,closedDocument=null;
   class Emitter {
@@ -219,7 +219,7 @@ test('C4 registers Packages view and renders package tree with source actions',a
   };
   const vscode={
     EventEmitter:Emitter,TreeItem:Item,ThemeIcon:Icon,RelativePattern,
-    TreeItemCollapsibleState:{Collapsed:1,None:0},
+    TreeItemCollapsibleState:{Collapsed:1,None:0,Expanded:2},
     workspace,window:{
       registerTreeDataProvider(id,provider){
         treeProviders.set(id,provider);return {dispose(){}};
@@ -230,7 +230,10 @@ test('C4 registers Packages view and renders package tree with source actions',a
     }
   };
   const context={subscriptions:[]};
-  const activeProcedure={uri:uri('/workspace/skills/establish-pdu-session/assurance/procedure.yaml'),isDirty:false};
+  const activeProcedure={
+    uri:uri('/workspace/skills/establish-pdu-session/assurance/procedure.yaml'),
+    isDirty:false
+  };
   registerPackageOverview(vscode,context,()=>activeProcedure);
   const refresh=commands.get('skillStudio.refreshPackages');
   assert.equal(typeof refresh,'function');
@@ -238,18 +241,22 @@ test('C4 registers Packages view and renders package tree with source actions',a
   const provider=treeProviders.get('skillStudio.packages');
   assert.ok(provider);
 
-  const roots=provider.getChildren();
-  assert.equal(roots[0].label,'3 SKILL Packages');
-  const pkg=roots.find(x=>x.kind==='package'&&x.name==='establish-pdu-session');
+  const sections=await provider.getChildren();
+  assert.deepEqual(sections.map(item=>item.section),['skills','dependencies']);
+  assert.equal(provider.getTreeItem(sections[0]).label,'Skills');
+  assert.equal(provider.getTreeItem(sections[0]).collapsibleState,2);
+  const skills=await provider.getChildren(sections[0]);
+  assert.equal(skills[0].label,'3 SKILL Packages');
+  const pkg=skills.find(x=>x.kind==='package'&&x.name==='establish-pdu-session');
   assert.ok(pkg);
-  assert.match(pkg.description,/3\/3 core/);
+  assert.match(pkg.description,/3\\/3 core/);
   assert.match(pkg.description,/1 modified/);
-  const groups=provider.getChildren(pkg);
+  const groups=await provider.getChildren(pkg);
   const schemas=groups.find(x=>x.key==='schemas');
-  const schemaFiles=provider.getChildren(schemas);
+  const schemaFiles=await provider.getChildren(schemas);
   assert.equal(schemaFiles[0].label,'request.schema.yaml');
   assert.equal(schemaFiles[0].command.command,'skillStudio.openSchema');
-  assert.equal(provider.getParent(pkg),undefined);
+  assert.equal(provider.getParent(pkg).section,'skills');
   assert.equal(provider.getParent(schemas).kind,'package');
   const schemaParent=provider.getParent(schemaFiles[0]);
   assert.equal(schemaParent.kind,'group');
