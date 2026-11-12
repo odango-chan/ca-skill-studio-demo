@@ -10,7 +10,6 @@ const pcfOutcomeLine=publishedProcedure.slice(0,
   pcfOutcomeStart+pcfOutcomeHeader.indexOf('            FAILED:'))
   .split('\n').length;
 export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
-  if (!requireEditor) return {required:false};
   const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1});
     await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,button:'none',buttons:0,pointerType:'mouse'});
@@ -126,6 +125,67 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
      mas?.fileCount!==5||mas?.corePresent!==3)
     throw Error('Two-SKILL inventory does not match the pinned sample manifest: '+
       JSON.stringify({classic,mas}));
+
+  // Dependencies must be a real section in the same native TreeView in both
+  // backend and browser-only Theia. It starts collapsed and expands to the
+  // owner-provided empty state; no second Dependencies view is permitted.
+  const dependenciesRow=rows.find(row=>row.visible&&
+    row.text.includes('Dependencies')&&
+    row.text.includes('Plugin-managed snapshots and contracts'));
+  if(!dependenciesRow)
+    throw Error('Package Explorer is missing its composed Dependencies section: '+
+      JSON.stringify(rows));
+  if(!String(dependenciesRow.toggleClass??'').includes('theia-mod-collapsed'))
+    throw Error('Dependencies must be collapsed by default: '+JSON.stringify(dependenciesRow));
+  await clickVisibleToggle(dependenciesRow,'Dependencies section');
+  let dependencyEmptyState=null;
+  for(let attempt=0;attempt<40;attempt++){
+    rows=await readTreeRows();
+    dependencyEmptyState=rows.find(row=>row.visible&&
+      row.text.includes('No dependencies'));
+    if(dependencyEmptyState)break;
+    await sleep(100);
+  }
+  if(!dependencyEmptyState)
+    throw Error('Expanded Dependencies section did not show its real empty state: '+
+      JSON.stringify(rows));
+  const expandedDependencies=rows.find(row=>row.visible&&
+    row.text.includes('Dependencies')&&
+    row.text.includes('Plugin-managed snapshots and contracts'));
+  if(!expandedDependencies)
+    throw Error('Dependencies section disappeared after expansion');
+  await clickVisibleToggle(expandedDependencies,'Dependencies collapse');
+  let collapsedDependencies=null;
+  for(let attempt=0;attempt<20;attempt++){
+    rows=await readTreeRows();
+    collapsedDependencies=rows.find(row=>row.visible&&
+      row.text.includes('Dependencies')&&
+      row.text.includes('Plugin-managed snapshots and contracts'));
+    if(collapsedDependencies&&
+       String(collapsedDependencies.toggleClass??'').includes('theia-mod-collapsed'))break;
+    await sleep(100);
+  }
+  if(!collapsedDependencies||
+     !String(collapsedDependencies.toggleClass??'').includes('theia-mod-collapsed'))
+    throw Error('Dependencies section did not return to its collapsed state');
+
+  const compositeEvidence={
+    dependenciesVisible:true,
+    dependenciesCollapsedByDefault:true,
+    dependenciesExpandedToOwnerEmptyState:true,
+    dependenciesCanCollapseAgain:true
+  };
+  if(!requireEditor){
+    const evidence={
+      skills:[
+        {name:'establish-pdu-session',files:classic.fileCount,core:'3/3'},
+        {name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3'}
+      ],
+      treeVisible:true,scanState:scan.state,composite:compositeEvidence
+    };
+    console.log('STUDIO_PACKAGE_EXPLORER_BROWSER_ONLY_CHROMIUM',JSON.stringify(evidence));
+    return {required:true,twoSkills:true,browserOnlyInventory:true,evidence};
+  }
   const packageNames=expectedNames;
   const isPackageRow=row=>packageNames.some(name=>
     row.text.includes(name+' · 3/3 core ·'));
@@ -354,6 +414,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       groups:masGroups,contract:masContract
     }],
     treeVisible:true,scanState:scan.state,
+    composite:compositeEvidence,
     treeReadsByKind:postExpansion.treeReadsByKind,
     exactPackageUris:true,restoredActivity:restored
   };
