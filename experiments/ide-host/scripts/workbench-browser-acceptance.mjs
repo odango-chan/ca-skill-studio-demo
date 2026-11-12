@@ -1784,7 +1784,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const nativeMarkdownLiveEvidence={
       previewContextRetained:true,
       nativeMarkdownScrollEvidence,
-      finalPreviewScroll:await previewScroll('window.scrollY')
+      finalPreviewScroll:previewViewport.scrollY
     };
     console.log('STUDIO_NATIVE_MARKDOWN_LIVE_SYNC_CHROMIUM',
       JSON.stringify(nativeMarkdownLiveEvidence));
