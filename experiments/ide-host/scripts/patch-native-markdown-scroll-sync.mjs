@@ -25,9 +25,16 @@ if(script.includes(marker)){
   }));
   process.exit(0);
 }
-const declaration=/let\s+scrollDisabledCount\s*=\s*0\s*;/;
+const declaration=/\\bscrollDisabledCount\\s*=\\s*0\\b/;
 const match=script.match(declaration);
-if(!match)throw Error("Pinned Markdown Preview runtime no longer exposes its expected scroll suppression counter");
+if(!match){
+  const reveal=script.indexOf("revealLine");
+  console.log("STUDIO_NATIVE_MARKDOWN_SCROLL_RUNTIME_DIAGNOSTIC",JSON.stringify({
+    bytes:script.length,hasCounter:script.includes("scrollDisabledCount"),
+    revealSnippet:reveal>=0?script.slice(Math.max(0,reveal-900),Math.min(script.length,reveal+250)):"revealLine token not found"
+  }));
+  throw Error("Pinned Markdown Preview runtime no longer exposes its expected scroll suppression counter");
+}
 const reset=`
 // STUDIO_NATIVE_MARKDOWN_USER_SCROLL_RESET: a real user gesture supersedes stale programmatic-scroll suppression.
 const studioResetNativeMarkdownScrollSuppression = () => { scrollDisabledCount = 0; };
@@ -39,7 +46,8 @@ window.addEventListener("keydown", event => {
     studioResetNativeMarkdownScrollSuppression();
 }, true);
 `;
-script=script.replace(declaration,match[0]+reset);
+const insertionAt=match.index+match[0].length;
+script=script.slice(0,insertionAt)+reset+script.slice(insertionAt);
 if(!script.includes(marker)||!script.includes('addEventListener("wheel"'))
   throw Error("Native Markdown user-scroll compatibility patch did not apply");
 await writeFile(scriptPath,script);
