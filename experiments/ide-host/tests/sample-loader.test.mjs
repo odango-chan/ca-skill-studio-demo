@@ -74,7 +74,7 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
   assert.deepEqual(result.skills,["establish-pdu-session","establish-pdu-session-mas"]);
   assert.ok(result.workspaceUpdated);
   assert.equal(h.opened.length,1);
-  assert.equal(h.opened[0].folder.name,"skill-studio-demo");
+  assert.equal(h.opened[0].folder.uri.path.split("/").at(-1),"skill-studio-demo");
   assert.equal(result.root.path,"/global-storage/skill-studio-demo");
   assert.equal(result.skillsRoot.path,result.root.path+"/skills");
   assert.equal(result.libraryRoot.path,result.root.path+"/lib");
