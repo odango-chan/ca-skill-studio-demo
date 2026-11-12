@@ -55,7 +55,6 @@ export function activate(context){
   registerSchemaEditor(vscode,context);
   let packageOverview=null;
   const dependenciesView=registerDependenciesView(vscode,context,{
-    treeViewId:null,
     onLockChanged:()=>workbench.invalidateDependencyAnalysis?.(),
     onProjectRootChanged:()=>void packageOverview?.refresh()
   });
