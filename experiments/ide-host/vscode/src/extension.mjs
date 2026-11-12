@@ -228,6 +228,13 @@ export function activate(context){
     webviewOptions:{retainContextWhenHidden:true}
   }));
   const onlineDemo=typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST;
+  const demoResetStateKey="skillStudio.defaultExampleResetVersion";
+  const demoResetVersion="2026-11-12-v1";
+  // One-time migration reset: restore the currently deployed demo once, then
+  // preserve future user edits across reloads. A later explicit reset can bump
+  // this version without changing desktop/user-workspace behavior.
+  let resetExistingOnLoad=onlineDemo&&
+    context.globalState?.get?.(demoResetStateKey)!==demoResetVersion;
   let exampleLoadPromise=null;
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
     ()=>{
@@ -237,9 +244,14 @@ export function activate(context){
       exampleLoadPromise=(async()=>{
       let stage="seed-example";
       try{
+        const resetExisting=resetExistingOnLoad;
         const result=await seedExampleWorkspace(vscode,context.extensionUri,context.globalStorageUri,{
-          resetExisting:onlineDemo
+          resetExisting
         });
+        if(resetExisting){
+          await context.globalState?.update?.(demoResetStateKey,demoResetVersion);
+          resetExistingOnLoad=false;
+        }
         stage="show-packages";
         // User-triggered import should end in the real native Packages view.
         // View-container activation is a host command: fall back gracefully
@@ -276,7 +288,7 @@ export function activate(context){
           defaultProcedure:result.procedure.toString(),
           editor:VIEW
         }));
-        const resetSummary=onlineDemo
+        const resetSummary=resetExisting
           ?"已重置 "+result.resetPackages+" 个官方 SKILL 包。"
           :"保留 "+result.skipped+" 个已有文件。";
         void vscode.window.showInformationMessage(
@@ -291,11 +303,10 @@ export function activate(context){
       })().finally(()=>{exampleLoadPromise=null;});
       return exampleLoadPromise;
     }));
-  // The browser-only Pages host is a managed demo workspace. Re-seed its
-  // exact extension-owned root on every return, so the published example is
-  // deterministic and user edits to the two bundled Skills do not persist.
-  // Any unrelated/user-selected workspace is preserved. Desktop VS Code and
-  // backend Theia keep the explicit, create-only Load Example behavior.
+  // The browser-only Pages host owns one default demo workspace. The first
+  // activation after this migration resets the two pinned sample Skills once;
+  // later visits preserve edits. Unrelated/user-selected workspaces are kept.
+  // Desktop VS Code and backend Theia keep create-only Load Example behavior.
   const workspaceName=vscode.workspace.name??null;
   const legacyDemoRoot=vscode.Uri.joinPath(context.globalStorageUri,"workspaces");
   const demoRoot=vscode.Uri.joinPath(legacyDemoRoot,EXAMPLE_PROJECT_NAME);
