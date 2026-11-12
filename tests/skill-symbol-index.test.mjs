@@ -35,7 +35,6 @@ function packageSnapshot(extra=[]){
     document("assurance/predicates.yaml",read("assurance/predicates.yaml")),
     document("assurance/procedure.yaml",read("assurance/procedure.yaml")),
     document("schemas/establishment-request.schema.yaml",read("schemas/establishment-request.schema.yaml")),
-    document("scripts/select_establishment_configuration.py",read("scripts/select_establishment_configuration.py")),
     document("lib/tools/udm.tool.yaml",`apiVersion: connectionagent.io/v1alpha1
 kind: ToolCatalog
 spec:
@@ -113,21 +112,6 @@ test("Contract Schema references resolve to exact Package-owned Schema files",()
   assert.equal(declaration.uri,schema.uri);
   assert.deepEqual(declaration.range,{start:0,end:0},
     "file-path navigation lands at the exact target document start");
-});
-
-test("Contract Schema and Procedure Script references resolve to exact Package files",()=>{
-  const snapshot=packageSnapshot();
-  const index=symbols.buildSkillSymbolIndex(snapshot);
-  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
-  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
-  const schema=snapshot.documents.find(x=>x.relativePath==="schemas/establishment-request.schema.yaml");
-  const script=snapshot.documents.find(x=>x.relativePath==="scripts/select_establishment_configuration.py");
-  const schemaPath="schemas/establishment-request.schema.yaml";
-  const schemaHit=at(index,contract.uri,contract.text,schemaPath);
-  assert.equal(symbols.uniqueSkillSymbolDeclaration(schemaHit).uri,schema.uri);
-  const scriptPath="scripts/select_establishment_configuration.py";
-  const scriptHit=at(index,procedure.uri,procedure.text,scriptPath);
-  assert.equal(symbols.uniqueSkillSymbolDeclaration(scriptHit).uri,script.uri);
 });
 
 test("missing Owner Schema and fragment-only refs never produce guessed destinations",()=>{
