@@ -354,30 +354,21 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1','Scripts · 5','References · 3'];
   const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
   async function packageTreeScroll(deltaY){
-    const target=await evalJS(`(()=>{
-      const header=[...document.querySelectorAll('.theia-view-container-part-header')]
-        .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
-          x.getBoundingClientRect().width>0);
-      const part=header?.closest('.part');
-      const tree=part?.querySelector('.theia-Tree');
-      const element=tree??part;
-      const rect=element?.getBoundingClientRect();
-      if(!rect||rect.width<80||rect.height<80)
-        return {found:false,reason:'Package Explorer tree viewport is unavailable'};
-      return {found:true,x:Math.round(rect.left+rect.width/2),
-        y:Math.round(rect.top+Math.min(rect.height-12,rect.height/2)),
-        width:rect.width,height:rect.height,
-        className:String(element.className??'')};
-    })()`);
-    if(!target?.found)
-      throw Error('Could not locate Package Explorer scroll viewport: '+JSON.stringify(target));
-    // Theia virtualizes TreeView rows. Scroll through the actual viewport using
-    // trusted Chromium wheel input; there may be no full-height DOM scroller.
+    const visibleRows=await readTreeRows();
+    const target=visibleRows.find(row=>row.visible&&row.contentPos);
+    if(!target)
+      throw Error('Package Explorer has no visible TreeView row for wheel input: '+
+        JSON.stringify(visibleRows));
+    // Theia virtualizes TreeView rows. Send trusted wheel input over a real
+    // visible row so the host's scroll container receives the gesture.
     await command('Input.dispatchMouseEvent',{
-      type:'mouseWheel',x:target.x,y:target.y,deltaX:0,deltaY
+      type:'mouseWheel',x:target.contentPos.x,y:target.contentPos.y,
+      deltaX:0,deltaY
     });
-    await sleep(160);
-    return {...target,deltaY};
+    await sleep(180);
+    const after=await readTreeRows();
+    return {deltaY,target:target.text,
+      visibleRows:after.filter(row=>row.visible).map(row=>row.text)};
   }
   async function collectPackageRowsAcrossScroll(){
     const rows=[],scrollStates=[];
