@@ -71,6 +71,10 @@ const markdownPluginSource=resolve(
 const markdownPluginTarget=join(root,"hostedPlugin","vscode_markdown_language_features");
 await mkdir(markdownPluginTarget,{recursive:true});
 await cp(markdownPluginSource,markdownPluginTarget,{recursive:true,force:true});
+const markdownPreviewScript=await readFile(
+  join(markdownPluginTarget,"media","index.js"),"utf8");
+if(!markdownPreviewScript.includes("STUDIO_NATIVE_MARKDOWN_USER_SCROLL_RESET"))
+  throw Error("Static native Markdown Preview is missing the user-scroll suppression compatibility patch");
 const markdownManifest=JSON.parse(await readFile(
   join(markdownPluginTarget,"package.json"),"utf8"));
 const markdownBrowserEntry=String(markdownManifest.browser??"").startsWith("./")
@@ -87,7 +91,8 @@ for(const required of [
 }
 console.log("STUDIO_THEIA_STATIC_MARKDOWN_ASSETS",JSON.stringify({
   markdownPluginTarget,version:markdownManifest.version,
-  browser:markdownManifest.browser,workerBytes:(await stat(markdownWorker)).size
+  browser:markdownManifest.browser,workerBytes:(await stat(markdownWorker)).size,
+  userScrollSuppressionPatched:true
 }));
 // Theia does not copy arbitrary extension assets into hostedPlugin.
 // Preserve the exact theme package paths referenced by its contribution JSON.
