@@ -16,7 +16,7 @@ const display=value=>value===undefined||value===null||value===''?'未声明':Str
 export function inspectionSnapshot(text,selection={},projected=null,files=null){
   const model=projected??projectWorkspace(text);
   if(model.state!=='READY')return {
-    model,outline:[],inspection:[],evidence:[],problems:model.diagnostics,
+    model,outline:[],inspection:[],problems:model.diagnostics,
     dataflow:null,consumerContracts:null
   };
   const procedure=model.procedures.get(selection.procedureId)??model.procedures.get(model.entry);
@@ -130,24 +130,13 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
       ...dataflowRows
     ],{description:'Static Source analysis only · Runtime NOT_RUN · no write authorization'}
   ):null;
-  // Contextual Data Flow is a Source-derived Inspector section. Keep the old
-  // Evidence view temporarily until right-sidebar parity is accepted.
+  // Contextual Data Flow is the sole Source-derived Inspector projection;
+  // Runtime Evidence remains outside this editor-time model.
   if(node&&dataflowSummary)inspection.push(row(
     'Data Flow · Producer / Consumer · '+dataflow.bindings.length+' bindings',
     node.line,dataflowSummary.children,{
       kind:'data-flow',procedureId:procedure.name,nodeId:node.id,
       description:'Source-derived only · Runtime NOT_RUN · no write authority'
     }));
-  const evidence=[row('Source evidence only · Runtime NOT_RUN · no write authority',1),
-    ...((node?[node]:procedure.nodes).flatMap(n=>[
-      ...n.children.map(c=>row(n.id+' → '+c.procedure,c.line,[],{description:c.via})),
-      ...n.phases.map(p=>row(n.id+' · '+p.name,p.line,p.steps.map(s=>{
-        const summary=node?.id===n.id?stepEvidence(p.name,s.index-1):null;
-        return row(s.operator+' · '+s.value,s.line,[],{
-          description:summary?.label??'No resolved Phase binding evidence'
-        });
-      })))
-    ])),
-    ...(dataflowSummary?[dataflowSummary]:[])];
-  return {model,outline,inspection,evidence,problems:[],dataflow,consumerContracts};
+  return {model,outline,inspection,problems:[],dataflow,consumerContracts};
 }
