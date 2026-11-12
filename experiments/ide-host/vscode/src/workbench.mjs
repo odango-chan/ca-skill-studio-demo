@@ -2706,6 +2706,13 @@ export function registerWorkbench(vscode,context){
       void vscode.commands.executeCommand('skillStudio.previewMarkdown',target);
     },0);
   }));
+  // Internal acceptance probe reports the authoritative VS Code TextDocument
+  // version; the custom-editor webview's display revision is not that version.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.sourceVersionAcceptance',()=>({
+      uri:document?.uri.toString()??null,
+      version:document?.version??null
+    })));
   // Internal real-browser acceptance opens the owner-pinned conventional guide
   // by exact workspace path; it is not a contributed user command.
   context.subscriptions.push(vscode.commands.registerCommand(
