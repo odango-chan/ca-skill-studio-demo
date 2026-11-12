@@ -692,12 +692,12 @@ export function registerWorkbench(vscode,context){
         if(!operationCompletion.some(item=>
           (typeof item.label==="string"?item.label:item.label?.label)===operationName))
           throw Error("v0.2 Procedure Operation completion did not return the imported ToolCatalog ID");
-        const scriptPathValue="scripts/select_establishment_configuration.py";
+        const scriptCompletionPath="scripts/select_establishment_configuration.py";
         const scriptCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
-          sourcePosition(procedureDocument,procedureText,scriptPathValue,9)));
+          sourcePosition(procedureDocument,procedureText,scriptCompletionPath,9)));
         if(!scriptCompletion.some(item=>
-          (typeof item.label==="string"?item.label:item.label?.label)===scriptPathValue))
+          (typeof item.label==="string"?item.label:item.label?.label)===scriptCompletionPath))
           throw Error("v0.2 Procedure Script completion did not return the Package-local Script path");
         const predicateHoverResult=await vscode.commands.executeCommand(
           "vscode.executeHoverProvider",procedureUri,
