@@ -12,7 +12,7 @@ function newNonce(){
 }
 import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
-import {seedExampleWorkspace} from "./sample-loader.mjs";
+import {EXAMPLE_PROJECT_NAME,seedExampleWorkspace} from "./sample-loader.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
