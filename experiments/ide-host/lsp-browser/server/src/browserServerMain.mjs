@@ -409,8 +409,8 @@ connection.onHover(params => {
     const resolved=Boolean(declaration&&snapshot.completeness==="complete"&&
       index?.generation===snapshot.generation);
     const body=resolved
-      ? "**"+kind+"** `"+symbolHit.token.name+"`\\n\\nDeclared in `"+declaration.relativePath+"`"
-      : "**"+kind+" reference** `"+symbolHit.token.name+"`\\n\\nNo unique declaration is available in the current complete Package snapshot.";
+      ? "**"+kind+"** `"+symbolHit.token.name+"`\n\nDeclared in `"+declaration.relativePath+"`"
+      : "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nNo unique declaration is available in the current complete Package snapshot.";
     return {contents:{kind:"markdown",value:body},
       range:toLspRange(source.text,symbolHit.token.range)};
   }
