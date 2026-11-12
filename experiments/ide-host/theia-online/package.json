@@ -51,8 +51,12 @@
   "devDependencies": {
     "@theia/cli": "1.76.0"
   },
+  "theiaPlugins": {
+    "vscode.markdown-language-features": "https://open-vsx.org/api/vscode/markdown-language-features/1.95.3/file/vscode.markdown-language-features-1.95.3.vsix"
+  },
   "scripts": {
     "build": "theia build --mode production",
+    "download:plugins": "theia download:plugins",
     "build:development": "theia build --mode development"
   }
 }
