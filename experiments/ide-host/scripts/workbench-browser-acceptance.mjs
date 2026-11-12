@@ -1812,7 +1812,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!safeLink||!safeLink.href||safeLink.href==='#'||blockedLinks.length)
       throw Error('Native Markdown must retain the exact safe Package-local link and omit escaping/missing targets: '+
         JSON.stringify({safeLink,blockedLinks,evidence}));
-    if(safeLink.href!=='3gpp-procedure.md')
+    if(safeLink.href!=='references/3gpp-procedure.md')
       throw Error('Native Markdown changed the exact safe Package-local link target: '+
         JSON.stringify({href:safeLink.href,evidence}));
     // Runtime.evaluate(link.click()) is a synthetic DOM click, not a trusted
