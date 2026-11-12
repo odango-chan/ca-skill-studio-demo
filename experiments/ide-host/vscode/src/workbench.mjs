@@ -2878,6 +2878,9 @@ export function registerWorkbench(vscode,context){
     if(!target||!target.path.toLowerCase().endsWith('.md'))return;
     const key=target.toString();
     setTimeout(()=>{
+      if(nativeMarkdownOpening.has(key)||nativeMarkdownPaired.has(key))return;
+      if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
+      void openNativeMarkdownPreview(target);
     },0);
   }));
   // Internal acceptance probe reports the authoritative VS Code TextDocument
