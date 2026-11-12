@@ -263,8 +263,8 @@ test('C4 registers Package Explorer and renders Skills under the unified tree',a
   assert.deepEqual(masGroups.map(group=>group.key),
     ['definition','assurance','schemas','scripts']);
   assert.equal(masGroups.find(group=>group.key==='scripts').files.length,1);
-  assert.equal(masGroups.find(group=>group.key==='references').files.length,0);
-  assert.equal(masGroups.find(group=>group.key==='other').files.length,0);
+  assert.equal(masGroups.some(group=>group.key==='references'),false);
+  assert.equal(masGroups.some(group=>group.key==='other'),false);
   const schemas=groups.find(x=>x.key==='schemas');
   const schemaFiles=await provider.getChildren(schemas);
   assert.equal(schemaFiles[0].label,'request.schema.yaml');
