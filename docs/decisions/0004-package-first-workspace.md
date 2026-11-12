@@ -24,15 +24,17 @@ Those are logical project resources and do not require fixed `lib/` or `output/`
 
 Use the host's existing **Explorer** view container (the native VS Code / Theia Explorer container). Do not contribute a separate Skill Studio Activity Bar or a second workbench shell.
 
-The primary sidebar order is:
+Logical navigation priority is:
 
-1. **Package Explorer** — the first and default-expanded project view.
-2. **Files** — the host's native physical workspace file tree, available below Package Explorer.
+1. **Package Explorer** — the first Studio-contributed project view and visible by default.
+2. **Files** — the host's native physical workspace file tree, always retained and never duplicated or hidden by Studio.
 3. **Outline** — the host's native document-symbol view, following the active editor.
 
-Package Explorer is visible by default for a new or reset Studio workspace. It must not steal keyboard focus from the active editor or repeatedly reopen itself after a user closes, moves or collapses it. Respect the host's persisted layout and user rearrangement after first-run defaults have been established.
+**Host API ordering constraint:** VS Code's `contributes.views` supports first-workspace visibility (`visibility: visible`) but does not expose a supported ordering property that can force an extension-contributed view above the built-in Files view. Therefore Package Explorer is first among Studio-contributed views and is visible/expanded on first workspace open; its exact relative position to the built-in Files view is host-owned. Theia and desktop VS Code acceptance must record the actual default. Users may drag Package Explorer above Files, and Studio must respect the host's persisted layout. Do not patch internal workbench models, hide the native Files view, or claim an ordering guarantee the extension API does not provide.
 
-Keep the existing stable `skillStudio.packages` view identity where practical. The user-facing title becomes **Package Explorer**. The view is contributed to the built-in `explorer` container; no custom `viewsContainers.activitybar` entry is allowed.
+Package Explorer must not steal keyboard focus from the active editor or repeatedly reopen itself after a user closes, moves or collapses it. The manifest's `visibility: visible` is a first-workspace default only; subsequent user layout choices take precedence.
+
+Keep the existing stable `skillStudio.packages` view identity. The user-facing title becomes **Package Explorer** and its first-workspace manifest visibility is `visible`. The view is contributed to the built-in `explorer` container; no custom `viewsContainers.activitybar` entry is allowed.
 
 ## Decision 2 · One coherent Package Explorer projection
 
@@ -134,7 +136,7 @@ Package Explorer does not absorb Inspector, Outline, Problems, Package Audit or 
 
 ## Acceptance gates
 
-1. A fresh Theia Browser-Only and backend Theia workspace opens with Package Explorer first and expanded in the native Explorer container; native Files remains available below it; no separate Skill Studio Activity Bar exists.
+1. A fresh Theia Browser-Only and backend Theia workspace opens with Package Explorer visible and expanded in the native Explorer container; it is first among Studio-contributed views, native Files remains available, and no separate Skill Studio Activity Bar exists. Record its actual relative position to built-in Files in each host; do not claim a cross-host ordering guarantee. Verify that user drag/reorder persists.
 2. Package Explorer contains one coherent Skills / Dependencies / Build Artifacts hierarchy. Dependency and Build sections consume their authoritative services; no duplicate state or second package manager exists.
 3. Existing two-Skill discovery, incomplete-Package visibility, file-role grouping, exact-URI editor navigation, refresh and expansion-state regressions pass.
 4. Package-aware Source create / import / rename / move / delete operations use the host filesystem API, enforce selected-root and ownership checks, preserve dirty buffers, and refresh after both Studio and native / external file changes.
