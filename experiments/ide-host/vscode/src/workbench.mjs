@@ -50,6 +50,27 @@ export function registerWorkbench(vscode,context){
   const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),
     nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
     markdownOpening=new Set(),nativeMarkdownOpening=new Set(),nativeMarkdownPaired=new Set();
+  const nativeMarkdownWebviewMessages=[];
+  let nativeMarkdownMessageTapInstalled=false;
+  const installNativeMarkdownMessageTap=()=>{
+    if(nativeMarkdownMessageTapInstalled||
+       typeof vscode.window.createWebviewPanel!=='function')return;
+    const original=vscode.window.createWebviewPanel;
+    vscode.window.createWebviewPanel=function(...args){
+      const panel=original.apply(this,args);
+      if(args[0]==='markdown.preview'&&
+         typeof panel?.webview?.onDidReceiveMessage==='function'){
+        context.subscriptions.push(panel.webview.onDidReceiveMessage(message=>{
+          if(message?.type==='revealLine'){
+            nativeMarkdownWebviewMessages.push({type:message.type,line:message.line});
+            if(nativeMarkdownWebviewMessages.length>30)nativeMarkdownWebviewMessages.shift();
+          }
+        }));
+      }
+      return panel;
+    };
+    nativeMarkdownMessageTapInstalled=true;
+  };
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2612,6 +2633,7 @@ export function registerWorkbench(vscode,context){
     void state.panel.webview.postMessage({type:'layoutState',singlePane:state.singlePane});
   };
   async function openNativeMarkdownPreview(uri){
+    installNativeMarkdownMessageTap();
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path?.toLowerCase().endsWith('.md'))return false;
     const key=uri.toString();
@@ -3049,7 +3071,10 @@ export function registerWorkbench(vscode,context){
     'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',async direction=>{
       const editor=vscode.window.visibleTextEditors.find(item=>
         item.document.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
-      if(direction==='clear')nativeMarkdownScrollEvents.length=0;
+      if(direction==='clear'){
+        nativeMarkdownScrollEvents.length=0;
+        nativeMarkdownWebviewMessages.length=0;
+      }
       if(!editor)return {editorFound:false,recentEvents:[...nativeMarkdownScrollEvents]};
       const before=editor.visibleRanges.map(range=>({
         start:range.start.line,end:range.end.line
@@ -3066,6 +3091,7 @@ export function registerWorkbench(vscode,context){
         })),
         activeEditor:vscode.window.activeTextEditor?.document.uri.toString()??null,
         recentEvents:[...nativeMarkdownScrollEvents],
+        recentMessages:[...nativeMarkdownWebviewMessages],
         config:vscode.workspace.getConfiguration('markdown.preview')
           .get('scrollEditorWithPreview')
       };
