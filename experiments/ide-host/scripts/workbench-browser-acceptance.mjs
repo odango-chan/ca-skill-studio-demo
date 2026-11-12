@@ -2082,7 +2082,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const nativeSourceGroup=nativeMarkdownGroups.find(group=>
     group.labels.some(label=>/^SKILL\.md/.test(label)));
   const nativePreviewGroup=nativeMarkdownGroups.find(group=>
-    group.labels.some(label=>/Preview.*SKILL\.md|SKILL\.md.*Preview/i.test(label)));
+    group.labels.some(label=>/Markdown.*SKILL\.md|SKILL\.md.*Markdown/i.test(label)));
   if(!nativeSourceGroup||!nativePreviewGroup||
      nativeSourceGroup.index===nativePreviewGroup.index)
     throw Error('Native Markdown must keep editable Source and Preview in separate editor groups: '+
