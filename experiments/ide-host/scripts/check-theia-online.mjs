@@ -49,8 +49,10 @@ if(markdownManifest.publisher!=="vscode"||
    markdownManifest.name!=="markdown-language-features"||
    markdownManifest.version!=="1.95.3")
   throw Error("Theia static preview has an unexpected native Markdown extension identity");
-const markdownBrowser=join(markdownPluginRoot,
-  (markdownManifest.browser??"").replace(/^\\.\\//,""));
+const markdownBrowserPath=String(markdownManifest.browser??"").startsWith("./")
+  ?markdownManifest.browser.slice(2):markdownManifest.browser;
+const markdownBrowser=join(markdownPluginRoot,markdownBrowserPath);
+  ?markdownManifest.browser.slice(2):markdownManifest.browser;
 const markdownWorker=join(markdownPluginRoot,"dist/browser/serverWorkerMain.js");
 for(const asset of [markdownBrowser,markdownWorker])
   if(!existsSync(asset)||statSync(asset).size<100)
