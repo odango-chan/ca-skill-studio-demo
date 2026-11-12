@@ -305,9 +305,13 @@ try{
       bodyText:document.body.innerText.slice(-2200),
       explorerText:document.querySelector('.theia-navigator-container')?.innerText??'',
       noFolderPrompt:(document.querySelector('.theia-navigator-container')?.innerText??'')
-        .includes('You have not yet opened a folder.'),
+        .includes('You have not yet opened a folder.')||
+        (document.querySelector('.theia-navigator-container')?.innerText??'')
+        .includes('You have not yet added a folder to the workspace.'),
       workspaceRootVisible:(document.querySelector('.theia-navigator-container')?.innerText??'')
-        .includes('skill-studio-demo'),
+        .includes('workspaces')||
+        (document.querySelector('.theia-navigator-container')?.innerText??'')
+        .includes('skills'),
       notificationText:[...document.querySelectorAll('.theia-notification-list-item,.theia-notification-message')]
         .map(x=>x.innerText).filter(Boolean).slice(0,7),
       visibleEditors:document.querySelectorAll('.monaco-editor').length,
@@ -1439,6 +1443,41 @@ try{
     throw Error("Two-SKILL Package Overview Chromium acceptance did not complete: "+
       JSON.stringify(packageOverviewEvidence));
   console.log("STUDIO_THEIA_STAGE","package-overview");
+  // Inspect the native Explorer itself, not Package Overview's fallback scan
+  // over open documents. This is the regression that the old smoke missed.
+  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"F1",code:"F1",windowsVirtualKeyCode:112});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"F1",code:"F1",windowsVirtualKeyCode:112});
+  await sleep(300);
+  await command("Input.insertText",{text:"Focus on Files Explorer"});
+  await sleep(500);
+  const focusExplorerRow=await evalJS(`(()=>{
+    const node=[...document.querySelectorAll('.monaco-list-row')].find(x=>
+      x.innerText.includes('Focus on Files Explorer'));
+    if(!node)return null;
+    const r=node.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2,text:node.innerText};
+  })()`);
+  if(!focusExplorerRow)
+    throw Error("The native Focus on Files Explorer command is unavailable");
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:focusExplorerRow.x,y:focusExplorerRow.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:focusExplorerRow.x,y:focusExplorerRow.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:focusExplorerRow.x,y:focusExplorerRow.y,button:"left",clickCount:1});
+  await sleep(500);
+  const nativeExplorer=await evalJS(`(()=>{
+    const explorer=document.querySelector('.theia-navigator-container');
+    const text=explorer?.innerText??'';
+    return {visible:Boolean(explorer),text,
+      noFolderPrompt:text.includes('You have not yet opened a folder.')||
+        text.includes('You have not yet added a folder to the workspace.'),
+      rootVisible:text.includes('workspaces')||text.includes('skills')};
+  })()`);
+  afterImport.explorerText=nativeExplorer.text;
+  afterImport.noFolderPrompt=nativeExplorer.noFolderPrompt;
+  afterImport.workspaceRootVisible=nativeExplorer.rootVisible;
+  afterImport.explorerVisible=nativeExplorer.visible;
+  if(!nativeExplorer.visible||nativeExplorer.noFolderPrompt||!nativeExplorer.rootVisible)
+    throw Error("The native Explorer still has no default project root: "+
+      JSON.stringify(nativeExplorer));
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={shellReadyMs,workbenchEvidence,packageOverviewEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
