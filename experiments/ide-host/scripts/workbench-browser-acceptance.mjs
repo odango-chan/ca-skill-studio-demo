@@ -2218,7 +2218,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify(nativeMarkdownUri));
   const nativeMarkdown=await waitNativeMarkdown(view=>
     view.heading==='Establish PDU Session'&&view.nativePreviewRoot&&
-    view.styles.some(url=>url.includes('/media/markdown-preview.css')),
+    view.styles.some(url=>url.includes('/media/native-markdown-preview.css')),
     'Studio-themed native Markdown preview');
   if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||
      nativeMarkdown.view.maxWidth!=='980px')
