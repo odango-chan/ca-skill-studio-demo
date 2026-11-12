@@ -169,14 +169,14 @@ export async function collectPackageSnapshot(vscode, procedureDocument, generati
   let libraryInventory="unavailable";
   let libraryReason=null;
   const projectRoot=projectRoots(vscode.workspace.workspaceFolders).find(entry=>{
-    const path=entry.path.replace(/\\/$/,"");
+    const path=entry.path.replace(/\/$/,"");
     return rootUri.scheme===entry.uri.scheme&&
       rootUri.authority===entry.uri.authority&&
       rootUri.path.startsWith(path+"/skills/");
   });
   if(projectRoot){
     const libraryRoot=projectRoot.uri.with({path:projectRoot.path+"/lib"});
-    const libraryPath=libraryRoot.path.replace(/\\/$/,"");
+    const libraryPath=libraryRoot.path.replace(/\/$/,"");
     const libraryCandidates=new Map();
     const libraryReasons=[];
     try{
@@ -190,8 +190,8 @@ export async function collectPackageSnapshot(vscode, procedureDocument, generati
           libraryReasons.push("Ignored a library file outside project lib/");
           continue;
         }
-        const relative=uri.path.slice(libraryPath.length).replace(/^\\//,"");
-        if(!relative||relative.includes("\\\\")||
+        const relative=uri.path.slice(libraryPath.length).replace(/^\//,"");
+        if(!relative||relative.includes("\\")||
            relative.split("/").some(part=>!part||part==="."||part==="..")){
           libraryReasons.push("Ignored an unsafe project lib/ path");
           continue;
@@ -201,8 +201,8 @@ export async function collectPackageSnapshot(vscode, procedureDocument, generati
       for(const document of openDocuments.values()){
         const uri=document.uri;
         if(!insideRoot(libraryRoot,uri))continue;
-        const relative=uri.path.slice(libraryPath.length).replace(/^\\//,"");
-        if(!relative||relative.includes("\\\\")||
+        const relative=uri.path.slice(libraryPath.length).replace(/^\//,"");
+        if(!relative||relative.includes("\\")||
            relative.split("/").some(part=>!part||part==="."||part==="..")){
           libraryReasons.push("Ignored an unsafe open project lib/ path");
           continue;
