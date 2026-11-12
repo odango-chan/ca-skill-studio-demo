@@ -452,7 +452,10 @@
         }
       ]
     },
-    "markdown.markdownItPlugins": true
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/markdown-preview.css"
+    ]
   },
   "scripts": {
     "build": "node ../scripts/build-ide-spike.mjs",
