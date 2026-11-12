@@ -47,6 +47,7 @@ export function registerWorkbench(vscode,context){
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
   const providers=new Map(),sessions=new Map(),selections=new Map(),markdownPanels=new Map(),
+    nativeMarkdownSecurityOriginals=new Map(),
     markdownOpening=new Set(),nativeMarkdownOpening=new Set();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
@@ -2754,21 +2755,19 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
       const matches=await vscode.workspace.findFiles(
-        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
+        '**/establish-pdu-session/references/3gpp-procedure.md','**/node_modules/**',5);
       const exact=matches.filter(item=>item.path.endsWith(
-        '/establish-pdu-session/SKILL.md'));
+        '/establish-pdu-session/references/3gpp-procedure.md'));
       if(exact.length!==1)
-        throw Error('Expected exactly one 5GC Skill package for the security probe');
-      const rootPath=exact[0].path.slice(0,-'/SKILL.md'.length);
-      const probe=exact[0].with({
-        path:rootPath+'/references/__native-markdown-security.md'
-      });
-      try{
-        await vscode.workspace.fs.stat(probe);
-        throw Error('Refusing to overwrite an existing Markdown security fixture');
-      }catch(error){
-        if(String(error?.message??error).includes('Refusing to overwrite'))throw error;
-      }
+        throw Error('Expected exactly one existing Markdown reference for the security probe');
+      const target=exact[0];
+      const doc=await vscode.workspace.openTextDocument(target);
+      if(doc.languageId!=='markdown')
+        throw Error('Existing reference is not registered as Markdown: '+doc.languageId);
+      const original=doc.getText();
+      if(nativeMarkdownSecurityOriginals.has(target.toString()))
+        throw Error('Native Markdown security probe is already active');
+      nativeMarkdownSecurityOriginals.set(target.toString(),original);
       const source=[
         '# Native Markdown Security Probe',
         '',
@@ -2780,23 +2779,41 @@ export function registerWorkbench(vscode,context){
         '[Missing package link](missing.md)',
         '![Remote pixel](https://example.invalid/markdown-pixel.png)',
         ''
-      ].join('\n');
-      await vscode.workspace.fs.writeFile(probe,new TextEncoder().encode(source));
-      const opened=await openNativeMarkdownPreview(probe);
+      ].join('\\n');
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(original.length)),source);
+      const applied=await vscode.workspace.applyEdit(edit);
+      if(!applied){
+        nativeMarkdownSecurityOriginals.delete(target.toString());
+        throw Error('Could not apply the temporary native Markdown security probe');
+      }
+      const opened=await openNativeMarkdownPreview(target);
       if(!opened){
-        await vscode.workspace.fs.delete(probe,{useTrash:false});
+        const restore=new vscode.WorkspaceEdit();
+        const changed=await vscode.workspace.openTextDocument(target);
+        restore.replace(target,new vscode.Range(changed.positionAt(0),changed.positionAt(changed.getText().length)),original);
+        await vscode.workspace.applyEdit(restore);
+        nativeMarkdownSecurityOriginals.delete(target.toString());
         throw Error('Native Markdown security probe could not establish a safe Package inventory');
       }
-      return probe.toString();
+      return target.toString();
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      const suffix='/establish-pdu-session/references/__native-markdown-security.md';
+      const suffix='/establish-pdu-session/references/3gpp-procedure.md';
       if(!target.path.endsWith(suffix))
-        throw Error('Refusing to delete a non-fixture Markdown file');
+        throw Error('Refusing to restore a non-fixture Markdown file');
+      const original=nativeMarkdownSecurityOriginals.get(target.toString());
+      if(typeof original!=='string')
+        throw Error('No original Markdown content is recorded for this security probe');
+      const doc=await vscode.workspace.openTextDocument(target);
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
+      const restored=await vscode.workspace.applyEdit(edit);
+      if(!restored)throw Error('Could not restore the original Markdown reference after security probe');
+      nativeMarkdownSecurityOriginals.delete(target.toString());
       clearNativeMarkdownPackagePolicies([target]);
-      await vscode.workspace.fs.delete(target,{useTrash:false});
       return true;
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
