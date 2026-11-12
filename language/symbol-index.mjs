@@ -35,22 +35,22 @@ function packageFilePath(value,sourcePath){
 function symbolKey(token,name,relativePath){
   switch(token.type){
     case "skillProcedure":
-      return "procedure\\u0000"+name;
+      return "procedure\u0000"+name;
     case "skillStep":{
       const procedure=token.path?.[0]==="procedures"?token.path[1]:null;
       return typeof procedure==="string"&&procedure
-        ? "step\\u0000"+procedure+"\\u0000"+name
+        ? "step\u0000"+procedure+"\\u0000"+name
         : null;
     }
     case "skillPredicate":
-      return "predicate\\u0000"+name;
+      return "predicate\u0000"+name;
     case "skillOperation":
-      return "operation\\u0000"+name;
+      return "operation\u0000"+name;
     // allowedResources.capabilities may grant a Capability or a direct
     // Operation. The v0.2 projection has no local Capability declaration
     // profile, so resolve this only when an exact imported Operation exists.
     case "skillCapability":
-      return "operation\\u0000"+name;
+      return "operation\u0000"+name;
     case "skillSchema":
     case "skillReference":{
       const targetPath=packageFilePath(name,relativePath);
