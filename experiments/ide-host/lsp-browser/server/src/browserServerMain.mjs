@@ -87,8 +87,12 @@ function createSession(rootUri) {
       });
     },
     analysis(snapshot, analysis) {
-      if (requestedGeneration.get(rootUri) === snapshot.generation)
+      if (requestedGeneration.get(rootUri) === snapshot.generation) {
         packageAnalyses.set(rootUri, { snapshot, analysis });
+        // Index only after the shared core has validated the Package boundary.
+        // The index is tied to the exact accepted source generation.
+        symbolIndexes.set(rootUri,buildSkillSymbolIndex(snapshot));
+      }
       refreshSemanticTokens();
     }
   });
@@ -605,7 +609,6 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
   // LanguageDiagnosticSession analysis may still be pending or PARTIAL; color
   // projection must not wait for Python indexing or diagnostics completion.
   packageSnapshots.set(rootUri, snapshot);
-  symbolIndexes.set(rootUri,buildSkillSymbolIndex(snapshot));
   let session = sessions.get(rootUri);
   if (!session) {
     session = createSession(rootUri);
