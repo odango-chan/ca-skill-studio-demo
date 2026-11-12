@@ -1985,9 +1985,14 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Return the native Explorer to the foreground: the evidence acceptance
   // opened the native Explorer and intentionally kept it selected.
   await invoke('workbench.files.action.focusFilesExplorer');
-  // Open the exact owner-pinned conventional Skill guide through the real
-  // Theia command registry, then exercise package-local navigation in Chromium.
+  // Open the exact owner-pinned conventional Skill guide. Markdown source
+  // remains a native TextDocument; the official VS Code extension owns preview.
   await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session');
+  const nativeMarkdownResult=await nativeCommand('skillStudio.internal.markdownNativeAcceptance');
+  if(nativeMarkdownResult?.previewOwner!=='vscode.markdown-language-features'||
+     nativeMarkdownResult?.command!=='markdown.showPreviewToSide')
+    throw Error('Native Markdown preview was not opened by the official extension: '+
+      JSON.stringify(nativeMarkdownResult));
   const markdownWorlds=new Map();
   async function markdownViews(){
     const tree=await command('Page.getFrameTree'),found=[];
@@ -1996,17 +2001,36 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         let contextId=markdownWorlds.get(node.frame.id);
         if(!contextId){
           const world=await command('Page.createIsolatedWorld',{
-            frameId:node.frame.id,worldName:'markdown-c5-acceptance',grantUniveralAccess:true
+            frameId:node.frame.id,worldName:'native-markdown-acceptance',
+            grantUniveralAccess:true
           });
           contextId=world.executionContextId;
           markdownWorlds.set(node.frame.id,contextId);
         }
         const result=await command('Runtime.evaluate',{
           contextId,returnByValue:true,
-          expression:'(()=>{const article=document.querySelector("article.markdown-preview");if(!article)return null;const theme=getComputedStyle(article),heading=article.querySelector("h1"),headingColor=heading?getComputedStyle(heading).color:"",bodyColor=theme.color;const cssLink=[...document.querySelectorAll("link")].find(el=>el.href.includes("markdown-preview.css"));const mappedBlocks=article.querySelectorAll("[data-source-line]").length;const splitToolbar=Boolean(document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]"));return {heading:heading?.textContent?.trim()??null,toc:!!article.querySelector(".md-toc"),tocLinks:[...article.querySelectorAll(".md-toc a")].filter(a=>(a.getAttribute("href")??"").startsWith("#md-heading-")).length,localPaths:[...article.querySelectorAll("a[data-local-path]")].map(a=>a.getAttribute("data-local-path")),headingColor,bodyColor,mappedBlocks,splitToolbar,themeApplied:Boolean(cssLink&&theme.maxWidth==="920px"&&parseFloat(theme.paddingLeft)>0&&headingColor&&headingColor!==bodyColor&&mappedBlocks>5&&splitToolbar)};})()'
+          expression:`(()=>{
+            const article=document.querySelector('.markdown-body');
+            if(!article)return null;
+            const heading=article.querySelector('h1');
+            const style=heading?getComputedStyle(heading):null;
+            const cssLink=[...document.querySelectorAll('link')]
+              .find(el=>el.href.includes('markdown-preview.css'));
+            const links=[...article.querySelectorAll('a[href]')].map(a=>a.href);
+            return {heading:heading?.textContent?.trim()??null,
+              headingColor:style?.color??null,
+              themeApplied:Boolean(cssLink&&style?.color==='rgb(25, 123, 107)'),
+              cssLoaded:Boolean(cssLink),
+              tableCount:article.querySelectorAll('table').length,
+              linkHrefs:links,
+              scrollY:window.scrollY,
+              scrollHeight:document.documentElement.scrollHeight,
+              viewportHeight:document.documentElement.clientHeight,
+              bodyClass:document.body.className};
+          })()`
         });
         if(result.result?.value?.heading)
-          found.push({contextId,...result.result.value});
+          found.push({contextId,...result.result.value,frameUrl:node.frame.url});
       }catch{
         markdownWorlds.delete(node.frame.id);
       }
@@ -2017,125 +2041,137 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }
   async function waitMarkdown(predicate,label){
     let views=[];
-    for(let attempt=0;attempt<80;attempt++){
+    for(let attempt=0;attempt<100;attempt++){
       views=await markdownViews();
       const view=views.find(predicate);
       if(view)return {view,views};
       await sleep(100);
     }
-    throw Error(label+' did not appear in a real Theia Webview: '+JSON.stringify(views));
+    throw Error(label+' did not appear in a native Markdown Webview: '+JSON.stringify(views));
   }
   const guideOpen=await waitMarkdown(
-    view=>view.heading==='Establish PDU Session'&&view.themeApplied,'Themed conventional SKILL.md preview');
-  if(!guideOpen.view.toc||guideOpen.view.tocLinks<10||
-     !guideOpen.view.localPaths.includes('references/3gpp-procedure.md')||
-     !guideOpen.view.localPaths.includes('references/session-selection.md')||
-     !guideOpen.view.localPaths.includes('references/failure-handling.md')||
-     !guideOpen.view.localPaths.includes('assurance/procedure.yaml'))
-    throw Error('SKILL.md outline or explicit Reference links are incomplete: '+
+    view=>view.heading==='Establish PDU Session'&&view.themeApplied,
+    'Themed native conventional SKILL.md preview');
+  if(!guideOpen.view.cssLoaded||guideOpen.view.tableCount<1||
+     !guideOpen.view.linkHrefs.some(href=>href.includes('references/3gpp-procedure.md'))||
+     !guideOpen.view.linkHrefs.some(href=>href.includes('assurance/procedure.yaml')))
+    throw Error('Native Markdown Preview is missing its theme, tables or relative links: '+
       JSON.stringify(guideOpen.view));
   const markdownTabGroups=()=>evalJS(
-    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>{"+
-    "const label=tab.textContent.trim();return label==='SKILL.md'||(label.includes('Markdown')&&label.includes('SKILL.md'));});"+
-    "const groups=new Map();for(const tab of tabs){const bar=tab.parentElement;if(!groups.has(bar)){"+
+    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>"+
+    "tab.textContent.trim().includes('SKILL.md'));const groups=new Map();"+
+    "for(const tab of tabs){const bar=tab.parentElement;if(!groups.has(bar)){"+
     "const r=bar.getBoundingClientRect();groups.set(bar,{index:groups.size,labels:[],"+
     "rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}groups.get(bar).labels.push(tab.textContent.trim());}"+
     "return [...groups.values()];})()");
   let splitGroups=await markdownTabGroups();
-  const sourceGroup=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
-  const previewGroup=splitGroups.find(group=>group.labels.some(label=>
-    label.includes('Markdown')&&label.includes('SKILL.md')));
-  if(!sourceGroup||!previewGroup||sourceGroup.index===previewGroup.index)
-    throw Error('Markdown must open native SKILL.md Source and read-only Preview in two editor groups: '+
+  if(splitGroups.length<2)
+    throw Error('Native Markdown must open Source and Preview in separate editor groups: '+
       JSON.stringify(splitGroups));
-  const singlePaneClick=await command('Runtime.evaluate',{
-    contextId:guideOpen.view.contextId,returnByValue:true,
-    expression:'(()=>{const button=document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]");if(!button)return false;button.click();return true;})()'
-  });
-  if(singlePaneClick.result?.value!==true)
-    throw Error('Markdown single-pane toggle button is missing');
-  await sleep(350);
-  splitGroups=await markdownTabGroups();
-  const sourceSingle=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
-  const previewSingle=splitGroups.find(group=>group.labels.some(label=>
-    label.includes('Markdown')&&label.includes('SKILL.md')));
-  if(!sourceSingle||!previewSingle||sourceSingle.index!==previewSingle.index)
-    throw Error('Markdown single-pane toggle did not move Preview into the Source editor group: '+
-      JSON.stringify(splitGroups));
-  const singlePaneGuide=await waitMarkdown(
-    view=>view.heading==='Establish PDU Session'&&view.splitToolbar,
-    'Markdown Preview after moving into a single editor group');
-  const restoreClick=await command('Runtime.evaluate',{
-    contextId:singlePaneGuide.view.contextId,returnByValue:true,
-    expression:'(()=>{const button=document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]");if(!button)return false;button.click();return true;})()'
-  });
-  if(restoreClick.result?.value!==true)
-    throw Error('Markdown restore-split toolbar button is missing');
-  await sleep(350);
-  splitGroups=await markdownTabGroups();
-  const sourceRestored=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
-  const previewRestored=splitGroups.find(group=>group.labels.some(label=>
-    label.includes('Markdown')&&label.includes('SKILL.md')));
-  if(!sourceRestored||!previewRestored||sourceRestored.index===previewRestored.index)
-    throw Error('Markdown restore-split toggle did not restore two editor groups: '+
-      JSON.stringify(splitGroups));
-  console.log('STUDIO_MARKDOWN_SPLIT_CHROMIUM',JSON.stringify({
-    initialSourceGroup:sourceGroup.index,initialPreviewGroup:previewGroup.index,
-    singlePaneGroup:sourceSingle.index,restoredSourceGroup:sourceRestored.index,
-    restoredPreviewGroup:previewRestored.index
+  console.log('STUDIO_NATIVE_MARKDOWN_SPLIT_CHROMIUM',JSON.stringify({
+    groups:splitGroups,preview:guideOpen.view
   }));
+
+  // Verify bidirectional scroll synchronization between the Monaco Source
+  // editor and the native Markdown Preview webview.
+  const sourceScroll=()=>evalJS(`(()=>{
+    const editor=document.querySelector('.monaco-editor');
+    const scroll=editor?.querySelector('.monaco-scrollable-element.editor-scrollable');
+    return scroll?{top:scroll.scrollTop,height:scroll.scrollHeight,client:scroll.clientHeight}:null;
+  })()`);
+  const sourceBefore=await sourceScroll();
+  if(!sourceBefore||sourceBefore.height<=sourceBefore.client)
+    throw Error('Native Markdown Source editor is not scrollable: '+JSON.stringify(sourceBefore));
+  await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{window.scrollTo(0,0);return true;})()'
+  });
+  await evalJS(`(()=>{
+    const scroll=document.querySelector('.monaco-editor .monaco-scrollable-element.editor-scrollable');
+    if(!scroll)return false;
+    scroll.scrollTop=scroll.scrollHeight;
+    scroll.dispatchEvent(new Event('scroll',{bubbles:true}));
+    return true;
+  })()`);
+  await sleep(500);
+  const previewAfterSourceScroll=await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,
+    expression:'({top:window.scrollY,height:document.documentElement.scrollHeight,client:document.documentElement.clientHeight})'
+  });
+  if((previewAfterSourceScroll.result?.value?.top??0)<20)
+    throw Error('Scrolling Markdown Source did not scroll the native Preview: '+
+      JSON.stringify({sourceBefore,previewAfterSourceScroll:previewAfterSourceScroll.result?.value}));
+  const sourceBeforePreviewScroll=await sourceScroll();
+  await evalJS(`(()=>{
+    const scroll=document.querySelector('.monaco-editor .monaco-scrollable-element.editor-scrollable');
+    if(!scroll)return false;
+    scroll.scrollTop=0;scroll.dispatchEvent(new Event('scroll',{bubbles:true}));
+    return true;
+  })()`);
+  await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{window.scrollTo(0,0);return true;})()'
+  });
+  await command('Runtime.evaluate',{
+    contextId:guideOpen.view.contextId,returnByValue:true,
+    expression:'(()=>{window.scrollTo(0,document.documentElement.scrollHeight);return true;})()'
+  });
+  await sleep(500);
+  const sourceAfterPreviewScroll=await sourceScroll();
+  if((sourceAfterPreviewScroll?.top??0)<20)
+    throw Error('Scrolling native Markdown Preview did not scroll the Source editor: '+
+      JSON.stringify({sourceBeforePreviewScroll,sourceAfterPreviewScroll}));
+  console.log('STUDIO_NATIVE_MARKDOWN_SCROLL_SYNC_CHROMIUM',JSON.stringify({
+    sourceBefore,previewAfterSourceScroll:previewAfterSourceScroll.result?.value,
+    sourceBeforePreviewScroll,sourceAfterPreviewScroll
+  }));
+
+  // Native Markdown layout toggle delegates to the standard preview commands.
+  await nativeCommand('skillStudio.toggleMarkdownLayout');
+  await sleep(300);
+  splitGroups=await markdownTabGroups();
+  if(splitGroups.length!==1)
+    throw Error('Native Markdown inline layout did not collapse into one editor group: '+
+      JSON.stringify(splitGroups));
+  await nativeCommand('skillStudio.toggleMarkdownLayout');
+  await sleep(300);
+  splitGroups=await markdownTabGroups();
+  if(splitGroups.length<2)
+    throw Error('Native Markdown side-by-side layout did not restore two editor groups: '+
+      JSON.stringify(splitGroups));
+  console.log('STUDIO_NATIVE_MARKDOWN_LAYOUT_TOGGLE_CHROMIUM',JSON.stringify(splitGroups));
+
+  // Relative links stay inside the built-in Markdown Preview navigation flow.
   const openReference=await command('Runtime.evaluate',{
     contextId:guideOpen.view.contextId,returnByValue:true,
-    expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="references/3gpp-procedure.md");if(!link)return false;link.click();return true;})()'
+    expression:'(()=>{const link=[...document.querySelectorAll(".markdown-body a[href]")].find(a=>a.href.includes("references/3gpp-procedure.md"));if(!link)return false;link.click();return true;})()'
   });
   if(openReference.result?.value!==true)
-    throw Error('Could not click the explicit 3GPP Reference path in SKILL.md');
+    throw Error('Could not follow the explicit 3GPP Reference link in native Markdown Preview');
   const referenceOpen=await waitMarkdown(
     view=>view.heading==='PDU Session Establishment: actors and causal boundaries',
-    '3GPP Reference preview');
-  if(!referenceOpen.view.localPaths.includes('../SKILL.md'))
-    throw Error('Reference preview did not expose its explicit link back to SKILL.md: '+
-      JSON.stringify(referenceOpen.view));
-  const beforeForgery=(await markdownViews()).length;
-  await command('Runtime.evaluate',{
-    contextId:referenceOpen.view.contextId,returnByValue:true,
-    expression:'(()=>{const link=document.createElement("a");link.href="#";link.dataset.localPath="../../establish-pdu-session-mas/SKILL.md";document.body.append(link);link.click();link.remove();return true;})()'
-  });
-  await sleep(300);
-  const afterForgery=await markdownViews();
-  const traversalBlocked=afterForgery.length===beforeForgery;
-  if(!traversalBlocked)
-    throw Error('Forged Webview message opened a file outside the active Skill Package');
-  const guidePreviewActive=()=>evalJS(
-    `[...document.querySelectorAll('.lm-TabBar-tab.lm-mod-current')]
-      .some(tab=>tab.textContent.trim()==='Markdown · SKILL.md')`);
-  if(await guidePreviewActive())
-    throw Error('Reference navigation did not select the Reference preview');
+    'Native 3GPP Reference preview');
   const returnToGuide=await command('Runtime.evaluate',{
     contextId:referenceOpen.view.contextId,returnByValue:true,
-    expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="../SKILL.md");if(!link)return false;link.click();return true;})()'
+    expression:'(()=>{const link=[...document.querySelectorAll(".markdown-body a[href]")].find(a=>a.href.endsWith("/SKILL.md"));if(!link)return false;link.click();return true;})()'
   });
   if(returnToGuide.result?.value!==true)
-    throw Error('Could not follow Reference → SKILL.md navigation');
-  let returnedGuideActive=false;
-  for(let attempt=0;attempt<80;attempt++){
-    returnedGuideActive=await guidePreviewActive();
-    if(returnedGuideActive)break;
-    await sleep(100);
-  }
-  if(!returnedGuideActive)
-    throw Error('Reference → SKILL.md did not select the guide preview');
+    throw Error('Could not navigate from native Reference Preview back to SKILL.md');
+  const returnedGuide=await waitMarkdown(
+    view=>view.heading==='Establish PDU Session','Native return navigation to SKILL.md');
   await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session-mas');
   const masOpen=await waitMarkdown(
-    view=>view.heading==='Establish PDU Session through SMF MAS'&&view.themeApplied,'Themed MAS SKILL.md preview');
-  if(!masOpen.view.toc||masOpen.view.localPaths.length!==0)
-    throw Error('MAS Skill preview invented Package-local Reference links: '+
-      JSON.stringify(masOpen.view));
+    view=>view.heading==='Establish PDU Session through SMF MAS'&&view.themeApplied,
+    'Themed native MAS SKILL.md preview');
+  if(!masOpen.view.cssLoaded)
+    throw Error('Native Markdown theme was not applied to the MAS Skill');
   const markdownGuideEvidence={
     conventional:guideOpen.view,reference:referenceOpen.view,
-    returnedGuideActive,mas:masOpen.view,traversalBlocked
+    returnedGuide:returnedGuide.view,mas:masOpen.view,
+    scrollSync:{sourceToPreview:true,previewToSource:true},
+    layouts:{sideBySide:true,inline:true}
   };
-  console.log('STUDIO_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
+  console.log('STUDIO_NATIVE_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
   await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
   let contractView=null,contractFrame=null,contractContextId=null;
