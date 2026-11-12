@@ -512,7 +512,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const root=document.querySelector('.theia-Files')??document;
     const nodes=[...root.querySelectorAll('.theia-TreeNode')];
     const normalize=value=>value.replace(/\\s+/g,' ').trim();
-    const el=nodes.find(node=>normalize(node.innerText)==='procedure.yaml'&&
+    const el=nodes.find(node=>normalize(node.innerText).replace(/\\s+\\d+$/,'')==='procedure.yaml'&&
       node.getBoundingClientRect().width>0);
     if(!el)return {found:false,nodeCount:nodes.length,
       fileRows:nodes.map(node=>normalize(node.innerText)).filter(name=>name.includes('procedure.yaml')).slice(0,12)};
@@ -568,7 +568,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const roots=[...document.querySelectorAll('.theia-Files')];
       const rows=(roots.length?roots:[document]).flatMap(root=>
         [...root.querySelectorAll('.theia-TreeNode')]);
-      const row=rows.find(node=>node.innerText.replace(/\\s+/g,' ').trim()==='procedure.yaml'&&
+      const row=rows.find(node=>node.innerText.replace(/\\s+/g,' ').trim().replace(/\\s+\\d+$/,'')==='procedure.yaml'&&
         node.getBoundingClientRect().width>0);
       if(!row)return {found:false,reason:'procedure row unavailable'};
       row.scrollIntoView({block:'center',inline:'nearest'});
@@ -604,7 +604,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // checks so the active Webview frame and its selection are unambiguous.
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.replace(/\\s+\\d+$/,'').trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file disappeared after closing preview/pinned tabs');
   await click(file.x,file.y,2);
   let singlePinned=null;
