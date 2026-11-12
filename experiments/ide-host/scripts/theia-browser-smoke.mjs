@@ -30,8 +30,16 @@ const server=externalUrl?null:createServer((req,res)=>{
   let name;
   try{name=decodeURIComponent(url.pathname);}catch{res.writeHead(400).end();return;}
   if(basePath){
-    if(name!==basePath&&!name.startsWith(basePath+"/")){res.writeHead(404).end();return;}
-    name=name.slice(basePath.length)||"/";
+    if(name===basePath||name.startsWith(basePath+"/")){
+      name=name.slice(basePath.length)||"/";
+    }else if(!name.startsWith("/hostedPlugin/")){
+      res.writeHead(404).end();return;
+    }
+    // Theia's browser extension host constructs extensionUri from the origin
+    // root, even when the workbench itself is hosted below a Pages base path.
+    // Browser Workers therefore request /hostedPlugin/... without the app
+    // prefix. Permit only immutable generated plugin assets at that root;
+    // all other static requests remain confined to the configured base path.
   }
   requests.add(name);
   const file=resolve(root,"."+name.replace(/\/$/,"/index.html"));
@@ -44,6 +52,20 @@ const server=externalUrl?null:createServer((req,res)=>{
   });
 });
 if(server)await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
+if(server){
+  const workerPath="/hostedPlugin/vscode_markdown_language_features/dist/browser/serverWorkerMain.js";
+  const workerFile=join(root,workerPath);
+  if(!existsSync(workerFile))
+    throw Error("Pinned native Markdown Worker was not staged: "+workerFile);
+  const workerProbe=await fetch("http://127.0.0.1:"+server.address().port+workerPath);
+  if(!workerProbe.ok)
+    throw Error("Theia root-relative hostedPlugin Worker route failed: "+
+      workerPath+" status="+workerProbe.status);
+  console.log("STUDIO_THEIA_ROOT_RELATIVE_PLUGIN_WORKER",JSON.stringify({
+    path:workerPath,status:workerProbe.status,bytes:(await workerProbe.arrayBuffer()).byteLength,
+    basePath
+  }));
+}
 const url=externalUrl||("http://127.0.0.1:"+server.address().port+basePath+"/");
 const profile=await mkdtemp(join(tmpdir(),"theia-online-chrome-"));
 const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",

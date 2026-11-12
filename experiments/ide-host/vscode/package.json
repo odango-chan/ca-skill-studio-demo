@@ -21,7 +21,6 @@
     "onCommand:skillStudio.auditPackage",
     "onCommand:skillStudio.exportPackageZip",
     "onCommand:skillStudio.previewMarkdown",
-    "onCommand:skillStudio.toggleMarkdownLayout",
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
     "onCommand:skillStudio.editNodeOperatorValue",
@@ -95,10 +94,6 @@
       {
         "command": "skillStudio.previewMarkdown",
         "title": "SKILL Studio: Preview Markdown"
-      },
-      {
-        "command": "skillStudio.toggleMarkdownLayout",
-        "title": "SKILL Studio: Toggle Markdown Split"
       },
       {
         "command": "skillStudio.refreshInspection",
@@ -189,15 +184,21 @@
         "title": "Skill Studio: Inspect Locked Contract"
       }
     ],
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/native-markdown-preview.css"
+    ],
+    "languages": [
+      {
+        "id": "markdown",
+        "aliases": ["Markdown","markdown"],
+        "extensions": [".md",".markdown"]
+      }
+    ],
     "menus": {
       "editor/title": [
         {
           "command": "skillStudio.previewMarkdown",
-          "when": "resourceExtname == .md",
-          "group": "navigation"
-        },
-        {
-          "command": "skillStudio.toggleMarkdownLayout",
           "when": "resourceExtname == .md",
           "group": "navigation"
         }

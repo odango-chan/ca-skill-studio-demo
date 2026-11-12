@@ -47,6 +47,8 @@ jobs:
         run: node experiments/ide-host/scripts/prepare-theia-online.mjs
       - name: Install isolated Theia 1.76 browser app
         run: npm install --prefix experiments/ide-host/theia-browser --no-audit --no-fund
+      - name: Download pinned built-in Markdown extension from Open VSX
+        run: npm run download:plugins --prefix experiments/ide-host/theia-browser
       - name: Build normal Theia browser app with backend
         run: npm run build --prefix experiments/ide-host/theia-browser
       - name: Apply Classic shell icons and SKILL Studio menu branding
@@ -60,6 +62,9 @@ jobs:
           test -s "$HOME/.theia/plugins/odango-chan.skill-studio-theme/package.json"
           cp -R experiments/ide-host/theia-online/plugins/odango-chan.skill-studio-languages "$HOME/.theia/plugins/"
           test -s "$HOME/.theia/plugins/odango-chan.skill-studio-languages/package.json"
+          markdown_manifest=$(find experiments/ide-host/theia-online/plugins -mindepth 2 -maxdepth 5 -type f -name package.json -print | while IFS= read -r file; do grep -q '"name"[[:space:]]*:[[:space:]]*"markdown-language-features"' "$file" && { echo "$file"; break; }; done)
+          test -n "$markdown_manifest"
+          cp -R "$(dirname "$markdown_manifest")" "$HOME/.theia/plugins/"
       - name: Start Theia backend for Webview endpoint
         run: |
           npm run start --prefix experiments/ide-host/theia-browser > /tmp/theia-browser.log 2>&1 &

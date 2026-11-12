@@ -598,7 +598,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const root=document.querySelector('.theia-Files')??document;
     const nodes=[...root.querySelectorAll('.theia-TreeNode')];
     const normalize=value=>value.replace(/\\s+/g,' ').trim();
-    const el=nodes.find(node=>normalize(node.innerText)==='procedure.yaml'&&
+    const el=nodes.find(node=>normalize(node.innerText).replace(/\\s+\\d+$/,'')==='procedure.yaml'&&
       node.getBoundingClientRect().width>0);
     if(!el)return {found:false,nodeCount:nodes.length,
       fileRows:nodes.map(node=>normalize(node.innerText)).filter(name=>name.includes('procedure.yaml')).slice(0,12)};
@@ -654,7 +654,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const roots=[...document.querySelectorAll('.theia-Files')];
       const rows=(roots.length?roots:[document]).flatMap(root=>
         [...root.querySelectorAll('.theia-TreeNode')]);
-      const row=rows.find(node=>node.innerText.replace(/\\s+/g,' ').trim()==='procedure.yaml'&&
+      const row=rows.find(node=>node.innerText.replace(/\\s+/g,' ').trim().replace(/\\s+\\d+$/,'')==='procedure.yaml'&&
         node.getBoundingClientRect().width>0);
       if(!row)return {found:false,reason:'procedure row unavailable'};
       row.scrollIntoView({block:'center',inline:'nearest'});
@@ -690,7 +690,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // checks so the active Webview frame and its selection are unambiguous.
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
+  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.replace(/\\s+\\d+$/,'').trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
   if(!file)throw Error('Procedure file disappeared after closing preview/pinned tabs');
   await click(file.x,file.y,2);
   let singlePinned=null;
@@ -1200,12 +1200,20 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // A prior TextDocument edit may have scheduled a debounced Package Audit.
   // Do not start another native edit while that audit still owns the current
   // snapshot; wait for the exact Package Audit terminal state first.
+  let phaseAuditRetryCount=0;
   for(let attempt=0;attempt<100;attempt++){
     phaseEvidenceText=await evalJS('document.body.innerText');
     if(/Package Audit · [0-9]+ editor warnings/.test(phaseEvidenceText))break;
-    if(phaseEvidenceText.includes('Package Audit · unavailable'))
-      throw Error('Package Audit became unavailable before Phase binding edit: '+
+    if(phaseEvidenceText.includes('Package Audit · unavailable')){
+      if(phaseAuditRetryCount===0){
+        phaseAuditRetryCount++;
+        await invoke('skillStudio.auditPackage');
+        await sleep(150);
+        continue;
+      }
+      throw Error('Package Audit remained unavailable after one explicit retry before Phase binding edit: '+
         phaseEvidenceText.slice(-1000));
+    }
     await sleep(100);
   }
   if(!/Package Audit · [0-9]+ editor warnings/.test(phaseEvidenceText))
@@ -1624,155 +1632,245 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   await invoke('workbench.files.action.focusFilesExplorer');
   // Open the exact owner-pinned conventional Skill guide through the real
   // Theia command registry, then exercise package-local navigation in Chromium.
-  await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session');
-  const markdownWorlds=new Map();
-  async function markdownViews(){
-    const tree=await command('Page.getFrameTree'),found=[];
-    async function walk(node){
-      try{
-        let contextId=markdownWorlds.get(node.frame.id);
-        if(!contextId){
-          const world=await command('Page.createIsolatedWorld',{
-            frameId:node.frame.id,worldName:'markdown-c5-acceptance',grantUniveralAccess:true
-          });
-          contextId=world.executionContextId;
-          markdownWorlds.set(node.frame.id,contextId);
-        }
-        const result=await command('Runtime.evaluate',{
-          contextId,returnByValue:true,
-          expression:'(()=>{const article=document.querySelector("article.markdown-preview");if(!article)return null;const theme=getComputedStyle(article),heading=article.querySelector("h1"),headingColor=heading?getComputedStyle(heading).color:"",bodyColor=theme.color;const cssLink=[...document.querySelectorAll("link")].find(el=>el.href.includes("markdown-preview.css"));const mappedBlocks=article.querySelectorAll("[data-source-line]").length;const splitToolbar=Boolean(document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]"));return {heading:heading?.textContent?.trim()??null,toc:!!article.querySelector(".md-toc"),tocLinks:[...article.querySelectorAll(".md-toc a")].filter(a=>(a.getAttribute("href")??"").startsWith("#md-heading-")).length,localPaths:[...article.querySelectorAll("a[data-local-path]")].map(a=>a.getAttribute("data-local-path")),headingColor,bodyColor,mappedBlocks,splitToolbar,themeApplied:Boolean(cssLink&&theme.maxWidth==="920px"&&parseFloat(theme.paddingLeft)>0&&headingColor&&headingColor!==bodyColor&&mappedBlocks>5&&splitToolbar)};})()'
-        });
-        if(result.result?.value?.heading)
-          found.push({contextId,...result.result.value});
-      }catch{
-        markdownWorlds.delete(node.frame.id);
-      }
-      for(const child of node.childFrames??[])await walk(child);
-    }
-    await walk(tree.frameTree);
-    return found;
-  }
-  async function waitMarkdown(predicate,label){
-    let views=[];
-    for(let attempt=0;attempt<80;attempt++){
-      views=await markdownViews();
-      const view=views.find(predicate);
-      if(view)return {view,views};
-      await sleep(100);
-    }
-    throw Error(label+' did not appear in a real Theia Webview: '+JSON.stringify(views));
-  }
-  const guideOpen=await waitMarkdown(
-    view=>view.heading==='Establish PDU Session'&&view.themeApplied,'Themed conventional SKILL.md preview');
-  if(!guideOpen.view.toc||guideOpen.view.tocLinks<10||
-     !guideOpen.view.localPaths.includes('references/3gpp-procedure.md')||
-     !guideOpen.view.localPaths.includes('references/session-selection.md')||
-     !guideOpen.view.localPaths.includes('references/failure-handling.md')||
-     !guideOpen.view.localPaths.includes('assurance/procedure.yaml'))
-    throw Error('SKILL.md outline or explicit Reference links are incomplete: '+
-      JSON.stringify(guideOpen.view));
-  const markdownTabGroups=()=>evalJS(
-    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>{"+
-    "const label=tab.textContent.trim();return label==='SKILL.md'||(label.includes('Markdown')&&label.includes('SKILL.md'));});"+
-    "const groups=new Map();for(const tab of tabs){const bar=tab.parentElement;if(!groups.has(bar)){"+
-    "const r=bar.getBoundingClientRect();groups.set(bar,{index:groups.size,labels:[],"+
-    "rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}groups.get(bar).labels.push(tab.textContent.trim());}"+
-    "return [...groups.values()];})()");
-  let splitGroups=await markdownTabGroups();
-  const sourceGroup=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
-  const previewGroup=splitGroups.find(group=>group.labels.some(label=>
-    label.includes('Markdown')&&label.includes('SKILL.md')));
-  if(!sourceGroup||!previewGroup||sourceGroup.index===previewGroup.index)
-    throw Error('Markdown must open native SKILL.md Source and read-only Preview in two editor groups: '+
-      JSON.stringify(splitGroups));
-  const singlePaneClick=await command('Runtime.evaluate',{
-    contextId:guideOpen.view.contextId,returnByValue:true,
-    expression:'(()=>{const button=document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]");if(!button)return false;button.click();return true;})()'
-  });
-  if(singlePaneClick.result?.value!==true)
-    throw Error('Markdown single-pane toggle button is missing');
-  await sleep(350);
-  splitGroups=await markdownTabGroups();
-  const sourceSingle=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
-  const previewSingle=splitGroups.find(group=>group.labels.some(label=>
-    label.includes('Markdown')&&label.includes('SKILL.md')));
-  if(!sourceSingle||!previewSingle||sourceSingle.index!==previewSingle.index)
-    throw Error('Markdown single-pane toggle did not move Preview into the Source editor group: '+
-      JSON.stringify(splitGroups));
-  const singlePaneGuide=await waitMarkdown(
-    view=>view.heading==='Establish PDU Session'&&view.splitToolbar,
-    'Markdown Preview after moving into a single editor group');
-  const restoreClick=await command('Runtime.evaluate',{
-    contextId:singlePaneGuide.view.contextId,returnByValue:true,
-    expression:'(()=>{const button=document.querySelector(".md-preview-toolbar button[data-action=toggle-layout]");if(!button)return false;button.click();return true;})()'
-  });
-  if(restoreClick.result?.value!==true)
-    throw Error('Markdown restore-split toolbar button is missing');
-  await sleep(350);
-  splitGroups=await markdownTabGroups();
-  const sourceRestored=splitGroups.find(group=>group.labels.some(label=>label==='SKILL.md'));
-  const previewRestored=splitGroups.find(group=>group.labels.some(label=>
-    label.includes('Markdown')&&label.includes('SKILL.md')));
-  if(!sourceRestored||!previewRestored||sourceRestored.index===previewRestored.index)
-    throw Error('Markdown restore-split toggle did not restore two editor groups: '+
-      JSON.stringify(splitGroups));
-  console.log('STUDIO_MARKDOWN_SPLIT_CHROMIUM',JSON.stringify({
-    initialSourceGroup:sourceGroup.index,initialPreviewGroup:previewGroup.index,
-    singlePaneGroup:sourceSingle.index,restoredSourceGroup:sourceRestored.index,
-    restoredPreviewGroup:previewRestored.index
-  }));
-  const openReference=await command('Runtime.evaluate',{
-    contextId:guideOpen.view.contextId,returnByValue:true,
-    expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="references/3gpp-procedure.md");if(!link)return false;link.click();return true;})()'
-  });
-  if(openReference.result?.value!==true)
-    throw Error('Could not click the explicit 3GPP Reference path in SKILL.md');
-  const referenceOpen=await waitMarkdown(
-    view=>view.heading==='PDU Session Establishment: actors and causal boundaries',
-    '3GPP Reference preview');
-  if(!referenceOpen.view.localPaths.includes('../SKILL.md'))
-    throw Error('Reference preview did not expose its explicit link back to SKILL.md: '+
-      JSON.stringify(referenceOpen.view));
-  const beforeForgery=(await markdownViews()).length;
-  await command('Runtime.evaluate',{
-    contextId:referenceOpen.view.contextId,returnByValue:true,
-    expression:'(()=>{const link=document.createElement("a");link.href="#";link.dataset.localPath="../../establish-pdu-session-mas/SKILL.md";document.body.append(link);link.click();link.remove();return true;})()'
-  });
-  await sleep(300);
-  const afterForgery=await markdownViews();
-  const traversalBlocked=afterForgery.length===beforeForgery;
-  if(!traversalBlocked)
-    throw Error('Forged Webview message opened a file outside the active Skill Package');
-  const guidePreviewActive=()=>evalJS(
-    `[...document.querySelectorAll('.lm-TabBar-tab.lm-mod-current')]
-      .some(tab=>tab.textContent.trim()==='Markdown · SKILL.md')`);
-  if(await guidePreviewActive())
-    throw Error('Reference navigation did not select the Reference preview');
-  const returnToGuide=await command('Runtime.evaluate',{
-    contextId:referenceOpen.view.contextId,returnByValue:true,
-    expression:'(()=>{const link=[...document.querySelectorAll("a[data-local-path]")].find(a=>a.dataset.localPath==="../SKILL.md");if(!link)return false;link.click();return true;})()'
-  });
-  if(returnToGuide.result?.value!==true)
-    throw Error('Could not follow Reference → SKILL.md navigation');
-  let returnedGuideActive=false;
-  for(let attempt=0;attempt<80;attempt++){
-    returnedGuideActive=await guidePreviewActive();
-    if(returnedGuideActive)break;
-    await sleep(100);
-  }
-  if(!returnedGuideActive)
-    throw Error('Reference → SKILL.md did not select the guide preview');
-  await nativeCommand('skillStudio.internal.markdownNavigationAcceptance','establish-pdu-session-mas');
-  const masOpen=await waitMarkdown(
-    view=>view.heading==='Establish PDU Session through SMF MAS'&&view.themeApplied,'Themed MAS SKILL.md preview');
-  if(!masOpen.view.toc||masOpen.view.localPaths.length!==0)
-    throw Error('MAS Skill preview invented Package-local Reference links: '+
-      JSON.stringify(masOpen.view));
-  const markdownGuideEvidence={
-    conventional:guideOpen.view,reference:referenceOpen.view,
-    returnedGuideActive,mas:masOpen.view,traversalBlocked
+  // The legacy Studio-owned Markdown renderer has been retired from the default path.
+  // Native Markdown Preview acceptance below now owns rendering, navigation and security checks.
+  const nativeMarkdownUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance','establish-pdu-session');
+  if(typeof nativeMarkdownUri!=='string'||!nativeMarkdownUri.endsWith('/SKILL.md'))
+    throw Error('Native Markdown preview command did not open the exact Skill Source URI: '+
+      JSON.stringify(nativeMarkdownUri));
+  const nativeMarkdown=await waitNativeMarkdown(view=>
+    view.heading==='Establish PDU Session'&&view.nativePreviewRoot&&
+    view.styles.some(url=>url.includes('/media/native-markdown-preview.css')),
+    'Studio-themed native Markdown preview');
+  if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||
+     nativeMarkdown.view.maxWidth!=='980px')
+    throw Error('Native Markdown preview did not apply the shared Studio theme: '+
+      JSON.stringify(nativeMarkdown.view));
+  const nativeMarkdownGroups=await evalJS(
+    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>"+
+    "tab.textContent.trim().includes('SKILL.md'));const groups=new Map();for(const tab of tabs){"+
+    "const bar=tab.parentElement;if(!groups.has(bar)){const r=bar.getBoundingClientRect();"+
+    "groups.set(bar,{index:groups.size,labels:[],rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}"+
+    "groups.get(bar).labels.push(tab.textContent.trim());}return [...groups.values()];})()");
+  const nativeSourceGroup=nativeMarkdownGroups.find(group=>
+    group.labels.some(label=>/^SKILL\.md/.test(label)));
+  const nativePreviewGroup=nativeMarkdownGroups.find(group=>
+    group.labels.some(label=>/^Preview(?:\s|·).*SKILL\.md/i.test(label)));
+  if(!nativeSourceGroup||!nativePreviewGroup||
+     nativeSourceGroup.index===nativePreviewGroup.index)
+    throw Error('Native Markdown must keep editable Source and Preview in separate editor groups: '+
+      JSON.stringify(nativeMarkdownGroups));
+  const nativeMarkdownEvidence={
+    uri:nativeMarkdownUri,preview:nativeMarkdown.view,
+    sourceGroup:nativeSourceGroup,previewGroup:nativePreviewGroup
   };
-  console.log('STUDIO_MARKDOWN_GUIDE_CHROMIUM',JSON.stringify(markdownGuideEvidence));
+  console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
+
+  // Prove native Markdown refreshes the existing preview from an unsaved
+  // Source edit, then exercise both scroll-sync directions through Monaco and
+  // the actual Markdown webview in Chromium.
+  const nativeLiveUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance');
+  try{
+    const nativeLive=await waitNativeMarkdown(
+      view=>view.heading==='Native Markdown Live Update Probe'&&view.nativePreviewRoot,
+      'native Markdown unsaved Source edit');
+    const nativeSettings=await nativeCommand('skillStudio.internal.nativeMarkdownSettingsAcceptance');
+    if(nativeSettings?.scrollEditorWithPreview!==true||
+       nativeSettings?.scrollPreviewWithEditor!==true)
+      throw Error('Native Markdown bidirectional scroll settings are not enabled: '+
+        JSON.stringify(nativeSettings));
+    if(nativeLive.view.contextId!==nativeMarkdown.view.contextId)
+      throw Error('Native Markdown recreated its Preview webview instead of updating it in place: '+
+        JSON.stringify({before:nativeMarkdown.view.contextId,after:nativeLive.view.contextId}));
+    const readSourceScroll=async()=>{
+      const state=await nativeCommand(
+        'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance');
+      if(!state?.editorFound||state.uri!==nativeMarkdownUri)
+        throw Error('Native Markdown visible Source editor is unavailable: '+JSON.stringify(state));
+      return {lineCount:state.lineCount,
+        visibleRanges:state.after??state.before??[],
+        topLine:state.after?.[0]?.start??state.before?.[0]?.start??null};
+    };
+    const sourceScroll=async direction=>{
+      const state=await nativeCommand(
+        'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',direction);
+      if(!state?.editorFound||state.uri!==nativeMarkdownUri)
+        throw Error('Native Markdown visible Source editor is unavailable: '+JSON.stringify(state));
+      return {lineCount:state.lineCount,visibleRanges:state.after??[],
+        topLine:state.after?.[0]?.start??null};
+    };
+    const previewScroll=async expression=>(await command('Runtime.evaluate',{
+      contextId:nativeLive.view.contextId,returnByValue:true,expression
+    })).result?.value;
+    await command('DOM.enable');
+    const scrollPreviewByWheel=async deltaY=>{
+      const owner=await command('DOM.getFrameOwner',{frameId:nativeLive.view.frameId});
+      const box=await command('DOM.getBoxModel',{backendNodeId:owner.backendNodeId});
+      const quad=box.model.content;
+      const frameMetrics=await previewScroll('({width:innerWidth,height:innerHeight})');
+      if(!frameMetrics?.width||!frameMetrics?.height)
+        throw Error('Native Markdown Preview viewport metrics are unavailable');
+      // Wheel over the left page gutter, not the center of a nested code/table
+      // scroller. The frame's page itself must receive the real wheel event.
+      const localX=Math.min(8,frameMetrics.width/20);
+      const localY=frameMetrics.height/2;
+      const x=quad[0]+(localX/frameMetrics.width)*(quad[2]-quad[0]);
+      const y=quad[1]+(localY/frameMetrics.height)*(quad[5]-quad[1]);
+      await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
+      // The published Open VSX Markdown extension uses a one-scroll-event
+      // suppression counter after its initial programmatic positioning.
+      // Model a continuous user gesture as two real wheel events so the
+      // follow-up event exercises Preview -> Source synchronization.
+      const firstDelta=Math.sign(deltaY)*Math.min(40,Math.abs(deltaY)/2);
+      await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY:firstDelta});
+      await sleep(75);
+      await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY:deltaY-firstDelta});
+      await sleep(150);
+      return previewScroll('window.scrollY');
+    };
+    const waitForScroll=async(read,predicate,label)=>{
+      let value=null;
+      for(let attempt=0;attempt<60;attempt++){
+        value=await read();
+        if(predicate(value))return value;
+        await sleep(100);
+      }
+      throw Error(label+' did not synchronize in real Chromium: '+JSON.stringify(value));
+    };
+    const waitForSourceScroll=async(predicate,label)=>{
+      try{
+        return await waitForScroll(()=>readSourceScroll(),predicate,label);
+      }catch(error){
+        const host=await nativeCommand('skillStudio.internal.nativeMarkdownSettingsAcceptance');
+        const scrollProbe=await nativeCommand(
+          'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance');
+        const previewEvents=await previewScroll(
+          'window.__studioNativeMarkdownScrollProbe??null');
+        throw Error(error.message+'; hostEditorState='+JSON.stringify(host)+
+          '; nativePreviewSettings='+JSON.stringify(nativeLive.view.previewSettings)+
+          '; sourceScrollEvents='+JSON.stringify(scrollProbe)+
+          '; previewScrollEvents='+JSON.stringify(previewEvents));
+      }
+    };
+    const initialSource=await readSourceScroll();
+    await previewScroll(`(()=>{
+      if(!window.__studioNativeMarkdownScrollProbe){
+        window.__studioNativeMarkdownScrollProbe={events:[],resizes:[]};
+        window.addEventListener('scroll',()=>{
+          window.__studioNativeMarkdownScrollProbe.events.push({
+            y:window.scrollY,at:performance.now(),
+            target:document.scrollingElement?.tagName??null
+          });
+          if(window.__studioNativeMarkdownScrollProbe.events.length>40)
+            window.__studioNativeMarkdownScrollProbe.events.shift();
+        },true);
+        window.addEventListener('resize',()=>{
+          window.__studioNativeMarkdownScrollProbe.resizes.push({
+            at:performance.now(),width:innerWidth,height:innerHeight
+          });
+          if(window.__studioNativeMarkdownScrollProbe.resizes.length>40)
+            window.__studioNativeMarkdownScrollProbe.resizes.shift();
+        },true);
+      }
+      window.__studioNativeMarkdownScrollProbe.events.length=0;
+      return {y:window.scrollY,target:document.scrollingElement?.tagName??null};
+    })()`);
+    if(initialSource.lineCount<=100)
+      throw Error('Native Markdown scroll fixture is not tall enough to test bidirectional synchronization: '+
+        JSON.stringify(initialSource));
+    const sourceBottom=await sourceScroll('bottom');
+    await waitForScroll(()=>previewScroll('window.scrollY'),
+      value=>value>100,'Native Source → Preview scroll');
+    await nativeCommand('skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance','clear');
+    const previewTop=await scrollPreviewByWheel(-12000);
+    await waitForSourceScroll(value=>value.topLine!==null&&value.topLine<3,
+      'Native Preview → Source top scroll');
+    const previewBottom=await scrollPreviewByWheel(12000);
+    const previewScrollDiagnostics=await previewScroll(
+      '(()=>({y:window.scrollY,innerHeight,bodyTop:document.body?.scrollTop??null,'+
+      'bodyHeight:document.body?.scrollHeight??null,rootTop:document.documentElement.scrollTop,'+
+      'rootHeight:document.documentElement.scrollHeight,scroller:document.scrollingElement?.tagName,'+
+      'scrollables:[...document.querySelectorAll("*")].filter(el=>el.scrollHeight>el.clientHeight+4&&'+
+      '/auto|scroll|overlay/.test(getComputedStyle(el).overflowY)).map(el=>({tag:el.tagName,'+
+      'id:el.id,className:String(el.className??""),top:el.scrollTop,height:el.scrollHeight,'+
+      'client:el.clientHeight,overflow:getComputedStyle(el).overflowY})).slice(0,20)}))()');
+    try{
+      await waitForSourceScroll(value=>value.topLine!==null&&value.topLine>100,
+        'Native Preview → Source bottom scroll');
+    }catch(error){
+      const scrollEvents=await previewScroll(
+        'window.__studioNativeMarkdownScrollProbe??null');
+      throw Error(error.message+'; previewBottom='+JSON.stringify(previewBottom)+
+        '; previewMetrics='+JSON.stringify(previewScrollDiagnostics)+
+        '; previewScrollEvents='+JSON.stringify(scrollEvents));
+    }
+    const sourceTop=await sourceScroll('top');
+    await waitForScroll(()=>previewScroll('window.scrollY'),value=>value<50,
+      'Native Source → Preview top scroll');
+    const nativeMarkdownLiveEvidence={
+      previewContextRetained:true,
+      initialSource,sourceBottom,previewAtTop:previewTop,
+      previewAtBottom:previewBottom,sourceAtTop:sourceTop,
+      finalPreviewScroll:await previewScroll('window.scrollY')
+    };
+    console.log('STUDIO_NATIVE_MARKDOWN_LIVE_SYNC_CHROMIUM',
+      JSON.stringify(nativeMarkdownLiveEvidence));
+  }finally{
+    await nativeCommand(
+      'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',nativeLiveUri);
+  }
+  const restoredNativeMarkdown=await waitNativeMarkdown(
+    view=>view.heading==='Establish PDU Session'&&view.nativePreviewRoot,
+    'native Markdown Source restoration');
+  if(restoredNativeMarkdown.view.contextId!==nativeMarkdown.view.contextId)
+    throw Error('Restoring the Markdown Source recreated the existing Preview webview');
+
+  const nativeSecurityUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownSecurityAcceptance');
+  if(typeof nativeSecurityUri!=='string'||
+     !nativeSecurityUri.endsWith('/references/3gpp-procedure.md'))
+    throw Error('Native Markdown security fixture was not created inside the 5GC Skill Package');
+  try{
+    const nativeSecurity=await waitNativeMarkdown(view=>
+      view.heading==='Native Markdown Security Probe'&&view.nativePreviewRoot,
+      'native Markdown Package security probe');
+    const evidence=nativeSecurity.view;
+    if(evidence.imageCount!==0||evidence.scriptMarkers!==0||evidence.scriptExecuted)
+      throw Error('Native Markdown allowed raw HTML or an image fetch: '+JSON.stringify(evidence));
+    const safeLink=evidence.anchorDetails.find(anchor=>
+      anchor.text==='Safe package reference');
+    const blockedLinks=evidence.anchorDetails.filter(anchor=>
+      anchor.text==='Escaping package link'||anchor.text==='Missing package link');
+    if(!safeLink||!safeLink.href||safeLink.href==='#'||blockedLinks.length)
+      throw Error('Native Markdown must retain the exact safe Package-local link and omit escaping/missing targets: '+
+        JSON.stringify({safeLink,blockedLinks,evidence}));
+    const safePackageLinkClick=await command('Runtime.evaluate',{
+      contextId:evidence.contextId,returnByValue:true,
+      expression:`(()=>{const link=[...document.querySelectorAll('a')].find(a=>
+        a.textContent.trim()==='Safe package reference');if(!link)return false;link.click();return true;})()`
+    });
+    if(safePackageLinkClick.result?.value!==true)
+      throw Error('Could not follow the safe Package-local link from the native Markdown preview');
+    const followedSafePackageLink=await waitNativeMarkdown(
+      view=>view.heading==='Establish PDU Session',
+      'native Markdown safe Package-local link navigation');
+    const safeLinkPreviewActive=await evalJS(
+      `[...document.querySelectorAll('.lm-TabBar-tab.lm-mod-current')]
+        .some(tab=>tab.textContent.trim()==='Markdown · SKILL.md')`);
+    if(followedSafePackageLink.view.heading!=='Establish PDU Session'||!safeLinkPreviewActive)
+      throw Error('Native Markdown safe Package-local link did not activate the owning Skill guide preview: '+JSON.stringify({view:followedSafePackageLink.view,safeLinkPreviewActive}));
+    if(!evidence.csp.includes("default-src 'none'")||
+       /script-src[^;]*unsafe-inline/.test(evidence.csp))
+      throw Error('Native Markdown preview is not using a strict script Content Security Policy: '+
+        JSON.stringify(evidence.csp));
+    console.log('STUDIO_NATIVE_MARKDOWN_SECURITY_CHROMIUM',JSON.stringify(evidence));
+  }finally{
+    await nativeCommand(
+      'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',nativeSecurityUri);
+  }
+
   // Contract is a distinct source-backed CustomEditor, not a second Procedure graph.
   await invokeSkillPackageFile('skillStudio.openContract','assurance/contract.yaml');
   let contractView=null,contractFrame=null,contractContextId=null;

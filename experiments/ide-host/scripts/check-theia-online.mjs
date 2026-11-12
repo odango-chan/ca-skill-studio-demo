@@ -27,6 +27,7 @@ const themeAssets=[
   "hostedPlugin/odango_chan_skill_studio_theme/package.json",
   "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
   "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
+  "hostedPlugin/odango_chan_skill_studio_theme/styles/markdown-preview.css",
   "hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg",
   "hostedPlugin/odango_chan_skill_studio_theme/icons/yaml.svg"
 ].map(p=>join(root,p));
@@ -39,6 +40,26 @@ console.log("STUDIO_THEIA_FRONTEND_ARTIFACT",JSON.stringify({
 if(!hasProcedurePlugin)throw Error("Theia browser-only build lacks prepared SKILL Studio Web extension");
 if(!hasThemePlugin)throw Error("Theia browser-only build lacks the built-in Skill Studio theme extension");
 if(missingThemeAssets.length)throw Error("Theia static preview is missing theme assets: "+missingThemeAssets.join(", "));
+const markdownPluginRoot=join(root,"hostedPlugin/vscode_markdown_language_features");
+const markdownManifestPath=join(markdownPluginRoot,"package.json");
+if(!existsSync(markdownManifestPath))
+  throw Error("Theia static preview lacks the pinned native Markdown extension");
+const markdownManifest=JSON.parse(readFileSync(markdownManifestPath,"utf8"));
+if(markdownManifest.publisher!=="vscode"||
+   markdownManifest.name!=="markdown-language-features"||
+   markdownManifest.version!=="1.95.3")
+  throw Error("Theia static preview has an unexpected native Markdown extension identity");
+const markdownBrowserPath=String(markdownManifest.browser??"").startsWith("./")
+  ?markdownManifest.browser.slice(2):markdownManifest.browser;
+const markdownBrowser=join(markdownPluginRoot,markdownBrowserPath);
+const markdownWorker=join(markdownPluginRoot,"dist/browser/serverWorkerMain.js");
+for(const asset of [markdownBrowser,markdownWorker])
+  if(!existsSync(asset)||statSync(asset).size<100)
+    throw Error("Theia static preview lacks native Markdown browser asset: "+asset);
+console.log("STUDIO_THEIA_STATIC_MARKDOWN_EXTENSION",JSON.stringify({
+  markdownPluginRoot,version:markdownManifest.version,
+  browser:markdownManifest.browser,workerBytes:statSync(markdownWorker).size
+}));
 const syntaxPluginRoot=join(root,"hostedPlugin/odango_chan_skill_studio_languages");
 const syntaxManifestPath=join(syntaxPluginRoot,"package.json");
 if(!existsSync(syntaxManifestPath))

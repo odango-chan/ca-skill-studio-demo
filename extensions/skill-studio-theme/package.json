@@ -37,6 +37,7 @@
   "files": [
     "themes/**",
     "icons/**",
+    "styles/**",
     "README.md"
   ],
   "repository": {
