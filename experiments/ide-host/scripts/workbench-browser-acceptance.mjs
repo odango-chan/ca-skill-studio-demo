@@ -1596,12 +1596,20 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // A prior TextDocument edit may have scheduled a debounced Package Audit.
   // Do not start another native edit while that audit still owns the current
   // snapshot; wait for the exact Package Audit terminal state first.
+  let phaseAuditRetryCount=0;
   for(let attempt=0;attempt<100;attempt++){
     phaseEvidenceText=await evalJS('document.body.innerText');
     if(/Package Audit · [0-9]+ editor warnings/.test(phaseEvidenceText))break;
-    if(phaseEvidenceText.includes('Package Audit · unavailable'))
-      throw Error('Package Audit became unavailable before Phase binding edit: '+
+    if(phaseEvidenceText.includes('Package Audit · unavailable')){
+      if(phaseAuditRetryCount===0){
+        phaseAuditRetryCount++;
+        await invoke('skillStudio.auditPackage');
+        await sleep(150);
+        continue;
+      }
+      throw Error('Package Audit remained unavailable after one explicit retry before Phase binding edit: '+
         phaseEvidenceText.slice(-1000));
+    }
     await sleep(100);
   }
   if(!/Package Audit · [0-9]+ editor warnings/.test(phaseEvidenceText))
