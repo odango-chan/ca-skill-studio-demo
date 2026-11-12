@@ -1,7 +1,7 @@
 {
   "name": "ca-skill-studio-ide-spike",
-  "displayName": "SKILL Studio IDE Host Spike",
-  "description": "Experimental source-first Procedure, Contract and Predicate visual editors for VS Code desktop/web and Theia host variants",
+  "displayName": "SKILL Studio IDE Host",
+  "description": "Source-first SKILL authoring, Package Explorer and native editor integration for VS Code-compatible desktop/web hosts, including Theia.",
   "version": "0.0.1",
   "publisher": "odango-chan",
   "private": true,
