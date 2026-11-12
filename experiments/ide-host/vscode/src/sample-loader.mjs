@@ -177,7 +177,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
   const skillsRoot=vscode.Uri.joinPath(root,"skills");
   const libraryRoot=vscode.Uri.joinPath(root,"lib");
   const outputRoot=vscode.Uri.joinPath(root,"output");
-  let created=0,skipped=0,overwritten=0;
+  let created=0,skipped=0,overwritten=0,resetPackages=0;
   phase="create-project-layout";
   await fileSystem.createDirectory(root);
   await fileSystem.createDirectory(skillsRoot);
@@ -188,6 +188,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
     // edited and untracked files inside those packages, but leaves other Skills,
     // lib/, output/, and every unrelated/user-selected workspace untouched.
     for(const skill of SKILLS){
+      let found=false;
       for(const packageRoot of [
         vscode.Uri.joinPath(skillsRoot,skill),
         vscode.Uri.joinPath(legacySkillsRoot,skill)
@@ -195,11 +196,13 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
         phase="reset-package:"+skill;
         try{
           await fileSystem.stat(packageRoot);
+          found=true;
           await fileSystem.delete(packageRoot,{recursive:true,useTrash:false});
         }catch(error){
           if(error?.code!=="FileNotFound")throw error;
         }
       }
+      if(found)resetPackages++;
     }
   }
   for(const file of files){
@@ -252,7 +255,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
   return {root,skillsRoot,libraryRoot,outputRoot,
     procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
     sourceSha:manifest.sourceSha,files:files.length,created,skipped,overwritten,
-    resetExisting,workspaceUpdated};
+    resetPackages,resetExisting,workspaceUpdated};
   }catch(error){
     throw Error(phase+": "+String(error?.message??error));
   }
