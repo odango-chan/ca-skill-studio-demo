@@ -2331,9 +2331,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         const host=await nativeCommand('skillStudio.internal.nativeMarkdownSettingsAcceptance');
         const scrollProbe=await nativeCommand(
           'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance');
+        const previewEvents=await previewScroll(
+          'window.__studioNativeMarkdownScrollProbe??null');
         throw Error(error.message+'; hostEditorState='+JSON.stringify(host)+
           '; nativePreviewSettings='+JSON.stringify(nativeLive.view.previewSettings)+
-          '; sourceScrollEvents='+JSON.stringify(scrollProbe));
+          '; sourceScrollEvents='+JSON.stringify(scrollProbe)+
+          '; previewScrollEvents='+JSON.stringify(previewEvents));
       }
     };
     const initialSource=await readSourceScroll();
