@@ -2713,6 +2713,14 @@ export function registerWorkbench(vscode,context){
       uri:document?.uri.toString()??null,
       version:document?.version??null
     })));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.selectionAcceptance',()=>({
+      uri:document?.uri.toString()??null,
+      version:document?.version??null,
+      procedureId:selection?.procedureId??null,
+      nodeId:selection?.nodeId??null,
+      snapshotState:snapshot?.model?.state??null
+    })));
   // Internal real-browser acceptance opens the owner-pinned conventional guide
   // by exact workspace path; it is not a contributed user command.
   context.subscriptions.push(vscode.commands.registerCommand(
