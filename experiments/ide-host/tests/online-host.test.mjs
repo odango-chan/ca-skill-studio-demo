@@ -30,8 +30,10 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   const secondaryViews=new Set(plugin.contributes.views.skillStudioInspector.map(x=>x.id));
   const secondaryContainers=plugin.contributes.viewsContainers.secondarySidebar??[];
   assert.deepEqual([...explorerViews],[
-    "skillStudio.packages","skillStudio.outline","skillStudio.evidence","skillStudio.problems"
+    "skillStudio.packages","skillStudio.outline","skillStudio.problems"
   ],"authoring/navigation views are contributed directly below native File Explorer");
+  assert.ok(!explorerViews.has("skillStudio.evidence"),"Data Flow belongs to right-side Inspector, not a separate Evidence view");
+  assert.ok(!plugin.activationEvents.includes("onView:skillStudio.evidence"));
   assert.ok(secondaryViews.has("skillStudio.inspection"),
     "Inspector view must be contributed to the native right-side container");
   assert.ok(secondaryContainers.some(x=>x.id==="skillStudioInspector"),
