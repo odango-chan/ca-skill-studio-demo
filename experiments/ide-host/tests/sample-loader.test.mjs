@@ -127,7 +127,7 @@ test("A user workspace named skills is not repurposed for the demo",async()=>{
   const userRoot={name:"skills",uri:uri("/user-project/skills")};
   const h=host(null,[userRoot]);
   const result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
-  assert.equal(result.root.path,"/global-storage/workspaces");
+  assert.equal(result.root.path,"/global-storage/skill-studio-demo");
   assert.equal(result.skillsRoot.path,result.root.path+"/skills");
   assert.equal(h.opened.length,1);
   assert.equal(h.opened[0].start,1);
