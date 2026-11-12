@@ -425,7 +425,8 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       message.params?.generation===1,15000);
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
     const status=await ready;
-    assert.notEqual(status.params.state,"UNAVAILABLE");
+    assert.equal(status.params.state,"READY",
+      "v0.2 completions and link diagnostics require an accepted complete Package");
 
     const tools=snapshot.documents.find(x=>x.relativePath==="lib/tools/udm.tool.yaml");
     assert.ok(contract&&procedure&&predicates&&tools);
@@ -541,6 +542,17 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       textDocument:{uri:contract.uri},position:positionOf(contract.text,entryName)
     });
     assert.equal(blocked,null);
+    const partialCompletion=await lspRequest(worker,315,"textDocument/completion",{
+      textDocument:{uri:contract.uri},
+      position:positionOf(contract.text,"schemas/establishment-request.schema.yaml",9)
+    });
+    assert.deepEqual(partialCompletion,[],
+      "partial Package must not offer cross-file completion candidates");
+    const partialDiagnostics=await lspRequest(worker,316,"textDocument/documentSymbol",{
+      textDocument:{uri:contract.uri}
+    });
+    assert.deepEqual(partialDiagnostics,[],
+      "non-Procedure YAML documents have no fabricated Outline symbols");
   }finally{
     await worker.terminate();
   }
