@@ -2332,6 +2332,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     const sourceBottom=await sourceScroll('bottom');
     await waitForScroll(()=>previewScroll('window.scrollY'),
       value=>value>100,'Native Source → Preview scroll');
+    await nativeCommand('skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance','clear');
     const previewTop=await scrollPreviewByWheel(-12000);
     await waitForSourceScroll(value=>value.topLine!==null&&value.topLine<3,
       'Native Preview → Source top scroll');
