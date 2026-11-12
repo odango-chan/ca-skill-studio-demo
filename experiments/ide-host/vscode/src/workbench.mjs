@@ -685,9 +685,18 @@ export function registerWorkbench(vscode,context){
           "vscode.executeDefinitionProvider",scriptUri,referencePosition);
         const reverseDefinitions=Array.isArray(reverseDefinitionResult)
           ?reverseDefinitionResult:reverseDefinitionResult?[reverseDefinitionResult]:[];
-        if(!reverseDefinitions.some(item=>item?.uri?.toString()===procedureUri.toString()))
-          throw Error("Python main() Definition provider did not return its YAML caller: "+
+        const preferredReverseDefinition=reverseDefinitions[0];
+        const expectedScriptStart=procedureLines[procedureLine].indexOf(scriptPathValue);
+        if(preferredReverseDefinition?.uri?.toString()!==procedureUri.toString())
+          throw Error("Python main() Definition did not prioritize the YAML caller: "+
             JSON.stringify(reverseDefinitions.map(item=>item?.uri?.toString?.()??null)));
+        if(preferredReverseDefinition.range?.start?.line!==procedureLine||
+           preferredReverseDefinition.range?.start?.character!==expectedScriptStart||
+           preferredReverseDefinition.range?.end?.line!==procedureLine||
+           preferredReverseDefinition.range?.end?.character!==expectedScriptStart+scriptPathValue.length)
+          throw Error("Python main() Definition did not target the exact YAML script: value range: "+
+            JSON.stringify(preferredReverseDefinition.range)+", expected line "+
+            procedureLine+" columns "+expectedScriptStart+"-"+(expectedScriptStart+scriptPathValue.length));
         const symbolResult=await vscode.commands.executeCommand(
           "vscode.executeDocumentSymbolProvider",scriptUri);
         const symbols=Array.isArray(symbolResult)?symbolResult:[];
