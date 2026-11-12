@@ -365,10 +365,26 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
 export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
-    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
+    // Match the already accepted Package TreeView interaction sequence:
+    // release any stale CDP pointer state, then allow native pressed/released
+    // events to reach Theia's TreeWidget on distinct event-loop turns.
+    await command('Input.dispatchMouseEvent',{
+      type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1
+    });
+    await command('Input.dispatchMouseEvent',{
+      type:'mouseMoved',x,y,button:'none',buttons:0,pointerType:'mouse'
+    });
     await sleep(100);
-    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:count});
-    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:count});
+    await command('Input.dispatchMouseEvent',{
+      type:'mousePressed',x,y,button:'left',buttons:1,
+      clickCount:count,pointerType:'mouse'
+    });
+    await sleep(100);
+    await command('Input.dispatchMouseEvent',{
+      type:'mouseReleased',x,y,button:'left',buttons:0,
+      clickCount:count,pointerType:'mouse'
+    });
+    await sleep(180);
   };
   // Use the real native command registry for setup/actions. Explorer gestures
   // below remain actual Chromium input; no host or TextDocument is mocked.
