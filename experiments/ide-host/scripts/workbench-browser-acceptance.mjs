@@ -10,7 +10,6 @@ const pcfOutcomeLine=publishedProcedure.slice(0,
   pcfOutcomeStart+pcfOutcomeHeader.indexOf('            FAILED:'))
   .split('\n').length;
 export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
-  if (!requireEditor) return {required:false};
   const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1});
     await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,button:'none',buttons:0,pointerType:'mouse'});
@@ -40,12 +39,12 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "const active=tabs.find(x=>x.classList.contains('theia-mod-active'));"+
     "const r=active?.getBoundingClientRect();"+
     "return {previous:active?{label:active.textContent.trim(),x:r.x+r.width/2,y:r.y+r.height/2}:null};})()");
-  // Packages now belongs to the native Explorer, not a custom Activity Bar.
+  // Package Explorer now belongs to the native Explorer, not a custom Activity Bar.
   await invoke('workbench.files.action.focusFilesExplorer');
   await sleep(400);
   const readTreeRows=()=>evalJS(
     "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
-    ".find(x=>x.textContent.trim().toLowerCase()==='packages'&&"+
+    ".find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&"+
     "x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);"+
     "const part=header?.closest('.part');"+
     "return [...(part?.querySelectorAll('.theia-TreeNode')??[])].map((el,index)=>{"+
@@ -126,6 +125,83 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
      mas?.fileCount!==5||mas?.corePresent!==3)
     throw Error('Two-SKILL inventory does not match the pinned sample manifest: '+
       JSON.stringify({classic,mas}));
+  function assertGroupInventory(result,packageName,expected){
+    const pkg=result?.packages?.find(item=>item.name===packageName);
+    if(!pkg)throw Error('Package scan omitted '+packageName);
+    const actual=Object.fromEntries((pkg.groups??[]).map(group=>[group.key,group.count]));
+    const missing=(pkg.groups??[]).flatMap(group=>
+      (group.missing??[]).map(file=>group.key+'/'+file));
+    if(JSON.stringify(actual)!==JSON.stringify(expected)||missing.length)
+      throw Error('Package group inventory mismatch for '+packageName+': '+
+        JSON.stringify({actual,expected,missing}));
+  }
+  assertGroupInventory(scan,'establish-pdu-session',{
+    definition:1,assurance:3,schemas:1,scripts:5,references:3
+  });
+  assertGroupInventory(scan,'establish-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1
+  });
+
+  // Dependencies must be a real section in the same native TreeView in both
+  // backend and browser-only Theia. It starts collapsed and expands to the
+  // owner-provided empty state; no second Dependencies view is permitted.
+  const dependenciesRow=rows.find(row=>row.visible&&
+    row.text.includes('Dependencies')&&
+    row.text.includes('Plugin-managed snapshots and contracts'));
+  if(!dependenciesRow)
+    throw Error('Package Explorer is missing its composed Dependencies section: '+
+      JSON.stringify(rows));
+  if(!String(dependenciesRow.toggleClass??'').includes('theia-mod-collapsed'))
+    throw Error('Dependencies must be collapsed by default: '+JSON.stringify(dependenciesRow));
+  await clickVisibleToggle(dependenciesRow,'Dependencies section');
+  let dependencyEmptyState=null;
+  for(let attempt=0;attempt<40;attempt++){
+    rows=await readTreeRows();
+    dependencyEmptyState=rows.find(row=>row.visible&&
+      row.text.includes('No dependencies'));
+    if(dependencyEmptyState)break;
+    await sleep(100);
+  }
+  if(!dependencyEmptyState)
+    throw Error('Expanded Dependencies section did not show its real empty state: '+
+      JSON.stringify(rows));
+  const expandedDependencies=rows.find(row=>row.visible&&
+    row.text.includes('Dependencies')&&
+    row.text.includes('Plugin-managed snapshots and contracts'));
+  if(!expandedDependencies)
+    throw Error('Dependencies section disappeared after expansion');
+  await clickVisibleToggle(expandedDependencies,'Dependencies collapse');
+  let collapsedDependencies=null;
+  for(let attempt=0;attempt<20;attempt++){
+    rows=await readTreeRows();
+    collapsedDependencies=rows.find(row=>row.visible&&
+      row.text.includes('Dependencies')&&
+      row.text.includes('Plugin-managed snapshots and contracts'));
+    if(collapsedDependencies&&
+       String(collapsedDependencies.toggleClass??'').includes('theia-mod-collapsed'))break;
+    await sleep(100);
+  }
+  if(!collapsedDependencies||
+     !String(collapsedDependencies.toggleClass??'').includes('theia-mod-collapsed'))
+    throw Error('Dependencies section did not return to its collapsed state');
+
+  const compositeEvidence={
+    dependenciesVisible:true,
+    dependenciesCollapsedByDefault:true,
+    dependenciesExpandedToOwnerEmptyState:true,
+    dependenciesCanCollapseAgain:true
+  };
+  if(!requireEditor){
+    const evidence={
+      skills:[
+        {name:'establish-pdu-session',files:classic.fileCount,core:'3/3'},
+        {name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3'}
+      ],
+      treeVisible:true,scanState:scan.state,composite:compositeEvidence
+    };
+    console.log('STUDIO_PACKAGE_EXPLORER_BROWSER_ONLY_CHROMIUM',JSON.stringify(evidence));
+    return {required:true,twoSkills:true,browserOnlyInventory:true,evidence};
+  }
   const packageNames=expectedNames;
   const isPackageRow=row=>packageNames.some(name=>
     row.text.includes(name+' · 3/3 core ·'));
@@ -207,7 +283,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   async function clickTreeContent(row,label,count=1){
     const target=await evalJS(`(()=>{
       const header=[...document.querySelectorAll('.theia-view-container-part-header')]
-        .find(x=>x.textContent.trim().toLowerCase()==='packages'&&
+        .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
           x.getBoundingClientRect().width>0);
       const part=header?.closest('.part');
       const nodes=[...(part?.querySelectorAll('.theia-TreeNode')??[])];
@@ -291,22 +367,27 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     throw Error('Opening '+name+' assurance/contract.yaml from Package Overview did not load its exact Contract Designer Source: '+
       JSON.stringify({file,frames:await readContractFrames(),rows:await readTreeRows()}));
   }
-  const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1','Scripts · 5','References · 3'];
-  const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
-  const classicView=await ensurePackageExpanded('establish-pdu-session');
-  const classicRange=classicView.range;
-  const classicVisible=classicView.rows.slice(classicRange.index+1,classicRange.end)
-    .filter(row=>row.visible).map(row=>row.text);
-  for(const group of classicGroups)
-    if(!classicVisible.some(text=>text.includes(group)))
-      throw Error('Traditional 5GC Package is missing group '+group+': '+JSON.stringify(classicVisible));
+  // Group membership and counts are asserted from the Package scan model
+  // above. Theia virtualizes TreeView rows, so DOM visibility is not a
+  // completeness signal. Here we verify the real Package row and Assurance
+  // navigation path only.
+  const conventionalPackageTop=await evalJS(`(()=>{
+    const header=[...document.querySelectorAll('.theia-view-container-part-header')]
+      .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
+        x.getBoundingClientRect().width>0);
+    const part=header?.closest('.part');
+    const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(el=>
+      el.innerText.replace(/\\s+/g,' ').includes(
+        'establish-pdu-session · 3/3 core ·'));
+    row?.scrollIntoView({block:'start',inline:'nearest'});
+    return Boolean(row);
+  })()`);
+  if(!conventionalPackageTop)
+    throw Error('Traditional 5GC Package row disappeared after Dependencies interaction');
+  await sleep(150);
+  await ensurePackageExpanded('establish-pdu-session');
   const classicContract=await openPackageContract('establish-pdu-session');
-  const masView=await ensurePackageExpanded('establish-pdu-session-mas');
-  const masVisible=masView.rows.slice(masView.range.index+1,masView.range.end)
-    .filter(row=>row.visible).map(row=>row.text);
-  for(const group of masGroups)
-    if(!masVisible.some(text=>text.includes(group)))
-      throw Error('MAS Package is missing group '+group+': '+JSON.stringify(masVisible));
+  await ensurePackageExpanded('establish-pdu-session-mas');
   const masContract=await openPackageContract('establish-pdu-session-mas');
   if(classicContract.contractName!=='establish-pdu-session'||
      masContract.contractName!=='establish-pdu-session-mas'||
@@ -316,11 +397,15 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   await invoke('skillStudio.refreshPackages');
   await invoke('skillStudio.refreshPackages');
   const postExpansion=await evalJS('window.__skillStudioLastCommandResult??null');
-  if(!postExpansion?.treeReadsByKind||
-     postExpansion.treeReadsByKind.package<2||
-     postExpansion.treeReadsByKind.group<2)
-    throw Error('Both Package and Assurance children must be requested by Theia TreeView: '+
-      JSON.stringify({postExpansion,classicVisible,masVisible}));
+  if(postExpansion?.state!=='ready'||postExpansion.packages?.length!==2)
+    throw Error('Package Explorer refresh did not preserve both Package inventories: '+
+      JSON.stringify(postExpansion));
+  assertGroupInventory(postExpansion,'establish-pdu-session',{
+    definition:1,assurance:3,schemas:1,scripts:5,references:3
+  });
+  assertGroupInventory(postExpansion,'establish-pdu-session-mas',{
+    definition:1,assurance:3,schemas:1
+  });
   const previous=activityState?.previous;
   let restoredActivity=null;
   if(previous&&previous.label!=='Skill Studio'){
@@ -348,12 +433,13 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const evidence={
     skills:[{
       name:'establish-pdu-session',files:classic.fileCount,core:'3/3',
-      groups:classicGroups,contract:classicContract
+      groups:classic.groups.map(group=>({key:group.key,count:group.count})),contract:classicContract
     },{
       name:'establish-pdu-session-mas',files:mas.fileCount,core:'3/3',
-      groups:masGroups,contract:masContract
+      groups:mas.groups.map(group=>({key:group.key,count:group.count})),contract:masContract
     }],
     treeVisible:true,scanState:scan.state,
+    composite:compositeEvidence,
     treeReadsByKind:postExpansion.treeReadsByKind,
     exactPackageUris:true,restoredActivity:restored
   };
@@ -470,7 +556,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       .some(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
     return {text:document.body.innerText,headers,trees:document.querySelectorAll('.theia-Tree').length,studioActivity};
   })()`);
-  for(const name of ['Packages','Procedure Outline','Problems'])
+  for(const name of ['Package Explorer','Procedure Outline','Problems'])
     if(!views.headers.some(x=>x.name.toLowerCase()===name.toLowerCase()))
       throw Error('Native Explorer view missing '+name+': '+JSON.stringify(views));
   if(views.studioActivity)
@@ -1014,6 +1100,21 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Source-derived Producer / Consumer and ABI information inside the native
   // right-side Inspector, without confusing it with Runtime Evidence.
   await invoke('skillStudio.auditPackage');
+  // Audit refreshes Source-derived tree models. Wait for its exact terminal
+  // state before interacting with the Inspector expansion arrow; otherwise a
+  // late model refresh can immediately collapse the row after a trusted click.
+  let initialAuditText='';
+  for(let attempt=0;attempt<100;attempt++){
+    initialAuditText=await evalJS('document.body.innerText');
+    if(/Package Audit · [0-9]+ editor warnings/.test(initialAuditText))break;
+    if(initialAuditText.includes('Package Audit · unavailable'))
+      throw Error('Package Audit became unavailable before Data Flow expansion: '+
+        initialAuditText.slice(-1000));
+    await sleep(100);
+  }
+  if(!/Package Audit · [0-9]+ editor warnings/.test(initialAuditText))
+    throw Error('Package Audit did not settle before Data Flow expansion: '+
+      initialAuditText.slice(-1000));
   let inspectorFlowState=null;
   for(let attempt=0;attempt<100;attempt++){
     inspectorFlowState=await evalJS(`(()=>{
@@ -1982,10 +2083,11 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // selections even after the conventional editor has been restored.
   await invoke('workbench.files.action.focusFilesExplorer');
   const explorerRow=async(label,which='last')=>evalJS(
-    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label);const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();const toggle=row.node.querySelector('.theia-ExpansionToggle');const tr=toggle?.getBoundingClientRect();const tx=tr?tr.x+tr.width/2:null,ty=tr?tr.y+tr.height/2:null;const hit=tr?document.elementFromPoint(tx,ty):null;return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length,toggleX:tx,toggleY:ty,toggleHit:!!toggle&&(hit===toggle||toggle.contains(hit)),toggleClass:toggle?.className??null};})()"
+    "(()=>{const label="+JSON.stringify(label)+";const rows=[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return {node,content,text:content?.innerText?.trim()??''};}).filter(row=>row.text===label||(label==='skills'&&row.text.endsWith('/skills')));const row="+(which==='first'?'rows[0]':'rows.at(-1)')+";if(!row)return {found:false,count:rows.length,labels:[...document.querySelectorAll('.theia-TreeNode')].map(node=>{const content=[...node.children].find(child=>child.classList?.contains('theia-TreeNodeContent'));return content?.innerText?.trim()??'';}).slice(-30)};row.content.scrollIntoView({block:'center',inline:'nearest'});const r=row.content.getBoundingClientRect();const toggle=row.node.querySelector('.theia-ExpansionToggle');const tr=toggle?.getBoundingClientRect();const tx=tr?tr.x+tr.width/2:null,ty=tr?tr.y+tr.height/2:null;const hit=tr?document.elementFromPoint(tx,ty):null;return {found:true,x:r.x+r.width/2,y:r.y+r.height/2,expanded:row.node.getAttribute('aria-expanded'),className:row.node.className,ariaLevel:row.node.getAttribute('aria-level'),dataNodeId:row.node.getAttribute('data-node-id'),count:rows.length,toggleX:tx,toggleY:ty,toggleHit:!!toggle&&(hit===toggle||toggle.contains(hit)),toggleClass:toggle?.className??null};})()"
   );
-  // Compiler-style project root: the Explorer owns skills/, lib/, output/.
-  // Expand only the source directory before looking for the two Skill folders.
+  // Expand the authored skills/ source directory before looking for the two
+  // Skill folders. Theia may compact the parent + skills into one row such as
+  // skill-studio-demo/skills; dependency and Build stores are not in this tree.
   let skillsFolder=null;
   for(let attempt=0;attempt<60;attempt++){
     skillsFolder=await explorerRow('skills');

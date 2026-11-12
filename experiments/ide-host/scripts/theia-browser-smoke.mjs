@@ -1565,8 +1565,6 @@ try{
      afterImport.noFolderPrompt||!afterImport.workspaceRootVisible||
      !afterImport.explorerText.includes("skills")||
      !afterImport.explorerText.includes("establish-pdu-session")||
-     !afterImport.explorerText.includes("lib")||
-     !afterImport.explorerText.includes("output")||
      !afterImport.explorerText.includes("procedure.yaml"))
     throw Error("Theia did not open the real default project workspace: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
   if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1||

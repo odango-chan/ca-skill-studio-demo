@@ -20,6 +20,7 @@ import {registerContractEditor} from "./contract-editor.mjs";
 import {registerPredicateEditor} from "./predicate-editor.mjs";
 import {registerSchemaEditor} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
+import {registerDependenciesView} from "./dependencies-view.mjs";
 import {iconShapes} from "../../../../site/icons.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
@@ -51,8 +52,17 @@ export function activate(context){
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
   registerSchemaEditor(vscode,context);
-  const packageOverview=registerPackageOverview(vscode,context,
-    ()=>workbench.getActiveDocument?.()??null);
+  let packageOverview=null;
+  const dependenciesView=registerDependenciesView(vscode,context,{
+    treeViewId:null,
+    onLockChanged:()=>workbench.invalidateDependencyAnalysis?.(),
+    onProjectRootChanged:()=>void packageOverview?.refresh()
+  });
+  packageOverview=registerPackageOverview(vscode,context,
+    ()=>workbench.getActiveDocument?.()??null,{
+      dependenciesProvider:dependenciesView.provider,
+      getProjectRoot:dependenciesView.getProjectRoot
+    });
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
@@ -270,12 +280,11 @@ export function activate(context){
           resetExistingOnLoad=false;
         }
         stage="show-packages";
-        // User-triggered import should end in the real native Packages view.
+        // User-triggered import should end in the real native Package Explorer view.
         // View-container activation is a host command: fall back gracefully
         // on VS Code/Theia variants that don't contribute that command.
         let viewOpened=false;
-        for(const id of ["workbench.view.extension.skillStudio",
-          "skillStudio.packages.focus"]){
+        for(const id of ["workbench.view.explorer","skillStudio.packages.focus"]){
           try{
             await vscode.commands.executeCommand(id);
             viewOpened=true;
@@ -311,8 +320,8 @@ export function activate(context){
         void vscode.window.showInformationMessage(
           "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+
           "同步 "+result.files+" 个官方文件；"+resetSummary+
-          (viewOpened&&revealed?"已展开 Packages（含传统 5GC + MAS）。":
-            "可在 Skill Studio → Packages 查看两个 SKILL。"));
+          (viewOpened&&revealed?"已展开 Package Explorer（含传统 5GC + MAS）。":
+            "可在 Explorer → Package Explorer 查看两个 SKILL。"));
       }catch(error){
         await vscode.window.showErrorMessage(
           "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));

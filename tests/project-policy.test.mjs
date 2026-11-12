@@ -7,50 +7,41 @@ const project=[{uri:uri("/w/demo")}];
 const can=(path,operation="edit",folders=project)=>
   checkStudioMutation(uri(path),folders,operation).allowed;
 
-test("project roots cannot be renamed, moved or deleted via Studio-owned operations",()=>{
-  for(const folder of ["/w/demo","/w/demo/skills","/w/demo/lib","/w/demo/output"]){
-    const role=classifyProjectResource(uri(folder),project);
-    assert.equal(role.protected,true,folder);
-    for(const op of ["edit","create","rename","delete","import-library","compiler-output"])
-      assert.equal(can(folder,op),false,folder+" "+op);
-  }
+test("project and Skills roots are protected, authored Source remains editable",()=>{
+  for(const path of ["/w/demo","/w/demo/skills"])
+    assert.equal(classifyProjectResource(uri(path),project).protected,true,path);
+  for(const path of ["/w/demo/skills/one/SKILL.md",
+    "/w/demo/skills/one/assurance/procedure.yaml",
+    "/w/demo/skills/one/scripts/run.py"])
+    assert.equal(can(path),true,path);
+  assert.equal(can("/w/demo/skills","rename"),false);
+  assert.equal(can("/w/demo","delete"),false);
 });
 
-test("skills Source is editable, lib is imported readonly, output is compiler-owned",()=>{
-  assert.equal(can("/w/demo/skills/one/SKILL.md"),true);
-  assert.equal(can("/w/demo/skills/one/assurance/procedure.yaml"),true);
-  assert.equal(can("/w/demo/skills/one/scripts/run.py"),true);
-  for(const target of ["/w/demo/lib/tool/contract.yaml","/w/demo/output/compiled/artifact.json"]){
-    for(const op of ["edit","create","delete","rename"])
-      assert.equal(can(target,op),false,target+" "+op);
-  }
-  assert.equal(can("/w/demo/lib/tool/contract.yaml","import-library"),true);
-  assert.equal(can("/w/demo/lib/tool/contract.yaml","compiler-output"),false);
-  assert.equal(can("/w/demo/output/compiled/artifact.json","compiler-output"),true);
-  assert.equal(can("/w/demo/output/compiled/artifact.json","import-library"),false);
+test("lib/ and output/ names do not imply ownership or permissions",()=>{
+  for(const path of ["/w/demo/lib/tool/contract.yaml",
+    "/w/demo/output/build.json","/w/demo/references/local.md"])
+    for(const operation of ["edit","create","rename","delete"])
+      assert.equal(can(path,operation),true,path+" "+operation);
 });
 
-test("name-only and prefix matches never impose project protection",()=>{
-  assert.equal(can("/w/demo/skills-extra/file.py"),true);
-  assert.equal(can("/w/demolib/contract.yaml"),true);
+test("Plugin-owned dependency store is protected and snapshots are read-only",()=>{
+  const snapshot="/w/demo/.skill-studio/dependencies/abcdef/tool-contract.json";
+  assert.equal(classifyProjectResource(uri("/w/demo/.skill-studio"),project).role,"managed-root");
+  assert.equal(classifyProjectResource(uri("/w/demo/.skill-studio/staging/tmp"),project).protected,true);
+  assert.equal(classifyProjectResource(uri("/w/demo/.skill-studio/dependencies"),project).protected,true);
+  assert.equal(classifyProjectResource(uri(snapshot),project).role,"dependency-snapshot");
+  for(const operation of ["edit","create","rename","delete"])
+    assert.equal(can(snapshot,operation),false,operation);
+  assert.equal(can(snapshot,"dependency-store-write"),true);
+  assert.throws(()=>assertStudioMutation(uri(snapshot),project),/immutable/);
+});
+
+test("URI scheme, authority and normalized path prevent accidental cross-root matches",()=>{
+  assert.deepEqual(projectRoots(project).map(root=>root.path),["/w/demo"]);
   assert.equal(can("/other/lib/file.yaml"),true);
-  assert.equal(can("/w/demo/liberty/file.py"),true);
-  assert.equal(classifyProjectResource(uri("/w/demo/lib/x","remote"),project).role,"outside");
-  assert.equal(classifyProjectResource(uri("/w/demo/lib/../skills/x"),project).role,"invalid");
-  assert.equal(classifyProjectResource(uri("/w/demo/lib/%2e%2e/skills/x"),project).role,"invalid");
-});
-
-test("legacy workspace directly opened at skills/ uses its parent project root",()=>{
-  const legacy=[{uri:uri("/browser/workspaces/skills")}];
-  assert.equal(projectRoots(legacy)[0].path,"/browser/workspaces");
-  assert.equal(can("/browser/workspaces/skills/one/SKILL.md","edit",legacy),true);
-  assert.equal(can("/browser/workspaces/lib/contract.yaml","edit",legacy),false);
-  assert.equal(can("/browser/workspaces/skills","rename",legacy),false);
-});
-
-test("Studio-owned mutation preflight rejects without altering sources",()=>{
-  assert.throws(()=>assertStudioMutation(uri("/w/demo/lib/tool/SKILL.md"),project),/read-only/);
-  assert.throws(()=>assertStudioMutation(uri("/w/demo/output/artifact.json"),project),/generated/);
-  assert.throws(()=>assertStudioMutation(uri("/w/demo/skills"),project,"rename"),/structure/);
-  assert.equal(assertStudioMutation(uri("/w/demo/skills/x/SKILL.md"),project).allowed,true);
+  assert.equal(classifyProjectResource(uri("/w/demo/skills/x","remote"),project).role,"outside");
+  assert.equal(classifyProjectResource(uri("/w/demo/skills/x","file","other"),project).role,"outside");
+  assert.equal(classifyProjectResource(uri("/w/demo/x/../skills"),project).role,"invalid");
+  assert.equal(classifyProjectResource(uri("/w/demo/%2e%2e/skills"),project).role,"invalid");
 });

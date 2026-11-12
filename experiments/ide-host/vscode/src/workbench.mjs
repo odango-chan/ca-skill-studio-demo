@@ -54,11 +54,12 @@ export function registerWorkbench(vscode,context){
   let languageRecoveryPromise=null;
   let languageClientEpoch=0;
   let languageClient=null,languageClientPromise=null,languageClientFailureShown=false,
-    languageStatusItem=null,languageTransportFailure=null;
+    languageStatusItem=null,languageTransportFailure=null,languagePackageFailure=null;
   const semanticTokenDiagnostics={
     registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null,
     renderer:null,renderedTokenCount:0,renderedTypeCount:0,renderError:null,
-    server:null,transport:null
+    server:null,transport:null,packageAttachAttempts:0,lastPackageRoot:null,
+    lastPackageAttachReason:null
   };
   function encodeNativeSemanticTokens(document,spans){
     const segments=[];
@@ -191,6 +192,16 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
+      languagePackages:[...languagePackages.values()].map(state=>({
+        rootUri:state.key,refs:state.refs,generation:state.generation,
+        ticket:state.ticket,disposed:state.disposed,
+        lastSentSnapshot:state.lastSentSnapshot
+      })),
+      languageClientStarted:Boolean(languageClient),
+      languageClientPending:Boolean(languageClientPromise),
+      languageTransportFailure,
+      languagePackageFailure,
+      languageStatus:languageStatusItem?.text??null,
       semanticHighlightingEnabled:vscode.workspace.getConfiguration("editor")
         .get("semanticHighlighting.enabled")
     })
@@ -335,6 +346,7 @@ export function registerWorkbench(vscode,context){
       updateLanguageStatus("ANALYZING","Analyzing "+snapshot.packageName+
         " · generation "+snapshot.generation);
       client.sendPackageSnapshot(snapshot);
+      languagePackageFailure=null;
       // Workspace import can briefly enumerate a file before its content is
       // readable. Preserve PARTIAL now, then retry with a NEW generation; never
       // label the incomplete snapshot READY or spin indefinitely on real loss.
@@ -359,6 +371,8 @@ export function registerWorkbench(vscode,context){
         if(strict)throw error;
         return null;
       }
+      languagePackageFailure={rootUri:state.key,generation,ticket,
+        reason:String(error?.message??error)};
       console.warn("Skill Studio Package analysis unavailable",error);
       updateLanguageStatus("ERROR",String(error?.message??error));
       if(!languageClientFailureShown){
@@ -498,9 +512,18 @@ export function registerWorkbench(vscode,context){
   ));
 
   function attachLanguagePackage(doc){
+    semanticTokenDiagnostics.packageAttachAttempts++;
     const rootInfo=packageRootForProcedure(vscode,doc);
-    if(!rootInfo||typeof Worker!=="function"||typeof globalThis.location==="undefined")
+    semanticTokenDiagnostics.lastPackageRoot=rootInfo?.uri?.toString?.()??null;
+    if(!rootInfo){
+      semanticTokenDiagnostics.lastPackageAttachReason="document is not a supported assurance/procedure.yaml";
       return ()=>{};
+    }
+    if(typeof Worker!=="function"||typeof globalThis.location==="undefined"){
+      semanticTokenDiagnostics.lastPackageAttachReason="browser Worker or location is unavailable";
+      return ()=>{};
+    }
+    semanticTokenDiagnostics.lastPackageAttachReason=null;
     const root=rootInfo.uri;
     const key=root.toString();
     let state=languagePackages.get(key);
@@ -2892,5 +2915,14 @@ export function registerWorkbench(vscode,context){
     const rootInfo=packageRootForProcedure(vscode,doc);
     const state=rootInfo?languagePackages.get(rootInfo.uri.toString()):null;
     if(state){state.procedureDocument=doc;scheduleLanguagePackageRefresh(state);}
+  },invalidateDependencyAnalysis(){
+    // Dependency Lock changes invalidate dependency-derived editor analysis.
+    // This remains editor-only analysis; it does not claim Compiler qualification.
+    languagePackageStatuses.clear();
+    for(const state of languagePackages.values()){
+      if(!state.disposed)scheduleLanguagePackageRefresh(state,true);
+    }
+    updateLanguageStatus("ANALYZING",
+      "Dependency configuration changed; editor analysis invalidated");
   },getActiveDocument(){return document;}};
 }

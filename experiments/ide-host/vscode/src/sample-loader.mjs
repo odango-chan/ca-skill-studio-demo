@@ -2,9 +2,8 @@
 // Online demo reset replaces the two bundled SKILL packages with their pinned
 // source; desktop/user workspaces remain create-only unless reset is explicit.
 const SRC=["samples","skills"];
-// A Skill Compiler project has one source workspace with three top-level
-// directories. The Studio demo may seed only skills/; it must not invent
-// Tool contracts in lib/ or build artifacts in output/.
+// The project owns authored skills/ Source. Dependencies and BuildResults are
+// managed by their services; the sample importer never creates lib/ or output/.
 export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
 const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
 const decoder=new TextDecoder();
@@ -175,14 +174,10 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
   const legacySkillsRoot=vscode.Uri.joinPath(legacyRoot,"skills");
   const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
   const skillsRoot=vscode.Uri.joinPath(root,"skills");
-  const libraryRoot=vscode.Uri.joinPath(root,"lib");
-  const outputRoot=vscode.Uri.joinPath(root,"output");
   let created=0,skipped=0,overwritten=0,resetPackages=0;
   phase="create-project-layout";
   await fileSystem.createDirectory(root);
   await fileSystem.createDirectory(skillsRoot);
-  await fileSystem.createDirectory(libraryRoot);
-  await fileSystem.createDirectory(outputRoot);
   if(resetExisting){
     // Reset only the two known bundled Skill package directories. This clears
     // edited and untracked files inside those packages, but leaves other Skills,
@@ -252,7 +247,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
   }
   const procedures=Object.fromEntries(SKILLS.map(name=>
     [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
-  return {root,skillsRoot,libraryRoot,outputRoot,
+  return {root,skillsRoot,
     procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
     sourceSha:manifest.sourceSha,files:files.length,created,skipped,overwritten,
     resetPackages,resetExisting,workspaceUpdated};

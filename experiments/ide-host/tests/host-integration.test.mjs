@@ -40,7 +40,12 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     TextEditorRevealType:{InCenter:1},
     workspace:{
       textDocuments:[document],
+      workspaceFolders:[],
       onDidChangeTextDocument(cb){listeners.add(cb);return {dispose(){listeners.delete(cb);}};},
+      onDidChangeConfiguration(){return {dispose(){}};},
+      onDidChangeWorkspaceFolders(){return {dispose(){}};},
+      registerTextDocumentContentProvider(){return {dispose(){}};},
+      getConfiguration(){return {get:(_key,fallback)=>fallback,update:async()=>{}};},
       async applyEdit(edit){
         const changes=edit.changes??[edit.change];
         for(const change of changes)assert.equal(change.file,document.uri);
@@ -281,10 +286,11 @@ test("Skill Studio authoring views live in native Explorer while Inspector stays
     "no competing Skill Studio Activity Bar container");
   const explorer=manifest.contributes.views.explorer;
   assert.deepEqual(explorer.map(view=>[view.id,view.name]),[
-    ["skillStudio.packages","Packages"],
+    ["skillStudio.packages","Package Explorer"],
     ["skillStudio.outline","Procedure Outline"],
     ["skillStudio.problems","Problems"]
   ]);
+  assert.equal(explorer.find(view=>view.id==="skillStudio.packages")?.visibility,"visible");
   assert.equal(manifest.contributes.views.skillStudio,undefined);
   assert.ok(!explorer.some(view=>view.name==="Outline"),
     "semantic Procedure Outline must not impersonate Theia's document-symbol Outline");

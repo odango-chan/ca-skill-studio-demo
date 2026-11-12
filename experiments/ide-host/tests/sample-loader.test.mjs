@@ -63,7 +63,7 @@ function host(manifestOverride=null,existing=[]){
   const vscode={Uri:{file:uri,joinPath},workspace};
   return {vscode,files,folders,opened,workspace};
 }
-test("Sample creates both exact pinned owner SKILL packages in one Skill Compiler project root",async()=>{
+test("Sample creates both exact pinned owner SKILL packages in one source-only project root",async()=>{
   const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
   assert.equal(result.files,manifest.files.length);
   assert.equal(result.created,manifest.files.length);
@@ -77,8 +77,6 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
   assert.equal(h.opened[0].folder.uri.path.split("/").at(-1),"skill-studio-demo");
   assert.equal(result.root.path,"/global-storage/skill-studio-demo");
   assert.equal(result.skillsRoot.path,result.root.path+"/skills");
-  assert.equal(result.libraryRoot.path,result.root.path+"/lib");
-  assert.equal(result.outputRoot.path,result.root.path+"/output");
   assert.ok(h.files.has(result.procedures["establish-pdu-session"].path));
   assert.ok(h.files.has(result.procedures["establish-pdu-session-mas"].path));
   assert.equal(manifest.files.length,18);
@@ -100,14 +98,16 @@ test("Sample creates both exact pinned owner SKILL packages in one Skill Compile
   assert.ok(h.files.has(result.skillsRoot.path+"/establish-pdu-session/scripts/build_n1n2_delivery.py"));
   assert.equal(result.procedure.path,result.procedures["establish-pdu-session"].path);
 });
-test("New project keeps imported library and generated output empty and isolated",async()=>{
+test("New project does not create legacy lib/ or output/ directories",async()=>{
   const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
-  for(const folder of [result.root,result.skillsRoot,result.libraryRoot,result.outputRoot])
-    assert.ok(await h.vscode.workspace.fs.stat(folder));
-  assert.equal([...h.files.keys()].filter(path=>
-    path.startsWith(result.libraryRoot.path+"/")||path.startsWith(result.outputRoot.path+"/")).length,0);
+  for(const name of ["lib","output"]){
+    await assert.rejects(h.vscode.workspace.fs.stat(uri(result.root.path+"/"+name)),
+      error=>error.code==="FileNotFound");
+  }
+  assert.ok(await h.vscode.workspace.fs.stat(result.skillsRoot));
   assert.ok([...h.files.keys()].every(path=>path.startsWith(result.skillsRoot.path+"/")));
 });
+
 test("Repeated dual-SKILL import never overwrites user edits, including MAS",async()=>{
   const h=host(),base=uri("/extension"),storage=uri("/global-storage");
   const a=await seedExampleWorkspace(h.vscode,base,storage);
@@ -156,8 +156,6 @@ test("Reset replaces the legacy Skills workspace with the canonical named projec
   assert.deepEqual(h.vscode.workspace.workspaceFolders.map(x=>x.uri.path),[result.root.path]);
   assert.equal(h.files.has(edited),false,"legacy edited package must be removed from the old location");
   assert.ok(h.files.has(result.skillsRoot.path+"/establish-pdu-session/SKILL.md"));
-  assert.ok(await h.vscode.workspace.fs.stat(result.libraryRoot));
-  assert.ok(await h.vscode.workspace.fs.stat(result.outputRoot));
 });
 test("Explicit online-demo reset overwrites both bundled Skills and removes package-local extras",async()=>{
   const h=host(),base=uri("/extension"),storage=uri("/global-storage");
