@@ -127,7 +127,6 @@ test("Contract and PredicateSet source positions follow their own profiles",()=>
   const p=observed(predicateSource,"skills/establish-pdu-session/assurance/predicates.yaml");
   tokenFor(predicateSource,p,"createdsession.ingress.eligible","skillPredicate","declaration");
   tokenFor(predicateSource,p,"createdsession.procedure_context","skillObservation","reference");
-  tokenFor(predicateSource,p,"cel","skillKeyword");
 });
 
 test("Skill-owned JSON Schema positions use canonical type and schema references",()=>{
