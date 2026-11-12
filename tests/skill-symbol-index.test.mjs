@@ -375,6 +375,33 @@ test("external Owner Schema diagnostics require a complete project lib inventory
     "missing Package-owned schemas are still diagnosed");
 });
 
+test("partial project lib inventory suppresses imported Operation and Owner Schema missing-link claims",()=>{
+  const base=packageSnapshot();
+  const procedure=base.documents.find(item=>item.relativePath==="assurance/procedure.yaml");
+  const text=procedure.text.replace("sbi.udm.sm_data.get","sbi.missing.operation");
+  const partial={...base,libraryInventory:"partial",documents:base.documents.map(item=>
+    item.uri===procedure.uri?{...item,text}:item)};
+  const partialIndex=symbols.buildSkillSymbolIndex(partial);
+  const partialDiagnostics=symbols.skillSymbolLinkDiagnostics(partialIndex,partial);
+  assert.ok(!partialDiagnostics.some(item=>
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    text.slice(item.range.start,item.range.end)==="sbi.missing.operation"),
+    "an incomplete project lib inventory cannot prove an Operation is missing");
+  assert.ok(!partialDiagnostics.some(item=>item.code==="SKILL_LINK_UNRESOLVED"&&
+    item.uri.endsWith("/assurance/contract.yaml")&&
+    partial.documents.find(doc=>doc.uri===item.uri)
+      .text.slice(item.range.start,item.range.end)==="lib/host/subject.schema.yaml"),
+    "an incomplete project lib inventory cannot prove an Owner Schema is missing");
+
+  const complete={...partial,libraryInventory:"complete"};
+  const completeIndex=symbols.buildSkillSymbolIndex(complete);
+  const completeDiagnostics=symbols.skillSymbolLinkDiagnostics(completeIndex,complete);
+  assert.ok(completeDiagnostics.some(item=>
+    item.code==="SKILL_LINK_UNRESOLVED"&&
+    text.slice(item.range.start,item.range.end)==="sbi.missing.operation"),
+    "a complete ToolCatalog inventory makes an unresolved Procedure.call diagnosable");
+});
+
 test("v0.2 link diagnostics are suppressed for incomplete or stale Package snapshots",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
