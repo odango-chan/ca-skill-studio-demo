@@ -44,7 +44,6 @@
     "onCommand:skillStudio.refreshPackages",
     "onView:skillStudio.packages",
     "onView:skillStudio.outline",
-    "onView:skillStudio.evidence",
     "onView:skillStudio.problems",
     "onView:skillStudio.inspection"
   ],
@@ -432,10 +431,6 @@
         {
           "id": "skillStudio.outline",
           "name": "Procedure Outline"
-        },
-        {
-          "id": "skillStudio.evidence",
-          "name": "Evidence"
         },
         {
           "id": "skillStudio.problems",
