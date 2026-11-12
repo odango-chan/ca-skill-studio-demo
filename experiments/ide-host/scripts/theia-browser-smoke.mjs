@@ -269,14 +269,23 @@ try{
     if(!node)return null;const r=node.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2,text:node.innerText};
   })()`);
-  if(loadExampleRow){
-    await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:loadExampleRow.x,y:loadExampleRow.y});
-    await command("Input.dispatchMouseEvent",{type:"mousePressed",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
-    await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
-    await sleep(3400);
+  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+  // This acceptance must prove first-run auto-loading, not rescue it by clicking
+  // the manual import command. Wait for the success notification emitted only
+  // after Theia confirms the workspace root and opens the conventional 5GC graph.
+  let automaticLoadReady=false;
+  for(let attempt=0;attempt<100;attempt++){
+    automaticLoadReady=await evalJS(`[...document.querySelectorAll(
+      '.theia-notification-list-item,.theia-notification-message'
+    )].some(node=>node.innerText.includes(
+      '示例项目已载入并打开工作区：skill-studio-demo/'
+    )&&node.innerText.includes('默认已打开传统 5GC Procedure.'))`);
+    if(automaticLoadReady)break;
+    await sleep(150);
   }
-  // Loading may be automatic on the empty online workbench or explicitly
-  // invoked again from the command palette. Both must preserve existing files.
+  if(!automaticLoadReady)
+    throw Error("The default online workspace did not auto-open its project and 5GC Procedure");
   const afterImport=await evalJS(`(async()=>{
     const names=[];let opfsError=null;
     try{
@@ -293,7 +302,9 @@ try{
         return {background:style.backgroundColor,foreground:style.color,
           noWorkspace:document.body.classList.contains("theia-no-open-workspace")};
       })(),
-      bodyText:document.body.innerText.slice(-1400),
+      bodyText:document.body.innerText.slice(-2200),
+      noFolderPrompt:document.body.innerText.includes('You have not yet opened a folder.'),
+      workspaceRootVisible:document.body.innerText.includes('skill-studio-demo'),
       notificationText:[...document.querySelectorAll('.theia-notification-list-item,.theia-notification-message')]
         .map(x=>x.innerText).filter(Boolean).slice(0,7),
       visibleEditors:document.querySelectorAll('.monaco-editor').length,
@@ -1471,16 +1482,18 @@ try{
     throw Error("Theia status bar is not Studio Light: "+
       JSON.stringify(afterImport.statusBar));
   if(!afterImport.notificationText.some(message=>
-       message.includes("示例项目已载入：skills/")&&
-       message.includes("lib/")&&message.includes("output/")&&
+       message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
+       message.includes("默认已打开传统 5GC Procedure.")&&
        /新增 (?:0|18) 个文件/.test(message))||
+     afterImport.noFolderPrompt||!afterImport.workspaceRootVisible||
      !afterImport.bodyText.includes("skills")||
      !afterImport.bodyText.includes("establish-pdu-session")||
      !afterImport.bodyText.includes("lib/")||
      !afterImport.bodyText.includes("output/")||
      !afterImport.bodyText.includes("procedure.yaml"))
-    throw Error("Theia sample import into browser workspace failed: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3000));
-  if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1))
+    throw Error("Theia did not open the real default project workspace: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
+  if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1||
+      webviewView.procedureValue!=="ue-requested-pdu-session-establishment"))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
   if(requireEditor&&(!patchEvidence?.preview?.ready||
