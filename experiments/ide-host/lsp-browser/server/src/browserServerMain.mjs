@@ -600,6 +600,17 @@ connection.onCompletion(params => {
   }
   const offset=offsetAt(document.text,params.position);
   debug.cursorOffset=offset;
+  const sourceLineStarts=lineStarts(document.text);
+  const sourceLineStart=sourceLineStarts[params.position?.line];
+  debug.sourceTextLength=document.text.length;
+  debug.cursorLineStart=Number.isSafeInteger(sourceLineStart)?sourceLineStart:null;
+  debug.cursorLineText=Number.isSafeInteger(sourceLineStart)
+    ?document.text.slice(sourceLineStart,
+      sourceLineStarts[params.position.line+1]??document.text.length)
+    :null;
+  debug.cursorLineTextLength=typeof debug.cursorLineText==="string"
+    ?debug.cursorLineText.length:null;
+  debug.cursorPositionRoundTrip=offset===null?null:positionAt(sourceLineStarts,offset);
   if(offset===null){
     debug.reason="Cursor position is outside the source document";
     return finish([]);
