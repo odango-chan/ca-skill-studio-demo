@@ -602,8 +602,6 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     });
     assert.deepEqual(ownerSchemaCompletion,[],
       "prefix lib/host cannot suggest Skill-local schemas or partial library files");
-    assert.ok(ownerSchemaCompletion.every(item=>!item.label.startsWith("lib/")),
-      "partial project lib inventory cannot offer Owner Schema completions");
     const libraryDiagnosticMessage=await libraryDiagnostics;
     assert.ok(!libraryDiagnosticMessage.params.diagnostics.some(item=>
       item.code==="SKILL_LINK_UNRESOLVED"&&
