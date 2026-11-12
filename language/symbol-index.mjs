@@ -212,14 +212,20 @@ export function skillSymbolCompletions(index,uri,offset){
   }
   const prefix=token.name.slice(0,Math.max(0,Math.min(
     token.name.length,offset-token.range.start)));
-  const seen=new Set();
-  const items=candidates.filter(item=>{
-    if(!item.name.startsWith(prefix))return false;
-    const identity=item.type+"\\u0000"+item.name+"\\u0000"+item.relativePath;
-    if(seen.has(identity))return false;
-    seen.add(identity);
-    return true;
-  }).sort((a,b)=>a.name.localeCompare(b.name)||a.relativePath.localeCompare(b.relativePath));
+  const groups=new Map();
+  for(const item of candidates){
+    if(!item.name.startsWith(prefix))continue;
+    const scope=item.type==="skillStep"?item.path?.[1]??"": "";
+    const identity=item.type+"\\u0000"+scope+"\\u0000"+item.name;
+    const values=groups.get(identity)??[];
+    values.push(item);
+    groups.set(identity,values);
+  }
+  // Duplicate declarations are deliberately omitted from completion rather
+  // than offered as multiple indistinguishable destinations.
+  const items=[...groups.values()].filter(values=>values.length===1)
+    .map(values=>values[0])
+    .sort((a,b)=>a.name.localeCompare(b.name)||a.relativePath.localeCompare(b.relativePath));
   return {token,prefix,items};
 }
 
