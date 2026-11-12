@@ -248,7 +248,7 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   };
   const context={subscriptions:[],extensionUri:uri('/extension')},workbench=registerWorkbench(vscode,context),posted=[];
   workbench.attach(doc,m=>posted.push(m));
-  assert.equal(providers.size,4);
+  assert.equal(providers.size,3);
   const beforeActivation=changes.length;workbench.activate(doc);workbench.activate(doc);
   assert.equal(changes.length,beforeActivation,"unchanged activation must not refresh the native trees");
   const outline=providers.get('skillStudio.outline');
@@ -630,12 +630,13 @@ test('Native views track unsaved Source, audit Classic package, reject stale sel
   assert.ok(exportedProcedure.includes('# unsaved-export-probe'),
     'ZIP contains current unsaved native Source rather than stale disk bytes');
   doc.text=source;doc.version++;changed({document:doc});
-  const evidence=providers.get('skillStudio.evidence').getChildren();
-  assert.ok(evidence[0].label.includes('no write authority'));
-  const dataflow=evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
-  assert.ok(dataflow,'bounded Package Audit hydrates selected-Node dataflow evidence');
+  assert.ok(!providers.has('skillStudio.evidence'),
+    'standalone Evidence TreeView must be retired');
+  const inspectorDataFlowRows=providers.get('skillStudio.inspection').getChildren();
+  const dataflow=inspectorDataFlowRows.find(x=>x.kind==='data-flow');
+  assert.ok(dataflow,'bounded Package Audit hydrates selected-Node Inspector Data Flow');
   assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
-  assert.match(dataflow.description,/no write authorization/);
+  assert.match(dataflow.description,/Runtime NOT_RUN/);
   assert.ok(dataflow.children.some(x=>x.label.includes('Source lineage')));
   await commands.get('skillStudio.previewMarkdown')(markdownUri);
   assert.equal(showDocumentCalls.at(-1).options.viewColumn,vscode.ViewColumn.One,
