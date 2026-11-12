@@ -42,7 +42,11 @@
     "onCustomEditor:skillStudio.schemaPreview",
     "onCommand:skillStudio.openSchema",
     "onCommand:skillStudio.refreshPackages",
-    "onView:skillStudio.packages"
+    "onView:skillStudio.packages",
+    "onView:skillStudio.outline",
+    "onView:skillStudio.evidence",
+    "onView:skillStudio.problems",
+    "onView:skillStudio.inspection"
   ],
   "contributes": {
     "colors": [
@@ -405,13 +409,6 @@
       }
     ],
     "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "skillStudio",
-          "title": "Skill Studio",
-          "icon": "icons/skill-studio.svg"
-        }
-      ],
       "secondarySidebar": [
         {
           "id": "skillStudioInspector",
@@ -421,7 +418,13 @@
       ]
     },
     "views": {
-      "skillStudio": [
+      "skillStudioInspector": [
+        {
+          "id": "skillStudio.inspection",
+          "name": "Inspector"
+        }
+      ],
+      "explorer": [
         {
           "id": "skillStudio.packages",
           "name": "Packages"
@@ -437,12 +440,6 @@
         {
           "id": "skillStudio.problems",
           "name": "Problems"
-        }
-      ],
-      "skillStudioInspector": [
-        {
-          "id": "skillStudio.inspection",
-          "name": "Inspector"
         }
       ]
     }
