@@ -141,7 +141,11 @@ export function skillSymbolAt(index,uri,offset){
   if(!index||typeof uri!=="string"||!Number.isSafeInteger(offset)||offset<0)
     return null;
   const token=(index.tokensByUri.get(uri)??[]).find(item=>
-    SYMBOL_TYPES.has(item.type)&&offset>=item.range.start&&offset<item.range.end);
+    SYMBOL_TYPES.has(item.type)&&
+    (item.type!=="skillStep"||!modifier(item,"declaration")||
+      (item.part==="key"&&item.path?.[0]==="procedures"&&
+       item.path?.[2]==="nodes"&&item.path.length===4))&&
+    offset>=item.range.start&&offset<item.range.end);
   if(!token)return null;
   const declarations=index.declarations.get(token.key)??index.documentTargets.get(token.key)??[];
   const references=index.references.get(token.key)??[];
