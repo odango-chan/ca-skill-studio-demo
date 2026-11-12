@@ -211,7 +211,9 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
             if(cancellationToken?.isCancellationRequested)return undefined;
             const source=Array.isArray(result)?result:
               Array.isArray(result?.items)?result.items:[];
-            if(!source.length)return undefined;
+            // Always publish the result to the host, including an empty
+            // Completion list, so source-generation diagnostics remain
+            // observable instead of silently returning before instrumentation.
             const items=source.map(item=>{
               const completion=new vscode.CompletionItem(
                 item.label,item.kind??vscode.CompletionItemKind.Text);
