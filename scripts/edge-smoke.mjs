@@ -47,7 +47,16 @@ const url="http://127.0.0.1:"+server.address().port+"/";
 const temp=await mkdtemp(join(tmpdir(),"studio-chrome-"));
 const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",
   "--disable-dev-shm-usage","--no-first-run","--no-default-browser-check",
-  "--remote-debugging-port=0","--user-data-dir="+temp,"about:blank"],{stdio:"ignore"});
+  "--disable-background-networking","--disable-extensions",
+  "--remote-debugging-port=0","--user-data-dir="+temp,"about:blank"],
+  {stdio:["ignore","ignore","pipe"]});
+let chromeStderr="";
+child.stderr?.on("data",chunk=>{
+  chromeStderr=(chromeStderr+chunk.toString()).slice(-5000);
+});
+child.on("error",error=>{
+  chromeStderr=(chromeStderr+"\\nspawn error: "+String(error)).slice(-5000);
+});
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 let ws=null,seq=0;
 const pending=new Map(),exceptions=[],warnings=[];
@@ -64,12 +73,19 @@ async function evaluate(expression){
 }
 try{
   let port=null;
-  for(let i=0;i<120;i++){
-    try{port=Number((await readFile(join(temp,"DevToolsActivePort"),"utf8")).split("\n")[0]);break;}
-    catch{if(child.exitCode!==null)throw Error("Chrome exited: "+child.exitCode);}
+  // Chrome can take longer to initialize on a cold or contended CI runner.
+  // Wait up to 60s and preserve stderr so startup failures are diagnosable.
+  for(let i=0;i<600;i++){
+    try{port=Number((await readFile(join(temp,"DevToolsActivePort"),"utf8")).split("\\n")[0]);break;}
+    catch{
+      if(child.exitCode!==null)
+        throw Error("Chrome exited before DevTools startup: "+
+          JSON.stringify({code:child.exitCode,signal:child.signalCode,stderr:chromeStderr}));
+    }
     await sleep(100);
   }
-  if(!port)throw Error("Chrome debugging port not ready");
+  if(!port)throw Error("Chrome debugging port not ready: "+
+    JSON.stringify({code:child.exitCode,signal:child.signalCode,stderr:chromeStderr}));
   const tabs=await (await fetch("http://127.0.0.1:"+port+"/json")).json();
   const page=tabs.find(t=>t.type==="page");
   if(!page)throw Error("Chrome page unavailable");
