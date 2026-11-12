@@ -442,6 +442,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const rightInspector=inspectorPlacement.tabs.find(x=>x.x>inspectorPlacement.viewportWidth/2);
   if(!rightInspector)throw Error('Inspector was not placed in the native right-side secondary sidebar: '+JSON.stringify(inspectorPlacement));
   await click(rightInspector.x,rightInspector.y);await sleep(300);
+  const rightPanelState=await evalJS(`(()=>{const panel=document.querySelector('#theia-right-content-panel');const r=panel?.getBoundingClientRect();return {found:!!panel,width:r?.width??0,height:r?.height??0};})()`);
+  if(!rightPanelState.found)throw Error('Theia right-side panel shell is missing: '+JSON.stringify(rightPanelState));
+  if(rightPanelState.width<120)await invoke('core.toggle.right.panel');
+  await sleep(250);
   console.log('STUDIO_INSPECTOR_SECONDARY_SIDEBAR_CHROMIUM',JSON.stringify({found:true,rightInspector,viewportWidth:inspectorPlacement.viewportWidth}));
   const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);el?.scrollIntoView({block:'center'});const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
@@ -821,24 +825,33 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
   });
-  const sourceVersion=Number(/v(\d+)/.exec(beforeEdit.result?.value??'')?.[1]);
-  if(!Number.isSafeInteger(sourceVersion))throw Error('Could not read native Source version');
+  const sourceVersionProbe=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  const sourceVersion=sourceVersionProbe?.version;
+  if(!Number.isSafeInteger(sourceVersion)||!sourceVersionProbe.uri)
+    throw Error('Could not read authoritative native Source version: '+JSON.stringify(sourceVersionProbe));
   await startNativeCommand('skillStudio.editNodeOperatorValue',{
     procedureId:selectionResult.result.value.procedure,nodeId:'nudm-sdm-get',sourceVersion
   },'sbi.udm.sm_data.get.preview');
   await confirmNativePreview('call: sbi.udm.sm_data.get','call: sbi.udm.sm_data.get.preview');
-  const afterEdit=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
+  const afterEdit=await waitForRevisionChange(graphContext,beforeEdit.result?.value,
+    'Native Inspector edit');
+  const afterSourceVersion=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
   const editResult=await evalJS(`window.__skillStudioCommandResult`);
-  if(editResult!==true||!afterEdit.result?.value||afterEdit.result.value===beforeEdit.result?.value)
-    throw Error('Native Inspector edit did not commit a Source revision: '+JSON.stringify({editResult,before:beforeEdit.result?.value,after:afterEdit.result?.value}));
+  if(editResult!==true||!afterEdit.result?.value||afterSourceVersion?.version<=sourceVersion)
+    throw Error('Native Inspector edit did not commit a Source revision: '+JSON.stringify({
+      editResult,before:beforeEdit.result?.value,after:afterEdit.result?.value,
+      sourceVersion,afterSourceVersion
+    }));
   await invoke('core.undo');
   const afterUndo=await waitForRevisionChange(graphContext,afterEdit.result?.value,
     'Native Inspector Undo');
-  if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value)
-    throw Error('Native Inspector edit did not round-trip through native Undo: '+JSON.stringify({after:afterEdit.result?.value,undo:afterUndo.result?.value}));
+  const undoSourceVersion=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value||
+     undoSourceVersion?.version<=afterSourceVersion?.version)
+    throw Error('Native Inspector edit did not round-trip through native Undo: '+JSON.stringify({
+      after:afterEdit.result?.value,undo:afterUndo.result?.value,
+      afterSourceVersion,undoSourceVersion
+    }));
   console.log('STUDIO_INSPECTOR_AUTHORING_CHROMIUM',JSON.stringify({
     node:selectionResult.result.value.node,procedure:selectionResult.result.value.procedure,
     before:beforeEdit.result?.value,after:afterEdit.result?.value,undo:afterUndo.result?.value
