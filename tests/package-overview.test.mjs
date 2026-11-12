@@ -252,17 +252,19 @@ test('C4 registers Package Explorer and renders Skills under the unified tree',a
   assert.match(pkg.description,/3\/3 core/);
   assert.match(pkg.description,/1 modified/);
   const groups=await provider.getChildren(pkg);
-  assert.deepEqual(groups.map(group=>group.key).filter(key=>key!=='other'),
-    ['definition','assurance','schemas','scripts','references']);
-  assert.equal(groups.find(group=>group.key==='other')?.files.length,0);
-  assert.equal(groups.find(group=>group.key==='scripts').files.length,5);
-  assert.equal(groups.find(group=>group.key==='references').files.length,3);
+  assert.deepEqual(groups.map(group=>group.key),
+    ['definition','assurance','schemas','scripts','references','other']);
+  assert.equal(groups.find(group=>group.key==='scripts').files.length,1);
+  assert.equal(groups.find(group=>group.key==='references').files.length,1);
+  assert.equal(groups.find(group=>group.key==='other').files.length,1);
   const masPkg=skills.find(x=>x.kind==='package'&&x.name==='establish-pdu-session-mas');
   assert.ok(masPkg);
   const masGroups=await provider.getChildren(masPkg);
-  assert.deepEqual(masGroups.map(group=>group.key).filter(key=>key!=='other'),
-    ['definition','assurance','schemas']);
-  assert.equal(masGroups.find(group=>group.key==='other')?.files.length,0);
+  assert.deepEqual(masGroups.map(group=>group.key),
+    ['definition','assurance','schemas','scripts','references','other']);
+  assert.equal(masGroups.find(group=>group.key==='scripts').files.length,1);
+  assert.equal(masGroups.find(group=>group.key==='references').files.length,0);
+  assert.equal(masGroups.find(group=>group.key==='other').files.length,0);
   const schemas=groups.find(x=>x.key==='schemas');
   const schemaFiles=await provider.getChildren(schemas);
   assert.equal(schemaFiles[0].label,'request.schema.yaml');
