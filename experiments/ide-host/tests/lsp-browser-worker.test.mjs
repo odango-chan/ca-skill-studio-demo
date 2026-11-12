@@ -478,21 +478,21 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.match(predicateHover.contents.value,/Predicate/);
     assert.ok(predicateHover.contents.value.includes(predicateName));
 
+    const completionDiagnostics=waitForMessage(worker,message=>
+      message?.method==="skillStudio/completionDiagnostics"&&
+      message.params?.sourcePath==="assurance/contract.yaml",5000);
     const schemaCompletions=await lspRequest(worker,312,"textDocument/completion",{
       textDocument:{uri:contract.uri},
-      position:positionOf(contract.text,schemaPath,9)
+      position:positionOf(contract.text,schemaPath,9),
+      context:{triggerKind:1,skillStudioDiagnostics:true}
     });
     assert.ok(schemaCompletions.some(item=>item.label===schemaPath),
       "Contract Schema path completion uses Package-owned Schema files");
-    const completionDebug=await lspRequest(worker,320,"skillStudio/completionDiagnostics",{
-      textDocument:{uri:contract.uri},
-      position:positionOf(contract.text,schemaPath,9)
-    });
-    assert.equal(completionDebug.snapshotFound,true);
-    assert.equal(completionDebug.sourcePath,"assurance/contract.yaml");
-    assert.ok(completionDebug.schemaDocuments.includes(schemaPath));
-    assert.equal(completionDebug.completionContext?.type,"skillSchema");
-    assert.ok(completionDebug.completionContext.candidates.includes(schemaPath));
+    const completionDebug=await completionDiagnostics;
+    assert.equal(completionDebug.params.snapshotFound,true);
+    assert.ok(completionDebug.params.schemaDocuments.includes(schemaPath));
+    assert.equal(completionDebug.params.completionContext?.type,"skillSchema");
+    assert.ok(completionDebug.params.completionContext.candidates.includes(schemaPath));
     const operationCompletions=await lspRequest(worker,313,"textDocument/completion",{
       textDocument:{uri:procedure.uri},
       position:positionOf(procedure.text,operationName,4)
