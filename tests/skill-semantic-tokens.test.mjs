@@ -68,6 +68,26 @@ test("Studio consumes the exact current ca-skills v0.2.0 semantic projection",()
     .update(contractText).digest("hex");
   assert.equal(blobSha,"618c5c671f2c18785ecc10f84b9d549f88b4b138",
     "refresh the pinned snapshot and source metadata together");
+  const sourcePins={
+    "skill-language-spec.md":"bc81fb340827521da3452074974f9e3663043b10",
+    "skill-language-spec.zh-CN.md":"23f242740ad7671e3dab9f313cce53ac03322419",
+    "script-contract.md":"b663977ef56d95538a50c13cda9301f28079697c",
+    "schema-ownership.md":"95900448bd7409b7a07faaa0337aebb872ee0e66",
+    "authoring-model.md":"250f2eb1557f9432380596026e7b1a7103ffc501"
+  };
+  const sourceReadme=readFileSync(new URL(
+    "../language/contracts/README.md",import.meta.url
+  ),"utf8");
+  assert.ok(sourceReadme.includes("3fce09aca32b6a6faf6ec3e9a204d38cc129ec38"));
+  for(const [name,expected] of Object.entries(sourcePins)){
+    const content=readFileSync(new URL(
+      "../language/contracts/source/"+name,import.meta.url
+    ),"utf8");
+    const actual=createHash("sha1")
+      .update("blob "+Buffer.byteLength(content)+"\\0")
+      .update(content).digest("hex");
+    assert.equal(actual,expected,name+" must remain byte-identical to ca-skills");
+  }
   assert.equal(contract.id,"connectionagent.skill.semantic-tokens");
   assert.equal(contract.schemaVersion,1);
   assert.equal(contract.version,"0.2.0");
