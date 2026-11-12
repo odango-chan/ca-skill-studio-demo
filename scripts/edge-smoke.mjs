@@ -55,7 +55,7 @@ child.stderr?.on("data",chunk=>{
   chromeStderr=(chromeStderr+chunk.toString()).slice(-5000);
 });
 child.on("error",error=>{
-  chromeStderr=(chromeStderr+"\\nspawn error: "+String(error)).slice(-5000);
+  chromeStderr=(chromeStderr+" spawn error: "+String(error)).slice(-5000);
 });
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 let ws=null,seq=0;
@@ -76,7 +76,7 @@ try{
   // Chrome can take longer to initialize on a cold or contended CI runner.
   // Wait up to 60s and preserve stderr so startup failures are diagnosable.
   for(let i=0;i<600;i++){
-    try{port=Number((await readFile(join(temp,"DevToolsActivePort"),"utf8")).split("\\n")[0]);break;}
+    try{port=Number((await readFile(join(temp,"DevToolsActivePort"),"utf8")).split("\n")[0]);break;}
     catch{
       if(child.exitCode!==null)
         throw Error("Chrome exited before DevTools startup: "+
