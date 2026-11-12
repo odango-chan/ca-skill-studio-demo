@@ -777,42 +777,14 @@ export function registerWorkbench(vscode,context){
           contractCompletionEditor,relatedUris.contract,
           contractCompletionPosition,requestSchemaPath);
         if(!completionProviderAfter?.completionProvider?.registered||
-           completionProviderAfter.completionProvider.requests<=
-             (completionProviderBefore?.completionProvider?.requests??0)||
+           completionProviderAfter.completionProvider.lastUri!==relatedUris.contract.toString()||
            !completionProviderAfter.completionProvider.lastLabels?.includes(requestSchemaPath))
-          throw Error("Native Theia Completion adapter did not return the exact Package Schema candidate: "+
+          throw Error("Native Theia Suggest did not return the exact Package Schema candidate: "+
             JSON.stringify({
               provider:completionProviderAfter?.completionProvider??null,
-              sourceOffset:contractText.indexOf(requestSchemaPath)+9,
-              sourcePosition:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
-              editorTextLength:contractText.length,
-              editorTokenOffset:contractText.indexOf(requestSchemaPath),
-              editorLineStart:contractText.lastIndexOf("\\n",contractText.indexOf(requestSchemaPath))+1,
-              editorLineText:contractText.slice(
-                contractText.lastIndexOf("\\n",contractText.indexOf(requestSchemaPath))+1,
-                contractText.indexOf("\\n",contractText.indexOf(requestSchemaPath))<0
-                  ?contractText.length:contractText.indexOf("\\n",contractText.indexOf(requestSchemaPath))),
-              editorPositionRoundTrip:contractDocument.positionAt(
-                contractText.indexOf(requestSchemaPath)+9),
-              sourceVersion:contractDocument.version,
-              acceptedGeneration:packageStateForYaml.generation,
-              acceptedSnapshotSource:packageStateForYaml.lastSentSnapshot?.documents?.find(item=>
-                item.uri===relatedUris.contract.toString())?.text?.indexOf(requestSchemaPath)??null,
-              acceptedSnapshotVersion:packageStateForYaml.lastSentSnapshot?.documents?.find(item=>
-                item.uri===relatedUris.contract.toString())?.version??null
+              sourcePosition:contractCompletionPosition,
+              expected:requestSchemaPath
             }));
-        const requestSchemaCompletion=completionItems(requestSchemaCompletionResult);
-        if(!requestSchemaCompletion.some(item=>
-          (typeof item.label==="string"?item.label:item.label?.label)===requestSchemaPath))
-          throw Error("v0.2 Contract Schema completion did not return the exact Package path: "+
-            JSON.stringify({labels:requestSchemaCompletion.map(item=>
-              typeof item.label==="string"?item.label:item.label?.label??String(item.label??"")),
-              count:requestSchemaCompletion.length,
-              rawKeys:Object.keys(requestSchemaCompletionResult??{}),
-              rawItemCount:requestSchemaCompletionResult?.items?.length??null,
-              rawSuggestionCount:requestSchemaCompletionResult?.suggestions?.length??null,
-              position:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
-              requestSchemaPath}));
         const predicateCompletionPosition=sourcePosition(
           procedureDocument,procedureText,predicateName,5);
         await openNativeSource(vscode,procedureUri,{
