@@ -394,7 +394,8 @@ spec:
       effect: READ
 `
   });
-  return {rootUri,packageName:"establish-pdu-session",generation,completeness,documents};
+  return {rootUri,packageName:"establish-pdu-session",generation,completeness,
+    libraryInventory:"complete",documents};
 }
 
 test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported ToolCatalog symbols",async()=>{
