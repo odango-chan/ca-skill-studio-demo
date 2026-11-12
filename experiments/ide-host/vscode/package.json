@@ -160,6 +160,13 @@
     "markdown.previewStyles": [
       "./media/native-markdown-preview.css"
     ],
+    "languages": [
+      {
+        "id": "markdown",
+        "aliases": ["Markdown","markdown"],
+        "extensions": [".md",".markdown"]
+      }
+    ],
     "menus": {
       "editor/title": [
         {
