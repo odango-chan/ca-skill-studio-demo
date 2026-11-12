@@ -2281,8 +2281,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const owner=await command('DOM.getFrameOwner',{frameId:nativeLive.view.frameId});
       const box=await command('DOM.getBoxModel',{backendNodeId:owner.backendNodeId});
       const quad=box.model.content;
-      const x=(quad[0]+quad[2]+quad[4]+quad[6])/4;
-      const y=(quad[1]+quad[3]+quad[5]+quad[7])/4;
+      const frameMetrics=await previewScroll('({width:innerWidth,height:innerHeight})');
+      if(!frameMetrics?.width||!frameMetrics?.height)
+        throw Error('Native Markdown Preview viewport metrics are unavailable');
+      // Wheel over the left page gutter, not the center of a nested code/table
+      // scroller. The frame's page itself must receive the real wheel event.
+      const localX=Math.min(8,frameMetrics.width/20);
+      const localY=frameMetrics.height/2;
+      const x=quad[0]+(localX/frameMetrics.width)*(quad[2]-quad[0]);
+      const y=quad[1]+(localY/frameMetrics.height)*(quad[5]-quad[1]);
       await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
       await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY});
       await sleep(150);
