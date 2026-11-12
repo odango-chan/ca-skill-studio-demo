@@ -680,46 +680,6 @@ connection.onCompletion(params => {
   return finish([]);
 });
 
-connection.onRequest("skillStudio/completionDiagnostics",params=>{
-  const uri=params?.textDocument?.uri;
-  const snapshot=typeof uri==="string"?packageSnapshotForUri(uri):null;
-  const source=snapshot?snapshotDocumentFor(snapshot,uri):null;
-  const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
-  const value=snapshot?packageAnalyses.get(snapshot.rootUri):null;
-  const offset=source?offsetAt(source.text,params.position):null;
-  const context=offset===null?null:skillSymbolCompletions(index,uri,offset);
-  return {
-    snapshotFound:Boolean(snapshot),
-    completeness:snapshot?.completeness??null,
-    libraryInventory:snapshot?.libraryInventory??null,
-    generation:snapshot?.generation??null,
-    analysisState:value?.analysis?.state??null,
-    analysisGeneration:value?.snapshot?.generation??null,
-    indexGeneration:index?.generation??null,
-    indexHasSource:Boolean(index?.tokensByUri.has(uri)),
-    analysisDocumentVersion:value?.analysis?.documents?.find(item=>
-      item.uri===source?.uri)?.version??null,
-    sourcePath:source?.relativePath??null,
-    sourceVersion:source?.version??null,
-    documentCount:snapshot?.documents?.length??0,
-    schemaDocuments:snapshot?.documents?.filter(item=>
-      item.relativePath.startsWith("schemas/")||
-      (item.relativePath.startsWith("lib/")&&
-       (item.relativePath.endsWith(".schema.yaml")||
-        item.relativePath.endsWith(".schema.yml"))))
-      .map(item=>item.relativePath)??[],
-    schemaTokens:(index?.tokensByUri.get(uri)??[])
-      .filter(item=>item.type==="skillSchema")
-      .map(item=>({name:item.name,range:item.range,path:item.path,part:item.part,
-        modifiers:item.modifiers})),
-    cursorOffset:offset,
-    completionContext:context?{
-      type:context.token.type,name:context.token.name,range:context.token.range,
-      prefix:context.prefix,candidates:context.items.map(item=>item.relativePath??item.name)
-    }:null
-  };
-});
-
 connection.onNotification(PACKAGE_INVALIDATE_NOTIFICATION, params => {
   const rootUri = params?.rootUri;
   const generation = params?.generation;
