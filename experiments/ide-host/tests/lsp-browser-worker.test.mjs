@@ -285,12 +285,11 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     // Definition must work in the reverse direction too: from the Python
     // main() entrypoint back to the exact YAML caller. This is the LSP
     // primitive used by native Monaco/Theia Ctrl/Cmd-click and Peek Definition.
-    const mainLine=script.text.split(/\r\n|\n|\r/).findIndex(line=>
-      /^(?:async )?def main\(/.test(line));
-    assert.ok(mainLine>=0,"Python main() entrypoint exists");
+    // This fixture uses the legacy metadata entry symbol; the canonical
+    // ca-skills form uses main() and is covered by the Theia browser probe.
     const reverseDefinition=await lspRequest(worker,24,"textDocument/definition",{
       textDocument:{uri:script.uri},
-      position:{line:mainLine,character:script.text.split(/\r\n|\n|\r/)[mainLine].indexOf("main")}
+      position:positionOf(script.text,nameNeedle,"# name: ".length)
     });
     const reverseDefinitions=Array.isArray(reverseDefinition)
       ?reverseDefinition:reverseDefinition?[reverseDefinition]:[];
