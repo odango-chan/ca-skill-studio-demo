@@ -61,7 +61,7 @@ function host(manifestOverride=null,existing=[]){
     }
   };
   const vscode={Uri:{file:uri,joinPath},workspace};
-  return {vscode,files,opened,workspace};
+  return {vscode,files,folders,opened,workspace};
 }
 test("Sample creates both exact pinned owner SKILL packages in one Skill Compiler project root",async()=>{
   const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
