@@ -106,17 +106,17 @@ export function classifySkillSemanticTokens(text, relativePath) {
 
   const result = [];
   const counter = {nodes: 0};
-  function add(scalar, type, modifiers = []) {
+  function add(scalar, type, modifiers = [], path = [], part = "value") {
     const span = scalarSpan(text, scalar);
     if (!span) return;
-    result.push({ ...span, type, modifiers: [...modifiers] });
+    result.push({ ...span, type, modifiers: [...modifiers], path: [...path], part });
   }
   function visit(node, path, depth) {
     if (!node || ++counter.nodes > MAX_NODES || depth > MAX_DEPTH ||
         result.length > MAX_TOKENS) throw Error("Skill semantic projection limit");
     if (isScalar(node)) {
       const match = ruleAt(profile, path, "value");
-      if (match) add(node, match.type, match.modifiers);
+      if (match) add(node, match.type, match.modifiers, path, "value");
       return;
     }
     if (isSeq(node)) {
@@ -129,8 +129,8 @@ export function classifySkillSemanticTokens(text, relativePath) {
       const key = pair.key.value;
       const next = [...path, key];
       const match = ruleAt(profile, next, "key");
-      if (match) add(pair.key, match.type, match.modifiers);
-      else if (isKeyword(profile, path, key)) add(pair.key, "skillKeyword");
+      if (match) add(pair.key, match.type, match.modifiers, next, "key");
+      else if (isKeyword(profile, path, key)) add(pair.key, "skillKeyword", [], next, "key");
       visit(pair.value, next, depth + 1);
     }
   }
