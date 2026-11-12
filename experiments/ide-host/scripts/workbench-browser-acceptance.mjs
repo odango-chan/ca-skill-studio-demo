@@ -1014,6 +1014,21 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Source-derived Producer / Consumer and ABI information inside the native
   // right-side Inspector, without confusing it with Runtime Evidence.
   await invoke('skillStudio.auditPackage');
+  // Audit refreshes Source-derived tree models. Wait for its exact terminal
+  // state before interacting with the Inspector expansion arrow; otherwise a
+  // late model refresh can immediately collapse the row after a trusted click.
+  let initialAuditText='';
+  for(let attempt=0;attempt<100;attempt++){
+    initialAuditText=await evalJS('document.body.innerText');
+    if(/Package Audit · [0-9]+ editor warnings/.test(initialAuditText))break;
+    if(initialAuditText.includes('Package Audit · unavailable'))
+      throw Error('Package Audit became unavailable before Data Flow expansion: '+
+        initialAuditText.slice(-1000));
+    await sleep(100);
+  }
+  if(!/Package Audit · [0-9]+ editor warnings/.test(initialAuditText))
+    throw Error('Package Audit did not settle before Data Flow expansion: '+
+      initialAuditText.slice(-1000));
   let inspectorFlowState=null;
   for(let attempt=0;attempt<100;attempt++){
     inspectorFlowState=await evalJS(`(()=>{
