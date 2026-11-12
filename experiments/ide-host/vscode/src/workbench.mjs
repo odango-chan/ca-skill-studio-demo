@@ -708,13 +708,18 @@ export function registerWorkbench(vscode,context){
               rawSuggestionCount:requestSchemaCompletionResult?.suggestions?.length??null,
               position:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
               requestSchemaPath}));
-        const operationName="sbi.udm.sm_data.get";
-        const operationCompletion=completionItems(await vscode.commands.executeCommand(
+        const predicateCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
-          sourcePosition(procedureDocument,procedureText,operationName,4)));
-        if(!operationCompletion.some(item=>
-          (typeof item.label==="string"?item.label:item.label?.label)===operationName))
-          throw Error("v0.2 Procedure Operation completion did not return the imported ToolCatalog ID");
+          sourcePosition(procedureDocument,procedureText,predicateName,5)));
+        if(!predicateCompletion.some(item=>
+          (typeof item.label==="string"?item.label:item.label?.label)===predicateName))
+          throw Error("v0.2 Procedure Predicate completion did not return the Package declaration");
+        const nodeCompletion=completionItems(await vscode.commands.executeCommand(
+          "vscode.executeCompletionItemProvider",procedureUri,
+          sourcePosition(procedureDocument,procedureText,nodeName,3)));
+        if(!nodeCompletion.some(item=>
+          (typeof item.label==="string"?item.label:item.label?.label)===nodeName))
+          throw Error("v0.2 Procedure node completion did not return the scoped node declaration");
         const scriptCompletionPath="scripts/select_establishment_configuration.py";
         const scriptCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
@@ -905,7 +910,8 @@ export function registerWorkbench(vscode,context){
           yamlPredicateOutline:locations(yamlPredicateSymbols).map(item=>item.name),
           yamlCompletions:{
             requestSchema:requestSchemaCompletion.length,
-            operation:operationCompletion.length,
+            predicate:predicateCompletion.length,
+            node:nodeCompletion.length,
             script:scriptCompletion.length
           },
           reverseDefinition:reverseDefinitions.length,
