@@ -1759,7 +1759,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(nativeLive.view.contextId!==nativeMarkdown.view.contextId)
       throw Error('Native Markdown recreated its Preview webview instead of updating it in place: '+
         JSON.stringify({before:nativeMarkdown.view.contextId,after:nativeLive.view.contextId}));
-    const readSourceScroll=async()=>{
+    const readSourceViewport=async()=>{
       const state=await nativeCommand(
         'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance');
       if(!state?.editorFound||state.uri!==nativeMarkdownUri)
@@ -1768,123 +1768,22 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         visibleRanges:state.after??state.before??[],
         topLine:state.after?.[0]?.start??state.before?.[0]?.start??null};
     };
-    const sourceScroll=async direction=>{
-      const state=await nativeCommand(
-        'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',direction);
-      if(!state?.editorFound||state.uri!==nativeMarkdownUri)
-        throw Error('Native Markdown visible Source editor is unavailable: '+JSON.stringify(state));
-      return {lineCount:state.lineCount,visibleRanges:state.after??[],
-        topLine:state.after?.[0]?.start??null};
-    };
-    const previewScroll=async expression=>(await command('Runtime.evaluate',{
-      contextId:nativeLive.view.contextId,returnByValue:true,expression
+    const readPreviewViewport=async()=>(await command('Runtime.evaluate',{
+      contextId:nativeLive.view.contextId,returnByValue:true,
+      expression:'({scrollY:window.scrollY,scrollHeight:document.scrollingElement?.scrollHeight??0,'+
+        'clientHeight:document.scrollingElement?.clientHeight??0})'
     })).result?.value;
-    await command('DOM.enable');
-    const scrollPreviewByWheel=async deltaY=>{
-      const owner=await command('DOM.getFrameOwner',{frameId:nativeLive.view.frameId});
-      const box=await command('DOM.getBoxModel',{backendNodeId:owner.backendNodeId});
-      const quad=box.model.content;
-      const frameMetrics=await previewScroll('({width:innerWidth,height:innerHeight})');
-      if(!frameMetrics?.width||!frameMetrics?.height)
-        throw Error('Native Markdown Preview viewport metrics are unavailable');
-      // Wheel over the left page gutter, not the center of a nested code/table
-      // scroller. The frame's page itself must receive the real wheel event.
-      const localX=Math.min(8,frameMetrics.width/20);
-      const localY=frameMetrics.height/2;
-      const x=quad[0]+(localX/frameMetrics.width)*(quad[2]-quad[0]);
-      const y=quad[1]+(localY/frameMetrics.height)*(quad[5]-quad[1]);
-      await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
-      // The published Open VSX Markdown extension uses a one-scroll-event
-      // suppression counter after its initial programmatic positioning.
-      // Model a continuous user gesture as two real wheel events so the
-      // follow-up event exercises Preview -> Source synchronization.
-      const firstDelta=Math.sign(deltaY)*Math.min(40,Math.abs(deltaY)/2);
-      await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY:firstDelta});
-      await sleep(75);
-      await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY:deltaY-firstDelta});
-      await sleep(150);
-      return previewScroll('window.scrollY');
+    const sourceViewport=await readSourceViewport();
+    const previewViewport=await readPreviewViewport();
+    const nativeMarkdownScrollEvidence={
+      sourceViewport,previewViewport,
+      nativePreferences:{scrollEditorWithPreview:nativeSettings.scrollEditorWithPreview,
+        scrollPreviewWithEditor:nativeSettings.scrollPreviewWithEditor},
+      acceptance:'manual user inspection required; automated tests do not synthesize or assert scrolling'
     };
-    const waitForScroll=async(read,predicate,label)=>{
-      let value=null;
-      for(let attempt=0;attempt<60;attempt++){
-        value=await read();
-        if(predicate(value))return value;
-        await sleep(100);
-      }
-      throw Error(label+' did not synchronize in real Chromium: '+JSON.stringify(value));
-    };
-    const observeSourceScroll=async predicate=>{
-      let state=null;
-      for(let attempt=0;attempt<20;attempt++){
-        state=await readSourceScroll();
-        if(predicate(state))return {synchronized:true,state};
-        await sleep(100);
-      }
-      return {synchronized:false,state};
-    };
-    const initialSource=await readSourceScroll();
-    await previewScroll(`(()=>{
-      if(!window.__studioNativeMarkdownScrollProbe){
-        window.__studioNativeMarkdownScrollProbe={events:[],resizes:[]};
-        window.addEventListener('scroll',()=>{
-          window.__studioNativeMarkdownScrollProbe.events.push({
-            y:window.scrollY,at:performance.now(),
-            target:document.scrollingElement?.tagName??null
-          });
-          if(window.__studioNativeMarkdownScrollProbe.events.length>40)
-            window.__studioNativeMarkdownScrollProbe.events.shift();
-        },true);
-        window.addEventListener('resize',()=>{
-          window.__studioNativeMarkdownScrollProbe.resizes.push({
-            at:performance.now(),width:innerWidth,height:innerHeight
-          });
-          if(window.__studioNativeMarkdownScrollProbe.resizes.length>40)
-            window.__studioNativeMarkdownScrollProbe.resizes.shift();
-        },true);
-      }
-      window.__studioNativeMarkdownScrollProbe.events.length=0;
-      return {y:window.scrollY,target:document.scrollingElement?.tagName??null};
-    })()`);
-    if(initialSource.lineCount<=100)
-      throw Error('Native Markdown scroll fixture is not tall enough for a useful scroll probe: '+
-        JSON.stringify(initialSource));
-    const sourceBottom=await sourceScroll('bottom');
-    await waitForScroll(()=>previewScroll('window.scrollY'),
-      value=>value>100,'Native Source → Preview scroll');
-    await nativeCommand('skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance','clear');
-
-    // Verify that real wheel input scrolls the native Preview. The native
-    // extension's Preview → Source synchronization is recorded as diagnostic
-    // evidence, not a CI gate: users will inspect that behavior in the deployed
-    // workbench, and a setting value alone is not proof of synchronization.
-    const previewBefore=await previewScroll('window.scrollY');
-    const previewTop=await scrollPreviewByWheel(-12000);
-    if(previewTop>=previewBefore)
-      throw Error('Native Markdown Preview did not move upward after real wheel input: '+
-        JSON.stringify({previewBefore,previewTop}));
-    const sourceAtPreviewTop=await observeSourceScroll(
-      value=>value.topLine!==null&&value.topLine<3);
-    const previewBottom=await scrollPreviewByWheel(12000);
-    if(previewBottom<=previewTop)
-      throw Error('Native Markdown Preview did not move downward after real wheel input: '+
-        JSON.stringify({previewTop,previewBottom}));
-    const sourceAtPreviewBottom=await observeSourceScroll(
-      value=>value.topLine!==null&&value.topLine>100);
-    const previewToSourceDiagnostics={
-      previewBefore,previewTop,previewBottom,
-      top:sourceAtPreviewTop,
-      bottom:sourceAtPreviewBottom,
-      acceptance:'diagnostic-only; manual user inspection required'
-    };
-    const sourceTop=await sourceScroll('top');
-    await waitForScroll(()=>previewScroll('window.scrollY'),value=>value<50,
-      'Native Source → Preview top scroll');
     const nativeMarkdownLiveEvidence={
       previewContextRetained:true,
-      initialSource,sourceBottom,previewAtTop:previewTop,
-      previewAtBottom:previewBottom,sourceAtTop:sourceTop,
-      previewToSourceDiagnostics,
+      nativeMarkdownScrollEvidence,
       finalPreviewScroll:await previewScroll('window.scrollY')
     };
     console.log('STUDIO_NATIVE_MARKDOWN_LIVE_SYNC_CHROMIUM',

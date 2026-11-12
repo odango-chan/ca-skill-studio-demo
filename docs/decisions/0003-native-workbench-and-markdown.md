@@ -125,7 +125,7 @@ The existing Studio view skillStudio.evidence is a different thing: it is a stat
 
 ### 6. Native Markdown is the active Theia implementation; Classic remains separate until retirement
 
-The accepted Theia implementation is the pinned built-in VS Code Markdown extension `vscode.markdown-language-features@1.95.3`, merged as [PR #169](https://github.com/odango-chan/ca-skill-studio-demo/pull/169) at `main@82f0b0c5`. It owns Markdown rendering, read-only Preview and Preview lifecycle. Native bidirectional scroll preferences are enabled, but actual Preview → Source synchronization has not been confirmed in Theia.
+The accepted Theia implementation is the pinned built-in VS Code Markdown extension `vscode.markdown-language-features@1.95.3`, merged as [PR #169](https://github.com/odango-chan/ca-skill-studio-demo/pull/169) at `main@82f0b0c5`. It owns Markdown rendering, read-only Preview and Preview lifecycle. Native bidirectional scroll preferences are enabled, but actual editor/preview scroll synchronization has not been confirmed in Theia.
 
 The Studio extension owns only the integration boundary:
 
@@ -139,14 +139,14 @@ The old `site/markdown-preview.mjs` renderer and its stylesheet remain for the p
 
 #### Native Markdown acceptance gates
 
-The implementation is merged and is the default. Cleanup PR [#177](https://github.com/odango-chan/ca-skill-studio-demo/pull/177) replaces the retired custom-renderer fixture and probes the actual native Preview frame in both Chromium hosts. Current runs confirm Source → Preview scrolling, but Preview → Source leaves the Source editor at its prior line even though both native preferences are true. This behavior is recorded as diagnostic evidence only; it is not a CI gate, and manual user inspection is pending. Do not restore the custom renderer or add a custom scroll bridge.
+The implementation is merged and is the default. Cleanup PR [#177](https://github.com/odango-chan/ca-skill-studio-demo/pull/177) replaces the retired custom-renderer fixture and probes the actual native Preview frame in both Chromium hosts. The previous automated probe used a programmatic Source `revealRange` helper rather than a real user scroll gesture, so it could not establish bidirectional behavior. Scroll synchronization is removed from automated acceptance and awaits manual user inspection. Do not restore the custom renderer or add a custom scroll bridge.
 
 The real-host acceptance must prove:
 
 1. **Host integration:** both Theia browser-only and backend builds load the pinned Markdown extension and its worker.
 2. **Default pairing:** opening a Markdown file from Explorer, Package Explorer and an internal Package link opens one authoritative Source editor plus one Preview in a separate editor group. Reopening / switching documents does not create duplicate previews.
 3. **Editing:** unsaved Source edits update the existing Preview without recreating it; native Undo / Redo remains authoritative.
-4. **Navigation:** Package-local link navigation targets the exact Package. Source → Preview scrolling is covered by Chromium acceptance. Preview → Source scroll observations are diagnostic-only; native preferences being enabled is not proof of synchronization. The user will inspect both directions in the deployed workbench before this behavior is called accepted.
+4. **Navigation:** Package-local link navigation targets the exact Package. Native scroll preferences are enabled, but editor/preview synchronization is not automated because the prior Source test used programmatic reveal rather than user input. The user will inspect both directions in the deployed workbench before this behavior is called accepted.
 5. **Theme:** heading accents, body typography, links, code blocks, tables, alignment, table overflow and responsive layout use the shared theme extension.
 6. **Skill guide behavior:** Front Matter remains understandable; headings / TOC or equivalent navigation remain available; relative Reference links work only within the active Skill Package.
 7. **Security:** raw HTML cannot execute; no remote images, scripts or arbitrary fetch are introduced; Package-local links pass exact Package-root containment, file inventory and symlink checks.
