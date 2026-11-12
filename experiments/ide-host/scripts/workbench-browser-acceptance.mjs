@@ -353,6 +353,35 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   }
   const classicGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1','Scripts · 5','References · 3'];
   const masGroups=['Skill Definition','Assurance · 3/3 core','Schemas · 1'];
+  async function packageTreeScroll(fraction){
+    const result=await evalJS(`(()=>{
+      const header=[...document.querySelectorAll('.theia-view-container-part-header')]
+        .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
+          x.getBoundingClientRect().width>0);
+      const part=header?.closest('.part');
+      if(!part)return {found:false,reason:'Package Explorer part not found'};
+      const candidates=[...part.querySelectorAll('*')].filter(el=>
+        el.clientHeight>80&&el.scrollHeight>el.clientHeight+8);
+      if(part.clientHeight>80&&part.scrollHeight>part.clientHeight+8)candidates.push(part);
+      candidates.sort((a,b)=>a.clientHeight-b.clientHeight);
+      const scroller=candidates[0];
+      if(!scroller)return {found:false,reason:'Package Explorer has no scrollable tree container'};
+      scroller.scrollTop=Math.round((scroller.scrollHeight-scroller.clientHeight)*${fraction});
+      return {found:true,scrollTop:scroller.scrollTop,scrollHeight:scroller.scrollHeight,
+        clientHeight:scroller.clientHeight,className:String(scroller.className??'')};
+    })()`);
+    if(!result?.found)throw Error('Could not scroll Package Explorer TreeView: '+JSON.stringify(result));
+    await sleep(140);
+    return result;
+  }
+  async function collectPackageRowsAcrossScroll(){
+    const rows=[],scrollStates=[];
+    for(const fraction of [0,.5,1]){
+      scrollStates.push(await packageTreeScroll(fraction));
+      rows.push(...await readTreeRows());
+    }
+    return {rows,scrollStates};
+  }
   // The Dependencies interaction above scrolls the shared TreeView to its
   // lower section. Return the conventional Package row to the top before
   // checking its visible group rows; otherwise a viewport-only assertion
@@ -375,11 +404,32 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const classicRange=classicView.range;
   // The tree may render valid rows outside the current viewport. Inventory
   // membership is about the native TreeView model, not simultaneous visibility.
-  const classicVisible=classicView.rows.slice(classicRange.index+1,classicRange.end)
+  const classicTopRows=classicView.rows.slice(classicRange.index+1,classicRange.end)
     .map(row=>row.text);
+  const classicScroll=await collectPackageRowsAcrossScroll();
+  const classicAllRows=[...classicTopRows,...classicScroll.rows.map(row=>row.text)];
+  const classicVisible=[...new Set(classicAllRows)];
   for(const group of classicGroups)
     if(!classicVisible.some(text=>text.includes(group)))
-      throw Error('Traditional 5GC Package is missing group '+group+': '+JSON.stringify(classicVisible));
+      throw Error('Traditional 5GC Package is missing group '+group+
+        ' after scrolling the virtualized TreeView: '+JSON.stringify({
+          top:classicTopRows,scrollStates:classicScroll.scrollStates,
+          rows:classicScroll.rows.map(row=>({text:row.text,visible:row.visible}))
+        }));
+  await packageTreeScroll(0);
+  const conventionalPackageRestored=await evalJS(`(()=>{
+    const header=[...document.querySelectorAll('.theia-view-container-part-header')]
+      .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
+        x.getBoundingClientRect().width>0);
+    const part=header?.closest('.part');
+    const row=[...(part?.querySelectorAll('.theia-TreeNode')??[])].find(el=>
+      el.innerText.replace(/\\s+/g,' ').includes('establish-pdu-session · 3/3 core ·'));
+    row?.scrollIntoView({block:'start',inline:'nearest'});
+    return Boolean(row);
+  })()`);
+  if(!conventionalPackageRestored)
+    throw Error('Traditional 5GC Package row did not return after virtualized group inspection');
+  await sleep(120);
   const classicContract=await openPackageContract('establish-pdu-session');
   const masView=await ensurePackageExpanded('establish-pdu-session-mas');
   const masVisible=masView.rows.slice(masView.range.index+1,masView.range.end)
