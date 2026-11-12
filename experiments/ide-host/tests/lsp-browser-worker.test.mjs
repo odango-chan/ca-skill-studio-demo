@@ -508,7 +508,7 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.ok(unresolvedSchema,
       "missing authoritative Owner Schema is published at its exact source token: "+
       JSON.stringify({diagnostics:unresolvedOwner.params.diagnostics,
-        expected:missingOwnerPath,contractLine:contract.text.split(/\\r\\n|\\n|\\r/)[
+        expected:missingOwnerPath,contractLine:contract.text.split(/\r\n|\n|\r/)[
           unresolvedOwner.params.diagnostics[0]?.range?.start?.line??0]}));
     const predicateReferences=await lspRequest(worker,307,"textDocument/references",{
       textDocument:{uri:predicates.uri},
@@ -606,7 +606,7 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     const libraryDiagnosticMessage=await libraryDiagnostics;
     assert.ok(!libraryDiagnosticMessage.params.diagnostics.some(item=>
       item.code==="SKILL_LINK_UNRESOLVED"&&
-      libraryPartialContract.text.split(/\\r\\n|\\n|\\r/)[item.range.start.line]
+      libraryPartialContract.text.split(/\r\n|\n|\r/)[item.range.start.line]
         ?.slice(item.range.start.character,item.range.end.character)===ownerSchemaPath),
       "missing Owner Schema diagnostics are suppressed when project lib inventory is partial");
   }finally{
