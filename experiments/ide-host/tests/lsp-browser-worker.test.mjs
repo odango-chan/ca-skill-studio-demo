@@ -409,6 +409,8 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.equal(initialized.result.capabilities.referencesProvider,true);
     assert.equal(initialized.result.capabilities.hoverProvider,true);
     assert.equal(initialized.result.capabilities.documentSymbolProvider,true);
+    assert.equal(initialized.result.capabilities.completionProvider.resolveProvider,false);
+    assert.ok(initialized.result.capabilities.completionProvider.triggerCharacters.includes("."));
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
     const snapshot=currentV02PackageSnapshot();
