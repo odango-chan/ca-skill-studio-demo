@@ -122,6 +122,9 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     assert.ok(webview.html.includes('data-icon="'+name+'"'),
       id+" must use the shared Classic icon "+name);
   }
+  for(const name of ["columns-2","git-branch"])
+    assert.ok(webview.html.includes('data-icon="'+name+'"'),
+      "Canvas layout and route controls must use shared icon "+name);
   assert.ok(webview.html.includes('<option value="DOWN" selected>垂直</option>'));
   assert.doesNotMatch(webview.html,/unsafe-inline/);
   assert.ok(typeof onMessage==="function");
@@ -269,4 +272,27 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.doesNotMatch(document.text,/^\\s{6}create-session:/m);
   assert.doesNotMatch(document.text,/from: create-session\\./);
   assert.ok(writes.length>3,"Node rename applies its complete non-overlapping CST span set");
+});
+
+
+test("Skill Studio authoring views live in native Explorer while Inspector stays in right sidebar",()=>{
+  const manifest=JSON.parse(readFileSync("experiments/ide-host/vscode/package.json","utf8"));
+  assert.equal(manifest.contributes.viewsContainers?.activitybar,undefined,
+    "no competing Skill Studio Activity Bar container");
+  const explorer=manifest.contributes.views.explorer;
+  assert.deepEqual(explorer.map(view=>[view.id,view.name]),[
+    ["skillStudio.packages","Packages"],
+    ["skillStudio.outline","Procedure Outline"],
+    ["skillStudio.evidence","Evidence"],
+    ["skillStudio.problems","Problems"]
+  ]);
+  assert.equal(manifest.contributes.views.skillStudio,undefined);
+  assert.ok(!explorer.some(view=>view.name==="Outline"),
+    "semantic Procedure Outline must not impersonate Theia's document-symbol Outline");
+  const inspector=manifest.contributes.viewsContainers?.secondarySidebar;
+  assert.ok(inspector?.some(container=>container.id==="skillStudioInspector"),
+    "Inspector keeps its native right-side Secondary Sidebar container");
+  assert.deepEqual(manifest.contributes.views.skillStudioInspector?.map(view=>[
+    view.id,view.name
+  ]),[["skillStudio.inspection","Inspector"]]);
 });

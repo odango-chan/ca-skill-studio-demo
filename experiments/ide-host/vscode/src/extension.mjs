@@ -96,10 +96,10 @@ export function activate(context){
             <button id="dismissPackageZip" type="button" aria-label="关闭 ZIP 下载提示">关闭</button>
           </div>
           <div id="graphTools" class="spike-tools" role="toolbar" aria-label="流程图显示选项">
-            <label>布局 <select id="layoutDirection" aria-label="自动布局方向">
+            <label>${svgIcon("columns-2")} 布局 <select id="layoutDirection" aria-label="自动布局方向">
               <option value="DOWN" selected>垂直</option><option value="RIGHT">水平</option>
             </select></label>
-            <label id="rootPathToolbar" hidden>路径 <select id="rootPathMode" aria-label="Root Procedure 路径显示">
+            <label id="rootPathToolbar" hidden>${svgIcon("git-branch")} 路径 <select id="rootPathMode" aria-label="Root Procedure 路径显示">
               <option value="normal" selected>主路径</option>
               <option value="custom">选择路径</option><option value="all">全部路径</option>
             </select></label>

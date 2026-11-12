@@ -383,10 +383,27 @@ try{
   let webviewView=graphFrame?.view??webviewFrames[0]?.view??null;
   const webviewFrameError=webviewFrames.find(item=>item.error)?.error??null;
   let patchEvidence=null;
+  let canvasIconEvidence=null;
   if(graphFrame){
     const world=await command("Page.createIsolatedWorld",{
       frameId:graphFrame.frame.id,worldName:"skill-studio-patch-acceptance",grantUniveralAccess:true
     });
+    const iconResult=await command("Runtime.evaluate",{
+      contextId:world.executionContextId,returnByValue:true,
+      expression:`[...document.querySelectorAll("#graphTools svg[data-icon]")].map(el=>{
+        const r=el.getBoundingClientRect();
+        return {name:el.getAttribute("data-icon"),visible:r.width>0&&r.height>0,
+          color:getComputedStyle(el).color};
+      })`
+    });
+    canvasIconEvidence=iconResult.result?.value??[];
+    const expectedIcons=["columns-2","git-branch","network","eye","locate-fixed",
+      "zoom-out","zoom-in","maximize","fit-width","fit-height"];
+    if(expectedIcons.some(name=>!canvasIconEvidence.some(item=>
+      item.name===name&&item.visible)))
+      throw Error("Classic canvas icon artwork missing from native toolbar: "+
+        JSON.stringify({expectedIcons,canvasIconEvidence}));
+    console.log("STUDIO_CANVAS_ICONS_CHROMIUM",JSON.stringify(canvasIconEvidence));
     const preview=await command("Runtime.evaluate",{
       contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
       expression:`(()=>{

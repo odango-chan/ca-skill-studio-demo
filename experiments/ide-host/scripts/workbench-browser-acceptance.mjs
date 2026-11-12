@@ -39,13 +39,9 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "x.getBoundingClientRect().y<innerHeight);"+
     "const active=tabs.find(x=>x.classList.contains('theia-mod-active'));"+
     "const r=active?.getBoundingClientRect();"+
-    "const target=tabs.find(x=>x.textContent.trim()==='Skill Studio');"+
-    "const tr=target?.getBoundingClientRect();"+
-    "return {previous:active?{label:active.textContent.trim(),x:r.x+r.width/2,y:r.y+r.height/2}:null,"+
-    "activity:tr?{x:tr.x+tr.width/2,y:tr.y+tr.height/2}:null};})()");
-  const activity=activityState?.activity;
-  if(!activity)throw Error('Package Overview Activity Bar entry missing');
-  await click(activity.x,activity.y);
+    "return {previous:active?{label:active.textContent.trim(),x:r.x+r.width/2,y:r.y+r.height/2}:null};})()");
+  // Packages now belongs to the native Explorer, not a custom Activity Bar.
+  await invoke('workbench.files.action.focusFilesExplorer');
   await sleep(400);
   const readTreeRows=()=>evalJS(
     "(()=>{const header=[...document.querySelectorAll('.theia-view-container-part-header')]"+
@@ -100,7 +96,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     await sleep(100);
   }
   if(!rows.some(x=>x.visible&&x.text.includes('establish-pdu-session · 3/3 core ·')))
-    throw Error('Package Overview did not populate after opening its native Activity Bar view: '+JSON.stringify(rows));
+    throw Error('Package Overview did not populate inside the native Explorer: '+JSON.stringify(rows));
   await invoke('skillStudio.refreshPackages');
   const scan=await evalJS('window.__skillStudioLastCommandResult??null');
   console.log('STUDIO_PACKAGE_SCAN_RESULT',JSON.stringify(scan));
@@ -208,6 +204,37 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     throw Error('Package Assurance group did not reveal '+filePath+': '+name+
       ' '+JSON.stringify({rows,clickEvents}));
   }
+  async function clickTreeContent(row,label,count=1){
+    const target=await evalJS(`(()=>{
+      const header=[...document.querySelectorAll('.theia-view-container-part-header')]
+        .find(x=>x.textContent.trim().toLowerCase()==='packages'&&
+          x.getBoundingClientRect().width>0);
+      const part=header?.closest('.part');
+      const nodes=[...(part?.querySelectorAll('.theia-TreeNode')??[])];
+      const normalize=value=>value.replace(/\\s+/g,' ').trim();
+      const el=nodes[${JSON.stringify(row.index)}];
+      if(!el||normalize(el.innerText)!==${JSON.stringify(row.text)})
+        return {found:false,index:${JSON.stringify(row.index)},
+          actual:el?normalize(el.innerText):null,
+          rows:nodes.map(node=>normalize(node.innerText)).slice(-12)};
+      el.scrollIntoView({block:'center',inline:'nearest'});
+      const content=el.querySelector('.theia-TreeNodeContent')??el;
+      const r=content.getBoundingClientRect();
+      const fractions=[.4,.55,.7,.85];
+      const points=fractions.map(f=>({x:Math.round(r.x+r.width*f),y:Math.round(r.y+r.height/2)}));
+      const point=points.find(({x,y})=>{
+        if(x<0||y<0||x>=innerWidth||y>=innerHeight)return false;
+        const hit=document.elementFromPoint(x,y);
+        return hit&&(hit===el||el.contains(hit))&&!hit.closest('.lm-SplitPanel-handle');
+      });
+      return {found:true,point:point??null,rect:{x:r.x,y:r.y,width:r.width,height:r.height},
+        className:el.className,hitClass:point?document.elementFromPoint(point.x,point.y)?.className??'':null};
+    })()`);
+    if(!target?.found||!target.point)
+      throw Error('Package file row has no unobstructed native click target: '+label+' '+
+        JSON.stringify({target,row}));
+    await click(target.point.x,target.point.y,count);
+  }
   async function readContractFrames(){
     const tree=await command('Page.getFrameTree');
     const frames=[];
@@ -242,7 +269,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     const file=result.file;
     if(!file.contentPos)
       throw Error('Contract file row is not clickable: '+JSON.stringify(file));
-    await click(file.contentPos.x,file.contentPos.y);
+    await clickTreeContent(file,name+' Contract');
     let snapshot=null;
     for(let attempt=0;attempt<35;attempt++){
       const frames=await readContractFrames();
@@ -253,7 +280,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     }
     // Some Theia TreeView hosts invoke TreeItem.command on the double-click
     // open gesture. Retry once without changing the selected package context.
-    await click(file.contentPos.x,file.contentPos.y,2);
+    await clickTreeContent(file,name+' Contract retry',2);
     for(let attempt=0;attempt<35;attempt++){
       const frames=await readContractFrames();
       snapshot=frames.find(frame=>frame.name===name)??null;
@@ -431,13 +458,23 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await click(target.x,target.y);await sleep(250);
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
-  const activity=await evalJS(`(()=>{const candidates=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')].filter(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&x.getBoundingClientRect().y<innerHeight);const el=candidates.find(x=>x.classList.contains('lm-mod-current'))??candidates[0];const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2,active:el.classList.contains('lm-mod-current')}:null;})()`);
-  if(!activity)throw Error('Native Skill Studio Activity Bar entry missing');
-  // C4 may already have opened this Activity Bar container. Clicking an
-  // active Theia viewlet toggles it closed, so only open it when inactive.
-  if(!activity.active){await click(activity.x,activity.y);await sleep(500);}
-  const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
-  for(const name of ['Packages','Procedure Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
+  await invoke('workbench.files.action.focusFilesExplorer');
+  await sleep(350);
+  // Authoring views belong to native Explorer; semantic Procedure Outline
+  // remains distinct from Theia's built-in document-symbol Outline.
+  const views=await evalJS(`(()=>{
+    const headers=[...document.querySelectorAll('.theia-view-container-part-header')]
+      .map(x=>({name:x.textContent.trim(),view:x.closest('.theia-view-container')?.id??''}))
+      .filter(x=>x.name);
+    const studioActivity=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]
+      .some(x=>x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
+    return {text:document.body.innerText,headers,trees:document.querySelectorAll('.theia-Tree').length,studioActivity};
+  })()`);
+  for(const name of ['Packages','Procedure Outline','Evidence','Problems'])
+    if(!views.headers.some(x=>x.name.toLowerCase()===name.toLowerCase()))
+      throw Error('Native Explorer view missing '+name+': '+JSON.stringify(views));
+  if(views.studioActivity)
+    throw Error('A separate Skill Studio Activity Bar container must not compete with Explorer');
   const inspectorPlacement=await evalJS(`(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(x=>x.textContent.trim().toLowerCase()==='inspector').map(x=>{const r=x.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height,parent:x.parentElement?.className??'',container:x.closest('.theia-view-container')?.id??null};}).filter(x=>x.width>0);return {found:tabs.some(x=>x.x>innerWidth/2),tabs,viewportWidth:innerWidth};})()`);
   const rightInspector=inspectorPlacement.tabs.find(x=>x.x>inspectorPlacement.viewportWidth/2);
   if(!rightInspector)throw Error('Inspector was not placed in the native right-side secondary sidebar: '+JSON.stringify(inspectorPlacement));
@@ -525,23 +562,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   if(!sourceOpenedForAudit)throw Error('Reopened Procedure Webview did not expose its native Source action');
   console.log('STUDIO_NATIVE_SOURCE_OPENED_FOR_AUDIT',sourceOpenedForAudit);
   await sleep(500);
-  // Explorer is active after the native file-open path. Re-activate Skill
-  // Studio so the Problems-owned Package Audit status is actually visible.
-  const skillStudioActivityAfterOpen=await evalJS(`(()=>{
-    const el=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]
-      .find(x=>x.textContent.trim()==='Skill Studio'&&
-        x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&
-        x.getBoundingClientRect().x<innerWidth);
-    const r=el?.getBoundingClientRect();
-    return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;
-  })()`);
-  if(!skillStudioActivityAfterOpen)
-    throw Error('Skill Studio Activity Bar entry missing after CustomEditor open');
-  await click(skillStudioActivityAfterOpen.x,skillStudioActivityAfterOpen.y);
+  // Package Audit is surfaced by the Problems view now contributed to
+  // the native Explorer. Re-focus Explorer; there is no Skill Studio Activity Bar.
+  await invoke('workbench.files.action.focusFilesExplorer');
   await sleep(350);
   const auditProblemsHeader=await evalJS(`(()=>{
-    const container=[...document.querySelectorAll('.theia-view-container')]
-      .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+    const container=document.getElementById('explorer-view-container');
     const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
       .find(x=>x.textContent.trim().toLowerCase()==='problems');
     header?.scrollIntoView({block:'center'});
@@ -551,7 +577,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       containerFound:!!container}:null;
   })()`);
   if(!auditProblemsHeader)
-    throw Error('Skill Studio Problems view is missing after reactivation');
+    throw Error('Explorer Problems view is missing after CustomEditor open');
   if(auditProblemsHeader.collapsed){
     await click(auditProblemsHeader.x,auditProblemsHeader.y);await sleep(250);
   }
@@ -921,20 +947,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     hasDataFlow:true,containerRect:inspectorDataFlow.containerRect,
     visibleRows:inspectorDataFlow.rows.filter(x=>x.visible).length
   }));
-  const skillStudioTab=await evalJS(`(()=>{
-    const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>
-      x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
-    const r=el?.getBoundingClientRect();
-    return r?{x:r.x+r.width/2,y:r.y+r.height/2,
-      active:el.classList.contains('lm-mod-current')}:null;
-  })()`);
-  if(!skillStudioTab)throw Error('Skill Studio native view container tab is missing');
-  if(!skillStudioTab.active){await click(skillStudioTab.x,skillStudioTab.y);await sleep(350);}
-  // Resolve the Evidence part inside the exact Skill Studio view container.
+  // Evidence is now an Explorer-contributed view. Focus the native
+  // Explorer instead of selecting a retired Skill Studio Activity Bar tab.
+  await invoke('workbench.files.action.focusFilesExplorer');
+  await sleep(350);
+  // Resolve the Evidence part inside the exact native Explorer container.
   // Avoid matching an unrelated tab/label when Theia has multiple split panels.
   const readEvidenceHeader=()=>evalJS(`(()=>{
     const container=[...document.querySelectorAll('.theia-view-container')]
-      .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+      .find(x=>x.id==='explorer-view-container');
     const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
       .find(x=>x.textContent.trim().toLowerCase()==='evidence');
     if(!container||!header)return {found:false,containerFound:!!container,
@@ -961,7 +982,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(let attempt=0;attempt<12;attempt++){
     evidenceHeader=await readEvidenceHeader();
     if(!evidenceHeader?.found)
-      throw Error('Native Evidence view header is missing from Skill Studio container: '+
+      throw Error('Native Evidence view header is missing from Explorer: '+
         JSON.stringify(evidenceHeader));
     if(!evidenceHeader.collapsed)break;
     if(!evidenceHeader.hitWithinHeader)
@@ -982,7 +1003,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(let attempt=0;attempt<100;attempt++){
     evidenceTreeState=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1040,7 +1061,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(let attempt=0;attempt<100&&!dataflowTreeRow;attempt++){
     evidenceRows=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1097,7 +1118,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       // descendants for a provider-refresh race.
       const phaseGroup=await evalJS(`(()=>{
         const container=[...document.querySelectorAll('.theia-view-container')]
-          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+          .find(x=>x.id==='explorer-view-container');
         const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
           .find(x=>x.textContent.trim().toLowerCase()==='evidence');
         const part=header?.closest('.part');
@@ -1141,7 +1162,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const widget=manager.getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence');
       if(!widget)return {found:false,reason:'Evidence widget unavailable'};
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1233,7 +1254,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     for(let attempt=0;attempt<24;attempt++){
       liveToggle=await evalJS(`(()=>{
         const container=[...document.querySelectorAll('.theia-view-container')]
-          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+          .find(x=>x.id==='explorer-view-container');
         const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
           .find(x=>x.textContent.trim().toLowerCase()==='evidence');
         const part=header?.closest('.part');
@@ -1272,7 +1293,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         JSON.stringify({dataflowTreeRow,liveToggle,stableHit}));
     toggleInstrumentation=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1342,7 +1363,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       await sleep(100);
       const postHoverToggle=await evalJS(`(()=>{
         const container=[...document.querySelectorAll('.theia-view-container')]
-          .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+          .find(x=>x.id==='explorer-view-container');
         const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
           .find(x=>x.textContent.trim().toLowerCase()==='evidence');
         const part=header?.closest('.part');
@@ -1386,7 +1407,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   for(let attempt=0;attempt<50;attempt++){
     dataflowExpansion=await evalJS(`(()=>{
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1475,7 +1496,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const key=keys.find(item=>typeof item==='function'&&typeof item.prototype?.getWidgets==='function'&&typeof item.prototype?.getOrCreateWidget==='function');
       const widget=key?c.get(key).getWidgets('plugin-view-data')?.find(item=>item.id==='skillStudio.evidence'):null;
       const container=[...document.querySelectorAll('.theia-view-container')]
-        .find(x=>x.id==='plugin-view-container:workbench.view.extension.skillStudio');
+        .find(x=>x.id==='explorer-view-container');
       const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])]
         .find(x=>x.textContent.trim().toLowerCase()==='evidence');
       const part=header?.closest('.part');
@@ -1933,7 +1954,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     restoration:'native editor exact line replacement'};
   console.log('STUDIO_PHASE_OUTCOME_REPAIR_CHROMIUM',JSON.stringify(phaseOutcome));
   // Return the native Explorer to the foreground: the evidence acceptance
-  // opened the Skill Studio Activity Bar and intentionally kept it selected.
+  // opened the native Explorer and intentionally kept it selected.
   await invoke('workbench.files.action.focusFilesExplorer');
   // Open the exact owner-pinned conventional Skill guide through the real
   // Theia command registry, then exercise package-local navigation in Chromium.
