@@ -876,8 +876,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const bindingTarget=await evalWebviewJS(`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Phase binding Node is not in the active graph');const r=node.getBoundingClientRect(),frame=window.frameElement?.getBoundingClientRect();return frame?{node:node.getAttribute('data-id'),point:{x:frame.x+r.x+r.width/2,y:frame.y+r.y+r.height/2}}:null;})()`);
   if(!bindingTarget?.node||!bindingTarget.point)throw Error('Could not resolve active Phase binding Node for Inspector Data Flow');
   await click(bindingTarget.point.x,bindingTarget.point.y);
+  const graphSelectionPayload=await evalWebviewJS('document.body.dataset.studioSelection??null');
   const selectionState=await nativeCommand('skillStudio.internal.selectionAcceptance');
-  console.log('STUDIO_INSPECTOR_SELECTION_STATE_CHROMIUM',JSON.stringify(selectionState));
+  console.log('STUDIO_INSPECTOR_SELECTION_STATE_CHROMIUM',JSON.stringify({graphSelectionPayload,selectionState}));
   let inspectorDataFlow=null;
   for(let attempt=0;attempt<60;attempt++){
     inspectorDataFlow=await evalJS(`(()=>{const container=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');const r=container?.getBoundingClientRect();const rows=[...(container?.querySelectorAll('.theia-TreeNode')??[])].map(x=>{const b=x.getBoundingClientRect();return {text:x.innerText.replace(/\\s+/g,' ').trim(),visible:b.width>0&&b.height>0&&b.x<innerWidth&&b.right>0&&b.y<innerHeight&&b.bottom>0};});return {found:!!container,rightSide:!!r&&r.x>innerWidth/2,containerRect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,text:container?.innerText??'',rows};})()`);
@@ -885,7 +886,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await sleep(100);
   }
   if(!inspectorDataFlow?.rightSide||!inspectorDataFlow.text.includes('Data Flow · Producer / Consumer'))
-    throw Error('Inspector is missing contextual Source Data Flow: '+JSON.stringify({selectionState,inspectorDataFlow}));
+    throw Error('Inspector is missing contextual Source Data Flow: '+JSON.stringify({graphSelectionPayload,selectionState,inspectorDataFlow}));
   console.log('STUDIO_INSPECTOR_DATA_FLOW_CHROMIUM',JSON.stringify({
     found:inspectorDataFlow.found,rightSide:inspectorDataFlow.rightSide,
     hasDataFlow:true,containerRect:inspectorDataFlow.containerRect,
