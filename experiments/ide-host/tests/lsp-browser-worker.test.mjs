@@ -503,7 +503,10 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       contract.text.split(/\\r\\n|\\n|\\r/)[item.range.start.line]
         ?.slice(item.range.start.character,item.range.end.character)===missingOwnerPath);
     assert.ok(unresolvedSchema,
-      "missing authoritative Owner Schema is published at its exact source token");
+      "missing authoritative Owner Schema is published at its exact source token: "+
+      JSON.stringify({diagnostics:unresolvedOwner.params.diagnostics,
+        expected:missingOwnerPath,contractLine:contract.text.split(/\\r\\n|\\n|\\r/)[
+          unresolvedOwner.params.diagnostics[0]?.range?.start?.line??0]}));
     const predicateReferences=await lspRequest(worker,307,"textDocument/references",{
       textDocument:{uri:predicates.uri},
       position:positionOf(predicates.text,predicateName),
