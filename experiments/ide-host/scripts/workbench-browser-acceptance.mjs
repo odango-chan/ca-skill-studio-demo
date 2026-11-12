@@ -2038,7 +2038,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         }
         const result=await command('Runtime.evaluate',{
           contextId,returnByValue:true,
-          expression:'(()=>{const heading=document.querySelector("h1");if(!heading)return null;const body=getComputedStyle(document.body),title=getComputedStyle(heading),styles=[...document.querySelectorAll("link[rel=stylesheet]")].map(x=>x.href),table=document.querySelector("table"),csp=document.querySelector("meta[http-equiv=Content-Security-Policy]")?.content??"";return {heading:heading.textContent.trim(),headingColor:title.color,bodyColor:body.color,maxWidth:body.maxWidth,styles,tableCount:document.querySelectorAll("table").length,tableDisplay:table?getComputedStyle(table).display:null,tableMaxHeight:table?getComputedStyle(table).maxHeight:null,csp,imageCount:document.querySelectorAll("img").length,scriptMarkers:[...document.querySelectorAll("script")].filter(x=>x.textContent.includes("skillStudioNativeMarkdownXss")).length,bodyHasScriptMarker:document.body.innerText.includes("skillStudioNativeMarkdownXss"),scriptExecuted:Boolean(window.skillStudioNativeMarkdownXss),anchorHrefs:[...document.querySelectorAll("a[href]")].map(x=>x.getAttribute("href")),anchorDetails:[...document.querySelectorAll("a")].map(a=>({text:a.textContent.trim(),href:a.getAttribute("href"),dataset:{...a.dataset},role:a.getAttribute("role"),ariaLabel:a.getAttribute("aria-label"),title:a.title,tabIndex:a.tabIndex})),scrollTop:window.scrollY,scrollHeight:document.documentElement.scrollHeight,bodyScrollTop:document.body?.scrollTop??null,bodyScrollHeight:document.body?.scrollHeight??null,scrollingElement:document.scrollingElement?{tag:document.scrollingElement.tagName,className:document.scrollingElement.className,scrollTop:document.scrollingElement.scrollTop,scrollHeight:document.scrollingElement.scrollHeight,clientHeight:document.scrollingElement.clientHeight}:null,scrollables:[...document.querySelectorAll("*")].filter(el=>el.scrollHeight>el.clientHeight+4&&/auto|scroll|overlay/.test(getComputedStyle(el).overflowY)).map(el=>({tag:el.tagName,id:el.id,className:String(el.className??""),scrollTop:el.scrollTop,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,overflowY:getComputedStyle(el).overflowY})).slice(0,20)};})()'
+          expression:'(()=>{const heading=document.querySelector("h1");if(!heading)return null;const body=getComputedStyle(document.body),title=getComputedStyle(heading),styles=[...document.querySelectorAll("link[rel=stylesheet]")].map(x=>x.href),table=document.querySelector("table"),csp=document.querySelector("meta[http-equiv=Content-Security-Policy]")?.content??"";return {heading:heading.textContent.trim(),headingColor:title.color,bodyColor:body.color,maxWidth:body.maxWidth,styles,tableCount:document.querySelectorAll("table").length,tableDisplay:table?getComputedStyle(table).display:null,tableMaxHeight:table?getComputedStyle(table).maxHeight:null,csp,imageCount:document.querySelectorAll("img").length,scriptMarkers:[...document.querySelectorAll("script")].filter(x=>x.textContent.includes("skillStudioNativeMarkdownXss")).length,bodyHasScriptMarker:document.body.innerText.includes("skillStudioNativeMarkdownXss"),scriptExecuted:Boolean(window.skillStudioNativeMarkdownXss),bodyClass:document.body?.className??"",htmlClass:document.documentElement?.className??"",nativePreviewRoot:Boolean(document.querySelector("#preview.markdown-body,.markdown-body")),previewRoot:document.querySelector("#preview,.markdown-body")?.className??null,anchorHrefs:[...document.querySelectorAll("a[href]")].map(x=>x.getAttribute("href")),anchorDetails:[...document.querySelectorAll("a")].map(a=>({text:a.textContent.trim(),href:a.getAttribute("href"),dataset:{...a.dataset},role:a.getAttribute("role"),ariaLabel:a.getAttribute("aria-label"),title:a.title,tabIndex:a.tabIndex})),scrollTop:window.scrollY,scrollHeight:document.documentElement.scrollHeight,bodyScrollTop:document.body?.scrollTop??null,bodyScrollHeight:document.body?.scrollHeight??null,scrollingElement:document.scrollingElement?{tag:document.scrollingElement.tagName,className:document.scrollingElement.className,scrollTop:document.scrollingElement.scrollTop,scrollHeight:document.scrollingElement.scrollHeight,clientHeight:document.scrollingElement.clientHeight}:null,scrollables:[...document.querySelectorAll("*")].filter(el=>el.scrollHeight>el.clientHeight+4&&/auto|scroll|overlay/.test(getComputedStyle(el).overflowY)).map(el=>({tag:el.tagName,id:el.id,className:String(el.className??""),scrollTop:el.scrollTop,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,overflowY:getComputedStyle(el).overflowY})).slice(0,20)};})()'
         });
         if(result.result?.value?.heading)
           found.push({contextId,frameUrl:node.frame.url,...result.result.value});
@@ -2066,7 +2066,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     throw Error('Native Markdown preview command did not open the exact Skill Source URI: '+
       JSON.stringify(nativeMarkdownUri));
   const nativeMarkdown=await waitNativeMarkdown(view=>
-    view.heading==='Establish PDU Session'&&
+    view.heading==='Establish PDU Session'&&view.nativePreviewRoot&&
     view.styles.some(url=>url.includes('/media/markdown-preview.css')),
     'Studio-themed native Markdown preview');
   if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||
@@ -2082,7 +2082,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const nativeSourceGroup=nativeMarkdownGroups.find(group=>
     group.labels.some(label=>/^SKILL\.md/.test(label)));
   const nativePreviewGroup=nativeMarkdownGroups.find(group=>
-    group.labels.some(label=>/Markdown.*SKILL\.md|SKILL\.md.*Markdown/i.test(label)));
+    group.labels.some(label=>/^Preview(?:\\s|·).*SKILL\\.md/i.test(label)));
   if(!nativeSourceGroup||!nativePreviewGroup||
      nativeSourceGroup.index===nativePreviewGroup.index)
     throw Error('Native Markdown must keep editable Source and Preview in separate editor groups: '+
@@ -2100,7 +2100,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance');
   try{
     const nativeLive=await waitNativeMarkdown(
-      view=>view.heading==='Native Markdown Live Update Probe',
+      view=>view.heading==='Native Markdown Live Update Probe'&&view.nativePreviewRoot,
       'native Markdown unsaved Source edit');
     if(nativeLive.view.contextId!==nativeMarkdown.view.contextId)
       throw Error('Native Markdown recreated its Preview webview instead of updating it in place: '+
@@ -2172,7 +2172,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',nativeLiveUri);
   }
   const restoredNativeMarkdown=await waitNativeMarkdown(
-    view=>view.heading==='Establish PDU Session',
+    view=>view.heading==='Establish PDU Session'&&view.nativePreviewRoot,
     'native Markdown Source restoration');
   if(restoredNativeMarkdown.view.contextId!==nativeMarkdown.view.contextId)
     throw Error('Restoring the Markdown Source recreated the existing Preview webview');
@@ -2184,7 +2184,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     throw Error('Native Markdown security fixture was not created inside the 5GC Skill Package');
   try{
     const nativeSecurity=await waitNativeMarkdown(view=>
-      view.heading==='Native Markdown Security Probe',
+      view.heading==='Native Markdown Security Probe'&&view.nativePreviewRoot,
       'native Markdown Package security probe');
     const evidence=nativeSecurity.view;
     if(evidence.imageCount!==0||evidence.scriptMarkers!==0||evidence.scriptExecuted)
