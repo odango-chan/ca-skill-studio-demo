@@ -283,7 +283,6 @@ test("Skill Studio authoring views live in native Explorer while Inspector stays
   assert.deepEqual(explorer.map(view=>[view.id,view.name]),[
     ["skillStudio.packages","Packages"],
     ["skillStudio.outline","Procedure Outline"],
-    ["skillStudio.evidence","Evidence"],
     ["skillStudio.problems","Problems"]
   ]);
   assert.equal(manifest.contributes.views.skillStudio,undefined);
