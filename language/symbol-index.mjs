@@ -204,7 +204,7 @@ export function skillSymbolCompletions(index,uri,offset){
   if(token.type==="skillSchema"){
     for(const values of index.documentTargets.values())
       for(const item of values)
-        if(item.type==="skillSchema"&&/^(?:schemas|lib)\/.+\.schema\.ya?ml$/.test(item.relativePath))
+        if(item.type==="skillSchema"&&/^(?:schemas\/.+\.ya?ml|lib\/.+\.schema\.ya?ml)$/.test(item.relativePath))
           candidates.push(item);
   }else if(token.type==="skillReference"){
     for(const values of index.documentTargets.values())
