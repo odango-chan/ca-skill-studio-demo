@@ -2318,6 +2318,14 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       }
       throw Error(label+' did not synchronize in real Chromium: '+JSON.stringify(value));
     };
+    const waitForSourceScroll=async(predicate,label)=>{
+      try{
+        return await waitForScroll(()=>readSourceScroll(),predicate,label);
+      }catch(error){
+        const host=await nativeCommand('skillStudio.internal.nativeMarkdownSettingsAcceptance');
+        throw Error(error.message+'; hostEditorState='+JSON.stringify(host));
+      }
+    };
     const initialSource=await sourceScroll(0);
     if(initialSource.scrollHeight<=initialSource.clientHeight+100)
       throw Error('Native Markdown scroll fixture is not tall enough to test bidirectional synchronization: '+
@@ -2326,7 +2334,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await waitForScroll(()=>previewScroll('window.scrollY'),
       value=>value>100,'Native Source → Preview scroll');
     const previewTop=await scrollPreviewByWheel(-12000);
-    await waitForScroll(()=>readSourceScroll(),value=>value.scrollTop<40,
+    await waitForSourceScroll(value=>value.scrollTop<40,
       'Native Preview → Source top scroll');
     const previewBottom=await scrollPreviewByWheel(12000);
     const previewScrollDiagnostics=await previewScroll(
@@ -2338,7 +2346,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       'id:el.id,className:String(el.className??""),top:el.scrollTop,height:el.scrollHeight,'+
       'client:el.clientHeight,overflow:getComputedStyle(el).overflowY})).slice(0,20)}))()');
     try{
-      await waitForScroll(()=>readSourceScroll(),value=>value.scrollTop>100,
+      await waitForSourceScroll(value=>value.scrollTop>100,
         'Native Preview → Source bottom scroll');
     }catch(error){
       throw Error(error.message+'; previewBottom='+JSON.stringify(previewBottom)+
