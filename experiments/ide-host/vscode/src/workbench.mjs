@@ -2486,7 +2486,13 @@ export function registerWorkbench(vscode,context){
     nativeMarkdownOpening.add(key);
     let paired=false;
     try{
-      const doc=await vscode.workspace.openTextDocument(uri);
+      let doc=await vscode.workspace.openTextDocument(uri);
+      // Newly imported or just-created Markdown files can briefly be classified
+      // as Plain Text by browser-only Theia before its file-type association
+      // catches up. Set the language explicitly before invoking the built-in
+      // Markdown Preview command.
+      if(doc.languageId!=='markdown')
+        doc=await vscode.languages.setTextDocumentLanguage(doc,'markdown');
       // Keep Source as the editable authority in the first editor group.
       // The built-in Markdown extension owns the read-only Preview in group two.
       await vscode.window.showTextDocument(doc,{
