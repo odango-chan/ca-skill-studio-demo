@@ -297,6 +297,8 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     'normal Markdown opening delegates to the native preview');
   assert.ok(commands.has('skillStudio.internal.nativeMarkdownPreviewAcceptance'));
   assert.ok(commands.has('skillStudio.internal.nativeMarkdownSettingsAcceptance'));
+  assert.equal(commands.has('skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance'),false,
+    'synthetic revealRange scroll instrumentation is not shipped in the workbench');
   await commands.get(item.command.command)(...item.command.arguments);
   assert.equal(posted.at(-1).type,'focusNode');
   doc.version++;doc.text='procedures: [broken]';changed({document:doc});
