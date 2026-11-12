@@ -284,8 +284,18 @@ try{
     if(automaticLoadReady)break;
     await sleep(150);
   }
-  if(!automaticLoadReady)
-    throw Error("The default online workspace did not auto-open its project and 5GC Procedure");
+  if(!automaticLoadReady){
+    const startupDiagnostics=await evalJS(`({
+      title:document.title,
+      notifications:[...document.querySelectorAll(
+        '.theia-notification-list-item,.theia-notification-message'
+      )].map(node=>node.innerText).filter(Boolean).slice(0,12),
+      explorer:document.querySelector('.theia-Files')?.innerText??'',
+      body:document.body.innerText.slice(-1600)
+    })`);
+    throw Error("The default online workspace did not auto-open its project and 5GC Procedure: "+
+      JSON.stringify(startupDiagnostics).slice(0,3200));
+  }
   const afterImport=await evalJS(`(async()=>{
     const names=[];let opfsError=null;
     try{
