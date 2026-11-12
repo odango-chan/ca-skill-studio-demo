@@ -192,15 +192,17 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let nativeCompletionRegistration=null;
   if(typeof vscode.languages?.registerCompletionItemProvider==="function"){
     nativeCompletionRegistration=vscode.languages.registerCompletionItemProvider(
-      [
-        {scheme:"file",pattern:"**/*.yaml"},
-        {scheme:"file",pattern:"**/*.yml"},
-        {language:"yaml"}
-      ],
+      {scheme:"file"},
       {
         async provideCompletionItems(document,position,cancellationToken){
+          if(!/\\.ya?ml$/i.test(document?.uri?.path??"")&&document?.languageId!=="yaml")
+            return undefined;
           if(stopped||terminalFailure||!started||
              cancellationToken?.isCancellationRequested)return undefined;
+          handlers.onCompletionProviderRequest?.({
+            uri:document.uri.toString(),
+            position:{line:position.line,character:position.character}
+          });
           try{
             const result=await client.sendRequest("textDocument/completion",{
               textDocument:{uri:document.uri.toString()},
@@ -227,8 +229,15 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
               if(item.preselect===true)completion.preselect=true;
               return completion;
             });
+            handlers.onCompletionProviderResult?.({
+              uri:document.uri.toString(),count:items.length
+            });
             return items.length?items:undefined;
           }catch(error){
+            handlers.onCompletionProviderError?.({
+              uri:document?.uri?.toString?.()??null,
+              message:String(error?.message??error)
+            });
             if(!stopped&&!terminalFailure)
               output.appendLine("Native Skill Language Completion request failed: "+
                 String(error?.message??error));
