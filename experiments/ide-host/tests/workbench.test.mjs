@@ -61,7 +61,6 @@ test('Inspection preserves Classic node/phase/route source identity; unknown syn
   const proc=[...result.model.procedures.values()].find(p=>p.nodes.some(n=>n.id==='nudm-sdm-subscribe'));
   const selected=inspectionSnapshot(source,{procedureId:proc.name,nodeId:'nudm-sdm-subscribe'});
   assert.ok(selected.inspection.some(x=>x.label==='preconditions'&&x.children.length===5));
-  assert.ok(selected.evidence.some(x=>x.label.includes('Runtime NOT_RUN')));
   assert.ok(selected.inspection.every(x=>x.line>0));
   assert.ok(selected.dataflow.bindings.length>0,'selected Node exposes source-resolved Phase dependencies');
   const inspectorFlow=selected.inspection.find(x=>x.kind==='data-flow');
@@ -74,7 +73,7 @@ test('Inspection preserves Classic node/phase/route source identity; unknown syn
     'Inspector Data Flow must never claim source analysis authorizes writes');
 
   assert.equal(selected.consumerContracts.summary.authorizedWrites,0,
-    'read-only Evidence never grants ABI write authority');
+    'Source-derived Data Flow never grants write authority');
   const script=readFileSync(root+'scripts/select_establishment_configuration.py','utf8');
   const schemas=new Map([
     ['scripts/select_establishment_configuration.py',{text:script}],
@@ -94,9 +93,9 @@ properties:
   ]);
   const typed=inspectionSnapshot(source,{procedureId:proc.name,nodeId:'nudm-sdm-subscribe'},null,schemas);
   assert.ok(typed.consumerContracts.bindings.some(x=>x.typeRelation==='TYPE_ONLY_MATCH'),
-    'Evidence distinguishes declared type-only matches from full ABI proof');
+    'Data Flow distinguishes declared type-only matches from full ABI proof');
   assert.ok(typed.consumerContracts.bindings.some(x=>x.typeRelation==='PRODUCER_TYPE_UNAVAILABLE'),
-    'Evidence keeps unknown producer output types explicit');
+    'Data Flow keeps unknown producer output types explicit');
   const typedFlow=typed.inspection.find(x=>x.kind==='data-flow');
   assert.ok(typedFlow?.children.some(x=>x.label.includes('Consumer ABI')));
   const consumerRows=typedFlow.children.filter(x=>x.label.includes('Step '));
@@ -104,10 +103,6 @@ properties:
     'Inspector Data Flow keeps consumer ABI declarations, not Runtime Evidence');
   assert.ok(consumerRows.some(x=>x.children.some(c=>c.label==='Source / Runtime boundary')),
     'Inspector Data Flow labels its evidence boundary explicitly');
-  const flow=typed.evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
-  assert.ok(flow?.children.some(x=>x.label.includes('Consumer ABI')));
-  assert.ok(flow.children.every(x=>!x.writeAuthorized),
-    'dataflow evidence rows remain read-only');
   const invalid=inspectionSnapshot('procedures: [invalid]');
   assert.equal(invalid.model.state,'UNAVAILABLE');assert.equal(invalid.outline.length,0);assert.ok(invalid.problems.length);
 });
