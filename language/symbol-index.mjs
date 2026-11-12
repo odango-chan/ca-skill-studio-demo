@@ -274,7 +274,15 @@ export function skillSymbolLinkDiagnostics(index,snapshot){
     const token=items[0];
     const declarations=index.declarations.get(key)??index.documentTargets.get(key)??[];
     if(declarations.length===0){
-      if(token.type==="skillCapability")continue;
+      // Tool Operations can be supplied by Built-in or MCP integrations that
+      // are not represented as ToolCatalog files. Absence from the file
+      // snapshot is not proof that an Operation does not exist.
+      if(token.type==="skillCapability"||token.type==="skillOperation")continue;
+      // lib/ belongs to the project dependency inventory, not the Skill
+      // Package. Diagnose a missing Owner Schema only when that inventory was
+      // captured completely; otherwise its absence is unknown, not an error.
+      if(token.type==="skillSchema"&&token.name.startsWith("lib/")&&
+         snapshot.libraryInventory!=="complete")continue;
       for(const item of items)
         push(item,"SKILL_LINK_UNRESOLVED",
           "Unresolved "+(labels[item.type]??"Skill reference")+
