@@ -166,7 +166,7 @@
           "command": "skillStudio.previewMarkdown",
           "when": "resourceExtname == .md",
           "group": "navigation"
-        },
+        }
       ],
       "explorer/context": [
         {
