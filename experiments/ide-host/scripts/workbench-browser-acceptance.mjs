@@ -437,7 +437,31 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // active Theia viewlet toggles it closed, so only open it when inactive.
   if(!activity.active){await click(activity.x,activity.y);await sleep(500);}
   const views=await evalJS(`({text:document.body.innerText,trees:document.querySelectorAll('.theia-Tree').length})`);
-  for(const name of ['Packages','Inspection','Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
+  for(const name of ['Packages','Procedure Outline','Evidence','Problems'])if(!views.text.toLowerCase().includes(name.toLowerCase()))throw Error('Native view missing: '+name);
+  const inspectorPlacement=await evalJS(`(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(x=>x.textContent.trim().toLowerCase()==='inspector').map(x=>{const r=x.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height,parent:x.parentElement?.className??'',container:x.closest('.theia-view-container')?.id??null};}).filter(x=>x.width>0);return {found:tabs.some(x=>x.x>innerWidth/2),tabs,viewportWidth:innerWidth};})()`);
+  const rightInspector=inspectorPlacement.tabs.find(x=>x.x>inspectorPlacement.viewportWidth/2);
+  if(!rightInspector)throw Error('Inspector was not placed in the native right-side secondary sidebar: '+JSON.stringify(inspectorPlacement));
+  await click(rightInspector.x,rightInspector.y);await sleep(300);
+  const readRightPanel=()=>evalJS(`(()=>{const panel=document.querySelector('#theia-right-content-panel');const r=panel?.getBoundingClientRect();const content=panel?.querySelector('.theia-side-panel');const cr=content?.getBoundingClientRect();return {found:!!panel,width:r?.width??0,height:r?.height??0,className:panel?.className??'',contentWidth:cr?.width??0,contentClass:content?.className??''};})()`);
+  let rightPanelState=await readRightPanel();
+  if(!rightPanelState.found)throw Error('Theia right-side panel shell is missing: '+JSON.stringify(rightPanelState));
+  if(rightPanelState.width<120||rightPanelState.contentWidth<100){
+    await invoke('core.toggle.right.panel');
+    await sleep(350);
+    rightPanelState=await readRightPanel();
+  }
+  console.log('STUDIO_INSPECTOR_RIGHT_PANEL_STATE',JSON.stringify(rightPanelState));
+  if(rightPanelState.width<120||rightPanelState.contentWidth<100)
+    throw Error('Theia secondary sidebar remains collapsed after core.toggle.right.panel: '+JSON.stringify(rightPanelState));
+  await click(rightInspector.x,rightInspector.y);await sleep(250);
+  await invoke('skillStudio.inspection.open');
+  await sleep(300);
+  const inspectorPartState=await evalJS(`(()=>{const container=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');const tabs=[...(container?.querySelectorAll('.lm-TabBar-tab')??[])].filter(x=>x.textContent.trim().toLowerCase()==='inspector').map(x=>{const r=x.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height,className:x.className};});const header=[...(container?.querySelectorAll('.theia-view-container-part-header')??[])].find(x=>x.textContent.trim().toLowerCase()==='inspector');const part=header?.closest('.part');const before={tabs,headerRect:(()=>{const r=header?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})(),partClass:part?.className??null};return {before,containerRect:(()=>{const r=container?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})()};})()`);
+  const innerInspectorTab=inspectorPartState.before.tabs.find(x=>x.width>0);
+  if(innerInspectorTab)await click(innerInspectorTab.x,innerInspectorTab.y);
+  await sleep(250);
+  console.log('STUDIO_INSPECTOR_PART_EXPANSION',JSON.stringify(inspectorPartState));
+  console.log('STUDIO_INSPECTOR_SECONDARY_SIDEBAR_CHROMIUM',JSON.stringify({found:true,rightInspector,viewportWidth:inspectorPlacement.viewportWidth}));
   const problemsHeader=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-view-container-part-header')].find(x=>x.textContent.trim().toLowerCase()==='problems'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);el?.scrollIntoView({block:'center'});const r=el?.getBoundingClientRect();const part=el?.closest('.part');const collapsed=el?.getAttribute('aria-expanded')==='false'||/collapsed/.test(part?.className??'');return r?{x:r.x+r.width/2,y:r.y+r.height/2,collapsed}:null;})()`);
   const problemHeaderDiagnostics=await evalJS(`[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='problems').map(x=>({className:x.className,ariaExpanded:x.getAttribute('aria-expanded'),parent:x.parentElement?.className,part:x.closest('.part')?.className,view:x.closest('.theia-view-container')?.id,rect:(()=>{const r=x.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))`);
   console.log('STUDIO_PROBLEMS_HEADERS',JSON.stringify(problemHeaderDiagnostics));
@@ -816,34 +840,72 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     contextId:graphContext,returnByValue:true,
     expression:`document.querySelector('#revision')?.textContent`
   });
-  const sourceVersion=Number(/v(\d+)/.exec(beforeEdit.result?.value??'')?.[1]);
-  if(!Number.isSafeInteger(sourceVersion))throw Error('Could not read native Source version');
+  const inspectorSourceVersionProbe=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  const sourceVersion=inspectorSourceVersionProbe?.version;
+  if(!Number.isSafeInteger(sourceVersion)||!inspectorSourceVersionProbe.uri)
+    throw Error('Could not read authoritative native Source version: '+JSON.stringify(inspectorSourceVersionProbe));
   await startNativeCommand('skillStudio.editNodeOperatorValue',{
     procedureId:selectionResult.result.value.procedure,nodeId:'nudm-sdm-get',sourceVersion
   },'sbi.udm.sm_data.get.preview');
   await confirmNativePreview('call: sbi.udm.sm_data.get','call: sbi.udm.sm_data.get.preview');
-  const afterEdit=await command('Runtime.evaluate',{
-    contextId:graphContext,returnByValue:true,
-    expression:`document.querySelector('#revision')?.textContent`
-  });
+  const afterEdit=await waitForRevisionChange(graphContext,beforeEdit.result?.value,
+    'Native Inspector edit');
+  const inspectorAfterSourceVersion=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
   const editResult=await evalJS(`window.__skillStudioCommandResult`);
-  if(editResult!==true||!afterEdit.result?.value||afterEdit.result.value===beforeEdit.result?.value)
-    throw Error('Native Inspector edit did not commit a Source revision: '+JSON.stringify({editResult,before:beforeEdit.result?.value,after:afterEdit.result?.value}));
+  if(editResult!==true||!afterEdit.result?.value||inspectorAfterSourceVersion?.version<=sourceVersion)
+    throw Error('Native Inspector edit did not commit a Source revision: '+JSON.stringify({
+      editResult,before:beforeEdit.result?.value,after:afterEdit.result?.value,
+      sourceVersion,inspectorAfterSourceVersion
+    }));
   await invoke('core.undo');
   const afterUndo=await waitForRevisionChange(graphContext,afterEdit.result?.value,
     'Native Inspector Undo');
-  if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value)
-    throw Error('Native Inspector edit did not round-trip through native Undo: '+JSON.stringify({after:afterEdit.result?.value,undo:afterUndo.result?.value}));
+  const inspectorUndoSourceVersion=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  if(!afterUndo.result?.value||afterUndo.result.value===afterEdit.result?.value||
+     inspectorUndoSourceVersion?.version<=inspectorAfterSourceVersion?.version)
+    throw Error('Native Inspector edit did not round-trip through native Undo: '+JSON.stringify({
+      after:afterEdit.result?.value,undo:afterUndo.result?.value,
+      inspectorAfterSourceVersion,inspectorUndoSourceVersion
+    }));
   console.log('STUDIO_INSPECTOR_AUTHORING_CHROMIUM',JSON.stringify({
     node:selectionResult.result.value.node,procedure:selectionResult.result.value.procedure,
     before:beforeEdit.result?.value,after:afterEdit.result?.value,undo:afterUndo.result?.value
   }));
-  const bindingSelection=await command('Runtime.evaluate',{
+  // Use a trusted browser click so React Flow and the host selection bridge
+  // publish the same Source-backed selection a user would make.
+  const bindingClick=await command('Runtime.evaluate',{
     contextId:graphContext,returnByValue:true,
-    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Phase binding Node is not in the current graph');node.click();return {node:node.getAttribute('data-id'),procedure:document.querySelector('#procedureList')?.value};})()`
+    expression:`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Phase binding Node is not in the active graph');node.click();return {node:node.getAttribute('data-id'),revision:document.querySelector('#revision')?.textContent};})()`
   });
-  if(!bindingSelection.result?.value?.node)throw Error('Could not select Phase binding Node');
-  await sleep(250);
+  if(bindingClick.result?.value?.node!=='nudm-sdm-subscribe')
+    throw Error('Could not activate the Phase binding Node in the real Procedure Webview');
+  let selectionState=null,graphSelectionPayload=null;
+  for(let attempt=0;attempt<40;attempt++){
+    graphSelectionPayload=await evalWebviewJS('document.body.dataset.studioSelection??null');
+    selectionState=await nativeCommand('skillStudio.internal.selectionAcceptance');
+    if(selectionState?.nodeId==='nudm-sdm-subscribe')break;
+    await sleep(100);
+  }
+  console.log('STUDIO_INSPECTOR_SELECTION_STATE_CHROMIUM',JSON.stringify({bindingClick:bindingClick.result?.value,graphSelectionPayload,selectionState}));
+  if(selectionState?.nodeId!=='nudm-sdm-subscribe'||
+     selectionState?.procedureId!==selectionResult.result.value.procedure)
+    throw Error('Host did not retain the exact selected Phase binding Node: '+JSON.stringify(selectionState));
+  const bindingSelection={result:{value:{
+    procedure:selectionState.procedureId,node:selectionState.nodeId
+  }}};
+  let inspectorDataFlow=null;
+  for(let attempt=0;attempt<60;attempt++){
+    inspectorDataFlow=await evalJS(`(()=>{const container=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');const r=container?.getBoundingClientRect();const rows=[...(container?.querySelectorAll('.theia-TreeNode')??[])].map(x=>{const b=x.getBoundingClientRect();return {text:x.innerText.replace(/\\s+/g,' ').trim(),visible:b.width>0&&b.height>0&&b.x<innerWidth&&b.right>0&&b.y<innerHeight&&b.bottom>0};});return {found:!!container,rightSide:!!r&&r.x>innerWidth/2,containerRect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,text:container?.innerText??'',rows};})()`);
+    if(inspectorDataFlow?.rightSide&&inspectorDataFlow.text.includes('Data Flow · Producer / Consumer'))break;
+    await sleep(100);
+  }
+  if(!inspectorDataFlow?.rightSide||!inspectorDataFlow.text.includes('Data Flow · Producer / Consumer'))
+    throw Error('Inspector is missing contextual Source Data Flow: '+JSON.stringify({graphSelectionPayload,selectionState,inspectorDataFlow}));
+  console.log('STUDIO_INSPECTOR_DATA_FLOW_CHROMIUM',JSON.stringify({
+    found:inspectorDataFlow.found,rightSide:inspectorDataFlow.rightSide,
+    hasDataFlow:true,containerRect:inspectorDataFlow.containerRect,
+    visibleRows:inspectorDataFlow.rows.filter(x=>x.visible).length
+  }));
   const skillStudioTab=await evalJS(`(()=>{
     const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>
       x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);

@@ -130,6 +130,13 @@ export function inspectionSnapshot(text,selection={},projected=null,files=null){
       ...dataflowRows
     ],{description:'Read-only Source evidence · no Runtime evidence · no write authorization'}
   ):null;
+  // Contextual Data Flow is a Source-derived Inspector section. Keep the old
+  // Evidence view temporarily until right-sidebar parity is accepted.
+  if(node&&dataflowSummary)inspection.push(row(
+    'Data Flow · Producer / Consumer · '+dataflow.bindings.length+' bindings',
+    node.line,dataflowSummary.children,{
+      description:'Source-derived only · Runtime NOT_RUN · no write authority'
+    }));
   const evidence=[row('Source evidence only · Runtime NOT_RUN · no write authority',1),
     ...((node?[node]:procedure.nodes).flatMap(n=>[
       ...n.children.map(c=>row(n.id+' → '+c.procedure,c.line,[],{description:c.via})),

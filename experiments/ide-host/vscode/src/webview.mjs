@@ -44,7 +44,7 @@ function downloadPreparedPackageZip(){
     $("zipExportNotice").hidden=true;
   }catch(error){status("ZIP 下载失败："+String(error?.message??error));}
 }
-function publishSelection(){vscode.postMessage({type:"selection",version:state.version,procedureId:state.procedureId,nodeId:state.selection?.kind==="node"?state.selection.id:null});}
+function publishSelection(){const payload={type:"selection",version:state.version,procedureId:state.procedureId,nodeId:state.selection?.kind==="node"?state.selection.id:null};document.body.dataset.studioSelection=JSON.stringify(payload);vscode.postMessage(payload);}
 const status=text=>{$("message").textContent=text;};
 const canvas=mountProcedureCanvas($("reactFlowRoot"),{
   onNodeSelect(id){
