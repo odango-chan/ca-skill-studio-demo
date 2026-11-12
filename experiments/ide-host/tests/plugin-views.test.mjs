@@ -69,7 +69,7 @@ function fixture({multiRoot=false}={}){
 test("Dependencies provider is composed into Package Explorer and does not create another view",async()=>{
   const h=fixture(),context={subscriptions:[],secrets:{get:async()=>undefined}};
   const view=registerDependenciesView(h.vscode,context,{
-    treeViewId:null,onProjectRootChanged:root=>h.selected.push(root?.path??null)
+    onProjectRootChanged:root=>h.selected.push(root?.path??null)
   });
   assert.equal(h.commands.has("skillStudio.addDependency"),true);
   assert.equal(h.commands.has("skillStudio.refreshDependency"),true);
@@ -85,7 +85,7 @@ test("Dependencies provider is composed into Package Explorer and does not creat
 test("multi-root Dependency operations require explicit project selection",async()=>{
   const h=fixture({multiRoot:true}),context={subscriptions:[],secrets:{get:async()=>undefined}};
   const view=registerDependenciesView(h.vscode,context,{
-    treeViewId:null,onProjectRootChanged:root=>h.selected.push(root?.path??null)
+    onProjectRootChanged:root=>h.selected.push(root?.path??null)
   });
   assert.equal(view.getProjectRoot(),null);
   const before=await view.provider.getChildren();
