@@ -1,71 +1,50 @@
-# SKILL Studio · Experimental VS Code Extension
+# SKILL Studio VS Code-compatible extension
 
-This is an isolated, **not production-ready** VS Code Custom Text Editor spike.
-**Online Studio remains a required, first-class product.** The existing GitHub
-Pages site is preserved; this extension is not a desktop-only replacement.
-The same source now generates `dist/extension.cjs` (Node host) and
-`dist/extension-web.cjs` (browser worker host). A successful browser build
-does **not** mean Theia browser-only has been integrated or deployed.
-It uses the native host's Explorer, file creation, search, tabs, YAML/Python
-code editors, undo/redo and save. It is **not** a second source buffer.
-`assurance/procedure.yaml` opens in the optional Procedure Visual custom view.
+This folder contains the shared VS Code API extension used by the online Theia host and optional local VS Code-compatible hosts. The extension does not own a second IDE shell or a separate editable Source buffer: native host editors, TextDocuments, WorkspaceEdits, save and undo remain authoritative.
 
-Build from repository root:
+## Editors and views
+
+- `assurance/procedure.yaml` opens the Procedure visual editor by default.
+- `assurance/contract.yaml` opens the Contract visual editor by default.
+- `assurance/predicates.yaml` opens the Predicate visual editor by default.
+- `schemas/*.schema.yaml` opens the read-only Schema visual editor by default.
+- Other YAML, Python, JSON and Markdown files use the host's native editors. The pinned VS Code Markdown language-features extension owns Theia's Markdown Preview.
+- Package Explorer is contributed to the host's existing Explorer container. It is a single TreeView that composes Skills and Plugin-managed Dependencies; native Files remains available.
+- Inspector is contributed to the right-side secondary sidebar. Its contextual Data Flow is a read-only Source-derived Producer / Consumer and Consumer ABI projection, not Runtime Evidence.
+
+Package Explorer inventory is not semantic validation or Compiler qualification. Imported dependency snapshots remain Plugin-owned and read-only by default. Build Artifacts are not shown without a real Compiler BuildResult.
+
+## Build
+
+From the repository root with Node.js 24:
 
 ```sh
 npm ci
 node experiments/ide-host/scripts/build-ide-spike.mjs
+node --test experiments/ide-host/tests/*.test.mjs
 ```
 
-To run in a VS Code Extension Development Host, open the repo as a workspace
-and press F5 using an Extension Host launch configuration pointing to this
-extension folder, or use:
+The build emits host-specific extension bundles and the Procedure webview assets. The `browser` entry is staged as a built-in plugin when building Theia; it is not installed dynamically into the browser-only app. The `main` entry is the optional Node host entry.
+
+## Optional local VS Code
+
+To open an Extension Development Host, use the repository's VS Code launch configuration or run:
 
 ```sh
 code --extensionDevelopmentPath="$PWD/experiments/ide-host/vscode" \
      "$PWD/site/samples/packages/establish-pdu-session"
 ```
 
-The extension loads `dist/extension.cjs` and `media/procedure.js` produced
-by the isolated build. From Explorer, `assurance/procedure.yaml` opens the
-Procedure Visual editor; `assurance/contract.yaml` opens the Contract Designer;
-`assurance/predicates.yaml` opens the Predicate Designer; and
-`schemas/*.schema.yaml` opens the read-only Schema Designer (Draft 2020-12).
-The Skill Studio activity bar also includes a **Packages** view. It discovers
-multiple SKILL roots in the current workspace, groups files by Definition,
-Assurance, Schemas, Scripts, References and Other, and opens the correct
-file-kind Designer. It is a bounded file inventory only; native Explorer
-remains the ordinary file tree and Package Audit remains the diagnostics owner.
-The Contract view is read-only and source-backed: it shows identity, entry,
-inputs, resources, predicates, planning, dependencies and failure semantics.
-Contract references can open their actual Procedure, Schema or Predicate
-Source. Predicate Designer shows each named Predicate as Observation →
-Evaluator, including scope, freshness and CEL/Script declaration. It never
-executes CEL or claims a live PASS/FAIL result. Use **打开 YAML Source** to edit
-the original document. Ordinary
-Python/YAML text editing remains native. Schema Designer shows a field tree,
-required flags, type/const/range constraints, Source line navigation and
-safe local JSON Pointer references. Remote references are never fetched;
-complex keywords remain clearly PARTIAL or Source-only, not silently ignored.
+Desktop VS Code GUI behavior has not yet received the same real-browser acceptance as Theia; treat it as an optional host path, not as a separately qualified product deployment.
 
-In the graph, choose a qualified Route, new target and **生成 Diff**. The
-confirm button sends a proposal; the extension independently validates the
-current TextDocument version and AST/CST patch before applying an exact
-scalar `WorkspaceEdit`. You can undo and save through the native host.
+## Theia
 
-To try desktop/server-backed Theia, package a VSIX with
-`npx --yes @vscode/vsce package --no-dependencies` from this folder after
-building, then install the VSIX in an existing Theia IDE instance using
-**Extensions: Install from VSIX...**. This path is an **unverified
-compatibility test** until actually tested in Theia; see ../README.md.
+The default online product is Theia 1.76 browser-only at GitHub Pages `/`. Its browser extension is bundled into the application at build time. Browser-only Theia uses OPFS rather than the user's local disk or automatic GitHub sync. The static Pages Webview adapter uses same-origin assets and weakens origin isolation; do not open sensitive files or untrusted workspaces in that deployment.
 
-For the **online** host, the candidate is Theia 1.76+ `browser-only`,
-with the extension prebundled at **application build time**. Browser-only
-Theia cannot install a VSIX dynamically through the Extensions UI. Its
-filesystem is OPFS, not a local disk or automatic GitHub sync. A separate
-online Theia shell build, CustomEditor activation, persistence and static
-hosting are still **NOT_RUN**. See
-[online-first host decision](https://github.com/odango-chan/ca-skill-studio-demo/blob/spike/ide-extension-theia-host/docs/decisions/0002-ide-host-spike.md).
+The separate backend-backed Theia app is a Chromium compatibility target. Its CI-only `THEIA_WEBVIEW_EXTERNAL_ENDPOINT={{hostname}}` setting is not a production security configuration.
 
-No run/debug/Skill execution is performed and no existing GitHub Pages
-assets are modified.
+See [`../README.md`](../README.md), [`../theia-online/README.md`](../theia-online/README.md) and [`../theia-browser/README.md`](../theia-browser/README.md) for host-specific details.
+
+## Acceptance boundaries
+
+Theia Browser-Only and backend Chromium acceptance cover the active extension integration. Native Markdown scroll preferences are enabled, but actual bidirectional scroll behavior and link activation still require manual inspection. Runtime / 5GC execution is outside this extension's authority and remains `NOT_RUN`.
