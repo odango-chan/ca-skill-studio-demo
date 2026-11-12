@@ -63,6 +63,15 @@ test('Inspection preserves Classic node/phase/route source identity; unknown syn
   assert.ok(selected.evidence.some(x=>x.label.includes('Runtime NOT_RUN')));
   assert.ok(selected.inspection.every(x=>x.line>0));
   assert.ok(selected.dataflow.bindings.length>0,'selected Node exposes source-resolved Phase dependencies');
+  const inspectorFlow=selected.inspection.find(x=>x.kind==='data-flow');
+  assert.ok(inspectorFlow,'selected Node displays contextual Data Flow in Inspector');
+  assert.match(inspectorFlow.label,/Data Flow · Producer \/ Consumer/);
+  assert.match(inspectorFlow.description,/Source-derived only · Runtime NOT_RUN/);
+  assert.ok(inspectorFlow.children.some(x=>x.label.includes('Source lineage')));
+  assert.ok(inspectorFlow.children.some(x=>x.label.includes('Consumer ABI')));
+  assert.ok(inspectorFlow.children.every(x=>!x.writeAuthorized),
+    'Inspector Data Flow must never claim source analysis authorizes writes');
+
   assert.equal(selected.consumerContracts.summary.authorizedWrites,0,
     'read-only Evidence never grants ABI write authority');
   const script=readFileSync(root+'scripts/select_establishment_configuration.py','utf8');
@@ -87,6 +96,13 @@ properties:
     'Evidence distinguishes declared type-only matches from full ABI proof');
   assert.ok(typed.consumerContracts.bindings.some(x=>x.typeRelation==='PRODUCER_TYPE_UNAVAILABLE'),
     'Evidence keeps unknown producer output types explicit');
+  const typedFlow=typed.inspection.find(x=>x.kind==='data-flow');
+  assert.ok(typedFlow?.children.some(x=>x.label.includes('Consumer ABI')));
+  const consumerRows=typedFlow.children.filter(x=>x.label.includes('Step '));
+  assert.ok(consumerRows.some(x=>x.children.some(c=>c.label==='Consumer ABI declaration')),
+    'Inspector Data Flow keeps consumer ABI declarations, not Runtime Evidence');
+  assert.ok(consumerRows.some(x=>x.children.some(c=>c.label==='Source / Runtime boundary')),
+    'Inspector Data Flow labels its evidence boundary explicitly');
   const flow=typed.evidence.find(x=>x.label.includes('Producer / Consumer dataflow'));
   assert.ok(flow?.children.some(x=>x.label.includes('Consumer ABI')));
   assert.ok(flow.children.every(x=>!x.writeAuthorized),
