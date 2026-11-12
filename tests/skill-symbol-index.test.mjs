@@ -100,6 +100,20 @@ test("Procedure start and route references resolve within their owning Procedure
   assert.ok(occurrences.length>=2);
 });
 
+test("Contract Schema references resolve to exact Package-owned Schema files",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  const schema=snapshot.documents.find(x=>x.relativePath==="schemas/establishment-request.schema.yaml");
+  const path="schemas/establishment-request.schema.yaml";
+  const hit=at(index,contract.uri,contract.text,path);
+  const declaration=symbols.uniqueSkillSymbolDeclaration(hit);
+  assert.equal(hit.token.type,"skillSchema");
+  assert.equal(declaration.uri,schema.uri);
+  assert.deepEqual(declaration.range,{start:0,end:0},
+    "file-path navigation lands at the exact target document start");
+});
+
 test("Procedure Operation references resolve only to an exact imported ToolCatalog declaration",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
