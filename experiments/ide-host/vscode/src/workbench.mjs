@@ -2774,7 +2774,7 @@ export function registerWorkbench(vscode,context){
         '<script>window.skillStudioNativeMarkdownXss = true;</script>',
         '<img src="https://example.invalid/raw-html-pixel.png" onerror="window.skillStudioNativeMarkdownXss = true">',
         '',
-        '[Safe package reference](3gpp-procedure.md)',
+        '[Safe package reference](../SKILL.md)',
         '[Escaping package link](../../outside.md)',
         '[Missing package link](missing.md)',
         '![Remote pixel](https://example.invalid/markdown-pixel.png)',
