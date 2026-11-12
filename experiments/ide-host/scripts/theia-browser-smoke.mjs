@@ -269,22 +269,31 @@ try{
     if(!node)return null;const r=node.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2,text:node.innerText};
   })()`);
+  // The browser-only Pages demo must auto-load on first entry. The normal
+  // backend Theia host is not the public demo, so exercise its explicit command.
+  if(externalUrl){
+    if(!loadExampleRow)
+      throw Error("Theia backend host does not expose the explicit Load Example command");
+    await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:loadExampleRow.x,y:loadExampleRow.y});
+    await command("Input.dispatchMouseEvent",{type:"mousePressed",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
+    await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
+    await sleep(350);
+  }
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
-  // This acceptance must prove first-run auto-loading, not rescue it by clicking
-  // the manual import command. Wait for the success notification emitted only
-  // after Theia confirms the workspace root and opens the conventional 5GC graph.
-  let automaticLoadReady=false;
+  // Public Pages proves automatic loading; backend Theia proves the explicit
+  // import command. Both must end with a confirmed workspace and 5GC Procedure.
+  let exampleLoadReady=false;
   for(let attempt=0;attempt<100;attempt++){
-    automaticLoadReady=await evalJS(`[...document.querySelectorAll(
+    exampleLoadReady=await evalJS(`[...document.querySelectorAll(
       '.theia-notification-list-item,.theia-notification-message'
     )].some(node=>node.innerText.includes(
       '示例项目已载入并打开工作区：skill-studio-demo/'
-    )&&node.innerText.includes('默认已打开传统 5GC Procedure.'))`);
-    if(automaticLoadReady)break;
+    )&&node.innerText.includes('默认已打开传统 5GC Procedure'))`);
+    if(exampleLoadReady)break;
     await sleep(150);
   }
-  if(!automaticLoadReady){
+  if(!exampleLoadReady){
     const startupDiagnostics=await evalJS(`({
       title:document.title,
       notifications:[...document.querySelectorAll(
@@ -319,9 +328,7 @@ try{
         (document.querySelector('.theia-Files')?.innerText??'')
         .includes('You have not yet added a folder to the workspace.'),
       workspaceRootVisible:(document.querySelector('.theia-Files')?.innerText??'')
-        .includes('workspaces')||
-        (document.querySelector('.theia-Files')?.innerText??'')
-        .includes('skills'),
+        .includes('skill-studio-demo'),
       notificationText:[...document.querySelectorAll('.theia-notification-list-item,.theia-notification-message')]
         .map(x=>x.innerText).filter(Boolean).slice(0,7),
       visibleEditors:document.querySelectorAll('.monaco-editor').length,
@@ -1479,15 +1486,16 @@ try{
     return {visible:Boolean(explorer),text,
       noFolderPrompt:text.includes('You have not yet opened a folder.')||
         text.includes('You have not yet added a folder to the workspace.'),
-      rootVisible:text.includes('workspaces')||text.includes('skills')};
+      rootVisible:text.includes('skill-studio-demo')};
   })()`);
   afterImport.explorerText=nativeExplorer.text;
   afterImport.noFolderPrompt=nativeExplorer.noFolderPrompt;
   afterImport.workspaceRootVisible=nativeExplorer.rootVisible;
   afterImport.explorerVisible=nativeExplorer.visible;
-  if(!nativeExplorer.visible||nativeExplorer.noFolderPrompt||!nativeExplorer.rootVisible)
+  if(!afterImport.statusBar||afterImport.statusBar.noWorkspace||
+     !nativeExplorer.visible||nativeExplorer.noFolderPrompt||!nativeExplorer.rootVisible)
     throw Error("The native Explorer still has no default project root: "+
-      JSON.stringify(nativeExplorer));
+      JSON.stringify({statusBar:afterImport.statusBar,nativeExplorer}));
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={shellReadyMs,workbenchEvidence,packageOverviewEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
