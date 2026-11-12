@@ -8,7 +8,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 2. [WORK](WORK.md) — **唯一当前实现与验收状态**
 3. [TRACEABILITY](TRACEABILITY.md) — Contract/设计 → 生产代码 → 测试 → 实际证据
 4. [Architecture](architecture/studio-boundaries.md) — ownership、Source authority
-5. [SKILL Project layout](architecture/skill-project-layout.md) — `skills/lib/output` 项目根、Compiler 集成边界
+5. [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) — 原生 Settings、Dependency Snapshot / Lock、Compiler 输入与所有权边界
 5. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
 6. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
 7. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
@@ -17,8 +17,9 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 10. [Skill Language Core / Browser LSP · L2-D1](design/skill-lsp-l2d-editor-acceptance.md) — 共享语言分析、Browser Worker 与真实 Theia 编辑器 Provider 验收边界
 11. [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) — 原生 Problems 诊断出现、修复清除与 Package generation 验收
 11. [ADR-0002 Theia default online host + Classic fallback](decisions/0002-ide-host-spike.md) — Theia 默认在线宿主与功能迁移背景
-12. [ADR-0003 Native Workbench / Inspector / Markdown](decisions/0003-native-workbench-and-markdown.md) — 原生视图收敛、右侧 Inspector、Observation / Evidence / Data Flow 边界与 Markdown 原生替代门禁
-13. [Documentation Governance](DOCUMENTATION.md) — canonical source map
+12. [ADR-0003 Native Workbench / Inspector / Markdown](decisions/0003-native-workbench-and-markdown.md) — 原生视图、右侧 Inspector、Data Flow 与 Markdown 决策
+13. [ADR-0004 Package-first Workspace](decisions/0004-package-first-workspace.md) — Package Explorer 默认入口、Dependencies / Build Artifacts 组合及资源所有权
+14. [Documentation Governance](DOCUMENTATION.md) — canonical source map
 
 ## 已完成阶段技术记录
 
@@ -31,7 +32,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | 主题 | Canonical |
 |---|---|
 | Owner / Authority / Source truth | [Architecture](architecture/studio-boundaries.md) |
-| Project 源码目录与未来 Compiler 适配 | [SKILL Project layout](architecture/skill-project-layout.md) |
+| Plugin-managed Project / Dependency / Build ownership | [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) |
 | 现有 UI 和 Source-backed 编辑契约 | [Workbench](design/authoring-workbench.md) |
 | Route 编辑 D3 设计 | [D3 Route Designer](design/route-designer.md) |
 | Phase Step 输入绑定与后续结构编辑 | [D4 Phase Designer](design/phase-designer.md) |
@@ -41,7 +42,8 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | Skill Language Core / Browser LSP · L2-D1 | [L2-D1 Editor Acceptance](design/skill-lsp-l2d-editor-acceptance.md) |
 | Native Problems diagnostics lifecycle · L2-D2 | [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) |
 | Theia 默认在线宿主 / Classic 保留与功能迁移背景 | [ADR-0002](decisions/0002-ide-host-spike.md) |
-| 当前工作台布局 / 右侧 Inspector / Data Flow / 原生 Markdown 决策 | [ADR-0003](decisions/0003-native-workbench-and-markdown.md) |
+| Native workbench / Inspector / Data Flow / Markdown ownership | [ADR-0003](decisions/0003-native-workbench-and-markdown.md) |
+| Package-first workspace and Package Explorer composition | [ADR-0004](decisions/0004-package-first-workspace.md) |
 | 当前状态 | [WORK](WORK.md) |
 | 实施、测试与证据 locator | [TRACEABILITY](TRACEABILITY.md) |
 | 文档治理 | [DOCUMENTATION](DOCUMENTATION.md) |

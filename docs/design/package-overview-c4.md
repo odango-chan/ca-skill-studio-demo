@@ -1,5 +1,7 @@
 # C4 — Package Overview
 
+> **Presentation update:** [ADR-0004 · Package-first Workspace](../decisions/0004-package-first-workspace.md) promotes this Skills inventory into the Skills section of the default Package Explorer and composes it with Plugin-managed Dependencies and actual Compiler Build Artifacts. The inventory rules, file grouping, bounded-scan behavior and no-semantic-validation boundary below remain applicable; this document is the C4 implementation baseline, not the complete Package Explorer design.
+
 ## Integration and browser evidence
 
 C4 is implemented on PR #133, targeting `main`. The earlier C1–C3

@@ -1,5 +1,9 @@
 # Skill Studio 当前工作状态
 
+## 2026-11-12 · Package-first Workspace（ADR-0004）
+
+**Design: ACCEPTED · Implementation: NOT_STARTED · Acceptance: NOT_RUN.** Package Explorer is the default project surface inside the native Explorer container; Files remains the secondary physical view. Skills / Dependencies / actual Build Artifacts are one logical projection backed by their existing owners. This changes presentation only; Plugin-managed Configuration v0.1, Source-first editing, Compiler ownership and ADR-0003's Inspector / Outline / Problems / Markdown decisions remain authoritative. Tracking: [Issue #173](https://github.com/odango-chan/ca-skill-studio-demo/issues/173). Draft [PR #152](https://github.com/odango-chan/ca-skill-studio-demo/pull/152) is not mergeable as-is: it is based on an earlier main and still contributes a separate Skill Studio Activity Bar. No implementation or browser acceptance is claimed.
+
 **Updated: 2026-11-10**  
 **Theia host migration merge:** `b2f4e991e5e273ebb98419ba0b66453bdd0f72cf` (PR #86 Squash Merge; Theia is now the default Pages host).  
 **Node Focus merge baseline:** `b9c1c38cd286526d742dd254646a9ec3c2489562` (PR #89 Node Focus migration merged; resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727)).  

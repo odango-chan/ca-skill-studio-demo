@@ -57,6 +57,9 @@ Studio owns the Dependency Service lifecycle: source acquisition, normalization,
 ## Views, commands and user-facing status
 
 Use native contributions:
+
+**Presentation update:** [ADR-0004 · Package-first Workspace](../decisions/0004-package-first-workspace.md) composes the Dependencies and Build projections as sections of one native Package Explorer TreeView inside the built-in Explorer container. This supersedes separate sidebar-panel placement only; the Dependency Service, Compiler adapter, command semantics, persistence, immutable snapshot and ownership contracts below remain unchanged.
+
 - **Settings Editor:** simple options; do not duplicate native Settings as a bespoke Project Settings page.
 - **Dependencies TreeView:** acquisition source badge, dependency ID, pinned digest/revision, selected Tool Operations, origin, contract preview, Add, Refresh, Update Lock, Remove. Show `UNKNOWN` Effect without guessing. Refresh discovers drift **without** changing the current lock; Update Lock requires explicit confirmation and should invalidate LSP caches.
 - **Build TreeView:** Check, Build, immutable output tree, diagnostic/source navigation, Export ZIP, Export Directory where supported. Build `NOT_RUN/UNAVAILABLE` until the new Compiler is actually integrated. No automatic writes to a project `output/` folder.
