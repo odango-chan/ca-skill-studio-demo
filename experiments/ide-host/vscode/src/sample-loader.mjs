@@ -214,6 +214,20 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
   const workspaceUpdated=await exposeWorkspaceRoot(vscode.workspace,root,[
     legacyRoot,legacySkillsRoot
   ]);
+  if(resetExisting){
+    // Remove only the two legacy bundled package directories from the previous
+    // extension-owned workspace location. Other Skills and unrelated data stay.
+    for(const skill of SKILLS){
+      const legacyPackage=vscode.Uri.joinPath(legacySkillsRoot,skill);
+      phase="clear-legacy-package:"+skill;
+      try{
+        await fileSystem.stat(legacyPackage);
+        await fileSystem.delete(legacyPackage,{recursive:true,useTrash:false});
+      }catch(error){
+        if(error?.code!=="FileNotFound")throw error;
+      }
+    }
+  }
   const procedures=Object.fromEntries(SKILLS.map(name=>
     [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
   return {root,skillsRoot,libraryRoot,outputRoot,
