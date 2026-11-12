@@ -684,7 +684,12 @@ export function registerWorkbench(vscode,context){
           sourcePosition(contractDocument,contractText,requestSchemaPath,9)));
         if(!requestSchemaCompletion.some(item=>
           (typeof item.label==="string"?item.label:item.label?.label)===requestSchemaPath))
-          throw Error("v0.2 Contract Schema completion did not return the exact Package path");
+          throw Error("v0.2 Contract Schema completion did not return the exact Package path: "+
+            JSON.stringify({labels:requestSchemaCompletion.map(item=>
+              typeof item.label==="string"?item.label:item.label?.label??String(item.label??"")),
+              count:requestSchemaCompletion.length,
+              position:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
+              requestSchemaPath}));
         const operationName="sbi.udm.sm_data.get";
         const operationCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
