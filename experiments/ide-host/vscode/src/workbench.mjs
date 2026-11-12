@@ -1,6 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
-import {prepareNativeMarkdownPackagePolicy,clearNativeMarkdownPackagePolicies} from "./markdown-link-policy.mjs";
+import {prepareNativeMarkdownPackagePolicy} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
@@ -2836,7 +2836,8 @@ export function registerWorkbench(vscode,context){
       const restored=await vscode.workspace.applyEdit(edit);
       if(!restored)throw Error('Could not restore the original Skill guide after security probe');
       nativeMarkdownSecurityOriginals.delete(target.toString());
-      clearNativeMarkdownPackagePolicies([target]);
+      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,target);
+      if(!policyReady)throw Error('Could not restore the Package link policy for the original Skill guide');
       return true;
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
