@@ -44,11 +44,6 @@ jobs:
         run: npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
       - name: Download pinned built-in Markdown extension from Open VSX
         run: npm run download:plugins --prefix experiments/ide-host/theia-online
-      - name: Patch native Markdown scroll suppression for real user input
-        run: |
-          markdown_manifest=$(find experiments/ide-host/theia-online/plugins -mindepth 2 -maxdepth 5 -type f -name package.json -print | while IFS= read -r file; do grep -q '"name"[[:space:]]*:[[:space:]]*"markdown-language-features"' "$file" && { echo "$file"; break; }; done)
-          test -n "$markdown_manifest"
-          node experiments/ide-host/scripts/patch-native-markdown-scroll-sync.mjs "$(dirname "$markdown_manifest")"
       - name: Build real Theia browser-only app
         run: npm run build --prefix experiments/ide-host/theia-online
       - name: Prepare same-origin Webview assets for static demo preview
