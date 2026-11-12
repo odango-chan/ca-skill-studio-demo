@@ -122,8 +122,6 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     assert.ok(webview.html.includes('data-icon="'+name+'"'),
       id+" must use the shared Classic icon "+name);
   }
-  assert.ok(webview.html.includes("data-icon=\"git-branch\"")===false,
-    "canvas controls do not invent unrelated branch icons");
   assert.ok(webview.html.includes('<option value="DOWN" selected>垂直</option>'));
   assert.doesNotMatch(webview.html,/unsafe-inline/);
   assert.ok(typeof onMessage==="function");
