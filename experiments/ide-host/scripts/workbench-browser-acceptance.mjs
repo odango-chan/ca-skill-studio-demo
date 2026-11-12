@@ -875,18 +875,20 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // publish the same Source-backed selection a user would make.
   const bindingTarget=await evalWebviewJS(`(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')].find(x=>x.getAttribute('data-id')==='nudm-sdm-subscribe');if(!node)throw Error('Phase binding Node is not in the active graph');const r=node.getBoundingClientRect(),frame=window.frameElement?.getBoundingClientRect();return frame?{node:node.getAttribute('data-id'),point:{x:frame.x+r.x+r.width/2,y:frame.y+r.y+r.height/2}}:null;})()`);
   if(!bindingTarget?.node||!bindingTarget.point)throw Error('Could not resolve active Phase binding Node for Inspector Data Flow');
-  await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:bindingTarget.point.x,y:bindingTarget.point.y});
-  await command('Input.dispatchMouseEvent',{type:'mousePressed',x:bindingTarget.point.x,y:bindingTarget.point.y,button:'left',buttons:1,clickCount:1});
-  await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:bindingTarget.point.x,y:bindingTarget.point.y,button:'left',buttons:0,clickCount:1});
+  await click(bindingTarget.point.x,bindingTarget.point.y);
   let inspectorDataFlow=null;
   for(let attempt=0;attempt<60;attempt++){
-    inspectorDataFlow=await evalJS(`(()=>{const headers=[...document.querySelectorAll('.theia-view-container-part-header')].filter(x=>x.textContent.trim().toLowerCase()==='inspector').map(x=>{const r=x.getBoundingClientRect();const part=x.closest('.part');return {x:r.x,y:r.y,width:r.width,partText:part?.innerText??'',container:x.closest('.theia-view-container')?.id??null};});const right=headers.find(x=>x.width>0&&x.x>innerWidth/2);return {found:!!right,rightSide:!!right,text:right?.partText??'',headers};})()`);
+    inspectorDataFlow=await evalJS(`(()=>{const container=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');const r=container?.getBoundingClientRect();const rows=[...(container?.querySelectorAll('.theia-TreeNode')??[])].map(x=>{const b=x.getBoundingClientRect();return {text:x.innerText.replace(/\\s+/g,' ').trim(),visible:b.width>0&&b.height>0&&b.x<innerWidth&&b.right>0&&b.y<innerHeight&&b.bottom>0};});return {found:!!container,rightSide:!!r&&r.x>innerWidth/2,containerRect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,text:container?.innerText??'',rows};})()`);
     if(inspectorDataFlow?.rightSide&&inspectorDataFlow.text.includes('Data Flow · Producer / Consumer'))break;
     await sleep(100);
   }
   if(!inspectorDataFlow?.rightSide||!inspectorDataFlow.text.includes('Data Flow · Producer / Consumer'))
     throw Error('Inspector is missing contextual Source Data Flow: '+JSON.stringify(inspectorDataFlow));
-  console.log('STUDIO_INSPECTOR_DATA_FLOW_CHROMIUM',JSON.stringify({found:true,rightSide:true,hasDataFlow:true}));
+  console.log('STUDIO_INSPECTOR_DATA_FLOW_CHROMIUM',JSON.stringify({
+    found:inspectorDataFlow.found,rightSide:inspectorDataFlow.rightSide,
+    hasDataFlow:true,containerRect:inspectorDataFlow.containerRect,
+    visibleRows:inspectorDataFlow.rows.filter(x=>x.visible).length
+  }));
   const skillStudioTab=await evalJS(`(()=>{
     const el=[...document.querySelectorAll('.lm-TabBar-tab')].find(x=>
       x.textContent.trim()==='Skill Studio'&&x.getBoundingClientRect().width>0);
