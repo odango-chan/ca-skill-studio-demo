@@ -262,12 +262,22 @@ export function activate(context){
         stage="open-procedure";
         // Respect the registered default CustomEditor association (the working
         // Theia first-run path); avoid opening a second explicit editor.
-        await vscode.commands.executeCommand("vscode.open",result.procedure);
+        const confirmedFolders=(vscode.workspace.workspaceFolders??[])
+          .map(folder=>folder.uri.toString());
+        if(!confirmedFolders.includes(result.root.toString()))
+          throw Error("Theia has not confirmed the skill-studio-demo workspace root");
+        await vscode.commands.executeCommand("vscode.openWith",result.procedure,VIEW);
+        console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
+          root:result.root.toString(),
+          workspaceFolders:confirmedFolders,
+          defaultProcedure:result.procedure.toString(),
+          editor:VIEW
+        }));
         void vscode.window.showInformationMessage(
-          "示例项目已载入：skills/（传统 5GC + MAS）、lib/（待导入 Tool 契约）、"+
-          "output/（待生成编译产物）。新增 "+result.created+" 个文件，"+
-          "保留 "+result.skipped+" 个已有文件。"+
-          (viewOpened&&revealed?"已展开 Packages。":"请打开 Skill Studio → Packages 查看两个 SKILL。"));
+          "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+
+          "新增 "+result.created+" 个文件，保留 "+result.skipped+" 个已有文件。"+
+          (viewOpened&&revealed?"已展开 Packages（含传统 5GC + MAS）。":
+            "可在 Skill Studio → Packages 查看两个 SKILL。"));
       }catch(error){
         await vscode.window.showErrorMessage(
           "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
