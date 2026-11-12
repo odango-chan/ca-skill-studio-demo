@@ -192,6 +192,18 @@ export function registerWorkbench(vscode,context){
   // Acceptance-only diagnostics are deliberately not contributed to the
   // Command Palette. The Chromium harness queries this internal command in
   // both browser-Worker and Node extension-host variants.
+  // Browser acceptance runs in an ephemeral Theia workspace. Make the
+  // Explorer interaction mode explicit so the single-click CustomEditor
+  // assertion does not depend on a runner's inherited user preferences.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.setExplorerOpenMode",async mode=>{
+      if(mode!=="singleClick")throw Error("Only singleClick is supported by this acceptance probe");
+      const configuration=vscode.workspace.getConfiguration("workbench.list");
+      const before=configuration.get("openMode");
+      await configuration.update("openMode",mode,vscode.ConfigurationTarget.Workspace);
+      return {before,after:configuration.get("openMode")};
+    }
+  ));
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
