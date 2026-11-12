@@ -557,7 +557,41 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }
   let opened=null;
   for(let i=0;i<100&&!opened;i++){opened=await graph();if(!opened)await sleep(100);}
-  if(!opened)throw Error('Explorer single-click did not open native associated CustomEditor');
+  // Closing editor groups and opening the secondary sidebar can cause Theia's
+  // Explorer to remount while the first pointer event is being dispatched.
+  // Retry only genuine on-screen single-clicks against a freshly hit-tested
+  // live file row; never substitute the extension openWith command here.
+  const explorerRetries=[];
+  for(let retry=0;retry<2&&!opened;retry++){
+    await invoke('workbench.files.action.focusFilesExplorer');
+    const current=await evalJS(`(()=>{
+      const roots=[...document.querySelectorAll('.theia-Files')];
+      const rows=(roots.length?roots:[document]).flatMap(root=>
+        [...root.querySelectorAll('.theia-TreeNode')]);
+      const row=rows.find(node=>node.innerText.replace(/\\s+/g,' ').trim()==='procedure.yaml'&&
+        node.getBoundingClientRect().width>0);
+      if(!row)return {found:false,reason:'procedure row unavailable'};
+      row.scrollIntoView({block:'center',inline:'nearest'});
+      const label=row.querySelector('.theia-TreeNodeSegmentGrow')??
+        row.querySelector('.theia-TreeNodeContent')??row;
+      const box=label.getBoundingClientRect();
+      const candidates=[.5,.65,.8,.9].map(f=>({
+        x:Math.round(box.x+box.width*f),y:Math.round(box.y+box.height/2)
+      }));
+      const point=candidates.find(p=>p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&
+        ((hit)=>hit&&(hit===row||row.contains(hit))&&
+          !hit.closest('.lm-SplitPanel-handle'))(document.elementFromPoint(p.x,p.y)));
+      return {found:true,point:point??null,
+        rect:{x:box.x,y:box.y,width:box.width,height:box.height}};
+    })()`);
+    explorerRetries.push({retry,current});
+    if(!current?.point)break;
+    file={x:current.point.x,y:current.point.y};
+    await click(file.x,file.y);
+    for(let i=0;i<40&&!opened;i++){opened=await graph();if(!opened)await sleep(100);}
+  }
+  if(!opened)throw Error('Explorer single-click did not open native associated CustomEditor; '+
+    JSON.stringify({originalTarget:file,retries:explorerRetries}));
   const openMs=performance.now()-start;
   const preview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(!preview)throw Error("Single-click CustomEditor was not a native preview tab");
