@@ -71,6 +71,9 @@ export function registerWorkbench(vscode,context){
     };
     nativeMarkdownMessageTapInstalled=true;
   };
+  // Install before any Markdown editor can auto-open its preview, so the
+  // native panel is observed even when the acceptance later reuses it.
+  installNativeMarkdownMessageTap();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
