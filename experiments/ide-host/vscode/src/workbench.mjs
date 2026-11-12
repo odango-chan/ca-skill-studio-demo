@@ -742,12 +742,14 @@ export function registerWorkbench(vscode,context){
         // Contract document. Activate the exact document before requesting.
         const contractCompletionPosition=sourcePosition(
           contractDocument,contractText,requestSchemaPath,9);
-        const contractCompletionEditor=await vscode.window.showTextDocument(
-          relatedUris.contract,{preview:false});
-        if(contractCompletionEditor.document.uri.toString()!==relatedUris.contract.toString())
-          throw Error("Contract Completion target did not become the active editor");
-        contractCompletionEditor.selection=new vscode.Selection(
-          contractCompletionPosition,contractCompletionPosition);
+        await openNativeSource(vscode,relatedUris.contract,{
+          preview:false,
+          selection:new vscode.Range(
+            contractCompletionPosition,contractCompletionPosition)
+        });
+        const contractCompletionEditor=vscode.window.activeTextEditor;
+        if(contractCompletionEditor?.document.uri.toString()!==relatedUris.contract.toString())
+          throw Error("Contract Completion target did not become the active native editor");
         const completionProviderBefore=await vscode.commands.executeCommand(
           "skillStudio.internal.semanticTokenDiagnostics");
         const requestSchemaCompletionResult=await vscode.commands.executeCommand(
@@ -792,14 +794,16 @@ export function registerWorkbench(vscode,context){
               rawSuggestionCount:requestSchemaCompletionResult?.suggestions?.length??null,
               position:sourcePosition(contractDocument,contractText,requestSchemaPath,9),
               requestSchemaPath}));
-        const procedureCompletionEditor=await vscode.window.showTextDocument(
-          procedureUri,{preview:false});
-        if(procedureCompletionEditor.document.uri.toString()!==procedureUri.toString())
-          throw Error("Procedure Completion target did not become the active editor");
         const predicateCompletionPosition=sourcePosition(
           procedureDocument,procedureText,predicateName,5);
-        procedureCompletionEditor.selection=new vscode.Selection(
-          predicateCompletionPosition,predicateCompletionPosition);
+        await openNativeSource(vscode,procedureUri,{
+          preview:false,
+          selection:new vscode.Range(
+            predicateCompletionPosition,predicateCompletionPosition)
+        });
+        const procedureCompletionEditor=vscode.window.activeTextEditor;
+        if(procedureCompletionEditor?.document.uri.toString()!==procedureUri.toString())
+          throw Error("Procedure Completion target did not become the active native editor");
         const predicateCompletion=completionItems(await vscode.commands.executeCommand(
           "vscode.executeCompletionItemProvider",procedureUri,
           predicateCompletionPosition));
