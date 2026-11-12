@@ -61,7 +61,7 @@
     "@theia/cli": "1.76.0"
   },
   "theiaPlugins": {
-    "vscode.markdown-language-features": "https://open-vsx.org/api/vscode/markdown-language-features/1.119.0/file/vscode.markdown-language-features-1.119.0.vsix"
+    "vscode.markdown-language-features": "https://open-vsx.org/api/vscode/markdown-language-features/1.95.3/file/vscode.markdown-language-features-1.95.3.vsix"
   },
   "scripts": {
     "build": "theia build --mode production",
