@@ -1,6 +1,6 @@
 # ADR-0004 · Package-first Workspace and Unified Package Explorer
 
-**Status: Accepted for implementation · Date: 2026-11-12**
+**Status: Accepted · initial Package Explorer implementation merged in PR #175; follow-up lifecycle UI remains deferred · Date: 2026-11-12**
 
 **Supersedes:** ADR-0003 §2 only for the primary-sidebar ordering and the user-facing placement of Package / Dependency / Build navigation. It also supersedes the presentation assumptions in the C4 Package Overview note that Packages are only a secondary inventory inside a dedicated Skill Studio Activity Bar.
 
