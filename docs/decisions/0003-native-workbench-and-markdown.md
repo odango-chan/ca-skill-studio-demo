@@ -8,7 +8,7 @@
 
 ## Context
 
-Theia is the default online host and the same VS Code extension is intended to remain usable in desktop VS Code. The current extension contributes a separate Skill Studio Activity Bar container with Packages, Inspection, Outline, Evidence and Problems views. This duplicates several capabilities already owned by the host:
+Theia is the default online host and the same VS Code extension is intended to remain usable in desktop VS Code. At the time this ADR was drafted, the extension contributed a separate Skill Studio Activity Bar container with Packages, Inspection, Outline, Evidence and Problems views. This duplicated several capabilities already owned by the host:
 
 - The host already owns Explorer, editor groups, Markdown preview, Outline, Problems, Output, menus and workbench layout.
 - The extension contributes a custom Procedure Outline even though Theia has a native Outline view.
@@ -17,7 +17,7 @@ Theia is the default online host and the same VS Code extension is intended to r
 - Inspector is a property editor for the selected Source-backed object. Keeping it beside file navigation is less natural than placing it in the right-side property / secondary sidebar.
 - At the time of this decision, Theia's Markdown path was a Studio-owned Webview renderer. The built-in VS Code Markdown extension, `vscode.markdown-language-features`, was selected as the replacement; it became the default Theia implementation in PR #169. The Classic shell still retains its old renderer until the later retirement operation.
 
-The current Plugin-managed Project / Dependency / Tool / BuildRequest contract is being developed in PRs #150 and #152. The new layout must not assume the retired skills/lib/output project model as its permanent authority.
+The Plugin-managed Configuration v0.1 contract is now canonical. The initial unified Package Explorer implementation is merged in PR #175; ADR-0004 supersedes this ADR for primary-sidebar ordering and the unified Skills / Dependencies projection. The layout must not assume the retired skills/lib/output project model.
 
 ## Decisions
 
