@@ -43,14 +43,14 @@ Do not build a second IDE shell or a second generic Markdown editor.
 
 ### 2. Target workbench layout
 
-**Primary sidebar (left):**
+**Primary sidebar (left) — current placement is defined by ADR-0004:**
 
-- Native Explorer / Files.
-- Project / Packages inventory.
-- Dependencies, based on the Plugin-managed Project contract.
+- The host's native Explorer container.
+- One Package Explorer TreeView with Skills and Plugin-managed Dependencies as logical sections.
+- The host's native Files tree remains separate and available.
 - Native Outline, driven by the active document's DocumentSymbol provider.
 
-These are native host views. They must not require a dedicated Skill Studio Activity Bar. A compact Project view may group Packages and Dependencies if that produces a clearer hierarchy; do not add more Activity Bar containers to compensate for missing layout decisions.
+The initial proposal above treated Packages and Dependencies as separate views. ADR-0004 supersedes that proposal with the single Package Explorer projection now implemented by PR #175. No dedicated Skill Studio Activity Bar or second workbench shell is contributed.
 
 **Secondary sidebar (right):**
 
@@ -58,7 +58,7 @@ These are native host views. They must not require a dedicated Skill Studio Acti
 - It displays the current selected Source-backed Node, Phase, Step, Route, Contract or Predicate properties and only exposes already-qualified bounded edits.
 - It may contain a contextual **Data Flow** section for the selected Step / consumer. Data Flow is not a separate permanent Evidence panel.
 
-The right-side placement is the product decision. Use the native secondarySidebar contribution. Theia 1.76's plugin contribution normalizer explicitly maps secondarySidebar to its right-side location (see [Theia v1.76.0 normalize-contributions.ts](https://github.com/eclipse-theia/theia/blob/v1.76.0/packages/plugin-utils/src/node/normalize-contributions.ts#L92-L96)); desktop VS Code exposes the same contribution point. The implementation still requires real Theia Chromium and desktop VS Code placement acceptance. If a host runtime does not attach the view as expected, use the host's native movable view/container mechanism; do not implement a custom right dock or a Theia-only property UI.
+The right-side placement is the product decision. Use the native secondarySidebar contribution. Theia 1.76's plugin contribution normalizer explicitly maps secondarySidebar to its right-side location (see [Theia v1.76.0 normalize-contributions.ts](https://github.com/eclipse-theia/theia/blob/v1.76.0/packages/plugin-utils/src/node/normalize-contributions.ts#L92-L96)); desktop VS Code exposes the same contribution point. Theia Browser-Only and backend Chromium acceptance verify the Inspector's right-side placement. Desktop VS Code placement remains `NOT_RUN`. If a host runtime does not attach the view as expected, use the host's native movable view/container mechanism; do not implement a custom right dock or a Theia-only property UI.
 
 **Bottom Panel:**
 
