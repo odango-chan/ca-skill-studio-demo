@@ -2296,7 +2296,14 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const x=quad[0]+(localX/frameMetrics.width)*(quad[2]-quad[0]);
       const y=quad[1]+(localY/frameMetrics.height)*(quad[5]-quad[1]);
       await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
-      await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY});
+      // The published Open VSX Markdown extension uses a one-scroll-event
+      // suppression counter after its initial programmatic positioning.
+      // Model a continuous user gesture as two real wheel events so the
+      // follow-up event exercises Preview -> Source synchronization.
+      const firstDelta=Math.sign(deltaY)*Math.min(40,Math.abs(deltaY)/2);
+      await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY:firstDelta});
+      await sleep(75);
+      await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY:deltaY-firstDelta});
       await sleep(150);
       return previewScroll('window.scrollY');
     };
