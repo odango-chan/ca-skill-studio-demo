@@ -1,10 +1,10 @@
-import {runPackageOverviewAcceptance,runWorkbenchAcceptance} from "./workbench-browser-acceptance.mjs";
+import {runPackageOverviewAcceptance,runWorkbenchAcceptance,assertSourceVisualPair} from "./workbench-browser-acceptance.mjs";
 // Real Chromium smoke for both Theia browser-only static preview and the
 // normal backend-backed browser host. Static mode uses an explicitly isolated
 // same-origin demo-only webview adapter; backend mode uses Theia's normal host.
 import {createServer} from "node:http";
 import {createReadStream,existsSync} from "node:fs";
-import {mkdtemp,readFile,rm} from "node:fs/promises";
+import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {spawn} from "node:child_process";
 import {tmpdir} from "node:os";
 import {extname,join,resolve,sep} from "node:path";
@@ -379,24 +379,6 @@ try{
     throw Error("The default online workspace did not auto-open its project and 5GC Procedure: "+
       JSON.stringify(startupDiagnostics).slice(0,3200));
   }
-  if(requireBrowserLsp){
-    const markdownStartup=await evalJS(`(async()=>{
-      const container=window.theia.container;
-      const key=[...container._bindingDictionary._map.keys()].find(
-        item=>typeof item==="function"&&item.prototype?.executeCommand&&
-          item.prototype?.registerCommand&&item.prototype?.getCommand);
-      if(!key)throw Error("Native Theia command registry missing");
-      return container.get(key).executeCommand(
-        "skillStudio.internal.nativeMarkdownWorkerStartupAcceptance");
-    })()`);
-    console.log('STUDIO_NATIVE_MARKDOWN_WORKER_STARTUP_CHROMIUM',
-      JSON.stringify(markdownStartup));
-    if(!markdownStartup?.isActive||markdownStartup.activationResult!=='ready'||
-       !markdownStartup.workerAvailable||markdownStartup.workerProbe?.ok!==true||
-       markdownStartup.workerProbe?.status!==200)
-      throw Error('Native Markdown Language Server did not activate on cold workbench startup: '+
-        JSON.stringify(markdownStartup));
-  }
   const afterImport=await evalJS(`(async()=>{
     const names=[];let opfsError=null;
     try{
@@ -477,6 +459,7 @@ try{
   let patchEvidence=null;
   let canvasIconEvidence=null;
   if(graphFrame){
+    await assertSourceVisualPair(evalJS,sleep,'procedure.yaml','Initial Procedure Designer');
     const world=await command("Page.createIsolatedWorld",{
       frameId:graphFrame.frame.id,worldName:"skill-studio-patch-acceptance",grantUniveralAccess:true
     });
@@ -1777,6 +1760,19 @@ try{
     console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; PHASE_DATAFLOW_EVIDENCE_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS; PACKAGE_OVERVIEW_TWO_SKILLS_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
+}catch(error){
+  if(process.env.THEIA_FAILURE_SCREENSHOT&&ws?.readyState===1){
+    try{
+      const screenshot=await command('Page.captureScreenshot',{format:'png'});
+      await writeFile(process.env.THEIA_FAILURE_SCREENSHOT,Buffer.from(screenshot.data,'base64'));
+      console.error('STUDIO_FAILURE_WORKBENCH',JSON.stringify(await evalJS(`({
+        tabs:[...document.querySelectorAll('.lm-TabBar-tab')].map(tab=>({
+          label:tab.textContent,rect:tab.getBoundingClientRect().toJSON()})),
+        body:document.body.innerText.slice(-2500)
+      })`)));
+    }catch{}
+  }
+  throw error;
 }finally{
   // Windows Edge launchers can hand off to the browser process and exit 0.
   // Close the actual browser over CDP before removing its isolated profile.

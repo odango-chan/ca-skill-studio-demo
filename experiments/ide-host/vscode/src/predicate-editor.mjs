@@ -1,5 +1,5 @@
 import {openNativeSource} from './native-source.mjs';
-import {openSourceViewPair,forgetSourceViewPair,revealVisualEditorRight} from './source-view-pair.mjs';
+import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
 import {projectPredicateSet} from '../../../../site/predicate-projection.mjs';
 
 const VIEW = 'skillStudio.predicatePreview';
@@ -111,7 +111,6 @@ export function registerPredicateEditor(vscode, context) {
       webview.options = {enableScripts: true, localResourceRoots: []};
       const token = nonce();
       webview.html = webviewHtml(token);
-      revealVisualEditorRight(vscode,panel);
       let disposed = false, ready = false;
       const push = () => {
         if (disposed || !ready) return;

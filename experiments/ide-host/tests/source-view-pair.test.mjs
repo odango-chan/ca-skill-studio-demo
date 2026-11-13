@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair,revealVisualEditorRight}
+import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair}
   from '../vscode/src/source-view-pair.mjs';
 
 const uri=path=>({path,toString(){return 'file://'+path;}});
@@ -31,24 +31,20 @@ test('all supported YAML visual editors have one explicit Source/Visual mapping'
   assert.equal(sourceViewType(uri('/p/assurance/other.yaml')),null);
 });
 
-test('CustomEditor providers can normalize their panel to the right after resolving',async()=>{
-  const {vscode}=vscodeApi(),calls=[];
-  const panel={reveal:(column,preserveFocus)=>calls.push({column,preserveFocus})};
-  assert.equal(revealVisualEditorRight(vscode,panel),true);
-  assert.deepEqual(calls,[{column:2,preserveFocus:true}]);
-  await new Promise(resolve=>setTimeout(resolve,20));
-  assert.deepEqual(calls,[{column:2,preserveFocus:true},{column:2,preserveFocus:true}]);
-});
-
 test('Source-first pairing opens Visual in column two and native Source in column one',async()=>{
   const {vscode,calls,shown}=vscodeApi();
   const target=uri('/p/assurance/contract.yaml');
+  const execute=vscode.commands.executeCommand;
+  vscode.commands.executeCommand=async(...args)=>{
+    assert.equal(shown.length,1,'Source must attach before opening the Visual');
+    return execute(...args);
+  };
   const result=await openSourceViewPair(vscode,target,{line:7});
   assert.equal(calls.length,1);
   assert.deepEqual(calls.map(call=>[call[0],call[2]]),[
     ['vscode.openWith','skillStudio.contractPreview']
   ]);
-  assert.equal(calls[0][3],2);
+  assert.deepEqual(calls[0][3],{viewColumn:2,preserveFocus:true,preview:false});
   assert.equal(shown.length,1);
   assert.equal(shown[0].document.uri,target);
   assert.equal(shown[0].options.viewColumn,1);
@@ -72,7 +68,7 @@ test('opening a Source already in column two moves it before creating Visual',as
     'workbench.action.moveEditorToFirstGroup',
     'vscode.openWith'
   ]);
-  assert.equal(calls[1][3],2);
+  assert.equal(calls[1][3].viewColumn,2);
   assert.equal(shown[0].options.viewColumn,1);
   forgetSourceViewPair(target);
 });

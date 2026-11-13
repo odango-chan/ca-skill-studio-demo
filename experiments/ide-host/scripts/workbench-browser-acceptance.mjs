@@ -9,6 +9,41 @@ if(pcfOutcomeStart<0)throw Error('Published PCF Outcome test anchor missing');
 const pcfOutcomeLine=publishedProcedure.slice(0,
   pcfOutcomeStart+pcfOutcomeHeader.indexOf('            FAILED:'))
   .split('\n').length;
+export async function assertSourceVisualPair(evalJS,sleep,filename,label){
+  let state;
+  for(let attempt=0;attempt<30;attempt++){
+    state=await evalJS(`(()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);
+      if(!key)throw Error('Theia shell missing');
+      const shell=c.get(key),bars=shell.mainAreaTabBars;
+      return shell.getWidgets('main').map(widget=>{
+        const uri=widget.editor?.uri??widget.resource;
+        if(!uri?.path?.toString().endsWith('/'+${JSON.stringify(filename)}))return null;
+        const rect=widget.node.getBoundingClientRect();
+        return {id:widget.id,uri:uri.toString(),
+          kind:widget.editor?'source':widget.viewType??'unknown',
+          column:bars.findIndex(bar=>bar.titles.some(title=>title.owner===widget))+1,
+          visible:!widget.isHidden&&rect.width>0&&rect.height>0,
+          rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}};
+      }).filter(Boolean);
+    })()`);
+    const sources=state.filter(w=>w.kind==='source');
+    const visuals=state.filter(w=>w.kind.startsWith('skillStudio.'));
+    if(sources.length===1&&visuals.length===1&&sources[0].uri===visuals[0].uri&&
+       sources[0].column===1&&visuals[0].column===2&&
+       sources[0].visible&&visuals[0].visible&&
+       sources[0].rect.x+sources[0].rect.width<=visuals[0].rect.x+2){
+      const evidence={filename,label,source:sources[0],visual:visuals[0]};
+      console.log('STUDIO_YAML_SOURCE_VISUAL_PAIR_CHROMIUM',JSON.stringify(evidence));
+      return evidence;
+    }
+    await sleep(100);
+  }
+  throw Error(label+' requires one visible native Source in column one and its Designer in column two: '+JSON.stringify(state));
+}
+
 export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
   const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1});
@@ -504,18 +539,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   async function nativeCommand(id,...args){
     return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
   }
-  async function assertYamlSourceVisualPair(filename,label){
-    const groups=await evalJS(`(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>tab.textContent.trim()===${JSON.stringify(filename)});const grouped=new Map();for(const tab of tabs){const bar=tab.parentElement;if(!grouped.has(bar)){const rect=bar.getBoundingClientRect();grouped.set(bar,{labels:[],rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}});}grouped.get(bar).labels.push(tab.textContent.trim());}return [...grouped.values()].filter(group=>group.rect.width>0);})()`);
-    if(groups.length!==2||groups[0].rect.x===groups[1].rect.x)
-      throw Error(label+' must have exactly one Source tab and one Designer tab in separate editor groups: '+JSON.stringify(groups));
-    const left=[...groups].sort((a,b)=>a.rect.x-b.rect.x)[0];
-    const right=[...groups].sort((a,b)=>a.rect.x-b.rect.x)[1];
-    if(left.rect.x>=right.rect.x)
-      throw Error(label+' Source/Designer groups are not ordered left-to-right: '+JSON.stringify(groups));
-    const evidence={filename,label,sourceGroup:left,visualGroup:right,layout:'Source-left / Visual-right'};
-    console.log('STUDIO_YAML_SOURCE_VISUAL_PAIR_CHROMIUM',JSON.stringify(evidence));
-    return evidence;
-  }
+  const assertYamlSourceVisualPair=(filename,label)=>
+    assertSourceVisualPair(evalJS,sleep,filename,label);
   async function waitNativeMarkdown(predicate,label,attempts=100){
     let latest={frames:[],candidates:[]};
     for(let attempt=0;attempt<attempts;attempt++){
@@ -639,6 +664,18 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       throw Error('Native Inspector confirmation did not show the expected Source Diff: '+target.text.slice(-1200));
     await click(target.x,target.y);await sleep(250);
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
+  }
+  if(requireBrowserLsp){
+    // This must be a cold first-open test. Calling the worker startup command
+    // here would pre-activate the extension and hide the real Explorer-open
+    // lifecycle that previously raced onLanguage:markdown against activate().
+    const markdownColdState=await nativeCommand(
+      'skillStudio.internal.nativeMarkdownActivationStateAcceptance');
+    console.log('STUDIO_NATIVE_MARKDOWN_COLD_ACTIVATION_CHROMIUM',
+      JSON.stringify(markdownColdState));
+    if(!markdownColdState?.installed||markdownColdState.isActive)
+      throw Error('Native Markdown extension was not cold before its first Markdown open: '+
+        JSON.stringify(markdownColdState));
   }
   await invoke('workbench.files.action.focusFilesExplorer');
   await sleep(350);
@@ -1823,7 +1860,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // The legacy Studio-owned Markdown renderer has been retired from the default path.
   // Native Markdown Preview acceptance below now owns rendering, navigation and security checks.
   const nativeMarkdownUri=await nativeCommand(
-    'skillStudio.internal.nativeMarkdownPreviewAcceptance','establish-pdu-session');
+    'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance','establish-pdu-session','SKILL.md',1);
   if(typeof nativeMarkdownUri!=='string'||!nativeMarkdownUri.endsWith('/SKILL.md'))
     throw Error('Native Markdown preview command did not open the exact Skill Source URI: '+
       JSON.stringify(nativeMarkdownUri));
@@ -1831,6 +1868,20 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     view.heading==='Establish PDU Session'&&view.nativePreviewRoot&&
     view.styles.some(url=>url.includes('/media/native-markdown-preview.css')),
     'Studio-themed native Markdown preview');
+  if(requireBrowserLsp){
+    // The first Markdown file has now opened through the normal editor path.
+    // Only now inspect the server: this verifies that first-open activation,
+    // Worker creation and the LanguageClient initialize handshake all finish.
+    const markdownStartup=await nativeCommand(
+      'skillStudio.internal.nativeMarkdownWorkerStartupAcceptance');
+    console.log('STUDIO_NATIVE_MARKDOWN_WORKER_STARTUP_CHROMIUM',
+      JSON.stringify(markdownStartup));
+    if(!markdownStartup?.isActive||markdownStartup.activationResult!=='ready'||
+       !markdownStartup.workerAvailable||markdownStartup.workerProbe?.ok!==true||
+       markdownStartup.workerProbe?.status!==200)
+      throw Error('Native Markdown Language Server did not activate from the first Markdown open: '+
+        JSON.stringify(markdownStartup));
+  }
   const nativeMarkdownWorkerDiagnostics=await nativeCommand('skillStudio.internal.nativeMarkdownWorkerDiagnostics');
   console.log('STUDIO_NATIVE_MARKDOWN_WORKER_URI_DIAGNOSTIC',JSON.stringify(nativeMarkdownWorkerDiagnostics));
   if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||

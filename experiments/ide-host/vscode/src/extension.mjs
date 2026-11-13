@@ -1,5 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
-import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair,revealVisualEditorRight} from "./source-view-pair.mjs";
+import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
@@ -170,7 +170,6 @@ export function activate(context){
             <button id="commit" disabled>确认并修改当前文档</button>
           </div>
           <script nonce="${nonce}" src="${script}"></script></body></html>`;
-      revealVisualEditorRight(vscode,panel);
       let disposed=false,ready=false;
       const push=()=>{
         if(disposed||!ready)return;

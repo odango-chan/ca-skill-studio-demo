@@ -1,5 +1,5 @@
 import {openNativeSource} from './native-source.mjs';
-import {openSourceViewPair,forgetSourceViewPair,revealVisualEditorRight} from './source-view-pair.mjs';
+import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
 import {projectSkillContract} from '../../../../site/contract-projection.mjs';
 import {projectWorkspace} from '../../../../site/workspace.mjs';
 import {parseDocument, LineCounter, isMap, isScalar} from 'yaml';
@@ -182,7 +182,6 @@ export function registerContractEditor(vscode, context) {
       webview.options = {enableScripts: true, localResourceRoots: []};
       const token = nonce();
       webview.html = webviewHtml(webview, token);
-      revealVisualEditorRight(vscode,panel);
       let disposed = false, ready = false;
       const push = () => {
         if (disposed || !ready) return;

@@ -30,22 +30,6 @@ export function forgetSourceViewPair(uri) {
   }
 }
 
-export function revealVisualEditorRight(vscode,panel) {
-  if(typeof panel?.reveal!=='function'||!vscode.ViewColumn)return false;
-  // Try immediately for hosts that support moving a resolving CustomEditor,
-  // then repeat after the current resolve call returns for hosts that attach
-  // the WebviewPanel to its editor group asynchronously.
-  const move=()=>{
-    try{
-      panel.reveal(vscode.ViewColumn.Two,true);
-      console.log("STUDIO_DESIGNER_COLUMN",JSON.stringify({viewType:panel.viewType,viewColumn:panel.viewColumn,visible:panel.visible}));
-    }catch(error){console.warn("SKILL Studio could not place Designer in column two:",String(error?.message??error));}
-  };
-  move();
-  setTimeout(move,0);
-  return true;
-}
-
 // Source-first orchestration avoids opening a duplicate text editor from inside
 // resolveCustomTextEditor. The native Source is the default editor; this helper
 // opens the visual in column two and keeps the one live Source in column one.
@@ -75,12 +59,14 @@ export async function openSourceViewPair(vscode,uri,{line}={}) {
       try{await vscode.commands.executeCommand('workbench.action.moveEditorToFirstGroup');}
       catch{/* Some compatible hosts do not expose the move command. */}
     }
-    // Theia's vscode.openWith command accepts a numeric ViewColumn (unlike
-    // showTextDocument's options object). Keep the call on the public command
-    // contract so Browser and desktop hosts agree on the right-side group.
-    await vscode.commands.executeCommand('vscode.openWith',uri,viewType,vscode.ViewColumn.Two);
+    // Establish the Source group before asking the host to split right. In
+    // Theia CustomEditors resolve before they attach to the shell; revealing
+    // their panel during resolve races the opener's captured placement.
     await vscode.window.showTextDocument(document,{
       viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,selection
+    });
+    await vscode.commands.executeCommand('vscode.openWith',uri,viewType,{
+      viewColumn:vscode.ViewColumn.Two,preserveFocus:true,preview:false
     });
     openPairs.add(key);
     console.log("STUDIO_SOURCE_VISUAL_PAIR_OPENED",JSON.stringify({uri:key,viewType,
