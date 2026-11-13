@@ -25,6 +25,7 @@ test('all supported YAML visual editors have one explicit Source/Visual pairing'
   assert.equal(sourceViewType(uri('/p/assurance/contract.yaml')),'skillStudio.contractPreview');
   assert.equal(sourceViewType(uri('/p/assurance/predicates.yaml')),'skillStudio.predicatePreview');
   assert.equal(sourceViewType(uri('/p/schemas/request.schema.yaml')),'skillStudio.schemaPreview');
+  assert.equal(sourceViewType(uri('/p/schemas/nested/request.schema.yaml')),null);
   assert.equal(sourceViewType(uri('/p/scripts/run.py')),null);
   assert.equal(sourceViewType(uri('/p/assurance/other.yaml')),null);
 });
