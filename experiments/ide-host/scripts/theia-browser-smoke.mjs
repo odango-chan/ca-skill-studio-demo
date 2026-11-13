@@ -92,35 +92,19 @@ const workerTargets=new Map(),workerTargetSetupErrors=[],discoveredTargets=[];
 const enableTargetSession=async(sessionId,targetInfo)=>{
   const type=targetInfo?.type??"unknown";
   const targetUrl=targetInfo?.url??"";
-  // Theia's service worker must never be held while enabling Network: some
-  // Chromium builds do not answer Network.enable for service_worker targets.
-  // It serves the workbench/Webview shell, not the Markdown language worker.
-  if(type==="service_worker"){
-    try{await command("Runtime.runIfWaitingForDebugger",{},sessionId);}
-    catch(error){workerTargetSetupErrors.push({target:targetUrl,type,
-      phase:"resume-service-worker",error:String(error)});}
-    return;
-  }
-  // Only dedicated/shared workers need nested-worker and network observation.
-  // Always release a paused target, even when CDP instrumentation fails.
-  if(type!=="worker"&&type!=="shared_worker"){
-    try{await command("Runtime.runIfWaitingForDebugger",{},sessionId);}
-    catch(error){workerTargetSetupErrors.push({target:targetUrl,type,
-      phase:"resume-target",error:String(error)});}
-    return;
-  }
+  // Observe dedicated/shared workers without pausing them. The Markdown
+  // extension is activated later by acceptance, after this Network domain is
+  // enabled on Theia's plugin worker, so its serverWorkerMain request is seen.
+  // Never pause the workbench or service worker: doing so can stall Webviews.
+  if(type!=="worker"&&type!=="shared_worker")return;
   try{
     await command("Network.enable",{},sessionId);
     await command("Target.setAutoAttach",{
-      autoAttach:true,waitForDebuggerOnStart:true,flatten:true
+      autoAttach:true,waitForDebuggerOnStart:false,flatten:true
     },sessionId);
   }catch(error){
     workerTargetSetupErrors.push({target:targetUrl,type,
       phase:"enable-worker-observation",error:String(error)});
-  }finally{
-    try{await command("Runtime.runIfWaitingForDebugger",{},sessionId);}
-    catch(error){workerTargetSetupErrors.push({target:targetUrl,type,
-      phase:"resume-worker",error:String(error)});}
   }
 };
 const evalJS=async expression=>{
@@ -202,7 +186,7 @@ try{
   // Theia's hosted extension worker). Attach recursively so the Markdown
   // Language Server request is observed in its own target, not just the page.
   await command("Target.setAutoAttach",{
-    autoAttach:true,waitForDebuggerOnStart:true,flatten:true
+    autoAttach:true,waitForDebuggerOnStart:false,flatten:true
   });
   // Use a realistic desktop workbench viewport; the default headless size can
   // collapse Theia's editor groups and make native Source interactions invalid.
