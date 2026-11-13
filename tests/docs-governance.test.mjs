@@ -101,126 +101,25 @@ test("current owner-pinned CreatedSession Reference example is documented withou
   assert.match(work,/可选业务参考材料/);
 });
 
-test("only owner-named establish-pdu-session is public and loads by default",()=>{
-  const html=content("site/index.html"),app=content("site/app.mjs");
-  const manifest=content("site/sample-packages.mjs");
-  assert.match(html,/id="establishSampleButton"[^>]*>establish-pdu-session<\/button>/);
-  assert.doesNotMatch(html,/Ensure Session|CreatedSession|id="sampleButton"/);
-  assert.match(app,/async function loadSample\(sample="establish"\)/);
-  assert.match(app,/const expandedAssetFolders=new Set\(\[[^\]]*"references"\]\)/);
-  assert.match(app,/loadSample\(\);\s*$/);
-  assert.match(manifest,/establish:Object\.freeze/);
-  assert.doesNotMatch(manifest,/ensure:Object\.freeze/);
+test("Theia is the only published host and Classic has no runtime entrypoint",()=>{
+  const workflow=content(".github/workflows/pages.yml");
+  const composer=content("experiments/ide-host/scripts/compose-pages-release.mjs");
+  const manifest=content("experiments/ide-host/vscode/package.json");
+  assert.doesNotMatch(workflow,/--classic|preserve Classic/i);
+  assert.match(workflow,/test ! -e dist\/classic/);
+  assert.match(composer,/classicPublished:false/);
+  assert.doesNotMatch(composer,/classicPath|classic\/index/);
+  assert.ok(!existsSync(resolve(root,"site/index.html")));
+  assert.ok(!existsSync(resolve(root,"site/app.mjs")));
+  assert.ok(!existsSync(resolve(root,"scripts/build.mjs")));
+  assert.ok(manifest.contributes.customEditors.some(x=>x.viewType==="skillStudio.procedurePreview"));
+  assert.ok(manifest.contributes.views.explorer.some(x=>x.id==="skillStudio.packages"));
 });
 
-test("new Phase consumer contract is checked by the Pages syntax gate",()=>{
-  const ci=content(".github/workflows/pages.yml");
-  assert.match(ci,/node --check site\/phase-consumer-contract\.mjs/);
-  assert.match(ci,/node --check tests\/phase-consumer-contract\.test\.mjs/);
-});
-
-test("D4-A3a bounded Step authoring retains Source authority and a Pages syntax gate",()=>{
-  const docs=content("docs/design/phase-designer.md");
-  const app=content("site/app.mjs"),ci=content(".github/workflows/pages.yml");
-  assert.match(docs,/D4-A3a/);
-  assert.match(docs,/Undo\/Redo/);
-  assert.match(app,/applyAdjacentVerifyReorder/);
-  assert.match(ci,/node --check site\/phase-step-order\.mjs/);
-  assert.match(ci,/node --check tests\/phase-step-order\.test\.mjs/);
-});
-
-test("D4-A3b1 Verify creation/deletion stays guarded by Source authority",()=>{
-  const ci=content(".github/workflows/pages.yml");
-  const work=content("docs/WORK.md"),spec=content("docs/design/phase-designer.md");
-  const app=content("site/app.mjs");
-  assert.match(work,/D4-A3b1/);
-  assert.match(spec,/D4-A3b1/);
-  assert.match(spec,/Runtime\/5GC/);
-  assert.match(app,/applyAddPhaseVerify/);
-  assert.match(app,/applyDeletePhaseVerify/);
-  assert.match(ci,/node --check site\/phase-step-structural\.mjs/);
-  assert.match(ci,/node --check tests\/phase-step-structural\.test\.mjs/);
-});
-
-test("D4-A3b2a names are source-reconciled before Preview and Pages syntax gated",()=>{
-  const docs=content("docs/design/phase-designer.md");
-  const ci=content(".github/workflows/pages.yml");
-  const app=content("site/app.mjs");
-  assert.match(docs,/D4-A3b2a/);
-  assert.match(docs,/Runtime\/5GC NOT_RUN/);
-  assert.match(app,/applyNamedPhaseStepRename/);
-  assert.match(ci,/node --check site\/phase-step-rename\.mjs/);
-  assert.match(ci,/node --check tests\/phase-step-rename\.test\.mjs/);
-});
-
-test("D4-A3b2b1 named Verify changes have Source authority and Pages syntax gate",()=>{
-  const spec=content("docs/design/phase-designer.md"),app=content("site/app.mjs");
-  const ci=content(".github/workflows/pages.yml");
-  assert.match(spec,/D4-A3b2b1/);
-  assert.match(spec,/Runtime\/5GC E2E NOT_RUN/);
-  assert.match(app,/applyDeleteUnreferencedNamedVerify/);
-  assert.match(app,/applySwapAdjacentNamedVerify/);
-  assert.match(ci,/node --check site\/phase-named-verify\.mjs/);
-  assert.match(ci,/node --check tests\/phase-named-verify\.test\.mjs/);
-});
-
-test("D4-A3b2b2a named Step impact remains read-only and syntax-gated",()=>{
-  const doc=content("docs/design/phase-designer.md");
-  const app=content("site/app.mjs"),ci=content(".github/workflows/pages.yml");
-  assert.match(doc,/D4-A3b2b2a/);
-  assert.match(doc,/EFFECT_UNPROVEN/);
-  assert.match(app,/namedStepMutationImpactReport/);
-  assert.match(ci,/node --check site\/phase-step-impact\.mjs/);
-  assert.match(ci,/node --check tests\/phase-step-impact\.test\.mjs/);
-});
-
-test("D4-A4a Phase Route origin and Source Patch are explicitly gated",()=>{
-  const spec=content("docs/design/phase-designer.md");
-  const work=content("docs/WORK.md"),ci=content(".github/workflows/pages.yml");
-  const app=content("site/app.mjs");
-  assert.match(spec,/D4-A4a/);
-  assert.match(spec,/Runtime\/5GC E2E NOT_RUN/);
-  assert.match(work,/D4-A4a/);
-  assert.match(app,/applyPhaseRouteTarget/);
-  assert.match(ci,/node --check site\/phase-routes\.mjs/);
-  assert.match(ci,/node --check tests\/phase-routes\.test\.mjs/);
-});
-
-test("D4-A4b1 protected Phase outcomes are source-backed and syntax-gated",()=>{
-  const spec=content("docs/design/phase-designer.md");
-  const app=content("site/app.mjs"),ci=content(".github/workflows/pages.yml");
-  assert.match(spec,/D4-A4b1/);
-  assert.match(spec,/Runtime\/5GC E2E NOT_RUN/);
-  assert.match(app,/applyAddObservedPhaseOutcome/);
-  assert.match(app,/applyDeleteNoncorePhaseOutcome/);
-  assert.match(ci,/node --check site\/phase-outcomes\.mjs/);
-  assert.match(ci,/node --check tests\/phase-outcomes\.test\.mjs/);
-});
-
-test("E1 Monaco integration retains Source authority and Pages Worker assets",()=>{
-  const spec=content("docs/design/source-editor-workstream.md");
-  const app=content("site/app.mjs"),ci=content(".github/workflows/pages.yml");
-  assert.match(spec,/PR #40/);
-  assert.match(app,/createSourceEditorAdapter/);
-  assert.match(app,/initializeMonaco/);
-  assert.match(ci,/editor\.worker\.js/);
-  assert.match(ci,/LICENSE\.monaco\.txt/);
-  assert.match(ci,/node --check site\/source-editor-adapter\.mjs/);
-  assert.match(ci,/node --check tests\/source-editor-adapter\.test\.mjs/);
-});
-
-test("E2 offline Owner Schema editor hints cannot bind obsolete Phase Procedure schema",()=>{
-  const work=content("docs/WORK.md");
-  const spec=content("docs/design/source-editor-workstream.md");
-  const code=content("site/monaco-source-backend.mjs");
-  const policy=content("site/yaml-schema-policy.mjs");
-  const ci=content(".github/workflows/pages.yml");
-  assert.match(work,/E2-A1\/A2/);
-  assert.match(spec,/PR #42/);
-  assert.match(spec,/Procedure.*Schema/);
-  assert.match(policy,/procedure-schema-incompatible/);
-  assert.match(code,/enableSchemaRequest: false/);
-  assert.match(ci,/yaml\.worker\.js/);
-  assert.match(ci,/node --check site\/yaml-owner-schemas\.mjs/);
-  assert.match(ci,/node --check tests\/yaml-owner-schemas\.test\.mjs/);
+test("Pages provenance records one source identity without a Classic source",()=>{
+  const provenance=content("experiments/ide-host/scripts/write-pages-build-info.mjs");
+  assert.match(provenance,/schemaVersion:2/);
+  assert.match(provenance,/defaultHost:"theia-browser-only"/);
+  assert.match(provenance,/classicPublished:false/);
+  assert.doesNotMatch(provenance,/classicSourceSha|classicPath/);
 });
