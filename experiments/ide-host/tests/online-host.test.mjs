@@ -73,10 +73,14 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     "Theia must not bypass the native Source-first pairing flow with forced CustomEditor associations");
   assert.ok(plugin.activationEvents.includes("onStartupFinished"),
     "first-run demo discovery must activate on startup");
-  assert.ok(plugin.contributes.viewsWelcome?.some(x=>
-    x.view==="workbench.explorer.fileView"&&
-    x.contents.includes("command:skillStudio.loadExample")),
-    "Explorer empty state must offer the demo project");
+  const welcome=plugin.contributes.viewsWelcome?.find(x=>
+    x.view==="workbench.explorer.fileView");
+  assert.equal(welcome?.when,"workspaceFolderCount == 0");
+  const locale=JSON.parse(readFileSync(join(root,
+    "plugins/odango-chan.ca-skill-studio-ide-spike/package.nls.json"),"utf8"));
+  const content=locale[welcome.contents.slice(1,-1)];
+  for(const command of ["newProject","openProject","loadExample"])
+    assert.ok(content.includes("command:skillStudio."+command),command);
   assert.ok(plugin.contributes.menus?.["view/title"]?.some(x=>
     x.command==="skillStudio.loadExample"),
     "Explorer title toolbar must expose the demo project");

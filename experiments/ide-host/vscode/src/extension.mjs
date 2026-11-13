@@ -264,18 +264,19 @@ export function activate(context){
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
     webviewOptions:{retainContextWhenHidden:true}
   }));
+  const projectText=value=>vscode.l10n?.t(value)??value;
   context.subscriptions.push(
     vscode.commands.registerCommand("skillStudio.newProject",async()=>{
       const name=await vscode.window.showInputBox({
-        prompt:vscode.l10n.t("Name your Skill Studio project"),
+        prompt:projectText("Name your Skill Studio project"),
         validateInput:value=>/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value)
-          ?undefined:vscode.l10n.t("Use up to 64 letters, numbers, hyphens or underscores.")
+          ?undefined:projectText("Use up to 64 letters, numbers, hyphens or underscores.")
       });
       if(!name)return;
       const root=vscode.Uri.joinPath(context.globalStorageUri,"projects",name);
       try{
         await vscode.workspace.fs.stat(root);
-        void vscode.window.showErrorMessage(vscode.l10n.t("A project with this name already exists."));
+        void vscode.window.showErrorMessage(projectText("A project with this name already exists."));
         return;
       }catch(error){
         if(error?.code!=="FileNotFound")throw error;
@@ -286,7 +287,7 @@ export function activate(context){
     vscode.commands.registerCommand("skillStudio.openProject",async()=>{
       const folders=await vscode.window.showOpenDialog({
         canSelectFiles:false,canSelectFolders:true,canSelectMany:false,
-        openLabel:vscode.l10n.t("Open Project")
+        openLabel:projectText("Open Project")
       });
       if(folders?.[0])await exposeWorkspaceRoot(vscode.workspace,folders[0]);
     }),
