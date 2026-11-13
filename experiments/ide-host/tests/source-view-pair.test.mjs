@@ -35,7 +35,7 @@ test('CustomEditor providers can normalize their panel to the right after resolv
   const {vscode}=vscodeApi(),calls=[];
   const panel={reveal:(column,preserveFocus)=>calls.push({column,preserveFocus})};
   assert.equal(revealVisualEditorRight(vscode,panel),true);
-  await new Promise(resolve=>setTimeout(resolve,0));
+  await new Promise(resolve=>setTimeout(resolve,20));
   assert.deepEqual(calls,[{column:2,preserveFocus:true}]);
 });
 
