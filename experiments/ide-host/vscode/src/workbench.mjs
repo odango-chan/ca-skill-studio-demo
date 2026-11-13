@@ -2749,6 +2749,15 @@ export function registerWorkbench(vscode,context){
     }
   }
   context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownActivationStateAcceptance',()=>{
+      const markdownExtension=vscode.extensions?.getExtension?.(
+        'vscode.markdown-language-features');
+      return {
+        installed:Boolean(markdownExtension),
+        isActive:Boolean(markdownExtension?.isActive)
+      };
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownWorkerStartupAcceptance',async()=>{
       const {markdownExtension,activationResult}=
         await activateNativeMarkdownExtension();
@@ -2912,7 +2921,10 @@ export function registerWorkbench(vscode,context){
     setTimeout(()=>{
       if(nativeMarkdownOpening.has(key)||nativeMarkdownPaired.has(key))return;
       if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
-      void openNativeMarkdownPreview(target);
+      void openNativeMarkdownPreview(target).catch(error=>{
+        void vscode.window.showWarningMessage(
+          '原生 Markdown 预览未能打开：'+String(error?.message??error));
+      });
     },0);
   }));
   // Internal acceptance probe reports the authoritative VS Code TextDocument
