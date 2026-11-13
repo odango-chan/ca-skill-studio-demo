@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {pairCustomEditor} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
@@ -69,6 +70,7 @@ export function activate(context){
         vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
         return;
       }
+      await pairCustomEditor(vscode,panel,document);
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
@@ -198,8 +200,8 @@ export function activate(context){
           return;
         }
         if(message.type==="openSource"){
-          await openNativeSource(vscode,document.uri,{viewColumn:vscode.ViewColumn.Beside,
-            preserveFocus:false,preview:false});
+          await openNativeSource(vscode,document.uri,{viewColumn:vscode.ViewColumn.One,
+            preserveFocus:true,preview:false});
           return;
         }
         if(message.type==="revealSourceLine"){
@@ -214,7 +216,7 @@ export function activate(context){
           // setting it on the visible native editor. Theia uses its dedicated
           // preview-capable text opener to bypass the visual association.
           await openNativeSource(vscode,document.uri,{
-            viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false,
+            viewColumn:vscode.ViewColumn.One,preserveFocus:true,preview:false,
             selection
           });
           const editor=vscode.window.visibleTextEditors.find(editor=>editor.document.uri.toString()===document.uri.toString());
