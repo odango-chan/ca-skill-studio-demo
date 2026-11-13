@@ -4,7 +4,7 @@ const SOURCE_VIEW_PAIRS = Object.freeze([
   {test:path=>path.toLowerCase().endsWith('/assurance/procedure.yaml'),viewType:'skillStudio.procedurePreview'},
   {test:path=>path.toLowerCase().endsWith('/assurance/contract.yaml'),viewType:'skillStudio.contractPreview'},
   {test:path=>path.toLowerCase().endsWith('/assurance/predicates.yaml'),viewType:'skillStudio.predicatePreview'},
-  {test:path=>path.toLowerCase().includes('/schemas/')&&path.toLowerCase().endsWith('.schema.yaml'),viewType:'skillStudio.schemaPreview'}
+  {test:path=>{const lower=path.toLowerCase(),index=lower.lastIndexOf('/schemas/');return index>=0&&!lower.slice(index+9).includes('/')&&lower.endsWith('.schema.yaml');},viewType:'skillStudio.schemaPreview'}
 ]);
 
 export function sourceViewType(uri) {
