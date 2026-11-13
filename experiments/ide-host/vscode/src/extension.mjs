@@ -1,5 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
-import {pairCustomEditor} from "./source-view-pair.mjs";
+import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
@@ -70,7 +70,6 @@ export function activate(context){
         vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
         return;
       }
-      await pairCustomEditor(vscode,panel,document);
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
@@ -253,7 +252,8 @@ export function activate(context){
         }
       });
       panel.onDidDispose(()=>{
-        disposed=true;detach();viewState.dispose();changed.dispose();incoming.dispose();
+        disposed=true;forgetSourceViewPair(document.uri);
+        detach();viewState.dispose();changed.dispose();incoming.dispose();
       });
     }
   };
@@ -313,7 +313,7 @@ export function activate(context){
           .map(folder=>folder.uri.toString());
         if(!confirmedFolders.includes(result.root.toString()))
           throw Error("Theia has not confirmed the skill-studio-demo workspace root");
-        await vscode.commands.executeCommand("vscode.openWith",result.procedure,VIEW);
+        await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
         console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
           root:result.root.toString(),
           workspaceFolders:confirmedFolders,
@@ -399,8 +399,17 @@ export function activate(context){
         }
       }
       if(!isProcedurePath(target.path))return;
-      await vscode.commands.executeCommand("vscode.openWith",target,VIEW);
+      await openSourceViewPair(vscode,target);
     }));
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
+    const uri=editor?.document?.uri;
+    if(!uri||!sourceViewType(uri)||hasSourceViewPair(uri))return;
+    void openSourceViewPair(vscode,uri).catch(error=>{
+      console.warn("SKILL Studio Source/Visual pairing failed:",String(error?.message??error));
+      void vscode.window.showWarningMessage(
+        "无法打开对应的 Skill Designer；原始 Source 仍可继续编辑。");
+    });
+  }));
   return {extendMarkdownIt};
 }
 export function deactivate(){}
