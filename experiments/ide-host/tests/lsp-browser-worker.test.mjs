@@ -528,6 +528,23 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       textDocument:{uri:contract.uri},position:positionOf(contract.text,entryName)
     });
     assert.equal(blocked,null);
+
+    const locked=currentV02PackageSnapshot(3);
+    locked.documents=locked.documents.filter(item=>item.uri!==tools.uri);
+    const location={
+      uri:"skill-studio-dependency:/udm/example/tool-contract.json",
+      range:{start:{line:4,character:13},end:{line:4,character:31}}
+    };
+    locked.dependencyOperations=[{id:operationName,dependencyId:"udm",location}];
+    const lockedReady=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===snapshot.rootUri&&
+      message.params?.generation===3,15000);
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:locked});
+    await lockedReady;
+    assert.deepEqual(await lspRequest(worker,400,"textDocument/definition",{
+      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,operationName)
+    }),location);
   }finally{
     await worker.terminate();
   }
