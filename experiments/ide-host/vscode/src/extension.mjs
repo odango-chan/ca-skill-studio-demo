@@ -401,15 +401,24 @@ export function activate(context){
       if(!isProcedurePath(target.path))return;
       await openSourceViewPair(vscode,target);
     }));
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
-    const uri=editor?.document?.uri;
+  const pairActiveYamlSource=uri=>{
     if(!uri||!sourceViewType(uri)||hasSourceViewPair(uri))return;
     void openSourceViewPair(vscode,uri).catch(error=>{
       console.warn("SKILL Studio Source/Visual pairing failed:",String(error?.message??error));
       void vscode.window.showWarningMessage(
         "无法打开对应的 Skill Designer；原始 Source 仍可继续编辑。");
     });
+  };
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
+    pairActiveYamlSource(editor?.document?.uri);
   }));
+  // A restored YAML Source may already be active before onStartupFinished
+  // activates this extension, so apply the same pairing once after activation.
+  const initiallyActiveYaml=vscode.window.activeTextEditor?.document?.uri;
+  if(initiallyActiveYaml)setTimeout(()=>{
+    if(vscode.window.activeTextEditor?.document?.uri?.toString()===initiallyActiveYaml.toString())
+      pairActiveYamlSource(initiallyActiveYaml);
+  },0);
   return {extendMarkdownIt};
 }
 export function deactivate(){}
