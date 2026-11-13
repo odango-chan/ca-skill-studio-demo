@@ -622,6 +622,52 @@ try{
         throw Error("Native semantic tokens were not registered, requested and rendered by Studio Light: "+
           JSON.stringify(semanticRendering));
       patchEvidence.lspSemanticColors=semanticRendering;
+      // The initial Package analysis must be owned by Package discovery, not
+      // by a user's first edit or by opening a Procedure Designer. Browser-only
+      // Pages uses the Worker Language Client; backend-backed Theia's Node host
+      // deliberately has no browser Worker and keeps its native editor path.
+      let initialPackageAnalysis=null;
+      for(let attempt=0;attempt<120;attempt++){
+        initialPackageAnalysis=await evalJS(`(async()=>{
+          const c=window.theia.container;
+          const key=[...c._bindingDictionary._map.keys()].find(k=>
+            typeof k==='function'&&k.prototype?.executeCommand&&
+            k.prototype?.registerCommand&&k.prototype?.getCommand);
+          return c.get(key).executeCommand('skillStudio.internal.semanticTokenDiagnostics');
+        })()`);
+        const packageStates=initialPackageAnalysis?.packageStatuses??[];
+        if(initialPackageAnalysis?.languageClientStarted&&
+           initialPackageAnalysis?.packageLifecycle?.attached?.length>0&&
+           packageStates.some(item=>item.state==='READY'||item.state==='PARTIAL'))break;
+        if(initialPackageAnalysis?.lastPackageAttachReason===
+           'browser Worker or location is unavailable')break;
+        await sleep(100);
+      }
+      const initialPackageStates=initialPackageAnalysis?.packageStatuses??[];
+      const browserWorkerLspExpected=initialPackageAnalysis?.lastPackageAttachReason!==
+        'browser Worker or location is unavailable';
+      if(browserWorkerLspExpected&&
+         (!(initialPackageAnalysis?.languageClientStarted)||
+          !(initialPackageAnalysis?.packageLifecycle?.attached?.length>0)||
+          !initialPackageStates.some(item=>item.state==='READY'||item.state==='PARTIAL')))
+        throw Error("Package discovery did not complete initial LSP analysis without file edits: "+
+          JSON.stringify(initialPackageAnalysis));
+      if(browserWorkerLspExpected){
+        console.log("STUDIO_PACKAGE_INITIAL_LSP_ANALYSIS_CHROMIUM",JSON.stringify({
+          lifecycle:initialPackageAnalysis.packageLifecycle,
+          statuses:initialPackageStates.map(item=>({rootUri:item.rootUri,state:item.state,
+            generation:item.generation,diagnostics:item.publishedDiagnosticCount??null}))
+        }));
+        patchEvidence.initialPackageLspAnalysis={
+          lifecycle:initialPackageAnalysis.packageLifecycle,
+          statuses:initialPackageStates
+        };
+      }else{
+        console.log("STUDIO_PACKAGE_LSP_NODE_HOST_SCOPE",JSON.stringify({
+          reason:initialPackageAnalysis.lastPackageAttachReason,
+          note:"Browser Worker LSP acceptance is covered by the browser-only Pages host"
+        }));
+      }
 
       // This probe opens a pinned owner script in the native workbench.
       // Open a real bundled Python source through Theia's native Quick Open.
@@ -675,6 +721,25 @@ try{
          !pythonSyntax.text.replace(/\u00a0/g," ").includes("def main"))
         throw Error("Native Python syntax tokenization not active: "+JSON.stringify(pythonSyntax));
       patchEvidence.pythonSyntax=pythonSyntax;
+      // Exercise the exact multi-Designer -> Python -> ordinary YAML -> another
+      // Designer sequence in the real Theia extension host, not a mocked API.
+      const editorGroupPlacement=await evalJS(`(async()=>{
+        const c=window.theia.container;
+        const key=[...c._bindingDictionary._map.keys()].find(k=>
+          typeof k==='function'&&k.prototype?.executeCommand&&
+          k.prototype?.registerCommand&&k.prototype?.getCommand);
+        if(!key)throw Error('Native command registry missing for editor-group acceptance');
+        return c.get(key).executeCommand('skillStudio.internal.editorGroupAcceptance');
+      })()`);
+      console.log("STUDIO_EDITOR_GROUP_PLACEMENT_CHROMIUM",JSON.stringify(editorGroupPlacement));
+      if(!(editorGroupPlacement?.openedVisualCount>=3)||
+         !(editorGroupPlacement?.groupCount>=1)||editorGroupPlacement?.groupCount>2||
+         editorGroupPlacement?.maxViewColumn>2||
+         editorGroupPlacement?.pythonColumn!==1||
+         editorGroupPlacement?.ordinaryYamlColumn!==1)
+        throw Error("Theia editor groups did not remain a stable two-column layout: "+
+          JSON.stringify(editorGroupPlacement));
+      patchEvidence.editorGroupPlacement=editorGroupPlacement;
       // Return to the authoritative Procedure Source editor before testing Undo.
       await command("Runtime.evaluate",{
         contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
