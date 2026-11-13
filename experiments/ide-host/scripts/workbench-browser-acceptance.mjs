@@ -1983,6 +1983,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     console.log('STUDIO_NATIVE_MARKDOWN_LIVE_SYNC_CHROMIUM',
       JSON.stringify(nativeMarkdownLiveEvidence));
   }finally{
+    // Exercise a real host-level Undo, as users do with the Markdown Source
+    // editor. Nested Undo calls from inside a plugin command can deadlock Theia.
+    console.log('STUDIO_NATIVE_MARKDOWN_RESTORE_ACTION','core.undo');
+    await nativeCommand('core.undo');
     await nativeCommand(
       'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',nativeLiveUri);
   }
