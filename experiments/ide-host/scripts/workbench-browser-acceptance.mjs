@@ -1882,7 +1882,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const nativeReferenceSourceGroup=nativeReferenceGroups.find(group=>
     group.labels.some(label=>/^3gpp-procedure\.md/.test(label)));
   const nativeReferencePreviewGroup=nativeReferenceGroups.find(group=>
-    group.labels.some(label=>/^Preview(?:\\s|·).*3gpp-procedure\.md/i.test(label)));
+    group.labels.some(label=>/^Preview(?:\s|·).*3gpp-procedure\.md/i.test(label)));
   if(!nativeReferenceSourceGroup||!nativeReferencePreviewGroup||
      nativeReferenceSourceGroup.index>=nativeReferencePreviewGroup.index||
      nativeReferenceSourceGroup.rect.x>=nativeReferencePreviewGroup.rect.x)
