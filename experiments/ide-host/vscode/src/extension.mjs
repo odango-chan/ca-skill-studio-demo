@@ -201,7 +201,7 @@ export function activate(context){
         }
         if(message.type==="openSource"){
           await openNativeSource(vscode,document.uri,{viewColumn:vscode.ViewColumn.One,
-            preserveFocus:true,preview:false});
+            preserveFocus:false,preview:false});
           return;
         }
         if(message.type==="revealSourceLine"){
@@ -216,7 +216,7 @@ export function activate(context){
           // setting it on the visible native editor. Theia uses its dedicated
           // preview-capable text opener to bypass the visual association.
           await openNativeSource(vscode,document.uri,{
-            viewColumn:vscode.ViewColumn.One,preserveFocus:true,preview:false,
+            viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,
             selection
           });
           const editor=vscode.window.visibleTextEditors.find(editor=>editor.document.uri.toString()===document.uri.toString());
