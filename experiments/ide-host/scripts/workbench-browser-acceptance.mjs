@@ -1913,6 +1913,18 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   };
   console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
 
+  const assertSharedTwoColumnLayout=async stage=>{
+    const layout=await nativeCommand('skillStudio.internal.twoColumnLayoutAcceptance');
+    const columns=layout?.groups?.map(group=>group.column)??[];
+    if(!columns.length||columns.length>2||columns.some(col=>col!==1&&col!==2)||
+       layout.editors?.some(editor=>editor.column!==1&&editor.column!==2))
+      throw Error('Studio created an unexpected editor group after '+stage+': '+
+        JSON.stringify(layout));
+    console.log('STUDIO_SHARED_TWO_COLUMN_CHROMIUM',JSON.stringify({stage,layout}));
+    return layout;
+  };
+  await assertSharedTwoColumnLayout('initial native Markdown preview');
+
   // A second, ordinary Package reference must follow the exact same layout.
   // Open it through the native editor command so the default active-editor
   // integration, not just the internal Preview helper, is exercised.
@@ -1952,6 +1964,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     uri:nativeReferenceUri,preview:nativeReferenceMarkdown.view,
     sourceGroup:nativeReferenceSourceGroup,previewGroup:nativeReferencePreviewGroup
   }));
+
+  await assertSharedTwoColumnLayout('second Markdown source opened from right group');
 
   // Prove native Markdown refreshes the existing preview from an unsaved
   // Source edit, then exercise both scroll-sync directions through Monaco and
