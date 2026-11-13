@@ -1,4 +1,5 @@
 import {openNativeSource} from './native-source.mjs';
+import {pairCustomEditor,openSourceViewPair} from './source-view-pair.mjs';
 import {projectJsonSchema, resolveSchemaPointer} from '../../../../site/schema-projection.mjs';
 
 export const SCHEMA_VIEW = 'skillStudio.schemaPreview';
@@ -33,19 +34,7 @@ export function localSchemaReference(uri, ref) {
   return {uri:target,pointer};
 }
 async function reveal(vscode, uri, line) {
-  const document = await vscode.workspace.openTextDocument(uri);
-  const safe = Number.isSafeInteger(line) && line > 0 && line <= document.lineCount ? line : 1;
-  const p = new vscode.Position(safe-1,0);
-  const selection = new vscode.Range(p,p);
-  await openNativeSource(vscode,uri,{
-    viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false,selection
-  });
-  const editor = vscode.window.visibleTextEditors.find(e =>
-    e.document.uri.toString()===uri.toString());
-  if (editor) {
-    editor.selection = new vscode.Selection(p,p);
-    editor.revealRange(selection,vscode.TextEditorRevealType.InCenter);
-  }
+  return openSourceViewPair(vscode,uri,{line});
 }
 async function followReference(vscode, document, projection, sourcePointer) {
   if (projection.state === 'SOURCE_ONLY') return;
@@ -164,6 +153,7 @@ export function registerSchemaEditor(vscode,context) {
         await vscode.window.showWarningMessage('Only Skill schemas/*.schema.yaml is supported');
         return;
       }
+      await pairCustomEditor(vscode,panel,document);
       const webview = panel.webview;
       webview.options={enableScripts:true,localResourceRoots:[]};
       webview.html=html(nonce());
@@ -186,7 +176,7 @@ export function registerSchemaEditor(vscode,context) {
         try {
           if(message.type==='openSource'){
             await openNativeSource(vscode,document.uri,{
-              viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false
+              viewColumn:vscode.ViewColumn.One,preserveFocus:true,preview:false
             });
           } else if(message.type==='revealLine') {
             await reveal(vscode,document.uri,message.value);
