@@ -501,7 +501,7 @@ export function activate(context){
       // Use a saved, temporary ordinary YAML file rather than an Untitled
       // buffer so the acceptance cleanup never opens an unsaved-changes dialog.
       const projectRoot=firstRoot.with({
-        path:firstRoot.path.replace(/\\/skills\\/[^/]+$/,"")
+        path:firstRoot.path.replace(/\/skills\/[^/]+$/,"")
       });
       const yamlUri=projectRoot.with({path:projectRoot.path+"/.studio-editor-group-acceptance.yaml"});
       await vscode.workspace.fs.writeFile(yamlUri,
