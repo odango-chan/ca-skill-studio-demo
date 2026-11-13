@@ -1491,7 +1491,7 @@ try{
   try{workbenchEvidence=await runWorkbenchAcceptance({
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp
   });}
-  catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
+  catch(error){console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_DIAGNOSTIC",JSON.stringify({workerRequests:markdownWorkerRequests,serverErrors:consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message)),networkFailures:networkFailures.filter(x=>/worker|plugin/i.test(x.errorText??""))}));console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const markdownServerErrors=consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message));
   const markdownWorkerEvidence={requests:markdownWorkerRequests,serverErrors:markdownServerErrors};
   console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_CHROMIUM",JSON.stringify(markdownWorkerEvidence));
