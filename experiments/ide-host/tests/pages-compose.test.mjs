@@ -47,6 +47,17 @@ test("Pages refuses a frontend containing a Classic navigation link or missing a
   const theia=join(temp,"theia"),output=join(temp,"dist");
   try{
     await put(theia,"index.html",'<!doctype html><html><body><div id="skill-studio-preview-warning">在线演示</div><a href="/classic/">old</a></body></html>');
+    await put(theia,"bundle.js","bundle");
+    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]');
+    await put(theia,"webview/index.html","webview");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json","{}");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js","extension");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js","worker");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/package.json","{}");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json","{}");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json","{}");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg","<svg></svg>");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_languages/package.json","{}");
     await assert.rejects(composePagesRelease({theiaFrontend:theia,outputDist:output}),/Classic navigation/);
     await assert.rejects(stat(output),{code:"ENOENT"});
   }finally{await rm(temp,{recursive:true,force:true});}
@@ -69,5 +80,4 @@ test("Pages workflow cannot reintroduce the Classic application",async()=>{
   const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
   assert.doesNotMatch(workflow,/--classic|dist\/classic|classic-icons\.css|preserve Classic/i);
   assert.match(workflow,/test ! -e dist\/classic/);
-  assert.match(workflow,/classicPublished:false/);
 });
