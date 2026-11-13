@@ -20,7 +20,6 @@
     "onStartupFinished",
     "onCommand:skillStudio.auditPackage",
     "onCommand:skillStudio.exportPackageZip",
-    "onCommand:skillStudio.previewMarkdown",
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
     "onCommand:skillStudio.editNodeOperatorValue",
@@ -90,10 +89,6 @@
       {
         "command": "skillStudio.exportPackageZip",
         "title": "SKILL Studio: Export Current Package ZIP"
-      },
-      {
-        "command": "skillStudio.previewMarkdown",
-        "title": "SKILL Studio: Preview Markdown"
       },
       {
         "command": "skillStudio.refreshInspection",
@@ -191,18 +186,18 @@
     "languages": [
       {
         "id": "markdown",
-        "aliases": ["Markdown","markdown"],
-        "extensions": [".md",".markdown"]
+        "aliases": [
+          "Markdown",
+          "markdown"
+        ],
+        "extensions": [
+          ".md",
+          ".markdown"
+        ]
       }
     ],
     "menus": {
-      "editor/title": [
-        {
-          "command": "skillStudio.previewMarkdown",
-          "when": "resourceExtname == .md",
-          "group": "navigation"
-        }
-      ],
+      "editor/title": [],
       "explorer/context": [
         {
           "command": "skillStudio.openSchema",
@@ -222,11 +217,6 @@
         {
           "command": "skillStudio.openProcedure",
           "when": "resourceFilename == procedure.yaml",
-          "group": "navigation"
-        },
-        {
-          "command": "skillStudio.previewMarkdown",
-          "when": "resourceExtname == .md",
           "group": "navigation"
         }
       ],
@@ -273,11 +263,6 @@
         }
       ],
       "view/item/context": [
-        {
-          "command": "skillStudio.previewMarkdown",
-          "when": "view == skillStudio.packages && viewItem == skillStudio.packageMarkdown",
-          "group": "navigation"
-        },
         {
           "command": "skillStudio.renameNode",
           "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
