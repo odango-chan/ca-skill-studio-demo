@@ -71,7 +71,7 @@ function workspaceHasRoot(workspace,root){
   return (workspace.workspaceFolders??[]).some(folder=>
     folder?.uri?.toString?.()===target);
 }
-async function exposeWorkspaceRoot(workspace,root,legacyRoots=[]){
+export async function exposeWorkspaceRoot(workspace,root,legacyRoots=[]){
   if(workspaceHasRoot(workspace,root))return false;
   if(typeof workspace.updateWorkspaceFolders!=="function"||
      typeof workspace.onDidChangeWorkspaceFolders!=="function")

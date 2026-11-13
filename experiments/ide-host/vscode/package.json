@@ -9,6 +9,7 @@
   "engines": {
     "vscode": "^1.88.0"
   },
+  "l10n": "./l10n",
   "categories": [
     "Other"
   ],
@@ -17,6 +18,10 @@
     "onCommand:skillStudio.openProcedure",
     "onCustomEditor:skillStudio.procedurePreview",
     "onCommand:skillStudio.loadExample",
+    "onCommand:skillStudio.newProject",
+    "onCommand:skillStudio.openProject",
+    "onCommand:skillStudio.openLanguageSpec",
+    "onCommand:skillStudio.openAuthoringGuide",
     "onStartupFinished",
     "onCommand:skillStudio.auditPackage",
     "onCommand:skillStudio.exportPackageZip",
@@ -67,6 +72,22 @@
     ],
     "commands": [
       {
+        "command": "skillStudio.newProject",
+        "title": "%project.new%"
+      },
+      {
+        "command": "skillStudio.openProject",
+        "title": "%project.open%"
+      },
+      {
+        "command": "skillStudio.openLanguageSpec",
+        "title": "%help.spec%"
+      },
+      {
+        "command": "skillStudio.openAuthoringGuide",
+        "title": "%help.guide%"
+      },
+      {
         "command": "skillStudio.refreshPackages",
         "title": "SKILL Studio: Refresh Packages"
       },
@@ -80,7 +101,7 @@
       },
       {
         "command": "skillStudio.loadExample",
-        "title": "SKILL Studio: Load Example Package (browser workspace)"
+        "title": "%project.example%"
       },
       {
         "command": "skillStudio.auditPackage",
@@ -460,7 +481,8 @@
     "viewsWelcome": [
       {
         "view": "workbench.explorer.fileView",
-        "contents": "**欢迎使用 SKILL Studio**\\n\\n还没有打开项目？可以载入包含传统 5GC 和 MAS 两个示例的 SKILL 项目，体验 Package Explorer 和可视化编辑。\\n\\n[载入示例 SKILL 项目](command:skillStudio.loadExample)\\n\\n示例导入到项目级 skills/ 目录；普通导入会保留已有文件。依赖与构建产物由各自服务管理，不作为普通 SKILL 源文件导入。"
+        "contents": "%project.welcome%",
+        "when": "workspaceFolderCount == 0"
       }
     ],
     "viewsContainers": {

@@ -14,7 +14,7 @@ function newNonce(){
 }
 import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
-import {seedExampleWorkspace} from "./sample-loader.mjs";
+import {exposeWorkspaceRoot,seedExampleWorkspace} from "./sample-loader.mjs";
 
 import {extendMarkdownIt} from "./markdown-link-policy.mjs";
 import {registerWorkbench} from "./workbench.mjs";
@@ -264,6 +264,37 @@ export function activate(context){
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
     webviewOptions:{retainContextWhenHidden:true}
   }));
+  context.subscriptions.push(
+    vscode.commands.registerCommand("skillStudio.newProject",async()=>{
+      const name=await vscode.window.showInputBox({
+        prompt:vscode.l10n.t("Name your Skill Studio project"),
+        validateInput:value=>/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value)
+          ?undefined:vscode.l10n.t("Use up to 64 letters, numbers, hyphens or underscores.")
+      });
+      if(!name)return;
+      const root=vscode.Uri.joinPath(context.globalStorageUri,"projects",name);
+      try{
+        await vscode.workspace.fs.stat(root);
+        void vscode.window.showErrorMessage(vscode.l10n.t("A project with this name already exists."));
+        return;
+      }catch(error){
+        if(error?.code!=="FileNotFound")throw error;
+      }
+      await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"skills"));
+      await exposeWorkspaceRoot(vscode.workspace,root);
+    }),
+    vscode.commands.registerCommand("skillStudio.openProject",async()=>{
+      const folders=await vscode.window.showOpenDialog({
+        canSelectFiles:false,canSelectFolders:true,canSelectMany:false,
+        openLabel:vscode.l10n.t("Open Project")
+      });
+      if(folders?.[0])await exposeWorkspaceRoot(vscode.workspace,folders[0]);
+    }),
+    vscode.commands.registerCommand("skillStudio.openLanguageSpec",()=>vscode.env.openExternal(
+      vscode.Uri.parse("https://github.com/odango-chan/ca-skills/blob/main/docs/skill-language-spec.zh-CN.md"))),
+    vscode.commands.registerCommand("skillStudio.openAuthoringGuide",()=>vscode.env.openExternal(
+      vscode.Uri.parse("https://github.com/odango-chan/ca-skills/blob/main/docs/authoring.zh-CN.md")))
+  );
   let exampleLoadPromise=null;
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
     ()=>{

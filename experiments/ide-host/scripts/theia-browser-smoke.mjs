@@ -341,24 +341,19 @@ try{
     text:document.body.innerText.slice(-1050)
   })`);
   const loadExampleRow=await evalJS(`(()=>{
-    const node=[...document.querySelectorAll('.monaco-list-row')].find(x=>x.innerText.includes('SKILL Studio: Load Example'));
+    const node=[...document.querySelectorAll('.monaco-list-row')].find(x=>x.innerText.includes('SKILL Studio: Open Example Project'));
     if(!node)return null;const r=node.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2,text:node.innerText};
   })()`);
-  // The browser-only Pages demo must auto-load on first entry. The normal
-  // backend Theia host is not the public demo, so exercise its explicit command.
-  if(externalUrl){
-    if(!loadExampleRow)
-      throw Error("Theia backend host does not expose the explicit Load Example command");
-    await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:loadExampleRow.x,y:loadExampleRow.y});
-    await command("Input.dispatchMouseEvent",{type:"mousePressed",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
-    await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
-    await sleep(350);
-  }
+  if(!loadExampleRow)
+    throw Error("Theia does not expose the explicit Open Example Project command");
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:loadExampleRow.x,y:loadExampleRow.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
+  await sleep(350);
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
-  // Public Pages proves automatic loading; backend Theia proves the explicit
-  // import command. Both must end with a confirmed workspace and 5GC Procedure.
+  // Both hosts must confirm the explicitly opened workspace and 5GC Procedure.
   let exampleLoadReady=false;
   for(let attempt=0;attempt<100;attempt++){
     exampleLoadReady=await evalJS(`[...document.querySelectorAll(
@@ -378,7 +373,7 @@ try{
       explorer:document.querySelector('.theia-Files')?.innerText??'',
       body:document.body.innerText.slice(-1600)
     })`);
-    throw Error("The default online workspace did not auto-open its project and 5GC Procedure: "+
+    throw Error("The explicit example import did not open its project and 5GC Procedure: "+
       JSON.stringify(startupDiagnostics).slice(0,3200));
   }
   const afterImport=await evalJS(`(async()=>{
