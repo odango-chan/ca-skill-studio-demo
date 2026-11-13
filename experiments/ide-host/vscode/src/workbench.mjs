@@ -2950,10 +2950,14 @@ export function registerWorkbench(vscode,context){
       const original=nativeMarkdownLiveOriginals.get(key);
       if(typeof original!=='string')
         throw Error('No original Markdown content is recorded for the live-update fixture');
+      console.log('STUDIO_MARKDOWN_RESTORE_PHASE','openTextDocument:start');
       const doc=await vscode.workspace.openTextDocument(target);
+      console.log('STUDIO_MARKDOWN_RESTORE_PHASE','openTextDocument:done');
       const edit=new vscode.WorkspaceEdit();
       edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
+      console.log('STUDIO_MARKDOWN_RESTORE_PHASE','applyEdit:start');
       const restored=await vscode.workspace.applyEdit(edit);
+      console.log('STUDIO_MARKDOWN_RESTORE_PHASE','applyEdit:done',restored);
       if(!restored)throw Error('Could not restore the original Skill guide after live-update acceptance');
       nativeMarkdownLiveOriginals.delete(key);
       return true;
