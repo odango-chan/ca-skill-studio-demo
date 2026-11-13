@@ -2937,12 +2937,14 @@ export function registerWorkbench(vscode,context){
         void openNativeMarkdownPreview(target);
     },0);
   }
-  context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document=>{
-    if(!isNativeMarkdownPath(document.uri.path))return;
-    const key=document.uri.toString();
-    nativeMarkdownOpening.delete(key);
-    nativeMarkdownPaired.delete(key);
-  }));
+  if(typeof vscode.workspace.onDidCloseTextDocument==='function'){
+    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document=>{
+      if(!isNativeMarkdownPath(document.uri.path))return;
+      const key=document.uri.toString();
+      nativeMarkdownOpening.delete(key);
+      nativeMarkdownPaired.delete(key);
+    }));
+  }
   // Internal acceptance probe reports the authoritative VS Code TextDocument
   // version; the custom-editor webview's display revision is not that version.
   context.subscriptions.push(vscode.commands.registerCommand(
