@@ -35,8 +35,9 @@ test('CustomEditor providers can normalize their panel to the right after resolv
   const {vscode}=vscodeApi(),calls=[];
   const panel={reveal:(column,preserveFocus)=>calls.push({column,preserveFocus})};
   assert.equal(revealVisualEditorRight(vscode,panel),true);
-  await new Promise(resolve=>setTimeout(resolve,20));
   assert.deepEqual(calls,[{column:2,preserveFocus:true}]);
+  await new Promise(resolve=>setTimeout(resolve,20));
+  assert.deepEqual(calls,[{column:2,preserveFocus:true},{column:2,preserveFocus:true}]);
 });
 
 test('Source-first pairing opens Visual in column two and native Source in column one',async()=>{
