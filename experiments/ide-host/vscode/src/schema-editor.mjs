@@ -1,5 +1,5 @@
 import {openNativeSource} from './native-source.mjs';
-import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
+import {openSourceViewPair,forgetSourceViewPair,revealVisualEditorRight} from './source-view-pair.mjs';
 import {projectJsonSchema, resolveSchemaPointer} from '../../../../site/schema-projection.mjs';
 
 export const SCHEMA_VIEW = 'skillStudio.schemaPreview';
@@ -156,6 +156,7 @@ export function registerSchemaEditor(vscode,context) {
       const webview = panel.webview;
       webview.options={enableScripts:true,localResourceRoots:[]};
       webview.html=html(nonce());
+      revealVisualEditorRight(vscode,panel);
       let disposed=false, ready=false;
       const push=()=>{
         if(disposed||!ready)return;
