@@ -27,6 +27,7 @@ import {
 const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
 const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
 const PACKAGE_CLOSE_NOTIFICATION = "skillStudio/packageClose";
+const PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION = "skillStudio/packageSnapshotAccepted";
 const ANALYSIS_STATUS_NOTIFICATION = "skillStudio/analysisStatus";
 const SERVER_ERROR_NOTIFICATION = "skillStudio/serverError";
 
@@ -609,6 +610,12 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
   // LanguageDiagnosticSession analysis may still be pending or PARTIAL; color
   // projection must not wait for Python indexing or diagnostics completion.
   packageSnapshots.set(rootUri, snapshot);
+  // Acknowledge only after the exact source snapshot is queryable. The client
+  // uses this signal to refresh Theia semantic tokens; firing the provider as
+  // soon as sendNotification() returns can race the Worker message delivery.
+  connection.sendNotification(PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION, {
+    rootUri, generation: snapshot.generation
+  });
   let session = sessions.get(rootUri);
   if (!session) {
     session = createSession(rootUri);
