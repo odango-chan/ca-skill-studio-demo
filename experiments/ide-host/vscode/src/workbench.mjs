@@ -2953,11 +2953,17 @@ export function registerWorkbench(vscode,context){
       console.log('STUDIO_MARKDOWN_RESTORE_PHASE','openTextDocument:start');
       const doc=await vscode.workspace.openTextDocument(target);
       console.log('STUDIO_MARKDOWN_RESTORE_PHASE','openTextDocument:done');
-      const edit=new vscode.WorkspaceEdit();
-      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
-      console.log('STUDIO_MARKDOWN_RESTORE_PHASE','applyEdit:start');
-      const restored=await vscode.workspace.applyEdit(edit);
-      console.log('STUDIO_MARKDOWN_RESTORE_PHASE','applyEdit:done',restored);
+      const sourceEditor=(vscode.window.visibleTextEditors??[]).find(editor=>
+        editor.document.uri.toString()===key&&
+        editor.viewColumn===vscode.ViewColumn.One);
+      // Restore the temporary buffer through the same native editor the
+      // user types into. A bulk WorkspaceEdit in the presence of the built-in
+      // Markdown preview CustomEditor can leave Theia's command unresolved.
+      if(!sourceEditor)throw Error('Native Markdown Source is not visible for restoration');
+      const restored=await sourceEditor.edit(builder=>{
+        builder.replace(new vscode.Range(doc.positionAt(0),
+          doc.positionAt(doc.getText().length)),original);
+      });
       if(!restored)throw Error('Could not restore the original Skill guide after live-update acceptance');
       nativeMarkdownLiveOriginals.delete(key);
       return true;
