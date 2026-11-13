@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
@@ -72,6 +73,10 @@ export function activate(context){
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
+      // Source is the active editor after the fixed split is established, so
+      // initialize the Procedure workbench explicitly instead of relying on
+      // the visual Webview becoming the active tab.
+      workbench.activate(document);
       void packageOverview.refresh();
       let wasActive=panel.active;
       const viewState=panel.onDidChangeViewState(()=>{
@@ -198,7 +203,7 @@ export function activate(context){
           return;
         }
         if(message.type==="openSource"){
-          await openNativeSource(vscode,document.uri,{viewColumn:vscode.ViewColumn.Beside,
+          await openNativeSource(vscode,document.uri,{viewColumn:vscode.ViewColumn.One,
             preserveFocus:false,preview:false});
           return;
         }
@@ -214,7 +219,7 @@ export function activate(context){
           // setting it on the visible native editor. Theia uses its dedicated
           // preview-capable text opener to bypass the visual association.
           await openNativeSource(vscode,document.uri,{
-            viewColumn:vscode.ViewColumn.Beside,preserveFocus:false,preview:false,
+            viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,
             selection
           });
           const editor=vscode.window.visibleTextEditors.find(editor=>editor.document.uri.toString()===document.uri.toString());
@@ -247,7 +252,8 @@ export function activate(context){
         }
       });
       panel.onDidDispose(()=>{
-        disposed=true;detach();viewState.dispose();changed.dispose();incoming.dispose();
+        disposed=true;forgetSourceViewPair(document.uri);
+        detach();viewState.dispose();changed.dispose();incoming.dispose();
       });
     }
   };
@@ -307,7 +313,7 @@ export function activate(context){
           .map(folder=>folder.uri.toString());
         if(!confirmedFolders.includes(result.root.toString()))
           throw Error("Theia has not confirmed the skill-studio-demo workspace root");
-        await vscode.commands.executeCommand("vscode.openWith",result.procedure,VIEW);
+        await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
         console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
           root:result.root.toString(),
           workspaceFolders:confirmedFolders,
@@ -371,7 +377,16 @@ export function activate(context){
   }
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.openProcedure",
     async uri=>{
-      let target=uri;
+      // Commands may cross a Theia/VS Code extension-host RPC boundary where
+      // Uri instances arrive as plain objects. Rehydrate them before passing
+      // them to workspace/editor APIs; otherwise showTextDocument can receive
+      // a serialized object and fail with "Failed to show text document
+      // [object Object]" during recovery cleanup.
+      let target=typeof uri==="string"?vscode.Uri.parse(uri):
+        uri?.scheme&&uri?.path!==undefined
+          ?vscode.Uri.from({scheme:uri.scheme,authority:uri.authority??"",
+            path:uri.path,query:uri.query??"",fragment:uri.fragment??""})
+          :uri;
       if(!target){
         const active=vscode.window.activeTextEditor?.document.uri;
         if(active&&isProcedurePath(active.path))target=active;
@@ -393,8 +408,26 @@ export function activate(context){
         }
       }
       if(!isProcedurePath(target.path))return;
-      await vscode.commands.executeCommand("vscode.openWith",target,VIEW);
+      await openSourceViewPair(vscode,target);
     }));
+  const pairActiveYamlSource=uri=>{
+    if(!uri||!sourceViewType(uri)||hasSourceViewPair(uri))return;
+    void openSourceViewPair(vscode,uri).catch(error=>{
+      console.warn("SKILL Studio Source/Visual pairing failed:",String(error?.message??error));
+      void vscode.window.showWarningMessage(
+        "无法打开对应的 Skill Designer；原始 Source 仍可继续编辑。");
+    });
+  };
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
+    pairActiveYamlSource(editor?.document?.uri);
+  }));
+  // A restored YAML Source may already be active before onStartupFinished
+  // activates this extension, so apply the same pairing once after activation.
+  const initiallyActiveYaml=vscode.window.activeTextEditor?.document?.uri;
+  if(initiallyActiveYaml)setTimeout(()=>{
+    if(vscode.window.activeTextEditor?.document?.uri?.toString()===initiallyActiveYaml.toString())
+      pairActiveYamlSource(initiallyActiveYaml);
+  },0);
   return {extendMarkdownIt};
 }
 export function deactivate(){}

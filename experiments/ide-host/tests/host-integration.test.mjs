@@ -21,7 +21,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   };
   const listeners=new Set(),commands=new Map(),posted=[],writes=[],opened=[],registered=[],revealed=[];
   let confirmChoice="确认并应用";
-  const textEditor={document,selection:null,revealRange(range,kind){revealed.push({range,kind});}};
+  const textEditor={document,viewColumn:1,selection:null,revealRange(range,kind){revealed.push({range,kind});}};
   let provider=null,onMessage=null;
   class WorkspaceEdit{
     constructor(){this.changes=[];}
@@ -34,13 +34,14 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     EventEmitter:class {event=()=>({dispose(){}});fire(){}dispose(){}},
     languages:{createDiagnosticCollection:()=>({dispose(){},clear(){},set(){}})},
     TreeItem:class {},TreeItemCollapsibleState:{None:0,Collapsed:1},
-    ViewColumn:{Beside:2},
+    ViewColumn:{One:1,Two:2,Beside:-2},
     Uri:{joinPath(base,...parts){return {path:base.path+"/"+parts.join("/")};}},
     Range,Position,Selection,WorkspaceEdit,
     TextEditorRevealType:{InCenter:1},
     workspace:{
       textDocuments:[document],
       workspaceFolders:[],
+      async openTextDocument(){return document;},
       onDidChangeTextDocument(cb){listeners.add(cb);return {dispose(){listeners.delete(cb);}};},
       onDidChangeConfiguration(){return {dispose(){}};},
       onDidChangeWorkspaceFolders(){return {dispose(){}};},
@@ -103,7 +104,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     postMessage:async data=>{posted.push(data);return true;},
     onDidReceiveMessage:cb=>{onMessage=cb;return{dispose(){}};}
   };
-  const panel={webview,onDidChangeViewState:()=>({dispose(){}}),onDidDispose:()=>({dispose(){}})};
+  const panel={webview,reveal:(column,preserveFocus)=>registered.push(['panel.reveal',column,preserveFocus]),onDidChangeViewState:()=>({dispose(){}}),onDidDispose:()=>({dispose(){}})};
   await provider.resolveCustomTextEditor(document,panel);
   assert.match(webview.html,/Content-Security-Policy/);
   assert.ok(webview.html.includes("procedure.js"));
@@ -144,7 +145,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(registered.at(-1)[0],"vscode.openWith");
   await onMessage({type:"openSource"});
   assert.equal(opened.at(-1).doc,document);
-  assert.equal(opened.at(-1).opts.viewColumn,2);
+  assert.equal(opened.at(-1).opts.viewColumn,1);
 
   assert.ok(document.lineCount>100,"the fixture must count real YAML lines");
   const sourceLine=source.split(/\r?\n/).findIndex(line=>line.includes("nudm-sdm-subscribe"))+1;

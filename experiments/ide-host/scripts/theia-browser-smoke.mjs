@@ -1,10 +1,10 @@
-import {runPackageOverviewAcceptance,runWorkbenchAcceptance} from "./workbench-browser-acceptance.mjs";
+import {runPackageOverviewAcceptance,runWorkbenchAcceptance,assertSourceVisualPair} from "./workbench-browser-acceptance.mjs";
 // Real Chromium smoke for both Theia browser-only static preview and the
 // normal backend-backed browser host. Static mode uses an explicitly isolated
 // same-origin demo-only webview adapter; backend mode uses Theia's normal host.
 import {createServer} from "node:http";
 import {createReadStream,existsSync} from "node:fs";
-import {mkdtemp,readFile,rm} from "node:fs/promises";
+import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {spawn} from "node:child_process";
 import {tmpdir} from "node:os";
 import {extname,join,resolve,sep} from "node:path";
@@ -459,6 +459,7 @@ try{
   let patchEvidence=null;
   let canvasIconEvidence=null;
   if(graphFrame){
+    await assertSourceVisualPair(evalJS,sleep,'procedure.yaml','Initial Procedure Designer');
     const world=await command("Page.createIsolatedWorld",{
       frameId:graphFrame.frame.id,worldName:"skill-studio-patch-acceptance",grantUniveralAccess:true
     });
@@ -562,8 +563,11 @@ try{
       // LSP SemanticTokens, then the extension-host adapter projects those
       // exact ranges through TextEditor decorations using the shared theme.
       // TextMate colors or provider registration alone do not satisfy this check.
-      let semanticRendering=null;
-      for(let attempt=0;attempt<35;attempt++){
+      let semanticRendering=null,semanticProviderDiagnostics=null;
+      // Package attachment and initial Worker analysis are asynchronous in the
+      // browser-only shell. Wait for the actual semantic-token request/render,
+      // not merely for SKILL LSP: READY or a fixed short delay.
+      for(let attempt=0;attempt<120;attempt++){
         semanticRendering=await evalJS(`(()=> {
           const editor=[...document.querySelectorAll('.monaco-editor')]
             .find(el=>el.getBoundingClientRect().width>150&&el.querySelector('.view-lines'));
@@ -584,18 +588,21 @@ try{
             visible:!!editor
           };
         })()`);
-        if(semanticRendering?.referenceColor==='rgb(49, 125, 192)'&&
+        semanticProviderDiagnostics=await evalJS(`(async()=>{
+          const c=window.theia.container;
+          const key=[...c._bindingDictionary._map.keys()].find(k=>
+            typeof k==='function'&&k.prototype?.executeCommand&&
+            k.prototype?.registerCommand&&k.prototype?.getCommand);
+          if(!key)throw Error('Native command registry missing');
+          return c.get(key).executeCommand('skillStudio.internal.semanticTokenDiagnostics');
+        })()`);
+        if(semanticProviderDiagnostics?.lastTokenCount>0&&
+           semanticProviderDiagnostics?.renderedTokenCount>0&&
+           semanticProviderDiagnostics?.renderedTypeCount>=2&&
+           semanticRendering?.referenceColor==='rgb(49, 125, 192)'&&
            semanticRendering?.outcomeColor==='rgb(173, 101, 23)')break;
-        await sleep(120);
+        await sleep(150);
       }
-      const semanticProviderDiagnostics=await evalJS(`(async()=>{
-        const c=window.theia.container;
-        const key=[...c._bindingDictionary._map.keys()].find(k=>
-          typeof k==='function'&&k.prototype?.executeCommand&&
-          k.prototype?.registerCommand&&k.prototype?.getCommand);
-        if(!key)throw Error('Native command registry missing');
-        return c.get(key).executeCommand('skillStudio.internal.semanticTokenDiagnostics');
-      })()`);
       semanticRendering.diagnostics=semanticProviderDiagnostics;
       console.log("STUDIO_NATIVE_SEMANTIC_COLORS_CHROMIUM",
         JSON.stringify(semanticRendering));
@@ -1075,6 +1082,24 @@ try{
       if(!routeFixture.ready)
         throw Error("Could not prepare the isolated Route-creation fixture using the native editor: "+
           JSON.stringify(routeFixture).slice(0,9000));
+      // Editing the fixture activates the Source tab. Bring the existing
+      // Visual back to the foreground before sending trusted pointer input.
+      await evalJS(`(async()=>{
+        const container=window.theia.container;
+        const openerKey=[...container._bindingDictionary._map.keys()].find(
+          key=>String(key)==="Symbol(OpenerService)");
+        const openers=await container.get(openerKey).getOpeners();
+        const custom=openers.find(opener=>opener.id==="custom-editor-skillStudio.procedurePreview");
+        const widget=custom?.widgetManager.getWidgets("plugin-custom-editor").find(
+          item=>item.resource?.path.toString().endsWith(
+            "/skills/establish-pdu-session/assurance/procedure.yaml"));
+        if(!widget)throw Error("Procedure Visual tab is missing after Source editing");
+        const shellKey=[...container._bindingDictionary._map.keys()].find(
+          key=>typeof key==="function"&&key.prototype?.activateWidget&&key.prototype?.addWidget);
+        if(!shellKey)throw Error("Theia application shell is missing");
+        await container.get(shellKey).activateWidget(widget.id);
+        return true;
+      })()`);
       const routeMode=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
@@ -1741,6 +1766,19 @@ try{
     console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; PHASE_DATAFLOW_EVIDENCE_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS; PACKAGE_OVERVIEW_TWO_SKILLS_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
+}catch(error){
+  if(process.env.THEIA_FAILURE_SCREENSHOT&&ws?.readyState===1){
+    try{
+      const screenshot=await command('Page.captureScreenshot',{format:'png'});
+      await writeFile(process.env.THEIA_FAILURE_SCREENSHOT,Buffer.from(screenshot.data,'base64'));
+      console.error('STUDIO_FAILURE_WORKBENCH',JSON.stringify(await evalJS(`({
+        tabs:[...document.querySelectorAll('.lm-TabBar-tab')].map(tab=>({
+          label:tab.textContent,rect:tab.getBoundingClientRect().toJSON()})),
+        body:document.body.innerText.slice(-2500)
+      })`)));
+    }catch{}
+  }
+  throw error;
 }finally{
   // Windows Edge launchers can hand off to the browser process and exit 0.
   // Close the actual browser over CDP before removing its isolated profile.

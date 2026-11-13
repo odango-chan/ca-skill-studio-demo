@@ -1,4 +1,5 @@
 import {openNativeSource} from './native-source.mjs';
+import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
 import {projectSkillContract} from '../../../../site/contract-projection.mjs';
 import {projectWorkspace} from '../../../../site/workspace.mjs';
 import {parseDocument, LineCounter, isMap, isScalar} from 'yaml';
@@ -43,19 +44,7 @@ function predicateLine(source, predicateId) {
   return 1;
 }
 async function reveal(vscode, uri, line) {
-  const target = await vscode.workspace.openTextDocument(uri);
-  const safeLine = Number.isSafeInteger(line) && line > 0 && line <= target.lineCount ? line : 1;
-  const position = new vscode.Position(safeLine - 1, 0);
-  const selection = new vscode.Range(position, position);
-  await openNativeSource(vscode, uri, {
-    viewColumn: vscode.ViewColumn.Beside, preserveFocus: false, preview: false, selection
-  });
-  const editor = vscode.window.visibleTextEditors.find(item =>
-    item.document.uri.toString() === uri.toString());
-  if (editor) {
-    editor.selection = new vscode.Selection(position, position);
-    editor.revealRange(selection, vscode.TextEditorRevealType.InCenter);
-  }
+  return openSourceViewPair(vscode,uri,{line});
 }
 async function openReference(vscode, contractDocument, message) {
   const root = packageRoot(contractDocument.uri);
@@ -216,7 +205,7 @@ export function registerContractEditor(vscode, context) {
         try {
           if (message.type === 'openSource') {
             await openNativeSource(vscode, document.uri, {
-              viewColumn: vscode.ViewColumn.Beside, preserveFocus: false, preview: false
+              viewColumn: vscode.ViewColumn.One, preserveFocus: false, preview: false
             });
           } else if (message.type === 'revealLine') {
             await reveal(vscode, document.uri, message.value);
@@ -230,6 +219,7 @@ export function registerContractEditor(vscode, context) {
       });
       panel.onDidDispose(() => {
         disposed = true;
+        forgetSourceViewPair(document.uri);
         changed.dispose();
         incoming.dispose();
       });
@@ -241,6 +231,6 @@ export function registerContractEditor(vscode, context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openContract',
     async uri => {
       const target = await chooseContract(vscode, uri);
-      if (target) await vscode.commands.executeCommand('vscode.openWith', target, VIEW);
+      if (target) await openSourceViewPair(vscode,target);
     }));
 }

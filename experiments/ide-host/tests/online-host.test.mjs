@@ -68,12 +68,10 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   assert.ok(plugin.activationEvents.includes("onView:skillStudio.packages"));
   assert.ok(plugin.contributes.menus["view/title"].some(x=>
     x.command==="skillStudio.refreshPackages"&&x.when==="view == skillStudio.packages"));
-  assert.ok(plugin.contributes.customEditors.every(x=>x.priority==="default"));
-  const associations=app.theia.frontend.config.preferences["workbench.editorAssociations"];
-  assert.equal(associations["procedure.yaml"],"skillStudio.procedurePreview");
-  assert.equal(associations["contract.yaml"],"skillStudio.contractPreview");
-  assert.equal(associations["predicates.yaml"],"skillStudio.predicatePreview");
-  assert.equal(associations["*.schema.yaml"],"skillStudio.schemaPreview");
+  assert.ok(plugin.contributes.customEditors.every(x=>x.priority==="option"),
+    "native YAML Source remains the default editor; Designer is opened by the shared pairing host");
+  assert.equal(app.theia.frontend.config.preferences["workbench.editorAssociations"],undefined,
+    "Theia must not bypass the native Source-first pairing flow with forced CustomEditor associations");
   assert.ok(plugin.activationEvents.includes("onStartupFinished"),
     "first-run demo discovery must activate on startup");
   assert.ok(plugin.contributes.viewsWelcome?.some(x=>

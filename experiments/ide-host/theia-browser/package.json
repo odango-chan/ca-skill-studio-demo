@@ -13,12 +13,6 @@
           "security.workspace.trust.enabled": false,
           "workbench.list.openMode": "singleClick",
           "editor.enablePreview": true,
-          "workbench.editorAssociations": {
-            "procedure.yaml": "skillStudio.procedurePreview",
-            "contract.yaml": "skillStudio.contractPreview",
-            "predicates.yaml": "skillStudio.predicatePreview",
-            "*.schema.yaml": "skillStudio.schemaPreview"
-          },
           "workbench.colorTheme": "SKILL Studio Light",
           "workbench.iconTheme": "skill-studio-file-icons",
           "editor.semanticHighlighting.enabled": true,

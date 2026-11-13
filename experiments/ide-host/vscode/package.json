@@ -424,7 +424,7 @@
             "filenamePattern": "**/assurance/[p]rocedure.yaml"
           }
         ],
-        "priority": "default"
+        "priority": "option"
       },
       {
         "viewType": "skillStudio.contractPreview",
@@ -434,7 +434,7 @@
             "filenamePattern": "**/assurance/[c]ontract.yaml"
           }
         ],
-        "priority": "default"
+        "priority": "option"
       },
       {
         "viewType": "skillStudio.predicatePreview",
@@ -444,7 +444,7 @@
             "filenamePattern": "**/assurance/[p]redicates.yaml"
           }
         ],
-        "priority": "default"
+        "priority": "option"
       },
       {
         "viewType": "skillStudio.schemaPreview",
@@ -454,7 +454,7 @@
             "filenamePattern": "**/schemas/*.schema.yaml"
           }
         ],
-        "priority": "default"
+        "priority": "option"
       }
     ],
     "viewsWelcome": [

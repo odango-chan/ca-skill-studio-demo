@@ -73,6 +73,45 @@ await mkdir(markdownPluginTarget,{recursive:true});
 await cp(markdownPluginSource,markdownPluginTarget,{recursive:true,force:true});
 const markdownManifest=JSON.parse(await readFile(
   join(markdownPluginTarget,"package.json"),"utf8"));
+// The host owns the first-open lifecycle. Let Skill Studio activate this
+// extension explicitly after a Markdown editor is selected; the upstream
+// onLanguage event otherwise races that explicit activation in Theia's
+// browser PluginHost and can strand LanguageClient in Starting.
+const markdownActivationEvents=markdownManifest.activationEvents;
+if(!Array.isArray(markdownActivationEvents))
+  throw Error("Pinned Markdown manifest does not expose activationEvents");
+const markdownLanguageActivationCount=markdownActivationEvents.filter(
+  event=>event==="onLanguage:markdown").length;
+if(markdownLanguageActivationCount!==1)
+  throw Error("Expected exactly one upstream onLanguage:markdown activation event; found "+
+    markdownLanguageActivationCount);
+markdownManifest.activationEvents=markdownActivationEvents.filter(
+  event=>event!=="onLanguage:markdown");
+await writeFile(join(markdownPluginTarget,"package.json"),
+  JSON.stringify(markdownManifest,null,2)+"\n");
+const hostedPluginListPath=join(root,"hostedPlugin","list.json");
+const hostedPluginList=JSON.parse(await readFile(hostedPluginListPath,"utf8"));
+const markdownPluginEntry=hostedPluginList.find(entry=>
+  entry.metadata?.model?.id==="vscode.markdown-language-features");
+if(!markdownPluginEntry)
+  throw Error("Theia hostedPlugin list is missing the pinned Markdown extension");
+const hostedActivationEvents=markdownPluginEntry.contributes?.activationEvents;
+if(!Array.isArray(hostedActivationEvents))
+  throw Error("Theia hostedPlugin list is missing Markdown activation events");
+const hostedLanguageActivationCount=hostedActivationEvents.filter(
+  event=>event==="onLanguage:markdown").length;
+if(hostedLanguageActivationCount!==1)
+  throw Error("Expected exactly one Theia onLanguage:markdown activation event; found "+
+    hostedLanguageActivationCount);
+markdownPluginEntry.contributes.activationEvents=hostedActivationEvents.filter(
+  event=>event!=="onLanguage:markdown");
+await writeFile(hostedPluginListPath,JSON.stringify(hostedPluginList,null,2)+"\n");
+console.log("STUDIO_THEIA_STATIC_MARKDOWN_COLD_ACTIVATION",JSON.stringify({
+  extensionId:"vscode.markdown-language-features",
+  removedOnLanguageActivation:true,
+  packageActivationEvents:markdownManifest.activationEvents,
+  hostedActivationEvents:markdownPluginEntry.contributes.activationEvents
+}));
 const markdownBrowserEntry=String(markdownManifest.browser??"").startsWith("./")
   ?markdownManifest.browser.slice(2):markdownManifest.browser;
 const markdownWorker=join(markdownPluginTarget,"dist","browser","serverWorkerMain.js");
@@ -96,7 +135,23 @@ if (workerBasePath && workerUrl.origin === workerBase.origin &&
     !workerUrl.pathname.startsWith(workerBasePath + "/")) {
   workerUrl.pathname = workerBasePath + workerUrl.pathname;
 }
-const worker = new Worker(workerUrl.toString());`;
+const worker = new Worker(workerUrl.toString());
+worker.addEventListener("error", event => {
+  console.error("[Skill Studio Markdown Language Server Worker Error]", JSON.stringify({
+    url: workerUrl.toString(),
+    message: event.message || "Worker error",
+    filename: event.filename || "",
+    lineno: event.lineno || 0,
+    colno: event.colno || 0,
+    error: event.error ? String(event.error.stack || event.error.message || event.error) : ""
+  }));
+});
+worker.addEventListener("messageerror", event => {
+  console.error("[Skill Studio Markdown Language Server Worker MessageError]", JSON.stringify({
+    url: workerUrl.toString(),
+    message: event.message || "Worker message deserialization failed"
+  }));
+});`;
 const markdownWorkerCreationCount=markdownBrowserBundle.split(markdownWorkerCreation).length-1;
 if(markdownWorkerCreationCount!==1)
   throw Error("Pinned Markdown Worker creation changed; expected exactly one patch point, found "+markdownWorkerCreationCount);

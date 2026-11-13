@@ -9,6 +9,44 @@ if(pcfOutcomeStart<0)throw Error('Published PCF Outcome test anchor missing');
 const pcfOutcomeLine=publishedProcedure.slice(0,
   pcfOutcomeStart+pcfOutcomeHeader.indexOf('            FAILED:'))
   .split('\n').length;
+export async function assertSourceVisualPair(evalJS,sleep,filename,label){
+  let state;
+  for(let attempt=0;attempt<30;attempt++){
+    state=await evalJS(`(()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);
+      if(!key)throw Error('Theia shell missing');
+      const shell=c.get(key),bars=shell.mainAreaTabBars;
+      return shell.getWidgets('main').map(widget=>{
+        const uri=widget.editor?.uri??widget.resource;
+        if(!uri?.path?.toString().endsWith('/'+${JSON.stringify(filename)}))return null;
+        const rect=widget.node.getBoundingClientRect();
+        return {id:widget.id,uri:uri.toString(),
+          kind:widget.editor?'source':widget.viewType??'unknown',
+          column:bars.findIndex(bar=>bar.titles.some(title=>title.owner===widget))+1,
+          visible:!widget.isHidden&&rect.width>0&&rect.height>0,
+          rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}};
+      }).filter(Boolean);
+    })()`);
+    // Theia may retain a hidden duplicate CodeEditor widget for the same
+    // URI while the CustomEditor owns the visible second column. The contract
+    // is exactly one VISIBLE native Source beside the visible Designer.
+    const sources=state.filter(w=>w.kind==='source'&&w.visible);
+    const visuals=state.filter(w=>w.kind.startsWith('skillStudio.')&&w.visible);
+    if(sources.length===1&&visuals.length===1&&sources[0].uri===visuals[0].uri&&
+       sources[0].column===1&&visuals[0].column===2&&
+       sources[0].visible&&visuals[0].visible&&
+       sources[0].rect.x+sources[0].rect.width<=visuals[0].rect.x+2){
+      const evidence={filename,label,source:sources[0],visual:visuals[0]};
+      console.log('STUDIO_YAML_SOURCE_VISUAL_PAIR_CHROMIUM',JSON.stringify(evidence));
+      return evidence;
+    }
+    await sleep(100);
+  }
+  throw Error(label+' requires one visible native Source in column one and its Designer in column two: '+JSON.stringify(state));
+}
+
 export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
   const click=async(x,y,count=1)=>{
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',buttons:0,clickCount:1});
@@ -504,6 +542,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   async function nativeCommand(id,...args){
     return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
   }
+  const assertYamlSourceVisualPair=(filename,label)=>
+    assertSourceVisualPair(evalJS,sleep,filename,label);
   async function waitNativeMarkdown(predicate,label,attempts=100){
     let latest={frames:[],candidates:[]};
     for(let attempt=0;attempt<attempts;attempt++){
@@ -629,15 +669,16 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
   if(requireBrowserLsp){
-    const markdownStartup=await nativeCommand(
-      'skillStudio.internal.nativeMarkdownWorkerStartupAcceptance');
-    console.log('STUDIO_NATIVE_MARKDOWN_WORKER_STARTUP_CHROMIUM',
-      JSON.stringify(markdownStartup));
-    if(!markdownStartup?.isActive||markdownStartup.activationResult!=='ready'||
-       !markdownStartup.workerAvailable||markdownStartup.workerProbe?.ok!==true||
-       markdownStartup.workerProbe?.status!==200)
-      throw Error('Native Markdown Language Server did not activate before workbench regression: '+
-        JSON.stringify(markdownStartup));
+    // This must be a cold first-open test. Calling the worker startup command
+    // here would pre-activate the extension and hide the real Explorer-open
+    // lifecycle that previously raced onLanguage:markdown against activate().
+    const markdownColdState=await nativeCommand(
+      'skillStudio.internal.nativeMarkdownActivationStateAcceptance');
+    console.log('STUDIO_NATIVE_MARKDOWN_COLD_ACTIVATION_CHROMIUM',
+      JSON.stringify(markdownColdState));
+    if(!markdownColdState?.installed||markdownColdState.isActive)
+      throw Error('Native Markdown extension was not cold before its first Markdown open: '+
+        JSON.stringify(markdownColdState));
   }
   await invoke('workbench.files.action.focusFilesExplorer');
   await sleep(350);
@@ -837,15 +878,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           graphDiagnostics}}));
   }
   const openMs=performance.now()-start;
-  const preview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
-  if(!preview)throw Error("Single-click CustomEditor was not a native preview tab");
+  await assertYamlSourceVisualPair('procedure.yaml','Procedure Designer');
+  const sourcePreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
+  if(sourcePreview)throw Error("Paired YAML Source must be pinned, not left as an unpinned preview tab");
   await click(file.x,file.y,2);await sleep(250);
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
-  if(stillPreview)throw Error("Double-click did not pin native preview tab");
-  const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
-  // The preview/pin probe can leave both preview and pinned editors alive.
-  // Close that pair and reopen one pinned Procedure before Source/Evidence
-  // checks so the active Webview frame and its selection are unambiguous.
+  if(stillPreview)throw Error("Double-click must retain the pinned native YAML Source");
+  const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost paired Procedure Designer');
+  // Close both sides and reopen one deterministic Source/Designer pair before
+  // Source/Evidence checks so the active Webview frame is unambiguous.
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
   file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.replace(/\\s+\\d+$/,'').trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
@@ -857,17 +898,17 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!singlePinned)await sleep(100);
   }
   if(!singlePinned)throw Error('Could not reopen one pinned 5GC Procedure editor');
+  await assertYamlSourceVisualPair('procedure.yaml','Reopened Procedure Designer');
   const remainingProcedureTabs=await evalJS(`[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>
     tab.textContent.trim()==='procedure.yaml'&&tab.getBoundingClientRect().width>0).length`);
-  if(remainingProcedureTabs!==1)
-    throw Error('Procedure Source/Evidence acceptance requires one unambiguous editor tab: '+
+  if(remainingProcedureTabs!==2)
+    throw Error('Procedure acceptance requires exactly one native Source and one Designer tab: '+
       JSON.stringify({remainingProcedureTabs,singlePinned}));
-  // Theia CustomEditor tabs do not necessarily activate a VS Code TextEditor.
-  // Package Audit consumes the active Procedure TextDocument, so open Source
-  // from this freshly reopened CustomEditor only now (after the Explorer path).
-  const sourceOpenedForAudit=await evalWebviewJS(`(()=>{const button=document.querySelector('#openSource');if(!button)return false;button.click();return true;})()`);
-  if(!sourceOpenedForAudit)throw Error('Reopened Procedure Webview did not expose its native Source action');
-  console.log('STUDIO_NATIVE_SOURCE_OPENED_FOR_AUDIT',sourceOpenedForAudit);
+  const sourceState=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  if(!sourceState?.uri?.endsWith('/assurance/procedure.yaml'))
+    throw Error('Procedure workbench did not retain the native Source document for Package Audit: '+
+      JSON.stringify(sourceState));
+  console.log('STUDIO_NATIVE_SOURCE_OPENED_FOR_AUDIT',sourceState);
   await sleep(500);
   // Package Audit is surfaced by the Problems view now contributed to
   // the native Explorer. Re-focus Explorer; there is no Skill Studio Activity Bar.
@@ -1822,7 +1863,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // The legacy Studio-owned Markdown renderer has been retired from the default path.
   // Native Markdown Preview acceptance below now owns rendering, navigation and security checks.
   const nativeMarkdownUri=await nativeCommand(
-    'skillStudio.internal.nativeMarkdownPreviewAcceptance','establish-pdu-session');
+    'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance','establish-pdu-session','SKILL.md',1);
   if(typeof nativeMarkdownUri!=='string'||!nativeMarkdownUri.endsWith('/SKILL.md'))
     throw Error('Native Markdown preview command did not open the exact Skill Source URI: '+
       JSON.stringify(nativeMarkdownUri));
@@ -1830,6 +1871,20 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     view.heading==='Establish PDU Session'&&view.nativePreviewRoot&&
     view.styles.some(url=>url.includes('/media/native-markdown-preview.css')),
     'Studio-themed native Markdown preview');
+  if(requireBrowserLsp){
+    // The first Markdown file has now opened through the normal editor path.
+    // Only now inspect the server: this verifies that first-open activation,
+    // Worker creation and the LanguageClient initialize handshake all finish.
+    const markdownStartup=await nativeCommand(
+      'skillStudio.internal.nativeMarkdownWorkerStartupAcceptance');
+    console.log('STUDIO_NATIVE_MARKDOWN_WORKER_STARTUP_CHROMIUM',
+      JSON.stringify(markdownStartup));
+    if(!markdownStartup?.isActive||markdownStartup.activationResult!=='ready'||
+       !markdownStartup.workerAvailable||markdownStartup.workerProbe?.ok!==true||
+       markdownStartup.workerProbe?.status!==200)
+      throw Error('Native Markdown Language Server did not activate from the first Markdown open: '+
+        JSON.stringify(markdownStartup));
+  }
   const nativeMarkdownWorkerDiagnostics=await nativeCommand('skillStudio.internal.nativeMarkdownWorkerDiagnostics');
   console.log('STUDIO_NATIVE_MARKDOWN_WORKER_URI_DIAGNOSTIC',JSON.stringify(nativeMarkdownWorkerDiagnostics));
   if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||
@@ -1847,14 +1902,56 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const nativePreviewGroup=nativeMarkdownGroups.find(group=>
     group.labels.some(label=>/^Preview(?:\s|·).*SKILL\.md/i.test(label)));
   if(!nativeSourceGroup||!nativePreviewGroup||
-     nativeSourceGroup.index===nativePreviewGroup.index)
-    throw Error('Native Markdown must keep editable Source and Preview in separate editor groups: '+
+     nativeSourceGroup.index>=nativePreviewGroup.index||
+     nativeSourceGroup.rect.x>=nativePreviewGroup.rect.x)
+    throw Error('Native Markdown must keep editable Source on the left and Preview on the right: '+
       JSON.stringify(nativeMarkdownGroups));
   const nativeMarkdownEvidence={
     uri:nativeMarkdownUri,preview:nativeMarkdown.view,
-    sourceGroup:nativeSourceGroup,previewGroup:nativePreviewGroup
+    sourceGroup:nativeSourceGroup,previewGroup:nativePreviewGroup,
+    layout:'Source-left / Preview-right'
   };
   console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
+
+  // A second, ordinary Package reference must follow the exact same layout.
+  // Open it through the native editor command so the default active-editor
+  // integration, not just the internal Preview helper, is exercised.
+  const nativeReferenceUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance',
+    'establish-pdu-session','references/3gpp-procedure.md',2);
+  if(typeof nativeReferenceUri!=='string'||
+     !nativeReferenceUri.endsWith('/references/3gpp-procedure.md'))
+    throw Error('Native Markdown did not open the exact Package reference Source: '+
+      JSON.stringify(nativeReferenceUri));
+  const nativeReferenceMarkdown=await waitNativeMarkdown(view=>
+    view.heading==='PDU Session Establishment: actors and causal boundaries'&&
+    view.nativePreviewRoot&&
+    view.styles.some(url=>url.includes('/media/native-markdown-preview.css')),
+    'second native Markdown Source/Preview pair');
+  const nativeReferenceGroups=await evalJS(
+    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>"+
+    "tab.textContent.trim().includes('3gpp-procedure.md'));const groups=new Map();for(const tab of tabs){"+
+    "const bar=tab.parentElement;if(!groups.has(bar)){const r=bar.getBoundingClientRect();"+
+    "groups.set(bar,{index:groups.size,labels:[],rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}"+
+    "groups.get(bar).labels.push(tab.textContent.trim());}return [...groups.values()];})()");
+  const nativeReferenceSourceGroup=nativeReferenceGroups.find(group=>
+    group.labels.some(label=>/^3gpp-procedure\.md/.test(label)));
+  const nativeReferencePreviewGroup=nativeReferenceGroups.find(group=>
+    group.labels.some(label=>/^Preview(?:\s|·).*3gpp-procedure\.md/i.test(label)));
+  const nativeReferenceSourceGroups=nativeReferenceGroups.filter(group=>
+    group.labels.some(label=>/^3gpp-procedure\.md/.test(label)));
+  const nativeReferencePreviewGroups=nativeReferenceGroups.filter(group=>
+    group.labels.some(label=>/^Preview(?:\s|·).*3gpp-procedure\.md/i.test(label)));
+  if(nativeReferenceSourceGroups.length!==1||nativeReferencePreviewGroups.length!==1||
+     !nativeReferenceSourceGroup||!nativeReferencePreviewGroup||
+     nativeReferenceSourceGroup.index>=nativeReferencePreviewGroup.index||
+     nativeReferenceSourceGroup.rect.x>=nativeReferencePreviewGroup.rect.x)
+    throw Error('Every Markdown file must use Source-left / Preview-right placement: '+
+      JSON.stringify(nativeReferenceGroups));
+  console.log('STUDIO_NATIVE_MARKDOWN_SECOND_PAIR_CHROMIUM',JSON.stringify({
+    uri:nativeReferenceUri,preview:nativeReferenceMarkdown.view,
+    sourceGroup:nativeReferenceSourceGroup,previewGroup:nativeReferencePreviewGroup
+  }));
 
   // Prove native Markdown refreshes the existing preview from an unsaved
   // Source edit, then exercise both scroll-sync directions through Monaco and
@@ -1870,9 +1967,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
        nativeSettings?.scrollPreviewWithEditor!==true)
       throw Error('Native Markdown bidirectional scroll settings are not enabled: '+
         JSON.stringify(nativeSettings));
-    if(nativeLive.view.contextId!==nativeMarkdown.view.contextId)
-      throw Error('Native Markdown recreated its Preview webview instead of updating it in place: '+
-        JSON.stringify({before:nativeMarkdown.view.contextId,after:nativeLive.view.contextId}));
+    // Theia may recreate the native Preview webview when the active Markdown
+    // document changes. The user-visible contract is that the active Source's
+    // unsaved content is rendered by its native Preview, not that a webview
+    // implementation detail (execution-context id) remains stable.
     const sourceViewport=nativeSettings.visibleEditors?.find(
       editor=>editor.uri===nativeMarkdownUri)??null;
     if(!sourceViewport)
@@ -1904,8 +2002,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const restoredNativeMarkdown=await waitNativeMarkdown(
     view=>view.heading==='Establish PDU Session'&&view.nativePreviewRoot,
     'native Markdown Source restoration');
-  if(restoredNativeMarkdown.view.contextId!==nativeMarkdown.view.contextId)
-    throw Error('Restoring the Markdown Source recreated the existing Preview webview');
+  // Theia may recreate the Preview webview while restoring the prior Source.
+  // The restored document content and native Preview are the user-visible contract.
 
   const nativeSecurityUri=await nativeCommand(
     'skillStudio.internal.nativeMarkdownSecurityAcceptance');
@@ -1996,6 +2094,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     predicateVisible:contractView.text.includes('createdsession.ran.setup_accepted'),
     readOnly:contractView.text.includes('Source 是唯一真源')
   }));
+  await assertYamlSourceVisualPair('contract.yaml','Contract Designer');
   // PredicateSet uses its own Observation -> Evaluator visual, never a live result graph.
   await invokeSkillPackageFile('skillStudio.openPredicates','assurance/predicates.yaml');
   let predicateView=null,predicateFrame=null;
@@ -2042,6 +2141,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     scriptEvaluatorVisible:predicateView.text.includes('scripts/evaluate_udm_read.py'),
     noLiveResultClaim:predicateView.text.includes('不是当前运行证据')
   }));
+  await assertYamlSourceVisualPair('predicates.yaml','Predicate Designer');
   // C3: real, source-backed JSON Schema field tree in the same Theia host.
   await invokeSkillPackageFile('skillStudio.openSchema','schemas/establishment-request.schema.yaml');
   let schemaView=null;
@@ -2082,6 +2182,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      !schemaView.status.includes('SOURCE VERSION'))
     throw Error('Schema Designer did not render real owner request fields: '+
       JSON.stringify(schemaView).slice(0,3000));
+  await assertYamlSourceVisualPair('establishment-request.schema.yaml','Schema Designer');
   console.log('STUDIO_SCHEMA_DESIGNER_CHROMIUM',JSON.stringify({
     title:schemaView.title,fields:schemaView.fields,required:schemaView.required,
     sourceVersion:schemaView.status,

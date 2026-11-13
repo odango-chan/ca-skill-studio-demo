@@ -4,6 +4,7 @@ import studioLightTheme from "../../../../../extensions/skill-studio-theme/theme
 import { createSemanticTokenDecorationRenderer } from "./semantic-token-decorations.mjs";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
+export const PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION = "skillStudio/packageSnapshotAccepted";
 export const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
 export const PACKAGE_CLOSE_NOTIFICATION = "skillStudio/packageClose";
 export const ANALYSIS_STATUS_NOTIFICATION = "skillStudio/analysisStatus";
@@ -127,14 +128,42 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         const uri=document.uri.toString();
         handlers.onSemanticTokenRequest?.(uri);
         try{
-          const result=await client.sendRequest(
+          const requestTokens=()=>client.sendRequest(
             "textDocument/semanticTokens/full",
             {textDocument:{uri:document.uri.toString()}},
             cancellationToken
           );
+          let result=await requestTokens();
           if(cancellationToken?.isCancellationRequested)
             return new vscode.SemanticTokens(new Uint32Array());
-          const data=Uint32Array.from(result?.data??[]);
+          let data=Uint32Array.from(result?.data??[]);
+          let serverDiagnostics=null;
+          if(data.length===0){
+            try{
+              serverDiagnostics=await client.sendRequest(
+                "skillStudio/semanticTokenDiagnostics",{uri}
+              );
+              // On first open, the editor can request tokens before the
+              // Package snapshot notification has reached the Worker. Wait
+              // briefly for that exact snapshot to become queryable, then
+              // retry once. Empty tokens for a known Package remain valid.
+              for(let attempt=0;!serverDiagnostics?.packageFound&&attempt<40;attempt++){
+                if(cancellationToken?.isCancellationRequested)
+                  return new vscode.SemanticTokens(new Uint32Array());
+                await new Promise(resolve=>setTimeout(resolve,50));
+                serverDiagnostics=await client.sendRequest(
+                  "skillStudio/semanticTokenDiagnostics",{uri}
+                );
+              }
+              if(serverDiagnostics?.packageFound){
+                result=await requestTokens();
+                if(cancellationToken?.isCancellationRequested)
+                  return new vscode.SemanticTokens(new Uint32Array());
+                data=Uint32Array.from(result?.data??[]);
+              }
+              handlers.onSemanticTokenServerDiagnostics?.(serverDiagnostics);
+            }catch{/* Diagnostics are acceptance-only and optional. */}
+          }
           handlers.onSemanticTokenResult?.(uri,data.length/5);
           if(semanticTokenRenderer){
             try{
@@ -146,16 +175,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
                 String(error?.message??error));
             }
           }
-          if(data.length===0){
-            try{
-              const diagnostics=await client.sendRequest(
-                "skillStudio/semanticTokenDiagnostics",{uri}
-              );
-              handlers.onSemanticTokenServerDiagnostics?.(diagnostics);
-            }catch{/* Diagnostic request is acceptance-only and optional. */}
-          }else{
-            handlers.onSemanticTokenServerDiagnostics?.(null);
-          }
+          if(data.length!==0)handlers.onSemanticTokenServerDiagnostics?.(null);
           return new vscode.SemanticTokens(data,result?.resultId);
         }catch(error){
           if(!stopped&&!terminalFailure){
@@ -282,6 +302,12 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   client.onDidChangeState(event => {
     if (started && !stopped && event.newState === State.Stopped)
       fatal("Browser LanguageClient stopped unexpectedly");
+  });
+  client.onNotification(PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION, accepted => {
+    if (!terminalFailure && accepted?.rootUri && Number.isSafeInteger(accepted.generation)) {
+      handlers.onPackageSnapshotAccepted?.(accepted);
+      refreshTheiaSemanticTokens();
+    }
   });
   client.onNotification(ANALYSIS_STATUS_NOTIFICATION, status => {
     if (!terminalFailure) handlers.onStatus?.(status);

@@ -1,4 +1,5 @@
 import {openNativeSource} from './native-source.mjs';
+import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
 import {projectPredicateSet} from '../../../../site/predicate-projection.mjs';
 
 const VIEW = 'skillStudio.predicatePreview';
@@ -40,19 +41,7 @@ async function choosePredicateSet(vscode, uri) {
   return picked?.uri ?? null;
 }
 async function reveal(vscode, uri, line) {
-  const target = await vscode.workspace.openTextDocument(uri);
-  const safeLine = Number.isSafeInteger(line) && line > 0 && line <= target.lineCount ? line : 1;
-  const position = new vscode.Position(safeLine - 1, 0);
-  const selection = new vscode.Range(position, position);
-  await openNativeSource(vscode, uri, {
-    viewColumn: vscode.ViewColumn.Beside, preserveFocus: false, preview: false, selection
-  });
-  const editor = vscode.window.visibleTextEditors.find(item =>
-    item.document.uri.toString() === uri.toString());
-  if (editor) {
-    editor.selection = new vscode.Selection(position, position);
-    editor.revealRange(selection, vscode.TextEditorRevealType.InCenter);
-  }
+  return openSourceViewPair(vscode,uri,{line});
 }
 function webviewHtml(token) {
   const csp = "default-src 'none'; img-src data:; style-src 'nonce-" + token +
@@ -145,7 +134,7 @@ export function registerPredicateEditor(vscode, context) {
         try {
           if (message.type === 'openSource') {
             await openNativeSource(vscode, document.uri, {
-              viewColumn: vscode.ViewColumn.Beside, preserveFocus: false, preview: false
+              viewColumn: vscode.ViewColumn.One, preserveFocus: false, preview: false
             });
           } else if (message.type === 'revealLine') {
             await reveal(vscode, document.uri, message.value);
@@ -157,6 +146,7 @@ export function registerPredicateEditor(vscode, context) {
       });
       panel.onDidDispose(() => {
         disposed = true;
+        forgetSourceViewPair(document.uri);
         changed.dispose();
         incoming.dispose();
       });
@@ -168,6 +158,6 @@ export function registerPredicateEditor(vscode, context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openPredicates',
     async uri => {
       const target = await choosePredicateSet(vscode, uri);
-      if (target) await vscode.commands.executeCommand('vscode.openWith', target, VIEW);
+      if (target) await openSourceViewPair(vscode,target);
     }));
 }
