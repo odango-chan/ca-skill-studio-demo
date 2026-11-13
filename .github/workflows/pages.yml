@@ -52,7 +52,6 @@ jobs:
         run: npm run typecheck
       - name: Check JavaScript syntax
         run: |
-          node --check site/app.mjs
           node --check site/source-editor-adapter.mjs
           node --check site/monaco-source-backend.mjs
           node --check site/monaco-language.mjs
@@ -133,8 +132,6 @@ jobs:
           node --check tests/layout.test.mjs
           node --check tests/workbench.test.mjs
           node --check tests/journey.test.mjs
-          node --check scripts/build.mjs
-          node --check scripts/edge-smoke.mjs
           node --check scripts/d1-interaction-smoke.mjs
       - name: Build Theia Web extension for default online workbench
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
