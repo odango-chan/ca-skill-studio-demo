@@ -2764,12 +2764,14 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownWorkerDiagnostics',()=>nativeMarkdownWorkerDiagnostics));
   context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async(skillName,relativePath)=>{
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async(skillName,relativePath,openColumn)=>{
       const name=typeof skillName==='string'?skillName:'establish-pdu-session';
       const targetPath=typeof relativePath==='string'?relativePath:'SKILL.md';
       if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
       if(!/^(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(targetPath))
         throw Error('Markdown acceptance target must be a known Package-local Markdown path');
+      if(openColumn!==undefined&&openColumn!==1&&openColumn!==2)
+        throw Error('Markdown acceptance editor column must be one or two');
       const matches=await vscode.workspace.findFiles(
         '**/'+name+'/'+targetPath,'**/node_modules/**',5);
       const suffix='/'+name+'/'+targetPath;
@@ -2777,10 +2779,10 @@ export function registerWorkbench(vscode,context){
       if(exact.length!==1)
         throw Error('Expected exactly one '+name+'/'+targetPath+' in the active Workspace');
       // Exercise the same default open path used by Explorer and Package Explorer.
-      // The active-editor listener must pair every Markdown Source with the
-      // native Preview and normalize Source-left / Preview-right placement.
+      // The second-column case proves the integration normalizes placement too.
       await vscode.commands.executeCommand('vscode.open',exact[0],{
-        viewColumn:vscode.ViewColumn.One,preview:false
+        viewColumn:openColumn===2?vscode.ViewColumn.Two:vscode.ViewColumn.One,
+        preview:false
       });
       return exact[0].toString();
     }));
