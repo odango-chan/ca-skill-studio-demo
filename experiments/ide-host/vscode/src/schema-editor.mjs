@@ -176,7 +176,7 @@ export function registerSchemaEditor(vscode,context) {
         try {
           if(message.type==='openSource'){
             await openNativeSource(vscode,document.uri,{
-              viewColumn:vscode.ViewColumn.One,preserveFocus:true,preview:false
+              viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
             });
           } else if(message.type==='revealLine') {
             await reveal(vscode,document.uri,message.value);
