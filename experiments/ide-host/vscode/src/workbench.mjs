@@ -2809,6 +2809,22 @@ export function registerWorkbench(vscode,context){
       if(!paired)nativeMarkdownOpening.delete(key);
     }
   }
+  // Shared acceptance contract for the entire Studio workbench, not just
+  // a particular Source/Preview pair. All native editors and CustomEditors
+  // must reuse groups One and Two even in a mixed open sequence.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.twoColumnLayoutAcceptance',()=>({
+      groups:(vscode.window.tabGroups?.all??[]).map(group=>({
+        column:group.viewColumn,
+        tabs:(group.tabs??[]).map(tab=>({
+          label:tab.label,
+          uri:tab.input?.uri?.toString?.()??null
+        }))
+      })),
+      editors:(vscode.window.visibleTextEditors??[]).map(editor=>({
+        uri:editor.document.uri.toString(),column:editor.viewColumn
+      }))
+    })));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownActivationStateAcceptance',()=>{
       const markdownExtension=vscode.extensions?.getExtension?.(
