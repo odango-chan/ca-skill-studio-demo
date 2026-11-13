@@ -1,5 +1,6 @@
-// Native VS Code/Theia Dependencies TreeView. The workspace configuration,
-// not this UI, is the single persistent source of declarations and lock.
+// VS Code/Theia integration for Plugin-managed Dependencies.
+// It owns acquisition commands and exposes a TreeDataProvider composed by
+// the single Package Explorer; it does not register a standalone view.
 import {readProjectConfiguration,watchProjectConfiguration}
   from "./project-configuration.mjs";
 import {applyDependency,removeDependency,refreshDependency,
@@ -10,8 +11,8 @@ import {discoverMcpHttpTools,readGitHubPinnedFile}
   from "./acquisition-transports.mjs";
 import {decodeBase64} from "./dependency-snapshot.mjs";
 const aliasPattern=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-export function registerDependenciesView(vscode,context,{onLockChanged=()=>{},
-  onProjectRootChanged=()=>{},treeViewId=null}={}){
+export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>{},
+  onProjectRootChanged=()=>{}}={}){
   const emitter=new vscode.EventEmitter();
   const previews=new Map();
   let selectedRoot=null,latest=null;
@@ -97,9 +98,7 @@ export function registerDependenciesView(vscode,context,{onLockChanged=()=>{},
       return item;
     }
   };
-  const view=treeViewId&&typeof vscode.window.createTreeView==="function"
-    ?vscode.window.createTreeView(treeViewId,{treeDataProvider:provider}):null;
-  context.subscriptions.push(emitter,...(view?[view]:[]),
+  context.subscriptions.push(emitter,
     watchProjectConfiguration(vscode,()=>{refresh();onLockChanged();}));
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders?.(()=>{
     if(selectedRoot&&!roots().some(folder=>folder.uri.toString()===selectedRoot.toString())){

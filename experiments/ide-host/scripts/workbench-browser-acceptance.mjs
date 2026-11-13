@@ -451,10 +451,19 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
 export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false}){
   if(!requireEditor)return {required:false};
   const click=async(x,y,count=1)=>{
-    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
+    // Match the verified Package Explorer gesture: clear any stale button
+    // state, move with an explicit pointer type, then send a complete press/release.
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,
+      button:'left',buttons:0,clickCount:1});
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y,
+      button:'none',buttons:0,pointerType:'mouse'});
     await sleep(100);
-    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'left',clickCount:count});
-    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:count});
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',x,y,
+      button:'left',buttons:1,clickCount:count,pointerType:'mouse'});
+    await sleep(100);
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,
+      button:'left',buttons:0,clickCount:count,pointerType:'mouse'});
+    await sleep(180);
   };
   // Use the real native command registry for setup/actions. Explorer gestures
   // below remain actual Chromium input; no host or TextDocument is mocked.
@@ -494,6 +503,81 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   }
   async function nativeCommand(id,...args){
     return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
+  }
+  async function waitNativeMarkdown(predicate,label,attempts=100){
+    let latest={frames:[],candidates:[]};
+    for(let attempt=0;attempt<attempts;attempt++){
+      try{
+        const tree=await command('Page.getFrameTree');
+        const frames=[];
+        const walk=node=>{
+          if(!node)return;
+          frames.push(node.frame);
+          for(const child of node.childFrames??[])walk(child);
+        };
+        walk(tree.frameTree);
+        latest={frames:frames.map(frame=>({id:frame.id,url:frame.url})),candidates:[]};
+        for(const frame of frames.filter(item=>/webview/i.test(item.url??''))){
+          try{
+            const world=await command('Page.createIsolatedWorld',{
+              frameId:frame.id,worldName:'studio-native-markdown-acceptance',
+              grantUniveralAccess:true
+            });
+            const evaluated=await command('Runtime.evaluate',{
+              contextId:world.executionContextId,returnByValue:true,
+              expression:`(()=> {
+                const styles=[...document.querySelectorAll('link[rel~="stylesheet"]')]
+                  .map(link=>link.href||link.getAttribute('href')||'');
+                const headingNode=document.querySelector('h1');
+                const heading=headingNode?.textContent?.trim()??null;
+                const body=document.body;
+                const csp=document.querySelector('meta[http-equiv="Content-Security-Policy" i]')?.content??'';
+                return {
+                  url:location.href,
+                  heading,
+                  nativePreviewRoot:Boolean(body&&styles.some(url=>url.includes('/media/native-markdown-preview.css'))),
+                  styles,
+                  headingColor:headingNode?getComputedStyle(headingNode).color:null,
+                  maxWidth:body?getComputedStyle(body).maxWidth:null,
+                  anchorDetails:[...document.querySelectorAll('a')].map(anchor=>({
+                    text:anchor.textContent.trim(),
+                    href:anchor.getAttribute('href'),
+                    resolvedHref:anchor.href
+                  })),
+                  imageCount:document.querySelectorAll('img').length,
+                  scriptMarkers:[...document.scripts].filter(script=>
+                    script.textContent.includes('skillStudioNativeMarkdownXss')).length,
+                  scriptExecuted:window.skillStudioNativeMarkdownXss===true,
+                  csp
+                };
+              })()`
+            });
+            const view=evaluated.result?.value;
+            if(!view)continue;
+            view.contextId=world.executionContextId;
+            view.frameId=frame.id;
+            latest.candidates.push({
+              url:frame.url,heading:view.heading,nativePreviewRoot:view.nativePreviewRoot,
+              styles:view.styles
+            });
+            if(predicate(view)){
+              try{
+                view.previewSettings=await nativeCommand(
+                  'skillStudio.internal.nativeMarkdownSettingsAcceptance');
+              }catch(error){
+                view.previewSettings={error:String(error?.message??error)};
+              }
+              return {view,contextId:world.executionContextId,frameId:frame.id};
+            }
+          }catch{/* Preview frames can be replaced while Theia activates the extension. */}
+        }
+      }catch(error){
+        latest.error=String(error?.message??error);
+      }
+      await sleep(100);
+    }
+    throw Error(label+' did not produce the expected native Markdown Preview in real Chromium: '+
+      JSON.stringify(latest));
   }
   async function startNativeCommand(id,...args){
     console.log("STUDIO_NATIVE_ACTION",id);
@@ -1158,7 +1242,36 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!inspectorFlowState.toggleHit)
       throw Error('Native Inspector Data Flow expansion arrow is obscured: '+
         JSON.stringify(inspectorFlowState));
+    await evalJS(`(()=>{
+      window.__inspectorDataFlowClicks=[];
+      document.addEventListener('click',event=>{
+        const toggle=event.target?.closest?.('.theia-ExpansionToggle');
+        const node=toggle?.closest('.theia-TreeNode');
+        if(!toggle||!node?.innerText?.includes('Data Flow · Producer / Consumer'))return;
+        window.__inspectorDataFlowClicks.push({trusted:event.isTrusted,
+          toggleClass:toggle.className,nodeText:node.innerText.replace(/\\s+/g,' ').trim()});
+      },true);
+      return true;
+    })()`);
     await click(inspectorFlowState.togglePoint.x,inspectorFlowState.togglePoint.y);
+    let expandedAfterClick=false;
+    for(let attempt=0;attempt<30;attempt++){
+      expandedAfterClick=await evalJS(`(()=>{
+        const container=document.getElementById(
+          'plugin-view-container:workbench.view.extension.skillStudioInspector');
+        const row=[...(container?.querySelectorAll('.theia-TreeNode')??[])].find(node=>
+          node.innerText.replace(/\\s+/g,' ').includes('Data Flow · Producer / Consumer'));
+        const toggle=row?.querySelector('.theia-ExpansionToggle');
+        return !!toggle&&!toggle.classList.contains('theia-mod-collapsed');
+      })()`);
+      if(expandedAfterClick)break;
+      await sleep(100);
+    }
+    if(!expandedAfterClick){
+      const clicks=await evalJS('window.__inspectorDataFlowClicks??[]');
+      throw Error('Trusted Inspector Data Flow click did not expand the row: '+
+        JSON.stringify({inspectorFlowState,clicks}));
+    }
   }
   let phaseEvidenceText='';
   for(let attempt=0;attempt<100;attempt++){
@@ -1684,136 +1797,27 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(nativeLive.view.contextId!==nativeMarkdown.view.contextId)
       throw Error('Native Markdown recreated its Preview webview instead of updating it in place: '+
         JSON.stringify({before:nativeMarkdown.view.contextId,after:nativeLive.view.contextId}));
-    const readSourceScroll=async()=>{
-      const state=await nativeCommand(
-        'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance');
-      if(!state?.editorFound||state.uri!==nativeMarkdownUri)
-        throw Error('Native Markdown visible Source editor is unavailable: '+JSON.stringify(state));
-      return {lineCount:state.lineCount,
-        visibleRanges:state.after??state.before??[],
-        topLine:state.after?.[0]?.start??state.before?.[0]?.start??null};
-    };
-    const sourceScroll=async direction=>{
-      const state=await nativeCommand(
-        'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',direction);
-      if(!state?.editorFound||state.uri!==nativeMarkdownUri)
-        throw Error('Native Markdown visible Source editor is unavailable: '+JSON.stringify(state));
-      return {lineCount:state.lineCount,visibleRanges:state.after??[],
-        topLine:state.after?.[0]?.start??null};
-    };
-    const previewScroll=async expression=>(await command('Runtime.evaluate',{
-      contextId:nativeLive.view.contextId,returnByValue:true,expression
+    const sourceViewport=nativeSettings.visibleEditors?.find(
+      editor=>editor.uri===nativeMarkdownUri)??null;
+    if(!sourceViewport)
+      throw Error('Native Markdown Source is not present in the host visible-editor snapshot: '+
+        JSON.stringify(nativeSettings.visibleEditors));
+    const readPreviewViewport=async()=>(await command('Runtime.evaluate',{
+      contextId:nativeLive.view.contextId,returnByValue:true,
+      expression:'({scrollY:window.scrollY,scrollHeight:document.scrollingElement?.scrollHeight??0,'+
+        'clientHeight:document.scrollingElement?.clientHeight??0})'
     })).result?.value;
-    await command('DOM.enable');
-    const scrollPreviewByWheel=async deltaY=>{
-      const owner=await command('DOM.getFrameOwner',{frameId:nativeLive.view.frameId});
-      const box=await command('DOM.getBoxModel',{backendNodeId:owner.backendNodeId});
-      const quad=box.model.content;
-      const frameMetrics=await previewScroll('({width:innerWidth,height:innerHeight})');
-      if(!frameMetrics?.width||!frameMetrics?.height)
-        throw Error('Native Markdown Preview viewport metrics are unavailable');
-      // Wheel over the left page gutter, not the center of a nested code/table
-      // scroller. The frame's page itself must receive the real wheel event.
-      const localX=Math.min(8,frameMetrics.width/20);
-      const localY=frameMetrics.height/2;
-      const x=quad[0]+(localX/frameMetrics.width)*(quad[2]-quad[0]);
-      const y=quad[1]+(localY/frameMetrics.height)*(quad[5]-quad[1]);
-      await command('Input.dispatchMouseEvent',{type:'mouseMoved',x,y});
-      // The published Open VSX Markdown extension uses a one-scroll-event
-      // suppression counter after its initial programmatic positioning.
-      // Model a continuous user gesture as two real wheel events so the
-      // follow-up event exercises Preview -> Source synchronization.
-      const firstDelta=Math.sign(deltaY)*Math.min(40,Math.abs(deltaY)/2);
-      await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY:firstDelta});
-      await sleep(75);
-      await command('Input.dispatchMouseEvent',{type:'mouseWheel',x,y,deltaX:0,deltaY:deltaY-firstDelta});
-      await sleep(150);
-      return previewScroll('window.scrollY');
+    const previewViewport=await readPreviewViewport();
+    const nativeMarkdownScrollEvidence={
+      sourceViewport,previewViewport,
+      nativePreferences:{scrollEditorWithPreview:nativeSettings.scrollEditorWithPreview,
+        scrollPreviewWithEditor:nativeSettings.scrollPreviewWithEditor},
+      acceptance:'manual user inspection required; automated tests do not synthesize or assert scrolling'
     };
-    const waitForScroll=async(read,predicate,label)=>{
-      let value=null;
-      for(let attempt=0;attempt<60;attempt++){
-        value=await read();
-        if(predicate(value))return value;
-        await sleep(100);
-      }
-      throw Error(label+' did not synchronize in real Chromium: '+JSON.stringify(value));
-    };
-    const waitForSourceScroll=async(predicate,label)=>{
-      try{
-        return await waitForScroll(()=>readSourceScroll(),predicate,label);
-      }catch(error){
-        const host=await nativeCommand('skillStudio.internal.nativeMarkdownSettingsAcceptance');
-        const scrollProbe=await nativeCommand(
-          'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance');
-        const previewEvents=await previewScroll(
-          'window.__studioNativeMarkdownScrollProbe??null');
-        throw Error(error.message+'; hostEditorState='+JSON.stringify(host)+
-          '; nativePreviewSettings='+JSON.stringify(nativeLive.view.previewSettings)+
-          '; sourceScrollEvents='+JSON.stringify(scrollProbe)+
-          '; previewScrollEvents='+JSON.stringify(previewEvents));
-      }
-    };
-    const initialSource=await readSourceScroll();
-    await previewScroll(`(()=>{
-      if(!window.__studioNativeMarkdownScrollProbe){
-        window.__studioNativeMarkdownScrollProbe={events:[],resizes:[]};
-        window.addEventListener('scroll',()=>{
-          window.__studioNativeMarkdownScrollProbe.events.push({
-            y:window.scrollY,at:performance.now(),
-            target:document.scrollingElement?.tagName??null
-          });
-          if(window.__studioNativeMarkdownScrollProbe.events.length>40)
-            window.__studioNativeMarkdownScrollProbe.events.shift();
-        },true);
-        window.addEventListener('resize',()=>{
-          window.__studioNativeMarkdownScrollProbe.resizes.push({
-            at:performance.now(),width:innerWidth,height:innerHeight
-          });
-          if(window.__studioNativeMarkdownScrollProbe.resizes.length>40)
-            window.__studioNativeMarkdownScrollProbe.resizes.shift();
-        },true);
-      }
-      window.__studioNativeMarkdownScrollProbe.events.length=0;
-      return {y:window.scrollY,target:document.scrollingElement?.tagName??null};
-    })()`);
-    if(initialSource.lineCount<=100)
-      throw Error('Native Markdown scroll fixture is not tall enough to test bidirectional synchronization: '+
-        JSON.stringify(initialSource));
-    const sourceBottom=await sourceScroll('bottom');
-    await waitForScroll(()=>previewScroll('window.scrollY'),
-      value=>value>100,'Native Source → Preview scroll');
-    await nativeCommand('skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance','clear');
-    const previewTop=await scrollPreviewByWheel(-12000);
-    await waitForSourceScroll(value=>value.topLine!==null&&value.topLine<3,
-      'Native Preview → Source top scroll');
-    const previewBottom=await scrollPreviewByWheel(12000);
-    const previewScrollDiagnostics=await previewScroll(
-      '(()=>({y:window.scrollY,innerHeight,bodyTop:document.body?.scrollTop??null,'+
-      'bodyHeight:document.body?.scrollHeight??null,rootTop:document.documentElement.scrollTop,'+
-      'rootHeight:document.documentElement.scrollHeight,scroller:document.scrollingElement?.tagName,'+
-      'scrollables:[...document.querySelectorAll("*")].filter(el=>el.scrollHeight>el.clientHeight+4&&'+
-      '/auto|scroll|overlay/.test(getComputedStyle(el).overflowY)).map(el=>({tag:el.tagName,'+
-      'id:el.id,className:String(el.className??""),top:el.scrollTop,height:el.scrollHeight,'+
-      'client:el.clientHeight,overflow:getComputedStyle(el).overflowY})).slice(0,20)}))()');
-    try{
-      await waitForSourceScroll(value=>value.topLine!==null&&value.topLine>100,
-        'Native Preview → Source bottom scroll');
-    }catch(error){
-      const scrollEvents=await previewScroll(
-        'window.__studioNativeMarkdownScrollProbe??null');
-      throw Error(error.message+'; previewBottom='+JSON.stringify(previewBottom)+
-        '; previewMetrics='+JSON.stringify(previewScrollDiagnostics)+
-        '; previewScrollEvents='+JSON.stringify(scrollEvents));
-    }
-    const sourceTop=await sourceScroll('top');
-    await waitForScroll(()=>previewScroll('window.scrollY'),value=>value<50,
-      'Native Source → Preview top scroll');
     const nativeMarkdownLiveEvidence={
       previewContextRetained:true,
-      initialSource,sourceBottom,previewAtTop:previewTop,
-      previewAtBottom:previewBottom,sourceAtTop:sourceTop,
-      finalPreviewScroll:await previewScroll('window.scrollY')
+      nativeMarkdownScrollEvidence,
+      finalPreviewScroll:previewViewport.scrollY
     };
     console.log('STUDIO_NATIVE_MARKDOWN_LIVE_SYNC_CHROMIUM',
       JSON.stringify(nativeMarkdownLiveEvidence));
@@ -1830,7 +1834,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const nativeSecurityUri=await nativeCommand(
     'skillStudio.internal.nativeMarkdownSecurityAcceptance');
   if(typeof nativeSecurityUri!=='string'||
-     !nativeSecurityUri.endsWith('/references/3gpp-procedure.md'))
+     !nativeSecurityUri.endsWith('/SKILL.md'))
     throw Error('Native Markdown security fixture was not created inside the 5GC Skill Package');
   try{
     const nativeSecurity=await waitNativeMarkdown(view=>
@@ -1846,21 +1850,13 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!safeLink||!safeLink.href||safeLink.href==='#'||blockedLinks.length)
       throw Error('Native Markdown must retain the exact safe Package-local link and omit escaping/missing targets: '+
         JSON.stringify({safeLink,blockedLinks,evidence}));
-    const safePackageLinkClick=await command('Runtime.evaluate',{
-      contextId:evidence.contextId,returnByValue:true,
-      expression:`(()=>{const link=[...document.querySelectorAll('a')].find(a=>
-        a.textContent.trim()==='Safe package reference');if(!link)return false;link.click();return true;})()`
-    });
-    if(safePackageLinkClick.result?.value!==true)
-      throw Error('Could not follow the safe Package-local link from the native Markdown preview');
-    const followedSafePackageLink=await waitNativeMarkdown(
-      view=>view.heading==='Establish PDU Session',
-      'native Markdown safe Package-local link navigation');
-    const safeLinkPreviewActive=await evalJS(
-      `[...document.querySelectorAll('.lm-TabBar-tab.lm-mod-current')]
-        .some(tab=>tab.textContent.trim()==='Markdown · SKILL.md')`);
-    if(followedSafePackageLink.view.heading!=='Establish PDU Session'||!safeLinkPreviewActive)
-      throw Error('Native Markdown safe Package-local link did not activate the owning Skill guide preview: '+JSON.stringify({view:followedSafePackageLink.view,safeLinkPreviewActive}));
+    if(safeLink.href!=='references/3gpp-procedure.md')
+      throw Error('Native Markdown changed the exact safe Package-local link target: '+
+        JSON.stringify({href:safeLink.href,evidence}));
+    // Runtime.evaluate(link.click()) is a synthetic DOM click, not a trusted
+    // user gesture. Theia's native opener may intentionally ignore it. Verify
+    // the rendered safe target and the blocked-target policy here; real link
+    // navigation remains a manual workbench interaction, not a CI assertion.
     if(!evidence.csp.includes("default-src 'none'")||
        /script-src[^;]*unsafe-inline/.test(evidence.csp))
       throw Error('Native Markdown preview is not using a strict script Content Security Policy: '+

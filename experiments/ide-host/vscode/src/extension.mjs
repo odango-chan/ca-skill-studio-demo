@@ -21,7 +21,7 @@ import {registerContractEditor} from "./contract-editor.mjs";
 import {registerPredicateEditor} from "./predicate-editor.mjs";
 import {registerSchemaEditor} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
-import {registerDependenciesView} from "./dependencies-view.mjs";
+import {registerDependencyIntegration} from "./dependency-integration.mjs";
 import {iconShapes} from "../../../../site/icons.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
@@ -54,20 +54,19 @@ export function activate(context){
   registerPredicateEditor(vscode,context);
   registerSchemaEditor(vscode,context);
   let packageOverview=null;
-  const dependenciesView=registerDependenciesView(vscode,context,{
-    treeViewId:null,
+  const dependencyIntegration=registerDependencyIntegration(vscode,context,{
     onLockChanged:()=>workbench.invalidateDependencyAnalysis?.(),
     onProjectRootChanged:()=>void packageOverview?.refresh()
   });
   packageOverview=registerPackageOverview(vscode,context,
     ()=>workbench.getActiveDocument?.()??null,{
-      dependenciesProvider:dependenciesView.provider,
-      getProjectRoot:dependenciesView.getProjectRoot
+      dependenciesProvider:dependencyIntegration.provider,
+      getProjectRoot:dependencyIntegration.getProjectRoot
     });
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
-        vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported in this spike");
+        vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
         return;
       }
       const openedAt=performance.now();
@@ -171,7 +170,7 @@ export function activate(context){
         if(disposed||!ready)return;
         const text=document.getText();
         if(text.length>MAX_SOURCE_BYTES){
-          void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB spike limit"});
+          void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB Procedure editor limit"});
           return;
         }
         void webview.postMessage({type:"snapshot",text,version:document.version,
@@ -184,7 +183,7 @@ export function activate(context){
         if(disposed||typeof message!=="object"||!message)return;
         if(message.type==="selection"){
           // A visible Procedure editor can lose active status when the user
-          // opens the Evidence sidebar. Its real graph selection still belongs
+          // opens the Inspector sidebar. Its real graph selection still belongs
           // to this editor; only hidden Webviews must be ignored.
           if(panel.active||panel.visible)workbench.select(document,message);
           return;

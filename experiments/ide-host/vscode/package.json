@@ -1,7 +1,7 @@
 {
   "name": "ca-skill-studio-ide-spike",
-  "displayName": "SKILL Studio IDE Host Spike",
-  "description": "Experimental source-first Procedure, Contract and Predicate visual editors for VS Code desktop/web and Theia host variants",
+  "displayName": "SKILL Studio IDE Host",
+  "description": "Source-first SKILL authoring, Package Explorer and native editor integration for VS Code-compatible desktop/web hosts, including Theia.",
   "version": "0.0.1",
   "publisher": "odango-chan",
   "private": true,
@@ -475,7 +475,7 @@
     "viewsWelcome": [
       {
         "view": "workbench.explorer.fileView",
-        "contents": "**欢迎使用 SKILL Studio**\\n\\n还没有打开项目？可以载入 skills/、lib/、output/ 三目录的演示项目，包含传统 5GC 和 MAS 两个 SKILL，并体验可视化编辑。\\n\\n[载入演示 SKILL 项目](command:skillStudio.loadExample)\\n\\n导入会在原有 skills/ 同级补齐 lib/、output/，打开项目根，不覆盖已有文件。"
+        "contents": "**欢迎使用 SKILL Studio**\\n\\n还没有打开项目？可以载入包含传统 5GC 和 MAS 两个示例的 SKILL 项目，体验 Package Explorer 和可视化编辑。\\n\\n[载入示例 SKILL 项目](command:skillStudio.loadExample)\\n\\n示例导入到项目级 skills/ 目录；普通导入会保留已有文件。依赖与构建产物由各自服务管理，不作为普通 SKILL 源文件导入。"
       }
     ],
     "viewsContainers": {

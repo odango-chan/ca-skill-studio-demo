@@ -1,5 +1,5 @@
-// Run from repository root after npm ci. Experimental artifact only.
-// No change to the existing Pages app or its dist/ output.
+// Build the shared VS Code-compatible extension bundles used by Theia and optional local hosts.
+// This step creates extension assets only; Theia app builds and Pages releases are separate.
 import {build} from "esbuild";
 import {mkdir,rm,cp,readdir,readFile,appendFile} from "node:fs/promises";
 import {dirname,join} from "node:path";
@@ -8,9 +8,7 @@ await rm(join(root,"dist"),{recursive:true,force:true});
 await rm(join(root,"media"),{recursive:true,force:true});
 await mkdir(join(root,"dist"),{recursive:true});
 await mkdir(join(root,"media"),{recursive:true});
-// Keep the existing Markdown fallback exactly unchanged for regression parity.
-await cp("site/markdown-preview.css",join(root,"media/markdown-preview.css"));
-// Native Markdown is an isolated experiment with a distinct stylesheet.
+// The pinned native Markdown extension owns Preview rendering; Studio supplies its shared theme.
 await cp("extensions/skill-studio-theme/styles/markdown-preview.css",
   join(root,"media/native-markdown-preview.css"));
 
@@ -126,5 +124,5 @@ console.log("STUDIO_PREPARED_SAMPLE",JSON.stringify({
   root:sampleDest,skills:sampleManifest.skills,files:sampleManifest.files.length,
   sourceSha:sampleManifest.sourceSha
 }));
-console.log("IDE spike: built Node + browser extension entries, isolated LSP Worker and local ReactFlow webview (not installed or run)");
+console.log("SKILL Studio IDE host: built Node and browser extension entries, isolated LSP Worker and ReactFlow webview assets; Theia application build and Pages release are separate.");
 // Owner Skill snapshots are pinned and validated; the demo does not auto-sync.

@@ -1,6 +1,6 @@
 # ADR-0004 · Package-first Workspace and Unified Package Explorer
 
-**Status: Accepted for implementation · Date: 2026-11-12**
+**Status: Accepted · initial Package Explorer implementation merged in PR #175; follow-up lifecycle UI remains deferred · Date: 2026-11-12**
 
 **Supersedes:** ADR-0003 §2 only for the primary-sidebar ordering and the user-facing placement of Package / Dependency / Build navigation. It also supersedes the presentation assumptions in the C4 Package Overview note that Packages are only a secondary inventory inside a dedicated Skill Studio Activity Bar.
 
@@ -112,7 +112,7 @@ If a user needs to customize an imported Schema, that requires creating a separa
 - **Outline** remains the host-native DocumentSymbol view; do not restore a custom Procedure Outline.
 - **Problems** remains the single native diagnostics surface for LSP and Package Audit.
 - **Output** remains the host-native log surface.
-- Markdown remains the accepted paired editable Source + read-only Preview experience, subject to ADR-0003's native Markdown gates.
+- Markdown defaults to the paired editable Source + read-only native Preview experience in Theia through the pinned VS Code Markdown extension (PR #169); the shared theme and exact Package-local link/security policy remain Studio-owned. Full host acceptance-harness closeout is tracked by #176.
 - Procedure / Contract / Predicate / Schema CustomEditors and all existing Source Patch invariants remain unchanged.
 
 Package Explorer does not absorb Inspector, Outline, Problems, Package Audit or the Procedure Designer. It is the project navigation and resource-operation surface.

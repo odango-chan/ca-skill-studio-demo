@@ -81,7 +81,7 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js","media/procedure.js","media/procedure.css",
     "samples/skills/files.json",
     "samples/skills/establish-pdu-session/assurance/procedure.yaml",
-    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml","media/markdown-preview.css","media/native-markdown-preview.css"])
+    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml","media/native-markdown-preview.css"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });
 test("Trial is isolated from existing Pages distribution",()=>{

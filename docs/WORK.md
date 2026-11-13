@@ -1,13 +1,24 @@
 # Skill Studio 当前工作状态
 
-## 2026-11-12 · Package-first Workspace（ADR-0004）
+## 2026-11-12 · Current Theia baseline and closeout
 
-**Design: ACCEPTED · Implementation: IN_PROGRESS · Acceptance: NOT_RUN.** Package Explorer is the default Studio project view inside the native Explorer container; native Files remains available. VS Code does not expose a supported API to force an extension view above built-in Files, so default ordering is host-owned; Package Explorer is visible by default and first among Studio-contributed views. Skills / Dependencies / actual Build Artifacts are one logical projection backed by their existing owners. This changes presentation only; Plugin-managed Configuration v0.1, Source-first editing, Compiler ownership and ADR-0003's Inspector / Outline / Problems / Markdown decisions remain authoritative. Tracking: [Issue #173](https://github.com/odango-chan/ca-skill-studio-demo/issues/173). Draft [PR #152](https://github.com/odango-chan/ca-skill-studio-demo/pull/152) is not mergeable as-is: it is based on an earlier main and still contributes a separate Skill Studio Activity Bar. No implementation or browser acceptance is claimed.
+**Current main:** `82f0b0c5afa4679d26b15dc656e020e74027f9af`. GitHub Pages root uses the native Theia 1.76 browser-only workbench; Classic remains preserved at `/classic/` and is not modified in this cleanup.
 
-**Updated: 2026-11-12**  
-**Theia host migration merge:** `b2f4e991e5e273ebb98419ba0b66453bdd0f72cf` (PR #86 Squash Merge; Theia is now the default Pages host).  
-**Node Focus merge baseline:** `b9c1c38cd286526d742dd254646a9ec3c2489562` (PR #89 Node Focus migration merged; resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727)).  
-**Integrated baseline before top-level menu UX: main@80cc153fc043cf3d6e7e6449fb9197adc7419eb6**（D1-A2c #70、Root 主路径 #73、分支收起 / 显式查看 #75、节点位置锚定 #77、统一菜单/移除双击 #79 均已合入；[resulting-main Pages #42181238105 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42181238105)。本节同时记录正在推进的 Explorer 整理 #80，不将待验收改动称为 main。）
+### 已合入并作为当前实现保留
+
+- **Package Explorer:** [PR #175](https://github.com/odango-chan/ca-skill-studio-demo/pull/175) merged at `5ddf90d557d74e06374b3d517b5844f6a4fdf525`. One native Explorer TreeView composes Skills and Plugin-managed Dependencies. Native Files remains available. Dependency Service owns acquisition, immutable snapshots and Lock state. Build Artifacts remain hidden until the Compiler supplies a real BuildResult.
+- **Native Markdown:** [PR #169](https://github.com/odango-chan/ca-skill-studio-demo/pull/169) merged at `82f0b0c5afa4679d26b15dc656e020e74027f9af`. The pinned `vscode.markdown-language-features@1.95.3` owns Theia rendering and Preview lifecycle. Native bidirectional scroll preferences are enabled, but actual editor/preview scroll synchronization is not confirmed in Theia. Automated acceptance only records the current native preferences and visible viewport snapshot; it does not synthesize scroll gestures. Manual user inspection remains pending. Studio contributes the shared theme and exact Package-local link/security policy. `site/markdown-preview.mjs` remains for Classic only; it is not the Theia renderer.
+- **Inspector / Data Flow:** [PR #170](https://github.com/odango-chan/ca-skill-studio-demo/pull/170) and [PR #171](https://github.com/odango-chan/ca-skill-studio-demo/pull/171) merged. The standalone Evidence view/provider is retired; Source-derived Producer/Consumer Data Flow lives in the right-side Inspector. Runtime Evidence remains `NOT_RUN`.
+- **Skill Language:** [PR #161](https://github.com/odango-chan/ca-skill-studio-demo/pull/161) aligned the editor with the canonical `ca-skills` Skill Language v0.2 contract. Compiler Check/Build remains authoritative.
+
+### 当前只做收尾，不扩张功能
+
+- **[#160 · LSP v0.2 closeout](https://github.com/odango-chan/ca-skill-studio-demo/issues/160):** finish review/acceptance of existing [PR #167](https://github.com/odango-chan/ca-skill-studio-demo/pull/167). Its four reported exact-head workflows passed, but the PR remains Draft / unmerged. No new provider families or grammar implementation.
+- **[#176 · Theia code cleanup](https://github.com/odango-chan/ca-skill-studio-demo/issues/176):** code-cleanup-only closeout; keep active Theia runtime behavior unchanged. [PR #177](https://github.com/odango-chan/ca-skill-studio-demo/pull/177) removes duplicate Markdown preview paths and synthetic scroll diagnostics, retires the unused standalone Evidence projection and Dependencies TreeView path, names the Plugin-managed Dependency host adapter accurately, and reconciles the host READMEs / ADRs with the shipped architecture. The native Markdown extension owns Preview rendering; the former `revealRange` test did not represent real user scrolling, so bidirectional scroll synchronization and link activation remain manual inspection items. Latest exact-head IDE Host, PR Verify, Browser-Only Chromium and backend Chromium all PASS (run links are recorded in PR #177). Resulting-main Pages remains NOT_RUN until a later merge and exact-merge-SHA deployment check. PR #177 remains Draft / unmerged; Classic remains untouched.
+- Package Explorer lifecycle UI for populated dependency Add/Refresh/Update Lock/Remove, multi-root selection UI, drag/reorder persistence and Package-aware Source file operations are deferred; [Issue #173](https://github.com/odango-chan/ca-skill-studio-demo/issues/173) is closed as a scoped first-stage delivery, not as proof those follow-ups shipped.
+- Build Artifacts are deferred until a real Compiler BuildResult exists. No fake BuildResult or permanent unavailable Build panel.
+- Classic retirement remains a separate later operation. This cleanup must not delete Classic or shared modules still consumed by it.
+- No Runtime, Provider, MAS or 5GC execution/qualification is claimed.
 
 ## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
 
@@ -49,7 +60,7 @@
 
 | Scope | Implementation | Acceptance | Tracking |
 |---|---|---|---|
-| Theia 工作台第一阶段：默认打开、原生只读 Inspection/Outline/Evidence/Problems、Package Audit、Markdown Preview、布局缓存与计时 | IMPLEMENTED | PASS（416 Unit / 29 Host、local Chrome Theia full smoke）；exact-head CI / resulting-main Pages 见 #93 | [#93](https://github.com/odango-chan/ca-skill-studio-demo/issues/93)、[范围与缺口](architecture/theia-workbench.md) |
+| Theia 原生工作台迁移：Explorer / Package Explorer、右侧 Inspector / Data Flow、原生 Outline / Problems、Markdown Source + Preview | IMPLEMENTED（分阶段合入） | Stage-one #93 PASS；Package Explorer #175、Data Flow #170/#171、Native Markdown #169 已合入；PR #169 的三项宿主验收 harness 收尾见 #176 | [ADR-0003](decisions/0003-native-workbench-and-markdown.md)、[ADR-0004](decisions/0004-package-first-workspace.md)、[#176](https://github.com/odango-chan/ca-skill-studio-demo/issues/176) |
 
 
 | Scope | Design | Implementation | Acceptance | Tracking / evidence |
@@ -85,7 +96,7 @@
 | E2-A1/A2 YAML 1.2 语法诊断 / 离线 Owner Schema 智能提示 | ACCEPTED（Editor-tier） | IMPLEMENTED（main@9708528f；PR #42 MERGED） | PASS（328/328 + TypeScript + Build + real completion/hover Chromium + resulting-main Pages） | [PR #42](https://github.com/odango-chan/ca-skill-studio-demo/pull/42)、[最终 PR CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41803566642)、[main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41804005500)、[#24](https://github.com/odango-chan/ca-skill-studio-demo/issues/24) |
 | E3-A1 Python Script caller/Schema 来源导航（只读） | ACCEPTED（Editor-tier） | IMPLEMENTED（main@fc6c42a；PR #45 MERGED） | PASS（333/333 + Chromium + resulting-main Pages） | [PR #45](https://github.com/odango-chan/ca-skill-studio-demo/pull/45)、[exact-head CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41807700051)、[main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41811535041)、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) |
 | E3-A2 Python 顶层 class/def/async def 符号导航（只读） | ACCEPTED（Editor-tier） | IMPLEMENTED（main@4e88e0a；PR #46 MERGED） | PASS（338/338 + Chromium + resulting-main Pages） | [PR #46](https://github.com/odango-chan/ca-skill-studio-demo/pull/46)、[rebased exact-head CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41811806093)、[main Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41812070377)、[#25](https://github.com/odango-chan/ca-skill-studio-demo/issues/25) |
-| D4-A2.2b2/A3b2b2b/A4b2 跨生产者写入 / 带副作用或输出依赖 Step 的写入 / 新 Phase on-map 与 owner Outcome 契约 | PROPOSED | NOT_STARTED | NOT_RUN | [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15)、[设计](design/phase-designer.md) |
+| D4-A2.2b2/A3b2b2b/A4b2 跨生产者写入 / effectful Step / 新 Phase on-map | DEFERRED（缺少 Owner ABI / Effect / Outcome 契约） | NOT_IMPLEMENTED | NOT_RUN | 历史 [#15](https://github.com/odango-chan/ca-skill-studio-demo/issues/15) 已关闭为 not planned；不得在 Studio 推断缺失契约 |
 | E4-A1 浏览器所选目录导入、未知文件保留与 ZIP 导出 | ACCEPTED（Editor-tier） | IMPLEMENTED（main@3433e99；PR #48 MERGED） | PASS（345/345 + Chromium FileList UI + resulting-main Pages） | [PR #48](https://github.com/odango-chan/ca-skill-studio-demo/pull/48)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41948794306)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41949134436)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
 | E4-A2 重选目录写入（非原路径证明 / 全目录冲突 / 部分保存报告） | ACCEPTED（Demo best-effort） | IMPLEMENTED（main@ef8eae87；PR #50 MERGED） | PASS（365/365 + Chromium OPFS + Windows fixture 3/3 + resulting-main Pages）；原生 Chrome picker NOT_RUN | [PR #50](https://github.com/odango-chan/ca-skill-studio-demo/pull/50)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41963816684)、[Windows](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41963816623)、[Pages](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41964699713)、[#26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26) |
 | E1 Monaco 浅色右键菜单不透明背景 | ACCEPTED | IMPLEMENTED（#56 MERGED） | PR exact-head CI PASS（374/374 + Chromium computed-style fallback）；真实桌面右键浮层待目视验收 | [#56](https://github.com/odango-chan/ca-skill-studio-demo/pull/56)、[CI](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41990206833)、[#55](https://github.com/odango-chan/ca-skill-studio-demo/issues/55) |
@@ -135,12 +146,7 @@ main-source checkout, builds Theia from the current ref, verifies the root
 subpath, and composes one artifact. PR #86 was merged by Squash Merge at `main@b2f4e991`; the same workflow
 now runs from `main` on every normal deployment.
 
-**This is not feature parity.** PR #89 has migrated the read-only Node Focus view
-(previous/current/next, PRE/OP/POST, Source line reveal) into the IDE-host
-CustomEditor. Route creation/reconnect, Phase Designer, full Inspector,
-Package Audit and Markdown preview remain Classic-only and must be migrated
-explicitly before Classic is retired. Do not treat a successful shell build
-as proof that all old features were carried over.
+**Historical status at this release:** PR #89 had migrated only Node Focus; the listed Route, Phase, Inspector, Package Audit and Markdown capabilities were then outstanding. Later PRs migrated the accepted bounded editor scope and native workbench capabilities. This paragraph is a dated migration snapshot, not the current feature matrix; see the current baseline at the top of this file.
 
 **Security / persistence boundary:** the GitHub Pages Theia build uses a
 same-origin Webview adapter and displays a persistent warning. It is for
@@ -168,7 +174,7 @@ main browser application remains available at `/classic/`.
 
 **Architecture:** No second business projection, no new Procedure Route and no Runtime meaning for view-only phase-order links. The host validates 1-based line bounds and owns the editor selection/reveal. Only four IDE-host files changed; shared theme/package files were untouched.
 
-**Evidence:** [PR #89](https://github.com/odango-chan/ca-skill-studio-demo/pull/89) merged at `main@b9c1c38`. Exact merged-base checks: [IDE Host #42584800417 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800417), [Theia browser-only #42584800342 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800342), [Theia backend Chromium #42584800599 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800599). Resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727). Route create/reconnect, Phase Designer, full Inspector, Package Audit and Markdown preview remain outstanding.
+**Evidence:** [PR #89](https://github.com/odango-chan/ca-skill-studio-demo/pull/89) merged at `main@b9c1c38`. Exact merged-base checks: [IDE Host #42584800417 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800417), [Theia browser-only #42584800342 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800342), [Theia backend Chromium #42584800599 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42584800599). Resulting-main Pages [#42585232727 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42585232727). At this historical PR #89 checkpoint, Route create/reconnect, Phase Designer, full Inspector, Package Audit and Markdown preview remained outstanding; subsequent PRs migrated or explicitly deferred those capabilities.
 
 
 ## 2026-11-10 · Theia Inspector Node authoring（首批增量，已合入 main）

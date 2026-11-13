@@ -1,6 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
-import {prepareNativeMarkdownPackagePolicy,clearNativeMarkdownPackagePolicies} from "./markdown-link-policy.mjs";
+import {prepareNativeMarkdownPackagePolicy} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
@@ -2714,10 +2714,8 @@ export function registerWorkbench(vscode,context){
       if(!paired)nativeMarkdownOpening.delete(key);
     }
   }
-  context.subscriptions.push(
-    vscode.commands.registerCommand('skillStudio.previewMarkdownNative',openNativeMarkdownPreview),
-    vscode.commands.registerCommand('skillStudio.previewMarkdown',uri=>
-      openNativeMarkdownPreview(uri)));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.previewMarkdown',uri=>openNativeMarkdownPreview(uri)));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownPreviewAcceptance',async skillName=>{
       const name=typeof skillName==='string'?skillName:'establish-pdu-session';
@@ -2780,11 +2778,11 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
       const matches=await vscode.workspace.findFiles(
-        '**/establish-pdu-session/references/3gpp-procedure.md','**/node_modules/**',5);
+        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
       const exact=matches.filter(item=>item.path.endsWith(
-        '/establish-pdu-session/references/3gpp-procedure.md'));
+        '/establish-pdu-session/SKILL.md'));
       if(exact.length!==1)
-        throw Error('Expected exactly one existing Markdown reference for the security probe');
+        throw Error('Expected exactly one existing Skill guide for the security probe');
       const target=exact[0];
       const doc=await vscode.workspace.openTextDocument(target);
       if(doc.languageId!=='markdown')
@@ -2799,7 +2797,7 @@ export function registerWorkbench(vscode,context){
         '<script>window.skillStudioNativeMarkdownXss = true;</script>',
         '<img src="https://example.invalid/raw-html-pixel.png" onerror="window.skillStudioNativeMarkdownXss = true">',
         '',
-        '[Safe package reference](../SKILL.md)',
+        '[Safe package reference](references/3gpp-procedure.md)',
         '[Escaping package link](../../outside.md)',
         '[Missing package link](missing.md)',
         '![Remote pixel](https://example.invalid/markdown-pixel.png)',
@@ -2826,60 +2824,22 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      const suffix='/establish-pdu-session/references/3gpp-procedure.md';
+      const suffix='/establish-pdu-session/SKILL.md';
       if(!target.path.endsWith(suffix))
-        throw Error('Refusing to restore a non-fixture Markdown file');
+        throw Error('Refusing to restore a non-fixture Skill guide');
       const original=nativeMarkdownSecurityOriginals.get(target.toString());
       if(typeof original!=='string')
-        throw Error('No original Markdown content is recorded for this security probe');
+        throw Error('No original Skill guide content is recorded for this security probe');
       const doc=await vscode.workspace.openTextDocument(target);
       const edit=new vscode.WorkspaceEdit();
       edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
       const restored=await vscode.workspace.applyEdit(edit);
-      if(!restored)throw Error('Could not restore the original Markdown reference after security probe');
+      if(!restored)throw Error('Could not restore the original Skill guide after security probe');
       nativeMarkdownSecurityOriginals.delete(target.toString());
-      clearNativeMarkdownPackagePolicies([target]);
+      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,target);
+      if(!policyReady)throw Error('Could not restore the Package link policy for the original Skill guide');
       return true;
     }));
-  const nativeMarkdownScrollEvents=[];
-  if(typeof vscode.window.onDidChangeTextEditorVisibleRanges==='function'){
-    context.subscriptions.push(vscode.window.onDidChangeTextEditorVisibleRanges(event=>{
-      if(event.textEditor.document.uri.path.endsWith('/establish-pdu-session/SKILL.md')){
-        nativeMarkdownScrollEvents.push({
-          ranges:event.visibleRanges.map(range=>({start:range.start.line,end:range.end.line})),
-          active:vscode.window.activeTextEditor?.document.uri.toString()??null
-        });
-        if(nativeMarkdownScrollEvents.length>20)nativeMarkdownScrollEvents.shift();
-      }
-    }));
-  }
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance',async direction=>{
-      const editor=vscode.window.visibleTextEditors.find(item=>
-        item.document.uri.path.endsWith('/establish-pdu-session/SKILL.md'));
-      if(direction==='clear'){
-        nativeMarkdownScrollEvents.length=0;
-      }
-        const before=editor.visibleRanges.map(range=>({
-        start:range.start.line,end:range.end.line
-      }));
-      const line=direction==='bottom'?Math.max(0,editor.document.lineCount-1):0;
-      if(direction==='top'||direction==='bottom')
-        editor.revealRange(new vscode.Range(line,0,line,0),vscode.TextEditorRevealType.AtTop);
-      await new Promise(resolve=>setTimeout(resolve,100));
-      return {
-        editorFound:true,uri:editor.document.uri.toString(),
-        viewColumn:editor.viewColumn,lineCount:editor.document.lineCount,
-        before,after:editor.visibleRanges.map(range=>({
-          start:range.start.line,end:range.end.line
-        })),
-        activeEditor:vscode.window.activeTextEditor?.document.uri.toString()??null,
-        recentEvents:[...nativeMarkdownScrollEvents],
-        config:vscode.workspace.getConfiguration('markdown.preview')
-          .get('scrollEditorWithPreview')
-      };
-    }));
-
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownSettingsAcceptance',()=>({
       scrollEditorWithPreview:vscode.workspace.getConfiguration('markdown.preview')

@@ -1,6 +1,6 @@
 # ADR-0003 · Native Workbench Layout, Inspector and Markdown Ownership
 
-**Status: Accepted for implementation · Native Markdown replacement remains gated by the isolated spike · Date: 2026-11-11**
+**Status: Accepted · Native Markdown is the default Theia implementation (PR #169); host acceptance-harness closeout remains tracked by #176 · Date: 2026-11-12**
 
 **Supersedes:** the view-placement and duplicate-view assumptions in the earlier Theia migration notes. It does not supersede the Source-first authority or existing bounded-edit contracts in ADR-0001.
 
@@ -8,16 +8,16 @@
 
 ## Context
 
-Theia is the default online host and the same VS Code extension is intended to remain usable in desktop VS Code. The current extension contributes a separate Skill Studio Activity Bar container with Packages, Inspection, Outline, Evidence and Problems views. This duplicates several capabilities already owned by the host:
+Theia is the default online host and the same VS Code extension is intended to remain usable in desktop VS Code. At the time this ADR was drafted, the extension contributed a separate Skill Studio Activity Bar container with Packages, Inspection, Outline, Evidence and Problems views. This duplicated several capabilities already owned by the host:
 
 - The host already owns Explorer, editor groups, Markdown preview, Outline, Problems, Output, menus and workbench layout.
 - The extension contributes a custom Procedure Outline even though Theia has a native Outline view.
 - The extension contributes a custom Problems tree while also publishing native diagnostics to the host Problems view.
 - The current view named **Evidence** is not a Runtime Evidence browser. It displays source-derived Child / Phase / Step structure, Producer / Consumer dataflow, consumer ABI declarations and source lineage.
 - Inspector is a property editor for the selected Source-backed object. Keeping it beside file navigation is less natural than placing it in the right-side property / secondary sidebar.
-- The current Markdown implementation is a custom Webview renderer. Theia 1.73 removed the old @theia/preview package and recommends the built-in VS Code Markdown extension, vscode.markdown-language-features.
+- At the time of this decision, Theia's Markdown path was a Studio-owned Webview renderer. The built-in VS Code Markdown extension, `vscode.markdown-language-features`, was selected as the replacement; it became the default Theia implementation in PR #169. The Classic shell still retains its old renderer until the later retirement operation.
 
-The current Plugin-managed Project / Dependency / Tool / BuildRequest contract is being developed in PRs #150 and #152. The new layout must not assume the retired skills/lib/output project model as its permanent authority.
+The Plugin-managed Configuration v0.1 contract is now canonical. The initial unified Package Explorer implementation is merged in PR #175; ADR-0004 supersedes this ADR for primary-sidebar ordering and the unified Skills / Dependencies projection. The layout must not assume the retired skills/lib/output project model.
 
 ## Decisions
 
@@ -43,14 +43,14 @@ Do not build a second IDE shell or a second generic Markdown editor.
 
 ### 2. Target workbench layout
 
-**Primary sidebar (left):**
+**Primary sidebar (left) — current placement is defined by ADR-0004:**
 
-- Native Explorer / Files.
-- Project / Packages inventory.
-- Dependencies, based on the Plugin-managed Project contract.
+- The host's native Explorer container.
+- One Package Explorer TreeView with Skills and Plugin-managed Dependencies as logical sections.
+- The host's native Files tree remains separate and available.
 - Native Outline, driven by the active document's DocumentSymbol provider.
 
-These are native host views. They must not require a dedicated Skill Studio Activity Bar. A compact Project view may group Packages and Dependencies if that produces a clearer hierarchy; do not add more Activity Bar containers to compensate for missing layout decisions.
+The initial proposal above treated Packages and Dependencies as separate views. ADR-0004 supersedes that proposal with the single Package Explorer projection now implemented by PR #175. No dedicated Skill Studio Activity Bar or second workbench shell is contributed.
 
 **Secondary sidebar (right):**
 
@@ -58,7 +58,7 @@ These are native host views. They must not require a dedicated Skill Studio Acti
 - It displays the current selected Source-backed Node, Phase, Step, Route, Contract or Predicate properties and only exposes already-qualified bounded edits.
 - It may contain a contextual **Data Flow** section for the selected Step / consumer. Data Flow is not a separate permanent Evidence panel.
 
-The right-side placement is the product decision. Use the native secondarySidebar contribution. Theia 1.76's plugin contribution normalizer explicitly maps secondarySidebar to its right-side location (see [Theia v1.76.0 normalize-contributions.ts](https://github.com/eclipse-theia/theia/blob/v1.76.0/packages/plugin-utils/src/node/normalize-contributions.ts#L92-L96)); desktop VS Code exposes the same contribution point. The implementation still requires real Theia Chromium and desktop VS Code placement acceptance. If a host runtime does not attach the view as expected, use the host's native movable view/container mechanism; do not implement a custom right dock or a Theia-only property UI.
+The right-side placement is the product decision. Use the native secondarySidebar contribution. Theia 1.76's plugin contribution normalizer explicitly maps secondarySidebar to its right-side location (see [Theia v1.76.0 normalize-contributions.ts](https://github.com/eclipse-theia/theia/blob/v1.76.0/packages/plugin-utils/src/node/normalize-contributions.ts#L92-L96)); desktop VS Code exposes the same contribution point. Theia Browser-Only and backend Chromium acceptance verify the Inspector's right-side placement. Desktop VS Code placement remains `NOT_RUN`. If a host runtime does not attach the view as expected, use the host's native movable view/container mechanism; do not implement a custom right dock or a Theia-only property UI.
 
 **Bottom Panel:**
 
@@ -123,38 +123,34 @@ The existing Studio view skillStudio.evidence is a different thing: it is a stat
 - Keep explicit Audit / Refresh commands and a clear unavailable state; a missing or incomplete audit must not be shown as a clean Package.
 - Compiler diagnostics may later join native Problems, but LSP / Package Audit must never be presented as Compiler success or Runtime qualification.
 
-### 6. Native Markdown is an isolated replacement experiment, not an immediate deletion
+### 6. Native Markdown is the active Theia implementation; Classic remains separate until retirement
 
-The preferred candidate is the built-in VS Code Markdown extension vscode.markdown-language-features, preinstalled in Theia 1.76. Theia's migration guide recommends this extension after removal of @theia/preview.
+The accepted Theia implementation is the pinned built-in VS Code Markdown extension `vscode.markdown-language-features@1.95.3`, merged as [PR #169](https://github.com/odango-chan/ca-skill-studio-demo/pull/169) at `main@82f0b0c5`. It owns Markdown rendering, read-only Preview and Preview lifecycle. Native bidirectional scroll preferences are enabled, but actual editor/preview scroll synchronization has not been confirmed in Theia.
 
-The isolated branch is:
+The Studio extension owns only the integration boundary:
 
-- spike/native-markdown-extension-20261111
-
-The experiment must use:
-
-- the host's native Monaco Markdown source editor;
-- the built-in Markdown preview and its native editor / preview synchronization;
-- the existing SKILL Studio Light color theme and a Studio-owned CSS contribution through the Markdown extension point contributes.markdown.previewStyles;
 - automatic pairing on Markdown open: editable Source in editor group one, read-only Preview in editor group two;
-- native preview live updates, bidirectional scrolling and source reveal.
+- the shared SKILL Studio Light Markdown theme via `contributes.markdown.previewStyles`;
+- exact Package-root inventory and symlink checks through `markdown-link-policy.mjs`;
+- fail-closed handling for missing/ambiguous Package roots and unsafe Package-relative links;
+- raw HTML and image fetches remain disabled.
 
-The default user experience is **Source + Preview together**. Opening a Markdown file must not silently open Preview-only. Users may use native editor-group controls to resize, move, hide or close Preview; the normal default is the paired split.
-
-The current custom Markdown implementation remains available as a comparison / fallback until every required gate below passes.
+The old `site/markdown-preview.mjs` renderer and its stylesheet remain for the preserved Classic shell only. They are not an alternative Theia renderer. Do not delete or refactor them as part of this issue; Classic retirement is a separate later operation.
 
 #### Native Markdown acceptance gates
 
-1. **Host integration:** Theia 1.76 browser-only build loads the pinned Markdown extension from its built-in plugin directory; real Chromium proves the native command and preview actually execute.
-2. **Default pairing:** opening a Markdown file from Explorer, Packages and an internal Package link opens one authoritative Source editor plus one Preview in a separate editor group. Reopening / switching documents does not create duplicate previews.
-3. **Editing:** unsaved Source edits update the existing Preview without recreating it; native Undo / Redo remains authoritative.
-4. **Navigation:** source-to-preview and preview-to-source scrolling work in both directions; heading navigation and the native Outline remain useful.
-5. **Theme:** heading accents, body typography, links, code blocks, tables, alignment, table overflow and responsive layout match the Studio design through the shared theme extension. Do not fork host-specific theme CSS.
-6. **Skill guide behavior:** Front Matter remains understandable; headings / TOC or equivalent navigation remain available; relative Reference links work only within the active Skill Package.
-7. **Security:** raw HTML cannot execute; no remote images, scripts or arbitrary fetch are introduced; the preview stays under the host's strict security level. Package-local links must pass exact Package-root containment, file inventory and symlink checks. A workspace-wide link is not automatically a Package-local link.
-8. **Fallback:** unsupported syntax, unavailable extension, CSP / webview failure or an unsafe link must fail closed and leave Source accessible.
+The implementation is merged and is the default. Cleanup PR [#177](https://github.com/odango-chan/ca-skill-studio-demo/pull/177) replaces the retired custom-renderer fixture and probes the actual native Preview frame in both Chromium hosts. The previous automated probe used a programmatic Source `revealRange` helper rather than a real user scroll gesture, so it could not establish bidirectional behavior. Synthetic scroll instrumentation is removed from the workbench and scroll synchronization is removed from automated acceptance. Tests record only current preferences and visible viewport state; manual user inspection remains pending. Do not restore the custom renderer or add a custom scroll bridge.
 
-If the native extension cannot preserve the current security and Package-link guarantees, do not replace the current renderer. A hybrid adapter is acceptable only if it delegates rendering and editor synchronization to the native extension and keeps the security / Package navigation checks in a thin Studio extension layer; do not fork the Markdown engine.
+The real-host acceptance must prove:
+
+1. **Host integration:** both Theia browser-only and backend builds load the pinned Markdown extension and its worker.
+2. **Default pairing:** opening a Markdown file from Explorer, Package Explorer and an internal Package link opens one authoritative Source editor plus one Preview in a separate editor group. Reopening / switching documents does not create duplicate previews.
+3. **Editing:** unsaved Source edits update the existing Preview without recreating it; native Undo / Redo remains authoritative.
+4. **Navigation:** Package-local link navigation targets the exact Package. Native scroll preferences are enabled, but editor/preview synchronization is not automated because the prior Source test used programmatic reveal rather than user input. The user will inspect both directions in the deployed workbench before this behavior is called accepted.
+5. **Theme:** heading accents, body typography, links, code blocks, tables, alignment, table overflow and responsive layout use the shared theme extension.
+6. **Skill guide behavior:** Front Matter remains understandable; headings / TOC or equivalent navigation remain available; relative Reference links work only within the active Skill Package.
+7. **Security:** raw HTML cannot execute; no remote images, scripts or arbitrary fetch are introduced; Package-local links pass exact Package-root containment, file inventory and symlink checks.
+8. **Fallback:** unsupported syntax, unavailable extension, CSP / webview failure or an unsafe link must fail closed and leave Source accessible.
 
 ### 7. Classic retirement is a later release operation
 
@@ -170,7 +166,7 @@ Do not remove site/ wholesale. Its current modules still contain shared Procedur
 
 ## Implementation order
 
-1. **Native Markdown spike:** build and test the built-in extension, Studio preview styles, default Source + Preview pairing and security / Package-link parity. Keep it on its own branch until reviewed.
+1. **Native Markdown:** default implementation is merged in PR #169; finish the acceptance-harness closeout under #176. Do not maintain a second Theia Markdown renderer.
 2. **Workbench layout:** move Project / Packages / Dependencies to the native primary sidebar and place Inspector in the native right-side secondary sidebar. Remove the separate Skill Studio Activity Bar only when the new views are reachable and accepted.
 3. **Native Outline:** implement Procedure YAML DocumentSymbols and verify Source ↔ Outline ↔ Canvas synchronization.
 4. **Problems and Data Flow:** consolidate diagnostics into native Problems; rename the old Evidence view and move its source-derived dataflow / ABI content into Inspector.

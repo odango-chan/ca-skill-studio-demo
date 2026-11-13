@@ -21,10 +21,6 @@ export function setNativeMarkdownPackagePolicies(uris,policy){
   }
 }
 
-export function clearNativeMarkdownPackagePolicies(uris){
-  for(const uri of uris??[])policies.delete(uriKey(uri));
-}
-
 export function isAllowedPackageRelativeLink(href,currentDirRelative,allowedFiles){
   if(typeof href!=="string"||!href)return false;
   if(href.startsWith("#"))return true;
