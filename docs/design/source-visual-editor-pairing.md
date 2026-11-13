@@ -34,6 +34,8 @@ The Markdown renderer remains the built-in Markdown extension. YAML projections 
 
 ## Implementation boundary
 
+YAML CustomEditors are registered with `priority: option`, and Theia must not force them through `workbench.editorAssociations`. Native text editing therefore opens first; the extension's active-editor hook then opens the matching Visual in the right group. Explicit Designer commands and cross-file navigation use the same orchestration.
+
 `source-view-pair.mjs` owns the common YAML Source/Designer placement and destination mapping. Each Designer continues to own its projection, webview lifecycle, source-change subscription, and domain-specific interactions. Markdown continues to use the built-in Markdown Preview integration, because its renderer and scroll synchronization are native extension responsibilities.
 
 The shared pairing helper must not absorb YAML parsing, projection, editor rendering, mutation policy, Markdown rendering, or package semantics.
