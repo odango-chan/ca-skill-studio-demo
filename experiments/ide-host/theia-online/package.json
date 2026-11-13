@@ -15,12 +15,6 @@
           "workbench.iconTheme": "skill-studio-file-icons",
           "workbench.list.openMode": "singleClick",
           "editor.enablePreview": true,
-          "workbench.editorAssociations": {
-            "procedure.yaml": "skillStudio.procedurePreview",
-            "contract.yaml": "skillStudio.contractPreview",
-            "predicates.yaml": "skillStudio.predicatePreview",
-            "*.schema.yaml": "skillStudio.schemaPreview"
-          },
           "editor.semanticHighlighting.enabled": true,
           "markdown.preview.scrollPreviewWithEditor": true,
           "markdown.preview.scrollEditorWithPreview": true,
