@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair}
+import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair,revealVisualEditorRight}
   from '../vscode/src/source-view-pair.mjs';
 
 const uri=path=>({path,toString(){return 'file://'+path;}});
@@ -29,6 +29,13 @@ test('all supported YAML visual editors have one explicit Source/Visual mapping'
   assert.equal(sourceViewType(uri('/p/schemas/nested/request.schema.yaml')),null);
   assert.equal(sourceViewType(uri('/p/scripts/run.py')),null);
   assert.equal(sourceViewType(uri('/p/assurance/other.yaml')),null);
+});
+
+test('CustomEditor providers can normalize their panel to the right after resolving',()=>{
+  const {vscode}=vscodeApi(),calls=[];
+  const panel={reveal:(column,preserveFocus)=>calls.push({column,preserveFocus})};
+  assert.equal(revealVisualEditorRight(vscode,panel),true);
+  assert.deepEqual(calls,[{column:2,preserveFocus:true}]);
 });
 
 test('Source-first pairing opens Visual in column two and native Source in column one',async()=>{
