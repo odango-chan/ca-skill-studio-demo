@@ -37,7 +37,8 @@ export function forgetSourceViewPair(uri) {
 // opens the visual in column two and keeps the one live Source in column one.
 export async function openSourceViewPair(vscode,uri,{line}={}) {
   const viewType=sourceViewType(uri);
-  const document=await vscode.workspace.openTextDocument(uri);
+  const document=(vscode.workspace.textDocuments??[]).find(item=>item.uri.toString()===uri.toString())??
+    await vscode.workspace.openTextDocument(uri);
   const safeLine=Number.isSafeInteger(line)&&line>0&&line<=document.lineCount?line:1;
   const position=new vscode.Position(safeLine-1,0);
   const selection=new vscode.Range(position,position);
