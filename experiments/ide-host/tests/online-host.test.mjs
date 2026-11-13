@@ -37,6 +37,11 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     language.id==="markdown"&&language.extensions?.includes(".md")),
     "native Markdown preview requires registered language ID in Theia");
   assert.deepEqual(plugin.contributes["markdown.previewStyles"],["./media/native-markdown-preview.css"]);
+  assert.ok(!plugin.contributes.commands.some(command=>command.command==="skillStudio.previewMarkdown"),
+    "Markdown Preview is owned by the native extension, not a duplicate Studio command");
+  for(const menu of Object.values(plugin.contributes.menus??{}))
+    assert.ok(!menu.some(item=>item.command==="skillStudio.previewMarkdown"),
+      "Studio must not contribute a duplicate Markdown Preview menu entry");
   const editorViews=new Set(plugin.contributes.customEditors.map(x=>x.viewType));
   for(const view of ["skillStudio.procedurePreview","skillStudio.contractPreview",
     "skillStudio.predicatePreview","skillStudio.schemaPreview"])assert.ok(editorViews.has(view),view);
