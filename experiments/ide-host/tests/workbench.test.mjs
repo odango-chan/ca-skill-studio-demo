@@ -234,7 +234,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     }:null;}},
     languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
     commands:{async executeCommand(id,...args){nativeCommands.push({id,args});return true;},
-      async getCommands(){return ['markdown.showPreviewToSide'];},
+      async getCommands(){return ['markdown.showPreview','vscode.openWith'];},
       registerCommand(name,cb){commands.set(name,cb);return disposable();}},
     workspace:{textDocuments:[doc,markdownDoc],
       getWorkspaceFolder:()=>({uri:uri('/workspace')}),
@@ -672,9 +672,11 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     'Markdown Source is persistent, not a transient preview tab');
   assert.equal(markdownExtensionActivated,true,
     'the exact pinned Markdown extension is activated before its command is used');
-  assert.ok(nativeCommands.some(call=>call.id==='markdown.showPreviewToSide'&&
-    call.args[0]?.path?.endsWith('/establish-pdu-session/SKILL.md')),
-    'the built-in Markdown Preview command owns rendering in the second editor group');
+  assert.ok(nativeCommands.some(call=>call.id==='vscode.openWith'&&
+    call.args[0]?.path?.endsWith('/establish-pdu-session/SKILL.md')&&
+    call.args[1]==='vscode.markdown.preview.editor'&&
+    call.args[2]?.viewColumn===vscode.ViewColumn.Two),
+    'the native Markdown Preview CustomEditor must target the shared second group');
   const nativeSettings=await commands.get(
     'skillStudio.internal.nativeMarkdownSettingsAcceptance')();
   assert.equal(nativeSettings.scrollEditorWithPreview,true);
