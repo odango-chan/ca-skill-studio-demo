@@ -1,5 +1,3 @@
-import {openNativeSource} from './native-source.mjs';
-
 const SOURCE_VIEW_PAIRS = Object.freeze([
   {test:path=>path.toLowerCase().endsWith('/assurance/procedure.yaml'),viewType:'skillStudio.procedurePreview'},
   {test:path=>path.toLowerCase().endsWith('/assurance/contract.yaml'),viewType:'skillStudio.contractPreview'},
@@ -43,7 +41,7 @@ export async function openSourceViewPair(vscode,uri,{line}={}) {
   const position=new vscode.Position(safeLine-1,0);
   const selection=new vscode.Range(position,position);
   if(!viewType) {
-    await openNativeSource(vscode,uri,{
+    await vscode.window.showTextDocument(document,{
       viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,selection
     });
     return {uri:uri.toString(),viewType:null,sourceColumn:vscode.ViewColumn.One,
@@ -61,10 +59,11 @@ export async function openSourceViewPair(vscode,uri,{line}={}) {
       try{await vscode.commands.executeCommand('workbench.action.moveEditorToFirstGroup');}
       catch{/* Some compatible hosts do not expose the move command. */}
     }
-    await vscode.commands.executeCommand('vscode.openWith',uri,viewType,{
-      viewColumn:vscode.ViewColumn.Two,preserveFocus:true,preview:false
-    });
-    await openNativeSource(vscode,uri,{
+    // Theia's vscode.openWith command accepts a numeric ViewColumn (unlike
+    // showTextDocument's options object). Keep the call on the public command
+    // contract so Browser and desktop hosts agree on the right-side group.
+    await vscode.commands.executeCommand('vscode.openWith',uri,viewType,vscode.ViewColumn.Two);
+    await vscode.window.showTextDocument(document,{
       viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,selection
     });
     openPairs.add(key);
