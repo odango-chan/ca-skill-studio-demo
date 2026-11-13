@@ -1,8 +1,8 @@
-// Compose the Pages artifact with Theia as the default root and the full
-// previous browser Studio preserved at /classic/.
-// The caller must build and smoke-test both inputs before invoking this step.
-import {cp,mkdtemp,mkdir,readdir,readFile,rm,stat,writeFile} from "node:fs/promises";
-import {dirname,join,resolve} from "node:path";
+// Publish only the supported Theia browser-only workbench.
+// No Classic application, compatibility copy, or alternate legacy entrypoint
+// is staged into the Pages artifact.
+import {cp,mkdir,readFile,rm,stat,writeFile} from "node:fs/promises";
+import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 
 async function requireFile(root,relative){
@@ -13,129 +13,67 @@ async function requireFile(root,relative){
   return path;
 }
 
-function injectBeforeBody(html,markup,id){
-  if(html.includes('id="'+id+'"'))return html;
-  const match=html.match(/<body(?:\s[^>]*)?>/i);
-  if(!match)throw new Error("Cannot add navigation banner: HTML has no body element");
-  return html.replace(match[0],match[0]+markup);
-}
-
-export async function composePagesRelease({classicDist,theiaFrontend,outputDist=classicDist}){
-  const classic=resolve(classicDist);
-  const output=resolve(outputDist);
-  const theia=resolve(theiaFrontend);
-  if(classic!==output)
-    throw new Error("outputDist must equal classicDist: the original Classic build is staged before replacement");
-
-  // Validate all inputs before touching the original build output.
-  for(const asset of ["index.html","app.js","studio.css","light.css","app.css"])
-    await requireFile(classic,asset);
-  const theiaIndexPath=await requireFile(theia,"index.html");
+export async function composePagesRelease({theiaFrontend,outputDist,siteRoot=null}){
+  if(!theiaFrontend||!outputDist)throw new Error("theiaFrontend and outputDist are required");
+  const theia=resolve(theiaFrontend),output=resolve(outputDist);
   for(const asset of [
-    "bundle.js","classic-icons.css","skill-studio-brand.css","skill-studio-brand.js",
-    "hostedPlugin/list.json","webview/index.html",
+    "index.html","bundle.js","hostedPlugin/list.json","webview/index.html",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js",
     "hostedPlugin/odango_chan_skill_studio_theme/package.json",
     "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
     "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
     "hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg",
-    "hostedPlugin/odango_chan_skill_studio_theme/icons/yaml.svg"
+    "hostedPlugin/odango_chan_skill_studio_languages/package.json"
   ])await requireFile(theia,asset);
+
+  const html=await readFile(join(theia,"index.html"),"utf8");
+  if(!html.includes('id="skill-studio-preview-warning"')||
+     !html.includes("在线演示")||
+     html.includes("/classic/")||
+     html.includes("classic-icons.css"))
+    throw new Error("Theia index must show the same-origin demo safety warning and contain no Classic navigation/assets");
+
   const pluginList=await readFile(join(theia,"hostedPlugin/list.json"),"utf8");
-  if(!pluginList.includes("skill-studio-theme"))
-    throw new Error("Theia hostedPlugin list does not include the shared Skill Studio theme");
-  const theiaHtml=await readFile(theiaIndexPath,"utf8");
-  if(!theiaHtml.includes('id="skill-studio-preview-warning"')||
-     !theiaHtml.includes('href="./classic/"')||
-     !theiaHtml.includes('id="skill-studio-classic-icon-theme"')||
-     !theiaHtml.includes('href="./classic-icons.css"')||
-     !theiaHtml.includes('id="skill-studio-brand-theme"')||
-     !theiaHtml.includes('href="./skill-studio-brand.css"')||
-     !theiaHtml.includes('id="skill-studio-brand-script"')||
-     !theiaHtml.includes('src="./skill-studio-brand.js"'))
-    throw new Error("Theia index must include the same-origin warning, Classic navigation, and SKILL Studio brand assets");
-
-  const stage=await mkdtemp(join(dirname(output),".skill-studio-classic-"));
-  const stagedClassic=join(stage,"classic");
-  try{
-    await cp(classic,stagedClassic,{recursive:true});
-    const classicIndex=await readFile(join(stagedClassic,"index.html"),"utf8");
-    const banner='<div id="skill-studio-classic-banner" role="note" style="position:fixed;right:12px;bottom:12px;z-index:2147483000;display:flex;gap:10px;align-items:center;padding:7px 11px;border:1px solid #c8d5e6;border-radius:7px;background:#f7faff;color:#26364a;box-shadow:0 2px 12px #0002;font:12px/1.4 system-ui,sans-serif"><span>Classic · 原版完整工作台</span><a href="../" aria-label="切换新版插件工作台" style="color:#1759a6;font-weight:600">打开新版工作台</a></div>';
-    await writeFile(join(stagedClassic,"index.html"),
-      injectBeforeBody(classicIndex,banner,"skill-studio-classic-banner"));
-
-    await rm(output,{recursive:true,force:true});
-    await mkdir(output,{recursive:true});
-    await cp(stagedClassic,join(output,"classic"),{recursive:true});
-
-    for(const entry of await readdir(theia,{withFileTypes:true})){
-      await cp(join(theia,entry.name),join(output,entry.name),{
-        recursive:true,force:true
-      });
-    }
-    // GitHub Pages must bypass Jekyll so Theia's underscore-prefixed assets
-    // and browser-worker paths are published exactly as built.
-    await writeFile(join(output,".nojekyll"),"");
-    // Preserve a configured Pages custom domain if the Classic build carries it.
-    try{
-      const domain=await readFile(join(stagedClassic,"CNAME"),"utf8");
-      await writeFile(join(output,"CNAME"),domain);
-    }catch(error){
-      if(error?.code!=="ENOENT")throw error;
-    }
-
-    const legacyPreview=join(output,"ide-preview");
-    await mkdir(legacyPreview,{recursive:true});
-    await writeFile(join(legacyPreview,"index.html"),
-      '<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../"><link rel="canonical" href="../"><meta name="robots" content="noindex"></head><body><p>Theia 已成为默认入口。<a href="../">打开新版工作台</a></p></body></html>');
-
-    // Final artifact assertions: Theia is at root; Classic remains complete.
-    await requireFile(output,"index.html");
-    await requireFile(output,"bundle.js");
-    await requireFile(output,"classic-icons.css");
-    await requireFile(output,"skill-studio-brand.css");
-    await requireFile(output,"skill-studio-brand.js");
-    await requireFile(output,"hostedPlugin/list.json");
-    await requireFile(output,"webview/index.html");
-    await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/package.json");
-    await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json");
-    await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json");
-    await requireFile(output,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg");
-    await requireFile(output,"classic/index.html");
-    await requireFile(output,"classic/app.js");
-    await requireFile(output,"classic/studio.css");
-    await requireFile(output,"ide-preview/index.html");
-    const rootHtml=await readFile(join(output,"index.html"),"utf8");
-    const classicHtml=await readFile(join(output,"classic","index.html"),"utf8");
-    if(!rootHtml.includes('href="./classic/"')||
-       !rootHtml.includes('href="./classic-icons.css"')||
-       !rootHtml.includes('href="./skill-studio-brand.css"')||
-       !rootHtml.includes('src="./skill-studio-brand.js"')||
-       !classicHtml.includes('href="../"'))
-      throw new Error("Published root/Classic navigation is incomplete");
-    return Object.freeze({
-      defaultHost:"theia-browser-only",
-      classicPath:"/classic/",
-      legacyPreviewRedirect:"/ide-preview/ -> /",
-      sameOriginWarning:true,
-      brandedNativeMenuBar:true
-    });
-  }finally{
-    await rm(stage,{recursive:true,force:true,maxRetries:4,retryDelay:100});
+  for(const id of ["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]){
+    if(!pluginList.includes(id))throw new Error("Theia hostedPlugin list is missing "+id);
   }
+
+  await rm(output,{recursive:true,force:true});
+  await mkdir(output,{recursive:true});
+  for(const entry of await (await import("node:fs/promises")).readdir(theia,{withFileTypes:true})){
+    await cp(join(theia,entry.name),join(output,entry.name),{recursive:true,force:true});
+  }
+  await writeFile(join(output,".nojekyll"),"");
+  if(siteRoot){
+    try{
+      const domain=await readFile(join(resolve(siteRoot),"CNAME"),"utf8");
+      await writeFile(join(output,"CNAME"),domain);
+    }catch(error){if(error?.code!=="ENOENT")throw error;}
+  }
+  await requireFile(output,"index.html");
+  await requireFile(output,"bundle.js");
+  await requireFile(output,"hostedPlugin/list.json");
+  await requireFile(output,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js");
+  const forbidden=["classic","app.js","studio.css","light.css","app.css","ide-preview"];
+  for(const name of forbidden){
+    const info=await stat(join(output,name)).catch(()=>null);
+    if(info)throw new Error("Legacy Classic artifact must not be published: "+name);
+  }
+  return Object.freeze({defaultHost:"theia-browser-only",classicPublished:false,
+    legacyRedirects:false,sameOriginWarning:true});
 }
 
 function arg(name){
   const index=process.argv.indexOf(name);
-  if(index<0||!process.argv[index+1])
-    throw new Error("Missing required argument "+name);
+  if(index<0||!process.argv[index+1])throw new Error("Missing required argument "+name);
   return process.argv[index+1];
 }
-
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const result=await composePagesRelease({
-    classicDist:arg("--classic"),
-    theiaFrontend:arg("--theia"),
-    outputDist:arg("--output")
+    theiaFrontend:arg("--theia"),outputDist:arg("--output"),
+    siteRoot:process.argv.includes("--site-root")?arg("--site-root"):null
   });
   console.log("STUDIO_PAGES_COMPOSED",JSON.stringify(result));
 }
