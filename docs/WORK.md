@@ -2,7 +2,7 @@
 
 ## 2026-11-13 · Theia-only baseline and Classic retirement
 
-**Current target architecture:** VS Code Web Extension hosted by Theia 1.76 browser-only. Classic standalone browser workbench is being retired by [PR #186](https://github.com/odango-chan/ca-skill-studio-demo/pull/186); the PR removes its app entrypoint, build scripts, CI path and Pages fallback. The PR is under exact-head CI and real Chromium verification; until merge and resulting-main Pages verification, do not claim the new artifact is deployed.
+**Current main:** `347b80682fa3f9044246a140a3b9ae5856095658`. VS Code Web Extension hosted by Theia 1.76 browser-only is the sole workbench. [PR #186](https://github.com/odango-chan/ca-skill-studio-demo/pull/186) is merged; Classic standalone browser app, build scripts, CI path and Pages fallback are removed. Resulting-main Pages deployment [run #43405949805](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/43405949805) succeeded. Its build-info records `sourceSha` and `workflowSha` as `347b80682fa3f9044246a140a3b9ae5856095658`, `defaultHost: theia-browser-only`, and `classicPublished: false`.
 
 ### 当前 Theia 实现
 
@@ -14,7 +14,7 @@
 
 ### Classic retirement boundary
 
-PR #186 removes the Classic standalone browser app, root-level build entrypoint, Classic shell icon CSS injection, old Classic-only E2E runner, and the /classic/ Pages artifact. Shared parser, projection, icon geometry, Package fixtures and edit-policy modules are retained only where still consumed by Theia, its extensions or regression tests. This cleanup does not delete user workspaces or user-authored Skill files.
+PR #186 has removed the Classic standalone browser app, root-level build entrypoint, Classic shell icon CSS injection, old Classic-only E2E runner, and the /classic/ Pages artifact. Shared parser, projection, icon geometry, Package fixtures and edit-policy modules remain only where consumed by Theia, its extensions or regression tests. No user workspaces or user-authored Skill files were deleted.
 
 ### 后续产品基础设施（尚未作为已交付能力）
 
