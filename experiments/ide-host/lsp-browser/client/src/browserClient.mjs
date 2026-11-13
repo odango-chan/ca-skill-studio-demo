@@ -4,6 +4,7 @@ import studioLightTheme from "../../../../../extensions/skill-studio-theme/theme
 import { createSemanticTokenDecorationRenderer } from "./semantic-token-decorations.mjs";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
+export const PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION = "skillStudio/packageSnapshotAccepted";
 export const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
 export const PACKAGE_CLOSE_NOTIFICATION = "skillStudio/packageClose";
 export const ANALYSIS_STATUS_NOTIFICATION = "skillStudio/analysisStatus";
@@ -282,6 +283,12 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   client.onDidChangeState(event => {
     if (started && !stopped && event.newState === State.Stopped)
       fatal("Browser LanguageClient stopped unexpectedly");
+  });
+  client.onNotification(PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION, accepted => {
+    if (!terminalFailure && accepted?.rootUri && Number.isSafeInteger(accepted.generation)) {
+      handlers.onPackageSnapshotAccepted?.(accepted);
+      refreshTheiaSemanticTokens();
+    }
   });
   client.onNotification(ANALYSIS_STATUS_NOTIFICATION, status => {
     if (!terminalFailure) handlers.onStatus?.(status);
