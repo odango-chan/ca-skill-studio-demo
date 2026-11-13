@@ -46,7 +46,7 @@ import {createSemanticTokenDecorationRenderer}
 import {createPackageLanguageLifecycle}
   from "./package-language-lifecycle.mjs";
 
-export function registerWorkbench(vscode,context){
+export function registerWorkbench(vscode,context,{prepareToolContract}={}){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer,
     lastSelectionMessage=null;
@@ -352,9 +352,20 @@ export function registerWorkbench(vscode,context){
               try{
                 const contract=JSON.parse(decoder.decode(decodeBase64(file.bytes)));
                 if(contract.apiVersion==="skillc.tool/v0.1"&&Array.isArray(contract.operations)){
+                  const text=JSON.stringify(contract,null,2);
+                  const uri=prepareToolContract?.(dependency,text)?.toString();
+                  const prefix='\n      "id": ';
                   for(const item of contract.operations){
-                    if(typeof item?.id==="string")
-                      operations.push({id:item.id,dependencyId:dependency.id});
+                    if(typeof item?.id!=="string")continue;
+                    const literal=JSON.stringify(item.id);
+                    const offset=text.indexOf(prefix+literal);
+                    const line=offset<0?0:text.slice(0,offset).split("\n").length;
+                    const character=prefix.length;
+                    const location=uri&&offset>=0?{uri,range:{
+                      start:{line,character},
+                      end:{line,character:character+literal.length-2}
+                    }}:undefined;
+                    operations.push({id:item.id,dependencyId:dependency.id,location});
                   }
                 }
               }catch(error){

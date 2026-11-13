@@ -110,27 +110,29 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     "skill-studio-dependency",{
       provideTextDocumentContent(uri){return previews.get(uri.path)??"";}
     }));
+  function prepareToolContract(snapshot,text){
+    const path="/"+snapshot.id+"/"+snapshot.snapshotDigest.slice(7)+"/tool-contract.json";
+    const uri=vscode.Uri.from({scheme:"skill-studio-dependency",path});
+    previews.set(path,text);
+    return uri;
+  }
   async function inspect(id,operationId=null){
     const root=await ensureRoot(),resolved=await resolveLockedDependencies(vscode,root);
     const snap=resolved.snapshots.find(entry=>entry.id===id);
     if(!snap)throw Error("Locked contract missing or invalid; refusing to use remote latest");
     const file=snap.files.find(item=>item.path==="tool-contract.json");
     if(!file)throw Error("No canonical Tool Contract in snapshot");
-    const virtualPath="/"+id+"/"+snap.snapshotDigest.slice(7)+"/tool-contract.json";
-    previews.set(virtualPath,new TextDecoder().decode(decodeBase64(file.bytes)));
-    const uri=vscode.Uri.from({scheme:"skill-studio-dependency",path:virtualPath});
-    const document=await vscode.workspace.openTextDocument(uri);
+    const text=JSON.stringify(JSON.parse(new TextDecoder().decode(decodeBase64(file.bytes))),null,2);
+    const document=await vscode.workspace.openTextDocument(prepareToolContract(snap,text));
     const editor=await vscode.window.showTextDocument(document,
       {preview:true,preserveFocus:false});
     if(typeof operationId==="string"&&operationId){
-      const marker='"id":'+JSON.stringify(operationId);
-      const content=document.getText();
-      const offset=content.indexOf(marker);
+      const marker='\n      "id": '+JSON.stringify(operationId);
+      const offset=text.indexOf(marker);
       if(offset>=0&&typeof document.positionAt==="function"){
-        const start=document.positionAt(offset+5);
+        const start=document.positionAt(offset+'\n      "id": '.length);
         const end=document.positionAt(offset+marker.length);
-        const selection=new vscode.Selection(start,end);
-        editor.selection=selection;
+        editor.selection=new vscode.Selection(start,end);
         editor.revealRange?.(new vscode.Range(start,end),
           vscode.TextEditorRevealType?.InCenter);
       }
@@ -283,5 +285,5 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     refresh();onLockChanged();return result;
   });
   const getProjectRoot=()=>selectedRoot??(roots().length===1?roots()[0].uri:null);
-  return {refresh,getProjectRoot,provider};
+  return {refresh,getProjectRoot,provider,prepareToolContract};
 }

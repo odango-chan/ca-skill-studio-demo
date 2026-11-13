@@ -65,7 +65,9 @@ export function activate(context){
       getProjectRoot:dependencyIntegration.getProjectRoot,
       onPackagesChanged:packages=>workbench?.syncPackages?.(packages)
     });
-  workbench=registerWorkbench(vscode,context);
+  workbench=registerWorkbench(vscode,context,{
+    prepareToolContract:dependencyIntegration.prepareToolContract
+  });
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
   registerSchemaEditor(vscode,context);

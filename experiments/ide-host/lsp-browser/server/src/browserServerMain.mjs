@@ -355,7 +355,11 @@ connection.onDefinition(params => {
     if(snapshot.completeness!=="complete"||index?.generation!==snapshot.generation)
       return null;
     const declaration=uniqueSkillSymbolDeclaration(symbolHit);
-    if(!declaration)return null;
+    if(!declaration){
+      if(symbolHit.declarations.length||
+         !["skillOperation","skillCapability"].includes(symbolHit.token.type))return null;
+      return projectOperationCatalog(snapshot,index).get(symbolHit.token.name)?.location??null;
+    }
     const target=snapshotDocumentFor(snapshot,declaration.uri);
     return location(declaration.uri,target,declaration.range);
   }
