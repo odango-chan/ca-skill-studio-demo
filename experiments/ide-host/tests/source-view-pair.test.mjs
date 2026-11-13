@@ -34,23 +34,16 @@ test('all supported YAML visual editors have one explicit Source/Visual mapping'
 test('Source-first pairing opens Visual in column two and native Source in column one',async()=>{
   const {vscode,calls,shown}=vscodeApi();
   const target=uri('/p/assurance/contract.yaml');
-  const execute=vscode.commands.executeCommand;
-  vscode.commands.executeCommand=async(...args)=>{
-    assert.equal(shown.length,1,'Source must attach before opening the Visual');
-    return execute(...args);
-  };
   const result=await openSourceViewPair(vscode,target,{line:7});
-  assert.equal(calls.length,1);
+  assert.equal(calls.length,2);
   assert.deepEqual(calls.map(call=>[call[0],call[2]]),[
+    ['vscode.openWith','default'],
     ['vscode.openWith','skillStudio.contractPreview']
   ]);
-  assert.deepEqual(calls[0][3],{viewColumn:2,preserveFocus:true,preview:false});
-  assert.equal(shown.length,1);
-  assert.equal(shown[0].document.uri,target);
-  assert.equal(shown[0].options.viewColumn,1);
-  assert.equal(shown[0].options.preserveFocus,false);
-  assert.equal(shown[0].options.selection.start.line,6);
-  assert.equal(shown[0].options.selection.end.line,6);
+  assert.deepEqual(calls[0][3],{viewColumn:1,preserveFocus:false,preview:false,
+    selection:shown[0]?.options?.selection});
+  assert.deepEqual(calls[1][3],{viewColumn:2,preserveFocus:true,preview:false});
+  assert.equal(shown.length,0,'supported YAML must use the native Source opener, not TextDocument RPC');
   assert.equal(result.line,7);
   assert.equal(result.sourceColumn,1);
   assert.equal(result.visualColumn,2);
@@ -66,10 +59,14 @@ test('opening a Source already in column two moves it before creating Visual',as
   await openSourceViewPair(vscode,target);
   assert.deepEqual(calls.map(call=>call[0]),[
     'workbench.action.moveEditorToFirstGroup',
+    'vscode.openWith',
     'vscode.openWith'
   ]);
-  assert.equal(calls[1][3].viewColumn,2);
-  assert.equal(shown[0].options.viewColumn,1);
+  assert.equal(calls[1][2],'default');
+  assert.equal(calls[1][3].viewColumn,1);
+  assert.equal(calls[2][2],'skillStudio.predicatePreview');
+  assert.equal(calls[2][3].viewColumn,2);
+  assert.equal(shown.length,0);
   forgetSourceViewPair(target);
 });
 
