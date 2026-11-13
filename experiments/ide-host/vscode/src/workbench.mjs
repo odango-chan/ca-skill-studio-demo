@@ -1710,8 +1710,10 @@ export function registerWorkbench(vscode,context){
             if(doc.isDirty||await disk()!==original)
               throw Error("Python Source remained dirty after restoration");
           }catch(error){cleanup.push(String(error?.message??error));}
-          try{await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);}
-          catch(error){cleanup.push("Procedure focus: "+String(error?.message??error));}
+          // The Language Worker is deliberately terminated for this probe.
+          // Restoring the native Python Source is sufficient; reopening the
+          // Procedure CustomEditor while its provider is degraded is unrelated
+          // to the edit cleanup and can fail in Theia's editor lifecycle.
           if(cleanup.length)throw Error("L2-D4 cleanup failed: "+cleanup.join("; "));
         }
         return {workerUnavailable:true,nativePythonEditing:edited,
