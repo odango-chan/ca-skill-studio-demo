@@ -51,20 +51,23 @@ function toolbarIconButton(id,name,label,{pressed=false}={}){
     (pressed?' aria-pressed="false"':'')+'>'+svgIcon(name)+'</button>';
 }
 export function activate(context){
-  const workbench=registerWorkbench(vscode,context);
-  registerContractEditor(vscode,context);
-  registerPredicateEditor(vscode,context);
-  registerSchemaEditor(vscode,context);
-  let packageOverview=null;
+  // Register the Package Explorer before the heavier editor/workbench
+  // contributions. Its TreeView can paint its loading state immediately;
+  // inventory discovery continues asynchronously in the background.
+  let workbench=null,packageOverview=null;
   const dependencyIntegration=registerDependencyIntegration(vscode,context,{
-    onLockChanged:()=>workbench.invalidateDependencyAnalysis?.(),
+    onLockChanged:()=>workbench?.invalidateDependencyAnalysis?.(),
     onProjectRootChanged:()=>void packageOverview?.refresh()
   });
   packageOverview=registerPackageOverview(vscode,context,
-    ()=>workbench.getActiveDocument?.()??null,{
+    ()=>workbench?.getActiveDocument?.()??null,{
       dependenciesProvider:dependencyIntegration.provider,
       getProjectRoot:dependencyIntegration.getProjectRoot
     });
+  workbench=registerWorkbench(vscode,context);
+  registerContractEditor(vscode,context);
+  registerPredicateEditor(vscode,context);
+  registerSchemaEditor(vscode,context);
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
@@ -78,7 +81,6 @@ export function activate(context){
       // initialize the Procedure workbench explicitly instead of relying on
       // the visual Webview becoming the active tab.
       workbench.activate(document);
-      void packageOverview.refresh();
       let wasActive=panel.active;
       const viewState=panel.onDidChangeViewState(()=>{
         const becameActive=panel.active&&!wasActive;wasActive=panel.active;
