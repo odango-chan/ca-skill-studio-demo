@@ -723,17 +723,47 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Measure the actual Explorer click → CustomEditor render path. Do not
   // insert a fixed sleep before polling; it would dominate the reported time.
   const start=performance.now();await click(file.x,file.y);
-  let graphContext;
+  let graphContext,graphDiagnostics={frames:[]};
   async function graph(expectedProcedure=null){
     const tree=await command('Page.getFrameTree'),frames=[];
-    const walk=n=>{frames.push(n.frame);for(const c of n.childFrames??[])walk(c);};walk(tree.frameTree);
-    for(const f of frames.filter(f=>f.url.includes('/webview/index.html')||f.url.includes('.webview.'))){
-      try{const world=await command('Page.createIsolatedWorld',{frameId:f.id,worldName:'workbench-native-open',grantUniveralAccess:true});
+    const walk=n=>{frames.push(n.frame);for(const child of n.childFrames??[])walk(child);};
+    walk(tree.frameTree);
+    const rootFrameId=tree.frameTree?.frame?.id;
+    const candidates=frames.filter(frame=>frame.id!==rootFrameId&&
+      frame.url&&frame.url!=='about:blank');
+    const evidence=[];
+    for(const frame of candidates){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'workbench-native-open',
+          grantUniveralAccess:true
+        });
         graphContext=world.executionContextId;
-        const result=await command('Runtime.evaluate',{contextId:world.executionContextId,returnByValue:true,expression:`({nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,procedureValue:document.querySelector('#procedureList')?.value??null,bodyText:document.body?.innerText?.slice(0,1600)??'',revision:document.querySelector('#revision')?.textContent,timing:document.querySelector('#reactFlowRoot')?.dataset.studioTiming})`});
-        if(result.result?.value?.nodes>0&&(!expectedProcedure||result.result.value.procedureValue===expectedProcedure))return result.result.value;
-      }catch{}
+        const result=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:`({
+            url:location.href,readyState:document.readyState,
+            title:document.title,
+            hasRoot:Boolean(document.querySelector('#reactFlowRoot')),
+            nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,
+            procedureValue:document.querySelector('#procedureList')?.value??null,
+            bodyText:document.body?.innerText?.slice(0,1200)??'',
+            revision:document.querySelector('#revision')?.textContent??null,
+            timing:document.querySelector('#reactFlowRoot')?.dataset.studioTiming??null
+          })`
+        });
+        const view=result.result?.value??null;
+        evidence.push({id:frame.id,url:frame.url,view});
+        if(view?.nodes>0&&(!expectedProcedure||
+           view.procedureValue===expectedProcedure)){
+          graphDiagnostics={frames:evidence,matchedFrame:frame.id};
+          return view;
+        }
+      }catch(error){
+        evidence.push({id:frame.id,url:frame.url,error:String(error)});
+      }
     }
+    graphDiagnostics={frames:evidence,matchedFrame:null};
     return null;
   }
   let opened=null;
@@ -771,8 +801,24 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await click(file.x,file.y);
     for(let i=0;i<40&&!opened;i++){opened=await graph();if(!opened)await sleep(100);}
   }
-  if(!opened)throw Error('Explorer single-click did not open native associated CustomEditor; '+
-    JSON.stringify({originalTarget:file,retries:explorerRetries}));
+  if(!opened){
+    const workbenchState=await evalJS(`({
+      tabs:[...document.querySelectorAll('.lm-TabBar-tab')].map(tab=>({
+        text:tab.textContent.trim(),className:tab.className,
+        visible:tab.getBoundingClientRect().width>0
+      })).filter(tab=>tab.visible),
+      iframes:[...document.querySelectorAll('iframe')].map(frame=>({
+        src:frame.getAttribute('src'),title:frame.title,
+        rect:(()=>{const r=frame.getBoundingClientRect();return {
+          x:r.x,y:r.y,width:r.width,height:r.height
+        };})()
+      })),
+      bodyText:document.body?.innerText?.slice(-1400)??''
+    })`);
+    throw Error('Explorer click did not produce a React Flow CustomEditor; '+
+      JSON.stringify({originalTarget:file,retries:explorerRetries,
+        graphDiagnostics,workbenchState}));
+  }
   const openMs=performance.now()-start;
   const preview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
   if(!preview)throw Error("Single-click CustomEditor was not a native preview tab");
