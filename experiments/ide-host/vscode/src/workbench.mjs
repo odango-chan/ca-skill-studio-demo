@@ -2715,8 +2715,6 @@ export function registerWorkbench(vscode,context){
     }
   }
   context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.previewMarkdown',uri=>openNativeMarkdownPreview(uri)));
-  context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownPreviewAcceptance',async skillName=>{
       const name=typeof skillName==='string'?skillName:'establish-pdu-session';
       if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
