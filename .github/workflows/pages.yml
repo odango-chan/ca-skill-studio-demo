@@ -156,6 +156,7 @@ jobs:
           npm run download:plugins --prefix experiments/ide-host/theia-online
           npm run build --prefix experiments/ide-host/theia-online
           node experiments/ide-host/scripts/prepare-theia-static-preview.mjs
+          node experiments/ide-host/scripts/prepare-theia-brand.mjs experiments/ide-host/theia-online/lib/frontend
       - name: Real Chromium acceptance at the default Pages root
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: ide-source
