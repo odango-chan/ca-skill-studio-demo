@@ -88,7 +88,7 @@ if(markdownLanguageActivationCount!==1)
 markdownManifest.activationEvents=markdownActivationEvents.filter(
   event=>event!=="onLanguage:markdown");
 await writeFile(join(markdownPluginTarget,"package.json"),
-  JSON.stringify(markdownManifest,null,2)+"\\n");
+  JSON.stringify(markdownManifest,null,2)+"\n");
 const hostedPluginListPath=join(root,"hostedPlugin","list.json");
 const hostedPluginList=JSON.parse(await readFile(hostedPluginListPath,"utf8"));
 const markdownPluginEntry=hostedPluginList.find(entry=>
@@ -105,7 +105,7 @@ if(hostedLanguageActivationCount!==1)
     hostedLanguageActivationCount);
 markdownPluginEntry.contributes.activationEvents=hostedActivationEvents.filter(
   event=>event!=="onLanguage:markdown");
-await writeFile(hostedPluginListPath,JSON.stringify(hostedPluginList,null,2)+"\\n");
+await writeFile(hostedPluginListPath,JSON.stringify(hostedPluginList,null,2)+"\n");
 console.log("STUDIO_THEIA_STATIC_MARKDOWN_COLD_ACTIVATION",JSON.stringify({
   extensionId:"vscode.markdown-language-features",
   removedOnLanguageActivation:true,
