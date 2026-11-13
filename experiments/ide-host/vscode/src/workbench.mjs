@@ -2818,7 +2818,8 @@ export function registerWorkbench(vscode,context){
         column:group.viewColumn,
         tabs:(group.tabs??[]).map(tab=>({
           label:tab.label,
-          uri:tab.input?.uri?.toString?.()??null
+          uri:tab.input?.uri?.toString?.()??null,
+          viewType:tab.input?.viewType??null
         }))
       })),
       editors:(vscode.window.visibleTextEditors??[]).map(editor=>({
