@@ -2689,9 +2689,10 @@ export function registerWorkbench(vscode,context){
     }
     return workerProbe;
   }
+  const isNativeMarkdownPath=path=>/\\.(?:md|markdown)$/i.test(path??"");
   async function openNativeMarkdownPreview(uri){
     uri=uri??vscode.window.activeTextEditor?.document.uri;
-    if(!uri||!uri.path?.toLowerCase().endsWith('.md'))return false;
+    if(!uri||!isNativeMarkdownPath(uri.path))return false;
     const key=uri.toString();
     if(nativeMarkdownPaired.has(key)||nativeMarkdownOpening.has(key))return true;
     nativeMarkdownOpening.add(key);
@@ -2763,16 +2764,25 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownWorkerDiagnostics',()=>nativeMarkdownWorkerDiagnostics));
   context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async skillName=>{
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async(skillName,relativePath)=>{
       const name=typeof skillName==='string'?skillName:'establish-pdu-session';
+      const targetPath=typeof relativePath==='string'?relativePath:'SKILL.md';
       if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
+      if(!/^(?:SKILL\\.md|references\\/[a-z0-9-]+\\.md)$/i.test(targetPath))
+        throw Error('Markdown acceptance target must be a known Package-local Markdown path');
       const matches=await vscode.workspace.findFiles(
-        '**/'+name+'/SKILL.md','**/node_modules/**',5);
-      const exact=matches.filter(item=>item.path.endsWith('/'+name+'/SKILL.md'));
+        '**/'+name+'/'+targetPath,'**/node_modules/**',5);
+      const suffix='/'+name+'/'+targetPath;
+      const exact=matches.filter(item=>item.path.endsWith(suffix));
       if(exact.length!==1)
-        throw Error('Expected exactly one '+name+' guide in the active Workspace');
-      const opened=await openNativeMarkdownPreview(exact[0]);
-      return opened?exact[0].toString():null;
+        throw Error('Expected exactly one '+name+'/'+targetPath+' in the active Workspace');
+      // Exercise the same default open path used by Explorer and Package Explorer.
+      // The active-editor listener must pair every Markdown Source with the
+      // native Preview and normalize Source-left / Preview-right placement.
+      await vscode.commands.executeCommand('vscode.open',exact[0],{
+        viewColumn:vscode.ViewColumn.One,preview:false
+      });
+      return exact[0].toString();
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',async()=>{
@@ -2907,13 +2917,29 @@ export function registerWorkbench(vscode,context){
   // first; its panel is then already registered and no duplicate is opened.
   context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
     const target=editor?.document?.uri;
-    if(!target||!target.path.toLowerCase().endsWith('.md'))return;
+    if(!target||!isNativeMarkdownPath(target.path))return;
     const key=target.toString();
     setTimeout(()=>{
       if(nativeMarkdownOpening.has(key)||nativeMarkdownPaired.has(key))return;
       if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
       void openNativeMarkdownPreview(target);
     },0);
+  }));
+  // An editor restored before extension activation does not emit a new active
+  // editor event. Apply the same default pairing to that already-active Source.
+  const initiallyActiveMarkdown=vscode.window.activeTextEditor?.document;
+  if(initiallyActiveMarkdown&&isNativeMarkdownPath(initiallyActiveMarkdown.uri.path)){
+    const target=initiallyActiveMarkdown.uri,key=target.toString();
+    setTimeout(()=>{
+      if(vscode.window.activeTextEditor?.document.uri.toString()===key)
+        void openNativeMarkdownPreview(target);
+    },0);
+  }
+  context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document=>{
+    if(!isNativeMarkdownPath(document.uri.path))return;
+    const key=document.uri.toString();
+    nativeMarkdownOpening.delete(key);
+    nativeMarkdownPaired.delete(key);
   }));
   // Internal acceptance probe reports the authoritative VS Code TextDocument
   // version; the custom-editor webview's display revision is not that version.
