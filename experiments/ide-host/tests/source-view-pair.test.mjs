@@ -39,7 +39,7 @@ test('CustomEditor is placed right and its editable native Source is opened left
   assert.equal(calls[0][0],'vscode.openWith');
   assert.equal(calls[0][1],document.uri);
   assert.equal(calls[0][2],'default');
-  assert.deepEqual(calls[0][3],{viewColumn:1,preserveFocus:true,preview:false});
+  assert.deepEqual(calls[0][3],{viewColumn:1,preserveFocus:false,preview:false});
 });
 
 test('cross-file navigation opens the matching visual on the right and Source on the left',async()=>{
