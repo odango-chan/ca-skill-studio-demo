@@ -1,10 +1,11 @@
-// Add the Classic SKILL Studio wordmark beside Lumino's native menu list.
+// Add the SKILL Studio wordmark beside Lumino's native menu list.
 // The native menu content node and all menu commands remain untouched.
 import {readFile,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
+import {fileURLToPath} from "node:url";
 
 export function buildSkillStudioBrandCss(){
-  return `/* Classic SKILL Studio wordmark in the native Theia menu-bar row. */
+  return `/* SKILL Studio wordmark in the native Theia menu-bar row. */
 .lm-MenuBar.skill-studio-branded{
   min-width:0;
 }
@@ -181,4 +182,10 @@ export async function prepareTheiaBrand(rootPath){
     cssBytes:Buffer.byteLength(css),
     scriptBytes:Buffer.byteLength(script)
   });
+}
+
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+  const root=process.argv[2]||"experiments/ide-host/theia-online/lib/frontend";
+  const result=await prepareTheiaBrand(root);
+  console.log("THEIA_SKILL_STUDIO_BRAND_PREPARED",JSON.stringify(result));
 }
