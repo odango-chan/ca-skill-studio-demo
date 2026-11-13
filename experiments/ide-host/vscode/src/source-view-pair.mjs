@@ -32,7 +32,13 @@ export function forgetSourceViewPair(uri) {
 
 export function revealVisualEditorRight(vscode,panel) {
   if(typeof panel?.reveal!=='function'||!vscode.ViewColumn)return false;
-  panel.reveal(vscode.ViewColumn.Two,true);
+  // A CustomTextEditor WebviewPanel may not yet be attached to its editor
+  // group while resolveCustomTextEditor is running. Defer the move until the
+  // host has completed resolution, then normalize it into the right column.
+  setTimeout(()=>{
+    try{panel.reveal(vscode.ViewColumn.Two,true);}
+    catch(error){console.warn("SKILL Studio could not place Designer in column two:",String(error?.message??error));}
+  },0);
   return true;
 }
 
