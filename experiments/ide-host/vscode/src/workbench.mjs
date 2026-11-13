@@ -2777,6 +2777,19 @@ export function registerWorkbench(vscode,context){
           '无法验证当前 Markdown 文件所属 Package 或文件清单，已拒绝打开原生预览。');
         return false;
       }
+      // The native CustomEditor is stable per resource. Never reopen an
+      // existing preview while its Webview or editor command is still settling:
+      // redundant openWith calls can stall subsequent WorkspaceEdit commands.
+      const existingPreview=(vscode.window.tabGroups?.all??[]).some(group=>
+        group.viewColumn===vscode.ViewColumn.Two&&
+        (group.tabs??[]).some(tab=>
+          tab.input?.uri?.toString?.()===key&&
+          tab.input?.viewType==='vscode.markdown.preview.editor'));
+      if(existingPreview){
+        nativeMarkdownOpening.delete(key);
+        paired=true;
+        return true;
+      }
       // Never use markdown.showPreviewToSide here: its Beside placement is
       // relative to the currently focused group and can insert a THIRD group
       // when a Designer already occupies the right side. The native Markdown
