@@ -507,8 +507,10 @@ export function activate(context){
       await vscode.workspace.fs.writeFile(yamlUri,
         new TextEncoder().encode("kind: editor-group-acceptance\\n"));
       const yamlDocument=await vscode.workspace.openTextDocument(yamlUri);
-      if(!await yamlDocument.save()||yamlDocument.isDirty)
-        throw Error("Temporary YAML fixture did not become a clean saved Source document");
+      if(yamlDocument.isDirty&&!await yamlDocument.save())
+        throw Error("Temporary YAML fixture could not be saved");
+      if(yamlDocument.isDirty)
+        throw Error("Temporary YAML fixture remained dirty after save");
       await vscode.window.showTextDocument(yamlDocument,{
         viewColumn:vscode.ViewColumn.Two,preserveFocus:false,preview:false
       });
