@@ -104,7 +104,7 @@ test("current owner-pinned CreatedSession Reference example is documented withou
 test("Theia is the only published host and Classic has no runtime entrypoint",()=>{
   const workflow=content(".github/workflows/pages.yml");
   const composer=content("experiments/ide-host/scripts/compose-pages-release.mjs");
-  const manifest=content("experiments/ide-host/vscode/package.json");
+  const manifest=JSON.parse(content("experiments/ide-host/vscode/package.json"));
   assert.doesNotMatch(workflow,/--classic|preserve Classic/i);
   assert.match(workflow,/test ! -e dist\/classic/);
   assert.match(composer,/classicPublished:false/);
