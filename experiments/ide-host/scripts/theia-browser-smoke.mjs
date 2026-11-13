@@ -81,7 +81,7 @@ child.on("error",error=>{
   chromeStderr=(chromeStderr+"\\nspawn error: "+String(error)).slice(-5000);
 });
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[];
+let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[],markdownWorkerRequests=[];
 const command=(method,params={})=>new Promise((resolve,reject)=>{
   const id=++seq;
   const timer=setTimeout(()=>{pending.delete(id);reject(Error("Chromium command timed out: "+method+" "+String(params.expression??"").slice(0,200)));},30000);
@@ -129,6 +129,9 @@ try{
     if(msg.method==="Runtime.executionContextsCleared")defaultExecutionContexts.clear();
     if(msg.method==="Runtime.exceptionThrown")
       exceptions.push(msg.params?.exceptionDetails?.exception?.description||msg.params?.exceptionDetails?.text);
+    if(msg.method==="Network.requestWillBeSent"&&
+       /markdown-language-features.*serverWorkerMain\.js|vscode_markdown_language_features.*serverWorkerMain\.js/i.test(msg.params?.request?.url??""))
+      markdownWorkerRequests.push({url:msg.params.request.url,initiator:msg.params.initiator?.type??null});
     if(msg.method==="Network.loadingFailed")
       networkFailures.push({requestId:msg.params.requestId,errorText:msg.params.errorText,
         canceled:msg.params.canceled,blockedReason:msg.params.blockedReason});
@@ -1489,6 +1492,11 @@ try{
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp
   });}
   catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
+  const markdownServerErrors=consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message));
+  const markdownWorkerEvidence={requests:markdownWorkerRequests,serverErrors:markdownServerErrors};
+  console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_CHROMIUM",JSON.stringify(markdownWorkerEvidence));
+  if(!markdownWorkerRequests.length||markdownServerErrors.length)
+    throw Error("Native Markdown Language Server did not start cleanly in real Chromium: "+JSON.stringify(markdownWorkerEvidence));
   // Run Package Overview last: opening the second Skill's visual Source must
   // not alter the Procedure Webview used by the preceding authoring regression.
   const packageOverviewEvidence=await runPackageOverviewAcceptance({
