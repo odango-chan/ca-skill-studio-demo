@@ -113,6 +113,15 @@ const webviewResourceMappingCount=pluginWorkerBundle.split(webviewResourceMappin
 if(webviewResourceMappingCount!==1)
   throw Error("Pinned Theia plugin-worker Webview resource mapping changed; expected exactly one patch point, found "+webviewResourceMappingCount);
 pluginWorkerBundle=pluginWorkerBundle.replace(webviewResourceMapping,webviewResourceMappingPatched);
+const webviewAsWebviewUri=String.raw`asWebviewUri(e){let t=this.initData.webviewResourceRoot.replace("{{scheme}}",e.scheme).replace("{{authority}}",e.authority).replace("{{path}}",e.path.replace(/^\//,"")).replace("{{uuid}}",this.origin??this.viewId);return Hd.URI.parse(t).with({query:e.query})}`;
+const webviewAsWebviewUriPatched=String.raw`asWebviewUri(e){let t=this.initData.webviewResourceRoot.replace("{{scheme}}",e.scheme).replace("{{authority}}",e.authority).replace("{{path}}",e.path.replace(/^\//,"")).replace("{{uuid}}",this.origin??this.viewId);const basePath=new URL(".",globalThis.location.href).pathname.replace(/\/$/,"");if(basePath){const resource=Hd.URI.parse(t);if((resource.scheme==="http"||resource.scheme==="https")&&resource.path.startsWith("/hostedPlugin/")&&!resource.path.startsWith(basePath+"/"))t=resource.with({path:basePath+resource.path}).toString()}return Hd.URI.parse(t).with({query:e.query})}`;
+const webviewAsWebviewUriCount=pluginWorkerBundle.split(webviewAsWebviewUri).length-1;
+if(webviewAsWebviewUriCount!==1)
+  throw Error("Pinned Theia Webview.asWebviewUri mapping changed; expected exactly one patch point, found "+webviewAsWebviewUriCount);
+pluginWorkerBundle=pluginWorkerBundle.replace(webviewAsWebviewUri,webviewAsWebviewUriPatched);
+console.log("STUDIO_THEIA_STATIC_WEBVIEW_API_BASE_PATH",JSON.stringify({
+  pluginWorkerPath,basePathAware:true,patchCount:webviewAsWebviewUriCount
+}));
 await writeFile(pluginWorkerPath,pluginWorkerBundle);
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_RESOURCE_BASE_PATH",JSON.stringify({
   pluginWorkerPath,basePathAware:true,patchCount:webviewResourceMappingCount
