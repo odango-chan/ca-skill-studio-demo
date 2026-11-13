@@ -56,7 +56,7 @@
     "colors": [
       {
         "id": "skillStudio.markdownHeading",
-        "description": "SKILL Studio Markdown heading accent, following the active Classic light/dark theme.",
+        "description": "SKILL Studio Markdown heading accent, following the active VS Code/Theia color theme.",
         "defaults": {
           "light": "#0c8e7b",
           "dark": "#83d9c4",
