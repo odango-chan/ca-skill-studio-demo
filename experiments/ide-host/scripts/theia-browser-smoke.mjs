@@ -81,13 +81,32 @@ child.on("error",error=>{
   chromeStderr=(chromeStderr+"\\nspawn error: "+String(error)).slice(-5000);
 });
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[];
-const command=(method,params={})=>new Promise((resolve,reject)=>{
+let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[],markdownWorkerRequests=[];
+const command=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
   const id=++seq;
   const timer=setTimeout(()=>{pending.delete(id);reject(Error("Chromium command timed out: "+method+" "+String(params.expression??"").slice(0,200)));},30000);
   pending.set(id,{resolve,reject,timer});
-  ws.send(JSON.stringify({id,method,params}));
+  ws.send(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})}));
 });
+const workerTargets=new Map(),workerTargetSetupErrors=[],discoveredTargets=[];
+const enableTargetSession=async(sessionId,targetInfo)=>{
+  const type=targetInfo?.type??"unknown";
+  const targetUrl=targetInfo?.url??"";
+  // Observe dedicated/shared workers without pausing them. The Markdown
+  // extension is activated later by acceptance, after this Network domain is
+  // enabled on Theia's plugin worker, so its serverWorkerMain request is seen.
+  // Never pause the workbench or service worker: doing so can stall Webviews.
+  if(type!=="worker"&&type!=="shared_worker")return;
+  try{
+    await command("Network.enable",{},sessionId);
+    await command("Target.setAutoAttach",{
+      autoAttach:true,waitForDebuggerOnStart:false,flatten:true
+    },sessionId);
+  }catch(error){
+    workerTargetSetupErrors.push({target:targetUrl,type,
+      phase:"enable-worker-observation",error:String(error)});
+  }
+};
 const evalJS=async expression=>{
   const data=await command("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});
   if(data.exceptionDetails)throw Error("Chromium evaluate: "+data.exceptionDetails.text);
@@ -117,6 +136,20 @@ try{
       console.log("STUDIO_TEST_BEFOREUNLOAD_ACCEPTED");
       void command("Page.handleJavaScriptDialog",{accept:true}).catch(error=>exceptions.push(String(error)));
     }
+    if(msg.method==="Target.targetCreated"){
+      const targetInfo=msg.params?.targetInfo;
+      if(targetInfo)discoveredTargets.push({type:targetInfo.type??"unknown",url:targetInfo.url??""});
+    }
+    if(msg.method==="Target.attachedToTarget"){
+      const {sessionId,targetInfo}=msg.params??{};
+      if(sessionId){
+        workerTargets.set(sessionId,{type:targetInfo?.type??"unknown",url:targetInfo?.url??""});
+        void enableTargetSession(sessionId,targetInfo).catch(error=>{
+          workerTargetSetupErrors.push({target:targetInfo?.url??"",type:targetInfo?.type??"unknown",error:String(error)});
+        });
+      }
+    }
+    if(msg.method==="Target.detachedFromTarget")workerTargets.delete(msg.params?.sessionId);
     if(msg.method==="Runtime.executionContextCreated"){
       const context=msg.params?.context,frameId=context?.auxData?.frameId;
       if(context?.auxData?.isDefault&&frameId)
@@ -129,6 +162,10 @@ try{
     if(msg.method==="Runtime.executionContextsCleared")defaultExecutionContexts.clear();
     if(msg.method==="Runtime.exceptionThrown")
       exceptions.push(msg.params?.exceptionDetails?.exception?.description||msg.params?.exceptionDetails?.text);
+    if(msg.method==="Network.requestWillBeSent"&&
+       /markdown-language-features.*serverWorkerMain\.js|vscode_markdown_language_features.*serverWorkerMain\.js/i.test(msg.params?.request?.url??""))
+      markdownWorkerRequests.push({url:msg.params.request.url,initiator:msg.params.initiator?.type??null,
+        sessionId:msg.sessionId??null,target:workerTargets.get(msg.sessionId)??null});
     if(msg.method==="Network.loadingFailed")
       networkFailures.push({requestId:msg.params.requestId,errorText:msg.params.errorText,
         canceled:msg.params.canceled,blockedReason:msg.params.blockedReason});
@@ -145,6 +182,12 @@ try{
   await command("Page.enable");
   await command("Runtime.enable");
   await command("Network.enable");
+  // Worker scripts load in separate CDP targets (including nested workers in
+  // Theia's hosted extension worker). Attach recursively so the Markdown
+  // Language Server request is observed in its own target, not just the page.
+  await command("Target.setAutoAttach",{
+    autoAttach:true,waitForDebuggerOnStart:false,flatten:true
+  });
   // Use a realistic desktop workbench viewport; the default headless size can
   // collapse Theia's editor groups and make native Source interactions invalid.
   await command("Emulation.setDeviceMetricsOverride",{
@@ -1488,7 +1531,14 @@ try{
   try{workbenchEvidence=await runWorkbenchAcceptance({
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp
   });}
-  catch(error){console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
+  catch(error){console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_DIAGNOSTIC",JSON.stringify({workerRequests:markdownWorkerRequests,targets:[...workerTargets.values()],discoveredTargets,targetSetupErrors:workerTargetSetupErrors,serverErrors:consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message)),networkFailures:networkFailures.filter(x=>/worker|plugin/i.test(x.errorText??""))}));console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
+  const markdownServerErrors=consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message));
+  const markdownWorkerEvidence={requests:markdownWorkerRequests,targets:[...workerTargets.values()],discoveredTargets,targetSetupErrors:workerTargetSetupErrors,serverErrors:markdownServerErrors};
+  console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_CHROMIUM",JSON.stringify(markdownWorkerEvidence));
+  if(requireBrowserLsp&&(!markdownWorkerRequests.length||markdownServerErrors.length))
+    throw Error("Native Markdown Language Server did not start cleanly in real Chromium: "+JSON.stringify(markdownWorkerEvidence));
+  if(!requireBrowserLsp)
+    console.log("STUDIO_NATIVE_MARKDOWN_BACKEND_HOST_LANGUAGE_SERVER",JSON.stringify({browserWorkerExpected:false,diagnostics:markdownWorkerEvidence}));
   // Run Package Overview last: opening the second Skill's visual Source must
   // not alter the Procedure Webview used by the preceding authoring regression.
   const packageOverviewEvidence=await runPackageOverviewAcceptance({

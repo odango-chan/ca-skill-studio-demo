@@ -49,6 +49,7 @@ export function registerWorkbench(vscode,context){
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
     nativeMarkdownOpening=new Set(),nativeMarkdownPaired=new Set();
+  let nativeMarkdownWorkerDiagnostics=null;
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2627,6 +2628,46 @@ export function registerWorkbench(vscode,context){
       }
     }),
     vscode.window.onDidChangeActiveTextEditor(editor=>{if(isProcedurePath(editor?.document.uri.path)){update(editor.document);scheduleAudit();}}));
+  async function activateNativeMarkdownExtension(){
+    const markdownExtension=vscode.extensions?.getExtension?.(
+      'vscode.markdown-language-features');
+    if(!markdownExtension)
+      throw Error('Pinned built-in vscode.markdown-language-features extension is not installed');
+    let activationState='pending',activationError=null;
+    const activation=Promise.resolve(markdownExtension.activate()).then(
+      ()=>{activationState='ready';},
+      error=>{activationState='failed';activationError=String(error?.message??error);}
+    );
+    const activationResult=await Promise.race([
+      activation.then(()=>activationState),
+      new Promise(resolve=>setTimeout(()=>resolve('timeout'),5000))
+    ]);
+    if(activationResult!=='ready')
+      throw Error('Built-in Markdown extension activation '+activationResult+
+        '; isActive='+String(markdownExtension.isActive)+
+        '; error='+String(activationError??'none'));
+    return {markdownExtension,activationResult};
+  }
+  // Resource probing is acceptance-only. Normal Markdown opening should not
+  // issue an extra HEAD request on every preview launch.
+  async function probeNativeMarkdownWorker(markdownExtension){
+    let workerProbe='not-applicable';
+    if(typeof Worker==='function'&&typeof globalThis.location!=='undefined'){
+      const workerUri=vscode.Uri.joinPath(markdownExtension.extensionUri,
+        'dist','browser','serverWorkerMain.js');
+      try{
+        const response=await fetch(workerUri.toString(),{method:'HEAD'});
+        workerProbe={uri:workerUri.toString(),status:response.status,ok:response.ok};
+      }catch(error){
+        workerProbe={uri:workerUri.toString(),error:String(error?.message??error)};
+      }
+      nativeMarkdownWorkerDiagnostics={
+        extensionUri:markdownExtension.extensionUri.toString(),
+        workerUri:workerUri.toString(),workerProbe
+      };
+    }
+    return workerProbe;
+  }
   async function openNativeMarkdownPreview(uri){
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!uri.path?.toLowerCase().endsWith('.md'))return false;
@@ -2647,35 +2688,7 @@ export function registerWorkbench(vscode,context){
       // Markdown preview commands from their implicit activation events. Load
       // the exact pinned built-in extension and verify its command registration
       // before treating a successful Source open as a native Preview launch.
-      const markdownExtension=vscode.extensions?.getExtension?.(
-        'vscode.markdown-language-features');
-      if(!markdownExtension)
-        throw Error('Pinned built-in vscode.markdown-language-features extension is not installed');
-      let workerProbe='not-applicable';
-      if(typeof Worker==='function'&&typeof globalThis.location!=='undefined'){
-        const workerUri=vscode.Uri.joinPath(markdownExtension.extensionUri,
-          'dist','browser','serverWorkerMain.js');
-        try{
-          const response=await fetch(workerUri.toString(),{method:'HEAD'});
-          workerProbe={uri:workerUri.toString(),status:response.status,ok:response.ok};
-        }catch(error){
-          workerProbe={uri:workerUri.toString(),error:String(error?.message??error)};
-        }
-      }
-      let activationState='pending',activationError=null;
-      const activation=Promise.resolve(markdownExtension.activate()).then(
-        ()=>{activationState='ready';},
-        error=>{activationState='failed';activationError=String(error?.message??error);}
-      );
-      const activationResult=await Promise.race([
-        activation.then(()=>activationState),
-        new Promise(resolve=>setTimeout(()=>resolve('timeout'),5000))
-      ]);
-      if(activationResult!=='ready')
-        throw Error('Built-in Markdown extension activation '+activationResult+
-          '; isActive='+String(markdownExtension.isActive)+
-          '; worker='+JSON.stringify(workerProbe)+
-          '; error='+String(activationError??'none'));
+      await activateNativeMarkdownExtension();
       const markdownCommands=await vscode.commands.getCommands(true);
       if(!markdownCommands.includes('markdown.showPreviewToSide'))
         throw Error('Built-in Markdown extension activated without registering markdown.showPreviewToSide');
@@ -2715,7 +2728,19 @@ export function registerWorkbench(vscode,context){
     }
   }
   context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.previewMarkdown',uri=>openNativeMarkdownPreview(uri)));
+    'skillStudio.internal.nativeMarkdownWorkerStartupAcceptance',async()=>{
+      const {markdownExtension,activationResult}=
+        await activateNativeMarkdownExtension();
+      const workerProbe=await probeNativeMarkdownWorker(markdownExtension);
+      return {
+        extensionUri:markdownExtension.extensionUri.toString(),
+        isActive:markdownExtension.isActive,
+        workerAvailable:typeof Worker==='function',
+        activationResult,workerProbe
+      };
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownWorkerDiagnostics',()=>nativeMarkdownWorkerDiagnostics));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownPreviewAcceptance',async skillName=>{
       const name=typeof skillName==='string'?skillName:'establish-pdu-session';
