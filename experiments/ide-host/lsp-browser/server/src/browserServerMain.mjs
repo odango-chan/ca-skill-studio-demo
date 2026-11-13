@@ -262,10 +262,16 @@ function scriptToolName(text) {
 function schemaTitleCatalog(snapshot) {
   const found = new Map();
   const ambiguous = new Set();
-  for (const document of snapshot.documents) {
-    if (!/^schemas\/[A-Za-z0-9_.-]+\.schema\.ya?ml$/.test(document.relativePath))
-      continue;
-    const parsed = parseDocument(document.text, {
+  const schemas = snapshot.documents.filter(document =>
+    /^schemas\/[A-Za-z0-9_.-]+\.schema\.ya?ml$/.test(document.relativePath)
+  ).map(document => ({ text: document.text, path: document.relativePath }));
+  for (const entry of snapshot.dependencySchemas ?? []) {
+    if (typeof entry?.text !== "string" || typeof entry.path !== "string" ||
+        typeof entry.dependencyId !== "string") continue;
+    schemas.push({ text: entry.text, path: entry.dependencyId + "/" + entry.path });
+  }
+  for (const schema of schemas) {
+    const parsed = parseDocument(schema.text, {
       version: "1.2", schema: "core", strict: true,
       uniqueKeys: true, stringKeys: true, logLevel: "silent"
     });
@@ -274,7 +280,7 @@ function schemaTitleCatalog(snapshot) {
     if (!isScalar(title) || typeof title.value !== "string" ||
         !/^[A-Za-z][A-Za-z0-9]*$/.test(title.value)) continue;
     if (found.has(title.value)) ambiguous.add(title.value);
-    else found.set(title.value, document.relativePath);
+    else found.set(title.value, schema.path);
   }
   return [...found].filter(([title]) => !ambiguous.has(title))
     .map(([title, path]) => ({ title, path }));
@@ -567,7 +573,7 @@ connection.onCompletion(params => {
         insertText: item.title,
         filterText: item.title,
         ...(editRange ? { textEdit: { range: editRange, newText: item.title } } : {}),
-        detail: "Package Schema · " + item.path
+        detail: "Schema · " + item.path
       }));
   }
   return [];

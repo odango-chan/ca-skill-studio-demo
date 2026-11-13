@@ -32,6 +32,8 @@ import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
   previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
   from '../../../../site/phase-named-verify.mjs';
 import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export.mjs';
+import {resolveLockedDependencies} from "./dependency-service.mjs";
+import {decodeBase64} from "./dependency-snapshot.mjs";
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 import {
   collectSkillSemanticTokenSpans,
@@ -335,6 +337,28 @@ export function registerWorkbench(vscode,context){
       );
       if(state.disposed||ticket!==state.ticket){
         if(strict)throw Error("Package refresh was superseded during snapshot collection");
+        return null;
+      }
+      const folder=vscode.workspace.getWorkspaceFolder?.(state.procedureDocument.uri);
+      if(folder){
+        const resolved=await resolveLockedDependencies(vscode,folder.uri);
+        const schemas=[];
+        const decoder=new TextDecoder();
+        for(const dependency of resolved.snapshots){
+          if(dependency.kind!=="schema-bundle")continue;
+          for(const file of dependency.files){
+            if(!/\.schema\.(?:json|ya?ml)$/.test(file.path))continue;
+            schemas.push({
+              dependencyId:dependency.id,
+              path:file.path,
+              text:decoder.decode(decodeBase64(file.bytes))
+            });
+          }
+        }
+        snapshot.dependencySchemas=schemas;
+      }
+      if(state.disposed||ticket!==state.ticket){
+        if(strict)throw Error("Package refresh was superseded during dependency resolution");
         return null;
       }
       const client=await ensureLanguageClient();
