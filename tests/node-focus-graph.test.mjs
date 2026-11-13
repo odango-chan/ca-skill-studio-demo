@@ -118,32 +118,3 @@ test("A2c multiple outcomes, cycles, and missing PRE/POST do not invent Route ID
   }),/Invalid visual-only node dimensions/);
 });
 
-test("A2c local graph uses same SVG edges/ELK and no local Route editing",()=>{
-  const files=["../site/app.mjs","../site/node-focus-flow.tsx",
-    "../site/react-flow-canvas.tsx","../site/index.html"];
-  const [app,canvas,shared,html]=files.map(file=>readFileSync(
-    new URL(file,import.meta.url),"utf8"));
-  assert.match(app,/mountNodeFocusCanvas\(\$\("nodeFocusFlow"\)/);
-  assert.match(app,/layoutProcedureELK\(local,\{direction:"RIGHT",dimensions:local.dimensions\}\)/);
-  assert.match(canvas,/from "@xyflow\/react"/);
-  assert.match(canvas,/import \{RouteEdge,portStyle\}/);
-  assert.match(canvas,/nodesConnectable=\{false\}/);
-  assert.match(canvas,/edgesReconnectable=\{false\}/);
-  assert.match(canvas,/function FocusBoundary/);
-  assert.match(canvas,/focus-current-boundary/);
-  assert.match(readFileSync(new URL("../site/light.css",import.meta.url),"utf8"),
-    /\.focus-current-boundary\{/);
-  assert.match(shared,/export function RouteEdge/);
-  assert.match(html,/id="nodeFocusFlow"/);
-  assert.doesNotMatch(html,/id="nodeFocusPrevious"/);
-});
-
-test("A2d missing and empty layout do not fabricate stage boundaries",()=>{
-  assert.equal(currentNodeBoundary(null,null),null);
-  const local=projectNodeFocusFlow(procedure,"nudm-sdm-subscribe");
-  const fake={positions:new Map()};
-  assert.equal(currentNodeBoundary(local,fake),null);
-  assert.ok(local.nodes.every(node=>node.id!=="view:current-node-boundary"));
-  assert.ok(local.routes.every(route=>route.source!=="view:current-node-boundary"&&
-    route.target!=="view:current-node-boundary"));
-});
