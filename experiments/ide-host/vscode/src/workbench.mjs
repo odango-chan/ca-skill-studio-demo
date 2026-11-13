@@ -2844,6 +2844,14 @@ export function registerWorkbench(vscode,context){
         throw Error('The conventional Skill guide is not registered as Markdown: '+doc.languageId);
       if(nativeMarkdownLiveOriginals.has(key))
         throw Error('Native Markdown live-update acceptance is already active');
+      // Model the real user returning to the already-open SKILL.md Source tab.
+      // The active-editor listener must retarget the single native Preview to
+      // this Source before the unsaved edit is applied.
+      await vscode.window.showTextDocument(doc,{
+        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:false
+      });
+      await new Promise(resolve=>setTimeout(resolve,0));
+      await openNativeMarkdownPreview(target);
       const original=doc.getText();
       nativeMarkdownLiveOriginals.set(key,original);
       const longTail=Array.from({length:80},(_,index)=>
