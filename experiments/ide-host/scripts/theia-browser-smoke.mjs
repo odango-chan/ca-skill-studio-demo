@@ -1095,7 +1095,7 @@ try{
           JSON.stringify(routeFixture).slice(0,9000));
       // Editing the fixture activates the Source tab. Bring the existing
       // Visual back to the foreground before sending trusted pointer input.
-      const visualTab=await evalJS(`(async()=>{
+      await evalJS(`(async()=>{
         const container=window.theia.container;
         const openerKey=[...container._bindingDictionary._map.keys()].find(
           key=>String(key)==="Symbol(OpenerService)");
@@ -1105,19 +1105,12 @@ try{
           item=>item.resource?.path.toString().endsWith(
             "/skills/establish-pdu-session/assurance/procedure.yaml"));
         if(!widget)throw Error("Procedure Visual tab is missing after Source editing");
-        const tab=[...document.querySelectorAll(".lm-TabBar-tab")].find(
-          item=>item.getAttribute("aria-controls")===widget.node.id);
-        const bounds=tab?.getBoundingClientRect();
-        return bounds?.width&&bounds.height
-          ?{x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2}:null;
+        const shellKey=[...container._bindingDictionary._map.keys()].find(
+          key=>typeof key==="function"&&key.prototype?.activateWidget&&key.prototype?.addWidget);
+        if(!shellKey)throw Error("Theia application shell is missing");
+        await container.get(shellKey).activateWidget(widget.id);
+        return true;
       })()`);
-      if(!visualTab)throw Error("Procedure Visual tab is unavailable for Route editing");
-      await command("Input.dispatchMouseEvent",{
-        type:"mousePressed",...visualTab,button:"left",buttons:1,clickCount:1
-      });
-      await command("Input.dispatchMouseEvent",{
-        type:"mouseReleased",...visualTab,button:"left",buttons:0,clickCount:1
-      });
       const routeMode=await command("Runtime.evaluate",{
         contextId:focusWorld.executionContextId,returnByValue:true,awaitPromise:true,
         expression:`(()=> {
