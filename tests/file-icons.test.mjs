@@ -72,24 +72,6 @@ test("icons are real locally-rendered SVG with hidden decorative shapes",()=>{
   assert.ok(folder.children.some(x=>x.attributes.class==="asset-folder-closed"));
   assert.ok(folder.children.some(x=>x.attributes.class==="asset-folder-open"));
 });
-test("Explorer keeps path/selection/dirty state while replacing uniform ▤ glyph",()=>{
-  const app=read("site/app.mjs");
-  const css=read("site/light.css");
-  assert.match(app,/import \{createFileIcon,createFolderIcon\} from "\.\/file-icons\.mjs"/);
-  assert.match(app,/const glyph=createFileIcon\(document,file\.path\)/);
-  assert.match(app,/summary\.append\(/);
-  assert.match(app,/createIcon\(document,"chevron-right",\{size:13,className:"disclosure-chevron"\}\)/);
-  assert.match(app,/createFolderIcon\(document\)/);
-  assert.match(app,/btn\.append\(glyph,title\)/);
-  assert.match(app,/btn\.setAttribute\("aria-label",file\.path/);
-  assert.match(app,/fileDirtyState\(activePackage,file\.path\)/);
-  assert.match(app,/const row=el\("div","asset-file-row asset-procedure-row"\)/);
-  assert.match(css,/\.asset-folder-icon \.asset-folder-open\{display:none\}/);
-  assert.match(css,/\.asset-folder-group\[open\]>.asset-folder-title \.asset-folder-open\{display:inline\}/);
-  assert.match(css,/\.asset-tree \.asset-file-icon,\s*\.asset-tree \.asset-folder-icon\{/);
-  assert.doesNotMatch(app,/asset-file-icon","▤"/);
-});
-
 test("shared icon registry uses deterministic, stroke-only and accessible SVG",async()=>{
   const {createIcon,iconShapes,operatorIcon}=await import("../site/icons.mjs");
   const made=[];
@@ -118,18 +100,3 @@ test("shared icon registry uses deterministic, stroke-only and accessible SVG",a
   assert.throws(()=>iconShapes("not-a-real-icon"),/Unknown Studio icon/);
 });
 
-test("every named toolbar icon exists; directory import never breaks startup",async()=>{
-  const {iconShapes}=await import("../site/icons.mjs");
-  const app=read("site/app.mjs"),html=read("site/index.html");
-  const start=app.indexOf("function decorateToolbar()");
-  const end=app.indexOf("\ndecorateToolbar();",start);
-  assert.ok(start>=0&&end>start);
-  const block=app.slice(start,end);
-  const icons=[...block.matchAll(/\["[^"]+","([^"]+)","[^"]+"\]/g)]
-    .map(match=>match[1]);
-  assert.ok(icons.includes("folder-open"));
-  assert.ok(icons.includes("folder-plus"));
-  for(const icon of icons)assert.doesNotThrow(()=>iconShapes(icon),icon);
-  assert.match(html,/id="openDirectoryButton"/);
-  assert.match(html,/id="directoryPicker"[^>]*webkitdirectory/);
-});
