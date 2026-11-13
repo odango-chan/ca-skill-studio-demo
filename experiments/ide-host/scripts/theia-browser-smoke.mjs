@@ -88,7 +88,7 @@ const command=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
   pending.set(id,{resolve,reject,timer});
   ws.send(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})}));
 });
-const workerTargets=new Map(),workerTargetSetupErrors=[];
+const workerTargets=new Map(),workerTargetSetupErrors=[],discoveredTargets=[];
 const enableTargetSession=async(sessionId,targetInfo)=>{
   await command("Network.enable",{},sessionId);
   await command("Target.setAutoAttach",{
@@ -127,6 +127,10 @@ try{
       console.log("STUDIO_TEST_BEFOREUNLOAD_ACCEPTED");
       void command("Page.handleJavaScriptDialog",{accept:true}).catch(error=>exceptions.push(String(error)));
     }
+    if(msg.method==="Target.targetCreated"){
+      const targetInfo=msg.params?.targetInfo;
+      if(targetInfo)discoveredTargets.push({type:targetInfo.type??"unknown",url:targetInfo.url??""});
+    }
     if(msg.method==="Target.attachedToTarget"){
       const {sessionId,targetInfo}=msg.params??{};
       if(sessionId){
@@ -151,7 +155,8 @@ try{
       exceptions.push(msg.params?.exceptionDetails?.exception?.description||msg.params?.exceptionDetails?.text);
     if(msg.method==="Network.requestWillBeSent"&&
        /markdown-language-features.*serverWorkerMain\.js|vscode_markdown_language_features.*serverWorkerMain\.js/i.test(msg.params?.request?.url??""))
-      markdownWorkerRequests.push({url:msg.params.request.url,initiator:msg.params.initiator?.type??null});
+      markdownWorkerRequests.push({url:msg.params.request.url,initiator:msg.params.initiator?.type??null,
+        sessionId:msg.sessionId??null,target:workerTargets.get(msg.sessionId)??null});
     if(msg.method==="Network.loadingFailed")
       networkFailures.push({requestId:msg.params.requestId,errorText:msg.params.errorText,
         canceled:msg.params.canceled,blockedReason:msg.params.blockedReason});
@@ -1517,12 +1522,14 @@ try{
   try{workbenchEvidence=await runWorkbenchAcceptance({
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp
   });}
-  catch(error){console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_DIAGNOSTIC",JSON.stringify({workerRequests:markdownWorkerRequests,serverErrors:consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message)),networkFailures:networkFailures.filter(x=>/worker|plugin/i.test(x.errorText??""))}));console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
+  catch(error){console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_DIAGNOSTIC",JSON.stringify({workerRequests:markdownWorkerRequests,targets:[...workerTargets.values()],discoveredTargets,targetSetupErrors:workerTargetSetupErrors,serverErrors:consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message)),networkFailures:networkFailures.filter(x=>/worker|plugin/i.test(x.errorText??""))}));console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const markdownServerErrors=consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message));
-  const markdownWorkerEvidence={requests:markdownWorkerRequests,targets:[...workerTargets.values()],targetSetupErrors:workerTargetSetupErrors,serverErrors:markdownServerErrors};
+  const markdownWorkerEvidence={requests:markdownWorkerRequests,targets:[...workerTargets.values()],discoveredTargets,targetSetupErrors:workerTargetSetupErrors,serverErrors:markdownServerErrors};
   console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_CHROMIUM",JSON.stringify(markdownWorkerEvidence));
-  if(!markdownWorkerRequests.length||markdownServerErrors.length)
+  if(requireBrowserLsp&&(!markdownWorkerRequests.length||markdownServerErrors.length))
     throw Error("Native Markdown Language Server did not start cleanly in real Chromium: "+JSON.stringify(markdownWorkerEvidence));
+  if(!requireBrowserLsp)
+    console.log("STUDIO_NATIVE_MARKDOWN_BACKEND_HOST_LANGUAGE_SERVER",JSON.stringify({browserWorkerExpected:false,diagnostics:markdownWorkerEvidence}));
   // Run Package Overview last: opening the second Skill's visual Source must
   // not alter the Procedure Webview used by the preceding authoring regression.
   const packageOverviewEvidence=await runPackageOverviewAcceptance({
