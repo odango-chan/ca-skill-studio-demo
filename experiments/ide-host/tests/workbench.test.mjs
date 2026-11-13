@@ -287,8 +287,8 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.ok(commands.has('skillStudio.editNodeOperatorValue'));
   assert.equal(commands.has('skillStudio.previewMarkdownNative'),false,
     'only the user-facing Package Preview command is registered');
-  assert.ok(commands.has('skillStudio.previewMarkdown'),
-    'normal Markdown opening delegates to the native preview');
+  assert.equal(commands.has('skillStudio.previewMarkdown'),false,
+    'Studio does not contribute a duplicate Markdown Preview command');
   assert.ok(commands.has('skillStudio.internal.nativeMarkdownPreviewAcceptance'));
   assert.ok(commands.has('skillStudio.internal.nativeMarkdownSettingsAcceptance'));
   assert.equal(commands.has('skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance'),false,
@@ -663,8 +663,8 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.ok(dataflow.children.some(x=>x.label.includes('Consumer ABI')));
   assert.match(dataflow.description,/Runtime NOT_RUN/);
   assert.ok(dataflow.children.some(x=>x.label.includes('Source lineage')));
-  const previewOpened=await commands.get('skillStudio.previewMarkdown')(markdownUri);
-  assert.equal(previewOpened,true,'normal Markdown opening succeeds through the native extension');
+  const previewOpened=await commands.get('skillStudio.internal.nativeMarkdownPreviewAcceptance')('establish-pdu-session');
+  assert.equal(typeof previewOpened,'string','internal Chromium acceptance opens native Markdown without a public Studio command');
   assert.equal(showDocumentCalls.at(-1).document,markdownDoc);
   assert.equal(showDocumentCalls.at(-1).options.viewColumn,vscode.ViewColumn.One,
     'editable Markdown Source stays in the first editor column');
