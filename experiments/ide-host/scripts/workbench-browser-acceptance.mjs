@@ -1863,7 +1863,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // integration, not just the internal Preview helper, is exercised.
   const nativeReferenceUri=await nativeCommand(
     'skillStudio.internal.nativeMarkdownPreviewAcceptance',
-    'establish-pdu-session','references/3gpp-procedure.md');
+    'establish-pdu-session','references/3gpp-procedure.md',2);
   if(typeof nativeReferenceUri!=='string'||
      !nativeReferenceUri.endsWith('/references/3gpp-procedure.md'))
     throw Error('Native Markdown did not open the exact Package reference Source: '+
@@ -1883,7 +1883,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     group.labels.some(label=>/^3gpp-procedure\.md/.test(label)));
   const nativeReferencePreviewGroup=nativeReferenceGroups.find(group=>
     group.labels.some(label=>/^Preview(?:\s|·).*3gpp-procedure\.md/i.test(label)));
-  if(!nativeReferenceSourceGroup||!nativeReferencePreviewGroup||
+  const nativeReferenceSourceGroups=nativeReferenceGroups.filter(group=>
+    group.labels.some(label=>/^3gpp-procedure\.md/.test(label)));
+  const nativeReferencePreviewGroups=nativeReferenceGroups.filter(group=>
+    group.labels.some(label=>/^Preview(?:\s|·).*3gpp-procedure\.md/i.test(label)));
+  if(nativeReferenceSourceGroups.length!==1||nativeReferencePreviewGroups.length!==1||
+     !nativeReferenceSourceGroup||!nativeReferencePreviewGroup||
      nativeReferenceSourceGroup.index>=nativeReferencePreviewGroup.index||
      nativeReferenceSourceGroup.rect.x>=nativeReferencePreviewGroup.rect.x)
     throw Error('Every Markdown file must use Source-left / Preview-right placement: '+
