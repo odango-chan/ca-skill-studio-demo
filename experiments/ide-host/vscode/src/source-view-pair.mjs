@@ -36,8 +36,10 @@ export function revealVisualEditorRight(vscode,panel) {
   // group while resolveCustomTextEditor is running. Defer the move until the
   // host has completed resolution, then normalize it into the right column.
   setTimeout(()=>{
-    try{panel.reveal(vscode.ViewColumn.Two,true);}
-    catch(error){console.warn("SKILL Studio could not place Designer in column two:",String(error?.message??error));}
+    try{
+      panel.reveal(vscode.ViewColumn.Two,true);
+      console.log("STUDIO_DESIGNER_COLUMN",JSON.stringify({viewType:panel.viewType,viewColumn:panel.viewColumn,visible:panel.visible}));
+    }catch(error){console.warn("SKILL Studio could not place Designer in column two:",String(error?.message??error));}
   },0);
   return true;
 }
@@ -79,6 +81,9 @@ export async function openSourceViewPair(vscode,uri,{line}={}) {
       viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,selection
     });
     openPairs.add(key);
+    console.log("STUDIO_SOURCE_VISUAL_PAIR_OPENED",JSON.stringify({uri:key,viewType,
+      sourceColumn:vscode.ViewColumn.One,visibleEditors:(vscode.window.visibleTextEditors??[])
+        .map(editor=>({uri:editor.document.uri.toString(),viewColumn:editor.viewColumn}))}));
     const editor=vscode.window.visibleTextEditors?.find(item=>
       item.document.uri.toString()===key&&item.viewColumn===vscode.ViewColumn.One);
     if(editor) {
