@@ -1862,7 +1862,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Open it through the native editor command so the default active-editor
   // integration, not just the internal Preview helper, is exercised.
   const nativeReferenceUri=await nativeCommand(
-    'skillStudio.internal.nativeMarkdownPreviewAcceptance',
+    'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance',
     'establish-pdu-session','references/3gpp-procedure.md',2);
   if(typeof nativeReferenceUri!=='string'||
      !nativeReferenceUri.endsWith('/references/3gpp-procedure.md'))
