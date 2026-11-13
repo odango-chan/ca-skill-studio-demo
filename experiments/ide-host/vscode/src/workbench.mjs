@@ -2950,13 +2950,9 @@ export function registerWorkbench(vscode,context){
       if(typeof original!=='string')
         throw Error('No original Markdown content is recorded for the live-update fixture');
       const doc=await vscode.workspace.openTextDocument(target);
-      // The fixture consists of exactly one native edit. Restore it with the
-      // real editor Undo operation instead of issuing a second competing edit
-      // while the built-in Markdown Preview CustomEditor is open.
-      await vscode.window.showTextDocument(doc,{
-        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
-      });
-      await vscode.commands.executeCommand('core.undo');
+      // The browser acceptance invokes the native host Undo command as a
+      // separate top-level action. Never call Undo/WorkspaceEdit *inside*
+      // a plugin command while the native Markdown preview editor is active.
       if(doc.getText()!==original)
         throw Error('Native Markdown Undo did not restore the exact original Source');
       nativeMarkdownLiveOriginals.delete(key);
