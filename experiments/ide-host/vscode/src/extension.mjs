@@ -74,6 +74,10 @@ export function activate(context){
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
+      // Source is the active editor after the fixed split is established, so
+      // initialize the Procedure workbench explicitly instead of relying on
+      // the visual Webview becoming the active tab.
+      workbench.activate(document);
       void packageOverview.refresh();
       let wasActive=panel.active;
       const viewState=panel.onDidChangeViewState(()=>{
