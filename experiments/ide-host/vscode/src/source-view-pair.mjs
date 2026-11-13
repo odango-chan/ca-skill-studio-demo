@@ -15,12 +15,16 @@ export function sourceViewType(uri) {
 // A CustomEditor owns the visual representation; the native text editor remains
 // the only editable Source. Both are deliberately pinned to stable columns.
 export async function pairCustomEditor(vscode,panel,document) {
-  if(typeof panel?.reveal!=='function')
-    throw new Error('Host does not support moving the visual editor into the right editor group');
+  // Older API test doubles and minimal compatible hosts may not expose the
+  // panel movement method. Real VS Code/Theia WebviewPanels do; keep those
+  // hosts usable without turning a missing optional capability into activation
+  // failure.
+  if(typeof panel?.reveal!=='function'||!vscode.ViewColumn)return false;
   panel.reveal(vscode.ViewColumn.Two,true);
   await openNativeSource(vscode,document.uri,{
     viewColumn:vscode.ViewColumn.One,preserveFocus:true,preview:false
   });
+  return true;
 }
 
 // Cross-file navigation uses the same pairing contract as ordinary Explorer
