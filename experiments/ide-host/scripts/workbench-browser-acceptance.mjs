@@ -504,6 +504,18 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   async function nativeCommand(id,...args){
     return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
   }
+  async function assertYamlSourceVisualPair(filename,label){
+    const groups=await evalJS(`(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>tab.textContent.trim()===${JSON.stringify(filename)});const grouped=new Map();for(const tab of tabs){const bar=tab.parentElement;if(!grouped.has(bar)){const rect=bar.getBoundingClientRect();grouped.set(bar,{labels:[],rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}});}grouped.get(bar).labels.push(tab.textContent.trim());}return [...grouped.values()].filter(group=>group.rect.width>0);})()`);
+    if(groups.length!==2||groups[0].rect.x===groups[1].rect.x)
+      throw Error(label+' must have exactly one Source tab and one Designer tab in separate editor groups: '+JSON.stringify(groups));
+    const left=[...groups].sort((a,b)=>a.rect.x-b.rect.x)[0];
+    const right=[...groups].sort((a,b)=>a.rect.x-b.rect.x)[1];
+    if(left.rect.x>=right.rect.x)
+      throw Error(label+' Source/Designer groups are not ordered left-to-right: '+JSON.stringify(groups));
+    const evidence={filename,label,sourceGroup:left,visualGroup:right,layout:'Source-left / Visual-right'};
+    console.log('STUDIO_YAML_SOURCE_VISUAL_PAIR_CHROMIUM',JSON.stringify(evidence));
+    return evidence;
+  }
   async function waitNativeMarkdown(predicate,label,attempts=100){
     let latest={frames:[],candidates:[]};
     for(let attempt=0;attempt<attempts;attempt++){
@@ -2038,6 +2050,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     predicateVisible:contractView.text.includes('createdsession.ran.setup_accepted'),
     readOnly:contractView.text.includes('Source 是唯一真源')
   }));
+  await assertYamlSourceVisualPair('contract.yaml','Contract Designer');
   // PredicateSet uses its own Observation -> Evaluator visual, never a live result graph.
   await invokeSkillPackageFile('skillStudio.openPredicates','assurance/predicates.yaml');
   let predicateView=null,predicateFrame=null;
@@ -2084,6 +2097,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     scriptEvaluatorVisible:predicateView.text.includes('scripts/evaluate_udm_read.py'),
     noLiveResultClaim:predicateView.text.includes('不是当前运行证据')
   }));
+  await assertYamlSourceVisualPair('predicates.yaml','Predicate Designer');
   // C3: real, source-backed JSON Schema field tree in the same Theia host.
   await invokeSkillPackageFile('skillStudio.openSchema','schemas/establishment-request.schema.yaml');
   let schemaView=null;
@@ -2124,6 +2138,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      !schemaView.status.includes('SOURCE VERSION'))
     throw Error('Schema Designer did not render real owner request fields: '+
       JSON.stringify(schemaView).slice(0,3000));
+  await assertYamlSourceVisualPair('establishment-request.schema.yaml','Schema Designer');
   console.log('STUDIO_SCHEMA_DESIGNER_CHROMIUM',JSON.stringify({
     title:schemaView.title,fields:schemaView.fields,required:schemaView.required,
     sourceVersion:schemaView.status,
