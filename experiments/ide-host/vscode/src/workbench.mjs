@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {openSourceViewPair} from "./source-view-pair.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {prepareNativeMarkdownPackagePolicy} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
