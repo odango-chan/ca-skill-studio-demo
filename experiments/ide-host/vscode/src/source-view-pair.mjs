@@ -1,10 +1,10 @@
 import {openNativeSource} from './native-source.mjs';
 
 const SOURCE_VIEW_PAIRS = Object.freeze([
-  {test:path=>/\\/assurance\\/procedure\\.ya?ml$/i.test(path),viewType:'skillStudio.procedurePreview'},
-  {test:path=>/\\/assurance\\/contract\\.ya?ml$/i.test(path),viewType:'skillStudio.contractPreview'},
-  {test:path=>/\\/assurance\\/predicates\\.ya?ml$/i.test(path),viewType:'skillStudio.predicatePreview'},
-  {test:path=>/\\/schemas\\/(?:[^/]+\\/)*[^/]+\\.schema\\.ya?ml$/i.test(path),viewType:'skillStudio.schemaPreview'}
+  {test:path=>path.toLowerCase().endsWith('/assurance/procedure.yaml'),viewType:'skillStudio.procedurePreview'},
+  {test:path=>path.toLowerCase().endsWith('/assurance/contract.yaml'),viewType:'skillStudio.contractPreview'},
+  {test:path=>path.toLowerCase().endsWith('/assurance/predicates.yaml'),viewType:'skillStudio.predicatePreview'},
+  {test:path=>path.toLowerCase().includes('/schemas/')&&path.toLowerCase().endsWith('.schema.yaml'),viewType:'skillStudio.schemaPreview'}
 ]);
 
 export function sourceViewType(uri) {
