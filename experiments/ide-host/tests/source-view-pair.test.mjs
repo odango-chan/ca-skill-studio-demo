@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {pairCustomEditor,openSourceViewPair,sourceViewType} from '../vscode/src/source-view-pair.mjs';
+import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair}
+  from '../vscode/src/source-view-pair.mjs';
 
 const uri=path=>({path,toString(){return 'file://'+path;}});
 const vscodeApi=()=>{
@@ -15,12 +16,12 @@ const vscodeApi=()=>{
     env:{uriScheme:'vscode'},
     commands:{executeCommand:async(...args)=>{calls.push(args);}},
     workspace:{openTextDocument:async uri=>({uri,lineCount:20})},
-    window:{visibleTextEditors:[]}
+    window:{activeTextEditor:null,visibleTextEditors:[]}
   };
   return {vscode,calls};
 };
 
-test('all supported YAML visual editors have one explicit Source/Visual pairing',()=>{
+test('all supported YAML visual editors have one explicit Source/Visual mapping',()=>{
   assert.equal(sourceViewType(uri('/p/assurance/procedure.yaml')),'skillStudio.procedurePreview');
   assert.equal(sourceViewType(uri('/p/assurance/contract.yaml')),'skillStudio.contractPreview');
   assert.equal(sourceViewType(uri('/p/assurance/predicates.yaml')),'skillStudio.predicatePreview');
@@ -30,29 +31,16 @@ test('all supported YAML visual editors have one explicit Source/Visual pairing'
   assert.equal(sourceViewType(uri('/p/assurance/other.yaml')),null);
 });
 
-test('CustomEditor is placed right and its editable native Source is opened left',async()=>{
-  const {vscode,calls}=vscodeApi(),events=[];
-  const panel={reveal:(column,preserveFocus)=>events.push(['visual',column,preserveFocus])};
-  const document={uri:uri('/p/assurance/contract.yaml')};
-  await pairCustomEditor(vscode,panel,document);
-  assert.deepEqual(events,[['visual',2,true]]);
-  assert.equal(calls.length,1);
-  assert.equal(calls[0][0],'vscode.openWith');
-  assert.equal(calls[0][1],document.uri);
-  assert.equal(calls[0][2],'default');
-  assert.deepEqual(calls[0][3],{viewColumn:1,preserveFocus:false,preview:false});
-});
-
-test('cross-file navigation opens the matching visual on the right and Source on the left',async()=>{
+test('Source-first pairing opens Visual in column two and native Source in column one',async()=>{
   const {vscode,calls}=vscodeApi();
-  const target=uri('/p/schemas/request.schema.yaml');
+  const target=uri('/p/assurance/contract.yaml');
   const result=await openSourceViewPair(vscode,target,{line:7});
   assert.equal(calls.length,2);
   assert.deepEqual(calls.map(call=>[call[0],call[2]]),[
-    ['vscode.openWith','skillStudio.schemaPreview'],
+    ['vscode.openWith','skillStudio.contractPreview'],
     ['vscode.openWith','default']
   ]);
-  assert.deepEqual(calls[0][3],{viewColumn:2,preserveFocus:false,preview:false});
+  assert.deepEqual(calls[0][3],{viewColumn:2,preserveFocus:true,preview:false});
   assert.equal(calls[1][3].viewColumn,1);
   assert.equal(calls[1][3].preserveFocus,false);
   assert.equal(calls[1][3].selection.start.line,6);
@@ -60,6 +48,24 @@ test('cross-file navigation opens the matching visual on the right and Source on
   assert.equal(result.line,7);
   assert.equal(result.sourceColumn,1);
   assert.equal(result.visualColumn,2);
+  assert.equal(hasSourceViewPair(target),true);
+  forgetSourceViewPair(target);
+  assert.equal(hasSourceViewPair(target),false);
+});
+
+test('opening a Source already in column two moves it before creating Visual',async()=>{
+  const {vscode,calls}=vscodeApi();
+  const target=uri('/p/assurance/predicates.yaml');
+  vscode.window.activeTextEditor={document:{uri:target},viewColumn:2};
+  await openSourceViewPair(vscode,target);
+  assert.deepEqual(calls.map(call=>call[0]),[
+    'workbench.action.moveEditorToFirstGroup',
+    'vscode.openWith',
+    'vscode.openWith'
+  ]);
+  assert.equal(calls[1][3].viewColumn,2);
+  assert.equal(calls[2][3].viewColumn,1);
+  forgetSourceViewPair(target);
 });
 
 test('unsupported YAML remains a plain Source editor without an empty visual',async()=>{
@@ -72,4 +78,5 @@ test('unsupported YAML remains a plain Source editor without an empty visual',as
   assert.equal(result.viewType,null);
   assert.equal(result.visualColumn,null);
   assert.equal(result.line,1);
+  assert.equal(hasSourceViewPair(target),false);
 });
