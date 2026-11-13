@@ -629,15 +629,16 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
   if(requireBrowserLsp){
-    const markdownStartup=await nativeCommand(
-      'skillStudio.internal.nativeMarkdownWorkerStartupAcceptance');
-    console.log('STUDIO_NATIVE_MARKDOWN_WORKER_STARTUP_CHROMIUM',
-      JSON.stringify(markdownStartup));
-    if(!markdownStartup?.isActive||markdownStartup.activationResult!=='ready'||
-       !markdownStartup.workerAvailable||markdownStartup.workerProbe?.ok!==true||
-       markdownStartup.workerProbe?.status!==200)
-      throw Error('Native Markdown Language Server did not activate before workbench regression: '+
-        JSON.stringify(markdownStartup));
+    // This must be a cold first-open test. Calling the worker startup command
+    // here would pre-activate the extension and hide the real Explorer-open
+    // lifecycle that previously raced onLanguage:markdown against activate().
+    const markdownColdState=await nativeCommand(
+      'skillStudio.internal.nativeMarkdownActivationStateAcceptance');
+    console.log('STUDIO_NATIVE_MARKDOWN_COLD_ACTIVATION_CHROMIUM',
+      JSON.stringify(markdownColdState));
+    if(!markdownColdState?.installed||markdownColdState.isActive)
+      throw Error('Native Markdown extension was not cold before its first Markdown open: '+
+        JSON.stringify(markdownColdState));
   }
   await invoke('workbench.files.action.focusFilesExplorer');
   await sleep(350);
@@ -1830,6 +1831,20 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     view.heading==='Establish PDU Session'&&view.nativePreviewRoot&&
     view.styles.some(url=>url.includes('/media/native-markdown-preview.css')),
     'Studio-themed native Markdown preview');
+  if(requireBrowserLsp){
+    // The first Markdown file has now opened through the normal editor path.
+    // Only now inspect the server: this verifies that first-open activation,
+    // Worker creation and the LanguageClient initialize handshake all finish.
+    const markdownStartup=await nativeCommand(
+      'skillStudio.internal.nativeMarkdownWorkerStartupAcceptance');
+    console.log('STUDIO_NATIVE_MARKDOWN_WORKER_STARTUP_CHROMIUM',
+      JSON.stringify(markdownStartup));
+    if(!markdownStartup?.isActive||markdownStartup.activationResult!=='ready'||
+       !markdownStartup.workerAvailable||markdownStartup.workerProbe?.ok!==true||
+       markdownStartup.workerProbe?.status!==200)
+      throw Error('Native Markdown Language Server did not activate from the first Markdown open: '+
+        JSON.stringify(markdownStartup));
+  }
   const nativeMarkdownWorkerDiagnostics=await nativeCommand('skillStudio.internal.nativeMarkdownWorkerDiagnostics');
   console.log('STUDIO_NATIVE_MARKDOWN_WORKER_URI_DIAGNOSTIC',JSON.stringify(nativeMarkdownWorkerDiagnostics));
   if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||
