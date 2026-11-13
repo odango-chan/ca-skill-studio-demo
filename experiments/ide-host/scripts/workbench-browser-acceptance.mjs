@@ -1891,39 +1891,32 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
      nativeMarkdown.view.maxWidth!=='980px')
     throw Error('Native Markdown preview did not apply the shared Studio theme: '+
       JSON.stringify(nativeMarkdown.view));
-  const nativeMarkdownGroups=await evalJS(
-    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>"+
-    "tab.textContent.trim().includes('SKILL.md'));const groups=new Map();for(const tab of tabs){"+
-    "const bar=tab.parentElement;if(!groups.has(bar)){const r=bar.getBoundingClientRect();"+
-    "groups.set(bar,{index:groups.size,labels:[],rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}"+
-    "groups.get(bar).labels.push(tab.textContent.trim());}return [...groups.values()];})()");
-  const nativeSourceGroup=nativeMarkdownGroups.find(group=>
-    group.labels.some(label=>/^SKILL\.md/.test(label)));
-  const nativePreviewGroup=nativeMarkdownGroups.find(group=>
-    group.labels.some(label=>/^Preview(?:\s|·).*SKILL\.md/i.test(label)));
-  if(!nativeSourceGroup||!nativePreviewGroup||
-     nativeSourceGroup.index>=nativePreviewGroup.index||
-     nativeSourceGroup.rect.x>=nativePreviewGroup.rect.x)
-    throw Error('Native Markdown must keep editable Source on the left and Preview on the right: '+
-      JSON.stringify(nativeMarkdownGroups));
-  const nativeMarkdownEvidence={
-    uri:nativeMarkdownUri,preview:nativeMarkdown.view,
-    sourceGroup:nativeSourceGroup,previewGroup:nativePreviewGroup,
-    layout:'Source-left / Preview-right'
-  };
-  console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
-
-  const assertSharedTwoColumnLayout=async stage=>{
+  const assertSharedTwoColumnLayout=async(stage,markdownUri)=>{
     const layout=await nativeCommand('skillStudio.internal.twoColumnLayoutAcceptance');
     const columns=layout?.groups?.map(group=>group.column)??[];
     if(!columns.length||columns.length>2||columns.some(col=>col!==1&&col!==2)||
        layout.editors?.some(editor=>editor.column!==1&&editor.column!==2))
       throw Error('Studio created an unexpected editor group after '+stage+': '+
         JSON.stringify(layout));
+    if(markdownUri){
+      const source=layout.groups.find(group=>group.column===1)?.tabs?.find(tab=>
+        tab.uri===markdownUri&&!tab.viewType);
+      const preview=layout.groups.find(group=>group.column===2)?.tabs?.find(tab=>
+        tab.uri===markdownUri&&tab.viewType==='vscode.markdown.preview.editor');
+      if(!source||!preview)
+        throw Error('Native Markdown Source/Preview did not occupy columns 1/2 after '+
+          stage+': '+JSON.stringify(layout));
+    }
     console.log('STUDIO_SHARED_TWO_COLUMN_CHROMIUM',JSON.stringify({stage,layout}));
     return layout;
   };
-  await assertSharedTwoColumnLayout('initial native Markdown preview');
+  const firstMarkdownLayout=await assertSharedTwoColumnLayout(
+    'initial native Markdown preview',nativeMarkdownUri);
+  const nativeMarkdownEvidence={
+    uri:nativeMarkdownUri,preview:nativeMarkdown.view,
+    layout:firstMarkdownLayout
+  };
+  console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
 
   // A second, ordinary Package reference must follow the exact same layout.
   // Open it through the native editor command so the default active-editor
@@ -1940,32 +1933,12 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     view.nativePreviewRoot&&
     view.styles.some(url=>url.includes('/media/native-markdown-preview.css')),
     'second native Markdown Source/Preview pair');
-  const nativeReferenceGroups=await evalJS(
-    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>"+
-    "tab.textContent.trim().includes('3gpp-procedure.md'));const groups=new Map();for(const tab of tabs){"+
-    "const bar=tab.parentElement;if(!groups.has(bar)){const r=bar.getBoundingClientRect();"+
-    "groups.set(bar,{index:groups.size,labels:[],rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}"+
-    "groups.get(bar).labels.push(tab.textContent.trim());}return [...groups.values()];})()");
-  const nativeReferenceSourceGroup=nativeReferenceGroups.find(group=>
-    group.labels.some(label=>/^3gpp-procedure\.md/.test(label)));
-  const nativeReferencePreviewGroup=nativeReferenceGroups.find(group=>
-    group.labels.some(label=>/^Preview(?:\s|·).*3gpp-procedure\.md/i.test(label)));
-  const nativeReferenceSourceGroups=nativeReferenceGroups.filter(group=>
-    group.labels.some(label=>/^3gpp-procedure\.md/.test(label)));
-  const nativeReferencePreviewGroups=nativeReferenceGroups.filter(group=>
-    group.labels.some(label=>/^Preview(?:\s|·).*3gpp-procedure\.md/i.test(label)));
-  if(nativeReferenceSourceGroups.length!==1||nativeReferencePreviewGroups.length!==1||
-     !nativeReferenceSourceGroup||!nativeReferencePreviewGroup||
-     nativeReferenceSourceGroup.index>=nativeReferencePreviewGroup.index||
-     nativeReferenceSourceGroup.rect.x>=nativeReferencePreviewGroup.rect.x)
-    throw Error('Every Markdown file must use Source-left / Preview-right placement: '+
-      JSON.stringify(nativeReferenceGroups));
+  const secondMarkdownLayout=await assertSharedTwoColumnLayout(
+    'second Markdown source opened from right group',nativeReferenceUri);
   console.log('STUDIO_NATIVE_MARKDOWN_SECOND_PAIR_CHROMIUM',JSON.stringify({
     uri:nativeReferenceUri,preview:nativeReferenceMarkdown.view,
-    sourceGroup:nativeReferenceSourceGroup,previewGroup:nativeReferencePreviewGroup
+    layout:secondMarkdownLayout
   }));
-
-  await assertSharedTwoColumnLayout('second Markdown source opened from right group');
 
   // Prove native Markdown refreshes the existing preview from an unsaved
   // Source edit, then exercise both scroll-sync directions through Monaco and
