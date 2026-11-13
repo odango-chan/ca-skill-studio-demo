@@ -1,5 +1,5 @@
 import {openNativeSource} from './native-source.mjs';
-import {pairCustomEditor,openSourceViewPair} from './source-view-pair.mjs';
+import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
 import {projectSkillContract} from '../../../../site/contract-projection.mjs';
 import {projectWorkspace} from '../../../../site/workspace.mjs';
 import {parseDocument, LineCounter, isMap, isScalar} from 'yaml';
@@ -178,7 +178,6 @@ export function registerContractEditor(vscode, context) {
           'Only assurance/contract.yaml is supported by Contract Designer');
         return;
       }
-      await pairCustomEditor(vscode,panel,document);
       const webview = panel.webview;
       webview.options = {enableScripts: true, localResourceRoots: []};
       const token = nonce();
@@ -220,6 +219,7 @@ export function registerContractEditor(vscode, context) {
       });
       panel.onDidDispose(() => {
         disposed = true;
+        forgetSourceViewPair(document.uri);
         changed.dispose();
         incoming.dispose();
       });
@@ -231,6 +231,6 @@ export function registerContractEditor(vscode, context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openContract',
     async uri => {
       const target = await chooseContract(vscode, uri);
-      if (target) await vscode.commands.executeCommand('vscode.openWith', target, VIEW);
+      if (target) await openSourceViewPair(vscode,target);
     }));
 }
