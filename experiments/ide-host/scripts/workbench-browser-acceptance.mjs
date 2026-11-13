@@ -1756,6 +1756,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     view.heading==='Establish PDU Session'&&view.nativePreviewRoot&&
     view.styles.some(url=>url.includes('/media/native-markdown-preview.css')),
     'Studio-themed native Markdown preview');
+  const nativeMarkdownWorkerDiagnostics=await nativeCommand('skillStudio.internal.nativeMarkdownWorkerDiagnostics');
+  console.log('STUDIO_NATIVE_MARKDOWN_WORKER_URI_DIAGNOSTIC',JSON.stringify(nativeMarkdownWorkerDiagnostics));
   if(nativeMarkdown.view.headingColor!=='rgb(12, 142, 123)'||
      nativeMarkdown.view.maxWidth!=='980px')
     throw Error('Native Markdown preview did not apply the shared Studio theme: '+
