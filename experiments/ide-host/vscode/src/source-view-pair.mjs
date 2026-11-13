@@ -30,6 +30,12 @@ export function forgetSourceViewPair(uri) {
   }
 }
 
+export function revealVisualEditorRight(vscode,panel) {
+  if(typeof panel?.reveal!=='function'||!vscode.ViewColumn)return false;
+  panel.reveal(vscode.ViewColumn.Two,true);
+  return true;
+}
+
 // Source-first orchestration avoids opening a duplicate text editor from inside
 // resolveCustomTextEditor. The native Source is the default editor; this helper
 // opens the visual in column two and keeps the one live Source in column one.
