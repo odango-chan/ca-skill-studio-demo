@@ -813,11 +813,28 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           x:r.x,y:r.y,width:r.width,height:r.height
         };})()
       })),
+      monacoEditors:[...document.querySelectorAll('.monaco-editor')].map(editor=>({
+        visible:editor.getBoundingClientRect().width>0,
+        text:editor.innerText?.slice(0,500)??''
+      })),
       bodyText:document.body?.innerText?.slice(-1400)??''
     })`);
+    // Diagnostic only: distinguish a broken Explorer default association from
+    // a broken CustomEditor provider. Explicit openProcedure must not turn a
+    // failed single-click acceptance into a pass.
+    let explicitOpenError=null,explicitOpenGraph=null;
+    try{
+      await nativeCommand('skillStudio.openProcedure');
+      for(let attempt=0;attempt<50&&!explicitOpenGraph;attempt++){
+        explicitOpenGraph=await graph();
+        if(!explicitOpenGraph)await sleep(100);
+      }
+    }catch(error){explicitOpenError=String(error);}
     throw Error('Explorer click did not produce a React Flow CustomEditor; '+
       JSON.stringify({originalTarget:file,retries:explorerRetries,
-        graphDiagnostics,workbenchState}));
+        graphDiagnostics,workbenchState,
+        explicitOpenDiagnostic:{error:explicitOpenError,graph:explicitOpenGraph,
+          graphDiagnostics}}));
   }
   const openMs=performance.now()-start;
   const preview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
