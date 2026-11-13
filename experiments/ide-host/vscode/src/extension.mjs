@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {createSourceOnlyEditorNormalizer} from "./editor-group-placement.mjs";
 import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
@@ -425,21 +426,12 @@ export function activate(context){
   // Paired YAML is deliberately excluded because openSourceViewPair owns its
   // two fixed positions. Moving an ordinary tab preserves its TextDocument,
   // dirty state, native Undo history and editor identity.
-  const normalizingSourceEditors=new Set();
-  const normalizeSourceOnlyEditor=editor=>{
-    const uri=editor?.document?.uri;
-    if(!uri||sourceViewType(uri)||hasSourceViewPair(uri)||
-       editor.viewColumn===vscode.ViewColumn.One)return;
-    const key=uri.toString();
-    if(normalizingSourceEditors.has(key))return;
-    normalizingSourceEditors.add(key);
-    void vscode.commands.executeCommand("workbench.action.moveEditorToFirstGroup")
-      .catch(error=>{
-        console.warn("SKILL Studio could not return a Source-only editor to the primary group:",
-          String(error?.message??error));
-      })
-      .finally(()=>normalizingSourceEditors.delete(key));
-  };
+  const normalizeSourceOnlyEditor=createSourceOnlyEditorNormalizer(vscode,{
+    sourceViewType,hasSourceViewPair,
+    onError:error=>console.warn(
+      "SKILL Studio could not return a Source-only editor to the primary group:",
+      String(error?.message??error))
+  });
   context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
     pairActiveYamlSource(editor?.document?.uri);
     normalizeSourceOnlyEditor(editor);
