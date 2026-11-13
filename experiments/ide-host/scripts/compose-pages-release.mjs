@@ -1,7 +1,7 @@
 // Publish only the supported Theia browser-only workbench.
 // No Classic application, compatibility copy, or alternate legacy entrypoint
 // is staged into the Pages artifact.
-import {cp,mkdir,readFile,rm,stat,writeFile} from "node:fs/promises";
+import {cp,mkdir,readdir,readFile,rm,stat,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 
@@ -42,7 +42,7 @@ export async function composePagesRelease({theiaFrontend,outputDist,siteRoot=nul
 
   await rm(output,{recursive:true,force:true});
   await mkdir(output,{recursive:true});
-  for(const entry of await (await import("node:fs/promises")).readdir(theia,{withFileTypes:true})){
+  for(const entry of await readdir(theia,{withFileTypes:true})){
     await cp(join(theia,entry.name),join(output,entry.name),{recursive:true,force:true});
   }
   await writeFile(join(output,".nojekyll"),"");
