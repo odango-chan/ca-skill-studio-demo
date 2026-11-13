@@ -23,7 +23,7 @@ class TreeItem{
   constructor(label,collapsibleState){this.label=label;this.collapsibleState=collapsibleState;}
 }
 function host({folders=[uri("/project")],selectedRoot=()=>folders.length===1?folders[0]:null,
-  files=null,dependenciesProvider=null}={}){
+  files=null,dependenciesProvider=null,statImpl=async()=>({type:2})}={}){
   const rootFiles=files??[
     uri("/project/skills/one/SKILL.md"),
     uri("/project/skills/one/assurance/contract.yaml"),
@@ -43,7 +43,7 @@ function host({folders=[uri("/project")],selectedRoot=()=>folders.length===1?fol
         uri:folder.uri??folder,name:folder.name??"project-"+index
       })),
       textDocuments:[],
-      fs:{stat:async()=>({type:2})},
+      fs:{stat:statImpl},
       findFiles:async()=>rootFiles,
       asRelativePath:target=>target.path,
       onDidChangeWorkspaceFolders:noEvent,
@@ -124,6 +124,20 @@ test("Package Explorer composes Skills and Plugin Dependencies in one native Tre
   const operations=await tree.getChildren(deps[0]);
   assert.equal(operations[0].operation.id,"ping");
   assert.equal((await tree.getParent(operations[0])).dependency.id,"network-tools");
+});
+
+test("Package Explorer paints an honest loading state before the initial inventory scan completes",async()=>{
+  let releaseStat;
+  const statGate=new Promise(resolve=>{releaseStat=resolve;});
+  const h=host({statImpl:()=>statGate});
+  const tree=h.views.get("skillStudio.packages");
+  const [skills]=await tree.getChildren();
+  const [summary,notice]=await tree.getChildren(skills);
+  assert.match(summary.description,/等待扫描当前 Workspace/);
+  assert.equal(notice.label,"正在读取 Package 文件清单…");
+  assert.match(notice.description,/后台进行/);
+  // Let the background scan finish so the fixture does not leave pending work.
+  releaseStat({type:2});
 });
 
 test("multi-root workspace does not scan an implicit project; it asks for explicit selection",async()=>{
