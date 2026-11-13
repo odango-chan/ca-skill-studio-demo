@@ -1,5 +1,5 @@
 import {openNativeSource} from './native-source.mjs';
-import {pairCustomEditor,openSourceViewPair} from './source-view-pair.mjs';
+import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
 import {projectPredicateSet} from '../../../../site/predicate-projection.mjs';
 
 const VIEW = 'skillStudio.predicatePreview';
@@ -107,7 +107,6 @@ export function registerPredicateEditor(vscode, context) {
           'Only assurance/predicates.yaml is supported by Predicate Designer');
         return;
       }
-      await pairCustomEditor(vscode,panel,document);
       const webview = panel.webview;
       webview.options = {enableScripts: true, localResourceRoots: []};
       const token = nonce();
@@ -147,6 +146,7 @@ export function registerPredicateEditor(vscode, context) {
       });
       panel.onDidDispose(() => {
         disposed = true;
+        forgetSourceViewPair(document.uri);
         changed.dispose();
         incoming.dispose();
       });
@@ -158,6 +158,6 @@ export function registerPredicateEditor(vscode, context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openPredicates',
     async uri => {
       const target = await choosePredicateSet(vscode, uri);
-      if (target) await vscode.commands.executeCommand('vscode.openWith', target, VIEW);
+      if (target) await openSourceViewPair(vscode,target);
     }));
 }
