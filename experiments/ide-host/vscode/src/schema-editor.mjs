@@ -1,5 +1,5 @@
 import {openNativeSource} from './native-source.mjs';
-import {pairCustomEditor,openSourceViewPair} from './source-view-pair.mjs';
+import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
 import {projectJsonSchema, resolveSchemaPointer} from '../../../../site/schema-projection.mjs';
 
 export const SCHEMA_VIEW = 'skillStudio.schemaPreview';
@@ -153,7 +153,6 @@ export function registerSchemaEditor(vscode,context) {
         await vscode.window.showWarningMessage('Only Skill schemas/*.schema.yaml is supported');
         return;
       }
-      await pairCustomEditor(vscode,panel,document);
       const webview = panel.webview;
       webview.options={enableScripts:true,localResourceRoots:[]};
       webview.html=html(nonce());
@@ -188,7 +187,7 @@ export function registerSchemaEditor(vscode,context) {
           await vscode.window.showWarningMessage('Schema Designer: '+String(e?.message??e));
         }
       });
-      panel.onDidDispose(()=>{disposed=true;onChange.dispose();onMessage.dispose();});
+      panel.onDidDispose(()=>{disposed=true;forgetSourceViewPair(document.uri);onChange.dispose();onMessage.dispose();});
     }
   };
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(
@@ -196,6 +195,6 @@ export function registerSchemaEditor(vscode,context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openSchema',
     async uri=>{
       const target=await chooseSchema(vscode,uri);
-      if(target)await vscode.commands.executeCommand('vscode.openWith',target,SCHEMA_VIEW);
+      if(target)await openSourceViewPair(vscode,target);
     }));
 }
