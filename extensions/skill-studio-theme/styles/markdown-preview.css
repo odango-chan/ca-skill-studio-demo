@@ -105,40 +105,52 @@ table {
   width: max-content;
   min-width: 100%;
   max-width: 100%;
-  max-height: 65vh;
-  overflow: auto;
-  overscroll-behavior: contain;
-  margin: 1.1em 0 1.4em;
+  /* Let long tables grow with the document; only wide tables scroll sideways. */
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  margin: 1.2em 0 1.5em;
+  border: 1px solid var(--vscode-panel-border, #e1e7ef);
+  border-radius: 10px;
   border-collapse: separate;
   border-spacing: 0;
-  border: 1px solid var(--vscode-panel-border, #e1e7ef);
-  border-radius: 8px;
-  font-size: 12.5px;
-  line-height: 1.5;
+  background: var(--vscode-editor-background, #ffffff);
+  font-size: 13px;
+  line-height: 1.55;
   font-variant-numeric: tabular-nums;
 }
 th, td {
-  padding: 9px 12px;
-  min-width: 72px;
+  min-width: 84px;
   max-width: 460px;
+  padding: 10px 14px;
   vertical-align: top;
   text-align: left;
   overflow-wrap: anywhere;
-  border-right: 1px solid var(--vscode-panel-border, #e1e7ef);
-  border-bottom: 1px solid var(--vscode-panel-border, #e1e7ef);
+  border: 0;
+  border-bottom: 1px solid #eaf0ef;
 }
-th:last-child, td:last-child { border-right: 0; }
-tbody tr:last-child td { border-bottom: 0; }
 thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--vscode-sideBarSectionHeader-background, #edf3f9);
-  color: var(--vscode-editor-foreground, #20314a);
+  background: #eff7f5;
+  color: #24534e;
   font-weight: 650;
+  border-bottom: 1px solid #d8e9e5;
 }
-tbody tr:nth-child(even) { background: var(--vscode-editorWidget-background, #fbfcfe); }
-tbody tr:hover { background: var(--vscode-list-hoverBackground, #eef5f8); }
+thead th:first-child { border-top-left-radius: 9px; }
+thead th:last-child { border-top-right-radius: 9px; }
+tbody tr:nth-child(even) td {
+  background: #fbfdfc;
+}
+tbody tr:hover td {
+  background: #f0f8f6;
+}
+tbody tr:last-child td { border-bottom: 0; }
+th[align="center"], td[align="center"] { text-align: center; }
+th[align="right"], td[align="right"] { text-align: right; }
+td code {
+  white-space: normal;
+  font-size: .9em;
+}
 hr {
   border: 0;
   border-top: 1px solid var(--vscode-panel-border, #e1e7ef);
