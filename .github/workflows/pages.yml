@@ -194,6 +194,10 @@ jobs:
         working-directory: ide-source
         run: |
           npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
+          # Fetch the pinned native Markdown language-features VSIX declared by
+          # the Theia app before building the frontend. The Pages build consumes
+          # its unpacked extension assets when preparing the static Preview.
+          npm run download:plugins --prefix experiments/ide-host/theia-online
           npm run build --prefix experiments/ide-host/theia-online
           node experiments/ide-host/scripts/prepare-theia-static-preview.mjs
       - name: Real Chromium acceptance at the default Pages root
