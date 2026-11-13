@@ -377,7 +377,16 @@ export function activate(context){
   }
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.openProcedure",
     async uri=>{
-      let target=uri;
+      // Commands may cross a Theia/VS Code extension-host RPC boundary where
+      // Uri instances arrive as plain objects. Rehydrate them before passing
+      // them to workspace/editor APIs; otherwise showTextDocument can receive
+      // a serialized object and fail with "Failed to show text document
+      // [object Object]" during recovery cleanup.
+      let target=typeof uri==="string"?vscode.Uri.parse(uri):
+        uri?.scheme&&uri?.path!==undefined
+          ?vscode.Uri.from({scheme:uri.scheme,authority:uri.authority??"",
+            path:uri.path,query:uri.query??"",fragment:uri.fragment??""})
+          :uri;
       if(!target){
         const active=vscode.window.activeTextEditor?.document.uri;
         if(active&&isProcedurePath(active.path))target=active;
