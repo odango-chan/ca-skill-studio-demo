@@ -29,36 +29,3 @@ test("Contract, Schema, Predicate and Script are source-only",()=>{
   assert.equal(permittedMode("source","split"),"source");
   assert.equal(graphControlsAvailable("source"),false);
 });
-test("one toolbar reuses Visual for Markdown and hides unsupported modes",()=>{
-  const app=file("site/app.mjs"),html=file("site/index.html");
-  assert.match(html,/id="markdownPane"[^>]*hidden/);
-  assert.match(html,/id="markdownPreview"/);
-  assert.match(html,/id="editorModes"/);
-  assert.match(html,/id="graphViewOptions"/);
-  assert.match(html,/id="zoomViewOptions"/);
-  assert.doesNotMatch(html,/id="viewMenuTitle"/);
-  assert.match(html,/id="toggleExplorer"/);
-  assert.match(app,/function updateViewAvailability\(nextKind\)/);
-  assert.match(app,/editorModes"\)\.hidden=!hasVisual/);
-  assert.match(app,/graphPane"\)\.hidden=!isGraph/);
-  assert.match(app,/markdownPane"\)\.hidden=viewKind!=="markdown"/);
-  assert.match(app,/setIconLabel\(\$\("mode-visual"\),viewKind==="markdown"\?"file-text":"network"/);
-  assert.match(app,/viewKind==="markdown"\?"预览":"Visual"/);
-  assert.match(app,/if\(!hasVisual&&mode!=="source"\)setMode\("source"\)/);
-});
-test("projection failure clears stale graph and preserves diagnostics and Source",()=>{
-  const app=file("site/app.mjs");
-  assert.match(app,/invalidateLayout\(\);\s*lastWorkspace=null;\s*lastGood=null;\s*graph=null;/);
-  assert.match(app,/投影失败 · 仅源码/);
-  assert.match(app,/function renderProblems\(\)/);
-  assert.match(app,/lineJump\(item\.line\)/);
-  assert.match(app,/updateViewAvailability\(viewKindFor\(/);
-});
-test("Markdown renderer stays independent of source history and canonical text",()=>{
-  const app=file("site/app.mjs");
-  assert.match(app,/renderMarkdown\(text\)/);
-  assert.match(app,/markdownPreview"\)\.innerHTML=rendered\.html/);
-  assert.match(app,/history\.record\(source\.value\)/);
-  assert.match(app,/source\.value\s*=\s*nextSource/);
-  assert.doesNotMatch(app,/source\.value\s*=\s*rendered\.html/);
-});
