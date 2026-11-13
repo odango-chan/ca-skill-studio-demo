@@ -2956,7 +2956,7 @@ export function registerWorkbench(vscode,context){
       await vscode.window.showTextDocument(doc,{
         viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
-      await vscode.commands.executeCommand('undo');
+      await vscode.commands.executeCommand('core.undo');
       if(doc.getText()!==original)
         throw Error('Native Markdown Undo did not restore the exact original Source');
       nativeMarkdownLiveOriginals.delete(key);
