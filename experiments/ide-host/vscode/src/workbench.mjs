@@ -2742,8 +2742,8 @@ export function registerWorkbench(vscode,context){
       // before treating a successful Source open as a native Preview launch.
       await activateNativeMarkdownExtension();
       const markdownCommands=await vscode.commands.getCommands(true);
-      if(!markdownCommands.includes('markdown.showPreviewToSide'))
-        throw Error('Built-in Markdown extension activated without registering markdown.showPreviewToSide');
+      if(!markdownCommands.includes('markdown.showPreview'))
+        throw Error('Built-in Markdown extension activated without registering markdown.showPreview');
       // Keep Source as the editable authority in the first editor group.
       // Theia can retain the original right-group Source tab when the same
       // document is shown in column one. Move the active tab when supported,
@@ -2777,10 +2777,16 @@ export function registerWorkbench(vscode,context){
           '无法验证当前 Markdown 文件所属 Package 或文件清单，已拒绝打开原生预览。');
         return false;
       }
-      // Do not await the host Preview command: some Theia PluginHost builds
-      // resolve it only after the Webview has completed its first render. The
-      // command itself must return promptly so callers can observe that render.
-      const opening=vscode.commands.executeCommand('markdown.showPreviewToSide',uri);
+      // Never use markdown.showPreviewToSide here: its Beside placement is
+      // relative to the currently focused group and can insert a THIRD group
+      // when a Designer already occupies the right side. The native Markdown
+      // extension also contributes a preview CustomEditor. Open that exact
+      // built-in editor in our shared Visual column explicitly.
+      // Do not await Webview initialization: hosts may settle only after render.
+      const opening=vscode.commands.executeCommand('vscode.openWith',uri,
+        'vscode.markdown.preview.editor',{
+          viewColumn:vscode.ViewColumn.Two,preserveFocus:true,preview:false
+        });
       paired=true;
       // Some Theia PluginHost builds leave the Preview command promise pending
       // after the webview is created. Never let that implementation detail keep
