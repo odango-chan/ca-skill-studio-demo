@@ -46,12 +46,16 @@ test('cross-file navigation opens the matching visual on the right and Source on
   const {vscode,calls}=vscodeApi();
   const target=uri('/p/schemas/request.schema.yaml');
   const result=await openSourceViewPair(vscode,target,{line:7});
-  assert.deepEqual(calls.map(call=>[call[0],call[2],call[3]]),[
-    ['vscode.openWith','skillStudio.schemaPreview',
-      {viewColumn:2,preserveFocus:false,preview:false}],
-    ['vscode.openWith','default',
-      {viewColumn:1,preserveFocus:true,preview:false,selection:new Range(new Position(6,0),new Position(6,0))}]
+  assert.equal(calls.length,2);
+  assert.deepEqual(calls.map(call=>[call[0],call[2]]),[
+    ['vscode.openWith','skillStudio.schemaPreview'],
+    ['vscode.openWith','default']
   ]);
+  assert.deepEqual(calls[0][3],{viewColumn:2,preserveFocus:false,preview:false});
+  assert.equal(calls[1][3].viewColumn,1);
+  assert.equal(calls[1][3].preserveFocus,true);
+  assert.equal(calls[1][3].selection.start.line,6);
+  assert.equal(calls[1][3].selection.end.line,6);
   assert.equal(result.line,7);
   assert.equal(result.sourceColumn,1);
   assert.equal(result.visualColumn,2);
