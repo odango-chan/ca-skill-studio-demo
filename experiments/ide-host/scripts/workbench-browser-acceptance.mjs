@@ -640,17 +640,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await click(target.x,target.y);await sleep(250);
     await evalJS(`(async()=>{window.__skillStudioCommandResult=await window.__skillStudioPendingCommand;window.__skillStudioPendingCommand=null;return true})()`);
   }
-  if(requireBrowserLsp){
-    const markdownStartup=await nativeCommand(
-      'skillStudio.internal.nativeMarkdownWorkerStartupAcceptance');
-    console.log('STUDIO_NATIVE_MARKDOWN_WORKER_STARTUP_CHROMIUM',
-      JSON.stringify(markdownStartup));
-    if(!markdownStartup?.isActive||markdownStartup.activationResult!=='ready'||
-       !markdownStartup.workerAvailable||markdownStartup.workerProbe?.ok!==true||
-       markdownStartup.workerProbe?.status!==200)
-      throw Error('Native Markdown Language Server did not activate before workbench regression: '+
-        JSON.stringify(markdownStartup));
-  }
   await invoke('workbench.files.action.focusFilesExplorer');
   await sleep(350);
   // Authoring views belong to native Explorer; semantic Procedure Outline

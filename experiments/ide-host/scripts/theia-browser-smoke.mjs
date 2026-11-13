@@ -379,6 +379,24 @@ try{
     throw Error("The default online workspace did not auto-open its project and 5GC Procedure: "+
       JSON.stringify(startupDiagnostics).slice(0,3200));
   }
+  if(requireBrowserLsp){
+    const markdownStartup=await evalJS(`(async()=>{
+      const container=window.theia.container;
+      const key=[...container._bindingDictionary._map.keys()].find(
+        item=>typeof item==="function"&&item.prototype?.executeCommand&&
+          item.prototype?.registerCommand&&item.prototype?.getCommand);
+      if(!key)throw Error("Native Theia command registry missing");
+      return container.get(key).executeCommand(
+        "skillStudio.internal.nativeMarkdownWorkerStartupAcceptance");
+    })()`);
+    console.log('STUDIO_NATIVE_MARKDOWN_WORKER_STARTUP_CHROMIUM',
+      JSON.stringify(markdownStartup));
+    if(!markdownStartup?.isActive||markdownStartup.activationResult!=='ready'||
+       !markdownStartup.workerAvailable||markdownStartup.workerProbe?.ok!==true||
+       markdownStartup.workerProbe?.status!==200)
+      throw Error('Native Markdown Language Server did not activate on cold workbench startup: '+
+        JSON.stringify(markdownStartup));
+  }
   const afterImport=await evalJS(`(async()=>{
     const names=[];let opfsError=null;
     try{
