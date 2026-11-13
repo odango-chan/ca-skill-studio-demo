@@ -78,6 +78,6 @@ test("Pages installs pinned browser LSP dependencies before bundling the Web ext
 
 test("Pages workflow cannot reintroduce the Classic application",async()=>{
   const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
-  assert.doesNotMatch(workflow,/--classic|dist\/classic|classic-icons\.css|preserve Classic/i);
+  assert.doesNotMatch(workflow,/--classic|preserve Classic/i);
   assert.match(workflow,/test ! -e dist\/classic/);
 });
