@@ -1,10 +1,10 @@
-// Add the Classic SKILL Studio wordmark beside Lumino's native menu list.
+// Add the SKILL Studio wordmark beside Lumino's native menu list.
 // The native menu content node and all menu commands remain untouched.
 import {readFile,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 
 export function buildSkillStudioBrandCss(){
-  return `/* Classic SKILL Studio wordmark in the native Theia menu-bar row. */
+  return `/* SKILL Studio wordmark in the native Theia menu-bar row. */
 .lm-MenuBar.skill-studio-branded{
   min-width:0;
 }
