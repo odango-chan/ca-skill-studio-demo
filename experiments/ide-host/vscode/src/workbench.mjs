@@ -1349,8 +1349,11 @@ export function registerWorkbench(vscode,context){
           // parent of that exact root so B is a true sibling, not a nested
           // subdirectory enumerated into A's Package snapshot.
           const sourcePath=sourceRoot.uri.path.replace(/\/$/,"");
-          const parentPath=sourcePath.slice(0,sourcePath.lastIndexOf("/"))||"/";
-          const parentUri=sourceRoot.uri.with({path:parentPath});
+          const skillsPath=sourcePath.slice(0,sourcePath.lastIndexOf("/"))||"/";
+          const workspacePath=skillsPath.slice(0,skillsPath.lastIndexOf("/"))||"/";
+          // Keep this isolated fixture outside the configured skills/ inventory:
+          // project discovery now attaches every authored Skill automatically.
+          const parentUri=sourceRoot.uri.with({path:workspacePath});
           const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
           const packageBContainer=vscode.Uri.joinPath(
             parentUri,"skill-studio-l2d4b-"+suffix);
