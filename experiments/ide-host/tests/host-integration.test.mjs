@@ -21,7 +21,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   };
   const listeners=new Set(),commands=new Map(),posted=[],writes=[],opened=[],registered=[],revealed=[];
   let confirmChoice="确认并应用";
-  const textEditor={document,selection:null,revealRange(range,kind){revealed.push({range,kind});}};
+  const textEditor={document,viewColumn:1,selection:null,revealRange(range,kind){revealed.push({range,kind});}};
   let provider=null,onMessage=null;
   class WorkspaceEdit{
     constructor(){this.changes=[];}
@@ -41,6 +41,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     workspace:{
       textDocuments:[document],
       workspaceFolders:[],
+      async openTextDocument(){return document;},
       onDidChangeTextDocument(cb){listeners.add(cb);return {dispose(){listeners.delete(cb);}};},
       onDidChangeConfiguration(){return {dispose(){}};},
       onDidChangeWorkspaceFolders(){return {dispose(){}};},
