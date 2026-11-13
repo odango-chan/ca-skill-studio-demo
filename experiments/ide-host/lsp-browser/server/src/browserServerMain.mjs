@@ -259,6 +259,20 @@ function scriptToolName(text) {
   return /^# name: ([A-Za-z][A-Za-z0-9_-]*)$/m.exec(text)?.[1] ?? null;
 }
 
+function projectOperationCatalog(snapshot,index) {
+  const unique = new Map();
+  const ambiguous = new Set();
+  for (const operation of snapshot.dependencyOperations ?? []) {
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,159}$/.test(operation?.id ?? "") ||
+        typeof operation.dependencyId !== "string") continue;
+    if (unique.has(operation.id) || index?.declarations.has("operation\u0000" + operation.id))
+      ambiguous.add(operation.id);
+    unique.set(operation.id, operation);
+  }
+  for (const id of ambiguous) unique.delete(id);
+  return unique;
+}
+
 function schemaTitleCatalog(snapshot) {
   const found = new Map();
   const ambiguous = new Set();
@@ -415,7 +429,14 @@ connection.onHover(params => {
     })[symbolHit.token.type]??"Skill symbol";
     const resolved=Boolean(declaration&&snapshot.completeness==="complete"&&
       index?.generation===snapshot.generation);
-    const body=resolved
+    const operation=!symbolHit.declarations.length&&snapshot.completeness==="complete"&&
+      index?.generation===snapshot.generation&&
+      ["skillOperation","skillCapability"].includes(symbolHit.token.type)
+      ? projectOperationCatalog(snapshot,index).get(symbolHit.token.name) : null;
+    const body=operation
+      ? "**Tool Operation** `"+operation.id+"`\n\nDeclared in project dependency `"+
+        operation.dependencyId+"`."
+      : resolved
       ? "**"+kind+"** `"+symbolHit.token.name+"`\n\nDeclared in `"+declaration.relativePath+"`"
       : "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nNo unique declaration is available in the current complete Package snapshot.";
     return {contents:{kind:"markdown",value:body},
@@ -531,6 +552,26 @@ connection.onCompletion(params => {
   const starts = lineStarts(document.text);
   const lineStart = starts[params.position.line];
   const prefix = document.text.slice(lineStart, offset);
+
+  if (document.relativePath === "assurance/procedure.yaml" &&
+      value.analysis.state === "READY" && value.snapshot.completeness === "complete") {
+    const index = symbolIndexes.get(value.snapshot.rootUri);
+    const hit = skillSymbolAt(index,document.uri,offset) ??
+      skillSymbolAt(index,document.uri,offset-1);
+    if (hit?.token.type === "skillOperation") {
+      const range = hit.token.range;
+      const typed = document.text.slice(range.start,offset);
+      const editRange = toLspRange(document.text,range);
+      return [...projectOperationCatalog(value.snapshot,index).values()]
+        .filter(item => item.id.startsWith(typed))
+        .map(item => ({
+          label: item.id,
+          kind: CompletionItemKind.Reference,
+          detail: "Tool dependency · " + item.dependencyId,
+          ...(editRange ? { textEdit: { range: editRange, newText: item.id } } : {})
+        }));
+    }
+  }
 
   if (document.relativePath === "assurance/procedure.yaml" &&
       /^\s*script:\s*[^#]*$/.test(prefix) &&

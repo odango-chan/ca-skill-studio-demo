@@ -343,8 +343,25 @@ export function registerWorkbench(vscode,context){
       if(folder){
         const resolved=await resolveLockedDependencies(vscode,folder.uri);
         const schemas=[];
+        const operations=[];
         const decoder=new TextDecoder();
         for(const dependency of resolved.snapshots){
+          if(dependency.kind==="tool-catalog"){
+            const file=dependency.files.find(item=>item.path==="tool-contract.json");
+            if(file){
+              try{
+                const contract=JSON.parse(decoder.decode(decodeBase64(file.bytes)));
+                if(contract.apiVersion==="skillc.tool/v0.1"&&Array.isArray(contract.operations)){
+                  for(const item of contract.operations){
+                    if(typeof item?.id==="string")
+                      operations.push({id:item.id,dependencyId:dependency.id});
+                  }
+                }
+              }catch(error){
+                console.warn("Cannot read locked Tool contract",dependency.id,error);
+              }
+            }
+          }
           if(dependency.kind!=="schema-bundle")continue;
           for(const file of dependency.files){
             if(!/\.schema\.(?:json|ya?ml)$/.test(file.path))continue;
@@ -356,6 +373,7 @@ export function registerWorkbench(vscode,context){
           }
         }
         snapshot.dependencySchemas=schemas;
+        snapshot.dependencyOperations=operations;
       }
       if(state.disposed||ticket!==state.ticket){
         if(strict)throw Error("Package refresh was superseded during dependency resolution");

@@ -421,6 +421,11 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
     const snapshot=currentV02PackageSnapshot();
+    snapshot.dependencyOperations=[
+      {id:"sbi.udm.sm_data.get.next",dependencyId:"udm"},
+      {id:"sbi.udm.sm_data.get.duplicate",dependencyId:"udm"},
+      {id:"sbi.udm.sm_data.get.duplicate",dependencyId:"other"}
+    ];
     const ready=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===snapshot.rootUri&&
@@ -472,6 +477,12 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     });
     assert.equal(operationDefinition.uri,tools.uri,
       "Operation references resolve only to an imported ToolCatalog declaration");
+
+    const operationCompletion=await lspRequest(worker,399,"textDocument/completion",{
+      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,operationName,operationName.length)
+    });
+    assert.ok(operationCompletion.some(item=>item.label===operationName+".next"));
+    assert.ok(!operationCompletion.some(item=>item.label===operationName+".duplicate"));
 
     const predicateHover=await lspRequest(worker,306,"textDocument/hover",{
       textDocument:{uri:procedure.uri},position:positionOf(procedure.text,predicateName)

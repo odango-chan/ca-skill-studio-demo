@@ -17,6 +17,10 @@ export interface PackageSnapshot {
   readonly generation: number;
   readonly completeness: PackageCompleteness;
   readonly documents: readonly PackageDocumentSnapshot[];
+  readonly dependencyOperations?: readonly {
+    readonly id: string;
+    readonly dependencyId: string;
+  }[];
   readonly dependencySchemas?: readonly {
     readonly dependencyId: string;
     readonly path: string;
