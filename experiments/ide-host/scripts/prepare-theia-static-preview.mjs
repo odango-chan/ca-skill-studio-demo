@@ -85,6 +85,47 @@ for(const required of [
   if(!info.isFile()||info.size<100)
     throw Error("Static hosted native Markdown asset missing or empty: "+required);
 }
+const markdownBrowserEntryPath=join(markdownPluginTarget,markdownBrowserEntry??"");
+let markdownBrowserBundle=await readFile(markdownBrowserEntryPath,"utf8");
+const markdownWorkerCreation="const worker = new Worker(serverMain.toString());";
+const markdownWorkerCreationPatched=String.raw`const workerBase = new URL(".", globalThis.location.href);
+const workerUrl = new URL(serverMain.toString(), workerBase);
+const workerBasePath = workerBase.pathname.replace(/\/$/, "");
+if (workerBasePath && workerUrl.origin === workerBase.origin &&
+    workerUrl.pathname.startsWith("/hostedPlugin/") &&
+    !workerUrl.pathname.startsWith(workerBasePath + "/")) {
+  workerUrl.pathname = workerBasePath + workerUrl.pathname;
+}
+const worker = new Worker(workerUrl.toString());`;
+const markdownWorkerCreationCount=markdownBrowserBundle.split(markdownWorkerCreation).length-1;
+if(markdownWorkerCreationCount!==1)
+  throw Error("Pinned Markdown Worker creation changed; expected exactly one patch point, found "+markdownWorkerCreationCount);
+markdownBrowserBundle=markdownBrowserBundle.replace(markdownWorkerCreation,markdownWorkerCreationPatched);
+await writeFile(markdownBrowserEntryPath,markdownBrowserBundle);
+console.log("STUDIO_THEIA_STATIC_MARKDOWN_WORKER_BASE_PATH",JSON.stringify({
+  browserEntry:markdownBrowserEntryPath,basePathAware:true,patchCount:markdownWorkerCreationCount
+}));
+const pluginWorkerPath=join(root,"plugin-worker.js");
+let pluginWorkerBundle=await readFile(pluginWorkerPath,"utf8");
+const webviewResourceMapping=String.raw`toGeneralWebviewResource(e,t){let n=Hd.URI.parse(e.packageUri),i=t.path.replace(n.path,""),r=Xke.PluginPackage.toPluginUrl(e,"")+i;return Hd.URI.parse(this.initData.webviewResourceRoot.replace("{{uuid}}","webviewUUID")).with({path:r})}`;
+const webviewResourceMappingPatched=String.raw`toGeneralWebviewResource(e,t){let n=Hd.URI.parse(e.packageUri),i=t.path.replace(n.path,""),r=Xke.PluginPackage.toPluginUrl(e,"")+i;const basePath=new URL(".",globalThis.location.href).pathname.replace(/\/$/,"");const resourcePath=r.startsWith("/")?r:"/"+r;if(basePath&&resourcePath.startsWith("/hostedPlugin/")&&!resourcePath.startsWith(basePath+"/"))r=basePath+resourcePath;return Hd.URI.parse(this.initData.webviewResourceRoot.replace("{{uuid}}","webviewUUID")).with({path:r})}`;
+const webviewResourceMappingCount=pluginWorkerBundle.split(webviewResourceMapping).length-1;
+if(webviewResourceMappingCount!==1)
+  throw Error("Pinned Theia plugin-worker Webview resource mapping changed; expected exactly one patch point, found "+webviewResourceMappingCount);
+pluginWorkerBundle=pluginWorkerBundle.replace(webviewResourceMapping,webviewResourceMappingPatched);
+const webviewAsWebviewUri=String.raw`asWebviewUri(e){let t=this.initData.webviewResourceRoot.replace("{{scheme}}",e.scheme).replace("{{authority}}",e.authority).replace("{{path}}",e.path.replace(/^\//,"")).replace("{{uuid}}",this.origin??this.viewId);return Hd.URI.parse(t).with({query:e.query})}`;
+const webviewAsWebviewUriPatched=String.raw`asWebviewUri(e){let t=this.initData.webviewResourceRoot.replace("{{scheme}}",e.scheme).replace("{{authority}}",e.authority).replace("{{path}}",e.path.replace(/^\//,"")).replace("{{uuid}}",this.origin??this.viewId);const basePath=new URL(".",globalThis.location.href).pathname.replace(/\/$/,"");if(basePath){const resource=Hd.URI.parse(t);if((resource.scheme==="http"||resource.scheme==="https")&&resource.path.startsWith("/hostedPlugin/")&&!resource.path.startsWith(basePath+"/"))t=resource.with({path:basePath+resource.path}).toString()}return Hd.URI.parse(t).with({query:e.query})}`;
+const webviewAsWebviewUriCount=pluginWorkerBundle.split(webviewAsWebviewUri).length-1;
+if(webviewAsWebviewUriCount!==1)
+  throw Error("Pinned Theia Webview.asWebviewUri mapping changed; expected exactly one patch point, found "+webviewAsWebviewUriCount);
+pluginWorkerBundle=pluginWorkerBundle.replace(webviewAsWebviewUri,webviewAsWebviewUriPatched);
+console.log("STUDIO_THEIA_STATIC_WEBVIEW_API_BASE_PATH",JSON.stringify({
+  pluginWorkerPath,basePathAware:true,patchCount:webviewAsWebviewUriCount
+}));
+await writeFile(pluginWorkerPath,pluginWorkerBundle);
+console.log("STUDIO_THEIA_STATIC_WEBVIEW_RESOURCE_BASE_PATH",JSON.stringify({
+  pluginWorkerPath,basePathAware:true,patchCount:webviewResourceMappingCount
+}));
 console.log("STUDIO_THEIA_STATIC_MARKDOWN_ASSETS",JSON.stringify({
   markdownPluginTarget,version:markdownManifest.version,
   browser:markdownManifest.browser,workerBytes:(await stat(markdownWorker)).size

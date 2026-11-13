@@ -206,6 +206,7 @@ jobs:
         env:
           THEIA_BASE_PATH: "/ca-skill-studio-demo"
           THEIA_REQUIRE_WEBVIEW: "1"
+          THEIA_REQUIRE_BROWSER_LSP: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       # Theia is the default online host. The previous full-featured browser
       # Studio is copied intact to /classic/ before the root is replaced.

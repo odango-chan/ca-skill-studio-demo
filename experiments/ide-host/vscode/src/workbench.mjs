@@ -2648,6 +2648,26 @@ export function registerWorkbench(vscode,context){
         '; error='+String(activationError??'none'));
     return {markdownExtension,activationResult};
   }
+  function resolveNativeMarkdownWorkerUrl(workerUri){
+    const locationHref=globalThis.location?.href;
+    if(!locationHref)return workerUri.toString();
+    try{
+      const appBase=new URL('.',locationHref);
+      const resolved=new URL(workerUri.toString(),appBase);
+      const basePath=appBase.pathname.replace(/\/$/,'');
+      // Theia's hosted-plugin URI can resolve from the origin root even when
+      // the workbench is deployed as a GitHub Pages project site. Keep the
+      // Worker inside the actual application base path.
+      if(basePath&&resolved.origin===appBase.origin&&
+         resolved.pathname.startsWith('/hostedPlugin/')&&
+         !resolved.pathname.startsWith(basePath+'/')){
+        resolved.pathname=basePath+resolved.pathname;
+      }
+      return resolved.toString();
+    }catch{
+      return workerUri.toString();
+    }
+  }
   // Resource probing is acceptance-only. Normal Markdown opening should not
   // issue an extra HEAD request on every preview launch.
   async function probeNativeMarkdownWorker(markdownExtension){
@@ -2655,15 +2675,16 @@ export function registerWorkbench(vscode,context){
     if(typeof Worker==='function'&&typeof globalThis.location!=='undefined'){
       const workerUri=vscode.Uri.joinPath(markdownExtension.extensionUri,
         'dist','browser','serverWorkerMain.js');
+      const workerUrl=resolveNativeMarkdownWorkerUrl(workerUri);
       try{
-        const response=await fetch(workerUri.toString(),{method:'HEAD'});
-        workerProbe={uri:workerUri.toString(),status:response.status,ok:response.ok};
+        const response=await fetch(workerUrl,{method:'HEAD'});
+        workerProbe={uri:workerUrl,status:response.status,ok:response.ok};
       }catch(error){
-        workerProbe={uri:workerUri.toString(),error:String(error?.message??error)};
+        workerProbe={uri:workerUrl,error:String(error?.message??error)};
       }
       nativeMarkdownWorkerDiagnostics={
         extensionUri:markdownExtension.extensionUri.toString(),
-        workerUri:workerUri.toString(),workerProbe
+        workerUri:workerUrl,workerProbe
       };
     }
     return workerProbe;

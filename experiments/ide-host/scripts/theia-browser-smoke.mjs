@@ -32,14 +32,12 @@ const server=externalUrl?null:createServer((req,res)=>{
   if(basePath){
     if(name===basePath||name.startsWith(basePath+"/")){
       name=name.slice(basePath.length)||"/";
-    }else if(!name.startsWith("/hostedPlugin/")){
+    }else{
+      // Match GitHub Pages project-site routing: the artifact exists below
+      // /<repository>/, not at the origin root. Root-relative plugin URLs must
+      // fail here instead of being silently mapped to the project artifact.
       res.writeHead(404).end();return;
     }
-    // Theia's browser extension host constructs extensionUri from the origin
-    // root, even when the workbench itself is hosted below a Pages base path.
-    // Browser Workers therefore request /hostedPlugin/... without the app
-    // prefix. Permit only immutable generated plugin assets at that root;
-    // all other static requests remain confined to the configured base path.
   }
   requests.add(name);
   const file=resolve(root,"."+name.replace(/\/$/,"/index.html"));
@@ -53,15 +51,16 @@ const server=externalUrl?null:createServer((req,res)=>{
 });
 if(server)await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
 if(server){
-  const workerPath="/hostedPlugin/vscode_markdown_language_features/dist/browser/serverWorkerMain.js";
-  const workerFile=join(root,workerPath);
+  const workerAssetPath="/hostedPlugin/vscode_markdown_language_features/dist/browser/serverWorkerMain.js";
+  const workerPath=basePath+workerAssetPath;
+  const workerFile=join(root,workerAssetPath);
   if(!existsSync(workerFile))
     throw Error("Pinned native Markdown Worker was not staged: "+workerFile);
   const workerProbe=await fetch("http://127.0.0.1:"+server.address().port+workerPath);
   if(!workerProbe.ok)
-    throw Error("Theia root-relative hostedPlugin Worker route failed: "+
+    throw Error("Theia Pages-base-path hostedPlugin Worker route failed: "+
       workerPath+" status="+workerProbe.status);
-  console.log("STUDIO_THEIA_ROOT_RELATIVE_PLUGIN_WORKER",JSON.stringify({
+  console.log("STUDIO_THEIA_PAGES_BASE_PATH_PLUGIN_WORKER",JSON.stringify({
     path:workerPath,status:workerProbe.status,bytes:(await workerProbe.arrayBuffer()).byteLength,
     basePath
   }));
@@ -88,7 +87,7 @@ const command=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
   pending.set(id,{resolve,reject,timer});
   ws.send(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})}));
 });
-const workerTargets=new Map(),workerTargetSetupErrors=[],discoveredTargets=[];
+const workerTargets=new Map(),workerTargetSetupErrors=[],discoveredTargets=[],workerRuntimeErrors=[];
 const enableTargetSession=async(sessionId,targetInfo)=>{
   const type=targetInfo?.type??"unknown";
   const targetUrl=targetInfo?.url??"";
@@ -98,6 +97,7 @@ const enableTargetSession=async(sessionId,targetInfo)=>{
   // Never pause the workbench or service worker: doing so can stall Webviews.
   if(type!=="worker"&&type!=="shared_worker")return;
   try{
+    await command("Runtime.enable",{},sessionId);
     await command("Network.enable",{},sessionId);
     await command("Target.setAutoAttach",{
       autoAttach:true,waitForDebuggerOnStart:false,flatten:true
@@ -160,8 +160,13 @@ try{
         if(id===msg.params?.executionContextId)defaultExecutionContexts.delete(frameId);
     }
     if(msg.method==="Runtime.executionContextsCleared")defaultExecutionContexts.clear();
-    if(msg.method==="Runtime.exceptionThrown")
-      exceptions.push(msg.params?.exceptionDetails?.exception?.description||msg.params?.exceptionDetails?.text);
+    if(msg.method==="Runtime.exceptionThrown"){
+      const message=msg.params?.exceptionDetails?.exception?.description||
+        msg.params?.exceptionDetails?.text||"Unknown worker exception";
+      exceptions.push(message);
+      const target=workerTargets.get(msg.sessionId);
+      if(target)workerRuntimeErrors.push({kind:"exception",target,message});
+    }
     if(msg.method==="Network.requestWillBeSent"&&
        /markdown-language-features.*serverWorkerMain\.js|vscode_markdown_language_features.*serverWorkerMain\.js/i.test(msg.params?.request?.url??""))
       markdownWorkerRequests.push({url:msg.params.request.url,initiator:msg.params.initiator?.type??null,
@@ -172,8 +177,12 @@ try{
     if(msg.method==="Network.responseReceived"&&networkResponses.length<80)
       networkResponses.push({url:msg.params.response.url,status:msg.params.response.status,
         type:msg.params.type});
-    if(msg.method==="Runtime.consoleAPICalled"&&msg.params?.type==="error")
-      consoleErrors.push(msg.params.args?.map(x=>x.value||x.description).join(" "));
+    if(msg.method==="Runtime.consoleAPICalled"&&msg.params?.type==="error"){
+      const message=msg.params.args?.map(x=>x.value||x.description).join(" ");
+      consoleErrors.push(message);
+      const target=workerTargets.get(msg.sessionId);
+      if(target)workerRuntimeErrors.push({kind:"console",target,message});
+    }
     if(msg.id&&pending.has(msg.id)){
       const call=pending.get(msg.id);pending.delete(msg.id);clearTimeout(call.timer);
       if(msg.error)call.reject(Error(msg.error.message));else call.resolve(msg.result);
@@ -1533,12 +1542,37 @@ try{
   });}
   catch(error){console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_DIAGNOSTIC",JSON.stringify({workerRequests:markdownWorkerRequests,targets:[...workerTargets.values()],discoveredTargets,targetSetupErrors:workerTargetSetupErrors,serverErrors:consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message)),networkFailures:networkFailures.filter(x=>/worker|plugin/i.test(x.errorText??""))}));console.log("STUDIO_WORKBENCH_ERROR",String(error));console.log("STUDIO_WORKBENCH_FAILURE",JSON.stringify(await evalJS(`({text:document.body.innerText,activities:[...document.querySelectorAll(".theia-app-sides [title],.theia-app-sides [aria-label]")].map(x=>({title:x.title,aria:x.getAttribute("aria-label")})),tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(x=>({text:x.textContent,className:x.className}))})`)));throw error;}
   const markdownServerErrors=consoleErrors.filter(message=>/Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message));
-  const markdownWorkerEvidence={requests:markdownWorkerRequests,targets:[...workerTargets.values()],discoveredTargets,targetSetupErrors:workerTargetSetupErrors,serverErrors:markdownServerErrors};
+  const markdownWorkerRuntimeErrors=workerRuntimeErrors.filter(({target,message})=>
+    /vscode_markdown_language_features|markdown-language-features|serverWorkerMain\.js/i.test(target?.url??"")||
+    /Client Markdown Language Server|markdown.*language server|language server.*markdown/i.test(message??""));
+  const expectedMarkdownWorkerPath=basePath+
+    "/hostedPlugin/vscode_markdown_language_features/dist/browser/serverWorkerMain.js";
+  const observedMarkdownWorkerPaths=markdownWorkerRequests.map(request=>{
+    try{return new URL(request.url).pathname;}catch{return request.url;}
+  });
+  const markdownWorkerPathObserved=observedMarkdownWorkerPaths.includes(expectedMarkdownWorkerPath);
+  const rootRelativeMarkdownWorkerRequests=basePath
+    ?observedMarkdownWorkerPaths.filter(path=>path==="/hostedPlugin/vscode_markdown_language_features/dist/browser/serverWorkerMain.js")
+    :[];
+  const markdownWorkerEvidence={
+    requests:markdownWorkerRequests,
+    expectedWorkerPath:expectedMarkdownWorkerPath,
+    observedWorkerPaths:observedMarkdownWorkerPaths,
+    workerPathObserved:markdownWorkerPathObserved,
+    rootRelativeWorkerRequests:rootRelativeMarkdownWorkerRequests,
+    targets:[...workerTargets.values()],discoveredTargets,
+    targetSetupErrors:workerTargetSetupErrors,
+    serverErrors:markdownServerErrors,
+    workerRuntimeErrors:markdownWorkerRuntimeErrors
+  };
   console.log("STUDIO_NATIVE_MARKDOWN_LANGUAGE_SERVER_CHROMIUM",JSON.stringify(markdownWorkerEvidence));
-  if(requireBrowserLsp&&(!markdownWorkerRequests.length||markdownServerErrors.length))
-    throw Error("Native Markdown Language Server did not start cleanly in real Chromium: "+JSON.stringify(markdownWorkerEvidence));
+  if((requireWebview||requireBrowserLsp)&&
+     (!markdownWorkerPathObserved||rootRelativeMarkdownWorkerRequests.length||
+      markdownServerErrors.length||markdownWorkerRuntimeErrors.length))
+    throw Error("Native Markdown Language Server did not start cleanly under the configured Pages path: "+
+      JSON.stringify(markdownWorkerEvidence));
   if(!requireBrowserLsp)
-    console.log("STUDIO_NATIVE_MARKDOWN_BACKEND_HOST_LANGUAGE_SERVER",JSON.stringify({browserWorkerExpected:false,diagnostics:markdownWorkerEvidence}));
+    console.log("STUDIO_NATIVE_MARKDOWN_HOST_DIAGNOSTIC",JSON.stringify({browserWorkerExpected:false,diagnostics:markdownWorkerEvidence}));
   // Run Package Overview last: opening the second Skill's visual Source must
   // not alter the Procedure Webview used by the preceding authoring regression.
   const packageOverviewEvidence=await runPackageOverviewAcceptance({
