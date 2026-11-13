@@ -1033,7 +1033,11 @@ export function registerWorkbench(vscode,context){
               persistedDriftObserved:diskBeforeClean!==state.original,cleanupSaved};
           }finally{
             languageDiagnosticAcceptance.delete(key);
-            await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
+            // This phase runs only after the acceptance test has deliberately
+            // terminated the Language Worker. Keep the restored native Source
+            // editor active: reopening the CustomEditor here is unrelated to
+            // source restoration and can fail while Theia is disposing the
+            // editor/provider state for the terminated worker.
           }
         }
 
