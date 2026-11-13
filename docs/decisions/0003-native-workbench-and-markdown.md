@@ -129,7 +129,9 @@ The accepted Theia implementation is the pinned built-in VS Code Markdown extens
 
 The Studio extension owns only the integration boundary:
 
-- automatic pairing on Markdown open: editable Source in editor group one, read-only Preview in editor group two;
+- automatic pairing for every `.md` and `.markdown` file opened from Explorer / Package Explorer, including a Markdown editor restored as active during startup;
+- one fixed default split: editable Source in editor group one (left), read-only native Preview in editor group two (right);
+- opening a Markdown Source from another editor group normalizes it back to Source-left / Preview-right; opening another Markdown file uses the same two positions;
 - the shared SKILL Studio Light Markdown theme via `contributes.markdown.previewStyles`;
 - exact Package-root inventory and symlink checks through `markdown-link-policy.mjs`;
 - fail-closed handling for missing/ambiguous Package roots and unsafe Package-relative links;
