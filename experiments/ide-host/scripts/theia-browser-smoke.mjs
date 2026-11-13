@@ -90,13 +90,38 @@ const command=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
 });
 const workerTargets=new Map(),workerTargetSetupErrors=[],discoveredTargets=[];
 const enableTargetSession=async(sessionId,targetInfo)=>{
-  await command("Network.enable",{},sessionId);
-  await command("Target.setAutoAttach",{
-    autoAttach:true,waitForDebuggerOnStart:true,flatten:true
-  },sessionId);
-  if(targetInfo?.type==="worker"||targetInfo?.type==="shared_worker"||
-     targetInfo?.type==="service_worker")
-    await command("Runtime.runIfWaitingForDebugger",{},sessionId);
+  const type=targetInfo?.type??"unknown";
+  const targetUrl=targetInfo?.url??"";
+  // Theia's service worker must never be held while enabling Network: some
+  // Chromium builds do not answer Network.enable for service_worker targets.
+  // It serves the workbench/Webview shell, not the Markdown language worker.
+  if(type==="service_worker"){
+    try{await command("Runtime.runIfWaitingForDebugger",{},sessionId);}
+    catch(error){workerTargetSetupErrors.push({target:targetUrl,type,
+      phase:"resume-service-worker",error:String(error)});}
+    return;
+  }
+  // Only dedicated/shared workers need nested-worker and network observation.
+  // Always release a paused target, even when CDP instrumentation fails.
+  if(type!=="worker"&&type!=="shared_worker"){
+    try{await command("Runtime.runIfWaitingForDebugger",{},sessionId);}
+    catch(error){workerTargetSetupErrors.push({target:targetUrl,type,
+      phase:"resume-target",error:String(error)});}
+    return;
+  }
+  try{
+    await command("Network.enable",{},sessionId);
+    await command("Target.setAutoAttach",{
+      autoAttach:true,waitForDebuggerOnStart:true,flatten:true
+    },sessionId);
+  }catch(error){
+    workerTargetSetupErrors.push({target:targetUrl,type,
+      phase:"enable-worker-observation",error:String(error)});
+  }finally{
+    try{await command("Runtime.runIfWaitingForDebugger",{},sessionId);}
+    catch(error){workerTargetSetupErrors.push({target:targetUrl,type,
+      phase:"resume-worker",error:String(error)});}
+  }
 };
 const evalJS=async expression=>{
   const data=await command("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});
