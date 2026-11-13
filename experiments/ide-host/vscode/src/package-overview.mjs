@@ -185,15 +185,17 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       tooltip:'文件清点，不代表 SKILL 内容已通过语义校验'
     };
     if(!packages.length){
-      const notice=inventoryState==='no-workspace'
-        ?{label:'请先打开 Workspace',description:'然后刷新 Package 清单'}
-        :inventoryState==='select-project-root'
-          ?{label:'请选择 Project Root',description:'多根工作区需要明确选择项目根目录'}
-        :inventoryState==='unavailable'
-          ?{label:'Package 清单不可用',description:message}
-          :inventoryState==='truncated-empty'
-            ?{label:'扫描范围内未发现 SKILL Package',description:'文件数量达到上限，无法判断剩余文件'}
-            :{label:'未发现 SKILL Package',description:'需要 SKILL.md 或 assurance/*.yaml'};
+      const notice=inventoryState==='loading'
+        ?{label:'正在读取 Package 文件清单…',description:'项目结构先行显示，文件清点在后台进行'}
+        :inventoryState==='no-workspace'
+          ?{label:'请先打开 Workspace',description:'然后刷新 Package 清单'}
+          :inventoryState==='select-project-root'
+            ?{label:'请选择 Project Root',description:'多根工作区需要明确选择项目根目录'}
+          :inventoryState==='unavailable'
+            ?{label:'Package 清单不可用',description:message}
+            :inventoryState==='truncated-empty'
+              ?{label:'扫描范围内未发现 SKILL Package',description:'文件数量达到上限，无法判断剩余文件'}
+              :{label:'未发现 SKILL Package',description:'需要 SKILL.md 或 assurance/*.yaml'};
       return [summary,{kind:'notice',...notice,icon:'info',
         tooltip:'Package Explorer 只清点文件，不做语义校验'}];
     }
@@ -278,9 +280,10 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       return undefined;
     }
   };
-  // Register without auto-opening the view. When supported, keep a real
-  // TreeView handle so an explicit example-import action can reveal both
-  // Skill roots without synthesizing mouse events or forcing initial focus.
+  // Register the view without programmatically stealing editor focus.
+  // The manifest's visibility: visible supplies the first-workspace default;
+  // persisted user layout remains authoritative after the first open.
+  // Keep a TreeView handle for explicit, focus-free Package reveal actions.
   const treeView = typeof vscode.window.createTreeView==='function'
     ? vscode.window.createTreeView('skillStudio.packages',{
         treeDataProvider:provider,showCollapseAll:true
