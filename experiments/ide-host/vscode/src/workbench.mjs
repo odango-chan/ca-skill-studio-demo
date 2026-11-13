@@ -871,7 +871,7 @@ export function registerWorkbench(vscode,context){
         // The native provider probe opened a Python editor. Restore the
         // Procedure CustomEditor so subsequent workbench actions (notably
         // native Undo) continue to target the visual editor under test.
-        await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
+        await openSourceViewPair(vscode,procedureUri);
         return {
           definition:scriptPath,
           yamlDefinitions:{
@@ -1077,7 +1077,7 @@ export function registerWorkbench(vscode,context){
             };
           }finally{
             languageDiagnosticAcceptance.delete(key);
-            await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
+            await openSourceViewPair(vscode,procedureUri);
           }
         }
         throw Error("Unknown live diagnostic acceptance phase: "+String(phase));
@@ -1228,7 +1228,7 @@ export function registerWorkbench(vscode,context){
             return {phase,restored:true,originalDiskUnchanged:true};
           }finally{
             languageRecoveryAcceptance.delete(key);
-            await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);
+            await openSourceViewPair(vscode,procedureUri);
           }
         }
         if(phase==="verify-and-restore"){
@@ -1298,7 +1298,7 @@ export function registerWorkbench(vscode,context){
               if(generation<=before)throw Error("Post-recovery restoration did not advance Package generation");
             }catch(error){cleanup.push(String(error?.message??error));}
             languageRecoveryAcceptance.delete(key);
-            try{await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);}
+            try{await openSourceViewPair(vscode,procedureUri);}
             catch(error){cleanup.push("Procedure focus: "+String(error?.message??error));}
             if(cleanup.length)throw Error("L2-D4b recovery cleanup failed: "+cleanup.join("; "));
           }
@@ -1637,7 +1637,7 @@ export function registerWorkbench(vscode,context){
                 throw Error("clean Source state was not restored");
             }catch(error){problems.push("clean "+entry.name+": "+String(error?.message??error));}
           }
-          try{await vscode.commands.executeCommand("skillStudio.openProcedure",procedureUri);}
+          try{await openSourceViewPair(vscode,procedureUri);}
           catch(error){problems.push("Procedure focus: "+String(error?.message??error));}
           if(problems.length)throw Error("L2-D3 cleanup: "+problems.join("; "));
         }
