@@ -2764,13 +2764,30 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownWorkerDiagnostics',()=>nativeMarkdownWorkerDiagnostics));
   context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async(skillName,relativePath,openColumn)=>{
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async(skillName,relativePath)=>{
       const name=typeof skillName==='string'?skillName:'establish-pdu-session';
       const targetPath=typeof relativePath==='string'?relativePath:'SKILL.md';
       if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
       if(!/^(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(targetPath))
         throw Error('Markdown acceptance target must be a known Package-local Markdown path');
-      if(openColumn!==undefined&&openColumn!==1&&openColumn!==2)
+      const matches=await vscode.workspace.findFiles(
+        '**/'+name+'/'+targetPath,'**/node_modules/**',5);
+      const suffix='/'+name+'/'+targetPath;
+      const exact=matches.filter(item=>item.path.endsWith(suffix));
+      if(exact.length!==1)
+        throw Error('Expected exactly one '+name+'/'+targetPath+' in the active Workspace');
+      const opened=await openNativeMarkdownPreview(exact[0]);
+      return opened?exact[0].toString():null;
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance',
+    async(skillName,relativePath,openColumn)=>{
+      const name=typeof skillName==='string'?skillName:'establish-pdu-session';
+      const targetPath=typeof relativePath==='string'?relativePath:'SKILL.md';
+      if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
+      if(!/^(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(targetPath))
+        throw Error('Markdown acceptance target must be a known Package-local Markdown path');
+      if(openColumn!==1&&openColumn!==2)
         throw Error('Markdown acceptance editor column must be one or two');
       const matches=await vscode.workspace.findFiles(
         '**/'+name+'/'+targetPath,'**/node_modules/**',5);
@@ -2778,8 +2795,9 @@ export function registerWorkbench(vscode,context){
       const exact=matches.filter(item=>item.path.endsWith(suffix));
       if(exact.length!==1)
         throw Error('Expected exactly one '+name+'/'+targetPath+' in the active Workspace');
-      // Exercise the same default open path used by Explorer and Package Explorer.
-      // The second-column case proves the integration normalizes placement too.
+      // Open only the editable Source. The active-editor listener must create
+      // its native Preview and normalize this right-column open back to the
+      // fixed Source-left / Preview-right layout.
       await vscode.commands.executeCommand('vscode.open',exact[0],{
         viewColumn:openColumn===2?vscode.ViewColumn.Two:vscode.ViewColumn.One,
         preview:false
