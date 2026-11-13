@@ -159,7 +159,7 @@ export async function prepareNativeMarkdownPackagePolicy(vscode,uri){
     for(const file of files){
       if(!file.path.startsWith(rootPath+"/"))continue;
       const relative=file.path.slice(rootPath.length+1);
-      if(/\\.(?:md|markdown)$/i.test(relative))markdownUris.push(file);
+      if(/\.(?:md|markdown)$/i.test(relative))markdownUris.push(file);
       const extension=relative.slice(relative.lastIndexOf(".")).toLowerCase();
       if(!allowedExtensions.has(extension))continue;
       const segments=relative.split("/");
