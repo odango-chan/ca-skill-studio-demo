@@ -205,7 +205,6 @@ for(const required of [
 }
 console.log("STUDIO_THEIA_STATIC_THEME_ASSETS",JSON.stringify({
   themePluginTarget,assets:["package.json","themes/**","icons/**","styles/**"],offlinePackage:true,
-  classicShellIconCss:false
 }));
 // The static frontend's hostedPlugin copier omits arbitrary declarative
 // extension assets just as it does for the theme package. Stage the pinned
