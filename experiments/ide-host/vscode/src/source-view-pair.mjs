@@ -22,7 +22,7 @@ export async function pairCustomEditor(vscode,panel,document) {
   if(typeof panel?.reveal!=='function'||!vscode.ViewColumn)return false;
   panel.reveal(vscode.ViewColumn.Two,true);
   await openNativeSource(vscode,document.uri,{
-    viewColumn:vscode.ViewColumn.One,preserveFocus:true,preview:false
+    viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
   });
   return true;
 }
@@ -42,7 +42,7 @@ export async function openSourceViewPair(vscode,uri,{line}={}) {
     });
   }
   await openNativeSource(vscode,uri,{
-    viewColumn:vscode.ViewColumn.One,preserveFocus:true,preview:false,selection
+    viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,selection
   });
   const editor=vscode.window.visibleTextEditors?.find(item=>
     item.document.uri.toString()===uri.toString()&&item.viewColumn===vscode.ViewColumn.One);
