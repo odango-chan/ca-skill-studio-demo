@@ -2,7 +2,7 @@
 
 **SKILL Package 的 Source-first 开发与编辑环境。** 当前产品以 VS Code Extension API 为核心，由 Theia 1.76 browser-only 提供在线宿主。它不是 Agent Runtime、5GC 控制台或 Runtime Validator。
 
-[打开 Skill Studio 在线版](https://odango-chan.github.io/ca-skill-studio-demo/) · [当前实现与验收](docs/WORK.md) · [开发文档地图](docs/README.md)
+[打开 Skill Studio 在线版](https://odango-chan.github.io/ca-skill-studio-demo/) · [当前实现与验收](docs/WORK.md) · [实施与证据追踪](docs/TRACEABILITY.md) · [开发文档地图](docs/README.md)
 
 ## 当前产品架构
 
