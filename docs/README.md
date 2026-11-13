@@ -16,7 +16,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 10. [Application Shell](design/application-shell.md) — Web/Local 共用菜单命令与未来本地执行边界
 11. [Skill Language Core / Browser LSP · L2-D1](design/skill-lsp-l2d-editor-acceptance.md) — 共享语言分析、Browser Worker 与真实 Theia 编辑器 Provider 验收边界
 12. [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) — 原生 Problems 诊断出现、修复清除与 Package generation 验收
-13. [ADR-0002 Theia default online host + Classic fallback](decisions/0002-ide-host-spike.md) — Theia 默认在线宿主与功能迁移背景
+13. [ADR-0002 Theia default online host (historical migration record)](decisions/0002-ide-host-spike.md) — Theia 默认在线宿主的历史迁移决策；Classic fallback 已退役
 14. [ADR-0003 Native Workbench / Inspector / Markdown](decisions/0003-native-workbench-and-markdown.md) — 原生视图、右侧 Inspector、Data Flow 与 Markdown 决策
 15. [ADR-0004 Package-first Workspace](decisions/0004-package-first-workspace.md) — Package Explorer 默认入口、Dependencies / Build Artifacts 组合及资源所有权
 16. [Documentation Governance](DOCUMENTATION.md) — canonical source map
@@ -41,7 +41,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | 当前应用菜单 / 本地宿主边界 | [Application Shell](design/application-shell.md) |
 | Skill Language Core / Browser LSP · L2-D1 | [L2-D1 Editor Acceptance](design/skill-lsp-l2d-editor-acceptance.md) |
 | Native Problems diagnostics lifecycle · L2-D2 | [L2-D2 Live Problems](design/skill-lsp-l2d2-live-problems.md) |
-| Theia 默认在线宿主 / Classic 保留与功能迁移背景 | [ADR-0002](decisions/0002-ide-host-spike.md) |
+| Theia 默认在线宿主与历史迁移决策（Classic 已退役） | [ADR-0002](decisions/0002-ide-host-spike.md) |
 | Native workbench / Inspector / Data Flow / Markdown ownership | [ADR-0003](decisions/0003-native-workbench-and-markdown.md) |
 | Package-first workspace and Package Explorer composition | [ADR-0004](decisions/0004-package-first-workspace.md) |
 | 当前状态 | [WORK](WORK.md) |
