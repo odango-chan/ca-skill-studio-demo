@@ -2752,10 +2752,16 @@ export function registerWorkbench(vscode,context){
       // command itself must return promptly so callers can observe that render.
       const opening=vscode.commands.executeCommand('markdown.showPreviewToSide',uri);
       paired=true;
+      // Some Theia PluginHost builds leave the Preview command promise pending
+      // after the webview is created. Never let that implementation detail keep
+      // this URI permanently marked as opening: a later Source activation must
+      // be able to retarget the singleton native Preview back to this document.
+      const releaseOpening=()=>nativeMarkdownOpening.delete(key);
+      setTimeout(releaseOpening,500);
       void Promise.resolve(opening).then(
-        ()=>setTimeout(()=>nativeMarkdownOpening.delete(key),500),
+        releaseOpening,
         error=>{
-          nativeMarkdownOpening.delete(key);
+          releaseOpening();
           void vscode.window.showWarningMessage(
             '原生 Markdown 预览未能打开：'+String(error?.message??error));
         }
