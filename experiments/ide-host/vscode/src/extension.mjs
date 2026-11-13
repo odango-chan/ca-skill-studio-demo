@@ -62,7 +62,8 @@ export function activate(context){
   packageOverview=registerPackageOverview(vscode,context,
     ()=>workbench?.getActiveDocument?.()??null,{
       dependenciesProvider:dependencyIntegration.provider,
-      getProjectRoot:dependencyIntegration.getProjectRoot
+      getProjectRoot:dependencyIntegration.getProjectRoot,
+      onPackagesChanged:packages=>workbench?.syncPackages?.(packages)
     });
   workbench=registerWorkbench(vscode,context);
   registerContractEditor(vscode,context);
@@ -449,6 +450,90 @@ export function activate(context){
       normalizeSourceOnlyEditor(vscode.window.activeTextEditor);
     }
   },0);
+  // Real-Chromium acceptance only: exercise several Designer tabs followed by
+  // ordinary Python/YAML Source documents while the Visual group is focused.
+  // The command is deliberately not contributed to the user command palette.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.editorGroupAcceptance",async()=>{
+      const procedures=await vscode.workspace.findFiles(
+        "**/assurance/procedure.yaml","**/node_modules/**",20);
+      if(procedures.length<1)throw Error("No real Skill Procedure files found for editor-group acceptance");
+      const visualUris=[];
+      const add=uri=>{
+        if(uri&&sourceViewType(uri)&&!visualUris.some(item=>item.toString()===uri.toString()))
+          visualUris.push(uri);
+      };
+      const procedureRoots=[];
+      for(const procedure of procedures){
+        const rootPath=procedure.path.replace(/\/assurance\/procedure\.yaml$/,"");
+        const root=procedure.with({path:rootPath});
+        procedureRoots.push({procedure,root});
+        add(procedure);
+        for(const relative of ["assurance/contract.yaml","assurance/predicates.yaml"]){
+          const uri=procedure.with({path:rootPath+"/"+relative});
+          try{await vscode.workspace.fs.stat(uri);add(uri);}catch{/* Optional authored view. */}
+        }
+        const schemas=await vscode.workspace.findFiles(
+          new vscode.RelativePattern(root,"schemas/*.schema.yaml"),"**/node_modules/**",10);
+        for(const schema of schemas)add(schema);
+      }
+      const firstRoot=procedureRoots[0].root;
+      const firstPackageVisuals=visualUris.filter(uri=>uri.path.startsWith(firstRoot.path+"/"));
+      for(const uri of firstPackageVisuals)await openSourceViewPair(vscode,uri);
+      const pythonFiles=await vscode.workspace.findFiles(
+        "**/scripts/evaluate_transfer_start.py","**/node_modules/**",5);
+      if(!pythonFiles.length)throw Error("Bundled Python acceptance fixture is missing");
+      const python=await vscode.workspace.openTextDocument(pythonFiles[0]);
+      await vscode.window.showTextDocument(python,{
+        viewColumn:vscode.ViewColumn.Two,preserveFocus:false,preview:false
+      });
+      const waitForPrimary=async uri=>{
+        const started=Date.now();
+        while(Date.now()-started<3000){
+          const editor=(vscode.window.visibleTextEditors??[]).find(item=>
+            item.document.uri.toString()===uri.toString());
+          if(editor?.viewColumn===vscode.ViewColumn.One)return editor;
+          await new Promise(resolve=>setTimeout(resolve,25));
+        }
+        throw Error("Source-only editor was not normalized into the primary group: "+uri.toString());
+      };
+      const pythonColumn=(await waitForPrimary(python.uri)).viewColumn;
+      // Use a saved, temporary ordinary YAML file rather than an Untitled
+      // buffer so the acceptance cleanup never opens an unsaved-changes dialog.
+      const projectRoot=firstRoot.with({
+        path:firstRoot.path.replace(/\/skills\/[^/]+$/,"")
+      });
+      const yamlUri=projectRoot.with({path:projectRoot.path+"/.studio-editor-group-acceptance.yaml"});
+      await vscode.workspace.fs.writeFile(yamlUri,
+        new TextEncoder().encode("kind: editor-group-acceptance\\n"));
+      const yamlDocument=await vscode.workspace.openTextDocument(yamlUri);
+      if(yamlDocument.isDirty&&!await yamlDocument.save())
+        throw Error("Temporary YAML fixture could not be saved");
+      if(yamlDocument.isDirty)
+        throw Error("Temporary YAML fixture remained dirty after save");
+      await vscode.window.showTextDocument(yamlDocument,{
+        viewColumn:vscode.ViewColumn.Two,preserveFocus:false,preview:false
+      });
+      const ordinaryYamlColumn=(await waitForPrimary(yamlDocument.uri)).viewColumn;
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      await vscode.workspace.fs.delete(yamlUri);
+      // Open a second Package's Designer after the Source-only tabs have been
+      // normalized. This catches the original two-to-three-column regression.
+      const secondProcedure=procedures.find(uri=>
+        !uri.path.startsWith(firstRoot.path+"/"));
+      if(secondProcedure)await openSourceViewPair(vscode,secondProcedure);
+      const groups=(vscode.window.tabGroups?.all??[]).map(group=>({
+        viewColumn:group.viewColumn,tabCount:group.tabs?.length??0
+      }));
+      const visibleEditors=(vscode.window.visibleTextEditors??[]).map(editor=>({
+        uri:editor.document.uri.toString(),viewColumn:editor.viewColumn
+      }));
+      const maxViewColumn=Math.max(0,...groups.map(group=>group.viewColumn??0),
+        ...visibleEditors.map(editor=>editor.viewColumn??0));
+      return {openedVisualCount:visualUris.length,groupCount:groups.length,
+        groups,visibleEditors,maxViewColumn,
+        pythonColumn,ordinaryYamlColumn};
+    }));
   return {extendMarkdownIt};
 }
 export function deactivate(){}

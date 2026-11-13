@@ -41,6 +41,8 @@ import {
 import studioLightTheme from "../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
 import {createSemanticTokenDecorationRenderer}
   from "../../lsp-browser/client/src/semantic-token-decorations.mjs";
+import {createPackageLanguageLifecycle}
+  from "./package-language-lifecycle.mjs";
 
 export function registerWorkbench(vscode,context){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
@@ -201,6 +203,8 @@ export function registerWorkbench(vscode,context){
         ticket:state.ticket,disposed:state.disposed,
         lastSentSnapshot:state.lastSentSnapshot
       })),
+      packageLifecycle:packageLanguageLifecycle.snapshot(),
+      packageStatuses:[...languagePackageStatuses.entries()].map(([rootUri,status])=>({rootUri,...status})),
       languageClientStarted:Boolean(languageClient),
       languageClientPending:Boolean(languageClientPromise),
       languageTransportFailure,
@@ -533,8 +537,10 @@ export function registerWorkbench(vscode,context){
     let state=languagePackages.get(key);
     if(state){
       state.refs++;
-      state.procedureDocument=doc;
-      scheduleLanguagePackageRefresh(state);
+      if(state.procedureDocument!==doc){
+        state.procedureDocument=doc;
+        scheduleLanguagePackageRefresh(state);
+      }
     }else{
       state={
         root,key,procedureDocument:doc,refs:1,
@@ -603,6 +609,15 @@ export function registerWorkbench(vscode,context){
       else close(languageClient);
     };
   }
+  const packageLanguageLifecycle=createPackageLanguageLifecycle({
+    openTextDocument:uri=>vscode.workspace.openTextDocument(uri),
+    attach:attachLanguagePackage,
+    onError:(key,error)=>console.warn(
+      "Skill Studio could not open discovered Package Procedure:",key,
+      String(error?.message??error))
+  });
+  context.subscriptions.push({dispose:()=>packageLanguageLifecycle.dispose()});
+
   context.subscriptions.push({dispose(){
     for(const state of languagePackages.values()){
       state.disposed=true;state.ticket++;clearTimeout(state.timer);
@@ -1334,7 +1349,15 @@ export function registerWorkbench(vscode,context){
           // parent of that exact root so B is a true sibling, not a nested
           // subdirectory enumerated into A's Package snapshot.
           const sourcePath=sourceRoot.uri.path.replace(/\/$/,"");
-          const parentPath=sourcePath.slice(0,sourcePath.lastIndexOf("/"))||"/";
+          const workspaceFolder=(vscode.workspace.workspaceFolders??[]).find(folder=>{
+            const path=folder.uri.path.replace(/\/$/,"");
+            return sourcePath===path||sourcePath.startsWith(path+"/");
+          });
+          const workspacePath=workspaceFolder?.uri?.path?.replace(/\/$/,"")||
+            sourcePath.slice(0,sourcePath.lastIndexOf("/"))||"/";
+          const parentPath=workspacePath.slice(0,workspacePath.lastIndexOf("/"))||"/";
+          // Keep this lifecycle fixture outside every open Workspace so it is
+          // explicitly attached here, not also retained by Package discovery.
           const parentUri=sourceRoot.uri.with({path:parentPath});
           const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
           const packageBContainer=vscode.Uri.joinPath(
@@ -3045,7 +3068,7 @@ export function registerWorkbench(vscode,context){
       });
       return exact[0].toString();
     }));
-  return {attach(doc,post){
+  return {syncPackages:packages=>packageLanguageLifecycle.sync(packages),attach(doc,post){
     sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();
     const releaseLanguagePackage=attachLanguagePackage(doc);
     return ()=>{sessions.delete(doc.uri.toString());releaseLanguagePackage();};

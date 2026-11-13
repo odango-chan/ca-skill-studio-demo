@@ -23,7 +23,7 @@ class TreeItem{
   constructor(label,collapsibleState){this.label=label;this.collapsibleState=collapsibleState;}
 }
 function host({folders=[uri("/project")],selectedRoot=()=>folders.length===1?folders[0]:null,
-  files=null,dependenciesProvider=null,statImpl=async()=>({type:2})}={}){
+  files=null,dependenciesProvider=null,onPackagesChanged=()=>{},statImpl=async()=>({type:2})}={}){
   const rootFiles=files??[
     uri("/project/skills/one/SKILL.md"),
     uri("/project/skills/one/assurance/contract.yaml"),
@@ -70,7 +70,7 @@ function host({folders=[uri("/project")],selectedRoot=()=>folders.length===1?fol
   };
   const context={subscriptions};
   const registered=registerPackageOverview(vscode,context,()=>null,{
-    dependenciesProvider,getProjectRoot:selectedRoot
+    dependenciesProvider,getProjectRoot:selectedRoot,onPackagesChanged
   });
   return {vscode,commands,views,subscriptions,registered};
 }
@@ -124,6 +124,19 @@ test("Package Explorer composes Skills and Plugin Dependencies in one native Tre
   const operations=await tree.getChildren(deps[0]);
   assert.equal(operations[0].operation.id,"ping");
   assert.equal((await tree.getParent(operations[0])).dependency.id,"network-tools");
+});
+
+test("Package inventory publishes discovered Procedure files for project-level language analysis",async()=>{
+  const notifications=[];
+  const h=host({onPackagesChanged:packages=>notifications.push(packages)});
+  await h.commands.get("skillStudio.refreshPackages")();
+  assert.equal(notifications.length,1);
+  assert.equal(notifications[0].length,1);
+  const procedure=notifications[0][0].files.find(file=>
+    file.path==="assurance/procedure.yaml");
+  assert.ok(procedure);
+  assert.equal(procedure.uri.toString(),
+    "file:///project/skills/one/assurance/procedure.yaml");
 });
 
 test("Package Explorer paints an honest loading state before the initial inventory scan completes",async()=>{

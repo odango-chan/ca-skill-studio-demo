@@ -2280,9 +2280,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     recoveryBufferPrepared=true;
     const recovery=await nativeCommand("skillStudio.restartLanguageService");
     if(!recovery?.recovered||!Array.isArray(recovery.packages)||
-       recovery.packages.length!==2||
+       recovery.packages.length<2||
        recovery.packages.some(item=>item.status!=="READY")||
-       new Set(recovery.packages.map(item=>item.rootUri)).size!==2||
+       new Set(recovery.packages.map(item=>item.rootUri)).size!==recovery.packages.length||
        !recovery.packages.some(item=>item.rootUri===packageLifecycle.packageARoot)||
        !recovery.packages.some(item=>item.rootUri===packageLifecycle.packageBRoot)||
        recovery.packages.some(item=>
