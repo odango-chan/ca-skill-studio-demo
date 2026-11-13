@@ -40,8 +40,11 @@ test('Source-first pairing opens Visual in column two and native Source in colum
     ['vscode.openWith','default'],
     ['vscode.openWith','skillStudio.contractPreview']
   ]);
-  assert.deepEqual(calls[0][3],{viewColumn:1,preserveFocus:false,preview:false,
-    selection:shown[0]?.options?.selection});
+  assert.equal(calls[0][3].viewColumn,1);
+  assert.equal(calls[0][3].preserveFocus,false);
+  assert.equal(calls[0][3].preview,false);
+  assert.equal(calls[0][3].selection.start.line,6);
+  assert.equal(calls[0][3].selection.end.line,6);
   assert.deepEqual(calls[1][3],{viewColumn:2,preserveFocus:true,preview:false});
   assert.equal(shown.length,0,'supported YAML must use the native Source opener, not TextDocument RPC');
   assert.equal(result.line,7);
