@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {createSourceOnlyEditorNormalizer} from "./editor-group-placement.mjs";
 import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
@@ -418,15 +419,33 @@ export function activate(context){
         "无法打开对应的 Skill Designer；原始 Source 仍可继续编辑。");
     });
   };
+  // Keep ordinary editable documents in the primary Source group. Without
+  // this normalization, opening a Python/unsupported YAML file while a
+  // Designer is focused inherits the right-hand Visual group; the next
+  // Source/Visual pair can then cause Theia to create a third editor column.
+  // Paired YAML is deliberately excluded because openSourceViewPair owns its
+  // two fixed positions. Moving an ordinary tab preserves its TextDocument,
+  // dirty state, native Undo history and editor identity.
+  const normalizeSourceOnlyEditor=createSourceOnlyEditorNormalizer(vscode,{
+    sourceViewType,hasSourceViewPair,
+    onError:error=>console.warn(
+      "SKILL Studio could not return a Source-only editor to the primary group:",
+      String(error?.message??error))
+  });
   context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
     pairActiveYamlSource(editor?.document?.uri);
+    normalizeSourceOnlyEditor(editor);
   }));
   // A restored YAML Source may already be active before onStartupFinished
   // activates this extension, so apply the same pairing once after activation.
   const initiallyActiveYaml=vscode.window.activeTextEditor?.document?.uri;
   if(initiallyActiveYaml)setTimeout(()=>{
-    if(vscode.window.activeTextEditor?.document?.uri?.toString()===initiallyActiveYaml.toString())
+    if(vscode.window.activeTextEditor?.document?.uri?.toString()===initiallyActiveYaml.toString()){
       pairActiveYamlSource(initiallyActiveYaml);
+      // Also normalize a Source-only document restored by the host before
+      // extension activation (there is no active-editor event in that case).
+      normalizeSourceOnlyEditor(vscode.window.activeTextEditor);
+    }
   },0);
   return {extendMarkdownIt};
 }
