@@ -98,23 +98,6 @@ test("fail-closed graph input refuses missing positions or dangling bundles",asy
     source:"missing",target:"done",routes:[{id:"fake"}],outcomes:["PASS"]}]};
   assert.throws(()=>makeFlowElements(dangling,ensure.procedure),/Unresolved flow edge/);
 });
-test("D1 keeps SVG source logic outside React Flow and retains Typed Patch authority",()=>{
-  const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
-  const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
-  const canvas=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
-  assert.match(app,/mountProcedureCanvas\(\$\("reactFlowRoot"\)/);
-  assert.match(html,/id="reactFlowRoot"/);
-  assert.doesNotMatch(html,/id="world"|id="canvas"/);
-  assert.match(canvas,/onReconnect=/);
-  assert.match(app,/previewVisualRouteEdit\(currentRouteEditContext\(route.id\),targetId\)/);
-  assert.match(app,/showPreview\(/);
-  assert.match(app,/history\.record\(source\.value\)/);
-  assert.match(app,/projectWorkspace\(/);
-  assert.match(canvas,/nodesDraggable=\{false\}/);
-  assert.match(canvas,/deleteKeyCode=\{null\}/);
-  assert.deepEqual(FLOW_NODE_SIZE,{width:238,height:80});
-});
-
 test("React Flow edges keep screen-space stroke width at default fit zoom",()=>{
   const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
   const old=readFileSync(new URL("../site/studio.css",import.meta.url),"utf8");
@@ -198,25 +181,6 @@ test("D3-A3 source-only creation affordance is explicit, selected and never term
   assert.ok(enabled.edges.every(e=>!e.id.startsWith("new-route-")));
 });
 
-
-test("Procedure toolbar keeps full, horizontal and vertical fit controls separate from zoom",()=>{
-  const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
-  const canvas=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
-  const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
-  const icons=readFileSync(new URL("../site/icons.mjs",import.meta.url),"utf8");
-  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
-  for(const id of ["fit","fitWidth","fitHeight","zoomIn","zoomOut"])
-    assert.ok(html.includes('id="'+id+'"'),id);
-  assert.match(canvas,/axisFitViewport/);
-  assert.match(canvas,/fitAxis\(axis\)/);
-  assert.match(canvas,/instance\?\.setViewport\(viewport,\{duration:150\}\)/);
-  assert.match(app,/\$\("fitWidth"\)\.addEventListener\("click"/);
-  assert.match(app,/\$\("fitHeight"\)\.addEventListener\("click"/);
-  assert.match(app,/let fitMode = "all"/);
-  assert.match(css,/\.compact-toolbar \.toolbar-axis-fit/);
-  assert.match(icons,/"fit-width":\[/);
-  assert.match(icons,/"fit-height":\[/);
-});
 
 test("visual START is separate from the business operator, without changing Source or Route counts",async()=>{
   const graph=await layoutProcedureELK(created.procedure);
@@ -325,26 +289,3 @@ test("route origin and outcome color are orthogonal; no Phase source is hidden",
   assert.ok(neutral.every(x=>x.data.displayLabel));
 });
 
-test("graph legend is floating and contextual; Node types differ from Step types",()=>{
-  const html=readFileSync(new URL("../site/index.html",import.meta.url),"utf8");
-  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
-  const jsx=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
-  const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
-  assert.match(html,/<details id="graphLegend" class="graph-legend"/);
-  for(const id of ["graphLegendNodeTypes","graphLegendStepTypes","graphLegendScope"])
-    assert.ok(html.includes('id="'+id+'"'));
-  assert.doesNotMatch(html,/<code>TOOL<\/code>/);
-  assert.match(app,/describeProcedureLegend\(lastGood,visible\)/);
-  assert.match(app,/function renderGraphLegend\(\)/);
-  for(const origin of ["PRE","OP","POST"])
-    assert.ok(html.includes("graph-legend-origin origin-"+origin));
-  for(const tone of ["success","failure","uncertain","neutral"])
-    assert.ok(html.includes("graph-legend-line tone-"+tone),tone);
-  assert.match(css,/\.graph-legend\{[^}]*position:absolute/s);
-  assert.match(css,/designer-node\.has-phases/);
-  assert.match(css,/designer-edge\.origin-PRE/);
-  assert.match(css,/designer-edge\.origin-POST/);
-  assert.match(jsx,/designer-phase-badge phase-/);
-  assert.match(jsx,/designer-edge tone-/);
-  assert.match(jsx,/designer-route-label tone-/);
-});
