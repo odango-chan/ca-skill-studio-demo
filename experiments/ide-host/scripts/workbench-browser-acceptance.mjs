@@ -1847,14 +1847,51 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const nativePreviewGroup=nativeMarkdownGroups.find(group=>
     group.labels.some(label=>/^Preview(?:\s|·).*SKILL\.md/i.test(label)));
   if(!nativeSourceGroup||!nativePreviewGroup||
-     nativeSourceGroup.index===nativePreviewGroup.index)
-    throw Error('Native Markdown must keep editable Source and Preview in separate editor groups: '+
+     nativeSourceGroup.index>=nativePreviewGroup.index||
+     nativeSourceGroup.rect.x>=nativePreviewGroup.rect.x)
+    throw Error('Native Markdown must keep editable Source on the left and Preview on the right: '+
       JSON.stringify(nativeMarkdownGroups));
   const nativeMarkdownEvidence={
     uri:nativeMarkdownUri,preview:nativeMarkdown.view,
-    sourceGroup:nativeSourceGroup,previewGroup:nativePreviewGroup
+    sourceGroup:nativeSourceGroup,previewGroup:nativePreviewGroup,
+    layout:'Source-left / Preview-right'
   };
   console.log('STUDIO_NATIVE_MARKDOWN_PREVIEW_CHROMIUM',JSON.stringify(nativeMarkdownEvidence));
+
+  // A second, ordinary Package reference must follow the exact same layout.
+  // Open it through the native editor command so the default active-editor
+  // integration, not just the internal Preview helper, is exercised.
+  const nativeReferenceUri=await nativeCommand(
+    'skillStudio.internal.nativeMarkdownPreviewAcceptance',
+    'establish-pdu-session','references/3gpp-procedure.md');
+  if(typeof nativeReferenceUri!=='string'||
+     !nativeReferenceUri.endsWith('/references/3gpp-procedure.md'))
+    throw Error('Native Markdown did not open the exact Package reference Source: '+
+      JSON.stringify(nativeReferenceUri));
+  const nativeReferenceMarkdown=await waitNativeMarkdown(view=>
+    view.heading==='PDU Session Establishment: actors and causal boundaries'&&
+    view.nativePreviewRoot&&
+    view.styles.some(url=>url.includes('/media/native-markdown-preview.css')),
+    'second native Markdown Source/Preview pair');
+  const nativeReferenceGroups=await evalJS(
+    "(()=>{const tabs=[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>"+
+    "tab.textContent.trim().includes('3gpp-procedure.md'));const groups=new Map();for(const tab of tabs){"+
+    "const bar=tab.parentElement;if(!groups.has(bar)){const r=bar.getBoundingClientRect();"+
+    "groups.set(bar,{index:groups.size,labels:[],rect:{x:r.x,y:r.y,width:r.width,height:r.height}});}"+
+    "groups.get(bar).labels.push(tab.textContent.trim());}return [...groups.values()];})()");
+  const nativeReferenceSourceGroup=nativeReferenceGroups.find(group=>
+    group.labels.some(label=>/^3gpp-procedure\.md/.test(label)));
+  const nativeReferencePreviewGroup=nativeReferenceGroups.find(group=>
+    group.labels.some(label=>/^Preview(?:\\s|·).*3gpp-procedure\.md/i.test(label)));
+  if(!nativeReferenceSourceGroup||!nativeReferencePreviewGroup||
+     nativeReferenceSourceGroup.index>=nativeReferencePreviewGroup.index||
+     nativeReferenceSourceGroup.rect.x>=nativeReferencePreviewGroup.rect.x)
+    throw Error('Every Markdown file must use Source-left / Preview-right placement: '+
+      JSON.stringify(nativeReferenceGroups));
+  console.log('STUDIO_NATIVE_MARKDOWN_SECOND_PAIR_CHROMIUM',JSON.stringify({
+    uri:nativeReferenceUri,preview:nativeReferenceMarkdown.view,
+    sourceGroup:nativeReferenceSourceGroup,previewGroup:nativeReferencePreviewGroup
+  }));
 
   // Prove native Markdown refreshes the existing preview from an unsaved
   // Source edit, then exercise both scroll-sync directions through Monaco and
