@@ -5,7 +5,7 @@ import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair
 
 const uri=path=>({path,toString(){return 'file://'+path;}});
 const vscodeApi=()=>{
-  const calls=[];
+  const calls=[],shown=[];
   class Position{constructor(line,character){this.line=line;this.character=character;}}
   class Range{constructor(start,end){this.start=start;this.end=end;}}
   class Selection extends Range{}
@@ -16,9 +16,9 @@ const vscodeApi=()=>{
     env:{uriScheme:'vscode'},
     commands:{executeCommand:async(...args)=>{calls.push(args);}},
     workspace:{openTextDocument:async uri=>({uri,lineCount:20})},
-    window:{activeTextEditor:null,visibleTextEditors:[]}
+    window:{activeTextEditor:null,visibleTextEditors:[],showTextDocument:async(document,options)=>{shown.push({document,options});return null;}}
   };
-  return {vscode,calls};
+  return {vscode,calls,shown};
 };
 
 test('all supported YAML visual editors have one explicit Source/Visual mapping',()=>{
@@ -32,7 +32,7 @@ test('all supported YAML visual editors have one explicit Source/Visual mapping'
 });
 
 test('Source-first pairing opens Visual in column two and native Source in column one',async()=>{
-  const {vscode,calls}=vscodeApi();
+  const {vscode,calls,shown}=vscodeApi();
   const target=uri('/p/assurance/contract.yaml');
   const result=await openSourceViewPair(vscode,target,{line:7});
   assert.equal(calls.length,2);
@@ -40,11 +40,13 @@ test('Source-first pairing opens Visual in column two and native Source in colum
     ['vscode.openWith','skillStudio.contractPreview'],
     ['vscode.openWith','default']
   ]);
-  assert.deepEqual(calls[0][3],{viewColumn:2,preserveFocus:true,preview:false});
-  assert.equal(calls[1][3].viewColumn,1);
-  assert.equal(calls[1][3].preserveFocus,false);
-  assert.equal(calls[1][3].selection.start.line,6);
-  assert.equal(calls[1][3].selection.end.line,6);
+  assert.equal(calls[0][3],2);
+  assert.equal(shown.length,1);
+  assert.equal(shown[0].document.uri,target);
+  assert.equal(shown[0].options.viewColumn,1);
+  assert.equal(shown[0].options.preserveFocus,false);
+  assert.equal(shown[0].options.selection.start.line,6);
+  assert.equal(shown[0].options.selection.end.line,6);
   assert.equal(result.line,7);
   assert.equal(result.sourceColumn,1);
   assert.equal(result.visualColumn,2);
@@ -54,7 +56,7 @@ test('Source-first pairing opens Visual in column two and native Source in colum
 });
 
 test('opening a Source already in column two moves it before creating Visual',async()=>{
-  const {vscode,calls}=vscodeApi();
+  const {vscode,calls,shown}=vscodeApi();
   const target=uri('/p/assurance/predicates.yaml');
   vscode.window.activeTextEditor={document:{uri:target},viewColumn:2};
   await openSourceViewPair(vscode,target);
@@ -63,18 +65,18 @@ test('opening a Source already in column two moves it before creating Visual',as
     'vscode.openWith',
     'vscode.openWith'
   ]);
-  assert.equal(calls[1][3].viewColumn,2);
-  assert.equal(calls[2][3].viewColumn,1);
+  assert.equal(calls[1][3],2);
+  assert.equal(shown[0].options.viewColumn,1);
   forgetSourceViewPair(target);
 });
 
 test('unsupported YAML remains a plain Source editor without an empty visual',async()=>{
-  const {vscode,calls}=vscodeApi();
+  const {vscode,calls,shown}=vscodeApi();
   const target=uri('/p/assurance/custom.yaml');
   const result=await openSourceViewPair(vscode,target,{line:999});
-  assert.equal(calls.length,1);
-  assert.equal(calls[0][2],'default');
-  assert.equal(calls[0][3].viewColumn,1);
+  assert.equal(calls.length,0);
+  assert.equal(shown.length,1);
+  assert.equal(shown[0].options.viewColumn,1);
   assert.equal(result.viewType,null);
   assert.equal(result.visualColumn,null);
   assert.equal(result.line,1);
