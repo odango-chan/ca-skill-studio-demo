@@ -53,7 +53,7 @@ test('cross-file navigation opens the matching visual on the right and Source on
   ]);
   assert.deepEqual(calls[0][3],{viewColumn:2,preserveFocus:false,preview:false});
   assert.equal(calls[1][3].viewColumn,1);
-  assert.equal(calls[1][3].preserveFocus,true);
+  assert.equal(calls[1][3].preserveFocus,false);
   assert.equal(calls[1][3].selection.start.line,6);
   assert.equal(calls[1][3].selection.end.line,6);
   assert.equal(result.line,7);
