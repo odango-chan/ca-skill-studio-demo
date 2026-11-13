@@ -1,11 +1,3 @@
-const transientRightSourceKeys=new Set();
-export function holdTransientRightSource(uri){
-  const key=uri?.toString?.();
-  if(!key)return ()=>{};
-  transientRightSourceKeys.add(key);
-  return ()=>transientRightSourceKeys.delete(key);
-}
-
 // Keep ordinary editable documents in the primary Source editor group.
 // The move command operates on the *currently active* editor, not the editor
 // passed by the event. Re-activate the captured document first so a rapid
@@ -21,7 +13,7 @@ export function createSourceOnlyEditorNormalizer(vscode,{
     if(!uri||sourceViewType(uri)||hasSourceViewPair(uri)||
        editor.viewColumn===vscode.ViewColumn.One)return false;
     const key=uri.toString();
-    if(moving.has(key)||transientRightSourceKeys.has(key))return false;
+    if(moving.has(key))return false;
     moving.add(key);
     try{
       let active=vscode.window.activeTextEditor;
