@@ -29,8 +29,11 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
           rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}};
       }).filter(Boolean);
     })()`);
-    const sources=state.filter(w=>w.kind==='source');
-    const visuals=state.filter(w=>w.kind.startsWith('skillStudio.'));
+    // Theia may retain a hidden duplicate CodeEditor widget for the same
+    // URI while the CustomEditor owns the visible second column. The contract
+    // is exactly one VISIBLE native Source beside the visible Designer.
+    const sources=state.filter(w=>w.kind==='source'&&w.visible);
+    const visuals=state.filter(w=>w.kind.startsWith('skillStudio.')&&w.visible);
     if(sources.length===1&&visuals.length===1&&sources[0].uri===visuals[0].uri&&
        sources[0].column===1&&visuals[0].column===2&&
        sources[0].visible&&visuals[0].visible&&
