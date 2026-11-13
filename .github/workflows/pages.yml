@@ -101,8 +101,6 @@ jobs:
           node --check experiments/ide-host/scripts/prepare-theia-brand.mjs
           node --check tests/react-flow-migration.test.mjs
           node --check tests/visual-route-edit.test.mjs
-          node --check tests/navigation-menu.test.mjs
-          node --check tests/nested-procedure.test.mjs
           node --check tests/markdown-preview.test.mjs
           node --check tests/view-policy.test.mjs
           node --check tests/highlight.test.mjs
@@ -130,8 +128,6 @@ jobs:
           node --check tests/patch.test.mjs
           node --check tests/workspace.test.mjs
           node --check tests/layout.test.mjs
-          node --check tests/workbench.test.mjs
-          node --check tests/journey.test.mjs
           node --check scripts/d1-interaction-smoke.mjs
       - name: Build Theia Web extension for default online workbench
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
