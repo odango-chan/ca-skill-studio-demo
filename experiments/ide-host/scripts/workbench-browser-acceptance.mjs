@@ -849,15 +849,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           graphDiagnostics}}));
   }
   const openMs=performance.now()-start;
-  const preview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
-  if(!preview)throw Error("Single-click CustomEditor was not a native preview tab");
+  await assertYamlSourceVisualPair('procedure.yaml','Procedure Designer');
+  const sourcePreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
+  if(sourcePreview)throw Error("Paired YAML Source must be pinned, not left as an unpinned preview tab");
   await click(file.x,file.y,2);await sleep(250);
   const stillPreview=await evalJS(`Boolean([...document.querySelectorAll(".theia-editor-preview-title-unpinned")].find(el=>el.textContent.includes("procedure.yaml")))`);
-  if(stillPreview)throw Error("Double-click did not pin native preview tab");
-  const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost CustomEditor');
-  // The preview/pin probe can leave both preview and pinned editors alive.
-  // Close that pair and reopen one pinned Procedure before Source/Evidence
-  // checks so the active Webview frame and its selection are unambiguous.
+  if(stillPreview)throw Error("Double-click must retain the pinned native YAML Source");
+  const pinned=await graph();if(!pinned)throw Error('Explorer double-click lost paired Procedure Designer');
+  // Close both sides and reopen one deterministic Source/Designer pair before
+  // Source/Evidence checks so the active Webview frame is unambiguous.
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
   file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.replace(/\\s+\\d+$/,'').trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
@@ -869,17 +869,17 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     if(!singlePinned)await sleep(100);
   }
   if(!singlePinned)throw Error('Could not reopen one pinned 5GC Procedure editor');
+  await assertYamlSourceVisualPair('procedure.yaml','Reopened Procedure Designer');
   const remainingProcedureTabs=await evalJS(`[...document.querySelectorAll('.lm-TabBar-tab')].filter(tab=>
     tab.textContent.trim()==='procedure.yaml'&&tab.getBoundingClientRect().width>0).length`);
-  if(remainingProcedureTabs!==1)
-    throw Error('Procedure Source/Evidence acceptance requires one unambiguous editor tab: '+
+  if(remainingProcedureTabs!==2)
+    throw Error('Procedure acceptance requires exactly one native Source and one Designer tab: '+
       JSON.stringify({remainingProcedureTabs,singlePinned}));
-  // Theia CustomEditor tabs do not necessarily activate a VS Code TextEditor.
-  // Package Audit consumes the active Procedure TextDocument, so open Source
-  // from this freshly reopened CustomEditor only now (after the Explorer path).
-  const sourceOpenedForAudit=await evalWebviewJS(`(()=>{const button=document.querySelector('#openSource');if(!button)return false;button.click();return true;})()`);
-  if(!sourceOpenedForAudit)throw Error('Reopened Procedure Webview did not expose its native Source action');
-  console.log('STUDIO_NATIVE_SOURCE_OPENED_FOR_AUDIT',sourceOpenedForAudit);
+  const sourceState=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
+  if(!sourceState?.uri?.endsWith('/assurance/procedure.yaml'))
+    throw Error('Procedure workbench did not retain the native Source document for Package Audit: '+
+      JSON.stringify(sourceState));
+  console.log('STUDIO_NATIVE_SOURCE_OPENED_FOR_AUDIT',sourceState);
   await sleep(500);
   // Package Audit is surfaced by the Problems view now contributed to
   // the native Explorer. Re-focus Explorer; there is no Skill Studio Activity Bar.
