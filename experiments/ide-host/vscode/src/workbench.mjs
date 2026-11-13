@@ -49,6 +49,7 @@ export function registerWorkbench(vscode,context){
   const providers=new Map(),sessions=new Map(),selections=new Map();
   const nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
     nativeMarkdownOpening=new Set(),nativeMarkdownPaired=new Set();
+  let nativeMarkdownWorkerDiagnostics=null;
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -2661,6 +2662,10 @@ export function registerWorkbench(vscode,context){
         }catch(error){
           workerProbe={uri:workerUri.toString(),error:String(error?.message??error)};
         }
+        nativeMarkdownWorkerDiagnostics={
+          extensionUri:markdownExtension.extensionUri.toString(),
+          workerUri:workerUri.toString(),workerProbe
+        };
       }
       let activationState='pending',activationError=null;
       const activation=Promise.resolve(markdownExtension.activate()).then(
@@ -2714,6 +2719,8 @@ export function registerWorkbench(vscode,context){
       if(!paired)nativeMarkdownOpening.delete(key);
     }
   }
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownWorkerDiagnostics',()=>nativeMarkdownWorkerDiagnostics));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownPreviewAcceptance',async skillName=>{
       const name=typeof skillName==='string'?skillName:'establish-pdu-session';
