@@ -21,6 +21,8 @@ await rm(target,{recursive:true,force:true});
 await mkdir(target,{recursive:true});
 const prepared={...manifest,browser:"./dist/extension-theia.js"};
 await writeFile(join(target,"package.json"),JSON.stringify(prepared,null,2)+"\n");
+for(const resource of ["package.nls.json","package.nls.zh-cn.json","l10n"])
+  await cp(join(ext,resource),join(target,resource),{recursive:true});
 await cp(join(ext,"dist"),join(target,"dist"),{recursive:true});
 await cp(join(ext,"media"),join(target,"media"),{recursive:true});
 await cp(join(ext,"icons"),join(target,"icons"),{recursive:true});
