@@ -1,3 +1,5 @@
+import {openNativeSource} from "./native-source.mjs";
+
 const SOURCE_VIEW_PAIRS = Object.freeze([
   {test:path=>path.toLowerCase().endsWith('/assurance/procedure.yaml'),viewType:'skillStudio.procedurePreview'},
   {test:path=>path.toLowerCase().endsWith('/assurance/contract.yaml'),viewType:'skillStudio.contractPreview'},
@@ -41,9 +43,8 @@ export async function openSourceViewPair(vscode,uri,{line}={}) {
   const position=new vscode.Position(safeLine-1,0);
   const selection=new vscode.Range(position,position);
   if(!viewType) {
-    await vscode.window.showTextDocument(document,{
-      viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,selection
-    });
+    await openNativeSource(vscode,uri,{viewColumn:vscode.ViewColumn.One,
+      preserveFocus:false,preview:false,selection});
     return {uri:uri.toString(),viewType:null,sourceColumn:vscode.ViewColumn.One,
       visualColumn:null,line:safeLine};
   }
@@ -62,9 +63,8 @@ export async function openSourceViewPair(vscode,uri,{line}={}) {
     // Establish the Source group before asking the host to split right. In
     // Theia CustomEditors resolve before they attach to the shell; revealing
     // their panel during resolve races the opener's captured placement.
-    await vscode.window.showTextDocument(document,{
-      viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,selection
-    });
+    await openNativeSource(vscode,uri,{viewColumn:vscode.ViewColumn.One,
+      preserveFocus:false,preview:false,selection});
     await vscode.commands.executeCommand('vscode.openWith',uri,viewType,{
       viewColumn:vscode.ViewColumn.Two,preserveFocus:true,preview:false
     });
