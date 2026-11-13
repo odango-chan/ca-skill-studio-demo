@@ -2943,28 +2943,22 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      const suffix='/establish-pdu-session/SKILL.md';
-      if(!target.path.endsWith(suffix))
+      if(!target.path.endsWith('/establish-pdu-session/SKILL.md'))
         throw Error('Refusing to restore a non-fixture Markdown guide');
       const key=target.toString();
       const original=nativeMarkdownLiveOriginals.get(key);
       if(typeof original!=='string')
         throw Error('No original Markdown content is recorded for the live-update fixture');
-      console.log('STUDIO_MARKDOWN_RESTORE_PHASE','openTextDocument:start');
       const doc=await vscode.workspace.openTextDocument(target);
-      console.log('STUDIO_MARKDOWN_RESTORE_PHASE','openTextDocument:done');
-      const sourceEditor=(vscode.window.visibleTextEditors??[]).find(editor=>
-        editor.document.uri.toString()===key&&
-        editor.viewColumn===vscode.ViewColumn.One);
-      // Restore the temporary buffer through the same native editor the
-      // user types into. A bulk WorkspaceEdit in the presence of the built-in
-      // Markdown preview CustomEditor can leave Theia's command unresolved.
-      if(!sourceEditor)throw Error('Native Markdown Source is not visible for restoration');
-      const restored=await sourceEditor.edit(builder=>{
-        builder.replace(new vscode.Range(doc.positionAt(0),
-          doc.positionAt(doc.getText().length)),original);
+      // The fixture consists of exactly one native edit. Restore it with the
+      // real editor Undo operation instead of issuing a second competing edit
+      // while the built-in Markdown Preview CustomEditor is open.
+      await vscode.window.showTextDocument(doc,{
+        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
-      if(!restored)throw Error('Could not restore the original Skill guide after live-update acceptance');
+      await vscode.commands.executeCommand('undo');
+      if(doc.getText()!==original)
+        throw Error('Native Markdown Undo did not restore the exact original Source');
       nativeMarkdownLiveOriginals.delete(key);
       return true;
     }));
