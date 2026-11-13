@@ -1,6 +1,6 @@
-# Theia 工作台与 Classic 功能对照
+# Theia 工作台迁移记录
 
-**Status: Migration history · Current architecture: [ADR-0003](../decisions/0003-native-workbench-and-markdown.md) + [ADR-0004](../decisions/0004-package-first-workspace.md) · Reconciled: 2026-11-12**
+**Status: Historical migration record · Current architecture: [ADR-0003](../decisions/0003-native-workbench-and-markdown.md) + [ADR-0004](../decisions/0004-package-first-workspace.md) · Classic retired by PR #186**
 
 本文件保留功能迁移与实现边界记录。当前 Pages 默认使用 Theia browser-only：Package Explorer 位于原生 Explorer 容器；Inspector 位于右侧 Secondary Sidebar，Data Flow 在 Inspector 内；Outline / Problems 使用宿主原生视图；Markdown 使用 pinned 原生 VS Code Markdown extension。独立 Evidence 视图已由 PR #170/#171 退役。Classic 仍保留在 `/classic/`，本轮清理不删除它。
 

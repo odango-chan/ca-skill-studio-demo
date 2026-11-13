@@ -210,13 +210,15 @@ try{
       readyState:document.readyState,title:document.title,
       text:document.body?.innerText?.slice(0,950)||"",
       appShell:!!document.querySelector("#theia-app-shell"),
-      classicIcons:(()=>{
-        const link=document.querySelector("#skill-studio-classic-icon-theme");
+      nativeCodicons:(()=>{
         const icons=[...document.querySelectorAll(".theia-app-sides .codicon")];
-        const mapped=icons.filter(icon=>
-          getComputedStyle(icon,"::before").maskImage.includes("data:image/svg+xml")
-        ).length;
-        return {loaded:Boolean(link?.sheet),activityIcons:icons.length,mapped};
+        const glyphs=icons.filter(icon=>{
+          const style=getComputedStyle(icon,"::before");
+          return style.content!=="none"&&style.content!=='""'&&
+            style.fontFamily.toLowerCase().includes("codicon");
+        }).length;
+        return {fontLoaded:document.fonts.check("16px codicon"),
+          activityIcons:icons.length,glyphs};
       })(),
       brand:(()=>{
         const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
@@ -476,7 +478,7 @@ try{
       "zoom-out","zoom-in","maximize","fit-width","fit-height"];
     if(expectedIcons.some(name=>!canvasIconEvidence.some(item=>
       item.name===name&&item.visible)))
-      throw Error("Classic canvas icon artwork missing from native toolbar: "+
+      throw Error("Studio canvas icon artwork missing from native toolbar: "+
         JSON.stringify({expectedIcons,canvasIconEvidence}));
     console.log("STUDIO_CANVAS_ICONS_CHROMIUM",JSON.stringify(canvasIconEvidence));
     const preview=await command("Runtime.evaluate",{
@@ -791,7 +793,7 @@ try{
         vertical:vertical.result?.value,allPaths:fullPaths.result?.value};
       console.log("STUDIO_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(patchEvidence.canvasToolbar));
 
-      // The Classic one-hop Node view is reused inside the host CustomEditor:
+      // The shared one-hop Node view is reused inside the host CustomEditor:
       // real neighbor Nodes/Routes plus read-only PRE/OP/POST stages.
       console.log("STUDIO_THEIA_STAGE","node-focus");
       const focusWorld=await command("Page.createIsolatedWorld",{
@@ -1656,9 +1658,9 @@ try{
   console.log("STUDIO_THEIA_REAL_CHROMIUM",JSON.stringify(evidence));
   if(!view?.appShell||view.widgets<5||view.bodyLength<15)
     throw Error("Theia browser shell failed to start: "+JSON.stringify(evidence).slice(0,2200));
-  if(!view?.classicIcons?.loaded||view.classicIcons.mapped<1)
-    throw Error("Classic icon artwork was not applied to Theia shell controls: "+
-      JSON.stringify(view?.classicIcons).slice(0,1200));
+  if(!view?.nativeCodicons?.fontLoaded||view.nativeCodicons.glyphs<1)
+    throw Error("Native Theia Codicon font did not render shell controls: "+
+      JSON.stringify(view?.nativeCodicons).slice(0,1200));
   if(!view?.brand?.present||!view.brand.stylesheet||
      !view.brand.beforeNativeMenus||!view.brand.sameRow||
      view.brand.label!=="SKILL Studio"||
@@ -1763,9 +1765,9 @@ try{
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; PHASE_DATAFLOW_EVIDENCE_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS; PACKAGE_OVERVIEW_TWO_SKILLS_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; THEIA_NATIVE_CODICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; PHASE_DATAFLOW_EVIDENCE_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS; PACKAGE_OVERVIEW_TWO_SKILLS_PASS");
   else
-    console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; CLASSIC_SHELL_ICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
+    console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; THEIA_NATIVE_CODICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }catch(error){
   if(process.env.THEIA_FAILURE_SCREENSHOT&&ws?.readyState===1){
     try{

@@ -1,6 +1,8 @@
 # ADR-0002 · Host-native SKILL Studio extension spike
 
 **Status: ACCEPTED as the default online demo host (2026-11-09); feature-parity migration IN PROGRESS**  
+
+> **Superseded for current product delivery:** Classic was retired and removed from the Pages artifact by the Theia-only workbench cleanup (PR #186). This ADR remains as a historical record of the host migration decision; the Classic route is not supported.
 **Issue:** [#85](https://github.com/odango-chan/ca-skill-studio-demo/issues/85)  
 **Owner:** ca-skill-studio-demo (editor-only; Runtime/5GC excluded)
 

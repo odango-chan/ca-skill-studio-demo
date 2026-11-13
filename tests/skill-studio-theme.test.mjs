@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import {existsSync,readFileSync} from "node:fs";
 import {join} from "node:path";
 import {fileIconSpec} from "../site/file-icons.mjs";
-import {buildClassicIconsCss,CLASSIC_FILE_ICON_ASSETS,renderClassicSvg,
-  THEIA_CLASSIC_ICON_MAP} from "../experiments/ide-host/scripts/classic-icons-css.mjs";
+import {STUDIO_FILE_ICON_ASSETS,renderStudioFileIconSvg}
+  from "../experiments/ide-host/scripts/studio-file-icons.mjs";
 const root="extensions/skill-studio-theme";
 const read=path=>readFileSync(join(root,path),"utf8");
 const manifest=JSON.parse(read("package.json"));
@@ -26,10 +26,6 @@ test("host colors reuse established Studio Light design tokens",()=>{
   assert.equal(theme.name,"SKILL Studio Light");
   assert.equal(theme.type,"light");
   assert.equal(theme.semanticHighlighting,true);
-  const css=readFileSync("site/light.css","utf8").toLowerCase();
-  const expected={"--bg":"#f5f7fb","--panel":"#ffffff","--border":"#e1e7ef","--text":"#20314a",
-    "--muted":"#697e97","--accent":"#0c8e7b","--blue":"#317dc0","--warning":"#ad6517"};
-  for(const [token,color] of Object.entries(expected))assert.ok(css.includes(token+":"+color),token);
   assert.equal(theme.colors["editor.background"],"#FFFFFF");
   assert.equal(theme.colors["sideBar.background"],"#FFFFFF");
   assert.equal(theme.colors["activityBar.activeBorder"],"#0C8E7B");
@@ -72,21 +68,7 @@ test("file icon theme maps SKILL assets and local SVGs",()=>{
     assert.doesNotMatch(svg,/<(?:image|script)\b/i);
   }
 });
-test("Theia shell controls use Classic SVG geometry without changing native commands",()=>{
-  const css=buildClassicIconsCss();
-  for(const name of ["files","search","source-control","debug-alt","extensions",
-    "settings-gear","account","new-file","new-folder","undo","redo","save",
-    "refresh","close","menu","chevron-down","collapse-all"])
-    assert.ok(THEIA_CLASSIC_ICON_MAP[name],name);
-  assert.equal(THEIA_CLASSIC_ICON_MAP.account,"user-round");
-  assert.match(css,/\.theia-app-sides \.codicon-files::before/);
-  assert.match(css,/\.theia-navigator \.codicon-new-file::before/);
-  assert.match(css,/\.lm-MenuBar \.codicon-menu::before/);
-  assert.match(css,/mask-image:url\("data:image\/svg\+xml,/);
-  assert.match(read("README.md"),/generated\s+from `site\/icons\.mjs`/);
-  assert.equal(manifest.contributes.productIconThemes,undefined);
-});
-test("Theia file icon SVGs are generated from the exact Classic file-icon shapes",()=>{
+test("Theia file icon SVGs are generated from shared Studio file-icon shapes",()=>{
   const expected={
     "file.svg":{icon:fileIconSpec("unknown.bin").icon,color:"#71889c"},
     "folder.svg":{icon:"folder",color:"#6c8198"},
@@ -106,7 +88,7 @@ test("Theia file icon SVGs are generated from the exact Classic file-icon shapes
     "text.svg":{icon:fileIconSpec("notes.txt").icon,color:"#7483a0"},
     "code.svg":{icon:fileIconSpec("app.ts").icon,color:"#638798"}
   };
-  assert.deepEqual(Object.keys(CLASSIC_FILE_ICON_ASSETS).sort(),Object.keys(expected).sort());
+  assert.deepEqual(Object.keys(STUDIO_FILE_ICON_ASSETS).sort(),Object.keys(expected).sort());
   for(const [filename,{icon,color}] of Object.entries(expected))
-    assert.equal(read("icons/"+filename),renderClassicSvg(icon,color),filename);
+    assert.equal(read("icons/"+filename),renderStudioFileIconSvg(icon,color),filename);
 });

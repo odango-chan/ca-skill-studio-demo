@@ -5,7 +5,6 @@ import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {isAllowedPackageRelativeLink} from "../vscode/src/markdown-link-policy.mjs";
-import {buildClassicIconsCss,THEIA_CLASSIC_ICON_MAP} from "../scripts/classic-icons-css.mjs";
 import {buildSkillStudioBrandCss,buildSkillStudioBrandScript,prepareTheiaBrand}
   from "../scripts/prepare-theia-brand.mjs";
 const root="experiments/ide-host/theia-online";
@@ -131,21 +130,6 @@ test("Theia bundles offline YAML and Python TextMate grammars independently of L
     assert.ok(statSync(path).size>100);
   }
   assert.ok(statSync(join(rootSyntax,"LICENSE.txt")).size>500);
-});
-
-test("Theia activity bar and shell toolbars render from the Classic icon registry",()=>{
-  const css=buildClassicIconsCss();
-  for(const name of ["files","search","source-control","debug-alt","extensions",
-    "settings-gear","account","new-file","new-folder","undo","redo","save",
-    "refresh","close","menu","chevron-down","collapse-all"]){
-    assert.ok(THEIA_CLASSIC_ICON_MAP[name],name+" must map to a Classic icon");
-    assert.ok(css.includes(".theia-app-sides .codicon-"+name+"::before")||
-      css.includes(".theia-navigator .codicon-"+name+"::before")||
-      css.includes(".lm-MenuBar .codicon-"+name+"::before"),name);
-  }
-  assert.match(css,/mask-image:url\("data:image\/svg\+xml,/);
-  assert.match(css,/background-color:currentColor/);
-  assert.doesNotMatch(css,/https?:\/\//);
 });
 
 test("SKILL Studio wordmark sits beside the native menu list and compacts on narrow screens",async()=>{

@@ -1,50 +1,42 @@
-# ConnectionAgent · Skill Studio Demo
+# ConnectionAgent · SKILL Studio
 
-**Source-first 的浏览器端 Skill Package 编辑原型**。D1 React Flow / ELK 与 D2 A1–A5 有界编辑已完成；当前不是 Agent Runtime、5GC 控制台或完整 Runtime Validator。
+**SKILL Package 的 Source-first 开发与编辑环境。** 当前产品以 VS Code Extension API 为核心，由 Theia 1.76 browser-only 提供在线宿主。它不是 Agent Runtime、5GC 控制台或 Runtime Validator。
 
-[新版在线工作台（Theia）](https://odango-chan.github.io/ca-skill-studio-demo/) · [原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) · [当前实现与验收](docs/WORK.md) · [开发文档地图](docs/README.md)
+[打开 Skill Studio 在线版](https://odango-chan.github.io/ca-skill-studio-demo/) · [当前实现与验收](docs/WORK.md) · [实施与证据追踪](docs/TRACEABILITY.md) · [开发文档地图](docs/README.md)
 
-## 在线入口
+## 当前产品架构
 
-GitHub Pages 根入口为 Theia 插件版；[原版完整工作台（Classic）](https://odango-chan.github.io/ca-skill-studio-demo/classic/) 保留旧功能，`/ide-preview/` 跳转新版。插件迁移尚未追平：Node Focus 与 Route 创建/重连已迁移；本阶段新增原生只读 Inspection/Outline/Evidence/Problems、Package Audit 和 Markdown Preview，完整 Inspector/Phase Designer 等剩余缺口见 [功能对照](docs/architecture/theia-workbench.md)。Theia 在线版使用同源 Webview，仅用于公开/示例工作区，不要打开敏感文件；OPFS 不等于本地磁盘或 GitHub 同步，也不执行 Python、Runtime 或 5GC。
+- Theia browser-only 是唯一在线工作台；不再发布独立 Classic 浏览器工作台或 /classic/ 兼容入口。
+- VS Code Web Extension 提供 Procedure / Contract / Predicate / Schema CustomEditor、Package Explorer、右侧 Inspector、Outline、Problems、LSP 与 Source/Visual 配对。
+- React Flow + ELK 提供 Procedure 可视化；原生 Markdown Language Features 拥有 Markdown Preview；独立主题扩展提供颜色、文件图标和预览样式。
+- YAML / Python TextMate 语法高亮不依赖 LSP；LSP 提供 Skill Language 语义能力。最终契约与编译结果仍由权威 Skill Compiler 决定。
+- 示例包含 5GC establish-pdu-session 与 MAS establish-session-mas，作为项目内容，不是 Studio 自己维护的第二套语言定义。
 
-## 本地运行
+## 在线演示安全边界
+
+GitHub Pages 使用 browser-only Theia 与同源 Webview，适合公开示例和非敏感工作区。浏览器存储不等于本地磁盘、GitHub 同步或可靠备份。在线版不执行用户 Python、Skill Runtime、Agent、Provider 或真实 5GC 操作。不要在公开在线演示中打开敏感文件。
+
+## 本地开发与验证
 
 需要 Node.js 24。在仓库根目录：
 
 ~~~bash
 npm ci
 npm test
+npm run test:plugin-managed
 npm run typecheck
-npm run build
-python3 -m http.server 8080 --directory dist
 ~~~
 
-浏览器打开 http://localhost:8080。此命令仍启动 Classic 原版浏览器应用，用于本地开发和功能对照；GitHub Pages 的默认 Theia Host 由 `.github/workflows/pages.yml` 单独构建。请使用已打包的 `dist/`，不要将 `site/index.html` 直接当成可运行的 TSX 原生页面。
+根目录不再构建或启动旧版独立浏览器应用。Theia Web Extension、browser-only host 和真实 Chromium 验收由 .github/workflows/ 中对应工作流执行；构建入口及精确依赖见 experiments/ide-host/。
 
-**注意：这是本地启动 Classic 编辑器，不是运行 SKILL 或 Python / Runtime。** Theia Pages 使用宿主原生菜单和编辑器，但复用相同的 Source 投影与受限 Patch 边界；两者都不提供真实 Run / Trace。设计见 [应用菜单与本地宿主](docs/design/application-shell.md)。
+## 代码与所有权边界
 
-## 现有能力
+- experiments/ide-host/vscode/：VS Code Web Extension、Host Adapter 与编辑器集成。
+- experiments/ide-host/theia-online/：在线 Theia 宿主与插件装配。
+- extensions/：独立主题、语言资源等扩展。
+- site/：仍被 Extension / Theme 复用的解析、投影、编辑策略与固定样本模块；不是可独立发布的第二个工作台。
+- docs/：架构决策、当前状态、设计和验收证据。
 
-- 唯一可选示例为 **`establish-pdu-session`**（启动默认加载，`references/` 默认展开），使用原始 SKILL 目录名；支持真实 Runtime 相关文件导航、Source 编辑、Markdown 安全预览、文件下载和 ZIP 打包。示例快照来自 [ca-agent-demo@eaadf948](https://github.com/odango-chan/ca-agent-demo/tree/eaadf9488ec3b5d6d6f60eb7090a2dee715d440b/skills/establish-pdu-session)，共 16 个运行时相关文件，包含 `references/`、Schema、Script、Contract、Predicate 和 Procedure。支持**完整本地 SKILL 目录导入**、多文件编辑与 ZIP 导出；不引入 Case 或内部 Design 文件。
-- 多 Procedure 和 Root/Child 下钻、Node / Phase Step / Outcome / Route 投影；React Flow + ELK 默认垂直布局，完整大图支持保守降级。
-- D2 有界 Node 重命名、在已有 Route 上插入少数 Node、受限删除、编辑已有 Operator 与 `with.<key>.from`，以及既有 Route Target 有界重连；所有 Visual 修改遵循 Source-backed Patch → Diff → Confirm → Undo/Redo。
-- 编辑期 Package 引用提醒、语法失败 Source 恢复，以及一致描边 SVG 图标。**编辑期提示不等于 Runtime qualification。**
+本仓只拥有 Studio 编辑器、Source projection、Typed Source Patch、项目体验和本仓测试。Skill DSL、Host Context、Tool 契约、Runtime 执行结果及 5GC 环境状态由各自权威仓库负责，不在 Studio 定义第二 authority。
 
-浏览器工作副本保存在内存。单文件下载和 ZIP 导出不会写盘；E4-A2 另提供**用户显式选择目录、核对全部文件快照、确认待保存文件后写入**的可选本地保存。只有支持 File System Access 的浏览器可用；不支持时继续使用 ZIP。多文件保存不保证原子性，且无法证明二次选择的目录就是首次导入的同一物理路径。真实 Windows Chrome 原生目录写盘验收仍见 [Issue #26](https://github.com/odango-chan/ca-skill-studio-demo/issues/26)。不修改 `ca-agent-demo` 或 Runtime。
-
-## 技术与边界
-
-React 19 / React Flow 12 / ELK / TypeScript 7 / YAML 2.9.1 / Node 24 / esbuild。原始 YAML/Markdown/Script Source 是唯一业务真源；图、布局、Inspector 和状态均是派生视图。
-
-单测、Chromium 和 Pages PASS 只证明本仓被实际覆盖的行为，不代表完整 Skill Runtime、Case、跨仓联调或 5GC E2E PASS。
-
-开发前先读 [AGENTS.md](AGENTS.md)、[WORK](docs/WORK.md)、[TRACEABILITY](docs/TRACEABILITY.md)。现有架构与编辑约束详见 [Workbench](docs/design/authoring-workbench.md)；[D3 Route Designer](docs/design/route-designer.md) 已完成 A1 有界 Outcome 新增和 [A2 受限重命名/删除](https://github.com/odango-chan/ca-skill-studio-demo/pull/11)，[A3 实际画布拖线](https://github.com/odango-chan/ca-skill-studio-demo/pull/13) 已通过编辑器级验收（仅有界 `operator.on`），统一跟踪 [#7](https://github.com/odango-chan/ca-skill-studio-demo/issues/7)。
-
-早期 [PR #1](https://github.com/odango-chan/ca-skill-studio-demo/pull/1)（初始架构）、[PR #2](https://github.com/odango-chan/ca-skill-studio-demo/pull/2)（Python 编辑 POC）、[PR #3](https://github.com/odango-chan/ca-skill-studio-demo/pull/3)（早期 TypeScript Pages）都还是**未合并的历史候选**，不代表 `main` 的实际实现。文档治理基线完成记录 [#6](https://github.com/odango-chan/ca-skill-studio-demo/issues/6)。
-
-画布缩放提供三个并列按钮：**适配**（完整流程）、**横向**（宽度铺满）、**纵向**（高度铺满）。它们只改变当前流程图的视口，不会修改 Source，更多细节见 [Workbench](docs/design/authoring-workbench.md)。
-
-D4 Phase Designer 已实现有界 Step 编辑、输出引用切换、只读依赖/消费者契约证据，以及 Verify Step、失败 Route 和 Outcome 编辑。所有操作仍受 Source Patch 与类型/来源约束；跨生产者重绑定和 Runtime/5GC 验证不在范围内。详见 [D4 设计](docs/design/phase-designer.md)、[WORK](docs/WORK.md) 与 [TRACEABILITY](docs/TRACEABILITY.md)。\n\nE1 Monaco Source Editor 已通过 [PR #40](https://github.com/odango-chan/ca-skill-studio-demo/pull/40) 合入最新 D4 主分支：本地 Monaco/Worker，YAML、Python、Markdown、JSON 的 Source 编辑，保留唯一工作副本及 Source/Visual/Split、Diff/确认/Undo/Redo；初始化失败回退原有文本编辑器。[322/322 + real Chromium 集成 CI PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41796985366)，[resulting-main Pages PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41797402343)，参见 [E 线设计](docs/design/source-editor-workstream.md)。
-
-E2 YAML 1.2 语法诊断和离线 Contract/Predicate Owner Schema 提示已由 [PR #42](https://github.com/odango-chan/ca-skill-studio-demo/pull/42) 合入主分支，通过 [328/328 + 真实补全/hover Chromium](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41803566642) 和 [Pages 部署验收](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/41804005500)。Procedure 保持 syntax-only，避免旧 Schema 误报；Runtime/5GC NOT_RUN。
+开始开发前先读 AGENTS.md、WORK.md、TRACEABILITY.md。单测、Chromium、Pages PASS 只证明本仓实际覆盖的行为，不代表完整 Skill Runtime、跨仓联调或真实 5GC E2E PASS。

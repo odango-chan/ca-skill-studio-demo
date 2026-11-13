@@ -1,24 +1,32 @@
 # Skill Studio 当前工作状态
 
-## 2026-11-12 · Current Theia baseline and closeout
+## 2026-11-13 · Theia-only baseline and Classic retirement
 
-**Current main:** `82f0b0c5afa4679d26b15dc656e020e74027f9af`. GitHub Pages root uses the native Theia 1.76 browser-only workbench; Classic remains preserved at `/classic/` and is not modified in this cleanup.
+**Current target architecture:** VS Code Web Extension hosted by Theia 1.76 browser-only. Classic standalone browser workbench is being retired by [PR #186](https://github.com/odango-chan/ca-skill-studio-demo/pull/186); the PR removes its app entrypoint, build scripts, CI path and Pages fallback. The PR is under exact-head CI and real Chromium verification; until merge and resulting-main Pages verification, do not claim the new artifact is deployed.
 
-### 已合入并作为当前实现保留
+### 当前 Theia 实现
 
-- **Package Explorer:** [PR #175](https://github.com/odango-chan/ca-skill-studio-demo/pull/175) merged at `5ddf90d557d74e06374b3d517b5844f6a4fdf525`. One native Explorer TreeView composes Skills and Plugin-managed Dependencies. Native Files remains available. Dependency Service owns acquisition, immutable snapshots and Lock state. Build Artifacts remain hidden until the Compiler supplies a real BuildResult.
-- **Native Markdown:** [PR #169](https://github.com/odango-chan/ca-skill-studio-demo/pull/169) merged at `82f0b0c5afa4679d26b15dc656e020e74027f9af`. The pinned `vscode.markdown-language-features@1.95.3` owns Theia rendering and Preview lifecycle. Native bidirectional scroll preferences are enabled, but actual editor/preview scroll synchronization is not confirmed in Theia. Automated acceptance only records the current native preferences and visible viewport snapshot; it does not synthesize scroll gestures. Manual user inspection remains pending. Studio contributes the shared theme and exact Package-local link/security policy. `site/markdown-preview.mjs` remains for Classic only; it is not the Theia renderer.
-- **Inspector / Data Flow:** [PR #170](https://github.com/odango-chan/ca-skill-studio-demo/pull/170) and [PR #171](https://github.com/odango-chan/ca-skill-studio-demo/pull/171) merged. The standalone Evidence view/provider is retired; Source-derived Producer/Consumer Data Flow lives in the right-side Inspector. Runtime Evidence remains `NOT_RUN`.
-- **Skill Language:** [PR #161](https://github.com/odango-chan/ca-skill-studio-demo/pull/161) aligned the editor with the canonical `ca-skills` Skill Language v0.2 contract. Compiler Check/Build remains authoritative.
+- **Package Explorer:** native Explorer container combines Skills and Plugin-managed Dependencies. Native Files remains available. Dependency Service owns acquisition, immutable snapshots and Lock state. Build Artifacts remain hidden until the Compiler supplies a real BuildResult.
+- **Native Markdown:** pinned vscode.markdown-language-features@1.95.3 owns Theia rendering and Preview lifecycle. Studio contributes shared preview theme and exact Package-local link/security policy. Native bidirectional scroll preferences are enabled; actual editor/preview scroll synchronization remains a manual inspection item until real user scrolling is verified.
+- **Inspector / Data Flow:** Producer / Consumer Data Flow lives in the right-side Inspector. The standalone Evidence view/provider is retired. Runtime Evidence remains NOT_RUN.
+- **Skill Language:** editor language features consume the canonical ca-skills Skill Language contract. Compiler Check/Build remains authoritative; LSP feedback is not a substitute for Compiler results.
+- **Examples:** 5GC establish-pdu-session and MAS establish-session-mas are separate Skill packages. Example project assembly and source acquisition are being moved toward build-time, version-pinned authoritative repository inputs; Studio-local copies must not become a second contract authority.
 
-### 当前只做收尾，不扩张功能
+### Classic retirement boundary
 
-- **[#160 · LSP v0.2 closeout](https://github.com/odango-chan/ca-skill-studio-demo/issues/160):** finish review/acceptance of existing [PR #167](https://github.com/odango-chan/ca-skill-studio-demo/pull/167). Its four reported exact-head workflows passed, but the PR remains Draft / unmerged. No new provider families or grammar implementation.
-- **[#176 · Theia code cleanup](https://github.com/odango-chan/ca-skill-studio-demo/issues/176):** code-cleanup-only closeout; keep active Theia runtime behavior unchanged. [PR #177](https://github.com/odango-chan/ca-skill-studio-demo/pull/177) removes duplicate Markdown preview paths and synthetic scroll diagnostics, retires the unused standalone Evidence projection and Dependencies TreeView path, names the Plugin-managed Dependency host adapter accurately, and reconciles the host READMEs / ADRs with the shipped architecture. The native Markdown extension owns Preview rendering; the former `revealRange` test did not represent real user scrolling, so bidirectional scroll synchronization and link activation remain manual inspection items. Latest exact-head IDE Host, PR Verify, Browser-Only Chromium and backend Chromium all PASS (run links are recorded in PR #177). Resulting-main Pages remains NOT_RUN until a later merge and exact-merge-SHA deployment check. PR #177 remains Draft / unmerged; Classic remains untouched.
-- Package Explorer lifecycle UI for populated dependency Add/Refresh/Update Lock/Remove, multi-root selection UI, drag/reorder persistence and Package-aware Source file operations are deferred; [Issue #173](https://github.com/odango-chan/ca-skill-studio-demo/issues/173) is closed as a scoped first-stage delivery, not as proof those follow-ups shipped.
-- Build Artifacts are deferred until a real Compiler BuildResult exists. No fake BuildResult or permanent unavailable Build panel.
-- Classic retirement remains a separate later operation. This cleanup must not delete Classic or shared modules still consumed by it.
-- No Runtime, Provider, MAS or 5GC execution/qualification is claimed.
+PR #186 removes the Classic standalone browser app, root-level build entrypoint, Classic shell icon CSS injection, old Classic-only E2E runner, and the /classic/ Pages artifact. Shared parser, projection, icon geometry, Package fixtures and edit-policy modules are retained only where still consumed by Theia, its extensions or regression tests. This cleanup does not delete user workspaces or user-authored Skill files.
+
+### 后续产品基础设施（尚未作为已交付能力）
+
+- Empty workspace Welcome: New Project, Open Project and explicitly selected Example project; do not auto-load an Example into a project-less workspace.
+- Build-time Example acquisition from authoritative repositories with pinned refs and explicit file ownership.
+- Unified Contract Acquisition for Skill / Host / Tool schemas; LSP, Completion, Hover, Definition, References, Diagnostics and Semantic Tokens consume the resolved project contract snapshot.
+- Help menu links to current Chinese Skill Language specifications and authoring guides; localization uses VS Code Locale with zh-CN and en resources, without a second language setting.
+- Online Theia and desktop VS Code consume the same extension resources and language services.
+
+### 运行边界
+
+GitHub Pages uses browser-only Theia with same-origin Webviews. It is suitable for public examples and non-sensitive workspaces only. Browser storage is not local disk or GitHub synchronization. The host does not execute user Python, Skill Runtime, Agent, Provider or real 5GC operations. No Runtime / Provider / MAS / 5GC qualification is claimed.
 
 ## 2026-11-06 · 统一菜单与显式节点导航（PR #79）
 

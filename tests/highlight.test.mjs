@@ -43,17 +43,3 @@ test("over-budget text and unknown file types safely fall back to normal textare
   assert.equal(highlightSource(data,"text.txt").enabled,false);
   assert.equal(highlightSource(data,"procedure.yaml",500).enabled,true);
 });
-test("Source editor mirrors typing and scrolling with an escaped highlight layer",()=>{
-  const html=read("site/index.html"),app=read("site/app.mjs");
-  const css=read("site/light.css");
-  assert.match(html,/id="sourceHighlight"/);
-  assert.match(html,/id="sourceEditor"[^>]*data-highlight/);
-  assert.match(html,/id="source" wrap="off"/);
-  assert.match(app,/sourceHighlight\.innerHTML=highlighted\.html/);
-  assert.match(app,/sourceHighlight\.scrollTop=source\.scrollTop/);
-  assert.match(app,/sourceHighlight\.scrollLeft=source\.scrollLeft/);
-  assert.match(app,/refreshHighlight\(\)/);
-  assert.match(css,/white-space:nowrap!important/);
-  assert.match(css,/text-overflow:ellipsis!important/);
-  assert.match(css,/caret-color:#107c70/);
-});
