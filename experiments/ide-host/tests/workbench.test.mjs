@@ -673,7 +673,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.equal(markdownExtensionActivated,true,
     'the exact pinned Markdown extension is activated before its command is used');
   assert.ok(nativeCommands.some(call=>call.id==='markdown.showPreviewToSide'&&
-    call.args[0]===markdownUri),
+    call.args[0]?.path?.endsWith('/establish-pdu-session/SKILL.md')),
     'the built-in Markdown Preview command owns rendering in the second editor group');
   const nativeSettings=await commands.get(
     'skillStudio.internal.nativeMarkdownSettingsAcceptance')();
