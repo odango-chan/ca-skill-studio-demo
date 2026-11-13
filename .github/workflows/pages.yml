@@ -50,45 +50,6 @@ jobs:
         run: npm test
       - name: Check Procedure Designer TypeScript
         run: npm run typecheck
-      - name: Bundle browser site
-        run: npm run build
-      - name: Chromium E2E — establish-pdu-session Route paths
-        run: node scripts/edge-smoke.mjs
-      - name: Check static site and asset references
-        run: |
-          python3 - <<'PY'
-          from html.parser import HTMLParser
-          from pathlib import Path
-          import re
-
-          html = Path("dist/index.html").read_text(encoding="utf-8")
-          assert html.lstrip().lower().startswith("<!doctype html>")
-          HTMLParser().feed(html)
-          for asset in ("./studio.css", "./light.css", "./app.css", "./app.js",
-                        "./editor.worker.js", "./yaml.worker.js",
-                        "./LICENSE.monaco.txt",
-                        "./ThirdPartyNotices.monaco.txt",
-                        "./samples/establish-pdu-session.procedure.yaml",
-                        "./samples/packages/establish-pdu-session/SKILL.md",
-                        "./samples/packages/establish-pdu-session/assurance/contract.yaml",
-                        "./samples/packages/establish-pdu-session/assurance/procedure.yaml",
-                        "./samples/packages/establish-pdu-session/assurance/predicates.yaml",
-                        "./samples/packages/establish-pdu-session/references/3gpp-procedure.md",
-                        "./samples/packages/establish-pdu-session/references/session-selection.md",
-                        "./samples/packages/establish-pdu-session/references/failure-handling.md",
-                        "./samples/packages/establish-pdu-session/scripts/evaluate_udm_read.py",
-                        "./samples/packages/establish-pdu-session/schemas/establishment-request.schema.yaml"):
-              assert Path("dist", asset.removeprefix("./")).is_file(), asset
-          # Legacy fixture sources remain under site/ for tests only, not in published dist/.
-          for legacy in ("samples/ensure-pdu-session.procedure.yaml",
-                         "samples/packages/ensure-pdu-session"):
-              assert not Path("dist", legacy).exists(), legacy
-          assert 'src="./app.js"' in html
-          assert 'href="./studio.css"' in html
-          assert 'href="./light.css"' in html
-          assert 'href="./app.css"' in html
-          assert not re.search(r'<script[^>]+src=["\']https?://', html, re.I)
-          PY
       - name: Check JavaScript syntax
         run: |
           node --check site/app.mjs
@@ -138,8 +99,6 @@ jobs:
           node --check site/react-flow-projection.mjs
           node --check site/file-icons.mjs
           node --check tests/file-icons.test.mjs
-          node --check experiments/ide-host/scripts/classic-icons-css.mjs
-          node --check experiments/ide-host/scripts/prepare-theia-shell-icons.mjs
           node --check experiments/ide-host/scripts/prepare-theia-brand.mjs
           node --check tests/react-flow-migration.test.mjs
           node --check tests/visual-route-edit.test.mjs
@@ -208,30 +167,29 @@ jobs:
           THEIA_REQUIRE_WEBVIEW: "1"
           THEIA_REQUIRE_BROWSER_LSP: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
-      # Theia is the default online host. The previous full-featured browser
-      # Studio is copied intact to /classic/ before the root is replaced.
-      - name: Compose default Theia root and preserve Classic Studio
+      # Theia is the only supported online host. Publish no Classic fallback.
+      - name: Compose Theia-only Pages release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: main-source
         run: |
-          node ../ide-source/experiments/ide-host/scripts/compose-pages-release.mjs --classic dist --theia ../ide-source/experiments/ide-host/theia-online/lib/frontend --output dist
+          node ../ide-source/experiments/ide-host/scripts/compose-pages-release.mjs --theia ../ide-source/experiments/ide-host/theia-online/lib/frontend --output dist --site-root .
           test -s dist/index.html
-          test -s dist/classic-icons.css
           test -s dist/bundle.js
           test -s dist/hostedPlugin/list.json
           test -s dist/hostedPlugin/odango_chan_skill_studio_theme/package.json
           test -s dist/hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json
           test -s dist/hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json
-          test -s dist/hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg
+          test -s dist/hostedPlugin/odango_chan_skill_studio_languages/package.json
           test -s dist/webview/index.html
-          test -s dist/classic/index.html
-          test -s dist/classic/app.js
-          test -s dist/classic/samples/packages/establish-pdu-session/assurance/procedure.yaml
-          test -s dist/ide-preview/index.html
+          test -s dist/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js
+          test ! -e dist/classic
+          test ! -e dist/app.js
+          test ! -e dist/ide-preview
+          test ! -e dist/classic-icons.css
       - name: Record and verify exact deployed source identity
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: main-source
-        run: node ../ide-source/experiments/ide-host/scripts/write-pages-build-info.mjs --classic-source . --theia-source ../ide-source --output dist/build-info.json
+        run: node ../ide-source/experiments/ide-host/scripts/write-pages-build-info.mjs --source ../ide-source --output dist/build-info.json
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
