@@ -35,10 +35,9 @@ test('Source-first pairing opens Visual in column two and native Source in colum
   const {vscode,calls,shown}=vscodeApi();
   const target=uri('/p/assurance/contract.yaml');
   const result=await openSourceViewPair(vscode,target,{line:7});
-  assert.equal(calls.length,2);
+  assert.equal(calls.length,1);
   assert.deepEqual(calls.map(call=>[call[0],call[2]]),[
-    ['vscode.openWith','skillStudio.contractPreview'],
-    ['vscode.openWith','default']
+    ['vscode.openWith','skillStudio.contractPreview']
   ]);
   assert.equal(calls[0][3],2);
   assert.equal(shown.length,1);
@@ -62,7 +61,6 @@ test('opening a Source already in column two moves it before creating Visual',as
   await openSourceViewPair(vscode,target);
   assert.deepEqual(calls.map(call=>call[0]),[
     'workbench.action.moveEditorToFirstGroup',
-    'vscode.openWith',
     'vscode.openWith'
   ]);
   assert.equal(calls[1][3],2);
