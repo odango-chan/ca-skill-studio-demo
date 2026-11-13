@@ -11,88 +11,73 @@ async function put(root,path,content){
   await writeFile(target,content);
 }
 
-test("Pages root is Theia, complete previous Studio remains at /classic/",async()=>{
+test("Pages publishes only Theia and never stages a Classic or legacy fallback",async()=>{
   const temp=await mkdtemp(join(tmpdir(),"studio-pages-compose-"));
-  const classic=join(temp,"dist"),theia=join(temp,"theia");
+  const theia=join(temp,"theia"),output=join(temp,"dist"),site=join(temp,"site");
   try{
-    await put(classic,"index.html",'<!doctype html><html><body><script src="./app.js"></script></body></html>');
-    await put(classic,"app.js","window.classicStudio=true;");
-    await put(classic,"studio.css","/* classic studio */");
-    await put(classic,"light.css","/* classic theme */");
-    await put(classic,"app.css","/* classic app */");
-    await put(classic,"samples/establish-pdu-session/SKILL.md","# Sample");
-    await put(theia,"index.html",'<!doctype html><html><head><link id="skill-studio-classic-icon-theme" rel="stylesheet" href="./classic-icons.css"><link id="skill-studio-brand-theme" rel="stylesheet" href="./skill-studio-brand.css"></head><body><div id="skill-studio-preview-warning"><a href="./classic/">Classic</a></div><div id="theia-app-shell"></div><script id="skill-studio-brand-script" type="module" src="./skill-studio-brand.js"></script></body></html>');
+    await put(site,"CNAME","studio.example.com\n");
+    await put(theia,"index.html",'<!doctype html><html><body><div id="skill-studio-preview-warning">在线演示 · Webview 使用同源模式</div><div id="theia-app-shell"></div></body></html>');
     await put(theia,"bundle.js","window.theia=true;");
-    await put(theia,"classic-icons.css","/* classic icon theme */");
-    await put(theia,"skill-studio-brand.css","/* SKILL Studio brand theme */");
-    await put(theia,"skill-studio-brand.js","/* SKILL Studio brand mount */");
-    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","odango-chan.skill-studio-theme"]');
+    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]');
+    await put(theia,"webview/index.html","<html>webview</html>");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json",'{"name":"ca-skill-studio-ide-spike"}');
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js","extension worker");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js","language worker");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/package.json",'{"name":"skill-studio-theme"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",'{"name":"SKILL Studio Light"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",'{"iconDefinitions":{}}');
-    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg",'<svg></svg>');
-    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/yaml.svg",'<svg></svg>');
-    await put(theia,"webview/index.html","<html>webview</html>");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg","<svg></svg>");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_languages/package.json",'{"name":"skill-studio-languages"}');
 
-    const result=await composePagesRelease({
-      classicDist:classic,theiaFrontend:theia,outputDist:classic
-    });
+    const result=await composePagesRelease({theiaFrontend:theia,outputDist:output,siteRoot:site});
     assert.equal(result.defaultHost,"theia-browser-only");
-    assert.equal(result.classicPath,"/classic/");
-    assert.match(await readFile(join(classic,"index.html"),"utf8"),/theia-app-shell/);
-    assert.match(await readFile(join(classic,"index.html"),"utf8"),/href="\.\/classic\//);
-    assert.match(await readFile(join(classic,"classic","index.html"),"utf8"),/href="\.\.\//);
-    assert.match(await readFile(join(classic,"classic","index.html"),"utf8"),/src="\.\/app\.js"/);
-    assert.equal(await readFile(join(classic,"classic","app.js"),"utf8"),"window.classicStudio=true;");
-    assert.equal(await readFile(join(classic,"classic","samples/establish-pdu-session/SKILL.md"),"utf8"),"# Sample");
-    assert.equal(await readFile(join(classic,"bundle.js"),"utf8"),"window.theia=true;");
-    assert.equal(await readFile(join(classic,"classic-icons.css"),"utf8"),"/* classic icon theme */");
-    assert.equal(await readFile(join(classic,"skill-studio-brand.css"),"utf8"),"/* SKILL Studio brand theme */");
-    assert.equal(await readFile(join(classic,"skill-studio-brand.js"),"utf8"),"/* SKILL Studio brand mount */");
-    assert.match(await readFile(join(classic,"hostedPlugin/list.json"),"utf8"),/ca-skill-studio-ide-spike/);
-    assert.match(await readFile(join(classic,"hostedPlugin/list.json"),"utf8"),/skill-studio-theme/);
-    assert.equal(await readFile(join(classic,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json"),"utf8"),'{"name":"SKILL Studio Light"}');
-    assert.equal(await readFile(join(classic,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg"),"utf8"),'<svg></svg>');
-    assert.equal(await readFile(join(classic,".nojekyll"),"utf8"),"");
-    assert.match(await readFile(join(classic,"ide-preview","index.html"),"utf8"),/url=\.\.\//);
-    await assert.rejects(stat(join(classic,"app.js")));
-  }finally{
-    await rm(temp,{recursive:true,force:true});
-  }
+    assert.equal(result.classicPublished,false);
+    assert.equal(result.legacyRedirects,false);
+    assert.match(await readFile(join(output,"index.html"),"utf8"),/theia-app-shell/);
+    assert.equal(await readFile(join(output,"bundle.js"),"utf8"),"window.theia=true;");
+    assert.equal(await readFile(join(output,"CNAME"),"utf8"),"studio.example.com\n");
+    assert.equal(await readFile(join(output,".nojekyll"),"utf8"),"");
+    for(const forbidden of ["classic","app.js","studio.css","light.css","app.css","ide-preview","classic-icons.css"])
+      await assert.rejects(stat(join(output,forbidden)),{code:"ENOENT"});
+  }finally{await rm(temp,{recursive:true,force:true});}
 });
 
-test("invalid Theia input is rejected before the Classic build is replaced",async()=>{
+test("Pages refuses a frontend containing a Classic navigation link or missing a required plugin",async()=>{
   const temp=await mkdtemp(join(tmpdir(),"studio-pages-guard-"));
-  const classic=join(temp,"dist"),theia=join(temp,"theia");
+  const theia=join(temp,"theia"),output=join(temp,"dist");
   try{
-    await put(classic,"index.html","<html><body>classic</body></html>");
-    await put(classic,"app.js","classic-app");
-    await put(classic,"studio.css","classic-studio-css");
-    await put(classic,"light.css","classic-light-css");
-    await put(classic,"app.css","classic-app-css");
-    await put(theia,"index.html","<html><body>not prepared</body></html>");
-    await assert.rejects(
-      composePagesRelease({classicDist:classic,theiaFrontend:theia,outputDist:classic}),
-      /Required Pages asset missing|same-origin warning/
-    );
-    assert.equal(await readFile(join(classic,"index.html"),"utf8"),"<html><body>classic</body></html>");
-    assert.equal(await readFile(join(classic,"app.js"),"utf8"),"classic-app");
-  }finally{
-    await rm(temp,{recursive:true,force:true});
-  }
+    await put(theia,"index.html",'<!doctype html><html><body><div id="skill-studio-preview-warning">在线演示</div><a href="/classic/">old</a></body></html>');
+    await put(theia,"bundle.js","bundle");
+    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]');
+    await put(theia,"webview/index.html","webview");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json","{}");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js","extension");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js","worker");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/package.json","{}");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json","{}");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json","{}");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg","<svg></svg>");
+    await put(theia,"hostedPlugin/odango_chan_skill_studio_languages/package.json","{}");
+    await assert.rejects(composePagesRelease({theiaFrontend:theia,outputDist:output}),/Classic navigation/);
+    await assert.rejects(stat(output),{code:"ENOENT"});
+  }finally{await rm(temp,{recursive:true,force:true});}
 });
 
 test("Pages installs pinned browser LSP dependencies before bundling the Web extension",async()=>{
-  const workflow=await readFile(
-    new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
+  const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
   const marker="- name: Build Theia Web extension for default online workbench";
   const start=workflow.indexOf(marker);
   const end=workflow.indexOf("- name: Build Theia browser-only static workbench",start);
-  assert.ok(start>=0&&end>start,"Pages Web extension build step must exist");
+  assert.ok(start>=0&&end>start);
   const step=workflow.slice(start,end);
   const client=step.indexOf("npm ci --prefix experiments/ide-host/lsp-browser/client ");
   const server=step.indexOf("npm ci --prefix experiments/ide-host/lsp-browser/server ");
   const bundle=step.indexOf("node experiments/ide-host/scripts/build-ide-spike.mjs");
-  assert.ok(client>=0&&server>client&&bundle>server,
-    "Both independently locked LSP SDK dependency roots must be installed before the Pages Worker bundle");
+  assert.ok(client>=0&&server>client&&bundle>server);
+});
+
+test("Pages workflow cannot reintroduce the Classic application",async()=>{
+  const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
+  assert.doesNotMatch(workflow,/--classic|dist\/classic|classic-icons\.css|preserve Classic/i);
+  assert.match(workflow,/test ! -e dist\/classic/);
 });
