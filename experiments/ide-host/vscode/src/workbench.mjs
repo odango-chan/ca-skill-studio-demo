@@ -2689,7 +2689,7 @@ export function registerWorkbench(vscode,context){
     }
     return workerProbe;
   }
-  const isNativeMarkdownPath=path=>/\\.(?:md|markdown)$/i.test(path??"");
+  const isNativeMarkdownPath=path=>/\.(?:md|markdown)$/i.test(path??"");
   async function openNativeMarkdownPreview(uri){
     uri=uri??vscode.window.activeTextEditor?.document.uri;
     if(!uri||!isNativeMarkdownPath(uri.path))return false;
@@ -2768,7 +2768,7 @@ export function registerWorkbench(vscode,context){
       const name=typeof skillName==='string'?skillName:'establish-pdu-session';
       const targetPath=typeof relativePath==='string'?relativePath:'SKILL.md';
       if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
-      if(!/^(?:SKILL\\.md|references\\/[a-z0-9-]+\\.md)$/i.test(targetPath))
+      if(!/^(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(targetPath))
         throw Error('Markdown acceptance target must be a known Package-local Markdown path');
       const matches=await vscode.workspace.findFiles(
         '**/'+name+'/'+targetPath,'**/node_modules/**',5);
