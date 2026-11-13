@@ -1,34 +1,39 @@
-# Markdown Side-by-Side Editing Experience
+# Native Markdown Side-by-Side Editing
 
-**Status:** Implementation proposal landed with the Markdown editor integration PR; final CI and browser acceptance are authoritative.
+**Status:** Accepted · Native VS Code Markdown extension is the default Theia implementation.
 
-## User experience
+## Default workbench layout
 
-- Opening a Markdown file from the native Explorer/editor automatically pairs the editable Source document in editor column one with its read-only Preview in column two. The explicit Preview command and Package-local Markdown links use the same path.
-- Source remains the only document authority. Preview consumes the current `TextDocument.getText()`, including unsaved edits.
-- The preview is created once. Source changes are debounced briefly and delivered as `updatePreview` Webview messages; the host does not replace `webview.html` for every keystroke.
-- A compact Preview toolbar offers a single-pane toggle for narrow workspaces. It moves the Preview into the Source editor group; toggling again restores the split. The command palette/editor title also exposes the layout toggle.
-- Classic light/dark heading accents use the shared theme color `skillStudio.markdownHeading` (light `#0c8e7b`, dark `#83d9c4`). Static Classic rendering falls back to the existing `--accent` token. H1/H2 use the accent; H3 gets a restrained accent rail; lower levels remain readable foreground text.
+- Every `.md` and `.markdown` file opened from the native Explorer or Package Explorer is paired automatically with the built-in, read-only Markdown Preview.
+- A Markdown editor restored as the active document when the extension starts receives the same pairing.
+- The editable **Source is always on the left** (editor group one); the native **Preview is always on the right** (editor group two).
+- If a Markdown Source is opened while another editor group is active, the integration normalizes it back to the Source-left / Preview-right layout.
+- Opening another Markdown document uses the same two positions; it must not reverse Source and Preview or create a second Studio-owned Markdown renderer.
+- Source remains the only document authority. Native Preview consumes the current Source document, including unsaved edits, and owns its normal preview lifecycle.
 
-## Source mapping and synchronized scrolling
+The Studio extension owns only the integration boundary:
 
-The Markdown renderer adds `data-source-line` to rendered block elements. The value is the original, zero-based source line, including the lines removed from the visible Front Matter projection. Headings retain their stable in-document IDs.
+- automatic pairing and stable editor-group placement;
+- the shared SKILL Studio theme through `contributes.markdown.previewStyles`;
+- exact Package-root inventory and symlink checks through `markdown-link-policy.mjs`;
+- fail-closed handling for missing/ambiguous Package roots and unsafe Package-relative links.
 
-- Native Source visible-range changes send the first visible line to Preview.
-- Preview scroll events find the first visible mapped block and ask the host to reveal the corresponding native Source line.
-- Programmatic scrolls are suppressed briefly on both sides to avoid feedback loops.
-- Live preview replacement preserves the first visible source-line anchor and its viewport offset instead of resetting to the top.
-
-This is line/element mapping, not percentage-based scroll approximation. Blank lines resolve to the closest preceding rendered block; table rows and list items also carry their own source line.
+The pinned built-in `vscode.markdown-language-features` extension owns Markdown parsing, rendering, the read-only Preview and its lifecycle. Do not reintroduce the retired Studio-owned renderer into the Theia/VS Code path.
 
 ## Security and boundaries
 
-- Raw HTML remains escaped by the existing renderer.
-- Remote images, remote script execution, arbitrary fetch, and inline source-provided styles remain unavailable.
-- The only Webview script is nonce-protected and handles local Package navigation, preview updates, scrolling, and the layout toggle.
-- The extension host continues to verify Package-local paths, file inventory, file type, and symlink boundaries before opening a target.
+- Raw HTML remains disabled.
+- Remote images and arbitrary resource fetches remain unavailable.
+- Package-relative links are resolved only against the exact, pre-inventoried Package file set.
+- Symlinked Package roots and descendants are rejected.
 - `lib/` and `output/` protection, Skill semantics, Compiler/LSP behavior, Procedure Designer and Runtime behavior are unchanged.
+
+## Scroll behavior
+
+The native Markdown Preview owns scroll synchronization. The native preferences `markdown.preview.scrollEditorWithPreview` and `markdown.preview.scrollPreviewWithEditor` remain enabled. Automated acceptance verifies the preferences and current viewport state; it does not synthesize user scroll gestures or claim that bidirectional scrolling has been manually accepted.
 
 ## Verification
 
-Unit coverage checks original line mappings, safe rendering, paired editor columns, live updates, bidirectional scroll messages, layout toggling, and oversized-source fallback. Real Theia Chromium acceptance checks the actual Webview, shared CSS, heading accent, source-line anchors, TOC and Reference navigation.
+- Unit tests cover Package-local link containment, symlink rejection, and both registered Markdown extensions (`.md` and `.markdown`).
+- Real Theia Chromium acceptance opens more than one Markdown document through the normal editor-open path and verifies that each editable Source tab is in a separate, left-side editor group from its right-side Preview tab.
+- Existing native Preview theme, unsaved-edit refresh, security and Language Server acceptance remain in force.
