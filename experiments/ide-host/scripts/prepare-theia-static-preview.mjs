@@ -105,6 +105,18 @@ await writeFile(markdownBrowserEntryPath,markdownBrowserBundle);
 console.log("STUDIO_THEIA_STATIC_MARKDOWN_WORKER_BASE_PATH",JSON.stringify({
   browserEntry:markdownBrowserEntryPath,basePathAware:true,patchCount:markdownWorkerCreationCount
 }));
+const pluginWorkerPath=join(root,"plugin-worker.js");
+let pluginWorkerBundle=await readFile(pluginWorkerPath,"utf8");
+const webviewResourceMapping=String.raw`toGeneralWebviewResource(e,t){let n=Hd.URI.parse(e.packageUri),i=t.path.replace(n.path,""),r=Xke.PluginPackage.toPluginUrl(e,"")+i;return Hd.URI.parse(this.initData.webviewResourceRoot.replace("{{uuid}}","webviewUUID")).with({path:r})}`;
+const webviewResourceMappingPatched=String.raw`toGeneralWebviewResource(e,t){let n=Hd.URI.parse(e.packageUri),i=t.path.replace(n.path,""),r=Xke.PluginPackage.toPluginUrl(e,"")+i;const basePath=new URL(".",globalThis.location.href).pathname.replace(/\/$/,"");if(basePath&&r.startsWith("/hostedPlugin/")&&!r.startsWith(basePath+"/"))r=basePath+r;return Hd.URI.parse(this.initData.webviewResourceRoot.replace("{{uuid}}","webviewUUID")).with({path:r})}`;
+const webviewResourceMappingCount=pluginWorkerBundle.split(webviewResourceMapping).length-1;
+if(webviewResourceMappingCount!==1)
+  throw Error("Pinned Theia plugin-worker Webview resource mapping changed; expected exactly one patch point, found "+webviewResourceMappingCount);
+pluginWorkerBundle=pluginWorkerBundle.replace(webviewResourceMapping,webviewResourceMappingPatched);
+await writeFile(pluginWorkerPath,pluginWorkerBundle);
+console.log("STUDIO_THEIA_STATIC_WEBVIEW_RESOURCE_BASE_PATH",JSON.stringify({
+  pluginWorkerPath,basePathAware:true,patchCount:webviewResourceMappingCount
+}));
 console.log("STUDIO_THEIA_STATIC_MARKDOWN_ASSETS",JSON.stringify({
   markdownPluginTarget,version:markdownManifest.version,
   browser:markdownManifest.browser,workerBytes:(await stat(markdownWorker)).size
