@@ -158,13 +158,18 @@ function treeNode(vscode, node) {
   return item;
 }
 export function registerPackageOverview(vscode,context,getActiveDocument=()=>null,
-  {dependenciesProvider=null,getProjectRoot=()=>null}={}) {
+  {dependenciesProvider=null,getProjectRoot=()=>null,onPackagesChanged=()=>{}}={}) {
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
   let observedRootSignature = null;
   let treeReads=0;
   const treeReadsByKind={root:0,section:0,package:0,group:0,dependency:0,other:0};
   const fire = () => emitter.fire();
+  const notifyPackagesChanged=list=>{
+    try{onPackagesChanged([...list]);}
+    catch(error){console.warn("SKILL Package language lifecycle notification failed:",
+      String(error?.message??error));}
+  };
   const skillsSection=()=>({
     kind:'section',section:'skills',label:'Skills',
     description:packages.length+' Skill Package'+(packages.length===1?'':'s'),
@@ -302,14 +307,16 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       const selectedRoot=getProjectRoot?.()??null;
       if(workspaceFolders.length>1&&!selectedRoot){
         observedRootSignature='';packages=[];inventoryState='select-project-root';
-        message='Multi-root workspace · select a Project Root';fire();return [];
+        message='Multi-root workspace · select a Project Root';
+        notifyPackagesChanged(packages);fire();return [];
       }
       const scanFolders=selectedRoot?[{uri:selectedRoot}]:workspaceFolders;
       const roots = packageScanRoots(scanFolders,openDocuments);
       const rootSignature = roots.map(root=>root.toString()).sort().join('\n');
       if (!roots.length) {
         observedRootSignature=rootSignature;
-        packages=[];inventoryState='no-workspace';message='请先打开 Workspace 或一个 SKILL 文件';fire();return [];
+        packages=[];inventoryState='no-workspace';message='请先打开 Workspace 或一个 SKILL 文件';
+        notifyPackagesChanged(packages);fire();return [];
       }
       const found = [], seen = new Set();
       for (const root of roots) {
@@ -359,12 +366,14 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       message = inventory.truncated
         ?'已扫描前 '+inventory.scannedFiles+' 个文件 · 结果可能不完整'
         :inventory.scannedFiles+' 个文件 · 仅清点，不做语义校验';
+      notifyPackagesChanged(packages);
       fire();
       return packages;
     } catch(error) {
       if (ticket !== generation) return packages;
       packages=[];inventoryState='unavailable';
       message='Inventory unavailable · '+String(error?.message??error);
+      notifyPackagesChanged(packages);
       fire();
       return [];
     }
