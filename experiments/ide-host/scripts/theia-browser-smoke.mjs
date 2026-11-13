@@ -563,8 +563,11 @@ try{
       // LSP SemanticTokens, then the extension-host adapter projects those
       // exact ranges through TextEditor decorations using the shared theme.
       // TextMate colors or provider registration alone do not satisfy this check.
-      let semanticRendering=null;
-      for(let attempt=0;attempt<35;attempt++){
+      let semanticRendering=null,semanticProviderDiagnostics=null;
+      // Package attachment and initial Worker analysis are asynchronous in the
+      // browser-only shell. Wait for the actual semantic-token request/render,
+      // not merely for SKILL LSP: READY or a fixed short delay.
+      for(let attempt=0;attempt<120;attempt++){
         semanticRendering=await evalJS(`(()=> {
           const editor=[...document.querySelectorAll('.monaco-editor')]
             .find(el=>el.getBoundingClientRect().width>150&&el.querySelector('.view-lines'));
@@ -585,18 +588,21 @@ try{
             visible:!!editor
           };
         })()`);
-        if(semanticRendering?.referenceColor==='rgb(49, 125, 192)'&&
+        semanticProviderDiagnostics=await evalJS(`(async()=>{
+          const c=window.theia.container;
+          const key=[...c._bindingDictionary._map.keys()].find(k=>
+            typeof k==='function'&&k.prototype?.executeCommand&&
+            k.prototype?.registerCommand&&k.prototype?.getCommand);
+          if(!key)throw Error('Native command registry missing');
+          return c.get(key).executeCommand('skillStudio.internal.semanticTokenDiagnostics');
+        })()`);
+        if(semanticProviderDiagnostics?.lastTokenCount>0&&
+           semanticProviderDiagnostics?.renderedTokenCount>0&&
+           semanticProviderDiagnostics?.renderedTypeCount>=2&&
+           semanticRendering?.referenceColor==='rgb(49, 125, 192)'&&
            semanticRendering?.outcomeColor==='rgb(173, 101, 23)')break;
-        await sleep(120);
+        await sleep(150);
       }
-      const semanticProviderDiagnostics=await evalJS(`(async()=>{
-        const c=window.theia.container;
-        const key=[...c._bindingDictionary._map.keys()].find(k=>
-          typeof k==='function'&&k.prototype?.executeCommand&&
-          k.prototype?.registerCommand&&k.prototype?.getCommand);
-        if(!key)throw Error('Native command registry missing');
-        return c.get(key).executeCommand('skillStudio.internal.semanticTokenDiagnostics');
-      })()`);
       semanticRendering.diagnostics=semanticProviderDiagnostics;
       console.log("STUDIO_NATIVE_SEMANTIC_COLORS_CHROMIUM",
         JSON.stringify(semanticRendering));
