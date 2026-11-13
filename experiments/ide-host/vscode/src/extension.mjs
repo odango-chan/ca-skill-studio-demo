@@ -500,7 +500,10 @@ export function activate(context){
       const pythonColumn=(await waitForPrimary(python.uri)).viewColumn;
       // Use a saved, temporary ordinary YAML file rather than an Untitled
       // buffer so the acceptance cleanup never opens an unsaved-changes dialog.
-      const yamlUri=firstRoot.with({path:firstRoot.path+"/.studio-editor-group-acceptance.yaml"});
+      const projectRoot=firstRoot.with({
+        path:firstRoot.path.replace(/\\/skills\\/[^/]+$/,"")
+      });
+      const yamlUri=projectRoot.with({path:projectRoot.path+"/.studio-editor-group-acceptance.yaml"});
       await vscode.workspace.fs.writeFile(yamlUri,
         new TextEncoder().encode("kind: editor-group-acceptance\\n"));
       const yamlDocument=await vscode.workspace.openTextDocument(yamlUri);
