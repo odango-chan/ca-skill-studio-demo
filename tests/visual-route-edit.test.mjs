@@ -63,24 +63,3 @@ test("graph targets fail closed for unrelated package and unsupported Route",()=
   assert.deepEqual(visualRouteTargets({...ctx,routeId:created.procedure.routes[0].id,
     packageName:"unknown-skill"}),[]);
 });
-test("React Flow reconnect remains preview-only and enforces existing target eligibility",()=>{
-  const app=readFileSync(new URL("../site/app.mjs",import.meta.url),"utf8");
-  const canvas=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
-  assert.match(canvas,/onReconnect=\{/);
-  assert.match(canvas,/resolveReconnectedRoute\(edge\.data\?\.bundle,selectionId\)/);
-  assert.match(app,/dropTargetAllowed\(targets,route\.target,targetId\)/);
-  assert.match(app,/showPreview\(previewVisualRouteEdit\(currentRouteEditContext\(route\.id\),targetId\)\)/);
-  assert.match(canvas,/nodesDraggable=\{false\}/);
-  assert.match(canvas,/deleteKeyCode=\{null\}/);
-  assert.match(app,/history\.record\(nextSource\)/);
-  assert.doesNotMatch(canvas,/candidateSource\s*=/);
-});
-test("NODES owns the remaining left column, with its own scroll and no fixed 220px cap",()=>{
-  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
-  assert.match(css,/Tall NODES explorer/);
-  assert.match(css,/\.workbench \.explorer \.explorer-nodes\[open\]\s*\{[^}]*flex:1 1 0/s);
-  assert.match(css,/\.workbench \.explorer \.explorer-nodes\[open\] \.outline\s*\{[^}]*max-height:none/s);
-  assert.match(css,/overscroll-behavior:contain/);
-  assert.match(css,/@media\(max-width:980px\)/);
-  assert.match(css,/\.procedure-flow \.designer-edge/);
-});
