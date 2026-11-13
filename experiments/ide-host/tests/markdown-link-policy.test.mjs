@@ -15,12 +15,17 @@ test("native Markdown permits only exact inventoried Package-relative targets",(
   const files=new Set([
     "SKILL.md",
     "references/guide.md",
+    "references/alternate.markdown",
     "references/3gpp-procedure.md",
     "assurance/procedure.yaml",
     "scripts/select.py"
   ]);
   assert.equal(isAllowedPackageRelativeLink("../SKILL.md","references",files),true);
   assert.equal(isAllowedPackageRelativeLink("references/3gpp-procedure.md","",files),true);
+  assert.equal(isAllowedPackageRelativeLink("references/alternate.markdown","",files),true,
+    "the alternate registered Markdown extension is inventoried and navigable");
+  assert.equal(isAllowedPackageRelativeLink("references/guide.mdx","",files),false,
+    "unsupported extensions remain outside the Package link allowlist");
   assert.equal(isAllowedPackageRelativeLink("../assurance/procedure.yaml","references",files),true);
   assert.equal(isAllowedPackageRelativeLink("../scripts/select.py","references",files),true);
   assert.equal(isAllowedPackageRelativeLink("../../outside.md","references",files),false);
@@ -50,9 +55,11 @@ test("native Markdown Package inventory fails closed outside exact SKILL.md root
 test("native Markdown Package inventory rejects symlinked roots and descendants",async()=>{
   const root="/workspace/skills/demo";
   const source=uri(root+"/references/guide.md");
+  const alternateMarkdown=uri(root+"/references/alternate.markdown");
   const files=[
     uri(root+"/SKILL.md"),
     source,
+    alternateMarkdown,
     uri(root+"/assurance/procedure.yaml")
   ];
   const directories=new Set([
@@ -73,6 +80,8 @@ test("native Markdown Package inventory rejects symlinked roots and descendants"
     }
   });
   assert.equal(await prepareNativeMarkdownPackagePolicy(makeVscode(null),source),true);
+  assert.equal(await prepareNativeMarkdownPackagePolicy(makeVscode(null),alternateMarkdown),true,
+    ".markdown files are accepted as native Markdown Package sources");
   assert.equal(await prepareNativeMarkdownPackagePolicy(makeVscode(root),source),false,
     "a symlinked Package root is rejected");
   assert.equal(await prepareNativeMarkdownPackagePolicy(
