@@ -2714,26 +2714,31 @@ export function registerWorkbench(vscode,context){
       const markdownCommands=await vscode.commands.getCommands(true);
       if(!markdownCommands.includes('markdown.showPreviewToSide'))
         throw Error('Built-in Markdown extension activated without registering markdown.showPreviewToSide');
-      // If the Source was opened from the right editor group, move that
-      // existing tab back to the first group before showing it there. Calling
-      // showTextDocument(uri, { viewColumn: One }) alone can leave a second
-      // Source tab in the original group in Theia, producing Source+Preview
-      // together on the right even though a left-side Source also exists.
+      // Keep Source as the editable authority in the first editor group.
+      // Theia can retain the original right-group Source tab when the same
+      // document is shown in column one. Move the active tab when supported,
+      // then explicitly close any remaining duplicate Source tabs outside the
+      // first group. This is safe because the first-group Source is already
+      // visible and is the one authoritative editable document.
       const activeSource=vscode.window.activeTextEditor;
       if(activeSource?.document?.uri?.toString()===key&&
          activeSource.viewColumn!==vscode.ViewColumn.One){
         try{
           await vscode.commands.executeCommand('workbench.action.moveEditorToFirstGroup');
-        }catch{
-          // Hosts without the native move command retain their existing layout;
-          // do not create another editor copy as a fallback.
-        }
+        }catch{/* Tab-group cleanup below is the deterministic fallback. */}
       }
-      // Keep Source as the editable authority in the first editor group.
-      // The built-in Markdown extension owns the read-only Preview in group two.
       await vscode.window.showTextDocument(doc,{
         viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:false
       });
+      const tabGroups=vscode.window.tabGroups;
+      if(typeof tabGroups?.close==='function'&&Array.isArray(tabGroups.all)){
+        const duplicateSourceTabs=tabGroups.all
+          .filter(group=>group.viewColumn!==vscode.ViewColumn.One)
+          .flatMap(group=>group.tabs??[])
+          .filter(tab=>tab.input?.uri?.toString?.()===key);
+        if(duplicateSourceTabs.length)
+          await tabGroups.close(duplicateSourceTabs,true);
+      }
       // Resolve the exact Skill Package root, inventory local files, and reject
       // symlinked targets before the native Markdown engine renders any links.
       const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,uri);
