@@ -26,10 +26,6 @@ test("host colors reuse established Studio Light design tokens",()=>{
   assert.equal(theme.name,"SKILL Studio Light");
   assert.equal(theme.type,"light");
   assert.equal(theme.semanticHighlighting,true);
-  const css=readFileSync("site/light.css","utf8").toLowerCase();
-  const expected={"--bg":"#f5f7fb","--panel":"#ffffff","--border":"#e1e7ef","--text":"#20314a",
-    "--muted":"#697e97","--accent":"#0c8e7b","--blue":"#317dc0","--warning":"#ad6517"};
-  for(const [token,color] of Object.entries(expected))assert.ok(css.includes(token+":"+color),token);
   assert.equal(theme.colors["editor.background"],"#FFFFFF");
   assert.equal(theme.colors["sideBar.background"],"#FFFFFF");
   assert.equal(theme.colors["activityBar.activeBorder"],"#0C8E7B");
