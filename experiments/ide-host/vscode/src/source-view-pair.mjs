@@ -43,8 +43,9 @@ export async function openSourceViewPair(vscode,uri,{line}={}) {
   const position=new vscode.Position(safeLine-1,0);
   const selection=new vscode.Range(position,position);
   if(!viewType) {
-    await openNativeSource(vscode,uri,{viewColumn:vscode.ViewColumn.One,
-      preserveFocus:false,preview:false,selection});
+    await vscode.window.showTextDocument(document,{
+      viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false,selection
+    });
     return {uri:uri.toString(),viewType:null,sourceColumn:vscode.ViewColumn.One,
       visualColumn:null,line:safeLine};
   }
