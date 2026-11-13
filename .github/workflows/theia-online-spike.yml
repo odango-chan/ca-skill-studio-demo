@@ -48,6 +48,8 @@ jobs:
         run: npm run build --prefix experiments/ide-host/theia-online
       - name: Prepare same-origin Webview assets for static demo preview
         run: node experiments/ide-host/scripts/prepare-theia-static-preview.mjs
+      - name: Apply SKILL Studio menu branding
+        run: node experiments/ide-host/scripts/prepare-theia-brand.mjs experiments/ide-host/theia-online/lib/frontend
       - name: Inventory generated frontend and bundled web plugin
         run: |
           find experiments/ide-host/theia-online/lib -maxdepth 5 -type f -name 'index.html' -o -name 'list.json' | head -40
