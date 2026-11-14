@@ -147,8 +147,10 @@ function validate(manifest){
       fail("Missing required "+skill+" package files");
   return manifest;
 }
-export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{resetExisting=false}={}){
+export async function seedExampleWorkspace(vscode,extensionUri,storageUri,
+  {resetExisting=false,onProgress=()=>{}}={}){
   let phase="initial";
+  const report=event=>{if(typeof onProgress==="function")onProgress(event);};
   try{
   if(!vscode?.workspace?.fs||!vscode.Uri?.file||!vscode.Uri.joinPath)
     fail("Host file system unavailable");
@@ -157,6 +159,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
   const extensionInfo=describeUri(extensionUri);
   const manifestInfo=describeUri(manifestUri);
   phase="read-bundled-manifest";
+  report({phase:"manifest"});
   let manifestBytes;
   try{
     manifestBytes=await readBundledResource(vscode,manifestUri);
@@ -167,6 +170,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
   }
   const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
   const files=manifest.files;
+  report({phase:"files",completed:0,total:files.length});
   // The actual folder basename must be the project name: Theia 1.76
   // ignores WorkspaceFolder.name passed to updateWorkspaceFolders().
   if(!storageUri)fail("No writable extension storage URI");
@@ -209,7 +213,11 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
     catch(error){
       if(error?.code!=="FileNotFound")throw error;
     }
-    if(exists&&!resetExisting){skipped++;continue;}
+    if(exists&&!resetExisting){
+      skipped++;
+      report({phase:"files",completed:created+skipped+overwritten,total:files.length});
+      continue;
+    }
     const source=vscode.Uri.joinPath(extensionUri,...SRC,...segments);
     phase="read-bundled-file:"+file;
     const bytes=await readBundledResource(vscode,source);
@@ -226,8 +234,10 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,{reset
     phase="write-file:"+file;
     await fileSystem.writeFile(destination,bytes);
     if(exists)overwritten++;else created++;
+    report({phase:"files",completed:created+skipped+overwritten,total:files.length});
   }
   phase="workspace-update-confirmation";
+  report({phase:"workspace"});
   const workspaceUpdated=await exposeWorkspaceRoot(vscode.workspace,root,[
     legacyRoot,legacySkillsRoot
   ]);
