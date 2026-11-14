@@ -146,6 +146,8 @@ test("SKILL Studio adds one native Theia top-level menu with real extension comm
   const css=buildSkillStudioBrandCss();
   const script=buildSkillStudioBrandScript();
   assert.match(css,/\.lm-MenuBar-item:first-child/);
+  assert.match(css,/\.theia-preload\.theia-hidden\s*\{\s*pointer-events:none;/,
+    "An invisible startup preload cannot intercept trusted native menu clicks");
   assert.doesNotMatch(css,/\.skill-studio-brand-label|linear-gradient/);
   assert.match(script,/MenuModelRegistry/);
   assert.match(script,/registerMenuAction/);
