@@ -5,8 +5,14 @@ import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 
 export function buildSkillStudioBrandCss(){
-  return `/* The first top-level item is the real Theia menu model contribution.
-   * Style only its native Lumino title; never add a separate branded button. */
+  return `/* Theia 1.76 fades out its preload overlay before removing it.
+   * Once it is marked hidden, never let that transparent overlay intercept
+   * real menu clicks during the final transition frame. */
+.theia-preload.theia-hidden{
+  pointer-events:none;
+}
+/* The first top-level item is the real Theia menu model contribution.
+ * Style only its native Lumino title; never add a separate branded button. */
 .lm-MenuBar{
   min-width:0;
 }
