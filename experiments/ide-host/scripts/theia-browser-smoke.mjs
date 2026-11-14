@@ -273,6 +273,42 @@ try{
     ariaLabels:[...document.querySelectorAll('[aria-label]')].slice(0,25).map(x=>x.getAttribute('aria-label')),
     title:document.title
   })`);
+  // First-run UI acceptance: no implicit import, and the native Explorer
+  // exposes the three project actions rather than an empty workbench.
+  const welcome=await evalJS(`(()=>{
+    const explorer=document.querySelector('.theia-Files');
+    const text=explorer?.innerText??'';
+    return {text:text.slice(0,1800),
+      noWorkspace:document.body.classList.contains('theia-no-open-workspace'),
+      hasNew:/New Project|新建项目/.test(text),
+      hasOpen:/Open Project|打开项目/.test(text),
+      hasExample:/Open Example Project|打开示例项目/.test(text)};
+  })()`);
+  console.log('STUDIO_FIRST_RUN_WELCOME_CHROMIUM',JSON.stringify(welcome));
+  if(!welcome.hasNew||!welcome.hasOpen||!welcome.hasExample)
+    throw Error('The first-run Explorer did not render the native project welcome actions: '+
+      JSON.stringify(welcome));
+  // Verify the user-facing Help menu, not only the manifest's command entries.
+  const helpPosition=await evalJS(`(()=>{
+    const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='Help');
+    if(!item)return null;
+    const r=item.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  if(!helpPosition)throw Error('Native Help menu is unavailable');
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",...helpPosition});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",...helpPosition,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",...helpPosition,button:"left",clickCount:1});
+  await sleep(350);
+  const helpItems=await evalJS(`[...document.querySelectorAll('.lm-Menu')]
+    .filter(x=>getComputedStyle(x).display!=='none')
+    .map(x=>x.innerText).join('\\n')`);
+  console.log('STUDIO_HELP_MENU_CHROMIUM',JSON.stringify(helpItems));
+  if(!helpItems.includes('Skill Language Specification')||
+     !helpItems.includes('Authoring Guide'))
+    throw Error('Native Help menu is missing the authoritative Skill documentation: '+helpItems);
+  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:390,y:270,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:390,y:270,button:"left",clickCount:1});
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"F1",code:"F1",windowsVirtualKeyCode:112});
