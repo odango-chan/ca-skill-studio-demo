@@ -68,7 +68,8 @@ export function buildSkillStudioBrandScript(){
     const commands=container.get(commandsKey);
     // Wait for the real VS Code extension commands. Missing commands must not
     // result in an empty or misleading menu that appears to have succeeded.
-    if(!actions.every(([, , id])=>commands.getCommand(id)))return false;
+    if(!actions.every(([, , id])=>
+      commands.getCommand(id)&&commands.isVisible(id)))return false;
     const menus=container.get(menuKey);
     const root=menus.getMenuNode(["menubar"]);
     if(root?.children?.some(node=>node.id===TOP[1])){
