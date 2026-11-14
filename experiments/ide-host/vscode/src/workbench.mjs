@@ -2474,17 +2474,36 @@ export function registerWorkbench(vscode,context){
     try{
       const base=doc.uri.with({path:doc.uri.path.slice(0,-'assurance/procedure.yaml'.length)});
       // Bounded by file count and aggregate bytes; never crawl another Package.
-      const found=await vscode.workspace.findFiles(new vscode.RelativePattern(base,'**/*'),'**/node_modules/**',501);
-      if(found.length>500)throw Error('Package exceeds 500-file audit limit');
-      let bytes=0;
-      for(const uri of found){
-        if(!uri.path.startsWith(base.path))continue;
-        const path=uri.path.slice(base.path.length);uris.set(path,uri);
-        if(!/\.(yaml|json|py|md)$/.test(path)){files.set(path,{text:''});continue;}
-        const open=vscode.workspace.textDocuments.find(d=>d.uri.toString()===uri.toString());
-        const text=open?open.getText():new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
-        bytes+=text.length;if(bytes>4*MAX_SOURCE_BYTES)throw Error('Package exceeds 4 MiB audit limit');
-        files.set(path,{text});
+      // OPFS may expose a just-written file in findFiles before it can be
+      // read, especially while Source edits and Package Language snapshots
+      // overlap. Retry the whole bounded inventory only for transient ENOENT;
+      // a genuinely missing core file still fails closed below.
+      for(let attempt=0;attempt<3;attempt++){
+        try{
+          const found=await vscode.workspace.findFiles(
+            new vscode.RelativePattern(base,'**/*'),'**/node_modules/**',501);
+          if(found.length>500)throw Error('Package exceeds 500-file audit limit');
+          files.clear();uris.clear();
+          let bytes=0;
+          for(const uri of found){
+            if(!uri.path.startsWith(base.path))continue;
+            const path=uri.path.slice(base.path.length);uris.set(path,uri);
+            if(!/\.(yaml|json|py|md)$/.test(path)){files.set(path,{text:''});continue;}
+            const open=vscode.workspace.textDocuments.find(d=>
+              d.uri.toString()===uri.toString());
+            const text=open?open.getText():new TextDecoder().decode(
+              await vscode.workspace.fs.readFile(uri));
+            bytes+=text.length;
+            if(bytes>4*MAX_SOURCE_BYTES)throw Error('Package exceeds 4 MiB audit limit');
+            files.set(path,{text});
+          }
+          break;
+        }catch(error){
+          if(ticket!==generation||document!==doc||doc.version!==version)return;
+          if(!/ENOENT|EntryNotFound|FileNotFound/.test(String(error?.message??error))||
+             attempt===2)throw error;
+          await new Promise(resolve=>setTimeout(resolve,100*(attempt+1)));
+        }
       }
       const required=['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml'];
       const missing=required.filter(p=>!files.has(p));
@@ -2761,7 +2780,10 @@ export function registerWorkbench(vscode,context){
         viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:false
       });
       const tabGroups=vscode.window.tabGroups;
-      if(typeof tabGroups?.close==='function'&&Array.isArray(tabGroups.all)){
+      // Theia can prompt to save a dirty Source when closing a duplicate
+      // tab even though the same TextDocument remains open in column One.
+      // Never trigger a destructive save dialog as part of auto-pairing.
+      if(!doc.isDirty&&typeof tabGroups?.close==='function'&&Array.isArray(tabGroups.all)){
         const duplicateSourceTabs=tabGroups.all
           .filter(group=>group.viewColumn!==vscode.ViewColumn.One)
           .flatMap(group=>group.tabs??[])
