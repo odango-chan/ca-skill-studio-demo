@@ -327,6 +327,28 @@ try{
     .filter(x=>getComputedStyle(x).display!=='none')
     .map(x=>x.innerText).join('\\n')`);
   console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',JSON.stringify(studioMenuItems));
+  const studioMenuModel=await evalJS(`(()=>{
+    const c=window.theia?.container;
+    const all=[...(c?._bindingDictionary?._map?.keys?.()??[])];
+    const mk=all.find(k=>typeof k==='function'&&k.prototype?.registerSubmenu&&
+      k.prototype?.registerMenuAction&&k.prototype?.getMenuNode);
+    const ck=all.find(k=>typeof k==='function'&&k.prototype?.getCommand&&
+      k.prototype?.executeCommand&&k.prototype?.registerCommand);
+    if(!mk||!ck)return {registry:false,commandRegistry:false};
+    const menu=c.get(mk),commands=c.get(ck);
+    const node=menu.getMenuNode(['menubar','00_skill_studio']);
+    const children=(node?.children??[]).flatMap(group=>
+      (group.children??[]).map(action=>({id:action.id,label:action.label,
+        visible:commands.isVisible(action.id),enabled:commands.isEnabled(action.id)})));
+    return {registry:true,topLabel:node?.label,topKind:node?.constructor?.name,
+      groups:node?.children?.map(n=>({id:n.id,kind:n.constructor?.name,
+        childCount:n.children?.length})),children,
+      uiMenus:[...document.querySelectorAll('.lm-Menu')].map(n=>({
+        className:n.className,text:n.innerText.slice(0,1200),
+        display:getComputedStyle(n).display}))};
+  })()`);
+  console.log('STUDIO_NATIVE_MENU_MODEL_CHROMIUM',JSON.stringify(studioMenuModel));
+
   for(const label of ['New Project','Open Project','Open Example Project',
     'Skill Language Specification','Authoring Guide'])
     if(!studioMenuItems.includes(label))
