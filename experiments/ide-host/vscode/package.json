@@ -218,6 +218,10 @@
       }
     ],
     "menus": {
+      "menubar/help": [
+        {"command": "skillStudio.openLanguageSpec", "group": "navigation@90"},
+        {"command": "skillStudio.openAuthoringGuide", "group": "navigation@91"}
+      ],
       "editor/title": [],
       "explorer/context": [
         {
