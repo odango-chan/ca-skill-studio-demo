@@ -109,7 +109,8 @@ const enableTargetSession=async(sessionId,targetInfo)=>{
 };
 const evalJS=async expression=>{
   const data=await command("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});
-  if(data.exceptionDetails)throw Error("Chromium evaluate: "+data.exceptionDetails.text);
+  if(data.exceptionDetails)throw Error("Chromium evaluate: "+
+    (data.exceptionDetails.exception?.description??data.exceptionDetails.text));
   return data.result?.value;
 };
 try{
@@ -223,11 +224,11 @@ try{
       nativeStudioMenu:(()=>{
         const bar=document.querySelector('[id="theia:menubar"].lm-MenuBar');
         const items=[...(bar?.querySelectorAll('.lm-MenuBar-item')??[])]
-          .map(node=>node.innerText.trim());
+          .map(node=>String(node.textContent??'').trim());
         return {
           present:items[0]==="SKILL Studio",
           items,
-          registryState:document.documentElement.dataset.skillStudioNativeMenu??null,
+          registryState:document.documentElement?.dataset?.skillStudioNativeMenu??null,
           stylesheet:Boolean(document.querySelector("#skill-studio-brand-theme")?.sheet),
           duplicateBrand:!!bar?.querySelector('.skill-studio-brand')
         };
@@ -323,30 +324,29 @@ try{
   await command("Input.dispatchMouseEvent",{type:"mousePressed",...studioMenuPosition,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",...studioMenuPosition,button:"left",clickCount:1});
   await sleep(400);
-  const studioMenuItems=await evalJS(`[...document.querySelectorAll('.lm-Menu')]
+  const pointerMenuItems=await evalJS(`[...document.querySelectorAll('.lm-Menu,.p-Menu')]
     .filter(x=>getComputedStyle(x).display!=='none')
     .map(x=>x.innerText).join('\\n')`);
-  console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',JSON.stringify(studioMenuItems));
-  const studioMenuModel=await evalJS(`(()=>{
-    const c=window.theia?.container;
-    const all=[...(c?._bindingDictionary?._map?.keys?.()??[])];
-    const mk=all.find(k=>typeof k==='function'&&k.prototype?.registerSubmenu&&
-      k.prototype?.registerMenuAction&&k.prototype?.getMenuNode);
-    const ck=all.find(k=>typeof k==='function'&&k.prototype?.getCommand&&
-      k.prototype?.executeCommand&&k.prototype?.registerCommand);
-    if(!mk||!ck)return {registry:false,commandRegistry:false};
-    const menu=c.get(mk),commands=c.get(ck);
-    const node=menu.getMenuNode(['menubar','00_skill_studio']);
-    const children=(node?.children??[]).flatMap(group=>
-      (group.children??[]).map(action=>({id:action.id,label:action.label,
-        visible:commands.isVisible(action.id),enabled:commands.isEnabled(action.id)})));
-    return {registry:true,topLabel:node?.label,topKind:node?.constructor?.name,
-      groups:node?.children?.map(n=>({id:n.id,kind:n.constructor?.name,
-        childCount:n.children?.length})),children,
-      uiMenus:[...document.querySelectorAll('.lm-Menu')].map(n=>({
-        className:n.className,text:n.innerText.slice(0,1200),
-        display:getComputedStyle(n).display}))};
+  // Theia 1.76 exposes an official native MenuBarWidget.activateMenu API.
+  // CDP mouse events do not consistently open Lumino menus when a Webview
+  // editor owns focus; use the native API to test model -> real popup rendering.
+  const activatedStudioMenu=await evalJS(`(async()=>{
+    const c=window.theia.container;
+    const shellKey=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);
+    if(!shellKey)throw Error('Theia ApplicationShell is missing for native menu acceptance');
+    const bar=c.get(shellKey).topPanel.widgets.find(w=>w.id==='theia:menubar');
+    if(!bar?.activateMenu)throw Error('Theia native MenuBarWidget is unavailable');
+    const popup=await bar.activateMenu('SKILL Studio');
+    return {items:popup.items.map(item=>({
+        label:item.label,type:item.type,enabled:item.isEnabled
+      })),visible:!!popup.node?.isConnected,
+      nativeMenuBar:true};
   })()`);
+  console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',JSON.stringify({
+    pointerMenuItems,activatedStudioMenu
+  }));
+  const studioMenuItems=activatedStudioMenu?.items?.map(item=>item.label).join('\n')??'';
   console.log('STUDIO_NATIVE_MENU_MODEL_CHROMIUM',JSON.stringify(studioMenuModel));
 
   for(const label of ['New Project','Open Project','Open Example Project',
