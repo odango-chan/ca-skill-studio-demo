@@ -30,8 +30,8 @@ export function registerProjectWelcome(vscode,context){
     newProject:"New Project",openProject:"Open Project",example:"Open Example Project",
     reference:"Documentation",spec:"Skill Language Specification",guide:"Authoring Guide"
   };
-  function show(){
-    if((vscode.workspace.workspaceFolders??[]).length)return;
+  function show({explicit=false}={}){
+    if(!explicit&&(vscode.workspace.workspaceFolders??[]).length)return;
     // Unit-test harnesses and lightweight VS Code-compatible hosts may omit
     // this UI API; production Theia/VS Code supplies the native panel.
     if(typeof vscode.window.createWebviewPanel!=="function")return;
@@ -94,7 +94,7 @@ document.querySelectorAll("[data-action]").forEach(el=>
     });
     panel.onDidDispose(()=>{events.dispose();panel=null;});
   }
-  context.subscriptions.push(vscode.commands.registerCommand("skillStudio.showWelcome",show));
+  context.subscriptions.push(vscode.commands.registerCommand("skillStudio.showWelcome",()=>show({explicit:true})));
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(()=>{
     if((vscode.workspace.workspaceFolders??[]).length){
       panel?.dispose();panel=null;
