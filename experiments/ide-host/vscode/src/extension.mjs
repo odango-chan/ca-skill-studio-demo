@@ -15,6 +15,7 @@ function newNonce(){
 import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
 import {exposeWorkspaceRoot,seedExampleWorkspace} from "./sample-loader.mjs";
+import {registerProjectWelcome} from "./project-welcome.mjs";
 
 import {extendMarkdownIt} from "./markdown-link-policy.mjs";
 import {registerWorkbench} from "./workbench.mjs";
@@ -510,6 +511,9 @@ export function activate(context){
         groups,visibleEditors,maxViewColumn,
         pythonColumn,ordinaryYamlColumn};
     }));
+  // A real empty-workspace editor page is required: Theia currently does not
+  // render Explorer viewsWelcome without a workspace folder.
+  registerProjectWelcome(vscode,context);
   return {extendMarkdownIt};
 }
 export function deactivate(){}
