@@ -25,5 +25,25 @@
     "establish-pdu-session/scripts/evaluate_transfer_start.py",
     "establish-pdu-session/scripts/evaluate_udm_read.py",
     "establish-pdu-session/scripts/select_establishment_configuration.py"
-  ]
+  ],
+  "blobs": {
+    "establish-pdu-session-mas/SKILL.md": "3892ee80e4042a34e607e08972b3c179ed6bd8e5",
+    "establish-pdu-session-mas/assurance/contract.yaml": "13451f50cda6feaf1235e2a3d98b77b20cab2879",
+    "establish-pdu-session-mas/assurance/predicates.yaml": "1752edce5e9dd4d4b76656e9d29a995403e07c28",
+    "establish-pdu-session-mas/assurance/procedure.yaml": "57746cffc6e55d2943489a7f00fb7c7f5a386976",
+    "establish-pdu-session-mas/schemas/establishment-request.schema.yaml": "c8027b6f9625949302900fa170ad59fec3b4a8f7",
+    "establish-pdu-session/SKILL.md": "085fd02432bde2908e5bd6f653af8a5ee75f0086",
+    "establish-pdu-session/assurance/contract.yaml": "51534c331100353af2d33f48d02e7422271c370d",
+    "establish-pdu-session/assurance/predicates.yaml": "c0ad54dd349bf75616445e1ccdcb157b66e69997",
+    "establish-pdu-session/assurance/procedure.yaml": "512d9649f8db1a5862f36e4a77c3c60612a14e6e",
+    "establish-pdu-session/references/3gpp-procedure.md": "d70148210dcd6ea7a7ddebbb1ffcba34e2bb33b3",
+    "establish-pdu-session/references/failure-handling.md": "02f1d6caf84f1f8dc29684ec07d90a805b9f81e0",
+    "establish-pdu-session/references/session-selection.md": "341a29272ee5b593760b5ee8632ac7c9e7508105",
+    "establish-pdu-session/schemas/establishment-request.schema.yaml": "c8027b6f9625949302900fa170ad59fec3b4a8f7",
+    "establish-pdu-session/scripts/build_n1n2_delivery.py": "304ad3e0621c96b41104c53016ff3fc1fd61a02d",
+    "establish-pdu-session/scripts/build_pcf_policy_inputs.py": "a7dc684e2eec2ad955fc82bf06179412995bc0a8",
+    "establish-pdu-session/scripts/evaluate_transfer_start.py": "de98d8403e871060eb2ddc8b8c551b900b9deed2",
+    "establish-pdu-session/scripts/evaluate_udm_read.py": "b6df8b68471cfa4555690b1f95ec0a18767db5f1",
+    "establish-pdu-session/scripts/select_establishment_configuration.py": "22a301a390fb84d1a68e176c6e8d1031b6ae0f1e"
+  }
 }

@@ -194,7 +194,11 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.ok(semanticLegend.tokenTypes.includes("skillOperator"));
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
-    const snapshot=samplePackageSnapshot();
+    const snapshot={...samplePackageSnapshot(),dependencySchemas:[
+      {dependencyId:"host",path:"host.schema.json",text:'{"title":"HostContextInput"}'},
+      {dependencyId:"host",path:"duplicate.schema.json",text:'{"title":"DuplicateInput"}'},
+      {dependencyId:"tools",path:"duplicate.schema.json",text:'{"title":"DuplicateInput"}'}
+    ]};
     // Register for READY before posting the snapshot. Semantic token requests
     // below are intentionally answered early, so READY can otherwise arrive
     // while the test is still awaiting those responses.
@@ -335,6 +339,12 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     });
     assert.ok(schemaCompletion.some(item=>item.label==="EstablishmentSelectionInput"));
     assert.ok(schema.uri.endsWith("selection-input.schema.yaml"));
+    const projectSchemas=await lspRequest(worker,30,"textDocument/completion",{
+      textDocument:{uri:script.uri},
+      position:positionOf(script.text,schemaNeedle,"# inputSchema: ".length)
+    });
+    assert.ok(projectSchemas.some(item=>item.label==="HostContextInput"));
+    assert.ok(!projectSchemas.some(item=>item.label==="DuplicateInput"));
 
     // Exact local ranges do not override the Package completeness gate.
     worker.postMessage({
@@ -411,6 +421,11 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
     const snapshot=currentV02PackageSnapshot();
+    snapshot.dependencyOperations=[
+      {id:"sbi.udm.sm_data.get.next",dependencyId:"udm"},
+      {id:"sbi.udm.sm_data.get.duplicate",dependencyId:"udm"},
+      {id:"sbi.udm.sm_data.get.duplicate",dependencyId:"other"}
+    ];
     const ready=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===snapshot.rootUri&&
@@ -463,6 +478,12 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.equal(operationDefinition.uri,tools.uri,
       "Operation references resolve only to an imported ToolCatalog declaration");
 
+    const operationCompletion=await lspRequest(worker,399,"textDocument/completion",{
+      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,operationName,operationName.length)
+    });
+    assert.ok(operationCompletion.some(item=>item.label===operationName+".next"));
+    assert.ok(!operationCompletion.some(item=>item.label===operationName+".duplicate"));
+
     const predicateHover=await lspRequest(worker,306,"textDocument/hover",{
       textDocument:{uri:procedure.uri},position:positionOf(procedure.text,predicateName)
     });
@@ -507,6 +528,23 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       textDocument:{uri:contract.uri},position:positionOf(contract.text,entryName)
     });
     assert.equal(blocked,null);
+
+    const locked=currentV02PackageSnapshot(3);
+    locked.documents=locked.documents.filter(item=>item.uri!==tools.uri);
+    const location={
+      uri:"skill-studio-dependency:/udm/example/tool-contract.json",
+      range:{start:{line:4,character:13},end:{line:4,character:31}}
+    };
+    locked.dependencyOperations=[{id:operationName,dependencyId:"udm",location}];
+    const lockedReady=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===snapshot.rootUri&&
+      message.params?.generation===3,15000);
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:locked});
+    await lockedReady;
+    assert.deepEqual(await lspRequest(worker,400,"textDocument/definition",{
+      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,operationName)
+    }),location);
   }finally{
     await worker.terminate();
   }

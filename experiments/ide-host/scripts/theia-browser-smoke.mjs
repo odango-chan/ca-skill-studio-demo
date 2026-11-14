@@ -109,7 +109,8 @@ const enableTargetSession=async(sessionId,targetInfo)=>{
 };
 const evalJS=async expression=>{
   const data=await command("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});
-  if(data.exceptionDetails)throw Error("Chromium evaluate: "+data.exceptionDetails.text);
+  if(data.exceptionDetails)throw Error("Chromium evaluate: "+
+    (data.exceptionDetails.exception?.description??data.exceptionDetails.text));
   return data.result?.value;
 };
 try{
@@ -220,22 +221,16 @@ try{
         return {fontLoaded:document.fonts.check("16px codicon"),
           activityIcons:icons.length,glyphs};
       })(),
-      brand:(()=>{
-        const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
-        const bar=brand?.parentElement;
-        const menuContent=bar&&Array.from(bar.children).find(child=>
-          child.classList.contains("lm-MenuBar-content")
-        );
-        const a=brand?.getBoundingClientRect();
-        const b=menuContent?.getBoundingClientRect();
-        const nativeMenus=menuContent?(menuContent.textContent||"").replace(/\\s+/g," ").trim():"";
+      nativeStudioMenu:(()=>{
+        const bar=document.querySelector('[id="theia:menubar"].lm-MenuBar');
+        const items=[...(bar?.querySelectorAll('.lm-MenuBar-item')??[])]
+          .map(node=>String(node.textContent??'').trim());
         return {
-          present:Boolean(brand),
-          label:brand?.querySelector(".skill-studio-brand-label")?.textContent.trim()||"",
+          present:items[0]==="SKILL Studio",
+          items,
+          registryState:document.documentElement?.dataset?.skillStudioNativeMenu??null,
           stylesheet:Boolean(document.querySelector("#skill-studio-brand-theme")?.sheet),
-          beforeNativeMenus:Boolean(brand&&menuContent&&brand.nextElementSibling===menuContent),
-          sameRow:Boolean(a&&b)&&Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2)<3,
-          nativeMenus
+          duplicateBrand:!!bar?.querySelector('.skill-studio-brand')
         };
       })(),
       widgets:document.querySelectorAll(".lm-Widget").length,
@@ -245,8 +240,10 @@ try{
       errors:document.querySelectorAll(".theia-error").length
     })`);
     if(view?.appShell&&view.widgets>4&&view.bodyLength>15&&
-       view.brand?.present&&view.brand.nativeMenus.includes("File")&&
-       view.brand.nativeMenus.includes("Edit"))break;
+       view.nativeStudioMenu?.present&&
+       view.nativeStudioMenu.registryState==="ready"&&
+       view.nativeStudioMenu.items.includes("File")&&
+       view.nativeStudioMenu.items.includes("Edit"))break;
     await sleep(150);
   }
   const shellReadyMs=performance.now()-navigatedAt;
@@ -273,6 +270,90 @@ try{
     ariaLabels:[...document.querySelectorAll('[aria-label]')].slice(0,25).map(x=>x.getAttribute('aria-label')),
     title:document.title
   })`);
+  // Theia does not render built-in Explorer viewsWelcome without a folder.
+  // Inspect the real first-run Webview editor in a live Chromium frame.
+  let welcome=null;
+  for(let attempt=0;attempt<50&&!welcome;attempt++){
+    const tree=await command('Page.getFrameTree');
+    const frames=[];
+    const walk=node=>{if(!node)return;frames.push(node.frame);
+      for(const child of node.childFrames??[])walk(child);};
+    walk(tree.frameTree);
+    for(const frame of frames.filter(item=>
+      item.url.includes('/webview/index.html')||item.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'studio-welcome-check',
+          grantUniveralAccess:true
+        });
+        const response=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:`(()=>{
+            const actions=[...document.querySelectorAll('[data-action]')]
+              .map(el=>({action:el.dataset.action,text:el.innerText}));
+            const button=document.querySelector('[data-action="example"]');
+            const rect=button?.getBoundingClientRect();
+            return {title:document.title,actions,
+              visible:!!rect&&rect.width>0&&rect.height>0};
+          })()`
+        });
+        const probe=response.result?.value;
+        if(probe?.actions?.some(item=>item.action==='example')){
+          welcome={...probe,frameUrl:frame.url};break;
+        }
+      }catch{/* Webview may be loading; inspect the next frame. */}
+    }
+    if(!welcome)await sleep(150);
+  }
+  console.log('STUDIO_FIRST_RUN_WELCOME_CHROMIUM',JSON.stringify(welcome));
+  const actions=new Set(welcome?.actions?.map(item=>item.action)??[]);
+  if(!welcome?.visible||!['newProject','openProject','example','spec','guide']
+    .every(action=>actions.has(action)))
+    throw Error('The first-run welcome editor did not render all project actions: '+
+      JSON.stringify(welcome));
+  // Open the actual Theia/Lumino native SKILL Studio top-level menu.
+  const studioMenuPosition=await evalJS(`(()=>{
+    const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>
+      x.innerText.trim()==='SKILL Studio');
+    if(!item)return null;
+    const r=item.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  if(!studioMenuPosition)throw Error('Native SKILL Studio top-level menu is unavailable');
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",...studioMenuPosition});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",...studioMenuPosition,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",...studioMenuPosition,button:"left",clickCount:1});
+  await sleep(400);
+  const pointerMenuItems=await evalJS(`[...document.querySelectorAll('.lm-Menu,.p-Menu')]
+    .filter(x=>getComputedStyle(x).display!=='none')
+    .map(x=>x.innerText).join('\\n')`);
+  // Inspect the real native Lumino widget without waiting for a CDP-driven
+  // popup reveal, which is unreliable when a sandboxed Webview owns focus.
+  const nativeStudioMenuWidget=await evalJS(`(()=>{
+    const c=window.theia.container;
+    const shellKey=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);
+    if(!shellKey)throw Error('Theia ApplicationShell is missing for native menu acceptance');
+    const bar=c.get(shellKey).topPanel.widgets.find(w=>w.id==='theia:menubar');
+    if(!bar?.menus)throw Error('Theia native MenuBarWidget is unavailable');
+    const menu=bar.menus.find(item=>item.title.label==='SKILL Studio');
+    if(!menu)throw Error('Studio menu is missing from native MenuBarWidget');
+    return {nativeMenuBar:true,
+      titles:bar.menus.map(item=>item.title.label),
+      items:menu.items.map(item=>({label:item.label,type:item.type,
+        enabled:item.isEnabled})),
+      menuNodeAttached:!!menu.node?.isConnected,
+      activeMenu:bar.activeMenu?.title?.label??null};
+  })()`);
+  console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',
+    JSON.stringify({pointerMenuItems,nativeStudioMenuWidget}));
+  const studioMenuItems=nativeStudioMenuWidget?.items?.map(item=>item.label).join('\n')??'';
+  for(const label of ['New Project','Open Project','Open Example Project',
+    'Skill Language Specification','Authoring Guide'])
+    if(!studioMenuItems.includes(label))
+      throw Error('Native Studio menu missing '+label+': '+studioMenuItems);
+  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:390,y:270,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:390,y:270,button:"left",clickCount:1});
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"F1",code:"F1",windowsVirtualKeyCode:112});
@@ -341,24 +422,19 @@ try{
     text:document.body.innerText.slice(-1050)
   })`);
   const loadExampleRow=await evalJS(`(()=>{
-    const node=[...document.querySelectorAll('.monaco-list-row')].find(x=>x.innerText.includes('SKILL Studio: Load Example'));
+    const node=[...document.querySelectorAll('.monaco-list-row')].find(x=>x.innerText.includes('SKILL Studio: Open Example Project'));
     if(!node)return null;const r=node.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2,text:node.innerText};
   })()`);
-  // The browser-only Pages demo must auto-load on first entry. The normal
-  // backend Theia host is not the public demo, so exercise its explicit command.
-  if(externalUrl){
-    if(!loadExampleRow)
-      throw Error("Theia backend host does not expose the explicit Load Example command");
-    await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:loadExampleRow.x,y:loadExampleRow.y});
-    await command("Input.dispatchMouseEvent",{type:"mousePressed",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
-    await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
-    await sleep(350);
-  }
+  if(!loadExampleRow)
+    throw Error("Theia does not expose the explicit Open Example Project command");
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:loadExampleRow.x,y:loadExampleRow.y});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
+  await sleep(350);
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
-  // Public Pages proves automatic loading; backend Theia proves the explicit
-  // import command. Both must end with a confirmed workspace and 5GC Procedure.
+  // Both hosts must confirm the explicitly opened workspace and 5GC Procedure.
   let exampleLoadReady=false;
   for(let attempt=0;attempt<100;attempt++){
     exampleLoadReady=await evalJS(`[...document.querySelectorAll(
@@ -378,7 +454,7 @@ try{
       explorer:document.querySelector('.theia-Files')?.innerText??'',
       body:document.body.innerText.slice(-1600)
     })`);
-    throw Error("The default online workspace did not auto-open its project and 5GC Procedure: "+
+    throw Error("The explicit example import did not open its project and 5GC Procedure: "+
       JSON.stringify(startupDiagnostics).slice(0,3200));
   }
   const afterImport=await evalJS(`(async()=>{
@@ -1726,30 +1802,27 @@ try{
   if(!view?.nativeCodicons?.fontLoaded||view.nativeCodicons.glyphs<1)
     throw Error("Native Theia Codicon font did not render shell controls: "+
       JSON.stringify(view?.nativeCodicons).slice(0,1200));
-  if(!view?.brand?.present||!view.brand.stylesheet||
-     !view.brand.beforeNativeMenus||!view.brand.sameRow||
-     view.brand.label!=="SKILL Studio"||
-     !view.brand.nativeMenus.includes("File")||
-     !view.brand.nativeMenus.includes("Edit"))
-    throw Error("SKILL Studio brand must share the native File/Edit menu row: "+
-      JSON.stringify(view?.brand));
+  const nativeMenu=view?.nativeStudioMenu;
+  if(!nativeMenu?.present||!nativeMenu.stylesheet||nativeMenu.duplicateBrand||
+     nativeMenu.registryState!=="ready"||
+     nativeMenu.items.filter(label=>label==="SKILL Studio").length!==1||
+     !nativeMenu.items.includes("File")||!nativeMenu.items.includes("Edit"))
+    throw Error("Studio must be exactly one native top-level menu alongside File/Edit: "+
+      JSON.stringify(nativeMenu));
   await command("Emulation.setDeviceMetricsOverride",{
     width:640,height:900,deviceScaleFactor:1,mobile:false
   });
-  const narrowBrand=await evalJS(`(()=>{
-    const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
-    const label=brand?.querySelector(".skill-studio-brand-label");
-    const mark=brand?.querySelector(".skill-studio-brand-mark");
-    return {
-      present:Boolean(brand),
-      labelDisplay:label?getComputedStyle(label).display:"missing",
-      markVisible:Boolean(mark)&&getComputedStyle(mark).display!=="none"&&mark.getBoundingClientRect().width>0
-    };
+  const narrowMenu=await evalJS(`(()=>{
+    const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>
+      x.innerText.trim()==='SKILL Studio');
+    const r=item?.getBoundingClientRect();
+    return {present:!!item,visible:!!r&&r.width>0&&r.height>0,
+      label:item?.innerText.trim()??null};
   })()`);
   await command("Emulation.clearDeviceMetricsOverride");
-  if(!narrowBrand.present||narrowBrand.labelDisplay!=="none"||!narrowBrand.markVisible)
-    throw Error("SKILL Studio brand did not compact cleanly on narrow screens: "+
-      JSON.stringify(narrowBrand));
+  if(!narrowMenu.present||!narrowMenu.visible)
+    throw Error("Native SKILL Studio menu is not visible on narrow screens: "+
+      JSON.stringify(narrowMenu));
   console.log("STUDIO_STATUS_BAR_CHROMIUM",JSON.stringify(afterImport.statusBar));
   if(!afterImport.statusBar||
      !["rgb(245, 247, 251)","rgb(229, 246, 239)"].includes(

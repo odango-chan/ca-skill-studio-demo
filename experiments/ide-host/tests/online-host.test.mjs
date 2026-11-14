@@ -73,10 +73,20 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     "Theia must not bypass the native Source-first pairing flow with forced CustomEditor associations");
   assert.ok(plugin.activationEvents.includes("onStartupFinished"),
     "first-run demo discovery must activate on startup");
-  assert.ok(plugin.contributes.viewsWelcome?.some(x=>
-    x.view==="workbench.explorer.fileView"&&
-    x.contents.includes("command:skillStudio.loadExample")),
-    "Explorer empty state must offer the demo project");
+  const welcome=plugin.contributes.viewsWelcome?.find(x=>
+    x.view==="workbench.explorer.fileView");
+  assert.equal(welcome?.when,"workspaceFolderCount == 0");
+  const locale=JSON.parse(readFileSync(join(root,
+    "plugins/odango-chan.ca-skill-studio-ide-spike/package.nls.json"),"utf8"));
+  const content=locale[welcome.contents.slice(1,-1)];
+  for(const command of ["newProject","openProject","loadExample"])
+    assert.ok(content.includes("command:skillStudio."+command),command);
+  for(const command of ["openLanguageSpec","openAuthoringGuide"]){
+    assert.ok(content.includes("command:skillStudio."+command),command);
+    assert.ok(plugin.contributes.commands.some(entry=>
+      entry.command==="skillStudio."+command),
+      "Documentation must remain a native extension command: "+command);
+  }
   assert.ok(plugin.contributes.menus?.["view/title"]?.some(x=>
     x.command==="skillStudio.loadExample"),
     "Explorer title toolbar must expose the demo project");
@@ -132,22 +142,22 @@ test("Theia bundles offline YAML and Python TextMate grammars independently of L
   assert.ok(statSync(join(rootSyntax,"LICENSE.txt")).size>500);
 });
 
-test("SKILL Studio wordmark sits beside the native menu list and compacts on narrow screens",async()=>{
+test("SKILL Studio adds one native Theia top-level menu with real extension commands",async()=>{
   const css=buildSkillStudioBrandCss();
   const script=buildSkillStudioBrandScript();
-  assert.match(css,/\.lm-MenuBar\.skill-studio-branded/);
-  assert.match(css,/\.lm-MenuBar-content/);
-  assert.match(css,/linear-gradient\(145deg,#dcf8ef,#b8e6de\)/);
-  assert.match(css,/@media\(max-width:760px\)/);
-  assert.match(css,/\.skill-studio-brand-label\{display:none\}/);
-  assert.doesNotMatch(css,/\.lm-MenuBar-item/);
-  assert.match(script,/document\.querySelectorAll\(BAR_SELECTOR\)/);
-  assert.match(script,/\[id="theia:menubar"\]/);
-  assert.match(script,/bar\.insertBefore\(brand,content\)/);
-  assert.match(script,/label\.textContent = "SKILL Studio"/);
-  assert.match(script,/new MutationObserver\(mount\)/);
-  assert.doesNotMatch(script,/content\.appendChild|addEventListener\(["']click/);
-
+  assert.match(css,/\.lm-MenuBar-item:first-child/);
+  assert.doesNotMatch(css,/\.skill-studio-brand-label|linear-gradient/);
+  assert.match(script,/MenuModelRegistry/);
+  assert.match(script,/registerMenuAction/);
+  assert.match(script,/registerSubmenu\(TOP,"SKILL Studio"/);
+  assert.match(script,/\["menubar","00_skill_studio"\]/);
+  for(const id of ["showWelcome","newProject","openProject","loadExample",
+    "selectProjectRoot","refreshPackages","addDependency",
+    "auditPackage","openLanguageSpec","openAuthoringGuide"])
+    assert.ok(script.includes('"skillStudio.'+id+'"'),"Native menu lacks "+id);
+  assert.doesNotMatch(script,/createElement\("div"\)|addEventListener\("click"/);
+  assert.ok(script.includes('commands.getCommand(id)'),
+    "Native menu must wait for real registered extension commands");
   const temp=await mkdtemp(join(tmpdir(),"theia-brand-"));
   try{
     await writeFile(join(temp,"index.html"),
@@ -159,7 +169,7 @@ test("SKILL Studio wordmark sits beside the native menu list and compacts on nar
     assert.equal((html.match(/id="skill-studio-brand-script"/g)||[]).length,1);
     assert.match(html,/href="\.\/skill-studio-brand\.css"/);
     assert.match(html,/src="\.\/skill-studio-brand\.js"/);
-    assert.ok(first.cssBytes>500);
+    assert.ok(first.cssBytes>150);
     assert.ok(first.scriptBytes>500);
     assert.equal(first.cssBytes,second.cssBytes);
     assert.equal(first.scriptBytes,second.scriptBytes);

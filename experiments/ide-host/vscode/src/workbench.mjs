@@ -32,6 +32,8 @@ import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
   previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
   from '../../../../site/phase-named-verify.mjs';
 import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export.mjs';
+import {resolveLockedDependencies} from "./dependency-service.mjs";
+import {decodeBase64} from "./dependency-snapshot.mjs";
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 import {
   collectSkillSemanticTokenSpans,
@@ -44,7 +46,7 @@ import {createSemanticTokenDecorationRenderer}
 import {createPackageLanguageLifecycle}
   from "./package-language-lifecycle.mjs";
 
-export function registerWorkbench(vscode,context){
+export function registerWorkbench(vscode,context,{prepareToolContract}={}){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer,
     lastSelectionMessage=null;
@@ -335,6 +337,57 @@ export function registerWorkbench(vscode,context){
       );
       if(state.disposed||ticket!==state.ticket){
         if(strict)throw Error("Package refresh was superseded during snapshot collection");
+        return null;
+      }
+      const folder=vscode.workspace.getWorkspaceFolder?.(state.procedureDocument.uri);
+      if(folder){
+        const resolved=await resolveLockedDependencies(vscode,folder.uri);
+        const schemas=[];
+        const operations=[];
+        const decoder=new TextDecoder();
+        for(const dependency of resolved.snapshots){
+          if(dependency.kind==="tool-catalog"){
+            const file=dependency.files.find(item=>item.path==="tool-contract.json");
+            if(file){
+              try{
+                const contract=JSON.parse(decoder.decode(decodeBase64(file.bytes)));
+                if(contract.apiVersion==="skillc.tool/v0.1"&&Array.isArray(contract.operations)){
+                  const text=JSON.stringify(contract,null,2);
+                  const uri=prepareToolContract?.(dependency,text)?.toString();
+                  const prefix='\n      "id": ';
+                  for(const item of contract.operations){
+                    if(typeof item?.id!=="string")continue;
+                    const literal=JSON.stringify(item.id);
+                    const offset=text.indexOf(prefix+literal);
+                    const line=offset<0?0:text.slice(0,offset).split("\n").length;
+                    const character=prefix.length;
+                    const location=uri&&offset>=0?{uri,range:{
+                      start:{line,character},
+                      end:{line,character:character+literal.length-2}
+                    }}:undefined;
+                    operations.push({id:item.id,dependencyId:dependency.id,location});
+                  }
+                }
+              }catch(error){
+                console.warn("Cannot read locked Tool contract",dependency.id,error);
+              }
+            }
+          }
+          if(dependency.kind!=="schema-bundle")continue;
+          for(const file of dependency.files){
+            if(!/\.schema\.(?:json|ya?ml)$/.test(file.path))continue;
+            schemas.push({
+              dependencyId:dependency.id,
+              path:file.path,
+              text:decoder.decode(decodeBase64(file.bytes))
+            });
+          }
+        }
+        snapshot.dependencySchemas=schemas;
+        snapshot.dependencyOperations=operations;
+      }
+      if(state.disposed||ticket!==state.ticket){
+        if(strict)throw Error("Package refresh was superseded during dependency resolution");
         return null;
       }
       const client=await ensureLanguageClient();

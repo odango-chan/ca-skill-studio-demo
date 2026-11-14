@@ -43,7 +43,7 @@ await writeFile(indexPath,indexHtml);
 // Explicitly stage the read-only sample package and Webview media beside it.
 const pluginSource=resolve("experiments/ide-host/theia-online/plugins/odango-chan.ca-skill-studio-ide-spike");
 const pluginTarget=join(root,"hostedPlugin","odango_chan_ca_skill_studio_ide_spike");
-for(const name of ["samples","media","icons"]){
+for(const name of ["samples","media","icons","l10n","package.nls.json","package.nls.zh-cn.json"]){
   await cp(join(pluginSource,name),join(pluginTarget,name),{recursive:true,force:true});
 }
 for(const required of [
