@@ -387,6 +387,27 @@ try{
         text:n.textContent?.slice(0,300)??''}))};
   })()`);
   console.log('STUDIO_NATIVE_MENU_POINTER_AFTER_CHROMIUM',JSON.stringify(pointerAfter));
+  // Regression gate: use CDP's browser-trusted pointer events against the
+  // actual top-level item, and require a real attached Lumino popup. A menu
+  // registry snapshot alone cannot establish user clickability.
+  const trustedClick=pointerAfter.events?.some(event=>
+    event.type==='click'&&event.trusted===true&&
+    event.text.includes('SKILL Studio'));
+  const trustedPointerDown=pointerAfter.events?.some(event=>
+    event.type==='pointerdown'&&event.trusted===true&&
+    event.text.includes('SKILL Studio'));
+  const popupVisible=pointerAfter.attached===true&&
+    pointerAfter.activeMenu==='SKILL Studio'&&
+    pointerAfter.childMenu==='SKILL Studio'&&
+    pointerAfter.menuNodes?.some(node=>node.display!=='none'&&
+      node.text.includes('New Project')&&
+      node.text.includes('Open Example Project')&&
+      node.text.includes('Skill Language Specification'));
+  if(!pointerHitBefore.insideItem||pointerHitBefore.pointerEvents==='none'||
+     !trustedPointerDown||!trustedClick||!popupVisible)
+    throw Error('Native Studio menu did not open from a trusted user pointer click: '+
+      JSON.stringify({pointerHitBefore,pointerAfter}));
+
   console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',
     JSON.stringify({pointerMenuItems,nativeStudioMenuWidget}));
   const studioMenuItems=nativeStudioMenuWidget?.items?.map(item=>item.label).join('\n')??'';
