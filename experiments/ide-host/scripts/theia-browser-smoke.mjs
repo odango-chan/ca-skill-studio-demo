@@ -275,8 +275,6 @@ try{
   })`);
   // Theia does not render built-in Explorer viewsWelcome without a folder.
   // Inspect the real first-run Webview editor in a live Chromium frame.
-  const welcomeTab=await evalJS(`[...document.querySelectorAll('.lm-TabBar-tab')]
-    .some(tab=>tab.innerText.includes('SKILL Studio Welcome'))`);
   let welcome=null;
   for(let attempt=0;attempt<50&&!welcome;attempt++){
     const tree=await command('Page.getFrameTree');
@@ -296,7 +294,10 @@ try{
           expression:`(()=>{
             const actions=[...document.querySelectorAll('[data-action]')]
               .map(el=>({action:el.dataset.action,text:el.innerText}));
-            return {title:document.title,actions};
+            const button=document.querySelector('[data-action="example"]');
+            const rect=button?.getBoundingClientRect();
+            return {title:document.title,actions,
+              visible:!!rect&&rect.width>0&&rect.height>0};
           })()`
         });
         const probe=response.result?.value;
@@ -307,13 +308,12 @@ try{
     }
     if(!welcome)await sleep(150);
   }
-  console.log('STUDIO_FIRST_RUN_WELCOME_CHROMIUM',
-    JSON.stringify({tabVisible:welcomeTab,...welcome}));
+  console.log('STUDIO_FIRST_RUN_WELCOME_CHROMIUM',JSON.stringify(welcome));
   const actions=new Set(welcome?.actions?.map(item=>item.action)??[]);
-  if(!welcomeTab||!['newProject','openProject','example','spec','guide']
+  if(!welcome?.visible||!['newProject','openProject','example','spec','guide']
     .every(action=>actions.has(action)))
     throw Error('The first-run welcome editor did not render all project actions: '+
-      JSON.stringify({tabVisible:welcomeTab,welcome}));
+      JSON.stringify(welcome));
   // Verify the user-facing Help menu, not only the manifest's command entries.
   const helpPosition=await evalJS(`(()=>{
     const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='Help');
