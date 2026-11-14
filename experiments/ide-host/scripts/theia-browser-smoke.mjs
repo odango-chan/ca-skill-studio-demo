@@ -327,27 +327,27 @@ try{
   const pointerMenuItems=await evalJS(`[...document.querySelectorAll('.lm-Menu,.p-Menu')]
     .filter(x=>getComputedStyle(x).display!=='none')
     .map(x=>x.innerText).join('\\n')`);
-  // Theia 1.76 exposes an official native MenuBarWidget.activateMenu API.
-  // CDP mouse events do not consistently open Lumino menus when a Webview
-  // editor owns focus; use the native API to test model -> real popup rendering.
-  const activatedStudioMenu=await evalJS(`(async()=>{
+  // Inspect the real native Lumino widget without waiting for a CDP-driven
+  // popup reveal, which is unreliable when a sandboxed Webview owns focus.
+  const nativeStudioMenuWidget=await evalJS(`(()=>{
     const c=window.theia.container;
     const shellKey=[...c._bindingDictionary._map.keys()].find(k=>
       typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);
     if(!shellKey)throw Error('Theia ApplicationShell is missing for native menu acceptance');
     const bar=c.get(shellKey).topPanel.widgets.find(w=>w.id==='theia:menubar');
-    if(!bar?.activateMenu)throw Error('Theia native MenuBarWidget is unavailable');
-    const popup=await bar.activateMenu('SKILL Studio');
-    return {items:popup.items.map(item=>({
-        label:item.label,type:item.type,enabled:item.isEnabled
-      })),visible:!!popup.node?.isConnected,
-      nativeMenuBar:true};
+    if(!bar?.menus)throw Error('Theia native MenuBarWidget is unavailable');
+    const menu=bar.menus.find(item=>item.title.label==='SKILL Studio');
+    if(!menu)throw Error('Studio menu is missing from native MenuBarWidget');
+    return {nativeMenuBar:true,
+      titles:bar.menus.map(item=>item.title.label),
+      items:menu.items.map(item=>({label:item.label,type:item.type,
+        enabled:item.isEnabled})),
+      menuNodeAttached:!!menu.node?.isConnected,
+      activeMenu:bar.activeMenu?.title?.label??null};
   })()`);
-  console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',JSON.stringify({
-    pointerMenuItems,activatedStudioMenu
-  }));
-  const studioMenuItems=activatedStudioMenu?.items?.map(item=>item.label).join('\n')??'';
-
+  console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',
+    JSON.stringify({pointerMenuItems,nativeStudioMenuWidget}));
+  const studioMenuItems=nativeStudioMenuWidget?.items?.map(item=>item.label).join('\n')??'';
   for(const label of ['New Project','Open Project','Open Example Project',
     'Skill Language Specification','Authoring Guide'])
     if(!studioMenuItems.includes(label))
