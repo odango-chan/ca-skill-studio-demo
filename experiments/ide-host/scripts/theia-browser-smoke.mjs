@@ -320,6 +320,32 @@ try{
     return {x:r.left+r.width/2,y:r.top+r.height/2};
   })()`);
   if(!studioMenuPosition)throw Error('Native SKILL Studio top-level menu is unavailable');
+  const pointerHitBefore=await evalJS(`(()=>{
+    const item=[...document.querySelectorAll('.lm-MenuBar-item')]
+      .find(node=>node.innerText.trim()==='SKILL Studio');
+    const r=item?.getBoundingClientRect();
+    const x=r?.left+r?.width/2,y=r?.top+r?.height/2;
+    const hit=document.elementFromPoint(x,y);
+    window.__studioMenuEvents=[];
+    for(const type of ['pointerdown','pointerup','mousedown','mouseup','click']){
+      document.addEventListener(type,event=>{
+        if(window.__studioMenuEvents.length>=30)return;
+        window.__studioMenuEvents.push({
+          type:event.type,trusted:event.isTrusted,
+          target:String(event.target?.className??'').slice(0,160),
+          text:String(event.target?.textContent??'').slice(0,100),
+          x:event.clientX,y:event.clientY
+        });
+      },{capture:true});
+    }
+    return {rect:{x:r?.x,y:r?.y,width:r?.width,height:r?.height},
+      targetTag:hit?.tagName??null,targetClass:String(hit?.className??''),
+      targetText:String(hit?.textContent??'').slice(0,120),
+      insideItem:!!(hit&&item?.contains(hit)),
+      pointerEvents:item?getComputedStyle(item).pointerEvents:null};
+  })()`);
+  console.log('STUDIO_NATIVE_MENU_POINTER_HIT_CHROMIUM',JSON.stringify(pointerHitBefore));
+
   await command("Input.dispatchMouseEvent",{type:"mouseMoved",...studioMenuPosition});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",...studioMenuPosition,button:"left",clickCount:1});
   await command("Input.dispatchMouseEvent",{type:"mouseReleased",...studioMenuPosition,button:"left",clickCount:1});
@@ -345,6 +371,22 @@ try{
       menuNodeAttached:!!menu.node?.isConnected,
       activeMenu:bar.activeMenu?.title?.label??null};
   })()`);
+  const pointerAfter=await evalJS(`(()=>{
+    const c=window.theia?.container;
+    const keys=[...(c?._bindingDictionary?._map?.keys?.()??[])];
+    const shellKey=keys.find(k=>typeof k==='function'&&
+      k.prototype?.activateWidget&&k.prototype?.addWidget);
+    const bar=shellKey?c.get(shellKey).topPanel.widgets.find(w=>w.id==='theia:menubar'):null;
+    const popup=bar?.childMenu??null;
+    return {events:window.__studioMenuEvents??[],
+      activeMenu:bar?.activeMenu?.title?.label??null,
+      childMenu:popup?.title?.label??null,
+      attached:!!popup?.node?.isConnected,
+      menuNodes:[...document.querySelectorAll('.lm-Menu,.p-Menu')].map(n=>({
+        className:n.className,display:getComputedStyle(n).display,
+        text:n.textContent?.slice(0,300)??''}))};
+  })()`);
+  console.log('STUDIO_NATIVE_MENU_POINTER_AFTER_CHROMIUM',JSON.stringify(pointerAfter));
   console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',
     JSON.stringify({pointerMenuItems,nativeStudioMenuWidget}));
   const studioMenuItems=nativeStudioMenuWidget?.items?.map(item=>item.label).join('\n')??'';
