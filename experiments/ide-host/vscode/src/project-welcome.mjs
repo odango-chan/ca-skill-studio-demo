@@ -32,6 +32,9 @@ export function registerProjectWelcome(vscode,context){
   };
   function show(){
     if((vscode.workspace.workspaceFolders??[]).length)return;
+    // Unit-test harnesses and lightweight VS Code-compatible hosts may omit
+    // this UI API; production Theia/VS Code supplies the native panel.
+    if(typeof vscode.window.createWebviewPanel!=="function")return;
     if(panel){panel.reveal(vscode.ViewColumn.One);return;}
     panel=vscode.window.createWebviewPanel(
       "skillStudio.welcome","SKILL Studio Welcome",vscode.ViewColumn.One,
