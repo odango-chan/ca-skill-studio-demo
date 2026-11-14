@@ -273,21 +273,47 @@ try{
     ariaLabels:[...document.querySelectorAll('[aria-label]')].slice(0,25).map(x=>x.getAttribute('aria-label')),
     title:document.title
   })`);
-  // First-run UI acceptance: no implicit import, and the native Explorer
-  // exposes the three project actions rather than an empty workbench.
-  const welcome=await evalJS(`(()=>{
-    const explorer=document.querySelector('.theia-Files');
-    const text=explorer?.innerText??'';
-    return {text:text.slice(0,1800),
-      noWorkspace:document.body.classList.contains('theia-no-open-workspace'),
-      hasNew:/New Project|新建项目/.test(text),
-      hasOpen:/Open Project|打开项目/.test(text),
-      hasExample:/Open Example Project|打开示例项目/.test(text)};
-  })()`);
-  console.log('STUDIO_FIRST_RUN_WELCOME_CHROMIUM',JSON.stringify(welcome));
-  if(!welcome.hasNew||!welcome.hasOpen||!welcome.hasExample)
-    throw Error('The first-run Explorer did not render the native project welcome actions: '+
-      JSON.stringify(welcome));
+  // Theia does not render built-in Explorer viewsWelcome without a folder.
+  // Inspect the real first-run Webview editor in a live Chromium frame.
+  const welcomeTab=await evalJS(`[...document.querySelectorAll('.lm-TabBar-tab')]
+    .some(tab=>tab.innerText.includes('SKILL Studio Welcome'))`);
+  let welcome=null;
+  for(let attempt=0;attempt<50&&!welcome;attempt++){
+    const tree=await command('Page.getFrameTree');
+    const frames=[];
+    const walk=node=>{if(!node)return;frames.push(node.frame);
+      for(const child of node.childFrames??[])walk(child);};
+    walk(tree.frameTree);
+    for(const frame of frames.filter(item=>
+      item.url.includes('/webview/index.html')||item.url.includes('.webview.'))){
+      try{
+        const world=await command('Page.createIsolatedWorld',{
+          frameId:frame.id,worldName:'studio-welcome-check',
+          grantUniveralAccess:true
+        });
+        const response=await command('Runtime.evaluate',{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:`(()=>{
+            const actions=[...document.querySelectorAll('[data-action]')]
+              .map(el=>({action:el.dataset.action,text:el.innerText}));
+            return {title:document.title,actions};
+          })()`
+        });
+        const probe=response.result?.value;
+        if(probe?.actions?.some(item=>item.action==='example')){
+          welcome={...probe,frameUrl:frame.url};break;
+        }
+      }catch{/* Webview may be loading; inspect the next frame. */}
+    }
+    if(!welcome)await sleep(150);
+  }
+  console.log('STUDIO_FIRST_RUN_WELCOME_CHROMIUM',
+    JSON.stringify({tabVisible:welcomeTab,...welcome}));
+  const actions=new Set(welcome?.actions?.map(item=>item.action)??[]);
+  if(!welcomeTab||!['newProject','openProject','example','spec','guide']
+    .every(action=>actions.has(action)))
+    throw Error('The first-run welcome editor did not render all project actions: '+
+      JSON.stringify({tabVisible:welcomeTab,welcome}));
   // Verify the user-facing Help menu, not only the manifest's command entries.
   const helpPosition=await evalJS(`(()=>{
     const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='Help');
