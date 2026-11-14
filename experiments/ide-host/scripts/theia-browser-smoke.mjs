@@ -220,22 +220,16 @@ try{
         return {fontLoaded:document.fonts.check("16px codicon"),
           activityIcons:icons.length,glyphs};
       })(),
-      brand:(()=>{
-        const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
-        const bar=brand?.parentElement;
-        const menuContent=bar&&Array.from(bar.children).find(child=>
-          child.classList.contains("lm-MenuBar-content")
-        );
-        const a=brand?.getBoundingClientRect();
-        const b=menuContent?.getBoundingClientRect();
-        const nativeMenus=menuContent?(menuContent.textContent||"").replace(/\\s+/g," ").trim():"";
+      nativeStudioMenu:(()=>{
+        const bar=document.querySelector('[id="theia:menubar"].lm-MenuBar');
+        const items=[...(bar?.querySelectorAll('.lm-MenuBar-item')??[])]
+          .map(node=>node.innerText.trim());
         return {
-          present:Boolean(brand),
-          label:brand?.querySelector(".skill-studio-brand-label")?.textContent.trim()||"",
+          present:items[0]==="SKILL Studio",
+          items,
+          registryState:document.documentElement.dataset.skillStudioNativeMenu??null,
           stylesheet:Boolean(document.querySelector("#skill-studio-brand-theme")?.sheet),
-          beforeNativeMenus:Boolean(brand&&menuContent&&brand.nextElementSibling===menuContent),
-          sameRow:Boolean(a&&b)&&Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2)<3,
-          nativeMenus
+          duplicateBrand:!!bar?.querySelector('.skill-studio-brand')
         };
       })(),
       widgets:document.querySelectorAll(".lm-Widget").length,
@@ -245,8 +239,10 @@ try{
       errors:document.querySelectorAll(".theia-error").length
     })`);
     if(view?.appShell&&view.widgets>4&&view.bodyLength>15&&
-       view.brand?.present&&view.brand.nativeMenus.includes("File")&&
-       view.brand.nativeMenus.includes("Edit"))break;
+       view.nativeStudioMenu?.present&&
+       view.nativeStudioMenu.registryState==="ready"&&
+       view.nativeStudioMenu.items.includes("File")&&
+       view.nativeStudioMenu.items.includes("Edit"))break;
     await sleep(150);
   }
   const shellReadyMs=performance.now()-navigatedAt;
@@ -314,25 +310,27 @@ try{
     .every(action=>actions.has(action)))
     throw Error('The first-run welcome editor did not render all project actions: '+
       JSON.stringify(welcome));
-  // Verify the user-facing Help menu, not only the manifest's command entries.
-  const helpPosition=await evalJS(`(()=>{
-    const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>x.innerText.trim()==='Help');
+  // Open the actual Theia/Lumino native SKILL Studio top-level menu.
+  const studioMenuPosition=await evalJS(`(()=>{
+    const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>
+      x.innerText.trim()==='SKILL Studio');
     if(!item)return null;
     const r=item.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2};
   })()`);
-  if(!helpPosition)throw Error('Native Help menu is unavailable');
-  await command("Input.dispatchMouseEvent",{type:"mouseMoved",...helpPosition});
-  await command("Input.dispatchMouseEvent",{type:"mousePressed",...helpPosition,button:"left",clickCount:1});
-  await command("Input.dispatchMouseEvent",{type:"mouseReleased",...helpPosition,button:"left",clickCount:1});
-  await sleep(350);
-  const helpItems=await evalJS(`[...document.querySelectorAll('.lm-Menu')]
+  if(!studioMenuPosition)throw Error('Native SKILL Studio top-level menu is unavailable');
+  await command("Input.dispatchMouseEvent",{type:"mouseMoved",...studioMenuPosition});
+  await command("Input.dispatchMouseEvent",{type:"mousePressed",...studioMenuPosition,button:"left",clickCount:1});
+  await command("Input.dispatchMouseEvent",{type:"mouseReleased",...studioMenuPosition,button:"left",clickCount:1});
+  await sleep(400);
+  const studioMenuItems=await evalJS(`[...document.querySelectorAll('.lm-Menu')]
     .filter(x=>getComputedStyle(x).display!=='none')
     .map(x=>x.innerText).join('\\n')`);
-  console.log('STUDIO_HELP_MENU_CHROMIUM',JSON.stringify(helpItems));
-  if(!helpItems.includes('Skill Language Specification')||
-     !helpItems.includes('Authoring Guide'))
-    throw Error('Native Help menu is missing the authoritative Skill documentation: '+helpItems);
+  console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',JSON.stringify(studioMenuItems));
+  for(const label of ['New Project','Open Project','Open Example Project',
+    'Skill Language Specification','Authoring Guide'])
+    if(!studioMenuItems.includes(label))
+      throw Error('Native Studio menu missing '+label+': '+studioMenuItems);
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:390,y:270,button:"left",clickCount:1});
@@ -1783,30 +1781,27 @@ try{
   if(!view?.nativeCodicons?.fontLoaded||view.nativeCodicons.glyphs<1)
     throw Error("Native Theia Codicon font did not render shell controls: "+
       JSON.stringify(view?.nativeCodicons).slice(0,1200));
-  if(!view?.brand?.present||!view.brand.stylesheet||
-     !view.brand.beforeNativeMenus||!view.brand.sameRow||
-     view.brand.label!=="SKILL Studio"||
-     !view.brand.nativeMenus.includes("File")||
-     !view.brand.nativeMenus.includes("Edit"))
-    throw Error("SKILL Studio brand must share the native File/Edit menu row: "+
-      JSON.stringify(view?.brand));
+  const nativeMenu=view?.nativeStudioMenu;
+  if(!nativeMenu?.present||!nativeMenu.stylesheet||nativeMenu.duplicateBrand||
+     nativeMenu.registryState!=="ready"||
+     nativeMenu.items.filter(label=>label==="SKILL Studio").length!==1||
+     !nativeMenu.items.includes("File")||!nativeMenu.items.includes("Edit"))
+    throw Error("Studio must be exactly one native top-level menu alongside File/Edit: "+
+      JSON.stringify(nativeMenu));
   await command("Emulation.setDeviceMetricsOverride",{
     width:640,height:900,deviceScaleFactor:1,mobile:false
   });
-  const narrowBrand=await evalJS(`(()=>{
-    const brand=document.querySelector('[id="theia:menubar"].lm-MenuBar > .skill-studio-brand');
-    const label=brand?.querySelector(".skill-studio-brand-label");
-    const mark=brand?.querySelector(".skill-studio-brand-mark");
-    return {
-      present:Boolean(brand),
-      labelDisplay:label?getComputedStyle(label).display:"missing",
-      markVisible:Boolean(mark)&&getComputedStyle(mark).display!=="none"&&mark.getBoundingClientRect().width>0
-    };
+  const narrowMenu=await evalJS(`(()=>{
+    const item=[...document.querySelectorAll('.lm-MenuBar-item')].find(x=>
+      x.innerText.trim()==='SKILL Studio');
+    const r=item?.getBoundingClientRect();
+    return {present:!!item,visible:!!r&&r.width>0&&r.height>0,
+      label:item?.innerText.trim()??null};
   })()`);
   await command("Emulation.clearDeviceMetricsOverride");
-  if(!narrowBrand.present||narrowBrand.labelDisplay!=="none"||!narrowBrand.markVisible)
-    throw Error("SKILL Studio brand did not compact cleanly on narrow screens: "+
-      JSON.stringify(narrowBrand));
+  if(!narrowMenu.present||!narrowMenu.visible)
+    throw Error("Native SKILL Studio menu is not visible on narrow screens: "+
+      JSON.stringify(narrowMenu));
   console.log("STUDIO_STATUS_BAR_CHROMIUM",JSON.stringify(afterImport.statusBar));
   if(!afterImport.statusBar||
      !["rgb(245, 247, 251)","rgb(229, 246, 239)"].includes(
