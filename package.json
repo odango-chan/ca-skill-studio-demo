@@ -7,7 +7,7 @@
     "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.language.json",
     "test:e4:native": "node scripts/e4-native-accept.mjs",
-    "test:plugin-managed": "node --test experiments/ide-host/tests/sample-loader.test.mjs experiments/ide-host/tests/project-configuration.test.mjs experiments/ide-host/tests/dependency-snapshot.test.mjs experiments/ide-host/tests/contract-acquisition.test.mjs experiments/ide-host/tests/dependency-service.test.mjs experiments/ide-host/tests/package-explorer.test.mjs experiments/ide-host/tests/plugin-views.test.mjs"
+    "test:plugin-managed": "node --test experiments/ide-host/tests/sample-loader.test.mjs experiments/ide-host/tests/project-configuration.test.mjs experiments/ide-host/tests/dependency-snapshot.test.mjs experiments/ide-host/tests/contract-acquisition.test.mjs experiments/ide-host/tests/dependency-service.test.mjs experiments/ide-host/tests/package-explorer.test.mjs experiments/ide-host/tests/plugin-views.test.mjs experiments/ide-host/tests/project-welcome.test.mjs"
   },
   "dependencies": {
     "@xyflow/react": "12.12.0",
