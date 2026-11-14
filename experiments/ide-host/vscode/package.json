@@ -55,7 +55,8 @@
     "onCommand:skillStudio.refreshDependency",
     "onCommand:skillStudio.updateDependencyLock",
     "onCommand:skillStudio.removeDependency",
-    "onCommand:skillStudio.inspectDependencyContract"
+    "onCommand:skillStudio.inspectDependencyContract",
+    "onCommand:skillStudio.showWelcome"
   ],
   "contributes": {
     "colors": [
@@ -71,6 +72,10 @@
       }
     ],
     "commands": [
+      {
+        "command": "skillStudio.showWelcome",
+        "title": "%project.welcome.title%"
+      },
       {
         "command": "skillStudio.newProject",
         "title": "%project.new%"
@@ -218,10 +223,6 @@
       }
     ],
     "menus": {
-      "menubar/help": [
-        {"command": "skillStudio.openLanguageSpec", "group": "navigation@90"},
-        {"command": "skillStudio.openAuthoringGuide", "group": "navigation@91"}
-      ],
       "editor/title": [],
       "explorer/context": [
         {
