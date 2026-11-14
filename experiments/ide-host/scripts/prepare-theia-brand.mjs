@@ -5,135 +5,103 @@ import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 
 export function buildSkillStudioBrandCss(){
-  return `/* SKILL Studio wordmark in the native Theia menu-bar row. */
-.lm-MenuBar.skill-studio-branded{
+  return \`/* The first top-level item is the real Theia menu model contribution.
+   * Style only its native Lumino title; never add a separate branded button. */
+.lm-MenuBar{
   min-width:0;
 }
-.lm-MenuBar.skill-studio-branded > .skill-studio-brand{
-  display:flex;
-  flex:0 0 auto;
-  align-items:center;
-  align-self:stretch;
-  gap:8px;
-  margin:0 6px 0 0;
-  padding:0 12px 0 10px;
-  border-right:1px solid var(--theia-ui-separator,#e1e7ef);
-  color:var(--theia-ui-font-color1,#233550);
-  font-family:var(--theia-ui-font-family,Inter,system-ui,sans-serif);
-  font-size:13px;
+.lm-MenuBar > .lm-MenuBar-content{
+  min-width:0;
+}
+.lm-MenuBar .lm-MenuBar-item:first-child{
   font-weight:650;
   letter-spacing:-.02em;
-  line-height:1;
-  white-space:nowrap;
-  user-select:none;
-  cursor:default;
+  color:var(--theia-ui-font-color1,#233550);
 }
-.lm-MenuBar.skill-studio-branded > .lm-MenuBar-content{
-  flex:1 1 auto;
-  min-width:0;
-}
-.skill-studio-brand-mark{
-  display:flex;
-  flex:none;
-  width:24px;
-  height:24px;
-  align-items:center;
-  justify-content:center;
-  gap:2px;
-  border:1px solid #99d9cb;
-  border-radius:7px;
-  background:linear-gradient(145deg,#dcf8ef,#b8e6de);
-}
-.skill-studio-brand-mark > span{
-  display:block;
-  width:3px;
-  border-radius:10px;
-  background:#198c7b;
-  transform:rotate(28deg);
-}
-.skill-studio-brand-mark > span:nth-child(1),
-.skill-studio-brand-mark > span:nth-child(3){height:9px}
-.skill-studio-brand-mark > span:nth-child(2){height:15px}
-.skill-studio-brand-label{
-  display:inline-block;
-  color:inherit;
-  white-space:nowrap;
-}
-@media(max-width:760px){
-  .lm-MenuBar.skill-studio-branded > .skill-studio-brand{
-    gap:0;
-    margin-right:4px;
-    padding:0 8px;
-  }
-  .skill-studio-brand-label{display:none}
-}
-@media(max-width:420px){
-  .lm-MenuBar.skill-studio-branded > .skill-studio-brand{padding:0 6px}
-  .skill-studio-brand-mark{width:22px;height:22px}
-}
-`;
+\`;
 }
 
 export function buildSkillStudioBrandScript(){
-  return `// Presentation-only insertion. Do not add a fake menu item or intercept events.
+  return \`// Theia 1.76 native MenuModelRegistry adapter.
+  // This is not a DOM menu or an event interception: the registry owns every
+  // action and Lumino owns the entire rendered menu and keyboard navigation.
 (() => {
-  // Theia 1.76 assigns this stable ID to BrowserMainMenuFactory's native bar.
-  const BAR_SELECTOR = '[id="theia:menubar"].lm-MenuBar';
-  const CONTENT_CLASS = "lm-MenuBar-content";
-  const BRAND_CLASS = "skill-studio-brand";
-
-  function createBrand(){
-    const brand = document.createElement("div");
-    brand.className = BRAND_CLASS;
-    brand.setAttribute("data-skill-studio-brand","true");
-
-    const mark = document.createElement("span");
-    mark.className = "skill-studio-brand-mark";
-    mark.setAttribute("aria-hidden","true");
-    for(let index=0;index<3;index++){
-      mark.appendChild(document.createElement("span"));
+  const TOP=["menubar","00_skill_studio"];
+  const zh=/^zh\\b/i.test(document.documentElement.lang||navigator.language||"");
+  const labels=zh?{
+    welcome:"欢迎页面",newProject:"新建项目",openProject:"打开项目",
+    example:"打开示例项目",selectRoot:"选择项目",refresh:"刷新 Package",
+    dependency:"添加依赖",audit:"审计当前 Package（编辑器）",
+    spec:"Skill 语言规范",guide:"编写指南"
+  }:{
+    welcome:"Welcome",newProject:"New Project",openProject:"Open Project",
+    example:"Open Example Project",selectRoot:"Select Project",refresh:"Refresh Packages",
+    dependency:"Add Dependency",audit:"Audit Current Package (Editor)",
+    spec:"Skill Language Specification",guide:"Authoring Guide"
+  };
+  const actions=[
+    ["01_project","0","skillStudio.showWelcome",labels.welcome],
+    ["01_project","1","skillStudio.newProject",labels.newProject],
+    ["01_project","2","skillStudio.openProject",labels.openProject],
+    ["01_project","3","skillStudio.loadExample",labels.example],
+    ["02_package","0","skillStudio.selectProjectRoot",labels.selectRoot],
+    ["02_package","1","skillStudio.refreshPackages",labels.refresh],
+    ["02_package","2","skillStudio.addDependency",labels.dependency],
+    ["02_package","3","skillStudio.auditPackage",labels.audit],
+    ["03_documentation","0","skillStudio.openLanguageSpec",labels.spec],
+    ["03_documentation","1","skillStudio.openAuthoringGuide",labels.guide]
+  ];
+  let attempts=0;
+  function install(){
+    const container=window.theia?.container;
+    const bar=document.querySelector('[id="theia:menubar"].lm-MenuBar');
+    const keys=container?._bindingDictionary?._map?.keys?.();
+    if(!bar||!keys)return false;
+    const all=[...keys];
+    const menuKey=all.find(key=>typeof key==="function"&&
+      key.prototype?.registerSubmenu&&key.prototype?.registerMenuAction&&
+      key.prototype?.getMenuNode);
+    const commandsKey=all.find(key=>typeof key==="function"&&
+      key.prototype?.executeCommand&&key.prototype?.registerCommand&&
+      key.prototype?.getCommand);
+    if(!menuKey||!commandsKey)return false;
+    const commands=container.get(commandsKey);
+    // Wait for the real VS Code extension commands. Missing commands must not
+    // result in an empty or misleading menu that appears to have succeeded.
+    if(!actions.every(([, , id])=>commands.getCommand(id)))return false;
+    const menus=container.get(menuKey);
+    const root=menus.getMenuNode(["menubar"]);
+    if(root?.children?.some(node=>node.id===TOP[1])){
+      const existing=root.children.find(node=>node.id===TOP[1]);
+      if(existing?.label!=="SKILL Studio")throw Error("Conflicting Studio top-level menu");
+    }else{
+      // Pre-register all groups and actions, then turn the placeholder group
+      // into the named submenu. Theia emits a native menu-bar change on
+      // registerSubmenu, rebuilding the real Lumino menu in one operation.
+      for(const [group,order,id,label] of actions)
+        menus.registerMenuAction([...TOP,group],{commandId:id,label,order});
+      menus.registerSubmenu(TOP,"SKILL Studio",{sortString:"00"});
     }
-
-    const label = document.createElement("span");
-    label.className = "skill-studio-brand-label";
-    label.textContent = "SKILL Studio";
-    brand.append(mark,label);
-    return brand;
+    document.documentElement.dataset.skillStudioBrand="ready";
+    document.documentElement.dataset.skillStudioNativeMenu="ready";
+    return true;
   }
-
-  function mount(){
-    let mounted = false;
-    for(const bar of document.querySelectorAll(BAR_SELECTOR)){
-      const content = Array.from(bar.children).find(child =>
-        child.classList.contains(CONTENT_CLASS)
-      );
-      if(!content)continue;
-
-      let brand = Array.from(bar.children).find(child =>
-        child.hasAttribute("data-skill-studio-brand")
-      );
-      if(!brand)brand = createBrand();
-      // Keep the brand immediately before Lumino's native list. Never mutate
-      // contentNode itself: Lumino owns its menu-title children and behavior.
-      if(brand.nextElementSibling!==content)bar.insertBefore(brand,content);
-      bar.classList.add("skill-studio-branded");
-      mounted = true;
+  const handle=setInterval(()=>{
+    try{
+      if(install()){clearInterval(handle);return;}
+      if(++attempts>200){
+        clearInterval(handle);
+        document.documentElement.dataset.skillStudioNativeMenu="unavailable";
+        console.error("SKILL Studio native menu: registry or commands unavailable");
+      }
+    }catch(error){
+      clearInterval(handle);
+      document.documentElement.dataset.skillStudioNativeMenu="error";
+      console.error("SKILL Studio native menu registration failed",error);
     }
-    if(mounted&&document.documentElement)
-      document.documentElement.dataset.skillStudioBrand = "ready";
-    return mounted;
-  }
-
-  function start(){
-    const observer = new MutationObserver(mount);
-    observer.observe(document.documentElement,{childList:true,subtree:true});
-    mount();
-  }
-
-  if(document.documentElement)start();
-  else document.addEventListener("DOMContentLoaded",start,{once:true});
+  },200);
 })();
-`;
+\`;
 }
 
 function ensureHeadLink(html,id,href){
