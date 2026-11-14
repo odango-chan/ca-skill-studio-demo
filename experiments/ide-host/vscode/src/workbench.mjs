@@ -2474,17 +2474,36 @@ export function registerWorkbench(vscode,context){
     try{
       const base=doc.uri.with({path:doc.uri.path.slice(0,-'assurance/procedure.yaml'.length)});
       // Bounded by file count and aggregate bytes; never crawl another Package.
-      const found=await vscode.workspace.findFiles(new vscode.RelativePattern(base,'**/*'),'**/node_modules/**',501);
-      if(found.length>500)throw Error('Package exceeds 500-file audit limit');
-      let bytes=0;
-      for(const uri of found){
-        if(!uri.path.startsWith(base.path))continue;
-        const path=uri.path.slice(base.path.length);uris.set(path,uri);
-        if(!/\.(yaml|json|py|md)$/.test(path)){files.set(path,{text:''});continue;}
-        const open=vscode.workspace.textDocuments.find(d=>d.uri.toString()===uri.toString());
-        const text=open?open.getText():new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
-        bytes+=text.length;if(bytes>4*MAX_SOURCE_BYTES)throw Error('Package exceeds 4 MiB audit limit');
-        files.set(path,{text});
+      // OPFS may expose a just-written file in findFiles before it can be
+      // read, especially while Source edits and Package Language snapshots
+      // overlap. Retry the whole bounded inventory only for transient ENOENT;
+      // a genuinely missing core file still fails closed below.
+      for(let attempt=0;attempt<3;attempt++){
+        try{
+          const found=await vscode.workspace.findFiles(
+            new vscode.RelativePattern(base,'**/*'),'**/node_modules/**',501);
+          if(found.length>500)throw Error('Package exceeds 500-file audit limit');
+          files.clear();uris.clear();
+          let bytes=0;
+          for(const uri of found){
+            if(!uri.path.startsWith(base.path))continue;
+            const path=uri.path.slice(base.path.length);uris.set(path,uri);
+            if(!/\.(yaml|json|py|md)$/.test(path)){files.set(path,{text:''});continue;}
+            const open=vscode.workspace.textDocuments.find(d=>
+              d.uri.toString()===uri.toString());
+            const text=open?open.getText():new TextDecoder().decode(
+              await vscode.workspace.fs.readFile(uri));
+            bytes+=text.length;
+            if(bytes>4*MAX_SOURCE_BYTES)throw Error('Package exceeds 4 MiB audit limit');
+            files.set(path,{text});
+          }
+          break;
+        }catch(error){
+          if(ticket!==generation||document!==doc||doc.version!==version)return;
+          if(!/ENOENT|EntryNotFound|FileNotFound/.test(String(error?.message??error))||
+             attempt===2)throw error;
+          await new Promise(resolve=>setTimeout(resolve,100*(attempt+1)));
+        }
       }
       const required=['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml'];
       const missing=required.filter(p=>!files.has(p));
@@ -2742,8 +2761,8 @@ export function registerWorkbench(vscode,context){
       // before treating a successful Source open as a native Preview launch.
       await activateNativeMarkdownExtension();
       const markdownCommands=await vscode.commands.getCommands(true);
-      if(!markdownCommands.includes('markdown.showPreviewToSide'))
-        throw Error('Built-in Markdown extension activated without registering markdown.showPreviewToSide');
+      if(!markdownCommands.includes('markdown.showPreview'))
+        throw Error('Built-in Markdown extension activated without registering markdown.showPreview');
       // Keep Source as the editable authority in the first editor group.
       // Theia can retain the original right-group Source tab when the same
       // document is shown in column one. Move the active tab when supported,
@@ -2761,7 +2780,10 @@ export function registerWorkbench(vscode,context){
         viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:false
       });
       const tabGroups=vscode.window.tabGroups;
-      if(typeof tabGroups?.close==='function'&&Array.isArray(tabGroups.all)){
+      // Theia can prompt to save a dirty Source when closing a duplicate
+      // tab even though the same TextDocument remains open in column One.
+      // Never trigger a destructive save dialog as part of auto-pairing.
+      if(!doc.isDirty&&typeof tabGroups?.close==='function'&&Array.isArray(tabGroups.all)){
         const duplicateSourceTabs=tabGroups.all
           .filter(group=>group.viewColumn!==vscode.ViewColumn.One)
           .flatMap(group=>group.tabs??[])
@@ -2777,10 +2799,29 @@ export function registerWorkbench(vscode,context){
           '无法验证当前 Markdown 文件所属 Package 或文件清单，已拒绝打开原生预览。');
         return false;
       }
-      // Do not await the host Preview command: some Theia PluginHost builds
-      // resolve it only after the Webview has completed its first render. The
-      // command itself must return promptly so callers can observe that render.
-      const opening=vscode.commands.executeCommand('markdown.showPreviewToSide',uri);
+      // The native CustomEditor is stable per resource. Never reopen an
+      // existing preview while its Webview or editor command is still settling:
+      // redundant openWith calls can stall subsequent WorkspaceEdit commands.
+      const existingPreview=(vscode.window.tabGroups?.all??[]).some(group=>
+        group.viewColumn===vscode.ViewColumn.Two&&
+        (group.tabs??[]).some(tab=>
+          tab.input?.uri?.toString?.()===key&&
+          tab.input?.viewType==='vscode.markdown.preview.editor'));
+      if(existingPreview){
+        nativeMarkdownOpening.delete(key);
+        paired=true;
+        return true;
+      }
+      // Never use markdown.showPreviewToSide here: its Beside placement is
+      // relative to the currently focused group and can insert a THIRD group
+      // when a Designer already occupies the right side. The native Markdown
+      // extension also contributes a preview CustomEditor. Open that exact
+      // built-in editor in our shared Visual column explicitly.
+      // Do not await Webview initialization: hosts may settle only after render.
+      const opening=vscode.commands.executeCommand('vscode.openWith',uri,
+        'vscode.markdown.preview.editor',{
+          viewColumn:vscode.ViewColumn.Two,preserveFocus:true,preview:false
+        });
       paired=true;
       // Some Theia PluginHost builds leave the Preview command promise pending
       // after the webview is created. Never let that implementation detail keep
@@ -2803,6 +2844,23 @@ export function registerWorkbench(vscode,context){
       if(!paired)nativeMarkdownOpening.delete(key);
     }
   }
+  // Shared acceptance contract for the entire Studio workbench, not just
+  // a particular Source/Preview pair. All native editors and CustomEditors
+  // must reuse groups One and Two even in a mixed open sequence.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.twoColumnLayoutAcceptance',()=>({
+      groups:(vscode.window.tabGroups?.all??[]).map(group=>({
+        column:group.viewColumn,
+        tabs:(group.tabs??[]).map(tab=>({
+          label:tab.label,
+          uri:tab.input?.uri?.toString?.()??null,
+          viewType:tab.input?.viewType??null
+        }))
+      })),
+      editors:(vscode.window.visibleTextEditors??[]).map(editor=>({
+        uri:editor.document.uri.toString(),column:editor.viewColumn
+      }))
+    })));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownActivationStateAcceptance',()=>{
       const markdownExtension=vscode.extensions?.getExtension?.(
@@ -2907,18 +2965,18 @@ export function registerWorkbench(vscode,context){
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      const suffix='/establish-pdu-session/SKILL.md';
-      if(!target.path.endsWith(suffix))
+      if(!target.path.endsWith('/establish-pdu-session/SKILL.md'))
         throw Error('Refusing to restore a non-fixture Markdown guide');
       const key=target.toString();
       const original=nativeMarkdownLiveOriginals.get(key);
       if(typeof original!=='string')
         throw Error('No original Markdown content is recorded for the live-update fixture');
       const doc=await vscode.workspace.openTextDocument(target);
-      const edit=new vscode.WorkspaceEdit();
-      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
-      const restored=await vscode.workspace.applyEdit(edit);
-      if(!restored)throw Error('Could not restore the original Skill guide after live-update acceptance');
+      // The browser acceptance invokes the native host Undo command as a
+      // separate top-level action. Never call Undo/WorkspaceEdit *inside*
+      // a plugin command while the native Markdown preview editor is active.
+      if(doc.getText()!==original)
+        throw Error('Native Markdown Undo did not restore the exact original Source');
       nativeMarkdownLiveOriginals.delete(key);
       return true;
     }));
