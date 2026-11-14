@@ -300,59 +300,120 @@ export function activate(context){
       vscode.Uri.parse("https://github.com/odango-chan/ca-skills/blob/main/docs/authoring.zh-CN.md")))
   );
   let exampleLoadPromise=null;
+  let projectWelcome=null;
+  const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
+  const exampleText=progressZh?{
+    title:"加载示例项目",
+    starting:"正在准备官方示例…",
+    manifest:"正在读取示例清单…",
+    files:(completed,total)=>"正在导入官方文件（"+completed+"/"+total+"）…",
+    workspace:"正在打开示例工作区…",
+    packages:"正在加载 Package Explorer…",
+    procedure:"正在打开 5GC Procedure…",
+    success:"示例项目已打开",
+    failure:"示例项目载入失败"
+  }:{
+    title:"Loading example project",
+    starting:"Preparing official examples…",
+    manifest:"Reading example manifest…",
+    files:(completed,total)=>"Importing official files ("+completed+"/"+total+")…",
+    workspace:"Opening example workspace…",
+    packages:"Preparing Package Explorer…",
+    procedure:"Opening 5GC Procedure…",
+    success:"Example project opened",
+    failure:"Example project failed to load"
+  };
   context.subscriptions.push(vscode.commands.registerCommand("skillStudio.loadExample",
     ()=>{
-      // Serialize repeated requests to load the example.
+      // All entry points (Welcome, menu and Command Palette) share this task.
+      // Repeated clicks must never start concurrent file imports.
       if(exampleLoadPromise)return exampleLoadPromise;
       exampleLoadPromise=(async()=>{
-      let stage="seed-example";
-      try{
-        const result=await seedExampleWorkspace(
-          vscode,context.extensionUri,context.globalStorageUri);
-        stage="show-packages";
-        // User-triggered import should end in the real native Package Explorer view.
-        // View-container activation is a host command: fall back gracefully
-        // on VS Code/Theia variants that don't contribute that command.
-        let viewOpened=false;
-        for(const id of ["workbench.view.explorer","skillStudio.packages.focus"]){
-          try{
-            await vscode.commands.executeCommand(id);
-            viewOpened=true;
-            break;
-          }catch{/* The alternative is optional, not a load failure. */}
+        // Also show the native status bar for hosts where notifications are
+        // delayed or don't render until the extension's first awaited I/O.
+        const statusBar=typeof vscode.window.setStatusBarMessage==="function"
+          ?vscode.window.setStatusBarMessage(exampleText.starting):null;
+        try{
+          const run=async progress=>{
+            const report=(message,details={})=>{
+              progress?.report?.({message});
+              projectWelcome?.setImportStatus({state:"loading",message,...details});
+            };
+            let stage="seed-example";
+            try{
+              report(exampleText.starting);
+              const result=await seedExampleWorkspace(
+                vscode,context.extensionUri,context.globalStorageUri,{
+                  onProgress:({phase,completed,total})=>{
+                    if(phase==="manifest")report(exampleText.manifest);
+                    else if(phase==="files")report(
+                      exampleText.files(completed,total),{completed,total});
+                    else if(phase==="workspace")report(exampleText.workspace);
+                  }
+                });
+              stage="show-packages";
+              report(exampleText.packages);
+              // End in the real Package Explorer, not a custom duplicate view.
+              let viewOpened=false;
+              for(const id of ["workbench.view.explorer","skillStudio.packages.focus"]){
+                try{
+                  await vscode.commands.executeCommand(id);
+                  viewOpened=true;
+                  break;
+                }catch{/* The alternative is optional, not a load failure. */}
+              }
+              let revealed=false;
+              try{revealed=await packageOverview.revealPackages();}
+              catch(error){
+                console.warn("SKILL Package reveal unavailable:",String(error?.message??error));
+                await packageOverview.refresh();
+              }
+              stage="open-procedure";
+              report(exampleText.procedure);
+              // Preserve the established Source/Visual pairing and editor focus.
+              const confirmedFolders=(vscode.workspace.workspaceFolders??[])
+                .map(folder=>folder.uri.toString());
+              if(!confirmedFolders.includes(result.root.toString()))
+                throw Error("Theia has not confirmed the skill-studio-demo workspace root");
+              await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
+              console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
+                root:result.root.toString(),
+                workspaceFolders:confirmedFolders,
+                defaultProcedure:result.procedure.toString(),
+                editor:VIEW
+              }));
+              projectWelcome?.setImportStatus({
+                state:"success",message:exampleText.success
+              });
+              // Keep the established success notification used by Chromium
+              // acceptance and make create-only / existing-file semantics clear.
+              void vscode.window.showInformationMessage(
+                "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+
+                "同步 "+result.files+" 个官方文件；保留 "+result.skipped+" 个已有文件。"+
+                (viewOpened&&revealed?"已展开 Package Explorer（含传统 5GC + MAS）。":
+                  "可在 Explorer → Package Explorer 查看两个 SKILL。"));
+              return result;
+            }catch(error){
+              const message=exampleText.failure+" ["+stage+"]："+String(error?.message??error);
+              projectWelcome?.setImportStatus({state:"error",message});
+              void vscode.window.showErrorMessage(
+                "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
+              return null;
+            }
+          };
+          // Theia and VS Code display their own native progress notification.
+          // No cancellation: the importer may have created some of its files.
+          if(typeof vscode.window.withProgress==="function"&&
+             vscode.ProgressLocation?.Notification!==undefined){
+            return await vscode.window.withProgress({
+              location:vscode.ProgressLocation.Notification,
+              title:exampleText.title,cancellable:false
+            },run);
+          }
+          return await run({report(){}});
+        }finally{
+          statusBar?.dispose?.();
         }
-        let revealed=false;
-        try{revealed=await packageOverview.revealPackages();}
-        catch(error){
-          console.warn("SKILL Package reveal unavailable:",String(error?.message??error));
-          await packageOverview.refresh();
-        }
-        // Keep the visible Packages sidebar, but return keyboard focus to
-        // the real Procedure CustomEditor after the sidebar is prepared.
-        // This preserves Source editor shortcuts and native Go to Line.
-        stage="open-procedure";
-        // Respect the registered default CustomEditor association (the working
-        // Theia first-run path); avoid opening a second explicit editor.
-        const confirmedFolders=(vscode.workspace.workspaceFolders??[])
-          .map(folder=>folder.uri.toString());
-        if(!confirmedFolders.includes(result.root.toString()))
-          throw Error("Theia has not confirmed the skill-studio-demo workspace root");
-        await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
-        console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
-          root:result.root.toString(),
-          workspaceFolders:confirmedFolders,
-          defaultProcedure:result.procedure.toString(),
-          editor:VIEW
-        }));
-        void vscode.window.showInformationMessage(
-          "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+
-          "同步 "+result.files+" 个官方文件；保留 "+result.skipped+" 个已有文件。"+
-          (viewOpened&&revealed?"已展开 Package Explorer（含传统 5GC + MAS）。":
-            "可在 Explorer → Package Explorer 查看两个 SKILL。"));
-      }catch(error){
-        await vscode.window.showErrorMessage(
-          "SKILL 示例载入失败 ["+stage+"]："+String(error?.message??error));
-      }
       })().finally(()=>{exampleLoadPromise=null;});
       return exampleLoadPromise;
     }));
@@ -513,7 +574,7 @@ export function activate(context){
     }));
   // A real empty-workspace editor page is required: Theia currently does not
   // render Explorer viewsWelcome without a workspace folder.
-  registerProjectWelcome(vscode,context);
+  projectWelcome=registerProjectWelcome(vscode,context);
   return {extendMarkdownIt};
 }
 export function deactivate(){}

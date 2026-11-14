@@ -98,6 +98,33 @@ test("Sample creates both exact pinned owner SKILL packages in one source-only p
   assert.ok(h.files.has(result.skillsRoot.path+"/establish-pdu-session/scripts/build_n1n2_delivery.py"));
   assert.equal(result.procedure.path,result.procedures["establish-pdu-session"].path);
 });
+test("Sample import reports actual file-count progress and workspace activation without overwriting",async()=>{
+  const h=host(),events=[],base=uri("/extension"),storage=uri("/global-storage");
+  const first=await seedExampleWorkspace(h.vscode,base,storage,{
+    onProgress:event=>events.push({...event})
+  });
+  assert.equal(events[0]?.phase,"manifest");
+  const files=events.filter(event=>event.phase==="files");
+  assert.equal(files.length,manifest.files.length+1);
+  assert.equal(files[0].completed,0);
+  assert.equal(files[0].total,manifest.files.length);
+  assert.deepEqual(files.map(event=>event.completed),
+    Array.from({length:manifest.files.length+1},(_,i)=>i));
+  assert.equal(events.at(-1)?.phase,"workspace");
+  assert.equal(first.created,manifest.files.length);
+  const edited=first.procedures["establish-pdu-session-mas"].path;
+  h.files.set(edited,new TextEncoder().encode("user-modified MAS"));
+  const repeat=[];
+  const second=await seedExampleWorkspace(h.vscode,base,storage,{
+    onProgress:event=>repeat.push(event)
+  });
+  assert.equal(second.skipped,manifest.files.length);
+  assert.equal(second.created,0);
+  assert.deepEqual(repeat.filter(event=>event.phase==="files").map(event=>event.completed),
+    Array.from({length:manifest.files.length+1},(_,i)=>i));
+  assert.equal(new TextDecoder().decode(h.files.get(edited)),"user-modified MAS");
+});
+
 test("New project does not create legacy lib/ or output/ directories",async()=>{
   const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
   for(const name of ["lib","output"]){

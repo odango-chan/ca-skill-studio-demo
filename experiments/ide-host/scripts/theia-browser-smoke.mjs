@@ -272,7 +272,7 @@ try{
   })`);
   // Theia does not render built-in Explorer viewsWelcome without a folder.
   // Inspect the real first-run Webview editor in a live Chromium frame.
-  let welcome=null;
+  let welcome=null,welcomeFrameId=null;
   for(let attempt=0;attempt<50&&!welcome;attempt++){
     const tree=await command('Page.getFrameTree');
     const frames=[];
@@ -299,7 +299,7 @@ try{
         });
         const probe=response.result?.value;
         if(probe?.actions?.some(item=>item.action==='example')){
-          welcome={...probe,frameUrl:frame.url};break;
+          welcome={...probe,frameUrl:frame.url};welcomeFrameId=frame.id;break;
         }
       }catch{/* Webview may be loading; inspect the next frame. */}
     }
@@ -491,9 +491,44 @@ try{
   })()`);
   if(!loadExampleRow)
     throw Error("Theia does not expose the explicit Open Example Project command");
-  await command("Input.dispatchMouseEvent",{type:"mouseMoved",x:loadExampleRow.x,y:loadExampleRow.y});
-  await command("Input.dispatchMouseEvent",{type:"mousePressed",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
-  await command("Input.dispatchMouseEvent",{type:"mouseReleased",x:loadExampleRow.x,y:loadExampleRow.y,button:"left",clickCount:1});
+  // The Command Palette action exists, but run the same command through the
+  // Welcome Webview to verify instant, visible acknowledgment before import.
+  // The click DOM event is synchronous; the extension-host RPC is asynchronous.
+  if(!welcomeFrameId)throw Error("Welcome Webview frame disappeared before import");
+  const importWorld=await command("Page.createIsolatedWorld",{
+    frameId:welcomeFrameId,worldName:"studio-example-import-acknowledgment",
+    grantUniveralAccess:true
+  });
+  const importClick=await command("Runtime.evaluate",{
+    contextId:importWorld.executionContextId,returnByValue:true,
+    expression:`(()=>{
+      const button=document.querySelector('[data-action="example"]');
+      const status=document.getElementById("example-import-status");
+      if(!button||!status)return {ready:false};
+      const before={disabled:button.disabled,hidden:status.hidden};
+      button.click();
+      return {ready:true,before,
+        disabled:button.disabled,loading:button.dataset.loading,
+        ariaBusy:button.getAttribute("aria-busy"),
+        statusHidden:status.hidden,statusText:status.textContent,
+        ariaLive:status.getAttribute("aria-live"),
+        otherButtonsDisabled:[...document.querySelectorAll(".actions button")]
+          .every(item=>item.disabled)};
+    })()`
+  });
+  const immediateFeedback=importClick.result?.value;
+  console.log("STUDIO_EXAMPLE_IMPORT_IMMEDIATE_FEEDBACK_CHROMIUM",
+    JSON.stringify(immediateFeedback));
+  if(!immediateFeedback?.ready||immediateFeedback.before.disabled||
+     !immediateFeedback.before.hidden||!immediateFeedback.disabled||
+     immediateFeedback.loading!=="true"||
+     immediateFeedback.ariaBusy!=="true"||
+     immediateFeedback.statusHidden||
+     immediateFeedback.ariaLive!=="polite"||
+     !immediateFeedback.otherButtonsDisabled||
+     !/Loading example project|正在加载示例项目/.test(immediateFeedback.statusText??""))
+    throw Error("Example Project click had no immediate feedback: "+
+      JSON.stringify(immediateFeedback));
   await sleep(350);
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
