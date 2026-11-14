@@ -4,5 +4,6 @@
   "project.open": "SKILL Studio: Open Project",
   "project.example": "SKILL Studio: Open Example Project",
   "help.spec": "SKILL Studio: Skill Language Specification",
-  "help.guide": "SKILL Studio: Authoring Guide"
+  "help.guide": "SKILL Studio: Authoring Guide",
+  "project.welcome.title": "SKILL Studio: Welcome"
 }
