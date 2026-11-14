@@ -81,6 +81,12 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   const content=locale[welcome.contents.slice(1,-1)];
   for(const command of ["newProject","openProject","loadExample"])
     assert.ok(content.includes("command:skillStudio."+command),command);
+  for(const command of ["openLanguageSpec","openAuthoringGuide"]){
+    assert.ok(content.includes("command:skillStudio."+command),command);
+    assert.ok(plugin.contributes.menus?.["menubar/help"]?.some(entry=>
+      entry.command==="skillStudio."+command),
+      "Help menu must expose the authoritative Skill documentation: "+command);
+  }
   assert.ok(plugin.contributes.menus?.["view/title"]?.some(x=>
     x.command==="skillStudio.loadExample"),
     "Explorer title toolbar must expose the demo project");
