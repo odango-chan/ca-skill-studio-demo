@@ -1,11 +1,11 @@
-// Add the SKILL Studio wordmark beside Lumino's native menu list.
-// The native menu content node and all menu commands remain untouched.
+// Register one native SKILL Studio top-level menu in the pinned Theia browser host.
+// Keep the real Lumino menu bar and its keyboard/command behavior authoritative.
 import {readFile,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 
 export function buildSkillStudioBrandCss(){
-  return \`/* The first top-level item is the real Theia menu model contribution.
+  return `/* The first top-level item is the real Theia menu model contribution.
    * Style only its native Lumino title; never add a separate branded button. */
 .lm-MenuBar{
   min-width:0;
@@ -18,11 +18,11 @@ export function buildSkillStudioBrandCss(){
   letter-spacing:-.02em;
   color:var(--theia-ui-font-color1,#233550);
 }
-\`;
+`;
 }
 
 export function buildSkillStudioBrandScript(){
-  return \`// Theia 1.76 native MenuModelRegistry adapter.
+  return `// Theia 1.76 native MenuModelRegistry adapter.
   // This is not a DOM menu or an event interception: the registry owns every
   // action and Lumino owns the entire rendered menu and keyboard navigation.
 (() => {
@@ -101,7 +101,7 @@ export function buildSkillStudioBrandScript(){
     }
   },200);
 })();
-\`;
+`;
 }
 
 function ensureHeadLink(html,id,href){
