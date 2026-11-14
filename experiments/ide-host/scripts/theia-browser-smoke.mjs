@@ -347,7 +347,6 @@ try{
     pointerMenuItems,activatedStudioMenu
   }));
   const studioMenuItems=activatedStudioMenu?.items?.map(item=>item.label).join('\n')??'';
-  console.log('STUDIO_NATIVE_MENU_MODEL_CHROMIUM',JSON.stringify(studioMenuModel));
 
   for(const label of ['New Project','Open Project','Open Example Project',
     'Skill Language Specification','Authoring Guide'])
