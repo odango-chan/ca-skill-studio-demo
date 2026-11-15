@@ -34,6 +34,9 @@ function symbolKey(token,name){
     case "skillProcedure":
       return "procedure\u0000"+name;
     case "skillStep":{
+      // v1alpha4 has one procedure with root nodes/<NodeId>.
+      if(token.path?.[0]==="nodes")
+        return "step\u0000"+name;
       const procedure=token.path?.[0]==="procedures"?token.path[1]:null;
       return typeof procedure==="string"&&procedure
         ? "step\u0000"+procedure+"\u0000"+name
