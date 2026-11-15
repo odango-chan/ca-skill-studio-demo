@@ -643,3 +643,142 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
     await worker.terminate();
   }
 });
+
+
+test("browser LSP v1alpha4 scopes completion and resolves local declarations",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  const rootUri="file:///workspace/v1alpha4";
+  const procedure=[
+    "start: check",
+    "nodes:",
+    "  check:",
+    "    ",
+    "    precondition:",
+    "      predicates:",
+    "        - predicate: sample.ready",
+    "          arguments: [context.ueRef]",
+    "      routes:",
+    "        PASS: read",
+    "        FAIL: FAILED",
+    "        UNKNOWN: UNRESOLVED",
+    "  read:",
+    "    observation:",
+    "      tool: ca::session.read",
+    "      arguments:",
+    "        ",
+    "        ueRef: context.ueRef",
+    "      routes:",
+    "        SUCCEEDED: final",
+    "        FAILED: FAILED",
+    "  final:",
+    "    postcondition:",
+    "      predicates:",
+    "        - predicate: sample.done",
+    "          arguments: [read.observation.output]",
+    "      routes:",
+    "        PASS: SUCCEEDED",
+    "        FAIL: FAILED",
+    "        UNKNOWN: UNRESOLVED",
+    "  mutate:",
+    "    operation:",
+    "      tool: ca::session.mutate",
+    "      arguments: {}",
+    "      routes:",
+    "        OUTCOME_UNKNOWN: SAFE_STOPPED",
+    "        SUCCEEDED: final",
+    ""
+  ].join("\n");
+  const contract=[
+    "goal: sample.established",
+    "precondition: check.precondition",
+    "requestSchema: schemas/request.schema.yaml",
+    "contextSchema: ca-context::urn:example:host:v1",
+    "dependencies: {ca: urn:example:tools}",
+    "capabilities: [sample-read]",
+    ""
+  ].join("\n");
+  const predicates=[
+    "predicates:",
+    "  sample.ready:",
+    "    parameters: [{ue: string}]",
+    "    evaluator: {type: cel, expression: 'ue != \"\"'}",
+    "  sample.done:",
+    "    parameters: [{data: string}]",
+    "    evaluator: {type: cel, expression: 'data != \"\"'}",
+    ""
+  ].join("\n");
+  const texts={
+    "assurance/procedure.yaml":procedure,
+    "assurance/contract.yaml":contract,
+    "assurance/predicates.yaml":predicates,
+    "schemas/request.schema.yaml":"type: object\nproperties: {ueRef: {type: string}}\n",
+    "scripts/evaluate.py":"def main():\n    return {}\n"
+  };
+  const snapshot={rootUri,packageName:"v1alpha4",generation:1,
+    completeness:"complete",documents:Object.entries(texts).map(([relativePath,text])=>({
+      uri:rootUri+"/"+relativePath,relativePath,text,version:1,
+      languageId:relativePath.endsWith(".py")?"python":"yaml"
+    }))};
+  const p=snapshot.documents[0],c=snapshot.documents[1],pred=snapshot.documents[2];
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:701,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
+    await waitForMessage(worker,message=>message?.id===701);
+    worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
+    const ready=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===rootUri&&message.params?.generation===1,15000);
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
+    const state=await ready;
+    assert.equal(state.params.state,"PARTIAL",
+      "source shape may be projected but no Owner/Compiler qualification is implied");
+    let id=702;
+    const completion=async(doc,needle,at=needle.length)=>await lspRequest(
+      worker,id++,"textDocument/completion",{
+        textDocument:{uri:doc.uri},position:positionOf(doc.text,needle,at)
+      });
+    const labels=items=>items.map(item=>item.label);
+
+    assert.ok(labels(await completion(c,"check.precondition",5))
+      .includes("check.precondition"));
+    assert.ok(labels(await completion(c,"schemas/request",15))
+      .includes("schemas/request.schema.yaml"));
+    assert.ok(labels(await completion(p,"sample.ready",7))
+      .includes("sample.ready"));
+    assert.ok(labels(await completion(p,"start: check","start: ".length))
+      .includes("check"));
+    assert.ok(labels(await completion(p,"  check:\n    ","  check:\n    ".length))
+      .includes("precondition:"));
+
+    const unsafe=labels(await completion(p,"OUTCOME_UNKNOWN:","OUTCOME_UNKNOWN:".length));
+    assert.ok(unsafe.includes("SAFE_STOPPED"));
+    assert.ok(!unsafe.includes("final")&&!unsafe.includes("read"),
+      "OUTCOME_UNKNOWN must never suggest further business Nodes");
+
+    const insideArguments=await completion(p,"      arguments:\n        ",
+      "      arguments:\n        ".length-1);
+    assert.ok(!labels(insideArguments).includes("PASS:"),
+      "route suggestions must not leak into Tool arguments");
+
+    const nodeDefinition=await lspRequest(worker,id++,"textDocument/definition",{
+      textDocument:{uri:c.uri},position:positionOf(c.text,"check.precondition",2)
+    });
+    assert.equal(nodeDefinition.uri,p.uri);
+    const predicateDefinition=await lspRequest(worker,id++,"textDocument/definition",{
+      textDocument:{uri:p.uri},position:positionOf(p.text,"sample.ready",3)
+    });
+    assert.equal(predicateDefinition.uri,pred.uri);
+    const observationDefinition=await lspRequest(worker,id++,"textDocument/definition",{
+      textDocument:{uri:p.uri},position:positionOf(p.text,"ca::session.read",4)
+    });
+    assert.equal(observationDefinition,null,
+      "unqualified Observation must not borrow an Operation definition");
+    const outline=await lspRequest(worker,id++,"textDocument/documentSymbol",{
+      textDocument:{uri:p.uri}
+    });
+    assert.ok(outline.some(item=>item.name==="check"));
+    assert.ok(outline.some(item=>item.name==="read"));
+  }finally{
+    await worker.terminate();
+  }
+});
