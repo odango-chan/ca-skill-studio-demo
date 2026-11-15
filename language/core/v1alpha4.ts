@@ -15,7 +15,9 @@ const OLD_FIELDS = new Set(["procedures","with","call","verify","reconcile","res
 const EVAL_FIELDS = new Set(["parameters","evidence","evaluator"]);
 
 export function isV1Alpha4Procedure(text: string): boolean {
-  return /^start:\s*/m.test(text) && /^nodes:\s*/m.test(text);
+  // Detect incomplete authoring snapshots too: deleting one root key in the editor
+  // must not silently re-route the document into the legacy v0.2 analyzer.
+  return /^(?:start|nodes):[ \t]*/m.test(text);
 }
 
 type SyntaxResult = {root: any; document: PackageDocumentSnapshot} | null;
@@ -113,7 +115,6 @@ export function analyzeV1Alpha4Source(
   const nodes:ProcedureNode[]=[];
   const routes:ProcedureRoute[]=[];
   const adjacency=new Map<string,string[]>();
-  let hasSuccessRequest=false,hasValidSuccess=false;
   for (const item of rawNodes.items) {
     const id=scalar(item.key);
     const body:any=item.value;
@@ -159,10 +160,6 @@ export function analyzeV1Alpha4Source(
         const isTerminal=TERMINALS.has(target);
         if (!target||(!isTerminal&&!declared.has(target)))
           add(p.document,"ROUTE_TARGET_INVALID","Route target must be a Node or terminal status",route.value);
-        if (target==="SUCCEEDED") {
-          hasSuccessRequest=true;
-          if(stage==="postcondition"&&outcome==="PASS") hasValidSuccess=true;
-        }
         if (outcome==="OUTCOME_UNKNOWN" && !["UNRESOLVED","SAFE_STOPPED"].includes(target))
           add(p.document,"ROUTE_OUTCOME_UNKNOWN","OUTCOME_UNKNOWN can only safely stop",route.value);
         if(!isTerminal && declared.has(target))outgoing.push(target);
@@ -190,11 +187,6 @@ export function analyzeV1Alpha4Source(
       line:lineAt(p.document,item.key),phases:[],children:[]
     });
   }
-  if(hasSuccessRequest && !hasValidSuccess)
-    add(p.document,"FINAL_POSTCONDITION_MISSING","Only a reachable final Postcondition aggregate PASS may request SUCCEEDED");
-  if(hasValidSuccess)for(const route of routes)if(route.target==="SUCCEEDED" &&
-    !(route.routeSource==="postcondition"&&route.outcome==="PASS"))
-    add(p.document,"SUCCESS_BYPASSES_FINAL_POSTCONDITION","A non-final stage bypasses final Goal proof");
   const visited=new Set<string>(),active=new Set<string>();
   let cycle=false;
   function walk(node:string) {
@@ -206,6 +198,19 @@ export function analyzeV1Alpha4Source(
   }
   if(declared.has(start))walk(start);
   if(cycle)add(p.document,"CONTROL_FLOW_CYCLE","Procedure DAG contains a reachable cycle",rawNodes);
+  // Success is a property of reachable source routes, not simply of a key
+  // appearing anywhere in the YAML. An orphan final stage cannot prove Goal
+  // or hide a reachable bypass (§12.9).
+  const successRoutes=routes.filter(route=>visited.has(route.source)&&route.target==="SUCCEEDED");
+  const hasValidSuccess=successRoutes.some(route=>
+    route.routeSource==="postcondition"&&route.outcome==="PASS");
+  if(successRoutes.length && !hasValidSuccess)
+    add(p.document,"FINAL_POSTCONDITION_MISSING",
+      "Only a reachable final Postcondition aggregate PASS may request SUCCEEDED");
+  if(hasValidSuccess)for(const route of successRoutes)if(
+    !(route.routeSource==="postcondition"&&route.outcome==="PASS"))
+    add(p.document,"SUCCESS_BYPASSES_FINAL_POSTCONDITION",
+      "A reachable non-final stage bypasses final Goal proof");
   // Projection READY means source graph shape is available for editor rendering,
   // *never* that the Tool/Schema/Capability trust closure has been compiled.
   const projection:ProcedureProjection={
