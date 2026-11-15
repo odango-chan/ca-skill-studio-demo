@@ -116,7 +116,7 @@ export function analyzeV1Alpha4Source(
   let hasSuccessRequest=false,hasValidSuccess=false;
   for (const item of rawNodes.items) {
     const id=scalar(item.key);
-    const body=item.value;
+    const body:any=item.value;
     if (!id || TERMINALS.has(id) || id==="context") {
       add(p.document,"NODE_ID_RESERVED","Node has missing or reserved identifier",item.key);
       continue;
@@ -170,7 +170,7 @@ export function analyzeV1Alpha4Source(
           id:id+"."+stage+"."+outcome,
           source:id,outcome,target,routeSource:stage,
           line:lineAt(p.document,route.key),
-          sourceSpan:{start:route.key.range?.[0]??0,end:route.key.range?.[1]??0},
+          sourceSpan:{start:(route.key as any)?.range?.[0]??0,end:(route.key as any)?.range?.[1]??0},
           patchable:false
         });
       }
