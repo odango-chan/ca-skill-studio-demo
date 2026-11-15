@@ -82,7 +82,7 @@ function isV1Alpha4Source(text, relativePath) {
   if (relativePath.endsWith("/contract.yaml"))
     return /^goal:\s*/m.test(text) && !/^spec:\s*/m.test(text);
   if (relativePath.endsWith("/predicates.yaml"))
-    return /^predicates:\s*/m.test(text) && !/^\s{2,}\w[^:]*:\s*\n\s+inputs:/m.test(text);
+    return /^predicates:\s*/m.test(text) && !/^apiVersion:\s*/m.test(text) && /^\s+parameters:\s*/m.test(text);
   return false;
 }
 
