@@ -155,3 +155,39 @@ test("v1alpha4 marks no Owner identity as a missing qualification, not a synthet
   assert.notEqual(a.state,"READY");
   assert.ok(a.packageAudit.reason.includes("requires v1alpha4 Compiler"));
 });
+
+test("v1alpha4 partial root edits do not switch back to the legacy procedure parser",()=>{
+  const withoutStart=analyzePackageSnapshot(snapshot(procedure.replace("start: check\n","")));
+  assert.equal(withoutStart.state,"PARTIAL");
+  assert.ok(withoutStart.diagnostics.some(x=>x.code==="PROCEDURE_START_MISSING"));
+  assert.ok(!withoutStart.diagnostics.some(x=>x.code==="PROCEDURE_PROJECTION"));
+
+  const withoutNodes=analyzePackageSnapshot(snapshot(procedure.replace("nodes:\n","nodesMissing:\n")));
+  assert.equal(withoutNodes.state,"PARTIAL");
+  assert.ok(withoutNodes.diagnostics.some(x=>x.code==="SOURCE_ROOT_INVALID"));
+  assert.ok(!withoutNodes.diagnostics.some(x=>x.code==="PROCEDURE_PROJECTION"));
+});
+
+test("unreachable Postcondition success cannot hide reachable success bypass",()=>{
+  const orphan=[
+    "  orphan:",
+    "    postcondition:",
+    "      predicates:",
+    "        - predicate: demo.done",
+    "          arguments: [read.observation.output]",
+    "      routes:",
+    "        PASS: SUCCEEDED",
+    "        FAIL: FAILED",
+    "        UNKNOWN: UNRESOLVED",
+    ""
+  ].join("\n");
+  const illegal=procedure.replace("SUCCEEDED: final","SUCCEEDED: SUCCEEDED")
+    .replace("PASS: SUCCEEDED","PASS: FAILED")+orphan;
+  const bypass=analyzePackageSnapshot(snapshot(illegal));
+  assert.ok(bypass.diagnostics.some(x=>x.code==="FINAL_POSTCONDITION_MISSING"));
+
+  const stopOnly=procedure.replace("PASS: SUCCEEDED","PASS: FAILED")+orphan;
+  const stopped=analyzePackageSnapshot(snapshot(stopOnly));
+  assert.ok(!stopped.diagnostics.some(x=>
+    x.code==="FINAL_POSTCONDITION_MISSING"||x.code==="SUCCESS_BYPASSES_FINAL_POSTCONDITION"));
+});
