@@ -191,6 +191,8 @@ test("unreachable Postcondition success cannot hide reachable success bypass",()
   const stopped=analyzePackageSnapshot(snapshot(stopOnly));
   assert.ok(!stopped.diagnostics.some(x=>
     x.code==="FINAL_POSTCONDITION_MISSING"||x.code==="SUCCESS_BYPASSES_FINAL_POSTCONDITION"));
+  assert.ok(stopped.diagnostics.some(x=>
+    x.code==="UNREACHABLE_NODE"&&x.severity==="warning"));
 });
 
 test("global gate accepts ASCII Identifier variants and rejects missing or unreachable stage",()=>{
@@ -241,4 +243,18 @@ test("success reachability is stage-sensitive within a multi-stage Node",()=>{
     base.replace("        SUCCEEDED: final\n","")));
   assert.ok(!advanced.diagnostics.some(x=>
     x.code==="FINAL_POSTCONDITION_MISSING"||x.code==="SUCCESS_BYPASSES_FINAL_POSTCONDITION"));
+});
+
+test("invalid Contract or PredicateSet does not hide a valid Procedure diagram",()=>{
+  const invalidContract=analyzePackageSnapshot(snapshot(
+    procedure,contract.replace("goal:","oldGoal:")));
+  assert.equal(invalidContract.procedure.state,"READY");
+  assert.ok(invalidContract.diagnostics.some(x=>
+    x.relativePath==="assurance/contract.yaml"&&x.severity==="error"));
+
+  const invalidPredicates=analyzePackageSnapshot(snapshot(
+    procedure,contract,predicates.replace("parameters: [{ue: string}]","parameters: []")));
+  assert.equal(invalidPredicates.procedure.state,"READY");
+  assert.ok(invalidPredicates.diagnostics.some(x=>
+    x.relativePath==="assurance/predicates.yaml"&&x.severity==="error"));
 });
