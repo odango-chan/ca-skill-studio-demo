@@ -4,6 +4,9 @@ import { mkdir,mkdtemp,rm } from "node:fs/promises";
 import {readFileSync} from "node:fs";
 import { join,resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import {buildSkillSymbolIndex,skillSymbolAt,uniqueSkillSymbolDeclaration,
+  skillSymbolOccurrences} from "../language/symbol-index.mjs";
+import {collectSkillSemanticTokenSpans} from "../language/semantic-tokens.mjs";
 import { build } from "esbuild";
 
 const tempRoot=resolve(".agent-tmp");
@@ -257,4 +260,51 @@ test("invalid Contract or PredicateSet does not hide a valid Procedure diagram",
   assert.equal(invalidPredicates.procedure.state,"READY");
   assert.ok(invalidPredicates.diagnostics.some(x=>
     x.relativePath==="assurance/predicates.yaml"&&x.severity==="error"));
+});
+
+test("v1alpha4 Contract global gate Definition and References use exact source ranges",()=>{
+  const source=snapshot();
+  const index=buildSkillSymbolIndex(source);
+  const c=source.documents.find(item=>item.relativePath==="assurance/contract.yaml");
+  const p=source.documents.find(item=>item.relativePath==="assurance/procedure.yaml");
+  const at=c.text.indexOf("check.precondition")+2;
+  assert.ok(at>0);
+  const hit=skillSymbolAt(index,c.uri,at);
+  assert.equal(hit?.token.name,"check.precondition");
+  const target=uniqueSkillSymbolDeclaration(hit);
+  assert.equal(target?.relativePath,"assurance/procedure.yaml");
+  assert.equal(p.text.slice(target.range.start,target.range.end),"check");
+  const refs=skillSymbolOccurrences(hit,true);
+  assert.ok(refs.some(item=>item.uri===c.uri&&item.name==="check.precondition"));
+  assert.ok(refs.some(item=>item.uri===p.uri&&item.name==="check"));
+});
+
+test("v1alpha4 Predicate references resolve only declared Package-local names",()=>{
+  const source=snapshot();
+  const index=buildSkillSymbolIndex(source);
+  const p=source.documents.find(item=>item.relativePath==="assurance/procedure.yaml");
+  const at=p.text.indexOf("demo.ready")+3;
+  const hit=skillSymbolAt(index,p.uri,at);
+  assert.equal(hit?.token.type,"skillPredicate");
+  const target=uniqueSkillSymbolDeclaration(hit);
+  assert.equal(target?.relativePath,"assurance/predicates.yaml");
+  assert.equal(target?.name,"demo.ready");
+});
+
+test("v1alpha4 Observation tool reference is indexed without inventing an Owner",()=>{
+  const source=snapshot();
+  const index=buildSkillSymbolIndex(source);
+  const p=source.documents.find(item=>item.relativePath==="assurance/procedure.yaml");
+  const at=p.text.indexOf("ca::session.read")+5;
+  const hit=skillSymbolAt(index,p.uri,at);
+  assert.equal(hit?.token.type,"skillObservation");
+  assert.equal(hit?.token.name,"ca::session.read");
+  assert.equal(uniqueSkillSymbolDeclaration(hit),null);
+});
+
+test("partial v1alpha4 root edits retain AST semantic symbols",()=>{
+  const broken=procedure.replace("start: check\\n","");
+  const spans=collectSkillSemanticTokenSpans(broken,"assurance/procedure.yaml");
+  assert.ok(spans.some(item=>item.type==="skillStep"&&
+    item.modifiers?.includes("declaration")));
 });
