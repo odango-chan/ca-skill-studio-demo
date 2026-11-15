@@ -2,6 +2,7 @@ import { projectWorkspace } from "../../site/workspace.mjs";
 import { auditPackageWorkspace } from "../../site/package-audit.mjs";
 import { scriptNavigationReport } from "../../site/script-navigation.mjs";
 import { pythonTopLevelOutline } from "../../site/python-outline.mjs";
+import { isV1Alpha4Procedure, analyzeV1Alpha4Source } from "./v1alpha4.js";
 import type {
   AnalysisState,
   DocumentAnalysis,
@@ -252,6 +253,38 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   const documentsByPath = new Map(normalizedDocuments.map(document => [document.relativePath, document] as const));
   const files = new Map(normalizedDocuments.map(document => [document.relativePath, { text: document.text }] as const));
   const procedureDocument = documentsByPath.get("assurance/procedure.yaml");
+
+  // CA-SL v1alpha4 is a breaking syntax target. Do not run the v0.2
+  // procedures/call/with Package analyzer against the root start/nodes model.
+  // Source projection can supply exact editor locations without any claim
+  // that trusted v1alpha4 ToolCatalog, CapabilityContracts or Host Schema
+  // publications have been linked.
+  if (procedureDocument && isV1Alpha4Procedure(procedureDocument.text)) {
+    const projected = analyzeV1Alpha4Source(documentsByPath, snapshot.packageName);
+    return {
+      state: "PARTIAL",
+      rootUri: snapshot.rootUri,
+      packageName: snapshot.packageName,
+      generation: snapshot.generation,
+      procedure: projected.procedure,
+      packageAudit: {
+        state: "UNAVAILABLE",
+        reason: snapshot.completeness !== "complete"
+          ? (snapshot.reason ?? "Partial Package snapshot")
+          : "CA-SL v1alpha4 source parsed; trusted Owner/Capability/Schema linking requires v1alpha4 Compiler and published snapshots",
+        diagnostics: []
+      },
+      documents: normalizedDocuments.map(document => ({
+        uri: document.uri, relativePath: document.relativePath,
+        version: document.version, languageId: document.languageId,
+        pythonOutlineState: "NOT_APPLICABLE" as const,
+        pythonSymbols: []
+      })),
+      scriptReferences: [],
+      schemaReferences: [],
+      diagnostics: projected.diagnostics
+    };
+  }
   let procedure: ProcedureProjection;
 
   if (!procedureDocument) {
