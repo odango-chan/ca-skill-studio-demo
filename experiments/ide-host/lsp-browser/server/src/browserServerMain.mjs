@@ -662,6 +662,16 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
   if(stageField && inNode)return make(["precondition:","operation:","observation:","postcondition:"],
     stageField[2],lineStart+4);
 
+  const memberField=/^ {6}([a-zA-Z]*)$/.exec(prefix);
+  if(memberField && inNode && stage){
+    const fields=stage==="precondition"||stage==="postcondition"
+      ?["predicates:","routes:"]:
+      stage==="observation"?["tool:","arguments:","routes:"]:
+      ["tool:","script:","arguments:","retryOf:","routes:"];
+    return make(fields,memberField[1],lineStart+6,
+      CompletionItemKind.Keyword,"CA-SL v1alpha4 "+stage+" stage fields");
+  }
+
   const routeKey=/^( {8})([A-Z_]*)$/.exec(prefix);
   if(routeKey && inNode && section==="routes" && stage){
     const keys=stage==="precondition"||stage==="postcondition"
