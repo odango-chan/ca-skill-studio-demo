@@ -38,8 +38,7 @@ function symbolKey(token,name){
       // The Contract gate references one exact Node precondition stage.
       // Its full scalar is <NodeId>.precondition, but navigation points to
       // that Node's declaration (no separate author stage declaration).
-      if(token.path?.length===1 && token.path[0]==="precondition" &&
-         token.relativePath==="assurance/contract.yaml"){
+      if(token.path?.length===1 && token.path[0]==="precondition"){
         const matched=/^([A-Za-z][A-Za-z0-9_-]*)\.precondition$/.exec(name);
         return matched?"step\u0000"+matched[1]:null;
       }
