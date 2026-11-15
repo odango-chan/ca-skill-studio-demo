@@ -213,3 +213,31 @@ test("global gate accepts ASCII Identifier variants and rejects missing or unrea
     x.code==="ENTRY_PRECONDITION_REF_INVALID"&&
     x.relativePath==="assurance/contract.yaml"));
 });
+
+test("success reachability is stage-sensitive within a multi-stage Node",()=>{
+  const localFinal=[
+    "    postcondition:",
+    "      predicates:",
+    "        - predicate: demo.done",
+    "          arguments: [read.observation.output]",
+    "      routes:",
+    "        PASS: SUCCEEDED",
+    "        FAIL: FAILED",
+    "        UNKNOWN: UNRESOLVED",
+    "  final:",
+    ""
+  ].join("\n");
+  const base=procedure.replace("  final:\n",localFinal);
+  // An explicit normal route bypasses the later postcondition in the
+  // same Node. The also-unreachable original final cannot supply proof.
+  const bypass=analyzePackageSnapshot(snapshot(
+    base.replace("SUCCEEDED: final","SUCCEEDED: SUCCEEDED")));
+  assert.ok(bypass.diagnostics.some(x=>x.code==="FINAL_POSTCONDITION_MISSING"));
+
+  // Without the explicit normal route, the Observation SUCCEEDED outcome
+  // implicitly advances to the local Postcondition.
+  const advanced=analyzePackageSnapshot(snapshot(
+    base.replace("        SUCCEEDED: final\n","")));
+  assert.ok(!advanced.diagnostics.some(x=>
+    x.code==="FINAL_POSTCONDITION_MISSING"||x.code==="SUCCESS_BYPASSES_FINAL_POSTCONDITION"));
+});
