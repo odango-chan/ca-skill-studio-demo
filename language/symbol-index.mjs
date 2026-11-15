@@ -5,6 +5,7 @@ const SYMBOL_TYPES=new Set([
   "skillStep",
   "skillPredicate",
   "skillOperation",
+  "skillObservation",
   "skillCapability",
   "skillSchema"
 ]);
@@ -34,6 +35,14 @@ function symbolKey(token,name){
     case "skillProcedure":
       return "procedure\u0000"+name;
     case "skillStep":{
+      // The Contract gate references one exact Node precondition stage.
+      // Its full scalar is <NodeId>.precondition, but navigation points to
+      // that Node's declaration (no separate author stage declaration).
+      if(token.path?.length===1 && token.path[0]==="precondition" &&
+         token.relativePath==="assurance/contract.yaml"){
+        const matched=/^([A-Za-z][A-Za-z0-9_-]*)\.precondition$/.exec(name);
+        return matched?"step\u0000"+matched[1]:null;
+      }
       // v1alpha4 has one procedure with root nodes/<NodeId>.
       if(token.path?.[0]==="nodes")
         return "step\u0000"+name;
@@ -45,6 +54,7 @@ function symbolKey(token,name){
     case "skillPredicate":
       return "predicate\u0000"+name;
     case "skillOperation":
+    case "skillObservation":
       return "operation\u0000"+name;
     // allowedResources.capabilities may grant a Capability or a direct
     // Operation. The v0.2 projection has no local Capability declaration
