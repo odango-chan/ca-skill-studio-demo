@@ -15,7 +15,7 @@ const OLD_FIELDS = new Set(["procedures","with","call","verify","reconcile","res
 const EVAL_FIELDS = new Set(["parameters","evidence","evaluator"]);
 
 export function isV1Alpha4Procedure(text: string): boolean {
-  return /(?m:^start:\s*)/.test(text) && /(?m:^nodes:\s*)/.test(text);
+  return /^start:\s*/m.test(text) && /^nodes:\s*/m.test(text);
 }
 
 type SyntaxResult = {root: any; document: PackageDocumentSnapshot} | null;
@@ -181,8 +181,8 @@ export function analyzeV1Alpha4Source(
         if (stageNames.at(-1)===stage && !rawRoutes.has("PASS"))
           add(p.document,"ROUTE_OUTCOME_MISSING","Final Predicate stage requires PASS route",part);
       }
-      if(stage==="operation" && isMap(rawRoutes) && part.has("tool") && !rawRoutes.has("OUTCOME_UNKNOWN"))
-        add(p.document,"OWNER_LINK_UNVERIFIED","Mutation OUTCOME_UNKNOWN obligation needs trusted Owner Effect; Studio cannot infer that Tool is READ",part);
+      // Mutation-only OUTCOME_UNKNOWN is decided from an exact trusted Owner
+      // Effect: never flag a legal READ just because a catalog is absent.
     }
     adjacency.set(id,outgoing);
     nodes.push({
