@@ -86,7 +86,7 @@ export function analyzeV1Alpha4Source(
     props(c.root,c.document,CONTRACT_FIELDS);
     if (!scalar(c.root.get("goal",true))) add(c.document,"SOURCE_ROOT_INVALID","Contract must declare one goal",c.root);
     const gate=c.root.get("precondition",true);
-    if (gate!==undefined && (!scalar(gate) || !/^[a-z][a-z0-9-]*\.precondition$/.test(scalar(gate))))
+    if (gate!==undefined && (!scalar(gate) || !/^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(scalar(gate))))
       add(c.document,"ENTRY_PRECONDITION_REF_INVALID","Contract precondition is a single node.precondition reference",gate);
   }
   if (predicates) {
@@ -198,6 +198,19 @@ export function analyzeV1Alpha4Source(
   }
   if(declared.has(start))walk(start);
   if(cycle)add(p.document,"CONTROL_FLOW_CYCLE","Procedure DAG contains a reachable cycle",rawNodes);
+  // A Contract gate must identify a real, reachable Precondition stage.
+  // This lexical/source check requires no trusted Owner publication.
+  if (c) {
+    const gate=c.root.get("precondition",true);
+    const reference=scalar(gate);
+    if (reference && /^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(reference)) {
+      const nodeId=reference.slice(0,-".precondition".length);
+      const node=rawNodes.get(nodeId,true);
+      if (!isMap(node) || !isMap(node.get("precondition",true)) || !visited.has(nodeId))
+        add(c.document,"ENTRY_PRECONDITION_REF_INVALID",
+          "Contract precondition must reference a reachable Node precondition stage",gate);
+    }
+  }
   // Success is a property of reachable source routes, not simply of a key
   // appearing anywhere in the YAML. An orphan final stage cannot prove Goal
   // or hide a reachable bypass (§12.9).
