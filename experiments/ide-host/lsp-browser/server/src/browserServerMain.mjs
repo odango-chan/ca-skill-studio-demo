@@ -357,7 +357,7 @@ connection.onDefinition(params => {
     const declaration=uniqueSkillSymbolDeclaration(symbolHit);
     if(!declaration){
       if(symbolHit.declarations.length||
-         !["skillOperation","skillCapability"].includes(symbolHit.token.type))return null;
+         !["skillOperation","skillObservation","skillCapability"].includes(symbolHit.token.type))return null;
       return projectOperationCatalog(snapshot,index).get(symbolHit.token.name)?.location??null;
     }
     const target=snapshotDocumentFor(snapshot,declaration.uri);
@@ -427,6 +427,7 @@ connection.onHover(params => {
       skillStep:"Procedure node",
       skillPredicate:"Predicate",
       skillOperation:"Tool Operation",
+      skillObservation:"Observation Tool",
       skillCapability:"Capability grant",
       skillSchema:"Schema",
       skillReference:"Script / Reference"
@@ -435,7 +436,7 @@ connection.onHover(params => {
       index?.generation===snapshot.generation);
     const operation=!symbolHit.declarations.length&&snapshot.completeness==="complete"&&
       index?.generation===snapshot.generation&&
-      ["skillOperation","skillCapability"].includes(symbolHit.token.type)
+      ["skillOperation","skillObservation","skillCapability"].includes(symbolHit.token.type)
       ? projectOperationCatalog(snapshot,index).get(symbolHit.token.name) : null;
     const body=operation
       ? "**Tool Operation** `"+operation.id+"`\n\nDeclared in project dependency `"+
@@ -529,6 +530,15 @@ connection.onDocumentSymbol(params => {
       if(range)symbols.push({name:item.name,kind:SymbolKind.Function,
         range,selectionRange:range});
     }
+    // v1alpha4 has one root Node graph and no named Procedure declaration.
+    // Show those Nodes in native Outline rather than returning an empty list.
+    if(!procedures.length && source.relativePath==="assurance/procedure.yaml"){
+      for(const item of steps.filter(item=>item.path?.[0]==="nodes")){
+        const range=toLspRange(source.text,item.range);
+        if(range)symbols.push({name:item.name,kind:SymbolKind.Method,
+          range,selectionRange:range});
+      }
+    }
     if(symbols.length)return symbols;
   }
   const value = packageForUri(uri);
@@ -546,8 +556,10 @@ connection.onDocumentSymbol(params => {
 
 /** v1alpha4 authoring completions are syntax suggestions, not Owner grants. */
 function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
-  if (document.relativePath!=="assurance/procedure.yaml" ||
-      !/^start:\s*/m.test(document.text) || !/^nodes:\s*/m.test(document.text))
+  const isProcedure=document.relativePath==="assurance/procedure.yaml";
+  const isContract=document.relativePath==="assurance/contract.yaml";
+  if(!isProcedure&&!isContract)return null;
+  if(isProcedure&&!/^(?:start|nodes):[ \t]*/m.test(document.text))
     return null;
 
   const lines=document.text.slice(0,lineStart).split(/\r?\n/);
@@ -561,7 +573,7 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
     parsed=parseDocument(document.text,{version:"1.2",strict:true,
       uniqueKeys:true,logLevel:"silent"});
   }catch{return [];}
-  const nodes=isMap(parsed.contents) ? parsed.contents.get("nodes",true) : null;
+  const nodes=isProcedure&&isMap(parsed.contents) ? parsed.contents.get("nodes",true) : null;
   const localNodes=isMap(nodes)?nodes.items
     .filter(item=>isScalar(item.key)&&typeof item.key.value==="string")
     .map(item=>item.key.value):[];
@@ -573,6 +585,56 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
         end:positionAt(lineStarts(document.text),offset)
       },newText:name}
     }));
+
+  if(isContract){
+    // Only suggest actual, locally declared Precondition stages from this
+    // Package. An unresolved or partial Procedure is not a declaration source.
+    const gate=/^precondition:[ \t]*([A-Za-z0-9_-]*)$/.exec(prefix);
+    if(gate && value.snapshot.completeness==="complete"){
+      const procedure=value.snapshot.documents.find(item=>
+        item.relativePath==="assurance/procedure.yaml");
+      if(!procedure)return [];
+      try {
+        const doc=parseDocument(procedure.text,{version:"1.2",strict:true,
+          uniqueKeys:true,logLevel:"silent"});
+        const sourceNodes=isMap(doc.contents)?doc.contents.get("nodes",true):null;
+        if(doc.errors.length||!isMap(sourceNodes))return [];
+        const choices=sourceNodes.items.filter(item=>
+          isScalar(item.key)&&typeof item.key.value==="string"&&
+          isMap(item.value)&&isMap(item.value.get("precondition",true)))
+          .map(item=>item.key.value+".precondition");
+        return make(choices,gate[1],offset-gate[1].length,
+          CompletionItemKind.Reference,"Declared Package Precondition stage");
+      }catch{return [];}
+    }
+    const request=/^requestSchema:[ \t]*([A-Za-z0-9_./-]*)$/.exec(prefix);
+    if(request && value.snapshot.completeness==="complete"){
+      return make(value.snapshot.documents
+        .filter(item=>/^schemas\/[A-Za-z0-9_.-]+\.schema\.ya?ml$/.test(item.relativePath))
+        .map(item=>item.relativePath),request[1],offset-request[1].length,
+        CompletionItemKind.File,"Skill-owned request Schema");
+    }
+    return null;
+  }
+
+  const predicate=/^\s*-\s+predicate:[ \t]*([A-Za-z0-9_.-]*)$/.exec(prefix);
+  if(predicate && (stage==="precondition"||stage==="postcondition") &&
+     value.snapshot.completeness==="complete"){
+    const definition=value.snapshot.documents.find(item=>
+      item.relativePath==="assurance/predicates.yaml");
+    if(!definition)return [];
+    try {
+      const doc=parseDocument(definition.text,{version:"1.2",strict:true,
+        uniqueKeys:true,logLevel:"silent"});
+      const predicates=isMap(doc.contents)?doc.contents.get("predicates",true):null;
+      if(doc.errors.length||!isMap(predicates))return [];
+      const ids=predicates.items.filter(item=>
+        isScalar(item.key)&&typeof item.key.value==="string"&&isMap(item.value))
+        .map(item=>item.key.value);
+      return make(ids,predicate[1],offset-predicate[1].length,
+        CompletionItemKind.Reference,"Package-local Predicate declaration");
+    }catch{return [];}
+  }
 
   const stageField=/^( {4})([a-z]*)$/.exec(prefix);
   if(stageField)return make(["precondition:","operation:","observation:","postcondition:"],
