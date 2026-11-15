@@ -114,7 +114,11 @@ export function analyzeV1Alpha4Source(
   if (!start || !declared.has(start)) add(p.document,"PROCEDURE_START_MISSING","start must name a declared Node",p.root.get("start",true));
   const nodes:ProcedureNode[]=[];
   const routes:ProcedureRoute[]=[];
+  // Reachability belongs to (Node,Stage), not just Node. A routed normal
+  // outcome skips later stages in that Node; only an unrouted normal
+  // outcome implicitly falls through (§12.1, §12.9).
   const adjacency=new Map<string,string[]>();
+  const firstStage=new Map<string,string>();
   for (const item of rawNodes.items) {
     const id=scalar(item.key);
     const body:any=item.value;
@@ -125,8 +129,9 @@ export function analyzeV1Alpha4Source(
     props(body,p.document,new Set(STAGES));
     const stageNames=STAGES.filter(x=>isMap(body)&&body.has(x));
     if (!stageNames.length) add(p.document,"SOURCE_ROOT_INVALID","Node must declare at least one stage",body);
-    const outgoing:string[]=[];
+    if (stageNames.length)firstStage.set(id,id+"."+stageNames[0]);
     for (const stage of stageNames) {
+      const outgoing:string[]=[];
       const part=body.get(stage,true);
       if (!isMap(part)) { add(p.document,"SOURCE_ROOT_INVALID",stage+" stage must be a mapping",part);continue; }
       props(part,p.document,new Set(stage==="precondition"||stage==="postcondition"
@@ -180,8 +185,12 @@ export function analyzeV1Alpha4Source(
       }
       // Mutation-only OUTCOME_UNKNOWN is decided from an exact trusted Owner
       // Effect: never flag a legal READ just because a catalog is absent.
+      const next=stageNames[stageNames.indexOf(stage)+1];
+      const normal=(stage==="precondition"||stage==="postcondition")?"PASS":"SUCCEEDED";
+      if (next && !(isMap(rawRoutes)&&rawRoutes.has(normal)))
+        outgoing.push(id+"."+next);
+      adjacency.set(id+"."+stage,outgoing);
     }
-    adjacency.set(id,outgoing);
     nodes.push({
       id, operator:stageNames[0]??"",value:stageNames.join(", "),
       line:lineAt(p.document,item.key),phases:[],children:[]
@@ -189,14 +198,18 @@ export function analyzeV1Alpha4Source(
   }
   const visited=new Set<string>(),active=new Set<string>();
   let cycle=false;
-  function walk(node:string) {
-    if(active.has(node)){cycle=true;return;}
-    if(visited.has(node))return;
-    visited.add(node);active.add(node);
-    for(const child of adjacency.get(node)??[])walk(child);
-    active.delete(node);
+  function walk(stage:string) {
+    if(active.has(stage)){cycle=true;return;}
+    if(visited.has(stage))return;
+    visited.add(stage);active.add(stage);
+    for(const child of adjacency.get(stage)??[]) {
+      const target=firstStage.get(child)??child;
+      if(adjacency.has(target))walk(target);
+    }
+    active.delete(stage);
   }
-  if(declared.has(start))walk(start);
+  const entry=firstStage.get(start);
+  if(entry)walk(entry);
   if(cycle)add(p.document,"CONTROL_FLOW_CYCLE","Procedure DAG contains a reachable cycle",rawNodes);
   // A Contract gate must identify a real, reachable Precondition stage.
   // This lexical/source check requires no trusted Owner publication.
@@ -206,7 +219,7 @@ export function analyzeV1Alpha4Source(
     if (reference && /^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(reference)) {
       const nodeId=reference.slice(0,-".precondition".length);
       const node=rawNodes.get(nodeId,true);
-      if (!isMap(node) || !isMap(node.get("precondition",true)) || !visited.has(nodeId))
+      if (!isMap(node) || !isMap(node.get("precondition",true)) || !visited.has(nodeId+".precondition"))
         add(c.document,"ENTRY_PRECONDITION_REF_INVALID",
           "Contract precondition must reference a reachable Node precondition stage",gate);
     }
@@ -214,7 +227,7 @@ export function analyzeV1Alpha4Source(
   // Success is a property of reachable source routes, not simply of a key
   // appearing anywhere in the YAML. An orphan final stage cannot prove Goal
   // or hide a reachable bypass (§12.9).
-  const successRoutes=routes.filter(route=>visited.has(route.source)&&route.target==="SUCCEEDED");
+  const successRoutes=routes.filter(route=>visited.has(route.source+"."+route.routeSource)&&route.target==="SUCCEEDED");
   const hasValidSuccess=successRoutes.some(route=>
     route.routeSource==="postcondition"&&route.outcome==="PASS");
   if(successRoutes.length && !hasValidSuccess)
