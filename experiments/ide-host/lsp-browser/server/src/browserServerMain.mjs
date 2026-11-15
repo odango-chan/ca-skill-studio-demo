@@ -562,17 +562,33 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
   if(isProcedure&&!/^(?:start|nodes):[ \t]*/m.test(document.text))
     return null;
 
+  // Track the current YAML indentation scope. Looking for the last stage
+  // alone leaks stale completion candidates across Nodes and into arguments.
   const lines=document.text.slice(0,lineStart).split(/\r?\n/);
-  let stage=null;
-  for(let i=lines.length-1;i>=0;i--){
-    const m=/^ {4}(precondition|operation|observation|postcondition):\s*$/.exec(lines[i]);
-    if(m){stage=m[1];break;}
+  let inNodes=false,inNode=false,stage=null,section=null;
+  for(const line of lines){
+    if(/^nodes:\s*$/.test(line)){
+      inNodes=true;inNode=false;stage=null;section=null;continue;
+    }
+    if(/^[^\s#]/.test(line)){
+      inNodes=false;inNode=false;stage=null;section=null;continue;
+    }
+    if(!inNodes)continue;
+    if(/^ {2}[A-Za-z][A-Za-z0-9_-]*:\s*$/.test(line)){
+      inNode=true;stage=null;section=null;continue;
+    }
+    if(!inNode)continue;
+    const nextStage=/^ {4}(precondition|operation|observation|postcondition):\s*$/.exec(line);
+    if(nextStage){stage=nextStage[1];section=null;continue;}
+    const nextSection=/^ {6}(predicates|arguments|routes):\s*$/.exec(line);
+    if(nextSection)section=nextSection[1];
   }
   let parsed;
   try {
     parsed=parseDocument(document.text,{version:"1.2",strict:true,
       uniqueKeys:true,logLevel:"silent"});
   }catch{return [];}
+  if(parsed.errors.length)return [];
   const nodes=isProcedure&&isMap(parsed.contents) ? parsed.contents.get("nodes",true) : null;
   const localNodes=isMap(nodes)?nodes.items
     .filter(item=>isScalar(item.key)&&typeof item.key.value==="string")
@@ -617,8 +633,14 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
     return null;
   }
 
-  const predicate=/^\s*-\s+predicate:[ \t]*([A-Za-z0-9_.-]*)$/.exec(prefix);
-  if(predicate && (stage==="precondition"||stage==="postcondition") &&
+  const entry=/^start:[ \t]*([A-Za-z0-9_-]*)$/.exec(prefix);
+  if(entry && value.snapshot.completeness==="complete")
+    return make(localNodes,entry[1],offset-entry[1].length,
+      CompletionItemKind.Reference,"Declared Package Node");
+
+  const predicate=/^ {8}-[ \t]+predicate:[ \t]*([A-Za-z0-9_.-]*)$/.exec(prefix);
+  if(predicate && section==="predicates" &&
+     (stage==="precondition"||stage==="postcondition") &&
      value.snapshot.completeness==="complete"){
     const definition=value.snapshot.documents.find(item=>
       item.relativePath==="assurance/predicates.yaml");
@@ -637,11 +659,11 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
   }
 
   const stageField=/^( {4})([a-z]*)$/.exec(prefix);
-  if(stageField)return make(["precondition:","operation:","observation:","postcondition:"],
+  if(stageField && inNode)return make(["precondition:","operation:","observation:","postcondition:"],
     stageField[2],lineStart+4);
 
   const routeKey=/^( {8})([A-Z_]*)$/.exec(prefix);
-  if(routeKey && stage){
+  if(routeKey && inNode && section==="routes" && stage){
     const keys=stage==="precondition"||stage==="postcondition"
       ?["PASS:","FAIL:","UNKNOWN:"] :
       stage==="observation"?["SUCCEEDED:","FAILED:","UNKNOWN:","DENIED:"]:
@@ -650,20 +672,33 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
       "Outcome key; actual Owner Effect/allowed outcomes need Compiler linking");
   }
 
-  const routeTarget=/^(\s*(PASS|FAIL|UNKNOWN|SUCCEEDED|FAILED|DENIED|OUTCOME_UNKNOWN):\s*)([A-Za-z0-9_-]*)$/.exec(prefix);
-  if(routeTarget && stage){
+  const routeTarget=/^( {8}(PASS|FAIL|UNKNOWN|SUCCEEDED|FAILED|DENIED|OUTCOME_UNKNOWN):\s*)([A-Za-z0-9_-]*)$/.exec(prefix);
+  if(routeTarget && inNode && section==="routes" && stage){
     const outcome=routeTarget[2],typed=routeTarget[3];
     const terminal=outcome==="UNKNOWN"||outcome==="OUTCOME_UNKNOWN"
       ?["UNRESOLVED","SAFE_STOPPED"]:
       outcome==="FAIL"||outcome==="FAILED"||outcome==="DENIED"
       ?["FAILED","SAFE_STOPPED"]:stage==="postcondition"&&outcome==="PASS"
       ?["SUCCEEDED"]:["SAFE_STOPPED"];
-    return make([...localNodes,...terminal],typed,offset-typed.length,CompletionItemKind.Reference,
+    // An unresolved Mutation may only stop. Never offer a Node as the
+    // target of OUTCOME_UNKNOWN: it would violate frozen §12.7/§22.
+    const choices=outcome==="OUTCOME_UNKNOWN"?terminal:[...localNodes,...terminal];
+    return make(choices,typed,offset-typed.length,CompletionItemKind.Reference,
       "Local Node / terminal; final SUCCEEDED only from Postcondition PASS");
   }
 
-  const tool=/^(\s*tool:\s*)([A-Za-z0-9_:.-]*)$/.exec(prefix);
-  if(tool){
+  const script=/^ {6}script:[ \t]*([A-Za-z0-9_./-]*)$/.exec(prefix);
+  if(script && inNode && stage==="operation" &&
+     value.snapshot.completeness==="complete"){
+    const names=value.snapshot.documents
+      .filter(item=>/^scripts\/[A-Za-z0-9_.-]+\.py$/.test(item.relativePath))
+      .map(item=>item.relativePath);
+    return make(names,script[1],offset-script[1].length,
+      CompletionItemKind.File,"Package-local Procedure Script");
+  }
+
+  const tool=/^ {6}tool:[ \t]*([A-Za-z0-9_:.-]*)$/.exec(prefix);
+  if(tool && inNode && (stage==="operation"||stage==="observation")){
     // Only list exact IDs explicitly supplied with the accepted snapshot.
     // These are source hints; membership, Scope and Effect are not inferred.
     const ids=[...new Set((value.snapshot.dependencyOperations??[])
