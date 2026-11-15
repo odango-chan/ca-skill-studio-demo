@@ -53,8 +53,10 @@ function symbolKey(token,name){
     case "skillPredicate":
       return "predicate\u0000"+name;
     case "skillOperation":
-    case "skillObservation":
       return "operation\u0000"+name;
+    case "skillObservation":
+      // Observation is not interchangeable with an Operation export.
+      return "observation\u0000"+name;
     // allowedResources.capabilities may grant a Capability or a direct
     // Operation. The v0.2 projection has no local Capability declaration
     // profile, so resolve this only when an exact imported Operation exists.
