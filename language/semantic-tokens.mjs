@@ -78,7 +78,7 @@ function scalarSpan(text, scalar) {
 
 function isV1Alpha4Source(text, relativePath) {
   if (relativePath.endsWith("/procedure.yaml"))
-    return /^start:\s*/m.test(text) && /^nodes:\s*/m.test(text);
+    return /^(?:start|nodes):[ \t]*/m.test(text);
   if (relativePath.endsWith("/contract.yaml"))
     return /^goal:\s*/m.test(text) && !/^spec:\s*/m.test(text);
   if (relativePath.endsWith("/predicates.yaml"))
@@ -125,6 +125,8 @@ function classifyV1Alpha4Tokens(text, relativePath) {
       else if(root==="procedure" && parent.includes("routes"))
         push(value,["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(value.value)?"skillOutcome":"skillStep",
           ["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(value.value)?[]:["reference"],path,"value");
+      else if(root==="contract" && last==="precondition")
+        push(value,"skillStep",["reference"],path,"value");
       else if(root==="contract" && last==="requestSchema")
         push(value,"skillSchema",["reference"],path,"value");
       else if(root==="contract" && last==="contextSchema")
