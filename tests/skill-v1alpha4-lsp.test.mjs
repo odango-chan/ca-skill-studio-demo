@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdir,mkdtemp,rm } from "node:fs/promises";
+import {readFileSync} from "node:fs";
 import { join,resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
@@ -88,6 +89,25 @@ function snapshot(source=procedure,contractSource=contract,predicatesSource=pred
       uri:"file:///workspace/sample/"+relativePath,relativePath,text,version:1
     }))};
 }
+
+test("optional Studio examples mirror the pinned PDU/MAS v1alpha4 source shape",()=>{
+  for(const [name,expectedNodes] of [["establish-pdu-session",15],["establish-pdu-session-mas",18]]) {
+    const files=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml",
+      "assurance/predicates.yaml","schemas/establishment-request.schema.yaml"];
+    const docs=files.map(relativePath=>({
+      relativePath,uri:"file:///workspace/"+name+"/"+relativePath,version:1,
+      text:readFileSync(new URL("../site/samples/v1alpha4/"+name+"/"+relativePath,import.meta.url),"utf8")
+    }));
+    const result=analyzePackageSnapshot({rootUri:"file:///workspace/"+name,
+      packageName:name,generation:1,completeness:"complete",documents:docs});
+    assert.equal(result.state,"PARTIAL");
+    assert.equal(result.procedure.state,"READY",
+      name+" source structure should be projected without a trusted Owner");
+    assert.ok(result.procedure.procedures[0].nodes.length>=expectedNodes);
+    assert.ok(!result.diagnostics.some(x=>x.severity==="error"),
+      name+" editor should not fabricate source errors: "+JSON.stringify(result.diagnostics));
+  }
+});
 
 test("v1alpha4 AST graph projects nodes and routes but never claims Owner qualification",()=>{
   const a=analyzePackageSnapshot(snapshot());
