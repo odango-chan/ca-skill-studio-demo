@@ -654,6 +654,7 @@ test("browser LSP v1alpha4 scopes completion and resolves local declarations",as
     "  check:",
     "    ",
     "    precondition:",
+    "      ",
     "      predicates:",
     "        - predicate: sample.ready",
     "          arguments: [context.ueRef]",
@@ -663,6 +664,7 @@ test("browser LSP v1alpha4 scopes completion and resolves local declarations",as
     "        UNKNOWN: UNRESOLVED",
     "  read:",
     "    observation:",
+    "      ",
     "      tool: ca::session.read",
     "      arguments:",
     "        ",
@@ -749,6 +751,14 @@ test("browser LSP v1alpha4 scopes completion and resolves local declarations",as
       .includes("check"));
     assert.ok(labels(await completion(p,"  check:\n    ","  check:\n    ".length))
       .includes("precondition:"));
+    const preFields=labels(await completion(p,
+      "    precondition:\n      ","    precondition:\n      ".length));
+    assert.ok(preFields.includes("predicates:")&&preFields.includes("routes:"));
+    assert.ok(!preFields.includes("tool:")&&!preFields.includes("script:"));
+    const obsFields=labels(await completion(p,
+      "    observation:\n      ","    observation:\n      ".length));
+    assert.ok(obsFields.includes("tool:")&&obsFields.includes("arguments:"));
+    assert.ok(!obsFields.includes("script:")&&!obsFields.includes("retryOf:"));
 
     const unsafe=labels(await completion(p,"OUTCOME_UNKNOWN:","OUTCOME_UNKNOWN:".length));
     assert.ok(unsafe.includes("SAFE_STOPPED"));
