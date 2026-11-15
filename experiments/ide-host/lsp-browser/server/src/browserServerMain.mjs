@@ -357,7 +357,7 @@ connection.onDefinition(params => {
     const declaration=uniqueSkillSymbolDeclaration(symbolHit);
     if(!declaration){
       if(symbolHit.declarations.length||
-         !["skillOperation","skillObservation","skillCapability"].includes(symbolHit.token.type))return null;
+         !["skillOperation","skillCapability"].includes(symbolHit.token.type))return null;
       return projectOperationCatalog(snapshot,index).get(symbolHit.token.name)?.location??null;
     }
     const target=snapshotDocumentFor(snapshot,declaration.uri);
@@ -436,7 +436,7 @@ connection.onHover(params => {
       index?.generation===snapshot.generation);
     const operation=!symbolHit.declarations.length&&snapshot.completeness==="complete"&&
       index?.generation===snapshot.generation&&
-      ["skillOperation","skillObservation","skillCapability"].includes(symbolHit.token.type)
+      ["skillOperation","skillCapability"].includes(symbolHit.token.type)
       ? projectOperationCatalog(snapshot,index).get(symbolHit.token.name) : null;
     const body=operation
       ? "**Tool Operation** `"+operation.id+"`\n\nDeclared in project dependency `"+
