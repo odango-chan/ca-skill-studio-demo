@@ -17,14 +17,16 @@ const establishExtras=[
   "scripts/select_establishment_configuration.py"
 ];
 export const SAMPLE_PACKAGES=Object.freeze({
-  establish:Object.freeze({name:"establish-pdu-session",entry:"assurance/procedure.yaml",files:Object.freeze([...core,...establishExtras])})
+  establish:Object.freeze({name:"establish-pdu-session",entry:"assurance/procedure.yaml",files:Object.freeze([...core,...establishExtras])}),
+  establishV4:Object.freeze({name:"establish-pdu-session",entry:"assurance/procedure.yaml",sourceDir:"v1alpha4",files:Object.freeze([...core,"schemas/establishment-request.schema.yaml"])}),
+  masV4:Object.freeze({name:"establish-pdu-session-mas",entry:"assurance/procedure.yaml",sourceDir:"v1alpha4",files:Object.freeze([...core,"schemas/establishment-request.schema.yaml"])})
 });
 
 export function packageFilesForSample(key) {
   const spec=SAMPLE_PACKAGES[key];
   if(!spec)throw new Error("Unknown sample package");
   return spec.files.map(path=>({
-    path,url:"./samples/packages/"+spec.name+"/"+path
+    path,url:"./samples/"+(spec.sourceDir??"packages")+"/"+spec.name+"/"+path
   }));
 }
 
