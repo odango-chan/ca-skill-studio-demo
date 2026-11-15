@@ -544,6 +544,75 @@ connection.onDocumentSymbol(params => {
     })).filter(symbol => symbol.location);
 });
 
+/** v1alpha4 authoring completions are syntax suggestions, not Owner grants. */
+function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
+  if (document.relativePath!=="assurance/procedure.yaml" ||
+      !/^start:\s*/m.test(document.text) || !/^nodes:\s*/m.test(document.text))
+    return null;
+
+  const lines=document.text.slice(0,lineStart).split(/\r?\n/);
+  let stage=null;
+  for(let i=lines.length-1;i>=0;i--){
+    const m=/^ {4}(precondition|operation|observation|postcondition):\s*$/.exec(lines[i]);
+    if(m){stage=m[1];break;}
+  }
+  let parsed;
+  try {
+    parsed=parseDocument(document.text,{version:"1.2",strict:true,
+      uniqueKeys:true,logLevel:"silent"});
+  }catch{return [];}
+  const nodes=isMap(parsed.contents) ? parsed.contents.get("nodes",true) : null;
+  const localNodes=isMap(nodes)?nodes.items
+    .filter(item=>isScalar(item.key)&&typeof item.key.value==="string")
+    .map(item=>item.key.value):[];
+  const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="CA-SL v1alpha4 source syntax")=>
+    labels.filter(name=>name.startsWith(typed)).map(name=>({
+      label:name,kind,detail,
+      textEdit:{range:{
+        start:positionAt(lineStarts(document.text),start),
+        end:positionAt(lineStarts(document.text),offset)
+      },newText:name}
+    }));
+
+  const stageField=/^( {4})([a-z]*)$/.exec(prefix);
+  if(stageField)return make(["precondition:","operation:","observation:","postcondition:"],
+    stageField[2],lineStart+4);
+
+  const routeKey=/^( {8})([A-Z_]*)$/.exec(prefix);
+  if(routeKey && stage){
+    const keys=stage==="precondition"||stage==="postcondition"
+      ?["PASS:","FAIL:","UNKNOWN:"] :
+      stage==="observation"?["SUCCEEDED:","FAILED:","UNKNOWN:","DENIED:"]:
+      ["SUCCEEDED:","FAILED:","DENIED:","OUTCOME_UNKNOWN:"];
+    return make(keys,routeKey[2],lineStart+8,CompletionItemKind.EnumMember,
+      "Outcome key; actual Owner Effect/allowed outcomes need Compiler linking");
+  }
+
+  const routeTarget=/^(\s*(PASS|FAIL|UNKNOWN|SUCCEEDED|FAILED|DENIED|OUTCOME_UNKNOWN):\s*)([A-Za-z0-9_-]*)$/.exec(prefix);
+  if(routeTarget && stage){
+    const outcome=routeTarget[2],typed=routeTarget[3];
+    const terminal=outcome==="UNKNOWN"||outcome==="OUTCOME_UNKNOWN"
+      ?["UNRESOLVED","SAFE_STOPPED"]:
+      outcome==="FAIL"||outcome==="FAILED"||outcome==="DENIED"
+      ?["FAILED","SAFE_STOPPED"]:stage==="postcondition"&&outcome==="PASS"
+      ?["SUCCEEDED"]:["SAFE_STOPPED"];
+    return make([...localNodes,...terminal],typed,offset-typed.length,CompletionItemKind.Reference,
+      "Local Node / terminal; final SUCCEEDED only from Postcondition PASS");
+  }
+
+  const tool=/^(\s*tool:\s*)([A-Za-z0-9_:.-]*)$/.exec(prefix);
+  if(tool){
+    // Only list exact IDs explicitly supplied with the accepted snapshot.
+    // These are source hints; membership, Scope and Effect are not inferred.
+    const ids=[...new Set((value.snapshot.dependencyOperations??[])
+      .map(item=>item.id).filter(id=>typeof id==="string"&&id.includes("::")))];
+    return make(ids,tool[2],offset-tool[2].length,CompletionItemKind.Reference,
+      "Unverified imported reference; Compiler must check exact Owner/Capability");
+  }
+
+  return null;
+}
+
 connection.onCompletion(params => {
   const value = packageForUri(params.textDocument.uri);
   if (!value || value.analysis.state === "UNAVAILABLE" ||
@@ -556,6 +625,8 @@ connection.onCompletion(params => {
   const starts = lineStarts(document.text);
   const lineStart = starts[params.position.line];
   const prefix = document.text.slice(lineStart, offset);
+  const v4 = v1Alpha4Completions(value,document,prefix,offset,lineStart);
+  if(v4!==null)return v4;
 
   if (document.relativePath === "assurance/procedure.yaml" &&
       value.analysis.state === "READY" && value.snapshot.completeness === "complete") {
