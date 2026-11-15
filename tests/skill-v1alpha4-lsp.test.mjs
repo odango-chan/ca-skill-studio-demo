@@ -4,20 +4,32 @@ import { mkdir,mkdtemp,rm } from "node:fs/promises";
 import {readFileSync} from "node:fs";
 import { join,resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import {buildSkillSymbolIndex,skillSymbolAt,uniqueSkillSymbolDeclaration,
-  skillSymbolOccurrences} from "../language/symbol-index.mjs";
-import {collectSkillSemanticTokenSpans} from "../language/semantic-tokens.mjs";
 import { build } from "esbuild";
 
 const tempRoot=resolve(".agent-tmp");
 await mkdir(tempRoot,{recursive:true});
 const directory=await mkdtemp(join(tempRoot,"v1alpha4-lsp-"));
 let analyzePackageSnapshot;
+let buildSkillSymbolIndex,skillSymbolAt,uniqueSkillSymbolDeclaration,
+  skillSymbolOccurrences,collectSkillSemanticTokenSpans;
 try {
   const outfile=join(directory,"index.mjs");
   await build({entryPoints:["language/core/index.ts"],outfile,bundle:true,
     format:"esm",platform:"node",target:"node24",packages:"external",logLevel:"silent"});
   ({analyzePackageSnapshot}=await import(pathToFileURL(outfile).href));
+  // Bundle language modules as the production Worker does: their canonical
+  // semantic token contract is JSON and is not a direct untyped Node import.
+  const symbolFile=join(directory,"symbols.mjs");
+  await build({entryPoints:["language/symbol-index.mjs"],outfile:symbolFile,
+    bundle:true,format:"esm",platform:"node",target:"node24",
+    packages:"external",logLevel:"silent"});
+  ({buildSkillSymbolIndex,skillSymbolAt,uniqueSkillSymbolDeclaration,
+    skillSymbolOccurrences}=await import(pathToFileURL(symbolFile).href));
+  const tokenFile=join(directory,"tokens.mjs");
+  await build({entryPoints:["language/semantic-tokens.mjs"],outfile:tokenFile,
+    bundle:true,format:"esm",platform:"node",target:"node24",
+    packages:"external",logLevel:"silent"});
+  ({collectSkillSemanticTokenSpans}=await import(pathToFileURL(tokenFile).href));
 } finally {
   await rm(directory,{recursive:true,force:true});
 }
