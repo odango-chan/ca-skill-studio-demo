@@ -1,0 +1,137 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdir,mkdtemp,rm } from "node:fs/promises";
+import { join,resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { build } from "esbuild";
+
+const tempRoot=resolve(".agent-tmp");
+await mkdir(tempRoot,{recursive:true});
+const directory=await mkdtemp(join(tempRoot,"v1alpha4-lsp-"));
+let analyzePackageSnapshot;
+try {
+  const outfile=join(directory,"index.mjs");
+  await build({entryPoints:["language/core/index.ts"],outfile,bundle:true,
+    format:"esm",platform:"node",target:"node24",packages:"external",logLevel:"silent"});
+  ({analyzePackageSnapshot}=await import(pathToFileURL(outfile).href));
+} finally {
+  await rm(directory,{recursive:true,force:true});
+}
+
+const contract=[
+  "goal: pdu_session.initial_request_fulfilled",
+  "precondition: check.precondition",
+  "requestSchema: schemas/request.schema.yaml",
+  "contextSchema: ca-context::urn:example:host:v1",
+  "dependencies:",
+  "  ca-context: urn:example:host",
+  "  ca: urn:example:tools",
+  "capabilities: [session-read]",
+  ""
+].join("\n");
+const procedure=[
+  "start: check",
+  "nodes:",
+  "  check:",
+  "    precondition:",
+  "      predicates:",
+  "        - predicate: demo.ready",
+  "          arguments: [context.ueRef]",
+  "      routes:",
+  "        PASS: read",
+  "        FAIL: FAILED",
+  "        UNKNOWN: UNRESOLVED",
+  "  read:",
+  "    observation:",
+  "      tool: ca::session.read",
+  "      arguments:",
+  "        ueRef: context.ueRef",
+  "      routes:",
+  "        SUCCEEDED: final",
+  "        FAILED: FAILED",
+  "  final:",
+  "    postcondition:",
+  "      predicates:",
+  "        - predicate: demo.done",
+  "          arguments: [read.observation.output]",
+  "      routes:",
+  "        PASS: SUCCEEDED",
+  "        FAIL: FAILED",
+  "        UNKNOWN: UNRESOLVED",
+  ""
+].join("\n");
+const predicates=[
+  "predicates:",
+  "  demo.ready:",
+  "    parameters: [{ue: string}]",
+  "    evaluator:",
+  "      type: cel",
+  "      expression: ue != \"\"",
+  "  demo.done:",
+  "    parameters: [{data: ca::urn:example:result:v1}]",
+  "    evaluator:",
+  "      type: cel",
+  "      expression: data.ready == true",
+  ""
+].join("\n");
+
+function snapshot(source=procedure,contractSource=contract,predicatesSource=predicates) {
+  const files={
+    "SKILL.md":"---\nname: sample\ndescription: v1alpha4\n---\n",
+    "assurance/contract.yaml":contractSource,
+    "assurance/procedure.yaml":source,
+    "assurance/predicates.yaml":predicatesSource,
+    "schemas/request.schema.yaml":"$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\n"
+  };
+  return {rootUri:"file:///workspace/sample",packageName:"sample",generation:1,
+    completeness:"complete",documents:Object.entries(files).map(([relativePath,text])=>({
+      uri:"file:///workspace/sample/"+relativePath,relativePath,text,version:1
+    }))};
+}
+
+test("v1alpha4 AST graph projects nodes and routes but never claims Owner qualification",()=>{
+  const a=analyzePackageSnapshot(snapshot());
+  assert.equal(a.state,"PARTIAL");
+  assert.equal(a.packageAudit.state,"UNAVAILABLE");
+  assert.match(a.packageAudit.reason,/Owner.*linking/);
+  assert.equal(a.procedure.state,"READY");
+  assert.equal(a.procedure.entry,"check");
+  assert.deepEqual(a.procedure.procedures[0].nodes.map(x=>x.id),["check","read","final"]);
+  assert.ok(a.procedure.procedures[0].routes.some(x=>x.target==="SUCCEEDED"&&x.routeSource==="postcondition"));
+  assert.deepEqual(a.diagnostics,[]);
+});
+
+test("v1alpha4 rejects author reconcile/legacy wrappers without automatic conversion",()=>{
+  const altered=procedure.replace("    observation:\n", "    reconcile: read\n    observation:\n");
+  const a=analyzePackageSnapshot(snapshot(altered));
+  assert.equal(a.procedure.state,"UNAVAILABLE");
+  assert.ok(a.diagnostics.some(x=>x.code==="UNKNOWN_FIELD"&&x.message.includes("reconcile")));
+});
+
+test("v1alpha4 recognizes missing direct final Postcondition",()=>{
+  const altered=procedure.replace("PASS: SUCCEEDED","PASS: FAILED")+
+    "  unsafe:\n    operation:\n      tool: ca::session.mutate\n      arguments: {}\n      routes:\n        SUCCEEDED: SUCCEEDED\n        OUTCOME_UNKNOWN: SAFE_STOPPED\n";
+  const a=analyzePackageSnapshot(snapshot(altered));
+  assert.ok(a.diagnostics.some(x=>x.code==="FINAL_POSTCONDITION_MISSING"));
+});
+
+test("v1alpha4 reports reachable cycle without invoking legacy procedure projector",()=>{
+  const altered=procedure.replace("SUCCEEDED: final","SUCCEEDED: check");
+  const a=analyzePackageSnapshot(snapshot(altered));
+  assert.ok(a.diagnostics.some(x=>x.code==="CONTROL_FLOW_CYCLE"));
+});
+
+test("v1alpha4 rejects duplicate YAML keys and invalid predicate groups",()=>{
+  const duplicate=procedure.replace("start: check","start: check\nstart: read");
+  let a=analyzePackageSnapshot(snapshot(duplicate));
+  assert.ok(a.diagnostics.some(x=>x.code==="YAML_PARSE_ERROR"));
+  const empty=procedure.replace("predicates:\n        - predicate: demo.ready\n          arguments: [context.ueRef]","predicates: []");
+  a=analyzePackageSnapshot(snapshot(empty));
+  assert.ok(a.diagnostics.some(x=>x.code==="PREDICATE_GROUP_INVALID"));
+});
+
+test("v1alpha4 marks no Owner identity as a missing qualification, not a synthetic PASS",()=>{
+  const a=analyzePackageSnapshot(snapshot());
+  assert.notEqual(a.state,"READY");
+  assert.ok(a.packageAudit.reason.includes("requires v1alpha4 Compiler"));
+});
