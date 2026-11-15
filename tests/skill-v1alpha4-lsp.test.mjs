@@ -191,3 +191,25 @@ test("unreachable Postcondition success cannot hide reachable success bypass",()
   assert.ok(!stopped.diagnostics.some(x=>
     x.code==="FINAL_POSTCONDITION_MISSING"||x.code==="SUCCESS_BYPASSES_FINAL_POSTCONDITION"));
 });
+
+test("global gate accepts ASCII Identifier variants and rejects missing or unreachable stage",()=>{
+  const renamed=analyzePackageSnapshot(snapshot(
+    procedure.replaceAll("check","Check_UE"),
+    contract.replace("check.precondition","Check_UE.precondition")
+  ));
+  assert.ok(!renamed.diagnostics.some(x=>x.code==="ENTRY_PRECONDITION_REF_INVALID"));
+
+  for(const missing of ["absent.precondition","read.precondition"]) {
+    const a=analyzePackageSnapshot(snapshot(procedure,
+      contract.replace("check.precondition",missing)));
+    assert.ok(a.diagnostics.some(x=>
+      x.code==="ENTRY_PRECONDITION_REF_INVALID"&&
+      x.relativePath==="assurance/contract.yaml"),missing);
+  }
+
+  const unreachable=analyzePackageSnapshot(snapshot(
+    procedure.replace("start: check","start: read"),contract));
+  assert.ok(unreachable.diagnostics.some(x=>
+    x.code==="ENTRY_PRECONDITION_REF_INVALID"&&
+    x.relativePath==="assurance/contract.yaml"));
+});
