@@ -129,7 +129,8 @@ test("v1alpha4 rejects author reconcile/legacy wrappers without automatic conver
 });
 
 test("v1alpha4 recognizes missing direct final Postcondition",()=>{
-  const altered=procedure.replace("PASS: SUCCEEDED","PASS: FAILED")+
+  const altered=procedure.replace("PASS: SUCCEEDED","PASS: FAILED")
+    .replace("SUCCEEDED: final","SUCCEEDED: unsafe")+
     "  unsafe:\n    operation:\n      tool: ca::session.mutate\n      arguments: {}\n      routes:\n        SUCCEEDED: SUCCEEDED\n        OUTCOME_UNKNOWN: SAFE_STOPPED\n";
   const a=analyzePackageSnapshot(snapshot(altered));
   assert.ok(a.diagnostics.some(x=>x.code==="FINAL_POSTCONDITION_MISSING"));
