@@ -27,11 +27,11 @@ export function analyzeV1Alpha4Source(
   packageName: string
 ): {procedure: ProcedureProjection; diagnostics: LanguageDiagnostic[]} {
   const diagnostics: LanguageDiagnostic[] = [];
-  function add(document: PackageDocumentSnapshot, code: string, message: string, item?: any) {
+  function add(document: PackageDocumentSnapshot, code: string, message: string, item?: any, severity: "error" | "warning"="error") {
     const position = Array.isArray(item?.range) && Number.isInteger(item.range[0]) ? item.range[0] : 0;
     const line = document.text.slice(0, position).split("\n").length;
     diagnostics.push({
-      code, message, severity:"error", uri:document.uri,
+      code, message, severity, uri:document.uri,
       relativePath:document.relativePath, source:"procedure-projection", confidence:"exact", line
     });
   }
@@ -211,6 +211,12 @@ export function analyzeV1Alpha4Source(
   const entry=firstStage.get(start);
   if(entry)walk(entry);
   if(cycle)add(p.document,"CONTROL_FLOW_CYCLE","Procedure DAG contains a reachable cycle",rawNodes);
+  for (const item of rawNodes.items) {
+    const id=scalar(item.key),head=firstStage.get(id);
+    if (head && !visited.has(head))
+      add(p.document,"UNREACHABLE_NODE",
+        "Node "+id+" is not reachable from start",item.key,"warning");
+  }
   // A Contract gate must identify a real, reachable Precondition stage.
   // This lexical/source check requires no trusted Owner publication.
   if (c) {
@@ -240,7 +246,10 @@ export function analyzeV1Alpha4Source(
   // Projection READY means source graph shape is available for editor rendering,
   // *never* that the Tool/Schema/Capability trust closure has been compiled.
   const projection:ProcedureProjection={
-    state: diagnostics.some(x=>x.severity==="error")?"UNAVAILABLE":"READY",
+    // Invalid Contract/PredicateSet text must not hide a structurally
+    // valid Procedure graph while its author is editing another document.
+    state: diagnostics.some(x=>x.severity==="error"&&
+      x.relativePath===p.document.relativePath)?"UNAVAILABLE":"READY",
     entry:start,diagnostics:diagnostics.filter(x=>x.relativePath===p.document.relativePath),
     procedures:[{
       name:packageName,start,nodes,routes,children:[],
