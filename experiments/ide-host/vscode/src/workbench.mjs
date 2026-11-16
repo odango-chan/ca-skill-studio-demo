@@ -1105,8 +1105,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             if(start<0)throw Error("v1alpha4 completion probe anchor missing: "+needle);
             const position=document.positionAt(start+
               (offsetInNeedle??needle.length));
-            const result=await vscode.commands.executeCommand(
-              "vscode.executeCompletionItemProvider",document.uri,position);
+            const result=await languageClient.provideCompletion(
+              document.uri.toString(),position);
             return labels(result);
           };
           const contractProbeSource=contractDocument.getText();
