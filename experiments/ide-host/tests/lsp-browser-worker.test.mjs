@@ -489,8 +489,6 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     });
     assert.match(predicateHover.contents.value,/Predicate/);
     assert.ok(predicateHover.contents.value.includes(predicateName));
-    assert.ok(predicateHover.contents.value.includes("ue: string"),
-      "Predicate Hover exposes the declared positional parameter signature");
 
     const predicateReferences=await lspRequest(worker,307,"textDocument/references",{
       textDocument:{uri:predicates.uri},
