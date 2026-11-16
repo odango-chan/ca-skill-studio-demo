@@ -86,6 +86,46 @@ test("A2c UDM Subscribe displays PRE 5 -> OP -> POST 1 and true outcomes",async(
     n.data.kind==="neighbor"&&n.data.role==="next"));
 });
 
+test("v1alpha4 Node focus preserves ordered Operation / Observation stages and Route origins",async()=>{
+  const node=(id,stages,extra={})=>({
+    id,operator:"node",value:stages.map(x=>x.name).join(" → "),line:1,
+    phases:[],children:[],stages,...extra
+  });
+  const terminal=id=>({id,operator:"terminal",value:id,line:0,
+    phases:[],children:[],viewOnly:true});
+  const procedure={
+    name:"sample",start:"check",profile:"CA-SL v1alpha4",
+    nodes:[
+      node("check",[{name:"precondition",line:2,count:1,routeOutcomes:["PASS","FAIL"]}]),
+      node("read",[
+        {name:"operation",line:5,count:1,target:"ca::session.read",routeOutcomes:["SUCCEEDED"]},
+        {name:"observation",line:8,count:1,target:"ca::session.observe",routeOutcomes:["SUCCEEDED"]}
+      ]),
+      node("verify",[{name:"postcondition",line:12,count:1,routeOutcomes:["PASS"]}],
+        {finalGoal:true}),
+      terminal("SUCCEEDED"),terminal("FAILED")
+    ],
+    routes:[
+      {id:"check.PASS",source:"check",target:"read",routeSource:"precondition",outcome:"PASS",line:3},
+      {id:"check.FAIL",source:"check",target:"FAILED",routeSource:"precondition",outcome:"FAIL",line:4},
+      {id:"read.OP",source:"read",target:"verify",routeSource:"operation",outcome:"SUCCEEDED",line:7},
+      {id:"read.OBS",source:"read",target:"verify",routeSource:"observation",outcome:"SUCCEEDED",line:10},
+      {id:"verify.PASS",source:"verify",target:"SUCCEEDED",routeSource:"postcondition",outcome:"PASS",line:14}
+    ]
+  };
+  const local=projectNodeFocusFlow(procedure,"read");
+  assert.deepEqual(local.stages,["operation","observation"]);
+  assert.ok(local.routes.some(route=>route.originalRoute?.id==="read.OP"&&
+    route.source==="stage:operation"));
+  assert.ok(local.routes.some(route=>route.originalRoute?.id==="read.OBS"&&
+    route.source==="stage:observation"));
+  assert.equal(local.routes.filter(route=>route.viewOnly).length,1);
+  const graph=await layoutProcedureELK(local,{direction:"RIGHT",dimensions:local.dimensions});
+  const flow=makeNodeFocusElements(local,graph);
+  assert.ok(flow.edges.some(edge=>edge.data.origin==="OP"));
+  assert.ok(flow.edges.some(edge=>edge.data.origin==="OBS"));
+});
+
 test("A2c multiple outcomes, cycles, and missing PRE/POST do not invent Route IDs",async()=>{
   const mk=id=>({id,operator:id==="c"?"terminal":"call",value:id,
     line:1,phases:id==="b"?[
