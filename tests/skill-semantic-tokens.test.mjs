@@ -79,8 +79,9 @@ test("legacy v0.2 token registry remains isolated from the frozen v1alpha4 autho
   assert.equal(contract.version,"0.2.0");
   assert.equal(contract.status,"current",
     "the registry is current only for its explicitly legacy v0.2 profile");
-  assert.equal(contract.languageCompatibility.startsWith("legacy-v0.2-only"),true);
-  assert.match(contract.authority.grammar,/NOT CA-SL v1alpha4/);
+  assert.match(contract.authority.semantics,/Skill Language v0\.2/);
+  assert.doesNotMatch(contract.authority.semantics,/v1alpha4/);
+  assert.match(sourceReadme,/semantic-tokens\.v1\.json.*legacy/i);
   const types=contract.legend.tokenTypes.map(item=>item.id);
   const modifiers=contract.legend.tokenModifiers.map(item=>item.id);
   assert.deepEqual(semantic.SKILL_SEMANTIC_TOKEN_TYPES,types);
