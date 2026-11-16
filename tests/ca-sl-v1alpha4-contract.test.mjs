@@ -33,6 +33,8 @@ test("the v0.2 semantic-token registry is explicitly legacy-only",()=>{
   const lock=JSON.parse(read("../language/contracts/ca-sl-v1alpha4.lock.json"));
   const legacy=JSON.parse(read("../language/contracts/semantic-tokens.v1.json"));
   assert.equal(lock.semanticTokens.legacy.status,"legacy-only");
-  assert.match(legacy.languageCompatibility,/legacy-v0\.2-only/);
-  assert.match(legacy.authority.grammar,/NOT CA-SL v1alpha4/);
+  assert.equal(legacy.version,"0.2.0");
+  assert.match(legacy.authority.semantics,/Skill Language v0\.2/);
+  assert.doesNotMatch(legacy.authority.semantics,/v1alpha4/);
+  assert.match(read("../language/contracts/README.md"),/legacy-v0\.2-only/i);
 });
