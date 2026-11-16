@@ -290,7 +290,7 @@ test("invalid Contract or PredicateSet does not hide a valid Procedure diagram",
     x.relativePath==="assurance/contract.yaml"&&x.severity==="error"));
 
   const invalidPredicates=analyzePackageSnapshot(snapshot(
-    procedure,contract,predicates.replace("parameters: [{ue: string}]","parameters: []")));
+    procedure,contract,predicates.replace("parameters: [{ue: string}]","parameters: [{ue: string, invalid: string}]")));
   assert.equal(invalidPredicates.procedure.state,"READY");
   assert.ok(invalidPredicates.diagnostics.some(x=>
     x.relativePath==="assurance/predicates.yaml"&&x.severity==="error"));
