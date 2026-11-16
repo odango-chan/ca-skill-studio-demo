@@ -994,6 +994,16 @@ font:11px ui-monospace,SFMono-Regular,Consolas,monospace}
   overflow:hidden;
   text-overflow:ellipsis;
 }
+.designer-node-contract-marker{
+  display:inline-flex;align-items:center;vertical-align:1px;
+  margin-left:5px;padding:1px 4px;border:1px solid #b8d9e5;
+  border-radius:4px;background:#edf6fa;color:#39728a;
+  font:700 8px/1.2 system-ui,sans-serif;letter-spacing:0;
+}
+.designer-node-contract-marker.is-final{
+  border-color:#b9dfcf;background:#edf8f2;color:#26745e;
+}
+.designer-node.is-view-only{cursor:default}
 .designer-node.is-terminal .designer-node-kind{color:#856b55}
 .designer-node-id{
   display:block;max-width:100%;
