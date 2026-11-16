@@ -1056,6 +1056,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
        !v1alpha4LanguageFeatureEvidence.contractDefinition||
        !v1alpha4LanguageFeatureEvidence.predicateDefinition||
        !v1alpha4LanguageFeatureEvidence.predicateReferences||
+       !v1alpha4LanguageFeatureEvidence.scriptDefinition||
        !v1alpha4LanguageFeatureEvidence.procedureOutline?.includes("run-script")||
        v1alpha4LanguageFeatureEvidence.ownerQualification!=="NOT_QUALIFIED")
       throw Error("Theia native v1alpha4 language-provider acceptance returned incomplete evidence: "+
