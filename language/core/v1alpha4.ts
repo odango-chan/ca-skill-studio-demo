@@ -92,6 +92,7 @@ export function analyzeV1Alpha4Source(
       add(c.document,"ENTRY_PRECONDITION_REF_INVALID","Contract precondition is a single node.precondition reference",gate);
   }
   const predicateSignatures=new Map<string,any[]>();
+  const predicateEvidence=new Map<string,{parameter:string;evidence:string[]}[]>();
   if (predicates) {
     props(predicates.root,predicates.document,new Set(["predicates"]));
     const declared=predicates.root.get("predicates",true);
@@ -104,6 +105,14 @@ export function analyzeV1Alpha4Source(
       if (!isSeq(parameters) || parameters.items.some((x:any)=>!isMap(x)||x.items.length!==1))
         add(predicates.document,"PREDICATE_GROUP_INVALID","Predicate parameters must be an ordered list of one-key mappings (an empty list declares zero parameters)",parameters??item.value);
       else if(predicateId)predicateSignatures.set(predicateId,parameters.items);
+      const evidenceNode=isMap(item.value)?item.value.get("evidence",true):null;
+      const requires=isMap(evidenceNode)?evidenceNode.get("requires",true):null;
+      if(predicateId&&isMap(requires)){
+        predicateEvidence.set(predicateId,requires.items.map((pair:any)=>({
+          parameter:scalar(pair.key),
+          evidence:isSeq(pair.value)?pair.value.items.map((value:any)=>scalar(value)):[]
+        })));
+      }
     }
   }
   function primitiveLiteralType(node:any,document:PackageDocumentSnapshot):string|null {
@@ -252,6 +261,8 @@ export function analyzeV1Alpha4Source(
       }
       adjacency.set(id+"."+stage,outgoing);
     }
+    const sourceValue=(node:any)=>Array.isArray(node?.range)
+      ?p.document.text.slice(node.range[0],node.range[1]):scalar(node);
     const stages=stageNames.map(stage=>{
       const part=body.get(stage,true);
       const rawStageRoutes=isMap(part)?part.get("routes",true):null;
@@ -260,11 +271,31 @@ export function analyzeV1Alpha4Source(
         ?(isSeq(calls)?calls.items.length:0):1;
       const target=isMap(part)
         ?(scalar(part.get("tool",true))||scalar(part.get("script",true))):"";
+      const callViews=(stage==="precondition"||stage==="postcondition")&&isSeq(calls)
+        ?calls.items.map((call:any)=>{
+          const predicate=isMap(call)?scalar(call.get("predicate",true)):"";
+          const argumentsNode=isMap(call)?call.get("arguments",true):null;
+          const parameters=predicateSignatures.get(predicate)??[];
+          return {
+            predicate,line:lineAt(p.document,call),
+            parameters:parameters.map((parameter:any)=>
+              isMap(parameter)?scalar(parameter.items[0]?.key):""),
+            arguments:isSeq(argumentsNode)?argumentsNode.items.map(sourceValue):[],
+            evidenceRequirements:predicateEvidence.get(predicate)??[]
+          };
+        }):[];
+      const argumentsNode=isMap(part)?part.get("arguments",true):null;
+      const argumentViews=isMap(argumentsNode)?argumentsNode.items.map((pair:any)=>({
+        name:scalar(pair.key),value:sourceValue(pair.value),
+        line:lineAt(p.document,pair.value)
+      })):[];
       return {
         name:stage,line:lineAt(p.document,part),count,
         ...(target?{target}:{}),
         routeOutcomes:isMap(rawStageRoutes)
-          ?rawStageRoutes.items.map((route:any)=>scalar(route.key)):[]
+          ?rawStageRoutes.items.map((route:any)=>scalar(route.key)):[],
+        ...(callViews.length?{calls:callViews}:{}),
+        ...(argumentViews.length?{arguments:argumentViews}:{})
       };
     });
     nodes.push({
