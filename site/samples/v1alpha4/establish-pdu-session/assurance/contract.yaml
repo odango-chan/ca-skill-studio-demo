@@ -1,0 +1,16 @@
+# CA-SL v1alpha4 author syntax. The external aliases below are *illustrative*,
+# not evidence of published, qualified ToolCatalog/CapabilityContracts owners.
+goal: pdu_session.initial_request_fulfilled
+precondition: check-request.precondition
+requestSchema: schemas/establishment-request.schema.yaml
+contextSchema: ca-context::urn:connectionagent:ca:context:invocation:v1
+dependencies:
+  ca-context: urn:example:connectionagent:host-context
+  ca: urn:example:connectionagent:5gc-tool-contracts
+capabilities:
+  - fivegc-session-read
+  - fivegc-session-mutation
+  - fivegc-session-assurance
+  - fivegc-session-responsibility
+limits:
+  maxActions: 32

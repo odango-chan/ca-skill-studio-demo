@@ -1,40 +1,27 @@
-# Skill Schema Ownership v0
+# Schema Ownership — Companion Notes
 
-The source tree must contain only schemas owned by the Skill. A file being present in a Skill folder does not make that Skill the owner of every data shape it consumes.
+**Status:** Non-normative Schema ownership companion to the [current CA-SL v1alpha4 specification](skill-language-spec.v1alpha4.zh-CN.md). Historical examples in this note have no authority to override its exact Schema/Evidence/Owner rules; existing unported 5GC source files remain legacy.
 
-| Contract | Owner | Source / Compiler treatment |
-| --- | --- | --- |
-| Public Skill Request | Skill author | `spec.inputs.requestSchema` points to `schemas/**`; Compiler resolves `context.request.*` from it. |
-| Tool Operation Input / Output | Tool owner | Imported ToolCatalog under logical `lib/tools/**`; Compiler links exact Operation IDs and uses its Schemas. |
-| Host Subject / Facts | Agent Host owner | Explicit `spec.context.schemas.subject/facts` paths into logical `lib/host/**`; missing files are `EXTERNAL_SCHEMA_MISSING`. |
-| Observation payload | Observation source owner | Explicit `spec.context.schemas.observations` path into logical `lib/observations/**`. |
-| Predicate evidence/provenance projection | Host / Runtime owner | Explicit `spec.context.schemas.evidence` path into logical `lib/host/**`. Never infer it from a Script or Case fixture. |
-| Procedure Script input | No separate file owner | Derived per call site from `with:` Producer references. |
-| Predicate Script input | Host evaluation context + declared observations | Derived from Request, explicit Host Schemas and Predicate observation declarations. |
-| Script output | Skill Script | Generated from the Script's strict Output `TypedDict`; read-only BuildResult output, not author source. |
+The comprehensive specification is the sole normative source for Schema ownership, identity, Evidence, Observation and argument binding. If this note conflicts with the specification, the specification takes precedence.
 
-`context.requiredFacts` is a list of required fact identifiers, **not** a field-level data Schema. `Procedure.inputs.*.type` is at most an author assertion checked against its Producer; it cannot replace a missing Producer Schema.
+## Ownership summary
 
-## Current PDU Session external dependencies
+- Skill owns its public Request Schema and genuinely Skill-owned data. The Request Schema lives under `schemas/**` and is referenced by `assurance/contract.yaml`.
+- Tool Owner owns Operation Input / Output / Reconcile Schemas.
+- Observation Owner publishes Query Input and normalized Output Schemas through ToolCatalog.
+- Host owns the Invocation Context Schema and Evidence-reference projection. `contract.yaml` references the exact Host export in `contextSchema`. Host validates required fields and references at admission.
+- Contract declares a direct alias-to-Package-ID map in `dependencies` and requested grants in `capabilities`. Dependency identity is not a version lock or download instruction; a Grant is not a dependency.
+- Operation / Observation arguments are named mappings checked against Owner Schemas.
+- Procedure Script arguments are named mappings that define the exact local input projection; strict return TypedDict generates the output Schema.
+- Predicate arguments are ordered positional values checked against Predicate.parameters.
+- Predicate Script inputs derive from the Predicate signature plus Host-attached Evidence refs; its strict return TypedDict generates PredicateEvaluationResult.
+- Consumers must not copy external Owner Schemas into the Skill package.
+- Schema is the JSON Schema data model; YAML and JSON are serialization formats. Source Skill-owned Schemas remain YAML-authoritative. Generated artifact serialization is a separate Compiler Artifact Contract decision.
 
-The current conventional PDU Contract declares these logical Owner inputs:
+## Dependency and snapshot boundary
 
-- `lib/host/subject.schema.yaml`
-- `lib/host/facts.schema.yaml`
-- `lib/host/evidence.schema.yaml`
-- `lib/observations/context-observations.schema.yaml`
+Skill Studio lets the author select public dependencies and Capability Grants from the available catalogs. It writes stable dependency identities and requested grants to Contract, and resolves exact immutable dependency snapshots for the current project / BuildRequest.
 
-These are references to required Owner contracts, not Schemas authored or fabricated in this repository. The current official `lib/` snapshot contains only `lib/tools/createdsession.tool.yaml` (12 Operations); the Host/Observation Schema files are not bundled. A strict build must report these missing inputs until the actual owners supply them. `root-routing-profile-v0.5.schema.json` is deployment configuration and is not a substitute.
+Compiler verifies the existing snapshot digest and compares the Contract Package ID with the trusted caller binding for that alias and digest. It validates Owner and exact export identities before linking. The caller establishes provenance; Compiler consumes supplied bytes and metadata. Preserve immutable revision markers in Owner Schema IDs.
 
-## Compiler / Studio boundary
-
-`ca-skills` owns Skill-authored contracts and official examples. Studio/caller prepares file bytes and supplies imported Owner/Tool contracts in the Compiler's logical `lib/**` namespace. Compiler parses and links supplied bytes; it does not discover, fetch, persist, version, lock or refresh dependencies. `outputFiles` are Compiler results; Studio decides how to display or export them.
-
-
-## Additional Tool Owner Schema gap
-
-The pinned `lib/tools/createdsession.tool.yaml` is an approved ToolCatalog snapshot, but the `sbi.udm.sm_data.get` Operation currently declares `outputSchema.properties.result` only as `{type: object}` with no nested `properties`. The conventional selection Script reads nested fields under `udmResult.subscription` (including S-NSSAI, DNN, PDU Session Types, SSC Modes, AMBR and default QoS), as well as response and provenance fields.
-
-That broad `object` declaration is not sufficient evidence for those nested fields. The Compiler must not infer them from the Script body or restore the removed Skill-owned `selection-input.schema.yaml` as a workaround. Until the Tool Owner supplies a complete Operation Output Schema, strict linking of those nested accesses must remain an explicit unresolved/unsupported producer-schema diagnostic.
-
-This is separate from the missing Host Subject/Facts/Evidence and Observation Owner Schemas above.
+The trusted deployment CapabilityContracts is supplied separately from ordinary DependencySnapshot inputs. It defines exact callable membership and Effect; imported ToolCatalog bytes provide the corresponding callable schemas. Compiler validates that every external callable is covered by exactly one granted Capability and matches the trusted Effect.

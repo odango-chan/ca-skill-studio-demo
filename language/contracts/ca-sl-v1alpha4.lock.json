@@ -1,0 +1,44 @@
+{
+  "authority": {
+    "repository": "odango-chan/ca-skills",
+    "commit": "7f84393ee8c395e4d8c39a74cb5000a1f896588d"
+  },
+  "language": {
+    "target": "connectionagent.io/v1alpha4",
+    "status": "FROZEN"
+  },
+  "externalProfiles": {
+    "toolCatalog": "connectionagent.io/toolcatalog/v1alpha4",
+    "capabilityContracts": "connectionagent.io/capability-contracts/v1alpha4",
+    "legacyFallback": false
+  },
+  "normativeSource": {
+    "path": "docs/skill-language-spec.v1alpha4.zh-CN.md",
+    "blobSha": "b70064c5737b8ee2b3d1435fe496357f44b42773",
+    "localPath": "language/contracts/source/skill-language-spec.v1alpha4.zh-CN.md"
+  },
+  "discoveryEntry": {
+    "path": "docs/skill-language-spec.md",
+    "blobSha": "5603c3c6b6c76ade82f1aaa8523e93adbeaec2dd",
+    "localPath": "language/contracts/source/skill-language-spec.md"
+  },
+  "qualification": {
+    "language": "FROZEN",
+    "compiler": "NOT_QUALIFIED",
+    "studioLsp": "NOT_QUALIFIED",
+    "host": "NOT_QUALIFIED",
+    "owner": "NOT_QUALIFIED",
+    "fiveGc": "NOT_QUALIFIED"
+  },
+  "semanticTokens": {
+    "legacy": {
+      "path": "language/contracts/semantic-tokens.v1.json",
+      "languageVersion": "0.2.0",
+      "status": "legacy-only"
+    },
+    "v1alpha4": {
+      "upstreamContract": "NOT_PUBLISHED_AT_PINNED_COMMIT",
+      "localProjection": "editor-only; not normative"
+    }
+  }
+}

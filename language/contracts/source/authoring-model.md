@@ -1,74 +1,60 @@
-# Current Skill Authoring Model
+# Authoring Model — Companion Notes
 
-**Status:** Current business and Procedure semantics. Compiler conformance is tracked independently. Language authority is [Skill Language Specification](skill-language-spec.md); Script rules are in [Script Contract](script-contract.md).
+**Status:** Non-normative companion to the [CA-SL v1alpha4 Specification](skill-language-spec.v1alpha4.zh-CN.md).
 
-## 1. One deterministic source graph
+The comprehensive specification is the sole normative language authority. If this file conflicts with it, the specification takes precedence.
 
-- `assurance/procedure.yaml` is the deterministic workflow source.
-- `SKILL.md` is model-facing business guidance for an LLM-driven path.
-- Do not maintain a second prose graph with duplicated next-node edges.
-- Both execution styles retain the same resource boundary, Predicate truth, evidence authority and final Contract boundary.
+## Author-maintained source
 
-## 2. Business-significant nodes
+v1alpha4 retains three assurance source files with distinct responsibilities:
 
-A main Procedure node represents a business-significant operation, side-effect boundary, independent asynchronous procedure, recovery boundary or recognizable protocol/service step.
+- `assurance/contract.yaml`: Skill's public contract — Goal, global Precondition references, public Request Schema, the Host Invocation Context Schema, shared dependency identities and Capability Grants.
+- `assurance/procedure.yaml`: the single deterministic execution graph — start, nodes, routes, reconciliation and final Postcondition.
+- `assurance/predicates.yaml`: reusable Predicate definitions and ordered parameter signatures.
 
-Do not create main-flow nodes merely for a local projection, deterministic calculation, read-only context preparation or a single fact check when these can be expressed as preparation owned by the consuming node.
+Contract is author-maintained source, not a compiler-generated file. The source omits redundant `apiVersion`, `kind` and `metadata.name`; language version comes from BuildRequest / Compiler Target and Skill identity comes from the Package root.
 
-## 3. Node preconditions
+## Contract and dependency semantics
 
-`preconditions` are an ordered node-entry phase. They complete immediately before the node's main operation.
+- Goal and public Request belong to Contract, not the Procedure graph.
+- Top-level `requestSchema` declares the Skill-owned Request. Top-level `contextSchema` links the exact Host-owned Invocation Context Schema. The Host validates the admitted Context and its references.
+- `dependencies` maps each alias directly to a stable Package ID string. The trusted build caller binds the Package ID and allowed Owners to the existing snapshot alias and verified digest. Compiler links exact Owner exports.
+- Top-level `capabilities` lists the requested grants. Dependencies make contracts available; grants request authorization.
+- Studio guides creation by selecting dependencies and Capabilities from available public catalogs, writes stable identities into Contract and obtains exact dependency snapshots for the BuildRequest.
+- Compiler receives exact bytes and trusted CapabilityContracts as inputs. It never downloads dependencies, manages versions or infers authorization from the set of imported Tools.
+- The exact dependency snapshot / revision selected by Studio belongs to project/build configuration. Owner Schema IDs that intrinsically encode immutable revisions must be preserved exactly.
 
-Supported step intents are only:
+## Procedure graph
 
-- `script`: Skill-owned pure local computation;
-- `call`: a declared Tool Operation, subject to imported input Schema and Runtime authority;
-- `verify`: a Predicate over already materialized evidence.
+A business Node may declare `precondition`, `operation`, `observation`, and `postcondition`. Declare at least one stage. Runtime runs the declared stages in that order. A normal outcome advances within the Node when another stage follows. The current stage's `routes` maps an Outcome to a Node ID or one of the four Invocation terminal statuses. The last stage's normal outcome uses this map.
 
-Preconditions must not contain mutations, hidden resource creation or operations requiring mutation reconciliation. The block stops at the first non-successful step. Its aggregate route distinguishes proven failure from unresolved evidence.
+Contract may declare **one** global gate using `precondition: <node-id>.precondition`. That stage may evaluate multiple ordered `predicates`, and its **aggregate PASS** must precede every business Mutation or SUCCEEDED request. Each final success path uses a Postcondition aggregate `PASS: SUCCEEDED` edge directly; there is no `postcondition.goal`, Contract `preconditions` list or Goal proof carried across Nodes (§12.9).
 
-Node preconditions do not replace Runtime/Harness hard guards. Runtime still rechecks attempt, lifecycle, authority and mutation admission immediately before dispatch; do not copy implementation guards into every Skill node.
+CA-SL v1alpha4 has one entry Procedure graph per Skill and does not define nested ProcedureCall or graph cycles. Branches and recovery are explicit nodes and routes.
 
-## 4. Node postconditions
+## Arguments and dataflow
 
-`postconditions` establish facts after the node's main operation and before the business flow may advance.
+- Tool Operation and Observation use a named arguments mapping defined by the Owner Input / Query Schema.
+- Procedure Script uses a named arguments mapping as its exact local input projection; its Input and Output Schemas derive from the strict TypedDict annotations on the entry point.
+- Precondition and Postcondition use an ordered arguments list matching the Predicate.parameters signature.
+- Stages bind `arguments` to admitted `context` fields or to earlier outputs qualified by Node and stage.
+- No implicit previous-node binding, parent Procedure state, ambient Context forwarding, or field-name guessing.
+- Reconcile READ is an Owner-published, Host-controlled **internal outcome-resolution ability**, never an author `operation.reconcile`/`resolve` stage. `COMMITTED` alone does not expose the original output; only verified recovery normalizing the original Operation to SUCCEEDED, or an independent authoritative Observation, can support subsequent proof.
 
-- Successful read/local-compute results and committed mutations enter the postcondition phase when declared.
-- Steps are ordered; the block stops at the first non-PASS result.
-- Only the block's PASS route advances after every step passes.
-- FAIL and UNKNOWN follow explicit routes.
-- A mutation being COMMITTED does not by itself establish the business fact.
+## Script roles
 
-Node-level postconditions differ from `SkillContract.spec.postconditions`. The former govern whether one operation may advance; the latter are independent final acceptance conditions for the whole Skill.
+A Procedure Script is a pure local data transformation / selection invoked through a Node's `operation` stage. It is not a Tool, Capability, or external READ / MUTATION effect.
 
-## 5. Shared preparation results
+A Predicate Script implements a Predicate evaluator and returns the structured PredicateEvaluationResult. Its business inputs derive from Predicate.parameters. Runtime verifies the Predicate's `evidence.requires` independently of the Script's `evidenceUsed` report.
 
-A preparation result belongs inside a node when only that node consumes it. When later business nodes also consume it, it is shared Procedure data. Name the exact Producer through paths such as:
+## Generated artifacts and policies
 
-~~~yaml
-from: <producer-node>.preconditions.<step-name>.output
-~~~
+Compiler derives normalized contracts, execution graph, type bindings and generated Schema artifacts from the author sources and exact dependency snapshots.
 
-Do not copy values into new inputs or invent implicit previous-node bindings. Compiler must resolve the exact Producer path or report it unresolved.
+- No Contract-level `entryProcedure` is needed because the Skill has one Procedure graph.
+- Final Postcondition is an executable Procedure node, not a duplicate Contract list.
+- Dynamic Procedure generation is forbidden by the static DAG language rule.
+- Runtime enforces a positive Host action budget; Contract may optionally set a stricter `limits.maxActions` upper bound (counting dispatched Tool, Observation, Script and Reconcile actions). Effective limit is the minimum, and missing/zero Host budget fails closed.
+- For Mutation UNKNOWN, reconcile the original attempt when a safe Owner contract and runtime conditions allow it. Otherwise stop and retain the original attempt and responsibility (§20).
 
-## 6. Script and Schema ownership
-
-- A Script's identity is the Skill package plus its relative Python path.
-- Procedure Script input is the per-call-site projection from `with:`; Predicate Script input is the declared Predicate Evaluation Context.
-- A Script declares only its strict, non-empty Output `TypedDict`. Compiler generates its read-only Output JSON Schema.
-- Do not author Script input/output Schema files, add `connectionagent-tool` metadata or create independent local Tool IDs.
-- Scripts are deterministic local computation only. They do not call HTTP, MCP, Providers, shell commands or other Tools.
-
-See [Script Contract](script-contract.md) and [Schema Ownership](schema-ownership.md).
-
-## 7. Reconciliation
-
-Use native `reconcile: <original-node>` for reconciliation of an original mutation. Preserve original Operation identity and uncertainty; never blindly retry an unknown mutation.
-
-## 8. Cases are source obligations, not execution evidence
-
-A Case records a scenario, context and expected outcome. It does not prove Compiler, Mock Runtime, Qualification suite or live network execution. Cases remain source material; Compiler does not implement a Qualification engine or Case runner.
-
-## 9. Compiler boundary
-
-Compiler consumes caller-supplied Skill and imported Owner/Tool files, performs static parse/link/type checks, generates output files and diagnostics. It does not acquire dependencies, manage a project, run Python, execute Tools, qualify a Skill or prove Runtime readiness.
+Generated Schema serialization and whether a deployment bundle embeds the reachable external dependency closure or keeps exact external references belong to the separate Compiler / Deployment Artifact Contract—not the CA-SL node grammar.

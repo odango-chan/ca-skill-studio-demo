@@ -62,37 +62,26 @@ function tokenFor(source,items,text,type,modifier,from=0){
   return found;
 }
 
-test("Studio consumes the exact current ca-skills v0.2.0 semantic projection",()=>{
+test("legacy v0.2 token registry remains isolated from the frozen v1alpha4 authoring target",()=>{
   const blobSha=createHash("sha1")
     .update("blob "+Buffer.byteLength(contractText)+"\0")
     .update(contractText).digest("hex");
   assert.equal(blobSha,"618c5c671f2c18785ecc10f84b9d549f88b4b138",
-    "refresh the pinned snapshot and source metadata together");
-  const sourcePins={
-    "skill-language-spec.md":"bc81fb340827521da3452074974f9e3663043b10",
-    "skill-language-spec.zh-CN.md":"23f242740ad7671e3dab9f313cce53ac03322419",
-    "script-contract.md":"b663977ef56d95538a50c13cda9301f28079697c",
-    "schema-ownership.md":"95900448bd7409b7a07faaa0337aebb872ee0e66",
-    "authoring-model.md":"250f2eb1557f9432380596026e7b1a7103ffc501"
-  };
+    "refresh the pinned legacy token snapshot and source metadata together");
   const sourceReadme=readFileSync(new URL(
     "../language/contracts/README.md",import.meta.url
   ),"utf8");
-  assert.ok(sourceReadme.includes("3fce09aca32b6a6faf6ec3e9a204d38cc129ec38"));
-  for(const [name,expected] of Object.entries(sourcePins)){
-    const content=readFileSync(new URL(
-      "../language/contracts/source/"+name,import.meta.url
-    ),"utf8");
-    const actual=createHash("sha1")
-      .update("blob "+Buffer.byteLength(content)+"\0")
-      .update(content).digest("hex");
-    assert.equal(actual,expected,name+" must remain byte-identical to ca-skills");
-  }
+  assert.ok(sourceReadme.includes("7f84393ee8c395e4d8c39a74cb5000a1f896588d"));
+  assert.match(sourceReadme,/FROZEN/);
+  assert.match(sourceReadme,/semantic-tokens\.v1\.json.*legacy/i);
   assert.equal(contract.id,"connectionagent.skill.semantic-tokens");
   assert.equal(contract.schemaVersion,1);
   assert.equal(contract.version,"0.2.0");
-  assert.equal(contract.status,"current");
+  assert.equal(contract.status,"current",
+    "the registry is current only for its explicitly legacy v0.2 profile");
   assert.match(contract.authority.semantics,/Skill Language v0\.2/);
+  assert.doesNotMatch(contract.authority.semantics,/v1alpha4/);
+  assert.match(sourceReadme,/semantic-tokens\.v1\.json.*legacy/i);
   const types=contract.legend.tokenTypes.map(item=>item.id);
   const modifiers=contract.legend.tokenModifiers.map(item=>item.id);
   assert.deepEqual(semantic.SKILL_SEMANTIC_TOKEN_TYPES,types);
@@ -109,7 +98,7 @@ test("Studio consumes the exact current ca-skills v0.2.0 semantic projection",()
     "colors are theme-owned, not language-contract data");
 });
 
-test("5GC Procedure uses exact v0.2 AST selectors for declarations, operators, references and bindings",()=>{
+test("legacy 5GC Procedure uses exact v0.2 AST selectors for declarations, operators, references and bindings",()=>{
   const source=sample("establish-pdu-session","assurance/procedure.yaml");
   const items=observed(source,"skills/establish-pdu-session/assurance/procedure.yaml");
   assert.ok(items.length>100);
@@ -125,7 +114,7 @@ test("5GC Procedure uses exact v0.2 AST selectors for declarations, operators, r
   assert.ok(!items.some(item=>item.type.startsWith("ca")));
 });
 
-test("MAS Procedure receives the same canonical language projection",()=>{
+test("legacy MAS Procedure receives the same v0.2 language projection",()=>{
   const source=sample("establish-pdu-session-mas","assurance/procedure.yaml");
   const items=observed(source,"skills/establish-pdu-session-mas/assurance/procedure.yaml");
   tokenFor(source,items,"establish-session","skillProcedure","declaration");
@@ -135,7 +124,85 @@ test("MAS Procedure receives the same canonical language projection",()=>{
   tokenFor(source,items,"PASS","skillOutcome");
 });
 
-test("Contract and PredicateSet source positions follow their own profiles",()=>{
+test("v1alpha4 uses its own AST semantic projection for the frozen single-graph grammar",()=>{
+  const contractSource=[
+    "goal: demo.session_established",
+    "precondition: check.precondition",
+    "requestSchema: schemas/request.schema.yaml",
+    "contextSchema: ca-context::urn:example:host:v1",
+    "dependencies: {ca: urn:example:tools}",
+    "capabilities: [session-read]",
+    ""
+  ].join("\n");
+  const procedureSource=[
+    "start: check",
+    "nodes:",
+    "  check:",
+    "    precondition:",
+    "      predicates:",
+    "        - predicate: demo.ready",
+    "          arguments: [context.ueRef]",
+    "      routes:",
+    "        PASS: read",
+    "        FAIL: FAILED",
+    "        UNKNOWN: UNRESOLVED",
+    "  read:",
+    "    observation:",
+    "      tool: ca::session.read",
+    "      arguments: {ueRef: context.ueRef}",
+    "      routes:",
+    "        SUCCEEDED: run-script",
+    "        FAILED: SAFE_STOPPED",
+    "        UNKNOWN: UNRESOLVED",
+    "  run-script:",
+    "    operation:",
+    "      script: scripts/runner.py",
+    "      arguments: {}",
+    "      routes:",
+    "        SUCCEEDED: final",
+    "        OUTCOME_UNKNOWN: SAFE_STOPPED",
+    "  final:",
+    "    postcondition:",
+    "      predicates:",
+    "        - predicate: demo.done",
+    "          arguments: [read.observation.output]",
+    "      routes:",
+    "        PASS: SUCCEEDED",
+    "        FAIL: FAILED",
+    "        UNKNOWN: UNRESOLVED",
+    ""
+  ].join("\n");
+  const predicatesSource=[
+    "predicates:",
+    "  demo.ready:",
+    "    parameters: [{ue: string}]",
+    "    evaluator: {type: cel, expression: 'ue != \"\"'}",
+    "  demo.done:",
+    "    parameters: [{result: string}]",
+    "    evaluator: {type: cel, expression: 'result != \"\"'}",
+    ""
+  ].join("\n");
+  const c=observed(contractSource,"skills/demo/assurance/contract.yaml");
+  const p=observed(procedureSource,"skills/demo/assurance/procedure.yaml");
+  const ps=observed(predicatesSource,"skills/demo/assurance/predicates.yaml");
+  tokenFor(contractSource,c,"check.precondition","skillStep","reference");
+  tokenFor(contractSource,c,"schemas/request.schema.yaml","skillSchema","reference");
+  tokenFor(contractSource,c,"session-read","skillCapability","reference");
+  tokenFor(procedureSource,p,"check","skillStep","declaration",procedureSource.indexOf("nodes:"));
+  tokenFor(procedureSource,p,"demo.ready","skillPredicate","reference");
+  tokenFor(procedureSource,p,"ca::session.read","skillObservation","reference");
+  tokenFor(procedureSource,p,"scripts/runner.py","skillReference","reference");
+  tokenFor(procedureSource,p,"PASS","skillOutcome");
+  tokenFor(procedureSource,p,"context.ueRef","skillBinding");
+  tokenFor(predicatesSource,ps,"demo.ready","skillPredicate","declaration");
+  tokenFor(predicatesSource,ps,"string","skillDataType");
+  assert.ok(!p.some(item=>item.type==="skillProcedure"),
+    "v1alpha4 has one Package Procedure graph, not v0.2 named Procedure declarations");
+  assert.ok(semantic.V1_ALPHA4_SEMANTIC_TOKEN_TYPES.includes("skillObservation"));
+  assert.ok(semantic.V1_ALPHA4_SEMANTIC_TOKEN_TYPES.includes("skillReference"));
+});
+
+test("legacy Contract and PredicateSet source positions follow their v0.2 profiles",()=>{
   const contractSource=sample("establish-pdu-session","assurance/contract.yaml");
   const c=observed(contractSource,"skills/establish-pdu-session/assurance/contract.yaml");
   tokenFor(contractSource,c,"entryProcedure","skillKeyword");

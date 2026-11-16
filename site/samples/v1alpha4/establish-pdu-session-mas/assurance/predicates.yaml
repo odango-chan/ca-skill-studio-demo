@@ -1,0 +1,45 @@
+predicates:
+  establishment.request.supported:
+    parameters:
+      - requestType: integer
+      - pduType: string
+      - sscMode: integer
+    evaluator:
+      type: cel
+      expression: requestType == 1 && pduType == "IPV4" && sscMode == 1
+  establishment.mas.subscription_usable:
+    parameters:
+      - result: mas::urn:example:mas:subscription-state:v1
+    evidence:
+      requires:
+        result: [mas::subscription.verified]
+    evaluator:
+      type: cel
+      expression: result.valid == true
+  establishment.mas.ran_adopted:
+    parameters:
+      - result: mas::urn:example:mas:ran-state:v1
+    evidence:
+      requires:
+        result: [mas::ran.adopted]
+    evaluator:
+      type: cel
+      expression: result.adopted == true
+  establishment.mas.forwarding_ready:
+    parameters:
+      - result: mas::urn:example:mas:n4-state:v1
+    evidence:
+      requires:
+        result: [mas::n4.forwarding-ready]
+    evaluator:
+      type: cel
+      expression: result.ready == true
+  establishment.mas.resources_managed:
+    parameters:
+      - result: mas::urn:example:mas:responsibility-state:v1
+    evidence:
+      requires:
+        result: [mas::resources.managed]
+    evaluator:
+      type: cel
+      expression: result.durable == true

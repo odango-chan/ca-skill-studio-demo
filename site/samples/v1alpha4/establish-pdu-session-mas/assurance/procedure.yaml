@@ -1,0 +1,297 @@
+# v1alpha4 MAS policy-first DAG. Tool/Owner exports are NOT YET PUBLISHED.
+# Host, not author Nodes, performs trusted mutation.reconcile when available.
+start: check-request
+nodes:
+  check-request:
+    precondition:
+      predicates:
+        - predicate: establishment.request.supported
+          arguments:
+            - context.request.requestType
+            - context.request.requestedPduSessionType
+            - context.request.requestedSscMode
+      routes:
+        PASS: validate-subscription
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+  validate-subscription:
+    operation:
+      tool: mas::ca.pdu_session.subscription.validate
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: verify-subscription
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  verify-subscription:
+    precondition:
+      predicates:
+        - predicate: establishment.mas.subscription_usable
+          arguments:
+            - validate-subscription.operation.output
+      routes:
+        PASS: secondary-auth
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+  secondary-auth:
+    operation:
+      tool: mas::ca.pdu_session.secondary_auth.disposition
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: create-context
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  create-context:
+    operation:
+      tool: mas::ca.pdu_session.context.create
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: register-uecm
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  register-uecm:
+    operation:
+      tool: mas::ca.pdu_session.uecm.register
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: create-policy
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  create-policy:
+    operation:
+      tool: mas::ca.pdu_session.policy.create
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: select-anchor
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  select-anchor:
+    operation:
+      tool: mas::ca.pdu_session.anchor.select
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: allocate-address
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  allocate-address:
+    operation:
+      tool: mas::ca.pdu_session.address.allocate
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: update-policy
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  update-policy:
+    operation:
+      tool: mas::ca.pdu_session.policy.update
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: create-charging
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  create-charging:
+    operation:
+      tool: mas::ca.pdu_session.charging.create
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: establish-n4
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  establish-n4:
+    operation:
+      tool: mas::ca.pdu_session.user_plane.establish
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: confirm-address
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  confirm-address:
+    operation:
+      tool: mas::ca.pdu_session.address.confirm
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: signal-access
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  signal-access:
+    operation:
+      tool: mas::ca.pdu_session.access.signal
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: activate-n4
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  activate-n4:
+    operation:
+      tool: mas::ca.pdu_session.user_plane.activate
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: emit-events
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  emit-events:
+    operation:
+      tool: mas::ca.pdu_session.events.emit
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: finalize-resources
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  finalize-resources:
+    operation:
+      tool: mas::ca.pdu_session.resources.finalize
+      arguments:
+        ueRef: context.ueRef
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        SUCCEEDED: verify-final
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  verify-final:
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.ran_adopted
+          arguments:
+            - signal-access.operation.output
+        - predicate: establishment.mas.forwarding_ready
+          arguments:
+            - activate-n4.operation.output
+        - predicate: establishment.mas.resources_managed
+          arguments:
+            - finalize-resources.operation.output
+      routes:
+        PASS: SUCCEEDED
+        FAIL: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED

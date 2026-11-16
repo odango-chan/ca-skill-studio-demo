@@ -5,8 +5,10 @@ const SYMBOL_TYPES=new Set([
   "skillStep",
   "skillPredicate",
   "skillOperation",
+  "skillObservation",
   "skillCapability",
-  "skillSchema"
+  "skillSchema",
+  "skillReference"
 ]);
 
 function modifier(token,name){
@@ -34,6 +36,16 @@ function symbolKey(token,name){
     case "skillProcedure":
       return "procedure\u0000"+name;
     case "skillStep":{
+      // The Contract gate references one exact Node precondition stage.
+      // Its full scalar is <NodeId>.precondition, but navigation points to
+      // that Node's declaration (no separate author stage declaration).
+      if(token.path?.length===1 && token.path[0]==="precondition"){
+        const matched=/^([A-Za-z][A-Za-z0-9_-]*)\.precondition$/.exec(name);
+        return matched?"step\u0000"+matched[1]:null;
+      }
+      // v1alpha4 has one procedure with root nodes/<NodeId>.
+      if(token.path?.[0]==="nodes")
+        return "step\u0000"+name;
       const procedure=token.path?.[0]==="procedures"?token.path[1]:null;
       return typeof procedure==="string"&&procedure
         ? "step\u0000"+procedure+"\u0000"+name
@@ -43,12 +55,16 @@ function symbolKey(token,name){
       return "predicate\u0000"+name;
     case "skillOperation":
       return "operation\u0000"+name;
+    case "skillObservation":
+      // Observation is not interchangeable with an Operation export.
+      return "observation\u0000"+name;
     // allowedResources.capabilities may grant a Capability or a direct
     // Operation. The v0.2 projection has no local Capability declaration
     // profile, so resolve this only when an exact imported Operation exists.
     case "skillCapability":
       return "operation\u0000"+name;
-    case "skillSchema":{
+    case "skillSchema":
+    case "skillReference":{
       const targetPath=packageFilePath(name);
       return targetPath?"document::"+targetPath:null;
     }

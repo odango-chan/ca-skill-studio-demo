@@ -14,7 +14,7 @@ import {
   SKILL_SEMANTIC_TOKEN_TYPES,
   SKILL_SEMANTIC_TOKEN_MODIFIERS
 } from "../../../../../language/semantic-tokens.mjs";
-import { parseDocument, isMap, isScalar } from "yaml";
+import { parseDocument, isMap, isScalar, isSeq } from "yaml";
 import { LanguageDiagnosticSession } from "../../../../../language/lsp/session.js";
 import {
   buildSkillSymbolIndex,
@@ -125,7 +125,10 @@ function positionAt(starts, offset) {
 function semanticTokensForDocument(document) {
   const spans=collectSkillSemanticTokenSpans(document.text,document.relativePath);
   const starts=lineStarts(document.text);
-  const builder=new SemanticTokensBuilder();
+  const builder=new SemanticTokensBuilder({
+    tokenTypes:SKILL_SEMANTIC_TOKEN_TYPES,
+    tokenModifiers:SKILL_SEMANTIC_TOKEN_MODIFIERS
+  });
   for(const span of spans){
     if(!Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
        span.start<0||span.end<=span.start||span.end>document.text.length||
@@ -136,8 +139,8 @@ function semanticTokensForDocument(document) {
     for(let line=first.line;line<=last.line;line++){
       const lineStart=starts[line];
       let lineEnd=line+1<starts.length?starts[line+1]:document.text.length;
-      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\\n")lineEnd--;
-      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\\r")lineEnd--;
+      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\n")lineEnd--;
+      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\r")lineEnd--;
       const segmentStart=Math.max(span.start,lineStart);
       const segmentEnd=Math.min(span.end,lineEnd);
       if(segmentEnd<=segmentStart)continue;
@@ -209,26 +212,6 @@ function snapshotDocumentFor(snapshot, uri) {
 function documentFor(value, uri) {
   return value?.snapshot.documents.find(document => document.uri === uri) ?? null;
 }
-
-connection.onRequest("skillStudio/semanticTokenDiagnostics", params=>{
-  const uri=params?.uri;
-  const snapshot=typeof uri==="string"?packageSnapshotForUri(uri):null;
-  const value=snapshot?packageAnalyses.get(snapshot.rootUri):null;
-  const document=snapshot?snapshotDocumentFor(snapshot,uri):null;
-  return {
-    packageCount:packageSnapshots.size,
-    packageFound:Boolean(snapshot),
-    analysisState:value?.analysis.state??null,
-    generation:snapshot?.generation??null,
-    documentCount:snapshot?.documents.length??0,
-    documentFound:Boolean(document),
-    relativePath:document?.relativePath??null,
-    textLength:typeof document?.text==="string"?document.text.length:0,
-    spanCount:document?collectSkillSemanticTokenSpans(
-      document.text,document.relativePath
-    ).length:0
-  };
-});
 
 function allReferences(analysis) {
   return [...analysis.scriptReferences, ...analysis.schemaReferences];
@@ -319,7 +302,7 @@ connection.onInitialize(() => ({
     documentSymbolProvider: true,
     completionProvider: {
       resolveProvider: false,
-      triggerCharacters: [":", "/"]
+      triggerCharacters: [":", "/", "."]
     }
   },
   serverInfo: {
@@ -422,14 +405,23 @@ connection.onHover(params => {
   const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
   if(symbolHit){
     const declaration=uniqueSkillSymbolDeclaration(symbolHit);
+    const procedureSource=snapshot.documents.find(item=>
+      item.relativePath==="assurance/procedure.yaml");
+    const v1alpha4Package=Boolean(procedureSource&&
+      /^start:[ \t]*/m.test(procedureSource.text)&&
+      /^nodes:[ \t]*/m.test(procedureSource.text));
+    const scriptDocument=declaration&&symbolHit.token.type==="skillReference"
+      ?snapshot.documents.find(item=>item.relativePath===declaration.relativePath):null;
+    const scriptName=scriptDocument?scriptToolName(scriptDocument.text):null;
     const kind=({
       skillProcedure:"Procedure",
       skillStep:"Procedure node",
       skillPredicate:"Predicate",
       skillOperation:"Tool Operation",
+      skillObservation:"Observation Tool",
       skillCapability:"Capability grant",
       skillSchema:"Schema",
-      skillReference:"Script / Reference"
+      skillReference:symbolHit.token.name.startsWith("scripts/")?"Skill Script":"Reference"
     })[symbolHit.token.type]??"Skill symbol";
     const resolved=Boolean(declaration&&snapshot.completeness==="complete"&&
       index?.generation===snapshot.generation);
@@ -437,11 +429,36 @@ connection.onHover(params => {
       index?.generation===snapshot.generation&&
       ["skillOperation","skillCapability"].includes(symbolHit.token.type)
       ? projectOperationCatalog(snapshot,index).get(symbolHit.token.name) : null;
+    let predicateSignature=null;
+    if(v1alpha4Package&&resolved&&symbolHit.token.type==="skillPredicate"){
+      const source=snapshot.documents.find(item=>
+        item.relativePath==="assurance/predicates.yaml");
+      if(source){
+        try{
+          const parsed=parseDocument(source.text,{version:"1.2",strict:true,
+            uniqueKeys:true,logLevel:"silent"});
+          const set=isMap(parsed.contents)?parsed.contents.get("predicates",true):null;
+          const predicate=isMap(set)?set.get(symbolHit.token.name,true):null;
+          const parameters=isMap(predicate)?predicate.get("parameters",true):null;
+          if(!parsed.errors.length&&isSeq(parameters)){
+            const signature=parameters.items.map(item=>{
+              if(!isMap(item)||item.items.length!==1)return null;
+              const pair=item.items[0];
+              const name=isScalar(pair.key)?String(pair.key.value):"";
+              const type=isScalar(pair.value)?String(pair.value.value):"";
+              return name&&type?name+": "+type:null;
+            });
+            if(signature.every(Boolean))
+              predicateSignature=symbolHit.token.name+"("+signature.join(", ")+")";
+          }
+        }catch{/* An incomplete PredicateSet must not fabricate a signature. */}
+      }
+    }
     const body=operation
       ? "**Tool Operation** `"+operation.id+"`\n\nDeclared in project dependency `"+
         operation.dependencyId+"`."
       : resolved
-      ? "**"+kind+"** `"+symbolHit.token.name+"`\n\nDeclared in `"+declaration.relativePath+"`"
+      ? "**"+kind+"** `"+(scriptName??predicateSignature??symbolHit.token.name)+"`\n\nDeclared in `"+declaration.relativePath+"`"
       : "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nNo unique declaration is available in the current complete Package snapshot.";
     return {contents:{kind:"markdown",value:body},
       range:toLspRange(source.text,symbolHit.token.range)};
@@ -529,6 +546,15 @@ connection.onDocumentSymbol(params => {
       if(range)symbols.push({name:item.name,kind:SymbolKind.Function,
         range,selectionRange:range});
     }
+    // v1alpha4 has one root Node graph and no named Procedure declaration.
+    // Show those Nodes in native Outline rather than returning an empty list.
+    if(!procedures.length && source.relativePath==="assurance/procedure.yaml"){
+      for(const item of steps.filter(item=>item.path?.[0]==="nodes")){
+        const range=toLspRange(source.text,item.range);
+        if(range)symbols.push({name:item.name,kind:SymbolKind.Method,
+          range,selectionRange:range});
+      }
+    }
     if(symbols.length)return symbols;
   }
   const value = packageForUri(uri);
@@ -544,11 +570,192 @@ connection.onDocumentSymbol(params => {
     })).filter(symbol => symbol.location);
 });
 
+/** v1alpha4 authoring completions are syntax suggestions, not Owner grants. */
+function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
+  const isProcedure=document.relativePath==="assurance/procedure.yaml";
+  const isContract=document.relativePath==="assurance/contract.yaml";
+  if(!isProcedure&&!isContract)return null;
+  if(isProcedure&&!/^(?:start|nodes):[ \t]*/m.test(document.text))
+    return null;
+
+  // Track the current YAML indentation scope. Looking for the last stage
+  // alone leaks stale completion candidates across Nodes and into arguments.
+  const lines=document.text.slice(0,lineStart).split(/\r?\n/);
+  let inNodes=false,inNode=false,nodeId=null,stage=null,section=null;
+  for(const line of lines){
+    if(/^nodes:\s*$/.test(line)){
+      inNodes=true;inNode=false;nodeId=null;stage=null;section=null;continue;
+    }
+    if(/^[^\s#]/.test(line)){
+      inNodes=false;inNode=false;nodeId=null;stage=null;section=null;continue;
+    }
+    if(!inNodes)continue;
+    const node=/^ {2}([A-Za-z][A-Za-z0-9_-]*):\s*$/.exec(line);
+    if(node){
+      inNode=true;nodeId=node[1];stage=null;section=null;continue;
+    }
+    if(!inNode)continue;
+    const nextStage=/^ {4}(precondition|operation|observation|postcondition):\s*$/.exec(line);
+    if(nextStage){stage=nextStage[1];section=null;continue;}
+    const nextSection=/^ {6}(predicates|arguments|routes):\s*$/.exec(line);
+    if(nextSection)section=nextSection[1];
+  }
+  let parsed;
+  try {
+    parsed=parseDocument(document.text,{version:"1.2",strict:true,
+      uniqueKeys:true,logLevel:"silent"});
+  }catch{return [];}
+  if(parsed.errors.length)return [];
+  const nodes=isProcedure&&isMap(parsed.contents) ? parsed.contents.get("nodes",true) : null;
+  const localNodes=isMap(nodes)?nodes.items
+    .filter(item=>isScalar(item.key)&&typeof item.key.value==="string")
+    .map(item=>item.key.value):[];
+  const currentNode=isMap(nodes)&&nodeId?nodes.get(nodeId,true):null;
+  const currentStages=["precondition","operation","observation","postcondition"]
+    .filter(name=>isMap(currentNode)&&currentNode.has(name));
+  const finalStage=currentStages.at(-1)===stage;
+  const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="CA-SL v1alpha4 source syntax")=>
+    labels.filter(name=>name.startsWith(typed)).map(name=>({
+      label:name,kind,detail,
+      textEdit:{range:{
+        start:positionAt(lineStarts(document.text),start),
+        end:positionAt(lineStarts(document.text),offset)
+      },newText:name}
+    }));
+
+  if(isContract){
+    // Only suggest actual, locally declared Precondition stages from this
+    // Package. An unresolved or partial Procedure is not a declaration source.
+    const gate=/^precondition:[ \t]*([A-Za-z0-9_.-]*)$/.exec(prefix);
+    if(gate && value.snapshot.completeness==="complete"){
+      const procedure=value.snapshot.documents.find(item=>
+        item.relativePath==="assurance/procedure.yaml");
+      if(!procedure)return [];
+      try {
+        const doc=parseDocument(procedure.text,{version:"1.2",strict:true,
+          uniqueKeys:true,logLevel:"silent"});
+        const sourceNodes=isMap(doc.contents)?doc.contents.get("nodes",true):null;
+        if(doc.errors.length||!isMap(sourceNodes))return [];
+        const choices=sourceNodes.items.filter(item=>
+          isScalar(item.key)&&typeof item.key.value==="string"&&
+          isMap(item.value)&&isMap(item.value.get("precondition",true)))
+          .map(item=>item.key.value+".precondition");
+        return make(choices,gate[1],offset-gate[1].length,
+          CompletionItemKind.Reference,"Declared Package Precondition stage");
+      }catch{return [];}
+    }
+    const request=/^requestSchema:[ \t]*([A-Za-z0-9_./-]*)$/.exec(prefix);
+    if(request && value.snapshot.completeness==="complete"){
+      return make(value.snapshot.documents
+        .filter(item=>/^schemas\/[A-Za-z0-9_.-]+\.schema\.ya?ml$/.test(item.relativePath))
+        .map(item=>item.relativePath),request[1],offset-request[1].length,
+        CompletionItemKind.File,"Skill-owned request Schema");
+    }
+    return null;
+  }
+
+  const entry=/^start:[ \t]*([A-Za-z0-9_-]*)$/.exec(prefix);
+  if(entry && value.snapshot.completeness==="complete")
+    return make(localNodes,entry[1],offset-entry[1].length,
+      CompletionItemKind.Reference,"Declared Package Node");
+
+  const predicate=/^ {8}-[ \t]+predicate:[ \t]*([A-Za-z0-9_.-]*)$/.exec(prefix);
+  if(predicate && section==="predicates" &&
+     (stage==="precondition"||stage==="postcondition") &&
+     value.snapshot.completeness==="complete"){
+    const definition=value.snapshot.documents.find(item=>
+      item.relativePath==="assurance/predicates.yaml");
+    if(!definition)return [];
+    try {
+      const doc=parseDocument(definition.text,{version:"1.2",strict:true,
+        uniqueKeys:true,logLevel:"silent"});
+      const predicates=isMap(doc.contents)?doc.contents.get("predicates",true):null;
+      if(doc.errors.length||!isMap(predicates))return [];
+      const ids=predicates.items.filter(item=>
+        isScalar(item.key)&&typeof item.key.value==="string"&&isMap(item.value))
+        .map(item=>item.key.value);
+      return make(ids,predicate[1],offset-predicate[1].length,
+        CompletionItemKind.Reference,"Package-local Predicate declaration");
+    }catch{return [];}
+  }
+
+  const stageField=/^( {4})([a-z]*)$/.exec(prefix);
+  if(stageField && inNode)return make(["precondition:","operation:","observation:","postcondition:"],
+    stageField[2],lineStart+4);
+
+  const memberField=/^ {6}([a-zA-Z]*)$/.exec(prefix);
+  if(memberField && inNode && stage){
+    const fields=stage==="precondition"||stage==="postcondition"
+      ?["predicates:","routes:"]:
+      stage==="observation"?["tool:","arguments:","routes:"]:
+      ["tool:","script:","arguments:","retryOf:","routes:"];
+    return make(fields,memberField[1],lineStart+6,
+      CompletionItemKind.Keyword,"CA-SL v1alpha4 "+stage+" stage fields");
+  }
+
+  const routeKey=/^( {8})([A-Z_]*)$/.exec(prefix);
+  if(routeKey && inNode && section==="routes" && stage){
+    let keys;
+    if(stage==="precondition"||stage==="postcondition"){
+      keys=["FAIL:","UNKNOWN:"];
+      if(finalStage)keys.push("PASS:");
+    }else if(stage==="observation"){
+      keys=["FAILED:","DENIED:","UNKNOWN:"];
+      if(finalStage)keys.push("SUCCEEDED:");
+    }else{
+      const operation=isMap(currentNode)?currentNode.get("operation",true):null;
+      const scriptOperation=isMap(operation)&&operation.has("script");
+      keys=scriptOperation?["FAILED:"]:
+        ["FAILED:","DENIED:","UNKNOWN:","OUTCOME_UNKNOWN:"];
+      if(finalStage)keys.push("SUCCEEDED:");
+    }
+    return make(keys,routeKey[2],lineStart+8,CompletionItemKind.EnumMember,
+      "Outcome key; Tool Owner Effect-specific outcomes require trusted Compiler linking");
+  }
+
+  const routeTarget=/^( {8}(PASS|FAIL|UNKNOWN|SUCCEEDED|FAILED|DENIED|NOT_COMMITTED|OUTCOME_UNKNOWN|COMMITTED):\s*)([A-Za-z0-9_-]*)$/.exec(prefix);
+  if(routeTarget && inNode && section==="routes" && stage){
+    const outcome=routeTarget[2],typed=routeTarget[3];
+    const terminals=["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"]
+      .filter(value=>value!=="SUCCEEDED"||
+        (stage==="postcondition"&&outcome==="PASS"&&finalStage));
+    // An unresolved Mutation may only stop. Never offer a Node as the
+    // target of OUTCOME_UNKNOWN: it would violate frozen §12.7/§22.
+    const choices=outcome==="OUTCOME_UNKNOWN"
+      ?["UNRESOLVED","SAFE_STOPPED"]:[...localNodes,...terminals];
+    return make(choices,typed,offset-typed.length,CompletionItemKind.Reference,
+      "Local Node / four terminal statuses; SUCCEEDED only from final Postcondition PASS");
+  }
+
+  const script=/^ {6}script:[ \t]*([A-Za-z0-9_./-]*)$/.exec(prefix);
+  if(script && inNode && stage==="operation" &&
+     value.snapshot.completeness==="complete"){
+    const names=value.snapshot.documents
+      .filter(item=>/^scripts\/[A-Za-z0-9_.-]+\.py$/.test(item.relativePath))
+      .map(item=>item.relativePath);
+    return make(names,script[1],offset-script[1].length,
+      CompletionItemKind.File,"Package-local Procedure Script");
+  }
+
+  const tool=/^ {6}tool:[ \t]*([A-Za-z0-9_:.-]*)$/.exec(prefix);
+  if(tool && inNode && (stage==="operation"||stage==="observation")){
+    // Only list exact IDs explicitly supplied with the accepted snapshot.
+    // These are source hints; membership, Scope and Effect are not inferred.
+    const ids=[...new Set((value.snapshot.dependencyOperations??[])
+      .map(item=>item.id).filter(id=>typeof id==="string"&&id.includes("::")))];
+    return make(ids,tool[2],offset-tool[2].length,CompletionItemKind.Reference,
+      "Unverified imported reference; Compiler must check exact Owner/Capability");
+  }
+
+  return null;
+}
+
 connection.onCompletion(params => {
-  const value = packageForUri(params.textDocument.uri);
+  const uri=params.textDocument.uri;
+  const value = packageForUri(uri);
   if (!value || value.analysis.state === "UNAVAILABLE" ||
       !value.analysis.documents.length) return [];
-  const document = documentFor(value, params.textDocument.uri);
+  const document = documentFor(value, uri);
   if (!document || !value.analysis.documents.some(item =>
       item.uri === document.uri && item.version === document.version)) return [];
   const offset = offsetAt(document.text, params.position);
@@ -556,6 +763,8 @@ connection.onCompletion(params => {
   const starts = lineStarts(document.text);
   const lineStart = starts[params.position.line];
   const prefix = document.text.slice(lineStart, offset);
+  const v4 = v1Alpha4Completions(value,document,prefix,offset,lineStart);
+  if(v4!==null)return v4;
 
   if (document.relativePath === "assurance/procedure.yaml" &&
       value.analysis.state === "READY" && value.snapshot.completeness === "complete") {

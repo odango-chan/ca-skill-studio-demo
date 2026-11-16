@@ -15,8 +15,17 @@ const sha=text=>{
   return createHash("sha1").update("blob "+bytes.length+"\0").update(bytes).digest("hex");
 };
 
-test("only the owner-named establish-pdu-session is a selectable real SKILL Package",()=>{
-  assert.deepEqual(Object.keys(SAMPLE_PACKAGES),["establish"]);
+test("legacy sample is preserved while v1alpha4 PDU and MAS are separately selectable",()=>{
+  assert.deepEqual(Object.keys(SAMPLE_PACKAGES),["establish","establishV4","masV4"]);
+  for(const key of ["establishV4","masV4"]){
+    const sample=SAMPLE_PACKAGES[key];
+    assert.equal(sample.sourceDir,"v1alpha4");
+    assert.equal(sample.files.length,5);
+    for(const item of packageFilesForSample(key)){
+      assert.match(item.url,/^\.\/samples\/v1alpha4\//);
+      assert.ok(readFileSync(new URL("../site/"+item.url.slice(2),import.meta.url),"utf8").trim().length>0);
+    }
+  }
   assert.equal(SAMPLE_PACKAGES.establish.name,"establish-pdu-session");
   assert.equal(SAMPLE_PACKAGES.establish.files.length,16);
   const spec=SAMPLE_PACKAGES.establish;

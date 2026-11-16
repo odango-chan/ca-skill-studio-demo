@@ -969,6 +969,279 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
     ));
   }
 
+  // Exercise frozen v1alpha4 providers through the public VS Code commands
+  // in real Theia. A uniquely named sibling Package is created inside the
+  // selected workspace and always removed; user-authored files are untouched.
+  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
+    context.subscriptions.push(vscode.commands.registerCommand(
+      "skillStudio.internal.v1alpha4LanguageProviderAcceptance",
+      async procedureUriValue=>{
+        const sourceUri=vscode.Uri.parse(String(procedureUriValue??""));
+        const sourceDocument=await vscode.workspace.openTextDocument(sourceUri);
+        const sourceRoot=packageRootForProcedure(vscode,sourceDocument);
+        if(!sourceRoot)throw Error("v1alpha4 acceptance requires an active Skill Package");
+        const sourcePath=sourceRoot.uri.path.replace(/\/$/,"");
+        const workspaceFolder=(vscode.workspace.workspaceFolders??[]).find(folder=>{
+          const path=folder.uri.path.replace(/\/$/,"");
+          return sourcePath===path||sourcePath.startsWith(path+"/");
+        });
+        if(!workspaceFolder)throw Error("v1alpha4 acceptance requires the selected workspace root");
+        const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
+        const packageRoot=vscode.Uri.joinPath(
+          workspaceFolder.uri,"skill-studio-v1alpha4-lsp-"+suffix);
+        const fs=vscode.workspace.fs;
+        const contract=[
+          "goal: pdu_session.initial_request_fulfilled",
+          "precondition: check.precondition",
+          "requestSchema: schemas/request.schema.yaml",
+          "contextSchema: ca-context::urn:example:host:v1",
+          "dependencies:",
+          "  ca-context: urn:example:host",
+          "  ca: urn:example:tools",
+          "capabilities: [session-read]",
+          ""
+        ].join("\n");
+        const procedure=[
+          "start: check",
+          "nodes:",
+          "  check:",
+          "    ",
+          "    precondition:",
+          "      ",
+          "      predicates:",
+          "        - predicate: demo.ready",
+          "          arguments: [context.ueRef]",
+          "      routes:",
+          "        ",
+          "        PASS: read",
+          "        FAIL: FAILED",
+          "        UNKNOWN: UNRESOLVED",
+          "  read:",
+          "    observation:",
+          "      ",
+          "      tool: ca::session.read",
+          "      arguments:",
+          "        ueRef: context.ueRef",
+          "      routes:",
+          "        SUCCEEDED: mutate",
+          "        FAILED: SAFE_STOPPED",
+          "        UNKNOWN: UNRESOLVED",
+          "  mutate:",
+          "    operation:",
+          "      tool: ca::session.mutate",
+          "      arguments: {}",
+          "      routes:",
+          "        SUCCEEDED: run-script",
+          "        FAILED: SAFE_STOPPED",
+          "        OUTCOME_UNKNOWN: SAFE_STOPPED",
+          "  run-script:",
+          "    operation:",
+          "      ",
+          "      script: scripts/runner.py",
+          "      arguments: {}",
+          "      routes:",
+          "        ",
+          "        SUCCEEDED: final",
+          "        FAILED: SAFE_STOPPED",
+          "  final:",
+          "    postcondition:",
+          "      predicates:",
+          "        - predicate: demo.done",
+          "          arguments: [read.observation.output]",
+          "      routes:",
+          "        PASS: SUCCEEDED",
+          "        FAIL: FAILED",
+          "        UNKNOWN: UNRESOLVED",
+          ""
+        ].join("\n");
+        const predicates=[
+          "predicates:",
+          "  demo.ready:",
+          "    parameters: [{ue: string}]",
+          "    evaluator:",
+          "      type: cel",
+          "      expression: ue != \"\"",
+          "  demo.done:",
+          "    parameters: [{data: string}]",
+          "    evaluator:",
+          "      type: cel",
+          "      expression: data.ready == true",
+          ""
+        ].join("\n");
+        const files={
+          "assurance/contract.yaml":contract,
+          "assurance/procedure.yaml":procedure,
+          "assurance/predicates.yaml":predicates,
+          "schemas/request.schema.yaml":
+            "$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\n",
+          "scripts/runner.py":"def main():\n    return {}\n"
+        };
+        let release=null;
+        let state=null;
+        try{
+          await fs.createDirectory(packageRoot);
+          for(const [relativePath,text] of Object.entries(files)){
+            const parts=relativePath.split("/");
+            await fs.createDirectory(vscode.Uri.joinPath(
+              packageRoot,...parts.slice(0,-1)));
+            await fs.writeFile(vscode.Uri.joinPath(packageRoot,...parts),
+              new TextEncoder().encode(text));
+          }
+          const uriFor=path=>vscode.Uri.joinPath(packageRoot,...path.split("/"));
+          const [contractDocument,procedureDocument,predicateDocument,scriptDocument]=await Promise.all([
+            vscode.workspace.openTextDocument(uriFor("assurance/contract.yaml")),
+            vscode.workspace.openTextDocument(uriFor("assurance/procedure.yaml")),
+            vscode.workspace.openTextDocument(uriFor("assurance/predicates.yaml")),
+            vscode.workspace.openTextDocument(uriFor("scripts/runner.py"))
+          ]);
+          release=attachLanguagePackage(procedureDocument);
+          state=languagePackages.get(packageRoot.toString());
+          if(!state||state.disposed)throw Error("v1alpha4 Package did not attach to Language Service");
+          const status=await waitForLanguagePackageStatus(state,state.generation,20000);
+          if(status.state!=="PARTIAL")
+            throw Error("Unqualified fixture must remain editor-only PARTIAL, got "+status.state);
+          if(state.lastSentSnapshot?.completeness!=="complete")
+            throw Error("v1alpha4 acceptance snapshot is incomplete: "+
+              JSON.stringify(state.lastSentSnapshot));
+          const labels=result=>(Array.isArray(result)?result:
+            result?.items??result?.suggestions??[]).map(item=>
+              typeof item.label==="string"?item.label:item.label?.label??"");
+          const complete=async(document,needle,offsetInNeedle)=>{
+            const source=document.getText();
+            const start=source.indexOf(needle);
+            if(start<0)throw Error("v1alpha4 completion probe anchor missing: "+needle);
+            const position=document.positionAt(start+
+              (offsetInNeedle??needle.length));
+            const result=await languageClient.provideCompletion(
+              document.uri.toString(),position);
+            return labels(result);
+          };
+          const contractGate=await complete(contractDocument,"check.precondition",6);
+          const schemaPath=await complete(contractDocument,"schemas/request.schema.yaml",8);
+          const entry=await complete(procedureDocument,"start: check",7);
+          const predicate=await complete(procedureDocument,"demo.ready",5);
+          const preconditionFields=await complete(procedureDocument,
+            "    precondition:\n      ");
+          const observationFields=await complete(procedureDocument,
+            "    observation:\n      ");
+          const operationFields=await complete(procedureDocument,
+            "    operation:\n      ");
+          const routeKeys=await complete(procedureDocument,
+            "  run-script:\n    operation:\n      \n      script: scripts/runner.py\n      arguments: {}\n      routes:\n        ");
+          const mutationRouteKeys=await complete(procedureDocument,
+            "  mutate:\n    operation:\n      tool: ca::session.mutate\n      arguments: {}\n      routes:\n        ");
+          const scriptPath=await complete(procedureDocument,"scripts/runner.py",8);
+          const unknownTarget=await complete(procedureDocument,
+            "OUTCOME_UNKNOWN: ");
+          const require=(items,label,description)=>{
+            if(!items.includes(label))
+              throw Error("Native Theia "+description+" completion omitted "+
+                label+": "+JSON.stringify(items));
+          };
+          if(!contractGate.includes("check.precondition"))
+            throw Error("Native Theia Contract Precondition completion omitted check.precondition: "+
+              JSON.stringify(contractGate));
+          require(schemaPath,"schemas/request.schema.yaml","Request Schema");
+          require(entry,"check","Procedure start Node");
+          require(predicate,"demo.ready","Predicate");
+          require(preconditionFields,"predicates:","Precondition field");
+          require(preconditionFields,"routes:","Precondition field");
+          if(preconditionFields.includes("tool:")||preconditionFields.includes("script:"))
+            throw Error("Precondition offered an Operation/Observation-only field");
+          require(observationFields,"tool:","Observation field");
+          require(observationFields,"arguments:","Observation field");
+          if(observationFields.includes("script:")||observationFields.includes("retryOf:"))
+            throw Error("Observation offered an Operation-only field");
+          require(operationFields,"tool:","Operation field");
+          require(operationFields,"script:","Operation field");
+          require(operationFields,"arguments:","Operation field");
+          require(routeKeys,"SUCCEEDED:","final Script route key");
+          require(routeKeys,"FAILED:","Script failure route key");
+          if(routeKeys.includes("OUTCOME_UNKNOWN:")||routeKeys.includes("NOT_COMMITTED:"))
+            throw Error("Procedure Script offered Tool/Mutation-only outcomes: "+
+              JSON.stringify(routeKeys));
+          require(mutationRouteKeys,"OUTCOME_UNKNOWN:","Mutation unresolved route key");
+          require(scriptPath,"scripts/runner.py","Package Script path");
+          require(unknownTarget,"SAFE_STOPPED","OUTCOME_UNKNOWN terminal");
+          if(unknownTarget.some(item=>["check","read","mutate","run-script","final"].includes(item)))
+            throw Error("OUTCOME_UNKNOWN offered a business Node target: "+
+              JSON.stringify(unknownTarget));
+
+          const at=(document,needle,offset=0)=>{
+            const source=document.getText(),start=source.indexOf(needle);
+            if(start<0)throw Error("v1alpha4 navigation probe anchor missing: "+needle);
+            return document.positionAt(start+offset);
+          };
+          const definitionItems=result=>Array.isArray(result)?result:
+            result?[result]:[];
+          const gateDefinition=definitionItems(await vscode.commands.executeCommand(
+            "vscode.executeDefinitionProvider",contractDocument.uri,
+            at(contractDocument,"check.precondition",2)));
+          if(!gateDefinition.some(item=>
+            (item?.uri??item?.targetUri)?.toString()===procedureDocument.uri.toString()))
+            throw Error("Native Theia Contract Precondition Definition did not reach the Node");
+          const predicateDefinition=definitionItems(await vscode.commands.executeCommand(
+            "vscode.executeDefinitionProvider",procedureDocument.uri,
+            at(procedureDocument,"demo.ready",3)));
+          if(!predicateDefinition.some(item=>
+            (item?.uri??item?.targetUri)?.toString()===predicateDocument.uri.toString()))
+            throw Error("Native Theia Predicate Definition did not reach PredicateSet");
+          const predicateHover=definitionItems(await vscode.commands.executeCommand(
+            "vscode.executeHoverProvider",procedureDocument.uri,
+            at(procedureDocument,"demo.ready",3))).flatMap(item=>
+              Array.isArray(item?.contents)?item.contents:[item?.contents])
+            .map(item=>typeof item==="string"?item:item?.value??String(item??""))
+            .join(" ");
+          if(!predicateHover.includes("demo.ready(ue: string)"))
+            throw Error("Native Theia Predicate Hover omitted its declared parameter signature: "+
+              predicateHover);
+          const references=definitionItems(await vscode.commands.executeCommand(
+            "vscode.executeReferenceProvider",predicateDocument.uri,
+            at(predicateDocument,"demo.ready",3),{includeDeclaration:true}));
+          if(!references.some(item=>
+            (item?.uri??item?.targetUri)?.toString()===procedureDocument.uri.toString()))
+            throw Error("Native Theia Predicate References omitted the Procedure use");
+          const scriptDefinition=definitionItems(await vscode.commands.executeCommand(
+            "vscode.executeDefinitionProvider",procedureDocument.uri,
+            at(procedureDocument,"scripts/runner.py",5)));
+          if(!scriptDefinition.some(item=>
+            (item?.uri??item?.targetUri)?.toString()===scriptDocument.uri.toString()))
+            throw Error("Native Theia v1alpha4 Script Definition did not reach its Package-owned file");
+          const symbols=definitionItems(await vscode.commands.executeCommand(
+            "vscode.executeDocumentSymbolProvider",procedureDocument.uri));
+          if(!symbols.some(item=>item.name==="check")||
+             !symbols.some(item=>item.name==="mutate")||
+             !symbols.some(item=>item.name==="run-script")||
+             !symbols.some(item=>item.name==="final"))
+            throw Error("Native Theia Outline did not expose v1alpha4 Node declarations");
+          return {
+            status:status.state,snapshotCompleteness:state.lastSentSnapshot.completeness,
+            contractPreconditionCompletion:contractGate,
+            requestSchemaCompletion:schemaPath,startNodeCompletion:entry,
+            predicateCompletion:predicate,
+            preconditionFields,observationFields,operationFields,
+            operationRouteKeys:routeKeys,mutationRouteKeys,scriptPathCompletion:scriptPath,
+            outcomeUnknownTargets:unknownTarget,
+            contractDefinition:gateDefinition.length,
+            predicateDefinition:predicateDefinition.length,
+            predicateHoverSignature:predicateHover.includes("demo.ready(ue: string)"),
+            predicateReferences:references.length,
+            scriptDefinition:scriptDefinition.length,
+            procedureOutline:symbols.map(item=>item.name),
+            ownerQualification:"NOT_QUALIFIED"
+          };
+        }finally{
+          release?.();
+          try{await fs.delete(packageRoot,{recursive:true,useTrash:false});}catch{}
+          if(state){
+            languagePackageGenerations.delete(state.key);
+            languagePackageStatuses.delete(state.key);
+          }
+        }
+      }
+    ));
+  }
+
   // Internal browser acceptance for the native Problems lifecycle. The
   // edit is temporary, Source-owned by TextDocument/WorkspaceEdit, and split
   // into publish/repair phases so Chromium can inspect the actual Problems UI.

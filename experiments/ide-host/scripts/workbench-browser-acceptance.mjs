@@ -1020,6 +1020,50 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       throw Error("Theia public language-provider acceptance returned incomplete evidence: "+
         JSON.stringify(languageFeatureEvidence));
     console.log("STUDIO_LSP_EDITOR_FEATURES",JSON.stringify(languageFeatureEvidence));
+    const v1alpha4LanguageFeatureEvidence=await evalJS(`(async()=>{
+      const container=window.theia.container;
+      const commandKey=[...container._bindingDictionary._map.keys()].find(key=>
+        typeof key==="function"&&key.prototype?.executeCommand&&
+        key.prototype?.registerCommand&&key.prototype?.getCommand);
+      if(!commandKey)throw Error("Native Theia command registry missing for v1alpha4");
+      const openerKey=[...container._bindingDictionary._map.keys()].find(key=>
+        String(key)==="Symbol(OpenerService)");
+      const openers=await container.get(openerKey).getOpeners();
+      const custom=openers.find(item=>item.id==="custom-editor-skillStudio.procedurePreview");
+      const widget=custom?.widgetManager.getWidgets("plugin-custom-editor").find(item=>
+        item.resource?.path.toString().endsWith("/assurance/procedure.yaml"));
+      const procedureUri=widget?.resource;
+      if(!procedureUri)throw Error("Active Procedure URI missing for v1alpha4 acceptance");
+      return container.get(commandKey).executeCommand(
+        "skillStudio.internal.v1alpha4LanguageProviderAcceptance",procedureUri.toString());
+    })()`);
+    if(v1alpha4LanguageFeatureEvidence?.status!=="PARTIAL"||
+       v1alpha4LanguageFeatureEvidence?.snapshotCompleteness!=="complete"||
+       !v1alpha4LanguageFeatureEvidence.contractPreconditionCompletion?.includes(
+         "check.precondition")||
+       !v1alpha4LanguageFeatureEvidence.requestSchemaCompletion?.includes(
+         "schemas/request.schema.yaml")||
+       !v1alpha4LanguageFeatureEvidence.startNodeCompletion?.includes("check")||
+       !v1alpha4LanguageFeatureEvidence.predicateCompletion?.includes("demo.ready")||
+       !v1alpha4LanguageFeatureEvidence.preconditionFields?.includes("predicates:")||
+       !v1alpha4LanguageFeatureEvidence.observationFields?.includes("tool:")||
+       !v1alpha4LanguageFeatureEvidence.operationFields?.includes("script:")||
+       !v1alpha4LanguageFeatureEvidence.scriptPathCompletion?.includes(
+         "scripts/runner.py")||
+       !v1alpha4LanguageFeatureEvidence.outcomeUnknownTargets?.includes("SAFE_STOPPED")||
+       v1alpha4LanguageFeatureEvidence.outcomeUnknownTargets?.some(item=>
+         ["check","read","run-script","final"].includes(item))||
+       !v1alpha4LanguageFeatureEvidence.contractDefinition||
+       !v1alpha4LanguageFeatureEvidence.predicateDefinition||
+       !v1alpha4LanguageFeatureEvidence.predicateHoverSignature||
+       !v1alpha4LanguageFeatureEvidence.predicateReferences||
+       !v1alpha4LanguageFeatureEvidence.scriptDefinition||
+       !v1alpha4LanguageFeatureEvidence.procedureOutline?.includes("run-script")||
+       v1alpha4LanguageFeatureEvidence.ownerQualification!=="NOT_QUALIFIED")
+      throw Error("Theia native v1alpha4 language-provider acceptance returned incomplete evidence: "+
+        JSON.stringify(v1alpha4LanguageFeatureEvidence));
+    console.log("STUDIO_LSP_V1ALPHA4_EDITOR_FEATURES",
+      JSON.stringify(v1alpha4LanguageFeatureEvidence));
     let diagnosticPublishEvidence=null,diagnosticRepairEvidence=null;
     try{
       diagnosticPublishEvidence=await evalJS(`(async()=>{
