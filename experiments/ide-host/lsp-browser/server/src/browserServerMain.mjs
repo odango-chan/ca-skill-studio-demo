@@ -222,10 +222,25 @@ connection.onRequest("skillStudio/semanticTokenDiagnostics", params=>{
     document.text,document.relativePath
   ):[];
   const encoded=document?semanticTokensForDocument(document):{data:[]};
+  let contractPreconditionCompletions=[];
+  if(value&&document?.relativePath==="assurance/contract.yaml"){
+    const gateStart=document.text.indexOf("check.precondition");
+    if(gateStart>=0){
+      const offset=gateStart+6;
+      const lineStart=document.text.lastIndexOf("\n",offset-1)+1;
+      const prefix=document.text.slice(lineStart,offset);
+      contractPreconditionCompletions=(v1Alpha4Completions(
+        value,document,prefix,offset,lineStart)??[]).map(item=>item.label);
+    }
+  }
   return {
     packageCount:packageSnapshots.size,
     packageFound:Boolean(snapshot),
     analysisState:value?.analysis.state??null,
+    analysisDocumentCount:value?.analysis.documents?.length??0,
+    analysisDocumentMatch:Boolean(value?.analysis.documents?.some(item=>
+      item.uri===uri&&item.version===document?.version)),
+    contractPreconditionCompletions,
     generation:snapshot?.generation??null,
     documentCount:snapshot?.documents.length??0,
     documentFound:Boolean(document),
