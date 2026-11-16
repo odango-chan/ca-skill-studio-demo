@@ -285,10 +285,11 @@ export function activate(context){
             creating?edit.newText:edit.newTarget);
           const applied=await vscode.workspace.applyEdit(patch);
           if(!applied)throw Error("Host rejected WorkspaceEdit");
+          await push();
           void webview.postMessage({type:"applied",routeId:edit.routeId});
         }catch(error){
           void webview.postMessage({type:"error",message:String(error?.message??error)});
-          push();
+          await push();
         }
       });
       panel.onDidDispose(()=>{
