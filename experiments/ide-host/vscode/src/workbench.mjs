@@ -1172,6 +1172,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           if(!predicateDefinition.some(item=>
             (item?.uri??item?.targetUri)?.toString()===predicateDocument.uri.toString()))
             throw Error("Native Theia Predicate Definition did not reach PredicateSet");
+          const predicateHover=definitionItems(await vscode.commands.executeCommand(
+            "vscode.executeHoverProvider",procedureDocument.uri,
+            at(procedureDocument,"demo.ready",3))).flatMap(item=>
+              Array.isArray(item?.contents)?item.contents:[item?.contents])
+            .map(item=>typeof item==="string"?item:item?.value??String(item??""))
+            .join(" ");
+          if(!predicateHover.includes("demo.ready(ue: string)"))
+            throw Error("Native Theia Predicate Hover omitted its declared parameter signature: "+
+              predicateHover);
           const references=definitionItems(await vscode.commands.executeCommand(
             "vscode.executeReferenceProvider",predicateDocument.uri,
             at(predicateDocument,"demo.ready",3),{includeDeclaration:true}));
@@ -1200,6 +1209,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,
+            predicateHoverSignature:predicateHover.includes("demo.ready(ue: string)"),
             predicateReferences:references.length,
             scriptDefinition:scriptDefinition.length,
             procedureOutline:symbols.map(item=>item.name),
