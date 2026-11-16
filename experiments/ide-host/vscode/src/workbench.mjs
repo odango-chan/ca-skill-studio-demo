@@ -1126,12 +1126,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             "OUTCOME_UNKNOWN: ");
           const serverContractDiagnostics=await languageClient.sendRequest(
             "skillStudio/semanticTokenDiagnostics",{uri:contractDocument.uri.toString()});
-          const gateStart=contractDocument.getText().indexOf("check.precondition");
-          const directGateResponse=await languageClient.sendRequest("textDocument/completion",{
-            textDocument:{uri:contractDocument.uri.toString()},
-            position:contractDocument.positionAt(gateStart+6)
-          });
-          const directGateLabels=labels(directGateResponse);
+          const serverGateLabels=serverContractDiagnostics?.contractPreconditionCompletions??[];
           const require=(items,label,description)=>{
             if(!items.includes(label))
               throw Error("Native Theia "+description+" completion omitted "+
@@ -1139,7 +1134,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           };
           if(!contractGate.includes("check.precondition"))
             throw Error("Native Theia Contract Precondition completion omitted check.precondition: "+
-              JSON.stringify({contractGate,directGateLabels,serverContractDiagnostics}));
+              JSON.stringify({contractGate,serverGateLabels,serverContractDiagnostics}));
           require(schemaPath,"schemas/request.schema.yaml","Request Schema");
           require(entry,"check","Procedure start Node");
           require(predicate,"demo.ready","Predicate");
@@ -1211,7 +1206,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           return {
             status:status.state,snapshotCompleteness:state.lastSentSnapshot.completeness,
             contractPreconditionCompletion:contractGate,
-            contractServerDiagnostics,directGateLabels,
+            contractServerDiagnostics,serverGateLabels,
             requestSchemaCompletion:schemaPath,startNodeCompletion:entry,
             predicateCompletion:predicate,
             preconditionFields,observationFields,operationFields,
