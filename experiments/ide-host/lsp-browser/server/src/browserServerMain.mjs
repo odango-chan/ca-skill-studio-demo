@@ -136,8 +136,8 @@ function semanticTokensForDocument(document) {
     for(let line=first.line;line<=last.line;line++){
       const lineStart=starts[line];
       let lineEnd=line+1<starts.length?starts[line+1]:document.text.length;
-      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\\n")lineEnd--;
-      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\\r")lineEnd--;
+      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\n")lineEnd--;
+      if(lineEnd>lineStart&&document.text[lineEnd-1]==="\r")lineEnd--;
       const segmentStart=Math.max(span.start,lineStart);
       const segmentEnd=Math.min(span.end,lineEnd);
       if(segmentEnd<=segmentStart)continue;
