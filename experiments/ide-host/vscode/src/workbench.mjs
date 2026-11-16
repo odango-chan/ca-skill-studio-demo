@@ -1109,6 +1109,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
               "vscode.executeCompletionItemProvider",document.uri,position);
             return labels(result);
           };
+          const contractProbeSource=contractDocument.getText();
+          const contractProbeStart=contractProbeSource.indexOf("check.precondition");
+          const contractProbePosition=contractDocument.positionAt(contractProbeStart+6);
           const contractGate=await complete(contractDocument,"check.precondition",6);
           const serverContractDiagnostics=await languageClient.sendRequest(
             "skillStudio/semanticTokenDiagnostics",{uri:contractDocument.uri.toString()});
@@ -1134,7 +1137,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           };
           if(!contractGate.includes("check.precondition"))
             throw Error("Native Theia Contract Precondition completion omitted check.precondition: "+
-              JSON.stringify({contractGate,serverGateLabels,serverContractDiagnostics}));
+              JSON.stringify({contractGate,serverGateLabels,serverContractDiagnostics,
+                contractProbeStart,contractProbePosition,
+                contractProbePrefix:contractProbeSource.slice(0,110)}));
           require(schemaPath,"schemas/request.schema.yaml","Request Schema");
           require(entry,"check","Procedure start Node");
           require(predicate,"demo.ready","Predicate");
