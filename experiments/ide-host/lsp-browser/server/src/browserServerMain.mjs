@@ -430,7 +430,7 @@ connection.onHover(params => {
       skillObservation:"Observation Tool",
       skillCapability:"Capability grant",
       skillSchema:"Schema",
-      skillReference:"Script / Reference"
+      skillReference:symbolHit.token.name.startsWith("scripts/")?"Skill Script":"Reference"
     })[symbolHit.token.type]??"Skill symbol";
     const resolved=Boolean(declaration&&snapshot.completeness==="complete"&&
       index?.generation===snapshot.generation);
