@@ -97,7 +97,8 @@ function snapshot(source=procedure,contractSource=contract,predicatesSource=pred
     "assurance/contract.yaml":contractSource,
     "assurance/procedure.yaml":source,
     "assurance/predicates.yaml":predicatesSource,
-    "schemas/request.schema.yaml":"$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\n"
+    "schemas/request.schema.yaml":"$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\n",
+    "scripts/runner.py":"def main():\n    return {}\n"
   };
   return {rootUri:"file:///workspace/sample",packageName:"sample",generation:1,
     completeness:"complete",documents:Object.entries(files).map(([relativePath,text])=>({
@@ -312,6 +313,21 @@ test("v1alpha4 Observation tool reference is indexed without inventing an Owner"
   assert.equal(hit?.token.type,"skillObservation");
   assert.equal(hit?.token.name,"ca::session.read");
   assert.equal(uniqueSkillSymbolDeclaration(hit),null);
+});
+
+test("v1alpha4 Script references resolve only to exact Package-owned script files",()=>{
+  const sourceText=procedure
+    .replace("SUCCEEDED: final","SUCCEEDED: run-script")
+    .replace("  final:\\n","  run-script:\\n    operation:\\n      script: scripts/runner.py\\n      arguments: {}\\n      routes:\\n        SUCCEEDED: final\\n        OUTCOME_UNKNOWN: SAFE_STOPPED\\n  final:\\n");
+  const source=snapshot(sourceText);
+  const index=buildSkillSymbolIndex(source);
+  const p=source.documents.find(item=>item.relativePath==="assurance/procedure.yaml");
+  const at=p.text.indexOf("scripts/runner.py")+5;
+  const hit=skillSymbolAt(index,p.uri,at);
+  assert.equal(hit?.token.type,"skillReference");
+  const target=uniqueSkillSymbolDeclaration(hit);
+  assert.equal(target?.relativePath,"scripts/runner.py");
+  assert.equal(target?.uri,"file:///workspace/sample/scripts/runner.py");
 });
 
 test("partial v1alpha4 root edits retain AST semantic symbols",()=>{
