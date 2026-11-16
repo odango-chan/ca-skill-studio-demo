@@ -970,8 +970,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
   }
 
   // Exercise frozen v1alpha4 providers through the public VS Code commands
-  // in real Theia. The temporary sibling Package is outside the active
-  // workspace and is always removed; no user-authored files are touched.
+  // in real Theia. A uniquely named sibling Package is created inside the
+  // selected workspace and always removed; user-authored files are untouched.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.v1alpha4LanguageProviderAcceptance",
@@ -985,12 +985,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           const path=folder.uri.path.replace(/\/$/,"");
           return sourcePath===path||sourcePath.startsWith(path+"/");
         });
-        const workspacePath=workspaceFolder?.uri?.path?.replace(/\/$/,"")||
-          sourcePath.slice(0,sourcePath.lastIndexOf("/"))||"/";
-        const parentPath=workspacePath.slice(0,workspacePath.lastIndexOf("/"))||"/";
-        const parentUri=sourceRoot.uri.with({path:parentPath});
+        if(!workspaceFolder)throw Error("v1alpha4 acceptance requires the selected workspace root");
         const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
-        const packageRoot=vscode.Uri.joinPath(parentUri,"skill-studio-v1alpha4-lsp-"+suffix);
+        const packageRoot=vscode.Uri.joinPath(
+          workspaceFolder.uri,"skill-studio-v1alpha4-lsp-"+suffix);
         const fs=vscode.workspace.fs;
         const contract=[
           "goal: pdu_session.initial_request_fulfilled",
