@@ -5,8 +5,13 @@ import {classifyRouteTone,ROUTE_TONE_COLOR,routeOrigin} from "./react-flow-proje
 
 const BASE={width:238,height:80};
 const stageId=name=>"stage:"+name;
-const sourceStage=origin=>origin==="preconditions.on"?"preconditions":
-  origin==="postconditions.on"?"postconditions":"operator";
+const sourceStage=origin=>{
+  if(origin==="preconditions.on")return "preconditions";
+  if(origin==="postconditions.on")return "postconditions";
+  if(["precondition","operation","observation","postcondition"].includes(origin))
+    return origin;
+  return "operator";
+};
 function dim(node){
   if(node.kind==="neighbor")return {...BASE};
   const steps=node.steps??[];
@@ -17,8 +22,12 @@ export function projectNodeFocusFlow(procedure,centerId){
   if(!neighbors)return null;
   const current=neighbors.node;
   const phases=new Map((current.phases??[]).map(p=>[p.name,p]));
-  const stages=["preconditions","operator","postconditions"]
-    .filter(name=>name==="operator"||phases.has(name));
+  const v1Stages=Array.isArray(current.stages)?current.stages:null;
+  const stageDetails=new Map((v1Stages??[]).map(stage=>[stage.name,stage]));
+  const stages=v1Stages
+    ?v1Stages.map(stage=>stage.name)
+    :["preconditions","operator","postconditions"]
+      .filter(name=>name==="operator"||phases.has(name));
   const nodes=[],dimensions=new Map();
   const add=node=>{nodes.push(node);dimensions.set(node.id,dim(node));};
   for(const {node} of neighbors.previous.peers){
@@ -26,11 +35,12 @@ export function projectNodeFocusFlow(procedure,centerId){
     add({id:"before:"+node.id,kind:"neighbor",role:"previous",original:node});
   }
   for(const name of stages){
-    const phase=phases.get(name);
+    const phase=phases.get(name),detail=stageDetails.get(name);
     add({id:stageId(name),kind:"stage",stage:name,
-      operator:name==="operator"?current.operator:null,
-      value:name==="operator"?current.value:null,
-      steps:phase?.steps??[],phaseLine:phase?.line??null,
+      operator:name==="operator"?current.operator:name,
+      value:name==="operator"?current.value:
+        detail?.target??(detail?.count?detail.count+" Predicate(s)":null),
+      steps:phase?.steps??[],phaseLine:phase?.line??detail?.line??null,
       original:current});
   }
   for(const {node} of neighbors.next.peers){
