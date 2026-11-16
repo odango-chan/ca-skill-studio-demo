@@ -60,10 +60,13 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
     state.selection={kind:"node",id};
     renderRoutes({preserveSelection:true});repaint();
     if(state.neighborsOnly)void layoutCurrentProcedure();
-    const options=addRouteOutcomeOptions(state.text,state.procedureId,id);
-    status(options?.outcomes?.length
-      ?"已选择 "+id+" · 可从节点专用添加端口提出新 Route"
-      :"已选择节点 "+id+" · 仅显示当前 Source 明确允许的 Route 操作");
+    const options=state.languageTarget==="v1alpha4"?null:
+      addRouteOutcomeOptions(state.text,state.procedureId,id);
+    status(state.languageTarget==="v1alpha4"
+      ?"已选择 Node "+id+" · 显示 v1alpha4 有序 Stage 与只读 Route"
+      :options?.outcomes?.length
+        ?"已选择 "+id+" · 可从节点专用添加端口提出新 Route"
+        :"已选择节点 "+id+" · 仅显示当前 Source 明确允许的 Route 操作");
   },
   onEdgeSelect(bundle){
     const routes=bundle?.routes??[];
