@@ -638,7 +638,7 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
   if(isContract){
     // Only suggest actual, locally declared Precondition stages from this
     // Package. An unresolved or partial Procedure is not a declaration source.
-    const gate=/^precondition:[ \t]*([A-Za-z0-9_-]*)$/.exec(prefix);
+    const gate=/^precondition:[ \t]*([A-Za-z0-9_.-]*)$/.exec(prefix);
     if(gate && value.snapshot.completeness==="complete"){
       const procedure=value.snapshot.documents.find(item=>
         item.relativePath==="assurance/procedure.yaml");
