@@ -1124,12 +1124,22 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           const scriptPath=await complete(procedureDocument,"scripts/runner.py",8);
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
+          const serverContractDiagnostics=await languageClient.sendRequest(
+            "skillStudio/semanticTokenDiagnostics",{uri:contractDocument.uri.toString()});
+          const gateStart=contractDocument.getText().indexOf("check.precondition");
+          const directGateResponse=await languageClient.sendRequest("textDocument/completion",{
+            textDocument:{uri:contractDocument.uri.toString()},
+            position:contractDocument.positionAt(gateStart+6)
+          });
+          const directGateLabels=labels(directGateResponse);
           const require=(items,label,description)=>{
             if(!items.includes(label))
               throw Error("Native Theia "+description+" completion omitted "+
                 label+": "+JSON.stringify(items));
           };
-          require(contractGate,"check.precondition","Contract Precondition");
+          if(!contractGate.includes("check.precondition"))
+            throw Error("Native Theia Contract Precondition completion omitted check.precondition: "+
+              JSON.stringify({contractGate,directGateLabels,serverContractDiagnostics}));
           require(schemaPath,"schemas/request.schema.yaml","Request Schema");
           require(entry,"check","Procedure start Node");
           require(predicate,"demo.ready","Predicate");
@@ -1201,6 +1211,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           return {
             status:status.state,snapshotCompleteness:state.lastSentSnapshot.completeness,
             contractPreconditionCompletion:contractGate,
+            contractServerDiagnostics,directGateLabels,
             requestSchemaCompletion:schemaPath,startNodeCompletion:entry,
             predicateCompletion:predicate,
             preconditionFields,observationFields,operationFields,
