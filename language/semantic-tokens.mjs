@@ -16,7 +16,7 @@ const LEGACY_SEMANTIC_TOKEN_TYPES = legacyContract.legend.tokenTypes.map(type=>t
 const LEGACY_SEMANTIC_TOKEN_MODIFIERS = legacyContract.legend.tokenModifiers.map(item=>item.id);
 export const SKILL_SEMANTIC_LEGEND = Object.freeze({
   tokenTypes:Object.freeze([...new Set([
-    ...V1_ALPHA4_SEMANTIC_TOKEN_TYPES,...LEGACY_SEMANTIC_TOKEN_TYPES
+    ...LEGACY_SEMANTIC_TOKEN_TYPES,...V1_ALPHA4_SEMANTIC_TOKEN_TYPES
   ])]),
   tokenModifiers:Object.freeze([...new Set([
     ...V1_ALPHA4_SEMANTIC_TOKEN_MODIFIERS,...LEGACY_SEMANTIC_TOKEN_MODIFIERS
