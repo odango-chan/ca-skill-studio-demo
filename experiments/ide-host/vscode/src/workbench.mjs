@@ -975,11 +975,22 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.v1alpha4LanguageProviderAcceptance",
-      async()=>{
-        const storageUri=context.globalStorageUri??context.storageUri;
-        if(!storageUri)throw Error("v1alpha4 acceptance requires extension-owned global storage");
+      async procedureUriValue=>{
+        const sourceUri=vscode.Uri.parse(String(procedureUriValue??""));
+        const sourceDocument=await vscode.workspace.openTextDocument(sourceUri);
+        const sourceRoot=packageRootForProcedure(vscode,sourceDocument);
+        if(!sourceRoot)throw Error("v1alpha4 acceptance requires an active Skill Package");
+        const sourcePath=sourceRoot.uri.path.replace(/\/$/,"");
+        const workspaceFolder=(vscode.workspace.workspaceFolders??[]).find(folder=>{
+          const path=folder.uri.path.replace(/\/$/,"");
+          return sourcePath===path||sourcePath.startsWith(path+"/");
+        });
+        const workspacePath=workspaceFolder?.uri?.path?.replace(/\/$/,"")||
+          sourcePath.slice(0,sourcePath.lastIndexOf("/"))||"/";
+        const parentPath=workspacePath.slice(0,workspacePath.lastIndexOf("/"))||"/";
+        const parentUri=sourceRoot.uri.with({path:parentPath});
         const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
-        const packageRoot=vscode.Uri.joinPath(storageUri,"v1alpha4-lsp-"+suffix);
+        const packageRoot=vscode.Uri.joinPath(parentUri,"skill-studio-v1alpha4-lsp-"+suffix);
         const fs=vscode.workspace.fs;
         const contract=[
           "goal: pdu_session.initial_request_fulfilled",
