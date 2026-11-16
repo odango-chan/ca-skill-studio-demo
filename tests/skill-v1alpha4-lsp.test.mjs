@@ -154,7 +154,7 @@ test("v1alpha4 enforces stage-normal routing and Script-only outcomes",()=>{
     x.code==="ROUTE_NORMAL_OUTCOME_NOT_ALLOWED"));
 
   const scriptWithMutationOutcome=procedure.replace(
-    "  read:\n    observation:\n      tool: ca::session.read\n      arguments:\n        ueRef: context.ueRef\n      routes:\n        SUCCEEDED: final\n        FAILED: FAILED\n        UNKNOWN: UNRESOLVED",
+    "  read:\n    observation:\n      tool: ca::session.read\n      arguments:\n        ueRef: context.ueRef\n      routes:\n        SUCCEEDED: final\n        FAILED: FAILED",
     "  read:\n    operation:\n      script: scripts/runner.py\n      arguments: {}\n      routes:\n        SUCCEEDED: final\n        FAILED: FAILED\n        OUTCOME_UNKNOWN: SAFE_STOPPED"
   );
   const invalidScript=analyzePackageSnapshot(snapshot(scriptWithMutationOutcome));
