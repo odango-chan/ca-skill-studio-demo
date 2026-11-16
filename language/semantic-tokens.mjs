@@ -256,9 +256,10 @@ const MODIFIER_INDEX = new Map(SKILL_SEMANTIC_TOKEN_MODIFIERS.map((name, index) 
 const PROVIDER_REGISTRATIONS = new WeakMap();
 
 /**
- * Compatibility projection consumed by the existing Monaco and browser LSP
- * adapters. All identities, positions and modifiers originate in the
- * ca-skills v0.2 registry; this function only adds protocol numeric indexes.
+ * Compatibility projection consumed by Monaco and browser LSP adapters.
+ * v1alpha4 identities are local editor-only AST projections; historical
+ * v0.2 identities come from the separately pinned legacy registry. This adds
+ * protocol numeric indexes without granting grammar or linking authority.
  */
 export function collectSkillSemanticTokenSpans(text, relativePath = "") {
   return classifySkillSemanticTokens(text, relativePath).map(token => {
