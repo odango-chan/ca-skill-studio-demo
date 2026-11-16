@@ -39,6 +39,31 @@ test("D1 projects the real CreatedSession 17-node / 65-Outcome graph unchanged",
   assert.ok(flow.edges.every(e=>e.markerEnd?.markerUnits==="userSpaceOnUse"));
   assert.equal(JSON.stringify(created.procedure),before);
 });
+test("CA-SL v1alpha4 graph disables connection and reconnection gestures",()=>{
+  const route={id:"check.precondition.PASS",source:"check",target:"read",
+    outcome:"PASS",routeSource:"precondition"};
+  const procedure={
+    profile:"CA-SL v1alpha4 (editor source projection only)",
+    start:"check",
+    nodes:[
+      {id:"check",operator:"node",value:"precondition",children:[],stages:[]},
+      {id:"read",operator:"node",value:"observation",children:[],stages:[]}
+    ],
+    routes:[route]
+  };
+  const graph={
+    direction:"DOWN",visibleNodes:procedure.nodes,visibleRoutes:[route],
+    bundles:[{source:"check",target:"read",routes:[route],outcomes:["PASS"],
+      routeSource:"precondition"}],
+    positions:new Map([["check",{x:0,y:0}],["read",{x:0,y:160}]]),
+    expandedNodeIds:new Set(),hiddenByNode:new Map()
+  };
+  const flow=makeFlowElements(graph,procedure);
+  assert.ok(flow.nodes.every(node=>node.connectable===false));
+  assert.ok(flow.nodes.every(node=>node.data.canAddRoute===false));
+  assert.ok(flow.edges.every(edge=>edge.reconnectable===false));
+});
+
 test("routeSource and all exact Outcome ids survive React Flow projection",async()=>{
   const graph=await layoutProcedureELK(created.procedure);
   const flow=makeFlowElements(graph,created.procedure);

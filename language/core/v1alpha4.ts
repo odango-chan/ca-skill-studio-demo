@@ -92,7 +92,10 @@ export function analyzeV1Alpha4Source(
       add(c.document,"ENTRY_PRECONDITION_REF_INVALID","Contract precondition is a single node.precondition reference",gate);
   }
   const predicateSignatures=new Map<string,any[]>();
-  const predicateEvidence=new Map<string,{parameter:string;evidence:string[]}[]>();
+  const predicateEvidence=new Map<string,{
+    requirements:{parameter:string;evidence:string[]}[];
+    locations:{parameter:string;evidence:string;line:number}[];
+  }>();
   if (predicates) {
     props(predicates.root,predicates.document,new Set(["predicates"]));
     const declared=predicates.root.get("predicates",true);
@@ -108,10 +111,17 @@ export function analyzeV1Alpha4Source(
       const evidenceNode=isMap(item.value)?item.value.get("evidence",true):null;
       const requires=isMap(evidenceNode)?evidenceNode.get("requires",true):null;
       if(predicateId&&isMap(requires)){
-        predicateEvidence.set(predicateId,requires.items.map((pair:any)=>({
+        const requirements=requires.items.map((pair:any)=>({
           parameter:scalar(pair.key),
           evidence:isSeq(pair.value)?pair.value.items.map((value:any)=>scalar(value)):[]
-        })));
+        }));
+        const locations=requires.items.flatMap((pair:any)=>{
+          const parameter=scalar(pair.key);
+          return isSeq(pair.value)?pair.value.items.map((value:any)=>({
+            parameter,evidence:scalar(value),line:lineAt(predicates.document,value)
+          })):[];
+        });
+        predicateEvidence.set(predicateId,{requirements,locations});
       }
     }
   }
@@ -276,12 +286,16 @@ export function analyzeV1Alpha4Source(
           const predicate=isMap(call)?scalar(call.get("predicate",true)):"";
           const argumentsNode=isMap(call)?call.get("arguments",true):null;
           const parameters=predicateSignatures.get(predicate)??[];
+          const evidence=predicateEvidence.get(predicate)??{requirements:[],locations:[]};
           return {
             predicate,line:lineAt(p.document,call),
             parameters:parameters.map((parameter:any)=>
               isMap(parameter)?scalar(parameter.items[0]?.key):""),
             arguments:isSeq(argumentsNode)?argumentsNode.items.map(sourceValue):[],
-            evidenceRequirements:predicateEvidence.get(predicate)??[]
+            argumentLines:isSeq(argumentsNode)
+              ?argumentsNode.items.map((argument:any)=>lineAt(p.document,argument)):[],
+            evidenceRequirements:evidence.requirements,
+            evidenceLocations:evidence.locations
           };
         }):[];
       const argumentsNode=isMap(part)?part.get("arguments",true):null;
@@ -371,8 +385,10 @@ export function analyzeV1Alpha4Source(
     state: diagnostics.some(x=>x.severity==="error"&&
       x.relativePath===p.document.relativePath)?"UNAVAILABLE":"READY",
     entry:start,diagnostics:diagnostics.filter(x=>x.relativePath===p.document.relativePath),
-    ...(contractGoal?{goal:contractGoal}:{}),
-    ...(contractGate?{precondition:contractGate}:{}),
+    ...(contractGoal?{goal:contractGoal,
+      goalLine:lineAt(c!.document,c!.root.get("goal",true))}:{}),
+    ...(contractGate?{precondition:contractGate,
+      preconditionLine:lineAt(c!.document,c!.root.get("precondition",true))}:{}),
     finalPostconditionNodes,
     procedures:[{
       name:packageName,start,nodes,routes,children:[],

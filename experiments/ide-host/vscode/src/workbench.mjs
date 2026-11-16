@@ -2761,7 +2761,16 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             tree[key]=item[key];
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
-        if(document&&item.line)tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',arguments:[{...item,uri:item.uri??document.uri,version:document.version,sourceVersion:document.version,documentUri:document.uri.toString(),...(item.uri?{auditGeneration:generation}:{})}]};
+        if(document&&item.line){
+          const rootInfo=packageRootForProcedure(vscode,document);
+          const uri=item.sourcePath&&rootInfo?.uri
+            ?vscode.Uri.joinPath(rootInfo.uri,...item.sourcePath.split("/"))
+            :typeof item.uri==="string"?vscode.Uri.parse(item.uri):item.uri??document.uri;
+          tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',
+            arguments:[{...item,uri,version:document.version,
+              sourceVersion:document.version,documentUri:document.uri.toString(),
+              ...(item.uri?{auditGeneration:generation}:{})}]};
+        }
         return tree;
       }};
     providers.set(id,emitter);

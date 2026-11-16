@@ -184,6 +184,14 @@ test("v1alpha4 Inspector shows Contract Goal and source-only Producer / Evidence
     item.kind==="v1alpha4-node"&&item.nodeId==="final"));
   assert.ok(view.inspection.some(item=>item.label.includes(
     "Contract Goal · pdu_session.initial_request_fulfilled")));
+  const goalRow=view.inspection.find(item=>item.kind==="v1alpha4-contract"&&
+    item.label.startsWith("Contract Goal"));
+  const gateRow=view.inspection.find(item=>item.kind==="v1alpha4-contract"&&
+    item.label.startsWith("Global Precondition"));
+  assert.equal(goalRow.line,1);
+  assert.equal(gateRow.line,2);
+  assert.equal(goalRow.sourcePath,"assurance/contract.yaml");
+  assert.equal(gateRow.sourcePath,"assurance/contract.yaml");
   assert.ok(view.inspection.some(item=>item.label.startsWith("Data Flow ·")));
   const binding=view.dataflow.bindings.find(item=>
     item.value==="read.observation.output");
@@ -192,6 +200,13 @@ test("v1alpha4 Inspector shows Contract Goal and source-only Producer / Evidence
   assert.deepEqual(binding.evidenceRequirements,[
     {parameter:"data",evidence:["ca::demo.verified"]}
   ]);
+  assert.equal(binding.line,77,"Predicate argument navigation uses the argument's exact line");
+  const rows=[];
+  const collect=items=>{for(const item of items??[]){rows.push(item);collect(item.children);}};
+  collect(view.inspection);
+  const evidenceRow=rows.find(item=>item.kind==="v1alpha4-evidence");
+  assert.equal(evidenceRow.line,11,"Evidence navigation uses the PredicateSet declaration line");
+  assert.equal(evidenceRow.sourcePath,"assurance/predicates.yaml");
   const node=view.inspection.find(item=>item.kind==="v1alpha4-node");
   assert.ok(node.children.some(item=>item.kind==="v1alpha4-stage"));
 });

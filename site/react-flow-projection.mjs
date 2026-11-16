@@ -99,6 +99,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
   routeCreationSourceId=null){
   if(!graph||!procedure)return {nodes:[],edges:[],direction:"DOWN"};
   const direction=graph.direction==="RIGHT"?"RIGHT":"DOWN";
+  const v1alpha4=String(procedure.profile??"").includes("v1alpha4");
   const present=new Set((graph.visibleNodes??procedure.nodes).map(n=>n.id));
   const selectedRoute=selection?.kind==="route"?selection.id:null;
   const selectedBundle=selection?.kind==="bundle"?selection.id:null;
@@ -123,6 +124,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       targetPosition:direction==="DOWN"?"top":"left",
       draggable:false,
       selectable:true,
+      // v1alpha4 is a source projection until trusted Compiler/Owner linking
+      // supplies exact Outcome eligibility. Disable all graph connections.
+      connectable:!v1alpha4,
       selected:selection?.kind==="node"&&selection.id===node.id,
       data:{
         id:node.id,operator:node.operator,value:node.value,
@@ -177,8 +181,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         strokeWidth:1.2,
         markerUnits:"userSpaceOnUse"
       },
-      // Only the verified handler may propose a YAML patch on reconnect.
-      reconnectable:true,
+      // v1alpha4 routes are strictly view-only; legacy routes retain their
+      // existing guarded reconnect/Preview/Diff workflow.
+      reconnectable:!v1alpha4,
       data:{
         bundle,sourceRouteIds:bundle.routes.map(route=>route.id),
         selected,important,tone,label,origin,

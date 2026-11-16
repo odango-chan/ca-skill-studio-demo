@@ -63,12 +63,15 @@ function v1alpha4InspectionSnapshot(text,selection,files,packageName,packageRoot
       })),{description:procedure.nodes.length+" Nodes · CA-SL v1alpha4",
         procedureId:procedure.name})];
   const contractRows=[
-    row("Contract Goal · "+display(projection.goal),1,[],{
-      kind:"v1alpha4-contract",description:"Read-only Contract goal declaration"
+    row("Contract Goal · "+display(projection.goal),projection.goalLine??1,[],{
+      kind:"v1alpha4-contract",sourcePath:"assurance/contract.yaml",
+      description:"Read-only Contract goal declaration"
     }),
-    row("Global Precondition · "+display(projection.precondition),1,[],{
-      kind:"v1alpha4-contract",description:"Contract-level precondition reference"
-    })
+    row("Global Precondition · "+display(projection.precondition),
+      projection.preconditionLine??1,[],{
+        kind:"v1alpha4-contract",sourcePath:"assurance/contract.yaml",
+        description:"Contract-level precondition reference"
+      })
   ];
   const node=procedure.nodes.find(item=>item.id===selection.nodeId);
   const bindings=[];
@@ -88,23 +91,33 @@ function v1alpha4InspectionSnapshot(text,selection,files,packageName,packageRoot
       const callChildren=[];
       call.arguments.forEach((value,index)=>{
         const parameter=call.parameters[index]||"arg"+(index+1);
+        const line=call.argumentLines?.[index]??call.line;
         const source=classifyV1Alpha4Source(value);
         const requirements=call.evidenceRequirements.filter(item=>
           item.parameter===parameter);
         const binding={consumer:call.predicate+" · "+parameter,value,
-          line:call.line,...source,evidenceRequirements:requirements};
+          line,...source,evidenceRequirements:requirements};
         bindings.push(binding);
-        callChildren.push(row(parameter+" ← "+value,call.line,[],{
+        callChildren.push(row(parameter+" ← "+value,line,[],{
           kind:"v1alpha4-flow",description:source.description
         }));
       });
-      for(const requirement of call.evidenceRequirements)
-        for(const evidence of requirement.evidence)
-          callChildren.push(row("Evidence required · "+evidence,call.line,[],{
-            kind:"v1alpha4-evidence",
-            description:"PredicateSet requires this Evidence for "+requirement.parameter+
+      if(call.evidenceLocations?.length){
+        for(const location of call.evidenceLocations)
+          callChildren.push(row("Evidence required · "+location.evidence,location.line,[],{
+            kind:"v1alpha4-evidence",sourcePath:"assurance/predicates.yaml",
+            description:"PredicateSet requires this Evidence for "+location.parameter+
               " · Owner guarantee / Producer satisfaction not qualified"
           }));
+      }else{
+        for(const requirement of call.evidenceRequirements)
+          for(const evidence of requirement.evidence)
+            callChildren.push(row("Evidence required · "+evidence,call.line,[],{
+              kind:"v1alpha4-evidence",
+              description:"PredicateSet requires this Evidence for "+requirement.parameter+
+                " · Owner guarantee / Producer satisfaction not qualified"
+            }));
+      }
       children.push(row("Predicate · "+call.predicate,call.line,callChildren,{
         kind:"v1alpha4-call",
         description:"Positional arguments · "+call.arguments.length

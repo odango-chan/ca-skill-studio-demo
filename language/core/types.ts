@@ -82,6 +82,14 @@ export interface ProcedureStagePredicateCall {
   readonly line: number;
   readonly parameters: readonly string[];
   readonly arguments: readonly string[];
+  /** Exact Procedure-source line for each positional argument. */
+  readonly argumentLines?: readonly number[];
+  /** Exact PredicateSet-source locations for declared Evidence requirements. */
+  readonly evidenceLocations?: readonly {
+    readonly parameter: string;
+    readonly evidence: string;
+    readonly line: number;
+  }[];
   readonly evidenceRequirements: readonly {
     readonly parameter: string;
     readonly evidence: readonly string[];
@@ -149,7 +157,9 @@ export interface ProcedureProjection {
   readonly diagnostics: readonly LanguageDiagnostic[];
   /** Read-only Contract metadata for the v1alpha4 Procedure Designer. */
   readonly goal?: string;
+  readonly goalLine?: number;
   readonly precondition?: string;
+  readonly preconditionLine?: number;
   readonly finalPostconditionNodes?: readonly string[];
 }
 
