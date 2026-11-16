@@ -111,6 +111,12 @@ export function activate(context){
           <button id="openSource">打开原生 YAML 编辑器</button>
           <button id="exportPackageZip" type="button" title="导出当前 Package 的 ZIP 备份">导出 Package ZIP</button>
           <span id="revision"></span></div>
+          <section id="goalSummary" class="spike-goal" hidden aria-label="Contract Goal">
+            <span class="spike-goal-label">CONTRACT GOAL</span>
+            <strong id="contractGoal"></strong>
+            <span id="contractGate"></span>
+            <small id="goalQualification"></small>
+          </section>
           <div id="message" role="status">等待当前文档…</div>
           <div id="zipExportNotice" class="spike-zip-notice" role="status" hidden>
             <span id="zipExportDetails"></span>
@@ -177,19 +183,46 @@ export function activate(context){
             <button id="commit" disabled>确认并修改当前文档</button>
           </div>
           <script nonce="${nonce}" src="${script}"></script></body></html>`;
-      let disposed=false,ready=false;
-      const push=()=>{
+      let disposed=false,ready=false,pushTicket=0;
+      const packageSuffix="/assurance/procedure.yaml";
+      const packageRootPath=document.uri.path.slice(0,-packageSuffix.length);
+      const packageName=packageRootPath.replace(/\/$/,"").split("/").at(-1);
+      const readPackageText=async relativePath=>{
+        const uri=document.uri.with({path:packageRootPath+"/"+relativePath});
+        const opened=(vscode.workspace.textDocuments??[]).find(item=>
+          item.uri.toString()===uri.toString());
+        if(opened)return {text:opened.getText(),version:opened.version};
+        try{
+          const bytes=await vscode.workspace.fs.readFile(uri);
+          return {text:new TextDecoder("utf-8",{fatal:true}).decode(bytes),version:0};
+        }catch{return {text:null,version:0};}
+      };
+      const push=async()=>{
         if(disposed||!ready)return;
-        const text=document.getText();
+        const ticket=++pushTicket,version=document.version,text=document.getText();
         if(text.length>MAX_SOURCE_BYTES){
           void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB Procedure editor limit"});
           return;
         }
-        void webview.postMessage({type:"snapshot",text,version:document.version,
-          path:document.uri.path});
+        const [contract,predicates]=await Promise.all([
+          readPackageText("assurance/contract.yaml"),
+          readPackageText("assurance/predicates.yaml")
+        ]);
+        if(disposed||ticket!==pushTicket||document.version!==version)return;
+        void webview.postMessage({
+          type:"snapshot",text,version,path:document.uri.path,
+          packageRootUri:document.uri.with({path:packageRootPath}).toString(),
+          packageName,contractText:contract.text,contractVersion:contract.version,
+          predicatesText:predicates.text,predicatesVersion:predicates.version
+        });
       };
+      const relatedPaths=new Set([
+        document.uri.path,
+        packageRootPath+"/assurance/contract.yaml",
+        packageRootPath+"/assurance/predicates.yaml"
+      ]);
       const changed=vscode.workspace.onDidChangeTextDocument(event=>{
-        if(event.document.uri.toString()===document.uri.toString())push();
+        if(relatedPaths.has(event.document.uri.path))void push();
       });
       const incoming=webview.onDidReceiveMessage(async message=>{
         if(disposed||typeof message!=="object"||!message)return;
