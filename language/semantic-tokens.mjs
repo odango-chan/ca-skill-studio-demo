@@ -1,11 +1,26 @@
 import {isMap, isScalar, isSeq, parseDocument} from "yaml";
-import contract from "./contracts/semantic-tokens.v1.json";
+import legacyContract from "./contracts/semantic-tokens.v1.json";
 
-// Single projection of the versioned Skill token contract. This is not a
-// second authoring grammar, compiler or Capability resolver.
+// The pinned ca-skills token registry is v0.2-only. v1alpha4 has no upstream
+// token-selector contract at the frozen language commit, so its presentation
+// vocabulary is deliberately local/editor-only and carries no grammar authority.
+export const V1_ALPHA4_SEMANTIC_TOKEN_TYPES = Object.freeze([
+  "skillKeyword","skillOperator","skillStep","skillCapability","skillPredicate",
+  "skillObservation","skillOutcome","skillDataType","skillSchema",
+  "skillReference","skillBinding","skillOperation"
+]);
+export const V1_ALPHA4_SEMANTIC_TOKEN_MODIFIERS = Object.freeze([
+  "declaration","reference","imported"
+]);
+const LEGACY_SEMANTIC_TOKEN_TYPES = legacyContract.legend.tokenTypes.map(type=>type.id);
+const LEGACY_SEMANTIC_TOKEN_MODIFIERS = legacyContract.legend.tokenModifiers.map(item=>item.id);
 export const SKILL_SEMANTIC_LEGEND = Object.freeze({
-  tokenTypes: Object.freeze(contract.legend.tokenTypes.map(type => type.id)),
-  tokenModifiers: Object.freeze(contract.legend.tokenModifiers.map(modifier => modifier.id))
+  tokenTypes:Object.freeze([...new Set([
+    ...V1_ALPHA4_SEMANTIC_TOKEN_TYPES,...LEGACY_SEMANTIC_TOKEN_TYPES
+  ])]),
+  tokenModifiers:Object.freeze([...new Set([
+    ...V1_ALPHA4_SEMANTIC_TOKEN_MODIFIERS,...LEGACY_SEMANTIC_TOKEN_MODIFIERS
+  ])])
 });
 
 const MAX_SOURCE_LENGTH = 4 * 1024 * 1024;
@@ -37,7 +52,7 @@ function profileFor(relativePath) {
   const segments = path.split("/");
   if (segments.some(segment => !segment || segment === "." || segment === ".."))
     return null;
-  for (const profile of Object.values(contract.profiles)) {
+  for (const profile of Object.values(legacyContract.profiles)) {
     const suffix = profile.file.split("/");
     if (segments.length < suffix.length) continue;
     if (suffix.every((part, index) =>
