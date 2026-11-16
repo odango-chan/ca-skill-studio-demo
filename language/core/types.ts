@@ -77,6 +77,14 @@ export interface ProcedureChildReference {
   readonly caller?: string;
 }
 
+export interface ProcedureStage {
+  readonly name: "precondition" | "operation" | "observation" | "postcondition";
+  readonly line: number;
+  readonly count: number;
+  readonly target?: string;
+  readonly routeOutcomes: readonly string[];
+}
+
 export interface ProcedureNode {
   readonly id: string;
   readonly operator: string;
@@ -84,6 +92,14 @@ export interface ProcedureNode {
   readonly line: number;
   readonly phases: readonly ProcedurePhase[];
   readonly children: readonly ProcedureChildReference[];
+  /** v1alpha4 ordered stages; these are not additional business Nodes. */
+  readonly stages?: readonly ProcedureStage[];
+  /** Contract-level gate reference, projected onto its real Node. */
+  readonly globalPrecondition?: boolean;
+  /** Reachable final Postcondition PASS: SUCCEEDED declaration. */
+  readonly finalGoal?: boolean;
+  /** Presentation-only endpoint; never a source Node declaration. */
+  readonly viewOnly?: boolean;
 }
 
 export interface ProcedureRoute {
@@ -112,6 +128,10 @@ export interface ProcedureProjection {
   readonly entry: string | null;
   readonly procedures: readonly ProcedureDefinition[];
   readonly diagnostics: readonly LanguageDiagnostic[];
+  /** Read-only Contract metadata for the v1alpha4 Procedure Designer. */
+  readonly goal?: string;
+  readonly precondition?: string;
+  readonly finalPostconditionNodes?: readonly string[];
 }
 
 export interface PackageAuditResult {
