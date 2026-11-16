@@ -82,11 +82,13 @@ export function analyzeV1Alpha4Source(
   const c=parse("assurance/contract.yaml");
   const p=parse("assurance/procedure.yaml");
   const predicates=parse("assurance/predicates.yaml");
+  const contractGoal=c?scalar(c.root.get("goal",true)):"";
+  const contractGate=c?scalar(c.root.get("precondition",true)):"";
   if (c) {
     props(c.root,c.document,CONTRACT_FIELDS);
-    if (!scalar(c.root.get("goal",true))) add(c.document,"SOURCE_ROOT_INVALID","Contract must declare one goal",c.root);
+    if (!contractGoal) add(c.document,"SOURCE_ROOT_INVALID","Contract must declare one goal",c.root);
     const gate=c.root.get("precondition",true);
-    if (gate!==undefined && (!scalar(gate) || !/^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(scalar(gate))))
+    if (gate!==undefined && (!contractGate || !/^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(contractGate)))
       add(c.document,"ENTRY_PRECONDITION_REF_INVALID","Contract precondition is a single node.precondition reference",gate);
   }
   const predicateSignatures=new Map<string,any[]>();
@@ -250,9 +252,26 @@ export function analyzeV1Alpha4Source(
       }
       adjacency.set(id+"."+stage,outgoing);
     }
+    const stages=stageNames.map(stage=>{
+      const part=body.get(stage,true);
+      const rawStageRoutes=isMap(part)?part.get("routes",true):null;
+      const calls=isMap(part)?part.get("predicates",true):null;
+      const count=(stage==="precondition"||stage==="postcondition")
+        ?(isSeq(calls)?calls.items.length:0):1;
+      const target=isMap(part)
+        ?(scalar(part.get("tool",true))||scalar(part.get("script",true))):"";
+      return {
+        name:stage,line:lineAt(p.document,part),count,
+        ...(target?{target}:{}),
+        routeOutcomes:isMap(rawStageRoutes)
+          ?rawStageRoutes.items.map((route:any)=>scalar(route.key)):[]
+      };
+    });
     nodes.push({
-      id, operator:stageNames[0]??"",value:stageNames.join(", "),
-      line:lineAt(p.document,item.key),phases:[],children:[]
+      id, operator:"node",value:stageNames.join(" → "),
+      line:lineAt(p.document,item.key),phases:[],children:[],stages,
+      globalPrecondition:contractGate===id+".precondition",
+      finalGoal:false
     });
   }
   const visited=new Set<string>(),active=new Set<string>();
@@ -293,8 +312,10 @@ export function analyzeV1Alpha4Source(
   // appearing anywhere in the YAML. An orphan final stage cannot prove Goal
   // or hide a reachable bypass (§12.9).
   const successRoutes=routes.filter(route=>visited.has(route.source+"."+route.routeSource)&&route.target==="SUCCEEDED");
-  const hasValidSuccess=successRoutes.some(route=>
-    route.routeSource==="postcondition"&&route.outcome==="PASS");
+  const finalPostconditionNodes=[...new Set(successRoutes
+    .filter(route=>route.routeSource==="postcondition"&&route.outcome==="PASS")
+    .map(route=>route.source))];
+  const hasValidSuccess=finalPostconditionNodes.length>0;
   if(successRoutes.length && !hasValidSuccess)
     add(p.document,"FINAL_POSTCONDITION_MISSING",
       "Only a reachable final Postcondition aggregate PASS may request SUCCEEDED");
@@ -302,6 +323,10 @@ export function analyzeV1Alpha4Source(
     !(route.routeSource==="postcondition"&&route.outcome==="PASS"))
     add(p.document,"SUCCESS_BYPASSES_FINAL_POSTCONDITION",
       "A reachable non-final stage bypasses final Goal proof");
+  for(const node of nodes) {
+    if(finalPostconditionNodes.includes(node.id))
+      (node as any).finalGoal=true;
+  }
   // Projection READY means source graph shape is available for editor rendering,
   // *never* that the Tool/Schema/Capability trust closure has been compiled.
   const projection:ProcedureProjection={
@@ -310,6 +335,9 @@ export function analyzeV1Alpha4Source(
     state: diagnostics.some(x=>x.severity==="error"&&
       x.relativePath===p.document.relativePath)?"UNAVAILABLE":"READY",
     entry:start,diagnostics:diagnostics.filter(x=>x.relativePath===p.document.relativePath),
+    ...(contractGoal?{goal:contractGoal}:{}),
+    ...(contractGate?{precondition:contractGate}:{}),
+    finalPostconditionNodes,
     procedures:[{
       name:packageName,start,nodes,routes,children:[],
       line:1,profile:"CA-SL v1alpha4 (editor source projection only)"
