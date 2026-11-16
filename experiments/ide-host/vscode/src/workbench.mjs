@@ -2663,6 +2663,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
+        if(item.kind==='v1alpha4-node'&&document){
+          tree.contextValue='skillStudio.v1alpha4Node';
+          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
+          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
+          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
+        }
         if(item.kind==='route'&&id==='inspection'&&document){
           const canInsert=Boolean(insertNodeOptions(
             document.getText(),item.procedureId,item.routeId));
