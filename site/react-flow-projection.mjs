@@ -8,7 +8,7 @@ export const FLOW_NODE_SIZE=Object.freeze({width:NODE_WIDTH,height:NODE_HEIGHT})
 // paint a mixed success/failure bundle green just because it contains PASS.
 const ROUTE_OUTCOMES={
   success:new Set(["PASS","SUCCEEDED","SUCCESS"]),
-  failure:new Set(["FAIL","FAILED","ERROR"]),
+  failure:new Set(["FAIL","FAILED","ERROR","DENIED"]),
   uncertain:new Set(["UNKNOWN","OUTCOME_UNKNOWN","UNRESOLVED","TIMEOUT","TIMED_OUT"])
 };
 export const ROUTE_TONE_COLOR=Object.freeze({
@@ -71,8 +71,8 @@ export function describeProcedureLegend(procedure,visibleNodes=null){
     const kind=String(node.operator||"").toUpperCase();
     nodeKinds.set(kind,(nodeKinds.get(kind)||0)+1);
     for(const phase of summarizeNodePhases(node)){
-      if(phase.name==="preconditions")preNodes++;
-      if(phase.name==="postconditions")postNodes++;
+      if(phase.name==="preconditions"||phase.name==="precondition")preNodes++;
+      if(phase.name==="postconditions"||phase.name==="postcondition")postNodes++;
       for(const {kind:stepKind,count} of phase.operators)
         stepKinds.set(stepKind,(stepKinds.get(stepKind)||0)+count);
     }
