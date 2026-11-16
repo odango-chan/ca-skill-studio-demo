@@ -1023,9 +1023,17 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           "      arguments:",
           "        ueRef: context.ueRef",
           "      routes:",
-          "        SUCCEEDED: run-script",
+          "        SUCCEEDED: mutate",
           "        FAILED: SAFE_STOPPED",
           "        UNKNOWN: UNRESOLVED",
+          "  mutate:",
+          "    operation:",
+          "      tool: ca::session.mutate",
+          "      arguments: {}",
+          "      routes:",
+          "        SUCCEEDED: run-script",
+          "        FAILED: SAFE_STOPPED",
+          "        OUTCOME_UNKNOWN: SAFE_STOPPED",
           "  run-script:",
           "    operation:",
           "      ",
@@ -1035,7 +1043,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           "        ",
           "        SUCCEEDED: final",
           "        FAILED: SAFE_STOPPED",
-          "        OUTCOME_UNKNOWN: SAFE_STOPPED",
           "  final:",
           "    postcondition:",
           "      predicates:",
@@ -1121,6 +1128,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             "    operation:\n      ");
           const routeKeys=await complete(procedureDocument,
             "  run-script:\n    operation:\n      \n      script: scripts/runner.py\n      arguments: {}\n      routes:\n        ");
+          const mutationRouteKeys=await complete(procedureDocument,
+            "  mutate:\n    operation:\n      tool: ca::session.mutate\n      arguments: {}\n      routes:\n        ");
           const scriptPath=await complete(procedureDocument,"scripts/runner.py",8);
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
@@ -1146,11 +1155,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           require(operationFields,"tool:","Operation field");
           require(operationFields,"script:","Operation field");
           require(operationFields,"arguments:","Operation field");
-          require(routeKeys,"SUCCEEDED:","Operation route key");
-          require(routeKeys,"OUTCOME_UNKNOWN:","Operation route key");
+          require(routeKeys,"SUCCEEDED:","final Script route key");
+          require(routeKeys,"FAILED:","Script failure route key");
+          if(routeKeys.includes("OUTCOME_UNKNOWN:")||routeKeys.includes("NOT_COMMITTED:"))
+            throw Error("Procedure Script offered Tool/Mutation-only outcomes: "+
+              JSON.stringify(routeKeys));
+          require(mutationRouteKeys,"OUTCOME_UNKNOWN:","Mutation unresolved route key");
           require(scriptPath,"scripts/runner.py","Package Script path");
           require(unknownTarget,"SAFE_STOPPED","OUTCOME_UNKNOWN terminal");
-          if(unknownTarget.some(item=>["check","read","run-script","final"].includes(item)))
+          if(unknownTarget.some(item=>["check","read","mutate","run-script","final"].includes(item)))
             throw Error("OUTCOME_UNKNOWN offered a business Node target: "+
               JSON.stringify(unknownTarget));
 
@@ -1197,6 +1210,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           const symbols=definitionItems(await vscode.commands.executeCommand(
             "vscode.executeDocumentSymbolProvider",procedureDocument.uri));
           if(!symbols.some(item=>item.name==="check")||
+             !symbols.some(item=>item.name==="mutate")||
              !symbols.some(item=>item.name==="run-script")||
              !symbols.some(item=>item.name==="final"))
             throw Error("Native Theia Outline did not expose v1alpha4 Node declarations");
@@ -1206,7 +1220,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             requestSchemaCompletion:schemaPath,startNodeCompletion:entry,
             predicateCompletion:predicate,
             preconditionFields,observationFields,operationFields,
-            operationRouteKeys:routeKeys,scriptPathCompletion:scriptPath,
+            operationRouteKeys:routeKeys,mutationRouteKeys,scriptPathCompletion:scriptPath,
             outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,
