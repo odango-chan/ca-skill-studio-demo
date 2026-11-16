@@ -132,7 +132,13 @@ test("v1alpha4 AST graph projects nodes and routes but never claims Owner qualif
   assert.match(a.packageAudit.reason,/Owner.*linking/);
   assert.equal(a.procedure.state,"READY");
   assert.equal(a.procedure.entry,"check");
+  assert.equal(a.procedure.goal,"pdu_session.initial_request_fulfilled");
+  assert.equal(a.procedure.precondition,"check.precondition");
+  assert.deepEqual(a.procedure.finalPostconditionNodes,["final"]);
   assert.deepEqual(a.procedure.procedures[0].nodes.map(x=>x.id),["check","read","final"]);
+  assert.deepEqual(a.procedure.procedures[0].nodes[0].stages.map(x=>x.name),["precondition"]);
+  assert.equal(a.procedure.procedures[0].nodes[0].globalPrecondition,true);
+  assert.equal(a.procedure.procedures[0].nodes[2].finalGoal,true);
   assert.ok(a.procedure.procedures[0].routes.some(x=>x.target==="SUCCEEDED"&&x.routeSource==="postcondition"));
   assert.deepEqual(a.diagnostics,[]);
 });
