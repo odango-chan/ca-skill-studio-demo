@@ -1109,10 +1109,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
               "vscode.executeCompletionItemProvider",document.uri,position);
             return labels(result);
           };
-          const contractGate=await complete(contractDocument,"check.precondition",5);
-          const schemaPath=await complete(contractDocument,"schemas/request.schema.yaml",11);
-          const entry=await complete(procedureDocument,"start: check",8);
-          const predicate=await complete(procedureDocument,"demo.ready",4);
+          const contractGate=await complete(contractDocument,"check.precondition",6);
+          const schemaPath=await complete(contractDocument,"schemas/request.schema.yaml",8);
+          const entry=await complete(procedureDocument,"start: check",7);
+          const predicate=await complete(procedureDocument,"demo.ready",5);
           const preconditionFields=await complete(procedureDocument,
             "    precondition:\n      ");
           const observationFields=await complete(procedureDocument,
@@ -1121,7 +1121,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             "    operation:\n      ");
           const routeKeys=await complete(procedureDocument,
             "  run-script:\n    operation:\n      \n      script: scripts/runner.py\n      arguments: {}\n      routes:\n        ");
-          const scriptPath=await complete(procedureDocument,"scripts/runner.py",11);
+          const scriptPath=await complete(procedureDocument,"scripts/runner.py",8);
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
           const require=(items,label,description)=>{
