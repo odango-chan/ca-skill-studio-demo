@@ -77,12 +77,31 @@ export interface ProcedureChildReference {
   readonly caller?: string;
 }
 
+export interface ProcedureStagePredicateCall {
+  readonly predicate: string;
+  readonly line: number;
+  readonly parameters: readonly string[];
+  readonly arguments: readonly string[];
+  readonly evidenceRequirements: readonly {
+    readonly parameter: string;
+    readonly evidence: readonly string[];
+  }[];
+}
+
+export interface ProcedureStageArgument {
+  readonly name: string;
+  readonly value: string;
+  readonly line: number;
+}
+
 export interface ProcedureStage {
   readonly name: "precondition" | "operation" | "observation" | "postcondition";
   readonly line: number;
   readonly count: number;
   readonly target?: string;
   readonly routeOutcomes: readonly string[];
+  readonly calls?: readonly ProcedureStagePredicateCall[];
+  readonly arguments?: readonly ProcedureStageArgument[];
 }
 
 export interface ProcedureNode {
