@@ -4,6 +4,7 @@ import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {prepareNativeMarkdownPackagePolicy} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
+import {isV1Alpha4Procedure} from "../../../../language/core/v1alpha4.ts";
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
@@ -2085,7 +2086,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
       throw Error("Inspector selection is stale; select the Node again");
     if(typeof procedureId!=="string"||typeof nodeId!=="string")
       throw Error("Select a Node in the graph or Inspector first");
-    const projected=inspectionSnapshot(source,{procedureId,nodeId});
+    const rootInfo=packageRootForProcedure(vscode,doc);
+    const projected=inspectionSnapshot(source,{procedureId,nodeId},null,null,
+      rootInfo?.name??"skill",rootInfo?.uri?.toString?.()??"file:///skill");
     const procedure=projected.model.procedures.get(procedureId);
     if(projected.model.state!=="READY"||!procedure?.nodes.some(n=>n.id===nodeId))
       throw Error("Selected Node is not present in the current Source");
@@ -2783,8 +2786,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
       void refreshPredicateSnapshot(doc);
     }
     if(changed){
-      snapshot={...inspectionSnapshot(text,selection,projected,evidenceFiles),text,evidenceStamp};
-      bindingOptions=snapshot.model.state==='READY'&&selection.procedureId&&selection.nodeId
+      const rootInfo=packageRootForProcedure(vscode,doc);
+      snapshot={...inspectionSnapshot(text,selection,projected,evidenceFiles,
+        rootInfo?.name??"skill",rootInfo?.uri?.toString?.()??"file:///skill"),
+        text,evidenceStamp};
+      const v1alpha4=[...(snapshot.model?.procedures?.values?.()??[])]
+        .some(procedure=>String(procedure.profile??"").includes("v1alpha4"));
+      bindingOptions=!v1alpha4&&snapshot.model.state==='READY'&&
+        selection.procedureId&&selection.nodeId
         ?phaseStepBindingOptions(text,selection.procedureId,selection.nodeId):[];
       fire();
     }
@@ -2833,11 +2842,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
       }
       const required=['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml'];
       const missing=required.filter(p=>!files.has(p));
+      const v1alpha4=isV1Alpha4Procedure(doc.getText());
       const results=missing.length?missing.map(path=>({message:'Audit unavailable: missing '+path,path:'assurance/procedure.yaml',line:1,code:'AUDIT_INCOMPLETE'})):
-        auditPackageWorkspace({name:base.path.replace(/\/$/,'').split('/').at(-1),files},doc.getText());
+        v1alpha4?[]:auditPackageWorkspace({name:base.path.replace(/\/$/,'').split('/').at(-1),files},doc.getText());
       if(ticket!==generation||document!==doc||doc.version!==version)return;
       audit=results.map(d=>({...d,uri:uris.get(d.path)??doc.uri}));
-      auditStatus="Package Audit · "+(missing.length?"unavailable":audit.length+" editor warnings");diagnostics.clear();
+      auditStatus=v1alpha4
+        ?"v1alpha4 Source · Compiler / Owner qualification pending"
+        :"Package Audit · "+(missing.length?"unavailable":audit.length+" editor warnings");
+      diagnostics.clear();
       if(!missing.length){
         packageFiles=files;packageFilesUri=doc.uri.toString();packageFilesVersion=version;
         update(doc);
