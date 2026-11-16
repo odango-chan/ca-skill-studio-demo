@@ -14,6 +14,7 @@ function newNonce(){
 }
 import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
+import {isV1Alpha4Procedure} from "../../../../language/core/v1alpha4.ts";
 import {exposeWorkspaceRoot,seedExampleWorkspace} from "./sample-loader.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
@@ -204,10 +205,14 @@ export function activate(context){
           void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB Procedure editor limit"});
           return;
         }
-        const [contract,predicates]=await Promise.all([
-          readPackageText("assurance/contract.yaml"),
-          readPackageText("assurance/predicates.yaml")
-        ]);
+        // Legacy Packages do not need the v1alpha4 Contract / PredicateSet
+        // visual projection. Avoid extra filesystem reads for the legacy
+        // default Example and keep the Theia virtual filesystem load bounded.
+        let contract={text:null,version:0},predicates={text:null,version:0};
+        if(isV1Alpha4Procedure(text)){
+          contract=await readPackageText("assurance/contract.yaml");
+          predicates=await readPackageText("assurance/predicates.yaml");
+        }
         if(disposed||ticket!==pushTicket||document.version!==version)return;
         void webview.postMessage({
           type:"snapshot",text,version,path:document.uri.path,
