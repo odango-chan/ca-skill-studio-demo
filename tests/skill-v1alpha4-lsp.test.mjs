@@ -318,7 +318,16 @@ test("v1alpha4 Observation tool reference is indexed without inventing an Owner"
 test("v1alpha4 Script references resolve only to exact Package-owned script files",()=>{
   const sourceText=procedure
     .replace("SUCCEEDED: final","SUCCEEDED: run-script")
-    .replace("  final:\\n","  run-script:\\n    operation:\\n      script: scripts/runner.py\\n      arguments: {}\\n      routes:\\n        SUCCEEDED: final\\n        OUTCOME_UNKNOWN: SAFE_STOPPED\\n  final:\\n");
+    .replace("  final:",[
+      "  run-script:",
+      "    operation:",
+      "      script: scripts/runner.py",
+      "      arguments: {}",
+      "      routes:",
+      "        SUCCEEDED: final",
+      "        OUTCOME_UNKNOWN: SAFE_STOPPED",
+      "  final:"
+    ].join("\\n"));
   const source=snapshot(sourceText);
   const index=buildSkillSymbolIndex(source);
   const p=source.documents.find(item=>item.relativePath==="assurance/procedure.yaml");
