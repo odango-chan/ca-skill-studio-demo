@@ -125,7 +125,10 @@ function positionAt(starts, offset) {
 function semanticTokensForDocument(document) {
   const spans=collectSkillSemanticTokenSpans(document.text,document.relativePath);
   const starts=lineStarts(document.text);
-  const builder=new SemanticTokensBuilder();
+  const builder=new SemanticTokensBuilder({
+    tokenTypes:SKILL_SEMANTIC_TOKEN_TYPES,
+    tokenModifiers:SKILL_SEMANTIC_TOKEN_MODIFIERS
+  });
   for(const span of spans){
     if(!Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
        span.start<0||span.end<=span.start||span.end>document.text.length||
