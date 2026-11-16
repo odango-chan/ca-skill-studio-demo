@@ -10,7 +10,7 @@ import {layoutProcedureELK} from "../../../../site/layout.mjs";
 import {mountProcedureCanvas} from "../../../../site/react-flow-canvas.tsx";
 import {mountNodeFocusCanvas} from "../../../../site/node-focus-flow.tsx";
 import {projectNodeFocusFlow} from "../../../../site/node-focus-graph.mjs";
-import {flowBundleSelectionId} from "../../../../site/react-flow-projection.mjs";
+import {flowBundleSelectionId,routeOrigin} from "../../../../site/react-flow-projection.mjs";
 import {routeTargetChoices,previewTargetPatch} from "./route-target.mjs";
 import {addRouteOutcomeOptions} from "../../../../site/route-create.mjs";
 import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
@@ -406,8 +406,11 @@ async function layoutCurrentProcedure({anchorId=null}={}){
     const visible=graph.visibleRoutes?.length??procedure.routes.length;
     const summary=graph.filterReason??(graph.isFiltered
       ?" · 筛选显示 "+visible+"/"+procedure.routes.length+" 条 Route":"");
-    status(state.procedureId+" · "+procedure.nodes.length+" Nodes / "+procedure.routes.length+
-      " Outcomes / "+graph.bundles.length+" Bundles"+summary+" · YAML Source 由 IDE 管理");
+    const businessNodeCount=procedure.nodes.filter(node=>!node.viewOnly).length;
+    status(state.procedureId+" · "+businessNodeCount+" Nodes / "+procedure.routes.length+
+      " Outcomes / "+graph.bundles.length+" Bundles"+summary+
+      (state.languageTarget==="v1alpha4"
+        ?" · v1alpha4 Source projection only · not qualified":" · YAML Source 由 IDE 管理"));
   }catch(error){
     if(ticket!==epoch)return;
     status("布局失败："+String(error?.message??error));
@@ -490,7 +493,7 @@ function receiveSnapshot(data){
       id,operator:"terminal",value:id,line:0,phases:[],children:[],viewOnly:true
     }));
     const procedure={...sourceProcedure,nodes:[...sourceProcedure.nodes,...terminalNodes]};
-    model={state:"READY",entry:projected.procedure.entry,
+    model={state:"READY",entry:procedure.name,
       procedures:new Map([[procedure.name,procedure]])};
   }else{
     model=projectWorkspace(data.text);
