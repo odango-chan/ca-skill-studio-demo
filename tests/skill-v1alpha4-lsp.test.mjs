@@ -327,7 +327,7 @@ test("v1alpha4 Script references resolve only to exact Package-owned script file
       "        SUCCEEDED: final",
       "        OUTCOME_UNKNOWN: SAFE_STOPPED",
       "  final:"
-    ].join("\\n"));
+    ].join("\n"));
   const source=snapshot(sourceText);
   const index=buildSkillSymbolIndex(source);
   const p=source.documents.find(item=>item.relativePath==="assurance/procedure.yaml");
