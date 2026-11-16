@@ -1034,6 +1034,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           "      script: scripts/runner.py",
           "      arguments: {}",
           "      routes:",
+          "        ",
           "        SUCCEEDED: final",
           "        FAILED: SAFE_STOPPED",
           "        OUTCOME_UNKNOWN: SAFE_STOPPED",
@@ -1120,7 +1121,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           const operationFields=await complete(procedureDocument,
             "    operation:\n      ");
           const routeKeys=await complete(procedureDocument,
-            "      routes:\n        ");
+            "  run-script:\n    operation:\n      script: scripts/runner.py\n      arguments: {}\n      routes:\n        ");
           const scriptPath=await complete(procedureDocument,"scripts/runner.py",11);
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
