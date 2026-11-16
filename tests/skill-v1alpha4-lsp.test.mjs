@@ -144,6 +144,24 @@ test("v1alpha4 rejects author reconcile/legacy wrappers without automatic conver
   assert.ok(a.diagnostics.some(x=>x.code==="UNKNOWN_FIELD"&&x.message.includes("reconcile")));
 });
 
+test("v1alpha4 enforces stage-normal routing and Script-only outcomes",()=>{
+  const withLaterStage=procedure.replace(
+    "        PASS: read\n        FAIL: FAILED\n        UNKNOWN: UNRESOLVED\n  read:",
+    "        PASS: read\n        FAIL: FAILED\n        UNKNOWN: UNRESOLVED\n    operation:\n      script: scripts/runner.py\n      arguments: {}\n      routes:\n        SUCCEEDED: read\n        FAILED: FAILED\n  read:"
+  );
+  const nonFinalNormal=analyzePackageSnapshot(snapshot(withLaterStage));
+  assert.ok(nonFinalNormal.diagnostics.some(x=>
+    x.code==="ROUTE_NORMAL_OUTCOME_NOT_ALLOWED"));
+
+  const scriptWithMutationOutcome=procedure.replace(
+    "  read:\n    observation:\n      tool: ca::session.read\n      arguments:\n        ueRef: context.ueRef\n      routes:\n        SUCCEEDED: final\n        FAILED: FAILED\n        UNKNOWN: UNRESOLVED",
+    "  read:\n    operation:\n      script: scripts/runner.py\n      arguments: {}\n      routes:\n        SUCCEEDED: final\n        FAILED: FAILED\n        OUTCOME_UNKNOWN: SAFE_STOPPED"
+  );
+  const invalidScript=analyzePackageSnapshot(snapshot(scriptWithMutationOutcome));
+  assert.ok(invalidScript.diagnostics.some(x=>x.code==="ROUTE_OUTCOME_UNKNOWN"&&
+    x.message.includes("OUTCOME_UNKNOWN")));
+});
+
 test("v1alpha4 recognizes missing direct final Postcondition",()=>{
   const altered=procedure.replace("PASS: SUCCEEDED","PASS: FAILED")
     .replace("SUCCEEDED: final","SUCCEEDED: unsafe")+
