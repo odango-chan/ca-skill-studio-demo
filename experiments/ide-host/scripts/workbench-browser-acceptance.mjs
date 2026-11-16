@@ -1055,6 +1055,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
          ["check","read","run-script","final"].includes(item))||
        !v1alpha4LanguageFeatureEvidence.contractDefinition||
        !v1alpha4LanguageFeatureEvidence.predicateDefinition||
+       !v1alpha4LanguageFeatureEvidence.predicateHoverSignature||
        !v1alpha4LanguageFeatureEvidence.predicateReferences||
        !v1alpha4LanguageFeatureEvidence.scriptDefinition||
        !v1alpha4LanguageFeatureEvidence.procedureOutline?.includes("run-script")||
