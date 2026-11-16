@@ -139,8 +139,28 @@ test("v1alpha4 AST graph projects nodes and routes but never claims Owner qualif
   assert.deepEqual(a.procedure.procedures[0].nodes[0].stages.map(x=>x.name),["precondition"]);
   assert.equal(a.procedure.procedures[0].nodes[0].globalPrecondition,true);
   assert.equal(a.procedure.procedures[0].nodes[2].finalGoal,true);
+  const readStage=a.procedure.procedures[0].nodes[1].stages[0];
+  assert.deepEqual(readStage.arguments.map(x=>[x.name,x.value]),
+    [["ueRef","context.ueRef"]]);
+  const finalCall=a.procedure.procedures[0].nodes[2].stages[0].calls[0];
+  assert.equal(finalCall.predicate,"demo.done");
+  assert.deepEqual(finalCall.parameters,["data"]);
+  assert.deepEqual(finalCall.arguments,["read.observation.output"]);
   assert.ok(a.procedure.procedures[0].routes.some(x=>x.target==="SUCCEEDED"&&x.routeSource==="postcondition"));
   assert.deepEqual(a.diagnostics,[]);
+});
+
+test("v1alpha4 carries PredicateSet Evidence requirements into the shared stage projection",()=>{
+  const withEvidence=predicates.replace(
+    "  demo.done:\n    parameters: [{data: ca::urn:example:result:v1}]",
+    "  demo.done:\n    parameters: [{data: ca::urn:example:result:v1}]\n    evidence:\n      requires:\n        data: [ca::demo.verified]"
+  );
+  const a=analyzePackageSnapshot(snapshot(procedure,contract,withEvidence));
+  const call=a.procedure.procedures[0].nodes.find(x=>x.id==="final")
+    .stages[0].calls[0];
+  assert.deepEqual(call.evidenceRequirements,[
+    {parameter:"data",evidence:["ca::demo.verified"]}
+  ]);
 });
 
 test("v1alpha4 rejects author reconcile/legacy wrappers without automatic conversion",()=>{
