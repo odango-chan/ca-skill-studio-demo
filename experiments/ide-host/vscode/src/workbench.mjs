@@ -1110,6 +1110,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             return labels(result);
           };
           const contractGate=await complete(contractDocument,"check.precondition",6);
+          const serverContractDiagnostics=await languageClient.sendRequest(
+            "skillStudio/semanticTokenDiagnostics",{uri:contractDocument.uri.toString()});
+          const serverGateLabels=serverContractDiagnostics?.contractPreconditionCompletions??[];
           const schemaPath=await complete(contractDocument,"schemas/request.schema.yaml",8);
           const entry=await complete(procedureDocument,"start: check",7);
           const predicate=await complete(procedureDocument,"demo.ready",5);
@@ -1124,9 +1127,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           const scriptPath=await complete(procedureDocument,"scripts/runner.py",8);
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
-          const serverContractDiagnostics=await languageClient.sendRequest(
-            "skillStudio/semanticTokenDiagnostics",{uri:contractDocument.uri.toString()});
-          const serverGateLabels=serverContractDiagnostics?.contractPreconditionCompletions??[];
           const require=(items,label,description)=>{
             if(!items.includes(label))
               throw Error("Native Theia "+description+" completion omitted "+
