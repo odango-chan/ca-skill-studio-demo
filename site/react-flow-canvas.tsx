@@ -120,7 +120,7 @@ function ProcedureCard({data,selected}){
       <span className="designer-node-phases" aria-label="节点内部阶段">
         {data.phaseBadges.map(phase=><span
           key={phase.name} className={"designer-phase-badge phase-"+phase.name}
-          title={phase.label+" · "+phase.count+" Steps"+(phase.operators.length
+          title={phase.label+" · "+phase.count+" "+(phase.countLabel??"Steps")+(phase.operators.length
             ?" · "+phase.operators.map(x=>x.kind+" ×"+x.count).join(" / "):"")}>
           {phase.label} · {phase.count}
         </span>)}
