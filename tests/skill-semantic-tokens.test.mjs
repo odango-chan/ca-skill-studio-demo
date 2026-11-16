@@ -193,8 +193,8 @@ test("v1alpha4 uses its own AST semantic projection for the frozen single-graph 
   tokenFor(procedureSource,p,"scripts/runner.py","skillReference","reference");
   tokenFor(procedureSource,p,"PASS","skillOutcome");
   tokenFor(procedureSource,p,"context.ueRef","skillBinding");
-  tokenFor(ps,ps,"demo.ready","skillPredicate","declaration");
-  tokenFor(ps,ps,"string","skillDataType");
+  tokenFor(predicatesSource,ps,"demo.ready","skillPredicate","declaration");
+  tokenFor(predicatesSource,ps,"string","skillDataType");
   assert.ok(!p.some(item=>item.type==="skillProcedure"),
     "v1alpha4 has one Package Procedure graph, not v0.2 named Procedure declarations");
   assert.ok(semantic.V1_ALPHA4_SEMANTIC_TOKEN_TYPES.includes("skillObservation"));
