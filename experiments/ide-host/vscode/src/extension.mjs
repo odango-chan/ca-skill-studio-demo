@@ -237,7 +237,7 @@ export function activate(context){
           if(message.version===document.version)console.log("STUDIO_OPEN_TIMING",JSON.stringify({version:document.version,hostToRenderMs:performance.now()-openedAt,projectionMs:message.projectionMs,layoutMs:message.layoutMs,cacheHit:message.cacheHit}));
           return;
         }
-        if(message.type==="ready"){ready=true;push();return;}
+        if(message.type==="ready"){ready=true;await push();return;}
         if(message.type==="exportPackageZip"){
           await vscode.commands.executeCommand("skillStudio.exportPackageZip");
           return;
