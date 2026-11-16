@@ -7,7 +7,8 @@ const SYMBOL_TYPES=new Set([
   "skillOperation",
   "skillObservation",
   "skillCapability",
-  "skillSchema"
+  "skillSchema",
+  "skillReference"
 ]);
 
 function modifier(token,name){
@@ -62,7 +63,8 @@ function symbolKey(token,name){
     // profile, so resolve this only when an exact imported Operation exists.
     case "skillCapability":
       return "operation\u0000"+name;
-    case "skillSchema":{
+    case "skillSchema":
+    case "skillReference":{
       const targetPath=packageFilePath(name);
       return targetPath?"document::"+targetPath:null;
     }
