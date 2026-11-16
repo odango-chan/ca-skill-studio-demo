@@ -215,6 +215,10 @@ connection.onRequest("skillStudio/semanticTokenDiagnostics", params=>{
   const snapshot=typeof uri==="string"?packageSnapshotForUri(uri):null;
   const value=snapshot?packageAnalyses.get(snapshot.rootUri):null;
   const document=snapshot?snapshotDocumentFor(snapshot,uri):null;
+  const spans=document?collectSkillSemanticTokenSpans(
+    document.text,document.relativePath
+  ):[];
+  const encoded=document?semanticTokensForDocument(document):{data:[]};
   return {
     packageCount:packageSnapshots.size,
     packageFound:Boolean(snapshot),
@@ -224,9 +228,13 @@ connection.onRequest("skillStudio/semanticTokenDiagnostics", params=>{
     documentFound:Boolean(document),
     relativePath:document?.relativePath??null,
     textLength:typeof document?.text==="string"?document.text.length:0,
-    spanCount:document?collectSkillSemanticTokenSpans(
-      document.text,document.relativePath
-    ).length:0
+    spanCount:spans.length,
+    mappedSpanCount:spans.filter(span=>Number.isSafeInteger(span.tokenType)&&
+      Number.isSafeInteger(span.tokenModifiers)).length,
+    encodedTokenCount:Math.floor((encoded?.data?.length??0)/5),
+    sampleTokenTypes:spans.slice(0,6).map(span=>({
+      type:span.type,tokenType:span.tokenType,tokenModifiers:span.tokenModifiers
+    }))
   };
 });
 
