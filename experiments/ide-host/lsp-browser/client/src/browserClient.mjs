@@ -360,7 +360,9 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       if(!started||stopped||terminalFailure)
         throw new Error("Language Worker unavailable: "+(terminalFailure??"not running"));
       return client.sendRequest(CompletionRequest.type,{
-        textDocument:{uri},position,context:{triggerKind:1}
+        textDocument:{uri},
+        position:{line:position.line,character:position.character},
+        context:{triggerKind:1}
       });
     },
     closePackage(rootUri) {
