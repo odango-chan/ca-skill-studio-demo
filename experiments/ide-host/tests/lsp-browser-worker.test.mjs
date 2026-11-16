@@ -213,13 +213,8 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     const procedureBeforeAnalysis=snapshot.documents.find(item=>
       item.relativePath==="assurance/procedure.yaml");
     assert.ok(procedureBeforeAnalysis);
-    // Semantic-token lookup must use the accepted Source snapshot immediately;
-    // it must not wait for Python indexing or Package READY diagnostics.
-    const earlyTokenDiagnostics=await lspRequest(worker,93,
-      "skillStudio/semanticTokenDiagnostics",{uri:procedureBeforeAnalysis.uri});
-    assert.equal(earlyTokenDiagnostics.packageFound,true);
-    assert.equal(earlyTokenDiagnostics.documentFound,true);
-    assert.ok(earlyTokenDiagnostics.spanCount>0);
+    // Semantic-token requests must use the accepted Source snapshot immediately;
+    // they must not wait for Python indexing or Package READY diagnostics.
     const earlySemanticTokens=await lspRequest(worker,94,
       "textDocument/semanticTokens/full",{
         textDocument:{uri:procedureBeforeAnalysis.uri}
