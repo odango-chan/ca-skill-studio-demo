@@ -983,8 +983,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
         const fs=vscode.workspace.fs;
         const contract=[
           "goal: pdu_session.initial_request_fulfilled",
-          "precondition: ",
-          "requestSchema: ",
+          "precondition: check.precondition",
+          "requestSchema: schemas/request.schema.yaml",
           "contextSchema: ca-context::urn:example:host:v1",
           "dependencies:",
           "  ca-context: urn:example:host",
@@ -993,14 +993,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           ""
         ].join("\n");
         const procedure=[
-          "start: ",
+          "start: check",
           "nodes:",
           "  check:",
           "    ",
           "    precondition:",
           "      ",
           "      predicates:",
-          "        - predicate: ",
+          "        - predicate: demo.ready",
           "          arguments: [context.ueRef]",
           "      routes:",
           "        ",
@@ -1020,7 +1020,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           "  run-script:",
           "    operation:",
           "      ",
-          "      script: ",
+          "      script: scripts/runner.py",
           "      arguments: {}",
           "      routes:",
           "        SUCCEEDED: final",
@@ -1098,10 +1098,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
               "vscode.executeCompletionItemProvider",document.uri,position);
             return labels(result);
           };
-          const contractGate=await complete(contractDocument,"precondition: ");
-          const schemaPath=await complete(contractDocument,"requestSchema: ");
-          const entry=await complete(procedureDocument,"start: ");
-          const predicate=await complete(procedureDocument,"- predicate: ");
+          const contractGate=await complete(contractDocument,"check.precondition",5);
+          const schemaPath=await complete(contractDocument,"schemas/request.schema.yaml",11);
+          const entry=await complete(procedureDocument,"start: check",8);
+          const predicate=await complete(procedureDocument,"demo.ready",4);
           const preconditionFields=await complete(procedureDocument,
             "    precondition:\n      ");
           const observationFields=await complete(procedureDocument,
@@ -1110,7 +1110,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             "    operation:\n      ");
           const routeKeys=await complete(procedureDocument,
             "      routes:\n        ");
-          const scriptPath=await complete(procedureDocument,"      script: ");
+          const scriptPath=await complete(procedureDocument,"scripts/runner.py",11);
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
           const require=(items,label,description)=>{
