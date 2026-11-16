@@ -97,7 +97,7 @@ test("legacy v0.2 token registry remains isolated from the frozen v1alpha4 autho
     "colors are theme-owned, not language-contract data");
 });
 
-test("5GC Procedure uses exact v0.2 AST selectors for declarations, operators, references and bindings",()=>{
+test("legacy 5GC Procedure uses exact v0.2 AST selectors for declarations, operators, references and bindings",()=>{
   const source=sample("establish-pdu-session","assurance/procedure.yaml");
   const items=observed(source,"skills/establish-pdu-session/assurance/procedure.yaml");
   assert.ok(items.length>100);
@@ -113,7 +113,7 @@ test("5GC Procedure uses exact v0.2 AST selectors for declarations, operators, r
   assert.ok(!items.some(item=>item.type.startsWith("ca")));
 });
 
-test("MAS Procedure receives the same canonical language projection",()=>{
+test("legacy MAS Procedure receives the same v0.2 language projection",()=>{
   const source=sample("establish-pdu-session-mas","assurance/procedure.yaml");
   const items=observed(source,"skills/establish-pdu-session-mas/assurance/procedure.yaml");
   tokenFor(source,items,"establish-session","skillProcedure","declaration");
@@ -201,7 +201,7 @@ test("v1alpha4 uses its own AST semantic projection for the frozen single-graph 
   assert.ok(semantic.V1_ALPHA4_SEMANTIC_TOKEN_TYPES.includes("skillReference"));
 });
 
-test("Contract and PredicateSet source positions follow their own profiles",()=>{
+test("legacy Contract and PredicateSet source positions follow their v0.2 profiles",()=>{
   const contractSource=sample("establish-pdu-session","assurance/contract.yaml");
   const c=observed(contractSource,"skills/establish-pdu-session/assurance/contract.yaml");
   tokenFor(contractSource,c,"entryProcedure","skillKeyword");
