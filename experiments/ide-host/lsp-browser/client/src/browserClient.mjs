@@ -1,5 +1,5 @@
 import { LanguageClient, ErrorAction, CloseAction, State } from "vscode-languageclient/browser";
-import { CompletionRequest } from "vscode-languageserver-protocol";
+import { CompletionRequest, SemanticTokensRequest } from "vscode-languageserver-protocol";
 import { SKILL_SEMANTIC_TOKEN_TYPES, SKILL_SEMANTIC_TOKEN_MODIFIERS } from "../../../../../language/semantic-tokens.mjs";
 import studioLightTheme from "../../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
 import { createSemanticTokenDecorationRenderer } from "./semantic-token-decorations.mjs";
@@ -130,7 +130,7 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         handlers.onSemanticTokenRequest?.(uri);
         try{
           const requestTokens=()=>client.sendRequest(
-            "textDocument/semanticTokens/full",
+            SemanticTokensRequest.type,
             {textDocument:{uri:document.uri.toString()}},
             cancellationToken
           );
