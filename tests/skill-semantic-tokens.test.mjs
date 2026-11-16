@@ -123,6 +123,84 @@ test("MAS Procedure receives the same canonical language projection",()=>{
   tokenFor(source,items,"PASS","skillOutcome");
 });
 
+test("v1alpha4 uses its own AST semantic projection for the frozen single-graph grammar",()=>{
+  const contractSource=[
+    "goal: demo.session_established",
+    "precondition: check.precondition",
+    "requestSchema: schemas/request.schema.yaml",
+    "contextSchema: ca-context::urn:example:host:v1",
+    "dependencies: {ca: urn:example:tools}",
+    "capabilities: [session-read]",
+    ""
+  ].join("\n");
+  const procedureSource=[
+    "start: check",
+    "nodes:",
+    "  check:",
+    "    precondition:",
+    "      predicates:",
+    "        - predicate: demo.ready",
+    "          arguments: [context.ueRef]",
+    "      routes:",
+    "        PASS: read",
+    "        FAIL: FAILED",
+    "        UNKNOWN: UNRESOLVED",
+    "  read:",
+    "    observation:",
+    "      tool: ca::session.read",
+    "      arguments: {ueRef: context.ueRef}",
+    "      routes:",
+    "        SUCCEEDED: run-script",
+    "        FAILED: SAFE_STOPPED",
+    "        UNKNOWN: UNRESOLVED",
+    "  run-script:",
+    "    operation:",
+    "      script: scripts/runner.py",
+    "      arguments: {}",
+    "      routes:",
+    "        SUCCEEDED: final",
+    "        OUTCOME_UNKNOWN: SAFE_STOPPED",
+    "  final:",
+    "    postcondition:",
+    "      predicates:",
+    "        - predicate: demo.done",
+    "          arguments: [read.observation.output]",
+    "      routes:",
+    "        PASS: SUCCEEDED",
+    "        FAIL: FAILED",
+    "        UNKNOWN: UNRESOLVED",
+    ""
+  ].join("\n");
+  const predicatesSource=[
+    "predicates:",
+    "  demo.ready:",
+    "    parameters: [{ue: string}]",
+    "    evaluator: {type: cel, expression: 'ue != \"\"'}",
+    "  demo.done:",
+    "    parameters: [{result: string}]",
+    "    evaluator: {type: cel, expression: 'result != \"\"'}",
+    ""
+  ].join("\n");
+  const c=observed(contractSource,"skills/demo/assurance/contract.yaml");
+  const p=observed(procedureSource,"skills/demo/assurance/procedure.yaml");
+  const ps=observed(predicatesSource,"skills/demo/assurance/predicates.yaml");
+  tokenFor(contractSource,c,"check.precondition","skillStep","reference");
+  tokenFor(contractSource,c,"schemas/request.schema.yaml","skillSchema","reference");
+  tokenFor(contractSource,c,"session-read","skillCapability","reference");
+  tokenFor(procedureSource,p,"check","skillStep","declaration",procedureSource.indexOf("nodes:"));
+  tokenFor(procedureSource,p,"demo.ready","skillPredicate","reference");
+  tokenFor(procedureSource,p,"ca::session.read","skillObservation","reference");
+  tokenFor(procedureSource,p,"scripts/runner.py","skillReference","reference");
+  tokenFor(procedureSource,p,"PASS","skillOutcome");
+  tokenFor(procedureSource,p,"context.ueRef","skillBinding");
+  tokenFor(ps,ps,"demo.ready","skillPredicate","declaration");
+  tokenFor(ps,ps,"string","skillDataType");
+  assert.ok(!p.some(item=>item.type==="skillProcedure"),
+    "v1alpha4 has one Package Procedure graph, not v0.2 named Procedure declarations");
+  assert.ok(semantic.V1_ALPHA4_SEMANTIC_TOKEN_TYPES.includes("skillObservation"));
+  assert.ok(semantic.V1_ALPHA4_SEMANTIC_TOKEN_TYPES.includes("skillReference"));
+});
+
 test("Contract and PredicateSet source positions follow their own profiles",()=>{
   const contractSource=sample("establish-pdu-session","assurance/contract.yaml");
   const c=observed(contractSource,"skills/establish-pdu-session/assurance/contract.yaml");
