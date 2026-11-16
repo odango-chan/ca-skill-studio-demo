@@ -1211,7 +1211,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           return {
             status:status.state,snapshotCompleteness:state.lastSentSnapshot.completeness,
             contractPreconditionCompletion:contractGate,
-            contractServerDiagnostics,serverGateLabels,
+            serverContractDiagnostics,serverGateLabels,
             requestSchemaCompletion:schemaPath,startNodeCompletion:entry,
             predicateCompletion:predicate,
             preconditionFields,observationFields,operationFields,
