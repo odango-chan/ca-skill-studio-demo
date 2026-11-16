@@ -142,10 +142,10 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(posted.at(-1).version,21);
   assert.equal(posted.at(-1).packageRootUri,"file:///workspace");
   assert.equal(posted.at(-1).packageName,"workspace");
-  assert.equal(posted.at(-1).contractText,
-    readFileSync("site/samples/packages/establish-pdu-session/assurance/contract.yaml","utf8"));
-  assert.equal(posted.at(-1).predicatesText,
-    readFileSync("site/samples/packages/establish-pdu-session/assurance/predicates.yaml","utf8"));
+  assert.equal(posted.at(-1).contractText,null,
+    "legacy Procedure snapshots must not trigger extra Contract reads");
+  assert.equal(posted.at(-1).predicatesText,null,
+    "legacy Procedure snapshots must not trigger extra PredicateSet reads");
   await onMessage({type:"exportPackageZip"});
   assert.ok(registered.some(args=>args[0]==="skillStudio.exportPackageZip"),
     "the native Procedure Webview routes ZIP export to the host command");
