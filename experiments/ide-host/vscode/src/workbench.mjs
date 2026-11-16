@@ -969,9 +969,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
     ));
   }
 
-  // Exercise the frozen v1alpha4 language service through the public VS Code
-  // provider commands in a real Theia browser host. The fixture lives only in
-  // this extension's private global storage and is always removed afterwards.
+  // Exercise frozen v1alpha4 providers through the public VS Code commands
+  // in real Theia. The temporary sibling Package is outside the active
+  // workspace and is always removed; no user-authored files are touched.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.v1alpha4LanguageProviderAcceptance",
