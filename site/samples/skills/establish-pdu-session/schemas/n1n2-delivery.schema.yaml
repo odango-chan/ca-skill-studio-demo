@@ -1,0 +1,8 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: n1n2-delivery.schema.yaml
+title: N1N2Delivery
+description: The N1/N2 delivery material selected by the admitted Skill Script.
+  This Script is the single producer of one Tool request, so its field-level
+  contract is owned by the Tool input schema (`tools/contracts/`) and validated
+  by the Runtime at the Tool boundary instead of being duplicated here.
+type: object

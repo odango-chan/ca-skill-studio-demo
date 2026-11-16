@@ -1,0 +1,88 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: pcf-policy-inputs-input.schema.yaml
+title: PcfPolicyInputsInput
+description: Verified subscription material from the admitted selection script. The
+  PCF create Backend independently re-checks the source and every policy value.
+type: object
+additionalProperties: false
+required:
+- subscriptionData
+- subscriptionSource
+properties:
+  subscriptionData:
+    type: object
+    required:
+    - sessionAmbr
+    - defaultQos
+    properties:
+      sessionAmbr:
+        type: object
+        additionalProperties: false
+        required:
+        - uplink
+        - downlink
+        properties:
+          uplink:
+            type: string
+            pattern: ^[0-9]+(\.[0-9]+)? (bps|Kbps|Mbps|Gbps|Tbps)$
+          downlink:
+            type: string
+            pattern: ^[0-9]+(\.[0-9]+)? (bps|Kbps|Mbps|Gbps|Tbps)$
+      defaultQos:
+        type: object
+        additionalProperties: false
+        required:
+        - fiveQi
+        - arp
+        properties:
+          fiveQi:
+            type: integer
+            minimum: 0
+            maximum: 255
+          priorityLevel:
+            type: integer
+            minimum: 1
+            maximum: 127
+          arp:
+            type: object
+            additionalProperties: false
+            required:
+            - priorityLevel
+            - preemptCap
+            - preemptVuln
+            properties:
+              priorityLevel:
+                type: integer
+                minimum: 1
+                maximum: 15
+              preemptCap:
+                enum:
+                - MAY_PREEMPT
+                - NOT_PREEMPT
+                type: string
+              preemptVuln:
+                enum:
+                - PREEMPTABLE
+                - NOT_PREEMPTABLE
+                type: string
+  subscriptionSource:
+    type: object
+    additionalProperties: false
+    required:
+    - transactionRef
+    - requestRef
+    - fabricRecordRef
+    - fabricRecordDigest
+    properties:
+      transactionRef:
+        type: string
+        minLength: 1
+      requestRef:
+        type: string
+        minLength: 1
+      fabricRecordRef:
+        type: string
+        minLength: 1
+      fabricRecordDigest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$

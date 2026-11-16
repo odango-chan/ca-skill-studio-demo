@@ -1,0 +1,774 @@
+{
+  "id": "connectionagent.skill.semantic-tokens",
+  "schemaVersion": 1,
+  "version": "0.2.0",
+  "status": "current",
+  "authority": {
+    "semantics": "ca-skills Skill Language v0.2 and Script Contract v0",
+    "grammar": "docs/skill-language-spec.md and docs/script-contract.md",
+    "note": "This is a source-position projection only. It does not validate YAML, resolve references, execute Scripts/Tools, or imply Runtime readiness."
+  },
+  "legend": {
+    "tokenTypes": [
+      {
+        "id": "skillKeyword",
+        "description": "Schema-defined Skill/YAML structural field"
+      },
+      {
+        "id": "skillOperator",
+        "description": "Executable Procedure node/step operator"
+      },
+      {
+        "id": "skillProcedure",
+        "description": "Declared or referenced Procedure identity"
+      },
+      {
+        "id": "skillStep",
+        "description": "Declared or referenced Procedure node/step identity"
+      },
+      {
+        "id": "skillCapability",
+        "description": "Resource-grant identity in allowedResources; may identify a Capability or directly granted Operation"
+      },
+      {
+        "id": "skillPredicate",
+        "description": "Predicate identity"
+      },
+      {
+        "id": "skillObservation",
+        "description": "Externally sourced Observation identifier"
+      },
+      {
+        "id": "skillOutcome",
+        "description": "Outcome or Predicate verdict in a declared route/expectation"
+      },
+      {
+        "id": "skillDataType",
+        "description": "Source-declared basic data type"
+      },
+      {
+        "id": "skillSchema",
+        "description": "Skill-owned Schema path or external schema reference"
+      },
+      {
+        "id": "skillReference",
+        "description": "Skill-owned script/reference file path"
+      },
+      {
+        "id": "skillBinding",
+        "description": "Explicit Procedure input/output/context binding"
+      },
+      {
+        "id": "skillOperation",
+        "description": "Exact callable Operation identity from an imported ToolCatalog"
+      }
+    ],
+    "tokenModifiers": [
+      {
+        "id": "declaration",
+        "description": "Source declaration"
+      },
+      {
+        "id": "reference",
+        "description": "Source reference, not necessarily resolved"
+      },
+      {
+        "id": "imported",
+        "description": "Imported read-only library declaration"
+      }
+    ]
+  },
+  "format": {
+    "path": "Slash-separated YAML AST path from document root; * matches exactly one mapping key or array item.",
+    "parts": [
+      "key",
+      "value"
+    ],
+    "exact": "Emitted only on a syntactically valid scalar with an exact single-line UTF-16 range.",
+    "failure": "Invalid YAML or a position without matching structural rule retains ordinary TextMate highlighting.",
+    "colors": "No theme colors are normative here."
+  },
+  "profiles": {
+    "procedure": {
+      "file": "assurance/procedure.yaml",
+      "keywords": {
+        "": [
+          "procedures"
+        ],
+        "procedures/*": [
+          "applicability",
+          "inputs",
+          "start",
+          "nodes"
+        ],
+        "procedures/*/applicability": [
+          "predicates"
+        ],
+        "procedures/*/inputs/*": [
+          "type",
+          "from",
+          "required",
+          "value"
+        ],
+        "procedures/*/nodes/*": [
+          "call",
+          "verify",
+          "script",
+          "reconcile",
+          "procedure",
+          "terminal",
+          "with",
+          "on",
+          "preconditions",
+          "postconditions"
+        ],
+        "procedures/*/nodes/*/preconditions": [
+          "steps",
+          "on"
+        ],
+        "procedures/*/nodes/*/preconditions/steps/*": [
+          "name",
+          "call",
+          "verify",
+          "script",
+          "with"
+        ],
+        "procedures/*/nodes/*/postconditions": [
+          "steps",
+          "on"
+        ],
+        "procedures/*/nodes/*/postconditions/steps/*": [
+          "name",
+          "call",
+          "verify",
+          "script",
+          "with"
+        ]
+      },
+      "rules": [
+        {
+          "path": "procedures/*",
+          "part": "key",
+          "type": "skillProcedure",
+          "modifiers": [
+            "declaration"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*",
+          "part": "key",
+          "type": "skillStep",
+          "modifiers": [
+            "declaration"
+          ]
+        },
+        {
+          "path": "procedures/*/start",
+          "part": "value",
+          "type": "skillStep",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/applicability/predicates/*",
+          "part": "key",
+          "type": "skillPredicate",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/applicability/predicates/*",
+          "part": "value",
+          "type": "skillOutcome"
+        },
+        {
+          "path": "procedures/*/nodes/*/call",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/call",
+          "part": "value",
+          "type": "skillOperation",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/script",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/script",
+          "part": "value",
+          "type": "skillReference",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/verify",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/verify",
+          "part": "value",
+          "type": "skillPredicate",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/reconcile",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/reconcile",
+          "part": "value",
+          "type": "skillStep",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/procedure",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/procedure",
+          "part": "value",
+          "type": "skillProcedure",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/terminal",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/terminal",
+          "part": "value",
+          "type": "skillOutcome"
+        },
+        {
+          "path": "procedures/*/nodes/*/preconditions/steps/*/call",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/preconditions/steps/*/call",
+          "part": "value",
+          "type": "skillOperation",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/preconditions/steps/*/script",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/preconditions/steps/*/script",
+          "part": "value",
+          "type": "skillReference",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/preconditions/steps/*/verify",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/preconditions/steps/*/verify",
+          "part": "value",
+          "type": "skillPredicate",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/postconditions/steps/*/call",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/postconditions/steps/*/call",
+          "part": "value",
+          "type": "skillOperation",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/postconditions/steps/*/script",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/postconditions/steps/*/script",
+          "part": "value",
+          "type": "skillReference",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/postconditions/steps/*/verify",
+          "part": "key",
+          "type": "skillOperator"
+        },
+        {
+          "path": "procedures/*/nodes/*/postconditions/steps/*/verify",
+          "part": "value",
+          "type": "skillPredicate",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/on/*",
+          "part": "key",
+          "type": "skillOutcome"
+        },
+        {
+          "path": "procedures/*/nodes/*/on/*",
+          "part": "value",
+          "type": "skillStep",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/preconditions/on/*",
+          "part": "key",
+          "type": "skillOutcome"
+        },
+        {
+          "path": "procedures/*/nodes/*/preconditions/on/*",
+          "part": "value",
+          "type": "skillStep",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/postconditions/on/*",
+          "part": "key",
+          "type": "skillOutcome"
+        },
+        {
+          "path": "procedures/*/nodes/*/postconditions/on/*",
+          "part": "value",
+          "type": "skillStep",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/inputs/*/type",
+          "part": "value",
+          "type": "skillDataType"
+        },
+        {
+          "path": "procedures/*/inputs/*/from",
+          "part": "value",
+          "type": "skillBinding",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/preconditions/steps/*/name",
+          "part": "value",
+          "type": "skillStep",
+          "modifiers": [
+            "declaration"
+          ]
+        },
+        {
+          "path": "procedures/*/nodes/*/postconditions/steps/*/name",
+          "part": "value",
+          "type": "skillStep",
+          "modifiers": [
+            "declaration"
+          ]
+        }
+      ]
+    },
+    "contract": {
+      "file": "assurance/contract.yaml",
+      "keywords": {
+        "": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "spec"
+        ],
+        "metadata": [
+          "name"
+        ],
+        "spec": [
+          "skillType",
+          "goal",
+          "entryProcedure",
+          "inputs",
+          "context",
+          "allowedResources",
+          "preconditions",
+          "postconditions",
+          "planning",
+          "failureSemantics"
+        ],
+        "spec/inputs": [
+          "requestSchema"
+        ],
+        "spec/context": [
+          "requiredFacts",
+          "schemas"
+        ],
+        "spec/allowedResources": [
+          "capabilities"
+        ],
+        "spec/preconditions/*": [
+          "predicate",
+          "expect"
+        ],
+        "spec/postconditions/*": [
+          "predicate",
+          "expect"
+        ],
+        "spec/planning": [
+          "maxActions",
+          "allowDynamicProcedure"
+        ],
+        "spec/failureSemantics": [
+          "outcomeUnknown"
+        ],
+        "spec/failureSemantics/outcomeUnknown": [
+          "requireReconcile"
+        ],
+        "spec/context/schemas": [
+          "subject",
+          "facts",
+          "observations",
+          "evidence"
+        ]
+      },
+      "rules": [
+        {
+          "path": "spec/entryProcedure",
+          "part": "value",
+          "type": "skillProcedure",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "spec/inputs/requestSchema",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "spec/allowedResources/capabilities/*",
+          "part": "value",
+          "type": "skillCapability",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "spec/preconditions/*/predicate",
+          "part": "value",
+          "type": "skillPredicate",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "spec/preconditions/*/expect",
+          "part": "value",
+          "type": "skillOutcome"
+        },
+        {
+          "path": "spec/postconditions/*/predicate",
+          "part": "value",
+          "type": "skillPredicate",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "spec/postconditions/*/expect",
+          "part": "value",
+          "type": "skillOutcome"
+        },
+        {
+          "path": "spec/context/schemas/subject",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "spec/context/schemas/facts",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "spec/context/schemas/observations",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "spec/context/schemas/evidence",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    "predicates": {
+      "file": "assurance/predicates.yaml",
+      "keywords": {
+        "": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "predicates"
+        ],
+        "metadata": [
+          "skill"
+        ],
+        "predicates/*": [
+          "observations",
+          "evaluator"
+        ],
+        "predicates/*/observations/*": [
+          "ref",
+          "scope",
+          "freshness",
+          "absencePolicy"
+        ],
+        "predicates/*/evaluator": [
+          "type",
+          "expression",
+          "ref"
+        ]
+      },
+      "rules": [
+        {
+          "path": "predicates/*",
+          "part": "key",
+          "type": "skillPredicate",
+          "modifiers": [
+            "declaration"
+          ]
+        },
+        {
+          "path": "predicates/*/observations/*/ref",
+          "part": "value",
+          "type": "skillObservation",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "predicates/*/evaluator/ref",
+          "part": "value",
+          "type": "skillReference",
+          "modifiers": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    "schema": {
+      "file": "schemas/*.schema.yaml",
+      "keywords": {
+        "": [
+          "$schema",
+          "$id",
+          "title",
+          "description",
+          "type",
+          "properties",
+          "required",
+          "items",
+          "$defs",
+          "definitions",
+          "$ref",
+          "enum",
+          "additionalProperties"
+        ],
+        "properties/*": [
+          "$ref",
+          "type",
+          "title",
+          "description",
+          "items",
+          "properties",
+          "required",
+          "enum",
+          "additionalProperties"
+        ],
+        "$defs/*": [
+          "$ref",
+          "type",
+          "title",
+          "description",
+          "items",
+          "properties",
+          "required",
+          "enum",
+          "additionalProperties"
+        ],
+        "definitions/*": [
+          "$ref",
+          "type",
+          "title",
+          "description",
+          "items",
+          "properties",
+          "required",
+          "enum",
+          "additionalProperties"
+        ],
+        "items": [
+          "$ref",
+          "type",
+          "title",
+          "description",
+          "items",
+          "properties",
+          "required",
+          "enum",
+          "additionalProperties"
+        ]
+      },
+      "rules": [
+        {
+          "path": "type",
+          "part": "value",
+          "type": "skillDataType"
+        },
+        {
+          "path": "$ref",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "properties/*/type",
+          "part": "value",
+          "type": "skillDataType"
+        },
+        {
+          "path": "properties/*/$ref",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "$defs/*/type",
+          "part": "value",
+          "type": "skillDataType"
+        },
+        {
+          "path": "$defs/*/$ref",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "definitions/*/type",
+          "part": "value",
+          "type": "skillDataType"
+        },
+        {
+          "path": "definitions/*/$ref",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        },
+        {
+          "path": "items/type",
+          "part": "value",
+          "type": "skillDataType"
+        },
+        {
+          "path": "items/$ref",
+          "part": "value",
+          "type": "skillSchema",
+          "modifiers": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    "importedToolCatalog": {
+      "file": "lib/tools/*.tool.yaml",
+      "keywords": {
+        "": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "spec"
+        ],
+        "spec": [
+          "contracts"
+        ],
+        "spec/contracts/*": [
+          "operation",
+          "adapter",
+          "effect",
+          "inputSchema",
+          "outputSchema",
+          "reconcileOutputSchema",
+          "description"
+        ]
+      },
+      "rules": [
+        {
+          "path": "spec/contracts/*/operation",
+          "part": "value",
+          "type": "skillOperation",
+          "modifiers": [
+            "declaration",
+            "imported"
+          ]
+        }
+      ]
+    }
+  }
+}

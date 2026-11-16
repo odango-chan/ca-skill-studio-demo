@@ -1,0 +1,679 @@
+// A thin IDE-host adapter around the exact Studio projection and ReactFlow.
+// No second file tree, Monaco, save buffer, or JS filesystem abstraction.
+import "../../../../site/studio.css";
+import "../../../../site/light.css";
+import "./webview.css";
+import {projectWorkspace} from "../../../../site/workspace.mjs";
+import {isV1Alpha4Procedure,analyzeV1Alpha4Source}
+  from "../../../../language/core/v1alpha4.ts";
+import {layoutProcedureELK} from "../../../../site/layout.mjs";
+import {mountProcedureCanvas} from "../../../../site/react-flow-canvas.tsx";
+import {mountNodeFocusCanvas} from "../../../../site/node-focus-flow.tsx";
+import {projectNodeFocusFlow} from "../../../../site/node-focus-graph.mjs";
+import {flowBundleSelectionId,routeOrigin} from "../../../../site/react-flow-projection.mjs";
+import {routeTargetChoices,previewTargetPatch} from "./route-target.mjs";
+import {addRouteOutcomeOptions} from "../../../../site/route-create.mjs";
+import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
+  from "../../../../site/route-connect.mjs";
+
+const vscode=acquireVsCodeApi();
+const $=id=>document.getElementById(id);
+let state={text:"",version:0,procedures:null,procedureId:null,entry:null,graph:null,
+  selection:null,pending:null,pendingKind:null,routeProposal:null,nodeFocusId:null,
+  languageTarget:"legacy",goal:null,preconditionGate:null,projectionDiagnostics:[],
+  layoutDirection:"DOWN",fitMode:"all",showAllLabels:false,neighborsOnly:false,
+  rootPathMode:"normal",pathCategories:new Set(),expandedNodes:new Set()},epoch=0,focusTicket=0;
+const layouts=new Map();
+let projectionMs=0,pendingPackageZip=null;
+function base64ToBytes(value){
+  if(typeof value!=="string"||value.length>16*1024*1024)
+    throw new Error("ZIP 下载数据超出安全上限");
+  const binary=atob(value),bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return bytes;
+}
+function downloadPreparedPackageZip(){
+  if(!pendingPackageZip)return;
+  try{
+    const bytes=base64ToBytes(pendingPackageZip.base64);
+    const blob=new Blob([bytes],{type:"application/zip"});
+    const url=URL.createObjectURL(blob),link=document.createElement("a");
+    link.href=url;link.download=pendingPackageZip.filename;
+    document.body.appendChild(link);link.click();link.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(url),30000);
+    status("已请求下载 "+pendingPackageZip.filename+" · "+
+      pendingPackageZip.fileCount+" 个文件；工作区和原始文件未被修改。");
+    pendingPackageZip=null;
+    $("zipExportNotice").hidden=true;
+  }catch(error){status("ZIP 下载失败："+String(error?.message??error));}
+}
+function publishSelection(){const payload={type:"selection",version:state.version,procedureId:state.procedureId,nodeId:state.selection?.kind==="node"?state.selection.id:null};document.body.dataset.studioSelection=JSON.stringify(payload);vscode.postMessage(payload);}
+const status=text=>{$("message").textContent=text;};
+const canvas=mountProcedureCanvas($("reactFlowRoot"),{
+  onNodeSelect(id){
+    const selectedNode=getProcedure()?.nodes.find(item=>item.id===id);
+    if(selectedNode?.viewOnly){
+      status("终态 "+id+" 是 Route 目标，不是可编辑的 Procedure Node。");
+      return;
+    }
+    state.routeProposal=null;state.pending=null;state.pendingKind=null;
+    state.selection={kind:"node",id};
+    renderRoutes({preserveSelection:true});repaint();
+    if(state.neighborsOnly)void layoutCurrentProcedure();
+    const options=state.languageTarget==="v1alpha4"?null:
+      addRouteOutcomeOptions(state.text,state.procedureId,id);
+    status(state.languageTarget==="v1alpha4"
+      ?"已选择 Node "+id+" · 显示 v1alpha4 有序 Stage 与只读 Route"
+      :options?.outcomes?.length
+        ?"已选择 "+id+" · 可从节点专用添加端口提出新 Route"
+        :"已选择节点 "+id+" · 仅显示当前 Source 明确允许的 Route 操作");
+  },
+  onEdgeSelect(bundle){
+    const routes=bundle?.routes??[];
+    if(!routes.length)return;
+    if(state.languageTarget==="v1alpha4"){
+      state.selection={kind:"bundle",id:flowBundleSelectionId(bundle)};
+      state.pending=null;state.pendingKind=null;state.routeProposal=null;
+      repaint();
+      status("只读 Route · "+routeOrigin(bundle.routeSource)+" · "+
+        bundle.outcomes.join(" / ")+
+        "；Tool Effect / Capability 授权须由可信 Compiler 依赖确认。");
+      return;
+    }
+    const candidate=state.selection?.kind==="route"&&
+      routes.some(route=>route.id===state.selection.id)
+      ?routes.find(route=>route.id===state.selection.id)
+      :routes.length===1?routes[0]:null;
+    const selected=candidate&&routeChoices(candidate.id).length
+      ?candidate.id:null;
+    state.routeProposal=null;state.pending=null;state.pendingKind=null;
+    state.selection=selected?{kind:"route",id:selected}:{
+      kind:"bundle",id:flowBundleSelectionId(bundle)
+    };
+    renderRoutes();
+    if(selected){
+      $("routeList").value=selected;
+      refreshTargets();
+      status("已明确选择 "+selected+"；可拖动该 Route 的目标端进行重连。");
+    }else{
+      repaint();
+      status(routes.length>1
+        ?"此连线包含多个 Outcome。请先在 Route 列表中明确选择一个 Route，再拖动目标端重连。"
+        :"该 Route 不满足当前 Source-backed Patch 资格；仍可原生编辑 YAML。");
+    }
+  },
+  onPaneClick(){
+    if(state.routeProposal)return;
+    state.selection=null;state.pending=null;state.pendingKind=null;
+    repaint();renderRoutes();
+    if(state.neighborsOnly)void layoutCurrentProcedure();
+  },
+  onViewDetails(id){openNodeFocus(id);},
+  onEnterChild(_caller,procedureId){if(state.procedures?.has(procedureId))void showProcedure(procedureId);},
+  onToggleBranches(id){
+    if(!isRootPath()||!getProcedure()?.nodes.some(node=>node.id===id))return;
+    state.rootPathMode="custom";
+    if(state.expandedNodes.has(id))state.expandedNodes.delete(id);
+    else state.expandedNodes.add(id);
+    void layoutCurrentProcedure({anchorId:id});
+  },
+  onReconnect(routeId,sourceId,targetId){prepareReconnect(routeId,sourceId,targetId);},
+  onCreateRoute(connection){prepareRouteCreation(connection);},
+  onAmbiguousReconnect(){status("Bundle 含多个 Outcome。请先选中具体 Route 再重连");}
+});
+const nodeFocusCanvas=mountNodeFocusCanvas($("nodeFocusFlow"),{
+  onPivot:id=>openNodeFocus(id),
+  onSource:line=>{
+    status("正在打开原生 Source 并定位到第 "+line+" 行…");
+    vscode.postMessage({type:"revealSourceLine",line});
+  }
+});
+function repaint(){
+  publishSelection();
+  updateGraphTools();
+  if(state.graph&&!state.nodeFocusId){
+    const selected=state.selection?.kind==="node"?state.selection.id:null;
+    const options=selected&&!state.routeProposal&&state.languageTarget!=="v1alpha4"
+      ?addRouteOutcomeOptions(state.text,state.procedureId,selected):null;
+    const routeCreationSourceId=options?.outcomes?.length?selected:null;
+    canvas.render(state.graph,state.procedures.get(state.procedureId),
+      state.selection,state.showAllLabels,routeCreationSourceId);
+  }
+}
+function option(select,text,value){
+  const o=document.createElement("option");
+  o.value=value;o.textContent=text;
+  select.appendChild(o);
+}
+function getProcedure(){return state.procedures?.get(state.procedureId)??null;}
+function isRootPath(){
+  return Boolean(state.procedures&&state.procedureId===state.entry&&!state.neighborsOnly);
+}
+function updateGraphTools(){
+  $("graphTools").hidden=!state.procedures||Boolean(state.nodeFocusId);
+  const root=isRootPath()&&!state.nodeFocusId&&state.languageTarget!=="v1alpha4";
+  $("rootPathToolbar").hidden=!root;
+  $("rootPathFilters").hidden=!root||state.rootPathMode!=="custom";
+  $("rootPathMode").value=state.rootPathMode;
+  $("layoutDirection").value=state.layoutDirection;
+  for(const [id,key] of [["pathFailure","failure"],["pathUncertain","uncertain"],
+    ["pathRecovery","recovery"]])$(""+id).checked=state.pathCategories.has(key);
+  for(const [id,value] of [["neighborsOnly",state.neighborsOnly],
+    ["showAllLabels",state.showAllLabels]])
+    $(""+id).setAttribute("aria-pressed",String(value));
+}
+function fitGraph(){
+  if(!state.graph||state.nodeFocusId)return;
+  if(state.fitMode!=="all"&&canvas.fitAxis(state.fitMode))return;
+  canvas.fit();
+}
+function clearNodeFocus(){
+  focusTicket++;
+  state.nodeFocusId=null;
+  nodeFocusCanvas.clear();
+  $("nodeFocus").hidden=true;
+  $("reactFlowRoot").hidden=false;
+  updateGraphTools();
+}
+function closeNodeFocus(){
+  if(!state.nodeFocusId)return;
+  clearNodeFocus();
+  renderRoutes({preserveSelection:true});
+  requestAnimationFrame(fitGraph);
+  status("已返回 Procedure 流程图；Source 未被修改。");
+}
+function openNodeFocus(id){
+  const procedure=getProcedure();
+  const node=procedure?.nodes.find(item=>item.id===id);
+  if(!procedure||!node)return;
+  let local;
+  try{local=projectNodeFocusFlow(procedure,id);}
+  catch(error){
+    status("节点局部图不可用："+String(error?.message??error));
+    return;
+  }
+  if(!local)return;
+  const ticket=++focusTicket;
+  state.nodeFocusId=id;
+  state.selection={kind:"node",id};
+  publishSelection();
+  state.pending=null;state.pendingKind=null;state.routeProposal=null;
+  $("reactFlowRoot").hidden=true;
+  $("nodeFocus").hidden=false;
+  $("patch").hidden=true;
+  updateGraphTools();
+  $("nodeFocusTitle").textContent=node.id;
+  $("nodeFocusSubtitle").textContent=
+    state.procedureId+" · "+node.operator.toUpperCase()+" · L"+node.line;
+  $("nodeFocusStats").textContent=local.previousCount+" 上一跳 / "+
+    local.nextCount+" 下一跳 · "+local.originalRouteCount+
+    " 条真实 Route（灰线仅表示内部阶段顺序）"+
+    (!local.previousCount?" · 无上一跳":"")+
+    (!local.nextCount?" · 无下一跳":"");
+  const children=$("nodeFocusChildren");
+  children.replaceChildren();
+  for(const ref of node.children??[]){
+    if(!state.procedures?.has(ref.procedure))continue;
+    const enter=document.createElement("button");
+    enter.type="button";
+    enter.className="node-focus-subflow";
+    enter.textContent="进入子流程 · "+ref.procedure;
+    enter.title=ref.via+" · L"+ref.line;
+    enter.addEventListener("click",()=>void showProcedure(ref.procedure));
+    children.appendChild(enter);
+  }
+  nodeFocusCanvas.clear();
+  status("正在布局 "+id+" 的上一跳、PRE/OP/POST 与下一跳…");
+  layoutProcedureELK(local,{direction:"RIGHT",dimensions:local.dimensions})
+    .then(layout=>{
+      if(ticket!==focusTicket||state.nodeFocusId!==id||
+         getProcedure()!==procedure||$("nodeFocus").hidden)return;
+      nodeFocusCanvas.render(local,layout);
+      status(id+" · "+local.previousCount+" 上一跳 / "+
+        local.nextCount+" 下一跳 / "+local.originalRouteCount+
+        " 条真实 Route · 只读局部视图");
+    })
+    .catch(error=>{
+      if(ticket!==focusTicket||state.nodeFocusId!==id)return;
+      nodeFocusCanvas.clear();
+      $("nodeFocusStats").textContent=
+        "局部图布局不可用："+String(error?.message??error);
+      status("节点局部图布局失败；原始 YAML 未修改。");
+    });
+}
+function routeChoices(routeId){
+  const procedure=getProcedure();
+  if(!procedure||state.languageTarget==="v1alpha4")return [];
+  return routeTargetChoices(procedure,routeId);
+}
+function refreshTargets(){
+  state.pending=null;state.pendingKind=null;
+  $("commit").disabled=true;$("diff").textContent="";
+  const procedure=getProcedure(),routeId=$("routeList").value;
+  const route=procedure?.routes.find(r=>r.id===routeId);
+  const targets=route?routeChoices(routeId).filter(x=>x!==route.target):[];
+  const menu=$("targetList");
+  menu.replaceChildren();
+  for(const name of targets)option(menu,name,name);
+  $("preview").disabled=!targets.length;
+  if(!route)status("请选择一个明确的 Route；多 Outcome Bundle 不会自动选择第一条");
+  else if(!targets.length)status("该 Route 不满足当前 Source-backed Patch 资格；仍可原生编辑 YAML");
+  if(route)state.selection={kind:"route",id:route.id};
+  repaint();
+}
+function renderRoutes({preserveSelection=false}={}){
+  if(state.languageTarget==="v1alpha4"){
+    $("patch").hidden=true;
+    state.pending=null;state.pendingKind=null;state.routeProposal=null;
+    $("commit").disabled=true;$("diff").textContent="";
+    return;
+  }
+  const previousSelection=state.selection;
+  const procedure=getProcedure(),list=$("routeList");
+  list.replaceChildren();
+  option(list,"请选择一个 Route","");
+  let routeCount=0;
+  for(const route of procedure?.routes??[]){
+    const usable=routeChoices(route.id).some(x=>x!==route.target);
+    if(usable){
+      option(list,route.source+" / "+route.outcome+
+        " ["+route.routeSource+"] → "+route.target,route.id);
+      routeCount++;
+    }
+  }
+  const selectedRoute=previousSelection?.kind==="route"
+    ?previousSelection.id:"";
+  list.value=selectedRoute&&[...list.options].some(item=>item.value===selectedRoute)
+    ?selectedRoute:"";
+  const hasProposal=Boolean(state.routeProposal);
+  $("existingRouteEditor").hidden=hasProposal||!routeCount;
+  $("newRouteEditor").hidden=!hasProposal;
+  $("patch").hidden=Boolean(state.nodeFocusId)||(!hasProposal&&!routeCount);
+  if(hasProposal){
+    const intent=state.routeProposal.intent;
+    const outcome=$("newRouteOutcome");
+    outcome.replaceChildren();
+    option(outcome,"请选择已观察 Outcome","");
+    for(const value of intent.outcomes)option(outcome,value,value);
+    outcome.value="";
+    $("newRouteSummary").textContent=intent.sourceId+" → "+intent.targetId+
+      " · operator.on · 候选仅来自当前 Source 的同类 Operator，不代表 Runtime 资格";
+    $("newRoutePreview").disabled=true;
+    state.pending=null;state.pendingKind=null;
+    $("commit").disabled=true;$("diff").textContent="";
+  }else if(routeCount&&list.value){
+    refreshTargets();
+  }else{
+    const targets=$("targetList");
+    targets.replaceChildren();
+    $("preview").disabled=true;
+    state.pending=null;state.pendingKind=null;
+    $("commit").disabled=true;$("diff").textContent="";
+    if(preserveSelection&&previousSelection?.kind==="node")
+      state.selection=previousSelection;
+    else if(previousSelection?.kind!=="node"&&previousSelection?.kind!=="bundle")
+      state.selection=null;
+    repaint();
+  }
+}
+function prepareRouteCreation(connection){
+  if(state.languageTarget==="v1alpha4"){
+    status("CA-SL v1alpha4 Route 为只读视图；不能使用旧语法 Patch。");
+    return;
+  }
+  if(state.nodeFocusId||!state.graph||!state.procedures?.has(state.procedureId)){
+    status("当前视图不能创建 Route");
+    return;
+  }
+  try{
+    const intent=proposeCanvasRouteConnection({
+      source:state.text,procedureId:state.procedureId,
+      sourceId:connection.source,targetId:connection.target,
+      sourceHandle:connection.sourceHandle,targetHandle:connection.targetHandle
+    });
+    state.routeProposal={
+      intent,sourceHandle:connection.sourceHandle,targetHandle:connection.targetHandle
+    };
+    state.pending=null;state.pendingKind=null;
+    state.selection={kind:"node",id:intent.sourceId};
+    renderRoutes();repaint();
+    status("连线只生成了提案；请选择明确的 Outcome，再预览 Diff。YAML 尚未修改。");
+  }catch(error){
+    state.routeProposal=null;
+    renderRoutes();repaint();
+    status("新建 Route 未应用："+String(error?.message??error));
+  }
+}
+function prepareReconnect(routeId,sourceId,targetId){
+  if(state.languageTarget==="v1alpha4"){
+    status("CA-SL v1alpha4 Route 目标不可通过旧版 Patch 修改。");
+    return;
+  }
+  const route=getProcedure()?.routes.find(item=>item.id===routeId);
+  if(!route||route.source!==sourceId){
+    status("重连拒绝：只允许保留原 Route Source 的目标变更");
+    return;
+  }
+  if(targetId===route.target){
+    status("重连未产生变化：目标仍是原 Node");
+    return;
+  }
+  if(!routeChoices(routeId).includes(targetId)){
+    status("重连拒绝：目标不在当前 Source-backed Patch 允许范围");
+    return;
+  }
+  state.routeProposal=null;state.pending=null;state.pendingKind=null;
+  state.selection={kind:"route",id:routeId};
+  renderRoutes();
+  $("routeList").value=routeId;
+  refreshTargets();
+  if([...$("targetList").options].some(item=>item.value===targetId))
+    $("targetList").value=targetId;
+  repaint();
+  status("重连只选择了新目标；请检查 Route Diff 并显式确认。");
+}
+async function layoutCurrentProcedure({anchorId=null}={}){
+  const procedure=getProcedure();
+  if(!procedure)return;
+  const ticket=++epoch;
+  const started=performance.now();
+  const anchor=anchorId?canvas.captureNodeAnchor(anchorId):null;
+  const focus=state.neighborsOnly&&state.selection?.kind==="node"?state.selection.id:null;
+  const pathFocus=isRootPath()&&state.languageTarget!=="v1alpha4"?{
+    mode:state.rootPathMode,categories:[...state.pathCategories],
+    expandedNodes:[...state.expandedNodes]
+  }:null;
+  const key=JSON.stringify([state.version,state.procedureId,state.layoutDirection,focus,pathFocus]);
+  const cacheHit=layouts.has(key);
+  status("ELK 正在布局 "+state.procedureId+"（不修改 YAML）…");
+  try{
+    const graph=cacheHit?layouts.get(key):await layoutProcedureELK(procedure,{
+      direction:state.layoutDirection,focus,neighborsOnly:Boolean(focus),pathFocus
+    });
+    if(ticket!==epoch)return;
+    if(!cacheHit){
+      if(layouts.size>=32)layouts.delete(layouts.keys().next().value);
+      layouts.set(key,graph);
+    }
+    state.graph=graph;
+    repaint();
+    // When the clicked card expands or collapses, keep it at the same screen
+    // coordinates and zoom. Other toolbar actions intentionally refit.
+    if(!anchor||!canvas.restoreNodeAnchor(anchor,graph))fitGraph();
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ticket===epoch){
+      const timing={type:"rendered",version:state.version,projectionMs,
+        layoutMs:performance.now()-started,cacheHit};
+      $("reactFlowRoot").dataset.studioTiming=JSON.stringify(timing);
+      vscode.postMessage(timing);
+    }}));
+    const visible=graph.visibleRoutes?.length??procedure.routes.length;
+    const summary=graph.filterReason??(graph.isFiltered
+      ?" · 筛选显示 "+visible+"/"+procedure.routes.length+" 条 Route":"");
+    const businessNodeCount=procedure.nodes.filter(node=>!node.viewOnly).length;
+    status(state.procedureId+" · "+businessNodeCount+" Nodes / "+procedure.routes.length+
+      " Outcomes / "+graph.bundles.length+" Bundles"+summary+
+      (state.languageTarget==="v1alpha4"
+        ?" · v1alpha4 Source projection only · not qualified":" · YAML Source 由 IDE 管理"));
+  }catch(error){
+    if(ticket!==epoch)return;
+    status("布局失败："+String(error?.message??error));
+  }
+}
+async function showProcedure(id){
+  if(!state.procedures?.has(id))return;
+  clearNodeFocus();
+  state.procedureId=id;state.selection=null;state.graph=null;
+  state.pending=null;state.pendingKind=null;state.routeProposal=null;
+  $("procedureList").value=id;
+  $("patch").hidden=true;
+  renderRoutes();
+  updateGraphTools();
+  await layoutCurrentProcedure();
+}
+function updateGoalSummary(goal,gate){
+  const summary=$("goalSummary");
+  if(!summary)return;
+  $("contractGoal").textContent=goal||"未声明";
+  $("contractGate").textContent=gate
+    ?"GLOBAL PRECONDITION · "+gate:"GLOBAL PRECONDITION · 未声明";
+  $("goalQualification").textContent=
+    "Source projection only · Owner / Capability / Runtime NOT QUALIFIED";
+  summary.hidden=!state.languageTarget||state.languageTarget!=="v1alpha4";
+}
+function receiveSnapshot(data){
+  if(typeof data.text!=="string"||data.text.length>1024*1024||
+     !Number.isSafeInteger(data.version))return;
+  if(data.version===state.version&&data.text===state.text&&
+     data.contractText===state.contractText&&data.predicatesText===state.predicatesText)return;
+  layouts.clear();
+  ++epoch;
+  clearNodeFocus();
+  state={...state,text:data.text,version:data.version,graph:null,selection:null,
+    contractText:data.contractText??null,predicatesText:data.predicatesText??null,
+    languageTarget:"legacy",goal:null,preconditionGate:null,projectionDiagnostics:[],
+    pending:null,pendingKind:null,routeProposal:null};
+  $("revision").textContent="TextDocument v"+data.version;
+  $("patch").hidden=true;
+  const started=performance.now();
+  let model=null;
+  if(isV1Alpha4Procedure(data.text)){
+    const rootUri=String(data.packageRootUri??data.path??"")
+      .replace(/\/assurance\/procedure\.yaml$/,"").replace(/\/$/,"");
+    const packageName=String(data.packageName??rootUri.split("/").at(-1)??"sample");
+    const document=(relativePath,text,version)=>({
+      uri:rootUri+"/"+relativePath,relativePath,text,version
+    });
+    const documents=new Map([
+      ["assurance/procedure.yaml",document("assurance/procedure.yaml",data.text,data.version)]
+    ]);
+    if(typeof data.contractText==="string")
+      documents.set("assurance/contract.yaml",document(
+        "assurance/contract.yaml",data.contractText,data.contractVersion??0));
+    if(typeof data.predicatesText==="string")
+      documents.set("assurance/predicates.yaml",document(
+        "assurance/predicates.yaml",data.predicatesText,data.predicatesVersion??0));
+    const projected=analyzeV1Alpha4Source(documents,packageName);
+    projectionMs=performance.now()-started;
+    state.languageTarget="v1alpha4";
+    state.goal=projected.procedure.goal??null;
+    state.preconditionGate=projected.procedure.precondition??null;
+    state.projectionDiagnostics=projected.diagnostics;
+    updateGoalSummary(state.goal,state.preconditionGate);
+    if(projected.procedure.state!=="READY"||!projected.procedure.procedures.length){
+      state.procedures=null;state.graph=null;state.entry=null;
+      canvas.render(null,null,null,false);updateGraphTools();
+      const first=projected.diagnostics.find(item=>item.relativePath==="assurance/procedure.yaml");
+      status("CA-SL v1alpha4 Source-only · "+
+        (first?.message??"Procedure 尚不能安全投影")+
+        " · Owner / Capability linking NOT QUALIFIED");
+      return;
+    }
+    const sourceProcedure=projected.procedure.procedures[0];
+    const terminalIds=[...new Set(sourceProcedure.routes
+      .map(route=>route.target)
+      .filter(target=>["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(target)))];
+    const terminalNodes=terminalIds.map(id=>({
+      id,operator:"terminal",value:id,line:0,phases:[],children:[],viewOnly:true
+    }));
+    const procedure={...sourceProcedure,nodes:[...sourceProcedure.nodes,...terminalNodes]};
+    model={state:"READY",entry:procedure.name,
+      procedures:new Map([[procedure.name,procedure]])};
+  }else{
+    model=projectWorkspace(data.text);
+    projectionMs=performance.now()-started;
+    updateGoalSummary(null,null);
+  }
+  if(model.state!=="READY"){
+    state.procedures=null;
+    state.graph=null;
+    state.entry=null;
+    canvas.render(null,null,null,false);
+    updateGraphTools();
+    status("Source-only · "+(model.diagnostics?.[0]?.message||"当前 YAML 无法安全投影"));
+    return;
+  }
+  const previous=state.procedureId;
+  state.procedures=model.procedures;
+  state.entry=model.entry;
+  state.expandedNodes.clear();
+  const list=$("procedureList");list.replaceChildren();
+  for(const proc of model.procedures.values()){
+    const count=proc.nodes.filter(node=>!node.viewOnly).length;
+    option(list,proc.name+" ("+count+" Nodes)",proc.name);
+  }
+  void showProcedure(model.procedures.has(previous)?previous:model.entry);
+  if(state.languageTarget==="v1alpha4"){
+    const errors=state.projectionDiagnostics.filter(item=>item.severity==="error").length;
+    status("CA-SL v1alpha4 · "+model.procedures.get(model.entry).nodes.length+
+      " visual Nodes · "+(errors?errors+" source diagnostics":"source shape parsed")+
+      " · Owner / Capability linking NOT QUALIFIED");
+  }
+}
+$("procedureList").addEventListener("change",event=>void showProcedure(event.target.value));
+$("layoutDirection").addEventListener("change",event=>{
+  if(!["DOWN","RIGHT"].includes(event.target.value))return;
+  state.layoutDirection=event.target.value;
+  void layoutCurrentProcedure();
+});
+for(const [id,mode] of [["fit","all"],["fitWidth","width"],["fitHeight","height"]]){
+  $(""+id).addEventListener("click",()=>{state.fitMode=mode;fitGraph();});
+}
+$("zoomIn").addEventListener("click",()=>canvas.zoomIn());
+$("zoomOut").addEventListener("click",()=>canvas.zoomOut());
+$("centerSelection").addEventListener("click",()=>{
+  const id=state.selection?.kind==="node"?state.selection.id:null;
+  if(id&&state.graph?.positions.has(id))canvas.center(id);
+  else fitGraph();
+});
+$("showAllLabels").addEventListener("click",()=>{
+  state.showAllLabels=!state.showAllLabels;
+  repaint();
+});
+$("neighborsOnly").addEventListener("click",()=>{
+  state.neighborsOnly=!state.neighborsOnly;
+  void layoutCurrentProcedure();
+});
+$("rootPathMode").addEventListener("change",event=>{
+  if(!["normal","custom","all"].includes(event.target.value)||!isRootPath())return;
+  state.rootPathMode=event.target.value;
+  void layoutCurrentProcedure();
+});
+for(const [id,key] of [["pathFailure","failure"],["pathUncertain","uncertain"],
+  ["pathRecovery","recovery"]]){
+  $(""+id).addEventListener("change",event=>{
+    if(!isRootPath())return;
+    if(event.target.checked)state.pathCategories.add(key);
+    else state.pathCategories.delete(key);
+    state.rootPathMode="custom";
+    void layoutCurrentProcedure();
+  });
+}
+window.addEventListener("resize",()=>{
+  if(state.nodeFocusId)nodeFocusCanvas.fit();
+  else fitGraph();
+});
+$("routeList").addEventListener("change",()=>{
+  const routeId=$("routeList").value;
+  state.selection=routeId?{kind:"route",id:routeId}:null;
+  refreshTargets();
+  if(routeId)status("已明确选择 "+routeId+"；重连只会改变其目标，不会改动 Route Source。");
+});
+$("targetList").addEventListener("change",()=>{
+  state.pending=null;state.pendingKind=null;
+  $("commit").disabled=true;$("diff").textContent="";
+});
+$("newRouteOutcome").addEventListener("change",()=>{
+  state.pending=null;state.pendingKind=null;
+  $("newRoutePreview").disabled=!$("newRouteOutcome").value;
+  $("commit").disabled=true;$("diff").textContent="";
+});
+$("newRoutePreview").addEventListener("click",()=>{
+  const route=state.routeProposal;
+  if(!route)return;
+  try{
+    const preview=previewCanvasRouteConnection(state.text,route.intent,
+      $("newRouteOutcome").value);
+    state.pending=preview;state.pendingKind="create";
+    $("diff").textContent=preview.diff;
+    $("commit").disabled=false;
+    status("只生成新增 Route 的 Diff；尚未修改文档。请检查后显式确认。");
+  }catch(error){
+    state.pending=null;state.pendingKind=null;
+    $("commit").disabled=true;
+    status("新增 Route 预览失败："+String(error?.message??error));
+  }
+});
+$("newRouteCancel").addEventListener("click",()=>{
+  state.routeProposal=null;state.pending=null;state.pendingKind=null;
+  renderRoutes({preserveSelection:true});repaint();
+  status("已放弃新 Route 提案；YAML 未变化。");
+});
+$("openSource").addEventListener("click",()=>vscode.postMessage({type:"openSource"}));
+$("nodeFocusReturn").addEventListener("click",closeNodeFocus);
+$("nodeFocusFit").addEventListener("click",()=>nodeFocusCanvas.fit());
+$("preview").addEventListener("click",()=>{
+  const procedure=getProcedure();
+  if(!procedure)return;
+  try{
+    const preview=previewTargetPatch(state.text,state.procedureId,
+      $("routeList").value,$("targetList").value);
+    state.pending=preview;
+    $("diff").textContent=preview.diff;
+    $("commit").disabled=false;
+    status("只生成 Diff；尚未修改文件。请检查后显式确认。");
+  }catch(error){
+    state.pending=null;$("commit").disabled=true;
+    status("Patch 预览失败："+String(error?.message??error));
+  }
+});
+$("commit").addEventListener("click",()=>{
+  const p=state.pending;if(!p)return;
+  $("commit").disabled=true;
+  if(state.pendingKind==="create"&&state.routeProposal){
+    const route=state.routeProposal;
+    vscode.postMessage({type:"applyRouteCreation",expectedVersion:state.version,
+      baseSource:state.text,candidateSource:p.candidateSource,diff:p.diff,
+      procedureId:route.intent.procedureId,sourceId:route.intent.sourceId,
+      targetId:route.intent.targetId,sourceHandle:route.sourceHandle,
+      targetHandle:route.targetHandle,outcome:$("newRouteOutcome").value});
+  }else{
+    vscode.postMessage({type:"applyRoute",expectedVersion:state.version,
+      baseSource:state.text,candidateSource:p.candidateSource,
+      procedureId:state.procedureId,routeId:$("routeList").value,
+      newTarget:$("targetList").value});
+  }
+  status("已提交 Patch 请求；等待原生 TextDocument 确认…");
+});
+$("exportPackageZip").addEventListener("click",()=>{
+  vscode.postMessage({type:"exportPackageZip"});
+  status("正在读取当前 Package 并准备 ZIP；不会写入磁盘或覆盖原文件…");
+});
+$("downloadPackageZip").addEventListener("click",downloadPreparedPackageZip);
+$("dismissPackageZip").addEventListener("click",()=>{
+  pendingPackageZip=null;$("zipExportNotice").hidden=true;
+});
+window.addEventListener("message",event=>{
+  const data=event.data;
+  if(!data||typeof data!=="object")return;
+  if(data.type==="packageZipReady"){
+    if(typeof data.filename!=="string"||
+      !/^[A-Za-z0-9._-]{1,100}\.zip$/.test(data.filename)||
+      typeof data.base64!=="string"||
+      !Number.isSafeInteger(data.fileCount)||data.fileCount<1||data.fileCount>64||
+      !Number.isSafeInteger(data.opaqueCount)||data.opaqueCount<0||data.opaqueCount>64){
+      status("Package ZIP 响应无效，已拒绝下载。");return;
+    }
+    pendingPackageZip=data;
+    $("zipExportDetails").textContent=data.filename+" · "+data.fileCount+
+      " 个文件 · "+data.opaqueCount+" 个二进制/不透明文件原样保留";
+    $("zipExportNotice").hidden=false;
+    status("Package ZIP 已准备好；请点击“下载 ZIP”完成浏览器下载。");
+  }
+  else if(data.type==="focusNode"&&data.version===state.version&&state.procedures?.has(data.procedureId)){
+    void showProcedure(data.procedureId).then(()=>openNodeFocus(data.nodeId));
+  }
+  else if(data.type==="snapshot")receiveSnapshot(data);
+  else if(data.type==="error")status("操作失败："+data.message);
+  else if(data.type==="applied")status("WorkspaceEdit 已应用；IDE 负责撤销、保存和文件事件");
+});
+vscode.postMessage({type:"ready"});

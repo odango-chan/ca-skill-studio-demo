@@ -1,0 +1,9 @@
+{
+  "project.welcome": "Welcome to SKILL Studio\n\n[New Project](command:skillStudio.newProject)\n[Open Project](command:skillStudio.openProject)\n[Open Example Project](command:skillStudio.loadExample)\n\n[Skill Language Specification](command:skillStudio.openLanguageSpec) · [Authoring Guide](command:skillStudio.openAuthoringGuide)",
+  "project.new": "SKILL Studio: New Project",
+  "project.open": "SKILL Studio: Open Project",
+  "project.example": "SKILL Studio: Open Example Project",
+  "help.spec": "SKILL Studio: Skill Language Specification",
+  "help.guide": "SKILL Studio: Authoring Guide",
+  "project.welcome.title": "SKILL Studio: Welcome"
+}

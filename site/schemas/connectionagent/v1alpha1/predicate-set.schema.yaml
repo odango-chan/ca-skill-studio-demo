@@ -1,0 +1,74 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: predicate-set.schema.yaml
+title: PredicateSet
+type: object
+required: [apiVersion, kind, metadata, predicates]
+properties:
+  apiVersion:
+    $ref: common.schema.yaml#/$defs/apiVersion
+  kind:
+    const: PredicateSet
+  metadata:
+    type: object
+    required: [skill]
+    properties:
+      skill:
+        $ref: common.schema.yaml#/$defs/skillName
+    additionalProperties: false
+  predicates:
+    type: object
+    minProperties: 1
+    propertyNames:
+      $ref: common.schema.yaml#/$defs/semanticId
+    additionalProperties:
+      $ref: '#/$defs/predicate'
+additionalProperties: false
+$defs:
+  observation:
+    type: object
+    required: [ref, scope, freshness]
+    properties:
+      ref:
+        $ref: common.schema.yaml#/$defs/semanticId
+      scope:
+        type: string
+        minLength: 1
+      freshness:
+        type: string
+        pattern: '^[0-9]+(ms|s|m|h)$'
+      when:
+        type: string
+        minLength: 1
+    additionalProperties: false
+  predicate:
+    type: object
+    required: [observations, evaluator]
+    properties:
+      observations:
+        type: object
+        minProperties: 1
+        propertyNames:
+          pattern: '^[A-Za-z][A-Za-z0-9_-]*$'
+        additionalProperties:
+          $ref: '#/$defs/observation'
+      evaluator:
+        oneOf:
+          - type: object
+            required: [type, expression]
+            properties:
+              type:
+                const: cel
+              expression:
+                type: string
+                minLength: 1
+            additionalProperties: false
+          - type: object
+            required: [type, ref]
+            properties:
+              type:
+                const: script
+              ref:
+                type: string
+                pattern: '^skill\.[a-z0-9][a-z0-9]*(?:-[a-z0-9]+)*$'
+            additionalProperties: false
+    additionalProperties: false

@@ -1,0 +1,179 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { projectProcedure, layoutProcedure } from "../site/graph.mjs";
+
+const fixture = readFileSync(new URL("../site/samples/ensure-pdu-session.procedure.yaml", import.meta.url), "utf8");
+
+test("fixed Demo ensure source projects exact 11 nodes, 24 route entries, 5 terminals", () => {
+  const result = projectProcedure(fixture);
+  assert.equal(result.state, "READY", JSON.stringify(result.diagnostics));
+  const proc = result.procedure;
+  assert.equal(proc.name, "ensure-session");
+  assert.equal(proc.start, "observe-target-session");
+  assert.equal(proc.nodes.length, 11);
+  assert.equal(proc.routes.length, 24);
+  assert.equal(proc.nodes.filter(n => n.operator === "terminal").length, 5);
+  assert.equal(proc.nodes.find(n => n.id === "reconcile-create").operator, "call");
+  assert.equal(proc.nodes.find(n => n.id === "reconcile-create").value, "pdu_session.reconcile");
+  assert.equal(new Set(proc.routes.map(r => r.id)).size, 24);
+});
+
+test("fail-closed decision edges retain exact outcome and target", () => {
+  const proc = projectProcedure(fixture).procedure;
+  const route = (node, outcome) => proc.routes.find(r => r.source === node && r.outcome === outcome);
+  assert.equal(route("observe-session-absence", "PASS").target, "create-session");
+  assert.equal(route("observe-session-absence", "UNKNOWN").target, "unresolved");
+  assert.equal(route("create-session", "OUTCOME_UNKNOWN").target, "reconcile-create");
+  assert.equal(route("reconcile-create", "NOT_COMMITTED").target, "retry-create-session");
+  assert.equal(route("retry-create-session", "OUTCOME_UNKNOWN").target, "unresolved");
+});
+
+test("CRLF/UTF-8 BOM input can be read without rewriting input source", () => {
+  const text = "\uFEFF" + fixture.replace(/\n/g, "\r\n");
+  assert.equal(projectProcedure(text).state, "READY");
+  assert.ok(text.includes("\r\n"));
+});
+
+test("invalid target never becomes a plausible graph", () => {
+  const broken = fixture.replace("PASS: done", "PASS: missing-target");
+  const parsed = projectProcedure(broken);
+  assert.equal(parsed.state, "UNAVAILABLE");
+  assert.match(parsed.diagnostics[0].message, /悬空/);
+});
+
+test("duplicate outcome refuses projection", () => {
+  const broken = fixture.replace("FAIL: observe-session-absence", "PASS: observe-session-absence");
+  assert.equal(projectProcedure(broken).state, "UNAVAILABLE");
+});
+
+test("unknown node property refuses semantic projection", () => {
+  const broken = fixture.replace("verify: pdu_session.absent", "mystery: pdu_session.absent");
+  assert.equal(projectProcedure(broken).state, "UNAVAILABLE");
+});
+
+test("Demo transitional phases are source-only", () => {
+  const broken = fixture.replace("verify: pdu_session.absent", "verify: pdu_session.absent\n        preconditions:");
+  const parsed = projectProcedure(broken);
+  assert.equal(parsed.state, "UNAVAILABLE");
+  assert.match(parsed.diagnostics[0].message, /Transitional Phase/);
+});
+
+test("multiple procedures intentionally unsupported until child drill-in", () => {
+  const broken = fixture + "\n  extra-procedure:\n    start: step\n";
+  const parsed = projectProcedure(broken);
+  assert.equal(parsed.state, "UNAVAILABLE");
+  assert.match(parsed.diagnostics[0].message, /多 Procedure/);
+});
+
+test("layout positions all nodes and bundles only visual edges", () => {
+  const proc = projectProcedure(fixture).procedure;
+  const layout = layoutProcedure(proc);
+  assert.equal(layout.positions.size, proc.nodes.length);
+  assert.equal(layout.bundles.reduce((sum, edge) => sum + edge.routes.length, 0), 24);
+  assert.ok(layout.width > 400 && layout.height > 200);
+  assert.ok([...layout.positions.values()].every(pos => Number.isFinite(pos.x) && Number.isFinite(pos.y)));
+});
+
+test("duplicate on mapping is not silently projected as one map", () => {
+  const broken = fixture.replace(
+    "          PASS: done\n          FAIL: observe-session-absence",
+    "          PASS: done\n        'on':\n          FAIL: observe-session-absence"
+  );
+  const result = projectProcedure(broken);
+  assert.equal(result.state, "UNAVAILABLE");
+  assert.match(result.diagnostics[0].message, /重复 YAML 字段|YAML 解析失败/);
+});
+
+
+test("CST source map locates every route scalar in the original YAML", () => {
+  const parsed = projectProcedure(fixture);
+  assert.equal(parsed.state, "READY", JSON.stringify(parsed.diagnostics));
+  for (const route of parsed.procedure.routes) {
+    assert.ok(route.sourceSpan);
+    assert.equal(fixture.slice(route.sourceSpan.start, route.sourceSpan.end), route.target);
+    assert.equal(route.patchable, true);
+    const before = fixture.slice(0, route.sourceSpan.start);
+    assert.equal(route.line, before.split("\n").length);
+  }
+});
+
+test("YAML 1.2 treats unquoted on as a string key, preserving core booleans", () => {
+  const src = fixture.replaceAll("'on':", "on:");
+  const parsed = projectProcedure(src);
+  assert.equal(parsed.state, "READY", JSON.stringify(parsed.diagnostics));
+  assert.equal(parsed.procedure.routes.length, 24);
+});
+
+test("duplicate YAML keys in nested mapping fail closed", () => {
+  const src = fixture.replace(
+    "          supi:\n            from: input.supi",
+    "          supi:\n            from: input.supi\n            from: input.dnn"
+  );
+  const result = projectProcedure(src);
+  assert.equal(result.state, "UNAVAILABLE");
+  assert.match(result.diagnostics[0].message, /YAML 解析失败|重复 YAML/);
+});
+
+test("malformed YAML never retains a READY projection", () => {
+  const src = fixture.replace("          FAIL: failed", "          FAIL: [failed");
+  assert.equal(projectProcedure(src).state, "UNAVAILABLE");
+});
+
+test("aliases and anchors are not admitted for Visual modification", () => {
+  const anchored = fixture.replace(
+    "verify: pdu_session.absent", "verify: &whichPredicate pdu_session.absent"
+  );
+  const aliased = fixture.replace(
+    "verify: pdu_session.absent", "verify: *whichPredicate"
+  );
+  assert.equal(projectProcedure(anchored).state, "UNAVAILABLE");
+  assert.equal(projectProcedure(aliased).state, "UNAVAILABLE");
+});
+
+test("multi-document YAML, unsafe tags and unsupported phases refuse the graph", () => {
+  assert.equal(projectProcedure(fixture + "\n---\nprocedures: {}\n").state, "UNAVAILABLE");
+  assert.equal(projectProcedure(fixture.replace("terminal: FAILED","terminal: !!str FAILED")).state, "UNAVAILABLE");
+  assert.equal(projectProcedure(fixture.replace("verify: pdu_session.absent","verify: pdu_session.absent\n        postconditions: {}")).state, "UNAVAILABLE");
+});
+
+test("unsupported quoted target stays projectable but is not patchable", () => {
+  const src = fixture.replace("          FAIL: failed\n          UNKNOWN: unresolved", "          FAIL: 'failed'\n          UNKNOWN: unresolved");
+  const parsed = projectProcedure(src);
+  assert.equal(parsed.state, "READY", JSON.stringify(parsed.diagnostics));
+  assert.equal(parsed.procedure.routes.find(r => r.id === "verify-created-target:FAIL").patchable, false);
+});
+
+test("basic fallback supports vertical direction without losing any graph node or route",()=>{
+  const proc=projectProcedure(fixture).procedure;
+  const right=layoutProcedure(proc,"RIGHT");
+  const down=layoutProcedure(proc,"DOWN");
+  assert.equal(right.direction,"RIGHT");
+  assert.equal(down.direction,"DOWN");
+  assert.deepEqual([...right.positions.keys()],[...down.positions.keys()]);
+  assert.equal(down.bundles.reduce((sum,b)=>sum+b.routes.length,0),proc.routes.length);
+  assert.ok(down.width>0&&down.height>0);
+  assert.ok([...down.positions.values()].every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)));
+  assert.notDeepEqual(right.positions.get(proc.nodes[1].id),down.positions.get(proc.nodes[1].id));
+  assert.throws(()=>layoutProcedure(proc,"SIDEWAYS"),/Unsupported/);
+});
+
+
+test("basic layout preserves Route origin boundaries even for identical endpoints",()=>{
+  const proc=projectProcedure(fixture).procedure;
+  const a=proc.start,b=proc.routes.find(r=>r.source===a).target;
+  const synthetic={...proc,routes:[
+    {id:"same:operator",source:a,target:b,outcome:"PASS",routeSource:"operator.on"},
+    {id:"same:post",source:a,target:b,outcome:"PASS",routeSource:"postconditions.on"}
+  ]};
+  for(const direction of ["DOWN","RIGHT"]){
+    const graph=layoutProcedure(synthetic,direction);
+    assert.equal(graph.positions.size,proc.nodes.length);
+    assert.equal(graph.bundles.length,2);
+    assert.deepEqual(graph.bundles.map(x=>x.routeSource),
+      ["operator.on","postconditions.on"]);
+    assert.deepEqual(graph.bundles.map(x=>x.routes[0].id),
+      ["same:operator","same:post"]);
+    assert.equal(graph.bundles.reduce((sum,x)=>sum+x.routes.length,0),2);
+  }
+});

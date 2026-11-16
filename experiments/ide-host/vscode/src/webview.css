@@ -1,0 +1,81 @@
+/* The original Procedure Designer styles are imported from site/.
+   Only IDE-host placement and extra native-document toolbar live here. */
+html,body{height:100%;width:100%;margin:0;padding:0;overflow:hidden;background:#f7f9fc;color:#29465c}
+body{display:flex;flex-direction:column;font:12px system-ui,-apple-system,sans-serif}
+.spike-head{display:flex;align-items:center;gap:10px;min-height:47px;
+  padding:8px 14px;box-sizing:border-box;background:#fff;border-bottom:1px solid #dfe8ef}
+.spike-head strong{flex:none;color:#196c62}
+.spike-head select{min-width:0;max-width:45%;overflow:hidden;text-overflow:ellipsis}
+.spike-head button{flex:none}
+.spike-head #revision{margin-left:auto;color:#788ca1;white-space:nowrap;font-size:10px}
+.spike-goal{display:flex;align-items:center;gap:9px;flex:none;flex-wrap:wrap;
+  padding:6px 14px;background:#f1f8f5;border-bottom:1px solid #d8e9e0;
+  color:#385f56;min-height:25px}
+.spike-goal[hidden]{display:none}
+.spike-goal-label{font:750 9px/1.2 ui-monospace,Consolas,monospace;
+  letter-spacing:.06em;color:#36806d}
+.spike-goal strong{font:650 11px/1.3 ui-monospace,Consolas,monospace;color:#274c43}
+.spike-goal span:not(.spike-goal-label){font-size:10px;color:#52786c}
+.spike-goal small{margin-left:auto;font-size:9px;color:#8a9a92}
+.spike-head button,.spike-head select,.spike-patch button,.spike-patch select{
+  border:1px solid #d6e3eb;background:#fff;border-radius:6px;padding:6px 8px;
+  color:#31556a;font-size:11px}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.45}
+#message{font-size:11px;padding:8px 14px;background:#eef7f5;color:#386d65;
+  border-bottom:1px solid #dcebe5;min-height:14px}
+.spike-tools{display:flex;flex:none;align-items:center;gap:6px;min-height:37px;
+  box-sizing:border-box;padding:5px 12px;background:#fff;border-bottom:1px solid #dce7ec;
+  overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:thin}
+.spike-tools label,.spike-path-filters label{display:inline-flex;align-items:center;gap:5px;
+  white-space:nowrap;font-size:11px;color:#4f687e}
+.spike-tools button,.spike-tools select{border:1px solid #d6e3eb;background:#fff;
+  border-radius:6px;padding:5px 8px;color:#31556a;font:inherit;flex:none}
+.spike-tools button[aria-pressed="true"]{color:#137b70;border-color:#7bbfb4;
+  background:#e5f5f1}
+.spike-tools button:hover:not(:disabled){background:#edf5f8}
+.spike-tools-separator{height:19px;width:1px;background:#dbe6ec;flex:none;margin:0 3px}
+.spike-path-filters{display:flex;align-items:center;gap:14px;flex:none;flex-wrap:wrap;
+  padding:6px 14px;background:#f4faf8;border-bottom:1px solid #dcebe5}
+.spike-path-filters span{color:#657c8e;font-size:10px}
+#graphTools[hidden],#rootPathFilters[hidden],#rootPathToolbar[hidden]{display:none}
+.spike-pane{flex:1;min-height:130px;width:100%;display:flex;position:relative;overflow:hidden}
+.spike-flow{flex:1;min-height:130px;width:100%;position:relative;background-color:#f7f9fc;
+  background-image:radial-gradient(#cfdae7 .85px,transparent .85px);background-size:22px 22px}
+.spike-flow .react-flow{height:100%;width:100%}
+.spike-flow .designer-node{background:#fff}
+.spike-patch{flex:none;padding:9px 13px;background:#fff;border-top:1px solid #dce7ec;
+  display:flex;align-items:center;flex-wrap:wrap;gap:9px;max-height:230px;overflow:auto}
+.spike-patch[hidden]{display:none}
+.spike-patch strong{font-size:11px;flex:1 0 100%}
+.spike-route-editor{display:flex;align-items:center;flex-wrap:wrap;gap:9px;min-width:0}
+.spike-route-editor[hidden]{display:none}
+.spike-route-create{flex:1 1 100%;padding:7px 9px;border:1px solid #dce7ec;
+  border-radius:7px;background:#f7fafb}
+#newRouteSummary{flex:1 1 100%;font-size:10px;color:#597184}
+.spike-patch label{display:flex;align-items:center;gap:5px;font-size:11px}
+.spike-patch #routeList{max-width:320px}
+.spike-patch #targetList{max-width:170px}
+.spike-patch pre{flex:1 0 100%;white-space:pre-wrap;word-break:break-all;
+  max-height:100px;overflow:auto;padding:7px;background:#f5f8fa;font:10px/1.4 monospace;margin:0}
+.spike-patch pre:empty{display:none}
+@media(max-width:650px){
+  .spike-head{flex-wrap:wrap}.spike-head select{max-width:100%}
+  .spike-patch #routeList{max-width:210px}
+}
+
+.spike-zip-notice{display:flex;align-items:center;gap:9px;flex:none;min-height:36px;
+  padding:5px 12px;box-sizing:border-box;background:#f1faf7;border-bottom:1px solid #d8ebe4}
+.spike-zip-notice[hidden]{display:none}
+.spike-zip-notice span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:#416f67;font-size:11px}
+.spike-zip-notice button{flex:none;border:1px solid #c7e0d7;background:#fff;
+  border-radius:6px;padding:5px 9px;color:#236d5f;font:inherit}
+.spike-zip-notice button:hover{background:#e7f5f0}
+
+.spike-tools button{width:30px;height:28px;padding:4px;display:inline-flex;
+  align-items:center;justify-content:center;flex:none}
+.spike-tools button .studio-icon{width:16px;height:16px;display:block;flex:none}
+.studio-icon{vertical-align:middle}
+.node-focus-back{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.node-focus-back .studio-icon{width:15px;height:15px;flex:none}

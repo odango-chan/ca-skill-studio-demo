@@ -1,0 +1,225 @@
+# Illustrative CA-SL v1alpha4 deterministic DAG, NOT linked to qualified Owners.
+# A missing Owner output / Evidence guarantee MUST block compilation, not be guessed.
+start: check-request
+nodes:
+  check-request:
+    precondition:
+      predicates:
+        - predicate: establishment.request.supported
+          arguments:
+            - context.request.requestType
+            - context.request.requestedPduSessionType
+            - context.request.requestedSscMode
+      routes:
+        PASS: read-udm
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+  read-udm:
+    operation:
+      tool: ca::sbi.udm.sm_data.get
+      arguments:
+        ueRef: context.ueRef
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+        servingPlmn: context.request.servingPlmn
+      routes:
+        SUCCEEDED: check-subscription
+        FAILED: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED
+        DENIED: SAFE_STOPPED
+  check-subscription:
+    precondition:
+      predicates:
+        - predicate: establishment.subscription.usable
+          arguments:
+            - read-udm.operation.output.result
+            - context.request.dnn
+      routes:
+        PASS: bind-udm-hold
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+  bind-udm-hold:
+    operation:
+      tool: ca::ca.session.udm_hold.bind
+      arguments:
+        ueRef: context.ueRef
+        dnn: context.request.dnn
+        snssai: context.request.sNssai
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+      routes:
+        SUCCEEDED: subscribe-udm
+        FAILED: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED
+        DENIED: SAFE_STOPPED
+  subscribe-udm:
+    operation:
+      tool: ca::sbi.udm.sdm_subscription.create
+      arguments:
+        ueRef: context.ueRef
+        udmInvocationRef: read-udm.operation.output.invocationId
+        udmTransactionRef: read-udm.operation.output.result.transactionRef
+        selection: read-udm.operation.output.result.selection
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        waiterRef: bind-udm-hold.operation.output.holdRef
+      routes:
+        SUCCEEDED: bind-pcf-hold
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  bind-pcf-hold:
+    operation:
+      tool: ca::ca.session.pcf_hold.bind
+      arguments:
+        ueRef: context.ueRef
+        pduSessionId: context.request.pduSessionId
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+      routes:
+        SUCCEEDED: read-pcf-inputs
+        FAILED: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED
+        DENIED: SAFE_STOPPED
+  read-pcf-inputs:
+    operation:
+      tool: ca::ca.session.pcf_create_inputs.read
+      arguments:
+        ueRef: context.ueRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        fabricHoldRef: bind-pcf-hold.operation.output.holdRef
+        selection: read-udm.operation.output.result.selection
+      routes:
+        SUCCEEDED: create-pcf
+        FAILED: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED
+        DENIED: SAFE_STOPPED
+  create-pcf:
+    operation:
+      tool: ca::sbi.pcf.sm_policy.create
+      arguments:
+        ueRef: context.ueRef
+        pcfCreateInputsRef: read-pcf-inputs.operation.output.pcfCreateInputsRef
+        selection: read-udm.operation.output.result.selection
+        policyInputs: read-udm.operation.output.result.policyInputs
+        lifecycleRef: context.correlation.lifecycleRef
+        sdmSubscriptionRef: subscribe-udm.operation.output.subscriptionRef
+        waiterRef: bind-pcf-hold.operation.output.holdRef
+      routes:
+        SUCCEEDED: read-operation-context
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  read-operation-context:
+    operation:
+      tool: ca::ca.session.operation_context.read
+      arguments:
+        ueRef: context.ueRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        selection: read-udm.operation.output.result.selection
+        policyResultRef: create-pcf.operation.output.policyResultRef
+        purpose: "N1N2_DELIVERY"
+      routes:
+        SUCCEEDED: prepare-response
+        FAILED: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED
+        DENIED: SAFE_STOPPED
+  prepare-response:
+    operation:
+      tool: ca::ca.session.establishment_response.prepare
+      arguments:
+        operationContextRef: read-operation-context.operation.output.operationContextRef
+        runtimeInvocationRef: read-pcf-inputs.operation.output.runtimeInvocationRef
+        ueRef: context.ueRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        lifecycleRef: context.correlation.lifecycleRef
+        selection: read-udm.operation.output.result.selection
+        policyResultRef: create-pcf.operation.output.policyResultRef
+      routes:
+        SUCCEEDED: bind-n1n2-hold
+        FAILED: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED
+        DENIED: SAFE_STOPPED
+  bind-n1n2-hold:
+    operation:
+      tool: ca::ca.session.n1n2_hold.bind
+      arguments:
+        ueRef: context.ueRef
+        pduSessionId: context.request.pduSessionId
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+      routes:
+        SUCCEEDED: transfer-n1n2
+        FAILED: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED
+        DENIED: SAFE_STOPPED
+  transfer-n1n2:
+    operation:
+      tool: ca::sbi.amf.n1n2.transfer
+      arguments:
+        operationContextRef: read-operation-context.operation.output.operationContextRef
+        runtimeInvocationRef: read-pcf-inputs.operation.output.runtimeInvocationRef
+        ueRef: context.ueRef
+        pduSessionId: context.request.pduSessionId
+        lifecycleRef: context.correlation.lifecycleRef
+        responseArtifactRef: prepare-response.operation.output.responseArtifactRef
+        waiterRef: bind-n1n2-hold.operation.output.holdRef
+        delivery: prepare-response.operation.output
+      routes:
+        SUCCEEDED: await-network-evidence
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  await-network-evidence:
+    operation:
+      tool: ca::ca.session.evidence.await
+      arguments:
+        ueRef: context.ueRef
+        pduSessionId: context.request.pduSessionId
+        pti: context.request.pti
+        requestType: context.request.requestType
+        ingressRef: context.correlation.ingressRef
+        lifecycleRef: context.correlation.lifecycleRef
+        operationContextRef: read-operation-context.operation.output.operationContextRef
+        afterOperationRef: transfer-n1n2.operation.output.operationRef
+      routes:
+        SUCCEEDED: transfer-responsibility
+        FAILED: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED
+        DENIED: SAFE_STOPPED
+  transfer-responsibility:
+    operation:
+      tool: ca::ca.session.resource_responsibility.transfer
+      arguments:
+        lifecycleRef: context.correlation.lifecycleRef
+        disposition: "success"
+      routes:
+        SUCCEEDED: verify-final
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+  verify-final:
+    postcondition:
+      predicates:
+        - predicate: establishment.ran.adopted
+          arguments:
+            - await-network-evidence.operation.output
+        - predicate: establishment.n4.forwarding_ready
+          arguments:
+            - await-network-evidence.operation.output
+        - predicate: establishment.resources.managed
+          arguments:
+            - transfer-responsibility.operation.output
+      routes:
+        PASS: SUCCEEDED
+        FAIL: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED

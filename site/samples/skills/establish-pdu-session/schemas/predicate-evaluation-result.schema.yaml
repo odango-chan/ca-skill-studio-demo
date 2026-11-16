@@ -1,0 +1,28 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: predicate-evaluation-result.schema.yaml
+title: PredicateEvaluationResult
+type: object
+required:
+- result
+- reasonCode
+properties:
+  result:
+    type: string
+    enum:
+    - PASS
+    - FAIL
+    - UNKNOWN
+  reasonCode:
+    type: string
+    pattern: ^[A-Z][A-Z0-9_]*$
+  summary:
+    type: string
+  evidenceUsed:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  details:
+    type: object
+additionalProperties: false

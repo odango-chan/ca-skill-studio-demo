@@ -1,0 +1,879 @@
+procedures:
+  ue-requested-pdu-session-establishment:
+    applicability:
+      predicates:
+        createdsession.ingress.eligible: PASS
+    inputs:
+      ue-ref:
+        type: string
+        from: context.subject.ueRef
+      psi:
+        type: integer
+        from: context.request.pduSessionId
+      pti:
+        type: integer
+        from: context.request.pti
+      request-type:
+        type: integer
+        from: context.request.requestType
+      dnn:
+        type: string
+        from: context.request.dnn
+      slice:
+        type: object
+        from: context.request.sNssai
+      plmn:
+        type: object
+        from: context.request.servingPlmn
+      ingress-ref:
+        type: string
+        from: context.facts.createdsession_ingress
+      lifecycle-ref:
+        type: string
+        from: context.facts.createdsession_lifecycle
+      requested-type:
+        type: string
+        from: context.request.requestedPduSessionType
+      requested-ssc:
+        type: integer
+        from: context.request.requestedSscMode
+
+    start: nudm-sdm-get
+
+    nodes:
+      nudm-sdm-get:
+        call: sbi.udm.sm_data.get
+        with:
+          ueRef:
+            from: input.ue-ref
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.slice
+          servingPlmn:
+            from: input.plmn
+        postconditions:
+          steps:
+            - verify: createdsession.udm.subscription_usable
+              with:
+                udmReadReceipt:
+                  from: nudm-sdm-get.output
+          'on':
+            PASS: nudm-sdm-subscribe
+            FAIL: failed
+            UNKNOWN: unresolved
+        'on':
+          FAILED: failed
+          DENIED: failed
+          UNKNOWN: unresolved
+
+      nudm-sdm-subscribe:
+        preconditions:
+          steps:
+            # Shared procedure data, consumed later by PCF Create and AMF delivery
+            # preparation.
+            - name: select-subscription-configuration
+              script: scripts/select_establishment_configuration.py
+              with:
+                dnn:
+                  from: input.dnn
+                sNssai:
+                  from: input.slice
+                requestedPduSessionType:
+                  from: input.requested-type
+                requestedSscMode:
+                  from: input.requested-ssc
+                udmResult:
+                  from: nudm-sdm-get.output.result
+
+            # UDM Subscribe is answered from UDM-owned evidence only. A PCF
+            # create inputs handle cannot exist yet: the SMF only starts the
+            # PCF create after this subscription is answered, and the held
+            # Fabric PCF hold does not exist before that. Requiring the future
+            # handle here made the subscription depend on its own successor.
+            #
+            # The SMF's own UDM SDM subscription create is held by Fabric. The
+            # Runtime may only present a hold reference Fabric issued for this
+            # exact environment, lifecycle, SUPI, DNN and S-NSSAI. The UDM hold
+            # declares no PDU Session and no policy association, so neither is
+            # required or inferred here.
+            - name: bind-udm-hold
+              call: ca.session.udm_hold.bind
+              with:
+                ueRef:
+                  from: input.ue-ref
+                dnn:
+                  from: input.dnn
+                snssai:
+                  from: input.slice
+                ingressRef:
+                  from: input.ingress-ref
+                lifecycleRef:
+                  from: input.lifecycle-ref
+
+            - verify: createdsession.udm.hold_bound
+              with:
+                udmHoldRef:
+                  from: preconditions.bind-udm-hold.output.holdRef
+
+            - verify: createdsession.ingress.eligible
+            - verify: createdsession.lifecycle.ready
+          'on':
+            FAILED: failed
+            UNRESOLVED: unresolved
+
+        call: sbi.udm.sdm_subscription.create
+        with:
+          # The exact Provider UDM read that this attempt performed. The
+          # Runtime resolves the stored record by subject/invocation/transaction
+          # and refuses a selection that was not derived from it.
+          ueRef:
+            from: input.ue-ref
+          udmInvocationRef:
+            from: nudm-sdm-get.output.invocationId
+          udmTransactionRef:
+            from: nudm-sdm-get.output.result.transactionRef
+          selection:
+            from: preconditions.select-subscription-configuration.output
+          ingressRef:
+            from: input.ingress-ref
+          lifecycleRef:
+            from: input.lifecycle-ref
+          # The subscribe answers exactly the held SMF waiter whose identity was
+          # bound above. The Runtime claims that waiter after its operation
+          # identity and commitment exist, immediately before this mutation.
+          waiterRef:
+            from: preconditions.bind-udm-hold.output.holdRef
+        postconditions:
+          steps:
+            - verify: createdsession.udm.subscription_owned
+          'on':
+            PASS: npcf-sm-policy-control-create
+            FAIL: finalize-failed
+            UNKNOWN: finalize-unresolved
+        'on':
+          NOT_COMMITTED: finalize-failed
+          OUTCOME_UNKNOWN: reconcile-nudm-sdm-subscribe
+          FAILED: finalize-failed
+          DENIED: finalize-failed
+
+      npcf-sm-policy-control-create:
+        preconditions:
+          steps:
+            # PCF Hold Binding. The SMF's original PCF create is held by Fabric
+            # and only exists after UDM Subscribe is answered, so binding it is
+            # a step of the create, not of the subscription. The Runtime may
+            # only present a hold reference Fabric issued and that matches this
+            # exact environment/lifecycle/UE/PDU Session.
+            - name: bind-pcf-hold
+              call: ca.session.pcf_hold.bind
+              with:
+                ueRef:
+                  from: input.ue-ref
+                pduSessionId:
+                  from: input.psi
+                ingressRef:
+                  from: input.ingress-ref
+                lifecycleRef:
+                  from: input.lifecycle-ref
+
+            - verify: createdsession.pcf.hold_bound
+              with:
+                pcfHoldRef:
+                  from: preconditions.bind-pcf-hold.output.holdRef
+                pcfHoldPolicyAssociationRef:
+                  from: preconditions.bind-pcf-hold.output.currentInstanceRef
+
+            # Pre-N4 inputs are prepared from that exact held request. Input
+            # readiness is still only readiness: it never authorizes a create.
+            - name: resolve-pcf-create-inputs
+              call: ca.session.pcf_create_inputs.read
+              with:
+                ueRef:
+                  from: input.ue-ref
+                pduSessionId:
+                  from: input.psi
+                pti:
+                  from: input.pti
+                requestType:
+                  from: input.request-type
+                ingressRef:
+                  from: input.ingress-ref
+                lifecycleRef:
+                  from: input.lifecycle-ref
+                fabricHoldRef:
+                  from: preconditions.bind-pcf-hold.output.holdRef
+                selection:
+                  from: nudm-sdm-subscribe.preconditions.select-subscription-configuration.output
+
+            - verify: createdsession.pcf.create_inputs.ready
+              with:
+                pcfCreateInputsRef:
+                  from: preconditions.resolve-pcf-create-inputs.output.pcfCreateInputsRef
+                runtimeInvocationRef:
+                  from: preconditions.resolve-pcf-create-inputs.output.runtimeInvocationRef
+
+            # Which verified subscription values become PCF policy inputs is a
+            # Skill business choice. The script selects them; the Provider
+            # projection, owner ranges and hold/handle checks stay in the
+            # Backend and are not widened by this output.
+            - name: build-pcf-policy-inputs
+              script: scripts/build_pcf_policy_inputs.py
+              with:
+                subscriptionData:
+                  from: nudm-sdm-subscribe.preconditions.select-subscription-configuration.output.subscriptionData
+                subscriptionSource:
+                  from: nudm-sdm-subscribe.preconditions.select-subscription-configuration.output.subscriptionSource
+
+            # The Pre-N4 baseline is captured immediately before the PCF Create
+            # mutation. It must be a complete exact SMF read for this SUPI/PSI.
+            # Only a proven no-pair state is admissible: an existing pair, an
+            # unavailable read or an ambiguous read blocks the create instead of
+            # being guessed. The baseline is keyed to this exact Pre-N4 policy
+            # association and lifecycle, not to an N4 instance.
+            - verify: createdsession.n4.baseline_clear
+              with:
+                pcfPolicyAssociationRef:
+                  from: preconditions.resolve-pcf-create-inputs.output.pcfPolicyAssociationRef
+                fabricHoldRef:
+                  from: preconditions.bind-pcf-hold.output.holdRef
+
+            # Input readiness above is necessary, not sufficient. A create also
+            # needs a clean resource lifecycle and proof that the original SMF's
+            # competing create was not forwarded. No admitted owner supplies that
+            # evidence yet, so this gate stays UNRESOLVED and blocks the create
+            # instead of being replaced by a locally invented ownership claim.
+            - verify: createdsession.pcf.create_governed
+              with:
+                lifecycleRef:
+                  from: input.lifecycle-ref
+                ingressRef:
+                  from: input.ingress-ref
+            - verify: createdsession.lifecycle.ready
+          'on':
+            FAILED: finalize-failed
+            UNRESOLVED: finalize-unresolved
+
+        call: sbi.pcf.sm_policy.create
+        with:
+          # Explicit business binding; the Runtime cross-checks it against the
+          # trusted ingress subject and the owner Pre-N4 inputs handle below.
+          ueRef:
+            from: input.ue-ref
+          pcfCreateInputsRef:
+            from: preconditions.resolve-pcf-create-inputs.output.pcfCreateInputsRef
+          selection:
+            from: nudm-sdm-subscribe.preconditions.select-subscription-configuration.output
+          policyInputs:
+            from: preconditions.build-pcf-policy-inputs.output
+          lifecycleRef:
+            from: input.lifecycle-ref
+          sdmSubscriptionRef:
+            from: nudm-sdm-subscribe.output.subscriptionRef
+          # The create answers exactly the held SMF waiter whose inputs it read.
+          # The Runtime claims that waiter after its operation identity and
+          # commitment exist, immediately before this mutation.
+          waiterRef:
+            from: preconditions.bind-pcf-hold.output.holdRef
+        postconditions:
+          steps:
+            - verify: createdsession.pcf.association_owned
+          'on':
+            PASS: n4-session-establishment
+            FAIL: finalize-failed
+            UNKNOWN: finalize-unresolved
+        'on':
+          NOT_COMMITTED: finalize-failed
+          OUTCOME_UNKNOWN: reconcile-npcf-sm-policy-control-create
+          FAILED: finalize-failed
+          DENIED: finalize-failed
+
+      n4-session-establishment:
+        procedure: await-initial-n4-session-establishment
+        with:
+          ue-ref:
+            from: input.ue-ref
+          psi:
+            from: input.psi
+          pti:
+            from: input.pti
+          request-type:
+            from: input.request-type
+          ingress-ref:
+            from: input.ingress-ref
+          # The N4 wait is anchored on the Pre-N4 policy association this
+          # attempt created. It deliberately does NOT receive a session
+          # instance: the N4 SEID pair does not exist yet, and a Pre-N4 value
+          # must never be presented as the Post-N4 identity. Resolving the
+          # policy association to the N4 pair is the Post-N4 observation
+          # source's job.
+          pcf-policy-association-ref:
+            from: npcf-sm-policy-control-create.preconditions.resolve-pcf-create-inputs.output.pcfPolicyAssociationRef
+          lifecycle-ref:
+            from: input.lifecycle-ref
+        'on':
+          SUCCEEDED: namf-communication-n1n2-message-transfer
+          FAILED: finalize-failed
+          UNRESOLVED: finalize-unresolved
+
+      namf-communication-n1n2-message-transfer:
+        preconditions:
+          steps:
+            # Shared procedure data, reused by AMF transfer and downstream
+            # RAN/N4 convergence.
+            - name: resolve-effective-session-configuration
+              call: ca.session.operation_context.read
+              with:
+                ueRef:
+                  from: input.ue-ref
+                pduSessionId:
+                  from: input.psi
+                pti:
+                  from: input.pti
+                requestType:
+                  from: input.request-type
+                ingressRef:
+                  from: input.ingress-ref
+                lifecycleRef:
+                  from: input.lifecycle-ref
+                selection:
+                  from: nudm-sdm-subscribe.preconditions.select-subscription-configuration.output
+                policyResultRef:
+                  from: npcf-sm-policy-control-create.output.policyResultRef
+                purpose:
+                  value: nas-and-n2-delivery
+
+            - verify: createdsession.delivery_context.ready
+              with:
+                operationContextRef:
+                  from: preconditions.resolve-effective-session-configuration.output.contextRef
+                runtimeInvocationRef:
+                  from: preconditions.resolve-effective-session-configuration.output.runtimeInvocationRef
+
+            - name: prepare-establishment-response
+              call: ca.session.establishment_response.prepare
+              with:
+                operationContextRef:
+                  from: preconditions.resolve-effective-session-configuration.output.contextRef
+                runtimeInvocationRef:
+                  from: preconditions.resolve-effective-session-configuration.output.runtimeInvocationRef
+                ueRef:
+                  from: input.ue-ref
+                pduSessionId:
+                  from: input.psi
+                pti:
+                  from: input.pti
+                lifecycleRef:
+                  from: input.lifecycle-ref
+                selection:
+                  from: nudm-sdm-subscribe.preconditions.select-subscription-configuration.output
+                policyResultRef:
+                  from: npcf-sm-policy-control-create.output.policyResultRef
+
+            # Which prepared N1/N2 material is delivered is a Skill business
+            # choice. The Script selects the admitted SM profile and the exact
+            # prepared digests for this attempt; the Tool input schema validates
+            # the complete transfer request and the adapter proves the selected
+            # material against its durable prepared-response record.
+            - name: build-n1n2-delivery
+              script: scripts/build_n1n2_delivery.py
+              with:
+                preparedResponse:
+                  from: preconditions.prepare-establishment-response.output
+                operationContextRef:
+                  from: preconditions.resolve-effective-session-configuration.output.contextRef
+                policyResultRef:
+                  from: npcf-sm-policy-control-create.output.policyResultRef
+                pduSessionType:
+                  from: input.requested-type
+
+            # The SMF's own N1/N2 Message Transfer is held by Fabric. Binding it
+            # is a read: it selects the one hold whose published scope is this
+            # exact environment/lifecycle/SUPI/PDU-Session and the operator AMF
+            # target. It is bound after preparation so the short hold budget is
+            # not spent while the NAS/N2 artifact is prepared, and it never
+            # claims or sends anything.
+            - name: bind-n1n2-hold
+              call: ca.session.n1n2_hold.bind
+              with:
+                ueRef:
+                  from: input.ue-ref
+                pduSessionId:
+                  from: input.psi
+                ingressRef:
+                  from: input.ingress-ref
+                lifecycleRef:
+                  from: input.lifecycle-ref
+
+            - verify: createdsession.n1n2.hold_bound
+              with:
+                n1n2HoldRef:
+                  from: preconditions.bind-n1n2-hold.output.holdRef
+
+          'on':
+            FAILED: finalize-failed
+            UNRESOLVED: finalize-unresolved
+
+        call: sbi.amf.n1n2.transfer
+        with:
+          operationContextRef:
+            from: preconditions.resolve-effective-session-configuration.output.contextRef
+          runtimeInvocationRef:
+            from: preconditions.resolve-effective-session-configuration.output.runtimeInvocationRef
+          # Explicit business bindings for this attempt. The Runtime still
+          # cross-checks both against the trusted ingress context and the exact
+          # Fabric hold bound earlier, so a parent-local rename cannot change
+          # which session or subject is sent.
+          ueRef:
+            from: input.ue-ref
+          pduSessionId:
+            from: input.psi
+          lifecycleRef:
+            from: input.lifecycle-ref
+          responseArtifactRef:
+            from: preconditions.prepare-establishment-response.output.responseArtifactRef
+          # The N1/N2 delivery material selected by the admitted Script. The Tool
+          # input schema validates the complete request before dispatch.
+          delivery:
+            from: preconditions.build-n1n2-delivery.output
+          # The transfer answers exactly the held SMF waiter bound above. The
+          # Runtime derives the Agent operation identity and commitment, records
+          # them durably, claims that waiter, and only then dispatches with the
+          # same association.
+          waiterRef:
+            from: preconditions.bind-n1n2-hold.output.holdRef
+        postconditions:
+          steps:
+            - verify: createdsession.amf.transfer_initiated
+              with:
+                amfTransferOperationRef:
+                  from: namf-communication-n1n2-message-transfer.output.operationRef
+          'on':
+            PASS: pdu-session-resource-setup
+            FAIL: finalize-failed
+            UNKNOWN: finalize-unresolved
+        'on':
+          NOT_COMMITTED: finalize-failed
+          OUTCOME_UNKNOWN: reconcile-n1n2-message-transfer
+          FAILED: finalize-failed
+          DENIED: finalize-failed
+
+      pdu-session-resource-setup:
+        procedure: await-pdu-session-resource-setup
+        with:
+          ue-ref:
+            from: input.ue-ref
+          psi:
+            from: input.psi
+          pti:
+            from: input.pti
+          request-type:
+            from: input.request-type
+          ingress-ref:
+            from: input.ingress-ref
+          operation-context-ref:
+            from: namf-communication-n1n2-message-transfer.preconditions.resolve-effective-session-configuration.output.contextRef
+          after-operation-ref:
+            from: namf-communication-n1n2-message-transfer.output.operationRef
+          lifecycle-ref:
+            from: input.lifecycle-ref
+        'on':
+          SUCCEEDED: n4-session-modification
+          FAILED: finalize-failed
+          UNRESOLVED: finalize-unresolved
+
+      n4-session-modification:
+        procedure: await-n4-forwarding-convergence
+        with:
+          ue-ref:
+            from: input.ue-ref
+          psi:
+            from: input.psi
+          pti:
+            from: input.pti
+          request-type:
+            from: input.request-type
+          ingress-ref:
+            from: input.ingress-ref
+          operation-context-ref:
+            from: namf-communication-n1n2-message-transfer.preconditions.resolve-effective-session-configuration.output.contextRef
+          after-operation-ref:
+            from: namf-communication-n1n2-message-transfer.output.operationRef
+          lifecycle-ref:
+            from: input.lifecycle-ref
+        'on':
+          SUCCEEDED: finalize-success
+          FAILED: finalize-failed
+          UNRESOLVED: finalize-unresolved
+
+      # Success is decided by the two core-network facts already verified above:
+      # the SMF adopted the RAN resources and the SMF/UPF downlink forwarding
+      # resources match the same N4 session instance. UE-internal state (NAS
+      # PS-ACTIVE, TUN, ping) is not an Agent-observable business fact and is not
+      # a completion gate.
+      finalize-success:
+        procedure: finalize-resource-responsibility
+        with:
+          ue-ref:
+            from: input.ue-ref
+          psi:
+            from: input.psi
+          pti:
+            from: input.pti
+          request-type:
+            from: input.request-type
+          ingress-ref:
+            from: input.ingress-ref
+          lifecycle-ref:
+            from: input.lifecycle-ref
+          disposition:
+            value: success
+        'on':
+          SUCCEEDED: done
+          FAILED: safe-stopped
+          UNRESOLVED: unresolved
+          SAFE_STOPPED: safe-stopped
+
+      finalize-failed:
+        procedure: finalize-resource-responsibility
+        with:
+          ue-ref:
+            from: input.ue-ref
+          psi:
+            from: input.psi
+          pti:
+            from: input.pti
+          request-type:
+            from: input.request-type
+          ingress-ref:
+            from: input.ingress-ref
+          lifecycle-ref:
+            from: input.lifecycle-ref
+          disposition:
+            value: failed
+        'on':
+          SUCCEEDED: failed
+          FAILED: safe-stopped
+          UNRESOLVED: unresolved
+          SAFE_STOPPED: safe-stopped
+
+      finalize-unresolved:
+        procedure: finalize-resource-responsibility
+        with:
+          ue-ref:
+            from: input.ue-ref
+          psi:
+            from: input.psi
+          pti:
+            from: input.pti
+          request-type:
+            from: input.request-type
+          ingress-ref:
+            from: input.ingress-ref
+          lifecycle-ref:
+            from: input.lifecycle-ref
+          disposition:
+            value: unresolved
+        'on':
+          SUCCEEDED: unresolved
+          FAILED: safe-stopped
+          UNRESOLVED: unresolved
+          SAFE_STOPPED: safe-stopped
+
+      reconcile-nudm-sdm-subscribe:
+        reconcile: nudm-sdm-subscribe
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: safe-stopped
+
+      reconcile-npcf-sm-policy-control-create:
+        reconcile: npcf-sm-policy-control-create
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: safe-stopped
+
+      reconcile-n1n2-message-transfer:
+        reconcile: namf-communication-n1n2-message-transfer
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: safe-stopped
+
+      done:
+        terminal: SUCCEEDED
+      failed:
+        terminal: FAILED
+      unresolved:
+        terminal: UNRESOLVED
+      safe-stopped:
+        terminal: SAFE_STOPPED
+
+  await-initial-n4-session-establishment:
+    inputs:
+      ue-ref:
+        type: string
+        from: context.subject.ueRef
+      psi:
+        type: integer
+        from: context.request.pduSessionId
+      pti:
+        type: integer
+        from: context.request.pti
+      request-type:
+        type: integer
+        from: context.request.requestType
+      ingress-ref:
+        type: string
+        from: context.facts.createdsession_ingress
+      # Pre-N4 anchor of this attempt. It is not a session instance: the N4 pair
+      # is created by the SMF after the policy association.
+      pcf-policy-association-ref:
+        type: string
+        from: context.facts.createdsession_policy_association
+      lifecycle-ref:
+        type: string
+        from: context.facts.createdsession_lifecycle
+    start: await-initial-resources
+    nodes:
+      await-initial-resources:
+        call: ca.session.evidence.await
+        with:
+          ueRef:
+            from: input.ue-ref
+          pduSessionId:
+            from: input.psi
+          pti:
+            from: input.pti
+          requestType:
+            from: input.request-type
+          ingressRef:
+            from: input.ingress-ref
+          pcfPolicyAssociationRef:
+            from: input.pcf-policy-association-ref
+          lifecycleRef:
+            from: input.lifecycle-ref
+          # A proven initial-N4 absence is a real "not yet" owner answer, not an
+          # establishment and not a terminal failure. The bounded wait keeps
+          # polling until evidence appears or its budget/deadline ends; the
+          # Predicate below still decides whether the acquired fact passes.
+          absencePolicy:
+            value: CONTINUE
+        postconditions:
+          steps:
+            - verify: createdsession.n4.initial_resources_ready
+              with:
+                pcfPolicyAssociationRef:
+                  from: input.pcf-policy-association-ref
+          'on':
+            PASS: done
+            FAIL: failed
+            UNKNOWN: unresolved
+        'on':
+          FAILED: unresolved
+          UNKNOWN: unresolved
+          DENIED: failed
+      done:
+        terminal: SUCCEEDED
+      failed:
+        terminal: FAILED
+      unresolved:
+        terminal: UNRESOLVED
+
+  await-pdu-session-resource-setup:
+    inputs:
+      ue-ref:
+        type: string
+        from: context.subject.ueRef
+      psi:
+        type: integer
+        from: context.request.pduSessionId
+      pti:
+        type: integer
+        from: context.request.pti
+      request-type:
+        type: integer
+        from: context.request.requestType
+      ingress-ref:
+        type: string
+        from: context.facts.createdsession_ingress
+      operation-context-ref:
+        type: string
+        from: context.subject.operationContextRef
+      after-operation-ref:
+        type: string
+        from: context.subject.afterOperationRef
+      lifecycle-ref:
+        type: string
+        from: context.facts.createdsession_lifecycle
+    start: await-ran-result
+    nodes:
+      await-ran-result:
+        call: ca.session.evidence.await
+        with:
+          operationContextRef:
+            from: input.operation-context-ref
+          afterOperationRef:
+            from: input.after-operation-ref
+          lifecycleRef:
+            from: input.lifecycle-ref
+          # The SMF-owned RAN adoption state belongs to exactly one attempt
+          # session. The wait must therefore carry the same attempt selector the
+          # createdsession.ran.setup_accepted Predicate uses; an
+          # operation-context handle alone cannot be attributed to a session.
+          ueRef:
+            from: input.ue-ref
+          pduSessionId:
+            from: input.psi
+          pti:
+            from: input.pti
+          requestType:
+            from: input.request-type
+          ingressRef:
+            from: input.ingress-ref
+        postconditions:
+          steps:
+            - verify: createdsession.ran.setup_accepted
+          'on':
+            PASS: done
+            FAIL: failed
+            UNKNOWN: unresolved
+        'on':
+          FAILED: unresolved
+          UNKNOWN: unresolved
+          DENIED: failed
+      done:
+        terminal: SUCCEEDED
+      failed:
+        terminal: FAILED
+      unresolved:
+        terminal: UNRESOLVED
+
+  await-n4-forwarding-convergence:
+    inputs:
+      ue-ref:
+        type: string
+        from: context.subject.ueRef
+      psi:
+        type: integer
+        from: context.request.pduSessionId
+      pti:
+        type: integer
+        from: context.request.pti
+      request-type:
+        type: integer
+        from: context.request.requestType
+      ingress-ref:
+        type: string
+        from: context.facts.createdsession_ingress
+      operation-context-ref:
+        type: string
+        from: context.subject.operationContextRef
+      after-operation-ref:
+        type: string
+        from: context.subject.afterOperationRef
+      lifecycle-ref:
+        type: string
+        from: context.facts.createdsession_lifecycle
+    start: await-forwarding
+    nodes:
+      await-forwarding:
+        call: ca.session.evidence.await
+        with:
+          operationContextRef:
+            from: input.operation-context-ref
+          afterOperationRef:
+            from: input.after-operation-ref
+          lifecycleRef:
+            from: input.lifecycle-ref
+          # Same attempt selector as the createdsession.n4.forwarding_ready
+          # Predicate: the SMF/UPF forwarding state is read for exactly this
+          # UE/PDU Session/PTI/ingress attempt, never for the environment.
+          ueRef:
+            from: input.ue-ref
+          pduSessionId:
+            from: input.psi
+          pti:
+            from: input.pti
+          requestType:
+            from: input.request-type
+          ingressRef:
+            from: input.ingress-ref
+        postconditions:
+          steps:
+            - verify: createdsession.n4.forwarding_ready
+          'on':
+            PASS: done
+            FAIL: failed
+            UNKNOWN: unresolved
+        'on':
+          FAILED: unresolved
+          UNKNOWN: unresolved
+          DENIED: failed
+      done:
+        terminal: SUCCEEDED
+      failed:
+        terminal: FAILED
+      unresolved:
+        terminal: UNRESOLVED
+
+
+  finalize-resource-responsibility:
+    inputs:
+      ue-ref:
+        type: string
+        from: context.subject.ueRef
+      psi:
+        type: integer
+        from: context.request.pduSessionId
+      pti:
+        type: integer
+        from: context.request.pti
+      request-type:
+        type: integer
+        from: context.request.requestType
+      ingress-ref:
+        type: string
+        from: context.facts.createdsession_ingress
+      lifecycle-ref:
+        type: string
+        from: context.facts.createdsession_lifecycle
+      disposition:
+        type: string
+        from: context.subject.resourceDisposition
+    start: transfer
+    nodes:
+      transfer:
+        call: ca.session.resource_responsibility.transfer
+        with:
+          lifecycleRef:
+            from: input.lifecycle-ref
+          disposition:
+            from: input.disposition
+        postconditions:
+          steps:
+            - verify: createdsession.resources.managed
+          'on':
+            PASS: done
+            FAIL: safe-stopped
+            UNKNOWN: unresolved
+        'on':
+          NOT_COMMITTED: safe-stopped
+          OUTCOME_UNKNOWN: reconcile-transfer
+          FAILED: safe-stopped
+          DENIED: safe-stopped
+
+      reconcile-transfer:
+        reconcile: transfer
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: safe-stopped
+
+      done:
+        terminal: SUCCEEDED
+      unresolved:
+        terminal: UNRESOLVED
+      safe-stopped:
+        terminal: SAFE_STOPPED

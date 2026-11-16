@@ -1,0 +1,39 @@
+name: Verify Skill Studio pull requests
+on:
+  pull_request:
+    paths:
+      - 'site/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'AGENTS.md'
+      - '.gitignore'
+      - 'tests/**'
+      - 'extensions/skill-studio-languages/**'
+      - 'extensions/skill-studio-theme/**'
+      - 'language/**'
+      - 'experiments/ide-host/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/pr-verify.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - name: Plugin-managed project and Package Explorer tests
+        run: npm run test:plugin-managed
+      - run: npm run typecheck
+      - name: Install pinned browser LSP client and server dependencies
+        run: |
+          npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
+          npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
+      - name: Build IDE host extensions
+        run: node experiments/ide-host/scripts/build-ide-spike.mjs

@@ -1,0 +1,47 @@
+# Owner-linked business proof descriptors below remain deliberately unqualified.
+predicates:
+  establishment.request.supported:
+    parameters:
+      - requestType: integer
+      - pduType: string
+      - sscMode: integer
+    evaluator:
+      type: cel
+      expression: requestType == 1 && pduType == "IPV4" && sscMode == 1
+  establishment.subscription.usable:
+    parameters:
+      - subscription: ca::urn:example:5gc:udm-subscription:v1
+      - dnn: string
+    evidence:
+      requires:
+        subscription: [ca::udm.subscription-state]
+    evaluator:
+      type: cel
+      expression: subscription.dnn == dnn && subscription.status == "ACTIVE"
+  establishment.ran.adopted:
+    parameters:
+      - network: ca::urn:example:5gc:network-convergence:v1
+    evidence:
+      requires:
+        network: [ca::ran.setup-adopted]
+    evaluator:
+      type: cel
+      expression: network.ranAdopted == true
+  establishment.n4.forwarding_ready:
+    parameters:
+      - network: ca::urn:example:5gc:network-convergence:v1
+    evidence:
+      requires:
+        network: [ca::n4.forwarding-ready]
+    evaluator:
+      type: cel
+      expression: network.forwardingReady == true
+  establishment.resources.managed:
+    parameters:
+      - responsibility: ca::urn:example:5gc:resource-responsibility:v1
+    evidence:
+      requires:
+        responsibility: [ca::resources.durably-managed]
+    evaluator:
+      type: cel
+      expression: responsibility.disposition == "success" && responsibility.managementState == "ACCEPTED"

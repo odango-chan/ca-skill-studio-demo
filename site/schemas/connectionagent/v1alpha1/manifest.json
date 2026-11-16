@@ -1,0 +1,29 @@
+{
+  "schemaFamily": "ConnectionAgent v1alpha1",
+  "ownerRepository": "odango-chan/ca-agent-demo",
+  "ownerSkillCommit": "7570b309a998580a6952352e2bf4b1c19e5c710d",
+  "toolchainSchemaSnapshot": "03a42764ee2a67e39f57ab550b63c7a5d7966199",
+  "vendorSourcePrefix": "tests/contracts/ca-skill-toolchain/03a42764ee2a67e39f57ab550b63c7a5d7966199/",
+  "files": {
+    "common.schema.yaml": {
+      "path": "site/schemas/connectionagent/v1alpha1/common.schema.yaml",
+      "gitBlobSha": "ac6c3cb259b6d303adee44229b36946ab38b1e13"
+    },
+    "skill-contract.schema.yaml": {
+      "path": "site/schemas/connectionagent/v1alpha1/skill-contract.schema.yaml",
+      "gitBlobSha": "bfe688be2d44ce26c621c9a4d6e78af3d933381d"
+    },
+    "predicate-set.schema.yaml": {
+      "path": "site/schemas/connectionagent/v1alpha1/predicate-set.schema.yaml",
+      "gitBlobSha": "e01af3b6bb803e9632eb5ff6ba99bbb87da0bc4e"
+    }
+  },
+  "applicability": {
+    "assurance/contract.yaml": "skill-contract.schema.yaml",
+    "assurance/predicates.yaml": "predicate-set.schema.yaml",
+    "assurance/procedure.yaml": null
+  },
+  "procedureSchemaStatus": "NOT_APPLICABLE_PHASE_PRE_POSTCONDITIONS_MISSING",
+  "localReferencePolicy": "Only the pinned common.schema.yaml is bundled; external schema requests are disabled.",
+  "note": "The three YAML schema files are copied byte-for-byte from the owner-pinned Toolchain snapshot. Runtime and Toolchain qualification remain outside Studio."
+}

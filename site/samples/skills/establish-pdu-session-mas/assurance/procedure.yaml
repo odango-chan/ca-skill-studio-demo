@@ -1,0 +1,836 @@
+procedures:
+  establish-session:
+    inputs:
+      ue:
+        type: string
+        from: context.subject.ueRef
+      ingress:
+        type: string
+        from: context.facts.createdsession_ingress
+      lifecycle:
+        type: string
+        from: context.facts.createdsession_lifecycle
+      pduSessionId:
+        type: integer
+        from: context.request.pduSessionId
+      pti:
+        type: integer
+        from: context.request.pti
+      requestType:
+        type: integer
+        from: context.request.requestType
+      dnn:
+        type: string
+        from: context.request.dnn
+      sNssai:
+        type: object
+        from: context.request.sNssai
+      servingPlmn:
+        type: object
+        from: context.request.servingPlmn
+      requestedPduSessionType:
+        type: string
+        from: context.request.requestedPduSessionType
+      requestedSscMode:
+        type: integer
+        from: context.request.requestedSscMode
+    start: verify-eligible
+    nodes:
+      verify-eligible:
+        verify: mas.establishment.eligible
+        'on':
+          PASS: validate-subscription
+          FAIL: failed
+          UNKNOWN: unresolved
+      validate-subscription:
+        call: ca.pdu_session.subscription.validate
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+        'on':
+          COMMITTED: verify-validate-subscription
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-validate-subscription
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-validate-subscription:
+        verify: mas.establishment.subscription_valid
+        'on':
+          PASS: secondary-auth
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-validate-subscription:
+        reconcile: validate-subscription
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      secondary-auth:
+        call: ca.pdu_session.secondary_auth.disposition
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          subscriptionStateRef:
+            from: validate-subscription.output.stateRef
+          required:
+            value: 0
+        'on':
+          COMMITTED: verify-secondary-auth
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-secondary-auth
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-secondary-auth:
+        verify: mas.establishment.secondary_auth_resolved
+        'on':
+          PASS: create-context
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-secondary-auth:
+        reconcile: secondary-auth
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      create-context:
+        call: ca.pdu_session.context.create
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          subscriptionStateRef:
+            from: validate-subscription.output.stateRef
+          authStateRef:
+            from: secondary-auth.output.stateRef
+          subSummary:
+            from: validate-subscription.output.sub_summary
+        'on':
+          COMMITTED: verify-create-context
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-create-context
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-create-context:
+        verify: mas.establishment.context_ready
+        'on':
+          PASS: register-uecm
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-create-context:
+        reconcile: create-context
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      register-uecm:
+        call: ca.pdu_session.uecm.register
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          contextStateRef:
+            from: create-context.output.stateRef
+          sessionKeys:
+            from: create-context.output.session_keys
+        'on':
+          COMMITTED: verify-register-uecm
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-register-uecm
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-register-uecm:
+        verify: mas.establishment.uecm_registered
+        'on':
+          PASS: create-policy
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-register-uecm:
+        reconcile: register-uecm
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      create-policy:
+        call: ca.pdu_session.policy.create
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          contextStateRef:
+            from: create-context.output.stateRef
+          subscriptionStateRef:
+            from: validate-subscription.output.stateRef
+          sessionKeys:
+            from: create-context.output.session_keys
+        'on':
+          COMMITTED: verify-create-policy
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-create-policy
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-create-policy:
+        verify: mas.establishment.policy_created
+        'on':
+          PASS: select-anchor
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-create-policy:
+        reconcile: create-policy
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      select-anchor:
+        call: ca.pdu_session.anchor.select
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          policyStateRef:
+            from: create-policy.output.stateRef
+        'on':
+          COMMITTED: verify-select-anchor
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-select-anchor
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-select-anchor:
+        verify: mas.establishment.anchor_selected
+        'on':
+          PASS: allocate-address
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-select-anchor:
+        reconcile: select-anchor
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      allocate-address:
+        call: ca.pdu_session.address.allocate
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          anchorStateRef:
+            from: select-anchor.output.stateRef
+          allocator:
+            value: "LOCAL_POOL"
+          upAnchor:
+            from: select-anchor.output.up_anchor
+        'on':
+          COMMITTED: verify-allocate-address
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-allocate-address
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-allocate-address:
+        verify: mas.establishment.address_ready
+        'on':
+          PASS: update-policy
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-allocate-address:
+        reconcile: allocate-address
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      update-policy:
+        call: ca.pdu_session.policy.update
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          contextStateRef:
+            from: create-context.output.stateRef
+          policyStateRef:
+            from: create-policy.output.stateRef
+          addressStateRef:
+            from: allocate-address.output.stateRef
+          sessionKeys:
+            from: create-context.output.session_keys
+          ueAddress:
+            from: allocate-address.output.ue_addr
+          policyAssociationId:
+            from: create-policy.output.policy_assoc_id
+        'on':
+          COMMITTED: verify-update-policy
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-update-policy
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-update-policy:
+        verify: mas.establishment.policy_updated
+        'on':
+          PASS: create-charging
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-update-policy:
+        reconcile: update-policy
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      create-charging:
+        call: ca.pdu_session.charging.create
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          updatedPolicyStateRef:
+            from: update-policy.output.stateRef
+          ratingGroupRefs:
+            value: "default"
+        'on':
+          COMMITTED: verify-create-charging
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-create-charging
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-create-charging:
+        verify: mas.establishment.charging_owned
+        'on':
+          PASS: establish-user-plane
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-create-charging:
+        reconcile: create-charging
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      establish-user-plane:
+        call: ca.pdu_session.user_plane.establish
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          updatedPolicyStateRef:
+            from: update-policy.output.stateRef
+          anchorStateRef:
+            from: select-anchor.output.stateRef
+          addressStateRef:
+            from: allocate-address.output.stateRef
+          upIntent:
+            from: update-policy.output.up_intent
+          upAnchor:
+            from: select-anchor.output.up_anchor
+          ueAddress:
+            from: allocate-address.output.ue_addr
+        'on':
+          COMMITTED: verify-establish-user-plane
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-establish-user-plane
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-establish-user-plane:
+        verify: mas.establishment.initial_resources_ready
+        'on':
+          PASS: confirm-address
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-establish-user-plane:
+        reconcile: establish-user-plane
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      confirm-address:
+        call: ca.pdu_session.address.confirm
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          addressStateRef:
+            from: allocate-address.output.stateRef
+          allocator:
+            value: "LOCAL_POOL"
+          ueAddress:
+            from: allocate-address.output.ue_addr
+        'on':
+          COMMITTED: verify-confirm-address
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-confirm-address
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-confirm-address:
+        verify: mas.establishment.address_confirmed
+        'on':
+          PASS: signal-access
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-confirm-address:
+        reconcile: confirm-address
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      signal-access:
+        call: ca.pdu_session.access.signal
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          contextStateRef:
+            from: create-context.output.stateRef
+          addressStateRef:
+            from: confirm-address.output.stateRef
+          userPlaneStateRef:
+            from: establish-user-plane.output.stateRef
+          sessionKeys:
+            from: create-context.output.session_keys
+          ueAddress:
+            from: allocate-address.output.ue_addr
+          n4Seid:
+            from: establish-user-plane.output.n4_seid
+        'on':
+          COMMITTED: verify-signal-access
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-signal-access
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-signal-access:
+        verify: mas.establishment.ran_accepted
+        'on':
+          PASS: activate-forwarding
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-signal-access:
+        reconcile: signal-access
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      activate-forwarding:
+        call: ca.pdu_session.user_plane.activate
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          userPlaneStateRef:
+            from: establish-user-plane.output.stateRef
+          ranStateRef:
+            from: signal-access.output.stateRef
+          anTunnelTeid:
+            from: signal-access.output.an_tunnel_teid
+          anTunnelIp:
+            from: signal-access.output.an_tunnel_ip
+          n4Seid:
+            from: establish-user-plane.output.n4_seid
+        'on':
+          COMMITTED: verify-activate-forwarding
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-activate-forwarding
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-activate-forwarding:
+        verify: mas.establishment.forwarding_ready
+        'on':
+          PASS: emit-events
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-activate-forwarding:
+        reconcile: activate-forwarding
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      emit-events:
+        call: ca.pdu_session.events.emit
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          contextStateRef:
+            from: create-context.output.stateRef
+          forwardingStateRef:
+            from: activate-forwarding.output.stateRef
+          eventName:
+            value: "ESTABLISHED"
+          sessionKeys:
+            from: create-context.output.session_keys
+        'on':
+          COMMITTED: verify-emit-events
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-emit-events
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-emit-events:
+        verify: mas.establishment.events_accounted
+        'on':
+          PASS: finalize-resources
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-emit-events:
+        reconcile: emit-events
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      finalize-resources:
+        call: ca.pdu_session.resources.finalize
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+          eventsStateRef:
+            from: emit-events.output.stateRef
+          forwardingStateRef:
+            from: activate-forwarding.output.stateRef
+        'on':
+          COMMITTED: verify-finalize-resources
+          NOT_COMMITTED: cleanup
+          OUTCOME_UNKNOWN: reconcile-finalize-resources
+          FAILED: cleanup
+          DENIED: cleanup
+      verify-finalize-resources:
+        verify: mas.establishment.resources_managed
+        'on':
+          PASS: done
+          FAIL: cleanup
+          UNKNOWN: unresolved
+      reconcile-finalize-resources:
+        reconcile: finalize-resources
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      cleanup:
+        call: ca.pdu_session.resources.cleanup
+        with:
+          ueRef:
+            from: input.ue
+          ingressRef:
+            from: input.ingress
+          lifecycleRef:
+            from: input.lifecycle
+          pduSessionId:
+            from: input.pduSessionId
+          pti:
+            from: input.pti
+          requestType:
+            from: input.requestType
+          dnn:
+            from: input.dnn
+          sNssai:
+            from: input.sNssai
+          servingPlmn:
+            from: input.servingPlmn
+          requestedPduSessionType:
+            from: input.requestedPduSessionType
+          requestedSscMode:
+            from: input.requestedSscMode
+        'on':
+          COMMITTED: verify-cleanup
+          NOT_COMMITTED: safe-stopped
+          OUTCOME_UNKNOWN: reconcile-cleanup
+          FAILED: safe-stopped
+          DENIED: safe-stopped
+      verify-cleanup:
+        verify: mas.establishment.cleanup_complete
+        'on':
+          PASS: failed
+          FAIL: safe-stopped
+          UNKNOWN: unresolved
+      reconcile-cleanup:
+        reconcile: cleanup
+        'on':
+          COMMITTED: safe-stopped
+          NOT_COMMITTED: safe-stopped
+          UNRESOLVED: unresolved
+      done:
+        terminal: SUCCEEDED
+      failed:
+        terminal: FAILED
+      unresolved:
+        terminal: UNRESOLVED
+      safe-stopped:
+        terminal: SAFE_STOPPED

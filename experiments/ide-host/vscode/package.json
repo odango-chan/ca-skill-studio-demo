@@ -1,0 +1,585 @@
+{
+  "name": "ca-skill-studio-ide-spike",
+  "displayName": "SKILL Studio IDE Host",
+  "description": "Source-first SKILL authoring, Package Explorer and native editor integration for VS Code-compatible desktop/web hosts, including Theia.",
+  "version": "0.0.1",
+  "publisher": "odango-chan",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "l10n": "./l10n",
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onCommand:skillStudio.openProcedure",
+    "onCustomEditor:skillStudio.procedurePreview",
+    "onCommand:skillStudio.loadExample",
+    "onCommand:skillStudio.newProject",
+    "onCommand:skillStudio.openProject",
+    "onCommand:skillStudio.openLanguageSpec",
+    "onCommand:skillStudio.openAuthoringGuide",
+    "onStartupFinished",
+    "onCommand:skillStudio.auditPackage",
+    "onCommand:skillStudio.exportPackageZip",
+    "onCommand:skillStudio.refreshInspection",
+    "onCommand:skillStudio.renameNode",
+    "onCommand:skillStudio.editNodeOperatorValue",
+    "onCommand:skillStudio.editPhaseInputBinding",
+    "onCommand:skillStudio.editPhaseOutputReference",
+    "onCommand:skillStudio.editPhaseRouteTarget",
+    "onCommand:skillStudio.repairPhaseOutcome",
+    "onCommand:skillStudio.insertNode",
+    "onCommand:skillStudio.deleteNode",
+    "onCommand:skillStudio.addPhaseVerify",
+    "onCommand:skillStudio.editPhaseVerifyStep",
+    "onCommand:skillStudio.renameNamedPhaseStep",
+    "onCommand:skillStudio.restartLanguageService",
+    "onCustomEditor:skillStudio.contractPreview",
+    "onCommand:skillStudio.openContract",
+    "onCustomEditor:skillStudio.predicatePreview",
+    "onCommand:skillStudio.openPredicates",
+    "onCustomEditor:skillStudio.schemaPreview",
+    "onCommand:skillStudio.openSchema",
+    "onCommand:skillStudio.refreshPackages",
+    "onView:skillStudio.packages",
+    "onView:skillStudio.outline",
+    "onView:skillStudio.problems",
+    "onView:skillStudio.inspection",
+    "onCommand:skillStudio.selectProjectRoot",
+    "onCommand:skillStudio.addDependency",
+    "onCommand:skillStudio.refreshDependencies",
+    "onCommand:skillStudio.refreshDependency",
+    "onCommand:skillStudio.updateDependencyLock",
+    "onCommand:skillStudio.removeDependency",
+    "onCommand:skillStudio.inspectDependencyContract",
+    "onCommand:skillStudio.showWelcome"
+  ],
+  "contributes": {
+    "colors": [
+      {
+        "id": "skillStudio.markdownHeading",
+        "description": "SKILL Studio Markdown heading accent, following the active VS Code/Theia color theme.",
+        "defaults": {
+          "light": "#0c8e7b",
+          "dark": "#83d9c4",
+          "highContrastLight": "#075f55",
+          "highContrast": "#a8f0df"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "skillStudio.showWelcome",
+        "title": "%project.welcome.title%"
+      },
+      {
+        "command": "skillStudio.newProject",
+        "title": "%project.new%"
+      },
+      {
+        "command": "skillStudio.openProject",
+        "title": "%project.open%"
+      },
+      {
+        "command": "skillStudio.openLanguageSpec",
+        "title": "%help.spec%"
+      },
+      {
+        "command": "skillStudio.openAuthoringGuide",
+        "title": "%help.guide%"
+      },
+      {
+        "command": "skillStudio.refreshPackages",
+        "title": "SKILL Studio: Refresh Packages"
+      },
+      {
+        "command": "skillStudio.openSchema",
+        "title": "SKILL Studio: Open Schema Visual"
+      },
+      {
+        "command": "skillStudio.openProcedure",
+        "title": "SKILL Studio: Open Procedure Visual"
+      },
+      {
+        "command": "skillStudio.loadExample",
+        "title": "%project.example%"
+      },
+      {
+        "command": "skillStudio.auditPackage",
+        "title": "SKILL Studio: Audit Current Package"
+      },
+      {
+        "command": "skillStudio.exportPackageZip",
+        "title": "SKILL Studio: Export Current Package ZIP"
+      },
+      {
+        "command": "skillStudio.refreshInspection",
+        "title": "SKILL Studio: Refresh Inspection"
+      },
+      {
+        "command": "skillStudio.renameNode",
+        "title": "SKILL Studio: Rename Node"
+      },
+      {
+        "command": "skillStudio.editNodeOperatorValue",
+        "title": "SKILL Studio: Edit Node Operator Value"
+      },
+      {
+        "command": "skillStudio.editPhaseInputBinding",
+        "title": "SKILL Studio: Edit Phase Input Binding"
+      },
+      {
+        "command": "skillStudio.editPhaseOutputReference",
+        "title": "SKILL Studio: Normalize Phase Output Reference"
+      },
+      {
+        "command": "skillStudio.editPhaseRouteTarget",
+        "title": "SKILL Studio: Retarget Existing Phase Failure Route"
+      },
+      {
+        "command": "skillStudio.repairPhaseOutcome",
+        "title": "SKILL Studio: Repair Observed Phase Outcome"
+      },
+      {
+        "command": "skillStudio.insertNode",
+        "title": "SKILL Studio: Insert Node on Route"
+      },
+      {
+        "command": "skillStudio.deleteNode",
+        "title": "SKILL Studio: Delete Node"
+      },
+      {
+        "command": "skillStudio.addPhaseVerify",
+        "title": "SKILL Studio: Add Verify Step"
+      },
+      {
+        "command": "skillStudio.editPhaseVerifyStep",
+        "title": "SKILL Studio: Edit Verify Step"
+      },
+      {
+        "command": "skillStudio.renameNamedPhaseStep",
+        "title": "SKILL Studio: Rename Named Phase Step"
+      },
+      {
+        "command": "skillStudio.restartLanguageService",
+        "title": "SKILL Studio: Restart Language Service"
+      },
+      {
+        "command": "skillStudio.openPredicates",
+        "title": "SKILL Studio: Open Predicate Visual"
+      },
+      {
+        "command": "skillStudio.openContract",
+        "title": "SKILL Studio: Open Contract Visual"
+      },
+      {
+        "command": "skillStudio.selectProjectRoot",
+        "title": "Skill Studio: Select Project Root"
+      },
+      {
+        "command": "skillStudio.addDependency",
+        "title": "Skill Studio: Add Dependency"
+      },
+      {
+        "command": "skillStudio.refreshDependencies",
+        "title": "Skill Studio: Refresh Dependencies"
+      },
+      {
+        "command": "skillStudio.refreshDependency",
+        "title": "Skill Studio: Refresh Upstream Dependency"
+      },
+      {
+        "command": "skillStudio.updateDependencyLock",
+        "title": "Skill Studio: Update Dependency Lock"
+      },
+      {
+        "command": "skillStudio.removeDependency",
+        "title": "Skill Studio: Remove Dependency"
+      },
+      {
+        "command": "skillStudio.inspectDependencyContract",
+        "title": "Skill Studio: Inspect Locked Contract"
+      }
+    ],
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/native-markdown-preview.css"
+    ],
+    "languages": [
+      {
+        "id": "markdown",
+        "aliases": [
+          "Markdown",
+          "markdown"
+        ],
+        "extensions": [
+          ".md",
+          ".markdown"
+        ]
+      }
+    ],
+    "menus": {
+      "editor/title": [],
+      "explorer/context": [
+        {
+          "command": "skillStudio.openSchema",
+          "when": "resourceFilename =~ /\\.schema\\.ya?ml$/",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.openContract",
+          "when": "resourceFilename == contract.yaml",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.openPredicates",
+          "when": "resourceFilename == predicates.yaml",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.openProcedure",
+          "when": "resourceFilename == procedure.yaml",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "skillStudio.refreshPackages",
+          "when": "view == skillStudio.packages",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.loadExample",
+          "when": "view == skillStudio.packages",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.loadExample",
+          "when": "view == workbench.explorer.fileView",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.auditPackage",
+          "when": "view == skillStudio.inspection || view == skillStudio.problems",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.refreshInspection",
+          "when": "view == skillStudio.inspection",
+          "group": "navigation"
+        },
+        {
+          "command": "skillStudio.addDependency",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@3"
+        },
+        {
+          "command": "skillStudio.refreshDependencies",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@4"
+        },
+        {
+          "command": "skillStudio.selectProjectRoot",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@5"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "skillStudio.renameNode",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
+          "group": "1_node"
+        },
+        {
+          "command": "skillStudio.editNodeOperatorValue",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
+          "group": "2_node"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStep",
+          "group": "3_phase"
+        },
+        {
+          "command": "skillStudio.renameNode",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.deletableNode",
+          "group": "1_node"
+        },
+        {
+          "command": "skillStudio.editNodeOperatorValue",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.deletableNode",
+          "group": "2_node"
+        },
+        {
+          "command": "skillStudio.deleteNode",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.deletableNode",
+          "group": "3_node"
+        },
+        {
+          "command": "skillStudio.insertNode",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.route",
+          "group": "1_route"
+        },
+        {
+          "command": "skillStudio.insertNode",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.routeAndPhaseTarget",
+          "group": "1_route"
+        },
+        {
+          "command": "skillStudio.editPhaseRouteTarget",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseRouteTarget",
+          "group": "2_route"
+        },
+        {
+          "command": "skillStudio.editPhaseRouteTarget",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.routeAndPhaseTarget",
+          "group": "2_route"
+        },
+        {
+          "command": "skillStudio.repairPhaseOutcome",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseOutcomeRepair",
+          "group": "6_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStepAndVerify",
+          "group": "3_phase"
+        },
+        {
+          "command": "skillStudio.addPhaseVerify",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseWithVerifyAdd",
+          "group": "4_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStep",
+          "group": "5_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStepAndVerify",
+          "group": "5_phase"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedPhaseStep",
+          "group": "1_phase"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedPhaseStepAndBinding",
+          "group": "1_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedPhaseStepAndBinding",
+          "group": "2_phase"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStep",
+          "group": "1_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStep",
+          "group": "2_phase"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStepAndBinding",
+          "group": "1_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStepAndBinding",
+          "group": "2_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStepAndBinding",
+          "group": "3_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStepAndBinding",
+          "group": "3_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStepAndBinding",
+          "group": "4_phase"
+        },
+        {
+          "command": "skillStudio.editPhaseOutputReference",
+          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseOutputReference",
+          "group": "4_phase"
+        },
+        {
+          "command": "skillStudio.inspectDependencyContract",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
+          "group": "1_inspect"
+        },
+        {
+          "command": "skillStudio.refreshDependency",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
+          "group": "2_refresh"
+        },
+        {
+          "command": "skillStudio.updateDependencyLock",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
+          "group": "3_update"
+        },
+        {
+          "command": "skillStudio.removeDependency",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
+          "group": "4_remove"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "skillStudio.procedurePreview",
+        "displayName": "SKILL Procedure Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/assurance/[p]rocedure.yaml"
+          }
+        ],
+        "priority": "option"
+      },
+      {
+        "viewType": "skillStudio.contractPreview",
+        "displayName": "SKILL Contract Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/assurance/[c]ontract.yaml"
+          }
+        ],
+        "priority": "option"
+      },
+      {
+        "viewType": "skillStudio.predicatePreview",
+        "displayName": "SKILL Predicate Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/assurance/[p]redicates.yaml"
+          }
+        ],
+        "priority": "option"
+      },
+      {
+        "viewType": "skillStudio.schemaPreview",
+        "displayName": "SKILL Schema Visual",
+        "selector": [
+          {
+            "filenamePattern": "**/schemas/*.schema.yaml"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "viewsWelcome": [
+      {
+        "view": "workbench.explorer.fileView",
+        "contents": "%project.welcome%",
+        "when": "workspaceFolderCount == 0"
+      }
+    ],
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "skillStudioInspector",
+          "title": "Inspector",
+          "icon": "icons/skill-studio.svg"
+        }
+      ]
+    },
+    "views": {
+      "skillStudioInspector": [
+        {
+          "id": "skillStudio.inspection",
+          "name": "Inspector"
+        }
+      ],
+      "explorer": [
+        {
+          "id": "skillStudio.packages",
+          "name": "Package Explorer",
+          "visibility": "visible"
+        },
+        {
+          "id": "skillStudio.outline",
+          "name": "Procedure Outline"
+        },
+        {
+          "id": "skillStudio.problems",
+          "name": "Problems"
+        }
+      ]
+    },
+    "configuration": {
+      "id": "connectionAgent.skillStudio",
+      "title": "Skill Studio",
+      "type": "object",
+      "properties": {
+        "connectionAgent.skillStudio.skillsRoot": {
+          "type": "string",
+          "enum": [
+            "skills"
+          ],
+          "default": "skills",
+          "scope": "resource",
+          "markdownDescription": "Project Skill source root. Compiler v0.1 currently accepts skills/."
+        },
+        "connectionAgent.skillStudio.dependencies": {
+          "type": "array",
+          "default": [],
+          "scope": "resource",
+          "items": {
+            "type": "object"
+          },
+          "markdownDescription": "Project dependency declarations. Manage through Package Explorer; source schema is owned by the Compiler contract."
+        },
+        "connectionAgent.skillStudio.dependencyLock": {
+          "type": "object",
+          "default": {
+            "version": "skillc.lock/v0.1",
+            "entries": []
+          },
+          "scope": "resource",
+          "markdownDescription": "Managed pinned dependency lock. Refresh observes drift; Update Lock explicitly changes the pin."
+        },
+        "connectionAgent.skillStudio.defaultBuildTarget": {
+          "type": "string",
+          "enum": [
+            "all"
+          ],
+          "default": "all",
+          "scope": "application",
+          "markdownDescription": "Default target for a future Compiler adapter; does not imply a Build is available."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node ../scripts/build-ide-spike.mjs",
+    "package": "npm run build && npx --yes @vscode/vsce package --no-dependencies"
+  },
+  "files": [
+    "dist/**",
+    "media/**",
+    "README.md",
+    "samples/**",
+    "icons/**"
+  ],
+  "browser": "./dist/extension-web.cjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/odango-chan/ca-skill-studio-demo.git"
+  }
+}

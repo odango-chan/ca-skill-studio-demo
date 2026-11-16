@@ -1,0 +1,95 @@
+{
+  "iconDefinitions": {
+    "_file": {
+      "iconPath": "./file.svg"
+    },
+    "_folder": {
+      "iconPath": "./folder.svg"
+    },
+    "_folder_open": {
+      "iconPath": "./folder-open.svg"
+    },
+    "_skill": {
+      "iconPath": "./skill.svg"
+    },
+    "_yaml": {
+      "iconPath": "./yaml.svg"
+    },
+    "_markdown": {
+      "iconPath": "./markdown.svg"
+    },
+    "_python": {
+      "iconPath": "./python.svg"
+    },
+    "_json": {
+      "iconPath": "./json.svg"
+    },
+    "_shell": {
+      "iconPath": "./shell.svg"
+    },
+    "_text": {
+      "iconPath": "./text.svg"
+    },
+    "_code": {
+      "iconPath": "./code.svg"
+    },
+    "_folder_skills": {
+      "iconPath": "./folder-skills.svg"
+    },
+    "_folder_library": {
+      "iconPath": "./folder-library.svg"
+    },
+    "_folder_output": {
+      "iconPath": "./folder-output.svg"
+    }
+  },
+  "file": "_file",
+  "folder": "_folder",
+  "folderExpanded": "_folder_open",
+  "rootFolder": "_folder",
+  "rootFolderExpanded": "_folder_open",
+  "fileNames": {
+    "SKILL.md": "_skill",
+    "AGENTS.md": "_markdown",
+    "README.md": "_markdown",
+    "procedure.yaml": "_yaml",
+    "contract.yaml": "_yaml",
+    "predicates.yaml": "_yaml",
+    "package.json": "_json"
+  },
+  "fileExtensions": {
+    "yaml": "_yaml",
+    "yml": "_yaml",
+    "md": "_markdown",
+    "markdown": "_markdown",
+    "py": "_python",
+    "pyw": "_python",
+    "json": "_json",
+    "jsonc": "_json",
+    "sh": "_shell",
+    "bash": "_shell",
+    "fish": "_shell",
+    "txt": "_text",
+    "log": "_text",
+    "lrc": "_text",
+    "js": "_code",
+    "mjs": "_code",
+    "cjs": "_code",
+    "ts": "_code",
+    "tsx": "_code",
+    "go": "_code",
+    "css": "_code",
+    "html": "_code",
+    "jsx": "_code"
+  },
+  "folderNames": {
+    "skills": "_folder_skills",
+    "lib": "_folder_library",
+    "output": "_folder_output"
+  },
+  "folderNamesExpanded": {
+    "skills": "_folder_skills",
+    "lib": "_folder_library",
+    "output": "_folder_output"
+  }
+}

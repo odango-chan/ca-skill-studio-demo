@@ -1,0 +1,84 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: transfer-start-evaluation-input.schema.yaml
+title: TransferStartEvaluationInput
+type: object
+required:
+- subject
+- observations
+properties:
+  subject:
+    type: object
+    required:
+    - amfTransferOperationRef
+    properties:
+      amfTransferOperationRef:
+        type: string
+        minLength: 1
+    additionalProperties: true
+  observations:
+    type: object
+    required:
+    - response
+    properties:
+      response:
+        type: object
+        required:
+        - operationRef
+        - networkOutcome
+        properties:
+          operationRef:
+            type: string
+            minLength: 1
+          networkOutcome:
+            type: string
+            enum:
+            - HTTP_RESPONSE
+            - TIMEOUT
+            - TRANSPORT_FAILURE
+          responseOrigin:
+            type: string
+            enum:
+            - TARGET_SERVICE_VIA_SCP
+            - SCP
+            - FABRIC
+            - UNKNOWN
+          captureComplete:
+            type: boolean
+          httpStatus:
+            type: integer
+            minimum: 200
+            maximum: 599
+          cause:
+            # The Provider projects an absent AMF cause as an explicit null.
+            # A definite HTTP error without a cause must still classify as FAIL,
+            # so null is the "no cause provided" value, not a schema violation.
+            type:
+            - string
+            - 'null'
+            minLength: 1
+        allOf:
+        - if:
+            properties:
+              networkOutcome:
+                const: HTTP_RESPONSE
+            required:
+            - networkOutcome
+          then:
+            required:
+            - responseOrigin
+            - captureComplete
+            - httpStatus
+        additionalProperties: true
+    additionalProperties: false
+  evidence:
+    type: object
+    additionalProperties:
+      type: object
+      properties:
+        refs:
+          type: array
+          items:
+            type: string
+            minLength: 1
+      additionalProperties: true
+additionalProperties: true

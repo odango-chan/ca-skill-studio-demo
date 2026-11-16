@@ -1,0 +1,158 @@
+apiVersion: connectionagent.io/v1alpha1
+kind: PredicateSet
+metadata:
+  skill: establish-pdu-session-mas
+predicates:
+  mas.establishment.eligible:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.eligible == true
+  mas.establishment.subscription_valid:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.subscription_valid == true
+  mas.establishment.secondary_auth_resolved:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.secondary_auth_resolved == true
+  mas.establishment.context_ready:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.context_ready == true
+  mas.establishment.uecm_registered:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.uecm_registered == true
+  mas.establishment.policy_created:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.policy_created == true
+  mas.establishment.anchor_selected:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.anchor_selected == true
+  mas.establishment.address_ready:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.address_ready == true
+  mas.establishment.policy_updated:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.policy_updated == true
+  mas.establishment.charging_owned:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.charging_owned == true
+  mas.establishment.initial_resources_ready:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.initial_resources_ready == true
+  mas.establishment.address_confirmed:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.address_confirmed == true
+  mas.establishment.ran_accepted:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.ran_accepted == true
+  mas.establishment.forwarding_ready:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.forwarding_ready == true
+  mas.establishment.events_accounted:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.events_accounted == true
+  mas.establishment.resources_managed:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.resources_managed == true
+  mas.establishment.cleanup_complete:
+    observations:
+      state:
+        ref: mas.establishment.snapshot
+        scope: '{"ueRef": subject.ueRef, "pduSessionId": request.pduSessionId, "ingressRef": facts.createdsession_ingress, "lifecycleRef": facts.createdsession_lifecycle}'
+        freshness: 5s
+    evaluator:
+      type: cel
+      expression: observations.state.cleanup_complete == true

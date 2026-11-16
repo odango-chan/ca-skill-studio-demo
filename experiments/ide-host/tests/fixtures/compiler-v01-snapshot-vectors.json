@@ -1,0 +1,35 @@
+{
+  "version": "skillc/snapshot/v1",
+  "cases": [
+    {
+      "name": "mcp-ping-unknown-effect",
+      "files": [
+        {
+          "path": "tool-contract.json",
+          "bytes": "eyJhcGlWZXJzaW9uIjoic2tpbGxjLnRvb2wvdjAuMSIsIm9wZXJhdGlvbnMiOlt7ImVmZmVjdCI6eyJhdXRob3JpdHkiOiJVTlZFUklGSUVEIiwiY2xhc3NpZmljYXRpb24iOiJVTktOT1dOIn0sImlkIjoicGluZyIsImlucHV0U2NoZW1hIjp7InR5cGUiOiJvYmplY3QifX1dfQ==",
+          "size": 157,
+          "sha256": "sha256:cc9a063c3f3045513b38b5a052a3ccdc888b31399c4049cd421c8ef30cf3f9fd"
+        }
+      ],
+      "snapshotDigest": "sha256:e767fe5bf3914658691d2502a44fc6ae0027f3499f92f854d6694bea8fd456b7"
+    },
+    {
+      "name": "schema-bundle-two-files-reordered",
+      "files": [
+        {
+          "path": "schemas/z.json",
+          "bytes": "eyJ0eXBlIjoic3RyaW5nIn0=",
+          "size": 17,
+          "sha256": "sha256:00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "path": "schemas/a.json",
+          "bytes": "eyJ0eXBlIjoib2JqZWN0In0=",
+          "size": 17,
+          "sha256": "sha256:a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0"
+        }
+      ],
+      "snapshotDigest": "sha256:2fe116aa838cfa3c6b5cd52fd4a535d7b4a15af28e2222bc0681b88c01f05e2f"
+    }
+  ]
+}
