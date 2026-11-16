@@ -1026,8 +1026,16 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         typeof key==="function"&&key.prototype?.executeCommand&&
         key.prototype?.registerCommand&&key.prototype?.getCommand);
       if(!commandKey)throw Error("Native Theia command registry missing for v1alpha4");
+      const openerKey=[...container._bindingDictionary._map.keys()].find(key=>
+        String(key)==="Symbol(OpenerService)");
+      const openers=await container.get(openerKey).getOpeners();
+      const custom=openers.find(item=>item.id==="custom-editor-skillStudio.procedurePreview");
+      const widget=custom?.widgetManager.getWidgets("plugin-custom-editor").find(item=>
+        item.resource?.path.toString().endsWith("/assurance/procedure.yaml"));
+      const procedureUri=widget?.resource;
+      if(!procedureUri)throw Error("Active Procedure URI missing for v1alpha4 acceptance");
       return container.get(commandKey).executeCommand(
-        "skillStudio.internal.v1alpha4LanguageProviderAcceptance");
+        "skillStudio.internal.v1alpha4LanguageProviderAcceptance",procedureUri.toString());
     })()`);
     if(v1alpha4LanguageFeatureEvidence?.status!=="PARTIAL"||
        v1alpha4LanguageFeatureEvidence?.snapshotCompleteness!=="complete"||
