@@ -89,16 +89,33 @@ export function analyzeV1Alpha4Source(
     if (gate!==undefined && (!scalar(gate) || !/^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(scalar(gate))))
       add(c.document,"ENTRY_PRECONDITION_REF_INVALID","Contract precondition is a single node.precondition reference",gate);
   }
+  const predicateSignatures=new Map<string,any[]>();
   if (predicates) {
     props(predicates.root,predicates.document,new Set(["predicates"]));
     const declared=predicates.root.get("predicates",true);
     if (!isMap(declared)) add(predicates.document,"SOURCE_ROOT_INVALID","PredicateSet must contain a predicates mapping",declared);
     else for (const item of declared.items) {
       props(item.value,predicates.document,EVAL_FIELDS);
+      const predicateId=scalar(item.key);
       const parameters=isMap(item.value)?item.value.get("parameters",true):null;
-      if (!isSeq(parameters) || !parameters.items.length || parameters.items.some((x:any)=>!isMap(x)||x.items.length!==1))
-        add(predicates.document,"PREDICATE_GROUP_INVALID","Predicate parameters must be an ordered nonempty list of one-key mappings",parameters??item.value);
+      // An empty list is the explicit zero-parameter signature in v1alpha4.
+      if (!isSeq(parameters) || parameters.items.some((x:any)=>!isMap(x)||x.items.length!==1))
+        add(predicates.document,"PREDICATE_GROUP_INVALID","Predicate parameters must be an ordered list of one-key mappings (an empty list declares zero parameters)",parameters??item.value);
+      else if(predicateId)predicateSignatures.set(predicateId,parameters.items);
     }
+  }
+  function primitiveLiteralType(node:any,document:PackageDocumentSnapshot):string|null {
+    if(!isScalar(node))return null;
+    if(typeof node.value==="boolean")return "boolean";
+    if(typeof node.value==="number")return Number.isInteger(node.value)?"integer":"number";
+    if(typeof node.value==="string"){
+      const raw=Array.isArray(node.range)?document.text.slice(node.range[0],node.range[1]):"";
+      if(raw.startsWith('"')||raw.startsWith("'"))return "string";
+      // Bare strings are SourcePaths in this language. Their type must come
+      // from the exact Context / Producer Schema, never from the YAML scalar.
+      return null;
+    }
+    return null;
   }
 
   const empty:ProcedureProjection={state:"UNAVAILABLE",entry:null,procedures:[],diagnostics};
@@ -146,6 +163,29 @@ export function analyzeV1Alpha4Source(
           const argumentsNode=isMap(call)?call.get("arguments",true):null;
           if (!scalar(signature)||!isSeq(argumentsNode))
             add(p.document,"PREDICATE_GROUP_INVALID","Every predicate call needs predicate and positional arguments",call);
+          else {
+            const parameters=predicateSignatures.get(scalar(signature));
+            if(parameters){
+              if(argumentsNode.items.length!==parameters.length)
+                add(p.document,"PREDICATE_ARITY_MISMATCH",
+                  "Predicate "+scalar(signature)+" expects "+parameters.length+
+                  " positional arguments but received "+argumentsNode.items.length,
+                  argumentsNode);
+              else for(let index=0;index<parameters.length;index++){
+                const parameter=parameters[index];
+                const targetType=isMap(parameter)?scalar(parameter.items[0]?.value):"";
+                const actualType=primitiveLiteralType(argumentsNode.items[index],p.document);
+                if(!actualType||!["string","integer","number","boolean"].includes(targetType))continue;
+                const compatible=targetType==="number"
+                  ?actualType==="integer"||actualType==="number"
+                  :targetType===actualType;
+                if(!compatible)add(p.document,"PREDICATE_TYPE_MISMATCH",
+                  "Predicate "+scalar(signature)+" argument "+(index+1)+
+                  " requires "+targetType+" but received "+actualType,
+                  argumentsNode.items[index]);
+              }
+            }
+          }
         }
       } else {
         const tool=part.get("tool",true),script=part.get("script",true);
