@@ -743,6 +743,9 @@ test("browser LSP v1alpha4 scopes completion and resolves local declarations",as
 
     assert.ok(labels(await completion(c,"check.precondition",5))
       .includes("check.precondition"));
+    assert.ok(labels(await completion(c,"check.precondition",6))
+      .includes("check.precondition"),
+      "Contract completion must continue through the dotted Precondition suffix");
     assert.ok(labels(await completion(c,"schemas/request",15))
       .includes("schemas/request.schema.yaml"));
     assert.ok(labels(await completion(p,"sample.ready",7))
