@@ -328,17 +328,22 @@ export function analyzeV1Alpha4Source(
   }
   // A Contract gate must identify a real, reachable Precondition stage.
   // This lexical/source check requires no trusted Owner publication.
+  let validContractGate=false;
   if (c) {
     const gate=c.root.get("precondition",true);
     const reference=scalar(gate);
     if (reference && /^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(reference)) {
       const nodeId=reference.slice(0,-".precondition".length);
       const node=rawNodes.get(nodeId,true);
-      if (!isMap(node) || !isMap(node.get("precondition",true)) || !visited.has(nodeId+".precondition"))
+      validContractGate=Boolean(isMap(node)&&isMap(node.get("precondition",true))&&
+        visited.has(nodeId+".precondition"));
+      if (!validContractGate)
         add(c.document,"ENTRY_PRECONDITION_REF_INVALID",
           "Contract precondition must reference a reachable Node precondition stage",gate);
     }
   }
+  for(const node of nodes)if(node.globalPrecondition&&!validContractGate)
+    (node as any).globalPrecondition=false;
   // Success is a property of reachable source routes, not simply of a key
   // appearing anywhere in the YAML. An orphan final stage cannot prove Goal
   // or hide a reachable bypass (§12.9).
