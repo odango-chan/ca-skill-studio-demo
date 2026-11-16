@@ -167,6 +167,27 @@ test("v1alpha4 rejects duplicate YAML keys and invalid predicate groups",()=>{
   assert.ok(a.diagnostics.some(x=>x.code==="PREDICATE_GROUP_INVALID"));
 });
 
+test("v1alpha4 checks positional Predicate arity and permits explicit zero-parameter signatures",()=>{
+  const wrongArity=analyzePackageSnapshot(snapshot(
+    procedure.replace("arguments: [context.ueRef]","arguments: []")));
+  assert.ok(wrongArity.diagnostics.some(x=>x.code==="PREDICATE_ARITY_MISMATCH"));
+
+  const zeroParameters=analyzePackageSnapshot(snapshot(
+    procedure.replace("arguments: [context.ueRef]","arguments: []"),
+    contract,
+    predicates.replace("parameters: [{ue: string}]","parameters: []")
+  ));
+  assert.ok(!zeroParameters.diagnostics.some(x=>
+    x.code==="PREDICATE_GROUP_INVALID"||x.code==="PREDICATE_ARITY_MISMATCH"));
+  assert.equal(zeroParameters.procedure.state,"READY");
+});
+
+test("v1alpha4 rejects primitive literal Predicate argument type mismatches",()=>{
+  const wrongType=analyzePackageSnapshot(snapshot(
+    procedure.replace("arguments: [context.ueRef]","arguments: [true]")));
+  assert.ok(wrongType.diagnostics.some(x=>x.code==="PREDICATE_TYPE_MISMATCH"));
+});
+
 test("v1alpha4 marks no Owner identity as a missing qualification, not a synthetic PASS",()=>{
   const a=analyzePackageSnapshot(snapshot());
   assert.notEqual(a.state,"READY");
