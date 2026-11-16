@@ -315,6 +315,25 @@ connection.onInitialize(() => ({
 // mutate Package Source or claim an analysis generation is READY.
 connection.onRequest("skillStudio/health", () => ({alive:true}));
 
+// Acceptance-only semantic-token diagnostics let the Theia adapter distinguish
+// "snapshot has not arrived yet" from "this exact source has no token spans".
+// Return metadata only; never return source contents or linking/qualification.
+connection.onRequest("skillStudio/semanticTokenDiagnostics", params => {
+  const uri=typeof params?.uri==="string"?params.uri:"";
+  const snapshot=uri?packageSnapshotForUri(uri):null;
+  const document=snapshot?snapshotDocumentFor(snapshot,uri):null;
+  const spans=document
+    ?collectSkillSemanticTokenSpans(document.text,document.relativePath):[];
+  return {
+    packageFound:Boolean(document),
+    rootUri:snapshot?.rootUri??null,
+    generation:snapshot?.generation??null,
+    relativePath:document?.relativePath??null,
+    textLength:document?.text?.length??0,
+    tokenCount:spans.length
+  };
+});
+
 connection.languages.semanticTokens.on(params=>{
   const snapshot=packageSnapshotForUri(params.textDocument.uri);
   if(!snapshot)return {data:[]};

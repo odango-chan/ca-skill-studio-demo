@@ -9,7 +9,7 @@ import { build } from "esbuild";
 const tempRoot=resolve(".agent-tmp");
 await mkdir(tempRoot,{recursive:true});
 const directory=await mkdtemp(join(tempRoot,"v1alpha4-lsp-"));
-let analyzePackageSnapshot;
+let analyzePackageSnapshot,inspectionSnapshot;
 let buildSkillSymbolIndex,skillSymbolAt,uniqueSkillSymbolDeclaration,
   skillSymbolOccurrences,collectSkillSemanticTokenSpans;
 try {
@@ -17,6 +17,11 @@ try {
   await build({entryPoints:["language/core/index.ts"],outfile,bundle:true,
     format:"esm",platform:"node",target:"node24",packages:"external",logLevel:"silent"});
   ({analyzePackageSnapshot}=await import(pathToFileURL(outfile).href));
+  const inspectionFile=join(directory,"inspection.mjs");
+  await build({entryPoints:["experiments/ide-host/vscode/src/inspection.mjs"],
+    outfile:inspectionFile,bundle:true,format:"esm",platform:"node",
+    target:"node24",packages:"external",logLevel:"silent"});
+  ({inspectionSnapshot}=await import(pathToFileURL(inspectionFile).href));
   // Bundle language modules as the production Worker does: their canonical
   // semantic token contract is JSON and is not a direct untyped Node import.
   const symbolFile=join(directory,"symbols.mjs");
@@ -132,9 +137,78 @@ test("v1alpha4 AST graph projects nodes and routes but never claims Owner qualif
   assert.match(a.packageAudit.reason,/Owner.*linking/);
   assert.equal(a.procedure.state,"READY");
   assert.equal(a.procedure.entry,"check");
+  assert.equal(a.procedure.goal,"pdu_session.initial_request_fulfilled");
+  assert.equal(a.procedure.precondition,"check.precondition");
+  assert.deepEqual(a.procedure.finalPostconditionNodes,["final"]);
   assert.deepEqual(a.procedure.procedures[0].nodes.map(x=>x.id),["check","read","final"]);
+  assert.deepEqual(a.procedure.procedures[0].nodes[0].stages.map(x=>x.name),["precondition"]);
+  assert.equal(a.procedure.procedures[0].nodes[0].globalPrecondition,true);
+  assert.equal(a.procedure.procedures[0].nodes[2].finalGoal,true);
+  const readStage=a.procedure.procedures[0].nodes[1].stages[0];
+  assert.deepEqual(readStage.arguments.map(x=>[x.name,x.value]),
+    [["ueRef","context.ueRef"]]);
+  const finalCall=a.procedure.procedures[0].nodes[2].stages[0].calls[0];
+  assert.equal(finalCall.predicate,"demo.done");
+  assert.deepEqual(finalCall.parameters,["data"]);
+  assert.deepEqual(finalCall.arguments,["read.observation.output"]);
   assert.ok(a.procedure.procedures[0].routes.some(x=>x.target==="SUCCEEDED"&&x.routeSource==="postcondition"));
   assert.deepEqual(a.diagnostics,[]);
+});
+
+test("v1alpha4 carries PredicateSet Evidence requirements into the shared stage projection",()=>{
+  const withEvidence=predicates.replace(
+    "  demo.done:\n    parameters: [{data: ca::urn:example:result:v1}]",
+    "  demo.done:\n    parameters: [{data: ca::urn:example:result:v1}]\n    evidence:\n      requires:\n        data: [ca::demo.verified]"
+  );
+  const a=analyzePackageSnapshot(snapshot(procedure,contract,withEvidence));
+  const call=a.procedure.procedures[0].nodes.find(x=>x.id==="final")
+    .stages[0].calls[0];
+  assert.deepEqual(call.evidenceRequirements,[
+    {parameter:"data",evidence:["ca::demo.verified"]}
+  ]);
+});
+
+test("v1alpha4 Inspector shows Contract Goal and source-only Producer / Evidence flow",()=>{
+  const withEvidence=predicates.replace(
+    "  demo.done:\n    parameters: [{data: ca::urn:example:result:v1}]",
+    "  demo.done:\n    parameters: [{data: ca::urn:example:result:v1}]\n    evidence:\n      requires:\n        data: [ca::demo.verified]"
+  );
+  const files=new Map([
+    ["assurance/contract.yaml",{text:contract}],
+    ["assurance/predicates.yaml",{text:withEvidence}]
+  ]);
+  const view=inspectionSnapshot(procedure,{procedureId:"sample",nodeId:"final"},
+    null,files,"sample","file:///workspace/sample");
+  assert.equal(view.model.state,"READY");
+  assert.ok(view.outline[0].children.some(item=>
+    item.kind==="v1alpha4-node"&&item.nodeId==="final"));
+  assert.ok(view.inspection.some(item=>item.label.includes(
+    "Contract Goal · pdu_session.initial_request_fulfilled")));
+  const goalRow=view.inspection.find(item=>item.kind==="v1alpha4-contract"&&
+    item.label.startsWith("Contract Goal"));
+  const gateRow=view.inspection.find(item=>item.kind==="v1alpha4-contract"&&
+    item.label.startsWith("Global Precondition"));
+  assert.equal(goalRow.line,1);
+  assert.equal(gateRow.line,2);
+  assert.equal(goalRow.sourcePath,"assurance/contract.yaml");
+  assert.equal(gateRow.sourcePath,"assurance/contract.yaml");
+  assert.ok(view.inspection.some(item=>item.label.startsWith("Data Flow ·")));
+  const binding=view.dataflow.bindings.find(item=>
+    item.value==="read.observation.output");
+  assert.equal(binding.kind,"Producer");
+  assert.equal(binding.producerNode,"read");
+  assert.deepEqual(binding.evidenceRequirements,[
+    {parameter:"data",evidence:["ca::demo.verified"]}
+  ]);
+  assert.equal(binding.line,24,"Predicate argument navigation uses the argument's exact line");
+  const rows=[];
+  const collect=items=>{for(const item of items??[]){rows.push(item);collect(item.children);}};
+  collect(view.inspection);
+  const evidenceRow=rows.find(item=>item.kind==="v1alpha4-evidence");
+  assert.equal(evidenceRow.line,11,"Evidence navigation uses the PredicateSet declaration line");
+  assert.equal(evidenceRow.sourcePath,"assurance/predicates.yaml");
+  const node=view.inspection.find(item=>item.kind==="v1alpha4-node");
+  assert.ok(node.children.some(item=>item.kind==="v1alpha4-stage"));
 });
 
 test("v1alpha4 rejects author reconcile/legacy wrappers without automatic conversion",()=>{

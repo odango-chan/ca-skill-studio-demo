@@ -82,14 +82,20 @@ export function analyzeV1Alpha4Source(
   const c=parse("assurance/contract.yaml");
   const p=parse("assurance/procedure.yaml");
   const predicates=parse("assurance/predicates.yaml");
+  const contractGoal=c?scalar(c.root.get("goal",true)):"";
+  const contractGate=c?scalar(c.root.get("precondition",true)):"";
   if (c) {
     props(c.root,c.document,CONTRACT_FIELDS);
-    if (!scalar(c.root.get("goal",true))) add(c.document,"SOURCE_ROOT_INVALID","Contract must declare one goal",c.root);
+    if (!contractGoal) add(c.document,"SOURCE_ROOT_INVALID","Contract must declare one goal",c.root);
     const gate=c.root.get("precondition",true);
-    if (gate!==undefined && (!scalar(gate) || !/^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(scalar(gate))))
+    if (gate!==undefined && (!contractGate || !/^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(contractGate)))
       add(c.document,"ENTRY_PRECONDITION_REF_INVALID","Contract precondition is a single node.precondition reference",gate);
   }
   const predicateSignatures=new Map<string,any[]>();
+  const predicateEvidence=new Map<string,{
+    requirements:{parameter:string;evidence:string[]}[];
+    locations:{parameter:string;evidence:string;line:number}[];
+  }>();
   if (predicates) {
     props(predicates.root,predicates.document,new Set(["predicates"]));
     const declared=predicates.root.get("predicates",true);
@@ -102,6 +108,21 @@ export function analyzeV1Alpha4Source(
       if (!isSeq(parameters) || parameters.items.some((x:any)=>!isMap(x)||x.items.length!==1))
         add(predicates.document,"PREDICATE_GROUP_INVALID","Predicate parameters must be an ordered list of one-key mappings (an empty list declares zero parameters)",parameters??item.value);
       else if(predicateId)predicateSignatures.set(predicateId,parameters.items);
+      const evidenceNode=isMap(item.value)?item.value.get("evidence",true):null;
+      const requires=isMap(evidenceNode)?evidenceNode.get("requires",true):null;
+      if(predicateId&&isMap(requires)){
+        const requirements=requires.items.map((pair:any)=>({
+          parameter:scalar(pair.key),
+          evidence:isSeq(pair.value)?pair.value.items.map((value:any)=>scalar(value)):[]
+        }));
+        const locations=requires.items.flatMap((pair:any)=>{
+          const parameter=scalar(pair.key);
+          return isSeq(pair.value)?pair.value.items.map((value:any)=>({
+            parameter,evidence:scalar(value),line:lineAt(predicates.document,value)
+          })):[];
+        });
+        predicateEvidence.set(predicateId,{requirements,locations});
+      }
     }
   }
   function primitiveLiteralType(node:any,document:PackageDocumentSnapshot):string|null {
@@ -250,9 +271,52 @@ export function analyzeV1Alpha4Source(
       }
       adjacency.set(id+"."+stage,outgoing);
     }
+    const sourceValue=(node:any)=>Array.isArray(node?.range)
+      ?p.document.text.slice(node.range[0],node.range[1]):scalar(node);
+    const stages=stageNames.map(stage=>{
+      const part=body.get(stage,true);
+      const rawStageRoutes=isMap(part)?part.get("routes",true):null;
+      const calls=isMap(part)?part.get("predicates",true):null;
+      const count=(stage==="precondition"||stage==="postcondition")
+        ?(isSeq(calls)?calls.items.length:0):1;
+      const target=isMap(part)
+        ?(scalar(part.get("tool",true))||scalar(part.get("script",true))):"";
+      const callViews=(stage==="precondition"||stage==="postcondition")&&isSeq(calls)
+        ?calls.items.map((call:any)=>{
+          const predicate=isMap(call)?scalar(call.get("predicate",true)):"";
+          const argumentsNode=isMap(call)?call.get("arguments",true):null;
+          const parameters=predicateSignatures.get(predicate)??[];
+          const evidence=predicateEvidence.get(predicate)??{requirements:[],locations:[]};
+          return {
+            predicate,line:lineAt(p.document,call),
+            parameters:parameters.map((parameter:any)=>
+              isMap(parameter)?scalar(parameter.items[0]?.key):""),
+            arguments:isSeq(argumentsNode)?argumentsNode.items.map(sourceValue):[],
+            argumentLines:isSeq(argumentsNode)
+              ?argumentsNode.items.map((argument:any)=>lineAt(p.document,argument)):[],
+            evidenceRequirements:evidence.requirements,
+            evidenceLocations:evidence.locations
+          };
+        }):[];
+      const argumentsNode=isMap(part)?part.get("arguments",true):null;
+      const argumentViews=isMap(argumentsNode)?argumentsNode.items.map((pair:any)=>({
+        name:scalar(pair.key),value:sourceValue(pair.value),
+        line:lineAt(p.document,pair.value)
+      })):[];
+      return {
+        name:stage,line:lineAt(p.document,part),count,
+        ...(target?{target}:{}),
+        routeOutcomes:isMap(rawStageRoutes)
+          ?rawStageRoutes.items.map((route:any)=>scalar(route.key)):[],
+        ...(callViews.length?{calls:callViews}:{}),
+        ...(argumentViews.length?{arguments:argumentViews}:{})
+      };
+    });
     nodes.push({
-      id, operator:stageNames[0]??"",value:stageNames.join(", "),
-      line:lineAt(p.document,item.key),phases:[],children:[]
+      id, operator:"node",value:stageNames.join(" → "),
+      line:lineAt(p.document,item.key),phases:[],children:[],stages,
+      globalPrecondition:contractGate===id+".precondition",
+      finalGoal:false
     });
   }
   const visited=new Set<string>(),active=new Set<string>();
@@ -278,23 +342,30 @@ export function analyzeV1Alpha4Source(
   }
   // A Contract gate must identify a real, reachable Precondition stage.
   // This lexical/source check requires no trusted Owner publication.
+  let validContractGate=false;
   if (c) {
     const gate=c.root.get("precondition",true);
     const reference=scalar(gate);
     if (reference && /^[A-Za-z][A-Za-z0-9_-]*\.precondition$/.test(reference)) {
       const nodeId=reference.slice(0,-".precondition".length);
       const node=rawNodes.get(nodeId,true);
-      if (!isMap(node) || !isMap(node.get("precondition",true)) || !visited.has(nodeId+".precondition"))
+      validContractGate=Boolean(isMap(node)&&isMap(node.get("precondition",true))&&
+        visited.has(nodeId+".precondition"));
+      if (!validContractGate)
         add(c.document,"ENTRY_PRECONDITION_REF_INVALID",
           "Contract precondition must reference a reachable Node precondition stage",gate);
     }
   }
+  for(const node of nodes)if(node.globalPrecondition&&!validContractGate)
+    (node as any).globalPrecondition=false;
   // Success is a property of reachable source routes, not simply of a key
   // appearing anywhere in the YAML. An orphan final stage cannot prove Goal
   // or hide a reachable bypass (§12.9).
   const successRoutes=routes.filter(route=>visited.has(route.source+"."+route.routeSource)&&route.target==="SUCCEEDED");
-  const hasValidSuccess=successRoutes.some(route=>
-    route.routeSource==="postcondition"&&route.outcome==="PASS");
+  const finalPostconditionNodes=[...new Set(successRoutes
+    .filter(route=>route.routeSource==="postcondition"&&route.outcome==="PASS")
+    .map(route=>route.source))];
+  const hasValidSuccess=finalPostconditionNodes.length>0;
   if(successRoutes.length && !hasValidSuccess)
     add(p.document,"FINAL_POSTCONDITION_MISSING",
       "Only a reachable final Postcondition aggregate PASS may request SUCCEEDED");
@@ -302,6 +373,10 @@ export function analyzeV1Alpha4Source(
     !(route.routeSource==="postcondition"&&route.outcome==="PASS"))
     add(p.document,"SUCCESS_BYPASSES_FINAL_POSTCONDITION",
       "A reachable non-final stage bypasses final Goal proof");
+  for(const node of nodes) {
+    if(finalPostconditionNodes.includes(node.id))
+      (node as any).finalGoal=true;
+  }
   // Projection READY means source graph shape is available for editor rendering,
   // *never* that the Tool/Schema/Capability trust closure has been compiled.
   const projection:ProcedureProjection={
@@ -310,6 +385,11 @@ export function analyzeV1Alpha4Source(
     state: diagnostics.some(x=>x.severity==="error"&&
       x.relativePath===p.document.relativePath)?"UNAVAILABLE":"READY",
     entry:start,diagnostics:diagnostics.filter(x=>x.relativePath===p.document.relativePath),
+    ...(contractGoal?{goal:contractGoal,
+      goalLine:lineAt(c!.document,c!.root.get("goal",true))}:{}),
+    ...(contractGate?{precondition:contractGate,
+      preconditionLine:lineAt(c!.document,c!.root.get("precondition",true))}:{}),
+    finalPostconditionNodes,
     procedures:[{
       name:packageName,start,nodes,routes,children:[],
       line:1,profile:"CA-SL v1alpha4 (editor source projection only)"

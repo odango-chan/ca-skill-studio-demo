@@ -8,7 +8,7 @@ export const FLOW_NODE_SIZE=Object.freeze({width:NODE_WIDTH,height:NODE_HEIGHT})
 // paint a mixed success/failure bundle green just because it contains PASS.
 const ROUTE_OUTCOMES={
   success:new Set(["PASS","SUCCEEDED","SUCCESS"]),
-  failure:new Set(["FAIL","FAILED","ERROR"]),
+  failure:new Set(["FAIL","FAILED","ERROR","DENIED"]),
   uncertain:new Set(["UNKNOWN","OUTCOME_UNKNOWN","UNRESOLVED","TIMEOUT","TIMED_OUT"])
 };
 export const ROUTE_TONE_COLOR=Object.freeze({
@@ -29,8 +29,22 @@ export function classifyRouteTone(outcomes){
 // The node card and contextual legend are read-only views of existing YAML.
 // A Phase Step's operator is not a new graph Node or an assertion that TOOL
 // and CALL have the same Runtime semantics.
-const PHASE_LABELS=Object.freeze({preconditions:"PRE",postconditions:"POST"});
+const PHASE_LABELS=Object.freeze({
+  preconditions:"PRE",postconditions:"POST",
+  precondition:"PRE",operation:"OP",observation:"OBS",postcondition:"POST"
+});
 export function summarizeNodePhases(node){
+  if(Array.isArray(node?.stages)){
+    return node.stages.map(stage=>({
+      name:stage.name,label:PHASE_LABELS[stage.name]??String(stage.name).toUpperCase(),
+      count:Number.isSafeInteger(stage.count)?stage.count:1,
+      countLabel:stage.name==="precondition"||stage.name==="postcondition"
+        ?"Predicates":"Stage",
+      operators:stage.target?[{kind:stage.name==="observation"?"OBSERVATION":
+        stage.name==="operation"?"TOOL":"PREDICATE",count:1}]:[],
+      routeCount:Array.isArray(stage.routeOutcomes)?stage.routeOutcomes.length:0
+    }));
+  }
   const phases=[];
   for(const name of ["preconditions","postconditions"]){
     const phase=node?.phases?.find(item=>item.name===name);
@@ -57,8 +71,8 @@ export function describeProcedureLegend(procedure,visibleNodes=null){
     const kind=String(node.operator||"").toUpperCase();
     nodeKinds.set(kind,(nodeKinds.get(kind)||0)+1);
     for(const phase of summarizeNodePhases(node)){
-      if(phase.name==="preconditions")preNodes++;
-      if(phase.name==="postconditions")postNodes++;
+      if(phase.name==="preconditions"||phase.name==="precondition")preNodes++;
+      if(phase.name==="postconditions"||phase.name==="postcondition")postNodes++;
       for(const {kind:stepKind,count} of phase.operators)
         stepKinds.set(stepKind,(stepKinds.get(stepKind)||0)+count);
     }
@@ -73,8 +87,10 @@ export function flowBundleSelectionId(bundle){
     bundle.routes.map(route=>route.id).sort().join("|");
 }
 export function routeOrigin(routeSource){
-  if(routeSource==="preconditions.on")return "PRE";
-  if(routeSource==="postconditions.on")return "POST";
+  if(routeSource==="preconditions.on"||routeSource==="precondition")return "PRE";
+  if(routeSource==="postconditions.on"||routeSource==="postcondition")return "POST";
+  if(routeSource==="operation")return "OP";
+  if(routeSource==="observation")return "OBS";
   if(routeSource==="operator.on")return "OP";
   return "OTHER";
 }
@@ -83,6 +99,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
   routeCreationSourceId=null){
   if(!graph||!procedure)return {nodes:[],edges:[],direction:"DOWN"};
   const direction=graph.direction==="RIGHT"?"RIGHT":"DOWN";
+  const v1alpha4=String(procedure.profile??"").includes("v1alpha4");
   const present=new Set((graph.visibleNodes??procedure.nodes).map(n=>n.id));
   const selectedRoute=selection?.kind==="route"?selection.id:null;
   const selectedBundle=selection?.kind==="bundle"?selection.id:null;
@@ -107,12 +124,18 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       targetPosition:direction==="DOWN"?"top":"left",
       draggable:false,
       selectable:true,
+      // v1alpha4 is a source projection until trusted Compiler/Owner linking
+      // supplies exact Outcome eligibility. Disable all graph connections.
+      connectable:!v1alpha4,
       selected:selection?.kind==="node"&&selection.id===node.id,
       data:{
         id:node.id,operator:node.operator,value:node.value,
         start:node.id===procedure.start,
         terminal:node.operator==="terminal",
         childCount:node.children?.length??0,direction,
+        viewOnly:Boolean(node.viewOnly),
+        globalPrecondition:Boolean(node.globalPrecondition),
+        finalGoal:Boolean(node.finalGoal),
         // A procedure invocation is a real Node referring to a separate
         // definition. Never inline or duplicate the child in this graph.
         childProcedure:node.operator==="procedure"&&
@@ -121,9 +144,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         phaseBadges:summarizeNodePhases(node),
         hiddenBranchCount:graph.hiddenByNode?.get(node.id)??0,
         branchesExpanded:graph.expandedNodeIds?.has(node.id)??false,
-        canAddRoute:node.operator!=="terminal"&&
-          selection?.kind==="node"&&selection.id===node.id&&
-          routeCreationSourceId===node.id,
+        canAddRoute:!node.viewOnly&&!String(procedure.profile??"").includes("v1alpha4")&&
+          node.operator!=="terminal"&&selection?.kind==="node"&&
+          selection.id===node.id&&routeCreationSourceId===node.id,
         ports:ports.get(node.id)??[],
         portSignature:(ports.get(node.id)??[])
           .map(port=>port.id+":"+port.side+":"+port.offset).join("|")
@@ -158,8 +181,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         strokeWidth:1.2,
         markerUnits:"userSpaceOnUse"
       },
-      // Only the verified handler may propose a YAML patch on reconnect.
-      reconnectable:true,
+      // v1alpha4 routes are strictly view-only; legacy routes retain their
+      // existing guarded reconnect/Preview/Diff workflow.
+      reconnectable:!v1alpha4,
       data:{
         bundle,sourceRouteIds:bundle.routes.map(route=>route.id),
         selected,important,tone,label,origin,

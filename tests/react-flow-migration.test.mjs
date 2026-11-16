@@ -39,6 +39,31 @@ test("D1 projects the real CreatedSession 17-node / 65-Outcome graph unchanged",
   assert.ok(flow.edges.every(e=>e.markerEnd?.markerUnits==="userSpaceOnUse"));
   assert.equal(JSON.stringify(created.procedure),before);
 });
+test("CA-SL v1alpha4 graph disables connection and reconnection gestures",()=>{
+  const route={id:"check.precondition.PASS",source:"check",target:"read",
+    outcome:"PASS",routeSource:"precondition"};
+  const procedure={
+    profile:"CA-SL v1alpha4 (editor source projection only)",
+    start:"check",
+    nodes:[
+      {id:"check",operator:"node",value:"precondition",children:[],stages:[]},
+      {id:"read",operator:"node",value:"observation",children:[],stages:[]}
+    ],
+    routes:[route]
+  };
+  const graph={
+    direction:"DOWN",visibleNodes:procedure.nodes,visibleRoutes:[route],
+    bundles:[{source:"check",target:"read",routes:[route],outcomes:["PASS"],
+      routeSource:"precondition"}],
+    positions:new Map([["check",{x:0,y:0}],["read",{x:0,y:160}]]),
+    expandedNodeIds:new Set(),hiddenByNode:new Map()
+  };
+  const flow=makeFlowElements(graph,procedure);
+  assert.ok(flow.nodes.every(node=>node.connectable===false));
+  assert.ok(flow.nodes.every(node=>node.data.canAddRoute===false));
+  assert.ok(flow.edges.every(edge=>edge.reconnectable===false));
+});
+
 test("routeSource and all exact Outcome ids survive React Flow projection",async()=>{
   const graph=await layoutProcedureELK(created.procedure);
   const flow=makeFlowElements(graph,created.procedure);
@@ -202,6 +227,58 @@ test("visual START is separate from the business operator, without changing Sour
   assert.match(css,/\.designer-node\.is-start::before\{/);
   assert.match(css,/\.designer-node\.is-start\.is-horizontal::before\{/);
   assert.equal(JSON.stringify(created.procedure),before);
+});
+
+test("v1alpha4 Designer renders real stages, Contract gate, final Goal and terminal endpoints",async()=>{
+  const procedure={
+    name:"sample",start:"check",profile:"CA-SL v1alpha4 (editor source projection only)",
+    nodes:[
+      {id:"check",operator:"node",value:"precondition",line:1,phases:[],children:[],
+        stages:[{name:"precondition",line:2,count:1,routeOutcomes:["PASS","FAIL","UNKNOWN"]}],
+        globalPrecondition:true},
+      {id:"read",operator:"node",value:"operation",line:8,phases:[],children:[],
+        stages:[{name:"operation",line:9,count:1,target:"ca::sbi.udm.read",
+          routeOutcomes:["SUCCEEDED","FAILED","OUTCOME_UNKNOWN"]}]},
+      {id:"verify",operator:"node",value:"postcondition",line:16,phases:[],children:[],
+        stages:[{name:"postcondition",line:17,count:2,routeOutcomes:["PASS","FAIL","UNKNOWN"]}],
+        finalGoal:true},
+      ...["SUCCEEDED","FAILED","SAFE_STOPPED","UNRESOLVED"].map(id=>({
+        id,operator:"terminal",value:id,line:0,phases:[],children:[],viewOnly:true
+      }))
+    ],
+    routes:[
+      {id:"check.precondition.PASS",source:"check",target:"read",
+        routeSource:"precondition",outcome:"PASS",line:4},
+      {id:"check.precondition.FAIL",source:"check",target:"FAILED",
+        routeSource:"precondition",outcome:"FAIL",line:5},
+      {id:"read.operation.SUCCEEDED",source:"read",target:"verify",
+        routeSource:"operation",outcome:"SUCCEEDED",line:12},
+      {id:"read.operation.OUTCOME_UNKNOWN",source:"read",target:"SAFE_STOPPED",
+        routeSource:"operation",outcome:"OUTCOME_UNKNOWN",line:13},
+      {id:"verify.postcondition.PASS",source:"verify",target:"SUCCEEDED",
+        routeSource:"postcondition",outcome:"PASS",line:20},
+      {id:"verify.postcondition.FAIL",source:"verify",target:"FAILED",
+        routeSource:"postcondition",outcome:"FAIL",line:21}
+    ]
+  };
+  const before=JSON.stringify(procedure);
+  const graph=await layoutProcedureELK(procedure);
+  const flow=makeFlowElements(graph,procedure);
+  assert.equal(flow.nodes.length,7);
+  assert.equal(flow.nodes.find(n=>n.id==="check").data.globalPrecondition,true);
+  assert.equal(flow.nodes.find(n=>n.id==="verify").data.finalGoal,true);
+  assert.ok(flow.nodes.filter(n=>n.data.viewOnly).every(n=>!n.data.canAddRoute));
+  assert.ok(flow.nodes.find(n=>n.id==="read").data.phaseBadges.some(x=>x.label==="OP"));
+  assert.ok(flow.edges.some(e=>e.data.origin==="PRE"));
+  assert.ok(flow.edges.some(e=>e.data.origin==="OP"));
+  assert.ok(flow.edges.some(e=>e.data.origin==="POST"));
+  assert.equal(routeOrigin("precondition"),"PRE");
+  assert.equal(routeOrigin("operation"),"OP");
+  assert.equal(routeOrigin("observation"),"OBS");
+  assert.equal(routeOrigin("postcondition"),"POST");
+  assert.ok(flow.nodes.every(n=>n.data.canAddRoute===false),
+    "v1alpha4 does not use the legacy route mutation planner");
+  assert.equal(JSON.stringify(procedure),before,"Designer projection must be view-only");
 });
 
 test("Route outcome colors never turn mixed success/failure green",async()=>{

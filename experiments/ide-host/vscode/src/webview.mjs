@@ -4,11 +4,13 @@ import "../../../../site/studio.css";
 import "../../../../site/light.css";
 import "./webview.css";
 import {projectWorkspace} from "../../../../site/workspace.mjs";
+import {isV1Alpha4Procedure,analyzeV1Alpha4Source}
+  from "../../../../language/core/v1alpha4.ts";
 import {layoutProcedureELK} from "../../../../site/layout.mjs";
 import {mountProcedureCanvas} from "../../../../site/react-flow-canvas.tsx";
 import {mountNodeFocusCanvas} from "../../../../site/node-focus-flow.tsx";
 import {projectNodeFocusFlow} from "../../../../site/node-focus-graph.mjs";
-import {flowBundleSelectionId} from "../../../../site/react-flow-projection.mjs";
+import {flowBundleSelectionId,routeOrigin} from "../../../../site/react-flow-projection.mjs";
 import {routeTargetChoices,previewTargetPatch} from "./route-target.mjs";
 import {addRouteOutcomeOptions} from "../../../../site/route-create.mjs";
 import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
@@ -18,6 +20,7 @@ const vscode=acquireVsCodeApi();
 const $=id=>document.getElementById(id);
 let state={text:"",version:0,procedures:null,procedureId:null,entry:null,graph:null,
   selection:null,pending:null,pendingKind:null,routeProposal:null,nodeFocusId:null,
+  languageTarget:"legacy",goal:null,preconditionGate:null,projectionDiagnostics:[],
   layoutDirection:"DOWN",fitMode:"all",showAllLabels:false,neighborsOnly:false,
   rootPathMode:"normal",pathCategories:new Set(),expandedNodes:new Set()},epoch=0,focusTicket=0;
 const layouts=new Map();
@@ -48,18 +51,35 @@ function publishSelection(){const payload={type:"selection",version:state.versio
 const status=text=>{$("message").textContent=text;};
 const canvas=mountProcedureCanvas($("reactFlowRoot"),{
   onNodeSelect(id){
+    const selectedNode=getProcedure()?.nodes.find(item=>item.id===id);
+    if(selectedNode?.viewOnly){
+      status("终态 "+id+" 是 Route 目标，不是可编辑的 Procedure Node。");
+      return;
+    }
     state.routeProposal=null;state.pending=null;state.pendingKind=null;
     state.selection={kind:"node",id};
     renderRoutes({preserveSelection:true});repaint();
     if(state.neighborsOnly)void layoutCurrentProcedure();
-    const options=addRouteOutcomeOptions(state.text,state.procedureId,id);
-    status(options?.outcomes?.length
-      ?"已选择 "+id+" · 可从节点专用添加端口提出新 Route"
-      :"已选择节点 "+id+" · 仅显示当前 Source 明确允许的 Route 操作");
+    const options=state.languageTarget==="v1alpha4"?null:
+      addRouteOutcomeOptions(state.text,state.procedureId,id);
+    status(state.languageTarget==="v1alpha4"
+      ?"已选择 Node "+id+" · 显示 v1alpha4 有序 Stage 与只读 Route"
+      :options?.outcomes?.length
+        ?"已选择 "+id+" · 可从节点专用添加端口提出新 Route"
+        :"已选择节点 "+id+" · 仅显示当前 Source 明确允许的 Route 操作");
   },
   onEdgeSelect(bundle){
     const routes=bundle?.routes??[];
     if(!routes.length)return;
+    if(state.languageTarget==="v1alpha4"){
+      state.selection={kind:"bundle",id:flowBundleSelectionId(bundle)};
+      state.pending=null;state.pendingKind=null;state.routeProposal=null;
+      repaint();
+      status("只读 Route · "+routeOrigin(bundle.routeSource)+" · "+
+        bundle.outcomes.join(" / ")+
+        "；Tool Effect / Capability 授权须由可信 Compiler 依赖确认。");
+      return;
+    }
     const candidate=state.selection?.kind==="route"&&
       routes.some(route=>route.id===state.selection.id)
       ?routes.find(route=>route.id===state.selection.id)
@@ -113,7 +133,7 @@ function repaint(){
   updateGraphTools();
   if(state.graph&&!state.nodeFocusId){
     const selected=state.selection?.kind==="node"?state.selection.id:null;
-    const options=selected&&!state.routeProposal
+    const options=selected&&!state.routeProposal&&state.languageTarget!=="v1alpha4"
       ?addRouteOutcomeOptions(state.text,state.procedureId,selected):null;
     const routeCreationSourceId=options?.outcomes?.length?selected:null;
     canvas.render(state.graph,state.procedures.get(state.procedureId),
@@ -131,7 +151,7 @@ function isRootPath(){
 }
 function updateGraphTools(){
   $("graphTools").hidden=!state.procedures||Boolean(state.nodeFocusId);
-  const root=isRootPath()&&!state.nodeFocusId;
+  const root=isRootPath()&&!state.nodeFocusId&&state.languageTarget!=="v1alpha4";
   $("rootPathToolbar").hidden=!root;
   $("rootPathFilters").hidden=!root||state.rootPathMode!=="custom";
   $("rootPathMode").value=state.rootPathMode;
@@ -223,7 +243,7 @@ function openNodeFocus(id){
 }
 function routeChoices(routeId){
   const procedure=getProcedure();
-  if(!procedure)return [];
+  if(!procedure||state.languageTarget==="v1alpha4")return [];
   return routeTargetChoices(procedure,routeId);
 }
 function refreshTargets(){
@@ -242,6 +262,12 @@ function refreshTargets(){
   repaint();
 }
 function renderRoutes({preserveSelection=false}={}){
+  if(state.languageTarget==="v1alpha4"){
+    $("patch").hidden=true;
+    state.pending=null;state.pendingKind=null;state.routeProposal=null;
+    $("commit").disabled=true;$("diff").textContent="";
+    return;
+  }
   const previousSelection=state.selection;
   const procedure=getProcedure(),list=$("routeList");
   list.replaceChildren();
@@ -291,6 +317,10 @@ function renderRoutes({preserveSelection=false}={}){
   }
 }
 function prepareRouteCreation(connection){
+  if(state.languageTarget==="v1alpha4"){
+    status("CA-SL v1alpha4 Route 为只读视图；不能使用旧语法 Patch。");
+    return;
+  }
   if(state.nodeFocusId||!state.graph||!state.procedures?.has(state.procedureId)){
     status("当前视图不能创建 Route");
     return;
@@ -315,6 +345,10 @@ function prepareRouteCreation(connection){
   }
 }
 function prepareReconnect(routeId,sourceId,targetId){
+  if(state.languageTarget==="v1alpha4"){
+    status("CA-SL v1alpha4 Route 目标不可通过旧版 Patch 修改。");
+    return;
+  }
   const route=getProcedure()?.routes.find(item=>item.id===routeId);
   if(!route||route.source!==sourceId){
     status("重连拒绝：只允许保留原 Route Source 的目标变更");
@@ -345,7 +379,7 @@ async function layoutCurrentProcedure({anchorId=null}={}){
   const started=performance.now();
   const anchor=anchorId?canvas.captureNodeAnchor(anchorId):null;
   const focus=state.neighborsOnly&&state.selection?.kind==="node"?state.selection.id:null;
-  const pathFocus=isRootPath()?{
+  const pathFocus=isRootPath()&&state.languageTarget!=="v1alpha4"?{
     mode:state.rootPathMode,categories:[...state.pathCategories],
     expandedNodes:[...state.expandedNodes]
   }:null;
@@ -375,8 +409,11 @@ async function layoutCurrentProcedure({anchorId=null}={}){
     const visible=graph.visibleRoutes?.length??procedure.routes.length;
     const summary=graph.filterReason??(graph.isFiltered
       ?" · 筛选显示 "+visible+"/"+procedure.routes.length+" 条 Route":"");
-    status(state.procedureId+" · "+procedure.nodes.length+" Nodes / "+procedure.routes.length+
-      " Outcomes / "+graph.bundles.length+" Bundles"+summary+" · YAML Source 由 IDE 管理");
+    const businessNodeCount=procedure.nodes.filter(node=>!node.viewOnly).length;
+    status(state.procedureId+" · "+businessNodeCount+" Nodes / "+procedure.routes.length+
+      " Outcomes / "+graph.bundles.length+" Bundles"+summary+
+      (state.languageTarget==="v1alpha4"
+        ?" · v1alpha4 Source projection only · not qualified":" · YAML Source 由 IDE 管理"));
   }catch(error){
     if(ticket!==epoch)return;
     status("布局失败："+String(error?.message??error));
@@ -393,20 +430,79 @@ async function showProcedure(id){
   updateGraphTools();
   await layoutCurrentProcedure();
 }
+function updateGoalSummary(goal,gate){
+  const summary=$("goalSummary");
+  if(!summary)return;
+  $("contractGoal").textContent=goal||"未声明";
+  $("contractGate").textContent=gate
+    ?"GLOBAL PRECONDITION · "+gate:"GLOBAL PRECONDITION · 未声明";
+  $("goalQualification").textContent=
+    "Source projection only · Owner / Capability / Runtime NOT QUALIFIED";
+  summary.hidden=!state.languageTarget||state.languageTarget!=="v1alpha4";
+}
 function receiveSnapshot(data){
   if(typeof data.text!=="string"||data.text.length>1024*1024||
      !Number.isSafeInteger(data.version))return;
-  if(data.version===state.version&&data.text===state.text)return;
+  if(data.version===state.version&&data.text===state.text&&
+     data.contractText===state.contractText&&data.predicatesText===state.predicatesText)return;
   layouts.clear();
   ++epoch;
   clearNodeFocus();
   state={...state,text:data.text,version:data.version,graph:null,selection:null,
+    contractText:data.contractText??null,predicatesText:data.predicatesText??null,
+    languageTarget:"legacy",goal:null,preconditionGate:null,projectionDiagnostics:[],
     pending:null,pendingKind:null,routeProposal:null};
   $("revision").textContent="TextDocument v"+data.version;
   $("patch").hidden=true;
   const started=performance.now();
-  const model=projectWorkspace(data.text);
-  projectionMs=performance.now()-started;
+  let model=null;
+  if(isV1Alpha4Procedure(data.text)){
+    const rootUri=String(data.packageRootUri??data.path??"")
+      .replace(/\/assurance\/procedure\.yaml$/,"").replace(/\/$/,"");
+    const packageName=String(data.packageName??rootUri.split("/").at(-1)??"sample");
+    const document=(relativePath,text,version)=>({
+      uri:rootUri+"/"+relativePath,relativePath,text,version
+    });
+    const documents=new Map([
+      ["assurance/procedure.yaml",document("assurance/procedure.yaml",data.text,data.version)]
+    ]);
+    if(typeof data.contractText==="string")
+      documents.set("assurance/contract.yaml",document(
+        "assurance/contract.yaml",data.contractText,data.contractVersion??0));
+    if(typeof data.predicatesText==="string")
+      documents.set("assurance/predicates.yaml",document(
+        "assurance/predicates.yaml",data.predicatesText,data.predicatesVersion??0));
+    const projected=analyzeV1Alpha4Source(documents,packageName);
+    projectionMs=performance.now()-started;
+    state.languageTarget="v1alpha4";
+    state.goal=projected.procedure.goal??null;
+    state.preconditionGate=projected.procedure.precondition??null;
+    state.projectionDiagnostics=projected.diagnostics;
+    updateGoalSummary(state.goal,state.preconditionGate);
+    if(projected.procedure.state!=="READY"||!projected.procedure.procedures.length){
+      state.procedures=null;state.graph=null;state.entry=null;
+      canvas.render(null,null,null,false);updateGraphTools();
+      const first=projected.diagnostics.find(item=>item.relativePath==="assurance/procedure.yaml");
+      status("CA-SL v1alpha4 Source-only · "+
+        (first?.message??"Procedure 尚不能安全投影")+
+        " · Owner / Capability linking NOT QUALIFIED");
+      return;
+    }
+    const sourceProcedure=projected.procedure.procedures[0];
+    const terminalIds=[...new Set(sourceProcedure.routes
+      .map(route=>route.target)
+      .filter(target=>["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(target)))];
+    const terminalNodes=terminalIds.map(id=>({
+      id,operator:"terminal",value:id,line:0,phases:[],children:[],viewOnly:true
+    }));
+    const procedure={...sourceProcedure,nodes:[...sourceProcedure.nodes,...terminalNodes]};
+    model={state:"READY",entry:procedure.name,
+      procedures:new Map([[procedure.name,procedure]])};
+  }else{
+    model=projectWorkspace(data.text);
+    projectionMs=performance.now()-started;
+    updateGoalSummary(null,null);
+  }
   if(model.state!=="READY"){
     state.procedures=null;
     state.graph=null;
@@ -421,9 +517,17 @@ function receiveSnapshot(data){
   state.entry=model.entry;
   state.expandedNodes.clear();
   const list=$("procedureList");list.replaceChildren();
-  for(const proc of model.procedures.values())
-    option(list,proc.name+" ("+proc.nodes.length+" Nodes)",proc.name);
+  for(const proc of model.procedures.values()){
+    const count=proc.nodes.filter(node=>!node.viewOnly).length;
+    option(list,proc.name+" ("+count+" Nodes)",proc.name);
+  }
   void showProcedure(model.procedures.has(previous)?previous:model.entry);
+  if(state.languageTarget==="v1alpha4"){
+    const errors=state.projectionDiagnostics.filter(item=>item.severity==="error").length;
+    status("CA-SL v1alpha4 · "+model.procedures.get(model.entry).nodes.length+
+      " visual Nodes · "+(errors?errors+" source diagnostics":"source shape parsed")+
+      " · Owner / Capability linking NOT QUALIFIED");
+  }
 }
 $("procedureList").addEventListener("change",event=>void showProcedure(event.target.value));
 $("layoutDirection").addEventListener("change",event=>{

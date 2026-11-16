@@ -50,6 +50,7 @@ function ProcedureCard({data,selected}){
       (data.direction==="RIGHT"?" is-horizontal":"")+
       (selected?" is-selected":"")+
       (data.phaseBadges?.length?" has-phases":"")+
+      (data.viewOnly?" is-view-only":"")+
       (data.childProcedure?" is-subflow-invocation":"")
     }>
     <Handle type="target" id="in" position={inputPosition}
@@ -72,6 +73,10 @@ function ProcedureCard({data,selected}){
       <OperatorGlyph operator={data.operator}/>
       {String(data.operator).toUpperCase()}
       {data.childProcedure?" · 子流程":data.childCount?" · CHILD":""}
+      {data.globalPrecondition&&<span className="designer-node-contract-marker"
+        title="Contract.precondition 指向此 Node 的 Precondition">GLOBAL PRE</span>}
+      {data.finalGoal&&<span className="designer-node-contract-marker is-final"
+        title="可达的最终 Postcondition PASS 路由至 SUCCEEDED">FINAL GOAL</span>}
     </span>
     <strong className="designer-node-id" title={data.id}>{data.id}</strong>
     <span className="designer-node-meta" title={data.value}>
@@ -86,7 +91,7 @@ function ProcedureCard({data,selected}){
         event.stopPropagation();
         data.onEnterChild?.();
       }}>进入子流程 <span aria-hidden="true">›</span></button>}
-    <div className="designer-card-actions nodrag nopan">
+    {!data.viewOnly&&<div className="designer-card-actions nodrag nopan">
       {(data.hiddenBranchCount>0||data.branchesExpanded)&&<button type="button"
         className="designer-hidden-branches nodrag nopan"
         aria-pressed={Boolean(data.branchesExpanded)}
@@ -110,12 +115,12 @@ function ProcedureCard({data,selected}){
         onClick={event=>{event.stopPropagation();data.onViewDetails?.();}}>
         查看 <span aria-hidden="true">›</span>
       </button>
-    </div>
+    </div>}
     {Boolean(data.phaseBadges?.length)&&
       <span className="designer-node-phases" aria-label="节点内部阶段">
         {data.phaseBadges.map(phase=><span
           key={phase.name} className={"designer-phase-badge phase-"+phase.name}
-          title={phase.label+" · "+phase.count+" Steps"+(phase.operators.length
+          title={phase.label+" · "+phase.count+" "+(phase.countLabel??"Steps")+(phase.operators.length
             ?" · "+phase.operators.map(x=>x.kind+" ×"+x.count).join(" / "):"")}>
           {phase.label} · {phase.count}
         </span>)}

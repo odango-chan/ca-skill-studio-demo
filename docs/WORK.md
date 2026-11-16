@@ -1,16 +1,26 @@
 # Skill Studio 当前工作状态
 
+## 2026-11-16 · CA-SL v1alpha4 编辑器基线与 Procedure Designer
+
+本轮以 `main@087a764753dad98ce8af0e4f9377a6378754547b` 为基线；CA-SL v1alpha4 规范唯一权威来源固定为 `odango-chan/ca-skills@7f84393ee8c395e4d8c39a74cb5000a1f896588d`（`connectionagent.io/v1alpha4`，语言语义 FROZEN）。
+
+- **LSP / Source projection：** PR #195 已合入。v1alpha4 使用独立 AST 分析路径，支持 Procedure Node / Stage、Predicate 签名、Completion、Hover、Definition、References、Semantic Tokens 与源级诊断；不把 v0.2 / v1alpha3 的 `procedures/call/with/reconcile` 语法转换成 v1alpha4。
+- **Procedure Designer / Inspector：** PR #197 在现有 Theia CustomEditor 上复用同一 v1alpha4 AST，显示 Contract Goal、有效的全局 Precondition Gate、最终 Postcondition PASS → SUCCEEDED、四类有序 Stage、终态 Route，以及 Context / Producer / Predicate 参数 / Evidence 要求的只读 Source Data Flow。Producer 输出 Schema 和 Owner Evidence 保证尚未链接，界面明确保持 NOT QUALIFIED。
+- **Dependency / Capability 边界：** Dependency snapshot 与 Capability Grant 是两个独立概念。PR #197 不猜测 Tool Effect、Owner、Capability 授权或外部 Schema。剩余 §35 工作统一追踪在 [Issue #196](https://github.com/odango-chan/ca-skill-studio-demo/issues/196)。
+- **Compiler 协作：** Studio 等待 Compiler 仓 PR #11（v1alpha4 source admission）与 PR #12（Compiler / Studio 实施契约）形成可消费的稳定接口；在可信快照契约明确前，不实现第二套 Resolver 或 Owner linking。
+- **在线部署：** PR #195 resulting-main Pages 部署 [run #43796689593](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/43796689593) 已 PASS。该部署只证明 Theia 工作台可部署与浏览器验收，不代表 Compiler / Owner / Runtime / 5GC 资格成立。
+
 ## 2026-11-13 · Theia-only baseline and Classic retirement
 
-**Current main:** `347b80682fa3f9044246a140a3b9ae5856095658`. VS Code Web Extension hosted by Theia 1.76 browser-only is the sole workbench. [PR #186](https://github.com/odango-chan/ca-skill-studio-demo/pull/186) is merged; Classic standalone browser app, build scripts, CI path and Pages fallback are removed. Resulting-main Pages deployment [run #43405949805](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/43405949805) succeeded. Its build-info records `sourceSha` and `workflowSha` as `347b80682fa3f9044246a140a3b9ae5856095658`, `defaultHost: theia-browser-only`, and `classicPublished: false`.
+**Historical baseline at this checkpoint:** `347b80682fa3f9044246a140a3b9ae5856095658`. VS Code Web Extension hosted by Theia 1.76 browser-only is the sole workbench. [PR #186](https://github.com/odango-chan/ca-skill-studio-demo/pull/186) is merged; Classic standalone browser app, build scripts, CI path and Pages fallback are removed. Resulting-main Pages deployment [run #43405949805](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/43405949805) succeeded. Its build-info records `sourceSha` and `workflowSha` as `347b80682fa3f9044246a140a3b9ae5856095658`, `defaultHost: theia-browser-only`, and `classicPublished: false`.
 
 ### 当前 Theia 实现
 
 - **Package Explorer:** native Explorer container combines Skills and Plugin-managed Dependencies. Native Files remains available. Dependency Service owns acquisition, immutable snapshots and Lock state. Build Artifacts remain hidden until the Compiler supplies a real BuildResult.
 - **Native Markdown:** pinned vscode.markdown-language-features@1.95.3 owns Theia rendering and Preview lifecycle. Studio contributes shared preview theme and exact Package-local link/security policy. Native bidirectional scroll preferences are enabled; actual editor/preview scroll synchronization remains a manual inspection item until real user scrolling is verified.
-- **Inspector / Data Flow:** Producer / Consumer Data Flow lives in the right-side Inspector. The standalone Evidence view/provider is retired. Runtime Evidence remains NOT_RUN.
-- **Skill Language:** editor language features consume the canonical ca-skills Skill Language contract. Compiler Check/Build remains authoritative; LSP feedback is not a substitute for Compiler results.
-- **Examples:** 5GC establish-pdu-session and MAS establish-session-mas are separate Skill packages. Example project assembly and source acquisition are being moved toward build-time, version-pinned authoritative repository inputs; Studio-local copies must not become a second contract authority.
+- **Inspector / Data Flow:** Legacy Producer / Consumer Data Flow lives in the right-side Inspector; PR #197 adds a v1alpha4 source-only Data Flow projection for Context, stage arguments, Predicate parameters and declared Evidence requirements. The standalone Evidence view/provider is retired. Runtime Evidence remains NOT_RUN.
+- **Skill Language:** editor language features pin the frozen CA-SL v1alpha4 source in ca-skills. LSP / Designer source projection is not Compiler linking or qualification; Compiler Check/Build remains authoritative.
+- **Examples:** 5GC establish-pdu-session and MAS establish-pdu-session-mas v1alpha4 are separate, separately selectable Skill packages. Example project assembly and source acquisition are being moved toward build-time, version-pinned authoritative repository inputs; Studio-local copies must not become a second contract authority.
 
 ### Classic retirement boundary
 
