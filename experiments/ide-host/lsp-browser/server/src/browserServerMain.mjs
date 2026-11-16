@@ -41,6 +41,7 @@ const packageSnapshots = new Map();
 const symbolIndexes = new Map();
 const requestedGeneration = new Map();
 let lastCompletionDebug=null;
+const completionDebugHistory=[];
 
 function reportError(message, rootUri = undefined) {
   connection.sendNotification(SERVER_ERROR_NOTIFICATION, {
@@ -243,6 +244,7 @@ connection.onRequest("skillStudio/semanticTokenDiagnostics", params=>{
       item.uri===uri&&item.version===document?.version)),
     contractPreconditionCompletions,
     lastCompletionDebug,
+    completionDebugHistory:completionDebugHistory.filter(item=>item.uri===uri).slice(-12),
     generation:snapshot?.generation??null,
     documentCount:snapshot?.documents.length??0,
     documentFound:Boolean(document),
@@ -787,6 +789,7 @@ connection.onCompletion(params => {
   if (!value || value.analysis.state === "UNAVAILABLE" ||
       !value.analysis.documents.length) {
     lastCompletionDebug={uri,stage:"no-package-or-analysis",analysisState:value?.analysis.state??null};
+    completionDebugHistory.push(lastCompletionDebug);
     return [];
   }
   const document = documentFor(value, uri);
@@ -795,11 +798,13 @@ connection.onCompletion(params => {
     lastCompletionDebug={uri,stage:"document-not-in-current-analysis",
       analysisState:value.analysis.state,documentFound:Boolean(document),
       analysisDocuments:value.analysis.documents.length};
+    completionDebugHistory.push(lastCompletionDebug);
     return [];
   }
   const offset = offsetAt(document.text, params.position);
   if (offset === null) {
     lastCompletionDebug={uri,stage:"invalid-position",position:params.position};
+    completionDebugHistory.push(lastCompletionDebug);
     return [];
   }
   const starts = lineStarts(document.text);
@@ -813,6 +818,8 @@ connection.onCompletion(params => {
     analysisVersion:value.analysis.documents.find(item=>item.uri===uri)?.version??null,
     documentVersion:document.version,
     v4Result:v4===null?null:v4.map(item=>item.label)};
+  completionDebugHistory.push(lastCompletionDebug);
+  if(completionDebugHistory.length>100)completionDebugHistory.splice(0,completionDebugHistory.length-100);
   if(v4!==null)return v4;
 
   if (document.relativePath === "assurance/procedure.yaml" &&
