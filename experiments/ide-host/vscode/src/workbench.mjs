@@ -1083,10 +1083,11 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
               new TextEncoder().encode(text));
           }
           const uriFor=path=>vscode.Uri.joinPath(packageRoot,...path.split("/"));
-          const [contractDocument,procedureDocument,predicateDocument]=await Promise.all([
+          const [contractDocument,procedureDocument,predicateDocument,scriptDocument]=await Promise.all([
             vscode.workspace.openTextDocument(uriFor("assurance/contract.yaml")),
             vscode.workspace.openTextDocument(uriFor("assurance/procedure.yaml")),
-            vscode.workspace.openTextDocument(uriFor("assurance/predicates.yaml"))
+            vscode.workspace.openTextDocument(uriFor("assurance/predicates.yaml")),
+            vscode.workspace.openTextDocument(uriFor("scripts/runner.py"))
           ]);
           release=attachLanguagePackage(procedureDocument);
           state=languagePackages.get(packageRoot.toString());
@@ -1177,6 +1178,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           if(!references.some(item=>
             (item?.uri??item?.targetUri)?.toString()===procedureDocument.uri.toString()))
             throw Error("Native Theia Predicate References omitted the Procedure use");
+          const scriptDefinition=definitionItems(await vscode.commands.executeCommand(
+            "vscode.executeDefinitionProvider",procedureDocument.uri,
+            at(procedureDocument,"scripts/runner.py",5)));
+          if(!scriptDefinition.some(item=>
+            (item?.uri??item?.targetUri)?.toString()===scriptDocument.uri.toString()))
+            throw Error("Native Theia v1alpha4 Script Definition did not reach its Package-owned file");
           const symbols=definitionItems(await vscode.commands.executeCommand(
             "vscode.executeDocumentSymbolProvider",procedureDocument.uri));
           if(!symbols.some(item=>item.name==="check")||
@@ -1194,6 +1201,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,
             predicateReferences:references.length,
+            scriptDefinition:scriptDefinition.length,
             procedureOutline:symbols.map(item=>item.name),
             ownerQualification:"NOT_QUALIFIED"
           };
