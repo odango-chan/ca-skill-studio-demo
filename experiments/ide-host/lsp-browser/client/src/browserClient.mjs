@@ -1,4 +1,5 @@
 import { LanguageClient, ErrorAction, CloseAction, State } from "vscode-languageclient/browser";
+import { CompletionRequest } from "vscode-languageserver-protocol";
 import { SKILL_SEMANTIC_TOKEN_TYPES, SKILL_SEMANTIC_TOKEN_MODIFIERS } from "../../../../../language/semantic-tokens.mjs";
 import studioLightTheme from "../../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
 import { createSemanticTokenDecorationRenderer } from "./semantic-token-decorations.mjs";
@@ -354,6 +355,13 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       if(!started||stopped||terminalFailure)
         throw new Error("Language Worker unavailable: "+(terminalFailure??"not running"));
       return client.sendRequest(method,params,cancellationToken);
+    },
+    provideCompletion(uri,position) {
+      if(!started||stopped||terminalFailure)
+        throw new Error("Language Worker unavailable: "+(terminalFailure??"not running"));
+      return client.sendRequest(CompletionRequest.type,{
+        textDocument:{uri},position,context:{triggerKind:1}
+      });
     },
     closePackage(rootUri) {
       if (!started || stopped || terminalFailure) return;
