@@ -351,11 +351,6 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       // the snapshot before awaiting its independent analysis session.
       refreshTheiaSemanticTokens();
     },
-    sendRequest(method,params,cancellationToken) {
-      if(!started||stopped||terminalFailure)
-        throw new Error("Language Worker unavailable: "+(terminalFailure??"not running"));
-      return client.sendRequest(method,params,cancellationToken);
-    },
     provideCompletion(uri,position) {
       if(!started||stopped||terminalFailure)
         throw new Error("Language Worker unavailable: "+(terminalFailure??"not running"));
