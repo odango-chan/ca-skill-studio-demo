@@ -14,7 +14,7 @@ import {
   SKILL_SEMANTIC_TOKEN_TYPES,
   SKILL_SEMANTIC_TOKEN_MODIFIERS
 } from "../../../../../language/semantic-tokens.mjs";
-import { parseDocument, isMap, isScalar } from "yaml";
+import { parseDocument, isMap, isScalar, isSeq } from "yaml";
 import { LanguageDiagnosticSession } from "../../../../../language/lsp/session.js";
 import {
   buildSkillSymbolIndex,
@@ -438,11 +438,36 @@ connection.onHover(params => {
       index?.generation===snapshot.generation&&
       ["skillOperation","skillCapability"].includes(symbolHit.token.type)
       ? projectOperationCatalog(snapshot,index).get(symbolHit.token.name) : null;
+    let predicateSignature=null;
+    if(resolved&&symbolHit.token.type==="skillPredicate"){
+      const source=snapshot.documents.find(item=>
+        item.relativePath==="assurance/predicates.yaml");
+      if(source){
+        try{
+          const parsed=parseDocument(source.text,{version:"1.2",strict:true,
+            uniqueKeys:true,logLevel:"silent"});
+          const set=isMap(parsed.contents)?parsed.contents.get("predicates",true):null;
+          const predicate=isMap(set)?set.get(symbolHit.token.name,true):null;
+          const parameters=isMap(predicate)?predicate.get("parameters",true):null;
+          if(!parsed.errors.length&&isSeq(parameters)){
+            const signature=parameters.items.map(item=>{
+              if(!isMap(item)||item.items.length!==1)return null;
+              const pair=item.items[0];
+              const name=isScalar(pair.key)?String(pair.key.value):"";
+              const type=isScalar(pair.value)?String(pair.value.value):"";
+              return name&&type?name+": "+type:null;
+            });
+            if(signature.every(Boolean))
+              predicateSignature=symbolHit.token.name+"("+signature.join(", ")+")";
+          }
+        }catch{/* An incomplete PredicateSet must not fabricate a signature. */}
+      }
+    }
     const body=operation
       ? "**Tool Operation** `"+operation.id+"`\n\nDeclared in project dependency `"+
         operation.dependencyId+"`."
       : resolved
-      ? "**"+kind+"** `"+symbolHit.token.name+"`\n\nDeclared in `"+declaration.relativePath+"`"
+      ? "**"+kind+"** `"+(predicateSignature??symbolHit.token.name)+"`\n\nDeclared in `"+declaration.relativePath+"`"
       : "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nNo unique declaration is available in the current complete Package snapshot.";
     return {contents:{kind:"markdown",value:body},
       range:toLspRange(source.text,symbolHit.token.range)};
