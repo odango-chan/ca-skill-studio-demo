@@ -202,6 +202,19 @@ export function analyzeV1Alpha4Source(
       }
       if (isMap(rawRoutes)) for (const route of rawRoutes.items) {
         const outcome=scalar(route.key),target=scalar(route.value);
+        const allowedOutcomes=stage==="precondition"||stage==="postcondition"
+          ?new Set(["PASS","FAIL","UNKNOWN"])
+          :stage==="observation"
+            ?new Set(["SUCCEEDED","FAILED","DENIED","UNKNOWN"])
+            :part.has("script")
+              ?new Set(["SUCCEEDED","FAILED"])
+              // Tool Effect and Owner-declared outcomes require trusted linking.
+              // Accept the union here, but never infer which outcomes are valid.
+              :new Set(["SUCCEEDED","FAILED","DENIED","UNKNOWN",
+                "NOT_COMMITTED","OUTCOME_UNKNOWN","COMMITTED"]);
+        if(!allowedOutcomes.has(outcome))
+          add(p.document,"ROUTE_OUTCOME_UNKNOWN",
+            "Outcome "+outcome+" is not valid for "+stage+" stage source",route.key);
         const isTerminal=TERMINALS.has(target);
         if (!target||(!isTerminal&&!declared.has(target)))
           add(p.document,"ROUTE_TARGET_INVALID","Route target must be a Node or terminal status",route.value);
@@ -216,19 +229,25 @@ export function analyzeV1Alpha4Source(
           patchable:false
         });
       }
-      // Only validate unconditional v1alpha4 rules without guessing Owner Effect.
-      if ((stage==="precondition"||stage==="postcondition") && isMap(rawRoutes)) {
-        for(const key of ["FAIL","UNKNOWN"])if(!rawRoutes.has(key))
+      // Enforce stage-local outcomes that do not require Owner linking.
+      if (stage==="precondition"||stage==="postcondition") {
+        for(const key of ["FAIL","UNKNOWN"])if(!isMap(rawRoutes)||!rawRoutes.has(key))
           add(p.document,"ROUTE_OUTCOME_MISSING","Predicate stage requires "+key+" route",part);
-        if (stageNames.at(-1)===stage && !rawRoutes.has("PASS"))
-          add(p.document,"ROUTE_OUTCOME_MISSING","Final Predicate stage requires PASS route",part);
       }
-      // Mutation-only OUTCOME_UNKNOWN is decided from an exact trusted Owner
-      // Effect: never flag a legal READ just because a catalog is absent.
+      if(stage==="operation"&&part.has("script")&&
+         (!isMap(rawRoutes)||!rawRoutes.has("FAILED")))
+        add(p.document,"ROUTE_OUTCOME_MISSING","Procedure Script requires FAILED route",part);
       const next=stageNames[stageNames.indexOf(stage)+1];
       const normal=(stage==="precondition"||stage==="postcondition")?"PASS":"SUCCEEDED";
-      if (next && !(isMap(rawRoutes)&&rawRoutes.has(normal)))
-        outgoing.push(id+"."+next);
+      if(next){
+        if(isMap(rawRoutes)&&rawRoutes.has(normal))
+          add(p.document,"ROUTE_NORMAL_OUTCOME_NOT_ALLOWED",
+            "Normal "+normal+" outcome advances to the next stage and must not be routed explicitly",rawRoutes.get(normal,true));
+        else outgoing.push(id+"."+next);
+      }else if(!isMap(rawRoutes)||!rawRoutes.has(normal)){
+        add(p.document,"ROUTE_OUTCOME_MISSING",
+          "Final "+stage+" stage requires "+normal+" route",part);
+      }
       adjacency.set(id+"."+stage,outgoing);
     }
     nodes.push({
