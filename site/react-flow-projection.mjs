@@ -38,6 +38,8 @@ export function summarizeNodePhases(node){
     return node.stages.map(stage=>({
       name:stage.name,label:PHASE_LABELS[stage.name]??String(stage.name).toUpperCase(),
       count:Number.isSafeInteger(stage.count)?stage.count:1,
+      countLabel:stage.name==="precondition"||stage.name==="postcondition"
+        ?"Predicates":"Stage",
       operators:stage.target?[{kind:stage.name==="observation"?"OBSERVATION":
         stage.name==="operation"?"TOOL":"PREDICATE",count:1}]:[],
       routeCount:Array.isArray(stage.routeOutcomes)?stage.routeOutcomes.length:0
