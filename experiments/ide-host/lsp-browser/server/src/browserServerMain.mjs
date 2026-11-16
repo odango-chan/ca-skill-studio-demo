@@ -581,17 +581,18 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
   // Track the current YAML indentation scope. Looking for the last stage
   // alone leaks stale completion candidates across Nodes and into arguments.
   const lines=document.text.slice(0,lineStart).split(/\r?\n/);
-  let inNodes=false,inNode=false,stage=null,section=null;
+  let inNodes=false,inNode=false,nodeId=null,stage=null,section=null;
   for(const line of lines){
     if(/^nodes:\s*$/.test(line)){
-      inNodes=true;inNode=false;stage=null;section=null;continue;
+      inNodes=true;inNode=false;nodeId=null;stage=null;section=null;continue;
     }
     if(/^[^\s#]/.test(line)){
-      inNodes=false;inNode=false;stage=null;section=null;continue;
+      inNodes=false;inNode=false;nodeId=null;stage=null;section=null;continue;
     }
     if(!inNodes)continue;
-    if(/^ {2}[A-Za-z][A-Za-z0-9_-]*:\s*$/.test(line)){
-      inNode=true;stage=null;section=null;continue;
+    const node=/^ {2}([A-Za-z][A-Za-z0-9_-]*):\s*$/.exec(line);
+    if(node){
+      inNode=true;nodeId=node[1];stage=null;section=null;continue;
     }
     if(!inNode)continue;
     const nextStage=/^ {4}(precondition|operation|observation|postcondition):\s*$/.exec(line);
@@ -609,6 +610,10 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
   const localNodes=isMap(nodes)?nodes.items
     .filter(item=>isScalar(item.key)&&typeof item.key.value==="string")
     .map(item=>item.key.value):[];
+  const currentNode=isMap(nodes)&&nodeId?nodes.get(nodeId,true):null;
+  const currentStages=["precondition","operation","observation","postcondition"]
+    .filter(name=>isMap(currentNode)&&currentNode.has(name));
+  const finalStage=currentStages.at(-1)===stage;
   const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="CA-SL v1alpha4 source syntax")=>
     labels.filter(name=>name.startsWith(typed)).map(name=>({
       label:name,kind,detail,
@@ -690,27 +695,36 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
 
   const routeKey=/^( {8})([A-Z_]*)$/.exec(prefix);
   if(routeKey && inNode && section==="routes" && stage){
-    const keys=stage==="precondition"||stage==="postcondition"
-      ?["PASS:","FAIL:","UNKNOWN:"] :
-      stage==="observation"?["SUCCEEDED:","FAILED:","UNKNOWN:","DENIED:"]:
-      ["SUCCEEDED:","FAILED:","DENIED:","OUTCOME_UNKNOWN:"];
+    let keys;
+    if(stage==="precondition"||stage==="postcondition"){
+      keys=["FAIL:","UNKNOWN:"];
+      if(finalStage)keys.push("PASS:");
+    }else if(stage==="observation"){
+      keys=["FAILED:","DENIED:","UNKNOWN:"];
+      if(finalStage)keys.push("SUCCEEDED:");
+    }else{
+      const operation=isMap(currentNode)?currentNode.get("operation",true):null;
+      const scriptOperation=isMap(operation)&&operation.has("script");
+      keys=scriptOperation?["FAILED:"]:
+        ["FAILED:","DENIED:","UNKNOWN:","OUTCOME_UNKNOWN:"];
+      if(finalStage)keys.push("SUCCEEDED:");
+    }
     return make(keys,routeKey[2],lineStart+8,CompletionItemKind.EnumMember,
-      "Outcome key; actual Owner Effect/allowed outcomes need Compiler linking");
+      "Outcome key; Tool Owner Effect-specific outcomes require trusted Compiler linking");
   }
 
-  const routeTarget=/^( {8}(PASS|FAIL|UNKNOWN|SUCCEEDED|FAILED|DENIED|OUTCOME_UNKNOWN):\s*)([A-Za-z0-9_-]*)$/.exec(prefix);
+  const routeTarget=/^( {8}(PASS|FAIL|UNKNOWN|SUCCEEDED|FAILED|DENIED|NOT_COMMITTED|OUTCOME_UNKNOWN|COMMITTED):\s*)([A-Za-z0-9_-]*)$/.exec(prefix);
   if(routeTarget && inNode && section==="routes" && stage){
     const outcome=routeTarget[2],typed=routeTarget[3];
-    const terminal=outcome==="UNKNOWN"||outcome==="OUTCOME_UNKNOWN"
-      ?["UNRESOLVED","SAFE_STOPPED"]:
-      outcome==="FAIL"||outcome==="FAILED"||outcome==="DENIED"
-      ?["FAILED","SAFE_STOPPED"]:stage==="postcondition"&&outcome==="PASS"
-      ?["SUCCEEDED"]:["SAFE_STOPPED"];
+    const terminals=["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"]
+      .filter(value=>value!=="SUCCEEDED"||
+        (stage==="postcondition"&&outcome==="PASS"&&finalStage));
     // An unresolved Mutation may only stop. Never offer a Node as the
     // target of OUTCOME_UNKNOWN: it would violate frozen §12.7/§22.
-    const choices=outcome==="OUTCOME_UNKNOWN"?terminal:[...localNodes,...terminal];
+    const choices=outcome==="OUTCOME_UNKNOWN"
+      ?["UNRESOLVED","SAFE_STOPPED"]:[...localNodes,...terminals];
     return make(choices,typed,offset-typed.length,CompletionItemKind.Reference,
-      "Local Node / terminal; final SUCCEEDED only from Postcondition PASS");
+      "Local Node / four terminal statuses; SUCCEEDED only from final Postcondition PASS");
   }
 
   const script=/^ {6}script:[ \t]*([A-Za-z0-9_./-]*)$/.exec(prefix);
