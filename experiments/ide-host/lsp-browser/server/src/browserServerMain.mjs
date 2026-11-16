@@ -40,8 +40,6 @@ const packageAnalyses = new Map();
 const packageSnapshots = new Map();
 const symbolIndexes = new Map();
 const requestedGeneration = new Map();
-let lastCompletionDebug=null;
-const completionDebugHistory=[];
 
 function reportError(message, rootUri = undefined) {
   connection.sendNotification(SERVER_ERROR_NOTIFICATION, {
@@ -214,51 +212,6 @@ function snapshotDocumentFor(snapshot, uri) {
 function documentFor(value, uri) {
   return value?.snapshot.documents.find(document => document.uri === uri) ?? null;
 }
-
-connection.onRequest("skillStudio/semanticTokenDiagnostics", params=>{
-  const uri=params?.uri;
-  const snapshot=typeof uri==="string"?packageSnapshotForUri(uri):null;
-  const value=snapshot?packageAnalyses.get(snapshot.rootUri):null;
-  const document=snapshot?snapshotDocumentFor(snapshot,uri):null;
-  const spans=document?collectSkillSemanticTokenSpans(
-    document.text,document.relativePath
-  ):[];
-  const encoded=document?semanticTokensForDocument(document):{data:[]};
-  let contractPreconditionCompletions=[];
-  if(value&&document?.relativePath==="assurance/contract.yaml"){
-    const gateStart=document.text.indexOf("check.precondition");
-    if(gateStart>=0){
-      const offset=gateStart+6;
-      const lineStart=document.text.lastIndexOf("\n",offset-1)+1;
-      const prefix=document.text.slice(lineStart,offset);
-      contractPreconditionCompletions=(v1Alpha4Completions(
-        value,document,prefix,offset,lineStart)??[]).map(item=>item.label);
-    }
-  }
-  return {
-    packageCount:packageSnapshots.size,
-    packageFound:Boolean(snapshot),
-    analysisState:value?.analysis.state??null,
-    analysisDocumentCount:value?.analysis.documents?.length??0,
-    analysisDocumentMatch:Boolean(value?.analysis.documents?.some(item=>
-      item.uri===uri&&item.version===document?.version)),
-    contractPreconditionCompletions,
-    lastCompletionDebug,
-    completionDebugHistory:completionDebugHistory.filter(item=>item.uri===uri).slice(-12),
-    generation:snapshot?.generation??null,
-    documentCount:snapshot?.documents.length??0,
-    documentFound:Boolean(document),
-    relativePath:document?.relativePath??null,
-    textLength:typeof document?.text==="string"?document.text.length:0,
-    spanCount:spans.length,
-    mappedSpanCount:spans.filter(span=>Number.isSafeInteger(span.tokenType)&&
-      Number.isSafeInteger(span.tokenModifiers)).length,
-    encodedTokenCount:Math.floor((encoded?.data?.length??0)/5),
-    sampleTokenTypes:spans.slice(0,6).map(span=>({
-      type:span.type,tokenType:span.tokenType,tokenModifiers:span.tokenModifiers
-    }))
-  };
-});
 
 function allReferences(analysis) {
   return [...analysis.scriptReferences, ...analysis.schemaReferences];
@@ -787,39 +740,16 @@ connection.onCompletion(params => {
   const uri=params.textDocument.uri;
   const value = packageForUri(uri);
   if (!value || value.analysis.state === "UNAVAILABLE" ||
-      !value.analysis.documents.length) {
-    lastCompletionDebug={uri,stage:"no-package-or-analysis",analysisState:value?.analysis.state??null};
-    completionDebugHistory.push(lastCompletionDebug);
-    return [];
-  }
+      !value.analysis.documents.length) return [];
   const document = documentFor(value, uri);
   if (!document || !value.analysis.documents.some(item =>
-      item.uri === document.uri && item.version === document.version)) {
-    lastCompletionDebug={uri,stage:"document-not-in-current-analysis",
-      analysisState:value.analysis.state,documentFound:Boolean(document),
-      analysisDocuments:value.analysis.documents.length};
-    completionDebugHistory.push(lastCompletionDebug);
-    return [];
-  }
+      item.uri === document.uri && item.version === document.version)) return [];
   const offset = offsetAt(document.text, params.position);
-  if (offset === null) {
-    lastCompletionDebug={uri,stage:"invalid-position",position:params.position};
-    completionDebugHistory.push(lastCompletionDebug);
-    return [];
-  }
+  if (offset === null) return [];
   const starts = lineStarts(document.text);
   const lineStart = starts[params.position.line];
   const prefix = document.text.slice(lineStart, offset);
   const v4 = v1Alpha4Completions(value,document,prefix,offset,lineStart);
-  lastCompletionDebug={uri,relativePath:document.relativePath,position:params.position,
-    offset,lineStart,prefix,analysisState:value.analysis.state,
-    snapshotGeneration:value.snapshot.generation,
-    snapshotCompleteness:value.snapshot.completeness,
-    analysisVersion:value.analysis.documents.find(item=>item.uri===uri)?.version??null,
-    documentVersion:document.version,
-    v4Result:v4===null?null:v4.map(item=>item.label)};
-  completionDebugHistory.push(lastCompletionDebug);
-  if(completionDebugHistory.length>100)completionDebugHistory.splice(0,completionDebugHistory.length-100);
   if(v4!==null)return v4;
 
   if (document.relativePath === "assurance/procedure.yaml" &&
