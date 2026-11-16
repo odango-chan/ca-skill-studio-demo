@@ -58,7 +58,10 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
         for(const callback of listeners)callback({document});
         return true;
       },
-      fs:{readFile:async()=>new TextEncoder().encode(readFileSync("site/samples/packages/establish-pdu-session/assurance/predicates.yaml","utf8"))},
+      fs:{readFile:async uri=>new TextEncoder().encode(readFileSync(
+        uri.path.endsWith("/assurance/contract.yaml")
+          ?"site/samples/packages/establish-pdu-session/assurance/contract.yaml"
+          :"site/samples/packages/establish-pdu-session/assurance/predicates.yaml","utf8"))},
       findFiles:async()=>[uri],
       asRelativePath:file=>file.path
     },
@@ -137,6 +140,12 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   await onMessage({type:"ready"});
   assert.equal(posted.at(-1).type,"snapshot");
   assert.equal(posted.at(-1).version,21);
+  assert.equal(posted.at(-1).packageRootUri,"file:///workspace");
+  assert.equal(posted.at(-1).packageName,"workspace");
+  assert.equal(posted.at(-1).contractText,
+    readFileSync("site/samples/packages/establish-pdu-session/assurance/contract.yaml","utf8"));
+  assert.equal(posted.at(-1).predicatesText,
+    readFileSync("site/samples/packages/establish-pdu-session/assurance/predicates.yaml","utf8"));
   await onMessage({type:"exportPackageZip"});
   assert.ok(registered.some(args=>args[0]==="skillStudio.exportPackageZip"),
     "the native Procedure Webview routes ZIP export to the host command");
