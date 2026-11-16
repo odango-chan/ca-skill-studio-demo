@@ -422,6 +422,14 @@ connection.onHover(params => {
   const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
   if(symbolHit){
     const declaration=uniqueSkillSymbolDeclaration(symbolHit);
+    const procedureSource=snapshot.documents.find(item=>
+      item.relativePath==="assurance/procedure.yaml");
+    const v1alpha4Package=Boolean(procedureSource&&
+      /^start:[ \t]*/m.test(procedureSource.text)&&
+      /^nodes:[ \t]*/m.test(procedureSource.text));
+    const scriptDocument=declaration&&symbolHit.token.type==="skillReference"
+      ?snapshot.documents.find(item=>item.relativePath===declaration.relativePath):null;
+    const scriptName=scriptDocument?scriptToolName(scriptDocument.text):null;
     const kind=({
       skillProcedure:"Procedure",
       skillStep:"Procedure node",
@@ -430,7 +438,8 @@ connection.onHover(params => {
       skillObservation:"Observation Tool",
       skillCapability:"Capability grant",
       skillSchema:"Schema",
-      skillReference:symbolHit.token.name.startsWith("scripts/")?"Skill Script":"Reference"
+      skillReference:symbolHit.token.name.startsWith("scripts/")
+        ?(v1alpha4Package?"Skill Script":"Script / Reference"):"Reference"
     })[symbolHit.token.type]??"Skill symbol";
     const resolved=Boolean(declaration&&snapshot.completeness==="complete"&&
       index?.generation===snapshot.generation);
@@ -439,7 +448,7 @@ connection.onHover(params => {
       ["skillOperation","skillCapability"].includes(symbolHit.token.type)
       ? projectOperationCatalog(snapshot,index).get(symbolHit.token.name) : null;
     let predicateSignature=null;
-    if(resolved&&symbolHit.token.type==="skillPredicate"){
+    if(v1alpha4Package&&resolved&&symbolHit.token.type==="skillPredicate"){
       const source=snapshot.documents.find(item=>
         item.relativePath==="assurance/predicates.yaml");
       if(source){
@@ -467,7 +476,7 @@ connection.onHover(params => {
       ? "**Tool Operation** `"+operation.id+"`\n\nDeclared in project dependency `"+
         operation.dependencyId+"`."
       : resolved
-      ? "**"+kind+"** `"+(predicateSignature??symbolHit.token.name)+"`\n\nDeclared in `"+declaration.relativePath+"`"
+      ? "**"+kind+"** `"+(scriptName??predicateSignature??symbolHit.token.name)+"`\n\nDeclared in `"+declaration.relativePath+"`"
       : "**"+kind+" reference** `"+symbolHit.token.name+"`\n\nNo unique declaration is available in the current complete Package snapshot.";
     return {contents:{kind:"markdown",value:body},
       range:toLspRange(source.text,symbolHit.token.range)};
