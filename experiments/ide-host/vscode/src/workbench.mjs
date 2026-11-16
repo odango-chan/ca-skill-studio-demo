@@ -1141,6 +1141,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           require(observationFields,"arguments:","Observation field");
           if(observationFields.includes("script:")||observationFields.includes("retryOf:"))
             throw Error("Observation offered an Operation-only field");
+          require(operationFields,"tool:","Operation field");
           require(operationFields,"script:","Operation field");
           require(operationFields,"arguments:","Operation field");
           require(routeKeys,"SUCCEEDED:","Operation route key");
