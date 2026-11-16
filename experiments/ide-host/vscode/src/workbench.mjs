@@ -1109,13 +1109,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
               document.uri.toString(),position);
             return labels(result);
           };
-          const contractProbeSource=contractDocument.getText();
-          const contractProbeStart=contractProbeSource.indexOf("check.precondition");
-          const contractProbePosition=contractDocument.positionAt(contractProbeStart+6);
           const contractGate=await complete(contractDocument,"check.precondition",6);
-          const serverContractDiagnostics=await languageClient.sendRequest(
-            "skillStudio/semanticTokenDiagnostics",{uri:contractDocument.uri.toString()});
-          const serverGateLabels=serverContractDiagnostics?.contractPreconditionCompletions??[];
           const schemaPath=await complete(contractDocument,"schemas/request.schema.yaml",8);
           const entry=await complete(procedureDocument,"start: check",7);
           const predicate=await complete(procedureDocument,"demo.ready",5);
@@ -1137,9 +1131,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           };
           if(!contractGate.includes("check.precondition"))
             throw Error("Native Theia Contract Precondition completion omitted check.precondition: "+
-              JSON.stringify({contractGate,serverGateLabels,serverContractDiagnostics,
-                contractProbeStart,contractProbePosition,
-                contractProbePrefix:contractProbeSource.slice(0,110)}));
+              JSON.stringify(contractGate));
           require(schemaPath,"schemas/request.schema.yaml","Request Schema");
           require(entry,"check","Procedure start Node");
           require(predicate,"demo.ready","Predicate");
@@ -1211,7 +1203,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
           return {
             status:status.state,snapshotCompleteness:state.lastSentSnapshot.completeness,
             contractPreconditionCompletion:contractGate,
-            serverContractDiagnostics,serverGateLabels,
             requestSchemaCompletion:schemaPath,startNodeCompletion:entry,
             predicateCompletion:predicate,
             preconditionFields,observationFields,operationFields,
