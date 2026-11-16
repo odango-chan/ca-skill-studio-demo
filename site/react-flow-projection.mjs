@@ -29,8 +29,20 @@ export function classifyRouteTone(outcomes){
 // The node card and contextual legend are read-only views of existing YAML.
 // A Phase Step's operator is not a new graph Node or an assertion that TOOL
 // and CALL have the same Runtime semantics.
-const PHASE_LABELS=Object.freeze({preconditions:"PRE",postconditions:"POST"});
+const PHASE_LABELS=Object.freeze({
+  preconditions:"PRE",postconditions:"POST",
+  precondition:"PRE",operation:"OP",observation:"OBS",postcondition:"POST"
+});
 export function summarizeNodePhases(node){
+  if(Array.isArray(node?.stages)){
+    return node.stages.map(stage=>({
+      name:stage.name,label:PHASE_LABELS[stage.name]??String(stage.name).toUpperCase(),
+      count:Number.isSafeInteger(stage.count)?stage.count:1,
+      operators:stage.target?[{kind:stage.name==="observation"?"OBSERVATION":
+        stage.name==="operation"?"TOOL":"PREDICATE",count:1}]:[],
+      routeCount:Array.isArray(stage.routeOutcomes)?stage.routeOutcomes.length:0
+    }));
+  }
   const phases=[];
   for(const name of ["preconditions","postconditions"]){
     const phase=node?.phases?.find(item=>item.name===name);
@@ -73,8 +85,10 @@ export function flowBundleSelectionId(bundle){
     bundle.routes.map(route=>route.id).sort().join("|");
 }
 export function routeOrigin(routeSource){
-  if(routeSource==="preconditions.on")return "PRE";
-  if(routeSource==="postconditions.on")return "POST";
+  if(routeSource==="preconditions.on"||routeSource==="precondition")return "PRE";
+  if(routeSource==="postconditions.on"||routeSource==="postcondition")return "POST";
+  if(routeSource==="operation")return "OP";
+  if(routeSource==="observation")return "OBS";
   if(routeSource==="operator.on")return "OP";
   return "OTHER";
 }
@@ -113,6 +127,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         start:node.id===procedure.start,
         terminal:node.operator==="terminal",
         childCount:node.children?.length??0,direction,
+        viewOnly:Boolean(node.viewOnly),
+        globalPrecondition:Boolean(node.globalPrecondition),
+        finalGoal:Boolean(node.finalGoal),
         // A procedure invocation is a real Node referring to a separate
         // definition. Never inline or duplicate the child in this graph.
         childProcedure:node.operator==="procedure"&&
@@ -121,9 +138,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         phaseBadges:summarizeNodePhases(node),
         hiddenBranchCount:graph.hiddenByNode?.get(node.id)??0,
         branchesExpanded:graph.expandedNodeIds?.has(node.id)??false,
-        canAddRoute:node.operator!=="terminal"&&
-          selection?.kind==="node"&&selection.id===node.id&&
-          routeCreationSourceId===node.id,
+        canAddRoute:!node.viewOnly&&!String(procedure.profile??"").includes("v1alpha4")&&
+          node.operator!=="terminal"&&selection?.kind==="node"&&
+          selection.id===node.id&&routeCreationSourceId===node.id,
         ports:ports.get(node.id)??[],
         portSignature:(ports.get(node.id)??[])
           .map(port=>port.id+":"+port.side+":"+port.offset).join("|")
