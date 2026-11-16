@@ -200,7 +200,7 @@ test("v1alpha4 Inspector shows Contract Goal and source-only Producer / Evidence
   assert.deepEqual(binding.evidenceRequirements,[
     {parameter:"data",evidence:["ca::demo.verified"]}
   ]);
-  assert.equal(binding.line,26,"Predicate argument navigation uses the argument's exact line");
+  assert.equal(binding.line,24,"Predicate argument navigation uses the argument's exact line");
   const rows=[];
   const collect=items=>{for(const item of items??[]){rows.push(item);collect(item.children);}};
   collect(view.inspection);
