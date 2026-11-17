@@ -639,6 +639,46 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
   const currentNode=isMap(nodes)&&nodeId?nodes.get(nodeId,true):null;
   const currentStages=["precondition","operation","observation","postcondition"]
     .filter(name=>isMap(currentNode)&&currentNode.has(name));
+  // Response-boundary completion must follow the event-accepted business path.
+  // In particular, do not suggest a Node that is reachable only through this
+  // Wait's TIMEOUT edge. Wait-control routes are intentionally not traversed.
+  const waitResponseTargets=()=>{
+    const reachable=new Set(),queue=[];
+    let globalGate="";
+    const contractDocument=value.snapshot.documents.find(item=>
+      item.relativePath==="assurance/contract.yaml");
+    if(contractDocument){
+      try{
+        const contractTree=parseDocument(contractDocument.text,{version:"1.2",strict:true,
+          uniqueKeys:true,logLevel:"silent"});
+        if(!contractTree.errors.length&&isMap(contractTree.contents))
+          globalGate=String(contractTree.contents.get("precondition",true)?.value??"");
+      }catch{}
+    }
+    const enqueueBusinessRoutes=(id)=>{
+      const body=isMap(nodes)?nodes.get(id,true):null;
+      if(!isMap(body))return;
+      for(const stage of ["precondition","operation","observation","postcondition"]){
+        if(id===nodeId&&globalGate===id+".precondition"&&stage==="precondition")continue;
+        const stageNode=body.get(stage,true);
+        const routes=isMap(stageNode)?stageNode.get("routes",true):null;
+        if(!isMap(routes))continue;
+        for(const route of routes.items){
+          const target=isScalar(route.value)?String(route.value.value):"";
+          if(localNodes.includes(target)&&target!==nodeId&&!reachable.has(target))
+            queue.push(target);
+        }
+      }
+    };
+    enqueueBusinessRoutes(nodeId);
+    while(queue.length){
+      const id=queue.shift();
+      if(reachable.has(id))continue;
+      reachable.add(id);
+      enqueueBusinessRoutes(id);
+    }
+    return [...reachable];
+  };
   const finalStage=currentStages.at(-1)===stage;
   const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="CA-SL v1alpha5 candidate source syntax")=>
     labels.filter(name=>name.startsWith(typed)).map(name=>({
@@ -728,7 +768,7 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
   const waitResponseTarget=/^ {8}after:[ \\t]*([A-Za-z0-9_-]*)$/.exec(prefix);
   if(waitResponseTarget&&inWait&&waitSection==="response"&&
      value.snapshot.completeness==="complete")
-    return make(localNodes.filter(id=>id!==nodeId),waitResponseTarget[1],
+    return make(waitResponseTargets(),waitResponseTarget[1],
       offset-waitResponseTarget[1].length,CompletionItemKind.Reference,
       "Declared response-boundary Node on the accepted-event path");
 
