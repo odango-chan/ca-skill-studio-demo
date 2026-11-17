@@ -4,14 +4,14 @@ import { handleRequest } from "../src/index.mjs";
 const origin = "https://odango-chan.github.io";
 const aud = "studio-gateway-audience";
 const env = (extra = {}) => ({
-  ACCESS_AUD: aud, ALLOWED_ORIGINS: origin, ALLOWED_MODELS: "test-model,deepseek-chat",
+  ACCESS_AUD: aud, ALLOWED_ORIGINS: origin, ALLOWED_MODELS: "test-model,deepseek-chat", PROVIDER_MODEL: "test-model",
   MAX_REQUEST_BYTES: "65536", MAX_OUTPUT_TOKENS: "2048", PROVIDER_API_KEY: "provider-secret-test-only",
   PROVIDER_CHAT_COMPLETIONS_URL: "https://provider.example/v1/chat/completions",
   USER_RATE_LIMITER: { async limit({ key }) { assert.equal(key, "author@example.com"); return { success: true }; } },
   ...extra,
 });
 const ctx = (extra = {}) => ({ access: { aud, async getIdentity() { return { email: "Author@Example.com" }; }, ...extra } });
-const payload = (extra = {}) => ({ model: "test-model", messages: [{ role: "user", content: "Draft a Procedure." }], stream: true, ...extra });
+const payload = (extra = {}) => ({ messages: [{ role: "user", content: "Draft a Procedure." }], ...extra });
 const req = (body, extra = {}) => new Request("https://gateway.example/v1/chat/completions", {
   method: "POST", headers: { Origin: origin, "Content-Type": "application/json", ...extra }, body: JSON.stringify(body),
 });
@@ -73,7 +73,7 @@ test("rate limit is keyed by verified identity and fails closed", async () => {
 test("request body, model, schema and output limits are enforced", async () => {
   const cases = [
     [payload({ model: "unlisted" }), "model_not_allowed"],
-    [payload({ stream: false }), "streaming_required"],
+    [payload({ stream: "yes" }), "invalid_stream"],
     [payload({ arbitrary_url: "https://attacker.example" }), "unsupported_request_field"],
     [payload({ max_tokens: 2049 }), "output_token_limit_exceeded"],
     [payload({ response_format: { type: "json_schema", json_schema: {} } }), "unsupported_response_format"],
@@ -103,13 +103,15 @@ test("valid request uses only server credentials and streams the provider respon
   let target;
   let init;
   const sse = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); controller.close(); } });
-  const response = await handleRequest(req(payload({ max_tokens: 512, temperature: 0.2, response_format: { type: "json_object" } }), { Authorization: "Bearer browser-secret", "X-Provider-Key": "attacker" }), env(), ctx(), async (url, options) => {
+  const response = await handleRequest(req(payload({ stream: true, max_tokens: 512, temperature: 0.2, response_format: { type: "json_object" } }), { Authorization: "Bearer browser-secret", "X-Provider-Key": "attacker" }), env(), ctx(), async (url, options) => {
     target = url; init = options;
     return new Response(sse, { status: 200, headers: { "Content-Type": "text/event-stream", "X-Upstream-Secret": "must-not-pass" } });
   });
   assert.equal(target, "https://provider.example/v1/chat/completions");
   assert.equal(init.headers.Authorization, "Bearer provider-secret-test-only");
   assert.equal(init.headers["X-Provider-Key"], undefined);
+  assert.equal(JSON.parse(init.body).model, "test-model");
+  assert.equal(JSON.parse(init.body).stream, true);
   assert.equal(JSON.parse(init.body).max_tokens, 512);
   assert.deepEqual(JSON.parse(init.body).response_format, { type: "json_object" });
   assert.equal(response.status, 200);
@@ -155,6 +157,33 @@ test("cancelling the downstream stream cancels the upstream body", async () => {
   assert.equal(response.status, 200);
   await response.body.cancel();
   assert.equal(cancelled, true);
+});
+
+test("non-streaming Authoring Core requests use the server-selected model and JSON response", async () => {
+  let init;
+  const providerResponse = { choices: [{ message: { content: "{\\"schema\\":\\"ca-studio.ai-model-proposal/v1\\"}" } }] };
+  const response = await handleRequest(req(payload({ response_format: { type: "json_object" } })), env(), ctx(), async (_url, options) => {
+    init = options;
+    return Response.json(providerResponse);
+  });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /application\\/json/);
+  assert.equal(init.headers.Accept, "application/json");
+  const sent = JSON.parse(init.body);
+  assert.equal(sent.model, "test-model");
+  assert.equal(sent.stream, false);
+  assert.deepEqual(sent.response_format, { type: "json_object" });
+  assert.deepEqual(await response.json(), providerResponse);
+});
+
+test("text content parts accepted by the host-neutral model client are preserved", async () => {
+  let sent;
+  const response = await handleRequest(req(payload({ messages: [{ role: "user", content: [{ type: "text", text: "Review this Procedure." }] }] })), env(), ctx(), async (_url, options) => {
+    sent = JSON.parse(options.body);
+    return Response.json({ choices: [{ message: { content: "ok" } }] });
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(sent.messages[0].content, [{ type: "text", text: "Review this Procedure." }]);
 });
 
 test("provider response-header wait is bounded by a timeout", async () => {
