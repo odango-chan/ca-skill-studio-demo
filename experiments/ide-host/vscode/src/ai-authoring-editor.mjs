@@ -16,9 +16,9 @@ import { isProcedurePath } from "./bridge.mjs";
 import { assertStudioMutation } from "./project-policy.mjs";
 
 const LANGUAGE_TARGET = "connectionagent.io/v1alpha5";
-const MAX_CONTEXT_ITEMS = 128;
+const MAX_CONTEXT_ITEMS = 512;
 const TEXT_DEPENDENCY_FILE = /\.(?:json|ya?ml|md)$/i;
-const SENSITIVE_SEGMENT = /(?:^|[._-])(?:secrets?|credentials?|private[-_]?keys?|access[-_]?tokens?|tokens?)(?:[._-]|$)/i;
+const SENSITIVE_SEGMENT = /(?:^|[._-])(?:secrets?|credentials?|passwords?|api[-_]?keys?|private[-_]?keys?|access[-_]?tokens?|tokens?|auth)(?:[._-]|$)/i;
 const encoder = new TextEncoder();
 
 async function sha256Hex(value) {
@@ -52,7 +52,7 @@ export function createPackageRevisionTracker() {
       path: item.relativePath,
       version: item.version,
       text: item.text,
-    }));
+    })).sort((left, right) => left.path.localeCompare(right.path));
     const dependencies = (dependencyResolution.snapshots ?? [])
       .map((item) => ({ id: item.id, kind: item.kind, digest: item.snapshotDigest }))
       .sort((left, right) => left.id.localeCompare(right.id));
@@ -327,8 +327,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       post({ type: "error", message: "当前上下文尚未就绪，请先刷新。" });
       return;
     }
-    if (session.controller) {
-      post({ type: "error", message: "已有模型请求正在运行。" });
+    if (session.generating || session.controller) {
+      post({ type: "error", message: "已有模型请求正在准备或运行。" });
       return;
     }
     const task = typeof message.task === "string" ? message.task.trim() : "";
@@ -354,6 +354,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       return;
     }
 
+    session.generating = true;
     const document = session.document;
     const initial = session.context;
     const selectedResources = initial.resources.map((item) => ({
@@ -378,6 +379,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         maxBytes: MAX_CONTEXT_PACK_BYTES,
       });
     } catch (error) {
+      session.generating = false;
       post({ type: "error", message: String(error?.message ?? error) });
       return;
     }
@@ -401,6 +403,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       "发送并生成提案",
     );
     if (confirmed !== "发送并生成提案") {
+      session.generating = false;
       post({ type: "status", message: "已取消发送；没有向模型发送数据。" });
       return;
     }
@@ -410,11 +413,13 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       if (document.version !== initial.procedure.version ||
         current.generation !== initial.generation ||
         document.getText() !== initial.procedure.text) {
+        session.generating = false;
         await refreshContext();
         post({ type: "error", message: "生成期间 Package 或 Procedure 已变化。上下文已刷新，请重新检查后再生成。" });
         return;
       }
     } catch (error) {
+      session.generating = false;
       post({ type: "error", message: String(error?.message ?? error) });
       return;
     }
@@ -520,6 +525,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       });
     } finally {
       if (session?.controller === controller) session.controller = null;
+      if (session) session.generating = false;
       post({ type: "status", message: "请求结束。Compiler Check: NOT_RUN。", busy: false });
     }
   }
@@ -549,6 +555,10 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
   }
 
   async function handleApply(message) {
+    if (session?.applying) {
+      post({ type: "error", message: "正在应用已选修改，请稍候。" });
+      return;
+    }
     if (!session?.pending) {
       post({ type: "error", message: "没有可应用的 READY Patch Plan。" });
       return;
@@ -563,8 +573,9 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       post({ type: "error", message: "该提案处于 PREVIEW ONLY 状态，尚未满足 v1alpha5 语义 / Owner 验证门槛。" });
       return;
     }
+    session.applying = true;
     const document = pending.document;
-    post({ type: "status", message: "正在检查文档与 Package revision…" });
+    post({ type: "status", message: "正在检查文档与 Package revision…", busy: true });
     try {
       const current = await collectAuthoringState(document);
       if (document.version !== pending.documentVersion ||
@@ -600,6 +611,9 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       await refreshContext();
     } catch (error) {
       post({ type: "error", message: String(error?.message ?? error) });
+    } finally {
+      if (session) session.applying = false;
+      post({ type: "status", message: "应用操作结束。Compiler Check: NOT_RUN。", busy: false });
     }
   }
 
