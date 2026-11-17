@@ -1,4 +1,4 @@
-import { CONTEXT_PACK_SCHEMA } from "./context-pack.mjs";
+import { CONTEXT_PACK_SCHEMA, MAX_CONTEXT_PACK_BYTES } from "./context-pack.mjs";
 import {
   MODEL_PROPOSAL_SCHEMA,
   ALLOWED_SEMANTIC_OPERATIONS,
@@ -34,16 +34,23 @@ function exactKeys(value, keys) {
 
 function safeLabel(kind, label) {
   if (typeof label !== "string" || label.startsWith("/") || label.includes("\\") ||
-    label.split("/").some((part) => !part || part === "." || part === ".." || part.startsWith("."))) {
-    return false;
+    label.includes(":") || label.includes("?") || label.includes("#") || label.includes("%")) {
+    if (kind !== "dependency") return false;
   }
   if (kind === "procedure") return label === "assurance/procedure.yaml";
   if (kind === "contract") return label === "assurance/contract.yaml";
   if (kind === "predicate") return label === "assurance/predicates.yaml";
+  if (kind === "dependency") {
+    return /^dependency:[A-Za-z0-9][A-Za-z0-9._:-]{0,159}@[A-Za-z0-9][A-Za-z0-9._+:-]{0,127}$/.test(label);
+  }
+  const parts = label.split("/");
+  const blocked = new Set([".git", "node_modules", "lib", "output", "dist", "build", "artifacts", "logs"]);
+  const sensitive = /(?:^|[._-])(?:secrets?|credentials?|private[-_]?keys?|access[-_]?tokens?|tokens?)(?:[._-]|$)/i;
+  if (parts.some((part) => !part || part === "." || part === ".." ||
+    part.startsWith(".") || blocked.has(part.toLowerCase()) || sensitive.test(part))) return false;
   if (kind === "schema") return label.startsWith("schemas/");
   if (kind === "reference") return label.startsWith("references/");
   if (kind === "script") return label.startsWith("scripts/");
-  if (kind === "dependency") return /^dependency:[A-Za-z0-9][A-Za-z0-9._:-]{0,159}@[A-Za-z0-9][A-Za-z0-9._+:-]{0,127}$/.test(label);
   return false;
 }
 
@@ -65,6 +72,10 @@ async function validateContextPack(packInput, manifestInput) {
     !Array.isArray(pack.resources) || pack.resources.length > 128 ||
     !Array.isArray(manifest)) {
     throw new TypeError("Invalid or unsupported Context Pack.");
+  }
+
+  if (new TextEncoder().encode(JSON.stringify(pack)).byteLength > MAX_CONTEXT_PACK_BYTES) {
+    throw new TypeError("Context Pack exceeds the initial 128 KiB serialized byte ceiling.");
   }
 
   const packItems = [pack.procedure, ...pack.resources];
@@ -142,9 +153,9 @@ export function createProcedureAgent({ modelClient } = {}) {
 
       const proposal = parseModelProposal(content, { allowedContextIds });
       return Object.freeze({
-        taskId: contextPack.taskId,
-        revision: contextPack.revision,
-        languageTarget: contextPack.languageTarget,
+        taskId: validatedContext.pack.taskId,
+        revision: validatedContext.pack.revision,
+        languageTarget: validatedContext.pack.languageTarget,
         manifest: Object.freeze(validatedContext.manifest.map((item) => Object.freeze(item))),
         proposal,
       });
