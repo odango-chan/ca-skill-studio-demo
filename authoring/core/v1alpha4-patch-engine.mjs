@@ -246,6 +246,7 @@ function validateStageDefinition(stage, definition, operationId) {
         call.arguments.some((value) => typeof value !== "string")) {
         reject("stage_definition_invalid", "Predicate calls require a predicate ID and positional string arguments.", operationId);
       }
+      validatePredicateId(call.predicate, operationId);
     }
   } else {
     const allowed = stage === "observation"
@@ -260,7 +261,10 @@ function validateStageDefinition(stage, definition, operationId) {
     if (definition.tool !== undefined) validateCallableId("tool", definition.tool, operationId);
     if (definition.script !== undefined) validateCallableId("script", definition.script, operationId);
     if (definition.retryOf !== undefined) nonEmptyString(definition.retryOf, "retryOf", operationId);
-    for (const value of Object.values(definition.arguments)) nonEmptyString(value, "argument expression", operationId, 4096);
+    for (const [name, value] of Object.entries(definition.arguments)) {
+      if (!ARGUMENT_ID.test(name)) reject("argument_name_invalid", "Argument name is invalid.", operationId);
+      nonEmptyString(value, "argument expression", operationId, 4096);
+    }
   }
   if (definition.routes !== undefined) {
     if (!plain(definition.routes)) reject("stage_definition_invalid", "Stage routes must be a mapping.", operationId);
@@ -269,6 +273,9 @@ function validateStageDefinition(stage, definition, operationId) {
     for (const [outcome, target] of Object.entries(definition.routes)) {
       if (!allowed.has(outcome)) reject("route_outcome_invalid", "Outcome is invalid for " + stage + ".", operationId);
       nonEmptyString(target, "route target", operationId, 128);
+      if (outcome === "OUTCOME_UNKNOWN" && !["UNRESOLVED", "SAFE_STOPPED"].includes(target)) {
+        reject("unsafe_unknown_route", "OUTCOME_UNKNOWN may only route to UNRESOLVED or SAFE_STOPPED.", operationId);
+      }
     }
   }
 }
@@ -493,7 +500,9 @@ function scalarEditFromPair(parsed, node, value, operationId) {
   }
   const range = rangeOf(node, operationId);
   const raw = parsed.source.slice(range.start, range.end);
-  return { start: range.start, end: range.end, text: encodedScalar(value, raw) };
+  const text = encodedScalar(value, raw);
+  if (text === raw) reject("no_op_edit", "Semantic operation does not change the current Source value.", operationId);
+  return { start: range.start, end: range.end, text };
 }
 
 function materializeAppendEdits(source, appendMaps, appendSequences) {
