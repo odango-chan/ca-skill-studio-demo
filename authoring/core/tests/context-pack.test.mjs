@@ -42,7 +42,8 @@ test("Context Pack uses the live Procedure and returns a matching disclosure man
   assert.equal(result.pack.procedure.text, "start: create-session\nnodes: {}\n");
   assert.equal(result.pack.resources.length, 2);
   assert.equal(result.manifest.length, 3);
-  assert.equal(result.byteCount, result.manifest.reduce((sum, item) => sum + item.bytes, 0));
+  assert.equal(result.contentBytes, result.manifest.reduce((sum, item) => sum + item.bytes, 0));
+  assert.ok(result.byteCount >= result.contentBytes);
   assert.equal(result.pack.procedure.label, "assurance/procedure.yaml");
   assert.equal("documentVersion" in result.pack, false);
   assert.equal("path" in result.pack.procedure, false);
