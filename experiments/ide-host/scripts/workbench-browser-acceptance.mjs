@@ -962,7 +962,7 @@ export async function runWorkbenchAcceptance({
   if(!schema.view.bodyText.includes("sNssai")||
      !schema.view.bodyText.includes("requestedPduSessionType")||
      !schema.view.bodyText.includes("const: IPV4")||
-     !schema.view.bodyText.includes("SOURCE VERSION"))
+     !schema.view.bodyText.includes("Draft 2020-12"))
     throw Error("v1alpha4 Schema Designer did not render the real request Schema: "+
       JSON.stringify(schema.view).slice(0,2600));
   await assertSourceVisualPair(evalJS,sleep,"establishment-request.schema.yaml",
