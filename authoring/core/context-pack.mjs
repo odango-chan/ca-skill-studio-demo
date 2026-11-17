@@ -38,8 +38,9 @@ function assertSafeRelativePath(path) {
     reject("excluded_path", "Context source is outside the allowed authoring surface.", { path });
   }
   const basename = parts[parts.length - 1];
-  if (/^\.env(?:\.|$)/i.test(basename) ||
-    /^(?:secret|secrets|credentials?|private[-_]?key|access[-_]?token|token)$/i.test(basename)) {
+  const sensitiveName = /(?:^|[._-])(?:secrets?|credentials?|private[-_]?keys?|access[-_]?tokens?|tokens?)(?:[._-]|$)/i;
+  if (parts.some((part) => /^\.env(?:\.|$)/i.test(part) || sensitiveName.test(part)) ||
+    /^\.env(?:\.|$)/i.test(basename)) {
     reject("sensitive_path", "Sensitive files cannot be added to the Context Pack.", { path });
   }
   return path;
