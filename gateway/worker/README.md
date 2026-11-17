@@ -20,10 +20,10 @@ Cloudflare AI Gateway is not called by the browser. It may be added behind this 
 - Cloudflare Access must authenticate the direct Worker invocation. The Worker checks ctx.access.aud and reads the verified identity using ctx.access.getIdentity().
 - The verified email is normalized and used as the per-user rate-limit key. Caller-supplied user IDs and IP addresses are not trusted.
 - A Cloudflare Rate Limiting binding is mandatory. Missing or failed rate limiting fails closed.
-- Only configured models and the configured provider endpoint are used. Arbitrary client URLs, provider headers and unknown request fields are rejected.
+- The deployment selects PROVIDER_MODEL; it must be included in ALLOWED_MODELS. A caller may optionally request another allowlisted model, but cannot choose an arbitrary model. Arbitrary client URLs, provider headers and unknown request fields are rejected.
 - Provider credentials are read only from the Worker secret PROVIDER_API_KEY.
-- Request body, output token ceilings and a provider response-header timeout are enforced. Optional structured output is restricted to JSON-object mode; the client must still parse and validate the ModelProposal / Change Set schema.
-- Streaming is mandatory. The upstream SSE body is passed through without buffering. Redirects, non-SSE responses and provider error bodies are not forwarded.
+- Request body, output token ceilings and a provider response-header timeout are enforced. Text-only content-part arrays are supported for the host-neutral Authoring Core. Optional structured output is restricted to JSON-object mode; the client must still parse and validate the ModelProposal / Change Set schema.
+- Both non-streaming JSON and SSE responses are supported for OpenAI-compatible clients. The upstream body is passed through without buffering; response mode and Content-Type must match. Redirects, mismatched response types and provider error bodies are not forwarded.
 - CORS uses an exact origin allowlist. CORS is not authentication; Access remains mandatory.
 - Prompts, completions, identities and credentials are not logged.
 
