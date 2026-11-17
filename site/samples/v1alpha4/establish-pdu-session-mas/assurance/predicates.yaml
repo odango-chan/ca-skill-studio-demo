@@ -101,17 +101,18 @@ predicates:
       type: cel
       expression: result.policy_assoc_id != "" && result.policy_assoc_id != "bound"
 
-  # The source implementation currently returns charging_ref="1" and records
-  # NOT_IMPL_skip. A real resource reference plus trusted evidence is required.
-  establishment.mas.charging_reservation_created:
+  # The pinned NW Agent source returns SMF_MAS_OK, charging_ref="1" and
+  # records NOT_IMPL_skip. This proves only that the required s7 plan step
+  # completed under the current stub; it does not prove a charging reservation.
+  establishment.mas.charging_step_completed:
     parameters:
       - result: mas::urn:example:openamsm:mas:ca-charging-result:v1
     evidence:
       requires:
-        result: [mas::ca.charging-reservation-created]
+        result: [mas::ca.charging-step-skipped]
     evaluator:
       type: cel
-      expression: result.charging_ref != "" && result.charging_ref != "1"
+      expression: result.charging_ref == "1"
 
   establishment.mas.n4_session_established:
     parameters:
