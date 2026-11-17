@@ -87,6 +87,8 @@ test("Context Pack rejects path traversal, absolute paths and excluded directori
     "output/result.yaml",
     "references/../../.env",
     "references/.env.local",
+    "references/.git/config",
+    "references/output/private.md",
   ]) {
     await assert.rejects(
       buildContextPack(base({
