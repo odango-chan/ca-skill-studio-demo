@@ -17,9 +17,10 @@ Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台�
 3. 边界改动读 docs/architecture/studio-boundaries.md 和 docs/architecture/plugin-managed-configuration-v0.1.md；
 4. Extension / Host 改动读 experiments/ide-host/README.md、experiments/ide-host/vscode/ 与对应测试；
 5. UI / Projection / Patch 改动读 docs/design/authoring-workbench.md、相关共享模块和测试；
-6. Route / Phase 改动读 docs/design/route-designer.md、docs/D1-procedure-designer.md、docs/D2-node-designer.md；
-7. 语言服务改动读 docs/design/skill-lsp-l2d-editor-acceptance.md 与 docs/design/skill-lsp-l2d2-live-problems.md；
-8. 文档改动读 docs/DOCUMENTATION.md，并参考 ConnectionAgent 文档治理。
+6. AI Authoring 改动必须读 docs/design/ai-procedure-authoring.md 与 Issue #200；模型输出不是可信 Patch，v1alpha4 变更必须经 Host 侧 Semantic Patch Engine；
+7. Route / Phase 改动读 docs/design/route-designer.md、docs/D1-procedure-designer.md、docs/D2-node-designer.md；
+8. 语言服务改动读 docs/design/skill-lsp-l2d-editor-acceptance.md 与 docs/design/skill-lsp-l2d2-live-problems.md；
+9. 文档改动读 docs/DOCUMENTATION.md，并参考 ConnectionAgent 文档治理。
 
 历史 ADR 和迁移对照文档用于解释决策背景，不得把已退役的 Classic 路径当成当前实现或兼容目标。
 

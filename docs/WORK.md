@@ -1,5 +1,15 @@
 # Skill Studio 当前工作状态
 
+## 2026-11-17 · AI Procedure Authoring P1（设计提案）
+
+[Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md)
+
+- **产品决策：** 独立 Editor Tab、结构化 Change Set、接受后应用到原生 TextDocument Buffer、用户自行保存；P1 仅修改现有 Procedure。
+- **架构基线：** 复用 Theia / VS Code Extension、原生 TextDocument / WorkspaceEdit、Package Snapshot 和 Compiler Check；AI Webview 不拥有 Source 或网络写入权限。
+- **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。
+- **Provider：** 尚未选择模型服务。浏览器 CORS、SecretStorage 和用户自有 Gateway 需要先做 Spike；未完成前不发送 Package 内容。
+- **状态：** Design PROPOSED；Implementation NOT_STARTED；Acceptance NOT_RUN。没有 AI Provider 集成、没有代码变更、没有 Runtime / 5GC 能力声明。
+
 ## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
 
 Compiler 已正式发布 `v1.0.0`，目标固定为 CA-SL `connectionagent.io/v1alpha4`，规范 pin 为 `ca-skills@7f84393`。本轮在独立分支 `feat/compiler-v1.0.0-studio-integration-20261117` 接入真实 Go/WASM Core，不再实现模拟 Check / Build。
