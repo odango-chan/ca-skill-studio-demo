@@ -8,15 +8,18 @@
 # Non-SMF context required by an Operation stays inside its responsible Tool/Owner adapter.
 # Host performs ingress admission, identity/instance association, duplicate suppression and
 # execution lifecycle before this graph starts. Host execution metadata is not a Procedure input.
+# 3GPP reference: TS 23.502 V19.9.0 (Release 19); per-NF Stage 3 API versions are pinned
+# independently in SKILL.md and docs/authoring-5gc-3gpp-profile.md. Step 3/5 and 15/17
+# Nsmf service request/response continuity is Host/Integration-owned, not a Skill Node.
 start: get-sm-subscription-data
 nodes:
-  # Primary action: 3GPP_NATIVE — TS 23.502 V18.12.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Get.
+  # Primary action: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Get.
   # Supplementary Observation: CA_EXTENSION — exact UE/PSI SM Context presence read, after this
   # read-only Operation and before the first session-creating or session-mutating Operation.
   # 404 SESSION_NOT_FOUND is normalized to evidenced ABSENT; 200 AVAILABLE/UNAVAILABLE is PRESENT.
   # PRESENT is not an initial-creation path; until an idempotent/recovery Owner contract exists,
   # stop rather than replaying the initial mutation chain. Query failure is not ABSENT.
-  # 3GPP: 3GPP_NATIVE — TS 23.502 V18.12.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Get. The supplementary CA_EXTENSION Observation remains in this same Node.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Get. UDM API: TS 29.503 V19.7.0, SDM service §6.1 / OpenAPI Annex A.2. The supplementary CA_EXTENSION Observation remains in this same Node.
   get-sm-subscription-data:
     precondition:
       predicates:
@@ -69,7 +72,7 @@ nodes:
 
   # The UDM Owner binds the exact original Get/Subscribe transaction privately.
   # Only the SUPI, requested selection and validated business result are Skill inputs.
-  # 3GPP: 3GPP_NATIVE — TS 23.502 V18.12.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Subscribe.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Subscribe. UDM API: TS 29.503 V19.7.0, SDM service §6.1 / OpenAPI Annex A.2.
   subscribe-sm-data:
     operation:
       tool: ca::sbi.udm.sdm_subscription.create
@@ -94,7 +97,7 @@ nodes:
   # The PCF Owner consumes the validated UDM result and request. It resolves its own SDM
   # subscription state internally, checks the Step 6 profile gate before dispatch, and
   # exposes whether a Step 9 modification trigger applies. This profile admits only no-trigger.
-  # 3GPP: 3GPP_NATIVE — TS 23.502 V18.12.0 §4.3.2.2.1 step 7b; Npcf_SMPolicyControl_Create.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 7b; Npcf_SMPolicyControl_Create. PCF API: TS 29.512 V19.6.0 / OpenAPI Annex A.2.
   establish-sm-policy-association:
     operation:
       tool: ca::sbi.pcf.sm_policy.create
@@ -120,7 +123,7 @@ nodes:
   # N4 Session Establishment as one business interaction. It returns the effective session
   # configuration, allocated IPv4 address and a digest consumed by the AMF N1/N2 Tool.
   # No internal SMF module name or owner handle is exposed to the Skill.
-  # 3GPP: CA_ADAPTER — TS 23.502 V18.12.0 §4.3.2.2.1 step 8 and steps 10a–10b; §4.4.1.2.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 8 and steps 10a–10b; §4.4.1.2. N4/PFCP: TS 29.244 V19.6.0. Step 8 selection is SMF-local work inside this Owner operation; the N4 Request/Response is steps 10a–10b.
   establish-n4-session:
     operation:
       tool: smf::n4.session.establish
@@ -150,7 +153,7 @@ nodes:
   # The AMF Tool consumes the exact effective configuration returned by the N4 Owner.
   # Its Evidence binds the transferred N1/N2 payload to that configuration digest.
   # An AMF transfer acknowledgement is initiation only; it never proves RAN adoption.
-  # 3GPP: 3GPP_NATIVE — TS 23.502 V18.12.0 §4.3.2.2.1 step 11; Namf_Communication_N1N2MessageTransfer.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 11; Namf_Communication_N1N2MessageTransfer. AMF API: TS 29.518 V19.8.0, Namf_Communication §5.2 / §6.1.2.4 / OpenAPI Annex A.2; TS 29.571 V19.7.0 §5.4.4.14 `RefToBinaryData` for referenced N1/N2 binary body parts.
   transfer-n1n2-message:
     operation:
       tool: ca::sbi.amf.n1n2.transfer
@@ -181,7 +184,7 @@ nodes:
   # Runtime resumes this same Invocation when the Owner returns the result. The paired Step 17
   # response remains a private Host service-exit obligation.
   # After completion, this Node performs a fresh exact UE/PSI SM Context Observation.
-  # 3GPP: CA_ADAPTER — TS 23.502 V18.12.0 §4.3.2.2.1 step 15; Nsmf_PDUSession_UpdateSMContext.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 15; Nsmf_PDUSession_UpdateSMContext. SMF API: TS 29.502 V19.7.0, Nsmf_PDUSession §5.2/§6.1/§6.1.2.4 / OpenAPI Annex A.2; TS 29.571 V19.7.0 §5.4.4.14 `RefToBinaryData` for referenced N1/N2 binary body parts.
   update-sm-context:
     operation:
       tool: smf::nsmf.pdu_session.update_sm_context
@@ -216,7 +219,7 @@ nodes:
         FAIL: SAFE_STOPPED
         UNKNOWN: SAFE_STOPPED
 
-  # 3GPP: CA_ADAPTER — TS 23.502 V18.12.0 §4.3.2.2.1 steps 16a–16b; §4.4.1.3 N4 Session Modification.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 steps 16a–16b; §4.4.1.3 N4 Session Modification. N4/PFCP: TS 29.244 V19.6.0.
   modify-n4-session:
     operation:
       tool: smf::n4.session.modify
@@ -245,7 +248,7 @@ nodes:
   # SMF registration in UDM. The Owner checks the current SMF context flag: if already
   # registered it returns ALREADY_REGISTERED; otherwise it performs Nudm_UECM_Registration.
   # The SMF instance identity and UDM transaction handles remain Owner-private.
-  # 3GPP: 3GPP_NATIVE — TS 23.502 V18.12.0 §4.3.2.2.1 step 16c; Nudm_UECM_Registration.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 16c; Nudm_UECM_Registration. UDM API: TS 29.503 V19.7.0, UECM service §6.2 / OpenAPI Annex A.3.
   ensure-uecm-registration:
     operation:
       tool: ca::sbi.udm.uecm.register
