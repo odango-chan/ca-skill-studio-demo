@@ -174,6 +174,25 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   // Dependencies must be a real section in the same native TreeView in both
   // backend and browser-only Theia. It starts collapsed and expands to the
   // owner-provided empty state; no second Dependencies view is permitted.
+  // Skills are expanded above it, so reveal the lower native TreeView rows
+  // before querying visibility rather than treating off-screen as missing.
+  await evalJS(`(()=>{
+    const header=[...document.querySelectorAll('.theia-view-container-part-header')]
+      .find(x=>x.textContent.trim().toLowerCase()==='package explorer'&&
+        x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0);
+    const part=header?.closest('.part');
+    const candidates=[...(part?.querySelectorAll('*')??[])].filter(el=>{
+      const style=getComputedStyle(el);
+      return (style.overflowY==='auto'||style.overflowY==='scroll')&&
+        el.scrollHeight>el.clientHeight+4;
+    }).sort((a,b)=>(b.scrollHeight-b.clientHeight)-(a.scrollHeight-a.clientHeight));
+    const scroller=candidates[0];
+    if(scroller)scroller.scrollTop=scroller.scrollHeight;
+    return {found:Boolean(scroller),scrollTop:scroller?.scrollTop??null,
+      scrollHeight:scroller?.scrollHeight??null,clientHeight:scroller?.clientHeight??null};
+  })()`);
+  await sleep(180);
+  rows=await readTreeRows();
   const dependenciesRow=rows.find(row=>row.visible&&
     row.text.includes('Dependencies')&&
     row.text.includes('Plugin-managed snapshots and contracts'));
