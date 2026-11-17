@@ -559,7 +559,7 @@ export async function runWorkbenchAcceptance({
   const waitNativeMarkdown=(predicate,label,attempts=100)=>
     waitWebview(view=>view.nativePreviewRoot&&predicate(view),label,attempts);
   const openPackageFile=async(id,relativePath)=>{
-    const packageRoot=defaultProcedureUri.slice(0,-procedureSuffix.length);
+    const packageRoot=defaultProcedureUri.replace(/\/assurance\/procedure\.yaml$/,"");
     const target=packageRoot+"/"+relativePath;
     await nativeCommand(id,target);
     await sleep(250);
