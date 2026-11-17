@@ -13,6 +13,7 @@ This folder contains the first host-neutral model-client and proposal-validation
 - A request cannot be sent until the caller confirms the Context Pack disclosure.
 - ModelProposal is untrusted and validated against a versioned Studio-owned schema.
 - The model cannot author source offsets, file paths, candidate YAML, WorkspaceEdit, atomic groups or validation state.
+- The Host materializes validated proposals into a frozen Change Set envelope, stamps live document / Package revisions, fixes the write scope to the Procedure, assigns operation IDs and leaves atomic grouping / Compiler validation NOT_RUN until later Host stages.
 - Every evidence reference must resolve to an ID in the exact Context Pack manifest supplied by the host.
 
 This is not yet the full Authoring Core. It does not provide the Authoring Editor Tab, compute atomic groups, patch YAML or apply edits. The v1alpha4 Semantic Patch Engine remains a separate Host-owned implementation gate.
