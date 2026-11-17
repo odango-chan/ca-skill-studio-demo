@@ -1,4 +1,5 @@
 export const CONTEXT_PACK_SCHEMA = "ca-studio.ai-context-pack/v1";
+export const MAX_CONTEXT_PACK_BYTES = 131072;
 const PROCEDURE_PATH = "assurance/procedure.yaml";
 const BLOCKED_ROOTS = new Set([
   ".git", "node_modules", "lib", "output", "dist", "build", "artifacts", "logs",
@@ -100,8 +101,8 @@ export async function buildContextPack({
   if (languageTarget !== "connectionagent.io/v1alpha4") {
     reject("unsupported_language_target", "AI Authoring currently accepts only CA-SL v1alpha4.");
   }
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 1048576) {
-    reject("invalid_byte_limit", "Context Pack byte limit must be between 1 and 1048576.");
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_CONTEXT_PACK_BYTES) {
+    reject("invalid_byte_limit", "Context Pack byte limit must be between 1 and 131072 bytes.");
   }
   if (!procedure || procedure.path !== PROCEDURE_PATH ||
     !Number.isSafeInteger(procedure.documentVersion) || procedure.documentVersion < 1 ||
