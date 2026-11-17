@@ -753,8 +753,75 @@ try{
       webviewFrames.push({frame,error:String(error)});
     }
   }
+  // The imported Example must default to the v1alpha4 Candidate. Capture that
+  // proof first; the long-standing route/node authoring regression below is a
+  // Legacy v0.2 fixture and must run against its own exact Procedure URI.
+  const candidateGraphFrame=webviewFrames.find(item=>
+    item.view?.procedureRoot&&item.view.procedureValue==="establish-pdu-session");
+  const candidateWebviewView=candidateGraphFrame?.view??null;
+  if(requireEditor&&!candidateGraphFrame)
+    throw Error("The default v1alpha4 Candidate Procedure did not render before Legacy regression tests: "+
+      JSON.stringify({webviewFrames:webviewFrames.map(item=>({url:item.frame.url,view:item.view}))}));
+  const legacyProcedureUri=identity.legacyProcedure;
+  await evalJS(`(async()=>{
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==="function"&&k.prototype?.executeCommand&&
+      k.prototype?.registerCommand&&k.prototype?.getCommand);
+    if(!key)throw Error("Native command registry missing before Legacy regression fixture");
+    await c.get(key).executeCommand("skillStudio.openProcedure",${JSON.stringify(legacyProcedureUri)});
+    return true;
+  })()`);
+  let legacySourceState=null;
+  for(let attempt=0;attempt<60;attempt++){
+    legacySourceState=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==="function"&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      if(!key)throw Error("Native command registry missing while opening Legacy fixture");
+      return c.get(key).executeCommand("skillStudio.internal.sourceVersionAcceptance");
+    })()`);
+    if(legacySourceState?.uri===legacyProcedureUri)break;
+    await sleep(100);
+  }
+  if(legacySourceState?.uri!==legacyProcedureUri)
+    throw Error("Legacy regression fixture did not become the exact active Source: "+
+      JSON.stringify({expected:legacyProcedureUri,actual:legacySourceState}));
+  frames.length=0;
+  walkFrames((await command("Page.getFrameTree")).frameTree);
+  webviewFrames.length=0;
+  for(const frame of frames.filter(item=>item.url.includes("/webview/index.html")||
+      item.url.includes(".webview."))){
+    try{
+      const world=await command("Page.createIsolatedWorld",{
+        frameId:frame.id,worldName:"skill-studio-legacy-acceptance",grantUniveralAccess:true
+      });
+      const evaluated=await command("Runtime.evaluate",{
+        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+        expression:`({
+          readyState:document.readyState,title:document.title,
+          bodyText:document.body?.innerText?.slice(0,1200)||"",
+          timing:document.querySelector("#reactFlowRoot")?.dataset.studioTiming,
+          procedureRoot:!!document.querySelector("#reactFlowRoot"),
+          graphNodes:document.querySelectorAll(".react-flow__node").length,
+          graphEdges:document.querySelectorAll(".react-flow__edge").length,
+          procedureValue:document.querySelector("#procedureList")?.value||"",
+          routeOptions:document.querySelector("#routeList")?.options?.length||0,
+          message:document.querySelector("#message")?.textContent||"",
+          patchVisible:!document.querySelector("#patch")?.hidden,
+          html:document.documentElement?.outerHTML?.slice(0,5000)||"",
+          nestedFrames:[...document.querySelectorAll("iframe")].map(child=>({
+            src:child.getAttribute("src"),title:child.title,html:child.outerHTML.slice(0,500)
+          }))
+        })`
+      });
+      webviewFrames.push({frame,view:evaluated.result?.value??null});
+    }catch(error){webviewFrames.push({frame,error:String(error)});}
+  }
   console.log("STUDIO_THEIA_STAGE","initial-graph");
-  const graphFrame=webviewFrames.find(item=>item.view?.procedureRoot&&item.view.graphNodes>0);
+  const graphFrame=webviewFrames.find(item=>
+    item.view?.procedureRoot&&item.view.procedureValue==="ue-requested-pdu-session-establishment");
   const webviewFrame=graphFrame?.frame??webviewFrames[0]?.frame??null;
   let webviewView=graphFrame?.view??webviewFrames[0]?.view??null;
   const webviewFrameError=webviewFrames.find(item=>item.error)?.error??null;
@@ -1958,8 +2025,6 @@ try{
   // switch explicitly to the official Legacy package for that separate suite.
   // This keeps its coverage honest instead of pretending those assertions
   // describe the smaller v1alpha4 candidate graph.
-  const legacyProcedureUri=identity.root+
-    "/skills/establish-pdu-session/assurance/procedure.yaml";
   await evalJS(`(async()=>{
     const c=window.theia.container;
     const key=[...c._bindingDictionary._map.keys()].find(k=>
@@ -2075,7 +2140,7 @@ try{
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={shellReadyMs,workbenchEvidence,packageOverviewEvidence,view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,afterImport,
-    frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrames,webviewFrame,webviewView,webviewFrameError,patchEvidence,
+    frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),webviewFrames,webviewFrame,webviewView,candidateWebviewView,webviewFrameError,patchEvidence,
     extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500),
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
@@ -2127,8 +2192,8 @@ try{
     throw Error("Theia did not open the real default project workspace: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
   // The candidate Procedure ID is establish-pdu-session; get-sm-subscription-data
   // is its first Node ID and must not be mistaken for the Procedure selector value.
-  if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1||
-      webviewView.procedureValue!=="establish-pdu-session"))
+  if(requireEditor&&(!candidateWebviewView?.procedureRoot||candidateWebviewView.graphNodes<1||
+      candidateWebviewView.procedureValue!=="establish-pdu-session"))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
   if(requireEditor&&(!patchEvidence?.preview?.ready||
