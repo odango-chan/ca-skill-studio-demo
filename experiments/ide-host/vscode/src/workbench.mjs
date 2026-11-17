@@ -3278,16 +3278,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       const workspaceFolder=vscode.workspace.getWorkspaceFolder(target);
       if(!workspaceFolder)
         throw Error('Markdown acceptance URI must be inside the active workspace');
-      // Reuse the same Package-root discovery, bounded inventory and symlink
-      // checks as the actual native Preview. Do not assume the active
-      // workspace root is the project root rather than its skills/ directory.
-      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,target);
-      if(!policyReady){
-        const root=workspaceFolder.uri.path.replace(/\/$/,'');
-        throw Error('Markdown acceptance URI must identify an inventoried Markdown file inside a Skill Package: '+
-          JSON.stringify({target:target.toString(),workspaceRoot:workspaceFolder.uri.toString(),
-            relativePath:target.path.slice(root.length+1)}));
-      }
+      // Check the package-local path shape without rescanning the workspace.
+      // openNativeMarkdownPreview applies the authoritative inventoried-file,
+      // Package-root and symlink policy before rendering the document.
+      if(!/\\/skills\\/[a-z0-9-]+\\/(?:SKILL\\.md|(?:[a-z0-9-]+\\/)*[a-z0-9-]+\\.md)$/i.test(target.path))
+        throw Error('Markdown acceptance URI must identify a Markdown file inside a Skill Package: '+
+          JSON.stringify({target:target.toString(),workspaceRoot:workspaceFolder.uri.toString()}));
       try{await vscode.workspace.fs.stat(target);}
       catch{throw Error('Markdown acceptance target does not exist: '+target.toString());}
       // Open only the editable Source. The active-editor listener must create
@@ -3406,8 +3402,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       const restored=await vscode.workspace.applyEdit(edit);
       if(!restored)throw Error('Could not restore the original Skill guide after security probe');
       nativeMarkdownSecurityOriginals.delete(target.toString());
-      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,target);
-      if(!policyReady)throw Error('Could not restore the Package link policy for the original Skill guide');
+      // The probe changed only document contents. The Package inventory and
+      // link policy established before Preview creation are still valid.
       return true;
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
