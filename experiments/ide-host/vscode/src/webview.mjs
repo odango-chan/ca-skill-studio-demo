@@ -4,8 +4,8 @@ import "../../../../site/studio.css";
 import "../../../../site/light.css";
 import "./webview.css";
 import {projectWorkspace} from "../../../../site/workspace.mjs";
-import {isV1Alpha4Procedure,analyzeV1Alpha4Source}
-  from "../../../../language/core/v1alpha4.ts";
+import {isV1Alpha5Procedure,analyzeV1Alpha5Source}
+  from "../../../../language/core/v1alpha5.ts";
 import {layoutProcedureELK} from "../../../../site/layout.mjs";
 import {mountProcedureCanvas} from "../../../../site/react-flow-canvas.tsx";
 import {mountNodeFocusCanvas} from "../../../../site/node-focus-flow.tsx";
@@ -60,10 +60,10 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
     state.selection={kind:"node",id};
     renderRoutes({preserveSelection:true});repaint();
     if(state.neighborsOnly)void layoutCurrentProcedure();
-    const options=state.languageTarget==="v1alpha4"?null:
+    const options=state.languageTarget==="v1alpha5"?null:
       addRouteOutcomeOptions(state.text,state.procedureId,id);
-    status(state.languageTarget==="v1alpha4"
-      ?"已选择 Node "+id+" · 显示 v1alpha4 有序 Stage 与只读 Route"
+    status(state.languageTarget==="v1alpha5"
+      ?"已选择 Node "+id+" · 显示 v1alpha5 有序 Stage 与只读 Route"
       :options?.outcomes?.length
         ?"已选择 "+id+" · 可从节点专用添加端口提出新 Route"
         :"已选择节点 "+id+" · 仅显示当前 Source 明确允许的 Route 操作");
@@ -71,7 +71,7 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
   onEdgeSelect(bundle){
     const routes=bundle?.routes??[];
     if(!routes.length)return;
-    if(state.languageTarget==="v1alpha4"){
+    if(state.languageTarget==="v1alpha5"){
       state.selection={kind:"bundle",id:flowBundleSelectionId(bundle)};
       state.pending=null;state.pendingKind=null;state.routeProposal=null;
       repaint();
@@ -133,7 +133,7 @@ function repaint(){
   updateGraphTools();
   if(state.graph&&!state.nodeFocusId){
     const selected=state.selection?.kind==="node"?state.selection.id:null;
-    const options=selected&&!state.routeProposal&&state.languageTarget!=="v1alpha4"
+    const options=selected&&!state.routeProposal&&state.languageTarget!=="v1alpha5"
       ?addRouteOutcomeOptions(state.text,state.procedureId,selected):null;
     const routeCreationSourceId=options?.outcomes?.length?selected:null;
     canvas.render(state.graph,state.procedures.get(state.procedureId),
@@ -151,7 +151,7 @@ function isRootPath(){
 }
 function updateGraphTools(){
   $("graphTools").hidden=!state.procedures||Boolean(state.nodeFocusId);
-  const root=isRootPath()&&!state.nodeFocusId&&state.languageTarget!=="v1alpha4";
+  const root=isRootPath()&&!state.nodeFocusId&&state.languageTarget!=="v1alpha5";
   $("rootPathToolbar").hidden=!root;
   $("rootPathFilters").hidden=!root||state.rootPathMode!=="custom";
   $("rootPathMode").value=state.rootPathMode;
@@ -243,7 +243,7 @@ function openNodeFocus(id){
 }
 function routeChoices(routeId){
   const procedure=getProcedure();
-  if(!procedure||state.languageTarget==="v1alpha4")return [];
+  if(!procedure||state.languageTarget==="v1alpha5")return [];
   return routeTargetChoices(procedure,routeId);
 }
 function refreshTargets(){
@@ -262,7 +262,7 @@ function refreshTargets(){
   repaint();
 }
 function renderRoutes({preserveSelection=false}={}){
-  if(state.languageTarget==="v1alpha4"){
+  if(state.languageTarget==="v1alpha5"){
     $("patch").hidden=true;
     state.pending=null;state.pendingKind=null;state.routeProposal=null;
     $("commit").disabled=true;$("diff").textContent="";
@@ -317,8 +317,8 @@ function renderRoutes({preserveSelection=false}={}){
   }
 }
 function prepareRouteCreation(connection){
-  if(state.languageTarget==="v1alpha4"){
-    status("CA-SL v1alpha4 Route 为只读视图；不能使用旧语法 Patch。");
+  if(state.languageTarget==="v1alpha5"){
+    status("CA-SL v1alpha5 Route 为只读视图；不能使用旧语法 Patch。");
     return;
   }
   if(state.nodeFocusId||!state.graph||!state.procedures?.has(state.procedureId)){
@@ -345,8 +345,8 @@ function prepareRouteCreation(connection){
   }
 }
 function prepareReconnect(routeId,sourceId,targetId){
-  if(state.languageTarget==="v1alpha4"){
-    status("CA-SL v1alpha4 Route 目标不可通过旧版 Patch 修改。");
+  if(state.languageTarget==="v1alpha5"){
+    status("CA-SL v1alpha5 Route 目标不可通过旧版 Patch 修改。");
     return;
   }
   const route=getProcedure()?.routes.find(item=>item.id===routeId);
@@ -379,7 +379,7 @@ async function layoutCurrentProcedure({anchorId=null}={}){
   const started=performance.now();
   const anchor=anchorId?canvas.captureNodeAnchor(anchorId):null;
   const focus=state.neighborsOnly&&state.selection?.kind==="node"?state.selection.id:null;
-  const pathFocus=isRootPath()&&state.languageTarget!=="v1alpha4"?{
+  const pathFocus=isRootPath()&&state.languageTarget!=="v1alpha5"?{
     mode:state.rootPathMode,categories:[...state.pathCategories],
     expandedNodes:[...state.expandedNodes]
   }:null;
@@ -412,8 +412,8 @@ async function layoutCurrentProcedure({anchorId=null}={}){
     const businessNodeCount=procedure.nodes.filter(node=>!node.viewOnly).length;
     status(state.procedureId+" · "+businessNodeCount+" Nodes / "+procedure.routes.length+
       " Outcomes / "+graph.bundles.length+" Bundles"+summary+
-      (state.languageTarget==="v1alpha4"
-        ?" · v1alpha4 Source projection only · not qualified":" · YAML Source 由 IDE 管理"));
+      (state.languageTarget==="v1alpha5"
+        ?" · v1alpha5 Source projection only · not qualified":" · YAML Source 由 IDE 管理"));
   }catch(error){
     if(ticket!==epoch)return;
     status("布局失败："+String(error?.message??error));
@@ -438,7 +438,7 @@ function updateGoalSummary(goal,gate){
     ?"GLOBAL PRECONDITION · "+gate:"GLOBAL PRECONDITION · 未声明";
   $("goalQualification").textContent=
     "Source projection only · Owner / Capability / Runtime NOT QUALIFIED";
-  summary.hidden=!state.languageTarget||state.languageTarget!=="v1alpha4";
+  summary.hidden=!state.languageTarget||state.languageTarget!=="v1alpha5";
 }
 function receiveSnapshot(data){
   if(typeof data.text!=="string"||data.text.length>1024*1024||
@@ -456,7 +456,7 @@ function receiveSnapshot(data){
   $("patch").hidden=true;
   const started=performance.now();
   let model=null;
-  if(isV1Alpha4Procedure(data.text)){
+  if(isV1Alpha5Procedure(data.text)){
     const rootUri=String(data.packageRootUri??data.path??"")
       .replace(/\/assurance\/procedure\.yaml$/,"").replace(/\/$/,"");
     const packageName=String(data.packageName??rootUri.split("/").at(-1)??"sample");
@@ -472,9 +472,9 @@ function receiveSnapshot(data){
     if(typeof data.predicatesText==="string")
       documents.set("assurance/predicates.yaml",document(
         "assurance/predicates.yaml",data.predicatesText,data.predicatesVersion??0));
-    const projected=analyzeV1Alpha4Source(documents,packageName);
+    const projected=analyzeV1Alpha5Source(documents,packageName);
     projectionMs=performance.now()-started;
-    state.languageTarget="v1alpha4";
+    state.languageTarget="v1alpha5";
     state.goal=projected.procedure.goal??null;
     state.preconditionGate=projected.procedure.precondition??null;
     state.projectionDiagnostics=projected.diagnostics;
@@ -483,7 +483,7 @@ function receiveSnapshot(data){
       state.procedures=null;state.graph=null;state.entry=null;
       canvas.render(null,null,null,false);updateGraphTools();
       const first=projected.diagnostics.find(item=>item.relativePath==="assurance/procedure.yaml");
-      status("CA-SL v1alpha4 Source-only · "+
+      status("CA-SL v1alpha5 Source-only · "+
         (first?.message??"Procedure 尚不能安全投影")+
         " · Owner / Capability linking NOT QUALIFIED");
       return;
@@ -522,9 +522,9 @@ function receiveSnapshot(data){
     option(list,proc.name+" ("+count+" Nodes)",proc.name);
   }
   void showProcedure(model.procedures.has(previous)?previous:model.entry);
-  if(state.languageTarget==="v1alpha4"){
+  if(state.languageTarget==="v1alpha5"){
     const errors=state.projectionDiagnostics.filter(item=>item.severity==="error").length;
-    status("CA-SL v1alpha4 · "+model.procedures.get(model.entry).nodes.length+
+    status("CA-SL v1alpha5 · "+model.procedures.get(model.entry).nodes.length+
       " visual Nodes · "+(errors?errors+" source diagnostics":"source shape parsed")+
       " · Owner / Capability linking NOT QUALIFIED");
   }
