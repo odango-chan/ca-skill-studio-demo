@@ -47,6 +47,20 @@ test("Access context and audience are mandatory", async () => {
   assert.equal(wrong.status, 401);
 });
 
+test("missing and failed Access identity lookups fail closed", async () => {
+  for (const access of [
+    { aud, async getIdentity() { return null; } },
+    { aud, async getIdentity() { throw new Error("identity unavailable"); } },
+    { aud, async getIdentity() { return { email: " " }; } },
+  ]) {
+    const response = await handleRequest(req(payload()), env(), { access }, async () => {
+      throw new Error("upstream must not run");
+    });
+    assert.equal(response.status, 401);
+    assert.equal(await code(response), "authentication_required");
+  }
+});
+
 test("rate limit is keyed by verified identity and fails closed", async () => {
   const denied = await handleRequest(req(payload()), env({ USER_RATE_LIMITER: { async limit({ key }) { assert.equal(key, "author@example.com"); return { success: false }; } } }), ctx());
   assert.equal(denied.status, 429);
@@ -102,6 +116,45 @@ test("valid request uses only server credentials and streams the provider respon
   assert.match(response.headers.get("content-type"), /text\/event-stream/);
   assert.equal(response.headers.get("x-upstream-secret"), null);
   assert.equal(await response.text(), "data: [DONE]\n\n");
+});
+
+test("client cancellation aborts an in-flight provider request", async () => {
+  const controller = new AbortController();
+  const request = new Request("https://gateway.example/v1/chat/completions", {
+    method: "POST",
+    headers: { Origin: origin, "Content-Type": "application/json" },
+    body: JSON.stringify(payload()),
+    signal: controller.signal,
+  });
+  let signalStarted;
+  const started = new Promise((resolve) => { signalStarted = resolve; });
+  const pending = handleRequest(request, env(), ctx(), async (_url, options) => {
+    signalStarted(options.signal);
+    return new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+    });
+  });
+  const upstreamSignal = await started;
+  controller.abort();
+  const response = await pending;
+  assert.equal(upstreamSignal.aborted, true);
+  assert.equal(response.status, 499);
+  assert.equal(await code(response), "client_disconnected");
+});
+
+test("cancelling the downstream stream cancels the upstream body", async () => {
+  let cancelled = false;
+  const upstreamBody = new ReadableStream({
+    start(controller) { controller.enqueue(new TextEncoder().encode("data: partial\\n\\n")); },
+    cancel() { cancelled = true; },
+  });
+  const response = await handleRequest(req(payload()), env(), ctx(), async () => new Response(upstreamBody, {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  }));
+  assert.equal(response.status, 200);
+  await response.body.cancel();
+  assert.equal(cancelled, true);
 });
 
 test("provider response-header wait is bounded by a timeout", async () => {
