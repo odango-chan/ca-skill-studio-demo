@@ -133,9 +133,10 @@ test("Build emits a bundled Node extension and a local script/style Webview",()=
     "experiments/ide-host/vscode/dist/extension-theia.js",
     "experiments/ide-host/vscode/media/procedure.js",
     "experiments/ide-host/vscode/media/procedure.css",
-    "experiments/ide-host/vscode/samples/skills/files.json",
-    "experiments/ide-host/vscode/samples/skills/establish-pdu-session/assurance/procedure.yaml",
-    "experiments/ide-host/vscode/samples/skills/establish-pdu-session-mas/assurance/procedure.yaml"])
+    "experiments/ide-host/vscode/samples/v1alpha4/files.json",
+    "experiments/ide-host/vscode/samples/v1alpha4/README.md",
+    "experiments/ide-host/vscode/samples/v1alpha4/establish-pdu-session/assurance/procedure.yaml",
+    "experiments/ide-host/vscode/samples/v1alpha4/establish-pdu-session-mas/assurance/procedure.yaml"])
     assert.ok(statSync(path).size>(path.endsWith("files.json")?50:1000),path);
 });
 
