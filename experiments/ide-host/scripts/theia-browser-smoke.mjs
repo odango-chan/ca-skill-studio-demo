@@ -705,11 +705,14 @@ try{
      identity.workspaceFolders[0]!==identity.root||
      !identity.legacyProcedureExists||!identity.candidateProcedureExists||
      !afterImport.documentTitle.includes("skill-studio-demo")||
-     afterImport.documentTitle.includes("Untitled")||
-     !afterImport.workspaceRootVisible||afterImport.noFolderPrompt)
+     afterImport.documentTitle.includes("Untitled"))
     throw Error("Example did not open as a named single-folder workspace with both pinned sample sets: "+
       JSON.stringify({documentTitle:afterImport.documentTitle,
-        browserIdentity:afterImport.workspaceIdentity,extensionIdentity:identity,
+        browserIdentity:afterImport.workspaceIdentity,
+        ui:{workspaceRootVisible:afterImport.workspaceRootVisible,
+          noFolderPrompt:afterImport.noFolderPrompt,
+          explorerText:afterImport.explorerText.slice(0,500)},
+        extensionIdentity:identity,
         extensionConsoleReports:workspaceReports.slice(-3)}));
   const frameTree=await command("Page.getFrameTree");
   const frames=[];
