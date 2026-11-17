@@ -970,7 +970,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     ));
   }
 
-  // Exercise frozen v1alpha5 providers through the public VS Code commands
+  // Exercise candidate v1alpha5 providers through the public VS Code commands
   // in real Theia. A uniquely named sibling Package is created inside the
   // selected workspace and always removed; user-authored files are untouched.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
