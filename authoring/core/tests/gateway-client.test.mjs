@@ -97,3 +97,24 @@ test("Gateway client rejects malformed Chat Completions content", async () => {
     (error) => error instanceof GatewayRequestError && error.code === "missing_model_content",
   );
 });
+
+
+test("Gateway client rejects an oversized serialized request before consuming a Turnstile token", async () => {
+  let challengeCalled = false;
+  let fetchCalled = false;
+  const client = createGatewayModelClient({
+    gatewayBaseUrl: "https://ai-gateway.example",
+    maxRequestBytes: 1024,
+    getTurnstileToken: async () => { challengeCalled = true; return "challenge-token"; },
+    fetchImpl: async () => { fetchCalled = true; return Response.json({ choices: [] }); },
+  });
+  await assert.rejects(
+    client.complete({
+      contextDisclosureAccepted: true,
+      messages: [{ role: "user", content: "x".repeat(4096) }],
+    }),
+    /exceeds the configured UTF-8 byte limit/,
+  );
+  assert.equal(challengeCalled, false);
+  assert.equal(fetchCalled, false);
+});
