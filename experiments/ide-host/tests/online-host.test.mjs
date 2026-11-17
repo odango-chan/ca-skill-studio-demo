@@ -98,9 +98,9 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     "the retired v0.2 sample set must not be bundled");
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js",
     "dist/compiler-worker.js","dist/skillc.wasm","dist/wasm_exec.js","media/procedure.js","media/procedure.css",
-    "samples/v1alpha4/files.json","samples/v1alpha4/README.md",
-    "samples/v1alpha4/establish-pdu-session/assurance/procedure.yaml",
-    "samples/v1alpha4/establish-pdu-session-mas/assurance/procedure.yaml",
+    "samples/v1alpha5/files.json","samples/v1alpha5/README.md",
+    "samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml",
+    "samples/v1alpha5/establish-pdu-session-mas/assurance/procedure.yaml",
     "media/native-markdown-preview.css"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });
