@@ -1,6 +1,6 @@
 # CA-SL v1alpha5 Semantic Patch Engine
 
-This Host-owned source patcher is restricted to the pinned CA-SL v1alpha5 Preview Procedure target.
+This Host-owned source patcher is restricted to the pinned CA-SL v1alpha5 Procedure target.
 
 ## Scope
 
