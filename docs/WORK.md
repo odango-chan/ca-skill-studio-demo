@@ -1,19 +1,19 @@
 # Skill Studio 当前工作状态
 
-## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
+## 2026-11-17 · CA-SL v1alpha5 Preview（适配实施中）
 
-Compiler 已正式发布 `v1.0.0`，目标固定为 CA-SL `connectionagent.io/v1alpha4`，规范 pin 为 `ca-skills@7f84393`。本轮在独立分支 `feat/compiler-v1.0.0-studio-integration-20261117` 接入真实 Go/WASM Core，不再实现模拟 Check / Build。
+**当前活动编辑目标：** `connectionagent.io/v1alpha5`，使用 `ca-skills@12a9512a9eae006ad4578daf37ebe0bdf3070642` 的完整单文件 PUBLIC REVIEW DRAFT。该候选尚未发布、尚未冻结；v1alpha4 保持历史冻结基线，不再作为并行活动 Example。
 
-- **Worker：** 构建时从 Compiler `v1.0.0` tag 编译 Go/WASM，随 Theia Web Extension 发布 `compiler-worker.js`、`skillc.wasm` 和匹配的 `wasm_exec.js`。
-- **CI 凭据：** Compiler 仓为私有仓；Studio Actions 需要 `CA_SKILL_COMPILER_READ_TOKEN`（仅 `Contents: read`）才能检出固定 tag。Token 仅用于 Actions Checkout，不能进入浏览器或 Worker。
-- **命令：** 新增 Check Skill、Build Skill、Inspect Dependencies，均调用 Compiler v1alpha4 API。
-- **Problems：** Compiler 原始 Diagnostic Code / Phase / path / line / column 映射到宿主诊断，不由 Studio 重写。
-- **Build Artifacts：** Package Explorer 增加 Build Artifacts 分区。仅在 Compiler BuildResult 完整性验证通过后显示只读、会话内 Artifact；失败 Build 不保留部分输出。
-- **明确限制：** 当前旧的 `skillc.lock/v0.1` / Tool Contract acquisition 不转换成 v1alpha4 DependencySnapshot。当前请求故意不提供 `resolvedDependencies` 与 `trustedBuildContext`，因此需要外部 Owner / Capability 的 Skill 会按 Compiler 规则 fail-closed。下一工作包是 v1alpha4 digest、Owner Binding 与 CapabilityContracts 的可信快照管线。
-- **Wait：** Compiler v1.0.0 仍是 v1alpha4，不支持 post-v1alpha4 Node-entry Event Wait；不做语法降级或模拟。
-- **验收：** Node 单测与真实 Chromium Worker smoke 已加入 PR workflow；当前尚未取得该分支 exact-head CI / Chromium 结果，不能先行标记 PASS。
+**Example 来源：** `ca-skills@84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef`（PR #65）。Studio 构建产物仅打包 `site/samples/v1alpha5`，并按固定 manifest、source ref 和 Git blob SHA 校验全部示例文件。现有 Example 只有在用户明确确认替换时才会整体重建；普通项目不经过 Example 导入器。
 
-详细边界见 [Compiler v1alpha4 Studio Integration](design/compiler-v1alpha4-studio-integration.md)。这轮只证明 Studio 能真实调用 Compiler；不代表真实 5GC Owner / Deployment、Runtime 或 MAS 已 QUALIFIED。
+- **Source / LSP：** 已有独立 v1alpha5 AST 源码投影；保留四种业务阶段，并把 Node-entry Wait 单独表示为控制字段。Wait 不作为第五种阶段或 Wait-only Node。
+- **Wait 编辑提示：** 正在接入 Wait 字段、Ingress event selector、TIMEOUT 路由、response.after 和同 Node wait.output 的 Completion / Definition / Inspector 展示。响应边界 Completion 只应来自事件接受后的业务路径，不得把仅从 TIMEOUT 可达的 Node 当成响应边界。
+- **Semantic Tokens：** 增加 Studio 本地 `skillWait` token 与主题颜色。它是编辑器展示元数据，不是上游 v1alpha5 Token Selector 契约。
+- **Compiler 边界：** 集成的 Compiler v1.0.0 仍只接受 v1alpha4。Studio 对 v1alpha5 的 Check / Build / Inspect Dependencies 必须 fail-closed；不得把 Wait 降级为旧语法。Compiler PR #30 当前仅有 WP2 AST slice，不是可发布或可资格化的集成版本。
+- **Qualification：** v1alpha5 36 个 EW 用例是规范性验收义务，尚不能据此宣称 Host / Runtime / Integration 通过。Trusted IngressCatalog、Owner / CapabilityContracts、Wait 持久化续接、EVENT_ACCEPTED occurrence 隔离、tombstone 和 paired response 仍 NOT_QUALIFIED。
+- **在线验收：** 需要 exact-head CI、Theia Browser-Only / Browser Host 和真实 Chromium 验收通过后，才考虑合并和 Pages 部署。当前 PR #199 保持 Draft；未通过的验收不能以放宽断言替代。
+
+详细边界见 [CA-SL v1alpha5 Studio Preview](design/ca-sl-v1alpha5-studio-preview.md) 与 [Compiler v1alpha4 Studio Integration](design/compiler-v1alpha4-studio-integration.md)。后者仅描述 v1alpha4 Compiler v1.0.0，不构成 v1alpha5 支持声明。
 
 
 ## 2026-11-16 · CA-SL v1alpha4 编辑器基线与 Procedure Designer
