@@ -20,7 +20,7 @@ function packageRoot(uri) {
 }
 function safeScriptPath(value) {
   return typeof value === 'string' && value.startsWith('scripts/') &&
-    !value.startsWith('/') && !value.includes('\\\\') &&
+    !value.startsWith('/') && !value.includes('\\') &&
     value.split('/').every(part => part && part !== '.' && part !== '..');
 }
 function commandUri(vscode,value) {
