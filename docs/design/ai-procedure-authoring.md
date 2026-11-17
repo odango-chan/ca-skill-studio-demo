@@ -503,7 +503,7 @@ After Apply, the native document change triggers the existing Source / Visual / 
 
 A fixture provider may be used for deterministic UI / Patch Engine tests. It must be clearly identified as a test fixture and cannot be reported as a working AI integration.
 
-**Current Slice B status:** the portable Fetch-API handler, Cloudflare Worker adapter, Turnstile verification, per-IP rate-limit binding, request caps, streaming pass-through and deterministic tests are implemented in the Gateway spike PR. Exact-head CI, Wrangler dry-run and live Cloudflare / model acceptance are separate gates; no live provider integration is claimed.
+**Current Slice B status:** the portable Fetch-API handler, Cloudflare Worker adapter, Turnstile verification, per-IP rate-limit binding, request caps, streaming pass-through and deterministic tests are implemented in [PR #202](https://github.com/odango-chan/ca-skill-studio-demo/pull/202). Exact-head PR verification and Wrangler 4.36.0 dry-run passed at commit `737f1a1`; live Cloudflare deployment, Turnstile widget and provider request remain NOT_RUN.
 
 The online path is implemented first, but every P1 boundary is designed so the later Desktop and intranet profiles reuse the same Authoring Core, Gateway protocol, proposal schema and patch engine.
 
