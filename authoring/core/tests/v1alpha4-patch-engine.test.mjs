@@ -227,7 +227,7 @@ test("accepted atomic groups materialize only their source edits", async () => {
     plan: result,
     acceptedGroupIds: [result.groups[1].id],
   });
-  assert.ok(selected.source.includes("dnn: input.newDnn"));
+  assert.ok(selected.source.includes('dnn: "input.newDnn"'));
   assert.ok(selected.source.startsWith("# Keep this header comment.\nstart: create-session\n"));
 });
 
