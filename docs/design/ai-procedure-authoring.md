@@ -1,7 +1,7 @@
 # AI Procedure Authoring Workbench
 
-**Status: Proposed · Product decisions approved; CA-SL v1alpha5 Preview target · detailed design awaiting review**  
-**Implementation: Gateway PARTIAL · Authoring Core PARTIAL · v1alpha5 Semantic Patch Engine PARTIAL (PR #207) · Editor / Host integration NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
+**Status: Implementation in progress · CA-SL v1alpha5 FROZEN / RELEASED · Studio / Host / Compiler qualification NOT_QUALIFIED**  
+**Implementation: Gateway PARTIAL · Authoring Core PARTIAL · v1alpha5 Semantic Patch Engine CI PASS (PR #207) · standalone Editor Tab / Host integration in PR #208 (CI pending) · Theia / Access / Compiler acceptance NOT_RUN · Date: 2026-11-17**  
 **Tracking: [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200)**
 
 This document defines the first AI-assisted authoring capability for Skill Studio. It is a Studio editing feature, not a CA-SL language extension, Compiler feature, Host capability or Runtime feature.
@@ -13,7 +13,7 @@ This document defines the first AI-assisted authoring capability for Skill Studi
 | Main surface | A standalone Editor Tab named **AI Authoring** |
 | Editing model | A Studio-owned, versioned semantic Change Set; host-native ChangeSet APIs are optional adapters, not the source of truth |
 | Apply behavior | Apply accepted changes to the existing native TextDocument buffer; the user saves |
-| First release | Modify an existing CA-SL v1alpha5 Preview Procedure only; no v1alpha4 fallback |
+| First release | Modify an existing CA-SL v1alpha5 Procedure only; no v1alpha4 fallback |
 | Architecture target | One cross-host Authoring core for Theia Browser, VS Code Desktop/Web/Remote and self-hosted intranet deployments |
 | First implementation target | The existing Theia Browser-Only / GitHub Pages product, using an external OpenAI-compatible AI Gateway |
 | Model credentials | One deployment-scoped shared provider credential, held by the Gateway; no per-user model API keys |
@@ -33,7 +33,7 @@ The current Theia workbench already provides useful host infrastructure:
 - A Procedure CustomEditor implemented as a Webview, paired with the native Source editor.
 - Native TextDocument versions, native WorkspaceEdit, editor dirty state and Undo/Redo.
 - A Package snapshot collector that prefers open TextDocuments over persisted bytes.
-- A pinned CA-SL v1alpha5 Preview candidate and exact IngressCatalog companion contract; v1alpha5 status remains NOT RELEASED / NOT QUALIFIED.
+- CA-SL v1alpha5 is FROZEN / RELEASED at `odango-chan/ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5`; IngressCatalog v1alpha1 is released at `odango-chan/ca-skills@9412be9894ef36acf846c757a5870dc0c48b33ac`. Studio / Compiler / Host / Runtime / Integration / Owner / 5GC product qualification remains separate.
 - The published Compiler v1.0.0 integration is v1alpha4-only. Compiler PR #30 adds a v1alpha5 candidate API / WP2 parser-AST, but full v1alpha5 Check is not yet available.
 - **No model / Agent integration is currently installed in the Studio workbench.** The current Theia 1.76.0 application manifests do not include the Theia AI packages. Existing LSP completion, diagnostics and semantic tokens are language tooling, not LLM-based AI.
 - A first portable Gateway implementation now exists under `gateway/`: a Fetch-API request handler, a thin Cloudflare Worker adapter, Wrangler configuration and deterministic Node tests. It is not yet deployed and has not made a live provider request.
@@ -42,12 +42,12 @@ The current Theia workbench already provides useful host infrastructure:
 - The production GitHub Pages application is static hosting. It has no trusted server process in which to keep a shared provider key. The Pages bundle, browser storage, Webview and VSIX are all client-controlled and must never contain the shared provider credential. A separate Gateway service is required.
 - The current Studio extension is a VS Code Web Extension hosted by Theia. VS Code documents that Web Extensions can also run on Desktop and Web, but their runtime does not provide Node.js APIs. This makes the current browser-compatible extension a useful portability baseline, not proof that every Desktop / Remote host mode is already supported ([VS Code Web Extensions](https://code.visualstudio.com/api/extension-guides/web-extensions)).
 
-There is an important version boundary. The current Studio LSP / Procedure Designer baseline is still the published, frozen CA-SL v1alpha4 projection; it is read-only and MUST NOT be used to interpret or patch a v1alpha5 Procedure. PR #207 now provides a separate v1alpha5 patch engine, but no v1alpha5 LSP / Designer or Theia Host Adapter has been integrated yet. CA-SL v1alpha5 Preview inherits the immutable v1alpha4 normative baseline and adds Node-entry Event Wait through Appendix L. P1 MUST implement a v1alpha5-specific semantic patch layer and MUST NOT fall back to the v1alpha4 parser, patch engine or Compiler API.
+There is an important version boundary. The current Studio LSP / Procedure Designer baseline is still the published, frozen CA-SL v1alpha4 projection; it MUST NOT be used to interpret or patch a v1alpha5 Procedure. PR #207 provides a separate v1alpha5 patch engine; PR #208 adds the independent AI Authoring Editor Tab, Host orchestration and native WorkspaceEdit path. This does not convert the legacy LSP / Designer to v1alpha5. CA-SL v1alpha5 is FROZEN / RELEASED, inherits the immutable v1alpha4 normative baseline and adds Node-entry Event Wait through Appendix L. P1 MUST use the exact v1alpha5 normative and Ingress companion release identities and MUST NOT fall back to the v1alpha4 parser, patch engine or Compiler API.
 
 The exact development pins are:
-- CA-SL v1alpha5 Preview single-file candidate: `odango-chan/ca-skills@d3f89dfafbf218e5e95c97a974004362b7b967b6` (PR #61).
-- Integration Ingress Operation / IngressCatalog companion contract: `odango-chan/ca-skills@561d14c639e11cc43d0f247111e4971dfb98761e` (PR #62).
-These are Preview review refs, not published production dependencies. v1alpha5 remains PUBLIC REVIEW DRAFT / NOT RELEASED / NOT QUALIFIED; Studio must display that status and pin the exact commits used for development.
+- CA-SL v1alpha5 normative single-file release: `odango-chan/ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5` (PR #66 MERGED).
+- Integration Ingress Operation / IngressCatalog v1alpha1 companion release: `odango-chan/ca-skills@9412be9894ef36acf846c757a5870dc0c48b33ac` (PR #62 MERGED).
+These are immutable released normative identities. CA-SL v1alpha5 is FROZEN / RELEASED; Studio, Compiler, Host, Runtime, Integration, Owner and 5GC remain NOT_QUALIFIED until their own applicable acceptance evidence exists. Studio must pin these exact commits.
 
 The published Compiler v1.0.0 targets v1alpha4 and MUST NOT be used to validate v1alpha5 candidates. Compiler PR #30 introduces the independent v1alpha5 API and WP2 Procedure / Wait parser-AST, but its WP3-WP8 linking, graph, SourcePath, response-boundary and conformance work is not complete. Until the v1alpha5 Compiler returns a complete authoritative result, candidate validation remains BLOCKED / NOT_RUN; AI Authoring must never translate Wait away, simulate it, or report a partial parser result as a full Check PASS.
 
@@ -118,7 +118,7 @@ This avoids building two generic chat products. Skill Studio implements only the
 
 ### 3.5 Keep CA-SL and host Agent Skills separate
 
-VS Code / Theia Agent Skills, prompt instructions and chat tools are host-specific AI integration mechanisms. They are not CA-SL Skill Packages, do not define Procedure semantics and are not Compiler inputs. They may provide optional prompt knowledge only; the pinned CA-SL v1alpha5 Preview candidate and its matching Compiler implementation remain authoritative for this authoring path.
+VS Code / Theia Agent Skills, prompt instructions and chat tools are host-specific AI integration mechanisms. They are not CA-SL Skill Packages, do not define Procedure semantics and are not Compiler inputs. They may provide optional prompt knowledge only; the pinned CA-SL v1alpha5 candidate and its matching Compiler implementation remain authoritative for this authoring path.
 
 ### 3.6 No generic file-editing agents
 
@@ -167,9 +167,9 @@ The current menu reorganization is being handled separately by PR #199. The AI c
 
 ### 5.2 Target resolution
 
-- If the active editor belongs to a supported v1alpha5 Preview Procedure, use that document.
+- If the active editor belongs to the current v1alpha5 authoring target, use that document.
 - If no Procedure is active, offer a picker limited to the current workspace's `assurance/procedure.yaml` files.
-- If the selected file is not v1alpha5 Preview, show an explicit unsupported-version explanation. Do not fall back to v1alpha4 or attempt Legacy conversion.
+- If the current build target is not explicitly v1alpha5, show an unsupported-target explanation. Do not fall back to v1alpha4 or attempt Legacy conversion.
 - One live Authoring session is allowed per Procedure URI. Reopening the command focuses the existing tab rather than opening a duplicate session.
 
 
@@ -432,7 +432,7 @@ For v1alpha5 Wait operations it MUST enforce Appendix L.1 / L.1.1 exactly: exact
 
 For every operation it must:
 
-1. Verify the target document is the selected v1alpha5 Preview Procedure.
+1. Verify the active build / authoring target is v1alpha5 and the target document is `assurance/procedure.yaml`.
 2. Parse the current live Source with the pinned YAML 1.2 parser and v1alpha5 source projection, including Appendix L Wait structure.
 3. Resolve Node / Stage / Predicate / Route targets from the parsed source; never trust model-provided offsets.
 4. Check the operation allowlist, current structure, uniqueness, reserved IDs, references and graph invariants.
@@ -541,7 +541,7 @@ After Apply, the native document change triggers the existing Source / Visual / 
 
 A fixture provider may be used for deterministic UI / Patch Engine tests. It must be clearly identified as a test fixture and cannot be reported as a working AI integration.
 
-**Current Slice A status:** the host-neutral Context Pack builder, Access-credentialed Gateway client, Procedure proposal orchestrator and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203), now aligned to v1alpha5 Preview. The Host-owned Change Set envelope is implemented in [PR #204](https://github.com/odango-chan/ca-skill-studio-demo/pull/204), also aligned to v1alpha5. Their exact-head CI must be rerun after the v1alpha5 changes; older v1alpha4-targeted run results are not acceptance evidence for the current heads. The first v1alpha5 source patcher and atomic Wait groups are implemented in [PR #207](https://github.com/odango-chan/ca-skill-studio-demo/pull/207); exact-head CI is in progress after fixing two first-run test failures. Live TextDocument collection, Editor Tab, Theia Host Adapter, native WorkspaceEdit and full v1alpha5 Compiler Check remain NOT_STARTED.
+**Current Slice A status:** the host-neutral Context Pack builder, Access-credentialed Gateway client, Procedure proposal orchestrator and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203); the Host-owned Change Set envelope is implemented in [PR #204](https://github.com/odango-chan/ca-skill-studio-demo/pull/204); and the v1alpha5 source patcher / atomic Wait groups are implemented in [PR #207](https://github.com/odango-chan/ca-skill-studio-demo/pull/207), whose exact-head CI passed [run #44093747817](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44093747817). [PR #208](https://github.com/odango-chan/ca-skill-studio-demo/pull/208) adds the standalone Editor Tab, complete Package Context collection, host-owned proposal / Change Set / Patch orchestration and native WorkspaceEdit application. Its exact-head CI and real Theia Chromium acceptance are separate gates; full v1alpha5 Compiler Check remains NOT_RUN.
 
 **Current Slice B status:** the restricted Cloudflare Access Worker, per-identity Rate Limiting binding, deployment-selected model, request / output limits, JSON + SSE response modes, cancellation and deterministic tests are implemented in [PR #206](https://github.com/odango-chan/ca-skill-studio-demo/pull/206). The Worker implementation commit passed CI and Wrangler dry-run [run #44077321845](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44077321845); the current stacked branch includes documentation alignment and requires exact-head recheck. Live Cloudflare deployment, Pages-origin Access login and provider request remain NOT_RUN.
 
@@ -551,7 +551,7 @@ The online path is implemented first, but every P1 boundary is designed so the l
 ## 16. P1 acceptance checklist
 
 - [ ] Opens one independent AI Authoring Editor Tab and preserves the existing Source / Visual pair.
-- [ ] Uses the live unsaved v1alpha5 Preview Procedure buffer and exact base revision.
+- [ ] Uses the live unsaved v1alpha5 Procedure buffer and exact base revision.
 - [ ] Shows and gates the exact Context Pack before external transmission.
 - [ ] Does not expose provider credentials to the Webview, browser bundle, workspace or extension package.
 - [ ] Uses the Studio-owned Authoring Core and Host Adapter boundary; domain logic has no mandatory Theia / VS Code imports.
@@ -586,7 +586,7 @@ The product decisions in Section 1 and the cross-host architecture direction are
 
 ## Implementation ownership summary
 
-- **CA-SL / ca-skills:** owns the v1alpha5 Preview language candidate and its publication decision; v1alpha4 remains frozen.
+- **CA-SL / ca-skills:** owns the v1alpha5 language candidate and its publication decision; v1alpha4 remains frozen.
 - **CA Skill Compiler:** owns authoritative Check / Build / linking diagnostics.
 - **Skill Studio:** owns the Authoring UI, context disclosure, Studio semantic proposal / Change Set schema, v1alpha5 source patching and host-neutral candidate generation.
 - **Host Adapters:** bridge the shared Authoring Core to Theia / VS Code editor APIs; they own live document access and native buffer application.
