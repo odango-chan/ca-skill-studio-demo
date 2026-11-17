@@ -1173,12 +1173,16 @@ try{
               revision:document.querySelector("#revision")?.textContent||"",
               graphNodes:document.querySelectorAll(".react-flow__node").length,
               graphEdges:document.querySelectorAll(".react-flow__edge").length,
-              procedureRoot:!!document.querySelector("#reactFlowRoot")
+              procedureRoot:!!document.querySelector("#reactFlowRoot"),
+              procedureValue:document.querySelector("#procedureList")?.value||""
             })`
           });
-          if(undone.result?.value?.procedureRoot)undoFrames.push(undone.result.value);
+          if(undone.result?.value?.procedureRoot&&
+             undone.result.value.procedureValue==="ue-requested-pdu-session-establishment")
+            undoFrames.push(undone.result.value);
         }catch{}
       }
+      console.log("STUDIO_THEIA_UNDO_FRAMES_CHROMIUM",JSON.stringify(undoFrames));
       console.log("STUDIO_THEIA_STAGE","native-source-undo");
       patchEvidence.sourceEditor=sourceEditor;
       patchEvidence.undo=undoFrames[0]??null;
