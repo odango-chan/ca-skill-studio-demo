@@ -298,8 +298,14 @@ function addMapEntry(groupMap, mapNode, key, value, operationIndex, operationId)
   }
   const existing = group.entries.find((entry) => entry.key === key);
   if (existing) {
-    if (plain(existing.value) && plain(value)) Object.assign(existing.value, value);
-    else reject("duplicate_append_key", "Two operations attempt to add the same YAML mapping key.", operationId);
+    if (plain(existing.value) && plain(value)) {
+      for (const [nestedKey, nestedValue] of Object.entries(value)) {
+        if (Object.prototype.hasOwnProperty.call(existing.value, nestedKey)) {
+          reject("duplicate_append_key", "Two operations attempt to add the same nested YAML mapping key.", operationId);
+        }
+        existing.value[nestedKey] = nestedValue;
+      }
+    } else reject("duplicate_append_key", "Two operations attempt to add the same YAML mapping key.", operationId);
   } else {
     group.entries.push({ key, value });
   }
