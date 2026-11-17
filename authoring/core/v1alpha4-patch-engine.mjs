@@ -512,15 +512,15 @@ function mergeCoincidentInsertions(edits) {
 }
 
 function applyEdits(source, edits) {
-  const ordered = [...edits].sort((a, b) => b.start - a.start || b.end - a.end);
-  for (let index = 1; index < ordered.length; index += 1) {
-    const current = ordered[index];
-    const previous = ordered[index - 1];
-    if (current.end > previous.start ||
-      (current.start === previous.start && current.end === current.start && previous.end === previous.start)) {
+  const ascending = [...edits].sort((a, b) => a.start - b.start || a.end - b.end);
+  for (let index = 1; index < ascending.length; index += 1) {
+    const current = ascending[index];
+    const previous = ascending[index - 1];
+    if (current.start < previous.end || current.start === previous.start) {
       reject("patch_overlap", "Two semantic operations produce overlapping Source edits.");
     }
   }
+  const ordered = [...edits].sort((a, b) => b.start - a.start || b.end - a.end);
   let result = source;
   for (const edit of ordered) {
     result = result.slice(0, edit.start) + edit.text + result.slice(edit.end);
