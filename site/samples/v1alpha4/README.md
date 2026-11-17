@@ -1,37 +1,26 @@
-# CA-SL v1alpha4 candidate examples
+# CA-SL v1alpha4 Example Skills
 
-**Status: DRAFT / NOT_QUALIFIED.** This directory is a pinned review snapshot of
-[ca-skills PR #58](https://github.com/odango-chan/ca-skills/pull/58) at
-`33664aec7ebc9bb1764618f839d01b7493425429` (2026-11-17). PR #58 is still open and draft; this is not
-the official `ca-skills/main` release.
+**Language baseline:** CA-SL v1alpha4  
+**Source:** [ca-skills PR #58](https://github.com/odango-chan/ca-skills/pull/58), commit `ab189d5dd62763be4cd2f00cc8047a0c5982b6be`  
+**Qualification:** NOT_QUALIFIED
 
-## Source boundaries
+This directory contains the two v1alpha4 Skills used by the Skill Studio Example project:
 
-- `skills/` in the Example project remains the official 5GC reference snapshot
-  from `ca-skills/main@dfba05071cb33424c475e00a325712f5273a19de`. It is Legacy v0.2 / v1alpha1.
-- `examples/v1alpha4-candidate/` contains the two separate migration examples
-  from PR #58. They are not promoted into `skills/`, not qualified packages,
-  and not evidence that Compiler v1.0.0 can build every dependency.
-- The candidate uses SUPI-based identity and does not depend on Host-created
-  `ueRef`. The MAS example is retained as a reference, not an E2E qualification claim.
+- `establish-pdu-session` — conventional 5GC PDU Session establishment.
+- `establish-pdu-session-mas` — an OpenAMSM/MAS source-aligned example.
 
-## Wait status
-
-The Node-level Event Wait semantic baseline was merged in
-[ca-skills PR #60](https://github.com/odango-chan/ca-skills/pull/60).
-Follow-up normative clauses remain draft in
-[ca-skills PR #61](https://github.com/odango-chan/ca-skills/pull/61).
-This snapshot is pinned to PR #58 and does **not** claim to include or execute
-the final Wait revision. Compiler v1.0.0 also predates that later Wait work.
-Do not translate the candidate into newer Wait syntax until the normative
-contract and Compiler support are released together.
+The Example importer places both packages directly under `skills/`. The v1alpha4 packages are the active authoring, validation, and Compiler test baseline. The previous v0.2 sample set is no longer used for product acceptance.
 
 ## Qualification boundary
 
-The candidate does not include the complete trusted Owner ToolCatalog,
-CapabilityContracts, output Schema, Evidence Descriptor and product
-qualification chain required for an executable release. The Compiler must
-fail closed when those publications are missing. A successful YAML parse is
-not a qualification result.
+The source examples demonstrate CA-SL v1alpha4 syntax and its Procedure, Contract, PredicateSet, Schema, and Script references. They do not establish that every referenced Tool, Capability, Schema, or Evidence Guarantee has been published by its Owner.
 
-Refresh this snapshot only from a reviewed immutable upstream commit.
+The conventional 5GC Skill is the primary example. The MAS Skill is retained to illustrate the source mapping to OpenAMSM; it is not an end-to-end qualification claim.
+
+## 3GPP references
+
+The source pins versions independently by specification. The current set includes TS 23.502 V19.9.0, TS 23.501 V19.9.0, TS 23.503 V19.8.0, TS 29.502 V19.7.0, TS 29.503 V19.7.0, TS 29.512 V19.6.0, TS 29.518 V19.8.0, and TS 29.244 V19.6.0. Consult each Skill's `SKILL.md` for the complete reference list and the mapping of its Nodes to 3GPP procedure steps.
+
+## Existing Example workspaces
+
+When an existing Example workspace is upgraded, the importer promotes the v1alpha4 packages into `skills/`. Retired v0.2 packages are moved to `archive/legacy-v0.2/` so any local edits remain recoverable; they are not scanned as active Skills and are not part of acceptance.
