@@ -2065,9 +2065,12 @@ try{
   afterImport.noFolderPrompt=nativeExplorer.noFolderPrompt;
   afterImport.workspaceRootVisible=nativeExplorer.rootVisible;
   afterImport.explorerVisible=nativeExplorer.visible;
+  // The Extension Host identity command already proves the exact single-folder
+  // root. The Explorer's virtualized text may omit its root label when scrolled
+  // into the tree, so verify the live Explorer and absence of its empty prompt.
   if(!afterImport.statusBar||afterImport.statusBar.noWorkspace||
-     !nativeExplorer.visible||nativeExplorer.noFolderPrompt||!nativeExplorer.rootVisible)
-    throw Error("The native Explorer still has no default project root: "+
+     !nativeExplorer.visible||nativeExplorer.noFolderPrompt)
+    throw Error("The native Explorer still has no active project: "+
       JSON.stringify({statusBar:afterImport.statusBar,nativeExplorer}));
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
