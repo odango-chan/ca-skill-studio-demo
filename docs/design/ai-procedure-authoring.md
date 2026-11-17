@@ -1,7 +1,7 @@
 # AI Procedure Authoring Workbench
 
 **Status: Proposed · Product decisions approved; CA-SL v1alpha5 Preview target · detailed design awaiting review**  
-**Implementation: Gateway spike PARTIAL · Authoring Core foundation PARTIAL · Editor / Agent integration NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
+**Implementation: Gateway PARTIAL · Authoring Core PARTIAL · v1alpha5 Semantic Patch Engine PARTIAL (PR #207) · Editor / Host integration NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
 **Tracking: [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200)**
 
 This document defines the first AI-assisted authoring capability for Skill Studio. It is a Studio editing feature, not a CA-SL language extension, Compiler feature, Host capability or Runtime feature.
@@ -42,7 +42,7 @@ The current Theia workbench already provides useful host infrastructure:
 - The production GitHub Pages application is static hosting. It has no trusted server process in which to keep a shared provider key. The Pages bundle, browser storage, Webview and VSIX are all client-controlled and must never contain the shared provider credential. A separate Gateway service is required.
 - The current Studio extension is a VS Code Web Extension hosted by Theia. VS Code documents that Web Extensions can also run on Desktop and Web, but their runtime does not provide Node.js APIs. This makes the current browser-compatible extension a useful portability baseline, not proof that every Desktop / Remote host mode is already supported ([VS Code Web Extensions](https://code.visualstudio.com/api/extension-guides/web-extensions)).
 
-There is an important version boundary. The current Studio LSP / Procedure Designer baseline is still the published, frozen CA-SL v1alpha4 projection; it is read-only and MUST NOT be used to interpret or patch a v1alpha5 Procedure. CA-SL v1alpha5 Preview inherits the immutable v1alpha4 normative baseline and adds Node-entry Event Wait through Appendix L. P1 MUST implement a v1alpha5-specific semantic patch layer and MUST NOT fall back to the v1alpha4 parser, patch engine or Compiler API.
+There is an important version boundary. The current Studio LSP / Procedure Designer baseline is still the published, frozen CA-SL v1alpha4 projection; it is read-only and MUST NOT be used to interpret or patch a v1alpha5 Procedure. PR #207 now provides a separate v1alpha5 patch engine, but no v1alpha5 LSP / Designer or Theia Host Adapter has been integrated yet. CA-SL v1alpha5 Preview inherits the immutable v1alpha4 normative baseline and adds Node-entry Event Wait through Appendix L. P1 MUST implement a v1alpha5-specific semantic patch layer and MUST NOT fall back to the v1alpha4 parser, patch engine or Compiler API.
 
 The exact development pins are:
 - CA-SL v1alpha5 Preview single-file candidate: `odango-chan/ca-skills@d3f89dfafbf218e5e95c97a974004362b7b967b6` (PR #61).
