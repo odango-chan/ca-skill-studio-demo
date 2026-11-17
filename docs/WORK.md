@@ -22,7 +22,7 @@
 - **限流与预算：** 基于已验证身份做 per-user rate limit；Cloudflare Rate Limiting 是近似、分区域的突发控制，不是严格总预算。第一阶段另加输出 Token 上限；不声称具备严格全局模型费用账本。可用时配置 Provider 侧费用控制；严格应用级预算需后续设计持久化记账。
 - **流式：** Worker 透传 Response stream，不缓冲完整响应；客户端断开视为不完整响应，不得生成可接受 Change Set。
 - **Free 计划：** 当前官方限制为 100,000 requests/day、10ms CPU/request、128MB memory、6 simultaneous outgoing connections/request；HTTP 请求只要客户端保持连接就没有硬 wall-time 限制。10ms CPU 不包括上游模型推理时间。必须以真实请求验证。
-- **实现：** `gateway/worker/` 已加入独立 Cloudflare Worker、Wrangler 配置、Access 本地模拟、Provider 转发与 SSE 测试；9 项 Node 单测本地 PASS。PR #202 的 exact-head CI / Wrangler dry-run 待验证。
+- **实现：** `gateway/worker/` 已加入独立 Cloudflare Worker、Wrangler 配置、Access 本地模拟、Provider 转发与 SSE 测试；9 项 Node 单测本地 PASS。PR #206 的 exact-head CI / Wrangler dry-run 待验证。
 - **未完成：** Worker 尚未部署；没有生产 Provider Key、真实模型请求、Pages-origin Access 登录验证或生产 CORS 验收。Rate Limiting binding 的真实账号配置待做；无严格全局费用账本。
 
 ## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
