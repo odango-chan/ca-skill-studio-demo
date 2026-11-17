@@ -16,6 +16,11 @@ function nonce() {
 export function isSkillSchema(path) {
   return typeof path === 'string' && SCHEMA_PATH.test(path);
 }
+function schemaPackageName(uri) {
+  const marker = '/schemas/';
+  const index = typeof uri?.path === 'string' ? uri.path.lastIndexOf(marker) : -1;
+  return index >= 0 ? uri.path.slice(0, index).split('/').pop() : '';
+}
 export function localSchemaReference(uri, ref) {
   if (typeof ref !== 'string' || ref.length > 2048 ||
       !isSkillSchema(uri?.path)) return null;
@@ -91,7 +96,7 @@ function html(token) {
     "for(const c of node.constraints||[])extras.append(el('span','chip',c.key+': '+value(c.value)));if(extras.childNodes.length)d.append(extras);",
     "for(const item of node.children||[])field(d,item);parent.append(d);}",
     "function filter(){const needle=$('search').value.trim().toLowerCase();for(const d of document.querySelectorAll('.field')){d.hidden=false;if(!needle)continue;const own=(d.dataset.field||'').includes(needle);const descendants=[...d.querySelectorAll('.field')].some(x=>(x.dataset.field||'').includes(needle));d.hidden=!(own||descendants);if(descendants)d.open=true;}}",
-    "function render(msg){last=msg.projection;version=msg.version;$('status').textContent='SOURCE VERSION '+version;$('title').textContent=last.title||last.schemaId||'Schema';$('tree').replaceChildren();$('banner').replaceChildren();$('summary').replaceChildren();$('search').value='';",
+    "function render(msg){last=msg.projection;version=msg.version;$('status').textContent='SOURCE VERSION '+version;$('title').textContent=(msg.packageName?msg.packageName+' · ':'')+(last.title||last.schemaId||'Schema');$('tree').replaceChildren();$('banner').replaceChildren();$('summary').replaceChildren();$('search').value='';",
     "if(last.state==='SOURCE_ONLY'){const f=el('section','fallback');f.append(el('h2','','当前 Schema 无法安全可视化'));f.append(el('p','subtitle',last.reason||'请查看原始 YAML'));f.append(action('打开 YAML Source','openSource'));$('tree').append(f);return;}",
     "$('summary').append(el('span','pill','Draft 2020-12'),el('span','pill',last.fieldCount+' fields'),el('span','pill','只读 · Source 真源'));",
     "if(last.state==='PARTIAL'){const b=el('div','banner');b.append(el('strong','', '部分可视化 · 未展示内容仍保留在 YAML'));const ul=el('ul');for(const p of [...(last.unprojectedPaths||[]),...(last.projectionWarnings||[])])ul.append(el('li','',p));b.append(ul);$('banner').append(b);}",
@@ -160,7 +165,8 @@ export function registerSchemaEditor(vscode,context) {
       const push=()=>{
         if(disposed||!ready)return;
         const projection=projectJsonSchema(document.getText());
-        void webview.postMessage({type:'snapshot',version:document.version,projection});
+        void webview.postMessage({type:'snapshot',version:document.version,
+          packageName:schemaPackageName(document.uri),projection});
       };
       const onChange=vscode.workspace.onDidChangeTextDocument(e=>{
         if(e.document.uri.toString()===document.uri.toString())push();
