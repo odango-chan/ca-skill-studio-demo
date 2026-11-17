@@ -438,7 +438,8 @@ export function activate(context){
                   root:result.root.toString(),
                   procedure:result.procedure.toString(),
                   files:result.files,candidateFiles:result.candidateFiles,
-                  skipped:result.skipped,legacyArchived:result.legacyArchived,
+                  skipped:result.skipped,overwritten:result.overwritten,
+                  legacyArchived:result.legacyArchived,readmeUpdated:result.readmeUpdated,
                   skills:result.skills,sourceShas:result.sourceShas
                 };
                 await context.globalState.update(PENDING_EXAMPLE_OPEN_KEY,pending);
@@ -492,7 +493,9 @@ export function activate(context){
               // acceptance and make create-only / existing-file semantics clear.
               void vscode.window.showInformationMessage(
                 "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL v1alpha4 Procedure（DRAFT / NOT_QUALIFIED）。"+
-                "导入 v1alpha4 Skill 文件 "+result.candidateFiles+" 个；保留 "+result.skipped+" 个已有文件。"+
+                "导入 v1alpha4 Skill 文件 "+result.candidateFiles+" 个；更新未修改的旧版文件 "+
+                result.overwritten+" 个；保留 "+result.skipped+" 个已有文件。"+
+                (result.readmeUpdated?"已更新示例项目说明。":"")+
                 (result.legacyArchived?"旧版 Skill 已归档，不再参与默认项目验收。":"")+
                 (viewOpened&&revealed?"已展开 Package Explorer（两个 CA-SL v1alpha4 Skills）。":
                   "可在 Explorer → Package Explorer 查看 v1alpha4 Skills。"));
@@ -703,10 +706,14 @@ export function activate(context){
         editor:VIEW
       }));
       const detail=progressZh
-        ?("导入 CA-SL v1alpha4 Skill 文件 "+pending.candidateFiles+" 个；保留 "+
-          pending.skipped+" 个已有文件。"+(pending.legacyArchived?"旧版 Skill 已归档。":""))
-        :("Imported "+pending.candidateFiles+" CA-SL v1alpha4 Skill files; preserved "+
-          pending.skipped+" existing files."+(pending.legacyArchived?" Archived the retired legacy Skills.":""));
+        ?("导入 CA-SL v1alpha4 Skill 文件 "+pending.candidateFiles+" 个；更新未修改的旧版文件 "+
+          pending.overwritten+" 个；保留 "+pending.skipped+" 个已有文件。"+
+          (pending.readmeUpdated?"已更新示例项目说明。":"")+
+          (pending.legacyArchived?"旧版 Skill 已归档。":""))
+        :("Imported "+pending.candidateFiles+" CA-SL v1alpha4 Skill files; refreshed "+
+          pending.overwritten+" untouched previous files; preserved "+pending.skipped+
+          " existing files."+(pending.readmeUpdated?" Refreshed the Example README.":"")+
+          (pending.legacyArchived?" Archived the retired legacy Skills.":""));
       const message=progressZh
         ?("示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL v1alpha4 Procedure（DRAFT / NOT_QUALIFIED）。"+detail)
         :("Example project opened: skill-studio-demo/. The CA-SL v1alpha4 Procedure is open (DRAFT / NOT_QUALIFIED). "+detail);
