@@ -9,6 +9,9 @@ await rm(join(root,"dist"),{recursive:true,force:true});
 await rm(join(root,"media"),{recursive:true,force:true});
 await mkdir(join(root,"dist"),{recursive:true});
 await mkdir(join(root,"media"),{recursive:true});
+// Keep the Go/WASM Compiler adapter as a separate classic Worker entry; the
+// pinned wasm_exec.js and skillc.wasm are staged by the CI Go build step.
+await cp(join(root,"src/compiler-worker.js"),join(root,"dist/compiler-worker.js"));
 // The pinned native Markdown extension owns Preview rendering; Studio supplies its shared theme.
 await cp("extensions/skill-studio-theme/styles/markdown-preview.css",
   join(root,"media/native-markdown-preview.css"));
