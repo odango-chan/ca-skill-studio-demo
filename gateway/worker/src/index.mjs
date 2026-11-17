@@ -118,14 +118,17 @@ export async function handleRequest(request, env, ctx, fetchImpl = globalThis.fe
   let payload;
   try { payload = validatePayload(await readJson(request, int(env.MAX_REQUEST_BYTES, 65536)), env); }
   catch (failure) { return error(failure?.status ?? 400, failure?.code ?? "invalid_request", headers); }
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(new DOMException("Provider response header timeout", "TimeoutError")), int(env.UPSTREAM_TIMEOUT_MS, 120000));
   try {
     const upstream = await fetchImpl(env.PROVIDER_CHAT_COMPLETIONS_URL, {
       method: "POST",
       redirect: "manual",
-      signal: request.signal,
+      signal: AbortSignal.any([request.signal, timeoutController.signal]),
       headers: { Authorization: "Bearer " + env.PROVIDER_API_KEY, "Content-Type": "application/json", Accept: "text/event-stream" },
       body: JSON.stringify(payload),
     });
+    clearTimeout(timeoutId);
     if (upstream.status === 429) {
       await upstream.body?.cancel();
       return error(429, "provider_rate_limited", headers);
@@ -139,7 +142,10 @@ export async function handleRequest(request, env, ctx, fetchImpl = globalThis.fe
     headers.set("X-Accel-Buffering", "no");
     return new Response(upstream.body, { status: 200, headers });
   } catch (failure) {
-    return error(failure?.name === "AbortError" ? 499 : 502, failure?.name === "AbortError" ? "client_disconnected" : "provider_unavailable", headers);
+    clearTimeout(timeoutId);
+    if (request.signal.aborted) return error(499, "client_disconnected", headers);
+    if (timeoutController.signal.aborted) return error(504, "provider_timeout", headers);
+    return error(502, "provider_unavailable", headers);
   }
 }
 export default { fetch(request, env, ctx) { return handleRequest(request, env, ctx); } };
