@@ -75,7 +75,7 @@ test("Authoring Core and Access Gateway interoperate using the deployment model 
         assert.equal(body.stream, false);
         assert.deepEqual(body.response_format, { type: "json_object" });
         return Response.json({
-          choices: [{ message: { content: "{\\"schema\\":\\"ca-studio.ai-model-proposal/v1\\"}" } }],
+          choices: [{ message: { content: "{\"schema\":\"ca-studio.ai-model-proposal/v1\"}" } }],
         });
       });
     },
@@ -88,7 +88,7 @@ test("Authoring Core and Access Gateway interoperate using the deployment model 
     ],
     responseFormat: { type: "json_object" },
   });
-  assert.equal(content, "{\\"schema\\":\\"ca-studio.ai-model-proposal/v1\\"}");
+  assert.equal(content, "{\"schema\":\"ca-studio.ai-model-proposal/v1\"}");
 });
 
 test("Gateway client clamps output tokens to the configured ceiling", async () => {
