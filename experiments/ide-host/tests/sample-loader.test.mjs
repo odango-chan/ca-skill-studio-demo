@@ -149,9 +149,11 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
   for(const retiredPath of [
     root+"/archive/legacy-v0.2/old.txt",
     root+"/examples/v1alpha4-candidate/README.md",
-    root+"/local-note.md",
-    skillRoot+"/establish-pdu-session-mas/SKILL.md"
+    root+"/local-note.md"
   ])assert.equal(h.files.has(retiredPath),false,"replacement removes "+retiredPath);
+  assert.deepEqual(h.files.get(skillRoot+"/establish-pdu-session-mas/SKILL.md"),
+    bundled("establish-pdu-session-mas/SKILL.md"),
+    "the active Skill path is recreated from the v1alpha4 snapshot");
   for(const retiredFolder of [root+"/archive",root+"/examples"])
     assert.equal(h.folders.has(retiredFolder),false,"replacement removes "+retiredFolder);
 });
