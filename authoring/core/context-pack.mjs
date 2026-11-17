@@ -34,7 +34,7 @@ function assertSafeRelativePath(path) {
   if (parts.some((part) => !part || part === "." || part === "..")) {
     reject("unsafe_path", "Context source path contains an unsafe segment.", { path });
   }
-  if (BLOCKED_ROOTS.has(parts[0].toLowerCase())) {
+  if (parts.some((part) => BLOCKED_ROOTS.has(part.toLowerCase()) || part.startsWith("."))) {
     reject("excluded_path", "Context source is outside the allowed authoring surface.", { path });
   }
   const basename = parts[parts.length - 1];
