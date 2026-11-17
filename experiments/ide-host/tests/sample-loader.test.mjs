@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {posix} from "node:path";
 import {seedExampleProject} from "../vscode/src/sample-loader.mjs";
 
-const sampleRoot="site/samples/v1alpha4/";
+const sampleRoot="site/samples/v1alpha5/";
 const candidate=JSON.parse(readFileSync(sampleRoot+"files.json","utf8"));
 const uri=path=>({scheme:"file",path,toString(){return "file://"+path;}});
 const joinPath=(base,...paths)=>uri(posix.normalize(posix.join(base.path,...paths)));
@@ -14,10 +14,10 @@ function host(candidateOverride=null,{files:seedFiles=[],folders:seedFolders=[]}
   const folders=new Set(["/global-storage",...seedFolders]);
   const workspace={workspaceFolders:[],fs:{
     async readFile(target){
-      if(target.path==="/extension/samples/v1alpha4/files.json")
+      if(target.path==="/extension/samples/v1alpha5/files.json")
         return new TextEncoder().encode(JSON.stringify(candidateOverride??candidate));
-      if(target.path.startsWith("/extension/samples/v1alpha4/"))
-        return new Uint8Array(readFileSync(sampleRoot+target.path.slice("/extension/samples/v1alpha4/".length)));
+      if(target.path.startsWith("/extension/samples/v1alpha5/"))
+        return new Uint8Array(readFileSync(sampleRoot+target.path.slice("/extension/samples/v1alpha5/".length)));
       const value=files.get(target.path);
       if(value)return new Uint8Array(value);
       throw Object.assign(Error("missing"),{code:"FileNotFound"});
@@ -80,12 +80,13 @@ const bundled=file=>new Uint8Array(readFileSync(sampleRoot+file));
 const decode=bytes=>new TextDecoder().decode(bytes);
 const total=candidate.files.length;
 
-test("Example imports only the pinned CA-SL v1alpha4 Skills into skills/",async()=>{
+test("Example imports only the pinned CA-SL v1alpha5 Skills into skills/",async()=>{
   const h=host(),result=await seedExampleProject(
     h.vscode,uri("/extension"),uri("/global-storage"));
-  assert.equal(candidate.sourceSha,"ab189d5dd62763be4cd2f00cc8047a0c5982b6be");
+  assert.equal(candidate.sourceSha,"84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef");
+  assert.equal(candidate.sourceRef,"refs/pull/65/head");
   assert.equal(candidate.sourceStatus,"DRAFT_NOT_QUALIFIED");
-  assert.equal(candidate.languageVersion,"connectionagent.io/v1alpha4");
+  assert.equal(candidate.languageVersion,"connectionagent.io/v1alpha5");
   assert.equal(result.candidateFiles,14);
   assert.equal(result.files,total);
   assert.equal(result.created,total);
@@ -97,11 +98,11 @@ test("Example imports only the pinned CA-SL v1alpha4 Skills into skills/",async(
   assert.equal(h.files.size,total+1,"14 Skill files plus the Example README are imported");
   assert.ok(h.files.has(procedurePath));
   assert.ok(h.files.has(masProcedurePath));
-  assert.match(decode(h.files.get(procedurePath)),/^# Illustrative CA-SL v1alpha4/m);
+  assert.match(decode(h.files.get(procedurePath)),/^# Illustrative CA-SL v1alpha5/m);
   assert.match(decode(h.files.get(procedurePath)),/start: get-sm-subscription-data/);
   assert.doesNotMatch(decode(h.files.get(procedurePath)),/ueRef|ue-ref/);
   assert.match(decode(h.files.get(masProcedurePath)),/start: validate-sm-subscription/);
-  assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha4 Example Skills/);
+  assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 Example Skills/);
   assert.match(decode(h.files.get(root+"/README.md")),/ab189d5dd62763be4cd2f00cc8047a0c5982b6be/);
   assert.ok(h.files.has(skillRoot+"/establish-pdu-session/scripts/validate-subscription-request.py"));
   assert.ok(h.files.has(skillRoot+"/establish-pdu-session-mas/assurance/openamsm-operation-mapping.md"));
@@ -143,9 +144,9 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
   assert.equal(replaced.skipped,0);
   assert.equal(replaced.readmeUpdated,true);
   assert.equal(h.files.size,total+1);
-  assert.match(decode(h.files.get(procedurePath)),/^# Illustrative CA-SL v1alpha4/m);
+  assert.match(decode(h.files.get(procedurePath)),/^# Illustrative CA-SL v1alpha5/m);
   assert.match(decode(h.files.get(masProcedurePath)),/start: validate-sm-subscription/);
-  assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha4 Example Skills/);
+  assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 Example Skills/);
   for(const retiredPath of [
     root+"/archive/legacy-v0.2/old.txt",
     root+"/examples/v1alpha4-candidate/README.md",
@@ -153,12 +154,12 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
   ])assert.equal(h.files.has(retiredPath),false,"replacement removes "+retiredPath);
   assert.deepEqual(h.files.get(skillRoot+"/establish-pdu-session-mas/SKILL.md"),
     bundled("establish-pdu-session-mas/SKILL.md"),
-    "the active Skill path is recreated from the v1alpha4 snapshot");
+    "the active Skill path is recreated from the v1alpha5 snapshot");
   for(const retiredFolder of [root+"/archive",root+"/examples"])
     assert.equal(h.folders.has(retiredFolder),false,"replacement removes "+retiredFolder);
 });
 
-test("Progress covers the v1alpha4 import and a non-replacing reload preserves local edits",async()=>{
+test("Progress covers the v1alpha5 import and a non-replacing reload preserves local edits",async()=>{
   const h=host(),events=[];
   const first=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),
     {onProgress:event=>events.push({...event})});
@@ -168,7 +169,7 @@ test("Progress covers the v1alpha4 import and a non-replacing reload preserves l
   assert.deepEqual(progress.map(event=>event.completed),
     Array.from({length:total+1},(_,index)=>index));
   assert.equal(events.at(-1).phase,"project-ready");
-  const userProcedure=new TextEncoder().encode("user-authored v1alpha4 edit");
+  const userProcedure=new TextEncoder().encode("user-authored v1alpha5 edit");
   const userReadme=new TextEncoder().encode("user-authored Example README");
   const extra=skillRoot+"/establish-pdu-session/notes.local.md";
   h.files.set(first.procedure.path,userProcedure);
@@ -193,7 +194,7 @@ test("Example import does not fabricate lib or output directories",async()=>{
       error=>error.code==="FileNotFound");
 });
 
-test("Malformed or falsely qualified v1alpha4 manifests refuse all writes",async()=>{
+test("Malformed or falsely qualified v1alpha5 manifests refuse all writes",async()=>{
   for(const data of [
     {...candidate,files:[...candidate.files,"../outside"]},
     {...candidate,files:[...candidate.files,candidate.files[0]]},
