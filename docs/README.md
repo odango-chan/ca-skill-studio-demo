@@ -10,7 +10,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 4. [Architecture](architecture/studio-boundaries.md) — ownership、Source authority
 5. [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) — 原生 Settings、Dependency Snapshot / Lock、Compiler 输入与所有权边界
 6. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
-7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — P1 自然语言修改、结构化 Change Set、v1alpha4 Patch 与 Provider 安全边界（Proposed）
+7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — 跨宿主 Authoring Core、OpenAI-compatible Gateway、在线优先及 VS Code / 内网部署边界（Proposed）
 8. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
 9. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
 10. [E Source Editor](design/source-editor-workstream.md) — Monaco / shared D4 history and E2–E4 scope
@@ -35,7 +35,7 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 | Owner / Authority / Source truth | [Architecture](architecture/studio-boundaries.md) |
 | Plugin-managed Project / Dependency / Build ownership | [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) |
 | 现有 UI 和 Source-backed 编辑契约 | [Workbench](design/authoring-workbench.md) |
-| AI Procedure Authoring P1 | [AI Procedure Authoring](design/ai-procedure-authoring.md) |
+| AI Procedure Authoring P1（跨宿主、在线优先） | [AI Procedure Authoring](design/ai-procedure-authoring.md) |
 | Route 编辑 D3 设计 | [D3 Route Designer](design/route-designer.md) |
 | Phase Step 输入绑定与后续结构编辑 | [D4 Phase Designer](design/phase-designer.md) |
 | 为何采用 Source-first | [ADR-0001](decisions/0001-source-first-visual.md) |
