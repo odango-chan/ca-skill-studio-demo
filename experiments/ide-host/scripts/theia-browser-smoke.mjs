@@ -607,9 +607,13 @@ try{
   for(let attempt=0;attempt<100;attempt++){
     exampleLoadReady=await evalJS(`[...document.querySelectorAll(
       '.theia-notification-list-item,.theia-notification-message'
-    )].some(node=>node.innerText.includes(
-      '示例项目已载入并打开工作区：skill-studio-demo/'
-    )&&node.innerText.includes('默认已打开传统 5GC Procedure'))`);
+    )].some(node=>{
+      const message=node.innerText;
+      return (message.includes('示例项目已载入并打开工作区：skill-studio-demo/')&&
+        message.includes('默认已打开 v1alpha4 候选 Procedure（DRAFT / NOT_QUALIFIED）'))||
+        (message.includes('Example project opened: skill-studio-demo/')&&
+        message.includes('v1alpha4 candidate Procedure is open (DRAFT / NOT_QUALIFIED)'));
+    })`);
     if(exampleLoadReady)break;
     await sleep(150);
   }
@@ -2041,9 +2045,12 @@ try{
     throw Error("Theia status bar is not Studio Light: "+
       JSON.stringify(afterImport.statusBar));
   if(!afterImport.notificationText.some(message=>
-       message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
-       message.includes("默认已打开 v1alpha4 候选 Procedure（DRAFT / NOT_QUALIFIED）")&&
-       message.includes("导入官方 Legacy 文件 18 个、v1alpha4 候选文件 14 个"))||
+       (message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
+        message.includes("默认已打开 v1alpha4 候选 Procedure（DRAFT / NOT_QUALIFIED）")&&
+        message.includes("导入官方 Legacy 文件 18 个、v1alpha4 候选文件 14 个"))||
+       (message.includes("Example project opened: skill-studio-demo/")&&
+        message.includes("v1alpha4 candidate Procedure is open (DRAFT / NOT_QUALIFIED)")&&
+        message.includes("Imported 18 official legacy files and 14 v1alpha4 candidate files")))||
      afterImport.noFolderPrompt||!afterImport.workspaceRootVisible||
      !afterImport.explorerText.includes("skills")||
      !afterImport.explorerText.includes("establish-pdu-session")||
