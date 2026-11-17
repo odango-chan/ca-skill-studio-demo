@@ -103,7 +103,7 @@ test("Example imports only the pinned CA-SL v1alpha5 Skills into skills/",async(
   assert.doesNotMatch(decode(h.files.get(procedurePath)),/ueRef|ue-ref/);
   assert.match(decode(h.files.get(masProcedurePath)),/start: validate-sm-subscription/);
   assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 Example Skills/);
-  assert.match(decode(h.files.get(root+"/README.md")),/ab189d5dd62763be4cd2f00cc8047a0c5982b6be/);
+  assert.match(decode(h.files.get(root+"/README.md")),/84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef/);
   assert.ok(h.files.has(skillRoot+"/establish-pdu-session/scripts/validate-subscription-request.py"));
   assert.ok(h.files.has(skillRoot+"/establish-pdu-session-mas/assurance/openamsm-operation-mapping.md"));
   assert.deepEqual(h.workspace.workspaceFolders,[],"import never mutates the active workspace");
