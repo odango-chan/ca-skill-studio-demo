@@ -507,8 +507,7 @@ export async function runWorkbenchAcceptance({
       };
       walk(tree.frameTree);
       latest={frames:frames.map(frame=>({id:frame.id,url:frame.url})),candidates:[]};
-      for(const frame of frames.filter(item=>
-          item.url.includes("/webview/")||item.url.includes(".webview."))){
+      for(const frame of frames.filter(item=>/webview/i.test(item.url??""))){
         try{
           const world=await command("Page.createIsolatedWorld",{
             frameId:frame.id,worldName:"skill-studio-v1alpha4-acceptance",
@@ -526,6 +525,8 @@ export async function runWorkbenchAcceptance({
               "graphEdges:document.querySelectorAll('.react-flow__edge').length,"+
               "procedureValue:document.querySelector('#procedureList')?.value??null,"+
               "revision:document.querySelector('#revision')?.textContent??null,"+
+              "timing:root?.dataset.studioTiming??null,"+
+              "cards:[...document.querySelectorAll('.card h2')].map(el=>el.textContent.trim()),"+
               "heading:heading?.textContent?.trim()??null,"+
               "nativePreviewRoot:Boolean(document.body&&styles.some(url=>url.includes('/media/native-markdown-preview.css'))),"+
               "styles,headingColor:heading?getComputedStyle(heading).color:null,"+
@@ -586,9 +587,9 @@ export async function runWorkbenchAcceptance({
   const initialGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
     "default v1alpha4 Procedure graph");
-  const initialTiming=JSON.parse(initialGraph.view.bodyText.includes("TextDocument")
-    ?JSON.stringify({type:"rendered",revision:initialGraph.view.revision,nodes:initialGraph.view.graphNodes})
-    :"null");
+  const initialTiming=initialGraph.view.timing?JSON.parse(initialGraph.view.timing):{
+    type:"rendered",revision:initialGraph.view.revision,nodes:initialGraph.view.graphNodes
+  };
 
   // Exercise Source-backed Patch Preview, Apply and native Undo on the actual
   // v1alpha4 Procedure. No Legacy fixture or second language version is opened.
@@ -905,9 +906,9 @@ export async function runWorkbenchAcceptance({
     "Planning","Failure Semantics","Dependencies"];
   const contractCards=contract.view.cards??[];
   if(!contract.view.bodyText.includes("establish-pdu-session")||
-     !contract.view.bodyText.includes("ca::sbi.udm.sm_data.get")||
-     !contract.view.bodyText.includes("establishment.ran.adopted")||
-     expectedContractCards.some(title=>!contract.view.bodyText.includes(title)))
+     !contract.view.bodyText.includes("pdu_session.initial_request_fulfilled")||
+     !contract.view.bodyText.includes("nudm-sdm-get")||
+     expectedContractCards.some(title=>!contract.view.cards.includes(title)))
     throw Error("v1alpha4 Contract Designer did not render the current Contract Source: "+
       JSON.stringify(contract.view).slice(0,2600));
   await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha4 Contract Designer");
@@ -945,12 +946,14 @@ export async function runWorkbenchAcceptance({
   const masProcedureUri=defaultProcedureUri.replace(
     "/establish-pdu-session/assurance/procedure.yaml",
     "/establish-pdu-session-mas/assurance/procedure.yaml");
+  await nativeCommand("core.close.all.main.tabs");
   await nativeCommand("skillStudio.openProcedure",masProcedureUri);
   const masPair=await assertSourceVisualPair(
     evalJS,sleep,"procedure.yaml","v1alpha4 MAS Procedure Designer");
   const masGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-session"&&view.graphNodes>0,
     "v1alpha4 MAS Procedure graph");
+  await nativeCommand("core.close.all.main.tabs");
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const restoredPair=await assertSourceVisualPair(
     evalJS,sleep,"procedure.yaml","restored v1alpha4 5GC Procedure Designer");
@@ -965,6 +968,7 @@ export async function runWorkbenchAcceptance({
      packageOverviewEvidence.evidence?.skills?.length!==2)
     throw Error("Package Overview did not discover both v1alpha4 Skills: "+
       JSON.stringify(packageOverviewEvidence));
+  await nativeCommand("core.close.all.main.tabs");
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const finalPair=await assertSourceVisualPair(
     evalJS,sleep,"procedure.yaml","final v1alpha4 default Procedure Designer");
