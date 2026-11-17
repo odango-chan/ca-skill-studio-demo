@@ -16,13 +16,14 @@
 ## 2026-11-17 · AI Gateway 技术 Spike（设计收敛）
 
 - **架构：** Browser → Application Gateway Worker → OpenAI-compatible provider。Cloudflare AI Gateway 若使用，只作为 Worker 后方的可选路由 / 分析层，不能直接暴露给浏览器。
-- **试点认证：** 第一阶段采用 Cloudflare Access 受限访问；Worker 校验 JWT 的签名、issuer、audience 和有效期。它是受控试点方案，不代表已决定最终面向公众的登录体系。
+- **试点认证：** 第一阶段使用 Cloudflare Access 直接保护 Worker；Worker 检查 `ctx.access.aud`，再通过 `ctx.access.getIdentity()` 读取已验证身份，不自行解析 JWT。Worker 不启用 Static Assets，以免丢失 Access context。最终面向公众的登录体系尚未决定。
 - **密钥：** Provider Key 和 Cloudflare API Token 均只保存在 Worker Secret / 服务端；禁止静态 bearer token 打包到网页或 VSIX。
 - **代理边界：** 固定 Chat Completions 路径、上游地址和模型白名单；拒绝任意 URL、任意 Header、超大请求体和未知模型；响应头 / 错误不得泄漏上游密钥。
-- **限流与预算：** 基于已验证身份做 per-user rate limit；Cloudflare Rate Limiting 是近似、分区域的突发控制，不是严格总预算。必须另设 provider / account spend ceiling，并在预算状态不可用时 fail closed。
+- **限流与预算：** 基于已验证身份做 per-user rate limit；Cloudflare Rate Limiting 是近似、分区域的突发控制，不是严格总预算。第一阶段另加输出 Token 上限；不声称具备严格全局模型费用账本。可用时配置 Provider 侧费用控制；严格应用级预算需后续设计持久化记账。
 - **流式：** Worker 透传 Response stream，不缓冲完整响应；客户端断开视为不完整响应，不得生成可接受 Change Set。
 - **Free 计划：** 当前官方限制为 100,000 requests/day、10ms CPU/request、128MB memory、6 simultaneous outgoing connections/request；HTTP 请求只要客户端保持连接就没有硬 wall-time 限制。10ms CPU 不包括上游模型推理时间。必须以真实请求验证。
-- **状态：** 方案已写入 canonical design；Gateway Worker 尚未部署，尚无 Provider Key、真实模型请求或生产认证。先做 fixture-provider 的正负测试，再做显式授权的真实 Provider smoke test。
+- **实现：** `gateway/worker/` 已加入独立 Cloudflare Worker、Wrangler 配置、Access 本地模拟、Provider 转发与 SSE 测试；9 项 Node 单测本地 PASS。PR #202 的 exact-head CI / Wrangler dry-run 待验证。
+- **未完成：** Worker 尚未部署；没有生产 Provider Key、真实模型请求、Pages-origin Access 登录验证或生产 CORS 验收。Rate Limiting binding 的真实账号配置待做；无严格全局费用账本。
 
 ## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
 
