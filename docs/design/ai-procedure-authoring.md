@@ -1,21 +1,30 @@
 # AI Procedure Authoring Workbench
 
-**Status: Proposed · Product decisions approved; detailed design awaiting review**  
+**Status: Proposed · Product decisions approved; cross-host architecture direction approved; detailed design awaiting review**  
 **Implementation: NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
 **Tracking: [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200)**
 
 This document defines the first AI-assisted authoring capability for Skill Studio. It is a Studio editing feature, not a CA-SL language extension, Compiler feature, Host capability or Runtime feature.
+
 
 ## 1. Approved product decisions
 
 | Decision | P1 baseline |
 |---|---|
 | Main surface | A standalone Editor Tab named **AI Authoring** |
-| Editing model | A Studio-private semantic Change Set, reusing Theia AI's generic ChangeSet lifecycle and custom ChangeSetElement contract |
+| Editing model | A Studio-owned, versioned semantic Change Set; host-native ChangeSet APIs are optional adapters, not the source of truth |
 | Apply behavior | Apply accepted changes to the existing native TextDocument buffer; the user saves |
 | First release | Modify an existing CA-SL v1alpha4 Procedure only |
+| Architecture target | One cross-host Authoring core for Theia Browser, VS Code Desktop/Web/Remote and self-hosted intranet deployments |
+| First implementation target | The existing Theia Browser-Only / GitHub Pages product, using an external OpenAI-compatible AI Gateway |
+| Model credentials | One deployment-scoped shared provider credential, held by the Gateway; no per-user model API keys |
+| Deployment portability | Cloudflare Worker is a candidate online Gateway deployment, not a dependency of the Authoring core |
 
-The main surface is not a permanent chat sidebar. Natural language is the task input and refinement mechanism; the primary output is a reviewable change proposal.
+The main surface is not a permanent chat sidebar. Natural language is the task input and refinement mechanism; the primary output is a reviewable Change Set.
+
+The first implementation is online-first, but the product architecture is not online-only. Later host and Gateway deployments must consume the same Authoring contracts and must not require a second Procedure Agent, proposal format or patch engine.
+
+A shared provider credential does not remove the need to protect the Gateway itself. Gateway access authorization, abuse controls and usage limits are separate from provider-key management; they must not be implemented by exposing the provider key to clients.
 
 ## 2. Current implementation baseline
 
@@ -27,64 +36,88 @@ The current Theia workbench already provides useful host infrastructure:
 - A Package snapshot collector that prefers open TextDocuments over persisted bytes.
 - A pinned CA-SL v1alpha4 language source and source-derived Procedure projection.
 - A Compiler v1.0.0 Go/WASM integration and Check / Build / Inspect entry points.
-- **No Theia AI integration is currently installed.** The current Theia 1.76.0 application manifests do not include `@theia/ai-core`, `@theia/ai-chat`, `@theia/ai-openai` or the related AI packages. Existing LSP completion, diagnostics and semantic tokens are language tooling, not LLM-based AI.
+- **No model / Agent integration is currently installed.** The current Theia 1.76.0 application manifests do not include the Theia AI packages. Existing LSP completion, diagnostics and semantic tokens are language tooling, not LLM-based AI.
+- The production GitHub Pages application is static hosting. It has no trusted server process in which to keep a shared provider key. The Pages bundle, browser storage, Webview and VSIX are all client-controlled and must never contain the shared provider credential. A separate Gateway service is required.
+- The current Studio extension is a VS Code Web Extension hosted by Theia. VS Code documents that Web Extensions can also run on Desktop and Web, but their runtime does not provide Node.js APIs. This makes the current browser-compatible extension a useful portability baseline, not proof that every Desktop / Remote host mode is already supported ([VS Code Web Extensions](https://code.visualstudio.com/api/extension-guides/web-extensions)).
 
 There is an important version boundary: the current v1alpha4 Procedure Designer is a read-only projection. Existing D1/D2 typed patch modules and legacy Procedure operations are not automatically valid for v1alpha4. P1 MUST add and test a v1alpha4-specific semantic patch layer. It MUST NOT translate v1alpha4 into legacy syntax or reuse legacy patch operations without an explicit compatibility proof.
 
 The current Compiler v1.0.0 also predates the later Node-entry Event Wait work. AI Authoring MUST NOT invent, lower or simulate that Wait behavior. The existing Compiler remains the authority for the language subset it actually supports.
 
 
-## 3. Theia AI reuse strategy
 
-P1 MUST reuse the existing Theia AI framework where it fits instead of implementing a second generic AI harness.
+## 3. Cross-host architecture and reuse strategy
 
-### 3.1 Reusable framework capabilities
+The final architecture is host-neutral. Theia and VS Code supply editor integration; neither owns the Procedure Authoring domain logic or the shared model credential.
 
-The current Theia baseline is 1.76.0. The initial package candidates are:
+### 3.1 Shared Authoring Core
 
-| Package | P1 use |
+Create a platform-neutral TypeScript core with no imports from VS Code, Theia, DOM or Node-only APIs. It owns:
+
+- Authoring task and session state.
+- Context Pack schema, allowlist and disclosure manifest.
+- Prompt construction and Procedure-specific orchestration.
+- Versioned ModelProposal validation.
+- Studio-owned semantic Change Set model and atomic-group rules.
+- v1alpha4 semantic patch planning and candidate-source generation.
+- Provider-neutral request / response / streaming / cancellation interfaces.
+
+The core never reads or writes workspace files by itself. It receives snapshots and revision metadata through a Host Adapter and returns typed results. It does not own the model provider credential or Gateway deployment.
+
+### 3.2 Host Adapter contract
+
+A small AuthoringHost interface isolates editor and deployment differences. It must provide only the capabilities needed by the core:
+
+| Capability | Responsibility |
 |---|---|
-| `@theia/ai-core` | Agent framework, LanguageModel registry, PromptService, prompt fragments, model requirements, cancellation and AI variables |
-| `@theia/ai-openai` | OpenAI-compatible model provider; custom endpoint, model ID, optional API key and custom headers |
-| `@theia/ai-chat` | Generic Chat / ChangeSet model contracts, including `ChangeSet` and `ChangeSetElement` |
-| `@theia/ai-core-ui` | Optional AI provider / model configuration UI, subject to the host integration decision |
-| `@theia/ai-chat-ui` | Optional reusable response renderers or default chat UI components; not the P1 primary surface |
+| readDocument | Read the live Procedure TextDocument and its version / URI |
+| readContext | Read explicitly allowlisted Package files and identify unsaved buffers |
+| applyWorkspaceEdit | Apply host-generated edits to the current buffer through native editor APIs |
+| getCompiler | Run the pinned Compiler against an in-memory Package overlay |
+| getSecureSessionStore | Store short-lived Gateway access/session material where the host supports secure storage |
+| openAuthoringTab | Open/focus the standalone AI Authoring Editor Tab |
 
-Theia AI already provides agents that can be called from editors and custom widgets, prompt templates, variables, tool functions, streaming response handling, cancellation and custom response parts. P1 should implement one focused `ProcedureAuthoringAgent` and only the domain-specific context / proposal logic.
+Implement host adapters in stages:
 
-Theia AI also provides generic Change Sets and custom `ChangeSetElement` implementations. P1 should implement a `ProcedureChangeSetElement` rather than recreate the generic pending / applied / stale lifecycle. The element's `apply()` MUST delegate to the host's v1alpha4 Patch Engine and native `WorkspaceEdit`; it MUST NOT use the default file-based change implementation or write the Procedure directly to disk.
+1. **Theia Browser-Only** — first production adapter for GitHub Pages.
+2. **VS Code Desktop / Web** — reuse the same browser-compatible core and Web Extension entry where possible; add a Node Extension Host adapter only for capabilities that genuinely require Node / local process access.
+3. **VS Code Remote / WSL / Container** — explicitly choose whether the UI-side or workspace-side Extension Host owns the operation; the configured Gateway must be reachable from that host.
+4. **Self-hosted intranet** — same host contract, pointing at an internal Gateway.
 
-Theia's default Change Set UI is integrated into its generic Chat UI. Since the approved product surface is a standalone Editor Tab, P1 keeps its own Plan / Flow Changes / YAML Diff / Validation workbench and reuses the framework contracts and lifecycle. It does not switch the product to a Chat sidebar.
+The VS Code Web Extension runtime is supported by VS Code on Desktop and Web, but it does not expose Node.js APIs. Do not confuse "extension runs locally in Desktop" with "it has unrestricted Node access" or with "the model provider key can be embedded in the extension package".
 
-### 3.2 Keep CA-SL and Theia Agent Skills separate
+### 3.3 Model Client and Gateway boundary
 
-Theia AI's Agent Skills are reusable prompt instructions / domain knowledge for agents. They are not CA-SL Skill Packages, do not define Procedure semantics, and are not Compiler inputs. They may be used for internal authoring instructions only; the CA-SL v1alpha4 contract and Compiler remain authoritative.
+The shared core depends on an IModelClient, not on Theia AI or a particular provider SDK. The production implementation is an OpenAI-compatible HTTP adapter targeting an AI Gateway.
 
-### 3.3 Do not use generic file-editing agents
+The Gateway owns deployment-specific concerns:
 
-P1 MUST NOT delegate Procedure editing to the generic Theia Coder agent or enable broad workspace file tools. The authoring agent is restricted to the explicit Context Pack and the typed Procedure proposal schema. It cannot write files, execute shell commands, invoke Runtime / Tools or alter any Package file.
+- Provider endpoint, model routing and the shared provider API credential.
+- Gateway-side authentication / session verification.
+- Rate limits, request-size limits, timeout / cancellation propagation and usage controls.
+- Safe forwarding of the supported OpenAI-compatible request / response stream.
 
-### 3.4 Current host integration gap
+The Studio client owns the task prompt, Context Pack, proposal schema and strict response validation. The Gateway is a transport / credential boundary; it does not parse CA-SL, decide whether a Procedure is valid, generate trusted source offsets or apply edits.
 
-The current product is implemented as a VS Code Web Extension hosted by Theia. Theia AI is a Theia-native extension framework; it is not automatically available inside the existing VS Code extension.
+The baseline protocol should target the broadly supported OpenAI Chat Completions request / response shape. Streaming may be used for progress and response delivery, but a proposal is not reviewable until the complete payload has passed host-side schema validation. Do not assume every compatible provider supports /v1/models, strict JSON Schema mode, tool calling or identical cancellation semantics.
 
-In Theia 1.76.0, the VS Code plugin API's `vscode.lm.selectChatModels()` is stubbed and returns an empty list, and `registerLanguageModelChatProvider()` is also stubbed. P1 MUST NOT assume that the existing extension can access Theia AI through the VS Code Language Model API.
+### 3.4 Optional native AI integrations
 
-Slice A must prove a supported integration path, preferably a small Theia-native extension service / command bridge to the existing Editor Tab. If this bridge is not stable, evaluate implementing the Editor Tab as a Theia-native editor-area widget while preserving the approved standalone-tab UX. Do not silently create a second independent model client as a workaround.
+Native host AI APIs are optional adapters, not the canonical Agent runtime:
 
-### 3.5 Browser-only provider constraint
+- **VS Code Language Model API (vscode.lm)** may be used as an optional model source in native VS Code when a model is available and the user has granted consent. Model selection may return no models, and availability / quotas depend on the user's VS Code / Copilot environment. It cannot be the required P1 path because the current Theia 1.76 VS Code plugin API stubs selectChatModels() and returns an empty list. See [VS Code Language Model API](https://code.visualstudio.com/api/extension-guides/ai/language-model).
+- **Theia AI** may be reused behind a Theia-specific adapter if a supported host path is proven. It is not installed in the current application, and its backend-dependent provider path is not the Browser-Only production architecture.
+- A future integration may expose the Gateway as a native VS Code model provider, but the standalone AI Authoring Editor Tab must work without opening Copilot Chat or depending on a Chat Participant.
 
-The production Pages host is Theia Browser-Only and has no Theia backend. Theia's `@theia/ai-openai` 1.76.0 frontend module obtains its `OpenAiLanguageModelsManager` through a remote connection proxy, while the OpenAI model implementation and manager are in the Node backend module. Therefore the dependency being present in a browser-only package is not sufficient evidence that model discovery and requests work in the production host.
+This avoids building two generic chat products. Skill Studio implements only the domain-specific Authoring orchestration and typed Change Set workflow; it uses the common OpenAI-compatible Gateway for the first production path.
 
-The provider spike MUST prove the exact 1.76.0 path in both:
-- Theia Browser-Only / GitHub Pages, the production target.
-- Theia backend-backed browser host, the acceptance target.
+### 3.5 Keep CA-SL and host Agent Skills separate
 
-If the backend-dependent provider cannot run in Browser-Only, choose explicitly between:
-1. A user-controlled OpenAI-compatible gateway reachable from the browser, with the required CORS and user authentication; or
-2. A narrowly scoped frontend-only Theia LanguageModel provider that uses the same OpenAI-compatible protocol.
+VS Code / Theia Agent Skills, prompt instructions and chat tools are host-specific AI integration mechanisms. They are not CA-SL Skill Packages, do not define Procedure semantics and are not Compiler inputs. They may provide optional prompt knowledge only; the CA-SL v1alpha4 contract and Compiler remain authoritative.
 
-Do not embed a shared API key in the static build. The Theia AI documentation states that API keys entered through Preferences are stored in clear text. Do not store provider credentials in workspace-scoped settings or committed files. If a user supplies a personal key in a browser-only deployment, disclose the browser-storage risk and keep it out of Package content, Webview messages, prompts and logs.
+### 3.6 No generic file-editing agents
+
+P1 MUST NOT delegate Procedure editing to a generic Coder agent or enable broad workspace file tools. The Authoring core is restricted to the explicit Context Pack and typed proposal schema. It cannot write files, execute shell commands, invoke Runtime / Tools or alter any Package file.
 
 ## 4. P1 scope
 
@@ -134,17 +167,20 @@ The current menu reorganization is being handled separately by PR #199. The AI c
 - If the selected file is not v1alpha4, show an explicit unsupported-version explanation. Do not attempt Legacy conversion.
 - One live Authoring session is allowed per Procedure URI. Reopening the command focuses the existing tab rather than opening a duplicate session.
 
+
 ### 5.3 Tab implementation
 
-Preferred host implementation: a standalone VS Code-compatible `WebviewPanel` opened as one Editor Tab in the active editor group.
+Preferred host implementation: a standalone VS Code-compatible WebviewPanel opened as one Editor Tab in the active editor group.
 
 - It MUST NOT open a third editor column.
 - It MUST NOT disturb the existing native Source / Procedure Visual pair.
-- It MUST NOT register a second custom editor for `procedure.yaml`.
-- The webview is presentation only. It has no direct provider/network access and cannot write workspace files.
-- The extension host owns context reads, provider requests, Change Set validation, patch generation, Compiler calls and WorkspaceEdit application.
+- It MUST NOT register a second custom editor for procedure.yaml.
+- The Webview is presentation only. It has no direct provider-network access, no provider credentials and no workspace write authority.
+- The Extension Host / Host Adapter owns context reads, Gateway requests, proposal validation, Change Set state, patch generation, Compiler calls and native WorkspaceEdit application.
+- In Browser-Only hosts, the Extension Host is itself browser-constrained; it calls the separately deployed Gateway over HTTPS and never receives the shared provider API key.
+- In Desktop hosts, the same extension workflow uses the local Extension Host for editor operations but still calls the configured Gateway. A Node Extension Host is optional and must not become a second implementation of the Authoring core.
 
-Theia 1.76 browser-only and backend-backed hosts must both prove the `WebviewPanel` lifecycle and tab placement. If the public API behaves differently in either host, resolve that in a focused host spike before choosing an alternative.
+Theia Browser-Only and backend-backed hosts must prove the WebviewPanel lifecycle and tab placement. VS Code Desktop / Web compatibility is a later host acceptance gate; API parity must be verified rather than inferred from the shared extension API surface.
 
 ## 6. Workbench layout
 
@@ -220,34 +256,62 @@ The initial context-size limit should be enforced by bytes before transmission. 
 
 Before the first request in a task, the user sees the provider destination and exact context manifest, then explicitly confirms sending it. Changing the provider or adding context requires a new review. The extension must not transmit Package content merely because the AI Authoring tab was opened.
 
-## 8. OpenAI-compatible model integration and security gate
 
-**Provider family decision: OpenAI-compatible API.** The model endpoint and model ID are configured per deployment; P1 does not assume a specific vendor.
+## 8. AI Gateway and deployment profiles
 
-First evaluate Theia 1.76.0's `@theia/ai-openai` provider. It already supports custom model endpoint URL, model ID, optional API key, custom HTTP headers, streaming and the provider's structured-output / tool-calling capabilities. Do not implement a second generic OpenAI client unless Slice A proves the built-in provider cannot serve the Browser-Only production host.
+### 8.1 Canonical model protocol
 
-The provider integration must preserve these rules:
+**Provider family: OpenAI-compatible API.** The model endpoint and model ID are deployment configuration, not CA-SL or Authoring-core configuration.
 
-- The Webview is presentation-only and never calls the model endpoint directly.
-- The Procedure Authoring Agent receives an explicit, user-approved Context Pack.
-- The model endpoint, model ID and any custom headers are shown in provider configuration.
-- Provider credentials never appear in Webview HTML, JavaScript, DOM, postMessage payloads, Package files, prompts, diagnostics, telemetry, logs or Change Set data.
-- No shared API key is embedded in the public GitHub Pages bundle.
-- Workspace-scoped provider credentials are forbidden. Theia documents that keys entered in Preferences are stored in clear text; any user-level browser key configuration must carry an explicit risk warning.
-- The browser-only endpoint must allow the deployed origin through CORS, or traffic must go through an authenticated user-controlled gateway.
-- Custom static headers supported by the provider may be used for gateway routing / attribution, but must not be treated as a secure secret store.
+The first client adapter targets the OpenAI Chat Completions-compatible request / response shape. The adapter must support cancellation and may support streaming. Structured output / JSON Schema response modes are capability-negotiated; the Host MUST validate every completed response against the Studio-owned ModelProposal schema even when the provider claims schema-constrained output.
 
-The exact Browser-Only / backend-host transport and credential behavior is a blocking technical spike, not an open provider-family decision. If `@theia/ai-openai` cannot run in Browser-Only because its model manager depends on a Node backend, choose a user-controlled OpenAI-compatible gateway or a narrowly scoped frontend-only Theia LanguageModel provider. Keep the same OpenAI-compatible request semantics and Theia AI Agent / ChangeSet layers.
+The Gateway is intentionally thin. It authenticates the caller, applies request and usage limits, injects the deployment's shared provider credential, forwards the request to the configured provider and streams the result. It MUST NOT become a second Procedure Agent, parse CA-SL semantics, edit source or claim Compiler validity.
+
+### 8.2 Deployment profiles
+
+| Profile | Editor / Host | Gateway | Credential location | Status |
+|---|---|---|---|---|
+| **Online first** | GitHub Pages + Theia Browser-Only | Separate HTTPS Gateway; Cloudflare Worker Free is the first candidate | One deployment-scoped provider secret stored by the Gateway | P1 implementation target |
+| **VS Code Desktop** | Same VS Code extension and shared Authoring core; editor operations run in the local Extension Host | Reuse the online Gateway by default, or configure an internal Gateway | Provider secret remains server-side; optional short-lived Gateway session material uses host secure storage | Follow-up host adapter |
+| **VS Code Web** | Browser Extension Host | Same online or intranet Gateway | Provider secret remains server-side | Follow-up host adapter |
+| **VS Code Remote / WSL / Container** | Explicitly selected UI-side or workspace-side Extension Host | Gateway must be reachable from the selected host | Provider secret remains server-side | Follow-up host acceptance |
+| **Intranet / self-hosted** | Theia Browser or VS Code Desktop/Web | Self-hosted Gateway on an internal server or managed workstation | Shared provider secret stored in the internal Gateway's environment / secret store | Final deployment target |
+
+The Gateway protocol is identical across profiles. Moving from Cloudflare to an intranet Gateway changes deployment configuration and operational controls, not the Procedure Agent, Change Set schema, patch engine or Editor Tab.
+
+**Online deployment note:** GitHub Pages remains a static frontend and cannot hold the shared provider key. Cloudflare Workers is a candidate because its Secrets feature stores sensitive values server-side and exposes them to Worker code without placing them in the browser bundle ([Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)). The current Workers Free documentation lists 100,000 requests/day and 10 ms CPU time per request; these limits, streaming behavior, account eligibility and model-provider latency must be checked in a real spike before committing to the free tier ([Workers limits](https://developers.cloudflare.com/workers/platform/limits/)). No database is required merely to store one deployment-scoped provider secret.
+
+**Local / intranet note:** A VS Code Desktop extension can run its editor integration in the local Extension Host, but that does not mean a shared provider secret should be packaged with the extension. If a Gateway runs on the same workstation, it is a separately installed local service reached through a configured loopback endpoint; browser access additionally requires a secure-origin, CORS and local-request/CSRF review. The same Gateway can instead run on an internal server for multiple workstations.
+
+### 8.3 Shared provider credential and Gateway access security
+
+The product decision is **one shared provider API credential per deployment**, not one model API key per end user. Users do not need to configure their own provider keys in the normal product flow.
+
+Keep two credential types distinct:
+
+1. **Provider credential:** the shared key used by the Gateway to call the model service. It exists only in Gateway-side secret storage / environment configuration. It MUST NOT appear in GitHub Pages assets, Webview HTML/JavaScript/DOM, postMessage, VSIX packages, settings.json, workspace files, browser storage, prompts, diagnostics, telemetry or logs.
+2. **Gateway access authorization:** the mechanism that decides who may consume the shared Gateway and under what limits. This is not a provider API key and does not require asking every user to supply a model-provider key. The exact login / invitation / short-lived session mechanism remains an implementation decision.
+
+Before a public Gateway is enabled, it MUST have an access-control strategy, rate limiting, abuse protection and a usage ceiling. CORS is a browser-origin policy, not authentication; an origin allowlist alone does not protect a publicly reachable API from non-browser clients. A hidden URL or static token shipped in the client is not a security boundary.
+
+VS Code SecretStorage is appropriate for optional user-owned credentials or short-lived Gateway session material where needed. It is not a safe place to distribute a deployment-wide shared provider key to every installed copy of the extension. Do not add a per-user provider-key setup flow to P1.
+
+### 8.4 Optional VS Code / Theia model APIs
+
+The VS Code Language Model API can be evaluated as an optional native model source, but P1 must not depend on it: model access requires user consent, availability is dynamic, selectChatModels() may return an empty array and quota failures must be handled. The current Theia 1.76 plugin implementation also stubs this API. See [VS Code Language Model API](https://code.visualstudio.com/api/extension-guides/ai/language-model).
+
+Theia AI's OpenAI provider may be used by a Theia-specific adapter only if its backend dependency is compatible with the chosen host. The current @theia/ai-openai 1.76 frontend manager obtains its manager over a remote connection to a Node backend, while the production Pages host is Browser-Only. Merely adding the package to the browser build is not proof of a working provider path.
+
+No host-specific AI API may change the canonical IModelClient, ModelProposal, Change Set or patch semantics.
 
 ## 9. Change Set contract
 
+
 ### 9.1 Ownership
 
-The semantic proposal is a Studio-private, versioned editing protocol. It is not CA-SL syntax, not a Runtime artifact and not a file in the Skill Package. Once validated by the host, it is materialized as a Theia AI generic `ChangeSet` containing a custom `ProcedureChangeSetElement`.
+The semantic proposal is a Studio-owned, versioned editing protocol. It is not CA-SL syntax, not a Runtime artifact and not a file in the Skill Package. It is the canonical Change Set model across Theia, VS Code Desktop/Web and self-hosted deployments.
 
-The model returns a constrained `ModelProposal`. The extension host validates it and stamps the authoritative Change Set metadata:
-
-The model returns a constrained `ModelProposal`. The extension host validates it and stamps the authoritative Change Set metadata:
+The model returns a constrained ModelProposal. The Host Adapter validates it and stamps the authoritative Change Set metadata:
 
 ~~~json
 {
@@ -279,7 +343,9 @@ The model returns a constrained `ModelProposal`. The extension host validates it
 }
 ~~~
 
-`base`, `scope`, operation IDs, groups, source spans, candidate Source and validation state are host-owned. The model cannot author or override them. The host then exposes the validated proposal through a custom Theia AI `ProcedureChangeSetElement`; the ChangeSet model is a review / lifecycle container, not the model's output schema.
+base, scope, operation IDs, groups, source spans, candidate Source and validation state are Host-owned. The model cannot author or override them. The Host materializes the validated proposal into the Studio Change Set model. A host may optionally adapt that model to a native Theia / VS Code ChangeSet UI contract, but such an adapter is presentation / lifecycle integration only; it does not own the semantic proposal or patch authority.
+
+The Change Set is review data, not a write instruction. Its apply path always delegates to the Host's v1alpha4 Semantic Patch Engine and native WorkspaceEdit; it never writes the Procedure directly to disk.
 
 ### 9.2 Model output restrictions
 
@@ -417,28 +483,37 @@ After Apply, the native document change triggers the existing Source / Visual / 
 | WorkspaceEdit rejected | Keep source unchanged and report failure |
 | Tab closes before Apply | Discard session proposal after warning; source remains unchanged |
 
+
 ## 15. P1 implementation sequence
 
 | Slice | Deliverable | Gate |
 |---|---|---|
-| A. Theia AI / host bridge spike | Add the minimum Theia AI packages; prove Agent / LanguageModel / ChangeSet integration, OpenAI-compatible endpoint, Browser-Only transport, credential path and bridge from the current Editor Tab | Production Browser-Only and backend Theia host proof; do not assume `vscode.lm` works; no secret in Webview |
-| B. Proposal / Change Set contract | ModelProposal schema, host-owned envelope, custom `ProcedureChangeSetElement`, operation allowlist and atomic group validation | Positive / negative schema and forged-operation tests |
-| C. v1alpha4 Patch Engine | Source-preserving patch operations for the initial allowlist | Round-trip, comment / unknown-field preservation, stale revision and malformed YAML tests |
-| D. Authoring Workbench | Context, Plan, Flow Changes, YAML Diff, Validation and Change Set UI | Real Chromium layout, keyboard/focus, no third editor group |
-| E. Procedure Authoring Agent | Theia AI Agent, prompt fragments, explicit Context Pack and structured proposal parsing | Cancellation, timeout, invalid response, disclosure and credential tests |
-| F. Compiler / Apply | In-memory candidate Check and custom ChangeSetElement native WorkspaceEdit apply | Compiler result identity, Source/Visual refresh, dirty state and native Undo/Redo |
-| G. Regression acceptance | Full host and editor regression | IDE Host, Browser-Only Theia Chromium, backend Theia Chromium, `npm test`, `npm run test:plugin-managed`, `npm run typecheck`, `git diff --check` |
+| A. Cross-host contracts | Platform-neutral Authoring Core types, AuthoringHost, IModelClient, Gateway protocol and versioned ModelProposal / Change Set envelope | Core contract tests; no mandatory VS Code, Theia, DOM or Node imports |
+| B. Online Gateway spike | Deploy a minimal OpenAI-compatible Gateway; Cloudflare Worker Free is the first candidate; prove server-side secret injection, streaming / cancellation, CORS, access authorization, rate limits and usage ceiling | Real GitHub Pages → Gateway → model request; no provider secret in browser assets; confirm Free-tier limits and provider latency |
+| C. Theia Browser adapter | Bridge the current standalone Editor Tab / Extension Host to the shared core and Gateway | Real Browser-Only and backend-backed Theia Chromium; no Theia AI or vscode.lm dependency |
+| D. Proposal / Change Set contract | Strict ModelProposal schema, Host-owned envelope, Studio Change Set lifecycle, operation allowlist and atomic-group validation | Positive / negative schema, malformed / forged / out-of-scope operation tests |
+| E. v1alpha4 Patch Engine | Source-preserving patch operations for the initial allowlist | Round-trip, comment / unknown-field preservation, stale revision and malformed YAML tests |
+| F. Authoring Workbench | Context, Plan, Flow Changes, YAML Diff, Validation and Change Set UI | Real Chromium layout, keyboard/focus, no third editor group |
+| G. Compiler / Apply | In-memory candidate Check and native WorkspaceEdit apply | Compiler result identity, Source/Visual refresh, dirty state and native Undo/Redo |
+| H. VS Code Desktop / Web adapter | Package the shared core for VS Code; use the local Extension Host for editor APIs and the same configured Gateway for model access | Desktop and Web Extension acceptance; verify actual host placement and no bundled provider secret |
+| I. Intranet Gateway profile | Deploy the same Gateway contract to a self-hosted internal service / managed workstation | Browser and Desktop clients can use the internal endpoint; secret remains server-side; Cloudflare is not required |
+| J. Regression acceptance | Full host and editor regression | npm test, npm run test:plugin-managed, npm run typecheck, git diff --check; Theia Browser-Only / backend Chromium for P1, Desktop / Web and intranet gates in their respective phases |
 
 A fixture provider may be used for deterministic UI / Patch Engine tests. It must be clearly identified as a test fixture and cannot be reported as a working AI integration.
+
+The online path is implemented first, but every P1 boundary is designed so the later Desktop and intranet profiles reuse the same Authoring Core, Gateway protocol, proposal schema and patch engine.
+
 
 ## 16. P1 acceptance checklist
 
 - [ ] Opens one independent AI Authoring Editor Tab and preserves the existing Source / Visual pair.
 - [ ] Uses the live unsaved v1alpha4 Procedure buffer and exact base revision.
-- [ ] Shows and gates the exact context pack before external transmission.
-- [ ] Does not expose provider credentials to the Webview or workspace.
-- [ ] Uses Theia AI Agent / OpenAI-compatible provider infrastructure where supported; does not duplicate generic model transport, streaming or cancellation.
-- [ ] Materializes validated proposals as a custom Theia AI `ProcedureChangeSetElement`; applies only through native WorkspaceEdit.
+- [ ] Shows and gates the exact Context Pack before external transmission.
+- [ ] Does not expose provider credentials to the Webview, browser bundle, workspace or extension package.
+- [ ] Uses the Studio-owned Authoring Core and Host Adapter boundary; domain logic has no mandatory Theia / VS Code imports.
+- [ ] Uses the OpenAI-compatible Gateway for the first online path; shared provider credential is stored server-side.
+- [ ] Gateway access authorization, rate limits and usage ceiling are enforced independently of CORS.
+- [ ] Materializes only validated proposals into the Studio Change Set model; host-native ChangeSet APIs remain optional adapters.
 - [ ] Accepts only the versioned ModelProposal schema and known operation allowlist.
 - [ ] Rejects raw YAML replacement, arbitrary paths, forged spans, unknown operations and stale proposals.
 - [ ] Uses a dedicated v1alpha4 patch layer; legacy syntax and patch semantics are not reused implicitly.
@@ -449,23 +524,27 @@ A fixture provider may be used for deterministic UI / Patch Engine tests. It mus
 - [ ] Does not auto-save, Build, execute Runtime or claim Owner / 5GC qualification.
 - [ ] Passes positive and negative unit tests and real Theia Browser-Only / backend Chromium acceptance.
 
+Desktop / Web Extension and intranet Gateway compatibility are explicit follow-up acceptance phases, not implied by the online P1 PASS.
+
+
 ## 17. Open decisions before live provider implementation
 
-1. **Endpoint configuration:** confirm the OpenAI-compatible base URL, model ID, whether `GET /v1/models` is supported, and any required custom headers.
-2. **Browser-only transport / credentials:** prove the provider path and choose direct user-owned endpoint versus authenticated gateway; do not embed shared credentials.
-3. **Host bridge:** prove the Theia-native AI service can be invoked from the standalone Editor Tab without relying on the stubbed VS Code `vscode.lm` API.
-4. **Initial context budget:** finalize a byte budget during the provider spike; never silently truncate.
-5. **Operation allowlist:** finalize exact v1alpha4 CST patch operations and source-preservation limits during Slice C.
+1. **Gateway access authorization:** choose a low-friction access/session mechanism for the shared Gateway. It must not require per-user model-provider keys, but must prevent an unrestricted public proxy.
+2. **Online Gateway deployment:** verify Cloudflare Workers Free limits, streaming behavior, timeout behavior, secret configuration and operational monitoring against actual model calls; retain a provider-neutral self-hosted implementation path.
+3. **OpenAI-compatible subset:** confirm Chat Completions compatibility, streaming, cancellation and structured-output support for the selected model endpoint. Do not assume /v1/models or tool calling.
+4. **VS Code host placement:** decide whether the Desktop package can use the Web Extension Host alone or needs a separate Node Extension Host adapter; explicitly test Desktop, Web, Remote and WSL/Container behavior.
+5. **Native model APIs:** determine whether vscode.lm or Theia AI adapters provide meaningful optional value; neither is a required model path.
+6. **Initial Context Pack byte budget:** finalize a byte budget during the online provider spike; never silently truncate.
+7. **Operation allowlist:** finalize exact v1alpha4 CST patch operations and source-preservation limits during Slice E.
 
-The product decisions in Section 1 are approved. This detailed technical design remains Proposed until the provider gate and v1alpha4 patch-engine spike are reviewed.
-
----
+The product decisions in Section 1 and the cross-host architecture direction are approved. The detailed technical design remains Proposed until the online Gateway, shared-core boundary and v1alpha4 patch-engine spikes are reviewed.
 
 ## Implementation ownership summary
 
 - **CA-SL / ca-skills:** owns normative v1alpha4 language semantics.
 - **CA Skill Compiler:** owns authoritative Check / Build / linking diagnostics.
 - **Skill Studio:** owns the Authoring UI, context disclosure, private semantic proposal schema, custom Procedure ChangeSetElement, v1alpha4 source patching and native buffer application.
-- **Theia AI:** supplies the reusable Agent / Prompt / LanguageModel / generic ChangeSet infrastructure; it does not own CA-SL semantics or Procedure patch authority.
-- **AI Provider / Gateway:** generates proposals only; it has no authority to write files or declare a Skill valid.
+- **Host Adapters:** bridge the shared Authoring Core to Theia / VS Code editor APIs; they own live document access and native buffer application.
+- **AI Gateway:** stores the deployment-scoped provider credential, authorizes and limits requests, and forwards OpenAI-compatible model calls; it does not own CA-SL semantics or Procedure patch authority.
+- **Optional Theia AI / VS Code Language Model adapters:** may provide alternate model sources, but are not required for the canonical workflow.
 - **Host / Runtime / Tool Owners:** remain outside P1; no invocation or execution is performed.
