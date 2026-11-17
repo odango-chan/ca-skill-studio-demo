@@ -687,7 +687,7 @@ export async function runWorkbenchAcceptance({
     const languageServiceDiagnostics=await nativeCommand(
       "skillStudio.internal.semanticTokenDiagnostics");
     const expectedPackageRoot=defaultProcedureUri.replace(
-      /\\/assurance\\/procedure\\.yaml$/,"");
+      /\/assurance\/procedure\.yaml$/,"");
     const languagePackage=languageServiceDiagnostics?.packageStatuses?.find(
       item=>item.rootUri===expectedPackageRoot);
     const packageSnapshot=languageServiceDiagnostics?.languagePackages?.find(
@@ -770,7 +770,7 @@ export async function runWorkbenchAcceptance({
     if(inspectorState.visible&&
        text.includes("Contract Goal · pdu_session.initial_request_fulfilled")&&
        text.includes("Global Precondition · get-sm-subscription-data.precondition")&&
-       /Data Flow · \\d+ arguments/.test(text)&&
+       /Data Flow · \d+ arguments/.test(text)&&
        text.includes("Source lineage only"))break;
     await sleep(100);
   }
@@ -784,7 +784,7 @@ export async function runWorkbenchAcceptance({
     sourceOnly:inspectorText.includes("Source lineage only")&&
       inspectorText.toLowerCase().includes("not linked"),
     noRuntimeClaims:!inspectorText.includes("Runtime Evidence")&&
-      !/Runtime \\(PASS|FAILED|SUCCEEDED|COMMITTED)/.test(inspectorText)
+      !/Runtime (?:PASS|FAILED|SUCCEEDED|COMMITTED)/.test(inspectorText)
   };
   if(!phaseEvidence.visible||!phaseEvidence.contractGoal||
      !phaseEvidence.globalPrecondition||!phaseEvidence.selectedNode||
