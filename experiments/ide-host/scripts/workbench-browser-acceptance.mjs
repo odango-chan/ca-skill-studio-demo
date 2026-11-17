@@ -780,7 +780,7 @@ export async function runWorkbenchAcceptance({
     contractGoal:inspectorText.includes("Contract Goal · pdu_session.initial_request_fulfilled"),
     globalPrecondition:inspectorText.includes("Global Precondition · get-sm-subscription-data.precondition"),
     selectedNode:inspectorText.includes("get-sm-subscription-data"),
-    dataflow:/Data Flow · \\d+ arguments/.test(inspectorText),
+    dataflow:/Data Flow · \d+ arguments/.test(inspectorText),
     sourceOnly:inspectorText.includes("Source lineage only")&&
       inspectorText.toLowerCase().includes("not linked"),
     noRuntimeClaims:!inspectorText.includes("Runtime Evidence")&&
