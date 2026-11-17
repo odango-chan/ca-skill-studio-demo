@@ -15,7 +15,7 @@ nodes:
       tool: ca::smf.session.create # keep tool comment
       arguments:
         supi: context.supi # keep argument comment
-        dnn: input.dnn
+        dnn: "input.dnn"
       routes:
         FAILED: FAILED
         COMMITTED: FAILED
@@ -114,7 +114,7 @@ test("stage.argument.set updates one existing argument value", async () => {
       { nodeId: "create-session", stage: "operation", argumentName: "dnn" },
       { expression: "input.requestedDnn" }),
   ]);
-  assert.ok(result.candidateSource.includes("dnn: input.requestedDnn"));
+  assert.ok(result.candidateSource.includes('dnn: "input.requestedDnn"'));
   assert.ok(result.candidateSource.includes("supi: context.supi # keep argument comment"));
 });
 
@@ -246,4 +246,25 @@ test("Patch Engine rejects a non-v1alpha4 write scope and malformed candidate ro
       { targetNodeId: "missing-node" })]),
     (error) => error instanceof PatchPlanningError && error.code === "route_target_invalid",
   );
+});
+
+
+test("stage.argument.set appends a missing named argument to the existing mapping", async () => {
+  const result = await plan([
+    op("stage.argument.set",
+      { nodeId: "create-session", stage: "operation", argumentName: "sst" },
+      { expression: "input.sst" }),
+  ]);
+  assert.ok(result.candidateSource.includes("sst: input.sst"));
+  assert.ok(result.candidateSource.includes('dnn: "input.dnn"'));
+});
+
+test("stage.route.set can add a missing outcome to an existing routes mapping", async () => {
+  const result = await plan([
+    op("stage.route.set",
+      { nodeId: "create-session", stage: "operation", outcome: "UNKNOWN" },
+      { targetNodeId: "UNRESOLVED" }),
+  ]);
+  assert.ok(result.candidateSource.includes("UNKNOWN: UNRESOLVED"));
+  assert.ok(result.candidateSource.includes("COMMITTED: FAILED"));
 });
