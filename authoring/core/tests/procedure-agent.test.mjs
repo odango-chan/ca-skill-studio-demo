@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createProcedureAgent } from "../procedure-agent.mjs";
-import { CONTEXT_PACK_SCHEMA } from "../context-pack.mjs";
+import { CONTEXT_PACK_SCHEMA, buildContextPack } from "../context-pack.mjs";
 import { MODEL_PROPOSAL_SCHEMA } from "../model-proposal.mjs";
 
 async function context() {
@@ -195,4 +195,38 @@ test("Procedure Agent rejects untrusted extra Context Pack fields and sensitive 
     /manifest does not match/,
   );
   assert.equal(called, false);
+});
+
+
+test("Context Pack builder output can be consumed by the Procedure Agent without changing its manifest", async () => {
+  const built = await buildContextPack({
+    taskId: "integrated-task",
+    revision: 1,
+    languageTarget: "connectionagent.io/v1alpha4",
+    procedure: {
+      path: "assurance/procedure.yaml",
+      documentVersion: 4,
+      text: "start: create-session\nnodes: {}\n",
+    },
+    resources: [{
+      id: "contract-goal",
+      kind: "contract",
+      path: "assurance/contract.yaml",
+      selected: true,
+      content: "goal: session.established\n",
+    }],
+    maxBytes: 131072,
+  });
+  const agent = createProcedureAgent({
+    modelClient: { complete: async () => proposal() },
+  });
+  const result = await agent.propose({
+    task: "Add the successful route to verification.",
+    contextPack: built.pack,
+    contextManifest: built.manifest,
+    contextDisclosureAccepted: true,
+  });
+  assert.equal(result.taskId, "integrated-task");
+  assert.deepEqual(result.manifest, built.manifest);
+  assert.equal(result.proposal.operations[0].type, "stage.route.set");
 });
