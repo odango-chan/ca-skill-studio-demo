@@ -2,7 +2,7 @@ import { projectWorkspace } from "../../site/workspace.mjs";
 import { auditPackageWorkspace } from "../../site/package-audit.mjs";
 import { scriptNavigationReport } from "../../site/script-navigation.mjs";
 import { pythonTopLevelOutline } from "../../site/python-outline.mjs";
-import { isV1Alpha4Procedure, analyzeV1Alpha4Source } from "./v1alpha4.js";
+import { isV1Alpha5Procedure, analyzeV1Alpha5Source } from "./v1alpha5.js";
 import type {
   AnalysisState,
   DocumentAnalysis,
@@ -254,13 +254,13 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   const files = new Map(normalizedDocuments.map(document => [document.relativePath, { text: document.text }] as const));
   const procedureDocument = documentsByPath.get("assurance/procedure.yaml");
 
-  // CA-SL v1alpha4 is a breaking syntax target. Do not run the v0.2
+  // CA-SL v1alpha5 is a breaking syntax target. Do not run the v0.2
   // procedures/call/with Package analyzer against the root start/nodes model.
   // Source projection can supply exact editor locations without any claim
-  // that trusted v1alpha4 ToolCatalog, CapabilityContracts or Host Schema
+  // that trusted v1alpha5 ToolCatalog, CapabilityContracts or Host Schema
   // publications have been linked.
-  if (procedureDocument && isV1Alpha4Procedure(procedureDocument.text)) {
-    const projected = analyzeV1Alpha4Source(documentsByPath, snapshot.packageName);
+  if (procedureDocument && isV1Alpha5Procedure(procedureDocument.text)) {
+    const projected = analyzeV1Alpha5Source(documentsByPath, snapshot.packageName);
     return {
       state: "PARTIAL",
       rootUri: snapshot.rootUri,
@@ -271,7 +271,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
         state: "UNAVAILABLE",
         reason: snapshot.completeness !== "complete"
           ? (snapshot.reason ?? "Partial Package snapshot")
-          : "CA-SL v1alpha4 source parsed; trusted Owner/Capability/Schema linking requires v1alpha4 Compiler and published snapshots",
+          : "CA-SL v1alpha5 source parsed; trusted Owner/Capability/Schema linking requires v1alpha5 Compiler and published snapshots",
         diagnostics: []
       },
       documents: normalizedDocuments.map(document => ({
