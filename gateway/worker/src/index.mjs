@@ -1,6 +1,6 @@
 const CHAT_PATH = "/v1/chat/completions";
 const HEALTH_PATH = "/healthz";
-const REQUEST_FIELDS = new Set(["model", "messages", "stream", "max_tokens", "temperature", "top_p"]);
+const REQUEST_FIELDS = new Set(["model", "messages", "stream", "max_tokens", "temperature", "top_p", "response_format"]);
 const csv = (value) => String(value ?? "").split(",").map((v) => v.trim()).filter(Boolean);
 const int = (value, fallback) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : fallback;
 const error = (status, code, headers) => {
@@ -86,6 +86,13 @@ function validatePayload(input, env) {
   if (input.top_p !== undefined) {
     if (typeof input.top_p !== "number" || !Number.isFinite(input.top_p) || input.top_p < 0 || input.top_p > 1) throw { status: 400, code: "invalid_top_p" };
     output.top_p = input.top_p;
+  }
+  if (input.response_format !== undefined) {
+    const format = input.response_format;
+    if (!format || typeof format !== "object" || Array.isArray(format) || Object.keys(format).length !== 1 || format.type !== "json_object") {
+      throw { status: 400, code: "unsupported_response_format" };
+    }
+    output.response_format = { type: "json_object" };
   }
   return output;
 }
