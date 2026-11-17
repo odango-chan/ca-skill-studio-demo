@@ -379,7 +379,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         maxBytes: MAX_CONTEXT_PACK_BYTES,
       });
     } catch (error) {
-      session.generating = false;
+      if (session) session.generating = false;
       post({ type: "error", message: String(error?.message ?? error) });
       return;
     }
@@ -403,27 +403,29 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       "发送并生成提案",
     );
     if (confirmed !== "发送并生成提案") {
-      session.generating = false;
+      if (session) session.generating = false;
       post({ type: "status", message: "已取消发送；没有向模型发送数据。" });
       return;
     }
+    if (!session || session.disposed) return;
 
     try {
       const current = await collectAuthoringState(document);
       if (document.version !== initial.procedure.version ||
         current.generation !== initial.generation ||
         document.getText() !== initial.procedure.text) {
-        session.generating = false;
+        if (session) session.generating = false;
         await refreshContext();
         post({ type: "error", message: "生成期间 Package 或 Procedure 已变化。上下文已刷新，请重新检查后再生成。" });
         return;
       }
     } catch (error) {
-      session.generating = false;
+      if (session) session.generating = false;
       post({ type: "error", message: String(error?.message ?? error) });
       return;
     }
 
+    if (!session || session.disposed) return;
     const controller = new AbortController();
     session.controller = controller;
     post({ type: "status", message: "正在请求模型并校验语义提案…", busy: true });
