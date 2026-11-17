@@ -66,88 +66,7 @@ async function readBundledResource(vscode,uri){
   }
   return vscode.workspace.fs.readFile(uri);
 }
-function workspaceHasRoot(workspace,root){
-  const target=root.toString();
-  return (workspace.workspaceFolders??[]).some(folder=>
-    folder?.uri?.toString?.()===target);
-}
-export async function exposeWorkspaceRoot(workspace,root,legacyRoots=[]){
-  if(workspaceHasRoot(workspace,root))return false;
-  if(typeof workspace.updateWorkspaceFolders!=="function"||
-     typeof workspace.onDidChangeWorkspaceFolders!=="function")
-    fail("Host cannot open a native workspace folder");
-  const folders=workspace.workspaceFolders??[];
-  const legacySet=new Set(legacyRoots.map(uri=>uri.toString()));
-  const legacyIndex=folders.findIndex(folder=>
-    legacySet.has(folder?.uri?.toString?.()));
-  const start=legacyIndex>=0?legacyIndex:folders.length;
-  const deleteCount=legacyIndex>=0?1:0;
-  let subscription=null,timer=null,settled=false;
-  const waitForRoot=new Promise((resolve,reject)=>{
-    const finish=(error)=>{
-      if(settled)return;
-      settled=true;
-      subscription?.dispose?.();
-      if(timer!==null)clearTimeout(timer);
-      if(error)reject(error);else resolve(true);
-    };
-    subscription=workspace.onDidChangeWorkspaceFolders(()=>{
-      if(workspaceHasRoot(workspace,root))finish();
-    });
-    timer=setTimeout(()=>{
-      const current=(workspace.workspaceFolders??[]).map(folder=>
-        folder?.uri?.toString?.()??"<invalid-uri>");
-      finish(Error("Timed out waiting for Theia to open project root "+
-        root.toString()+"; current workspace folders: "+JSON.stringify(current)));
-    },15000);
-    let accepted=false;
-    try{
-      accepted=workspace.updateWorkspaceFolders(start,deleteCount,{uri:root});
-    }catch(error){
-      finish(Error("Workspace update request failed: "+String(error?.message??error)));
-      return;
-    }
-    if(!accepted){
-      if(workspaceHasRoot(workspace,root))finish();
-      else finish(Error("Theia rejected the project workspace root update"));
-      return;
-    }
-    // Some hosts publish the new folder before returning from the API call;
-    // others report it only through onDidChangeWorkspaceFolders.
-    if(workspaceHasRoot(workspace,root))finish();
-  });
-  await waitForRoot;
-  if(!workspaceHasRoot(workspace,root))
-    fail("Workspace change event arrived without the requested project root");
-  return true;
-}
-function validate(manifest){
-  if(manifest?.schemaVersion!==1||
-     manifest?.sourceRepo!=="odango-chan/ca-skills"||
-     !/^[a-f0-9]{40}$/.test(manifest?.sourceSha??"")||
-     !Array.isArray(manifest.skills)||
-     JSON.stringify(manifest.skills)!==JSON.stringify(SKILLS)||
-     !Array.isArray(manifest.files)||manifest.files.length<6||
-     manifest.files.length>100)
-    fail("Unrecognized two-SKILL sample manifest");
-  const seen=new Set();
-  for(const item of manifest.files){
-    if(typeof item!=="string"||item.length>180||
-       item.startsWith("/")||item.includes("\\")||
-       item.split("/").some(p=>!p||p==="."||p==="..")||
-       !SKILLS.includes(item.split("/")[0])||seen.has(item))
-      fail("Unsafe or unexpected sample path");
-    seen.add(item);
-  }
-  for(const skill of SKILLS)
-    if(!seen.has(skill+"/SKILL.md")||
-       !seen.has(skill+"/assurance/procedure.yaml")||
-       !seen.has(skill+"/assurance/contract.yaml")||
-       !seen.has(skill+"/assurance/predicates.yaml"))
-      fail("Missing required "+skill+" package files");
-  return manifest;
-}
-export async function seedExampleWorkspace(vscode,extensionUri,storageUri,
+export async function seedExampleProject(vscode,extensionUri,storageUri,
   {resetExisting=false,onProgress=()=>{}}={}){
   let phase="initial";
   const report=event=>{if(typeof onProgress==="function")onProgress(event);};
@@ -174,8 +93,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,
   // The actual folder basename must be the project name: Theia 1.76
   // ignores WorkspaceFolder.name passed to updateWorkspaceFolders().
   if(!storageUri)fail("No writable extension storage URI");
-  const legacyRoot=vscode.Uri.joinPath(storageUri,"workspaces");
-  const legacySkillsRoot=vscode.Uri.joinPath(legacyRoot,"skills");
+  const legacySkillsRoot=vscode.Uri.joinPath(storageUri,"workspaces","skills");
   const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
   const skillsRoot=vscode.Uri.joinPath(root,"skills");
   let created=0,skipped=0,overwritten=0,resetPackages=0;
@@ -236,11 +154,8 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,
     if(exists)overwritten++;else created++;
     report({phase:"files",completed:created+skipped+overwritten,total:files.length});
   }
-  phase="workspace-update-confirmation";
-  report({phase:"workspace"});
-  const workspaceUpdated=await exposeWorkspaceRoot(vscode.workspace,root,[
-    legacyRoot,legacySkillsRoot
-  ]);
+  phase="project-ready";
+  report({phase:"project-ready"});
   if(resetExisting){
     // Remove only the two legacy bundled package directories from the previous
     // extension-owned workspace location. Other Skills and unrelated data stay.
@@ -260,7 +175,7 @@ export async function seedExampleWorkspace(vscode,extensionUri,storageUri,
   return {root,skillsRoot,
     procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
     sourceSha:manifest.sourceSha,files:files.length,created,skipped,overwritten,
-    resetPackages,resetExisting,workspaceUpdated};
+    resetPackages,resetExisting};
   }catch(error){
     throw Error(phase+": "+String(error?.message??error));
   }

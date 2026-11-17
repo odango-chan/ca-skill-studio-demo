@@ -15,7 +15,8 @@ function newNonce(){
 import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
 import {isV1Alpha4Procedure} from "../../../../language/core/v1alpha4.ts";
-import {exposeWorkspaceRoot,seedExampleWorkspace} from "./sample-loader.mjs";
+import {seedExampleProject} from "./sample-loader.mjs";
+import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
 import {extendMarkdownIt} from "./markdown-link-policy.mjs";
@@ -329,15 +330,16 @@ export function activate(context){
       }catch(error){
         if(error?.code!=="FileNotFound")throw error;
       }
+      await vscode.workspace.fs.createDirectory(root);
       await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"skills"));
-      await exposeWorkspaceRoot(vscode.workspace,root);
+      await openProjectFolder(vscode,root);
     }),
     vscode.commands.registerCommand("skillStudio.openProject",async()=>{
       const folders=await vscode.window.showOpenDialog({
         canSelectFiles:false,canSelectFolders:true,canSelectMany:false,
         openLabel:projectText("Open Project")
       });
-      if(folders?.[0])await exposeWorkspaceRoot(vscode.workspace,folders[0]);
+      if(folders?.[0])await openProjectFolder(vscode,folders[0]);
     }),
     vscode.commands.registerCommand("skillStudio.openLanguageSpec",()=>vscode.env.openExternal(
       vscode.Uri.parse("https://github.com/odango-chan/ca-skills/blob/main/docs/skill-language-spec.zh-CN.md"))),
@@ -387,15 +389,37 @@ export function activate(context){
             let stage="seed-example";
             try{
               report(exampleText.starting);
-              const result=await seedExampleWorkspace(
+              const result=await seedExampleProject(
                 vscode,context.extensionUri,context.globalStorageUri,{
                   onProgress:({phase,completed,total})=>{
                     if(phase==="manifest")report(exampleText.manifest);
                     else if(phase==="files")report(
                       exampleText.files(completed,total),{completed,total});
-                    else if(phase==="workspace")report(exampleText.workspace);
+                    else if(phase==="project-ready")report(exampleText.workspace);
                   }
                 });
+              // A Theia browser-only session may currently be backed by an
+              // Untitled multi-root workspace file. Opening the project folder
+              // natively replaces that workspace and gives the workbench its
+              // real folder identity. Resume the default Procedure after the
+              // extension host is reactivated in the newly opened folder.
+              if(!isSingleFolderWorkspace(vscode,result.root)){
+                stage="open-project";
+                report(exampleText.workspace);
+                const pending={
+                  root:result.root.toString(),
+                  procedure:result.procedure.toString(),
+                  files:result.files,skipped:result.skipped,skills:result.skills
+                };
+                await context.globalState.update(PENDING_EXAMPLE_OPEN_KEY,pending);
+                try{
+                  await openProjectFolder(vscode,result.root);
+                }catch(error){
+                  await context.globalState.update(PENDING_EXAMPLE_OPEN_KEY,undefined);
+                  throw error;
+                }
+                return result;
+              }
               stage="show-packages";
               report(exampleText.packages);
               // End in the real Package Explorer, not a custom duplicate view.
@@ -420,9 +444,13 @@ export function activate(context){
                 .map(folder=>folder.uri.toString());
               if(!confirmedFolders.includes(result.root.toString()))
                 throw Error("Theia has not confirmed the skill-studio-demo workspace root");
+              if(!isSingleFolderWorkspace(vscode,result.root))
+                throw Error("Theia did not open the project as a named single-folder workspace");
               await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
               console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
                 root:result.root.toString(),
+                workspaceName:vscode.workspace.name??null,
+                workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
                 workspaceFolders:confirmedFolders,
                 defaultProcedure:result.procedure.toString(),
                 editor:VIEW
@@ -620,6 +648,42 @@ export function activate(context){
   // A real empty-workspace editor page is required: Theia currently does not
   // render Explorer viewsWelcome without a workspace folder.
   projectWelcome=registerProjectWelcome(vscode,context);
+  // Open Example switches to a named folder, which restarts the extension host.
+  // Complete the user-requested default Procedure open only after the new
+  // single-folder workspace is active; never auto-open on unrelated projects.
+  void restorePendingExampleProject(vscode,context,{
+    revealPackages:async()=>{
+      for(const id of ["workbench.view.explorer","skillStudio.packages.focus"]){
+        try{await vscode.commands.executeCommand(id);break;}
+        catch{/* The alternative is optional. */}
+      }
+      try{await packageOverview?.revealPackages?.();}
+      catch{await packageOverview?.refresh?.();}
+    },
+    onRestored:pending=>{
+      const folders=(vscode.workspace.workspaceFolders??[])
+        .map(folder=>folder.uri.toString());
+      console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
+        root:pending.root,
+        workspaceName:vscode.workspace.name??null,
+        workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
+        workspaceFolders:folders,
+        defaultProcedure:pending.procedure,
+        editor:VIEW
+      }));
+      const detail=progressZh
+        ?("同步 "+pending.files+" 个官方文件；保留 "+pending.skipped+" 个已有文件。")
+        :("Imported "+pending.files+" official files; preserved "+pending.skipped+" existing files.");
+      const message=progressZh
+        ?("示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+detail)
+        :("Example project opened: skill-studio-demo/. The conventional 5GC Procedure is open. "+detail);
+      void vscode.window.showInformationMessage(message);
+    }
+  }).catch(error=>{
+    void vscode.window.showErrorMessage(
+      "SKILL Studio could not finish opening the Example Procedure: "+
+      String(error?.message??error));
+  });
   return {extendMarkdownIt};
 }
 export function deactivate(){}
