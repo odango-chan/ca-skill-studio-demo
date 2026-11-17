@@ -11,7 +11,7 @@
 - **VS Code / 本地：** 桌面插件通过本地 Extension Host 处理编辑器操作，默认仍调用配置的在线或内网 Gateway；本机模型或单机部署可连接 loopback Gateway。组织共用 Provider Key 时优先使用受管内网 Gateway，不应复制到每台员工电脑。不能把共享 Provider Key 打包进 VSIX。Web Extension 可作为 Desktop/Web 共用基线，但不提供 Node.js API；必要时再增加 Node Host Adapter。
 - **原生 AI API：** vscode.lm 和 Theia AI 均作为可选适配，不是核心 Agent 运行时。Theia 1.76 的 vscode.lm stub 和 @theia/ai-openai backend RPC 限制继续作为兼容事实，不阻塞通用 Gateway 路径。
 - **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。Compiler Check 仍是候选 Procedure 的权威静态验证。
-- **Gateway Spike（PR #202）：** 新增平台无关 Fetch-API handler、Cloudflare Worker adapter、Wrangler Free 配置、Turnstile Siteverify、精确 Origin allowlist、必需的 per-IP Rate Limiting binding、请求/输出上限、流式转发和错误脱敏。代码与确定性测试已提交；CI / Wrangler dry-run 待 exact-head 验证，Cloudflare 部署与真实模型调用尚未执行。
+- **Gateway Spike（PR #202）：** 新增平台无关 Fetch-API handler、Cloudflare Worker adapter、Wrangler Free 配置、Turnstile Siteverify、精确 Origin allowlist、必需的 per-IP Rate Limiting binding、请求/输出上限、流式转发和错误脱敏。确定性测试与 Wrangler 4.36.0 Worker dry-run 均已通过；exact-head GitHub Actions [run #44060665450 PASS](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44060665450)。Cloudflare 实际部署、真实 Turnstile widget 和模型请求尚未执行。
 - **安全边界：** Turnstile + per-IP rate limit 是 anti-abuse，不是用户身份认证；广泛公开前仍需身份/邀请策略或私有访问边界。Cloudflare Rate Limiting 为近似、分地域计数；Provider 侧仍需配置实际费用上限。
 - **状态：** 产品决策 APPROVED；跨宿主架构方向 APPROVED；详细设计 PROPOSED；Gateway spike PARTIAL；Authoring Core / Editor 集成 NOT_STARTED；Cloudflare / live model Acceptance NOT_RUN。无 Runtime / 5GC 能力声明。
 
