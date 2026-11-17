@@ -73,7 +73,8 @@ export function activate(context){
       onPackagesChanged:packages=>workbench?.syncPackages?.(packages)
     });
   workbench=registerWorkbench(vscode,context,{
-    prepareToolContract:dependencyIntegration.prepareToolContract
+    prepareToolContract:dependencyIntegration.prepareToolContract,
+    compilerProblemsProvider:compilerIntegration.problems
   });
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
