@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGatewayModelClient, GatewayRequestError } from "../gateway-client.mjs";
+import { handleRequest } from "../../../gateway/worker/src/index.mjs";
 
 test("Gateway client requires explicit context disclosure before sending", async () => {
   let called = false;
@@ -41,6 +42,53 @@ test("Gateway client sends a credentialed OpenAI-compatible request without clie
   assert.equal("model" in body, false);
   assert.equal("tools" in body, false);
   assert.deepEqual(body.response_format, { type: "json_object" });
+});
+
+test("Authoring Core and Access Gateway interoperate using the deployment model and JSON response mode", async () => {
+  const accessAudience = "studio-gateway-audience";
+  const gatewayEnv = {
+    ACCESS_AUD: accessAudience,
+    ALLOWED_ORIGINS: "https://studio.example",
+    ALLOWED_MODELS: "fixture-model",
+    PROVIDER_MODEL: "fixture-model",
+    MAX_REQUEST_BYTES: "262144",
+    MAX_OUTPUT_TOKENS: "2048",
+    PROVIDER_API_KEY: "server-only-provider-secret",
+    PROVIDER_CHAT_COMPLETIONS_URL: "https://provider.example/v1/chat/completions",
+    USER_RATE_LIMITER: { async limit({ key }) { assert.equal(key, "author@example.com"); return { success: true }; } },
+  };
+  const accessContext = {
+    access: { aud: accessAudience, async getIdentity() { return { email: "Author@Example.com" }; } },
+  };
+  const client = createGatewayModelClient({
+    gatewayBaseUrl: "https://gateway.example",
+    fetchImpl: async (url, init) => {
+      assert.equal(init.credentials, "include");
+      const request = new Request(url, {
+        ...init,
+        headers: { ...init.headers, Origin: "https://studio.example" },
+      });
+      return handleRequest(request, gatewayEnv, accessContext, async (_upstreamUrl, upstreamInit) => {
+        assert.equal(upstreamInit.headers.Authorization, "Bearer server-only-provider-secret");
+        const body = JSON.parse(upstreamInit.body);
+        assert.equal(body.model, "fixture-model");
+        assert.equal(body.stream, false);
+        assert.deepEqual(body.response_format, { type: "json_object" });
+        return Response.json({
+          choices: [{ message: { content: "{\\"schema\\":\\"ca-studio.ai-model-proposal/v1\\"}" } }],
+        });
+      });
+    },
+  });
+  const content = await client.complete({
+    contextDisclosureAccepted: true,
+    messages: [
+      { role: "system", content: "Return a valid proposal JSON object." },
+      { role: "user", content: "Propose one safe operation." },
+    ],
+    responseFormat: { type: "json_object" },
+  });
+  assert.equal(content, "{\\"schema\\":\\"ca-studio.ai-model-proposal/v1\\"}");
 });
 
 test("Gateway client clamps output tokens to the configured ceiling", async () => {
