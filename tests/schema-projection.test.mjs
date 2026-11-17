@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {projectJsonSchema, resolveSchemaPointer} from '../site/schema-projection.mjs';
 
 const sample = readFileSync(new URL(
-  '../site/samples/v1alpha4/establish-pdu-session/schemas/establishment-request.schema.yaml',
+  '../site/samples/v1alpha5/establish-pdu-session/schemas/establishment-request.schema.yaml',
   import.meta.url), 'utf8');
 const find = (node, name) => node?.name === name ? node :
   node?.children.flatMap(c => [find(c,name)]).find(Boolean);
