@@ -464,6 +464,9 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
 }
 
 function scalarEditFromPair(parsed, node, value, operationId) {
+  if (!isScalar(node) || node.anchor || node.tag) {
+    reject("source_scalar_unsupported", "Anchored, tagged or non-scalar Source values cannot be rewritten.", operationId);
+  }
   const range = rangeOf(node, operationId);
   const raw = parsed.source.slice(range.start, range.end);
   return { start: range.start, end: range.end, text: encodedScalar(value, raw) };
@@ -529,6 +532,7 @@ function applyEdits(source, edits) {
 }
 
 function digestHex(text) {
+  if (!globalThis.crypto?.subtle) reject("crypto_unavailable", "Web Crypto is required for source revision checks.");
   return globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))
     .then((value) => [...new Uint8Array(value)].map((item) => item.toString(16).padStart(2, "0")).join(""));
 }
@@ -647,7 +651,10 @@ export async function planV1Alpha4Patch({
     changeSet.scope.writePaths[0] !== "assurance/procedure.yaml") {
     reject("change_set_scope_invalid", "Patch Engine only accepts v1alpha4 Procedure-only write scope.");
   }
-  if (changeSet.base.documentUri !== currentDocumentUri ||
+  if (typeof currentDocumentUri !== "string" || currentDocumentUri.trim().length === 0 ||
+    !Number.isSafeInteger(currentDocumentVersion) || currentDocumentVersion < 1 ||
+    !Number.isSafeInteger(currentPackageGeneration) || currentPackageGeneration < 1 ||
+    changeSet.base.documentUri !== currentDocumentUri ||
     changeSet.base.documentVersion !== currentDocumentVersion ||
     changeSet.base.packageGeneration !== currentPackageGeneration) {
     reject("stale_change_set", "Live document or Package revision changed after proposal generation.");
