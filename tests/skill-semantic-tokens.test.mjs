@@ -62,7 +62,7 @@ function tokenFor(source,items,text,type,modifier,from=0){
   return found;
 }
 
-test("legacy v0.2 token registry remains isolated from the frozen v1alpha5 authoring target",()=>{
+test("legacy v0.2 token registry remains isolated from the v1alpha5 candidate authoring target",()=>{
   const blobSha=createHash("sha1")
     .update("blob "+Buffer.byteLength(contractText)+"\0")
     .update(contractText).digest("hex");
@@ -84,12 +84,15 @@ test("legacy v0.2 token registry remains isolated from the frozen v1alpha5 autho
   assert.match(sourceReadme,/semantic-tokens\.v1\.json.*legacy/i);
   const types=contract.legend.tokenTypes.map(item=>item.id);
   const modifiers=contract.legend.tokenModifiers.map(item=>item.id);
-  assert.deepEqual(semantic.SKILL_SEMANTIC_TOKEN_TYPES,types);
-  assert.deepEqual(semantic.SKILL_SEMANTIC_TOKEN_MODIFIERS,modifiers);
-  assert.deepEqual(manifest.contributes.semanticTokenTypes.map(item=>item.id),types);
+  assert.ok(types.every(type=>semantic.SKILL_SEMANTIC_TOKEN_TYPES.includes(type)),
+    "the local v1alpha5 legend retains every legacy v0.2 token identity");
+  assert.ok(semantic.SKILL_SEMANTIC_TOKEN_TYPES.includes("skillWait"),
+    "v1alpha5 adds a local editor-only Wait token identity");
+  assert.deepEqual(semantic.SKILL_SEMANTIC_TOKEN_TYPES,
+    manifest.contributes.semanticTokenTypes.map(item=>item.id));
   assert.deepEqual(
-    manifest.contributes.semanticTokenModifiers.map(item=>item.id).sort(),
-    modifiers.filter(item=>item!=="declaration").sort()
+    semantic.SKILL_SEMANTIC_TOKEN_MODIFIERS.filter(item=>item!=="declaration").sort(),
+    manifest.contributes.semanticTokenModifiers.map(item=>item.id).sort()
   );
   assert.equal(theme.semanticHighlighting,true);
   for(const type of types)
@@ -107,9 +110,10 @@ test("v1alpha5 5GC Procedure exposes exact node, operation, observation and Pred
   tokenFor(source,items,"ca-session-context::context.smf.session.read","skillObservation","reference");
   tokenFor(source,items,"establishment.request.supported","skillPredicate","reference");
   tokenFor(source,items,"PASS","skillOutcome");
-  tokenFor(source,items,"wait","skillWait");
+  tokenFor(source,items,"wait","skillWait",undefined,source.indexOf("update-sm-context:\n"));
   tokenFor(source,items,"TIMEOUT","skillWait");
-  tokenFor(source,items,"update-sm-context.wait.output","skillStep","reference");
+  tokenFor(source,items,"update-sm-context.wait.output","skillStep","reference",
+    source.indexOf("request: update-sm-context.wait.output"));
   tokenFor(source,items,"context.supi","skillBinding");
   assert.ok(items.every(item=>item.start>=0&&item.end<=source.length&&item.start<item.end));
   assert.ok(!items.some(item=>item.type==="skillProcedure"),
