@@ -152,7 +152,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
   if(classic?.fileCount!==8||classic?.corePresent!==3||
      mas?.fileCount!==6||mas?.corePresent!==3)
-    throw Error('Two-SKILL v1alpha4 inventory does not match the pinned sample manifest: 
+    throw Error('Two-SKILL v1alpha4 inventory does not match the pinned sample manifest: '+
       JSON.stringify({classic,mas}));
   function assertGroupInventory(result,packageName,expected){
     const pkg=result?.packages?.find(item=>item.name===packageName);
