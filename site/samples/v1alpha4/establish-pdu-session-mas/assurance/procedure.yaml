@@ -10,7 +10,7 @@ nodes:
   # The source output exposed by the plan is sub_summary ("ok" on validation).
   # This is a CA adapter around the SMF's UDM SDM Get path, not a new 3GPP API.
   # The exact UE/PSI context Observation follows this read-only Operation in the same Node, before any mutation.
-  # 3GPP: CA_ADAPTER — NW Agent s1 SC.VALIDATE_SUBSCRIPTION wraps the Step 4 UDM Nudm_SDM_Get path; callable publication is pending.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; NW Agent s1 SC.VALIDATE_SUBSCRIPTION wraps UDM Nudm_SDM_Get. UDM API: TS 29.503 V19.7.0 §6.1 / OpenAPI Annex A.2; callable publication is pending.
   validate-sm-subscription:
     precondition:
       predicates:
@@ -56,7 +56,7 @@ nodes:
   # OpenAMSM OES: SAA.SECONDARY_AUTH (s2, optional). The current plan hard-codes
   # required="0"; this operation therefore returns phase=SKIPPED. It is not a
   # dynamic secondary-auth decision and this Skill excludes auth-required profiles.
-  # 3GPP: CA_ADAPTER — NW Agent s2 SAA.SECONDARY_AUTH; the pinned plan fixes required=0, so no secondary-authentication exchange runs.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 6 (optional DN-AAA secondary authentication/authorization); NW Agent s2 fixes required=0, so no 3GPP secondary-authentication exchange runs.
   skip-secondary-authentication:
     operation:
       tool: mas::SAA.SECONDARY_AUTH
@@ -80,7 +80,7 @@ nodes:
   # OpenAMSM OES: SC.CREATE_SM_CONTEXT (s3). This is the internal context
   # creation that supports the paired CreateSMContext service boundary; the
   # early step-5 response is not proof of final PDU Session establishment.
-  # 3GPP: CA_ADAPTER — NW Agent s3 SC.CREATE_SM_CONTEXT implements SM Context creation at the Step 3/5 service boundary; Step 5 is not final Goal proof.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 steps 3/5; NW Agent s3 SC.CREATE_SM_CONTEXT implements SM Context creation at the Nsmf service boundary. SMF API: TS 29.502 V19.7.0 §5.2/§6.1/§6.1.2.4 / OpenAPI Annex A.2; common binary type TS 29.571 V19.7.0 §5.4.4.14 for N1 SM; Step 5 is not final Goal proof.
   create-sm-context:
     operation:
       tool: mas::SC.CREATE_SM_CONTEXT
@@ -106,7 +106,7 @@ nodes:
 
   # OpenAMSM OES: SC.REGISTER_UECM (s3r). The MAS plan places this before PCF/N4;
   # that is an explicit ordering deviation from TS 23.502 step 16c.
-  # 3GPP: 3GPP_NATIVE — NW Agent s3r SC.REGISTER_UECM calls UDM Nudm_UECM_Registration; MAS ordering is earlier than conventional Step 16c.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 16c; NW Agent s3r SC.REGISTER_UECM calls UDM Nudm_UECM_Registration. UDM API: TS 29.503 V19.7.0 §6.2 / OpenAPI Annex A.3; MAS ordering is earlier than conventional Step 16c.
   register-uecm:
     operation:
       tool: mas::SC.REGISTER_UECM
@@ -131,7 +131,7 @@ nodes:
   # OpenAMSM OES: PA.CREATE_SM_POLICY (s3p), the MAS adapter for PCF policy
   # association creation. The Owner must return the real association identity;
   # the source fallback "bound" is not an acceptable resource identity.
-  # 3GPP: 3GPP_NATIVE — NW Agent s3p PA.CREATE_SM_POLICY maps to PCF Npcf_SMPolicyControl_Create.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 7b; NW Agent s3p PA.CREATE_SM_POLICY maps to PCF Npcf_SMPolicyControl_Create. PCF API: TS 29.512 V19.6.0 / OpenAPI Annex A.2.
   establish-sm-policy-association:
     operation:
       tool: mas::PA.CREATE_SM_POLICY
@@ -158,7 +158,7 @@ nodes:
 
   # OpenAMSM OES: UPS.DECIDE_ANCHOR (s4). The source output up_anchor is a
   # "1"/"0" readiness marker; the selected PFCP node remains SMF-internal.
-  # 3GPP: CA_ADAPTER — NW Agent s4 UPS.DECIDE_ANCHOR performs SMF-local UPF selection; no separate external NF Service Operation.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 8; NW Agent s4 UPS.DECIDE_ANCHOR performs SMF-local UPF selection; no separate external NF Service Operation.
   select-upf-anchor:
     operation:
       tool: mas::UPS.DECIDE_ANCHOR
@@ -184,7 +184,7 @@ nodes:
   # OpenAMSM OES: IAM.ALLOCATE_ADDRESS (s5), allocator=LOCAL_POOL.
   # ue_addr is a "1"/"0" allocation marker, not the actual UE IP address.
   # The real address stays in the SMF session and is consumed inside later Owners.
-  # 3GPP: CA_ADAPTER — NW Agent s5 IAM.ALLOCATE_ADDRESS performs SMF-local address allocation for the fixed LOCAL_POOL profile.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 8; NW Agent s5 IAM.ALLOCATE_ADDRESS performs SMF-local address allocation for the fixed LOCAL_POOL profile.
   allocate-pdu-session-address:
     operation:
       tool: mas::IAM.ALLOCATE_ADDRESS
@@ -210,7 +210,7 @@ nodes:
 
   # OpenAMSM OES: PA.UPDATE_SM_POLICY (s6u). The Owner consumes the allocation
   # marker and exact policy association; it does not receive a fabricated UE IP.
-  # 3GPP: 3GPP_NATIVE — NW Agent s6u PA.UPDATE_SM_POLICY maps to PCF Npcf_SMPolicyControl_Update.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 9 (conditional); NW Agent s6u PA.UPDATE_SM_POLICY maps to PCF Npcf_SMPolicyControl_Update. PCF API: TS 29.512 V19.6.0 / OpenAPI Annex A.2.
   modify-sm-policy-association:
     operation:
       tool: mas::PA.UPDATE_SM_POLICY
@@ -233,15 +233,16 @@ nodes:
           arguments:
             - modify-sm-policy-association.operation.output
       routes:
-        PASS: create-charging-reservation
+        PASS: execute-charging-step
         FAIL: SAFE_STOPPED
         UNKNOWN: SAFE_STOPPED
 
-  # OpenAMSM OES: CA.CREATE_CHARGING (s7). The current implementation is an
-  # explicit NOT_IMPL_skip stub returning charging_ref="1". It is retained as a
-  # qualification gate, not accepted as proof of a charging reservation.
-  # 3GPP: CA_EXTENSION — NW Agent s7 CA.CREATE_CHARGING is a MAS-specific charging extension; the pinned source is NOT_IMPL_skip, not a 3GPP call.
-  create-charging-reservation:
+  # OpenAMSM OES: CA.CREATE_CHARGING (s7). The pinned adapter returns
+  # SMF_MAS_OK with charging_ref="1" and records NOT_IMPL_skip. The required
+  # plan step therefore completes and s8 proceeds, but no charging reservation
+  # is created or claimed by this Skill.
+  # 3GPP: CA_EXTENSION — MAS-specific charging extension; this source revision is a successful skip stub, not a 3GPP charging operation.
+  execute-charging-step:
     operation:
       tool: mas::CA.CREATE_CHARGING
       arguments:
@@ -254,9 +255,9 @@ nodes:
         DENIED: SAFE_STOPPED
     postcondition:
       predicates:
-        - predicate: establishment.mas.charging_reservation_created
+        - predicate: establishment.mas.charging_step_completed
           arguments:
-            - create-charging-reservation.operation.output
+            - execute-charging-step.operation.output
       routes:
         PASS: establish-n4-session
         FAIL: SAFE_STOPPED
@@ -265,7 +266,7 @@ nodes:
   # OpenAMSM OES: UPN.CREATE_UP_SESSION (s8). Step-8 UPF selection and address
   # allocation are already represented by UPS/IAM; the actual UPF/UE IP remain
   # inside the SMF session. n4_seid is the single UPF SEID, not an N4 SEID pair.
-  # 3GPP: 3GPP_NATIVE — NW Agent s8 UPN.CREATE_UP_SESSION performs N4 Session Establishment; TS 23.502 §4.4.1.2.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 steps 10a–10b and §4.4.1.2; NW Agent s8 UPN.CREATE_UP_SESSION performs N4 Session Establishment. PFCP/N4: TS 29.244 V19.6.0.
   establish-n4-session:
     operation:
       tool: mas::UPN.CREATE_UP_SESSION
@@ -296,7 +297,7 @@ nodes:
   # remain pending until the exact later step-15 UpdateSMContext result supplies
   # the RAN F-TEID. Host correlates that request to this Operation; Runtime
   # resumes this same Invocation. The AMF transfer ACK alone is not adoption.
-  # 3GPP: CA_ADAPTER — NW Agent s10 SSM.SIGNAL_UE_AN orchestrates Step 11 Namf_Communication_N1N2MessageTransfer and pending Step 15 UpdateSMContext completion.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 steps 11 and 15; NW Agent s10 SSM.SIGNAL_UE_AN orchestrates Namf_Communication_N1N2MessageTransfer and the pending Nsmf_PDUSession_UpdateSMContext completion. APIs: TS 29.518 V19.8.0 §5.2 / §6.1.2.4 / OpenAPI Annex A.2; TS 29.502 V19.7.0 §5.2/§6.1/§6.1.2.4 / OpenAPI Annex A.2; common binary type TS 29.571 V19.7.0 §5.4.4.14.
   signal-ue-and-access-network:
     operation:
       tool: mas::SSM.SIGNAL_UE_AN
@@ -322,7 +323,7 @@ nodes:
 
   # OpenAMSM OES: UPN.MODIFY_UP_SESSION (s11), the separate N4 Modification
   # proof boundary. It consumes the RAN F-TEID returned by the pending SSM call.
-  # 3GPP: 3GPP_NATIVE — NW Agent s11 UPN.MODIFY_UP_SESSION performs N4 Session Modification; TS 23.502 §4.4.1.3.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 steps 16a–16b and §4.4.1.3; NW Agent s11 UPN.MODIFY_UP_SESSION performs N4 Session Modification. PFCP/N4: TS 29.244 V19.6.0.
   modify-n4-session:
     operation:
       tool: mas::UPN.MODIFY_UP_SESSION
@@ -348,7 +349,7 @@ nodes:
 
   # OpenAMSM OES: SE.EMIT_EVENTS (s13). The current source records a local MAS
   # event and returns last_event="1"; this is not TS 23.502 step-18 notification.
-  # 3GPP: CA_EXTENSION — NW Agent s13 SE.EMIT_EVENTS records a local MAS event only; it is not Step 18 SM Context Status Notify.
+  # 3GPP: CA_EXTENSION — TS 23.502 V19.9.0 §4.3.2.2.1 step 18 is SM Context Status Notify on the conditional failure path; NW Agent s13 SE.EMIT_EVENTS records a local MAS event only and is not that 3GPP operation.
   record-session-establishment-event:
     operation:
       tool: mas::SE.EMIT_EVENTS
@@ -401,9 +402,9 @@ nodes:
         - predicate: establishment.mas.policy_updated
           arguments:
             - modify-sm-policy-association.operation.output
-        - predicate: establishment.mas.charging_reservation_created
+        - predicate: establishment.mas.charging_step_completed
           arguments:
-            - create-charging-reservation.operation.output
+            - execute-charging-step.operation.output
         - predicate: establishment.mas.n4_session_established
           arguments:
             - establish-n4-session.operation.output
