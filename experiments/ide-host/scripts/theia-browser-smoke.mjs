@@ -256,7 +256,7 @@ try{
         const items=[...(bar?.querySelectorAll('.lm-MenuBar-item')??[])]
           .map(node=>String(node.textContent??'').trim());
         return {
-          present:items[0]==="SKILL Studio",
+          present:items.filter(label=>label==="SKILL Studio").length===1,
           items,
           registryState:document.documentElement?.dataset?.skillStudioNativeMenu??null,
           stylesheet:Boolean(document.querySelector("#skill-studio-brand-theme")?.sheet),
