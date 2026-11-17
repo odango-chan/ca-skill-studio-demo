@@ -5,6 +5,7 @@
 Compiler 已正式发布 `v1.0.0`，目标固定为 CA-SL `connectionagent.io/v1alpha4`，规范 pin 为 `ca-skills@7f84393`。本轮在独立分支 `feat/compiler-v1.0.0-studio-integration-20261117` 接入真实 Go/WASM Core，不再实现模拟 Check / Build。
 
 - **Worker：** 构建时从 Compiler `v1.0.0` tag 编译 Go/WASM，随 Theia Web Extension 发布 `compiler-worker.js`、`skillc.wasm` 和匹配的 `wasm_exec.js`。
+- **CI 凭据：** Compiler 仓为私有仓；Studio Actions 需要 `CA_SKILL_COMPILER_READ_TOKEN`（仅 `Contents: read`）才能检出固定 tag。Token 仅用于 Actions Checkout，不能进入浏览器或 Worker。
 - **命令：** 新增 Check Skill、Build Skill、Inspect Dependencies，均调用 Compiler v1alpha4 API。
 - **Problems：** Compiler 原始 Diagnostic Code / Phase / path / line / column 映射到宿主诊断，不由 Studio 重写。
 - **Build Artifacts：** Package Explorer 增加 Build Artifacts 分区。仅在 Compiler BuildResult 完整性验证通过后显示只读、会话内 Artifact；失败 Build 不保留部分输出。
