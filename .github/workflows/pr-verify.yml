@@ -12,6 +12,7 @@ on:
       - 'extensions/skill-studio-theme/**'
       - 'language/**'
       - 'experiments/ide-host/**'
+      - 'gateway/**'
       - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'

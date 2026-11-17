@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "ca-skill-studio-ai-gateway",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-11-17",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "OPENAI_BASE_URL": "https://api.openai.com/v1",
+    "OPENAI_MODEL": "replace-with-provider-model-id",
+    "ALLOWED_ORIGINS": "https://odango-chan.github.io",
+    "TURNSTILE_SITE_KEY": "replace-with-public-turnstile-site-key",
+    "TURNSTILE_EXPECTED_HOSTNAMES": "odango-chan.github.io",
+    "TURNSTILE_EXPECTED_ACTION": "ai_authoring",
+    "MAX_INPUT_BYTES": "262144",
+    "MAX_OUTPUT_TOKENS": "2048",
+    "UPSTREAM_TIMEOUT_MS": "60000"
+  },
+  "ratelimits": [
+    {
+      "name": "AI_GATEWAY_RATE_LIMITER",
+      "namespace_id": "2026111701",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ]
+}
