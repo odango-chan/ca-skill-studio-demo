@@ -170,18 +170,7 @@ export async function buildContextPack({
     });
   }
 
-  const byteCount = procedureBytes + included.reduce((total, item) => total + item.bytes, 0);
-  if (byteCount > maxBytes) {
-    const oversizedItems = [procedureItem, ...included]
-      .sort((left, right) => right.bytes - left.bytes)
-      .map(({ id, label, bytes }) => ({ id, label, bytes }));
-    reject("context_too_large", "Context Pack exceeds its byte limit; remove items or narrow the selection. Content was not truncated.", {
-      maxBytes,
-      byteCount,
-      items: oversizedItems,
-    });
-  }
-
+  const contentBytes = procedureBytes + included.reduce((total, item) => total + item.bytes, 0);
   const pack = {
     schema: CONTEXT_PACK_SCHEMA,
     taskId,
@@ -198,10 +187,23 @@ export async function buildContextPack({
       id, kind, label, digest, text,
     })),
   };
+  const byteCount = encoder.encode(JSON.stringify(pack)).byteLength;
+
+  if (byteCount > maxBytes) {
+    const oversizedItems = [procedureItem, ...included]
+      .sort((left, right) => right.bytes - left.bytes)
+      .map(({ id, label, bytes }) => ({ id, label, bytes }));
+    reject("context_too_large", "Serialized Context Pack exceeds its byte limit; remove items or narrow the selection. Content was not truncated.", {
+      maxBytes,
+      byteCount,
+      contentBytes,
+      items: oversizedItems,
+    });
+  }
 
   const manifest = [procedureItem, ...included].map(({ id, kind, label, digest, bytes }) => ({
     id, kind, label, digest, bytes,
   }));
 
-  return freezeDeep({ pack, manifest, byteCount, maxBytes });
+  return freezeDeep({ pack, manifest, byteCount, contentBytes, maxBytes });
 }
