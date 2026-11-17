@@ -412,7 +412,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     return Boolean(row);
   })()`);
   if(!conventionalPackageTop)
-    throw Error('Traditional 5GC Package row disappeared after Dependencies interaction');
+    throw Error('v1alpha4 5GC Package row disappeared after Dependencies interaction');
   await sleep(150);
   await ensurePackageExpanded('establish-pdu-session');
   const classicContract=await openPackageContract('establish-pdu-session');
