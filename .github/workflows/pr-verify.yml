@@ -29,6 +29,9 @@ jobs:
           node-version: '24'
       - run: npm ci --no-audit --no-fund
       - run: npm test
+      - name: Validate Cloudflare Worker bundle and Wrangler config
+        working-directory: gateway
+        run: npx --yes wrangler@4.34.0 deploy --dry-run --config wrangler.jsonc
       - name: Plugin-managed project and Package Explorer tests
         run: npm run test:plugin-managed
       - run: npm run typecheck
