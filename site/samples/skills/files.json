@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "sourceRepo": "odango-chan/ca-skills",
-  "sourceSha": "3fce09aca32b6a6faf6ec3e9a204d38cc129ec38",
+  "sourceSha": "dfba05071cb33424c475e00a325712f5273a19de",
   "skills": [
     "establish-pdu-session",
     "establish-pdu-session-mas"
@@ -45,5 +45,7 @@
     "establish-pdu-session/scripts/evaluate_transfer_start.py": "de98d8403e871060eb2ddc8b8c551b900b9deed2",
     "establish-pdu-session/scripts/evaluate_udm_read.py": "b6df8b68471cfa4555690b1f95ec0a18767db5f1",
     "establish-pdu-session/scripts/select_establishment_configuration.py": "22a301a390fb84d1a68e176c6e8d1031b6ae0f1e"
-  }
+  },
+  "sourceRef": "refs/heads/main",
+  "sourceStatus": "LEGACY_NOT_V1ALPHA4"
 }
