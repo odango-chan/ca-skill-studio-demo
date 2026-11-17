@@ -5,6 +5,7 @@ import {
   COMPILER_LANGUAGE_TARGET,
   COMPILER_BUILD_RESULT_VERSION,
   COMPILER_INSPECTION_VERSION,
+  assertCompilerLanguageTarget,
   createCompilerBuildRequest,
   isCompilerBuildResult,
   isCompilerInspection
@@ -35,6 +36,14 @@ test("Compiler BuildRequest uses exact independent API and CA-SL v1alpha4 target
   ]);
   assert.equal(decode(request.files[0].bytes),"# Example\n");
   assert.equal(decode(request.files[1].bytes),"start: run\nnodes: {}\n");
+});
+
+test("Compiler language gate refuses the v1alpha5 Preview target",()=>{
+  assert.equal(assertCompilerLanguageTarget(COMPILER_LANGUAGE_TARGET),COMPILER_LANGUAGE_TARGET);
+  assert.throws(()=>assertCompilerLanguageTarget("connectionagent.io/v1alpha5"),
+    /supports only connectionagent.io\/v1alpha4; refusing language target connectionagent.io\/v1alpha5/);
+  assert.throws(()=>assertCompilerLanguageTarget("connectionagent.io/v1alpha6"),
+    /supports only connectionagent.io\/v1alpha4/);
 });
 
 test("Compiler request refuses path traversal, duplicate files and invalid package targets",()=>{
