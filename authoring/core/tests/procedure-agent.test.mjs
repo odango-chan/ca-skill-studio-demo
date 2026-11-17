@@ -5,40 +5,25 @@ import { CONTEXT_PACK_SCHEMA, buildContextPack } from "../context-pack.mjs";
 import { MODEL_PROPOSAL_SCHEMA } from "../model-proposal.mjs";
 
 async function context() {
-  async function digest(text) {
-    const value = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-    return [...new Uint8Array(value)].map((item) => item.toString(16).padStart(2, "0")).join("");
-  }
-  const procedureText = "start: create-session\nnodes: {}\n";
-  const contractText = "goal: session.established\n";
-  const procedure = {
-    id: "procedure-current",
-    kind: "procedure",
-    label: "assurance/procedure.yaml",
-    digest: await digest(procedureText),
-    text: procedureText,
-  };
-  const contract = {
-    id: "contract-goal",
-    kind: "contract",
-    label: "assurance/contract.yaml",
-    digest: await digest(contractText),
-    text: contractText,
-  };
-  return {
-    pack: {
-      schema: CONTEXT_PACK_SCHEMA,
-      taskId: "task-1",
-      revision: 2,
-      languageTarget: "connectionagent.io/v1alpha4",
-      procedure,
-      resources: [contract],
+  const built = await buildContextPack({
+    taskId: "task-1",
+    revision: 2,
+    languageTarget: "connectionagent.io/v1alpha4",
+    procedure: {
+      path: "assurance/procedure.yaml",
+      documentVersion: 7,
+      text: "start: create-session\nnodes: {}\n",
     },
-    manifest: [
-      { id: procedure.id, kind: procedure.kind, label: procedure.label, digest: procedure.digest, bytes: new TextEncoder().encode(procedureText).byteLength },
-      { id: contract.id, kind: contract.kind, label: contract.label, digest: contract.digest, bytes: new TextEncoder().encode(contractText).byteLength },
-    ],
-  };
+    resources: [{
+      id: "contract-goal",
+      kind: "contract",
+      path: "assurance/contract.yaml",
+      selected: true,
+      content: "goal: session.established\n",
+    }],
+    maxBytes: 131072,
+  });
+  return { pack: built.pack, manifest: built.manifest };
 }
 
 function proposal(references = ["procedure-current", "contract-goal"]) {
