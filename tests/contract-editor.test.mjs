@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {registerContractEditor} from '../experiments/ide-host/vscode/src/contract-editor.mjs';
 
 const contract = [
-  '# CA-SL v1alpha4 Contract',
+  '# CA-SL v1alpha5 Contract',
   'goal: demo.ready',
   'precondition: check-registration.precondition',
   'requestSchema: schemas/request.schema.yaml',
@@ -17,7 +17,7 @@ const contract = [
   ''
 ].join('\n');
 
-test('Contract custom editor renders a nonce-protected v1alpha4 read-only projection', async () => {
+test('Contract custom editor renders a nonce-protected v1alpha5 read-only projection', async () => {
   const registrations = new Map();
   const commands = new Map();
   const context = {subscriptions: []};
@@ -79,7 +79,7 @@ test('Contract custom editor renders a nonce-protected v1alpha4 read-only projec
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(messages.at(-1).type, 'snapshot');
   assert.equal(messages.at(-1).projection.state, 'READY');
-  assert.equal(messages.at(-1).projection.language, 'CA-SL v1alpha4');
+  assert.equal(messages.at(-1).projection.language, 'CA-SL v1alpha5');
   assert.equal(messages.at(-1).projection.name.value, 'demo');
   assert.equal(messages.at(-1).projection.goal.value, 'demo.ready');
   assert.equal(messages.at(-1).projection.requestSchema.value, 'schemas/request.schema.yaml');
