@@ -82,66 +82,66 @@ export function analyzeV1Alpha5Source(
     const offset=Array.isArray(item?.range)?item.range[0]:0;
     return document.text.slice(0,offset).split("\n").length;
   }
-  function parseWait(waitNode:any,nodeId:string,declared:ReadonlySet<string>):ProcedureWait|null {
+  function parseWait(waitNode:any,nodeId:string,declared:ReadonlySet<string>,procedureDocument:PackageDocumentSnapshot):ProcedureWait|null {
     if(!isMap(waitNode)){
-      add(p.document,"WAIT_DECLARATION_INVALID","Node wait must be a mapping",waitNode);
+      add(procedureDocument,"WAIT_DECLARATION_INVALID","Node wait must be a mapping",waitNode);
       return null;
     }
-    props(waitNode,p.document,new Set(["event","timeout","response","routes"]));
+    props(waitNode,procedureDocument,new Set(["event","timeout","response","routes"]));
     const eventNode=waitNode.get("event",true);
     let source="",service="",operation="";
     if(!isMap(eventNode)){
-      add(p.document,"WAIT_DECLARATION_INVALID","wait.event must declare source, service and operation",eventNode??waitNode);
+      add(procedureDocument,"WAIT_DECLARATION_INVALID","wait.event must declare source, service and operation",eventNode??waitNode);
     }else{
-      props(eventNode,p.document,new Set(["source","service","operation"]));
+      props(eventNode,procedureDocument,new Set(["source","service","operation"]));
       source=scalar(eventNode.get("source",true));
       service=scalar(eventNode.get("service",true));
       operation=scalar(eventNode.get("operation",true));
       if(!source||!service||!operation)
-        add(p.document,"WAIT_DECLARATION_INVALID","wait.event requires nonempty source, service and operation strings",eventNode);
+        add(procedureDocument,"WAIT_DECLARATION_INVALID","wait.event requires nonempty source, service and operation strings",eventNode);
     }
     const timeoutNode=waitNode.get("timeout",true);
     const timeout=scalar(timeoutNode);
     if(!timeout||!WAIT_DURATION.test(timeout)||timeout.endsWith("T")||!/[1-9]/.test(timeout))
-      add(p.document,"WAIT_TIMEOUT_INVALID","wait.timeout must be a positive fixed ISO 8601 duration (for example PT30S or P1DT2H30M)",timeoutNode??waitNode);
+      add(procedureDocument,"WAIT_TIMEOUT_INVALID","wait.timeout must be a positive fixed ISO 8601 duration (for example PT30S or P1DT2H30M)",timeoutNode??waitNode);
     let responseAfter="";
     let responseAfterLine:number|undefined;
     const responseNode=waitNode.get("response",true);
     if(responseNode!==undefined){
       if(!isMap(responseNode)){
-        add(p.document,"WAIT_DECLARATION_INVALID","wait.response must be a mapping",responseNode);
+        add(procedureDocument,"WAIT_DECLARATION_INVALID","wait.response must be a mapping",responseNode);
       }else{
-        props(responseNode,p.document,new Set(["after"]));
+        props(responseNode,procedureDocument,new Set(["after"]));
         const afterNode=responseNode.get("after",true);
         if(afterNode!==undefined){
           responseAfter=scalar(afterNode);
-          responseAfterLine=lineAt(p.document,afterNode);
+          responseAfterLine=lineAt(procedureDocument,afterNode);
           if(!NODE_ID.test(responseAfter)||TERMINALS.has(responseAfter)||responseAfter==="context"||
              !declared.has(responseAfter))
-            add(p.document,"WAIT_RESPONSE_BOUNDARY_INVALID","wait.response.after must name a declared non-terminal Node",afterNode);
+            add(procedureDocument,"WAIT_RESPONSE_BOUNDARY_INVALID","wait.response.after must name a declared non-terminal Node",afterNode);
         }
       }
     }
     const routesNode=waitNode.get("routes",true);
     let timeoutTarget="";
-    let timeoutRouteLine=lineAt(p.document,routesNode??waitNode);
+    let timeoutRouteLine=lineAt(procedureDocument,routesNode??waitNode);
     if(!isMap(routesNode)){
-      add(p.document,"WAIT_TIMEOUT_ROUTE_INVALID","wait.routes must contain exactly one TIMEOUT route",routesNode??waitNode);
+      add(procedureDocument,"WAIT_TIMEOUT_ROUTE_INVALID","wait.routes must contain exactly one TIMEOUT route",routesNode??waitNode);
     }else{
       if(routesNode.items.length!==1||!routesNode.has("TIMEOUT"))
-        add(p.document,"WAIT_TIMEOUT_ROUTE_INVALID","wait.routes must contain exactly one TIMEOUT route",routesNode);
+        add(procedureDocument,"WAIT_TIMEOUT_ROUTE_INVALID","wait.routes must contain exactly one TIMEOUT route",routesNode);
       for(const route of routesNode.items){
         const outcome=scalar(route.key),target=scalar(route.value);
         if(outcome!=="TIMEOUT")
-          add(p.document,"WAIT_TIMEOUT_ROUTE_INVALID","TIMEOUT is the only permitted wait.routes key",route.key);
+          add(procedureDocument,"WAIT_TIMEOUT_ROUTE_INVALID","TIMEOUT is the only permitted wait.routes key",route.key);
         else{
           timeoutTarget=target;
-          timeoutRouteLine=lineAt(p.document,route.key);
+          timeoutRouteLine=lineAt(procedureDocument,route.key);
           if(!target||TERMINALS.has(target)&&!WAIT_TERMINALS.has(target)||
              !WAIT_TERMINALS.has(target)&&!NODE_ID.test(target))
-            add(p.document,"WAIT_TIMEOUT_ROUTE_INVALID","TIMEOUT must target a declared Node, FAILED, UNRESOLVED or SAFE_STOPPED",route.value);
+            add(procedureDocument,"WAIT_TIMEOUT_ROUTE_INVALID","TIMEOUT must target a declared Node, FAILED, UNRESOLVED or SAFE_STOPPED",route.value);
           else if(NODE_ID.test(target)&&!WAIT_TERMINALS.has(target)&&!declared.has(target))
-            add(p.document,"CONTROL_FLOW_DANGLING","Wait TIMEOUT target does not identify a declared Node: "+target,route.value);
+            add(procedureDocument,"CONTROL_FLOW_DANGLING","Wait TIMEOUT target does not identify a declared Node: "+target,route.value);
         }
       }
     }
@@ -149,16 +149,17 @@ export function analyzeV1Alpha5Source(
     return {
       event:{source,service,operation},timeout,timeoutTarget,
       ...(responseAfter?{responseAfter,responseAfterLine}:{}),
-      line:lineAt(p.document,waitNode),
-      eventLine:lineAt(p.document,eventNode),
-      timeoutLine:lineAt(p.document,timeoutNode),
+      line:lineAt(procedureDocument,waitNode),
+      eventLine:lineAt(procedureDocument,eventNode),
+      timeoutLine:lineAt(procedureDocument,timeoutNode),
       timeoutRouteLine
     };
   }
 
   function routesNodeRange(node:any):[number,number]|null {
     const routes=isMap(node)?node.get("routes",true):null;
-    const timeout=isMap(routes)?routes.items.find((item:any)=>scalar(item.key)==="TIMEOUT"):null;
+    const timeout:any=isMap(routes)
+      ?routes.items.find((item:any)=>scalar(item.key)==="TIMEOUT"):null;
     return Array.isArray(timeout?.key?.range)?timeout.key.range:null;
   }
 
@@ -251,7 +252,7 @@ export function analyzeV1Alpha5Source(
     const stageNames=STAGES.filter(x=>isMap(body)&&body.has(x));
     const waitNode=isMap(body)?body.get("wait",true):undefined;
     const hasWait=waitNode!==undefined;
-    const wait=hasWait?parseWait(waitNode,id,declared):null;
+    const wait=hasWait?parseWait(waitNode,id,declared,p.document):null;
     const globalGate=contractGate===id+".precondition";
     const stagesAfterEntryGate=stageNames.filter(stage=>!(globalGate&&stage==="precondition"));
     if(hasWait&&!stagesAfterEntryGate.length)
