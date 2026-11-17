@@ -27,6 +27,16 @@ jobs:
     steps:
       - name: Checkout exact source
         uses: actions/checkout@v4
+      - name: Checkout pinned CA Skill Compiler v1.0.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: odango-chan/ca-skill-compiler
+          ref: v1.0.0
+          path: compiler-source
+      - name: Go 1.26.6 for the pinned Compiler WASM build
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.6"
       - name: Node.js 24
         uses: actions/setup-node@v4
         with:
@@ -72,6 +82,16 @@ jobs:
           npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
       - name: Build shared Procedure extension and webview
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
+      - name: Build pinned Compiler v1.0.0 Go/WASM Core
+        working-directory: compiler-source
+        run: |
+          mkdir -p dist
+          GOWORK=off CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -o dist/skillc.wasm ./cmd/skillc-wasm
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/wasm_exec.js
+          cp dist/skillc.wasm ../experiments/ide-host/vscode/dist/skillc.wasm
+          cp dist/wasm_exec.js ../experiments/ide-host/vscode/dist/wasm_exec.js
+      - name: Stage same Web extension for Theia
+        run: node experiments/ide-host/scripts/prepare-theia-online.mjs
       - name: Stage same Web extension for Theia
         run: node experiments/ide-host/scripts/prepare-theia-online.mjs
       - name: Install isolated Theia 1.76 browser app
