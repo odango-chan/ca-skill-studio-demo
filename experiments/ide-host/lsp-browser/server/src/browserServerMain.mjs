@@ -426,7 +426,7 @@ connection.onHover(params => {
     const declaration=uniqueSkillSymbolDeclaration(symbolHit);
     const procedureSource=snapshot.documents.find(item=>
       item.relativePath==="assurance/procedure.yaml");
-    const v1alpha4Package=Boolean(procedureSource&&
+    const v1alpha5Package=Boolean(procedureSource&&
       /^start:[ \t]*/m.test(procedureSource.text)&&
       /^nodes:[ \t]*/m.test(procedureSource.text));
     const scriptDocument=declaration&&symbolHit.token.type==="skillReference"
@@ -449,7 +449,7 @@ connection.onHover(params => {
       ["skillOperation","skillCapability"].includes(symbolHit.token.type)
       ? projectOperationCatalog(snapshot,index).get(symbolHit.token.name) : null;
     let predicateSignature=null;
-    if(v1alpha4Package&&resolved&&symbolHit.token.type==="skillPredicate"){
+    if(v1alpha5Package&&resolved&&symbolHit.token.type==="skillPredicate"){
       const source=snapshot.documents.find(item=>
         item.relativePath==="assurance/predicates.yaml");
       if(source){
@@ -565,7 +565,7 @@ connection.onDocumentSymbol(params => {
       if(range)symbols.push({name:item.name,kind:SymbolKind.Function,
         range,selectionRange:range});
     }
-    // v1alpha4 has one root Node graph and no named Procedure declaration.
+    // v1alpha5 has one root Node graph and no named Procedure declaration.
     // Show those Nodes in native Outline rather than returning an empty list.
     if(!procedures.length && source.relativePath==="assurance/procedure.yaml"){
       for(const item of steps.filter(item=>item.path?.[0]==="nodes")){
