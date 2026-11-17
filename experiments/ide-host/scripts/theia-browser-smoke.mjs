@@ -905,8 +905,8 @@ try{
     throw Error("Default v1alpha4 Procedure CustomEditor did not render: "+
       JSON.stringify({defaultWebviewView,webviewFrames}).slice(0,3000));
   if(requireEditor&&(!workbenchEvidence?.sourcePatch?.preview?.ready||
-      !/TextDocument v\\d+/.test(workbenchEvidence.sourcePatch.applied?.revision??"")||
-      !/TextDocument v\\d+/.test(workbenchEvidence.sourcePatch.undo?.revision??"")||
+      !/TextDocument v\d+/.test(workbenchEvidence.sourcePatch.applied?.revision??"")||
+      !/TextDocument v\d+/.test(workbenchEvidence.sourcePatch.undo?.revision??"")||
       workbenchEvidence.sourcePatch.restoredNodes!==workbenchEvidence.sourcePatch.initialNodes||
       workbenchEvidence.sourcePatch.restoredEdges!==workbenchEvidence.sourcePatch.initialEdges))
     throw Error("v1alpha4 Source-backed Patch/Undo acceptance did not complete: "+
@@ -925,4 +925,3 @@ try{
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
-}
