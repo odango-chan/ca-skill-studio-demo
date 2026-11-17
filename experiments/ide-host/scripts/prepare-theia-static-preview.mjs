@@ -59,10 +59,10 @@ for(const name of ["compiler-worker.js","skillc.wasm","wasm_exec.js"]){
   await copyFile(source,join(compilerDistTarget,name));
 }
 for(const required of [
-  join(pluginTarget,"samples","v1alpha4","files.json"),
-  join(pluginTarget,"samples","v1alpha4","README.md"),
-  join(pluginTarget,"samples","v1alpha4","establish-pdu-session","assurance","procedure.yaml"),
-  join(pluginTarget,"samples","v1alpha4","establish-pdu-session-mas","assurance","procedure.yaml"),
+  join(pluginTarget,"samples","v1alpha5","files.json"),
+  join(pluginTarget,"samples","v1alpha5","README.md"),
+  join(pluginTarget,"samples","v1alpha5","establish-pdu-session","assurance","procedure.yaml"),
+  join(pluginTarget,"samples","v1alpha5","establish-pdu-session-mas","assurance","procedure.yaml"),
   join(pluginTarget,"media","procedure.js"),
   join(pluginTarget,"media","procedure.css"),
   join(pluginTarget,"dist","compiler-worker.js"),
