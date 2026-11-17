@@ -15,10 +15,16 @@ const row=(label,line,children=[],extra={})=>({label,line,children,...extra});
 const sameBinding=(a,b)=>a.phaseName===b.phaseName&&a.stepIndex===b.stepIndex&&
   a.bindingKey===b.bindingKey;
 const display=value=>value===undefined||value===null||value===''?'未声明':String(value);
-function classifyV1Alpha4Source(value){
+function classifyV1Alpha5Source(value){
   const raw=String(value??"").trim();
   if(/^context\./.test(raw))return {
     kind:"Context",description:"Context reference · Host Context Schema not linked"
+  };
+  const waitOutput=/^([A-Za-z][A-Za-z0-9_-]*)\.wait\.output(?:\.(.*))?$/.exec(raw);
+  if(waitOutput)return {
+    kind:"Wait Output",producerNode:waitOutput[1],producerStage:"wait",
+    output:waitOutput[2]??"",
+    description:"Normalized Ingress request · available only after this exact Wait occurrence is EVENT_RECEIVED; Ingress Schema not linked"
   };
   const producer=/^([A-Za-z][A-Za-z0-9_-]*)\.(operation|observation)\.output(?:\.(.*))?$/.exec(raw);
   if(producer)return {
@@ -53,12 +59,18 @@ function v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRoot
   const model={state:"READY",entry:procedure.name,
     procedures:new Map([[procedure.name,procedure]]),diagnostics:projection.diagnostics};
   const outline=[row(procedure.name,procedure.nodes[0]?.line??1,
-    procedure.nodes.map(node=>row(node.id,node.line,
-      (node.stages??[]).map(stage=>row(stage.name,stage.line,[],{
+    procedure.nodes.map(node=>row(node.id,node.line,[
+      ...(node.wait?[row("Wait · "+node.wait.event.source+"/"+node.wait.event.service+"/"+node.wait.event.operation,
+        node.wait.line,[],{kind:"v1alpha5-wait",
+          description:"Timeout "+node.wait.timeout+" · TIMEOUT → "+node.wait.timeoutTarget+
+            (node.wait.responseAfter?" · response after "+node.wait.responseAfter:"")})]:[]),
+      ...(node.stages??[]).map(stage=>row(stage.name,stage.line,[],{
         kind:"v1alpha5-stage",description:[stage.target,
           (stage.routeOutcomes??[]).join(" / ")].filter(Boolean).join(" · ")
-      })),{
-        description:(node.stages??[]).map(stage=>stage.name).join(" → "),
+      }))
+    ],{
+        description:(node.wait?("WAIT · "+node.wait.event.source+"/"+node.wait.event.service+"/"+node.wait.event.operation+" · "):"")+
+          (node.stages??[]).map(stage=>stage.name).join(" → "),
         procedureId:procedure.name,nodeId:node.id,kind:"v1alpha5-node"
       })),{description:procedure.nodes.length+" Nodes · CA-SL v1alpha5",
         procedureId:procedure.name})];
@@ -75,10 +87,26 @@ function v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRoot
   ];
   const node=procedure.nodes.find(item=>item.id===selection.nodeId);
   const bindings=[];
+  const waitRows=node?.wait?[row(
+    "Node-entry Wait · "+node.wait.event.source+"/"+node.wait.event.service+"/"+node.wait.event.operation,
+    node.wait.line,[
+      row("Timeout · "+node.wait.timeout,node.wait.timeoutLine,[],{
+        kind:"v1alpha5-wait",description:"Fixed event-wait deadline; no polling loop"
+      }),
+      row("TIMEOUT → "+node.wait.timeoutTarget,node.wait.timeoutRouteLine,[],{
+        kind:"v1alpha5-wait",description:"Wait-control edge; not a business Stage Outcome"
+      }),
+      ...(node.wait.responseAfter?[row("Response boundary · "+node.wait.responseAfter,
+        node.wait.responseAfterLine??node.wait.line,[],{
+          kind:"v1alpha5-wait",description:"Paired response commits at this Node completion"
+        })]:[])
+    ],{kind:"v1alpha5-wait",
+      description:"Exact Ingress event selector; wait.output is available only on the accepted-event path"
+    })]:[];
   const stageRows=(node?.stages??[]).map(stage=>{
     const children=[];
     for(const argument of stage.arguments??[]){
-      const source=classifyV1Alpha4Source(argument.value);
+      const source=classifyV1Alpha5Source(argument.value);
       const binding={consumer:stage.name+" · "+argument.name,
         value:argument.value,line:argument.line,...source,evidenceRequirements:[]};
       bindings.push(binding);
@@ -92,7 +120,7 @@ function v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRoot
       call.arguments.forEach((value,index)=>{
         const parameter=call.parameters[index]||"arg"+(index+1);
         const line=call.argumentLines?.[index]??call.line;
-        const source=classifyV1Alpha4Source(value);
+        const source=classifyV1Alpha5Source(value);
         const requirements=call.evidenceRequirements.filter(item=>
           item.parameter===parameter);
         const binding={consumer:call.predicate+" · "+parameter,value,
@@ -138,8 +166,8 @@ function v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRoot
     }));
   const inspection=node?[
     ...contractRows,
-    row(node.id,node.line,[...stageRows,...routeRows],{
-      description:"Node · "+(node.stages??[]).map(stage=>stage.name).join(" → "),
+    row(node.id,node.line,[...waitRows,...stageRows,...routeRows],{
+      description:"Node · "+(node.wait?"Wait · ":"")+(node.stages??[]).map(stage=>stage.name).join(" → "),
       kind:"v1alpha5-node",procedureId:procedure.name,nodeId:node.id
     }),
     row("Data Flow · "+bindings.length+" arguments",node.line,dataflowRows,{
