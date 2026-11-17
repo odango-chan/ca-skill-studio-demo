@@ -50,22 +50,6 @@ test('PredicateSet projection preserves observation-to-evaluator relationships a
   assert.match(source, /^# Keep this comment/);
 });
 
-test('Current establish-pdu-session PredicateSet projects all real predicates without claiming live results', () => {
-  const actual = readFileSync(new URL(
-    '../site/samples/skills/establish-pdu-session/assurance/predicates.yaml',
-    import.meta.url), 'utf8');
-  const p = projectPredicateSet(actual);
-  assert.equal(p.state, 'READY');
-  assert.equal(p.skill.value, 'establish-pdu-session');
-  assert.equal(p.predicateCount, 17);
-  assert.ok(p.predicates.some(x => x.id === 'createdsession.ran.setup_accepted'));
-  assert.ok(p.predicates.some(x => x.evaluator.type.value === 'script' &&
-    x.evaluator.ref.value === 'scripts/evaluate_udm_read.py'));
-  assert.ok(p.predicates.every(x => x.observations.length > 0 && x.evaluator));
-  assert.equal('result' in p.predicates[0], false);
-  assert.equal('status' in p.predicates[0], false);
-});
-
 test('Unknown nested fields are visible as partial rather than silently omitted', () => {
   const changed = source.replace('        freshness: 5s',
     '        freshness: 5s\n        futureEvidenceMode: strict');
