@@ -101,6 +101,14 @@ test("valid request uses only server credentials and streams the provider respon
   assert.equal(await response.text(), "data: [DONE]\n\n");
 });
 
+test("provider response-header wait is bounded by a timeout", async () => {
+  const response = await handleRequest(req(payload()), env({ UPSTREAM_TIMEOUT_MS: "5" }), ctx(), async (_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+  }));
+  assert.equal(response.status, 504);
+  assert.equal(await code(response), "provider_timeout");
+});
+
 test("provider errors and non-SSE responses are normalized without leaking bodies", async () => {
   const failed = await handleRequest(req(payload()), env(), ctx(), async () => new Response("secret upstream detail", { status: 401 }));
   assert.equal(failed.status, 502);
