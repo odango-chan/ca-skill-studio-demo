@@ -1032,9 +1032,37 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           "      tool: ca::session.mutate",
           "      arguments: {}",
           "      routes:",
+          "        SUCCEEDED: await-event",
+          "        FAILED: SAFE_STOPPED",
+          "        OUTCOME_UNKNOWN: SAFE_STOPPED",
+          "  await-event:",
+          "    wait:",
+          "      event:",
+          "        source: AMF",
+          "        service: Nsmf_PDUSession",
+          "        operation: UpdateSMContext",
+          "      timeout: PT30S",
+          "      response:",
+          "        after: final",
+          "      routes:",
+          "        TIMEOUT: timeout-handler",
+          "    operation:",
+          "      tool: ca::session.resume",
+          "      arguments:",
+          "        request: await-event.wait.output",
+          "      routes:",
           "        SUCCEEDED: run-script",
           "        FAILED: SAFE_STOPPED",
           "        OUTCOME_UNKNOWN: SAFE_STOPPED",
+          "  timeout-handler:",
+          "    observation:",
+          "      tool: ca::session.read",
+          "      arguments:",
+          "        ueRef: context.ueRef",
+          "      routes:",
+          "        SUCCEEDED: SAFE_STOPPED",
+          "        FAILED: SAFE_STOPPED",
+          "        UNKNOWN: SAFE_STOPPED",
           "  run-script:",
           "    operation:",
           "      ",
@@ -1132,6 +1160,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const mutationRouteKeys=await complete(procedureDocument,
             "  mutate:\n    operation:\n      tool: ca::session.mutate\n      arguments: {}\n      routes:\n        ");
           const scriptPath=await complete(procedureDocument,"scripts/runner.py",8);
+          const waitNodeFields=await complete(procedureDocument,"  await-event:\n    ");
+          const waitFields=await complete(procedureDocument,"    wait:\n      ");
+          const waitEventFields=await complete(procedureDocument,"      event:\n        ");
+          const waitResponseFields=await complete(procedureDocument,"      response:\n        ");
+          const waitRouteKeys=await complete(procedureDocument,"      routes:\n        ");
+          const waitResponseAfter=await complete(procedureDocument,"        after: ");
+          const waitTimeoutTarget=await complete(procedureDocument,"        TIMEOUT: ");
+          const waitOutput=await complete(procedureDocument,
+            "        request: await-event.wait.output");
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
           const require=(items,label,description)=>{
@@ -1163,8 +1200,18 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               JSON.stringify(routeKeys));
           require(mutationRouteKeys,"OUTCOME_UNKNOWN:","Mutation unresolved route key");
           require(scriptPath,"scripts/runner.py","Package Script path");
+          require(waitNodeFields,"wait:","Node-entry Wait field");
+          for(const field of ["event:","timeout:","response:","routes:"])
+            require(waitFields,field,"Wait control field");
+          for(const field of ["source:","service:","operation:"])
+            require(waitEventFields,field,"Wait event selector");
+          require(waitResponseFields,"after:","Wait response boundary");
+          require(waitRouteKeys,"TIMEOUT:","Wait timeout route key");
+          require(waitResponseAfter,"final","Wait response boundary Node");
+          require(waitTimeoutTarget,"timeout-handler","Wait timeout target Node");
+          require(waitOutput,"await-event.wait.output","typed Wait output binding");
           require(unknownTarget,"SAFE_STOPPED","OUTCOME_UNKNOWN terminal");
-          if(unknownTarget.some(item=>["check","read","mutate","run-script","final"].includes(item)))
+          if(unknownTarget.some(item=>["check","read","mutate","await-event","timeout-handler","run-script","final"].includes(item)))
             throw Error("OUTCOME_UNKNOWN offered a business Node target: "+
               JSON.stringify(unknownTarget));
 
@@ -1212,6 +1259,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             "vscode.executeDocumentSymbolProvider",procedureDocument.uri));
           if(!symbols.some(item=>item.name==="check")||
              !symbols.some(item=>item.name==="mutate")||
+             !symbols.some(item=>item.name==="await-event")||
+             !symbols.some(item=>item.name==="timeout-handler")||
              !symbols.some(item=>item.name==="run-script")||
              !symbols.some(item=>item.name==="final"))
             throw Error("Native Theia Outline did not expose v1alpha5 Node declarations");
@@ -1222,6 +1271,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             predicateCompletion:predicate,
             preconditionFields,observationFields,operationFields,
             operationRouteKeys:routeKeys,mutationRouteKeys,scriptPathCompletion:scriptPath,
+            waitNodeFields,waitFields,waitEventFields,waitResponseFields,
+            waitRouteKeys,waitResponseAfter,waitTimeoutTarget,waitOutput,
             outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,
