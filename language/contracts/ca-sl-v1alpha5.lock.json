@@ -1,0 +1,53 @@
+{
+  "authority": {
+    "repository": "odango-chan/ca-skills",
+    "commit": "12a9512a9eae006ad4578daf37ebe0bdf3070642",
+    "sourceRef": "refs/pull/61/head",
+    "status": "PUBLIC_REVIEW_DRAFT"
+  },
+  "language": {
+    "target": "connectionagent.io/v1alpha5",
+    "status": "PUBLIC_REVIEW_DRAFT — NOT_RELEASED",
+    "inheritedBaseline": "connectionagent.io/v1alpha4"
+  },
+  "externalProfiles": {
+    "toolCatalog": "connectionagent.io/toolcatalog/v1alpha4",
+    "capabilityContracts": "connectionagent.io/capability-contracts/v1alpha4",
+    "legacyFallback": false
+  },
+  "normativeSource": {
+    "path": "docs/skill-language-spec.v1alpha5.zh-CN.md",
+    "blobSha": "2916fa78bd095ee5809136389cda4cdb6302b9d9",
+    "localPath": "language/contracts/source/skill-language-spec.v1alpha5.zh-CN.md"
+  },
+  "compiler": {
+    "repository": "odango-chan/ca-skill-compiler",
+    "commit": "34993dc30b66f4cf7d573cbc81d884c356062a12",
+    "sourceRef": "refs/pull/30/head",
+    "status": "DRAFT_WP2_ONLY",
+    "check": "v1alpha5 Wait AST / syntax Check only",
+    "build": "FAIL_CLOSED_UNTIL_WP3_WP8",
+    "dependencyInspection": "NOT_IMPLEMENTED"
+  },
+  "qualification": {
+    "language": "PUBLIC_REVIEW_DRAFT",
+    "compiler": "WP2_ONLY_NOT_QUALIFIED",
+    "studioLsp": "IN_PROGRESS_NOT_QUALIFIED",
+    "host": "NOT_QUALIFIED",
+    "runtime": "NOT_QUALIFIED",
+    "integration": "NOT_QUALIFIED",
+    "owner": "NOT_QUALIFIED",
+    "fiveGc": "NOT_QUALIFIED"
+  },
+  "semanticTokens": {
+    "legacy": {
+      "path": "language/contracts/semantic-tokens.v1.json",
+      "languageVersion": "0.2.0",
+      "status": "legacy-only"
+    },
+    "v1alpha5": {
+      "upstreamContract": "NOT_PUBLISHED",
+      "localProjection": "editor-only; not normative"
+    }
+  }
+}
