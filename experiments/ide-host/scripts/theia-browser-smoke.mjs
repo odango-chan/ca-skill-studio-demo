@@ -799,7 +799,7 @@ try{
               "document.querySelector('#reactFlowRoot')&&"+
               "document.querySelector('#procedureList')?.value==='establish-pdu-session')"
           });
-          latest.push({frame:frame.id,url:frame.url,hasV1alpha4Graph:probe.result?.value===true});
+          latest.push({frame:frame.id,url:frame.url,hasV1alpha5Graph:probe.result?.value===true});
           if(probe.result?.value!==true)continue;
           const contextId=defaultExecutionContexts.get(frame.id);
           if(!contextId)continue;
@@ -915,7 +915,7 @@ try{
     throw Error("v1alpha5 Inspector or Package Overview acceptance did not complete: "+
       JSON.stringify({phaseEvidence:workbenchEvidence?.phaseEvidence,
         packageOverview:workbenchEvidence?.packageOverview}).slice(0,3000));
-  console.log("STUDIO_V1ALPHA4_ONLY_ACCEPTANCE",JSON.stringify({
+  console.log("STUDIO_V1ALPHA5_ONLY_ACCEPTANCE",JSON.stringify({
     procedure:identity.defaultProcedure,masProcedure:identity.masProcedure,
     packageCount:workbenchEvidence?.packageOverview?.skills?.length??0,
     graphEditability:workbenchEvidence?.graphEditability??null,
@@ -923,9 +923,9 @@ try{
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
   if(requireEditor)
-    console.log("THEIA_BROWSER_HOST_V1ALPHA4_ACCEPTANCE_PASS");
+    console.log("THEIA_BROWSER_HOST_V1ALPHA5_ACCEPTANCE_PASS");
   else
-    console.log("THEIA_BROWSER_ONLY_V1ALPHA4_ACCEPTANCE_PASS");
+    console.log("THEIA_BROWSER_ONLY_V1ALPHA5_ACCEPTANCE_PASS");
 }catch(error){
   if(process.env.THEIA_FAILURE_SCREENSHOT&&ws?.readyState===1){
     try{
