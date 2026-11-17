@@ -9,7 +9,7 @@
 - Theia browser-only 是唯一在线工作台；不再发布独立 Classic 浏览器工作台或 /classic/ 兼容入口。
 - VS Code Web Extension 提供 Procedure / Contract / Predicate / Schema CustomEditor、Package Explorer、右侧 Inspector、Outline、Problems、LSP 与 Source/Visual 配对。
 - React Flow + ELK 提供 Procedure 可视化；原生 Markdown Language Features 拥有 Markdown Preview；独立主题扩展提供颜色、文件图标和预览样式。
-- YAML / Python TextMate 语法高亮不依赖 LSP；LSP 提供 Skill Language 语义能力。最终契约与编译结果仍由权威 Skill Compiler 决定。
+- YAML / Python TextMate 语法高亮不依赖 LSP；LSP 提供 Skill Language 语义能力。当前活动编辑目标为 CA-SL v1alpha5 Preview（PUBLIC REVIEW DRAFT，未发布、未冻结）；v1alpha4 保留为历史冻结基线。集成的 Compiler v1.0.0 仍只支持 v1alpha4，因此 v1alpha5 的 Check / Build / Inspect 明确阻断，不能把本地 LSP 投影当作编译符合性。
 - 示例包含 5GC establish-pdu-session 与 MAS establish-session-mas，作为项目内容，不是 Studio 自己维护的第二套语言定义。
 
 ## 在线演示安全边界
