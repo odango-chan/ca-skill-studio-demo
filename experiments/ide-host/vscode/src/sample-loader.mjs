@@ -1,6 +1,6 @@
 // Explicit Example project import for VS Code desktop/web or Theia browser-only OPFS.
 // Replacing an existing Example is a deliberate, user-confirmed operation that
-// deletes the Example root and recreates it from the single pinned v1alpha4 source.
+// deletes the Example root and recreates it from the single pinned v1alpha5 source.
 // Ordinary projects are never passed to this importer. It never creates lib/ or output/.
 export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
 const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
@@ -100,18 +100,18 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     if(!storageUri)fail("No writable extension storage URI");
     const fs=vscode.workspace.fs;
     const readManifest=async()=>{
-      const uri=vscode.Uri.joinPath(extensionUri,"samples","v1alpha4","files.json");
-      phase="read-v1alpha4-manifest";
+      const uri=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5","files.json");
+      phase="read-v1alpha5-manifest";
       report({phase:"manifest"});
       let bytes;
       try{bytes=await readBundledResource(vscode,uri);}
-      catch(error){fail("Cannot read CA-SL v1alpha4 manifest: "+JSON.stringify(describeError(error)));}
+      catch(error){fail("Cannot read CA-SL v1alpha5 manifest: "+JSON.stringify(describeError(error)));}
       return validate(JSON.parse(decoder.decode(bytes)),{
-        kind:"CA-SL v1alpha4",
-        sourceSha:"ab189d5dd62763be4cd2f00cc8047a0c5982b6be",
+        kind:"CA-SL v1alpha5",
+        sourceSha:"84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef",
         sourceStatus:"DRAFT_NOT_QUALIFIED",
-        sourceRef:"refs/pull/58/head",
-        languageVersion:"connectionagent.io/v1alpha4",
+        sourceRef:"refs/pull/65/head",
+        languageVersion:"connectionagent.io/v1alpha5",
         projectReadme:"README.md"
       });
     };
@@ -132,11 +132,11 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     await fs.createDirectory(root);
     await fs.createDirectory(skillsRoot);
 
-    const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha4",candidate.projectReadme);
+    const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",candidate.projectReadme);
     const readmeDestination=vscode.Uri.joinPath(root,"README.md");
     let readmeUpdated=false;
     if(!(await exists(readmeDestination))){
-      phase="write-v1alpha4-project-readme";
+      phase="write-v1alpha5-project-readme";
       const bytes=await readBundledResource(vscode,readmeSource);
       await fs.writeFile(readmeDestination,bytes);
       readmeUpdated=true;
@@ -156,13 +156,13 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       }
       phase="read-bundled-file:"+file;
       const bytes=await readBundledResource(vscode,
-        vscode.Uri.joinPath(extensionUri,"samples","v1alpha4",...parts));
-      if(!(bytes instanceof Uint8Array))fail("Unrecognized v1alpha4 sample file");
+        vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",...parts));
+      if(!(bytes instanceof Uint8Array))fail("Unrecognized v1alpha5 sample file");
       if(parts.length>1)
         await fs.createDirectory(vscode.Uri.joinPath(skillsRoot,...parts.slice(0,-1)));
-      try{await fs.stat(destination);fail("v1alpha4 sample file changed during import");}
+      try{await fs.stat(destination);fail("v1alpha5 sample file changed during import");}
       catch(error){if(error?.code!=="FileNotFound")throw error;}
-      phase="write-v1alpha4-file:"+file;
+      phase="write-v1alpha5-file:"+file;
       await fs.writeFile(destination,bytes);
       created++;
       report({phase:"files",completed:created+skipped,total});
@@ -175,7 +175,7 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       root,skillsRoot,procedure:procedures[SKILLS[0]],procedures,
       skills:[...SKILLS],
       sourceSha:candidate.sourceSha,
-      sourceShas:{v1alpha4:candidate.sourceSha},
+      sourceShas:{v1alpha5:candidate.sourceSha},
       candidateFiles:candidate.files.length,
       files:total,created,skipped,replacedExisting,readmeUpdated
     };
