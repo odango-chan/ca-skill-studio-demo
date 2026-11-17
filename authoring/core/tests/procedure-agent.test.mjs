@@ -4,20 +4,26 @@ import { createProcedureAgent } from "../procedure-agent.mjs";
 import { CONTEXT_PACK_SCHEMA } from "../context-pack.mjs";
 import { MODEL_PROPOSAL_SCHEMA } from "../model-proposal.mjs";
 
-function context() {
+async function context() {
+  async function digest(text) {
+    const value = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return [...new Uint8Array(value)].map((item) => item.toString(16).padStart(2, "0")).join("");
+  }
+  const procedureText = "start: create-session\nnodes: {}\n";
+  const contractText = "goal: session.established\n";
   const procedure = {
     id: "procedure-current",
     kind: "procedure",
     label: "assurance/procedure.yaml",
-    digest: "a".repeat(64),
-    text: "start: create-session\nnodes: {}\n",
+    digest: await digest(procedureText),
+    text: procedureText,
   };
   const contract = {
     id: "contract-goal",
     kind: "contract",
     label: "assurance/contract.yaml",
-    digest: "b".repeat(64),
-    text: "goal: session.established\n",
+    digest: await digest(contractText),
+    text: contractText,
   };
   return {
     pack: {
@@ -29,8 +35,8 @@ function context() {
       resources: [contract],
     },
     manifest: [
-      { id: procedure.id, kind: procedure.kind, label: procedure.label, digest: procedure.digest, bytes: 30 },
-      { id: contract.id, kind: contract.kind, label: contract.label, digest: contract.digest, bytes: 27 },
+      { id: procedure.id, kind: procedure.kind, label: procedure.label, digest: procedure.digest, bytes: new TextEncoder().encode(procedureText).byteLength },
+      { id: contract.id, kind: contract.kind, label: contract.label, digest: contract.digest, bytes: new TextEncoder().encode(contractText).byteLength },
     ],
   };
 }
@@ -57,7 +63,7 @@ test("Procedure Agent requires explicit Context Pack disclosure before any model
   const agent = createProcedureAgent({
     modelClient: { complete: async () => { called = true; return proposal(); } },
   });
-  const { pack, manifest } = context();
+  const { pack, manifest } = await context();
   await assert.rejects(
     agent.propose({ task: "Add a route", contextPack: pack, contextManifest: manifest }),
     /Context disclosure must be explicitly accepted/,
@@ -70,7 +76,7 @@ test("Procedure Agent validates the Context Pack and returns a typed proposal", 
   const agent = createProcedureAgent({
     modelClient: { complete: async (value) => { request = value; return proposal(); } },
   });
-  const { pack, manifest } = context();
+  const { pack, manifest } = await context();
   const result = await agent.propose({
     task: "Add the COMMITTED route to verification.",
     contextPack: pack,
@@ -92,7 +98,7 @@ test("Procedure Agent rejects proposal references outside the Context Pack manif
   const agent = createProcedureAgent({
     modelClient: { complete: async () => proposal(["unseen-file"]) },
   });
-  const { pack, manifest } = context();
+  const { pack, manifest } = await context();
   await assert.rejects(
     agent.propose({
       task: "Add a route",
@@ -109,7 +115,7 @@ test("Procedure Agent rejects a forged or incomplete disclosure manifest before 
   const agent = createProcedureAgent({
     modelClient: { complete: async () => { called = true; return proposal(); } },
   });
-  const { pack, manifest } = context();
+  const { pack, manifest } = await context();
   await assert.rejects(
     agent.propose({
       task: "Add a route",
@@ -124,7 +130,7 @@ test("Procedure Agent rejects a forged or incomplete disclosure manifest before 
 
 test("Procedure Agent rejects malformed model output and exposes no write capability", async () => {
   const agent = createProcedureAgent({ modelClient: { complete: async () => "not json" } });
-  const { pack, manifest } = context();
+  const { pack, manifest } = await context();
   await assert.rejects(
     agent.propose({
       task: "Add a route",
@@ -144,7 +150,7 @@ test("Procedure Agent rejects Context Pack content whose digest no longer matche
   const agent = createProcedureAgent({
     modelClient: { complete: async () => { called = true; return proposal(); } },
   });
-  const { pack, manifest } = context();
+  const { pack, manifest } = await context();
   pack.procedure.text = "tampered: true\n";
   await assert.rejects(
     agent.propose({
@@ -163,7 +169,7 @@ test("Procedure Agent rejects untrusted extra Context Pack fields and sensitive 
   const agent = createProcedureAgent({
     modelClient: { complete: async () => { called = true; return proposal(); } },
   });
-  const { pack, manifest } = context();
+  const { pack, manifest } = await context();
   pack.writePaths = ["assurance/procedure.yaml"];
   await assert.rejects(
     agent.propose({
@@ -176,7 +182,7 @@ test("Procedure Agent rejects untrusted extra Context Pack fields and sensitive 
   );
   assert.equal(called, false);
 
-  const next = context();
+  const next = await context();
   next.pack.resources[0].label = "references/api-secret.md";
   next.manifest[1].label = "references/api-secret.md";
   await assert.rejects(
