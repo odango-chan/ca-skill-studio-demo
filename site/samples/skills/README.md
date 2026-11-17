@@ -1,23 +1,19 @@
-# Studio example Skills (ca-skills)
+# Official 5GC reference Skills
 
-The two built-in authoring examples are pinned byte-for-byte to
-[`odango-chan/ca-skills`](https://github.com/odango-chan/ca-skills) at
-`3fce09aca32b6a6faf6ec3e9a204d38cc129ec38` (November 11, 2026):
+The two bundled reference packages are pinned byte-for-byte to
+`odango-chan/ca-skills` `main@dfba05071cb33424c475e00a325712f5273a19de` (2026-11-17):
 
 - `establish-pdu-session`
 - `establish-pdu-session-mas`
 
-`files.json` is the allowlist for imported source files. It includes `SKILL.md`,
-`assurance/`, `references/`, `schemas/`, and `scripts/` that exist in the
-pinned `ca-skills` examples. `cases/` is excluded from this authoring
-demo; the runtime/contract example is not a test fixture or package manager.
+**Source status: Legacy v0.2 / v1alpha1 — NOT CA-SL v1alpha4-conforming.**
+They are historical 5GC references, not current-language examples.
 
-Previous `ca-agent-demo` snapshots and superseded schema files can remain
-in the repository for existing Classic regression tests, but are **not**
-automatically imported into a new Studio workspace.
+The v1alpha4 migration candidate from draft PR #58 is kept separately under
+`site/samples/v1alpha4/` and imports into
+`examples/v1alpha4-candidate/`. It is marked DRAFT / NOT_QUALIFIED and is
+not a publishable or qualified Skill.
 
-The browser loader creates `skills/`, `lib/` and `output/` under the
-extension-owned demo project. It never overwrites existing files, including
-user-edited versions of these two examples; reloading can add missing files
-but cannot silently upgrade existing source. User-controlled workspaces are
-not reused as the sample destination.
+The browser importer is create-only by default. It preserves user edits and
+only replaces the two known bundled package sets when the explicit Example
+reset path is selected.
