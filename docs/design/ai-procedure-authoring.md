@@ -37,7 +37,7 @@ The current Theia workbench already provides useful host infrastructure:
 - A Compiler v1.0.0 Go/WASM integration and Check / Build / Inspect entry points.
 - **No model / Agent integration is currently installed in the Studio workbench.** The current Theia 1.76.0 application manifests do not include the Theia AI packages. Existing LSP completion, diagnostics and semantic tokens are language tooling, not LLM-based AI.
 - A first portable Gateway implementation now exists under `gateway/`: a Fetch-API request handler, a thin Cloudflare Worker adapter, Wrangler configuration and deterministic Node tests. It is not yet deployed and has not made a live provider request.
-- The first host-neutral Authoring Core slice now exists under `authoring/core/`: an OpenAI-compatible Gateway client that requires explicit context-disclosure acceptance and a host-supplied Turnstile token provider, plus a strict Studio ModelProposal validator. It has no VS Code, Theia, DOM, Node-only or Cloudflare imports.
+- The first host-neutral Authoring Core slices now exist under `authoring/core/`: an allowlisted Context Pack builder with a serialized byte budget, an OpenAI-compatible Gateway client that requires explicit context-disclosure acceptance and a host-supplied Turnstile token provider, plus a strict Studio ModelProposal validator. It has no VS Code, Theia, DOM, Node-only or Cloudflare imports.
 - The Worker spike requires server-side Turnstile Siteverify validation, an exact CORS origin allowlist and a Cloudflare Rate Limiting binding. The provider credential remains a Worker secret. Turnstile plus per-IP rate limiting is anti-abuse protection, not user identity authentication; the public access policy remains open.
 - The production GitHub Pages application is static hosting. It has no trusted server process in which to keep a shared provider key. The Pages bundle, browser storage, Webview and VSIX are all client-controlled and must never contain the shared provider credential. A separate Gateway service is required.
 - The current Studio extension is a VS Code Web Extension hosted by Theia. VS Code documents that Web Extensions can also run on Desktop and Web, but their runtime does not provide Node.js APIs. This makes the current browser-compatible extension a useful portability baseline, not proof that every Desktop / Remote host mode is already supported ([VS Code Web Extensions](https://code.visualstudio.com/api/extension-guides/web-extensions)).
@@ -250,7 +250,7 @@ The existing Package snapshot collector can be reused as a source of live Packag
 - Files outside the selected Package root.
 - Any data not shown in the context preview.
 
-The initial context-size limit should be enforced by bytes before transmission. Oversized context is rejected with a list of large items; content must not be silently truncated.
+The initial implementation enforces a **128 KiB serialized Context Pack limit** in UTF-8 bytes, leaving room below the Gateway's 256 KiB request-body limit for the system prompt and Chat Completions envelope. The limit is configurable per task but cannot exceed the 128 KiB implementation ceiling. Oversized context is rejected with a list of included items and their byte sizes; content must not be silently truncated. The ceiling remains subject to a real provider / prompt-size spike before it is treated as a product-wide frozen budget.
 
 ### 7.3 Consent
 
@@ -527,7 +527,7 @@ After Apply, the native document change triggers the existing Source / Visual / 
 
 A fixture provider may be used for deterministic UI / Patch Engine tests. It must be clearly identified as a test fixture and cannot be reported as a working AI integration.
 
-**Current Slice A status:** the host-neutral Gateway client and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203), with deterministic tests. Context Pack collection, Procedure orchestration, atomic grouping and the Patch Engine remain NOT_STARTED.
+**Current Slice A status:** the host-neutral Context Pack builder, Gateway client and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203), with deterministic tests. Host-side collection from live TextDocuments, Procedure task orchestration, atomic grouping and the Patch Engine remain NOT_STARTED.
 
 **Current Slice B status:** the portable Fetch-API handler, Cloudflare Worker adapter, Turnstile verification, per-IP rate-limit binding, request caps, streaming pass-through and deterministic tests are implemented in [PR #202](https://github.com/odango-chan/ca-skill-studio-demo/pull/202). Exact-head PR verification and Wrangler 4.36.0 dry-run passed at commit `737f1a1`; live Cloudflare deployment, Turnstile widget and provider request remain NOT_RUN.
 
@@ -565,7 +565,7 @@ Desktop / Web Extension and intranet Gateway compatibility are explicit follow-u
 3. **OpenAI-compatible subset:** confirm Chat Completions compatibility, streaming, cancellation and structured-output support for the selected model endpoint. Do not assume /v1/models or tool calling.
 4. **VS Code host placement:** decide whether the Desktop package can use the Web Extension Host alone or needs a separate Node Extension Host adapter; explicitly test Desktop, Web, Remote and WSL/Container behavior.
 5. **Native model APIs:** determine whether vscode.lm or Theia AI adapters provide meaningful optional value; neither is a required model path.
-6. **Initial Context Pack byte budget:** finalize a byte budget during the online provider spike; never silently truncate.
+6. **Initial Context Pack byte budget:** the core starts at a 128 KiB serialized cap, leaving headroom under the Gateway's 256 KiB body limit. Validate actual prompt overhead and provider context limits during the live model spike; never silently truncate.
 7. **Operation allowlist:** finalize exact v1alpha4 CST patch operations and source-preservation limits during Slice E.
 
 The product decisions in Section 1 and the cross-host architecture direction are approved. The detailed technical design remains Proposed until the online Gateway is deployed and exercised, the shared-core / proposal contracts are reviewed, and the v1alpha4 patch-engine spike is completed.
