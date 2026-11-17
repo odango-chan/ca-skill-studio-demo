@@ -936,7 +936,7 @@ export async function runWorkbenchAcceptance({
   await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha4 Contract Designer");
   const predicateUri=await openPackageFile("skillStudio.openPredicates","assurance/predicates.yaml");
   const predicates=await waitWebview(view=>view.title==="SKILL Predicate Visual"&&
-    view.bodyText.includes("Predicate Designer · establish-pdu-session\\n"),
+    view.bodyText.includes("Predicate Designer · establish-pdu-session\n"),
     "v1alpha4 5GC Predicate Designer");
   const predicateDetails=await command("Runtime.evaluate",{
     contextId:predicates.contextId,returnByValue:true,
