@@ -84,6 +84,8 @@ await build({
 });
 // Bundle only the pinned CA-SL v1alpha4 Example source. The retired
 // v0.2 sample set is not shipped as a parallel language baseline.
+// Remove artifacts from builds produced before the Legacy sample set was retired.
+await rm(join(root,"samples","skills"),{recursive:true,force:true});
 const sampleSets=[
   {kind:"v1alpha4",source:"site/samples/v1alpha4",destination:join(root,"samples","v1alpha4"),
     status:"DRAFT_NOT_QUALIFIED",ref:"refs/pull/58/head",
