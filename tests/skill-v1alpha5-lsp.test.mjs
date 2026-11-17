@@ -170,7 +170,8 @@ test("v1alpha5 5GC sample projects Node-entry Wait, wait.output and the Step 17 
     item.nodeId==="update-sm-context");
   assert.ok(waitRow.children.some(item=>item.kind==="v1alpha5-wait"&&
     item.label.includes("AMF/Nsmf_PDUSession/UpdateSMContext")));
-  assert.ok(waitRow.children.some(item=>item.label.includes(
+  const waitControl=waitRow.children.find(item=>item.kind==="v1alpha5-wait");
+  assert.ok(waitControl?.children.some(item=>item.label.includes(
     "Response boundary · prepare-step17-response")));
   assert.ok(view.dataflow.bindings.some(item=>
     item.value==="update-sm-context.wait.output"&&item.kind==="Wait Output"));
