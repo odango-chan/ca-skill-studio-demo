@@ -178,3 +178,25 @@ test("Context Pack hashes UTF-8 bytes and keeps all source paths Package-relativ
   assert.match(result.manifest[0].digest, /^[a-f0-9]{64}$/);
   assert.ok(result.pack.resources.every((item) => !item.label.startsWith("/")));
 });
+
+
+test("Context Pack rejects secret and token filenames even under an otherwise allowed directory", async () => {
+  for (const path of ["references/api-secret.md", "scripts/access-token.txt", "schemas/private-key.json"]) {
+    const kind = path.startsWith("references/") ? "reference" :
+      path.startsWith("scripts/") ? "script" : "schema";
+    await assert.rejects(
+      buildContextPack(base({
+        resources: [{
+          id: "sensitive-file",
+          kind,
+          path,
+          selected: true,
+          explicitlyIncluded: true,
+          content: "sensitive",
+        }],
+      })),
+      (error) => error instanceof ContextPackError && error.code === "sensitive_path",
+      path,
+    );
+  }
+});
