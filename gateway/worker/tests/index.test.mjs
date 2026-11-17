@@ -62,6 +62,8 @@ test("request body, model, schema and output limits are enforced", async () => {
     [payload({ stream: false }), "streaming_required"],
     [payload({ arbitrary_url: "https://attacker.example" }), "unsupported_request_field"],
     [payload({ max_tokens: 2049 }), "output_token_limit_exceeded"],
+    [payload({ response_format: { type: "json_schema", json_schema: {} } }), "unsupported_response_format"],
+    [payload({ response_format: { type: "json_object", extra: true } }), "unsupported_response_format"],
     [payload({ messages: [{ role: "tool", content: "run" }] }), "invalid_message_role"],
   ];
   for (const [body, expected] of cases) {
@@ -87,7 +89,7 @@ test("valid request uses only server credentials and streams the provider respon
   let target;
   let init;
   const sse = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); controller.close(); } });
-  const response = await handleRequest(req(payload({ max_tokens: 512, temperature: 0.2 }), { Authorization: "Bearer browser-secret", "X-Provider-Key": "attacker" }), env(), ctx(), async (url, options) => {
+  const response = await handleRequest(req(payload({ max_tokens: 512, temperature: 0.2, response_format: { type: "json_object" } }), { Authorization: "Bearer browser-secret", "X-Provider-Key": "attacker" }), env(), ctx(), async (url, options) => {
     target = url; init = options;
     return new Response(sse, { status: 200, headers: { "Content-Type": "text/event-stream", "X-Upstream-Secret": "must-not-pass" } });
   });
@@ -95,6 +97,7 @@ test("valid request uses only server credentials and streams the provider respon
   assert.equal(init.headers.Authorization, "Bearer provider-secret-test-only");
   assert.equal(init.headers["X-Provider-Key"], undefined);
   assert.equal(JSON.parse(init.body).max_tokens, 512);
+  assert.deepEqual(JSON.parse(init.body).response_format, { type: "json_object" });
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /text\/event-stream/);
   assert.equal(response.headers.get("x-upstream-secret"), null);
