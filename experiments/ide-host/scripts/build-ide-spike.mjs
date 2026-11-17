@@ -82,16 +82,12 @@ await build({
   loader:{".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file"},
   assetNames:"assets/[name]-[hash]",logLevel:"info"
 });
-// Bundle the official Legacy references and the separately pinned v1alpha4
-// candidate. They are deliberately different source sets and qualification states.
-const ownerCheckout=process.env.STUDIO_CA_SKILLS_CHECKOUT;
+// Bundle only the pinned CA-SL v1alpha4 Example source. The retired
+// v0.2 sample set is not shipped as a parallel language baseline.
 const sampleSets=[
-  {kind:"official",source:"site/samples/skills",destination:join(root,"samples","skills"),
-    status:"LEGACY_NOT_V1ALPHA4",ref:"refs/heads/main",
-    sourceRoot:ownerCheckout?join(ownerCheckout,"skills"):"site/samples/skills"},
-  {kind:"v1alpha4-candidate",source:"site/samples/v1alpha4",destination:join(root,"samples","v1alpha4"),
+  {kind:"v1alpha4",source:"site/samples/v1alpha4",destination:join(root,"samples","v1alpha4"),
     status:"DRAFT_NOT_QUALIFIED",ref:"refs/pull/58/head",
-    version:"connectionagent.io/v1alpha4",sourceRoot:"site/samples/v1alpha4"}
+    version:"connectionagent.io/v1alpha4"}
 ];
 for(const set of sampleSets){
   const manifest=JSON.parse(await readFile(join(set.source,"files.json"),"utf8"));
@@ -117,15 +113,11 @@ for(const set of sampleSets){
   await rm(set.destination,{recursive:true,force:true});
   await mkdir(set.destination,{recursive:true});
   await cp(join(set.source,"files.json"),join(set.destination,"files.json"));
-  if(set.kind==="official")
-    await cp(join(set.source,"README.md"),join(set.destination,"README.md"));
-  else{
-    if(manifest.projectReadme!=="README.md")
-      throw Error("Candidate project README is not pinned");
-    await cp(join(set.source,manifest.projectReadme),join(set.destination,manifest.projectReadme));
-  }
+  if(manifest.projectReadme!=="README.md")
+    throw Error("Example project README is not pinned");
+  await cp(join(set.source,manifest.projectReadme),join(set.destination,manifest.projectReadme));
   for(const path of manifest.files){
-    const bytes=await readFile(join(set.sourceRoot,path));
+    const bytes=await readFile(join(set.source,path));
     const gitBlob=createHash("sha1").update("blob "+bytes.length+"\0").update(bytes).digest("hex");
     if(gitBlob!==manifest.blobs[path])
       throw Error(set.kind+" example differs from pinned owner blob: "+path);
