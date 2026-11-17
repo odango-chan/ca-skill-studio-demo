@@ -208,11 +208,12 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
     const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha4",candidate.projectReadme);
     const readmeDestination=vscode.Uri.joinPath(root,"README.md");
     let readmeUpdated=false;
-    if(!(await exists(readmeDestination))){
-      phase="read-v1alpha4-project-readme";
+    if(!(await exists(readmeDestination))||resetExisting){
+      phase="write-v1alpha4-project-readme";
       const bytes=await readBundledResource(vscode,readmeSource);
       await fs.writeFile(readmeDestination,bytes);
-    }else if(!resetExisting){
+      readmeUpdated=resetExisting;
+    }else{
       const currentReadmeSha=await gitBlobSha(await fs.readFile(readmeDestination));
       if(currentReadmeSha===PREVIOUS_EXAMPLE_README_BLOB){
         phase="refresh-v1alpha4-project-readme";
