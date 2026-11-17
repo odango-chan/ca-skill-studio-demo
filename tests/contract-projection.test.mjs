@@ -39,7 +39,7 @@ test('Unknown v1alpha4 Contract extensions are explicit and remain in Source', (
 });
 
 test('Malformed known v1alpha4 sections are partial rather than silently discarded', () => {
-  const changed = source.replace(/capabilities:\n[\\s\\S]*?\n\nlimits:/,
+  const changed = source.replace(/capabilities:\n[\s\S]*?\n\nlimits:/,
     'capabilities: not-a-sequence\n\nlimits:');
   const p = projectSkillContract(changed);
   assert.equal(p.state, 'PARTIAL');
