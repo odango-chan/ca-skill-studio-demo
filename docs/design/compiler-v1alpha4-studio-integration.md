@@ -5,6 +5,8 @@
 **Language target:** `connectionagent.io/v1alpha4`  
 **Normative Skill authority:** `odango-chan/ca-skills@7f84393ee8c395e4d8c39a74cb5000a1f896588d`
 
+> **Version boundary:** This document describes only the Compiler v1.0.0 / CA-SL v1alpha4 integration. The active Studio authoring target is now CA-SL v1alpha5 Preview. Studio explicitly blocks Check / Build / Inspect for v1alpha5; this document must not be read as v1alpha5 Compiler support. See [CA-SL v1alpha5 Studio Preview](ca-sl-v1alpha5-studio-preview.md).
+
 ## 1. Ownership
 
 - ca-skills owns the normative Skill language and authored source.
