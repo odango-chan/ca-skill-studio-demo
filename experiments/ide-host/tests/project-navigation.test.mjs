@@ -39,7 +39,7 @@ test("only a single matching folder without a workspace file is a named folder w
 
 test("pending Example restoration waits for the named folder, then opens Procedure once",async()=>{
   const root="file:///global-storage/skill-studio-demo";
-  const procedure=root+"/skills/establish-pdu-session/assurance/procedure.yaml";
+  const procedure=root+"/examples/v1alpha4-candidate/establish-pdu-session/assurance/procedure.yaml";
   const pending={root,procedure,files:18,skipped:2,skills:["establish-pdu-session","establish-pdu-session-mas"]};
   const h=makeHost({folders:[{uri:uri(root)}],pending});
   let revealed=0,restored=null;
