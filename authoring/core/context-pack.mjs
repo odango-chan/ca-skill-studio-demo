@@ -98,8 +98,8 @@ export async function buildContextPack({
 } = {}) {
   assertString(taskId, "task_id", 128);
   if (!Number.isSafeInteger(revision) || revision < 1) reject("invalid_revision", "Context revision must be positive.");
-  if (languageTarget !== "connectionagent.io/v1alpha4") {
-    reject("unsupported_language_target", "AI Authoring currently accepts only CA-SL v1alpha4.");
+  if (languageTarget !== "connectionagent.io/v1alpha5") {
+    reject("unsupported_language_target", "AI Authoring currently accepts only CA-SL v1alpha5 Preview.");
   }
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_CONTEXT_PACK_BYTES) {
     reject("invalid_byte_limit", "Context Pack byte limit must be between 1 and 131072 bytes.");

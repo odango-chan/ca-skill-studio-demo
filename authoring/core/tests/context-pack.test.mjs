@@ -11,7 +11,7 @@ function base(overrides = {}) {
   return {
     taskId: "task-1",
     revision: 1,
-    languageTarget: "connectionagent.io/v1alpha4",
+    languageTarget: "connectionagent.io/v1alpha5",
     procedure: {
       path: "assurance/procedure.yaml",
       documentVersion: 7,

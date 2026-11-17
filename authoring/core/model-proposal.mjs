@@ -3,6 +3,11 @@ export const MODEL_PROPOSAL_SCHEMA = "ca-studio.ai-model-proposal/v1";
 export const ALLOWED_SEMANTIC_OPERATIONS = Object.freeze([
   "node.add",
   "node.stage.add",
+  "node.wait.set",
+  "node.wait.event.set",
+  "node.wait.timeout.set",
+  "node.wait.timeout-route.set",
+  "node.wait.response.set",
   "stage.callable.set",
   "stage.argument.set",
   "predicate.call.add",
@@ -19,7 +24,9 @@ const FORBIDDEN_PAYLOAD_KEYS = new Set(["__proto__", "constructor", "prototype",
   "offset", "startOffset", "endOffset", "line", "column", "file", "filePath", "path",
   "uri", "documentUri", "writePaths", "readPaths", "sourceDigest", "base", "scope",
   "groups", "validation", "operationId", "workspaceEdit", "patch", "command", "shell",
-  "tool_calls", "tools", "scriptSource", "packageGeneration", "documentVersion",
+  "tool_calls", "tools", "scriptSource", "packageGeneration", "documentVersion", "ingressCatalog", "ingressCatalogRef",
+  "correlationBinding", "armInputSchema", "expectedIngressRef", "deliveryRef", "responseObligationRef",
+  "trustedOwner", "ownerBinding", "normalizedSchemaRef",
 ]);
 
 export class ModelProposalValidationError extends Error {
@@ -47,7 +54,7 @@ function stringArray(value, path, maxItems, maxLength) {
   if (!Array.isArray(value) || value.length > maxItems) fail("invalid_array", path);
   value.forEach((item, index) => string(item, path + "[" + index + "]", maxLength));
 }
-function jsonValue(value, path, depth = 0) {
+function jsonValue(value, path, depth = 0, allowWaitEventSource = false) {
   if (depth > 8) fail("payload_too_deep", path);
   if (value === null || typeof value === "boolean") return;
   if (typeof value === "string") {
@@ -65,8 +72,9 @@ function jsonValue(value, path, depth = 0) {
   }
   if (!plain(value)) fail("invalid_payload_value", path);
   for (const [key, child] of Object.entries(value)) {
-    if (FORBIDDEN_PAYLOAD_KEYS.has(key)) fail("forbidden_authority_field", path + "." + key);
-    jsonValue(child, path + "." + key, depth + 1);
+    const isWaitEventSource = allowWaitEventSource && key === "source" && path.endsWith(".event");
+    if (FORBIDDEN_PAYLOAD_KEYS.has(key) && !isWaitEventSource) fail("forbidden_authority_field", path + "." + key);
+    jsonValue(child, path + "." + key, depth + 1, allowWaitEventSource);
   }
 }
 function freezeDeep(value) {
@@ -104,7 +112,8 @@ export function validateModelProposal(input, {
       }
     }
     if (!plain(operation.payload)) fail("invalid_payload", path + ".payload");
-    jsonValue(operation.payload, path + ".payload");
+    jsonValue(operation.payload, path + ".payload", 0,
+      ["node.add", "node.wait.set", "node.wait.event.set"].includes(operation.type));
     string(operation.rationale, path + ".rationale", 1000);
     if (!Array.isArray(operation.references) || operation.references.length > 40) {
       fail("invalid_references", path + ".references");
