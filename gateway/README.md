@@ -39,15 +39,15 @@ Cloudflare Workers Free currently documents 100,000 requests per day, 10 ms CPU 
 3. From the gateway directory, set the deployment secrets:
 
 ~~~bash
-npx wrangler@4.34.0 secret put OPENAI_API_KEY --config wrangler.jsonc
-npx wrangler@4.34.0 secret put TURNSTILE_SECRET_KEY --config wrangler.jsonc
+npx wrangler@4.36.0 secret put OPENAI_API_KEY --config wrangler.jsonc
+npx wrangler@4.36.0 secret put TURNSTILE_SECRET_KEY --config wrangler.jsonc
 ~~~
 
 4. Replace TURNSTILE_SITE_KEY in the Worker vars with the public widget site key.
 5. Deploy:
 
 ~~~bash
-npx wrangler@4.34.0 deploy --config wrangler.jsonc
+npx wrangler@4.36.0 deploy --config wrangler.jsonc
 ~~~
 
 6. Check GET /healthz and GET /public-config from the allowed origin. Then run the browser integration against /v1/chat/completions.
