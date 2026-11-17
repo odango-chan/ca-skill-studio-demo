@@ -91,9 +91,9 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
       entry.command==="skillStudio."+command),
       "Documentation must remain a native extension command: "+command);
   }
-  assert.ok(plugin.contributes.menus?.["view/title"]?.some(x=>
+  assert.ok(!plugin.contributes.menus?.["view/title"]?.some(x=>
     x.command==="skillStudio.loadExample"),
-    "Explorer title toolbar must expose the demo project");
+    "Example loading belongs in native File and SKILL Studio Project menus, not Explorer toolbar noise");
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js",
     "dist/compiler-worker.js","dist/skillc.wasm","dist/wasm_exec.js","media/procedure.js","media/procedure.css",
     "samples/skills/files.json",
