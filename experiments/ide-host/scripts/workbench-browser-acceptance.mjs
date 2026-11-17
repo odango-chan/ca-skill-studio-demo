@@ -978,14 +978,14 @@ export async function runWorkbenchAcceptance({
   const masProcedureUri=defaultProcedureUri.replace(
     "/establish-pdu-session/assurance/procedure.yaml",
     "/establish-pdu-session-mas/assurance/procedure.yaml");
-  await nativeCommand("core.close.all.main.tabs");
+  // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",masProcedureUri);
   const masPair=await assertSourceVisualPair(
     evalJS,sleep,"procedure.yaml","v1alpha4 MAS Procedure Designer");
   const masGraph=await waitWebview(view=>
     view.procedureRoot&&view.bodyText.includes("establish-pdu-session-mas")&&view.graphNodes>0,
     "v1alpha4 MAS Procedure graph");
-  await nativeCommand("core.close.all.main.tabs");
+  // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const restoredPair=await assertSourceVisualPair(
     evalJS,sleep,"procedure.yaml","restored v1alpha4 5GC Procedure Designer");
@@ -1000,7 +1000,7 @@ export async function runWorkbenchAcceptance({
      packageOverviewEvidence.evidence?.skills?.length!==2)
     throw Error("Package Overview did not discover both v1alpha4 Skills: "+
       JSON.stringify(packageOverviewEvidence));
-  await nativeCommand("core.close.all.main.tabs");
+  // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const finalPair=await assertSourceVisualPair(
     evalJS,sleep,"procedure.yaml","final v1alpha4 default Procedure Designer");
