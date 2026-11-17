@@ -216,6 +216,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
     TreeItem:class {constructor(label,state){this.label=label;this.collapsibleState=state;}},
     TreeItemCollapsibleState:{None:0,Collapsed:1},
+    ThemeIcon:class {constructor(id){this.id=id;}},
     Range:class {constructor(start,startCharacter,end,endCharacter){
       if(typeof start==='number'){
         this.start={line:start,character:startCharacter};
@@ -263,9 +264,32 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
       showInformationMessage:async()=>confirmChoice,showWarningMessage:async()=>{},
       showQuickPick:async items=>items[0],showInputBox:async options=>options?.value??'sbi.new.operation'}
   };
-  const context={subscriptions:[],extensionUri:uri('/extension')},workbench=registerWorkbench(vscode,context),posted=[];
+  const compilerProblems=[{
+    kind:'compiler-diagnostic',message:'Malformed Procedure YAML',
+    code:'YAML_PARSE_ERROR',severity:'error',line:2,column:1,
+    uri:'file:///workspace/establish-pdu-session/assurance/procedure.yaml'
+  }];
+  let emitCompilerProblems;
+  const compilerProblemsProvider={
+    getProblems:()=>compilerProblems,
+    onDidChange:listener=>{emitCompilerProblems=listener;return disposable();}
+  };
+  const context={subscriptions:[],extensionUri:uri('/extension')},
+    workbench=registerWorkbench(vscode,context,{compilerProblemsProvider}),posted=[];
   workbench.attach(doc,m=>posted.push(m));
   assert.equal(providers.size,3);
+  const problems=providers.get('skillStudio.problems');
+  const compilerProblem=problems.getChildren().find(item=>item.kind==='compiler-diagnostic');
+  assert.ok(compilerProblem,'Compiler diagnostics are projected into the native Skill Studio Problems view');
+  assert.equal(compilerProblem.code,'YAML_PARSE_ERROR');
+  assert.equal(compilerProblem.severity,'error');
+  assert.equal(problems.getTreeItem(compilerProblem).command.command,
+    'skillStudio.revealCompilerDiagnostic',
+    'Compiler Problems navigate to the exact source file through the Compiler reveal command');
+  const beforeCompilerRefresh=changes.length;
+  emitCompilerProblems?.();
+  assert.ok(changes.length>beforeCompilerRefresh,
+    'new Compiler diagnostics refresh only through the Problems provider event');
   const beforeActivation=changes.length;workbench.activate(doc);workbench.activate(doc);
   assert.equal(changes.length,beforeActivation,"unchanged activation must not refresh the native trees");
   const outline=providers.get('skillStudio.outline');
