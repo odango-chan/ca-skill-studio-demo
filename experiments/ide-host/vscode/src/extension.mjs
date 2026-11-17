@@ -348,16 +348,15 @@ export function activate(context){
   );
   // Keep browser acceptance independent of Extension Host console forwarding.
   // This command is internal (not contributed to the Command Palette) and
-  // returns the authoritative workspace plus the two pinned sample URIs.
+  // returns the authoritative workspace and the two v1alpha4 Skill URIs.
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.workspaceIdentityAcceptance",async()=>{
       const folders=vscode.workspace.workspaceFolders??[];
       const root=folders.length===1?folders[0].uri:null;
-      const legacyProcedure=root?vscode.Uri.joinPath(root,
+      const defaultProcedure=root?vscode.Uri.joinPath(root,
         "skills","establish-pdu-session","assurance","procedure.yaml"):null;
-      const candidateProcedure=root?vscode.Uri.joinPath(root,
-        "examples","v1alpha4-candidate","establish-pdu-session",
-        "assurance","procedure.yaml"):null;
+      const masProcedure=root?vscode.Uri.joinPath(root,
+        "skills","establish-pdu-session-mas","assurance","procedure.yaml"):null;
       const exists=async uri=>{
         if(!uri)return false;
         try{await vscode.workspace.fs.stat(uri);return true;}
@@ -368,10 +367,10 @@ export function activate(context){
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
         root:root?.toString?.()??null,
         workspaceFolders:folders.map(folder=>folder.uri.toString()),
-        legacyProcedure:legacyProcedure?.toString?.()??null,
-        legacyProcedureExists:await exists(legacyProcedure),
-        candidateProcedure:candidateProcedure?.toString?.()??null,
-        candidateProcedureExists:await exists(candidateProcedure)
+        defaultProcedure:defaultProcedure?.toString?.()??null,
+        defaultProcedureExists:await exists(defaultProcedure),
+        masProcedure:masProcedure?.toString?.()??null,
+        masProcedureExists:await exists(masProcedure)
       };
     }
   ));
@@ -380,22 +379,22 @@ export function activate(context){
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
   const exampleText=progressZh?{
     title:"加载示例项目",
-    starting:"正在准备官方参考 Skill 和 v1alpha4 候选示例…",
+    starting:"正在准备 CA-SL v1alpha4 Skills…",
     manifest:"正在读取示例清单…",
     files:(completed,total)=>"正在导入示例文件（"+completed+"/"+total+"）…",
     workspace:"正在打开示例工作区…",
     packages:"正在加载 Package Explorer…",
-    procedure:"正在打开 v1alpha4 候选 Procedure…",
+    procedure:"正在打开 v1alpha4 Procedure…",
     success:"示例项目已打开",
     failure:"示例项目载入失败"
   }:{
     title:"Loading example project",
-    starting:"Preparing official reference Skills and v1alpha4 candidate examples…",
+    starting:"Preparing CA-SL v1alpha4 Skills…",
     manifest:"Reading example manifests…",
     files:(completed,total)=>"Importing sample files ("+completed+"/"+total+")…",
     workspace:"Opening example workspace…",
     packages:"Preparing Package Explorer…",
-    procedure:"Opening v1alpha4 candidate Procedure…",
+    procedure:"Opening the v1alpha4 Procedure…",
     success:"Example project opened",
     failure:"Example project failed to load"
   };
@@ -438,8 +437,8 @@ export function activate(context){
                 const pending={
                   root:result.root.toString(),
                   procedure:result.procedure.toString(),
-                  files:result.files,officialFiles:result.officialFiles,
-                  candidateFiles:result.candidateFiles,skipped:result.skipped,
+                  files:result.files,candidateFiles:result.candidateFiles,
+                  skipped:result.skipped,legacyArchived:result.legacyArchived,
                   skills:result.skills,sourceShas:result.sourceShas
                 };
                 await context.globalState.update(PENDING_EXAMPLE_OPEN_KEY,pending);
@@ -492,11 +491,11 @@ export function activate(context){
               // Keep the established success notification used by Chromium
               // acceptance and make create-only / existing-file semantics clear.
               void vscode.window.showInformationMessage(
-                "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 v1alpha4 候选 Procedure（DRAFT / NOT_QUALIFIED）。"+
-                "导入官方 Legacy 文件 "+result.officialFiles+" 个、v1alpha4 候选文件 "+
-                result.candidateFiles+" 个；保留 "+result.skipped+" 个已有文件。"+
-                (viewOpened&&revealed?"已展开 Package Explorer（官方 Legacy 5GC + MAS）。":
-                  "可在 Explorer → Package Explorer 查看官方参考 Skill。"));
+                "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL v1alpha4 Procedure（DRAFT / NOT_QUALIFIED）。"+
+                "导入 v1alpha4 Skill 文件 "+result.candidateFiles+" 个；保留 "+result.skipped+" 个已有文件。"+
+                (result.legacyArchived?"旧版 Skill 已归档，不再参与默认项目验收。":"")+
+                (viewOpened&&revealed?"已展开 Package Explorer（两个 CA-SL v1alpha4 Skills）。":
+                  "可在 Explorer → Package Explorer 查看 v1alpha4 Skills。"));
               return result;
             }catch(error){
               const message=exampleText.failure+" ["+stage+"]："+String(error?.message??error);
@@ -624,8 +623,8 @@ export function activate(context){
       const firstPackageVisuals=visualUris.filter(uri=>uri.path.startsWith(firstRoot.path+"/"));
       for(const uri of firstPackageVisuals)await openSourceViewPair(vscode,uri);
       const pythonFiles=await vscode.workspace.findFiles(
-        "**/scripts/evaluate_transfer_start.py","**/node_modules/**",5);
-      if(!pythonFiles.length)throw Error("Bundled Python acceptance fixture is missing");
+        "**/scripts/validate-subscription-request.py","**/node_modules/**",5);
+      if(!pythonFiles.length)throw Error("CA-SL v1alpha4 Python acceptance fixture is missing");
       const python=await vscode.workspace.openTextDocument(pythonFiles[0]);
       await vscode.window.showTextDocument(python,{
         viewColumn:vscode.ViewColumn.Two,preserveFocus:false,preview:false
@@ -704,13 +703,13 @@ export function activate(context){
         editor:VIEW
       }));
       const detail=progressZh
-        ?("导入官方 Legacy 文件 "+pending.officialFiles+" 个、v1alpha4 候选文件 "+
-          pending.candidateFiles+" 个；保留 "+pending.skipped+" 个已有文件。")
-        :("Imported "+pending.officialFiles+" official legacy files and "+
-          pending.candidateFiles+" v1alpha4 candidate files; preserved "+pending.skipped+" existing files.");
+        ?("导入 CA-SL v1alpha4 Skill 文件 "+pending.candidateFiles+" 个；保留 "+
+          pending.skipped+" 个已有文件。"+(pending.legacyArchived?"旧版 Skill 已归档。":""))
+        :("Imported "+pending.candidateFiles+" CA-SL v1alpha4 Skill files; preserved "+
+          pending.skipped+" existing files."+(pending.legacyArchived?" Archived the retired legacy Skills.":""));
       const message=progressZh
-        ?("示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 v1alpha4 候选 Procedure（DRAFT / NOT_QUALIFIED）。"+detail)
-        :("Example project opened: skill-studio-demo/. The v1alpha4 candidate Procedure is open (DRAFT / NOT_QUALIFIED). "+detail);
+        ?("示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL v1alpha4 Procedure（DRAFT / NOT_QUALIFIED）。"+detail)
+        :("Example project opened: skill-studio-demo/. The CA-SL v1alpha4 Procedure is open (DRAFT / NOT_QUALIFIED). "+detail);
       void vscode.window.showInformationMessage(message);
     }
   }).catch(error=>{
