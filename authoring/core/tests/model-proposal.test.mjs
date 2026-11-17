@@ -102,6 +102,39 @@ test("ModelProposal parser rejects invalid JSON and enforces proposal size", () 
   );
 });
 
+test("ModelProposal accepts v1alpha5 Wait event.source only in the typed Wait event selector", () => {
+  const waitProposal = validProposal({
+    operations: [{
+      type: "node.wait.set",
+      target: { nodeId: "wait-for-update" },
+      payload: { definition: {
+        event: { source: "AMF", service: "nsmf-pdusession", operation: "UpdateSMContext" },
+        timeout: "PT30S",
+        routes: { TIMEOUT: "UNRESOLVED" },
+      }},
+      rationale: "Wait for the exact inbound event before entering the Node stages.",
+      references: ["procedure-current", "contract-goal"],
+    }],
+  });
+  const result = validateModelProposal(waitProposal, { allowedContextIds: ["procedure-current", "contract-goal"] });
+  assert.equal(result.operations[0].type, "node.wait.set");
+  assert.equal(result.operations[0].payload.definition.event.source, "AMF");
+});
+
+test("ModelProposal still rejects source authority fields outside a Wait event selector", () => {
+  const invalid = validProposal({
+    operations: [{
+      type: "node.add",
+      target: { nodeId: "new-node" },
+      payload: { definition: { source: "arbitrary-source" } },
+      rationale: "bad source field",
+      references: [],
+    }],
+  });
+  assert.throws(() => validateModelProposal(invalid),
+    (error) => error instanceof ModelProposalValidationError && error.code === "forbidden_authority_field");
+});
+
 
 test("ModelProposal requires a semantic target and rejects prototype mutation keys", () => {
   const noTarget = validProposal({

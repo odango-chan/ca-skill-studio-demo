@@ -8,7 +8,7 @@ async function context() {
   const built = await buildContextPack({
     taskId: "task-1",
     revision: 2,
-    languageTarget: "connectionagent.io/v1alpha4",
+    languageTarget: "connectionagent.io/v1alpha5",
     procedure: {
       path: "assurance/procedure.yaml",
       documentVersion: 7,
@@ -74,6 +74,9 @@ test("Procedure Agent validates the Context Pack and returns a typed proposal", 
   assert.equal(result.proposal.operations[0].type, "stage.route.set");
   assert.equal(request.messages[0].role, "system");
   assert.match(request.messages[0].content, /3GPP action boundaries/);
+  assert.match(request.messages[0].content, /Node-entry Event Wait/);
+  assert.match(request.messages[0].content, /wait.output/);
+  assert.match(request.messages[0].content, /never add EVENT_RECEIVED/);
   assert.match(request.messages[1].content, /assurance\/procedure.yaml/);
   assert.deepEqual(request.responseFormat, { type: "json_object" });
   assert.equal(request.contextDisclosureAccepted, true);
@@ -191,7 +194,7 @@ test("Context Pack builder output can be consumed by the Procedure Agent without
   const built = await buildContextPack({
     taskId: "integrated-task",
     revision: 1,
-    languageTarget: "connectionagent.io/v1alpha4",
+    languageTarget: "connectionagent.io/v1alpha5",
     procedure: {
       path: "assurance/procedure.yaml",
       documentVersion: 4,
