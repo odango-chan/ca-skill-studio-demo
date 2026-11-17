@@ -923,9 +923,8 @@ export async function runWorkbenchAcceptance({
   const contractUri=await openPackageFile("skillStudio.openContract","assurance/contract.yaml");
   const contract=await waitWebview(view=>view.title==="SKILL Contract Visual",
     "v1alpha4 Contract Designer");
-  const expectedContractCards=["Skill Identity","Entry & Inputs","Required Context",
-    "Allowed Resources","Preconditions","Requirements","Postconditions",
-    "Planning","Failure Semantics","Dependencies"];
+  const expectedContractCards=["Goal & Preconditions","Schemas & Context",
+    "Capabilities","Dependencies","Limits"];
   const contractCards=contract.view.cards??[];
   if(!contract.view.bodyText.includes("establish-pdu-session")||
      !contract.view.bodyText.includes("pdu_session.initial_request_fulfilled")||
@@ -937,12 +936,19 @@ export async function runWorkbenchAcceptance({
   const predicateUri=await openPackageFile("skillStudio.openPredicates","assurance/predicates.yaml");
   const predicates=await waitWebview(view=>view.title==="SKILL Predicate Visual",
     "v1alpha4 Predicate Designer");
-  if(!(predicates.view.bodyText.includes("establishment.ran.adopted"))||
-     !(predicates.view.bodyText.includes("scripts/validate-subscription-request.py"))||
-     !(predicates.view.bodyText.includes("Observation"))||
-     !(predicates.view.graphNodes>0||predicates.view.bodyText.length>200))
+  const predicateDetails=await command("Runtime.evaluate",{
+    contextId:predicates.contextId,returnByValue:true,
+    expression:"(()=>{const item=[...document.querySelectorAll('details.predicate')].find(node=>node.querySelector('.pid')?.textContent.trim()==='establishment.subscription.request_valid');if(!item)return {opened:false,bodyText:document.body?.innerText??''};item.open=true;return {opened:true,bodyText:document.body?.innerText??''};})()"
+  });
+  const predicateText=predicateDetails.result?.value?.bodyText??predicates.view.bodyText;
+  if(!predicateDetails.result?.value?.opened||
+     !predicateText.includes("establishment.ran.adopted")||
+     !predicateText.includes("scripts/validate-subscription-request.py")||
+     !predicateText.includes("Parameters → Evidence → Evaluator")||
+     !predicateText.includes("Evidence Requirements")||
+     predicateText.includes("Observation"))
     throw Error("v1alpha4 Predicate Designer did not render the current PredicateSet: "+
-      JSON.stringify(predicates.view).slice(0,2600));
+      JSON.stringify({view:predicates.view,predicateText:predicateText.slice(-2600)}));
   await assertSourceVisualPair(evalJS,sleep,"predicates.yaml","v1alpha4 Predicate Designer");
   const schemaUri=await openPackageFile(
     "skillStudio.openSchema","schemas/establishment-request.schema.yaml");
