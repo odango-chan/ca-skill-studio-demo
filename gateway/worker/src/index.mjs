@@ -17,7 +17,7 @@ function corsHeaders(origin, origins) {
   return h;
 }
 function configurationError(env) {
-  if (!env.ACCESS_AUD || !env.PROVIDER_API_KEY || !env.PROVIDER_CHAT_COMPLETIONS_URL || !csv(env.ALLOWED_MODELS).length || !csv(env.ALLOWED_ORIGINS).length || typeof env.USER_RATE_LIMITER?.limit !== "function") return true;
+  if (!env.ACCESS_AUD || !env.PROVIDER_API_KEY || !env.PROVIDER_CHAT_COMPLETIONS_URL || !env.PROVIDER_MODEL || !csv(env.ALLOWED_MODELS).includes(env.PROVIDER_MODEL) || !csv(env.ALLOWED_ORIGINS).length || typeof env.USER_RATE_LIMITER?.limit !== "function") return true;
   try {
     const endpoint = new URL(env.PROVIDER_CHAT_COMPLETIONS_URL);
     if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || !endpoint.pathname.endsWith("/chat/completions")) return true;
@@ -66,19 +66,27 @@ async function readJson(request, maxBytes) {
 function validatePayload(input, env) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw { status: 400, code: "invalid_request" };
   if (Object.keys(input).some((key) => !REQUEST_FIELDS.has(key))) throw { status: 400, code: "unsupported_request_field" };
-  if (typeof input.model !== "string" || !csv(env.ALLOWED_MODELS).includes(input.model)) throw { status: 400, code: "model_not_allowed" };
-  if (input.stream !== true) throw { status: 400, code: "streaming_required" };
+  const model = input.model === undefined ? env.PROVIDER_MODEL : input.model;
+  if (typeof model !== "string" || !csv(env.ALLOWED_MODELS).includes(model)) throw { status: 400, code: "model_not_allowed" };
+  if (input.stream !== undefined && typeof input.stream !== "boolean") throw { status: 400, code: "invalid_stream" };
   if (!Array.isArray(input.messages) || !input.messages.length || input.messages.length > 32) throw { status: 400, code: "invalid_messages" };
   const messages = input.messages.map((message) => {
     if (!message || typeof message !== "object" || Array.isArray(message) || Object.keys(message).some((k) => !["role", "content"].includes(k))) throw { status: 400, code: "invalid_message" };
     if (!["system", "user", "assistant"].includes(message.role)) throw { status: 400, code: "invalid_message_role" };
-    if (typeof message.content !== "string" || message.content.length > 24000) throw { status: 400, code: "invalid_message_content" };
-    return { role: message.role, content: message.content };
+    const content = message.content;
+    const validText = typeof content === "string" && content.length <= 24000;
+    const validTextParts = Array.isArray(content) && content.length > 0 && content.length <= 32 && content.every((part) =>
+      part && typeof part === "object" && !Array.isArray(part) &&
+      part.type === "text" && typeof part.text === "string" && part.text.length <= 24000 &&
+      Object.keys(part).every((key) => key === "type" || key === "text")
+    );
+    if (!validText && !validTextParts) throw { status: 400, code: "invalid_message_content" };
+    return { role: message.role, content };
   });
   const max = int(env.MAX_OUTPUT_TOKENS, 2048);
   const tokens = input.max_tokens === undefined ? max : input.max_tokens;
   if (!Number.isSafeInteger(tokens) || tokens < 1 || tokens > max) throw { status: 400, code: "output_token_limit_exceeded" };
-  const output = { model: input.model, messages, stream: true, max_tokens: tokens };
+  const output = { model, messages, stream: input.stream === true, max_tokens: tokens };
   if (input.temperature !== undefined) {
     if (typeof input.temperature !== "number" || !Number.isFinite(input.temperature) || input.temperature < 0 || input.temperature > 2) throw { status: 400, code: "invalid_temperature" };
     output.temperature = input.temperature;
@@ -132,7 +140,7 @@ export async function handleRequest(request, env, ctx, fetchImpl = globalThis.fe
       method: "POST",
       redirect: "manual",
       signal: AbortSignal.any([request.signal, timeoutController.signal]),
-      headers: { Authorization: "Bearer " + env.PROVIDER_API_KEY, "Content-Type": "application/json", Accept: "text/event-stream" },
+      headers: { Authorization: "Bearer " + env.PROVIDER_API_KEY, "Content-Type": "application/json", Accept: payload.stream ? "text/event-stream" : "application/json" },
       body: JSON.stringify(payload),
     });
     clearTimeout(timeoutId);
@@ -140,13 +148,14 @@ export async function handleRequest(request, env, ctx, fetchImpl = globalThis.fe
       await upstream.body?.cancel();
       return error(429, "provider_rate_limited", headers);
     }
-    if (!upstream.ok || !upstream.body || !upstream.headers.get("content-type")?.toLowerCase().includes("text/event-stream")) {
+    const expectedType = payload.stream ? "text/event-stream" : "application/json";
+    if (!upstream.ok || !upstream.body || !upstream.headers.get("content-type")?.toLowerCase().includes(expectedType)) {
       await upstream.body?.cancel();
       return error(502, "provider_unavailable", headers);
     }
-    headers.set("Content-Type", "text/event-stream; charset=utf-8");
-    headers.set("Cache-Control", "no-cache, no-transform");
-    headers.set("X-Accel-Buffering", "no");
+    headers.set("Content-Type", payload.stream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
+    headers.set("Cache-Control", payload.stream ? "no-cache, no-transform" : "no-store");
+    if (payload.stream) headers.set("X-Accel-Buffering", "no");
     return new Response(upstream.body, { status: 200, headers });
   } catch (failure) {
     clearTimeout(timeoutId);
