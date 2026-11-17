@@ -679,7 +679,7 @@ try{
         (document.querySelector('.theia-Files')?.innerText??'')
         .includes('You have not yet added a folder to the workspace.'),
       workspaceRootVisible:(document.querySelector('.theia-Files')?.innerText??'')
-        .includes('skill-studio-demo'),
+        .toLowerCase().includes('skill-studio-demo'),
       notificationText:[...document.querySelectorAll('.theia-notification-list-item,.theia-notification-message')]
         .map(x=>x.innerText).filter(Boolean).slice(0,7),
       visibleEditors:document.querySelectorAll('.monaco-editor').length,
