@@ -234,7 +234,16 @@ test('C4 registers Package Explorer and renders Skills under the unified tree',a
     uri:uri('/workspace/skills/establish-pdu-session/assurance/procedure.yaml'),
     isDirty:false
   };
-  registerPackageOverview(vscode,context,()=>activeProcedure);
+  const artifact={kind:'artifact-package',artifactId:'compiler-build-1',
+    packageName:'establish-pdu-session',label:'establish-pdu-session · Build',
+    success:true,files:[]};
+  const compilerProvider={
+    onDidChangeTreeData:listener=>noop(),
+    async getChildren(node){return node?.kind==='artifact-package'?[]:[artifact];},
+    getTreeItem(item){return new Item(item.label,item.kind==='artifact-package'?1:0);},
+    getParent(){return artifact;}
+  };
+  registerPackageOverview(vscode,context,()=>activeProcedure,{compilerProvider});
   const refresh=commands.get('skillStudio.refreshPackages');
   assert.equal(typeof refresh,'function');
   await refresh();
@@ -242,9 +251,13 @@ test('C4 registers Package Explorer and renders Skills under the unified tree',a
   assert.ok(provider);
 
   const sections=await provider.getChildren();
-  assert.deepEqual(sections.map(item=>item.section),['skills','dependencies']);
+  assert.deepEqual(sections.map(item=>item.section),['skills','dependencies','artifacts']);
   assert.equal(provider.getTreeItem(sections[0]).label,'Skills');
   assert.equal(provider.getTreeItem(sections[0]).collapsibleState,2);
+  assert.equal(provider.getTreeItem(sections[2]).label,'Build Artifacts');
+  const artifactItems=await provider.getChildren(sections[2]);
+  assert.equal(artifactItems[0].kind,'artifact-package');
+  assert.equal(provider.getParent(artifactItems[0]).section,'artifacts');
   const skills=await provider.getChildren(sections[0]);
   assert.equal(skills[0].label,'3 SKILL Packages');
   const pkg=skills.find(x=>x.kind==='package'&&x.name==='establish-pdu-session');
