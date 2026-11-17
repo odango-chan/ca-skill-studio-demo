@@ -1,6 +1,6 @@
 # AI Procedure Authoring Workbench
 
-**Status: Proposed · Product decisions approved; cross-host architecture direction approved; detailed design awaiting review**  
+**Status: Proposed · Product decisions approved; CA-SL v1alpha5 Preview target · detailed design awaiting review**  
 **Implementation: NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
 **Tracking: [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200)**
 
@@ -13,7 +13,7 @@ This document defines the first AI-assisted authoring capability for Skill Studi
 | Main surface | A standalone Editor Tab named **AI Authoring** |
 | Editing model | A Studio-owned, versioned semantic Change Set; host-native ChangeSet APIs are optional adapters, not the source of truth |
 | Apply behavior | Apply accepted changes to the existing native TextDocument buffer; the user saves |
-| First release | Modify an existing CA-SL v1alpha4 Procedure only |
+| First release | Modify an existing CA-SL v1alpha5 Preview Procedure only; no v1alpha4 fallback |
 | Architecture target | One cross-host Authoring core for Theia Browser, VS Code Desktop/Web/Remote and self-hosted intranet deployments |
 | First implementation target | The existing Theia Browser-Only / GitHub Pages product, using an external OpenAI-compatible AI Gateway |
 | Model credentials | One deployment-scoped shared provider credential, held by the Gateway; no per-user model API keys |
@@ -33,15 +33,20 @@ The current Theia workbench already provides useful host infrastructure:
 - A Procedure CustomEditor implemented as a Webview, paired with the native Source editor.
 - Native TextDocument versions, native WorkspaceEdit, editor dirty state and Undo/Redo.
 - A Package snapshot collector that prefers open TextDocuments over persisted bytes.
-- A pinned CA-SL v1alpha4 language source and source-derived Procedure projection.
-- A Compiler v1.0.0 Go/WASM integration and Check / Build / Inspect entry points.
+- A pinned CA-SL v1alpha5 Preview candidate and exact IngressCatalog companion contract; v1alpha5 status remains NOT RELEASED / NOT QUALIFIED.
+- The published Compiler v1.0.0 integration is v1alpha4-only. Compiler PR #30 adds a v1alpha5 candidate API / WP2 parser-AST, but full v1alpha5 Check is not yet available.
 - **No model / Agent integration is currently installed.** The current Theia 1.76.0 application manifests do not include the Theia AI packages. Existing LSP completion, diagnostics and semantic tokens are language tooling, not LLM-based AI.
 - The production GitHub Pages application is static hosting. It has no trusted server process in which to keep a shared provider key. The Pages bundle, browser storage, Webview and VSIX are all client-controlled and must never contain the shared provider credential. A separate Gateway service is required.
 - The current Studio extension is a VS Code Web Extension hosted by Theia. VS Code documents that Web Extensions can also run on Desktop and Web, but their runtime does not provide Node.js APIs. This makes the current browser-compatible extension a useful portability baseline, not proof that every Desktop / Remote host mode is already supported ([VS Code Web Extensions](https://code.visualstudio.com/api/extension-guides/web-extensions)).
 
-There is an important version boundary: the current v1alpha4 Procedure Designer is a read-only projection. Existing D1/D2 typed patch modules and legacy Procedure operations are not automatically valid for v1alpha4. P1 MUST add and test a v1alpha4-specific semantic patch layer. It MUST NOT translate v1alpha4 into legacy syntax or reuse legacy patch operations without an explicit compatibility proof.
+There is an important version boundary. The current Studio LSP / Procedure Designer baseline is still the published, frozen CA-SL v1alpha4 projection; it is read-only and MUST NOT be used to interpret or patch a v1alpha5 Procedure. CA-SL v1alpha5 Preview inherits the immutable v1alpha4 normative baseline and adds Node-entry Event Wait through Appendix L. P1 MUST implement a v1alpha5-specific semantic patch layer and MUST NOT fall back to the v1alpha4 parser, patch engine or Compiler API.
 
-The current Compiler v1.0.0 also predates the later Node-entry Event Wait work. AI Authoring MUST NOT invent, lower or simulate that Wait behavior. The existing Compiler remains the authority for the language subset it actually supports.
+The exact development pins are:
+- CA-SL v1alpha5 Preview single-file candidate: `odango-chan/ca-skills@d3f89dfafbf218e5e95c97a974004362b7b967b6` (PR #61).
+- Integration Ingress Operation / IngressCatalog companion contract: `odango-chan/ca-skills@561d14c639e11cc43d0f247111e4971dfb98761e` (PR #62).
+These are Preview review refs, not published production dependencies. v1alpha5 remains PUBLIC REVIEW DRAFT / NOT RELEASED / NOT QUALIFIED; Studio must display that status and pin the exact commits used for development.
+
+The published Compiler v1.0.0 targets v1alpha4 and MUST NOT be used to validate v1alpha5 candidates. Compiler PR #30 introduces the independent v1alpha5 API and WP2 Procedure / Wait parser-AST, but its WP3-WP8 linking, graph, SourcePath, response-boundary and conformance work is not complete. Until the v1alpha5 Compiler returns a complete authoritative result, candidate validation remains BLOCKED / NOT_RUN; AI Authoring must never translate Wait away, simulate it, or report a partial parser result as a full Check PASS.
 
 ## 3. Cross-host architecture and reuse strategy
 
@@ -56,7 +61,7 @@ Create a platform-neutral TypeScript core with no imports from VS Code, Theia, D
 - Prompt construction and Procedure-specific orchestration.
 - Versioned ModelProposal validation.
 - Studio-owned semantic Change Set model and atomic-group rules.
-- v1alpha4 semantic patch planning and candidate-source generation.
+- v1alpha5 semantic patch planning and candidate-source generation, including Node-entry Wait edits.
 - Provider-neutral request / response / streaming / cancellation interfaces.
 
 The core never reads or writes workspace files by itself. It receives snapshots and revision metadata through a Host Adapter and returns typed results. It does not own the model provider credential or Gateway deployment.
@@ -110,7 +115,7 @@ This avoids building two generic chat products. Skill Studio implements only the
 
 ### 3.5 Keep CA-SL and host Agent Skills separate
 
-VS Code / Theia Agent Skills, prompt instructions and chat tools are host-specific AI integration mechanisms. They are not CA-SL Skill Packages, do not define Procedure semantics and are not Compiler inputs. They may provide optional prompt knowledge only; the CA-SL v1alpha4 contract and Compiler remain authoritative.
+VS Code / Theia Agent Skills, prompt instructions and chat tools are host-specific AI integration mechanisms. They are not CA-SL Skill Packages, do not define Procedure semantics and are not Compiler inputs. They may provide optional prompt knowledge only; the pinned CA-SL v1alpha5 Preview candidate and its matching Compiler implementation remain authoritative for this authoring path.
 
 ### 3.6 No generic file-editing agents
 
@@ -159,9 +164,9 @@ The current menu reorganization is being handled separately by PR #199. The AI c
 
 ### 5.2 Target resolution
 
-- If the active editor belongs to a supported v1alpha4 Procedure, use that document.
+- If the active editor belongs to a supported v1alpha5 Preview Procedure, use that document.
 - If no Procedure is active, offer a picker limited to the current workspace's `assurance/procedure.yaml` files.
-- If the selected file is not v1alpha4, show an explicit unsupported-version explanation. Do not attempt Legacy conversion.
+- If the selected file is not v1alpha5 Preview, show an explicit unsupported-version explanation. Do not fall back to v1alpha4 or attempt Legacy conversion.
 - One live Authoring session is allowed per Procedure URI. Reopening the command focuses the existing tab rather than opening a duplicate session.
 
 
@@ -204,7 +209,7 @@ Four internal views:
 | View | Responsibility |
 |---|---|
 | Plan | Restate the requested outcome, proposed steps, blockers and assumptions |
-| Flow Changes | Compare the current and candidate v1alpha4 Procedure projections |
+| Flow Changes | Compare the current and candidate v1alpha5 Procedure projections |
 | YAML Diff | Show the exact source diff generated by the host patch engine |
 | Validation | Show actual Compiler Check diagnostics and the validation snapshot identity |
 
@@ -354,7 +359,7 @@ The model returns a constrained ModelProposal. The Host Adapter validates it and
     "documentVersion": 17,
     "sourceDigest": "sha256:...",
     "packageGeneration": 8,
-    "languageTarget": "connectionagent.io/v1alpha4"
+    "languageTarget": "connectionagent.io/v1alpha5"
   },
   "scope": {
     "writePaths": ["assurance/procedure.yaml"],
@@ -376,7 +381,7 @@ The model returns a constrained ModelProposal. The Host Adapter validates it and
 
 base, scope, operation IDs, groups, source spans, candidate Source and validation state are Host-owned. The model cannot author or override them. The Host materializes the validated proposal into the Studio Change Set model. A host may optionally adapt that model to a native Theia / VS Code ChangeSet UI contract, but such an adapter is presentation / lifecycle integration only; it does not own the semantic proposal or patch authority.
 
-The Change Set is review data, not a write instruction. Its apply path always delegates to the Host's v1alpha4 Semantic Patch Engine and native WorkspaceEdit; it never writes the Procedure directly to disk.
+The Change Set is review data, not a write instruction. Its apply path always delegates to the Host's v1alpha5 Semantic Patch Engine and native WorkspaceEdit; it never writes the Procedure directly to disk.
 
 ### 9.2 Model output restrictions
 
@@ -396,18 +401,23 @@ The exact implementation schema is finalized during the patch-engine spike, but 
 
 | Operation | Allowed intent |
 |---|---|
-| `node.add` | Add a uniquely named Node with one or more valid v1alpha4 stages |
-| `node.stage.add` | Add one missing stage to an existing Node; an existing stage cannot be replaced |
+| `node.add` | Add a uniquely named Node with at least one of the four business stages; an optional Node-entry `wait` may be included in the Node definition |
+| `node.stage.add` | Add one missing business stage to an existing Node; an existing stage cannot be replaced |
+| `node.wait.set` | Add or replace one complete Node-entry Wait declaration on an existing business Node |
+| `node.wait.event.set` | Change the exact `wait.event` selector triple (`source`, `service`, `operation`) |
+| `node.wait.timeout.set` | Set the fixed-duration `wait.timeout` string |
+| `node.wait.timeout-route.set` | Set the sole `wait.routes.TIMEOUT` target |
+| `node.wait.response.set` | Set the optional `wait.response.after` Node boundary |
 | `stage.callable.set` | Set the `tool` or `script` callable field of one explicitly identified Operation / Observation stage |
 | `stage.argument.set` | Set or update one named argument within an Operation / Observation stage |
 | `predicate.call.add` | Add one call to an already declared Predicate in a Precondition / Postcondition |
 | `predicate.call.arguments.set` | Replace the positional arguments of one identified Predicate call |
-| `stage.route.set` | Add or retarget one outcome route within one identified stage |
+| `stage.route.set` | Add or retarget one outcome route within one identified business stage |
 | `procedure.start.set` | Change the top-level start Node to an existing Node |
 
 P1 does not allow deleting Nodes, Stages, Predicate calls, arguments or Routes; replacing an existing Stage wholesale; renaming Nodes; modifying Contract / PredicateSet definitions; or changing dependencies. A Stage can only be added when absent; existing stage fields are changed through their specific allowlisted operations. Those destructive operations require separate reference-closure and source-preservation design.
 
-The allowlist uses v1alpha4's `start`, `nodes`, `precondition`, `operation`, `observation` and `postcondition` source shape. Legacy `procedures`, `call`, `with`, `verify`, `reconcile`, `target`, `on`, plural stage keys or inferred conversions are rejected.
+The allowlist uses v1alpha5's `start`, `nodes`, optional Node-level `wait`, and the four existing business stages `precondition`, `operation`, `observation` and `postcondition`. Wait is Node-entry control, not a fifth stage; a Wait-bearing Node still requires at least one business stage. `wait.event` must match exactly one trusted Ingress Operation in the pinned dependency snapshot; AI cannot invent or edit IngressCatalog / Owner / correlation contracts. `wait.routes` contains exactly `TIMEOUT` (never `EVENT_RECEIVED` or `SUCCEEDED`), and `wait.output` is typed normalized input available only on event-accepted paths, never timeout/bypass paths. Legacy `procedures`, `call`, `with`, `verify`, `reconcile`, `target`, `on`, plural stage keys or inferred conversions are rejected.
 
 ### 9.4 Reference and trust rules
 
@@ -417,18 +427,20 @@ The allowlist uses v1alpha4's `start`, `nodes`, `precondition`, `operation`, `ob
 - Missing or unverified Owner, Schema, callable or Capability information is a blocker or an explicitly unresolved status, never a fabricated contract.
 - Evidence references must resolve to supplied context or a separately verified source. Model-authored citations are not accepted as proof without resolution.
 
-## 10. Host-side v1alpha4 Semantic Patch Engine
+## 10. Host-side v1alpha5 Semantic Patch Engine
 
 The Patch Engine is the only component allowed to turn semantic operations into Source edits.
 
+For v1alpha5 Wait operations it MUST enforce Appendix L.1 / L.1.1 exactly: `wait.event` contains only non-empty exact `source` / `service` / `operation` strings; `timeout` is a positive fixed-duration YAML string in the specified subset (no calendar month/year/week, zero, leading zero, sign or fraction); optional `response` contains only optional `after`; and `routes` contains exactly one `TIMEOUT` target (Node ID, FAILED, UNRESOLVED or SAFE_STOPPED). `SUCCEEDED` and `EVENT_RECEIVED` are forbidden. A Wait-bearing Node MUST still contain at least one of the four business stages. The Patch Engine performs local shape / target checks only; it does not resolve the trusted Ingress export, prove correlation arming, perform Wait CFG / path-sensitive `wait.output` analysis or qualify response mapping. Those remain v1alpha5 Compiler / trusted Integration checks.
+
 For every operation it must:
 
-1. Verify the target document is the selected v1alpha4 Procedure.
-2. Parse the current live Source with the pinned YAML 1.2 parser and v1alpha4 source projection.
+1. Verify the target document is the selected v1alpha5 Preview Procedure.
+2. Parse the current live Source with the pinned YAML 1.2 parser and v1alpha5 source projection, including Appendix L Wait structure.
 3. Resolve Node / Stage / Predicate / Route targets from the parsed source; never trust model-provided offsets.
 4. Check the operation allowlist, current structure, uniqueness, reserved IDs, references and graph invariants.
 5. Resolve the smallest safe CST/source span and produce a candidate Source plus a real Diff.
-6. Reparse the candidate and run the v1alpha4 source projection.
+6. Reparse the candidate and run the v1alpha5 source projection.
 7. Reject the operation if it would rewrite unrelated source, erase comments or unknown fields, or relies on ambiguous anchors, aliases, quoted structures or spans.
 8. Return an explicit unsupported / Source-only result when a safe patch cannot be proven.
 
@@ -491,7 +503,7 @@ Additional states: `Blocked`, `Stale`, `Rejected`, `Cancelled`, `Provider Error`
 
 Compiler Check runs against an in-memory Package overlay where `assurance/procedure.yaml` is replaced by the host-generated candidate Source. The original workspace and open TextDocument remain unchanged until the user accepts the Change Set.
 
-The candidate request must use the same pinned Compiler v1.0.0 integration and exact Package source mapping as normal Check. It must not manufacture `resolvedDependencies`, trusted Owner bindings, CapabilityContracts or Evidence guarantees.
+The candidate request must use the exact v1alpha5 Compiler API / candidate revision, once its complete static pipeline is available. The v1alpha4-only Compiler v1.0.0 is forbidden for this target. It must not manufacture `resolvedDependencies`, trusted Owner bindings, IngressCatalog exports, CapabilityContracts or Evidence guarantees.
 
 Compiler diagnostics are displayed without rewriting their codes or severities. A failed or incomplete Check remains visible; the UI must not display a green qualification badge based only on AI review or LSP projection.
 
@@ -523,7 +535,7 @@ After Apply, the native document change triggers the existing Source / Visual / 
 | B. Online Gateway spike | Implement a thin application Worker with Cloudflare Access JWT verification, strict Chat Completions allowlist, server-side provider secret and streaming; evaluate Cloudflare AI Gateway only as an optional upstream | Positive / negative JWT tests, route / model / size rejection, streaming and cancellation, per-user rate limiting, spend ceiling; Pages → Worker → fixture provider first, then opt-in real provider smoke test |
 | C. Theia Browser adapter | Bridge the current standalone Editor Tab / Extension Host to the shared core and Gateway | Real Browser-Only and backend-backed Theia Chromium; no Theia AI or vscode.lm dependency |
 | D. Proposal / Change Set contract | Strict ModelProposal schema, Host-owned envelope, Studio Change Set lifecycle, operation allowlist and atomic-group validation | Positive / negative schema, malformed / forged / out-of-scope operation tests |
-| E. v1alpha4 Patch Engine | Source-preserving patch operations for the initial allowlist | Round-trip, comment / unknown-field preservation, stale revision and malformed YAML tests |
+| E. v1alpha5 Patch Engine | Source-preserving patch operations for the initial allowlist | Round-trip, comment / unknown-field preservation, stale revision and malformed YAML tests |
 | F. Authoring Workbench | Context, Plan, Flow Changes, YAML Diff, Validation and Change Set UI | Real Chromium layout, keyboard/focus, no third editor group |
 | G. Compiler / Apply | In-memory candidate Check and native WorkspaceEdit apply | Compiler result identity, Source/Visual refresh, dirty state and native Undo/Redo |
 | H. VS Code Desktop / Web adapter | Package the shared core for VS Code; use the local Extension Host for editor APIs and the same configured Gateway for model access | Desktop and Web Extension acceptance; verify actual host placement and no bundled provider secret |
@@ -538,7 +550,7 @@ The online path is implemented first, but every P1 boundary is designed so the l
 ## 16. P1 acceptance checklist
 
 - [ ] Opens one independent AI Authoring Editor Tab and preserves the existing Source / Visual pair.
-- [ ] Uses the live unsaved v1alpha4 Procedure buffer and exact base revision.
+- [ ] Uses the live unsaved v1alpha5 Preview Procedure buffer and exact base revision.
 - [ ] Shows and gates the exact Context Pack before external transmission.
 - [ ] Does not expose provider credentials to the Webview, browser bundle, workspace or extension package.
 - [ ] Uses the Studio-owned Authoring Core and Host Adapter boundary; domain logic has no mandatory Theia / VS Code imports.
@@ -547,7 +559,7 @@ The online path is implemented first, but every P1 boundary is designed so the l
 - [ ] Materializes only validated proposals into the Studio Change Set model; host-native ChangeSet APIs remain optional adapters.
 - [ ] Accepts only the versioned ModelProposal schema and known operation allowlist.
 - [ ] Rejects raw YAML replacement, arbitrary paths, forged spans, unknown operations and stale proposals.
-- [ ] Uses a dedicated v1alpha4 patch layer; legacy syntax and patch semantics are not reused implicitly.
+- [ ] Uses a dedicated v1alpha5 patch layer; v1alpha4-only tooling is not used as a fallback.
 - [ ] Preserves comments, formatting, quoting, unknown fields and unrelated Source bytes.
 - [ ] Computes safe atomic groups and supports selective acceptance.
 - [ ] Runs Compiler Check against an in-memory candidate Package snapshot.
@@ -566,15 +578,15 @@ Desktop / Web Extension and intranet Gateway compatibility are explicit follow-u
 4. **VS Code host placement:** decide whether the Desktop package can use the Web Extension Host alone or needs a separate Node Extension Host adapter; explicitly test Desktop, Web, Remote and WSL/Container behavior.
 5. **Native model APIs:** determine whether vscode.lm or Theia AI adapters provide meaningful optional value; neither is a required model path.
 6. **Initial Context Pack byte budget:** finalize a byte budget during the online provider spike; never silently truncate.
-7. **Operation allowlist:** finalize exact v1alpha4 CST patch operations and source-preservation limits during Slice E.
+7. **Operation allowlist:** finalize exact v1alpha5 CST patch operations, including Node-entry Wait, and source-preservation limits during Slice E.
 
 The product decisions in Section 1 and the cross-host architecture direction are approved. The detailed technical design remains Proposed until the online Gateway, shared-core boundary and v1alpha4 patch-engine spikes are reviewed.
 
 ## Implementation ownership summary
 
-- **CA-SL / ca-skills:** owns normative v1alpha4 language semantics.
+- **CA-SL / ca-skills:** owns the v1alpha5 Preview language candidate and its publication decision; v1alpha4 remains frozen.
 - **CA Skill Compiler:** owns authoritative Check / Build / linking diagnostics.
-- **Skill Studio:** owns the Authoring UI, context disclosure, Studio semantic proposal / Change Set schema, v1alpha4 source patching and host-neutral candidate generation.
+- **Skill Studio:** owns the Authoring UI, context disclosure, Studio semantic proposal / Change Set schema, v1alpha5 source patching and host-neutral candidate generation.
 - **Host Adapters:** bridge the shared Authoring Core to Theia / VS Code editor APIs; they own live document access and native buffer application.
 - **AI Gateway:** stores the deployment-scoped provider credential, authorizes and limits requests, and forwards OpenAI-compatible model calls; it does not own CA-SL semantics or Procedure patch authority.
 - **Optional Theia AI / VS Code Language Model adapters:** may provide alternate model sources, but are not required for the canonical workflow.
