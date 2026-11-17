@@ -49,7 +49,9 @@ test("pending Example restoration waits for the named folder, then opens Procedu
   });
   assert.equal(result,true);
   assert.equal(revealed,1);
-  assert.deepEqual(h.calls,[["skillStudio.openProcedure",uri(procedure)]]);
+  assert.equal(h.calls.length,1);
+  assert.equal(h.calls[0][0],"skillStudio.openProcedure");
+  assert.equal(h.calls[0][1].toString(),procedure);
   assert.equal(restored,pending);
   assert.equal(h.state.has(PENDING_EXAMPLE_OPEN_KEY),false);
   assert.deepEqual(h.updates,[[PENDING_EXAMPLE_OPEN_KEY,undefined]]);
