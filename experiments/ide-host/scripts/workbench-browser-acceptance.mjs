@@ -921,12 +921,13 @@ export async function runWorkbenchAcceptance({
   // The native Contract, Predicate and Schema Designers render the v1alpha4
   // source files from the same Skill Package and retain native Source pairing.
   const contractUri=await openPackageFile("skillStudio.openContract","assurance/contract.yaml");
-  const contract=await waitWebview(view=>view.title==="SKILL Contract Visual",
-    "v1alpha4 Contract Designer");
+  const contract=await waitWebview(view=>view.title==="SKILL Contract Visual"&&
+    view.bodyText.includes("Package\\nestablish-pdu-session\\n"),
+    "v1alpha4 5GC Contract Designer");
   const expectedContractCards=["Goal & Preconditions","Schemas & Context",
     "Capabilities","Dependencies","Limits"];
   const contractCards=contract.view.cards??[];
-  if(!contract.view.bodyText.includes("establish-pdu-session")||
+  if(!contract.view.bodyText.includes("Package\\nestablish-pdu-session\\n")||
      !contract.view.bodyText.includes("pdu_session.initial_request_fulfilled")||
      !contract.view.bodyText.includes("nudm-sdm-get")||
      expectedContractCards.some(title=>!contract.view.cards.includes(title)))
@@ -934,8 +935,9 @@ export async function runWorkbenchAcceptance({
       JSON.stringify(contract.view).slice(0,2600));
   await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha4 Contract Designer");
   const predicateUri=await openPackageFile("skillStudio.openPredicates","assurance/predicates.yaml");
-  const predicates=await waitWebview(view=>view.title==="SKILL Predicate Visual",
-    "v1alpha4 Predicate Designer");
+  const predicates=await waitWebview(view=>view.title==="SKILL Predicate Visual"&&
+    view.bodyText.includes("Predicate Designer · establish-pdu-session"),
+    "v1alpha4 5GC Predicate Designer");
   const predicateDetails=await command("Runtime.evaluate",{
     contextId:predicates.contextId,returnByValue:true,
     expression:"(()=>{const item=[...document.querySelectorAll('details.predicate')].find(node=>node.querySelector('.pid')?.textContent.trim()==='establishment.subscription.request_valid');if(!item)return {opened:false,bodyText:document.body?.innerText??''};item.open=true;return {opened:true,bodyText:document.body?.innerText??''};})()"
@@ -953,8 +955,9 @@ export async function runWorkbenchAcceptance({
   const schemaUri=await openPackageFile(
     "skillStudio.openSchema","schemas/establishment-request.schema.yaml");
   const schema=await waitWebview(view=>view.title==="SKILL Schema Visual"&&
+    view.bodyText.includes("Schema Designer · establish-pdu-session")&&
     view.bodyText.includes("establishment-request"),
-    "v1alpha4 Schema Designer");
+    "v1alpha4 5GC Schema Designer");
   if(!schema.view.bodyText.includes("sNssai")||
      !schema.view.bodyText.includes("requestedPduSessionType")||
      !schema.view.bodyText.includes("const: IPV4")||
