@@ -287,7 +287,7 @@ The product decision is **one shared provider API credential per deployment**, n
 Keep two credential types distinct:
 
 1. **Provider credential:** the shared key used by the Gateway to call the model service. It exists only in Gateway-side secret storage / environment configuration. It MUST NOT appear in GitHub Pages assets, Webview HTML/JavaScript/DOM, postMessage, VSIX packages, settings.json, workspace files, browser storage, prompts, diagnostics, telemetry or logs.
-2. **Gateway access authorization:** the mechanism that decides who may consume the shared Gateway and under what limits. This is not a provider API key and does not require asking every user to supply a model-provider key. The exact login / invitation / short-lived session mechanism remains an implementation decision.
+2. **Gateway access authorization:** the mechanism that decides who may consume the shared Gateway and under what limits. This is not a provider API key and does not require asking every user to supply a model-provider key. The restricted online pilot uses Cloudflare Access directly on the Worker; the general-public login / invitation / short-lived session model remains an implementation decision.
 
 Before a public Gateway is enabled, it MUST have an access-control strategy, rate limiting, abuse protection and a usage ceiling. CORS is a browser-origin policy, not authentication; an origin allowlist alone does not protect a publicly reachable API from non-browser clients. A hidden URL or static token shipped in the client is not a security boundary.
 
@@ -523,7 +523,7 @@ After Apply, the native document change triggers the existing Source / Visual / 
 | Slice | Deliverable | Gate |
 |---|---|---|
 | A. Cross-host contracts | Platform-neutral Authoring Core types, AuthoringHost, IModelClient, Gateway protocol and versioned ModelProposal / Change Set envelope | Core contract tests; no mandatory VS Code, Theia, DOM or Node imports |
-| B. Online Gateway spike | Implement a thin application Worker with Cloudflare Access JWT verification, strict Chat Completions allowlist, server-side provider secret and streaming; evaluate Cloudflare AI Gateway only as an optional upstream | Positive / negative JWT tests, route / model / size rejection, streaming and cancellation, per-user rate limiting, spend ceiling; Pages → Worker → fixture provider first, then opt-in real provider smoke test |
+| B. Online Gateway spike | Implement a thin application Worker using native Cloudflare Access ctx.access identity, strict Chat Completions allowlist, server-side provider secret and streaming; evaluate Cloudflare AI Gateway only as an optional upstream | Positive / negative Access-context and identity tests, route / model / size rejection, streaming and cancellation, per-user rate limiting and output-token ceilings; document that no strict global spend ledger is included in this no-database spike; Pages → Worker → fixture provider first, then opt-in real provider smoke test |
 | C. Theia Browser adapter | Bridge the current standalone Editor Tab / Extension Host to the shared core and Gateway | Real Browser-Only and backend-backed Theia Chromium; no Theia AI or vscode.lm dependency |
 | D. Proposal / Change Set contract | Strict ModelProposal schema, Host-owned envelope, Studio Change Set lifecycle, operation allowlist and atomic-group validation | Positive / negative schema, malformed / forged / out-of-scope operation tests |
 | E. v1alpha4 Patch Engine | Source-preserving patch operations for the initial allowlist | Round-trip, comment / unknown-field preservation, stale revision and malformed YAML tests |
@@ -546,7 +546,7 @@ The online path is implemented first, but every P1 boundary is designed so the l
 - [ ] Does not expose provider credentials to the Webview, browser bundle, workspace or extension package.
 - [ ] Uses the Studio-owned Authoring Core and Host Adapter boundary; domain logic has no mandatory Theia / VS Code imports.
 - [ ] Uses the OpenAI-compatible Gateway for the first online path; shared provider credential is stored server-side.
-- [ ] Gateway access authorization, rate limits and usage ceiling are enforced independently of CORS.
+- [ ] Gateway access authorization, per-user rate limits and request / output-token ceilings are enforced independently of CORS; a strict global spend ledger is explicitly outside the no-database pilot.
 - [ ] Materializes only validated proposals into the Studio Change Set model; host-native ChangeSet APIs remain optional adapters.
 - [ ] Accepts only the versioned ModelProposal schema and known operation allowlist.
 - [ ] Rejects raw YAML replacement, arbitrary paths, forged spans, unknown operations and stale proposals.
@@ -563,8 +563,8 @@ Desktop / Web Extension and intranet Gateway compatibility are explicit follow-u
 
 ## 17. Open decisions before live provider implementation
 
-1. **Gateway access authorization:** validate Cloudflare Access JWT for the restricted pilot. Select the general-public identity/session model separately before public launch; it must not require per-user model-provider keys or embed a shared static token in the client.
-2. **Online Gateway deployment:** implement and test the thin application Worker first; decide whether Cloudflare AI Gateway is useful behind it. Verify Free-tier limits, streaming, cancellation, secret injection and spend controls against actual model calls; retain a provider-neutral self-hosted implementation path.
+1. **Gateway access authorization:** the restricted pilot now uses native Worker ctx.access audience and verified-identity APIs; no manual JWT/JWKS parser is needed for direct Access-protected Worker invocation. Select and validate the general-public identity/session model separately before public launch; it must not require per-user model-provider keys or embed a shared static token in the client.
+2. **Online Gateway deployment:** deploy only after configuring the Access application, Rate Limiting namespace, exact production CORS origins and server-side provider secret. Verify Pages-origin Access login / cookie behavior, Free-tier limits, streaming, cancellation, secret injection and provider-side spending controls against actual model calls; retain a provider-neutral self-hosted implementation path. The no-database pilot does not provide a strict global application spend ledger.
 3. **OpenAI-compatible subset:** confirm Chat Completions compatibility, streaming, cancellation and structured-output support for the selected model endpoint. Do not assume /v1/models or tool calling.
 4. **VS Code host placement:** decide whether the Desktop package can use the Web Extension Host alone or needs a separate Node Extension Host adapter; explicitly test Desktop, Web, Remote and WSL/Container behavior.
 5. **Native model APIs:** determine whether vscode.lm or Theia AI adapters provide meaningful optional value; neither is a required model path.
