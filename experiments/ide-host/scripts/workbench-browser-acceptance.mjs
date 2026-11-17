@@ -719,6 +719,14 @@ export async function runWorkbenchAcceptance({
   // The native Inspector is source-derived and read-only; it is not Runtime Evidence.
   await evalWebviewJS("(()=>{const node=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')]"+
     ".find(el=>el.getAttribute('data-id')==='get-sm-subscription-data');node?.click();return !!node;})()");
+  await sleep(120);
+  const inspectorSelection=await nativeCommand("skillStudio.internal.selectionAcceptance");
+  console.log("STUDIO_V1ALPHA4_INSPECTOR_SELECTION_CHROMIUM",
+    JSON.stringify(inspectorSelection));
+  if(inspectorSelection?.nodeId!=="get-sm-subscription-data"||
+     inspectorSelection?.snapshotState!=="READY")
+    throw Error("v1alpha4 graph selection did not reach the native Inspector model: "+
+      JSON.stringify(inspectorSelection));
   await nativeCommand("skillStudio.auditPackage");
   try{await nativeCommand("workbench.view.extension.skillStudioInspector");}catch{/* It may already be visible. */}
   let inspectorText="";
@@ -737,8 +745,10 @@ export async function runWorkbenchAcceptance({
       inspectorText.toLowerCase().includes("no write authority")
   };
   if(!phaseEvidence.ready||!phaseEvidence.readOnly)
-    throw Error("v1alpha4 Inspector did not expose read-only Producer / Consumer evidence: "+
-      JSON.stringify({phaseEvidence,inspectorText:inspectorText.slice(-1800)}));
+    throw Error("v1alpha4 Inspector did not expose the selected Source-only projection: "+
+      JSON.stringify({phaseEvidence,inspectorSelection,
+        inspectorText:inspectorText.slice(-1800),
+        inspectorContainer:await evalJS("(()=>{const el=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');return {text:el?.innerText??'',html:el?.innerHTML?.slice(-3000)??'',visible:!!el&&el.getBoundingClientRect().width>0};})()") }));
   console.log("STUDIO_V1ALPHA4_INSPECTOR_CHROMIUM",JSON.stringify(phaseEvidence));
 
   // A single native EditorGroup test covers Procedure/Contract/Predicate/Schema
