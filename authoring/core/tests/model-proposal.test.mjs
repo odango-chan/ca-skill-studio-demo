@@ -101,3 +101,34 @@ test("ModelProposal parser rejects invalid JSON and enforces proposal size", () 
     (error) => error instanceof ModelProposalValidationError && error.code === "proposal_too_large",
   );
 });
+
+
+test("ModelProposal requires a semantic target and rejects prototype mutation keys", () => {
+  const noTarget = validProposal({
+    operations: [{
+      type: "procedure.start.set",
+      target: {},
+      payload: { nodeId: "start-node" },
+      rationale: "set the start node",
+      references: [],
+    }],
+  });
+  assert.throws(
+    () => validateModelProposal(noTarget),
+    (error) => error instanceof ModelProposalValidationError && error.code === "missing_target",
+  );
+
+  const prototypePayload = validProposal({
+    operations: [{
+      type: "node.add",
+      target: { nodeId: "new-node" },
+      payload: JSON.parse('{"__proto__":{"polluted":true}}'),
+      rationale: "reject prototype-shaped payload",
+      references: [],
+    }],
+  });
+  assert.throws(
+    () => validateModelProposal(prototypePayload),
+    (error) => error instanceof ModelProposalValidationError && error.code === "forbidden_authority_field",
+  );
+});
