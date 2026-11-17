@@ -82,6 +82,18 @@ test("Pages installs pinned browser LSP dependencies before bundling the Web ext
   assert.ok(client>=0&&server>client&&bundle>server);
 });
 
+test("Pages builds and smoke-tests the exact Compiler v1.0.0 Go/WASM release",async()=>{
+  const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
+  assert.match(workflow,/repository: odango-chan\/ca-skill-compiler[\s\S]*?ref: v1\.0\.0/);
+  assert.match(workflow,/go-version: "1\.26\.6"/);
+  const extensionBuild=workflow.indexOf("node experiments/ide-host/scripts/build-ide-spike.mjs");
+  const compilerBuild=workflow.indexOf("Build pinned Compiler v1.0.0 Go/WASM Core");
+  const stage=workflow.indexOf("node experiments/ide-host/scripts/prepare-theia-online.mjs");
+  assert.ok(extensionBuild>=0&&compilerBuild>extensionBuild&&stage>compilerBuild,
+    "WASM must be built after dist cleanup and before Theia plugin staging");
+  assert.match(workflow,/THEIA_REQUIRE_COMPILER_WORKER: "1"/);
+});
+
 test("Pages workflow cannot reintroduce the Classic application",async()=>{
   const workflow=await readFile(new URL("../../../.github/workflows/pages.yml",import.meta.url),"utf8");
   assert.doesNotMatch(workflow,/--classic|preserve Classic/i);
