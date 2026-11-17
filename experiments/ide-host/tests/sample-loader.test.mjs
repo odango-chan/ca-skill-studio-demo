@@ -87,7 +87,10 @@ test("Explicit reset replaces only the bundled package sets and their local extr
  const edited=first.procedure.path,extra=first.examplesRoot.path+"/establish-pdu-session/notes.local.md";
  h.files.set(edited,new TextEncoder().encode("local edit"));h.files.set(extra,new TextEncoder().encode("extra"));
  const reset=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{resetExisting:true});
- assert.equal(reset.resetPackages,2);assert.equal(reset.created,total);assert.equal(h.files.has(extra),false);
+ assert.equal(reset.resetPackages,2);
+ assert.equal(reset.created+reset.overwritten,total);
+ assert.equal(reset.overwritten,1,"candidate README is outside package folders and is refreshed");
+ assert.equal(h.files.has(extra),false);
  assert.deepEqual(h.files.get(edited),new Uint8Array(readFileSync(candidateRoot+"establish-pdu-session/assurance/procedure.yaml")));
 });
 test("Malformed or falsely qualified manifests refuse all writes",async()=>{
