@@ -164,7 +164,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
   const emitter = new vscode.EventEmitter();
   let observedRootSignature = null;
   let treeReads=0;
-  const treeReadsByKind={root:0,section:0,package:0,group:0,dependency:0,other:0};
+  const treeReadsByKind={root:0,section:0,package:0,group:0,dependency:0,artifact:0,other:0};
   const fire = () => emitter.fire();
   const notifyPackagesChanged=list=>{
     try{onPackagesChanged([...list]);}
@@ -222,6 +222,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       const readKind=node?.kind==='package'?'package':
         node?.kind==='group'?'group':node?.kind==='section'?'section':
         node?.sourceSection==='dependencies'?'dependency':
+        node?.sourceSection==='artifacts'?'artifact':
         node?'other':'root';
       treeReadsByKind[readKind]=(treeReadsByKind[readKind]??0)+1;
       if(!node)return [skillsSection(),dependenciesSection(),artifactsSection()];
@@ -294,7 +295,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
         if(node.kind==='operation')return node.parentNode??dependenciesSection();
       }
       if(node.sourceSection==='artifacts'){
-        if(node.kind==='artifact-package'||node.kind==='message')return artifactsSection();
+        if(node.kind==='artifact-package')return artifactsSection();
         const parent=compilerProvider?.getParent?.(node);
         return parent?{...parent,sourceSection:'artifacts'}:artifactsSection();
       }
