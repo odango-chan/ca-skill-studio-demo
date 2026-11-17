@@ -173,9 +173,15 @@ export function registerCompilerIntegration(vscode,context,{
 }={}){
   const output=vscode.window.createOutputChannel("Skill Compiler · "+COMPILER_VERSION);
   const diagnostics=vscode.languages.createDiagnosticCollection("skill-compiler");
+  const compilerProblems=new Map();
+  const problemsEmitter=new vscode.EventEmitter();
+  const problemsProvider={
+    onDidChange:problemsEmitter.event,
+    getProblems:()=>[...compilerProblems.values()].flat()
+  };
   const client=createCompilerWorkerClient(vscode,context);
   const artifacts=makeArtifactProvider(vscode,context,output);
-  context.subscriptions.push(output,diagnostics,{dispose:()=>client.dispose()});
+  context.subscriptions.push(output,diagnostics,problemsEmitter,{dispose:()=>client.dispose()});
 
   function clearPackageDiagnostics(packageRoot){
     const prefix=packageRoot.path.replace(/\/$/,"")+"/";
@@ -187,17 +193,25 @@ export function registerCompilerIntegration(vscode,context,{
   function publishDiagnostics(packageRoot,packageName,procedureUri,items){
     clearPackageDiagnostics(packageRoot);
     const grouped=new Map();
+    const problemEntries=[];
     for(const item of items??[]){
       if(!item.path){
         output.appendLine("[request] "+item.code+": "+item.message);
+        problemEntries.push({kind:"compiler-diagnostic",message:item.message,
+          code:item.code,severity:item.severity,uri:procedureUri.toString()});
         continue;
       }
       const relative=sourcePathForDiagnostic(packageName,item.path);
       if(!relative){
         output.appendLine("[unmapped] "+item.code+" "+item.path+": "+item.message);
+        problemEntries.push({kind:"compiler-diagnostic",message:item.message,
+          code:item.code,severity:item.severity,uri:procedureUri.toString()});
         continue;
       }
       const uri=vscode.Uri.joinPath(packageRoot,...relative.split("/"));
+      problemEntries.push({kind:"compiler-diagnostic",message:item.message,
+        code:item.code,severity:item.severity,line:item.line,column:item.column,
+        uri:uri.toString(),sourcePath:relative});
       const line=Number.isSafeInteger(item.line)&&item.line>0?item.line-1:0;
       const column=Number.isSafeInteger(item.column)&&item.column>0?item.column-1:0;
       const start=new vscode.Position(line,column);
@@ -213,6 +227,8 @@ export function registerCompilerIntegration(vscode,context,{
       grouped.get(uri.toString()).items.push(diagnostic);
     }
     for(const {uri,items:group} of grouped.values())diagnostics.set(uri,group);
+    compilerProblems.set(packageRoot.toString(),problemEntries);
+    problemsEmitter.fire();
     output.appendLine("Compiler diagnostics: "+(items?.length??0)+
       " · "+(items??[]).filter(item=>item.severity==="error").length+" error(s)");
   }
@@ -402,6 +418,20 @@ export function registerCompilerIntegration(vscode,context,{
   }
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("skillStudio.revealCompilerDiagnostic",async item=>{
+      const uri=asUri(vscode,item?.uri);
+      if(!uri)return;
+      const document=await vscode.workspace.openTextDocument(uri);
+      const editor=await vscode.window.showTextDocument(document,{
+        preview:false,viewColumn:vscode.ViewColumn.One
+      });
+      const line=Number.isSafeInteger(item?.line)&&item.line>0?item.line-1:0;
+      const column=Number.isSafeInteger(item?.column)&&item.column>0?item.column-1:0;
+      const position=new vscode.Position(line,column);
+      editor.selection=new vscode.Selection(position,position);
+      editor.revealRange(new vscode.Range(position,position),
+        vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    }),
     vscode.commands.registerCommand("skillStudio.checkSkill",target=>safe("check",target)),
     vscode.commands.registerCommand("skillStudio.buildSkill",target=>safe("build",target)),
     vscode.commands.registerCommand("skillStudio.inspectCompilerDependencies",
@@ -460,6 +490,7 @@ export function registerCompilerIntegration(vscode,context,{
 
   return {
     provider:artifacts,
+    problems:problemsProvider,
     getArtifactProvider:()=>artifacts,
     dispose(){client.dispose();diagnostics.dispose?.();output.dispose?.();}
   };
