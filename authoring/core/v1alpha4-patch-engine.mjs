@@ -643,7 +643,8 @@ export async function planV1Alpha4Patch({
 } = {}) {
   if (!plain(changeSet) || changeSet.schema !== "ca-studio.ai-change-set/v1" ||
     !plain(changeSet.base) || !plain(changeSet.scope) || !Array.isArray(changeSet.operations) ||
-    !Array.isArray(changeSet.groups) || changeSet.validation?.state !== "NOT_RUN") {
+    changeSet.operations.length === 0 || !Array.isArray(changeSet.groups) ||
+    changeSet.groups.length !== 0 || changeSet.validation?.state !== "NOT_RUN") {
     reject("change_set_invalid", "A Host-owned unvalidated Change Set is required.");
   }
   if (changeSet.base.languageTarget !== "connectionagent.io/v1alpha4" ||
@@ -659,7 +660,10 @@ export async function planV1Alpha4Patch({
     changeSet.base.packageGeneration !== currentPackageGeneration) {
     reject("stale_change_set", "Live document or Package revision changed after proposal generation.");
   }
-  if (typeof source !== "string") reject("source_invalid", "Live Procedure source is required.");
+  if (typeof source !== "string" || source.length === 0 ||
+    new TextEncoder().encode(source).byteLength > MAX_SOURCE_BYTES) {
+    reject("source_invalid", "Live Procedure source is empty or exceeds the 1 MiB patch limit.");
+  }
 
   const baseDigest = "sha256:" + await digestHex(source);
   if (changeSet.base.sourceDigest !== baseDigest) {
@@ -689,7 +693,8 @@ export async function planV1Alpha4Patch({
   for (let index = 0; index < operations.length; index += 1) {
     const operation = operations[index];
     if (!plain(operation) || typeof operation.id !== "string" ||
-      operationIds.has(operation.id) || !operation.id) {
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/.test(operation.id) ||
+      operationIds.has(operation.id)) {
       reject("operation_id_invalid", "Change Set operation IDs must be unique and non-empty.");
     }
     operationIds.add(operation.id);
