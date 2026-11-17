@@ -66,6 +66,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       asRelativePath:file=>file.path
     },
     window:{
+      createOutputChannel:()=>({appendLine(){},show(){},dispose(){}}),
       visibleTextEditors:[textEditor],
       registerTreeDataProvider:()=>({dispose(){}}),
       onDidChangeActiveTextEditor:()=>({dispose(){}}),
