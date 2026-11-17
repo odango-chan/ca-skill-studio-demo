@@ -74,10 +74,10 @@ function validatePayload(input, env) {
     if (!message || typeof message !== "object" || Array.isArray(message) || Object.keys(message).some((k) => !["role", "content"].includes(k))) throw { status: 400, code: "invalid_message" };
     if (!["system", "user", "assistant"].includes(message.role)) throw { status: 400, code: "invalid_message_role" };
     const content = message.content;
-    const validText = typeof content === "string" && content.length <= 24000;
+    const validText = typeof content === "string" && content.length <= int(env.MAX_REQUEST_BYTES, 262144);
     const validTextParts = Array.isArray(content) && content.length > 0 && content.length <= 32 && content.every((part) =>
       part && typeof part === "object" && !Array.isArray(part) &&
-      part.type === "text" && typeof part.text === "string" && part.text.length <= 24000 &&
+      part.type === "text" && typeof part.text === "string" && part.text.length <= int(env.MAX_REQUEST_BYTES, 262144) &&
       Object.keys(part).every((key) => key === "type" || key === "text")
     );
     if (!validText && !validTextParts) throw { status: 400, code: "invalid_message_content" };
@@ -131,7 +131,7 @@ export async function handleRequest(request, env, ctx, fetchImpl = globalThis.fe
     if (limited?.success !== true) return error(429, "rate_limit_exceeded", headers);
   } catch { return error(503, "rate_limit_unavailable", headers); }
   let payload;
-  try { payload = validatePayload(await readJson(request, int(env.MAX_REQUEST_BYTES, 65536)), env); }
+  try { payload = validatePayload(await readJson(request, int(env.MAX_REQUEST_BYTES, 262144)), env); }
   catch (failure) { return error(failure?.status ?? 400, failure?.code ?? "invalid_request", headers); }
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(new DOMException("Provider response header timeout", "TimeoutError")), int(env.UPSTREAM_TIMEOUT_MS, 120000));
