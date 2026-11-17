@@ -510,7 +510,7 @@ export function activate(context){
                 state:"success",message:exampleText.success
               });
               // Keep the established success notification used by Chromium
-              // acceptance and make create-only / existing-file semantics clear.
+              // acceptance and report whether the existing Example was replaced.
               void vscode.window.showInformationMessage(
                 "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL v1alpha4 Procedure（DRAFT / NOT_QUALIFIED）。"+
                 (result.replacedExisting?"已替换原有 Example 内容。":"")+
