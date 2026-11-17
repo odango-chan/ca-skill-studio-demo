@@ -1,7 +1,6 @@
 // Explicit Sample Package import for VS Code desktop/web or Theia browser-only OPFS.
 // Online demo reset replaces the two bundled SKILL packages with their pinned
 // source; desktop/user workspaces remain create-only unless reset is explicit.
-const SRC=["samples","skills"];
 // The project owns authored skills/ Source. Dependencies and BuildResults are
 // managed by their services; the sample importer never creates lib/ or output/.
 export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
@@ -101,99 +100,127 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       fail("Host file system unavailable");
     if(!storageUri)fail("No writable extension storage URI");
     const fs=vscode.workspace.fs;
-    const readManifest=async(sourceRoot,pin)=>{
-      const uri=vscode.Uri.joinPath(extensionUri,...sourceRoot,"files.json");
-      phase="read-"+pin.kind+"-manifest";
+    const readManifest=async()=>{
+      const uri=vscode.Uri.joinPath(extensionUri,"samples","v1alpha4","files.json");
+      phase="read-v1alpha4-manifest";
       report({phase:"manifest"});
       let bytes;
       try{bytes=await readBundledResource(vscode,uri);}
-      catch(error){fail("Cannot read "+pin.kind+" manifest: "+JSON.stringify(describeError(error)));}
-      return validate(JSON.parse(decoder.decode(bytes)),pin);
+      catch(error){fail("Cannot read CA-SL v1alpha4 manifest: "+JSON.stringify(describeError(error)));}
+      return validate(JSON.parse(decoder.decode(bytes)),{
+        kind:"CA-SL v1alpha4",
+        sourceSha:"33664aec7ebc9bb1764618f839d01b7493425429",
+        sourceStatus:"DRAFT_NOT_QUALIFIED",
+        sourceRef:"refs/pull/58/head",
+        languageVersion:"connectionagent.io/v1alpha4",
+        projectReadme:"README.md"
+      });
     };
-    const official=await readManifest(["samples","skills"],{
-      kind:"official",sourceSha:"dfba05071cb33424c475e00a325712f5273a19de",
-      sourceStatus:"LEGACY_NOT_V1ALPHA4",sourceRef:"refs/heads/main"
-    });
-    const candidate=await readManifest(["samples","v1alpha4"],{
-      kind:"v1alpha4 candidate",sourceSha:"33664aec7ebc9bb1764618f839d01b7493425429",
-      sourceStatus:"DRAFT_NOT_QUALIFIED",sourceRef:"refs/pull/58/head",
-      languageVersion:"connectionagent.io/v1alpha4",projectReadme:"README.md"
-    });
+    const candidate=await readManifest();
     const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
     const skillsRoot=vscode.Uri.joinPath(root,"skills");
     const examplesRoot=vscode.Uri.joinPath(root,"examples","v1alpha4-candidate");
-    const legacySkillsRoot=vscode.Uri.joinPath(storageUri,"workspaces","skills");
-    const sets=[
-      {source:["samples","skills"],destination:skillsRoot,files:official.files},
-      {source:["samples","v1alpha4"],destination:examplesRoot,
-        files:[...candidate.files,candidate.projectReadme]}
-    ];
-    const total=sets.reduce((sum,set)=>sum+set.files.length,0);
-    let created=0,skipped=0,overwritten=0,resetPackages=0;
+    const archiveRoot=vscode.Uri.joinPath(root,"archive");
+    const legacyArchiveRoot=vscode.Uri.joinPath(archiveRoot,"legacy-v0.2");
+    const exists=async uri=>{
+      try{await fs.stat(uri);return true;}
+      catch(error){if(error?.code==="FileNotFound")return false;throw error;}
+    };
+    const readText=async uri=>decoder.decode(await fs.readFile(uri));
     phase="create-project-layout";
     await fs.createDirectory(root);
     await fs.createDirectory(skillsRoot);
-    await fs.createDirectory(vscode.Uri.joinPath(root,"examples"));
-    await fs.createDirectory(examplesRoot);
+    let resetPackages=0,legacyArchived=0;
+
     if(resetExisting){
       for(const skill of SKILLS){
-        let found=false;
         for(const packageRoot of [
           vscode.Uri.joinPath(skillsRoot,skill),
-          vscode.Uri.joinPath(examplesRoot,skill),
-          vscode.Uri.joinPath(legacySkillsRoot,skill)
+          vscode.Uri.joinPath(examplesRoot,skill)
         ]){
-          phase="reset-package:"+skill;
-          try{await fs.stat(packageRoot);found=true;await fs.delete(packageRoot,{recursive:true,useTrash:false});}
-          catch(error){if(error?.code!=="FileNotFound")throw error;}
+          if(await exists(packageRoot)){
+            phase="reset-package:"+skill;
+            await fs.delete(packageRoot,{recursive:true,useTrash:false});
+            resetPackages++;
+          }
         }
-        if(found)resetPackages++;
       }
-    }
-    report({phase:"files",completed:0,total});
-    for(const set of sets){
-      for(const file of set.files){
-        const parts=file.split("/");
-        const destination=vscode.Uri.joinPath(set.destination,...parts);
-        phase="stat-existing:"+file;
-        let exists=false;
-        try{await fs.stat(destination);exists=true;}
-        catch(error){if(error?.code!=="FileNotFound")throw error;}
-        if(exists&&!resetExisting){
-          skipped++;report({phase:"files",completed:created+skipped+overwritten,total});continue;
-        }
-        phase="read-bundled-file:"+file;
-        const bytes=await readBundledResource(vscode,
-          vscode.Uri.joinPath(extensionUri,...set.source,...parts));
-        if(!(bytes instanceof Uint8Array))fail("Unrecognized sample file");
-        if(parts.length>1)
-          await fs.createDirectory(vscode.Uri.joinPath(set.destination,...parts.slice(0,-1)));
-        if(!exists){
-          try{await fs.stat(destination);fail("Sample file changed during import");}
-          catch(error){if(error?.code!=="FileNotFound")throw error;}
-        }
-        phase="write-file:"+file;
-        await fs.writeFile(destination,bytes);
-        if(exists)overwritten++;else created++;
-        report({phase:"files",completed:created+skipped+overwritten,total});
-      }
-    }
-    if(resetExisting){
+    }else{
+      // Migrate the previously bundled Example without destroying user edits:
+      // old v0.2 packages are moved out of the active skills/ tree, while any
+      // already-imported v1alpha4 package is promoted into skills/ in place.
       for(const skill of SKILLS){
-        const old=vscode.Uri.joinPath(legacySkillsRoot,skill);
-        try{await fs.stat(old);await fs.delete(old,{recursive:true,useTrash:false});}
-        catch(error){if(error?.code!=="FileNotFound")throw error;}
+        const target=vscode.Uri.joinPath(skillsRoot,skill);
+        if(await exists(target)){
+          const procedure=vscode.Uri.joinPath(target,"assurance","procedure.yaml");
+          let source="";
+          try{source=await readText(procedure);}catch{/* incomplete old package is archived too */}
+          if(!/^\s*#.*CA-SL v1alpha4/m.test(source)){
+            await fs.createDirectory(legacyArchiveRoot);
+            let destination=vscode.Uri.joinPath(legacyArchiveRoot,skill);
+            for(let suffix=2;await exists(destination);suffix++)
+              destination=vscode.Uri.joinPath(archiveRoot,"legacy-v0.2-"+suffix,skill);
+            phase="archive-legacy-package:"+skill;
+            await fs.createDirectory(vscode.Uri.joinPath(destination,".."));
+            await fs.rename(target,destination);
+            legacyArchived++;
+          }
+        }
+        const promoted=vscode.Uri.joinPath(examplesRoot,skill);
+        if(!(await exists(target))&&await exists(promoted)){
+          phase="promote-v1alpha4-package:"+skill;
+          await fs.rename(promoted,target);
+        }
       }
     }
+
+    const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha4",candidate.projectReadme);
+    const readmeDestination=vscode.Uri.joinPath(root,"README.md");
+    if(!(await exists(readmeDestination))){
+      phase="read-v1alpha4-project-readme";
+      const bytes=await readBundledResource(vscode,readmeSource);
+      await fs.writeFile(readmeDestination,bytes);
+    }
+
+    const total=candidate.files.length;
+    let created=0,skipped=0,overwritten=0;
+    report({phase:"files",completed:0,total});
+    for(const file of candidate.files){
+      const parts=file.split("/");
+      const destination=vscode.Uri.joinPath(skillsRoot,...parts);
+      phase="stat-existing:"+file;
+      const alreadyExists=await exists(destination);
+      if(alreadyExists&&!resetExisting){
+        skipped++;
+        report({phase:"files",completed:created+skipped+overwritten,total});
+        continue;
+      }
+      phase="read-bundled-file:"+file;
+      const bytes=await readBundledResource(vscode,
+        vscode.Uri.joinPath(extensionUri,"samples","v1alpha4",...parts));
+      if(!(bytes instanceof Uint8Array))fail("Unrecognized v1alpha4 sample file");
+      if(parts.length>1)
+        await fs.createDirectory(vscode.Uri.joinPath(skillsRoot,...parts.slice(0,-1)));
+      if(!alreadyExists){
+        try{await fs.stat(destination);fail("v1alpha4 sample file changed during import");}
+        catch(error){if(error?.code!=="FileNotFound")throw error;}
+      }
+      phase="write-v1alpha4-file:"+file;
+      await fs.writeFile(destination,bytes);
+      if(alreadyExists)overwritten++;else created++;
+      report({phase:"files",completed:created+skipped+overwritten,total});
+    }
+
     report({phase:"project-ready"});
     const procedures=Object.fromEntries(SKILLS.map(name=>
       [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
-    const languageProcedures=Object.fromEntries(SKILLS.map(name=>
-      [name,vscode.Uri.joinPath(examplesRoot,name,"assurance","procedure.yaml")]));
-    return {root,skillsRoot,examplesRoot,procedure:languageProcedures[SKILLS[0]],
-      procedures,languageProcedures,skills:[...SKILLS],
-      sourceShas:{official:official.sourceSha,v1alpha4Candidate:candidate.sourceSha},
-      officialFiles:official.files.length,candidateFiles:candidate.files.length,
-      files:total,created,skipped,overwritten,resetPackages,resetExisting};
+    return {
+      root,skillsRoot,procedure:procedures[SKILLS[0]],procedures,
+      skills:[...SKILLS],
+      sourceSha:candidate.sourceSha,
+      sourceShas:{v1alpha4:candidate.sourceSha},
+      candidateFiles:candidate.files.length,
+      files:total,created,skipped,overwritten,resetPackages,legacyArchived,resetExisting
+    };
   }catch(error){throw Error(phase+": "+String(error?.message??error));}
 }
