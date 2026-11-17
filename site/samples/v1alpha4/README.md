@@ -9,7 +9,7 @@ This directory contains the two v1alpha4 Skills used by the Skill Studio Example
 - `establish-pdu-session` — conventional 5GC PDU Session establishment.
 - `establish-pdu-session-mas` — an OpenAMSM/MAS source-aligned example.
 
-The Example importer places both packages directly under `skills/`. The v1alpha4 packages are the active authoring, validation, and Compiler test baseline. The previous v0.2 sample set is no longer used for product acceptance.
+The Example importer places both packages directly under `skills/`. The v1alpha4 packages are the only active authoring, validation, and Compiler test baseline. The retired v0.2 sample set has been removed from this repository.
 
 ## Qualification boundary
 
