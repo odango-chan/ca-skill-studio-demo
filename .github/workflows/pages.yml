@@ -40,6 +40,18 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
           path: ide-source
+      - name: Checkout pinned CA Skill Compiler v1.0.0 source
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        uses: actions/checkout@v4
+        with:
+          repository: odango-chan/ca-skill-compiler
+          ref: v1.0.0
+          path: compiler-source
+      - name: Go 1.26.6 for the pinned Compiler WASM build
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.6"
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -139,6 +151,20 @@ jobs:
           npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
           npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
           node experiments/ide-host/scripts/build-ide-spike.mjs
+      - name: Build pinned Compiler v1.0.0 Go/WASM Core
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: compiler-source
+        run: |
+          mkdir -p dist
+          GOWORK=off CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -o dist/skillc.wasm ./cmd/skillc-wasm
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/wasm_exec.js
+          cp dist/skillc.wasm ../ide-source/experiments/ide-host/vscode/dist/skillc.wasm
+          cp dist/wasm_exec.js ../ide-source/experiments/ide-host/vscode/dist/wasm_exec.js
+          sha256sum dist/skillc.wasm
+      - name: Stage prepared Compiler Worker and WASM assets
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        working-directory: ide-source
+        run: |
           node experiments/ide-host/scripts/prepare-theia-online.mjs
           node --test experiments/ide-host/tests/pages-compose.test.mjs
       - name: Build Theia browser-only static workbench
@@ -160,6 +186,7 @@ jobs:
           THEIA_BASE_PATH: "/ca-skill-studio-demo"
           THEIA_REQUIRE_WEBVIEW: "1"
           THEIA_REQUIRE_BROWSER_LSP: "1"
+          THEIA_REQUIRE_COMPILER_WORKER: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       # Theia is the only supported online host. Publish no Classic fallback.
       - name: Compose Theia-only Pages release
@@ -176,6 +203,9 @@ jobs:
           test -s dist/hostedPlugin/odango_chan_skill_studio_languages/package.json
           test -s dist/webview/index.html
           test -s dist/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js
+          test -s dist/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js
+          test -s dist/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skillc.wasm
+          test -s dist/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/wasm_exec.js
           test ! -e dist/classic
           test ! -e dist/app.js
           test ! -e dist/ide-preview
