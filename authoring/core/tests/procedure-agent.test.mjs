@@ -136,11 +136,12 @@ test("Procedure Agent rejects Context Pack content whose digest no longer matche
     modelClient: { complete: async () => { called = true; return proposal(); } },
   });
   const { pack, manifest } = await context();
-  pack.procedure.text = "tampered: true\n";
+  const tamperedPack = JSON.parse(JSON.stringify(pack));
+  tamperedPack.procedure.text = "tampered: true\n";
   await assert.rejects(
     agent.propose({
       task: "Add a route",
-      contextPack: pack,
+      contextPack: tamperedPack,
       contextManifest: manifest,
       contextDisclosureAccepted: true,
     }),
@@ -155,11 +156,12 @@ test("Procedure Agent rejects untrusted extra Context Pack fields and sensitive 
     modelClient: { complete: async () => { called = true; return proposal(); } },
   });
   const { pack, manifest } = await context();
-  pack.writePaths = ["assurance/procedure.yaml"];
+  const forgedPack = JSON.parse(JSON.stringify(pack));
+  forgedPack.writePaths = ["assurance/procedure.yaml"];
   await assert.rejects(
     agent.propose({
       task: "Add a route",
-      contextPack: pack,
+      contextPack: forgedPack,
       contextManifest: manifest,
       contextDisclosureAccepted: true,
     }),
@@ -168,13 +170,15 @@ test("Procedure Agent rejects untrusted extra Context Pack fields and sensitive 
   assert.equal(called, false);
 
   const next = await context();
-  next.pack.resources[0].label = "references/api-secret.md";
-  next.manifest[1].label = "references/api-secret.md";
+  const nextPack = JSON.parse(JSON.stringify(next.pack));
+  const nextManifest = JSON.parse(JSON.stringify(next.manifest));
+  nextPack.resources[0].label = "references/api-secret.md";
+  nextManifest[1].label = "references/api-secret.md";
   await assert.rejects(
     agent.propose({
       task: "Add a route",
-      contextPack: next.pack,
-      contextManifest: next.manifest,
+      contextPack: nextPack,
+      contextManifest: nextManifest,
       contextDisclosureAccepted: true,
     }),
     /manifest does not match/,
