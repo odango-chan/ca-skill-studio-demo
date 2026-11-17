@@ -18,7 +18,7 @@ nodes:
         dnn: input.dnn
       routes:
         FAILED: FAILED
-        COMMITTED: verify-session
+        COMMITTED: FAILED
     postcondition:
       predicates:
         - predicate: session.created
