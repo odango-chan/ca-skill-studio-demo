@@ -922,7 +922,8 @@ export async function runWorkbenchAcceptance({
   // source files from the same Skill Package and retain native Source pairing.
   const contractUri=await openPackageFile("skillStudio.openContract","assurance/contract.yaml");
   const contract=await waitWebview(view=>view.title==="SKILL Contract Visual"&&
-    view.bodyText.includes("Package\nestablish-pdu-session\n"),
+    view.bodyText.includes("Package\nestablish-pdu-session\n")&&
+    view.bodyText.includes("nudm-sdm-get"),
     "v1alpha4 5GC Contract Designer");
   const expectedContractCards=["Goal & Preconditions","Schemas & Context",
     "Capabilities","Dependencies","Limits"];
@@ -936,7 +937,7 @@ export async function runWorkbenchAcceptance({
   await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha4 Contract Designer");
   const predicateUri=await openPackageFile("skillStudio.openPredicates","assurance/predicates.yaml");
   const predicates=await waitWebview(view=>view.title==="SKILL Predicate Visual"&&
-    view.bodyText.includes("Predicate Designer · establish-pdu-session\n"),
+    view.bodyText.includes("establishment.ran.adopted"),
     "v1alpha4 5GC Predicate Designer");
   const predicateDetails=await command("Runtime.evaluate",{
     contextId:predicates.contextId,returnByValue:true,
@@ -955,7 +956,7 @@ export async function runWorkbenchAcceptance({
   const schemaUri=await openPackageFile(
     "skillStudio.openSchema","schemas/establishment-request.schema.yaml");
   const schema=await waitWebview(view=>view.title==="SKILL Schema Visual"&&
-    view.bodyText.includes("Schema Designer · establish-pdu-session · EstablishmentRequest")&&
+    view.bodyText.includes("Schema ID urn:connectionagent:example:5gc:establishment-request:v1alpha4")&&
     view.bodyText.includes("establishment-request"),
     "v1alpha4 5GC Schema Designer");
   if(!schema.view.bodyText.includes("sNssai")||
