@@ -1,7 +1,7 @@
 # AI Procedure Authoring Workbench
 
 **Status: Proposed · Product decisions approved; cross-host architecture direction approved; detailed design awaiting review**  
-**Implementation: NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
+**Implementation: Gateway spike PARTIAL · Authoring Core foundation PARTIAL · Editor / Agent integration NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
 **Tracking: [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200)**
 
 This document defines the first AI-assisted authoring capability for Skill Studio. It is a Studio editing feature, not a CA-SL language extension, Compiler feature, Host capability or Runtime feature.
@@ -35,7 +35,10 @@ The current Theia workbench already provides useful host infrastructure:
 - A Package snapshot collector that prefers open TextDocuments over persisted bytes.
 - A pinned CA-SL v1alpha4 language source and source-derived Procedure projection.
 - A Compiler v1.0.0 Go/WASM integration and Check / Build / Inspect entry points.
-- **No model / Agent integration is currently installed.** The current Theia 1.76.0 application manifests do not include the Theia AI packages. Existing LSP completion, diagnostics and semantic tokens are language tooling, not LLM-based AI.
+- **No model / Agent integration is currently installed in the Studio workbench.** The current Theia 1.76.0 application manifests do not include the Theia AI packages. Existing LSP completion, diagnostics and semantic tokens are language tooling, not LLM-based AI.
+- A first portable Gateway implementation now exists under `gateway/`: a Fetch-API request handler, a thin Cloudflare Worker adapter, Wrangler configuration and deterministic Node tests. It is not yet deployed and has not made a live provider request.
+- The first host-neutral Authoring Core slices now exist under `authoring/core/`: an allowlisted Context Pack builder with a serialized byte budget, an OpenAI-compatible Gateway client that requires explicit context-disclosure acceptance and sends browser Access credentials, a Procedure proposal orchestrator, and a strict Studio ModelProposal validator. It has no VS Code, Theia, DOM, Node-only or Cloudflare imports.
+- The Worker pilot requires direct Cloudflare Access protection, an exact CORS origin allowlist and a per-identity Cloudflare Rate Limiting binding. The provider credential remains a Worker secret. The general-public identity policy remains undecided; the restricted pilot must not be treated as a public endpoint.
 - The production GitHub Pages application is static hosting. It has no trusted server process in which to keep a shared provider key. The Pages bundle, browser storage, Webview and VSIX are all client-controlled and must never contain the shared provider credential. A separate Gateway service is required.
 - The current Studio extension is a VS Code Web Extension hosted by Theia. VS Code documents that Web Extensions can also run on Desktop and Web, but their runtime does not provide Node.js APIs. This makes the current browser-compatible extension a useful portability baseline, not proof that every Desktop / Remote host mode is already supported ([VS Code Web Extensions](https://code.visualstudio.com/api/extension-guides/web-extensions)).
 
@@ -247,7 +250,7 @@ The existing Package snapshot collector can be reused as a source of live Packag
 - Files outside the selected Package root.
 - Any data not shown in the context preview.
 
-The initial context-size limit should be enforced by bytes before transmission. Oversized context is rejected with a list of large items; content must not be silently truncated.
+The initial implementation enforces a **128 KiB serialized Context Pack limit** in UTF-8 bytes, leaving room below the Gateway's 256 KiB request-body limit for the system prompt and Chat Completions envelope. The limit is configurable per task but cannot exceed the 128 KiB implementation ceiling. Oversized context is rejected with a list of included items and their byte sizes; content must not be silently truncated. The ceiling remains subject to a real provider / prompt-size spike before it is treated as a product-wide frozen budget.
 
 ### 7.3 Consent
 
@@ -262,13 +265,13 @@ Before the first request in a task, the user sees the provider destination and e
 
 The first client adapter targets the OpenAI Chat Completions-compatible request / response shape. The adapter must support cancellation and may support streaming. Structured output / JSON Schema response modes are capability-negotiated; the Host MUST validate every completed response against the Studio-owned ModelProposal schema even when the provider claims schema-constrained output.
 
-The Gateway is intentionally thin. It authenticates the caller, applies request and usage limits, injects the deployment's shared provider credential, forwards the request to the configured provider and streams the result. It MUST NOT become a second Procedure Agent, parse CA-SL semantics, edit source or claim Compiler validity.
+The Gateway is intentionally thin. It authenticates the caller, applies per-user rate limits and request / output-token ceilings, injects the deployment's shared provider credential, and forwards OpenAI-compatible JSON or SSE responses. It does not own the Agent or editing semantics. It MUST NOT become a second Procedure Agent, parse CA-SL semantics, edit source or claim Compiler validity.
 
 ### 8.2 Deployment profiles
 
 | Profile | Editor / Host | Gateway | Credential location | Status |
 |---|---|---|---|---|
-| **Online first** | GitHub Pages + Theia Browser-Only | Separate HTTPS Gateway; Cloudflare Worker Free is the first candidate | One deployment-scoped provider secret stored by the Gateway | P1 implementation target |
+| **Online first** | GitHub Pages + Theia Browser-Only | Separate HTTPS Gateway; Cloudflare Worker Free is the first candidate | One deployment-scoped provider secret stored by the Gateway | Portable Worker spike implemented; Cloudflare deploy NOT_RUN |
 | **VS Code Desktop** | Same VS Code extension and shared Authoring core; editor operations run in the local Extension Host | Reuse the online Gateway by default, or configure an internal Gateway | Provider secret remains server-side; optional short-lived Gateway session material uses host secure storage | Follow-up host adapter |
 | **VS Code Web** | Browser Extension Host | Same online or intranet Gateway | Provider secret remains server-side | Follow-up host adapter |
 | **VS Code Remote / WSL / Container** | Explicitly selected UI-side or workspace-side Extension Host | Gateway must be reachable from the selected host | Provider secret remains server-side | Follow-up host acceptance |
@@ -276,7 +279,7 @@ The Gateway is intentionally thin. It authenticates the caller, applies request 
 
 The Gateway protocol is identical across profiles. Moving from Cloudflare to an intranet Gateway changes deployment configuration and operational controls, not the Procedure Agent, Change Set schema, patch engine or Editor Tab.
 
-**Online deployment note:** GitHub Pages remains a static frontend and cannot hold the shared provider key. Cloudflare Workers is a candidate because its Secrets feature stores sensitive values server-side and exposes them to Worker code without placing them in the browser bundle ([Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)). The current Workers Free documentation lists 100,000 requests/day and 10 ms CPU time per request; these limits, streaming behavior, account eligibility and model-provider latency must be checked in a real spike before committing to the free tier ([Workers limits](https://developers.cloudflare.com/workers/platform/limits/)). No database is required merely to store one deployment-scoped provider secret.
+**Online deployment note:** GitHub Pages remains a static frontend and cannot hold the shared provider key. Cloudflare Workers is a candidate because its Secrets feature stores sensitive values server-side and exposes them to Worker code without placing them in the browser bundle ([Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)). The current Workers Free documentation lists 100,000 requests/day, 10 ms CPU time and 50 external subrequests per invocation. This Gateway uses one upstream provider subrequest per model request; Access authentication is enforced at the edge. Network wait time is distinct from Worker CPU time. The limits and real provider latency still require a live deployment check ([Workers limits](https://developers.cloudflare.com/workers/platform/limits/)). No database is required merely to store one deployment-scoped provider secret.
 
 **Local / intranet note:** A VS Code Desktop extension can run its editor integration in the local Extension Host, but that does not mean a shared provider secret should be packaged with the extension. If a Gateway runs on the same workstation, it is a separately installed local service reached through a configured loopback endpoint; browser access additionally requires a secure-origin, CORS and local-request/CSRF review. A loopback Gateway is suitable for a local model, a single-workstation deployment or a managed workstation with an explicitly accepted trust boundary. For an organization-wide shared provider credential, prefer one managed internal Gateway service rather than copying the same key to every employee workstation. A local service is not a way to hide a shared secret from the owner of that workstation.
 
@@ -291,45 +294,13 @@ Keep two credential types distinct:
 
 Before a public Gateway is enabled, it MUST have an access-control strategy, rate limiting, abuse protection and a usage ceiling. CORS is a browser-origin policy, not authentication; an origin allowlist alone does not protect a publicly reachable API from non-browser clients. A hidden URL or static token shipped in the client is not a security boundary.
 
+The restricted Worker pilot uses native Cloudflare Access identity. It requires `ctx.access`, compares `ctx.access.aud` with the configured Access audience, then calls `ctx.access.getIdentity()` and uses the verified email as the per-user rate-limit key. Manual JWT/JWKS parsing is unnecessary for a direct Access-authenticated Worker invocation ([Workers Access integration](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)). `ctx.access` is not propagated through Service Bindings / RPC and is not passed through a Static Assets router, so the Gateway is a script-only Worker without Static Assets. Cloudflare's Rate Limiting API is approximate and per-location, not a strict global budget ([Rate Limiting API](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)).
+
+**Cloudflare Access / CORS:** Access blocks cross-origin `OPTIONS` preflight by default because browsers do not send cookies on preflight. Configure the Access application to **Bypass OPTIONS requests to origin**; the Worker answers preflight using its exact `ALLOWED_ORIGINS` allowlist, while actual POST remains Access-protected. Do not also configure Access-managed CORS response headers. The browser must use `credentials: include`. GitHub Pages (`github.io`) to `workers.dev` is cross-site, so third-party-cookie restrictions may block the `CF_Authorization` cookie; this remains a real-browser acceptance gate. If unreliable, use a same-site custom domain or design a separate application session flow before general release. See [Access CORS guidance](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/cors/).
+
+The Worker caps request bytes and output tokens, but it does not maintain a strict global daily token budget. Provider-side account / project spending controls remain required; a Cloudflare spending limit controls Cloudflare charges, not the model provider's bill. The no-database pilot explicitly defers a durable global application spend ledger.
+
 Host secure storage may hold short-lived Gateway session material where a host provides an appropriate implementation; security behavior must be verified separately for Desktop and browser hosts. It is not a place to distribute a deployment-wide shared provider key to every installed copy of the extension. Do not add a per-user provider-key setup flow to P1.
-
-### 8.5 Online Gateway spike: application Worker and upstream provider
-
-The online path must distinguish the **application Gateway** from Cloudflare's optional **AI Gateway product**:
-
-`Skill Studio (browser) → Application Gateway Worker → OpenAI-compatible provider`
-
-The application Gateway is the public-facing application boundary. It owns application authentication, request validation, per-user limits, model allowlisting, usage ceilings, provider-key injection and safe response streaming. It MUST NOT expose an upstream provider credential or Cloudflare API token to the browser.
-
-Cloudflare AI Gateway may sit behind the application Worker as an optional upstream routing / observability / analytics layer. It is not the browser-facing authentication mechanism. Current Cloudflare documentation states that newly created AI Gateways require authentication; therefore, if used, the Worker must hold the Cloudflare credential server-side and call the authenticated AI Gateway endpoint. The client must never receive a Cloudflare API token. See [Cloudflare AI Gateway authentication change](https://developers.cloudflare.com/changelog/product-group/developer-platform/2/) and [REST API](https://developers.cloudflare.com/ai-gateway/usage/rest-api/).
-
-**First restricted pilot profile:** enable Cloudflare Access directly on the Worker. The Worker requires `ctx.access`, compares `ctx.access.aud` with the configured Access audience, then calls `ctx.access.getIdentity()` and uses the verified email as the per-user rate-limit key. Cloudflare documents this as the native Worker path; manual JWT/JWKS parsing is unnecessary for a direct Access-authenticated invocation ([Workers Access integration](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)). `ctx.access` is not propagated through Service Bindings / RPC, and it is unavailable to the user Worker when a Static Assets router is present. Therefore this Gateway is a script-only Worker with no Static Assets; any future internal Worker hop must establish its own explicit authentication. This supports an allowlisted pilot without per-user model keys. It is not yet the final general-public identity model.
-
-**Access / CORS configuration:** Cloudflare Access blocks cross-origin `OPTIONS` preflight by default because browsers do not send cookies on preflight. For this pilot, configure the Access application to **Bypass OPTIONS requests to origin** and do not also configure Access-managed CORS response headers; the Worker then answers preflight using its exact `ALLOWED_ORIGINS` allowlist. This bypass applies only to preflight; actual POST requests remain Access-protected. The browser must send credentials so the `CF_Authorization` cookie is included. GitHub Pages to `workers.dev` is cross-site, so third-party-cookie restrictions may block the cookie even after login; this is an explicit browser acceptance gate, not something CORS headers can solve. If unreliable, use a same-site custom domain or design a separate application login/session flow before general release. See [Access CORS guidance](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/cors/).
-
-**Provider routing:** start with one configured OpenAI-compatible Chat Completions endpoint and one server-side provider secret. The Worker accepts only the supported route and a strict request envelope; it must reject arbitrary upstream URLs, caller-supplied authorization headers, unknown model IDs, oversized bodies and unsupported request fields. For structured authoring responses it supports only `response_format: { type: "json_object" }`; the Host still parses and validates the returned ModelProposal / Change Set against its own schema. The provider endpoint and model allowlist are deployment configuration. A future self-hosted Gateway implements the same public protocol.
-
-**Streaming:** forward the upstream response body as a stream. Do not buffer the full completion in Worker memory. Propagate client cancellation where the runtime permits; treat an interrupted stream as an incomplete proposal, never as a valid Change Set. Cloudflare documents unlimited wall time for an HTTP Worker request while the client remains connected, and recommends streaming bodies to avoid buffering / memory pressure ([Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [streaming best practices](https://developers.cloudflare.com/workers/best-practices/workers-best-practices/)).
-
-**Abuse and spend controls:** require identity before rate limiting; key the rate limit by verified user identity rather than IP. Cloudflare's Worker Rate Limiting API is approximate and regional, so it is a burst-control layer, not a strict global spend cap ([Rate Limiting API](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)). The first no-database spike enforces per-user rate limits and output-token ceilings, and should use provider-side spending controls where available. It does NOT claim a strict global application spend ceiling. A hard application-wide budget requires durable accounting and is deferred until its storage / consistency requirements are designed.
-
-**Free-tier feasibility:** current Workers Free documentation lists 100,000 requests/day, 10 ms CPU time per request, 128 MB memory and six simultaneous outgoing connections per request. HTTP wall time is not capped while the client remains connected. This is plausibly sufficient for a thin proxy, but the real spike must measure Access context availability, streaming, provider latency, disconnect behavior, request size and actual account eligibility before selecting the plan ([Workers limits](https://developers.cloudflare.com/workers/platform/limits/)). The 10 ms CPU allowance is not a model-inference time limit; model inference happens upstream.
-
-**Spike acceptance:**
-
-1. Access application is configured to bypass OPTIONS to the Worker origin; the Worker returns exact-origin CORS preflight headers, while actual POST remains Access-protected.
-2. A Pages-origin browser request includes the Access cookie and reaches the direct Worker invocation in supported browser privacy settings; third-party-cookie behavior is recorded.
-3. Missing Access context, wrong audience, missing identity and failed identity retrieval are rejected before any upstream request.
-4. Provider secret and any Cloudflare API token are absent from browser assets, Webview messages, response headers and logs.
-5. Only the configured model and Chat Completions route are accepted; arbitrary URL / header forwarding is impossible.
-6. Request size, output token ceiling, timeout and per-user rate limits are enforced.
-7. Streaming works end-to-end; a dropped client connection does not produce a completed proposal.
-8. Provider errors and 429 responses are normalized without leaking secret-bearing upstream headers or bodies.
-9. Per-user rate limits and output-token ceilings are enforced; the pilot explicitly documents that these are not a strict global spend ledger.
-10. A fixture provider proves the protocol and negative cases without live credentials; a real provider smoke test is a separate opt-in step.
-
-The spike MUST NOT deploy a publicly usable, unauthenticated proxy. The current Worker implementation is a restricted pilot scaffold; production Access login, Pages-origin CORS, real provider behavior and spend controls remain unverified. No production model key is configured.
-
 
 ### 8.4 Optional VS Code / Theia model APIs
 
@@ -390,6 +361,29 @@ The model may return:
 - Rationale for each operation.
 - References to items in the supplied context manifest.
 - Explicit assumptions and blockers.
+
+The initial Studio-private envelope is `ca-studio.ai-model-proposal/v1`:
+
+~~~json
+{
+  "schema": "ca-studio.ai-model-proposal/v1",
+  "summary": "...",
+  "plan": ["..."],
+  "operations": [
+    {
+      "type": "stage.route.set",
+      "target": { "nodeId": "create-session", "stage": "operation", "outcome": "COMMITTED" },
+      "payload": { "targetNodeId": "verify-session" },
+      "rationale": "...",
+      "references": ["procedure-current", "contract-goal"]
+    }
+  ],
+  "assumptions": [],
+  "blockers": []
+}
+~~~
+
+The model does not author operation IDs, atomic groups, base revision, write scope, source spans, candidate Source or validation state. `target` contains semantic identifiers only; `references` must resolve to IDs in the exact Context Pack manifest supplied to the model. `payload` is bounded JSON and the generic validator rejects source text, paths, offsets, WorkspaceEdit and host-owned fields. Each operation's payload still requires operation-specific validation by the v1alpha4 Patch Engine before it can enter an applicable Change Set. This private envelope is an initial implementation contract, not a CA-SL normative syntax or a frozen public API.
 
 The model MUST NOT return trusted source offsets, arbitrary file paths, raw replacement Source, a complete candidate YAML file, a direct WorkspaceEdit or instructions to execute Tools / Runtime actions.
 
@@ -523,7 +517,7 @@ After Apply, the native document change triggers the existing Source / Visual / 
 | Slice | Deliverable | Gate |
 |---|---|---|
 | A. Cross-host contracts | Platform-neutral Authoring Core types, AuthoringHost, IModelClient, Gateway protocol and versioned ModelProposal / Change Set envelope | Core contract tests; no mandatory VS Code, Theia, DOM or Node imports |
-| B. Online Gateway spike | Implement a thin application Worker using native Cloudflare Access ctx.access identity, strict Chat Completions allowlist, server-side provider secret and streaming; evaluate Cloudflare AI Gateway only as an optional upstream | Positive / negative Access-context and identity tests, route / model / size rejection, streaming and cancellation, per-user rate limiting and output-token ceilings; document that no strict global spend ledger is included in this no-database spike; Pages → Worker → fixture provider first, then opt-in real provider smoke test |
+| B. Online Gateway spike | Deploy a minimal OpenAI-compatible Gateway; Cloudflare Worker Free is the first candidate; prove server-side secret injection, streaming / cancellation, CORS, access authorization, rate limits and usage ceiling | Real GitHub Pages → Gateway → model request; no provider secret in browser assets; confirm Free-tier limits and provider latency |
 | C. Theia Browser adapter | Bridge the current standalone Editor Tab / Extension Host to the shared core and Gateway | Real Browser-Only and backend-backed Theia Chromium; no Theia AI or vscode.lm dependency |
 | D. Proposal / Change Set contract | Strict ModelProposal schema, Host-owned envelope, Studio Change Set lifecycle, operation allowlist and atomic-group validation | Positive / negative schema, malformed / forged / out-of-scope operation tests |
 | E. v1alpha4 Patch Engine | Source-preserving patch operations for the initial allowlist | Round-trip, comment / unknown-field preservation, stale revision and malformed YAML tests |
@@ -534,6 +528,10 @@ After Apply, the native document change triggers the existing Source / Visual / 
 | J. Regression acceptance | Full host and editor regression | npm test, npm run test:plugin-managed, npm run typecheck, git diff --check; Theia Browser-Only / backend Chromium for P1, Desktop / Web and intranet gates in their respective phases |
 
 A fixture provider may be used for deterministic UI / Patch Engine tests. It must be clearly identified as a test fixture and cannot be reported as a working AI integration.
+
+**Current Slice A status:** the host-neutral Context Pack builder, Gateway client, Procedure proposal orchestrator and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203), with deterministic tests. Host-side collection from live TextDocuments, Editor Tab integration, atomic grouping and the Patch Engine remain NOT_STARTED.
+
+**Current Slice B status:** the restricted Cloudflare Access Worker, per-identity Rate Limiting binding, deployment-selected model, request / output limits, JSON + SSE response modes, cancellation and deterministic tests are implemented in [PR #206](https://github.com/odango-chan/ca-skill-studio-demo/pull/206). Exact-head Gateway CI and Wrangler dry-run pass; live Cloudflare deployment, Pages-origin Access login and provider request remain NOT_RUN.
 
 The online path is implemented first, but every P1 boundary is designed so the later Desktop and intranet profiles reuse the same Authoring Core, Gateway protocol, proposal schema and patch engine.
 
@@ -546,7 +544,8 @@ The online path is implemented first, but every P1 boundary is designed so the l
 - [ ] Does not expose provider credentials to the Webview, browser bundle, workspace or extension package.
 - [ ] Uses the Studio-owned Authoring Core and Host Adapter boundary; domain logic has no mandatory Theia / VS Code imports.
 - [ ] Uses the OpenAI-compatible Gateway for the first online path; shared provider credential is stored server-side.
-- [ ] Gateway access authorization, per-user rate limits and request / output-token ceilings are enforced independently of CORS; a strict global spend ledger is explicitly outside the no-database pilot.
+- [ ] Gateway access authorization, rate limits and usage ceiling are enforced independently of CORS.
+- [ ] The restricted pilot authenticates through Cloudflare Access; browser credentials and CORS are configured correctly; general-public identity / invitation policy is selected separately.
 - [ ] Materializes only validated proposals into the Studio Change Set model; host-native ChangeSet APIs remain optional adapters.
 - [ ] Accepts only the versioned ModelProposal schema and known operation allowlist.
 - [ ] Rejects raw YAML replacement, arbitrary paths, forged spans, unknown operations and stale proposals.
@@ -563,15 +562,15 @@ Desktop / Web Extension and intranet Gateway compatibility are explicit follow-u
 
 ## 17. Open decisions before live provider implementation
 
-1. **Gateway access authorization:** the restricted pilot now uses native Worker ctx.access audience and verified-identity APIs; no manual JWT/JWKS parser is needed for direct Access-protected Worker invocation. Select and validate the general-public identity/session model separately before public launch; it must not require per-user model-provider keys or embed a shared static token in the client.
-2. **Online Gateway deployment:** deploy only after configuring the Access application, Rate Limiting namespace, exact production CORS origins and server-side provider secret. Verify Pages-origin Access login / cookie behavior, Free-tier limits, streaming, cancellation, secret injection and provider-side spending controls against actual model calls; retain a provider-neutral self-hosted implementation path. The no-database pilot does not provide a strict global application spend ledger.
+1. **Gateway access authorization:** the restricted pilot now uses native Worker `ctx.access` audience and verified-identity APIs. Validate the Pages-origin cookie flow and choose the general-public identity / invitation model separately before public launch; it must not require per-user model-provider keys or embed a shared static token in the client.
+2. **Online Gateway deployment:** configure Access, the Rate Limiting namespace, production CORS origins and the server-side provider secret. Verify Workers Free limits, Access login / third-party-cookie behavior, JSON and SSE responses, timeout / cancellation, secret configuration and provider-side spending controls against actual model calls; retain a provider-neutral self-hosted implementation path.
 3. **OpenAI-compatible subset:** confirm Chat Completions compatibility, streaming, cancellation and structured-output support for the selected model endpoint. Do not assume /v1/models or tool calling.
 4. **VS Code host placement:** decide whether the Desktop package can use the Web Extension Host alone or needs a separate Node Extension Host adapter; explicitly test Desktop, Web, Remote and WSL/Container behavior.
 5. **Native model APIs:** determine whether vscode.lm or Theia AI adapters provide meaningful optional value; neither is a required model path.
-6. **Initial Context Pack byte budget:** finalize a byte budget during the online provider spike; never silently truncate.
+6. **Initial Context Pack byte budget:** the core starts at a 128 KiB serialized cap, leaving headroom under the Gateway's 256 KiB body limit. Validate actual prompt overhead and provider context limits during the live model spike; never silently truncate.
 7. **Operation allowlist:** finalize exact v1alpha4 CST patch operations and source-preservation limits during Slice E.
 
-The product decisions in Section 1 and the cross-host architecture direction are approved. The detailed technical design remains Proposed until the online Gateway, shared-core boundary and v1alpha4 patch-engine spikes are reviewed.
+The product decisions in Section 1 and the cross-host architecture direction are approved. The detailed technical design remains Proposed until the online Gateway is deployed and exercised, the shared-core / proposal contracts are reviewed, and the v1alpha4 patch-engine spike is completed.
 
 ## Implementation ownership summary
 

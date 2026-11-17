@@ -11,19 +11,11 @@
 - **VS Code / 本地：** 桌面插件通过本地 Extension Host 处理编辑器操作，默认仍调用配置的在线或内网 Gateway；本机模型或单机部署可连接 loopback Gateway。组织共用 Provider Key 时优先使用受管内网 Gateway，不应复制到每台员工电脑。不能把共享 Provider Key 打包进 VSIX。Web Extension 可作为 Desktop/Web 共用基线，但不提供 Node.js API；必要时再增加 Node Host Adapter。
 - **原生 AI API：** vscode.lm 和 Theia AI 均作为可选适配，不是核心 Agent 运行时。Theia 1.76 的 vscode.lm stub 和 @theia/ai-openai backend RPC 限制继续作为兼容事实，不阻塞通用 Gateway 路径。
 - **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。Compiler Check 仍是候选 Procedure 的权威静态验证。
-- **状态：** 产品决策 APPROVED；跨宿主架构方向 APPROVED；详细设计 PROPOSED。Gateway Worker pilot scaffold 已实现并通过 exact-head CI；Authoring Core、Theia Host Adapter、Editor Tab、Change Set / Semantic Patch Engine 尚未实施。未部署 Gateway、未配置生产 Provider Key、未发起真实模型调用；Runtime / 5GC 能力不在本项范围。
-
-## 2026-11-17 · AI Gateway 技术 Spike（设计收敛）
-
-- **架构：** Browser → Application Gateway Worker → OpenAI-compatible provider。Cloudflare AI Gateway 若使用，只作为 Worker 后方的可选路由 / 分析层，不能直接暴露给浏览器。
-- **试点认证：** 第一阶段使用 Cloudflare Access 直接保护 Worker；Worker 检查 `ctx.access.aud`，再通过 `ctx.access.getIdentity()` 读取已验证身份，不自行解析 JWT。Worker 不启用 Static Assets，以免丢失 Access context。Access 应用需单独启用 **Bypass OPTIONS requests to origin**，由 Worker 处理精确 CORS；实际 POST 仍受 Access 保护。GitHub Pages → workers.dev 的第三方 Cookie 行为必须在真实浏览器验收。最终面向公众的登录体系尚未决定。
-- **密钥：** Provider Key 和 Cloudflare API Token 均只保存在 Worker Secret / 服务端；禁止静态 bearer token 打包到网页或 VSIX。
-- **代理边界：** 固定 Chat Completions 路径、上游地址和模型白名单；拒绝任意 URL、任意 Header、超大请求体和未知模型；可选结构化输出仅允许 `response_format: { type: json_object }`，最终 ModelProposal / Change Set 仍由 Host 按自有 Schema 校验；响应头 / 错误不得泄漏上游密钥。
-- **限流与预算：** 基于已验证身份做 per-user rate limit；Cloudflare Rate Limiting 是近似、分区域的突发控制，不是严格总预算。第一阶段另加输出 Token 上限；不声称具备严格全局模型费用账本。可用时配置 Provider 侧费用控制；严格应用级预算需后续设计持久化记账。
-- **流式：** Worker 透传 Response stream，不缓冲完整响应；客户端断开视为不完整响应，不得生成可接受 Change Set。
-- **Free 计划：** 当前官方限制为 100,000 requests/day、10ms CPU/request、128MB memory、6 simultaneous outgoing connections/request；HTTP 请求只要客户端保持连接就没有硬 wall-time 限制。10ms CPU 不包括上游模型推理时间。必须以真实请求验证。
-- **实现：** `gateway/worker/` 已加入独立 Cloudflare Worker、Wrangler 配置、Access 本地模拟、Provider 转发与 SSE 测试；13 项 Node 单测 PASS；PR #206 exact-head Gateway CI 与 Wrangler dry-run PASS。
-- **未完成：** Worker 尚未部署；没有生产 Provider Key 或真实模型请求；Pages-origin Access 登录 / 第三方 Cookie、生产 CORS 和目标 Cloudflare 账号资格尚未验收。Rate Limiting binding 的真实账号配置待做；无严格全局费用账本。
+- **Gateway Worker（PR #206）：** 独立 Cloudflare Worker 使用原生 `ctx.access` 验证 Access audience / 用户身份；按已验证身份限流；Provider endpoint、默认模型和密钥均由部署配置；支持 JSON 与 SSE 两种 OpenAI-compatible 响应模式、结构化 JSON 输出、请求/输出上限、响应头超时和取消传播。15 项 Worker 单测与 exact-head Gateway CI + Wrangler dry-run PASS（[run #44077321845](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44077321845)）；真实 Cloudflare 部署、Access 浏览器登录和模型请求尚未执行。
+- **安全边界：** 受限试点使用 Cloudflare Access 身份认证，不再把 Turnstile / IP 限流误当作用户身份。GitHub Pages → workers.dev 的第三方 Cookie 行为仍需真实浏览器验收；Cloudflare Rate Limiting 为近似、分地域计数，不是严格全局费用账本。
+- **Authoring Core Foundation（PR #203）：** 新增无宿主依赖的 Context Pack builder（Package 路径 allowlist、引用/脚本显式 opt-in、dependency verified gate、SHA-256 manifest、128 KiB serialized byte cap、超限拒绝不截断）、Gateway Model Client、Procedure proposal orchestrator 与 Studio 私有 ModelProposal v1 校验器；显式要求 Context disclosure consent；浏览器请求使用 `credentials: include` 携带 Access session，不传 Turnstile token、Provider Key 或 client-selected model；Agent 校验 manifest digest / UTF-8 byte count；模型不能提供文件路径、原始 YAML、Source offset、WorkspaceEdit、atomic groups 或 validation state；引用必须匹配 Host 提供的 Context Pack manifest。确定性测试已加入 npm test，PR #203 exact-head CI 验证中。
+- **Host-owned Change Set（PR #204）：** Host 为已验证 ModelProposal 构造不可变 Change Set，固定 Procedure 写入范围、文档 / Package revision、操作 ID 与 NOT_RUN 验证状态；尚不包含 Semantic Patch Engine、atomic groups 或 WorkspaceEdit。
+- **状态：** 产品决策 APPROVED；跨宿主架构方向 APPROVED；详细设计 PROPOSED；Gateway Worker、Authoring Core 与 Change Set envelope 均 PARTIAL；Theia Host Adapter、Semantic Patch Engine、Editor Tab 和真实浏览器 Access 登录尚未完成。无生产部署、真实模型调用或 Runtime / 5GC 能力声明。
 
 ## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
 
