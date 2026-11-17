@@ -82,14 +82,16 @@ await build({
   loader:{".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file"},
   assetNames:"assets/[name]-[hash]",logLevel:"info"
 });
-// Bundle only the pinned CA-SL v1alpha4 Example source. The retired
-// v0.2 sample set is not shipped as a parallel language baseline.
-// Remove artifacts from builds produced before the Legacy sample set was retired.
+// Bundle only the pinned CA-SL v1alpha5 candidate Example. v1alpha4 remains
+// an immutable historical language baseline and is not shipped as an active Example.
+// Remove all previously staged active/legacy sample directories before copying the
+// single selected candidate so an older build cannot leak a second authoring target.
 await rm(join(root,"samples","skills"),{recursive:true,force:true});
+await rm(join(root,"samples","v1alpha4"),{recursive:true,force:true});
 const sampleSets=[
-  {kind:"v1alpha4",source:"site/samples/v1alpha4",destination:join(root,"samples","v1alpha4"),
-    status:"DRAFT_NOT_QUALIFIED",ref:"refs/pull/58/head",
-    version:"connectionagent.io/v1alpha4"}
+  {kind:"v1alpha5",source:"site/samples/v1alpha5",destination:join(root,"samples","v1alpha5"),
+    status:"DRAFT_NOT_QUALIFIED",ref:"refs/pull/65/head",
+    version:"connectionagent.io/v1alpha5"}
 ];
 for(const set of sampleSets){
   const manifest=JSON.parse(await readFile(join(set.source,"files.json"),"utf8"));
