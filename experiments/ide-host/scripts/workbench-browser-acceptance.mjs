@@ -951,7 +951,7 @@ export async function runWorkbenchAcceptance({
   const masPair=await assertSourceVisualPair(
     evalJS,sleep,"procedure.yaml","v1alpha4 MAS Procedure Designer");
   const masGraph=await waitWebview(view=>
-    view.procedureRoot&&view.procedureValue==="validate-sm-subscription"&&view.graphNodes>0,
+    view.procedureRoot&&view.bodyText.includes("establish-pdu-session-mas")&&view.graphNodes>0,
     "v1alpha4 MAS Procedure graph");
   await nativeCommand("core.close.all.main.tabs");
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
