@@ -4,6 +4,7 @@ import {
   buildContextPack,
   CONTEXT_PACK_SCHEMA,
   ContextPackError,
+  MAX_CONTEXT_PACK_BYTES,
 } from "../context-pack.mjs";
 
 function base(overrides = {}) {
@@ -202,4 +203,13 @@ test("Context Pack rejects secret and token filenames even under an otherwise al
       path,
     );
   }
+});
+
+
+test("Context Pack enforces the initial 128 KiB budget ceiling", async () => {
+  assert.equal(MAX_CONTEXT_PACK_BYTES, 131072);
+  await assert.rejects(
+    buildContextPack(base({ maxBytes: MAX_CONTEXT_PACK_BYTES + 1 })),
+    (error) => error instanceof ContextPackError && error.code === "invalid_byte_limit",
+  );
 });
