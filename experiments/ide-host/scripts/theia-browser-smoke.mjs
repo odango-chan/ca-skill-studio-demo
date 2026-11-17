@@ -925,5 +925,4 @@ try{
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
-  return;
 }
