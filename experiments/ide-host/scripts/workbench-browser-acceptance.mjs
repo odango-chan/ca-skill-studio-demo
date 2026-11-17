@@ -632,7 +632,7 @@ export async function runWorkbenchAcceptance({
     throw Error("Read-only v1alpha5 graph interaction changed authoritative Source: "+
       JSON.stringify({sourceState,sourceAfterGraph,graphEditability}));
   graphEditability.sourceUnchanged=true;
-  console.log("STUDIO_V1ALPHA4_GRAPH_READ_ONLY_CHROMIUM",JSON.stringify(graphEditability));
+  console.log("STUDIO_V1ALPHA5_GRAPH_READ_ONLY_CHROMIUM",JSON.stringify(graphEditability));
 
   // Toolbar defaults and layout/path controls are checked against the v1alpha5 graph.
   const toolbarInitial=await evalWebviewJS("(()=>({"+
@@ -667,7 +667,7 @@ export async function runWorkbenchAcceptance({
     throw Error("v1alpha5 canvas layout or legacy-control isolation failed: "+
       JSON.stringify({toolbarInitial,horizontal,allPaths}));
   const canvasToolbar={initial:toolbarInitial,horizontal,allPaths};
-  console.log("STUDIO_V1ALPHA4_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbar));
+  console.log("STUDIO_V1ALPHA5_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbar));
 
   // Package ZIP must be produced from the exact active v1alpha5 Package snapshot.
   await evalWebviewJS("document.querySelector('#exportPackageZip')?.click();true");
@@ -692,7 +692,7 @@ export async function runWorkbenchAcceptance({
     throw Error("v1alpha5 Package ZIP did not produce a browser Blob download: "+
       JSON.stringify(packageZip));
   packageZip.details=zipNotice.details;
-  console.log("STUDIO_V1ALPHA4_PACKAGE_ZIP_CHROMIUM",JSON.stringify(packageZip));
+  console.log("STUDIO_V1ALPHA5_PACKAGE_ZIP_CHROMIUM",JSON.stringify(packageZip));
 
   let languageServiceStatus="NOT_REQUIRED_NODE_HOST";
   let v1alpha5LanguageFeatures=null,semanticTokenEvidence=null;
@@ -723,7 +723,7 @@ export async function runWorkbenchAcceptance({
        packageSnapshot?.lastSentSnapshot?.completeness!=="complete")
       throw Error("v1alpha5 Language Service must be available while its unqualified Package remains PARTIAL: "+
         JSON.stringify({languageServiceDiagnostics,expectedPackageRoot,languagePackage,packageSnapshot}));
-    console.log("STUDIO_V1ALPHA4_LSP_PARTIAL_IS_EXPECTED_CHROMIUM",JSON.stringify({
+    console.log("STUDIO_V1ALPHA5_LSP_PARTIAL_IS_EXPECTED_CHROMIUM",JSON.stringify({
       status:languageServiceStatus,
       languageClientStarted:languageServiceDiagnostics.languageClientStarted,
       languagePackage,
@@ -741,6 +741,16 @@ export async function runWorkbenchAcceptance({
        !v1alpha5LanguageFeatures.observationFields?.includes("tool:")||
        !v1alpha5LanguageFeatures.operationFields?.includes("script:")||
        !v1alpha5LanguageFeatures.scriptPathCompletion?.includes("scripts/runner.py")||
+       !v1alpha5LanguageFeatures.waitNodeFields?.includes("wait:")||
+       !v1alpha5LanguageFeatures.waitFields?.includes("event:")||
+       !v1alpha5LanguageFeatures.waitFields?.includes("routes:")||
+       !v1alpha5LanguageFeatures.waitEventFields?.includes("operation:")||
+       !v1alpha5LanguageFeatures.waitResponseFields?.includes("after:")||
+       !v1alpha5LanguageFeatures.waitRouteKeys?.includes("TIMEOUT:")||
+       !v1alpha5LanguageFeatures.waitResponseAfter?.includes("final")||
+       !v1alpha5LanguageFeatures.waitTimeoutTarget?.includes("timeout-handler")||
+       !v1alpha5LanguageFeatures.waitOutput?.includes("await-event.wait.output")||
+       v1alpha5LanguageFeatures.waitTimeoutTarget?.includes("SUCCEEDED")||
        !v1alpha5LanguageFeatures.outcomeUnknownTargets?.includes("SAFE_STOPPED")||
        !v1alpha5LanguageFeatures.contractDefinition||
        !v1alpha5LanguageFeatures.predicateDefinition||
@@ -748,6 +758,8 @@ export async function runWorkbenchAcceptance({
        !v1alpha5LanguageFeatures.predicateReferences||
        !v1alpha5LanguageFeatures.scriptDefinition||
        !v1alpha5LanguageFeatures.procedureOutline?.includes("run-script")||
+       !v1alpha5LanguageFeatures.procedureOutline?.includes("await-event")||
+       !v1alpha5LanguageFeatures.procedureOutline?.includes("timeout-handler")||
        v1alpha5LanguageFeatures.ownerQualification!=="NOT_QUALIFIED")
       throw Error("Native v1alpha5 language-provider acceptance failed: "+
         JSON.stringify(v1alpha5LanguageFeatures));
@@ -760,9 +772,9 @@ export async function runWorkbenchAcceptance({
        semanticTokenEvidence?.renderError)
       throw Error("Native v1alpha5 semantic tokens were not rendered: "+
         JSON.stringify(semanticTokenEvidence));
-    console.log("STUDIO_V1ALPHA4_LANGUAGE_FEATURES_CHROMIUM",
+    console.log("STUDIO_V1ALPHA5_LANGUAGE_FEATURES_CHROMIUM",
       JSON.stringify(v1alpha5LanguageFeatures));
-    console.log("STUDIO_V1ALPHA4_SEMANTIC_TOKENS_CHROMIUM",
+    console.log("STUDIO_V1ALPHA5_SEMANTIC_TOKENS_CHROMIUM",
       JSON.stringify(semanticTokenEvidence));
   }
 
@@ -771,7 +783,7 @@ export async function runWorkbenchAcceptance({
     ".find(el=>el.getAttribute('data-id')==='get-sm-subscription-data');node?.click();return !!node;})()");
   await sleep(120);
   const inspectorSelection=await nativeCommand("skillStudio.internal.selectionAcceptance");
-  console.log("STUDIO_V1ALPHA4_INSPECTOR_SELECTION_CHROMIUM",
+  console.log("STUDIO_V1ALPHA5_INSPECTOR_SELECTION_CHROMIUM",
     JSON.stringify(inspectorSelection));
   if(inspectorSelection?.nodeId!=="get-sm-subscription-data"||
      inspectorSelection?.snapshotState!=="READY")
@@ -813,7 +825,7 @@ export async function runWorkbenchAcceptance({
       JSON.stringify({phaseEvidence,inspectorSelection,
         inspectorText:inspectorText.slice(-2200),
         inspectorContainer:await evalJS("(()=>{const el=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');return {text:el?.innerText??'',html:el?.innerHTML?.slice(-3500)??'',visible:!!el&&el.getBoundingClientRect().width>0};})()") }));
-  console.log("STUDIO_V1ALPHA4_INSPECTOR_CHROMIUM",JSON.stringify(phaseEvidence));
+  console.log("STUDIO_V1ALPHA5_INSPECTOR_CHROMIUM",JSON.stringify(phaseEvidence));
 
   // A single native EditorGroup test covers Procedure/Contract/Predicate/Schema
   // visuals followed by ordinary Python/YAML Source tabs and a second Skill.
@@ -825,7 +837,7 @@ export async function runWorkbenchAcceptance({
      editorGroupPlacement?.ordinaryYamlColumn!==1)
     throw Error("v1alpha5 editor groups did not remain a stable two-column layout: "+
       JSON.stringify(editorGroupPlacement));
-  console.log("STUDIO_V1ALPHA4_EDITOR_GROUPS_CHROMIUM",JSON.stringify(editorGroupPlacement));
+  console.log("STUDIO_V1ALPHA5_EDITOR_GROUPS_CHROMIUM",JSON.stringify(editorGroupPlacement));
 
   // Native Markdown is the VS Code Markdown extension, with one shared
   // Source-left / Preview-right layout for both v1alpha5 Skill documents.
@@ -891,7 +903,7 @@ export async function runWorkbenchAcceptance({
     secondUri:secondMarkdownUri,secondPreview:secondMarkdown.view,
     secondLayout:secondMarkdownLayout,workerDiagnostics:markdownDiagnostics
   };
-  console.log("STUDIO_V1ALPHA4_NATIVE_MARKDOWN_CHROMIUM",JSON.stringify(nativeMarkdownEvidence));
+  console.log("STUDIO_V1ALPHA5_NATIVE_MARKDOWN_CHROMIUM",JSON.stringify(nativeMarkdownEvidence));
 
   const liveUri=await nativeCommand(
     "skillStudio.internal.nativeMarkdownLiveUpdateAcceptance",skillGuideUri);
@@ -903,7 +915,7 @@ export async function runWorkbenchAcceptance({
     if(settings?.scrollEditorWithPreview!==true||settings?.scrollPreviewWithEditor!==true)
       throw Error("Native Markdown bidirectional scroll settings are not enabled: "+
         JSON.stringify(settings));
-    console.log("STUDIO_V1ALPHA4_MARKDOWN_LIVE_UPDATE_CHROMIUM",JSON.stringify({
+    console.log("STUDIO_V1ALPHA5_MARKDOWN_LIVE_UPDATE_CHROMIUM",JSON.stringify({
       uri:liveUri,preview:live.view,scrollEditorWithPreview:settings.scrollEditorWithPreview,
       scrollPreviewWithEditor:settings.scrollPreviewWithEditor
     }));
@@ -931,7 +943,7 @@ export async function runWorkbenchAcceptance({
        /script-src[^;]*unsafe-inline/.test(security.view.csp))
       throw Error("Native Markdown package security boundary failed: "+
         JSON.stringify(security.view));
-    console.log("STUDIO_V1ALPHA4_MARKDOWN_SECURITY_CHROMIUM",
+    console.log("STUDIO_V1ALPHA5_MARKDOWN_SECURITY_CHROMIUM",
       JSON.stringify(security.view));
   }finally{
     await nativeCommand("skillStudio.internal.removeNativeMarkdownSecurityAcceptance",securityUri);
@@ -986,7 +998,7 @@ export async function runWorkbenchAcceptance({
       JSON.stringify(schema.view).slice(0,2600));
   await assertSourceVisualPair(evalJS,sleep,"establishment-request.schema.yaml",
     "v1alpha5 Schema Designer");
-  console.log("STUDIO_V1ALPHA4_DESIGNERS_CHROMIUM",JSON.stringify({
+  console.log("STUDIO_V1ALPHA5_DESIGNERS_CHROMIUM",JSON.stringify({
     contract:{uri:contractUri,cards:contractCards},
     predicates:{uri:predicateUri,heading:predicates.view.title},
     schema:{uri:schemaUri,heading:schema.view.title}
@@ -1045,7 +1057,7 @@ export async function runWorkbenchAcceptance({
     bodyText:finalRestoredGraph.view.bodyText
   };
   const warmTiming={type:"rendered",cacheHit:true,revision:finalRestoredGraph.view.revision};
-  console.log("STUDIO_V1ALPHA4_DUAL_SKILL_EXPLORER_CHROMIUM",
+  console.log("STUDIO_V1ALPHA5_DUAL_SKILL_EXPLORER_CHROMIUM",
     JSON.stringify(dualSkillExplorer));
   console.log("STUDIO_LAYOUT_TIMING",JSON.stringify({initialTiming,warmTiming}));
   console.log("STUDIO_WORKBENCH_CHROMIUM",JSON.stringify({
