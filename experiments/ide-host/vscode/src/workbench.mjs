@@ -3283,8 +3283,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         throw Error('Markdown acceptance URI must be inside the active workspace');
       const root=workspaceFolder.uri.path.replace(/\/$/,'');
       const relativePath=target.path.slice(root.length+1);
-      if(!/^skills\/[a-z0-9-]+\/(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(relativePath))
-        throw Error('Markdown acceptance URI must identify a Skill-local Markdown file');
+      if(!/^skills\/[a-z0-9-]+\/(?:SKILL\.md|(?:[a-z0-9-]+\/)*[a-z0-9-]+\.md)$/i.test(relativePath))
+        throw Error('Markdown acceptance URI must identify a Markdown file inside a Skill Package');
       try{await vscode.workspace.fs.stat(target);}
       catch{throw Error('Markdown acceptance target does not exist: '+target.toString());}
       // Open only the editable Source. The active-editor listener must create
@@ -3300,7 +3300,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
       if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
-        throw Error('Live-update acceptance requires the exact Legacy 5GC Skill guide URI');
+        throw Error('Live-update acceptance requires the exact v1alpha4 5GC Skill guide URI');
       const key=target.toString();
       const doc=await vscode.workspace.openTextDocument(target);
       if(doc.languageId!=='markdown')
@@ -3335,7 +3335,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
       if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
-        throw Error('Refusing to restore a non-Legacy 5GC Skill guide');
+        throw Error('Refusing to restore a non-v1alpha4 5GC Skill guide');
       const key=target.toString();
       const original=nativeMarkdownLiveOriginals.get(key);
       if(typeof original!=='string')
@@ -3350,7 +3350,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     'skillStudio.internal.nativeMarkdownSecurityAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
       if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
-        throw Error('Security acceptance requires the exact Legacy 5GC Skill guide URI');
+        throw Error('Security acceptance requires the exact v1alpha4 5GC Skill guide URI');
       const doc=await vscode.workspace.openTextDocument(target);
       if(doc.languageId!=='markdown')
         throw Error('Existing reference is not registered as Markdown: '+doc.languageId);
@@ -3364,7 +3364,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         '<script>window.skillStudioNativeMarkdownXss = true;</script>',
         '<img src="https://example.invalid/raw-html-pixel.png" onerror="window.skillStudioNativeMarkdownXss = true">',
         '',
-        '[Safe package reference](references/3gpp-procedure.md)',
+        '[Safe package reference](assurance/contract.yaml)',
         '[Escaping package link](../../outside.md)',
         '[Missing package link](missing.md)',
         '![Remote pixel](https://example.invalid/markdown-pixel.png)',
