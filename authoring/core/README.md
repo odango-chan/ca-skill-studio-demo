@@ -12,6 +12,7 @@ This folder contains the first host-neutral model-client and proposal-validation
 - No provider API key or model identifier is accepted from the client.
 - A request cannot be sent until the caller confirms the Context Pack disclosure.
 - ModelProposal is untrusted and validated against a versioned Studio-owned schema.
+- The Host materializes validated proposals into a frozen Change Set envelope, stamps live document / Package revisions, fixes the write scope to the Procedure, assigns operation IDs and leaves atomic grouping / Compiler validation `NOT_RUN` until later Host stages.
 - The model cannot author source offsets, file paths, candidate YAML, WorkspaceEdit, atomic groups or validation state.
 - Every evidence reference must resolve to an ID in the exact Context Pack manifest supplied by the host.
 
