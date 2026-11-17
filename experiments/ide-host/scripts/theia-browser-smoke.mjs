@@ -2125,8 +2125,10 @@ try{
      !afterImport.explorerText.includes("establish-pdu-session")||
      !afterImport.explorerText.includes("procedure.yaml"))
     throw Error("Theia did not open the real default project workspace: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
+  // The candidate Procedure ID is establish-pdu-session; get-sm-subscription-data
+  // is its first Node ID and must not be mistaken for the Procedure selector value.
   if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1||
-      webviewView.procedureValue!=="get-sm-subscription-data"))
+      webviewView.procedureValue!=="establish-pdu-session"))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
   if(requireEditor&&(!patchEvidence?.preview?.ready||
