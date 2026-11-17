@@ -14,7 +14,7 @@ export const ALLOWED_SEMANTIC_OPERATIONS = Object.freeze([
 const TOP_LEVEL_KEYS = new Set(["schema", "summary", "plan", "operations", "assumptions", "blockers"]);
 const OPERATION_KEYS = new Set(["type", "target", "payload", "rationale", "references"]);
 const TARGET_KEYS = new Set(["nodeId", "stage", "predicateId", "outcome", "argumentName", "callIndex"]);
-const FORBIDDEN_PAYLOAD_KEYS = new Set([
+const FORBIDDEN_PAYLOAD_KEYS = new Set(["__proto__", "constructor", "prototype",
   "source", "sourceText", "candidateSource", "rawYaml", "yaml", "sourceSpan", "span",
   "offset", "startOffset", "endOffset", "line", "column", "file", "filePath", "path",
   "uri", "documentUri", "writePaths", "readPaths", "sourceDigest", "base", "scope",
@@ -95,6 +95,7 @@ export function validateModelProposal(input, {
     exactKeys(operation, OPERATION_KEYS, path);
     if (!ALLOWED_SEMANTIC_OPERATIONS.includes(operation.type)) fail("unsupported_operation", path + ".type");
     exactKeys(operation.target, TARGET_KEYS, path + ".target");
+    if (Object.keys(operation.target).length === 0) fail("missing_target", path + ".target");
     for (const [key, value] of Object.entries(operation.target)) {
       if (key === "callIndex") {
         if (!Number.isSafeInteger(value) || value < 0) fail("invalid_target", path + ".target." + key);
