@@ -760,10 +760,14 @@ try{
     canvasIconEvidence=iconResult.result?.value??[];
     const expectedIcons=["columns-2","git-branch","network","eye","locate-fixed",
       "zoom-out","zoom-in","maximize","fit-width","fit-height"];
-    if(expectedIcons.some(name=>!canvasIconEvidence.some(item=>
-      item.name===name&&item.visible)))
+    const visibleIcons=expectedIcons.filter(name=>name!=="git-branch");
+    // Route-branch navigation is context-sensitive and may be hidden in the
+    // default Root view; its SVG must still be registered in the native toolbar.
+    if(expectedIcons.some(name=>!canvasIconEvidence.some(item=>item.name===name))||
+       visibleIcons.some(name=>!canvasIconEvidence.some(item=>
+         item.name===name&&item.visible)))
       throw Error("Studio canvas icon artwork missing from native toolbar: "+
-        JSON.stringify({expectedIcons,canvasIconEvidence}));
+        JSON.stringify({expectedIcons,visibleIcons,canvasIconEvidence}));
     console.log("STUDIO_CANVAS_ICONS_CHROMIUM",JSON.stringify(canvasIconEvidence));
     const preview=await command("Runtime.evaluate",{
       contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
