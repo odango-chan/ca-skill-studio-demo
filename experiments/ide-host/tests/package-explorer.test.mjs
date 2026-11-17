@@ -23,7 +23,7 @@ class TreeItem{
   constructor(label,collapsibleState){this.label=label;this.collapsibleState=collapsibleState;}
 }
 function host({folders=[uri("/project")],selectedRoot=()=>folders.length===1?folders[0]:null,
-  files=null,dependenciesProvider=null,onPackagesChanged=()=>{},statImpl=async()=>({type:2})}={}){
+  files=null,dependenciesProvider=null,compilerProvider=null,onPackagesChanged=()=>{},statImpl=async()=>({type:2})}={}){
   const rootFiles=files??[
     uri("/project/skills/one/SKILL.md"),
     uri("/project/skills/one/assurance/contract.yaml"),
@@ -70,7 +70,7 @@ function host({folders=[uri("/project")],selectedRoot=()=>folders.length===1?fol
   };
   const context={subscriptions};
   const registered=registerPackageOverview(vscode,context,()=>null,{
-    dependenciesProvider,getProjectRoot:selectedRoot,onPackagesChanged
+    dependenciesProvider,compilerProvider,getProjectRoot:selectedRoot,onPackagesChanged
   });
   return {vscode,commands,views,subscriptions,registered};
 }
@@ -98,17 +98,36 @@ function dependencyProvider(){
   };
 }
 
-test("Package Explorer composes Skills and Plugin Dependencies in one native TreeView",async()=>{
-  const dependencies=dependencyProvider(),h=host({dependenciesProvider:dependencies});
+function compilerProvider(){
+  const events=new EventEmitter();
+  const artifact={kind:"artifact-package",artifactId:"build-1",packageName:"one",
+    label:"one · Build",success:true,files:[]};
+  return {
+    onDidChangeTreeData:events.event,
+    async getChildren(node){
+      if(node?.kind==="artifact-package")return [];
+      return [artifact];
+    },
+    getTreeItem(node){return new TreeItem(node.label,node.kind==="artifact-package"?1:0);},
+    getParent(){return artifact;}
+  };
+}
+
+test("Package Explorer composes Skills, Plugin Dependencies and Compiler Artifacts in one native TreeView",async()=>{
+
+  const dependencies=dependencyProvider(),compiler=compilerProvider(),
+    h=host({dependenciesProvider:dependencies,compilerProvider:compiler});
   await h.commands.get("skillStudio.refreshPackages")();
   assert.deepEqual([...h.views.keys()],["skillStudio.packages"]);
   const tree=h.views.get("skillStudio.packages");
   const sections=await tree.getChildren();
-  assert.deepEqual(sections.map(item=>item.section),["skills","dependencies"]);
+  assert.deepEqual(sections.map(item=>item.section),["skills","dependencies","artifacts"]);
   assert.equal(tree.getTreeItem(sections[0]).collapsibleState,2,
     "Skills is expanded by default");
   assert.equal(tree.getTreeItem(sections[1]).collapsibleState,1,
     "Dependencies stays collapsed until needed");
+  assert.equal(tree.getTreeItem(sections[2]).collapsibleState,1,
+    "Build Artifacts stays collapsed until a successful or failed build is available");
 
   const skills=await tree.getChildren(sections[0]);
   const pkg=skills.find(item=>item.kind==="package");
@@ -124,6 +143,11 @@ test("Package Explorer composes Skills and Plugin Dependencies in one native Tre
   const operations=await tree.getChildren(deps[0]);
   assert.equal(operations[0].operation.id,"ping");
   assert.equal((await tree.getParent(operations[0])).dependency.id,"network-tools");
+
+  const artifactItems=await tree.getChildren(sections[2]);
+  assert.equal(artifactItems[0].kind,"artifact-package");
+  assert.equal(artifactItems[0].sourceSection,"artifacts");
+  assert.equal((await tree.getParent(artifactItems[0])).section,"artifacts");
 });
 
 test("Package inventory publishes discovered Procedure files for project-level language analysis",async()=>{
