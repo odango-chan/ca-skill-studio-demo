@@ -3,113 +3,67 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {projectSkillContract} from '../site/contract-projection.mjs';
 
-const contract = [
-  '# Preserve me',
-  'apiVersion: connectionagent.io/v1alpha1',
-  'kind: SkillContract',
-  'metadata:',
-  '  name: example',
-  'spec:',
-  '  skillType: executable',
-  '  goal: session.fulfilled',
-  '  entryProcedure: begin',
-  '  inputs:',
-  '    requestSchema: schemas/request.yaml',
-  '  context:',
-  '    requiredFacts:',
-  '    - ingress',
-  '  allowedResources:',
-  '    capabilities: [tool.read]',
-  '    localTools: [skill.select]',
-  '  postconditions:',
-  '  - predicate: session.ready',
-  '    expect: PASS',
-  '  planning:',
-  '    maxActions: 32',
-  '    allowDynamicProcedure: false',
-  '  failureSemantics:',
-  '    outcomeUnknown:',
-  '      requireReconcile: true',
-  ''
-].join('\n');
+const source = readFileSync(new URL(
+  '../site/samples/v1alpha4/establish-pdu-session/assurance/contract.yaml',
+  import.meta.url), 'utf8');
 
-test('Contract projection preserves source coordinates and real references', () => {
-  const p = projectSkillContract(contract);
+test('CA-SL v1alpha4 Contract projects its actual source fields and coordinates', () => {
+  const p = projectSkillContract(source, {name: 'establish-pdu-session'});
   assert.equal(p.state, 'READY');
-  assert.equal(p.entryProcedure.value, 'begin');
-  assert.equal(p.entryProcedure.line, 9);
-  assert.equal(p.requestSchema.value, 'schemas/request.yaml');
-  assert.equal(p.capabilities[0].value, 'tool.read');
-  assert.equal(p.localTools[0].value, 'skill.select');
-  assert.equal(p.postconditions[0].predicate.value, 'session.ready');
-  assert.equal(p.allowDynamicProcedure.value, false);
-  assert.equal(p.requireReconcile.value, true);
-  assert.match(contract, /^# Preserve me/);
-});
-
-test('Unknown extension is explicitly partial rather than silently dropped', () => {
-  const p = projectSkillContract(contract.replace('  skillType:',
-    '  extensionField: enabled\n  skillType:'));
-  assert.equal(p.state, 'PARTIAL');
-  assert.deepEqual(p.unprojectedPaths, ['spec.extensionField']);
-});
-
-test('Invalid or ambiguous Contract falls back without guessing', () => {
-  assert.equal(projectSkillContract('kind: [').state, 'SOURCE_ONLY');
-  assert.equal(projectSkillContract(contract.replace('  goal: session.fulfilled',
-    '  goal: a\n  goal: b')).state, 'SOURCE_ONLY');
-  assert.equal(projectSkillContract(contract.replace('  goal: session.fulfilled',
-    '  goal: &g session.fulfilled')).state, 'SOURCE_ONLY');
-  assert.equal(projectSkillContract('x'.repeat(1024 * 1024 + 1)).state,
-    'SOURCE_ONLY');
-  assert.equal(projectSkillContract(contract.replace('kind: SkillContract',
-    'kind: PredicateSet')).state, 'SOURCE_ONLY');
-});
-
-test('Existing Skill fixture can be projected without Runtime assumptions', () => {
-  const source = readFileSync(new URL(
-    '../site/samples/packages/establish-pdu-session/assurance/contract.yaml',
-    import.meta.url), 'utf8');
-  const p = projectSkillContract(source);
   assert.equal(p.kind, 'SkillContract');
+  assert.equal(p.language, 'CA-SL v1alpha4');
   assert.equal(p.name.value, 'establish-pdu-session');
-  assert.ok(p.entryProcedure.value);
-  assert.ok(p.postconditions.length);
+  assert.equal(p.goal.value, 'pdu_session.initial_request_fulfilled');
+  assert.equal(p.precondition.value, 'get-sm-subscription-data.precondition');
+  assert.equal(p.requestSchema.value, 'schemas/establishment-request.schema.yaml');
+  assert.equal(p.contextSchema.value,
+    'ca-context::urn:connectionagent:ca:context:subject:v1');
+  assert.equal(p.dependencies.length, 4);
+  assert.equal(p.dependencies[0].name, 'ca-context');
+  assert.equal(p.dependencies[0].value, 'urn:connectionagent:ca:host-context');
+  assert.equal(p.capabilities.length, 9);
+  assert.equal(p.limits[0].name, 'maxActions');
+  assert.equal(p.limits[0].value, 32);
+  assert.deepEqual(p.unprojectedPaths, []);
+  assert.deepEqual(p.projectionWarnings, []);
+  assert.match(source, /^# CA-SL v1alpha4/);
 });
 
-
-test('Full Owner Contract sections are projected, including requirements and dependencies', () => {
-  const advanced = contract
-    .replace('  postconditions:',
-      '  preconditions:\n  - predicate: session.input_ready\n    expect: PASS\n  postconditions:')
-    .replace('  planning:\n    maxActions: 32\n    allowDynamicProcedure: false',
-      '  requirements:\n  - predicate: policy.ready\n    expect: PASS\n    satisfiable: true\n' +
-      '  dependencies:\n  - name: child-skill\n    artifactRef: child-skill\n' +
-      '    digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n' +
-      '    variant: compact\n  planning:\n    maxActions: 32\n' +
-      '    allowDynamicProcedure: false\n    fallbackProcedure: recover\n' +
-      '    budgetPartition:\n      parentActions: 10\n      childActions: 22');
-  const p = projectSkillContract(advanced);
-  assert.equal(p.state, 'READY');
-  assert.equal(p.preconditions[0].predicate.value, 'session.input_ready');
-  assert.equal(p.requirements[0].satisfiable.value, true);
-  assert.equal(p.dependencies[0].artifactRef.value, 'child-skill');
-  assert.equal(p.dependencies[0].variant.value, 'compact');
-  assert.equal(p.fallbackProcedure.value, 'recover');
-  assert.equal(p.budgetPartition.parentActions.value, 10);
-  assert.equal(p.budgetPartition.childActions.value, 22);
-});
-
-test('Unknown nested fields and malformed known sections are explicitly partial', () => {
-  const unknown = contract.replace('    requiredFacts:',
-    '    futureContextPolicy: strict\n    requiredFacts:');
-  const p = projectSkillContract(unknown);
+test('Unknown v1alpha4 Contract extensions are explicit and remain in Source', () => {
+  const changed = source.replace('goal: pdu_session.initial_request_fulfilled',
+    'futurePolicy: strict\ngoal: pdu_session.initial_request_fulfilled');
+  const p = projectSkillContract(changed);
   assert.equal(p.state, 'PARTIAL');
-  assert.ok(p.unprojectedPaths.includes('spec.context.futureContextPolicy'));
+  assert.deepEqual(p.unprojectedPaths, ['futurePolicy']);
+  assert.match(changed, /futurePolicy: strict/);
+});
 
-  const malformed = contract.replace('    requiredFacts:\n    - ingress',
-    '    requiredFacts: ingress');
-  const partial = projectSkillContract(malformed);
-  assert.equal(partial.state, 'PARTIAL');
-  assert.ok(partial.projectionWarnings.includes('spec.context.requiredFacts is not a sequence'));
+test('Malformed known v1alpha4 sections are partial rather than silently discarded', () => {
+  const changed = source.replace('capabilities:\n', 'capabilities: not-a-sequence\n');
+  const p = projectSkillContract(changed);
+  assert.equal(p.state, 'PARTIAL');
+  assert.ok(p.projectionWarnings.includes('capabilities is not a sequence'));
+
+  const malformedLimits = projectSkillContract(source.replace('limits:\n  maxActions: 32',
+    'limits: 32'));
+  assert.equal(malformedLimits.state, 'PARTIAL');
+  assert.ok(malformedLimits.projectionWarnings.includes('limits is not a mapping'));
+});
+
+test('Invalid YAML, duplicate keys, aliases and oversized source fail closed', () => {
+  assert.equal(projectSkillContract('goal: [').state, 'SOURCE_ONLY');
+  assert.equal(projectSkillContract(source.replace(
+    'goal: pdu_session.initial_request_fulfilled',
+    'goal: one\ngoal: two')).state, 'SOURCE_ONLY');
+  assert.equal(projectSkillContract(source.replace(
+    'goal: pdu_session.initial_request_fulfilled',
+    'goal: &g pdu_session.initial_request_fulfilled')).state, 'SOURCE_ONLY');
+  assert.equal(projectSkillContract('x'.repeat(1024 * 1024 + 1)).state, 'SOURCE_ONLY');
+});
+
+test('Contract projection never invents qualification or Runtime evidence', () => {
+  const p = projectSkillContract(source, {name: 'establish-pdu-session'});
+  assert.equal(p.qualification, undefined);
+  assert.equal(p.runtime, undefined);
+  assert.equal(p.state, 'READY'); // projection completeness only
 });
