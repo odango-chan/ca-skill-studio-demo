@@ -1,5 +1,5 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
-// All browser acceptance fixtures use the pinned CA-SL v1alpha4 sample set.
+// All browser acceptance fixtures use the pinned CA-SL v1alpha5 sample set.
 export async function assertSourceVisualPair(evalJS,sleep,filename,label){
   let state;
   for(let attempt=0;attempt<30;attempt++){
@@ -152,7 +152,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
   if(classic?.fileCount!==8||classic?.corePresent!==3||
      mas?.fileCount!==6||mas?.corePresent!==3)
-    throw Error('Two-SKILL v1alpha4 inventory does not match the pinned sample manifest: '+
+    throw Error('Two-SKILL v1alpha5 inventory does not match the pinned sample manifest: '+
       JSON.stringify({classic,mas}));
   function assertGroupInventory(result,packageName,expected){
     const pkg=result?.packages?.find(item=>item.name===packageName);
@@ -431,7 +431,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     return Boolean(row);
   })()`);
   if(!conventionalPackageTop)
-    throw Error('v1alpha4 5GC Package row disappeared after Dependencies interaction');
+    throw Error('v1alpha5 5GC Package row disappeared after Dependencies interaction');
   await sleep(150);
   await ensurePackageExpanded('establish-pdu-session');
   const classicContract=await openPackageContract('establish-pdu-session');
@@ -503,7 +503,7 @@ export async function runWorkbenchAcceptance({
   const defaultProcedureUri=String(procedureUri??"");
   const procedureSuffix="/skills/establish-pdu-session/assurance/procedure.yaml";
   if(!defaultProcedureUri.endsWith(procedureSuffix))
-    throw Error("Browser acceptance must run against the active CA-SL v1alpha4 5GC Procedure: "+
+    throw Error("Browser acceptance must run against the active CA-SL v1alpha5 5GC Procedure: "+
       defaultProcedureUri);
 
   const nativeCommand=async(id,...args)=>evalJS(
@@ -529,7 +529,7 @@ export async function runWorkbenchAcceptance({
       for(const frame of frames.filter(item=>/webview/i.test(item.url??""))){
         try{
           const world=await command("Page.createIsolatedWorld",{
-            frameId:frame.id,worldName:"skill-studio-v1alpha4-acceptance",
+            frameId:frame.id,worldName:"skill-studio-v1alpha5-acceptance",
             grantUniveralAccess:true
           });
           const evaluated=await command("Runtime.evaluate",{
@@ -598,19 +598,19 @@ export async function runWorkbenchAcceptance({
 
   const started=Date.now();
   const procedurePair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","CA-SL v1alpha4 Procedure Designer");
+    evalJS,sleep,"procedure.yaml","CA-SL v1alpha5 Procedure Designer");
   const sourceState=await nativeCommand("skillStudio.internal.sourceVersionAcceptance");
   if(sourceState?.uri!==defaultProcedureUri||!Number.isSafeInteger(sourceState.version))
-    throw Error("Native Source is not the exact v1alpha4 Procedure TextDocument: "+
+    throw Error("Native Source is not the exact v1alpha5 Procedure TextDocument: "+
       JSON.stringify({expected:defaultProcedureUri,sourceState,procedurePair}));
   const initialGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
-    "default v1alpha4 Procedure graph");
+    "default v1alpha5 Procedure graph");
   const initialTiming=initialGraph.view.timing?JSON.parse(initialGraph.view.timing):{
     type:"rendered",revision:initialGraph.view.revision,nodes:initialGraph.view.graphNodes
   };
 
-  // The frozen v1alpha4 graph is intentionally read-only. Route changes belong
+  // The v1alpha5 candidate graph is intentionally read-only. Route changes belong
   // to explicit Source/Authoring workflows, not the legacy drag-to-rewire editor.
   const graphEditability=await evalWebviewJS("(()=>{"+
     "const patch=document.querySelector('#patch');"+
@@ -624,17 +624,17 @@ export async function runWorkbenchAcceptance({
     "routeOptions:routes?.options.length??0,targetOptions:targets?.options.length??0,"+
     "status:document.querySelector('#message')?.textContent??''};})()");
   if(!graphEditability?.readOnly)
-    throw Error("v1alpha4 Procedure graph exposed legacy interactive Route editing: "+
+    throw Error("v1alpha5 Procedure graph exposed legacy interactive Route editing: "+
       JSON.stringify(graphEditability));
   const sourceAfterGraph=await nativeCommand("skillStudio.internal.sourceVersionAcceptance");
   if(sourceAfterGraph?.uri!==defaultProcedureUri||
      sourceAfterGraph.version!==sourceState.version)
-    throw Error("Read-only v1alpha4 graph interaction changed authoritative Source: "+
+    throw Error("Read-only v1alpha5 graph interaction changed authoritative Source: "+
       JSON.stringify({sourceState,sourceAfterGraph,graphEditability}));
   graphEditability.sourceUnchanged=true;
   console.log("STUDIO_V1ALPHA4_GRAPH_READ_ONLY_CHROMIUM",JSON.stringify(graphEditability));
 
-  // Toolbar defaults and layout/path controls are checked against the v1alpha4 graph.
+  // Toolbar defaults and layout/path controls are checked against the v1alpha5 graph.
   const toolbarInitial=await evalWebviewJS("(()=>({"+
     "layout:document.querySelector('#layoutDirection')?.value??null,"+
     "rootMode:document.querySelector('#rootPathMode')?.value??null,"+
@@ -645,12 +645,12 @@ export async function runWorkbenchAcceptance({
     "controls:['columns-2','network','eye','locate-fixed','zoom-out','zoom-in','maximize','fit-width','fit-height']"+
     ".map(name=>({name,found:[...document.querySelectorAll('#graphTools svg[data-icon]')].some(el=>el.getAttribute('data-icon')===name)}))"+
     "}))()");
-  // Root-path filtering is a legacy Procedure control. v1alpha4 has its own
+  // Root-path filtering is a legacy Procedure control. v1alpha5 has its own
   // typed stage projection and must not expose that legacy path-editing surface.
   if(toolbarInitial?.layout!=="DOWN"||toolbarInitial.rootVisible||
      toolbarInitial.rootFiltersVisible||!toolbarInitial.toolbarVisible||
      toolbarInitial.controls.some(item=>!item.found))
-    throw Error("v1alpha4 Procedure canvas toolbar is incomplete or exposes legacy path controls: "+
+    throw Error("v1alpha5 Procedure canvas toolbar is incomplete or exposes legacy path controls: "+
       JSON.stringify(toolbarInitial));
   await evalWebviewJS("(()=>{const s=document.querySelector('#layoutDirection');s.value='RIGHT';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
   await sleep(180);
@@ -664,12 +664,12 @@ export async function runWorkbenchAcceptance({
     "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length}))()");
   if(horizontal!=="RIGHT"||allPaths.layout!=="DOWN"||allPaths.rootMode!=="normal"||
      allPaths.rootToolbarVisible||!(allPaths.nodes>0)||!(allPaths.edges>0))
-    throw Error("v1alpha4 canvas layout or legacy-control isolation failed: "+
+    throw Error("v1alpha5 canvas layout or legacy-control isolation failed: "+
       JSON.stringify({toolbarInitial,horizontal,allPaths}));
   const canvasToolbar={initial:toolbarInitial,horizontal,allPaths};
   console.log("STUDIO_V1ALPHA4_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbar));
 
-  // Package ZIP must be produced from the exact active v1alpha4 Package snapshot.
+  // Package ZIP must be produced from the exact active v1alpha5 Package snapshot.
   await evalWebviewJS("document.querySelector('#exportPackageZip')?.click();true");
   let zipNotice=null;
   for(let i=0;i<60;i++){
@@ -679,7 +679,7 @@ export async function runWorkbenchAcceptance({
     await sleep(100);
   }
   if(!zipNotice?.visible||!zipNotice.details.includes(".zip"))
-    throw Error("v1alpha4 Package ZIP export did not prepare a download: "+JSON.stringify(zipNotice));
+    throw Error("v1alpha5 Package ZIP export did not prepare a download: "+JSON.stringify(zipNotice));
   const packageZip=await evalWebviewJS("(()=>{let blobMeta=null,linkMeta=null;"+
     "const create=URL.createObjectURL,click=HTMLAnchorElement.prototype.click;"+
     "URL.createObjectURL=function(blob){blobMeta={size:blob.size,type:blob.type};return create.call(URL,blob);};"+
@@ -689,15 +689,15 @@ export async function runWorkbenchAcceptance({
   if(!(packageZip?.blobMeta?.size>22)||packageZip.blobMeta.type!=="application/zip"||
      !packageZip.linkMeta?.download?.endsWith(".zip")||
      !packageZip.linkMeta.href.startsWith("blob:")||!packageZip.noticeHidden)
-    throw Error("v1alpha4 Package ZIP did not produce a browser Blob download: "+
+    throw Error("v1alpha5 Package ZIP did not produce a browser Blob download: "+
       JSON.stringify(packageZip));
   packageZip.details=zipNotice.details;
   console.log("STUDIO_V1ALPHA4_PACKAGE_ZIP_CHROMIUM",JSON.stringify(packageZip));
 
   let languageServiceStatus="NOT_REQUIRED_NODE_HOST";
-  let v1alpha4LanguageFeatures=null,semanticTokenEvidence=null;
+  let v1alpha5LanguageFeatures=null,semanticTokenEvidence=null;
   if(requireBrowserLsp){
-    // A v1alpha4 Package is intentionally PARTIAL until trusted Owner,
+    // A v1alpha5 Package is intentionally PARTIAL until trusted Owner,
     // Capability and Schema snapshots are linked. PARTIAL is not a Worker
     // failure: verify the browser Language Client is alive and the exact
     // current Package generation parsed completely, without claiming
@@ -712,7 +712,7 @@ export async function runWorkbenchAcceptance({
     const packageSnapshot=languageServiceDiagnostics?.languagePackages?.find(
       item=>item.rootUri===expectedPackageRoot);
     const expectedPartialReason=
-      "CA-SL v1alpha4 source parsed; trusted Owner/Capability/Schema linking requires v1alpha4 Compiler and published snapshots";
+      "CA-SL v1alpha5 source parsed; trusted Owner/Capability/Schema linking requires v1alpha5 Compiler and published snapshots";
     if(languageServiceDiagnostics?.languageClientStarted!==true||
        languageServiceDiagnostics?.languageTransportFailure||
        !languagePackage||
@@ -721,7 +721,7 @@ export async function runWorkbenchAcceptance({
        languagePackage.packageAuditState!=="UNAVAILABLE"||
        !String(languagePackage.packageAuditReason??"").includes(expectedPartialReason)||
        packageSnapshot?.lastSentSnapshot?.completeness!=="complete")
-      throw Error("v1alpha4 Language Service must be available while its unqualified Package remains PARTIAL: "+
+      throw Error("v1alpha5 Language Service must be available while its unqualified Package remains PARTIAL: "+
         JSON.stringify({languageServiceDiagnostics,expectedPackageRoot,languagePackage,packageSnapshot}));
     console.log("STUDIO_V1ALPHA4_LSP_PARTIAL_IS_EXPECTED_CHROMIUM",JSON.stringify({
       status:languageServiceStatus,
@@ -729,28 +729,28 @@ export async function runWorkbenchAcceptance({
       languagePackage,
       snapshot:packageSnapshot?.lastSentSnapshot
     }));
-    v1alpha4LanguageFeatures=await nativeCommand(
-      "skillStudio.internal.v1alpha4LanguageProviderAcceptance",defaultProcedureUri);
-    if(v1alpha4LanguageFeatures?.status!=="PARTIAL"||
-       v1alpha4LanguageFeatures?.snapshotCompleteness!=="complete"||
-       !v1alpha4LanguageFeatures.contractPreconditionCompletion?.includes("check.precondition")||
-       !v1alpha4LanguageFeatures.requestSchemaCompletion?.includes("schemas/request.schema.yaml")||
-       !v1alpha4LanguageFeatures.startNodeCompletion?.includes("check")||
-       !v1alpha4LanguageFeatures.predicateCompletion?.includes("demo.ready")||
-       !v1alpha4LanguageFeatures.preconditionFields?.includes("predicates:")||
-       !v1alpha4LanguageFeatures.observationFields?.includes("tool:")||
-       !v1alpha4LanguageFeatures.operationFields?.includes("script:")||
-       !v1alpha4LanguageFeatures.scriptPathCompletion?.includes("scripts/runner.py")||
-       !v1alpha4LanguageFeatures.outcomeUnknownTargets?.includes("SAFE_STOPPED")||
-       !v1alpha4LanguageFeatures.contractDefinition||
-       !v1alpha4LanguageFeatures.predicateDefinition||
-       !v1alpha4LanguageFeatures.predicateHoverSignature||
-       !v1alpha4LanguageFeatures.predicateReferences||
-       !v1alpha4LanguageFeatures.scriptDefinition||
-       !v1alpha4LanguageFeatures.procedureOutline?.includes("run-script")||
-       v1alpha4LanguageFeatures.ownerQualification!=="NOT_QUALIFIED")
-      throw Error("Native v1alpha4 language-provider acceptance failed: "+
-        JSON.stringify(v1alpha4LanguageFeatures));
+    v1alpha5LanguageFeatures=await nativeCommand(
+      "skillStudio.internal.v1alpha5LanguageProviderAcceptance",defaultProcedureUri);
+    if(v1alpha5LanguageFeatures?.status!=="PARTIAL"||
+       v1alpha5LanguageFeatures?.snapshotCompleteness!=="complete"||
+       !v1alpha5LanguageFeatures.contractPreconditionCompletion?.includes("check.precondition")||
+       !v1alpha5LanguageFeatures.requestSchemaCompletion?.includes("schemas/request.schema.yaml")||
+       !v1alpha5LanguageFeatures.startNodeCompletion?.includes("check")||
+       !v1alpha5LanguageFeatures.predicateCompletion?.includes("demo.ready")||
+       !v1alpha5LanguageFeatures.preconditionFields?.includes("predicates:")||
+       !v1alpha5LanguageFeatures.observationFields?.includes("tool:")||
+       !v1alpha5LanguageFeatures.operationFields?.includes("script:")||
+       !v1alpha5LanguageFeatures.scriptPathCompletion?.includes("scripts/runner.py")||
+       !v1alpha5LanguageFeatures.outcomeUnknownTargets?.includes("SAFE_STOPPED")||
+       !v1alpha5LanguageFeatures.contractDefinition||
+       !v1alpha5LanguageFeatures.predicateDefinition||
+       !v1alpha5LanguageFeatures.predicateHoverSignature||
+       !v1alpha5LanguageFeatures.predicateReferences||
+       !v1alpha5LanguageFeatures.scriptDefinition||
+       !v1alpha5LanguageFeatures.procedureOutline?.includes("run-script")||
+       v1alpha5LanguageFeatures.ownerQualification!=="NOT_QUALIFIED")
+      throw Error("Native v1alpha5 language-provider acceptance failed: "+
+        JSON.stringify(v1alpha5LanguageFeatures));
     semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
     if(semanticTokenEvidence?.registered!==true||
        !(semanticTokenEvidence?.lastTokenCount>0)||
@@ -758,10 +758,10 @@ export async function runWorkbenchAcceptance({
        !(semanticTokenEvidence?.renderedTokenCount>0)||
        !(semanticTokenEvidence?.renderedTypeCount>=2)||
        semanticTokenEvidence?.renderError)
-      throw Error("Native v1alpha4 semantic tokens were not rendered: "+
+      throw Error("Native v1alpha5 semantic tokens were not rendered: "+
         JSON.stringify(semanticTokenEvidence));
     console.log("STUDIO_V1ALPHA4_LANGUAGE_FEATURES_CHROMIUM",
-      JSON.stringify(v1alpha4LanguageFeatures));
+      JSON.stringify(v1alpha5LanguageFeatures));
     console.log("STUDIO_V1ALPHA4_SEMANTIC_TOKENS_CHROMIUM",
       JSON.stringify(semanticTokenEvidence));
   }
@@ -775,7 +775,7 @@ export async function runWorkbenchAcceptance({
     JSON.stringify(inspectorSelection));
   if(inspectorSelection?.nodeId!=="get-sm-subscription-data"||
      inspectorSelection?.snapshotState!=="READY")
-    throw Error("v1alpha4 graph selection did not reach the native Inspector model: "+
+    throw Error("v1alpha5 graph selection did not reach the native Inspector model: "+
       JSON.stringify(inspectorSelection));
   await nativeCommand("skillStudio.auditPackage");
   // Theia 1.76 registers a per-view focus command from PluginViewRegistry.
@@ -809,7 +809,7 @@ export async function runWorkbenchAcceptance({
      !phaseEvidence.globalPrecondition||!phaseEvidence.selectedNode||
      !phaseEvidence.dataflow||!phaseEvidence.sourceOnly||
      !phaseEvidence.noRuntimeClaims)
-    throw Error("v1alpha4 Inspector did not expose the selected Source-only projection: "+
+    throw Error("v1alpha5 Inspector did not expose the selected Source-only projection: "+
       JSON.stringify({phaseEvidence,inspectorSelection,
         inspectorText:inspectorText.slice(-2200),
         inspectorContainer:await evalJS("(()=>{const el=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');return {text:el?.innerText??'',html:el?.innerHTML?.slice(-3500)??'',visible:!!el&&el.getBoundingClientRect().width>0};})()") }));
@@ -823,12 +823,12 @@ export async function runWorkbenchAcceptance({
      editorGroupPlacement?.maxViewColumn>2||
      editorGroupPlacement?.pythonColumn!==1||
      editorGroupPlacement?.ordinaryYamlColumn!==1)
-    throw Error("v1alpha4 editor groups did not remain a stable two-column layout: "+
+    throw Error("v1alpha5 editor groups did not remain a stable two-column layout: "+
       JSON.stringify(editorGroupPlacement));
   console.log("STUDIO_V1ALPHA4_EDITOR_GROUPS_CHROMIUM",JSON.stringify(editorGroupPlacement));
 
   // Native Markdown is the VS Code Markdown extension, with one shared
-  // Source-left / Preview-right layout for both v1alpha4 Skill documents.
+  // Source-left / Preview-right layout for both v1alpha5 Skill documents.
   const skillGuideUri=defaultProcedureUri.replace(
     /\/assurance\/procedure\.yaml$/,"/SKILL.md");
   const mappingUri=defaultProcedureUri.replace(
@@ -837,14 +837,14 @@ export async function runWorkbenchAcceptance({
   const nativeMarkdownUri=await nativeCommand(
     "skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance",skillGuideUri,1);
   if(nativeMarkdownUri!==skillGuideUri)
-    throw Error("Native Markdown did not open the exact v1alpha4 Skill guide: "+nativeMarkdownUri);
+    throw Error("Native Markdown did not open the exact v1alpha5 Skill guide: "+nativeMarkdownUri);
   const nativeMarkdown=await waitNativeMarkdown(view=>
     view.heading?.includes("Establish PDU Session")&&
     view.styles.some(url=>url.includes("/media/native-markdown-preview.css")),
-    "v1alpha4 native Markdown Preview");
+    "v1alpha5 native Markdown Preview");
   if(nativeMarkdown.view.headingColor!=="rgb(12, 142, 123)"||
      nativeMarkdown.view.maxWidth!=="980px")
-    throw Error("v1alpha4 Markdown Preview did not apply the shared Studio theme: "+
+    throw Error("v1alpha5 Markdown Preview did not apply the shared Studio theme: "+
       JSON.stringify(nativeMarkdown.view));
   if(requireBrowserLsp){
     const markdownStartup=await nativeCommand(
@@ -874,18 +874,18 @@ export async function runWorkbenchAcceptance({
     }
     return layout;
   };
-  const markdownLayout=await assertTwoColumns("initial v1alpha4 Markdown Preview",nativeMarkdownUri);
+  const markdownLayout=await assertTwoColumns("initial v1alpha5 Markdown Preview",nativeMarkdownUri);
   const secondMarkdownUri=await nativeCommand(
     "skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance",mappingUri,2);
   if(secondMarkdownUri!==mappingUri)
-    throw Error("Native Markdown did not open the v1alpha4 MAS mapping document: "+
+    throw Error("Native Markdown did not open the v1alpha5 MAS mapping document: "+
       JSON.stringify(secondMarkdownUri));
   const secondMarkdown=await waitNativeMarkdown(view=>
     view.heading?.includes("OpenAMSM source mapping")&&
     view.styles.some(url=>url.includes("/media/native-markdown-preview.css")),
-    "v1alpha4 MAS mapping Markdown Preview");
+    "v1alpha5 MAS mapping Markdown Preview");
   const secondMarkdownLayout=await assertTwoColumns(
-    "second v1alpha4 Markdown source opened from the right group",secondMarkdownUri);
+    "second v1alpha5 Markdown source opened from the right group",secondMarkdownUri);
   const nativeMarkdownEvidence={
     uri:nativeMarkdownUri,preview:nativeMarkdown.view,layout:markdownLayout,
     secondUri:secondMarkdownUri,secondPreview:secondMarkdown.view,
@@ -898,7 +898,7 @@ export async function runWorkbenchAcceptance({
   try{
     const live=await waitNativeMarkdown(view=>
       view.heading==="Native Markdown Live Update Probe",
-      "v1alpha4 Markdown unsaved Source update");
+      "v1alpha5 Markdown unsaved Source update");
     const settings=await nativeCommand("skillStudio.internal.nativeMarkdownSettingsAcceptance");
     if(settings?.scrollEditorWithPreview!==true||settings?.scrollPreviewWithEditor!==true)
       throw Error("Native Markdown bidirectional scroll settings are not enabled: "+
@@ -912,14 +912,14 @@ export async function runWorkbenchAcceptance({
     await nativeCommand("skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance",liveUri);
   }
   await waitNativeMarkdown(view=>view.heading?.includes("Establish PDU Session"),
-    "restored v1alpha4 Skill Markdown Preview");
+    "restored v1alpha5 Skill Markdown Preview");
 
   const securityUri=await nativeCommand(
     "skillStudio.internal.nativeMarkdownSecurityAcceptance",skillGuideUri);
   try{
     const security=await waitNativeMarkdown(view=>
       view.heading==="Native Markdown Security Probe",
-      "v1alpha4 Markdown security probe");
+      "v1alpha5 Markdown security probe");
     const safeLink=security.view.anchorDetails.find(anchor=>
       anchor.text==="Safe package reference");
     const blockedLinks=security.view.anchorDetails.filter(anchor=>
@@ -937,27 +937,27 @@ export async function runWorkbenchAcceptance({
     await nativeCommand("skillStudio.internal.removeNativeMarkdownSecurityAcceptance",securityUri);
   }
 
-  // The native Contract, Predicate and Schema Designers render the v1alpha4
+  // The native Contract, Predicate and Schema Designers render the v1alpha5
   // source files from the same Skill Package and retain native Source pairing.
   const contractUri=await openPackageFile("skillStudio.openContract","assurance/contract.yaml");
   const contract=await waitWebview(view=>view.title==="SKILL Contract Visual"&&
     view.bodyText.includes("Package\nestablish-pdu-session\n")&&
-    view.bodyText.includes("nudm-sdm-get"),
-    "v1alpha4 5GC Contract Designer");
+    view.bodyText.includes("get-sm-subscription-data"),
+    "v1alpha5 5GC Contract Designer");
   const expectedContractCards=["Goal & Preconditions","Schemas & Context",
     "Capabilities","Dependencies","Limits"];
   const contractCards=contract.view.cards??[];
   if(!contract.view.bodyText.includes("Package\nestablish-pdu-session\n")||
      !contract.view.bodyText.includes("pdu_session.initial_request_fulfilled")||
-     !contract.view.bodyText.includes("nudm-sdm-get")||
+     !contract.view.bodyText.includes("get-sm-subscription-data")||
      expectedContractCards.some(title=>!contract.view.cards.includes(title)))
-    throw Error("v1alpha4 Contract Designer did not render the current Contract Source: "+
+    throw Error("v1alpha5 Contract Designer did not render the current Contract Source: "+
       JSON.stringify(contract.view).slice(0,2600));
-  await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha4 Contract Designer");
+  await assertSourceVisualPair(evalJS,sleep,"contract.yaml","v1alpha5 Contract Designer");
   const predicateUri=await openPackageFile("skillStudio.openPredicates","assurance/predicates.yaml");
   const predicates=await waitWebview(view=>view.title==="SKILL Predicate Visual"&&
     view.bodyText.includes("establishment.ran.adopted"),
-    "v1alpha4 5GC Predicate Designer");
+    "v1alpha5 5GC Predicate Designer");
   const predicateDetails=await command("Runtime.evaluate",{
     contextId:predicates.contextId,returnByValue:true,
     expression:"(()=>{const item=[...document.querySelectorAll('details.predicate')].find(node=>node.querySelector('.pid')?.textContent.trim()==='establishment.subscription.request_valid');if(!item)return {opened:false,bodyText:document.body?.innerText??''};item.open=true;return {opened:true,bodyText:document.body?.innerText??''};})()"
@@ -969,30 +969,30 @@ export async function runWorkbenchAcceptance({
      !predicateText.includes("Parameters → Evidence → Evaluator")||
      !predicateText.includes("Evidence Requirements")||
      predicateText.includes("Observation"))
-    throw Error("v1alpha4 Predicate Designer did not render the current PredicateSet: "+
+    throw Error("v1alpha5 Predicate Designer did not render the current PredicateSet: "+
       JSON.stringify({view:predicates.view,predicateText:predicateText.slice(-2600)}));
-  await assertSourceVisualPair(evalJS,sleep,"predicates.yaml","v1alpha4 Predicate Designer");
+  await assertSourceVisualPair(evalJS,sleep,"predicates.yaml","v1alpha5 Predicate Designer");
   const schemaUri=await openPackageFile(
     "skillStudio.openSchema","schemas/establishment-request.schema.yaml");
   const schema=await waitWebview(view=>view.title==="SKILL Schema Visual"&&
-    view.bodyText.includes("Schema ID urn:connectionagent:example:5gc:establishment-request:v1alpha4")&&
+    view.bodyText.includes("Schema ID urn:connectionagent:example:5gc:establishment-request:v1alpha5")&&
     view.bodyText.includes("establishment-request"),
-    "v1alpha4 5GC Schema Designer");
+    "v1alpha5 5GC Schema Designer");
   if(!schema.view.bodyText.includes("sNssai")||
      !schema.view.bodyText.includes("requestedPduSessionType")||
      !schema.view.bodyText.includes("const: IPV4")||
      !schema.view.bodyText.includes("Draft 2020-12"))
-    throw Error("v1alpha4 Schema Designer did not render the real request Schema: "+
+    throw Error("v1alpha5 Schema Designer did not render the real request Schema: "+
       JSON.stringify(schema.view).slice(0,2600));
   await assertSourceVisualPair(evalJS,sleep,"establishment-request.schema.yaml",
-    "v1alpha4 Schema Designer");
+    "v1alpha5 Schema Designer");
   console.log("STUDIO_V1ALPHA4_DESIGNERS_CHROMIUM",JSON.stringify({
     contract:{uri:contractUri,cards:contractCards},
     predicates:{uri:predicateUri,heading:predicates.view.title},
     schema:{uri:schemaUri,heading:schema.view.title}
   }));
 
-  // Verify the second v1alpha4 Skill opens through its exact URI, then restore
+  // Verify the second v1alpha5 Skill opens through its exact URI, then restore
   // the primary 5GC Procedure as the final active editor.
   const masProcedureUri=defaultProcedureUri.replace(
     "/establish-pdu-session/assurance/procedure.yaml",
@@ -1000,32 +1000,32 @@ export async function runWorkbenchAcceptance({
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",masProcedureUri);
   const masPair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","v1alpha4 MAS Procedure Designer");
+    evalJS,sleep,"procedure.yaml","v1alpha5 MAS Procedure Designer");
   const masGraph=await waitWebview(view=>
     view.procedureRoot&&view.bodyText.includes("establish-pdu-session-mas")&&view.graphNodes>0,
-    "v1alpha4 MAS Procedure graph");
+    "v1alpha5 MAS Procedure graph");
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const restoredPair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","restored v1alpha4 5GC Procedure Designer");
+    evalJS,sleep,"procedure.yaml","restored v1alpha5 5GC Procedure Designer");
   const finalGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
-    "restored default v1alpha4 5GC Procedure graph");
+    "restored default v1alpha5 5GC Procedure graph");
 
   const packageOverviewEvidence=await runPackageOverviewAcceptance({
     command,evalJS,sleep,requireEditor
   });
   if(!packageOverviewEvidence?.twoSkills||
      packageOverviewEvidence.evidence?.skills?.length!==2)
-    throw Error("Package Overview did not discover both v1alpha4 Skills: "+
+    throw Error("Package Overview did not discover both v1alpha5 Skills: "+
       JSON.stringify(packageOverviewEvidence));
   // Keep unrelated editors open; closing every tab can block Theia's Webview command bridge.
   await nativeCommand("skillStudio.openProcedure",defaultProcedureUri);
   const finalPair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","final v1alpha4 default Procedure Designer");
+    evalJS,sleep,"procedure.yaml","final v1alpha5 default Procedure Designer");
   const finalRestoredGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
-    "final default v1alpha4 Procedure graph");
+    "final default v1alpha5 Procedure graph");
 
   const dualSkillExplorer={
     root:"skill-studio-demo/skills",
@@ -1060,7 +1060,7 @@ export async function runWorkbenchAcceptance({
     nativeSingleClick:true,nativeDoubleClick:true,reopenMs:Date.now()-started,
     dualSkillExplorer,packageOverview:packageOverviewEvidence.evidence,
     graphEditability,canvasToolbar,
-    v1alpha4LanguageFeatures,semanticTokenEvidence,
+    v1alpha5LanguageFeatures,semanticTokenEvidence,
     nativeMarkdownEvidence,designerEvidence:{
       contract:contract.view,predicates:predicates.view,schema:schema.view
     }
