@@ -1,6 +1,6 @@
 import {parseDocument, LineCounter, isMap, isSeq, isScalar, isAlias} from 'yaml';
 
-// Read-only CA-SL v1alpha4 Contract projection. This is not qualification,
+// Read-only CA-SL v1alpha5 Contract projection. This is not qualification,
 // dependency linking, authorization, or Runtime validation.
 const LIMIT = 1024 * 1024;
 const MAX_NODES = 20000;
@@ -152,7 +152,7 @@ export function projectSkillContract(source, options = {}) {
   return {
     state,
     kind: 'SkillContract',
-    language: 'CA-SL v1alpha4',
+    language: 'CA-SL v1alpha5',
     name: packageName,
     goal,
     precondition,
