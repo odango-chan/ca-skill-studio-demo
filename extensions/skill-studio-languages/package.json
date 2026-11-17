@@ -151,6 +151,11 @@
         "id": "skillOperation",
         "superType": "function",
         "description": "Exact callable Operation identity from an imported ToolCatalog"
+      },
+      {
+        "id": "skillWait",
+        "superType": "keyword",
+        "description": "CA-SL v1alpha5 Node-entry Event Wait control; not a business stage"
       }
     ],
     "semanticTokenModifiers": [
