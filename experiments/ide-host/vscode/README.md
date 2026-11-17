@@ -14,6 +14,12 @@ This folder contains the shared VS Code API extension used by the online Theia h
 
 Package Explorer inventory is not semantic validation or Compiler qualification. Imported dependency snapshots remain Plugin-owned and read-only by default. Build Artifacts are not shown without a real Compiler BuildResult.
 
+## CA-SL v1alpha5 Preview
+
+The active Example is pinned to the CA-SL v1alpha5 candidate from `ca-skills@84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef`; the normative candidate is separately pinned in `language/contracts/ca-sl-v1alpha5.lock.json`. The v1alpha5 Procedure projection exposes Node-entry Wait as a control field, separate from the four business stages. It is an editor-time source projection, not Compiler conformance.
+
+The bundled Compiler v1.0.0 targets v1alpha4. Check, Build and Inspect Dependencies are deliberately blocked for v1alpha5 until a released v1alpha5 Compiler with the required language and linking support is integrated. Do not lower Wait into legacy syntax or infer trusted Ingress / Owner contracts from completion hints. See [the Preview boundary](../../../docs/design/ca-sl-v1alpha5-studio-preview.md).
+
 ## Build
 
 From the repository root with Node.js 24:
