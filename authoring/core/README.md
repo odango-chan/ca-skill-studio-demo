@@ -26,7 +26,7 @@ npm test
 ~~~
 
 
-## v1alpha5 boundary
+## v1alpha5 release boundary
 
 - The core accepts only `connectionagent.io/v1alpha5`; it never falls back to the published v1alpha4 Compiler or parser.
 - The model prompt treats Node-entry Wait as control before the first business stage. It cannot invent trusted IngressCatalog / Owner / correlation contracts.
