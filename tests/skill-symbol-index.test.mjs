@@ -23,7 +23,7 @@ try{
 }
 
 const rootUri="file:///workspace/establish-pdu-session";
-const sampleRoot="../site/samples/skills/establish-pdu-session/";
+const sampleRoot="../site/samples/v1alpha4/establish-pdu-session/";
 function read(path){return readFileSync(new URL(sampleRoot+path,import.meta.url),"utf8");}
 function document(relativePath,text){
   return {uri:rootUri+"/"+relativePath,relativePath,languageId:"yaml",
@@ -34,14 +34,10 @@ function packageSnapshot(extra=[]){
     document("assurance/contract.yaml",read("assurance/contract.yaml")),
     document("assurance/predicates.yaml",read("assurance/predicates.yaml")),
     document("assurance/procedure.yaml",read("assurance/procedure.yaml")),
-    document("schemas/establishment-request.schema.yaml",read("schemas/establishment-request.schema.yaml")),
-    document("lib/tools/udm.tool.yaml",`apiVersion: connectionagent.io/v1alpha1
-kind: ToolCatalog
-spec:
-  contracts:
-    - operation: sbi.udm.sm_data.get
-      effect: READ
-`)
+    document("schemas/establishment-request.schema.yaml",
+      read("schemas/establishment-request.schema.yaml")),
+    document("scripts/validate-subscription-request.py",
+      read("scripts/validate-subscription-request.py"))
   ];
   return {rootUri,packageName:"establish-pdu-session",generation:1,
     completeness:"complete",documents:[...docs,...extra]};
@@ -56,51 +52,56 @@ function at(index,uri,text,needle,from=0){
   return symbols.skillSymbolAt(index,uri,offset);
 }
 
-test("Contract entry Procedure resolves to the unique Procedure declaration",()=>{
+test("Contract precondition resolves to the exact v1alpha4 Procedure Node",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
   const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
   const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
-  const hit=at(index,contract.uri,contract.text,"ue-requested-pdu-session-establishment");
+  const hit=at(index,contract.uri,contract.text,"get-sm-subscription-data.precondition");
+  assert.equal(hit.token.type,"skillStep");
   const declaration=symbols.uniqueSkillSymbolDeclaration(hit);
   assert.equal(declaration.uri,procedure.uri);
-  assert.equal(declaration.type,"skillProcedure");
+  assert.equal(declaration.type,"skillStep");
+  assert.equal(declaration.name,"get-sm-subscription-data");
   assert.ok(declaration.modifiers.includes("declaration"));
   const refs=symbols.skillSymbolOccurrences(hit,true);
   assert.ok(refs.some(x=>x.uri===contract.uri));
   assert.ok(refs.some(x=>x.uri===procedure.uri));
 });
 
-test("Procedure Predicate references resolve to PredicateSet declarations",()=>{
+test("Procedure Predicate references resolve to the v1alpha4 Predicate declarations",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
   const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
   const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
-  const hit=at(index,procedure.uri,procedure.text,"createdsession.ingress.eligible");
+  const hit=at(index,procedure.uri,procedure.text,"establishment.request.supported");
+  assert.equal(hit.token.type,"skillPredicate");
   const declaration=symbols.uniqueSkillSymbolDeclaration(hit);
   assert.equal(declaration.uri,predicates.uri);
   assert.equal(declaration.type,"skillPredicate");
-  assert.equal(declaration.name,"createdsession.ingress.eligible");
+  assert.equal(declaration.name,"establishment.request.supported");
   const occurrences=symbols.skillSymbolOccurrences(hit,true);
   assert.ok(occurrences.some(x=>x.uri===procedure.uri));
   assert.ok(occurrences.some(x=>x.uri===predicates.uri));
 });
 
-test("Procedure start and route references resolve within their owning Procedure scope",()=>{
+test("Procedure route references resolve to exact Node declarations in the same graph",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
   const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
-  const start=at(index,procedure.uri,procedure.text,"nudm-sdm-get");
-  const declaration=symbols.uniqueSkillSymbolDeclaration(start);
+  const route="PASS: subscribe-sm-data";
+  const hit=at(index,procedure.uri,procedure.text,"subscribe-sm-data",
+    procedure.text.indexOf(route));
+  assert.equal(hit.token.type,"skillStep");
+  const declaration=symbols.uniqueSkillSymbolDeclaration(hit);
   assert.equal(declaration.type,"skillStep");
-  assert.equal(declaration.name,"nudm-sdm-get");
-  assert.deepEqual(declaration.path.slice(0,3),["procedures",
-    "ue-requested-pdu-session-establishment","nodes"]);
-  const occurrences=symbols.skillSymbolOccurrences(start,true);
+  assert.equal(declaration.name,"subscribe-sm-data");
+  assert.equal(declaration.uri,procedure.uri);
+  const occurrences=symbols.skillSymbolOccurrences(hit,true);
   assert.ok(occurrences.length>=2);
 });
 
-test("Contract Schema references resolve to exact Package-owned Schema files",()=>{
+test("Contract request Schema reference resolves to the exact Package-owned Schema file",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
   const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
@@ -114,84 +115,64 @@ test("Contract Schema references resolve to exact Package-owned Schema files",()
     "file-path navigation lands at the exact target document start");
 });
 
-test("missing Owner Schema and fragment-only refs never produce guessed destinations",()=>{
+test("Predicate script references resolve only to exact Package-owned script files",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
-  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
-  const missingPath="lib/host/subject.schema.yaml";
-  const missing=at(index,contract.uri,contract.text,missingPath);
-  assert.ok(missing);
-  assert.equal(symbols.uniqueSkillSymbolDeclaration(missing),null);
-  const source="properties:\\n  value:\\n    $ref: '#/$defs/Thing'\\n$defs:\\n  Thing:\\n    type: string\\n";
-  const relativePath="schemas/fragment.schema.yaml";
-  const uri=rootUri+"/"+relativePath;
-  const fragmentSnapshot={...snapshot,documents:[...snapshot.documents,
-    document(relativePath,source)]};
-  const fragmentIndex=symbols.buildSkillSymbolIndex(fragmentSnapshot);
-  const fragment=at(fragmentIndex,uri,source,"#/$defs/Thing");
-  assert.equal(fragment,null,"fragment target needs exact AST range support");
-});
-
-test("Contract direct Operation grants resolve only when the exact ToolCatalog Operation exists",()=>{
-  const snapshot=packageSnapshot();
-  const index=symbols.buildSkillSymbolIndex(snapshot);
-  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
-  const operation="sbi.udm.sm_data.get";
-  const hit=at(index,contract.uri,contract.text,operation);
+  const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
+  const script=snapshot.documents.find(x=>x.relativePath==="scripts/validate-subscription-request.py");
+  const path="scripts/validate-subscription-request.py";
+  const hit=at(index,predicates.uri,predicates.text,path);
+  assert.equal(hit.token.type,"skillReference");
   const declaration=symbols.uniqueSkillSymbolDeclaration(hit);
-  assert.equal(declaration.relativePath,"lib/tools/udm.tool.yaml");
-  assert.ok(declaration.modifiers.includes("imported"));
+  assert.equal(declaration.uri,script.uri);
+  assert.equal(declaration.relativePath,path);
+  assert.deepEqual(declaration.range,{start:0,end:0});
 });
 
-test("Procedure Operation references resolve only to an exact imported ToolCatalog declaration",()=>{
-  const snapshot=packageSnapshot();
-  const index=symbols.buildSkillSymbolIndex(snapshot);
-  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
-  const tools=snapshot.documents.find(x=>x.relativePath==="lib/tools/udm.tool.yaml");
-  const hit=at(index,procedure.uri,procedure.text,"sbi.udm.sm_data.get");
-  const declaration=symbols.uniqueSkillSymbolDeclaration(hit);
-  assert.equal(declaration.uri,tools.uri);
-  assert.ok(declaration.modifiers.includes("imported"));
-});
-
-test("duplicate imported Operation declarations are ambiguous and never produce a Definition",()=>{
-  const duplicate=document("lib/tools/another.tool.yaml",`apiVersion: connectionagent.io/v1alpha1
-kind: ToolCatalog
-spec:
-  contracts:
-    - operation: sbi.udm.sm_data.get
-      effect: READ
-`);
-  const snapshot=packageSnapshot([duplicate]);
-  const index=symbols.buildSkillSymbolIndex(snapshot);
-  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
-  const hit=at(index,procedure.uri,procedure.text,"sbi.udm.sm_data.get");
-  assert.equal(hit.declarations.length,2);
-  assert.equal(symbols.uniqueSkillSymbolDeclaration(hit),null);
-});
-
-test("unresolved Operation and missing Owner Schema never become invented declarations",()=>{
+test("External context schemas and unpublished Capability/Operation grants never invent declarations",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
   const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
-  const grant=at(index,contract.uri,contract.text,"ca.session.operation_context.read");
-  assert.ok(grant,"resource grant has an exact source token");
+  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+
+  const contextSchema="ca-context::urn:connectionagent:ca:context:subject:v1";
+  assert.equal(symbols.skillSymbolAt(index,contract.uri,
+    offsetOf(contract.text,contextSchema)),null,
+    "an external Schema identity is not a Package-relative file path");
+
+  const capability="urn:example:connectionagent:capability:3gpp:nudm-sdm-get:v1";
+  const grant=at(index,contract.uri,contract.text,capability);
+  assert.equal(grant.token.type,"skillCapability");
   assert.equal(symbols.uniqueSkillSymbolDeclaration(grant),null,
-    "a Capability grant without a matching imported Operation is unresolved");
+    "an illustrative Capability without a trusted publication is unresolved");
+
+  const operation="ca::sbi.udm.sm_data.get";
+  const operationRef=at(index,procedure.uri,procedure.text,operation);
+  assert.equal(operationRef.token.type,"skillOperation");
+  assert.equal(symbols.uniqueSkillSymbolDeclaration(operationRef),null,
+    "a callable reference without an imported Owner ToolCatalog remains unresolved");
+
+  const observation="ca-session-context::context.smf.session.read";
+  const observationRef=at(index,procedure.uri,procedure.text,observation);
+  assert.equal(observationRef.token.type,"skillObservation");
+  assert.equal(symbols.uniqueSkillSymbolDeclaration(observationRef),null,
+    "an Observation is not conflated with an Operation export");
 });
 
-test("Document Symbols expose Procedures, nested nodes and Predicates from exact declarations",()=>{
+test("Document Symbols expose v1alpha4 Procedure Nodes and Predicate declarations",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
   const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
   const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
   const procedureSymbols=symbols.skillSymbolDeclarationsForDocument(index,procedure.uri);
-  assert.ok(procedureSymbols.some(x=>x.type==="skillProcedure"&&
-    x.name==="ue-requested-pdu-session-establishment"));
-  assert.ok(procedureSymbols.some(x=>x.type==="skillStep"&&x.name==="nudm-sdm-get"));
+  assert.ok(procedureSymbols.some(x=>x.type==="skillStep"&&
+    x.name==="get-sm-subscription-data"));
+  assert.ok(procedureSymbols.some(x=>x.type==="skillStep"&&x.name==="update-sm-context"));
+  assert.ok(!procedureSymbols.some(x=>x.type==="skillProcedure"),
+    "v1alpha4 has one Package-level Procedure graph");
   const predicateSymbols=symbols.skillSymbolDeclarationsForDocument(index,predicates.uri);
   assert.ok(predicateSymbols.some(x=>x.type==="skillPredicate"&&
-    x.name==="createdsession.ingress.eligible"));
+    x.name==="establishment.request.supported"));
 });
 
 test("symbol index remains package- and generation-scoped",()=>{
