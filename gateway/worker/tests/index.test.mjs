@@ -194,13 +194,13 @@ test("provider response-header wait is bounded by a timeout", async () => {
   assert.equal(await code(response), "provider_timeout");
 });
 
-test("provider errors and non-SSE responses are normalized without leaking bodies", async () => {
+test("provider errors and mismatched response modes are normalized without leaking bodies", async () => {
   const failed = await handleRequest(req(payload()), env(), ctx(), async () => new Response("secret upstream detail", { status: 401 }));
   assert.equal(failed.status, 502);
   assert.equal(await code(failed), "provider_unavailable");
   const limited = await handleRequest(req(payload()), env(), ctx(), async () => new Response("quota details", { status: 429 }));
   assert.equal(limited.status, 429);
   assert.equal(await code(limited), "provider_rate_limited");
-  const notStream = await handleRequest(req(payload()), env(), ctx(), async () => new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }));
+  const notStream = await handleRequest(req(payload({ stream: true })), env(), ctx(), async () => new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }));
   assert.equal(notStream.status, 502);
 });
