@@ -15,7 +15,7 @@ const OLD_FIELDS = new Set(["procedures","with","call","verify","reconcile","res
 const EVAL_FIELDS = new Set(["parameters","evidence","evaluator"]);
 const WAIT_TERMINALS = new Set(["FAILED","UNRESOLVED","SAFE_STOPPED"]);
 const NODE_ID = /^[A-Za-z][A-Za-z0-9_-]*$/;
-const WAIT_DURATION = /^P(?:(?:[1-9][0-9]*)D)?(?:T(?:(?:[1-9][0-9]*)H)?(?:(?:[1-9][0-9]*)M)?(?:(?:[1-9][0-9]*)S)?)?$/;
+const WAIT_DURATION = /^P(?:(?:[1-9][0-9]*D)(?:T(?:[1-9][0-9]*H(?:(?:[1-9][0-9]*M)(?:[1-9][0-9]*S)?)?|[1-9][0-9]*M(?:[1-9][0-9]*S)?|[1-9][0-9]*S))?|T(?:[1-9][0-9]*H(?:(?:[1-9][0-9]*M)(?:[1-9][0-9]*S)?)?|[1-9][0-9]*M(?:[1-9][0-9]*S)?|[1-9][0-9]*S))$/;
 
 export function isV1Alpha5Procedure(text: string): boolean {
   // Detect incomplete authoring snapshots too: deleting one root key in the editor
@@ -83,21 +83,21 @@ export function analyzeV1Alpha5Source(
   }
   function parseWait(waitNode:any,nodeId:string,declared:ReadonlySet<string>):ProcedureWait|null {
     if(!isMap(waitNode)){
-      add(p.document,"WAIT_EVENT_SELECTOR_INVALID","Node wait must be a mapping",waitNode);
+      add(p.document,"WAIT_DECLARATION_INVALID","Node wait must be a mapping",waitNode);
       return null;
     }
     props(waitNode,p.document,new Set(["event","timeout","response","routes"]));
     const eventNode=waitNode.get("event",true);
     let source="",service="",operation="";
     if(!isMap(eventNode)){
-      add(p.document,"WAIT_EVENT_SELECTOR_INVALID","wait.event must declare source, service and operation",eventNode??waitNode);
+      add(p.document,"WAIT_DECLARATION_INVALID","wait.event must declare source, service and operation",eventNode??waitNode);
     }else{
       props(eventNode,p.document,new Set(["source","service","operation"]));
       source=scalar(eventNode.get("source",true));
       service=scalar(eventNode.get("service",true));
       operation=scalar(eventNode.get("operation",true));
       if(!source||!service||!operation)
-        add(p.document,"WAIT_EVENT_SELECTOR_INVALID","wait.event requires nonempty source, service and operation strings",eventNode);
+        add(p.document,"WAIT_DECLARATION_INVALID","wait.event requires nonempty source, service and operation strings",eventNode);
     }
     const timeoutNode=waitNode.get("timeout",true);
     const timeout=scalar(timeoutNode);
@@ -108,14 +108,17 @@ export function analyzeV1Alpha5Source(
     const responseNode=waitNode.get("response",true);
     if(responseNode!==undefined){
       if(!isMap(responseNode)){
-        add(p.document,"WAIT_RESPONSE_BOUNDARY_INVALID","wait.response must be a mapping containing after",responseNode);
+        add(p.document,"WAIT_DECLARATION_INVALID","wait.response must be a mapping",responseNode);
       }else{
         props(responseNode,p.document,new Set(["after"]));
         const afterNode=responseNode.get("after",true);
-        responseAfter=scalar(afterNode);
-        responseAfterLine=lineAt(p.document,afterNode);
-        if(!NODE_ID.test(responseAfter)||!declared.has(responseAfter))
-          add(p.document,"WAIT_RESPONSE_BOUNDARY_INVALID","wait.response.after must name one declared Node",afterNode??responseNode);
+        if(afterNode!==undefined){
+          responseAfter=scalar(afterNode);
+          responseAfterLine=lineAt(p.document,afterNode);
+          if(!NODE_ID.test(responseAfter)||TERMINALS.has(responseAfter)||responseAfter==="context"||
+             !declared.has(responseAfter))
+            add(p.document,"WAIT_RESPONSE_BOUNDARY_INVALID","wait.response.after must name a declared non-terminal Node",afterNode);
+        }
       }
     }
     const routesNode=waitNode.get("routes",true);
