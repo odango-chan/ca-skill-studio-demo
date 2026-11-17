@@ -41,7 +41,7 @@ try{
 
 function sample(skill,path){
   return readFileSync(new URL(
-    "../site/samples/v1alpha4/"+skill+"/"+path,import.meta.url
+    "../site/samples/v1alpha5/"+skill+"/"+path,import.meta.url
   ),"utf8");
 }
 function observed(source,path){
@@ -62,7 +62,7 @@ function tokenFor(source,items,text,type,modifier,from=0){
   return found;
 }
 
-test("legacy v0.2 token registry remains isolated from the frozen v1alpha4 authoring target",()=>{
+test("legacy v0.2 token registry remains isolated from the frozen v1alpha5 authoring target",()=>{
   const blobSha=createHash("sha1")
     .update("blob "+Buffer.byteLength(contractText)+"\0")
     .update(contractText).digest("hex");
@@ -80,7 +80,7 @@ test("legacy v0.2 token registry remains isolated from the frozen v1alpha4 autho
   assert.equal(contract.status,"current",
     "the registry is current only for its explicitly legacy v0.2 profile");
   assert.match(contract.authority.semantics,/Skill Language v0\.2/);
-  assert.doesNotMatch(contract.authority.semantics,/v1alpha4/);
+  assert.doesNotMatch(contract.authority.semantics,/v1alpha5/);
   assert.match(sourceReadme,/semantic-tokens\.v1\.json.*legacy/i);
   const types=contract.legend.tokenTypes.map(item=>item.id);
   const modifiers=contract.legend.tokenModifiers.map(item=>item.id);
@@ -98,7 +98,7 @@ test("legacy v0.2 token registry remains isolated from the frozen v1alpha4 autho
     "colors are theme-owned, not language-contract data");
 });
 
-test("v1alpha4 5GC Procedure exposes exact node, operation, observation and Predicate tokens",()=>{
+test("v1alpha5 5GC Procedure exposes exact node, operation, observation and Predicate tokens",()=>{
   const source=sample("establish-pdu-session","assurance/procedure.yaml");
   const items=observed(source,"skills/establish-pdu-session/assurance/procedure.yaml");
   assert.ok(items.length>100);
@@ -107,13 +107,16 @@ test("v1alpha4 5GC Procedure exposes exact node, operation, observation and Pred
   tokenFor(source,items,"ca-session-context::context.smf.session.read","skillObservation","reference");
   tokenFor(source,items,"establishment.request.supported","skillPredicate","reference");
   tokenFor(source,items,"PASS","skillOutcome");
+  tokenFor(source,items,"wait","skillWait");
+  tokenFor(source,items,"TIMEOUT","skillWait");
+  tokenFor(source,items,"update-sm-context.wait.output","skillStep","reference");
   tokenFor(source,items,"context.supi","skillBinding");
   assert.ok(items.every(item=>item.start>=0&&item.end<=source.length&&item.start<item.end));
   assert.ok(!items.some(item=>item.type==="skillProcedure"),
-    "v1alpha4 has one package-level Procedure graph, not named v0.2 Procedures");
+    "v1alpha5 has one package-level Procedure graph, not named v0.2 Procedures");
 });
 
-test("v1alpha4 MAS Procedure receives the same graph token projection",()=>{
+test("v1alpha5 MAS Procedure receives the same graph token projection",()=>{
   const source=sample("establish-pdu-session-mas","assurance/procedure.yaml");
   const items=observed(source,"skills/establish-pdu-session-mas/assurance/procedure.yaml");
   tokenFor(source,items,"validate-sm-subscription","skillStep","declaration",source.indexOf("nodes:"));
@@ -122,7 +125,7 @@ test("v1alpha4 MAS Procedure receives the same graph token projection",()=>{
   tokenFor(source,items,"PASS","skillOutcome");
 });
 
-test("v1alpha4 uses its own AST semantic projection for the frozen single-graph grammar",()=>{
+test("v1alpha5 uses its own AST semantic projection for the frozen single-graph grammar",()=>{
   const contractSource=[
     "goal: demo.session_established",
     "precondition: check.precondition",
@@ -195,12 +198,13 @@ test("v1alpha4 uses its own AST semantic projection for the frozen single-graph 
   tokenFor(predicatesSource,ps,"demo.ready","skillPredicate","declaration");
   tokenFor(predicatesSource,ps,"string","skillDataType");
   assert.ok(!p.some(item=>item.type==="skillProcedure"),
-    "v1alpha4 has one Package Procedure graph, not v0.2 named Procedure declarations");
-  assert.ok(semantic.V1_ALPHA4_SEMANTIC_TOKEN_TYPES.includes("skillObservation"));
-  assert.ok(semantic.V1_ALPHA4_SEMANTIC_TOKEN_TYPES.includes("skillReference"));
+    "v1alpha5 has one Package Procedure graph, not v0.2 named Procedure declarations");
+  assert.ok(semantic.V1_ALPHA5_SEMANTIC_TOKEN_TYPES.includes("skillObservation"));
+  assert.ok(semantic.V1_ALPHA5_SEMANTIC_TOKEN_TYPES.includes("skillReference"));
+  assert.ok(semantic.V1_ALPHA5_SEMANTIC_TOKEN_TYPES.includes("skillWait"));
 });
 
-test("v1alpha4 Contract and PredicateSet expose source-backed references and declarations",()=>{
+test("v1alpha5 Contract and PredicateSet expose source-backed references and declarations",()=>{
   const contractSource=sample("establish-pdu-session","assurance/contract.yaml");
   const c=observed(contractSource,"skills/establish-pdu-session/assurance/contract.yaml");
   tokenFor(contractSource,c,"get-sm-subscription-data.precondition","skillStep","reference");
