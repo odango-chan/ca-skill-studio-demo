@@ -53,6 +53,10 @@ test("Compiler request refuses path traversal, duplicate files and invalid packa
     packageName:"../example",
     documents:[{relativePath:"SKILL.md",text:"x"}]
   }),/Package name/);
+  assert.throws(()=>createCompilerBuildRequest({
+    packageName:"example",
+    documents:[{relativePath:"目录/".repeat(60)+"x.yaml",text:"x"}]
+  }),/unsafe Skill-relative source path/);
 });
 
 test("Compiler result guards require the frozen v1alpha4 output identities",()=>{
