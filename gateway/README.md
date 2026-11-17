@@ -36,15 +36,18 @@ Cloudflare Workers Free currently documents 100,000 requests per day, 10 ms CPU 
 
 1. Create a Turnstile widget with hostname odango-chan.github.io and action ai_authoring. Use the public site key in the Studio client; keep the secret key in Worker secret storage.
 2. Configure OPENAI_MODEL in gateway/wrangler.jsonc for the selected OpenAI-compatible provider.
-3. From the gateway directory, set the deployment secrets:
+3. From the repository root, enter the gateway directory and set the deployment secrets:
 
 ~~~bash
+cd gateway
 npx wrangler@4.36.0 secret put OPENAI_API_KEY --config wrangler.jsonc
 npx wrangler@4.36.0 secret put TURNSTILE_SECRET_KEY --config wrangler.jsonc
 ~~~
 
-4. Replace TURNSTILE_SITE_KEY in the Worker vars with the public widget site key.
-5. Deploy:
+Alternatively, add both values as Secret entries under the deployed Worker’s Settings → Variables and Secrets in the Cloudflare dashboard. Never add them as plain-text vars. The configured rate-limit namespace ID must be a positive integer unique within your Cloudflare account; choose another unused value if 2026111701 is already in use.
+
+4. Replace TURNSTILE_SITE_KEY in the Worker vars with the public widget site key. The Turnstile site key is public; the secret key is not.
+5. Deploy from the gateway directory:
 
 ~~~bash
 npx wrangler@4.36.0 deploy --config wrangler.jsonc
