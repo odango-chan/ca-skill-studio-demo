@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {registerPredicateEditor} from '../experiments/ide-host/vscode/src/predicate-editor.mjs';
 
 const source = [
-  '# CA-SL v1alpha4 PredicateSet',
+  '# CA-SL v1alpha5 PredicateSet',
   'predicates:',
   '  session.ready:',
   '    parameters:',
@@ -24,7 +24,7 @@ const source = [
   ''
 ].join('\n');
 
-test('Predicate custom editor renders v1alpha4 Parameters, Evidence and Evaluator', async () => {
+test('Predicate custom editor renders v1alpha5 Parameters, Evidence and Evaluator', async () => {
   const registrations = new Map();
   const commands = new Map();
   const context = {subscriptions: []};
@@ -82,7 +82,7 @@ test('Predicate custom editor renders v1alpha4 Parameters, Evidence and Evaluato
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(messages.at(-1).type, 'snapshot');
   assert.equal(messages.at(-1).projection.state, 'READY');
-  assert.equal(messages.at(-1).projection.language, 'CA-SL v1alpha4');
+  assert.equal(messages.at(-1).projection.language, 'CA-SL v1alpha5');
   assert.equal(messages.at(-1).projection.skill.value, 'demo');
   assert.equal(messages.at(-1).projection.predicateCount, 2);
   assert.deepEqual(messages.at(-1).projection.predicates[0].parameters
