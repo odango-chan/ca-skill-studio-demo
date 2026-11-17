@@ -4,13 +4,14 @@
 
 [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md) · [PR #201](https://github.com/odango-chan/ca-skill-studio-demo/pull/201)
 
-- **产品决策：** 独立 Editor Tab、Studio 自有结构化 Change Set、接受后应用到原生 TextDocument Buffer、用户自行保存；P1 仅修改现有 CA-SL v1alpha4 Procedure。
-- **最终架构目标：** 平台无关的 Authoring Core + Host Adapter + OpenAI-compatible AI Gateway。Theia、VS Code Desktop/Web/Remote 与内网部署复用同一套 Context Pack、Procedure Agent、ModelProposal、Change Set 和 v1alpha4 Semantic Patch Engine。
+- **产品决策：** 独立 Editor Tab、Studio 自有结构化 Change Set、接受后应用到原生 TextDocument Buffer、用户自行保存；P1 仅修改现有 CA-SL v1alpha5 Preview Procedure，不回退到 v1alpha4。
+- **语言基线：** v1alpha5 Preview 固定 `ca-skills@d3f89dfafbf218e5e95c97a974004362b7b967b6`（PR #61）；IngressCatalog companion contract 固定 `ca-skills@561d14c639e11cc43d0f247111e4971dfb98761e`（PR #62）。两者均为 Draft / NOT RELEASED / NOT QUALIFIED；v1alpha5 继承 v1alpha4 冻结语义并增加 Appendix L Node-entry Wait。
+- **最终架构目标：** 平台无关的 Authoring Core + Host Adapter + OpenAI-compatible AI Gateway。Theia、VS Code Desktop/Web/Remote 与内网部署复用同一套 Context Pack、Procedure Agent、ModelProposal、Change Set 和 v1alpha5 Semantic Patch Engine。
 - **在线优先：** 第一条真实链路是 GitHub Pages / Theia Browser-Only → HTTPS AI Gateway → OpenAI-compatible 模型。Cloudflare Worker Free 是 Gateway 候选，不是核心依赖；GitHub Pages 本身没有可存放共享模型密钥的可信后端。
 - **共享密钥：** 按部署共用一份 Provider API Key，由 Gateway 服务端保存；不要求每位用户配置自己的模型 Key。受限试点由 Cloudflare Access 认证用户、Gateway 按身份限流并限制请求 / 输出 Token；CORS 不是身份验证。严格全局费用账本暂不纳入无数据库试点。
 - **VS Code / 本地：** 桌面插件通过本地 Extension Host 处理编辑器操作，默认仍调用配置的在线或内网 Gateway；本机模型或单机部署可连接 loopback Gateway。组织共用 Provider Key 时优先使用受管内网 Gateway，不应复制到每台员工电脑。不能把共享 Provider Key 打包进 VSIX。Web Extension 可作为 Desktop/Web 共用基线，但不提供 Node.js API；必要时再增加 Node Host Adapter。
 - **原生 AI API：** vscode.lm 和 Theia AI 均作为可选适配，不是核心 Agent 运行时。Theia 1.76 的 vscode.lm stub 和 @theia/ai-openai backend RPC 限制继续作为兼容事实，不阻塞通用 Gateway 路径。
-- **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。Compiler Check 仍是候选 Procedure 的权威静态验证。
+- **v1alpha5 缺口：** 当前 PR #197 / LSP 仍是 v1alpha4 只读投影，不能用于 v1alpha5 编辑。旧版 D1/D2 Patch 与 v1alpha4 Patch Engine 不可直接复用；P1 需要独立 v1alpha5 Semantic Patch Engine。Compiler v1.0.0 仅支持 v1alpha4；Compiler PR #30 目前只完成 v1alpha5 WP2 Parser / AST，完整 Check 仍未就绪。
 - **Gateway Worker（PR #206）：** 独立 Cloudflare Worker 使用原生 `ctx.access` 验证 Access audience / 用户身份；按已验证身份限流；Provider endpoint、默认模型和密钥均由部署配置；支持 JSON 与 SSE 两种 OpenAI-compatible 响应模式、结构化 JSON 输出、请求/输出上限、响应头超时和取消传播。15 项 Worker 单测与 exact-head Gateway CI + Wrangler dry-run PASS（[run #44077321845](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44077321845)）；真实 Cloudflare 部署、Access 浏览器登录和模型请求尚未执行。
 - **安全边界：** 受限试点使用 Cloudflare Access 身份认证，不再把 Turnstile / IP 限流误当作用户身份。GitHub Pages → workers.dev 的第三方 Cookie 行为仍需真实浏览器验收；Cloudflare Rate Limiting 为近似、分地域计数，不是严格全局费用账本。
 - **Authoring Core Foundation（PR #203）：** 新增无宿主依赖的 Context Pack builder（Package 路径 allowlist、引用/脚本显式 opt-in、dependency verified gate、SHA-256 manifest、128 KiB serialized byte cap、超限拒绝不截断）、Gateway Model Client、Procedure proposal orchestrator 与 Studio 私有 ModelProposal v1 校验器；显式要求 Context disclosure consent；浏览器请求使用 `credentials: include` 携带 Access session，不传 Turnstile token、Provider Key 或 client-selected model；Agent 校验 manifest digest / UTF-8 byte count；模型不能提供文件路径、原始 YAML、Source offset、WorkspaceEdit、atomic groups 或 validation state；引用必须匹配 Host 提供的 Context Pack manifest。确定性测试已加入 npm test，PR #203 exact-head CI 验证中。

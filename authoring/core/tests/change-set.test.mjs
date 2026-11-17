@@ -11,7 +11,7 @@ function proposalResult(overrides = {}) {
   return {
     taskId: "task-1",
     revision: 3,
-    languageTarget: "connectionagent.io/v1alpha4",
+    languageTarget: "connectionagent.io/v1alpha5",
     manifest: [
       {
         id: "procedure-current",
@@ -83,7 +83,7 @@ test("Change Set stamps base and scope from Host metadata, not model output", ()
   assert.equal(result.base.documentVersion, 12);
   assert.equal(result.base.packageGeneration, 5);
   assert.equal(result.base.sourceDigest, "sha256:" + "a".repeat(64));
-  assert.equal(result.base.languageTarget, "connectionagent.io/v1alpha4");
+  assert.equal(result.base.languageTarget, "connectionagent.io/v1alpha5");
   assert.deepEqual(result.scope.writePaths, ["assurance/procedure.yaml"]);
   assert.deepEqual(result.scope.readPaths, [
     "assurance/contract.yaml",

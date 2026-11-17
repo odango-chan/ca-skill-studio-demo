@@ -89,7 +89,7 @@ export function createChangeSet({
   if (!plain(proposalResult) ||
     typeof proposalResult.taskId !== "string" ||
     !Number.isSafeInteger(proposalResult.revision) || proposalResult.revision < 1 ||
-    proposalResult.languageTarget !== "connectionagent.io/v1alpha4" ||
+    proposalResult.languageTarget !== "connectionagent.io/v1alpha5" ||
     !Array.isArray(proposalResult.manifest)) {
     reject("invalid_proposal_result", "A validated Procedure proposal result is required.");
   }
