@@ -622,9 +622,18 @@ export function activate(context){
   // The command is deliberately not contributed to the user command palette.
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.editorGroupAcceptance",async()=>{
-      const procedures=await vscode.workspace.findFiles(
+      const discoveredProcedures=await vscode.workspace.findFiles(
         "**/assurance/procedure.yaml","**/node_modules/**",20);
-      if(procedures.length<1)throw Error("No real Skill Procedure files found for editor-group acceptance");
+      if(discoveredProcedures.length<1)throw Error("No real Skill Procedure files found for editor-group acceptance");
+      // The Example contains both the baseline 5GC Skill and its MAS
+      // adaptation. Keep the editor-group baseline deterministic instead of
+      // relying on filesystem enumeration order.
+      const baseline=discoveredProcedures.find(uri=>
+        /\/skills\/establish-pdu-session\/assurance\/procedure\.yaml$/i.test(uri.path));
+      const procedures=baseline
+        ? [baseline,...discoveredProcedures.filter(uri=>uri.toString()!==baseline.toString())
+            .sort((a,b)=>a.path.localeCompare(b.path))]
+        : [...discoveredProcedures].sort((a,b)=>a.path.localeCompare(b.path));
       const visualUris=[];
       const add=uri=>{
         if(uri&&sourceViewType(uri)&&!visualUris.some(item=>item.toString()===uri.toString()))
