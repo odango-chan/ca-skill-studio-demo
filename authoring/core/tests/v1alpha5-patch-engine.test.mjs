@@ -341,7 +341,7 @@ test("node.wait.timeout.set and node.wait.event.set patch only their scalar fiel
       event: { source: "AMF", service: "nsmf-pdusession", operation: "CreateSMContext" },
     }),
   ], SOURCE_WITH_WAIT);
-  assert.ok(eventResult.candidateSource.includes("source: SMF"));
+  assert.ok(eventResult.candidateSource.includes("source: AMF"));
   assert.ok(eventResult.candidateSource.includes("service: nsmf-pdusession"));
   assert.ok(eventResult.candidateSource.includes("operation: CreateSMContext"));
   assert.ok(eventResult.candidateSource.includes("timeout: PT30S # preserve wait timeout comment"));

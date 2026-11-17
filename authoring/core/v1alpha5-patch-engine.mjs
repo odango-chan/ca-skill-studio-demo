@@ -578,8 +578,10 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
       const indent = mapIndent(parsed.source, waitMap, id);
       const newline = parsed.source.includes("\r\n") ? "\r\n" : "\n";
       const value = stringify(after, { lineWidth: 0 }).trimEnd();
+      let start = range.start;
+      while (start > 0 && (parsed.source[start - 1] === " " || parsed.source[start - 1] === "\\t")) start -= 1;
       edits.push({
-        start: range.start,
+        start,
         end: range.end,
         text: newline + indent + "  after: " + value,
         operationIndexes: [operationIndex],
