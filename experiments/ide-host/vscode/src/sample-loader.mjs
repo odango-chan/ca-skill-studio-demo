@@ -23,12 +23,11 @@ const PREVIOUS_V1ALPHA4_BLOBS=Object.freeze({
   "establish-pdu-session/scripts/validate-subscription-request.py":"806c9384e827a4a37f394194e9444dce7fc44c5a"
 });
 const PREVIOUS_EXAMPLE_README_BLOB="3458aebabef840f36b7dc9231aa3a86bb5ef5351";
-const decoder=new TextDecoder();
 async function gitBlobSha(bytes){
   try{
     const crypto=globalThis.crypto;
     if(!crypto?.subtle?.digest)return null;
-    const prefix=new TextEncoder().encode("blob "+bytes.length+"\\0");
+    const prefix=new TextEncoder().encode("blob "+bytes.length+"\0");
     const payload=new Uint8Array(prefix.length+bytes.length);
     payload.set(prefix,0);
     payload.set(bytes,prefix.length);
