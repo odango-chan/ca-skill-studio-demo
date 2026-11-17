@@ -82,9 +82,9 @@ test("all three current CreatedSession business References render safely in Mark
   assert.doesNotMatch(gpp.html,/href="\.\.\/SKILL.md"/);
 });
 
-test("current dual Skill guides render safely and expose only explicit Package-local paths",()=>{
+test("current v1alpha4 Skill guides render safely and expose only explicit Package-local paths",()=>{
   for(const name of ["establish-pdu-session","establish-pdu-session-mas"]){
-    const source=readFileSync(new URL("../site/samples/skills/"+name+"/SKILL.md",import.meta.url),"utf8");
+    const source=readFileSync(new URL("../site/samples/v1alpha4/"+name+"/SKILL.md",import.meta.url),"utf8");
     const preview=renderMarkdown(source);
     assert.equal(preview.available,true,name);
     assert.match(preview.html,/<details class="md-frontmatter" data-source-line="0">/,name);
@@ -92,34 +92,25 @@ test("current dual Skill guides render safely and expose only explicit Package-l
     assert.doesNotMatch(preview.html,/<script\b|<iframe\b|<img\b/i,name);
   }
   const source=readFileSync(new URL(
-    "../site/samples/skills/establish-pdu-session/SKILL.md",import.meta.url),"utf8");
+    "../site/samples/v1alpha4/establish-pdu-session-mas/SKILL.md",import.meta.url),"utf8");
   const packageFiles=new Set([
-    "SKILL.md","assurance/procedure.yaml",
-    "references/3gpp-procedure.md","references/session-selection.md",
-    "references/failure-handling.md"
+    "SKILL.md","assurance/openamsm-operation-mapping.md",
+    "assurance/contract.yaml","assurance/procedure.yaml","assurance/predicates.yaml"
   ]);
   const linked=renderMarkdown(source,{
     localLinks:true,localFiles:packageFiles,relativeDir:""
   }).html;
-  assert.match(linked,/data-local-path="assurance\/procedure\.yaml"/);
-  assert.match(linked,/data-local-path="references\/3gpp-procedure\.md"/);
-  assert.match(linked,/data-local-path="references\/session-selection\.md"/);
-  assert.match(linked,/data-local-path="references\/failure-handling\.md"/);
-  // Do not couple the canonical guide to an obsolete repository-level link:
-  // an updated ca-skills SKILL.md may legitimately contain only local links.
-  assert.doesNotMatch(linked,/data-local-path="\.\.\/\.\.\/docs/);
-  assert.doesNotMatch(linked,/data-local-path="docs\/design\/llm-skill-execution-baseline\.md"/);
+  assert.match(linked,/data-local-path="assurance\/openamsm-operation-mapping\.md"/);
+  assert.doesNotMatch(linked,/data-local-path="\.\.\//);
 });
 
-test("Reference Markdown can link back to SKILL.md, while local navigation is opt-in",()=>{
-  const source=readFileSync(new URL(
-    "../site/samples/skills/establish-pdu-session/references/3gpp-procedure.md",
-    import.meta.url),"utf8");
+test("Package-local Markdown can link back to SKILL.md, while local navigation is opt-in",()=>{
+  const source="[Back to Skill](../SKILL.md)";
   const ordinary=renderMarkdown(source).html;
   assert.doesNotMatch(ordinary,/data-local-path=/);
   const linked=renderMarkdown(source,{
-    localLinks:true,localFiles:new Set(["SKILL.md","references/3gpp-procedure.md"]),
-    relativeDir:"references"
+    localLinks:true,localFiles:new Set(["SKILL.md","assurance/openamsm-operation-mapping.md"]),
+    relativeDir:"assurance"
   }).html;
   assert.match(linked,/data-local-path="\.\.\/SKILL\.md"/);
 });
