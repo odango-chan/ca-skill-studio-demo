@@ -201,7 +201,7 @@ export function renderAiAuthoringHtml(nonce) {
     "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'nonce-" + nonce + "'; script-src 'nonce-" + nonce + "'; connect-src 'none'; font-src 'none';\">",
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
     "<title>AI Procedure Authoring</title><style nonce=\"" + nonce + "\">" + css + "</style></head><body>",
-    "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span class=\"compiler\">CA-SL v1alpha5 Preview</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
+    "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span class=\"compiler\">CA-SL v1alpha5 · FROZEN / RELEASED</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
     "<main>",
     "<section class=\"card\"><h2>任务说明</h2><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只会提出语义修改，不会直接写文件或执行 Tool。\"></textarea><div class=\"note\"><strong>数据披露：</strong>选中的上下文将在你确认后发送到配置的 AI Gateway。Provider API Key 不存储在 Studio 中。</div><div id=\"gatewayNotice\" class=\"note warning\"></div><div class=\"actions\"><button id=\"generate\">生成修改提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div></section>",
     "<section class=\"card\"><h2>上下文来源</h2><p class=\"note\">Procedure 当前缓冲区必定包含。Contract、Predicate、Schema 和已验证依赖默认选中；Reference / Script 需要逐任务显式选择。</p><div id=\"sources\" class=\"source-list\"></div></section>",
