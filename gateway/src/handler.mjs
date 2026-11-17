@@ -212,10 +212,12 @@ async function verifyTurnstile({
 
 function validateConfiguration(env, rateLimit) {
   const required = [
-    "OPENAI_API_KEY", "OPENAI_MODEL", "TURNSTILE_SECRET_KEY",
+    "OPENAI_API_KEY", "OPENAI_MODEL", "TURNSTILE_SECRET_KEY", "TURNSTILE_SITE_KEY",
     "TURNSTILE_EXPECTED_HOSTNAMES", "ALLOWED_ORIGINS",
   ];
   if (required.some((key) => !String(env[key] || "").trim())) return false;
+  if (String(env.OPENAI_MODEL).startsWith("replace-")) return false;
+  if (String(env.TURNSTILE_SITE_KEY).startsWith("replace-")) return false;
   if (typeof rateLimit !== "function") return false;
   return resolveUpstreamUrl(env) !== null;
 }
