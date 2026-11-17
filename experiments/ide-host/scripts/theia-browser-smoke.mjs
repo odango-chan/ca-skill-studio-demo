@@ -925,3 +925,28 @@ try{
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
+  if(requireEditor)
+    console.log("THEIA_BROWSER_HOST_V1ALPHA4_ACCEPTANCE_PASS");
+  else
+    console.log("THEIA_BROWSER_ONLY_V1ALPHA4_ACCEPTANCE_PASS");
+}catch(error){
+  if(process.env.THEIA_FAILURE_SCREENSHOT&&ws?.readyState===1){
+    try{
+      const screenshot=await command("Page.captureScreenshot",{format:"png"});
+      await writeFile(process.env.THEIA_FAILURE_SCREENSHOT,Buffer.from(screenshot.data,"base64"));
+      console.error("STUDIO_FAILURE_WORKBENCH",JSON.stringify(await evalJS(`({
+        tabs:[...document.querySelectorAll(".lm-TabBar-tab")].map(tab=>({
+          label:tab.textContent,rect:tab.getBoundingClientRect().toJSON()})),
+        body:document.body.innerText.slice(-2500)
+      })`)));
+    }catch{}
+  }
+  throw error;
+}finally{
+  if(ws?.readyState===1){void command("Browser.close").catch(()=>{});await sleep(700);}
+  ws?.close();child.kill("SIGKILL");
+  if(server?.listening){server.closeAllConnections();await new Promise(ok=>server.close(ok));}
+  await rm(profile,{recursive:true,force:true,maxRetries:4,retryDelay:200});
+}
+// Exact-head CI note: assert YAML and Python TextMate tokens in both Theia hosts.
+
