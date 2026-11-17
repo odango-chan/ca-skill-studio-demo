@@ -453,6 +453,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       });
       let patchPlan = null;
       let patchError = null;
+      let candidateSource = null;
       if (proposalResult.proposal.blockers.length === 0 &&
         proposalResult.proposal.operations.length > 0) {
         try {
@@ -463,6 +464,12 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
             currentDocumentVersion: document.version,
             currentPackageGeneration: initial.generation,
           });
+          const preview = await materializeAcceptedPatchGroups({
+            source: document.getText(),
+            plan: patchPlan,
+            acceptedGroupIds: patchPlan.groups.map((group) => group.id),
+          });
+          candidateSource = preview.source;
         } catch (error) {
           patchError = String(error?.message ?? error);
         }
@@ -492,6 +499,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
           ? "Wait edits require a trusted IngressCatalog v1alpha1 Owner binding and a complete v1alpha5 Compiler Check. The current Studio dependency / Compiler path does not provide that proof; Wait changes cannot be applied."
           : patchError,
         canApply,
+        currentSource: patchPlan ? document.getText() : "",
+        candidateSource: candidateSource ?? "",
         groups: patchPlan ? patchPlan.groups.map((group) => ({
           id: group.id,
           label: group.label,
@@ -512,6 +521,30 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
     } finally {
       if (session?.controller === controller) session.controller = null;
       post({ type: "status", message: "请求结束。Compiler Check: NOT_RUN。", busy: false });
+    }
+  }
+
+  async function handlePreview(message) {
+    if (!session?.pending) return;
+    if (!Array.isArray(message.groupIds) ||
+      message.groupIds.some((id) => typeof id !== "string") ||
+      !Number.isSafeInteger(message.requestId)) {
+      post({ type: "error", message: "预览修改组选择无效。" });
+      return;
+    }
+    try {
+      const preview = await materializeAcceptedPatchGroups({
+        source: session.pending.source,
+        plan: session.pending.patchPlan,
+        acceptedGroupIds: message.groupIds,
+      });
+      post({
+        type: "preview",
+        requestId: message.requestId,
+        candidateSource: preview.source,
+      });
+    } catch (error) {
+      post({ type: "error", message: "候选 YAML 生成失败：" + String(error?.message ?? error) });
     }
   }
 
@@ -598,7 +631,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         else if (message.type === "cancel") {
           session?.controller?.abort();
           post({ type: "status", message: "正在取消模型请求…" });
-        } else if (message.type === "apply") await handleApply(message);
+        } else if (message.type === "preview") await handlePreview(message);
+        else if (message.type === "apply") await handleApply(message);
         else if (message.type === "discard") {
           if (session) session.pending = null;
           post({ type: "discarded" });
