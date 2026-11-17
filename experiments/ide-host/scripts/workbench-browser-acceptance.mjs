@@ -620,29 +620,33 @@ export async function runWorkbenchAcceptance({
     "layout:document.querySelector('#layoutDirection')?.value??null,"+
     "rootMode:document.querySelector('#rootPathMode')?.value??null,"+
     "rootVisible:document.querySelector('#rootPathToolbar')?.hidden===false,"+
+    "rootFiltersVisible:document.querySelector('#rootPathFilters')?.hidden===false,"+
     "toolbarVisible:document.querySelector('#graphTools')?.hidden===false,"+
     "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
     "controls:['columns-2','network','eye','locate-fixed','zoom-out','zoom-in','maximize','fit-width','fit-height']"+
     ".map(name=>({name,found:[...document.querySelectorAll('#graphTools svg[data-icon]')].some(el=>el.getAttribute('data-icon')===name)}))"+
     "}))()");
-  if(toolbarInitial?.layout!=="DOWN"||!toolbarInitial.rootVisible||
-     !toolbarInitial.toolbarVisible||toolbarInitial.controls.some(item=>!item.found))
-    throw Error("v1alpha4 Procedure canvas toolbar is incomplete or not vertically initialized: "+
+  // Root-path filtering is a legacy Procedure control. v1alpha4 has its own
+  // typed stage projection and must not expose that legacy path-editing surface.
+  if(toolbarInitial?.layout!=="DOWN"||toolbarInitial.rootVisible||
+     toolbarInitial.rootFiltersVisible||!toolbarInitial.toolbarVisible||
+     toolbarInitial.controls.some(item=>!item.found))
+    throw Error("v1alpha4 Procedure canvas toolbar is incomplete or exposes legacy path controls: "+
       JSON.stringify(toolbarInitial));
   await evalWebviewJS("(()=>{const s=document.querySelector('#layoutDirection');s.value='RIGHT';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
   await sleep(180);
   const horizontal=await evalWebviewJS("document.querySelector('#layoutDirection')?.value??null");
-  await evalWebviewJS("(()=>{const s=document.querySelector('#layoutDirection');s.value='DOWN';s.dispatchEvent(new Event('change',{bubbles:true}));const p=document.querySelector('#rootPathMode');if(p){p.value='all';p.dispatchEvent(new Event('change',{bubbles:true}));}return true;})()");
+  await evalWebviewJS("(()=>{const s=document.querySelector('#layoutDirection');s.value='DOWN';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
   await sleep(350);
   const allPaths=await evalWebviewJS("(()=>({layout:document.querySelector('#layoutDirection')?.value??null,"+
     "rootMode:document.querySelector('#rootPathMode')?.value??null,"+
+    "rootToolbarVisible:document.querySelector('#rootPathToolbar')?.hidden===false,"+
     "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
     "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length}))()");
-  if(horizontal!=="RIGHT"||allPaths.layout!=="DOWN"||allPaths.rootMode!=="all"||
-     !(allPaths.nodes>0)||!(allPaths.edges>0))
-    throw Error("v1alpha4 canvas layout/path controls did not respond: "+
+  if(horizontal!=="RIGHT"||allPaths.layout!=="DOWN"||allPaths.rootMode!=="normal"||
+     allPaths.rootToolbarVisible||!(allPaths.nodes>0)||!(allPaths.edges>0))
+    throw Error("v1alpha4 canvas layout or legacy-control isolation failed: "+
       JSON.stringify({toolbarInitial,horizontal,allPaths}));
-  await evalWebviewJS("(()=>{const p=document.querySelector('#rootPathMode');if(p){p.value='normal';p.dispatchEvent(new Event('change',{bubbles:true}));}return true;})()");
   const canvasToolbar={initial:toolbarInitial,horizontal,allPaths};
   console.log("STUDIO_V1ALPHA4_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbar));
 
