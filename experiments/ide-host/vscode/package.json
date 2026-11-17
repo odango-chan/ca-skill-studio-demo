@@ -56,7 +56,10 @@
     "onCommand:skillStudio.updateDependencyLock",
     "onCommand:skillStudio.removeDependency",
     "onCommand:skillStudio.inspectDependencyContract",
-    "onCommand:skillStudio.showWelcome"
+    "onCommand:skillStudio.showWelcome",
+    "onCommand:skillStudio.checkSkill",
+    "onCommand:skillStudio.buildSkill",
+    "onCommand:skillStudio.inspectCompilerDependencies"
   ],
   "contributes": {
     "colors": [
@@ -203,6 +206,18 @@
       {
         "command": "skillStudio.inspectDependencyContract",
         "title": "Skill Studio: Inspect Locked Contract"
+      },
+      {
+        "command": "skillStudio.checkSkill",
+        "title": "SKILL Studio: Check Skill (Compiler v1.0.0)"
+      },
+      {
+        "command": "skillStudio.buildSkill",
+        "title": "SKILL Studio: Build Skill (Compiler v1.0.0)"
+      },
+      {
+        "command": "skillStudio.inspectCompilerDependencies",
+        "title": "SKILL Studio: Inspect Dependencies (Compiler v1.0.0)"
       }
     ],
     "markdown.markdownItPlugins": true,
@@ -286,6 +301,21 @@
           "command": "skillStudio.selectProjectRoot",
           "when": "view == skillStudio.packages",
           "group": "navigation@5"
+        },
+        {
+          "command": "skillStudio.checkSkill",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@6"
+        },
+        {
+          "command": "skillStudio.buildSkill",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@7"
+        },
+        {
+          "command": "skillStudio.inspectCompilerDependencies",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@8"
         }
       ],
       "view/item/context": [
@@ -438,6 +468,21 @@
           "command": "skillStudio.removeDependency",
           "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
           "group": "4_remove"
+        },
+        {
+          "command": "skillStudio.checkSkill",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.package",
+          "group": "5_compiler"
+        },
+        {
+          "command": "skillStudio.buildSkill",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.package",
+          "group": "6_compiler"
+        },
+        {
+          "command": "skillStudio.inspectCompilerDependencies",
+          "when": "view == skillStudio.packages && viewItem == skillStudio.package",
+          "group": "7_compiler"
         }
       ]
     },
@@ -534,7 +579,7 @@
           ],
           "default": "skills",
           "scope": "resource",
-          "markdownDescription": "Project Skill source root. Compiler v0.1 currently accepts skills/."
+          "markdownDescription": "Project Skill source root. CA Skill Compiler v1.0.0 accepts authored files under skills/<skill-name>/."
         },
         "connectionAgent.skillStudio.dependencies": {
           "type": "array",
@@ -552,7 +597,7 @@
             "entries": []
           },
           "scope": "resource",
-          "markdownDescription": "Managed pinned dependency lock. Refresh observes drift; Update Lock explicitly changes the pin."
+          "markdownDescription": "Legacy skillc.lock/v0.1 snapshot lock. Compiler v1alpha4 does not consume this format; only exact v1alpha4 DependencySnapshot and trusted Owner / CapabilityContracts inputs can be linked."
         },
         "connectionAgent.skillStudio.defaultBuildTarget": {
           "type": "string",
@@ -561,7 +606,7 @@
           ],
           "default": "all",
           "scope": "application",
-          "markdownDescription": "Default target for a future Compiler adapter; does not imply a Build is available."
+          "markdownDescription": "Default Compiler v1.0.0 target selection. The current integration builds the selected Skill Package explicitly."
         }
       }
     }
