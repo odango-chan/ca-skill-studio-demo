@@ -108,13 +108,14 @@ export async function buildAuthoringResourceInventory(snapshot, dependencyResolu
       }
     }
     if (!files.length) continue;
+    files.sort((left, right) => left.path.localeCompare(right.path));
     const content = JSON.stringify({
       dependencyId: dependency.id,
       kind: dependency.kind,
       snapshotDigest: dependency.snapshotDigest,
       files,
     }, null, 2);
-    const id = "dep-" + dependency.id;
+    const id = dependency.id;
     resources.push({
       id,
       kind: "dependency",
