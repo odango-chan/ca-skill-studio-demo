@@ -41,7 +41,7 @@ try{
 
 function sample(skill,path){
   return readFileSync(new URL(
-    "../site/samples/skills/"+skill+"/"+path,import.meta.url
+    "../site/samples/v1alpha4/"+skill+"/"+path,import.meta.url
   ),"utf8");
 }
 function observed(source,path){
@@ -98,29 +98,27 @@ test("legacy v0.2 token registry remains isolated from the frozen v1alpha4 autho
     "colors are theme-owned, not language-contract data");
 });
 
-test("legacy 5GC Procedure uses exact v0.2 AST selectors for declarations, operators, references and bindings",()=>{
+test("v1alpha4 5GC Procedure exposes exact node, operation, observation and Predicate tokens",()=>{
   const source=sample("establish-pdu-session","assurance/procedure.yaml");
   const items=observed(source,"skills/establish-pdu-session/assurance/procedure.yaml");
   assert.ok(items.length>100);
-  tokenFor(source,items,"ue-requested-pdu-session-establishment","skillProcedure","declaration");
-  tokenFor(source,items,"nudm-sdm-get","skillStep","declaration",source.indexOf("nodes:"));
-  tokenFor(source,items,"call","skillOperator");
-  tokenFor(source,items,"sbi.udm.sm_data.get","skillOperation","reference");
-  tokenFor(source,items,"createdsession.ingress.eligible","skillPredicate","reference");
+  tokenFor(source,items,"get-sm-subscription-data","skillStep","declaration",source.indexOf("nodes:"));
+  tokenFor(source,items,"ca::sbi.udm.sm_data.get","skillOperation","reference");
+  tokenFor(source,items,"ca-session-context::context.smf.session.read","skillObservation","reference");
+  tokenFor(source,items,"establishment.request.supported","skillPredicate","reference");
   tokenFor(source,items,"PASS","skillOutcome");
-  tokenFor(source,items,"string","skillDataType");
-  tokenFor(source,items,"context.subject.ueRef","skillBinding","reference");
+  tokenFor(source,items,"context.supi","skillBinding");
   assert.ok(items.every(item=>item.start>=0&&item.end<=source.length&&item.start<item.end));
-  assert.ok(!items.some(item=>item.type.startsWith("ca")));
+  assert.ok(!items.some(item=>item.type==="skillProcedure"),
+    "v1alpha4 has one package-level Procedure graph, not named v0.2 Procedures");
 });
 
-test("legacy MAS Procedure receives the same v0.2 language projection",()=>{
+test("v1alpha4 MAS Procedure receives the same graph token projection",()=>{
   const source=sample("establish-pdu-session-mas","assurance/procedure.yaml");
   const items=observed(source,"skills/establish-pdu-session-mas/assurance/procedure.yaml");
-  tokenFor(source,items,"establish-session","skillProcedure","declaration");
-  tokenFor(source,items,"verify-eligible","skillStep","declaration",source.indexOf("nodes:"));
-  tokenFor(source,items,"verify","skillOperator",undefined,source.indexOf("verify:"));
-  tokenFor(source,items,"mas.establishment.eligible","skillPredicate","reference");
+  tokenFor(source,items,"validate-sm-subscription","skillStep","declaration",source.indexOf("nodes:"));
+  tokenFor(source,items,"mas::SC.VALIDATE_SUBSCRIPTION","skillOperation","reference");
+  tokenFor(source,items,"establishment.mas.subscription_validated","skillPredicate","reference");
   tokenFor(source,items,"PASS","skillOutcome");
 });
 
@@ -202,24 +200,18 @@ test("v1alpha4 uses its own AST semantic projection for the frozen single-graph 
   assert.ok(semantic.V1_ALPHA4_SEMANTIC_TOKEN_TYPES.includes("skillReference"));
 });
 
-test("legacy Contract and PredicateSet source positions follow their v0.2 profiles",()=>{
+test("v1alpha4 Contract and PredicateSet expose source-backed references and declarations",()=>{
   const contractSource=sample("establish-pdu-session","assurance/contract.yaml");
   const c=observed(contractSource,"skills/establish-pdu-session/assurance/contract.yaml");
-  tokenFor(contractSource,c,"entryProcedure","skillKeyword");
-  tokenFor(contractSource,c,"ue-requested-pdu-session-establishment","skillProcedure","reference");
+  tokenFor(contractSource,c,"get-sm-subscription-data.precondition","skillStep","reference");
   tokenFor(contractSource,c,"schemas/establishment-request.schema.yaml","skillSchema","reference");
-  tokenFor(contractSource,c,"sbi.udm.sm_data.get","skillCapability","reference");
+  tokenFor(contractSource,c,"urn:example:connectionagent:capability:3gpp:nudm-sdm-get:v1",
+    "skillCapability","reference");
 
   const predicateSource=sample("establish-pdu-session","assurance/predicates.yaml");
   const p=observed(predicateSource,"skills/establish-pdu-session/assurance/predicates.yaml");
-  tokenFor(predicateSource,p,"createdsession.ingress.eligible","skillPredicate","declaration");
-  tokenFor(predicateSource,p,"createdsession.procedure_context","skillObservation","reference");
-});
-
-test("Skill-owned JSON Schema positions use canonical type and schema references",()=>{
-  const source=sample("establish-pdu-session","schemas/establishment-request.schema.yaml");
-  const items=observed(source,"skills/establish-pdu-session/schemas/establishment-request.schema.yaml");
-  tokenFor(source,items,"object","skillDataType");
+  tokenFor(predicateSource,p,"establishment.request.supported","skillPredicate","declaration");
+  tokenFor(predicateSource,p,"string","skillDataType");
 });
 
 test("imported ToolCatalog operations are declarations, not fabricated resolved links",()=>{
