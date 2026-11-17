@@ -3,24 +3,28 @@ import assert from 'node:assert/strict';
 import {registerPredicateEditor} from '../experiments/ide-host/vscode/src/predicate-editor.mjs';
 
 const source = [
-  'apiVersion: connectionagent.io/v1alpha1',
-  'kind: PredicateSet',
-  'metadata:',
-  '  skill: browser-predicate-test',
+  '# CA-SL v1alpha4 PredicateSet',
   'predicates:',
   '  session.ready:',
-  '    observations:',
-  '      state:',
-  '        ref: session.context',
-  '        scope: request.sessionRef',
-  '        freshness: 5s',
+  '    parameters:',
+  '      - supi: string',
+  '      - pduSessionId: integer',
+  '    evidence:',
+  '      requires:',
+  '        supi: [ca::evidence.ue-identity]',
   '    evaluator:',
   '      type: cel',
-  '      expression: observations.state.status == "READY"',
+  '      expression: supi != "" && pduSessionId > 0',
+  '  session.persisted:',
+  '    parameters:',
+  '      - session: ca::schemas:session-result:v1',
+  '    evaluator:',
+  '      type: script',
+  '      script: scripts/validate-session.py',
   ''
 ].join('\n');
 
-test('Predicate custom editor registers independently and refreshes from current Source', async () => {
+test('Predicate custom editor renders v1alpha4 Parameters, Evidence and Evaluator', async () => {
   const registrations = new Map();
   const commands = new Map();
   const context = {subscriptions: []};
@@ -53,7 +57,8 @@ test('Predicate custom editor registers independently and refreshes from current
 
   let text = source;
   const uri = {path: '/workspace/demo/assurance/predicates.yaml',
-    toString: () => 'file:///workspace/demo/assurance/predicates.yaml'};
+    toString: () => 'file:///workspace/demo/assurance/predicates.yaml',
+    with: value => ({path: value.path, toString: () => 'file:///workspace/demo/' + value.path.split('/').slice(-1)[0]})};
   const document = {uri, version: 1, lineCount: source.split('\n').length,
     getText: () => text};
   const messages = [];
@@ -69,7 +74,7 @@ test('Predicate custom editor registers independently and refreshes from current
   assert.equal(webview.options.enableScripts, true);
   assert.equal(webview.options.localResourceRoots.length, 0);
   assert.match(webview.html, /Predicate Designer/);
-  assert.match(webview.html, /Observation → Evaluator/);
+  assert.match(webview.html, /Parameters → Evidence → Evaluator/);
   assert.match(webview.html, /Content-Security-Policy/);
   assert.doesNotMatch(webview.html, /unsafe-inline|https?:\/\//);
 
@@ -77,15 +82,23 @@ test('Predicate custom editor registers independently and refreshes from current
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(messages.at(-1).type, 'snapshot');
   assert.equal(messages.at(-1).projection.state, 'READY');
-  assert.equal(messages.at(-1).projection.predicateCount, 1);
+  assert.equal(messages.at(-1).projection.language, 'CA-SL v1alpha4');
+  assert.equal(messages.at(-1).projection.skill.value, 'demo');
+  assert.equal(messages.at(-1).projection.predicateCount, 2);
+  assert.deepEqual(messages.at(-1).projection.predicates[0].parameters
+    .map(item => [item.name, item.type]), [['supi', 'string'], ['pduSessionId', 'integer']]);
+  assert.equal(messages.at(-1).projection.predicates[0].evidence[0]
+    .guarantees[0].value, 'ca::evidence.ue-identity');
+  assert.equal(messages.at(-1).projection.predicates[1].evaluator.script.value,
+    'scripts/validate-session.py');
 
-  text = source.replace('status == "READY"', 'status == "ACCEPTED"');
+  text = source.replace('pduSessionId > 0', 'pduSessionId >= 1');
   document.version = 2;
   changeHandler({document});
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(messages.at(-1).version, 2);
   assert.match(messages.at(-1).projection.predicates[0].evaluator.expression.value,
-    /ACCEPTED/);
+    /pduSessionId >= 1/);
 
   await messageHandler({type: 'revealLine', value: 8, version: 1});
   await new Promise(resolve => setImmediate(resolve));
