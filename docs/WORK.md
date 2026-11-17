@@ -5,9 +5,10 @@
 [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md)
 
 - **产品决策：** 独立 Editor Tab、结构化 Change Set、接受后应用到原生 TextDocument Buffer、用户自行保存；P1 仅修改现有 Procedure。
-- **架构基线：** 复用 Theia / VS Code Extension、原生 TextDocument / WorkspaceEdit、Package Snapshot 和 Compiler Check；AI Webview 不拥有 Source 或网络写入权限。
-- **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。
-- **Provider：** 尚未选择模型服务。浏览器 CORS、SecretStorage 和用户自有 Gateway 需要先做 Spike；未完成前不发送 Package 内容。
+- **架构基线：** 复用 Theia / VS Code Extension、原生 TextDocument / WorkspaceEdit、Package Snapshot 和 Compiler Check；AI Webview 不拥有 Source 或网络写入权限。复用 Theia AI Agent / Prompt / LanguageModel / generic ChangeSet 能力，增加 CA-SL 专用 ProcedureChangeSetElement。
+- **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。Theia AI ChangeSet 只提供通用生命周期，不替代 CA-SL 语义校验和 Source Patch。
+- **模型服务决策：** 采用 OpenAI-compatible API；优先复用 Theia 1.76.0 `@theia/ai-openai`、`@theia/ai-core` 与 `@theia/ai-chat`。Theia AI Agent / ChangeSet 尚未集成。
+- **关键实施门槛：** 当前 VS Code 插件 API 的 `vscode.lm.selectChatModels()` 在 Theia 1.76.0 为 stub；`@theia/ai-openai` 前端管理器依赖 Theia Node backend RPC，而 Pages 生产环境是 Browser-Only。必须先完成 Theia-native bridge、Browser-Only provider transport、CORS 与凭据路径 Spike。
 - **状态：** Design PROPOSED；Implementation NOT_STARTED；Acceptance NOT_RUN。没有 AI Provider 集成、没有代码变更、没有 Runtime / 5GC 能力声明。
 
 ## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）

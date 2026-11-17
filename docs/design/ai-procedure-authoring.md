@@ -88,7 +88,7 @@ Do not embed a shared API key in the static build. The Theia AI documentation st
 
 ## 4. P1 scope
 
-### 3.1 Included
+### 4.1 Included
 
 - Open AI Authoring for one existing `assurance/procedure.yaml`.
 - Capture the live unsaved Procedure TextDocument as the base revision.
@@ -102,7 +102,7 @@ Do not embed a shared API key in the static build. The Theia AI documentation st
 - Preserve native Save, dirty state, Source/Visual refresh and Undo/Redo.
 - Keep a session-local revision history for proposal refinement.
 
-### 3.2 Excluded
+### 4.2 Excluded
 
 - Creating a new Skill from a reference.
 - Editing Contract, PredicateSet, Schema, Script, Dependency Lock or Capability grants.
@@ -117,7 +117,7 @@ A request that requires an excluded change is reported as a blocker or a separat
 
 ## 5. Entry and Editor Tab behavior
 
-### 4.1 Entry points
+### 5.1 Entry points
 
 P1 provides one primary command: **AI Authoring: Modify Current Procedure**.
 
@@ -127,14 +127,14 @@ P1 provides one primary command: **AI Authoring: Modify Current Procedure**.
 
 The current menu reorganization is being handled separately by PR #199. The AI command should join its native **Authoring** group after that work is integrated; do not create a parallel top-level menu.
 
-### 4.2 Target resolution
+### 5.2 Target resolution
 
 - If the active editor belongs to a supported v1alpha4 Procedure, use that document.
 - If no Procedure is active, offer a picker limited to the current workspace's `assurance/procedure.yaml` files.
 - If the selected file is not v1alpha4, show an explicit unsupported-version explanation. Do not attempt Legacy conversion.
 - One live Authoring session is allowed per Procedure URI. Reopening the command focuses the existing tab rather than opening a duplicate session.
 
-### 4.3 Tab implementation
+### 5.3 Tab implementation
 
 Preferred host implementation: a standalone VS Code-compatible `WebviewPanel` opened as one Editor Tab in the active editor group.
 
@@ -150,7 +150,7 @@ Theia 1.76 browser-only and backend-backed hosts must both prove the `WebviewPan
 
 The Editor Tab contains three internal regions. They are not three VS Code editor groups.
 
-### 5.1 Context panel
+### 6.1 Context panel
 
 Shows the exact information supplied to the model:
 
@@ -164,7 +164,7 @@ Shows the exact information supplied to the model:
 
 The context panel is collapsible. Narrow layouts move it into an internal drawer; they do not create another editor column.
 
-### 5.2 Main Workbench
+### 6.2 Main Workbench
 
 Four internal views:
 
@@ -177,7 +177,7 @@ Four internal views:
 
 Flow Changes is a read-only comparison of two source projections. It does not create a second graph model or become an editable business source.
 
-### 5.3 Change Set panel
+### 6.3 Change Set panel
 
 Shows:
 
@@ -194,7 +194,7 @@ Refinement creates a new proposal revision. The UI may show a compact revision t
 
 The existing Package snapshot collector can be reused as a source of live Package bytes, but its full output MUST NOT be sent to a model by default. The AI context pack is a separate allowlisted projection.
 
-### 6.1 Default context candidates
+### 7.1 Default context candidates
 
 | Source | Access | Default behavior |
 |---|---|---|
@@ -206,7 +206,7 @@ The existing Package snapshot collector can be reused as a source of live Packag
 | `references/` documents | Read-only | Opt-in per task; never silently include all references |
 | Script source | Read-only | Opt-in only when a directly referenced script is material to the requested change |
 
-### 6.2 Never include by default
+### 7.2 Never include by default
 
 - `.env`, credentials, tokens, secrets, browser storage or host environment.
 - `lib/`, `output/`, build artifacts, logs, arbitrary workspace files or unrelated Skills.
@@ -216,7 +216,7 @@ The existing Package snapshot collector can be reused as a source of live Packag
 
 The initial context-size limit should be enforced by bytes before transmission. Oversized context is rejected with a list of large items; content must not be silently truncated.
 
-### 6.3 Consent
+### 7.3 Consent
 
 Before the first request in a task, the user sees the provider destination and exact context manifest, then explicitly confirms sending it. Changing the provider or adding context requires a new review. The extension must not transmit Package content merely because the AI Authoring tab was opened.
 
@@ -281,7 +281,7 @@ The model returns a constrained `ModelProposal`. The extension host validates it
 
 `base`, `scope`, operation IDs, groups, source spans, candidate Source and validation state are host-owned. The model cannot author or override them. The host then exposes the validated proposal through a custom Theia AI `ProcedureChangeSetElement`; the ChangeSet model is a review / lifecycle container, not the model's output schema.
 
-### 8.2 Model output restrictions
+### 9.2 Model output restrictions
 
 The model may return:
 
@@ -293,7 +293,7 @@ The model may return:
 
 The model MUST NOT return trusted source offsets, arbitrary file paths, raw replacement Source, a complete candidate YAML file, a direct WorkspaceEdit or instructions to execute Tools / Runtime actions.
 
-### 8.3 Initial semantic operation allowlist
+### 9.3 Initial semantic operation allowlist
 
 The exact implementation schema is finalized during the patch-engine spike, but P1 is limited to these operation families:
 
@@ -312,7 +312,7 @@ P1 does not allow deleting Nodes, Stages, Predicate calls, arguments or Routes; 
 
 The allowlist uses v1alpha4's `start`, `nodes`, `precondition`, `operation`, `observation` and `postcondition` source shape. Legacy `procedures`, `call`, `with`, `verify`, `reconcile`, `target`, `on`, plural stage keys or inferred conversions are rejected.
 
-### 8.4 Reference and trust rules
+### 9.4 Reference and trust rules
 
 - A Predicate reference must resolve to the current Package's declared PredicateSet.
 - A Tool / Observation callable must resolve to an actually available, versioned contract before it can be described as verified.
@@ -356,7 +356,7 @@ The user may accept all safe groups, accept selected independent groups or rejec
 
 ## 12. Revision, conflict and lifecycle
 
-### 11.1 Base revision
+### 12.1 Base revision
 
 The host captures at least:
 
@@ -368,7 +368,7 @@ The host captures at least:
 
 The live unsaved buffer is authoritative. Persisted bytes must not replace it.
 
-### 11.2 Stale proposal
+### 12.2 Stale proposal
 
 If the Procedure buffer or a read-only context item changes while a request is running or awaiting review:
 
@@ -379,7 +379,7 @@ If the Procedure buffer or a read-only context item changes while a request is r
 
 P1 does not attempt automatic rebase or patch relocation.
 
-### 11.3 Session lifecycle
+### 12.3 Session lifecycle
 
 `Draft → Analyzing → Plan Ready → Changes Ready → Validating → Review Required → Applied → Saved`
 
