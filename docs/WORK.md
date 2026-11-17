@@ -1,15 +1,18 @@
 # Skill Studio 当前工作状态
 
-## 2026-11-17 · AI Procedure Authoring P1（设计提案）
 
-[Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md)
+## 2026-11-17 · AI Procedure Authoring P1（跨宿主设计提案）
 
-- **产品决策：** 独立 Editor Tab、结构化 Change Set、接受后应用到原生 TextDocument Buffer、用户自行保存；P1 仅修改现有 Procedure。
-- **架构基线：** 复用 Theia / VS Code Extension、原生 TextDocument / WorkspaceEdit、Package Snapshot 和 Compiler Check；AI Webview 不拥有 Source 或网络写入权限。复用 Theia AI Agent / Prompt / LanguageModel / generic ChangeSet 能力，增加 CA-SL 专用 ProcedureChangeSetElement。
-- **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。Theia AI ChangeSet 只提供通用生命周期，不替代 CA-SL 语义校验和 Source Patch。
-- **模型服务决策：** 采用 OpenAI-compatible API；优先复用 Theia 1.76.0 `@theia/ai-openai`、`@theia/ai-core` 与 `@theia/ai-chat`。Theia AI Agent / ChangeSet 尚未集成。
-- **关键实施门槛：** 当前 VS Code 插件 API 的 `vscode.lm.selectChatModels()` 在 Theia 1.76.0 为 stub；`@theia/ai-openai` 前端管理器依赖 Theia Node backend RPC，而 Pages 生产环境是 Browser-Only。必须先完成 Theia-native bridge、Browser-Only provider transport、CORS 与凭据路径 Spike。
-- **状态：** Design PROPOSED；Implementation NOT_STARTED；Acceptance NOT_RUN。没有 AI Provider 集成、没有代码变更、没有 Runtime / 5GC 能力声明。
+[Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md) · [PR #201](https://github.com/odango-chan/ca-skill-studio-demo/pull/201)
+
+- **产品决策：** 独立 Editor Tab、Studio 自有结构化 Change Set、接受后应用到原生 TextDocument Buffer、用户自行保存；P1 仅修改现有 CA-SL v1alpha4 Procedure。
+- **最终架构目标：** 平台无关的 Authoring Core + Host Adapter + OpenAI-compatible AI Gateway。Theia、VS Code Desktop/Web/Remote 与内网部署复用同一套 Context Pack、Procedure Agent、ModelProposal、Change Set 和 v1alpha4 Semantic Patch Engine。
+- **在线优先：** 第一条真实链路是 GitHub Pages / Theia Browser-Only → HTTPS AI Gateway → OpenAI-compatible 模型。Cloudflare Worker Free 是 Gateway 候选，不是核心依赖；GitHub Pages 本身没有可存放共享模型密钥的可信后端。
+- **共享密钥：** 按部署共用一份 Provider API Key，由 Gateway 服务端保存；不要求每位用户配置自己的模型 Key。Gateway 的访问授权、速率限制和用量上限仍须独立设计，CORS 不是身份验证。
+- **VS Code / 本地：** 桌面插件通过本地 Extension Host 处理编辑器操作，默认仍调用配置的在线或内网 Gateway；需要本机模型服务时可连接 loopback Gateway。不能把共享 Provider Key 打包进 VSIX。Web Extension 可作为 Desktop/Web 共用基线，但不提供 Node.js API；必要时再增加 Node Host Adapter。
+- **原生 AI API：** vscode.lm 和 Theia AI 均作为可选适配，不是核心 Agent 运行时。Theia 1.76 的 vscode.lm stub 和 @theia/ai-openai backend RPC 限制继续作为兼容事实，不阻塞通用 Gateway 路径。
+- **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。Compiler Check 仍是候选 Procedure 的权威静态验证。
+- **状态：** 产品决策 APPROVED；跨宿主架构方向 APPROVED；详细设计 PROPOSED；Implementation NOT_STARTED；Acceptance NOT_RUN。尚无 AI Provider / Gateway 集成、无模型调用、无 Runtime / 5GC 能力声明。
 
 ## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
 
