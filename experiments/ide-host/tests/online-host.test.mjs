@@ -191,8 +191,7 @@ test("SKILL Studio adds one native Theia top-level menu with real extension comm
     "skillStudio.loadExample","skillStudio.auditPackage","skillStudio.exportPackageZip",
     "skillStudio.refreshInspection","skillStudio.restartLanguageService",
     "skillStudio.openPredicates","skillStudio.openContract","skillStudio.selectProjectRoot",
-    "skillStudio.addDependency","skillStudio.refreshDependencies","skillStudio.refreshDependency",
-    "skillStudio.updateDependencyLock","skillStudio.removeDependency",
+    "skillStudio.addDependency","skillStudio.refreshDependencies",
     "skillStudio.checkSkill","skillStudio.buildSkill","skillStudio.inspectCompilerDependencies"
   ];
   for(const id of publicCommands){
