@@ -748,6 +748,7 @@ export async function runWorkbenchAcceptance({
        !v1alpha5LanguageFeatures.waitResponseFields?.includes("after:")||
        !v1alpha5LanguageFeatures.waitRouteKeys?.includes("TIMEOUT:")||
        !v1alpha5LanguageFeatures.waitResponseAfter?.includes("final")||
+       v1alpha5LanguageFeatures.waitResponseAfter?.includes("timeout-handler")||
        !v1alpha5LanguageFeatures.waitTimeoutTarget?.includes("timeout-handler")||
        !v1alpha5LanguageFeatures.waitOutput?.includes("await-event.wait.output")||
        v1alpha5LanguageFeatures.waitTimeoutTarget?.includes("SUCCEEDED")||
