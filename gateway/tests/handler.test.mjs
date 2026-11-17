@@ -306,3 +306,62 @@ test("upstream base URL rejects insecure or credential-bearing URLs", async () =
   );
   assert.equal(response.status, 503);
 });
+
+test("placeholder deployment configuration fails closed", async () => {
+  const response = await handleGatewayRequest(
+    makeRequest("/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-turnstile-token": "valid-challenge" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "hello" }] }),
+    }),
+    makeEnv({ OPENAI_MODEL: "replace-with-provider-model-id" }),
+    { clientIp: "203.0.113.11", rateLimit: allowRateLimit() },
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "gateway_not_configured");
+});
+
+test("Turnstile success is rejected when hostname does not match the configured host", async () => {
+  const response = await handleGatewayRequest(
+    makeRequest("/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-turnstile-token": "valid-challenge" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "hello" }] }),
+    }),
+    makeEnv(),
+    {
+      clientIp: "203.0.113.12",
+      rateLimit: allowRateLimit(),
+      fetchImpl: async () => Response.json({
+        success: true,
+        hostname: "attacker.example",
+        action: "ai_authoring",
+      }),
+    },
+  );
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error.code, "challenge_rejected");
+});
+
+test("Turnstile success is rejected when the action does not match", async () => {
+  const response = await handleGatewayRequest(
+    makeRequest("/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-turnstile-token": "valid-challenge" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "hello" }] }),
+    }),
+    makeEnv(),
+    {
+      clientIp: "203.0.113.13",
+      rateLimit: allowRateLimit(),
+      fetchImpl: async () => Response.json({
+        success: true,
+        hostname: "odango-chan.github.io",
+        action: "unrelated_action",
+      }),
+    },
+  );
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error.code, "challenge_rejected");
+});
+
