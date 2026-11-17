@@ -377,7 +377,8 @@ try{
   // popup reveal, which is unreliable when a sandboxed Webview owns focus.
   const nativeStudioMenuWidget=await evalJS(`(()=>{
     const c=window.theia.container;
-    const shellKey=[...c._bindingDictionary._map.keys()].find(k=>
+    const keys=[...c._bindingDictionary._map.keys()];
+    const shellKey=keys.find(k=>
       typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);
     if(!shellKey)throw Error('Theia ApplicationShell is missing for native menu acceptance');
     const bar=c.get(shellKey).topPanel.widgets.find(w=>w.id==='theia:menubar');
@@ -477,6 +478,7 @@ try{
   };
   await revealStudioSubmenu('Project',['New Project','Open Project','Open Example Project']);
   await revealStudioSubmenu('Skill',['Check Skill','Build Skill','Inspect Dependencies']);
+  await revealStudioSubmenu('Dependencies',['Add Dependency','Refresh Dependencies']);
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:390,y:270,button:"left",clickCount:1});
@@ -546,6 +548,12 @@ try{
     items:[...document.querySelectorAll('.monaco-list-row,.quick-input-list .monaco-list-row')].map(x=>x.innerText).filter(Boolean).slice(0,20),
     text:document.body.innerText.slice(-1050)
   })`);
+  const paletteText=(registeredCommands.items??[]).join("\\n")+"\\n"+(registeredCommands.text??"");
+  for(const label of [
+    "SKILL Studio: Check Skill","SKILL Studio: Build Skill",
+    "SKILL Studio: Add Dependency","SKILL Studio: Open Procedure Designer"
+  ])if(!paletteText.includes(label))
+    throw Error("Command Palette is missing "+label+": "+paletteText);
   const loadExampleRow=await evalJS(`(()=>{
     const node=[...document.querySelectorAll('.monaco-list-row')].find(x=>x.innerText.includes('SKILL Studio: Open Example Project'));
     if(!node)return null;const r=node.getBoundingClientRect();

@@ -150,7 +150,9 @@ test("Theia bundles offline YAML and Python TextMate grammars independently of L
 test("SKILL Studio adds one native Theia top-level menu with real extension commands",async()=>{
   const css=buildSkillStudioBrandCss();
   const script=buildSkillStudioBrandScript();
-  assert.match(css,/\.lm-MenuBar-item:first-child/);
+  assert.match(css,/\.lm-MenuBar-content/);
+  assert.doesNotMatch(css,/lm-MenuBar-item:first-child/,
+    "the custom menu must not displace the standard File menu from first position");
   assert.match(css,/\.theia-preload\.theia-hidden\s*\{\s*pointer-events:none;/,
     "An invisible startup preload cannot intercept trusted native menu clicks");
   assert.doesNotMatch(css,/\.skill-studio-brand-label|linear-gradient/);
@@ -166,8 +168,7 @@ test("SKILL Studio adds one native Theia top-level menu with real extension comm
     "showWelcome","newProject","openProject","loadExample","selectProjectRoot",
     "refreshPackages","checkSkill","buildSkill","inspectCompilerDependencies",
     "auditPackage","exportPackageZip","addDependency","refreshDependencies",
-    "refreshDependency","updateDependencyLock","inspectDependencyContract",
-    "removeDependency","openProcedure","openContract","openPredicates","openSchema",
+    "openProcedure","openContract","openPredicates","openSchema",
     "refreshInspection","restartLanguageService","openLanguageSpec","openAuthoringGuide"
   ])
     assert.ok(script.includes('"skillStudio.'+id+'"'),"Native menu lacks "+id);
@@ -188,8 +189,7 @@ test("SKILL Studio adds one native Theia top-level menu with real extension comm
     "skillStudio.openPredicates","skillStudio.openContract","skillStudio.selectProjectRoot",
     "skillStudio.addDependency","skillStudio.refreshDependencies","skillStudio.refreshDependency",
     "skillStudio.updateDependencyLock","skillStudio.removeDependency",
-    "skillStudio.inspectDependencyContract","skillStudio.checkSkill",
-    "skillStudio.buildSkill","skillStudio.inspectCompilerDependencies"
+    "skillStudio.checkSkill","skillStudio.buildSkill","skillStudio.inspectCompilerDependencies"
   ];
   for(const id of publicCommands){
     assert.equal(commandById.get(id)?.category,"SKILL Studio",id+" must be grouped in Command Palette");
@@ -202,7 +202,9 @@ test("SKILL Studio adds one native Theia top-level menu with real extension comm
     "skillStudio.editPhaseInputBinding","skillStudio.editPhaseOutputReference",
     "skillStudio.editPhaseRouteTarget","skillStudio.repairPhaseOutcome",
     "skillStudio.insertNode","skillStudio.deleteNode","skillStudio.addPhaseVerify",
-    "skillStudio.editPhaseVerifyStep","skillStudio.renameNamedPhaseStep"
+    "skillStudio.editPhaseVerifyStep","skillStudio.renameNamedPhaseStep",
+    "skillStudio.refreshDependency","skillStudio.updateDependencyLock",
+    "skillStudio.inspectDependencyContract","skillStudio.removeDependency"
   ])assert.ok(hiddenPalette.has(id),id+" must remain contextual, not global palette noise");
   const packageToolbar=extension.contributes.menus["view/title"]
     .filter(item=>item.when==="view == skillStudio.packages")

@@ -90,8 +90,8 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
   const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
   const files=manifest.files;
   report({phase:"files",completed:0,total:files.length});
-  // The actual folder basename must be the project name: Theia 1.76
-  // ignores WorkspaceFolder.name passed to updateWorkspaceFolders().
+  // The actual folder basename is the workspace identity when the caller
+  // opens this directory with the native vscode.openFolder command.
   if(!storageUri)fail("No writable extension storage URI");
   const legacySkillsRoot=vscode.Uri.joinPath(storageUri,"workspaces","skills");
   const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
