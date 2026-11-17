@@ -36,23 +36,23 @@ Cloudflare Workers Free currently documents 100,000 requests per day, 10 ms CPU 
 
 1. Create a Turnstile widget with hostname odango-chan.github.io and action ai_authoring. Use the public site key in the Studio client; keep the secret key in Worker secret storage.
 2. Configure OPENAI_MODEL in gateway/wrangler.jsonc for the selected OpenAI-compatible provider.
-3. Set the deployment secrets:
+3. From the gateway directory, set the deployment secrets:
 
 ~~~bash
-npx wrangler@4.34.0 secret put OPENAI_API_KEY --config gateway/wrangler.jsonc
-npx wrangler@4.34.0 secret put TURNSTILE_SECRET_KEY --config gateway/wrangler.jsonc
+npx wrangler@4.34.0 secret put OPENAI_API_KEY --config wrangler.jsonc
+npx wrangler@4.34.0 secret put TURNSTILE_SECRET_KEY --config wrangler.jsonc
 ~~~
 
 4. Replace TURNSTILE_SITE_KEY in the Worker vars with the public widget site key.
 5. Deploy:
 
 ~~~bash
-npx wrangler@4.34.0 deploy --config gateway/wrangler.jsonc
+npx wrangler@4.34.0 deploy --config wrangler.jsonc
 ~~~
 
 6. Check GET /healthz and GET /public-config from the allowed origin. Then run the browser integration against /v1/chat/completions.
 
-Do not deploy until the provider secret, Turnstile secret, site key, model ID and rate-limit binding are configured. The Worker intentionally returns gateway_not_configured if required bindings or secrets are absent.
+Do not deploy until the provider secret, Turnstile secret, non-placeholder public site key, model ID and rate-limit binding are configured. The Worker intentionally returns gateway_not_configured if required bindings or secrets are absent.
 
 ## Security and budget notes
 
