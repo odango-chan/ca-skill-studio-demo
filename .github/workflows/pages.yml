@@ -47,6 +47,8 @@ jobs:
           repository: odango-chan/ca-skill-compiler
           ref: v1.0.0
           path: compiler-source
+          token: ${{ secrets.CA_SKILL_COMPILER_READ_TOKEN }}
+          persist-credentials: false
       - name: Go 1.26.6 for the pinned Compiler WASM build
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         uses: actions/setup-go@v5
