@@ -23,7 +23,7 @@ try{
 }
 
 const rootUri="file:///workspace/establish-pdu-session";
-const sampleRoot="../site/samples/v1alpha4/establish-pdu-session/";
+const sampleRoot="../site/samples/v1alpha5/establish-pdu-session/";
 function read(path){return readFileSync(new URL(sampleRoot+path,import.meta.url),"utf8");}
 function document(relativePath,text){
   return {uri:rootUri+"/"+relativePath,relativePath,languageId:"yaml",
@@ -52,7 +52,7 @@ function at(index,uri,text,needle,from=0){
   return symbols.skillSymbolAt(index,uri,offset);
 }
 
-test("Contract precondition resolves to the exact v1alpha4 Procedure Node",()=>{
+test("Contract precondition resolves to the exact v1alpha5 Procedure Node",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
   const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
@@ -69,7 +69,7 @@ test("Contract precondition resolves to the exact v1alpha4 Procedure Node",()=>{
   assert.ok(refs.some(x=>x.uri===procedure.uri));
 });
 
-test("Procedure Predicate references resolve to the v1alpha4 Predicate declarations",()=>{
+test("Procedure Predicate references resolve to the v1alpha5 Predicate declarations",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
   const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
@@ -99,6 +99,27 @@ test("Procedure route references resolve to exact Node declarations in the same 
   assert.equal(declaration.uri,procedure.uri);
   const occurrences=symbols.skillSymbolOccurrences(hit,true);
   assert.ok(occurrences.length>=2);
+});
+
+test("v1alpha5 wait.output and response.after resolve to exact Node declarations",()=>{
+  const snapshot=packageSnapshot();
+  const index=symbols.buildSkillSymbolIndex(snapshot);
+  const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
+
+  const waitOutput="update-sm-context.wait.output";
+  const waitHit=at(index,procedure.uri,procedure.text,waitOutput);
+  assert.equal(waitHit.token.type,"skillStep");
+  const waitDeclaration=symbols.uniqueSkillSymbolDeclaration(waitHit);
+  assert.equal(waitDeclaration.name,"update-sm-context");
+  assert.equal(waitDeclaration.uri,procedure.uri);
+
+  const responseAfter="prepare-step17-response";
+  const responseHit=at(index,procedure.uri,procedure.text,responseAfter,
+    procedure.text.indexOf("after: "+responseAfter));
+  assert.equal(responseHit.token.type,"skillStep");
+  const responseDeclaration=symbols.uniqueSkillSymbolDeclaration(responseHit);
+  assert.equal(responseDeclaration.name,responseAfter);
+  assert.equal(responseDeclaration.uri,procedure.uri);
 });
 
 test("Contract request Schema reference resolves to the exact Package-owned Schema file",()=>{
@@ -159,7 +180,7 @@ test("External context schemas and unpublished Capability/Operation grants never
     "an Observation is not conflated with an Operation export");
 });
 
-test("Document Symbols expose v1alpha4 Procedure Nodes and Predicate declarations",()=>{
+test("Document Symbols expose v1alpha5 Procedure Nodes and Predicate declarations",()=>{
   const snapshot=packageSnapshot();
   const index=symbols.buildSkillSymbolIndex(snapshot);
   const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
@@ -169,7 +190,7 @@ test("Document Symbols expose v1alpha4 Procedure Nodes and Predicate declaration
     x.name==="get-sm-subscription-data"));
   assert.ok(procedureSymbols.some(x=>x.type==="skillStep"&&x.name==="update-sm-context"));
   assert.ok(!procedureSymbols.some(x=>x.type==="skillProcedure"),
-    "v1alpha4 has one Package-level Procedure graph");
+    "v1alpha5 has one Package-level Procedure graph");
   const predicateSymbols=symbols.skillSymbolDeclarationsForDocument(index,predicates.uri);
   assert.ok(predicateSymbols.some(x=>x.type==="skillPredicate"&&
     x.name==="establishment.request.supported"));
