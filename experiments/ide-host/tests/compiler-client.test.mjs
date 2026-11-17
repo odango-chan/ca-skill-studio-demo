@@ -80,6 +80,7 @@ test("Compiler Worker transport failure terminates the failed Worker and rejects
 });
 
 test("Compiler Worker client rejects unsupported commands before dispatch",async()=>{
+  FakeWorker.instances.length=0;
   const {client}=host();
   try{
     await assert.rejects(client.request("run",{}),/Unsupported Compiler command/);
