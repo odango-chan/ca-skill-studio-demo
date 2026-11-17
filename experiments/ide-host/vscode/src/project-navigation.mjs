@@ -34,16 +34,14 @@ export async function restorePendingExampleProject(vscode,context,{
   const root=vscode.Uri.parse(pending.root);
   if(!isSingleFolderWorkspace(vscode,root))return false;
 
-  try{
-    await revealPackages?.();
-    await vscode.commands.executeCommand(
-      "skillStudio.openProcedure",vscode.Uri.parse(pending.procedure)
-    );
-    await state.update(PENDING_EXAMPLE_OPEN_KEY,undefined);
-    await onRestored?.(pending);
-    return true;
-  }catch(error){
-    await state.update(PENDING_EXAMPLE_OPEN_KEY,undefined);
-    throw error;
-  }
+  // Claim the one-shot continuation before any asynchronous UI work.
+  // Opening a folder can restart the extension host; consuming first prevents
+  // concurrent activations from opening the same Procedure and notifying twice.
+  await state.update(PENDING_EXAMPLE_OPEN_KEY,undefined);
+  await revealPackages?.();
+  await vscode.commands.executeCommand(
+    "skillStudio.openProcedure",vscode.Uri.parse(pending.procedure)
+  );
+  await onRestored?.(pending);
+  return true;
 }
