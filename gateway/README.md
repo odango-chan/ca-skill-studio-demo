@@ -34,12 +34,13 @@ The tests use mocked Siteverify and model endpoints. They prove request shaping,
 
 Cloudflare Workers Free currently documents 100,000 requests per day, 10 ms CPU time per invocation and 50 external subrequests per invocation. The Gateway makes at most two external subrequests per model request: Turnstile Siteverify and the configured model endpoint. The CPU budget is for Worker execution, not the time spent waiting for the upstream model response. Verify current limits before deployment.
 
-1. Create a Turnstile widget with hostname odango-chan.github.io and action ai_authoring. Use the public site key in the Studio client; keep the secret key in Worker secret storage.
+1. Create a free Turnstile widget with hostname odango-chan.github.io and action ai_authoring. Turnstile can be used independently of Cloudflare DNS / proxying. Use the public site key in the Studio client; keep the secret key in Worker secret storage.
 2. Configure OPENAI_MODEL in gateway/wrangler.jsonc for the selected OpenAI-compatible provider.
 3. From the repository root, enter the gateway directory and set the deployment secrets:
 
 ~~~bash
 cd gateway
+npx wrangler@4.36.0 login
 npx wrangler@4.36.0 secret put OPENAI_API_KEY --config wrangler.jsonc
 npx wrangler@4.36.0 secret put TURNSTILE_SECRET_KEY --config wrangler.jsonc
 ~~~
