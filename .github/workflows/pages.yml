@@ -40,20 +40,6 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
           path: ide-source
-      - name: Checkout pinned CA Skill Compiler v1.0.0 source
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
-        uses: actions/checkout@v4
-        with:
-          repository: odango-chan/ca-skill-compiler
-          ref: v1.0.0
-          path: compiler-source
-          token: ${{ secrets.CA_SKILL_COMPILER_READ_TOKEN }}
-          persist-credentials: false
-      - name: Go 1.26.6 for the pinned Compiler WASM build
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.6"
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -153,6 +139,20 @@ jobs:
           npm ci --prefix experiments/ide-host/lsp-browser/client --omit=dev --no-audit --no-fund
           npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
           node experiments/ide-host/scripts/build-ide-spike.mjs
+      - name: Checkout pinned CA Skill Compiler v1.0.0 source
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        uses: actions/checkout@v4
+        with:
+          repository: odango-chan/ca-skill-compiler
+          ref: v1.0.0
+          path: compiler-source
+          token: ${{ secrets.CA_SKILL_COMPILER_READ_TOKEN }}
+          persist-credentials: false
+      - name: Go 1.26.6 for the pinned Compiler WASM build
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.6"
       - name: Build pinned Compiler v1.0.0 Go/WASM Core
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/spike/ide-extension-theia-host'
         working-directory: compiler-source
