@@ -853,7 +853,7 @@ try{
     viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,
     afterImport,identity,defaultWebviewView,
     frameCount:frames.length,frameUrls:frames.map(frame=>frame.url),
-    webviewFrames,defaultGraphFrame,patchEvidence:workbenchEvidence?.sourcePatch??null,
+    webviewFrames,defaultGraphFrame,graphEditability:workbenchEvidence?.graphEditability??null,
     extensionListStatus:listingResponse.status,extensionListPreview:listing.slice(0,500),
     extensionListPresent:listing.includes("ca-skill-studio-ide-spike"),
     requested:requests.size,notFound:[...notFound].slice(0,15),
@@ -904,13 +904,10 @@ try{
       defaultWebviewView.procedureValue!=="establish-pdu-session"))
     throw Error("Default v1alpha4 Procedure CustomEditor did not render: "+
       JSON.stringify({defaultWebviewView,webviewFrames}).slice(0,3000));
-  if(requireEditor&&(!workbenchEvidence?.sourcePatch?.preview?.ready||
-      !/TextDocument v\d+/.test(workbenchEvidence.sourcePatch.applied?.revision??"")||
-      !/TextDocument v\d+/.test(workbenchEvidence.sourcePatch.undo?.revision??"")||
-      workbenchEvidence.sourcePatch.restoredNodes!==workbenchEvidence.sourcePatch.initialNodes||
-      workbenchEvidence.sourcePatch.restoredEdges!==workbenchEvidence.sourcePatch.initialEdges))
-    throw Error("v1alpha4 Source-backed Patch/Undo acceptance did not complete: "+
-      JSON.stringify(workbenchEvidence?.sourcePatch).slice(0,3000));
+  if(requireEditor&&(!workbenchEvidence?.graphEditability?.readOnly||
+      !workbenchEvidence.graphEditability.sourceUnchanged))
+    throw Error("v1alpha4 Procedure graph did not remain read-only: "+
+      JSON.stringify(workbenchEvidence?.graphEditability).slice(0,3000));
   if(requireEditor&&(!workbenchEvidence?.phaseEvidence?.ready||
       !workbenchEvidence.phaseEvidence.readOnly||
       !workbenchEvidence?.packageOverview?.skills||
@@ -921,7 +918,7 @@ try{
   console.log("STUDIO_V1ALPHA4_ONLY_ACCEPTANCE",JSON.stringify({
     procedure:identity.defaultProcedure,masProcedure:identity.masProcedure,
     packageCount:workbenchEvidence?.packageOverview?.skills?.length??0,
-    sourcePatch:workbenchEvidence?.sourcePatch??null,
+    graphEditability:workbenchEvidence?.graphEditability??null,
     phaseEvidence:workbenchEvidence?.phaseEvidence??null,
     languageServiceStatus:workbenchEvidence?.languageServiceStatus??null
   }));
