@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "sourceRepo": "odango-chan/ca-skills",
+  "sourceRef": "refs/pull/65/head",
+  "sourceSha": "84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef",
+  "sourceStatus": "DRAFT_NOT_QUALIFIED",
+  "languageVersion": "connectionagent.io/v1alpha5",
+  "projectReadme": "README.md",
+  "skills": [
+    "establish-pdu-session",
+    "establish-pdu-session-mas"
+  ],
+  "files": [
+    "establish-pdu-session-mas/SKILL.md",
+    "establish-pdu-session-mas/assurance/contract.yaml",
+    "establish-pdu-session-mas/assurance/openamsm-operation-mapping.md",
+    "establish-pdu-session-mas/assurance/predicates.yaml",
+    "establish-pdu-session-mas/assurance/procedure.yaml",
+    "establish-pdu-session-mas/schemas/establishment-request.schema.yaml",
+    "establish-pdu-session/SKILL.md",
+    "establish-pdu-session/assurance/contract.yaml",
+    "establish-pdu-session/assurance/predicates.yaml",
+    "establish-pdu-session/assurance/procedure.yaml",
+    "establish-pdu-session/schemas/establishment-request.schema.yaml",
+    "establish-pdu-session/scripts/validate-smf-session-context-entry.py",
+    "establish-pdu-session/scripts/validate-smf-session-context.py",
+    "establish-pdu-session/scripts/validate-subscription-request.py"
+  ],
+  "blobs": {
+    "establish-pdu-session-mas/SKILL.md": "038d9ace2403c5b9c5a26f62d01e5bcf7d353847",
+    "establish-pdu-session-mas/assurance/contract.yaml": "3dcd2a3fa3cfb9842092ce388fc9b3e8c1d600d0",
+    "establish-pdu-session-mas/assurance/openamsm-operation-mapping.md": "538167625e47149d0d0f11217770356ba5bb17ca",
+    "establish-pdu-session-mas/assurance/predicates.yaml": "c28900038f8a6f531efcc35777f15825c294b555",
+    "establish-pdu-session-mas/assurance/procedure.yaml": "1fa0ce7366f23b2a5349ccf76629d95a89f7710a",
+    "establish-pdu-session-mas/schemas/establishment-request.schema.yaml": "a17059464dfd3958e5c5761ec38f80fe53cf46c5",
+    "establish-pdu-session/SKILL.md": "46508daa63ff22eca8e773cec94242e97985e138",
+    "establish-pdu-session/assurance/contract.yaml": "3c1c0cd5019267eb706cf3fd78e1954d070ff3e0",
+    "establish-pdu-session/assurance/predicates.yaml": "afc96d1b3aca4da5e559e553b082b1c5b2ed22a3",
+    "establish-pdu-session/assurance/procedure.yaml": "0d35fbf8e6bede82b1d211ae57627bd0d692abb5",
+    "establish-pdu-session/schemas/establishment-request.schema.yaml": "c30ebd0a95006e6be57a2ab51132e0a5c0ceb4d1",
+    "establish-pdu-session/scripts/validate-smf-session-context-entry.py": "7b5fab4ada028a2acd76405c6eb2a64d2b39ac15",
+    "establish-pdu-session/scripts/validate-smf-session-context.py": "9244f408a7af4c34e69e96b2cda2eb61c4a6b542",
+    "establish-pdu-session/scripts/validate-subscription-request.py": "806c9384e827a4a37f394194e9444dce7fc44c5a"
+  }
+}
