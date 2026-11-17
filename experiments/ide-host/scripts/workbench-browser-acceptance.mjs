@@ -591,67 +591,29 @@ export async function runWorkbenchAcceptance({
     type:"rendered",revision:initialGraph.view.revision,nodes:initialGraph.view.graphNodes
   };
 
-  // Exercise Source-backed Patch Preview, Apply and native Undo on the actual
-  // v1alpha4 Procedure. No Legacy fixture or second language version is opened.
-  const patchPreview=await evalWebviewJS("(()=>{"+
+  // The frozen v1alpha4 graph is intentionally read-only. Route changes belong
+  // to explicit Source/Authoring workflows, not the legacy drag-to-rewire editor.
+  const graphEditability=await evalWebviewJS("(()=>{"+
+    "const patch=document.querySelector('#patch');"+
+    "const commit=document.querySelector('#commit');"+
+    "const preview=document.querySelector('#preview');"+
     "const routes=document.querySelector('#routeList');"+
     "const targets=document.querySelector('#targetList');"+
-    "if(!routes||!targets||routes.options.length<2)return {ready:false,reason:'No v1alpha4 Route choices',routeOptions:routes?.options.length??0};"+
-    "routes.selectedIndex=1;routes.dispatchEvent(new Event('change',{bubbles:true}));"+
-    "if(targets.options.length<1)return {ready:false,reason:'No v1alpha4 target choices',routeOptions:routes.options.length};"+
-    "targets.selectedIndex=0;targets.dispatchEvent(new Event('change',{bubbles:true}));"+
-    "document.querySelector('#preview')?.click();"+
-    "return {ready:!document.querySelector('#commit')?.disabled,"+
-    "routeOptions:routes.options.length,targetOptions:targets.options.length,"+
-    "route:routes.value,target:targets.value,diff:document.querySelector('#diff')?.textContent??'',"+
-    "revision:document.querySelector('#revision')?.textContent??''};})()");
-  if(!patchPreview?.ready||!String(patchPreview.diff).includes("-")||
-     !String(patchPreview.diff).includes("+"))
-    throw Error("v1alpha4 Source-backed Patch Preview did not produce a reviewable diff: "+
-      JSON.stringify(patchPreview));
-  await evalWebviewJS("document.querySelector('#commit')?.click();true");
-  await sleep(800);
-  let patchApplied=null;
-  for(let i=0;i<40;i++){
-    patchApplied=await nativeCommand("skillStudio.internal.sourceVersionAcceptance");
-    if(patchApplied?.version>sourceState.version)break;
-    await sleep(100);
-  }
-  if(patchApplied?.uri!==defaultProcedureUri||patchApplied.version<=sourceState.version)
-    throw Error("v1alpha4 Patch Apply did not update the authoritative Source: "+
-      JSON.stringify({sourceState,patchApplied,patchPreview}));
-  await evalWebviewJS("document.querySelector('#openSource')?.click();true");
-  await sleep(500);
-  const sourceEditor=await evalJS("(()=>({editors:[...document.querySelectorAll('.monaco-editor')].map(el=>({"+
-    "text:el.querySelector('.view-lines')?.innerText??'',rect:(()=>{const r=el.getBoundingClientRect();"+
-    "return {x:r.x,y:r.y,width:r.width,height:r.height};})()}))}))()");
-  if(!sourceEditor.editors.some(editor=>editor.rect.width>150&&
-      editor.text.includes("start: get-sm-subscription-data")))
-    throw Error("The v1alpha4 native Source editor did not open after Patch Apply: "+
-      JSON.stringify(sourceEditor).slice(0,1800));
-  await command("Input.dispatchKeyEvent",{type:"keyDown",key:"z",code:"KeyZ",
-    modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90});
-  await command("Input.dispatchKeyEvent",{type:"keyUp",key:"z",code:"KeyZ",
-    modifiers:2,windowsVirtualKeyCode:90,nativeVirtualKeyCode:90});
-  await sleep(700);
-  let patchUndone=null;
-  for(let i=0;i<40;i++){
-    patchUndone=await nativeCommand("skillStudio.internal.sourceVersionAcceptance");
-    if(patchUndone?.version>patchApplied.version)break;
-    await sleep(100);
-  }
-  const restoredGraph=await waitWebview(view=>
-    view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&
-    view.graphNodes===initialGraph.view.graphNodes&&
-    view.graphEdges===initialGraph.view.graphEdges,
-    "v1alpha4 Procedure graph after native Undo");
-  if(patchUndone?.uri!==defaultProcedureUri||patchUndone.version<=patchApplied.version)
-    throw Error("Native Undo did not restore the v1alpha4 Procedure Source revision: "+
-      JSON.stringify({patchApplied,patchUndone}));
-  const patchEvidence={preview:patchPreview,applied:patchApplied,undo:patchUndone,
-    initialNodes:initialGraph.view.graphNodes,restoredNodes:restoredGraph.view.graphNodes,
-    initialEdges:initialGraph.view.graphEdges,restoredEdges:restoredGraph.view.graphEdges};
-  console.log("STUDIO_V1ALPHA4_SOURCE_PATCH_CHROMIUM",JSON.stringify(patchEvidence));
+    "return {readOnly:patch?.hidden===true&&commit?.disabled===true,"+
+    "patchHidden:patch?.hidden===true,commitDisabled:commit?.disabled===true,"+
+    "previewDisabled:preview?.disabled===true,"+
+    "routeOptions:routes?.options.length??0,targetOptions:targets?.options.length??0,"+
+    "status:document.querySelector('#message')?.textContent??''};})()");
+  if(!graphEditability?.readOnly)
+    throw Error("v1alpha4 Procedure graph exposed legacy interactive Route editing: "+
+      JSON.stringify(graphEditability));
+  const sourceAfterGraph=await nativeCommand("skillStudio.internal.sourceVersionAcceptance");
+  if(sourceAfterGraph?.uri!==defaultProcedureUri||
+     sourceAfterGraph.version!==sourceState.version)
+    throw Error("Read-only v1alpha4 graph interaction changed authoritative Source: "+
+      JSON.stringify({sourceState,sourceAfterGraph,graphEditability}));
+  graphEditability.sourceUnchanged=true;
+  console.log("STUDIO_V1ALPHA4_GRAPH_READ_ONLY_CHROMIUM",JSON.stringify(graphEditability));
 
   // Toolbar defaults and layout/path controls are checked against the v1alpha4 graph.
   const toolbarInitial=await evalWebviewJS("(()=>({"+
@@ -1008,7 +970,7 @@ export async function runWorkbenchAcceptance({
     markdown:true,restored,initialTiming,warmTiming,
     nativeSingleClick:true,nativeDoubleClick:true,reopenMs:Date.now()-started,
     dualSkillExplorer,packageOverview:packageOverviewEvidence.evidence,
-    sourcePatch:patchEvidence,canvasToolbar,
+    graphEditability,canvasToolbar,
     v1alpha4LanguageFeatures,semanticTokenEvidence,
     nativeMarkdownEvidence,designerEvidence:{
       contract:contract.view,predicates:predicates.view,schema:schema.view
