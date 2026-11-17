@@ -1,6 +1,7 @@
 /**
  * CA-SL v1alpha5 source-shape projection for editor diagnostics.
- * Frozen source: ca-skills@7f84393ee8c395e4d8c39a74cb5000a1f896588d.
+ * Candidate normative source: ca-skills@12a9512a9eae006ad4578daf37ebe0bdf3070642 (PR #61).
+ * Example Skill source: ca-skills@84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef (PR #65).
  *
  * This intentionally does not link Owner/Catalog/Capabilities or claim
  * Compiler/Host qualification. Missing trust always stays explicit.
