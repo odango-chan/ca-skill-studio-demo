@@ -24,6 +24,16 @@ jobs:
     steps:
       - name: Checkout exact source
         uses: actions/checkout@v4
+      - name: Checkout pinned CA Skill Compiler v1.0.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: odango-chan/ca-skill-compiler
+          ref: v1.0.0
+          path: compiler-source
+      - name: Go 1.26.6 for the pinned Compiler WASM build
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.6"
       - name: Node.js 24
         uses: actions/setup-node@v4
         with:
@@ -36,6 +46,16 @@ jobs:
           npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
       - name: Build Node and browser Procedure extensions
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
+      - name: Build pinned Compiler v1.0.0 Go/WASM Core
+        working-directory: compiler-source
+        run: |
+          mkdir -p dist
+          GOWORK=off CGO_ENABLED=0 GOOS=js GOARCH=wasm go build -o dist/skillc.wasm ./cmd/skillc-wasm
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/wasm_exec.js
+          cp dist/skillc.wasm ../experiments/ide-host/vscode/dist/skillc.wasm
+          cp dist/wasm_exec.js ../experiments/ide-host/vscode/dist/wasm_exec.js
+      - name: Stage web plugin for browser-only Theia
+        run: node experiments/ide-host/scripts/prepare-theia-online.mjs
       - name: Stage web plugin for browser-only Theia
         run: node experiments/ide-host/scripts/prepare-theia-online.mjs
       - name: Validate trial package manifest and prepared plugin
@@ -59,6 +79,7 @@ jobs:
           THEIA_BASE_PATH: "/ca-skill-studio-demo/ide-preview"
           THEIA_REQUIRE_WEBVIEW: "1"
           THEIA_REQUIRE_BROWSER_LSP: "1"
+          THEIA_REQUIRE_COMPILER_WORKER: "1"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
       - name: Upload isolated online frontend preview artifact
         uses: actions/upload-artifact@v4
