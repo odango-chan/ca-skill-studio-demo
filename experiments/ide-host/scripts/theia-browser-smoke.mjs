@@ -788,43 +788,56 @@ try{
   if(legacySourceState?.uri!==legacyProcedureUri)
     throw Error("Legacy regression fixture did not become the exact active Source: "+
       JSON.stringify({expected:legacyProcedureUri,actual:legacySourceState}));
-  frames.length=0;
-  walkFrames((await command("Page.getFrameTree")).frameTree);
-  webviewFrames.length=0;
-  for(const frame of frames.filter(item=>item.url.includes("/webview/index.html")||
-      item.url.includes(".webview."))){
-    try{
-      const world=await command("Page.createIsolatedWorld",{
-        frameId:frame.id,worldName:"skill-studio-legacy-acceptance",grantUniveralAccess:true
-      });
-      const evaluated=await command("Runtime.evaluate",{
-        contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
-        expression:`({
-          readyState:document.readyState,title:document.title,
-          bodyText:document.body?.innerText?.slice(0,1200)||"",
-          timing:document.querySelector("#reactFlowRoot")?.dataset.studioTiming,
-          procedureRoot:!!document.querySelector("#reactFlowRoot"),
-          graphNodes:document.querySelectorAll(".react-flow__node").length,
-          graphEdges:document.querySelectorAll(".react-flow__edge").length,
-          procedureValue:document.querySelector("#procedureList")?.value||"",
-          routeOptions:document.querySelector("#routeList")?.options?.length||0,
-          message:document.querySelector("#message")?.textContent||"",
-          patchVisible:!document.querySelector("#patch")?.hidden,
-          html:document.documentElement?.outerHTML?.slice(0,5000)||"",
-          nestedFrames:[...document.querySelectorAll("iframe")].map(child=>({
-            src:child.getAttribute("src"),title:child.title,html:child.outerHTML.slice(0,500)
-          }))
-        })`
-      });
-      webviewFrames.push({frame,view:evaluated.result?.value??null});
-    }catch(error){webviewFrames.push({frame,error:String(error)});}
+  // Opening the native Source is synchronous, but Theia's CustomEditor
+  // activation and Webview graph hydration are asynchronous. Do not treat the
+  // Source TextDocument becoming active as proof that the Legacy graph exists.
+  let graphFrame=null;
+  for(let attempt=0;attempt<100&&!graphFrame;attempt++){
+    frames.length=0;
+    walkFrames((await command("Page.getFrameTree")).frameTree);
+    webviewFrames.length=0;
+    for(const frame of frames.filter(item=>item.url.includes("/webview/index.html")||
+        item.url.includes(".webview."))){
+      try{
+        const world=await command("Page.createIsolatedWorld",{
+          frameId:frame.id,worldName:"skill-studio-legacy-acceptance",grantUniveralAccess:true
+        });
+        const evaluated=await command("Runtime.evaluate",{
+          contextId:world.executionContextId,returnByValue:true,awaitPromise:true,
+          expression:`({
+            readyState:document.readyState,title:document.title,
+            bodyText:document.body?.innerText?.slice(0,1200)||"",
+            timing:document.querySelector("#reactFlowRoot")?.dataset.studioTiming,
+            procedureRoot:!!document.querySelector("#reactFlowRoot"),
+            graphNodes:document.querySelectorAll(".react-flow__node").length,
+            graphEdges:document.querySelectorAll(".react-flow__edge").length,
+            procedureValue:document.querySelector("#procedureList")?.value||"",
+            routeOptions:document.querySelector("#routeList")?.options?.length||0,
+            message:document.querySelector("#message")?.textContent||"",
+            patchVisible:!document.querySelector("#patch")?.hidden,
+            html:document.documentElement?.outerHTML?.slice(0,5000)||"",
+            nestedFrames:[...document.querySelectorAll("iframe")].map(child=>({
+              src:child.getAttribute("src"),title:child.title,html:child.outerHTML.slice(0,500)
+            }))
+          })`
+        });
+        webviewFrames.push({frame,view:evaluated.result?.value??null});
+      }catch(error){webviewFrames.push({frame,error:String(error)});}
+    }
+    graphFrame=webviewFrames.find(item=>
+      item.view?.procedureRoot&&item.view.graphNodes>0&&
+      item.view.procedureValue==="ue-requested-pdu-session-establishment")??null;
+    if(!graphFrame)await sleep(100);
   }
   console.log("STUDIO_THEIA_STAGE","initial-graph");
-  const graphFrame=webviewFrames.find(item=>
-    item.view?.procedureRoot&&item.view.procedureValue==="ue-requested-pdu-session-establishment");
-  const webviewFrame=graphFrame?.frame??webviewFrames[0]?.frame??null;
-  let webviewView=graphFrame?.view??webviewFrames[0]?.view??null;
+  const webviewFrame=graphFrame?.frame??null;
+  let webviewView=graphFrame?.view??null;
   const webviewFrameError=webviewFrames.find(item=>item.error)?.error??null;
+  if(requireEditor&&!graphFrame)
+    throw Error("Legacy CustomEditor did not hydrate after its Source became active: "+
+      JSON.stringify({legacySourceState,webviewFrames: webviewFrames.map(item=>({
+        url:item.frame.url,error:item.error,view:item.view
+      }))}));
   let patchEvidence=null;
   let canvasIconEvidence=null;
   if(graphFrame){
