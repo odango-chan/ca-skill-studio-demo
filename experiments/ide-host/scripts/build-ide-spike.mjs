@@ -104,7 +104,7 @@ for(const set of sampleSets){
      !manifest.blobs||!Array.isArray(manifest.files)||manifest.files.length<5||
      manifest.files.length>100||new Set(manifest.files).size!==manifest.files.length||
      !manifest.files.every(path=>
-       typeof path==="string"&&!path.includes("\\\\")&&!path.startsWith("/")&&
+       typeof path==="string"&&!path.includes("\\")&&!path.startsWith("/")&&
        path.split("/").every(part=>part&&part!=="."&&part!=="..")&&
        manifest.skills.some(name=>path.startsWith(name+"/"))&&
        /^[a-f0-9]{40}$/.test(manifest.blobs[path]??""))||
@@ -126,7 +126,7 @@ for(const set of sampleSets){
   }
   for(const path of manifest.files){
     const bytes=await readFile(join(set.sourceRoot,path));
-    const gitBlob=createHash("sha1").update("blob "+bytes.length+"\\0").update(bytes).digest("hex");
+    const gitBlob=createHash("sha1").update("blob "+bytes.length+"\0").update(bytes).digest("hex");
     if(gitBlob!==manifest.blobs[path])
       throw Error(set.kind+" example differs from pinned owner blob: "+path);
     const target=join(set.destination,path);
