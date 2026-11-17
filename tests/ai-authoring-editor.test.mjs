@@ -112,6 +112,9 @@ test("AI Authoring Webview has a nonce-only script/style policy and no direct ne
   assert.match(html, /connect-src 'none'/);
   assert.doesNotMatch(html, /unsafe-inline|unsafe-eval|fetch\s*\(/);
   assert.ok(html.includes("CA-SL v1alpha5 · FROZEN / RELEASED"));
+  assert.ok(html.includes("Host 生成的 YAML 候选预览"));
+  assert.ok(html.includes("id=\\\"currentSource\\\""));
+  assert.ok(html.includes("id=\\\"candidateSource\\\""));
   assert.match(html, /Compiler Check: NOT_RUN/);
   assert.match(html, /不自动保存/);
   assert.throws(() => renderAiAuthoringHtml("not-a-secure-nonce"), /nonce/);
