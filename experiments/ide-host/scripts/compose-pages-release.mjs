@@ -21,6 +21,9 @@ export async function composePagesRelease({theiaFrontend,outputDist,siteRoot=nul
     "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json",
     "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js",
     "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skillc.wasm",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/wasm_exec.js",
     "hostedPlugin/odango_chan_skill_studio_theme/package.json",
     "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
     "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
@@ -56,6 +59,9 @@ export async function composePagesRelease({theiaFrontend,outputDist,siteRoot=nul
   await requireFile(output,"bundle.js");
   await requireFile(output,"hostedPlugin/list.json");
   await requireFile(output,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js");
+  await requireFile(output,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js");
+  await requireFile(output,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skillc.wasm");
+  await requireFile(output,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/wasm_exec.js");
   const forbidden=["classic","app.js","studio.css","light.css","app.css","ide-preview"];
   for(const name of forbidden){
     const info=await stat(join(output,name)).catch(()=>null);
