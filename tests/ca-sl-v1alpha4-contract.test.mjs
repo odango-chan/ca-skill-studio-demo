@@ -21,7 +21,8 @@ test("Skill Studio pins the complete frozen CA-SL v1alpha4 source",()=>{
     "the local normative copy must be byte-identical to the pinned ca-skills blob");
   assert.ok(spec.includes("CA-SL v1alpha4"));
   assert.ok(spec.includes("## 35. Skill Studio 与 LSP"));
-  assert.ok(entry.includes("skill-language-spec.v1alpha4.zh-CN.md"));
+  assert.ok(entry.includes("skill-language-spec.v1alpha5.zh-CN.md"));
+  assert.match(entry,/PUBLIC REVIEW DRAFT; NOT RELEASED/);
   assert.ok(readme.includes(lock.authority.commit));
   assert.ok(readme.includes("Active Skill Studio target: v1alpha5 candidate"));
   assert.ok(readme.includes("Historical frozen v1alpha4 source"));
