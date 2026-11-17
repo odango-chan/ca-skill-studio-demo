@@ -3275,16 +3275,19 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       const target=vscode.Uri.parse(String(rawUri??''));
       if(openColumn!==1&&openColumn!==2)
         throw Error('Markdown acceptance editor column must be one or two');
-      const workspaceFolder=(vscode.workspace.workspaceFolders??[]).find(folder=>{
-        const root=folder.uri.path.replace(/\/$/,'');
-        return target.path.startsWith(root+'/');
-      });
+      const workspaceFolder=vscode.workspace.getWorkspaceFolder(target);
       if(!workspaceFolder)
         throw Error('Markdown acceptance URI must be inside the active workspace');
-      const root=workspaceFolder.uri.path.replace(/\/$/,'');
-      const relativePath=target.path.slice(root.length+1);
-      if(!/^skills\/[a-z0-9-]+\/(?:SKILL\.md|(?:[a-z0-9-]+\/)*[a-z0-9-]+\.md)$/i.test(relativePath))
-        throw Error('Markdown acceptance URI must identify a Markdown file inside a Skill Package');
+      // Reuse the same Package-root discovery, bounded inventory and symlink
+      // checks as the actual native Preview. Do not assume the active
+      // workspace root is the project root rather than its skills/ directory.
+      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,target);
+      if(!policyReady){
+        const root=workspaceFolder.uri.path.replace(/\/$/,'');
+        throw Error('Markdown acceptance URI must identify an inventoried Markdown file inside a Skill Package: '+
+          JSON.stringify({target:target.toString(),workspaceRoot:workspaceFolder.uri.toString(),
+            relativePath:target.path.slice(root.length+1)}));
+      }
       try{await vscode.workspace.fs.stat(target);}
       catch{throw Error('Markdown acceptance target does not exist: '+target.toString());}
       // Open only the editable Source. The active-editor listener must create
