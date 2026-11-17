@@ -1,7 +1,7 @@
 # AI Procedure Authoring Workbench
 
 **Status: Proposed · Product decisions approved; cross-host architecture direction approved; detailed design awaiting review**  
-**Implementation: Gateway spike PARTIAL · Authoring Core NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
+**Implementation: Gateway spike PARTIAL · Authoring Core foundation PARTIAL · Editor / Agent integration NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
 **Tracking: [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200)**
 
 This document defines the first AI-assisted authoring capability for Skill Studio. It is a Studio editing feature, not a CA-SL language extension, Compiler feature, Host capability or Runtime feature.
@@ -37,6 +37,7 @@ The current Theia workbench already provides useful host infrastructure:
 - A Compiler v1.0.0 Go/WASM integration and Check / Build / Inspect entry points.
 - **No model / Agent integration is currently installed in the Studio workbench.** The current Theia 1.76.0 application manifests do not include the Theia AI packages. Existing LSP completion, diagnostics and semantic tokens are language tooling, not LLM-based AI.
 - A first portable Gateway implementation now exists under `gateway/`: a Fetch-API request handler, a thin Cloudflare Worker adapter, Wrangler configuration and deterministic Node tests. It is not yet deployed and has not made a live provider request.
+- The first host-neutral Authoring Core slice now exists under `authoring/core/`: an OpenAI-compatible Gateway client that requires explicit context-disclosure acceptance and a host-supplied Turnstile token provider, plus a strict Studio ModelProposal validator. It has no VS Code, Theia, DOM, Node-only or Cloudflare imports.
 - The Worker spike requires server-side Turnstile Siteverify validation, an exact CORS origin allowlist and a Cloudflare Rate Limiting binding. The provider credential remains a Worker secret. Turnstile plus per-IP rate limiting is anti-abuse protection, not user identity authentication; the public access policy remains open.
 - The production GitHub Pages application is static hosting. It has no trusted server process in which to keep a shared provider key. The Pages bundle, browser storage, Webview and VSIX are all client-controlled and must never contain the shared provider credential. A separate Gateway service is required.
 - The current Studio extension is a VS Code Web Extension hosted by Theia. VS Code documents that Web Extensions can also run on Desktop and Web, but their runtime does not provide Node.js APIs. This makes the current browser-compatible extension a useful portability baseline, not proof that every Desktop / Remote host mode is already supported ([VS Code Web Extensions](https://code.visualstudio.com/api/extension-guides/web-extensions)).
@@ -359,6 +360,29 @@ The model may return:
 - References to items in the supplied context manifest.
 - Explicit assumptions and blockers.
 
+The initial Studio-private envelope is `ca-studio.ai-model-proposal/v1`:
+
+~~~json
+{
+  "schema": "ca-studio.ai-model-proposal/v1",
+  "summary": "...",
+  "plan": ["..."],
+  "operations": [
+    {
+      "type": "stage.route.set",
+      "target": { "nodeId": "create-session", "stage": "operation", "outcome": "COMMITTED" },
+      "payload": { "targetNodeId": "verify-session" },
+      "rationale": "...",
+      "references": ["procedure-current", "contract-goal"]
+    }
+  ],
+  "assumptions": [],
+  "blockers": []
+}
+~~~
+
+The model does not author operation IDs, atomic groups, base revision, write scope, source spans, candidate Source or validation state. `target` contains semantic identifiers only; `references` must resolve to IDs in the exact Context Pack manifest supplied to the model. `payload` is bounded JSON and the generic validator rejects source text, paths, offsets, WorkspaceEdit and host-owned fields. Each operation's payload still requires operation-specific validation by the v1alpha4 Patch Engine before it can enter an applicable Change Set. This private envelope is an initial implementation contract, not a CA-SL normative syntax or a frozen public API.
+
 The model MUST NOT return trusted source offsets, arbitrary file paths, raw replacement Source, a complete candidate YAML file, a direct WorkspaceEdit or instructions to execute Tools / Runtime actions.
 
 ### 9.3 Initial semantic operation allowlist
@@ -503,6 +527,8 @@ After Apply, the native document change triggers the existing Source / Visual / 
 
 A fixture provider may be used for deterministic UI / Patch Engine tests. It must be clearly identified as a test fixture and cannot be reported as a working AI integration.
 
+**Current Slice A status:** the host-neutral Gateway client and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203), with deterministic tests. Context Pack collection, Procedure orchestration, atomic grouping and the Patch Engine remain NOT_STARTED.
+
 **Current Slice B status:** the portable Fetch-API handler, Cloudflare Worker adapter, Turnstile verification, per-IP rate-limit binding, request caps, streaming pass-through and deterministic tests are implemented in [PR #202](https://github.com/odango-chan/ca-skill-studio-demo/pull/202). Exact-head PR verification and Wrangler 4.36.0 dry-run passed at commit `737f1a1`; live Cloudflare deployment, Turnstile widget and provider request remain NOT_RUN.
 
 The online path is implemented first, but every P1 boundary is designed so the later Desktop and intranet profiles reuse the same Authoring Core, Gateway protocol, proposal schema and patch engine.
@@ -542,7 +568,7 @@ Desktop / Web Extension and intranet Gateway compatibility are explicit follow-u
 6. **Initial Context Pack byte budget:** finalize a byte budget during the online provider spike; never silently truncate.
 7. **Operation allowlist:** finalize exact v1alpha4 CST patch operations and source-preservation limits during Slice E.
 
-The product decisions in Section 1 and the cross-host architecture direction are approved. The detailed technical design remains Proposed until the online Gateway, shared-core boundary and v1alpha4 patch-engine spikes are reviewed.
+The product decisions in Section 1 and the cross-host architecture direction are approved. The detailed technical design remains Proposed until the online Gateway is deployed and exercised, the shared-core / proposal contracts are reviewed, and the v1alpha4 patch-engine spike is completed.
 
 ## Implementation ownership summary
 
