@@ -1,7 +1,5 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
-import {readFile} from 'node:fs/promises';
 // All browser acceptance fixtures use the pinned CA-SL v1alpha4 sample set.
-import {readFile} from 'node:fs/promises';
 export async function assertSourceVisualPair(evalJS,sleep,filename,label){
   let state;
   for(let attempt=0;attempt<30;attempt++){
