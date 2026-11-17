@@ -19,4 +19,4 @@ jobs:
       - name: Gateway unit tests
         run: node --test gateway/worker/tests/*.test.mjs
       - name: Cloudflare Worker dry-run bundle
-        run: npx --yes wrangler@4.157.0 deploy --dry-run --outdir "$RUNNER_TEMP/ca-skill-studio-ai-gateway"
+        run: npx --yes wrangler@4.157.0 deploy --config gateway/worker/wrangler.jsonc --dry-run --outdir "$RUNNER_TEMP/ca-skill-studio-ai-gateway"
