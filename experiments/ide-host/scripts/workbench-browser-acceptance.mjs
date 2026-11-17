@@ -678,7 +678,38 @@ export async function runWorkbenchAcceptance({
   let languageServiceStatus="NOT_REQUIRED_NODE_HOST";
   let v1alpha4LanguageFeatures=null,semanticTokenEvidence=null;
   if(requireBrowserLsp){
-    languageServiceStatus=await waitForStatus("READY");
+    // A v1alpha4 Package is intentionally PARTIAL until trusted Owner,
+    // Capability and Schema snapshots are linked. PARTIAL is not a Worker
+    // failure: verify the browser Language Client is alive and the exact
+    // current Package generation parsed completely, without claiming
+    // qualification that the bundled NOT_QUALIFIED Example does not have.
+    languageServiceStatus=await waitForStatus("PARTIAL");
+    const languageServiceDiagnostics=await nativeCommand(
+      "skillStudio.internal.semanticTokenDiagnostics");
+    const expectedPackageRoot=defaultProcedureUri.replace(
+      /\\/assurance\\/procedure\\.yaml$/,"");
+    const languagePackage=languageServiceDiagnostics?.packageStatuses?.find(
+      item=>item.rootUri===expectedPackageRoot);
+    const packageSnapshot=languageServiceDiagnostics?.languagePackages?.find(
+      item=>item.rootUri===expectedPackageRoot);
+    const expectedPartialReason=
+      "CA-SL v1alpha4 source parsed; trusted Owner/Capability/Schema linking requires v1alpha4 Compiler and published snapshots";
+    if(languageServiceDiagnostics?.languageClientStarted!==true||
+       languageServiceDiagnostics?.languageTransportFailure||
+       !languagePackage||
+       languagePackage.state!=="PARTIAL"||
+       languagePackage.procedureState!=="READY"||
+       languagePackage.packageAuditState!=="UNAVAILABLE"||
+       !String(languagePackage.packageAuditReason??"").includes(expectedPartialReason)||
+       packageSnapshot?.lastSentSnapshot?.completeness!=="complete")
+      throw Error("v1alpha4 Language Service must be available while its unqualified Package remains PARTIAL: "+
+        JSON.stringify({languageServiceDiagnostics,expectedPackageRoot,languagePackage,packageSnapshot}));
+    console.log("STUDIO_V1ALPHA4_LSP_PARTIAL_IS_EXPECTED_CHROMIUM",JSON.stringify({
+      status:languageServiceStatus,
+      languageClientStarted:languageServiceDiagnostics.languageClientStarted,
+      languagePackage,
+      snapshot:packageSnapshot?.lastSentSnapshot
+    }));
     v1alpha4LanguageFeatures=await nativeCommand(
       "skillStudio.internal.v1alpha4LanguageProviderAcceptance",defaultProcedureUri);
     if(v1alpha4LanguageFeatures?.status!=="PARTIAL"||
@@ -728,27 +759,41 @@ export async function runWorkbenchAcceptance({
     throw Error("v1alpha4 graph selection did not reach the native Inspector model: "+
       JSON.stringify(inspectorSelection));
   await nativeCommand("skillStudio.auditPackage");
-  try{await nativeCommand("workbench.view.extension.skillStudioInspector");}catch{/* It may already be visible. */}
-  let inspectorText="";
+  // Theia 1.76 registers a per-view focus command from PluginViewRegistry.
+  // The VS Code workbench.view.extension.<container> command is not registered
+  // by this Theia host; silently ignoring it leaves a real but hidden view.
+  await nativeCommand("skillStudio.inspection.focus");
+  let inspectorState={text:"",visible:false};
   for(let i=0;i<80;i++){
-    inspectorText=await evalJS("document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector')?.innerText??''");
-    if(inspectorText.includes("Data Flow · Producer / Consumer")&&
-       inspectorText.includes("Consumer ABI")&&inspectorText.includes("Source lineage"))break;
+    inspectorState=await evalJS("(()=>{const el=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');const r=el?.getBoundingClientRect();return {text:el?.innerText??'',visible:!!r&&r.width>0&&r.height>0};})()");
+    const text=inspectorState.text;
+    if(inspectorState.visible&&
+       text.includes("Contract Goal · pdu_session.initial_request_fulfilled")&&
+       text.includes("Global Precondition · get-sm-subscription-data.precondition")&&
+       /Data Flow · \\d+ arguments/.test(text)&&
+       text.includes("Source lineage only"))break;
     await sleep(100);
   }
+  const inspectorText=inspectorState.text;
   const phaseEvidence={
-    ready:inspectorText.includes("Data Flow · Producer / Consumer")&&
-      inspectorText.includes("Consumer ABI")&&inspectorText.includes("Source lineage"),
-    dataflowRows:inspectorText.split("Data Flow · Producer / Consumer").length-1,
-    consumerAbiRows:(inspectorText.match(/Consumer ABI/g)||[]).length,
-    readOnly:inspectorText.includes("Runtime NOT_RUN")&&
-      inspectorText.toLowerCase().includes("no write authority")
+    visible:inspectorState.visible,
+    contractGoal:inspectorText.includes("Contract Goal · pdu_session.initial_request_fulfilled"),
+    globalPrecondition:inspectorText.includes("Global Precondition · get-sm-subscription-data.precondition"),
+    selectedNode:inspectorText.includes("get-sm-subscription-data"),
+    dataflow:/Data Flow · \\d+ arguments/.test(inspectorText),
+    sourceOnly:inspectorText.includes("Source lineage only")&&
+      inspectorText.toLowerCase().includes("not linked"),
+    noRuntimeClaims:!inspectorText.includes("Runtime Evidence")&&
+      !/Runtime \\(PASS|FAILED|SUCCEEDED|COMMITTED)/.test(inspectorText)
   };
-  if(!phaseEvidence.ready||!phaseEvidence.readOnly)
+  if(!phaseEvidence.visible||!phaseEvidence.contractGoal||
+     !phaseEvidence.globalPrecondition||!phaseEvidence.selectedNode||
+     !phaseEvidence.dataflow||!phaseEvidence.sourceOnly||
+     !phaseEvidence.noRuntimeClaims)
     throw Error("v1alpha4 Inspector did not expose the selected Source-only projection: "+
       JSON.stringify({phaseEvidence,inspectorSelection,
-        inspectorText:inspectorText.slice(-1800),
-        inspectorContainer:await evalJS("(()=>{const el=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');return {text:el?.innerText??'',html:el?.innerHTML?.slice(-3000)??'',visible:!!el&&el.getBoundingClientRect().width>0};})()") }));
+        inspectorText:inspectorText.slice(-2200),
+        inspectorContainer:await evalJS("(()=>{const el=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');return {text:el?.innerText??'',html:el?.innerHTML?.slice(-3500)??'',visible:!!el&&el.getBoundingClientRect().width>0};})()") }));
   console.log("STUDIO_V1ALPHA4_INSPECTOR_CHROMIUM",JSON.stringify(phaseEvidence));
 
   // A single native EditorGroup test covers Procedure/Contract/Predicate/Schema
