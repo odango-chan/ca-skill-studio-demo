@@ -307,7 +307,7 @@ Cloudflare AI Gateway may sit behind the application Worker as an optional upstr
 
 **Access / CORS configuration:** Cloudflare Access blocks cross-origin `OPTIONS` preflight by default because browsers do not send cookies on preflight. For this pilot, configure the Access application to **Bypass OPTIONS requests to origin** and do not also configure Access-managed CORS response headers; the Worker then answers preflight using its exact `ALLOWED_ORIGINS` allowlist. This bypass applies only to preflight; actual POST requests remain Access-protected. The browser must send credentials so the `CF_Authorization` cookie is included. GitHub Pages to `workers.dev` is cross-site, so third-party-cookie restrictions may block the cookie even after login; this is an explicit browser acceptance gate, not something CORS headers can solve. If unreliable, use a same-site custom domain or design a separate application login/session flow before general release. See [Access CORS guidance](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/cors/).
 
-**Provider routing:** start with one configured OpenAI-compatible Chat Completions endpoint and one server-side provider secret. The Worker accepts only the supported route and a strict request envelope; it must reject arbitrary upstream URLs, caller-supplied authorization headers, unknown model IDs, oversized bodies and unsupported request fields. The provider endpoint and model allowlist are deployment configuration. A future self-hosted Gateway implements the same public protocol.
+**Provider routing:** start with one configured OpenAI-compatible Chat Completions endpoint and one server-side provider secret. The Worker accepts only the supported route and a strict request envelope; it must reject arbitrary upstream URLs, caller-supplied authorization headers, unknown model IDs, oversized bodies and unsupported request fields. For structured authoring responses it supports only `response_format: { type: "json_object" }`; the Host still parses and validates the returned ModelProposal / Change Set against its own schema. The provider endpoint and model allowlist are deployment configuration. A future self-hosted Gateway implements the same public protocol.
 
 **Streaming:** forward the upstream response body as a stream. Do not buffer the full completion in Worker memory. Propagate client cancellation where the runtime permits; treat an interrupted stream as an incomplete proposal, never as a valid Change Set. Cloudflare documents unlimited wall time for an HTTP Worker request while the client remains connected, and recommends streaming bodies to avoid buffering / memory pressure ([Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [streaming best practices](https://developers.cloudflare.com/workers/best-practices/workers-best-practices/)).
 
@@ -320,13 +320,13 @@ Cloudflare AI Gateway may sit behind the application Worker as an optional upstr
 1. Access application is configured to bypass OPTIONS to the Worker origin; the Worker returns exact-origin CORS preflight headers, while actual POST remains Access-protected.
 2. A Pages-origin browser request includes the Access cookie and reaches the direct Worker invocation in supported browser privacy settings; third-party-cookie behavior is recorded.
 3. Missing Access context, wrong audience, missing identity and failed identity retrieval are rejected before any upstream request.
-3. Provider secret and any Cloudflare API token are absent from browser assets, Webview messages, response headers and logs.
-4. Only the configured model and Chat Completions route are accepted; arbitrary URL / header forwarding is impossible.
-5. Request size, output token ceiling, timeout and per-user rate limits are enforced.
-6. Streaming works end-to-end; a dropped client connection does not produce a completed proposal.
-7. Provider errors and 429 responses are normalized without leaking secret-bearing upstream headers or bodies.
-8. Per-user rate limits and output-token ceilings are enforced; the pilot explicitly documents that these are not a strict global spend ledger.
-9. A fixture provider proves the protocol and negative cases without live credentials; a real provider smoke test is a separate opt-in step.
+4. Provider secret and any Cloudflare API token are absent from browser assets, Webview messages, response headers and logs.
+5. Only the configured model and Chat Completions route are accepted; arbitrary URL / header forwarding is impossible.
+6. Request size, output token ceiling, timeout and per-user rate limits are enforced.
+7. Streaming works end-to-end; a dropped client connection does not produce a completed proposal.
+8. Provider errors and 429 responses are normalized without leaking secret-bearing upstream headers or bodies.
+9. Per-user rate limits and output-token ceilings are enforced; the pilot explicitly documents that these are not a strict global spend ledger.
+10. A fixture provider proves the protocol and negative cases without live credentials; a real provider smoke test is a separate opt-in step.
 
 The spike MUST NOT deploy a publicly usable, unauthenticated proxy. The current Worker implementation is a restricted pilot scaffold; production Access login, Pages-origin CORS, real provider behavior and spend controls remain unverified. No production model key is configured.
 
