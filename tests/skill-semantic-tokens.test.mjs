@@ -129,7 +129,7 @@ test("v1alpha5 MAS Procedure receives the same graph token projection",()=>{
   tokenFor(source,items,"PASS","skillOutcome");
 });
 
-test("v1alpha5 uses its own AST semantic projection for the frozen single-graph grammar",()=>{
+test("v1alpha5 uses its own AST semantic projection for the candidate single-graph grammar",()=>{
   const contractSource=[
     "goal: demo.session_established",
     "precondition: check.precondition",
