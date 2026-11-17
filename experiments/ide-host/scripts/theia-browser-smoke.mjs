@@ -2042,15 +2042,15 @@ try{
       JSON.stringify(afterImport.statusBar));
   if(!afterImport.notificationText.some(message=>
        message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
-       message.includes("默认已打开传统 5GC Procedure")&&
-       message.includes("同步 18 个官方文件"))||
+       message.includes("默认已打开 v1alpha4 候选 Procedure（DRAFT / NOT_QUALIFIED）")&&
+       message.includes("导入官方 Legacy 文件 18 个、v1alpha4 候选文件 14 个"))||
      afterImport.noFolderPrompt||!afterImport.workspaceRootVisible||
      !afterImport.explorerText.includes("skills")||
      !afterImport.explorerText.includes("establish-pdu-session")||
      !afterImport.explorerText.includes("procedure.yaml"))
     throw Error("Theia did not open the real default project workspace: "+JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
   if(requireEditor&&(!webviewFrame||!webviewView?.procedureRoot||webviewView.graphNodes<1||
-      webviewView.procedureValue!=="ue-requested-pdu-session-establishment"))
+      webviewView.procedureValue!=="get-sm-subscription-data"))
     throw Error("Procedure Custom Editor webview did not render a graph: "+
       JSON.stringify({webviewFrame,webviewView,webviewFrameError,networkFailures}).slice(0,3000));
   if(requireEditor&&(!patchEvidence?.preview?.ready||
