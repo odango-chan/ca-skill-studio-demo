@@ -1,28 +1,44 @@
 # Canonical CA-SL language imports
 
-This directory pins the **current normative language source** from the sole authority, `odango-chan/ca-skills`.
+This directory pins the normative source files from the sole language authority, `odango-chan/ca-skills`.
 
-## Frozen v1alpha4 source
+## Active Skill Studio target: v1alpha5 candidate
 
 - Repository: https://github.com/odango-chan/ca-skills
+- Candidate PR: https://github.com/odango-chan/ca-skills/pull/61
+- Immutable candidate commit: `12a9512a9eae006ad4578daf37ebe0bdf3070642`
+- Language target: `connectionagent.io/v1alpha5`
+- Status: **PUBLIC REVIEW DRAFT — NOT RELEASED / NOT QUALIFIED**
+- Normative single-file source: `source/skill-language-spec.v1alpha5.zh-CN.md`
+- Normative source blob SHA: `2916fa78bd095ee5809136389cda4cdb6302b9d9`
+- Companion Compiler candidate: [ca-skill-compiler PR #30](https://github.com/odango-chan/ca-skill-compiler/pull/30), commit `34993dc30b66f4cf7d573cbc81d884c356062a12`, **WP2 only**.
+
+The v1alpha5 candidate inherits the immutable v1alpha4 baseline and adds Node-entry Event Wait. Studio projects the four existing business stages unchanged and models Wait separately as Node-entry control. The local projection is read-only/editor-only; it does not replace Compiler conformance.
+
+The pinned Compiler candidate can parse the current v1alpha5 Wait AST and run the supported Check slice. Build intentionally remains fail-closed until WP3–WP8 are complete. Dependency Inspection and trusted IngressCatalog linking are not yet available through this candidate.
+
+## Historical frozen v1alpha4 source
+
 - Immutable commit: `7f84393ee8c395e4d8c39a74cb5000a1f896588d`
 - Language target: `connectionagent.io/v1alpha4`
-- Status: **FROZEN — language and explicit v1alpha4 interop profile only**
-- External profiles: `connectionagent.io/toolcatalog/v1alpha4` and `connectionagent.io/capability-contracts/v1alpha4`; no v1alpha3 fallback.
-- Normative single-file source: `source/skill-language-spec.v1alpha4.zh-CN.md`
+- Status: **FROZEN — language semantics only**
+- Normative source: `source/skill-language-spec.v1alpha4.zh-CN.md`
 - Normative source blob SHA: `b70064c5737b8ee2b3d1435fe496357f44b42773`
-- Discovery entry blob SHA: `5603c3c6b6c76ade82f1aaa8523e93adbeaec2dd`
 
-The exact complete normative file is copied byte-for-byte from the pinned commit. `source/skill-language-spec.md` is only the non-normative discovery entry. The companion Script Contract, Schema Ownership and Authoring Model files are also pinned from the same commit; the complete CA-SL file remains the sole normative authority.
+v1alpha4 is retained as an immutable inheritance baseline and historical source snapshot. It is not a parallel active authoring target or a product compatibility mode.
 
 ## Historical and editor-only contracts
 
-- `source/skill-language-spec.zh-CN.md` is the historical v1alpha3 text. It is retained for historical references only and is **not** the v1alpha4 authoring target.
-- `semantic-tokens.v1.json` is the legacy ca-skills v0.2 semantic-token registry. It is retained only for explicitly legacy source coloring. Its selectors and legend do **not** define v1alpha4 grammar, linking or conformance.
-- The current v1alpha4 AST semantic-token projection in `language/semantic-tokens.mjs` is an editor presentation implementation. It is not a language grammar, does not establish reference resolution, and is not claimed to be an upstream normative token contract. The pinned ca-skills commit does not publish a v1alpha4 semantic-token selector contract.
+- `source/skill-language-spec.zh-CN.md` is the historical v1alpha3 text.
+- `semantic-tokens.v1.json` is the legacy ca-skills v0.2 semantic-token registry. Its selectors and legend do not define v1alpha5 grammar, linking or conformance.
+- The v1alpha5 AST semantic-token projection in `language/semantic-tokens.mjs` is editor presentation only. No upstream v1alpha5 semantic-token selector contract is published.
 
 ## Qualification boundary
 
-CA-SL v1alpha4 language semantics are frozen. Compiler, Studio/LSP, Host, Owner and 5GC product conformance remain **NOT_QUALIFIED** until the independent §45.2 evidence is completed. In particular, a Studio parser, completion provider, hover or Definition result does not prove Compiler diagnostic parity, trusted Owner identity, Capability authorization or Runtime readiness.
+The v1alpha5 normative candidate is not released or frozen. Compiler, Studio/LSP, Host, Runtime, Integration, Owner and 5GC conformance remain **NOT_QUALIFIED**. In particular:
 
-Do not edit these source snapshots independently. Refresh them only from an explicitly selected immutable `ca-skills` commit and update the pin and blob SHAs together.
+- the 36 EW cases are normative acceptance obligations, not claims of completed execution;
+- the v1alpha5 Compiler branch currently implements WP2 only;
+- no trusted production IngressCatalog export, Owner snapshot, deployment binding or real 5GC E2E is implied by the sample.
+
+Do not edit source snapshots independently. Refresh them only from an explicitly selected immutable `ca-skills` commit and update the lock and blob SHA together.
