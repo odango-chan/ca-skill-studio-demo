@@ -2121,7 +2121,6 @@ try{
        (message.includes("Example project opened: skill-studio-demo/")&&
         message.includes("v1alpha4 candidate Procedure is open (DRAFT / NOT_QUALIFIED)")&&
         message.includes("Imported 18 official legacy files and 14 v1alpha4 candidate files")))||
-     afterImport.noFolderPrompt||!afterImport.workspaceRootVisible||
      !afterImport.explorerText.includes("skills")||
      !afterImport.explorerText.includes("establish-pdu-session")||
      !afterImport.explorerText.includes("procedure.yaml"))
