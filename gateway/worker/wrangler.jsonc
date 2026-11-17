@@ -9,7 +9,7 @@
     "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173",
     "ALLOWED_MODELS": "gpt-4o-mini",
     "PROVIDER_MODEL": "gpt-4o-mini",
-    "MAX_REQUEST_BYTES": "65536",
+    "MAX_REQUEST_BYTES": "262144",
     "MAX_OUTPUT_TOKENS": "2048",
     "UPSTREAM_TIMEOUT_MS": "120000",
     "PROVIDER_CHAT_COMPLETIONS_URL": "https://api.openai.com/v1/chat/completions"
