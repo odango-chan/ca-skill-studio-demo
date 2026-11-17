@@ -1,8 +1,8 @@
 import {isMap, isScalar, isSeq, parseDocument} from "yaml";
 import legacyContract from "./contracts/semantic-tokens.v1.json";
 
-// The pinned ca-skills token registry is v0.2-only. v1alpha5 has no upstream
-// token-selector contract at the frozen language commit, so its presentation
+// The pinned ca-skills token registry is v0.2-only. The v1alpha5 candidate has no upstream
+// token-selector contract at its pinned normative commit, so its presentation
 // vocabulary is deliberately local/editor-only and carries no grammar authority.
 export const V1_ALPHA5_SEMANTIC_TOKEN_TYPES = Object.freeze([
   "skillKeyword","skillOperator","skillStep","skillCapability","skillPredicate",
