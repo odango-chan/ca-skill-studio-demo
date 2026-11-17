@@ -210,6 +210,27 @@ function validateRouteTarget(target, knownNodeIds, operationId) {
   }
 }
 
+function validateCallableId(kind, value, operationId) {
+  nonEmptyString(value, kind, operationId, 512);
+  if (kind === "tool" && !/^[A-Za-z][A-Za-z0-9_.:-]{0,255}$/.test(value)) {
+    reject("callable_id_invalid", "Tool ID must be a qualified Capability / Operation identifier.", operationId);
+  }
+  if (kind === "script") {
+    const parts = value.split("/");
+    if (!value.startsWith("scripts/") || parts.some((part) =>
+      !part || part === "." || part === ".." || part.startsWith("."))) {
+      reject("callable_id_invalid", "Script ID must remain inside the Package scripts directory.", operationId);
+    }
+  }
+}
+
+function validatePredicateId(value, operationId) {
+  nonEmptyString(value, "Predicate ID", operationId, 256);
+  if (!/^[A-Za-z][A-Za-z0-9_.:-]{0,255}$/.test(value)) {
+    reject("predicate_id_invalid", "Predicate ID must be a qualified Predicate identifier.", operationId);
+  }
+}
+
 function validateStageDefinition(stage, definition, operationId) {
   if (!plain(definition)) reject("stage_definition_invalid", "New stage definition must be a mapping.", operationId);
   const keys = Object.keys(definition);
@@ -236,8 +257,8 @@ function validateStageDefinition(stage, definition, operationId) {
       !plain(definition.arguments)) {
       reject("stage_definition_invalid", "Tool / Script stage definition is invalid.", operationId);
     }
-    if (definition.tool !== undefined) nonEmptyString(definition.tool, "tool", operationId);
-    if (definition.script !== undefined) nonEmptyString(definition.script, "script", operationId);
+    if (definition.tool !== undefined) validateCallableId("tool", definition.tool, operationId);
+    if (definition.script !== undefined) validateCallableId("script", definition.script, operationId);
     if (definition.retryOf !== undefined) nonEmptyString(definition.retryOf, "retryOf", operationId);
     for (const value of Object.values(definition.arguments)) nonEmptyString(value, "argument expression", operationId, 4096);
   }
@@ -374,12 +395,13 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
     assertTarget(operation, ["nodeId", "stage"]);
     assertPayload(operation, ["kind", "id"]);
     const kind = payload.kind;
-    const value = nonEmptyString(payload.id, "callable ID", id, 512);
+    const value = payload.id;
     if (!["tool", "script"].includes(kind) ||
       (stage !== "operation" && stage !== "observation") ||
       (stage === "observation" && kind !== "tool")) {
       reject("callable_kind_invalid", "Callable kind is invalid for this stage.", id);
     }
+    validateCallableId(kind, value, id);
     const existingTool = findPair(stageMap, "tool");
     const existingScript = findPair(stageMap, "script");
     const existing = kind === "tool" ? existingTool : existingScript;
@@ -416,7 +438,8 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
     if (stage !== "precondition" && stage !== "postcondition") {
       reject("predicate_stage_invalid", "Predicate calls can only be added to Precondition or Postcondition stages.", id);
     }
-    const predicateId = nonEmptyString(payload.predicateId, "Predicate ID", id, 256);
+    const predicateId = payload.predicateId;
+    validatePredicateId(predicateId, id);
     if (!Array.isArray(payload.arguments) || payload.arguments.some((value) => typeof value !== "string" || value.length > 4096)) {
       reject("predicate_arguments_invalid", "Predicate arguments must be an ordered list of expression strings.", id);
     }
@@ -441,7 +464,8 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
       !Array.isArray(payload.arguments) || payload.arguments.some((value) => typeof value !== "string" || value.length > 4096)) {
       reject("predicate_arguments_invalid", "Predicate call index or arguments are invalid.", id);
     }
-    const predicateId = nonEmptyString(target.predicateId, "Predicate ID", id, 256);
+    const predicateId = target.predicateId;
+    validatePredicateId(predicateId, id);
     const predicatesPair = findPair(stageMap, "predicates");
     if (!predicatesPair || !isSeq(predicatesPair.value) || !predicatesPair.value.items[target.callIndex]) {
       reject("predicate_call_not_found", "Target Predicate call does not exist.", id);
