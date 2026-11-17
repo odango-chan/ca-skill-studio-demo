@@ -6,7 +6,6 @@
 
 This document defines the first AI-assisted authoring capability for Skill Studio. It is a Studio editing feature, not a CA-SL language extension, Compiler feature, Host capability or Runtime feature.
 
-
 ## 1. Approved product decisions
 
 | Decision | P1 baseline |
@@ -43,8 +42,6 @@ The current Theia workbench already provides useful host infrastructure:
 There is an important version boundary: the current v1alpha4 Procedure Designer is a read-only projection. Existing D1/D2 typed patch modules and legacy Procedure operations are not automatically valid for v1alpha4. P1 MUST add and test a v1alpha4-specific semantic patch layer. It MUST NOT translate v1alpha4 into legacy syntax or reuse legacy patch operations without an explicit compatibility proof.
 
 The current Compiler v1.0.0 also predates the later Node-entry Event Wait work. AI Authoring MUST NOT invent, lower or simulate that Wait behavior. The existing Compiler remains the authority for the language subset it actually supports.
-
-
 
 ## 3. Cross-host architecture and reuse strategy
 
@@ -294,7 +291,7 @@ Keep two credential types distinct:
 
 Before a public Gateway is enabled, it MUST have an access-control strategy, rate limiting, abuse protection and a usage ceiling. CORS is a browser-origin policy, not authentication; an origin allowlist alone does not protect a publicly reachable API from non-browser clients. A hidden URL or static token shipped in the client is not a security boundary.
 
-VS Code SecretStorage is appropriate for optional user-owned credentials or short-lived Gateway session material where needed. It is not a safe place to distribute a deployment-wide shared provider key to every installed copy of the extension. Do not add a per-user provider-key setup flow to P1.
+Host secure storage may hold short-lived Gateway session material where a host provides an appropriate implementation; security behavior must be verified separately for Desktop and browser hosts. It is not a place to distribute a deployment-wide shared provider key to every installed copy of the extension. Do not add a per-user provider-key setup flow to P1.
 
 ### 8.4 Optional VS Code / Theia model APIs
 
@@ -305,7 +302,6 @@ Theia AI's OpenAI provider may be used by a Theia-specific adapter only if its b
 No host-specific AI API may change the canonical IModelClient, ModelProposal, Change Set or patch semantics.
 
 ## 9. Change Set contract
-
 
 ### 9.1 Ownership
 
@@ -403,7 +399,7 @@ For every operation it must:
 
 The Patch Engine MUST preserve comments, quoting, key order, line endings, unknown fields and all unrelated bytes. It MUST NOT serialize the entire YAML document to create a candidate.
 
-The model does not call this engine directly. The extension host validates and applies its result.
+The model does not call this engine directly. The Host Adapter invokes it, validates its result and applies the accepted edits through the native editor API.
 
 ## 11. Atomic groups and partial acceptance
 
@@ -543,7 +539,7 @@ The product decisions in Section 1 and the cross-host architecture direction are
 
 - **CA-SL / ca-skills:** owns normative v1alpha4 language semantics.
 - **CA Skill Compiler:** owns authoritative Check / Build / linking diagnostics.
-- **Skill Studio:** owns the Authoring UI, context disclosure, private semantic proposal schema, custom Procedure ChangeSetElement, v1alpha4 source patching and native buffer application.
+- **Skill Studio:** owns the Authoring UI, context disclosure, Studio semantic proposal / Change Set schema, v1alpha4 source patching and host-neutral candidate generation.
 - **Host Adapters:** bridge the shared Authoring Core to Theia / VS Code editor APIs; they own live document access and native buffer application.
 - **AI Gateway:** stores the deployment-scoped provider credential, authorizes and limits requests, and forwards OpenAI-compatible model calls; it does not own CA-SL semantics or Procedure patch authority.
 - **Optional Theia AI / VS Code Language Model adapters:** may provide alternate model sources, but are not required for the canonical workflow.
