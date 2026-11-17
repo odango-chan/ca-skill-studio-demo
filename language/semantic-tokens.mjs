@@ -135,6 +135,8 @@ function classifyV1Alpha4Tokens(text, relativePath) {
         push(value,parent[2]==="observation"?"skillObservation":"skillOperation",["reference"],path,"value");
       else if(root==="procedure" && last==="script" && parent[0]==="nodes")
         push(value,"skillReference",["reference"],path,"value");
+      else if(root==="predicates" && last==="script")
+        push(value,"skillReference",["reference"],path,"value");
       else if(root==="procedure" && last==="predicate" && parent.includes("predicates"))
         push(value,"skillPredicate",["reference"],path,"value");
       else if(root==="procedure" && parent.includes("routes"))
