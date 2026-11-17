@@ -56,6 +56,11 @@ const SOURCE_WITH_WAIT = SOURCE.replace(
 `,
 );
 
+const SOURCE_WITH_EMPTY_RESPONSE = SOURCE_WITH_WAIT.replace(
+  "      timeout: PT30S # preserve wait timeout comment",
+  "      response: {}\\n      timeout: PT30S # preserve wait timeout comment",
+);
+
 async function digest(text) {
   const value = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(value)].map((item) => item.toString(16).padStart(2, "0")).join("");
@@ -333,7 +338,7 @@ test("node.wait.timeout.set and node.wait.event.set patch only their scalar fiel
 
   const eventResult = await plan([
     op("node.wait.event.set", { nodeId: "create-session" }, {
-      event: { source: "SMF", service: "nsmf-pdusession", operation: "CreateSMContext" },
+      event: { source: "AMF", service: "nsmf-pdusession", operation: "CreateSMContext" },
     }),
   ], SOURCE_WITH_WAIT);
   assert.ok(eventResult.candidateSource.includes("source: SMF"));
@@ -466,4 +471,12 @@ test("all Wait field edits on one Node form a single atomic Change Set group", a
   ], SOURCE_WITH_WAIT);
   assert.equal(result.groups.length, 1);
   assert.equal(result.groups[0].operationIds.length, 2);
+});
+
+
+test("node.wait.response.set fills an existing empty response mapping", async () => {
+  const result = await plan([
+    op("node.wait.response.set", { nodeId: "create-session" }, { after: "verify-session" }),
+  ], SOURCE_WITH_EMPTY_RESPONSE);
+  assert.match(result.candidateSource, /response:\\n\\s+after: verify-session/);
 });

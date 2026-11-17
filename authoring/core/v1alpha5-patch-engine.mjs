@@ -151,7 +151,7 @@ function validateWaitAst(nodeId, waitMap, nodes) {
   }
   for (const field of ["source", "service", "operation"]) {
     const value = scalar(findPair(eventMap, field)?.value);
-    if (!value || value.trim().length === 0) reject("wait_event_invalid", "wait.event." + field + " must be a non-empty string.");
+    if (!value || value.trim().length === 0 || value !== value.trim()) reject("wait_event_invalid", "wait.event." + field + " must be a non-empty exact string.");
   }
   const timeout = scalar(findPair(waitMap, "timeout")?.value);
   if (!validFixedDuration(timeout)) reject("wait_timeout_invalid", "wait.timeout must be a positive fixed-duration ISO 8601 string in the v1alpha5 subset.");
@@ -190,7 +190,8 @@ function validateWaitDefinition(definition, knownNodeIds, operationId, nodeId) {
   }
   exactKeys(definition.event, ["source", "service", "operation"], operationId);
   for (const field of ["source", "service", "operation"]) {
-    nonEmptyString(definition.event[field], "wait.event." + field, operationId, 256);
+    const value = nonEmptyString(definition.event[field], "wait.event." + field, operationId, 256);
+    if (value !== value.trim()) reject("wait_event_invalid", "wait.event." + field + " must be an exact string without surrounding whitespace.", operationId);
   }
   if (!validFixedDuration(definition.timeout)) {
     reject("wait_timeout_invalid", "wait.timeout must be a positive fixed-duration ISO 8601 string in the v1alpha5 subset.", operationId);
@@ -496,6 +497,9 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
       const newline = parsed.source.includes("\r\n") ? "\r\n" : "\n";
       const replacement = stringify(payload.definition, { indent: 2, lineWidth: 0 }).trimEnd()
         .split(/\r\n|\n|\r/).map((line) => indent + line).join(newline);
+      if (parsed.source.slice(range.start, range.end) === replacement) {
+        reject("no_op_edit", "Semantic operation does not change the current Wait declaration.", id);
+      }
       edits.push({ start: range.start, end: range.end, text: replacement, operationIndexes: [operationIndex], operationIds: [id] });
     }
     return;
@@ -509,12 +513,18 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
     const waitMap = getMapValue(node, "wait", id).map;
     const eventMap = getMapValue(waitMap, "event", id).map;
     exactKeys(payload.event, ["source", "service", "operation"], id);
+    let changedFields = 0;
     for (const field of ["source", "service", "operation"]) {
       const value = nonEmptyString(payload.event[field], "wait.event." + field, id, 256);
+      if (value !== value.trim()) reject("wait_event_invalid", "wait.event." + field + " must be an exact string without surrounding whitespace.", id);
       const pair = findPair(eventMap, field);
       if (!pair) reject("wait_event_invalid", "Existing wait.event is missing " + field + ".", id);
-      edits.push({ ...scalarEditFromPair(parsed, pair.value, value, id), operationIndexes: [operationIndex], operationIds: [id] });
+      if (scalar(pair.value) !== value) {
+        edits.push({ ...scalarEditFromPair(parsed, pair.value, value, id), operationIndexes: [operationIndex], operationIds: [id] });
+        changedFields += 1;
+      }
     }
+    if (changedFields === 0) reject("no_op_edit", "Semantic operation does not change the current Wait event selector.", id);
     return;
   }
 
@@ -563,6 +573,18 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
       addMapEntry(appendMaps, waitMap, "response", { after }, operationIndex, id);
     } else if (!isMap(responsePair.value)) {
       reject("wait_response_invalid", "wait.response must be a mapping.", id);
+    } else if (responsePair.value.items.length === 0) {
+      const range = rangeOf(responsePair.value, id);
+      const indent = mapIndent(parsed.source, waitMap, id);
+      const newline = parsed.source.includes("\r\n") ? "\r\n" : "\n";
+      const value = stringify(after, { lineWidth: 0 }).trimEnd();
+      edits.push({
+        start: range.start,
+        end: range.end,
+        text: newline + indent + "  after: " + value,
+        operationIndexes: [operationIndex],
+        operationIds: [id],
+      });
     } else {
       const afterPair = findPair(responsePair.value, "after");
       if (afterPair) {
@@ -850,6 +872,20 @@ function buildGroups(operations, editRecords) {
     const stageKey = operation.target?.nodeId + "." + operation.target?.stage;
     if (stageAdds.has(stageKey) && index !== stageAdds.get(stageKey)) {
       uf.union(index, stageAdds.get(stageKey));
+    }
+    const wait = operation.type === "node.wait.set"
+      ? operation.payload?.definition
+      : operation.type === "node.add"
+        ? operation.payload?.definition?.wait
+        : null;
+    const references = [
+      wait?.routes?.TIMEOUT,
+      wait?.response?.after,
+      operation.type === "node.wait.timeout-route.set" ? operation.payload?.targetNodeId : undefined,
+      operation.type === "node.wait.response.set" ? operation.payload?.after : undefined,
+    ].filter((value) => typeof value === "string");
+    for (const reference of references) {
+      if (nodeAdds.has(reference)) uf.union(index, nodeAdds.get(reference));
     }
   });
 
