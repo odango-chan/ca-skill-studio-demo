@@ -128,11 +128,11 @@ function scalar(node) {
 
 function validFixedDuration(value) {
   if (typeof value !== "string") return false;
-  const match = value.match(/^P(?:(?:[1-9]\\d*D)(?:T(.+))?|T(.+))$/);
+  const match = value.match(/^P(?:(?:[1-9]\d*D)(?:T(.+))?|T(.+))$/);
   if (!match) return false;
   const time = match[1] ?? match[2];
   if (time === undefined) return true;
-  const parts = time.match(/^(?:([1-9]\\d*)H)?(?:([1-9]\\d*)M)?(?:([1-9]\\d*)S)?$/);
+  const parts = time.match(/^(?:([1-9]\d*)H)?(?:([1-9]\d*)M)?(?:([1-9]\d*)S)?$/);
   return Boolean(parts && (parts[1] || parts[2] || parts[3]));
 }
 
