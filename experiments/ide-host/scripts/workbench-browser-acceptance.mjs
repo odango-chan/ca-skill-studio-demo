@@ -1,16 +1,7 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
 import {readFile} from 'node:fs/promises';
-// This file is deliberately the Legacy v0.2 5GC regression fixture. The v1alpha4
-// candidate is validated separately through its exact imported workspace URI.
-const publishedProcedure=await readFile(new URL(
-  '../../../site/samples/skills/establish-pdu-session/assurance/procedure.yaml',
-  import.meta.url),'utf8');
-const pcfOutcomeHeader="          'on':\n            FAILED: finalize-failed\n            UNRESOLVED: finalize-unresolved\n";
-const pcfOutcomeStart=publishedProcedure.indexOf(pcfOutcomeHeader);
-if(pcfOutcomeStart<0)throw Error('Published PCF Outcome test anchor missing');
-const pcfOutcomeLine=publishedProcedure.slice(0,
-  pcfOutcomeStart+pcfOutcomeHeader.indexOf('            FAILED:'))
-  .split('\n').length;
+// All browser acceptance fixtures use the pinned CA-SL v1alpha4 sample set.
+import {readFile} from 'node:fs/promises';
 export async function assertSourceVisualPair(evalJS,sleep,filename,label){
   let state;
   for(let attempt=0;attempt<30;attempt++){
@@ -161,9 +152,9 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       JSON.stringify({scan,expectedNames}));
   const classic=scan.packages.find(x=>x.name==='establish-pdu-session');
   const mas=scan.packages.find(x=>x.name==='establish-pdu-session-mas');
-  if(classic?.fileCount!==13||classic?.corePresent!==3||
-     mas?.fileCount!==5||mas?.corePresent!==3)
-    throw Error('Two-SKILL inventory does not match the pinned sample manifest: '+
+  if(classic?.fileCount!==8||classic?.corePresent!==3||
+     mas?.fileCount!==6||mas?.corePresent!==3)
+    throw Error('Two-SKILL v1alpha4 inventory does not match the pinned sample manifest: 
       JSON.stringify({classic,mas}));
   function assertGroupInventory(result,packageName,expected){
     const pkg=result?.packages?.find(item=>item.name===packageName);
@@ -176,10 +167,10 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
         JSON.stringify({actual,expected,missing}));
   }
   assertGroupInventory(scan,'establish-pdu-session',{
-    definition:1,assurance:3,schemas:1,scripts:5,references:3
+    definition:1,assurance:3,schemas:1,scripts:3
   });
   assertGroupInventory(scan,'establish-pdu-session-mas',{
-    definition:1,assurance:3,schemas:1
+    definition:1,assurance:4,schemas:1
   });
 
   // Dependencies must be a real section in the same native TreeView in both
@@ -441,10 +432,10 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     throw Error('Package Explorer refresh did not preserve both Package inventories: '+
       JSON.stringify(postExpansion));
   assertGroupInventory(postExpansion,'establish-pdu-session',{
-    definition:1,assurance:3,schemas:1,scripts:5,references:3
+    definition:1,assurance:3,schemas:1,scripts:3
   });
   assertGroupInventory(postExpansion,'establish-pdu-session-mas',{
-    definition:1,assurance:3,schemas:1
+    definition:1,assurance:4,schemas:1
   });
   const previous=activityState?.previous;
   let restoredActivity=null;
