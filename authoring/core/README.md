@@ -7,7 +7,7 @@ This folder contains the first host-neutral model-client and proposal-validation
 - No imports from VS Code, Theia, DOM, Node-only modules or Cloudflare.
 - The Gateway client receives a Fetch implementation and Turnstile token provider from its Host Adapter.
 - The Context Pack builder accepts only the live v1alpha4 Procedure and allowlisted Package-relative context; references and scripts require explicit opt-in; dependencies require verified metadata.
-- Context Pack size is checked in UTF-8 bytes and oversized input is rejected, never silently truncated.
+- Context Pack size is checked against the serialized JSON envelope in UTF-8 bytes. The initial cap is 128 KiB to leave room for the system prompt and request metadata; oversized input is rejected, never silently truncated.
 - No provider API key or model identifier is accepted from the client.
 - A request cannot be sent until the caller confirms the Context Pack disclosure.
 - ModelProposal is untrusted and validated against a versioned Studio-owned schema.
