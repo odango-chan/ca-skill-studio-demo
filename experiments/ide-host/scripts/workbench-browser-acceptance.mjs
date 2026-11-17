@@ -810,7 +810,8 @@ export async function runWorkbenchAcceptance({
 
   // Native Markdown is the VS Code Markdown extension, with one shared
   // Source-left / Preview-right layout for both v1alpha4 Skill documents.
-  const skillGuideUri=defaultProcedureUri.slice(0,-procedureSuffix.length)+"/SKILL.md";
+  const skillGuideUri=defaultProcedureUri.replace(
+    /\\/assurance\\/procedure\\.yaml$/,"/SKILL.md");
   const mappingUri=defaultProcedureUri.replace(
     "/skills/establish-pdu-session/assurance/procedure.yaml",
     "/skills/establish-pdu-session-mas/assurance/openamsm-operation-mapping.md");
