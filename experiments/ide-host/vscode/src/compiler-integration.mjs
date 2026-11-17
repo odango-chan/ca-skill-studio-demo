@@ -5,7 +5,6 @@ import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot
 import {createCompilerWorkerClient} from "./compiler-client.mjs";
 import {
   COMPILER_VERSION,
-  COMPILER_BUILD_RESULT_VERSION,
   COMPILER_INSPECTION_VERSION,
   createCompilerBuildRequest,
   isCompilerBuildResult,
@@ -49,6 +48,7 @@ function sourcePathForDiagnostic(packageName,path){
 function makeArtifactProvider(vscode,context,output){
   const emitter=new vscode.EventEmitter();
   const builds=new Map();
+  const buildsById=new Map();
   const contents=new Map();
   let nextArtifactId=0;
 
@@ -99,10 +99,15 @@ function makeArtifactProvider(vscode,context,output){
     },
     getParent(node){
       if(!node||node.kind==="artifact-package")return undefined;
-      return builds.get(node.artifactId);
+      return buildsById.get(node.artifactId);
     },
     setBuild(packageRoot,packageName,result){
       const artifactId=String(++nextArtifactId);
+      const previous=builds.get(packageRoot.toString());
+      if(previous){
+        buildsById.delete(previous.artifactId);
+        for(const file of previous.files??[])contents.delete(file.uri.path);
+      }
       const prefix="skills/"+packageName+"/";
       const files=[];
       if(result.success){
@@ -145,6 +150,7 @@ function makeArtifactProvider(vscode,context,output){
           item.severity==="error").length,files
       };
       builds.set(packageRoot.toString(),entry);
+      buildsById.set(artifactId,entry);
       emitter.fire();
       output.appendLine("Artifact view updated: "+packageName+
         " · "+(result.success?files.length+" files":"FAILED / no partial output"));
