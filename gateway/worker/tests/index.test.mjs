@@ -147,10 +147,10 @@ test("client cancellation aborts an in-flight provider request", async () => {
 test("cancelling the downstream stream cancels the upstream body", async () => {
   let cancelled = false;
   const upstreamBody = new ReadableStream({
-    start(controller) { controller.enqueue(new TextEncoder().encode("data: partial\\n\\n")); },
+    start(controller) { controller.enqueue(new TextEncoder().encode("data: partial\n\n")); },
     cancel() { cancelled = true; },
   });
-  const response = await handleRequest(req(payload()), env(), ctx(), async () => new Response(upstreamBody, {
+  const response = await handleRequest(req(payload({ stream: true })), env(), ctx(), async () => new Response(upstreamBody, {
     status: 200,
     headers: { "Content-Type": "text/event-stream" },
   }));
@@ -161,13 +161,13 @@ test("cancelling the downstream stream cancels the upstream body", async () => {
 
 test("non-streaming Authoring Core requests use the server-selected model and JSON response", async () => {
   let init;
-  const providerResponse = { choices: [{ message: { content: "{\\"schema\\":\\"ca-studio.ai-model-proposal/v1\\"}" } }] };
+  const providerResponse = { choices: [{ message: { content: "{\"schema\":\"ca-studio.ai-model-proposal/v1\"}" } }] };
   const response = await handleRequest(req(payload({ response_format: { type: "json_object" } })), env(), ctx(), async (_url, options) => {
     init = options;
     return Response.json(providerResponse);
   });
   assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type"), /application\\/json/);
+  assert.match(response.headers.get("content-type"), /application\/json/);
   assert.equal(init.headers.Accept, "application/json");
   const sent = JSON.parse(init.body);
   assert.equal(sent.model, "test-model");
