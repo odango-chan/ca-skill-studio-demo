@@ -71,6 +71,7 @@ export function createGatewayModelClient({
   getTurnstileToken,
   fetchImpl = globalThis.fetch,
   maxOutputTokens = 2048,
+  maxRequestBytes = 245760,
 } = {}) {
   const endpoint = gatewayEndpoint(gatewayBaseUrl);
   if (typeof getTurnstileToken !== "function") {
@@ -79,6 +80,9 @@ export function createGatewayModelClient({
   if (typeof fetchImpl !== "function") throw new TypeError("A Fetch-compatible implementation is required.");
   if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 8192) {
     throw new TypeError("maxOutputTokens must be between 1 and 8192.");
+  }
+  if (!Number.isSafeInteger(maxRequestBytes) || maxRequestBytes < 1024 || maxRequestBytes > 262144) {
+    throw new TypeError("maxRequestBytes must be between 1024 and 262144.");
   }
 
   return Object.freeze({
@@ -93,11 +97,6 @@ export function createGatewayModelClient({
         throw new Error("Context disclosure must be explicitly accepted before sending a model request.");
       }
       validateMessages(messages);
-      const challengeToken = await getTurnstileToken();
-      if (typeof challengeToken !== "string" || challengeToken.length === 0 || challengeToken.length > 2048) {
-        throw new Error("The host did not provide a valid Turnstile challenge token.");
-      }
-
       const body = {
         messages,
         stream: false,
@@ -105,6 +104,16 @@ export function createGatewayModelClient({
       };
       const format = validateResponseFormat(responseFormat);
       if (format !== undefined) body.response_format = format;
+      const serializedBody = JSON.stringify(body);
+      const requestBytes = new TextEncoder().encode(serializedBody).byteLength;
+      if (requestBytes > maxRequestBytes) {
+        throw new RangeError("Model request exceeds the configured UTF-8 byte limit.");
+      }
+
+      const challengeToken = await getTurnstileToken();
+      if (typeof challengeToken !== "string" || challengeToken.length === 0 || challengeToken.length > 2048) {
+        throw new Error("The host did not provide a valid Turnstile challenge token.");
+      }
 
       let response;
       try {
@@ -114,7 +123,7 @@ export function createGatewayModelClient({
             "content-type": "application/json",
             "x-turnstile-token": challengeToken,
           },
-          body: JSON.stringify(body),
+          body: serializedBody,
           signal,
         });
       } catch (error) {
