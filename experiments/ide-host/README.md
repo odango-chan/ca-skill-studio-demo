@@ -10,6 +10,8 @@
 - React Flow + ELK provide the Procedure Designer Webview; the Webview is a projection and never becomes a second business source of truth.
 - The standalone theme extension owns color, file icon and Markdown preview styles. The declarative language extension supplies offline YAML / Python TextMate grammars.
 - The browser LSP Worker consumes the versioned Skill Language contract and project contract snapshot; Compiler remains authoritative for final semantic validation.
+- The active authoring target is CA-SL v1alpha5 Preview, pinned in `language/contracts/ca-sl-v1alpha5.lock.json`. The v1alpha5 candidate is not released or frozen; v1alpha4 remains only the historical frozen baseline.
+- The bundled Compiler v1.0.0 is v1alpha4-only. Studio blocks Check / Build / Inspect for v1alpha5 rather than attempting an incompatible request or silently lowering Node-entry Wait. See [the v1alpha5 Preview boundary](../../docs/design/ca-sl-v1alpha5-studio-preview.md).
 
 ## Browser-only limitations
 
