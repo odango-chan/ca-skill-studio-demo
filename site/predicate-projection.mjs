@@ -1,6 +1,6 @@
 import {parseDocument, LineCounter, isMap, isSeq, isScalar, isAlias} from 'yaml';
 
-// Read-only CA-SL v1alpha4 Predicate projection. Parameters and Evidence
+// Read-only CA-SL v1alpha5 Predicate projection. Parameters and Evidence
 // declarations are source metadata; CEL and Script evaluators are never run.
 const LIMIT = 1024 * 1024;
 const MAX_NODES = 30000;
@@ -223,7 +223,7 @@ export function projectPredicateSet(source, options = {}) {
   return {
     state,
     kind: 'PredicateSet',
-    language: 'CA-SL v1alpha4',
+    language: 'CA-SL v1alpha5',
     skill: skillName,
     predicates,
     predicateCount: predicates.length,
