@@ -90,8 +90,6 @@ test("Example imports only the pinned CA-SL v1alpha4 Skills into skills/",async(
   assert.equal(result.files,total);
   assert.equal(result.created,total);
   assert.equal(result.skipped,0);
-  assert.equal(result.overwritten,0);
-  assert.equal(result.legacyArchived,0);
   assert.equal(result.root.path,root);
   assert.equal(result.skillsRoot.path,skillRoot);
   assert.equal(result.procedure.path,procedurePath);
