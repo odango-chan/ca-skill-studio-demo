@@ -135,6 +135,15 @@ export async function buildAuthoringResourceInventory(snapshot, dependencyResolu
   return Object.freeze(resources.map((item) => Object.freeze(item)));
 }
 
+export function containsWaitMutation(operations) {
+  if (!Array.isArray(operations)) return false;
+  return operations.some((operation) =>
+    typeof operation?.type === "string" &&
+    (operation.type.startsWith("node.wait.") ||
+      (operation.type === "node.add" && operation.payload?.definition?.wait !== undefined))
+  );
+}
+
 function nonceValue() {
   const bytes = new Uint8Array(24);
   if (!globalThis.crypto?.getRandomValues) throw new Error("Secure randomness unavailable");

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildAuthoringResourceInventory,
+  containsWaitMutation,
   createPackageRevisionTracker,
   renderAiAuthoringHtml,
 } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
@@ -114,4 +115,16 @@ test("AI Authoring Webview has a nonce-only script/style policy and no direct ne
   assert.match(html, /Compiler Check: NOT_RUN/);
   assert.match(html, /不自动保存/);
   assert.throws(() => renderAiAuthoringHtml("not-a-secure-nonce"), /nonce/);
+});
+
+test("Wait proposals are preview-only until trusted IngressCatalog and full v1alpha5 Compiler gates exist", () => {
+  assert.equal(containsWaitMutation([
+    { type: "node.wait.set", payload: { definition: { event: {} } } },
+  ]), true);
+  assert.equal(containsWaitMutation([
+    { type: "node.add", payload: { definition: { wait: { event: {} }, operation: {} } } },
+  ]), true);
+  assert.equal(containsWaitMutation([
+    { type: "node.stage.add", payload: { definition: { operation: {} } } },
+  ]), false);
 });
