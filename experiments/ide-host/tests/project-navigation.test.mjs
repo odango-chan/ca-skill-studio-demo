@@ -42,13 +42,14 @@ test("pending Example restoration waits for the named folder, then opens Procedu
   const procedure=root+"/examples/v1alpha4-candidate/establish-pdu-session/assurance/procedure.yaml";
   const pending={root,procedure,files:18,skipped:2,skills:["establish-pdu-session","establish-pdu-session-mas"]};
   const h=makeHost({folders:[{uri:uri(root)}],pending});
-  let revealed=0,restored=null;
+  let revealed=0,restored=null,claimedBeforeUi=false;
   const result=await restorePendingExampleProject(h.vscode,h.context,{
-    async revealPackages(){revealed++;},
+    async revealPackages(){claimedBeforeUi=!h.state.has(PENDING_EXAMPLE_OPEN_KEY);revealed++;},
     onRestored(value){restored=value;}
   });
   assert.equal(result,true);
   assert.equal(revealed,1);
+  assert.equal(claimedBeforeUi,true,"one-shot continuation is consumed before asynchronous UI work");
   assert.equal(h.calls.length,1);
   assert.equal(h.calls[0][0],"skillStudio.openProcedure");
   assert.equal(h.calls[0][1].toString(),procedure);
