@@ -1,6 +1,5 @@
 # Skill Studio 当前工作状态
 
-
 ## 2026-11-17 · AI Procedure Authoring P1（跨宿主设计提案）
 
 [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md) · [PR #201](https://github.com/odango-chan/ca-skill-studio-demo/pull/201)
