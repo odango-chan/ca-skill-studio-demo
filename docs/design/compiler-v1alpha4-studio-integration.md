@@ -18,7 +18,9 @@ The Studio LSP and Designer remain editor-time projections. They do not replace 
 
 ## 2. Browser Worker packaging
 
-The extension bundles a dedicated classic Worker entry at `dist/compiler-worker.js`. The Pages and Theia workflows:
+The extension bundles a dedicated classic Worker entry at `dist/compiler-worker.js`. The Compiler repository is private. The Pages and Theia workflows therefore require the Studio repository Actions secret `CA_SKILL_COMPILER_READ_TOKEN`, a fine-grained token with **Contents: read** access to `odango-chan/ca-skill-compiler`. The token is used only by `actions/checkout` for the pinned source checkout (`persist-credentials: false`); it is never passed to the browser, Worker or Compiler.
+
+The Pages and Theia workflows:
 
 1. check out the exact Compiler `v1.0.0` tag;
 2. use Go 1.26.6;
