@@ -15,7 +15,7 @@ This directory pins the normative source files from the sole language authority,
 
 The v1alpha5 candidate inherits the immutable v1alpha4 baseline and adds Node-entry Event Wait. Studio projects the four existing business stages unchanged and models Wait separately as Node-entry control. The local projection is read-only/editor-only; it does not replace Compiler conformance.
 
-The pinned Compiler candidate can parse the current v1alpha5 Wait AST and run the supported Check slice. Build intentionally remains fail-closed until WP3–WP8 are complete. Dependency Inspection and trusted IngressCatalog linking are not yet available through this candidate.
+The pinned Compiler candidate PR #30 can parse the current v1alpha5 Wait AST and run its supported Check slice on that draft branch. **Studio does not integrate this draft Compiler.** The online Extension still bundles Compiler v1.0.0 for v1alpha4 and therefore blocks v1alpha5 Check, Build and Dependency Inspection. The candidate's Build intentionally remains fail-closed until WP3–WP8 are complete; Dependency Inspection and trusted IngressCatalog linking are not yet available through it.
 
 ## Historical frozen v1alpha4 source
 
