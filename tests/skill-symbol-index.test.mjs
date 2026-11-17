@@ -107,7 +107,8 @@ test("v1alpha5 wait.output and response.after resolve to exact Node declarations
   const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
 
   const waitOutput="update-sm-context.wait.output";
-  const waitHit=at(index,procedure.uri,procedure.text,waitOutput);
+  const waitHit=at(index,procedure.uri,procedure.text,waitOutput,
+    procedure.text.indexOf("request: "+waitOutput));
   assert.equal(waitHit.token.type,"skillStep");
   const waitDeclaration=symbols.uniqueSkillSymbolDeclaration(waitHit);
   assert.equal(waitDeclaration.name,"update-sm-context");
