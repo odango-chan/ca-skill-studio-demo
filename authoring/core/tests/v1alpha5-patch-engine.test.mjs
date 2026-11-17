@@ -58,7 +58,7 @@ const SOURCE_WITH_WAIT = SOURCE.replace(
 
 const SOURCE_WITH_EMPTY_RESPONSE = SOURCE_WITH_WAIT.replace(
   "      timeout: PT30S # preserve wait timeout comment",
-  "      response: {}\\n      timeout: PT30S # preserve wait timeout comment",
+  "      response: {}\n      timeout: PT30S # preserve wait timeout comment",
 );
 
 async function digest(text) {
@@ -478,5 +478,5 @@ test("node.wait.response.set fills an existing empty response mapping", async ()
   const result = await plan([
     op("node.wait.response.set", { nodeId: "create-session" }, { after: "verify-session" }),
   ], SOURCE_WITH_EMPTY_RESPONSE);
-  assert.match(result.candidateSource, /response:\\n\\s+after: verify-session/);
+  assert.match(result.candidateSource, /response:\n\s+after: verify-session/);
 });
