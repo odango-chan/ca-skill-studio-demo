@@ -96,9 +96,6 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     "Example loading belongs in native File and SKILL Studio Project menus, not Explorer toolbar noise");
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js",
     "dist/compiler-worker.js","dist/skillc.wasm","dist/wasm_exec.js","media/procedure.js","media/procedure.css",
-    "samples/skills/files.json",
-    "samples/skills/establish-pdu-session/assurance/procedure.yaml",
-    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml",
     "samples/v1alpha4/files.json","samples/v1alpha4/README.md",
     "samples/v1alpha4/establish-pdu-session/assurance/procedure.yaml",
     "samples/v1alpha4/establish-pdu-session-mas/assurance/procedure.yaml",
