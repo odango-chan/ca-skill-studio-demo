@@ -66,117 +66,134 @@ async function readBundledResource(vscode,uri){
   }
   return vscode.workspace.fs.readFile(uri);
 }
+function validate(manifest,{sourceSha,sourceStatus,sourceRef,languageVersion,projectReadme}={}){
+  if(manifest?.schemaVersion!==1||manifest?.sourceRepo!=="odango-chan/ca-skills"||
+     manifest?.sourceSha!==sourceSha||manifest?.sourceStatus!==sourceStatus||
+     manifest?.sourceRef!==sourceRef||
+     (languageVersion&&manifest?.languageVersion!==languageVersion)||
+     (projectReadme&&manifest?.projectReadme!==projectReadme)||
+     !Array.isArray(manifest.skills)||
+     JSON.stringify(manifest.skills)!==JSON.stringify(SKILLS)||
+     !Array.isArray(manifest.files)||manifest.files.length<5||
+     manifest.files.length>100||!manifest.blobs||typeof manifest.blobs!=="object")
+    fail("Unrecognized or stale pinned sample manifest");
+  const seen=new Set();
+  for(const item of manifest.files){
+    if(typeof item!=="string"||item.length>180||item.startsWith("/")||
+       item.includes("\\")||item.split("/").some(part=>!part||part==="."||part==="..")||
+       !SKILLS.includes(item.split("/")[0])||seen.has(item)||
+       !/^[a-f0-9]{40}$/.test(manifest.blobs[item]??""))
+      fail("Unsafe, duplicate or unpinned sample path");
+    seen.add(item);
+  }
+  for(const skill of SKILLS)
+    for(const required of ["SKILL.md","assurance/contract.yaml",
+      "assurance/procedure.yaml","assurance/predicates.yaml"])
+      if(!seen.has(skill+"/"+required))fail("Missing required "+skill+"/"+required);
+  return manifest;
+}
 export async function seedExampleProject(vscode,extensionUri,storageUri,
   {resetExisting=false,onProgress=()=>{}}={}){
   let phase="initial";
   const report=event=>{if(typeof onProgress==="function")onProgress(event);};
   try{
-  if(!vscode?.workspace?.fs||!vscode.Uri?.file||!vscode.Uri.joinPath)
-    fail("Host file system unavailable");
-  const fileSystem=vscode.workspace.fs;
-  const manifestUri=vscode.Uri.joinPath(extensionUri,...SRC,"files.json");
-  const extensionInfo=describeUri(extensionUri);
-  const manifestInfo=describeUri(manifestUri);
-  phase="read-bundled-manifest";
-  report({phase:"manifest"});
-  let manifestBytes;
-  try{
-    manifestBytes=await readBundledResource(vscode,manifestUri);
-  }catch(error){
-    fail("Cannot read bundled manifest; extensionUri="+JSON.stringify(extensionInfo)+
-      "; manifestUri="+JSON.stringify(manifestInfo)+
-      "; resourceRead="+JSON.stringify(describeError(error)));
-  }
-  const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
-  const files=manifest.files;
-  report({phase:"files",completed:0,total:files.length});
-  // The actual folder basename is the workspace identity when the caller
-  // opens this directory with the native vscode.openFolder command.
-  if(!storageUri)fail("No writable extension storage URI");
-  const legacySkillsRoot=vscode.Uri.joinPath(storageUri,"workspaces","skills");
-  const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
-  const skillsRoot=vscode.Uri.joinPath(root,"skills");
-  let created=0,skipped=0,overwritten=0,resetPackages=0;
-  phase="create-project-layout";
-  await fileSystem.createDirectory(root);
-  await fileSystem.createDirectory(skillsRoot);
-  if(resetExisting){
-    // Reset only the two known bundled Skill package directories. This clears
-    // edited and untracked files inside those packages, but leaves other Skills,
-    // lib/, output/, and every unrelated/user-selected workspace untouched.
-    for(const skill of SKILLS){
-      let found=false;
-      for(const packageRoot of [
-        vscode.Uri.joinPath(skillsRoot,skill),
-        vscode.Uri.joinPath(legacySkillsRoot,skill)
-      ]){
-        phase="reset-package:"+skill;
-        try{
-          await fileSystem.stat(packageRoot);
-          found=true;
-          await fileSystem.delete(packageRoot,{recursive:true,useTrash:false});
-        }catch(error){
-          if(error?.code!=="FileNotFound")throw error;
+    if(!vscode?.workspace?.fs||!vscode.Uri?.file||!vscode.Uri.joinPath)
+      fail("Host file system unavailable");
+    if(!storageUri)fail("No writable extension storage URI");
+    const fs=vscode.workspace.fs;
+    const readManifest=async(sourceRoot,pin)=>{
+      const uri=vscode.Uri.joinPath(extensionUri,...sourceRoot,"files.json");
+      phase="read-"+pin.kind+"-manifest";
+      report({phase:"manifest"});
+      let bytes;
+      try{bytes=await readBundledResource(vscode,uri);}
+      catch(error){fail("Cannot read "+pin.kind+" manifest: "+JSON.stringify(describeError(error)));}
+      return validate(JSON.parse(decoder.decode(bytes)),pin);
+    };
+    const official=await readManifest(["samples","skills"],{
+      kind:"official",sourceSha:"dfba05071cb33424c475e00a325712f5273a19de",
+      sourceStatus:"LEGACY_NOT_V1ALPHA4",sourceRef:"refs/heads/main"
+    });
+    const candidate=await readManifest(["samples","v1alpha4"],{
+      kind:"v1alpha4 candidate",sourceSha:"33664aec7ebc9bb1764618f839d01b7493425429",
+      sourceStatus:"DRAFT_NOT_QUALIFIED",sourceRef:"refs/pull/58/head",
+      languageVersion:"connectionagent.io/v1alpha4",projectReadme:"README.md"
+    });
+    const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
+    const skillsRoot=vscode.Uri.joinPath(root,"skills");
+    const examplesRoot=vscode.Uri.joinPath(root,"examples","v1alpha4-candidate");
+    const legacySkillsRoot=vscode.Uri.joinPath(storageUri,"workspaces","skills");
+    const sets=[
+      {source:["samples","skills"],destination:skillsRoot,files:official.files},
+      {source:["samples","v1alpha4"],destination:examplesRoot,
+        files:[...candidate.files,candidate.projectReadme]}
+    ];
+    const total=sets.reduce((sum,set)=>sum+set.files.length,0);
+    let created=0,skipped=0,overwritten=0,resetPackages=0;
+    phase="create-project-layout";
+    await fs.createDirectory(root);
+    await fs.createDirectory(skillsRoot);
+    await fs.createDirectory(vscode.Uri.joinPath(root,"examples"));
+    await fs.createDirectory(examplesRoot);
+    if(resetExisting){
+      for(const skill of SKILLS){
+        let found=false;
+        for(const packageRoot of [
+          vscode.Uri.joinPath(skillsRoot,skill),
+          vscode.Uri.joinPath(examplesRoot,skill),
+          vscode.Uri.joinPath(legacySkillsRoot,skill)
+        ]){
+          phase="reset-package:"+skill;
+          try{await fs.stat(packageRoot);found=true;await fs.delete(packageRoot,{recursive:true,useTrash:false});}
+          catch(error){if(error?.code!=="FileNotFound")throw error;}
         }
-      }
-      if(found)resetPackages++;
-    }
-  }
-  for(const file of files){
-    const segments=file.split("/");
-    const destination=vscode.Uri.joinPath(skillsRoot,...segments);
-    phase="stat-existing:"+file;
-    let exists=false;
-    try{await fileSystem.stat(destination);exists=true;}
-    catch(error){
-      if(error?.code!=="FileNotFound")throw error;
-    }
-    if(exists&&!resetExisting){
-      skipped++;
-      report({phase:"files",completed:created+skipped+overwritten,total:files.length});
-      continue;
-    }
-    const source=vscode.Uri.joinPath(extensionUri,...SRC,...segments);
-    phase="read-bundled-file:"+file;
-    const bytes=await readBundledResource(vscode,source);
-    if(!(bytes instanceof Uint8Array))fail("Unrecognized sample file");
-    phase="create-parent:"+file;
-    if(segments.length>1)
-      await fileSystem.createDirectory(vscode.Uri.joinPath(skillsRoot,...segments.slice(0,-1)));
-    // Normal imports remain create-only. The online demo's explicit reset
-    // intentionally replaces every pinned manifest file with canonical bytes.
-    if(!exists){
-      try{await fileSystem.stat(destination);fail("Sample file changed during import");}
-      catch(error){if(error?.code!=="FileNotFound")throw error;}
-    }
-    phase="write-file:"+file;
-    await fileSystem.writeFile(destination,bytes);
-    if(exists)overwritten++;else created++;
-    report({phase:"files",completed:created+skipped+overwritten,total:files.length});
-  }
-  phase="project-ready";
-  report({phase:"project-ready"});
-  if(resetExisting){
-    // Remove only the two legacy bundled package directories from the previous
-    // extension-owned workspace location. Other Skills and unrelated data stay.
-    for(const skill of SKILLS){
-      const legacyPackage=vscode.Uri.joinPath(legacySkillsRoot,skill);
-      phase="clear-legacy-package:"+skill;
-      try{
-        await fileSystem.stat(legacyPackage);
-        await fileSystem.delete(legacyPackage,{recursive:true,useTrash:false});
-      }catch(error){
-        if(error?.code!=="FileNotFound")throw error;
+        if(found)resetPackages++;
       }
     }
-  }
-  const procedures=Object.fromEntries(SKILLS.map(name=>
-    [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
-  return {root,skillsRoot,
-    procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
-    sourceSha:manifest.sourceSha,files:files.length,created,skipped,overwritten,
-    resetPackages,resetExisting};
-  }catch(error){
-    throw Error(phase+": "+String(error?.message??error));
-  }
+    report({phase:"files",completed:0,total});
+    for(const set of sets){
+      for(const file of set.files){
+        const parts=file.split("/");
+        const destination=vscode.Uri.joinPath(set.destination,...parts);
+        phase="stat-existing:"+file;
+        let exists=false;
+        try{await fs.stat(destination);exists=true;}
+        catch(error){if(error?.code!=="FileNotFound")throw error;}
+        if(exists&&!resetExisting){
+          skipped++;report({phase:"files",completed:created+skipped+overwritten,total});continue;
+        }
+        phase="read-bundled-file:"+file;
+        const bytes=await readBundledResource(vscode,
+          vscode.Uri.joinPath(extensionUri,...set.source,...parts));
+        if(!(bytes instanceof Uint8Array))fail("Unrecognized sample file");
+        if(parts.length>1)
+          await fs.createDirectory(vscode.Uri.joinPath(set.destination,...parts.slice(0,-1)));
+        if(!exists){
+          try{await fs.stat(destination);fail("Sample file changed during import");}
+          catch(error){if(error?.code!=="FileNotFound")throw error;}
+        }
+        phase="write-file:"+file;
+        await fs.writeFile(destination,bytes);
+        if(exists)overwritten++;else created++;
+        report({phase:"files",completed:created+skipped+overwritten,total});
+      }
+    }
+    if(resetExisting){
+      for(const skill of SKILLS){
+        const old=vscode.Uri.joinPath(legacySkillsRoot,skill);
+        try{await fs.stat(old);await fs.delete(old,{recursive:true,useTrash:false});}
+        catch(error){if(error?.code!=="FileNotFound")throw error;}
+      }
+    }
+    report({phase:"project-ready"});
+    const procedures=Object.fromEntries(SKILLS.map(name=>
+      [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
+    const languageProcedures=Object.fromEntries(SKILLS.map(name=>
+      [name,vscode.Uri.joinPath(examplesRoot,name,"assurance","procedure.yaml")]));
+    return {root,skillsRoot,examplesRoot,procedure:languageProcedures[SKILLS[0]],
+      procedures,languageProcedures,skills:[...SKILLS],
+      sourceShas:{official:official.sourceSha,v1alpha4Candidate:candidate.sourceSha},
+      officialFiles:official.files.length,candidateFiles:candidate.files.length,
+      files:total,created,skipped,overwritten,resetPackages,resetExisting};
+  }catch(error){throw Error(phase+": "+String(error?.message??error));}
 }
