@@ -109,7 +109,7 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       catch(error){fail("Cannot read CA-SL v1alpha4 manifest: "+JSON.stringify(describeError(error)));}
       return validate(JSON.parse(decoder.decode(bytes)),{
         kind:"CA-SL v1alpha4",
-        sourceSha:"33664aec7ebc9bb1764618f839d01b7493425429",
+        sourceSha:"ab189d5dd62763be4cd2f00cc8047a0c5982b6be",
         sourceStatus:"DRAFT_NOT_QUALIFIED",
         sourceRef:"refs/pull/58/head",
         languageVersion:"connectionagent.io/v1alpha4",
