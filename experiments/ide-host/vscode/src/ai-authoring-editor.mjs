@@ -464,6 +464,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
           patchError = String(error?.message ?? error);
         }
       }
+      const waitGate = containsWaitMutation(changeSet.operations);
+      const canApply = Boolean(patchPlan && !waitGate && proposalResult.proposal.blockers.length === 0);
       session.pending = patchPlan ? {
         document,
         source: document.getText(),
@@ -472,6 +474,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         proposalResult,
         changeSet,
         patchPlan,
+        canApply,
       } : null;
       post({
         type: "proposal",
@@ -479,10 +482,13 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         plan: proposalResult.proposal.plan,
         assumptions: proposalResult.proposal.assumptions,
         blockers: proposalResult.proposal.blockers,
-        patchState: patchPlan ? "READY · local source patch only" :
-          patchError ? "BLOCKED · patch planning failed" : "NOT_RUN",
-        patchError,
-        canApply: Boolean(patchPlan && proposalResult.proposal.blockers.length === 0),
+        patchState: patchPlan
+          ? (waitGate ? "PREVIEW ONLY · Wait qualification gate" : "READY · local source patch only")
+          : patchError ? "BLOCKED · patch planning failed" : "NOT_RUN",
+        patchError: waitGate
+          ? "Wait edits require a trusted IngressCatalog v1alpha1 Owner binding and a complete v1alpha5 Compiler Check. The current Studio dependency / Compiler path does not provide that proof; Wait changes cannot be applied."
+          : patchError,
+        canApply,
         groups: patchPlan ? patchPlan.groups.map((group) => ({
           id: group.id,
           label: group.label,
@@ -517,6 +523,10 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       return;
     }
     const pending = session.pending;
+    if (pending.canApply !== true) {
+      post({ type: "error", message: "该提案处于 PREVIEW ONLY 状态，尚未满足 v1alpha5 语义 / Owner 验证门槛。" });
+      return;
+    }
     const document = pending.document;
     post({ type: "status", message: "正在检查文档与 Package revision…" });
     try {
