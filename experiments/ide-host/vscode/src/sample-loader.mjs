@@ -156,12 +156,14 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
           let source="";
           try{source=await readText(procedure);}catch{/* incomplete old package is archived too */}
           if(!/^\s*#.*CA-SL v1alpha4/m.test(source)){
-            await fs.createDirectory(legacyArchiveRoot);
-            let destination=vscode.Uri.joinPath(legacyArchiveRoot,skill);
-            for(let suffix=2;await exists(destination);suffix++)
-              destination=vscode.Uri.joinPath(archiveRoot,"legacy-v0.2-"+suffix,skill);
+            let archiveParent=legacyArchiveRoot;
+            let destination=vscode.Uri.joinPath(archiveParent,skill);
+            for(let suffix=2;await exists(destination);suffix++){
+              archiveParent=vscode.Uri.joinPath(archiveRoot,"legacy-v0.2-"+suffix);
+              destination=vscode.Uri.joinPath(archiveParent,skill);
+            }
             phase="archive-legacy-package:"+skill;
-            await fs.createDirectory(vscode.Uri.joinPath(destination,".."));
+            await fs.createDirectory(archiveParent);
             await fs.rename(target,destination);
             legacyArchived++;
           }
