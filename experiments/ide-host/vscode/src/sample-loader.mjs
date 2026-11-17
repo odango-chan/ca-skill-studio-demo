@@ -6,6 +6,36 @@
 export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
 const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
 const decoder=new TextDecoder();
+const PREVIOUS_V1ALPHA4_BLOBS=Object.freeze({
+  "establish-pdu-session-mas/SKILL.md":"76b7eb8bbcc4a7423ca2c2378618af09fefe0616",
+  "establish-pdu-session-mas/assurance/contract.yaml":"1af104ea796d07d5fc917a9ffb42b89e3be328a4",
+  "establish-pdu-session-mas/assurance/openamsm-operation-mapping.md":"5c4bfeabd9208d4272ab877807d9ac06efe6537d",
+  "establish-pdu-session-mas/assurance/predicates.yaml":"75fd269e935d0571b9390da77cebdf8d9ddebdbd",
+  "establish-pdu-session-mas/assurance/procedure.yaml":"ac11b372f8da3d39a7ab4a420bf603b0ee5eff08",
+  "establish-pdu-session-mas/schemas/establishment-request.schema.yaml":"e8fc0da17c1ac22cb01633876644b6bc11d12417",
+  "establish-pdu-session/SKILL.md":"65d8ec3b1159c2f2fb4a47301143eb18a57ad030",
+  "establish-pdu-session/assurance/contract.yaml":"3d94d3ad842472d57f0b57c28a7b54928dc88d10",
+  "establish-pdu-session/assurance/predicates.yaml":"2b3031df2a2fdb8fff32701c42b4b32456a9c51f",
+  "establish-pdu-session/assurance/procedure.yaml":"0d8e41cc3eb2162731a457241879aeefa3f6361e",
+  "establish-pdu-session/schemas/establishment-request.schema.yaml":"e448b7f8f997b2ef0246d309a49362702f41bf3d",
+  "establish-pdu-session/scripts/validate-smf-session-context-entry.py":"7b5fab4ada028a2acd76405c6eb2a64d2b39ac15",
+  "establish-pdu-session/scripts/validate-smf-session-context.py":"9244f408a7af4c34e69e96b2cda2eb61c4a6b542",
+  "establish-pdu-session/scripts/validate-subscription-request.py":"806c9384e827a4a37f394194e9444dce7fc44c5a"
+});
+const PREVIOUS_EXAMPLE_README_BLOB="3458aebabef840f36b7dc9231aa3a86bb5ef5351";
+const decoder=new TextDecoder();
+async function gitBlobSha(bytes){
+  try{
+    const crypto=globalThis.crypto;
+    if(!crypto?.subtle?.digest)return null;
+    const prefix=new TextEncoder().encode("blob "+bytes.length+"\\0");
+    const payload=new Uint8Array(prefix.length+bytes.length);
+    payload.set(prefix,0);
+    payload.set(bytes,prefix.length);
+    const digest=await crypto.subtle.digest("SHA-1",payload);
+    return [...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,"0")).join("");
+  }catch{return null;}
+}
 const fail=reason=>{throw Error(reason);};
 const describeUri=uri=>({
   scheme:uri?.scheme??null,
@@ -178,10 +208,19 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
 
     const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha4",candidate.projectReadme);
     const readmeDestination=vscode.Uri.joinPath(root,"README.md");
+    let readmeUpdated=false;
     if(!(await exists(readmeDestination))){
       phase="read-v1alpha4-project-readme";
       const bytes=await readBundledResource(vscode,readmeSource);
       await fs.writeFile(readmeDestination,bytes);
+    }else if(!resetExisting){
+      const currentReadmeSha=await gitBlobSha(await fs.readFile(readmeDestination));
+      if(currentReadmeSha===PREVIOUS_EXAMPLE_README_BLOB){
+        phase="refresh-v1alpha4-project-readme";
+        const bytes=await readBundledResource(vscode,readmeSource);
+        await fs.writeFile(readmeDestination,bytes);
+        readmeUpdated=true;
+      }
     }
 
     const total=candidate.files.length;
@@ -192,10 +231,20 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       const destination=vscode.Uri.joinPath(skillsRoot,...parts);
       phase="stat-existing:"+file;
       const alreadyExists=await exists(destination);
+      let refreshUnmodifiedPrevious=false;
       if(alreadyExists&&!resetExisting){
-        skipped++;
-        report({phase:"files",completed:created+skipped+overwritten,total});
-        continue;
+        const previousBlob=PREVIOUS_V1ALPHA4_BLOBS[file];
+        const currentBlob=candidate.blobs[file];
+        if(previousBlob&&previousBlob!==currentBlob){
+          phase="check-previous-v1alpha4-file:"+file;
+          const actualBlob=await gitBlobSha(await fs.readFile(destination));
+          refreshUnmodifiedPrevious=actualBlob===previousBlob;
+        }
+        if(!refreshUnmodifiedPrevious){
+          skipped++;
+          report({phase:"files",completed:created+skipped+overwritten,total});
+          continue;
+        }
       }
       phase="read-bundled-file:"+file;
       const bytes=await readBundledResource(vscode,
@@ -222,7 +271,8 @@ export async function seedExampleProject(vscode,extensionUri,storageUri,
       sourceSha:candidate.sourceSha,
       sourceShas:{v1alpha4:candidate.sourceSha},
       candidateFiles:candidate.files.length,
-      files:total,created,skipped,overwritten,resetPackages,legacyArchived,resetExisting
+      files:total,created,skipped,overwritten,resetPackages,legacyArchived,
+      readmeUpdated,resetExisting
     };
   }catch(error){throw Error(phase+": "+String(error?.message??error));}
 }
