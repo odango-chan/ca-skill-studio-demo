@@ -100,7 +100,7 @@ child.on("error",error=>{
   chromeStderr=(chromeStderr+"\\nspawn error: "+String(error)).slice(-5000);
 });
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[],markdownWorkerRequests=[];
+let ws,seq=0;const pending=new Map(),exceptions=[],consoleErrors=[],markdownWorkerRequests=[],workspaceReports=[];
 const command=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
   const id=++seq;
   const timer=setTimeout(()=>{pending.delete(id);reject(Error("Chromium command timed out: "+method+" "+String(params.expression??"").slice(0,200)));},30000);
@@ -198,11 +198,21 @@ try{
     if(msg.method==="Network.responseReceived"&&networkResponses.length<80)
       networkResponses.push({url:msg.params.response.url,status:msg.params.response.status,
         type:msg.params.type});
-    if(msg.method==="Runtime.consoleAPICalled"&&msg.params?.type==="error"){
-      const message=msg.params.args?.map(x=>x.value||x.description).join(" ");
-      consoleErrors.push(message);
-      const target=workerTargets.get(msg.sessionId);
-      if(target)workerRuntimeErrors.push({kind:"console",target,message});
+    if(msg.method==="Runtime.consoleAPICalled"){
+      const args=msg.params?.args??[];
+      const message=args.map(x=>x.value??x.description??"").join(" ");
+      if(message.includes("STUDIO_DEFAULT_WORKSPACE_OPENED")){
+        const json=args.map(x=>x.value).find(x=>typeof x==="string"&&x.trim().startsWith("{"));
+        if(json){
+          try{workspaceReports.push(JSON.parse(json));}
+          catch(error){exceptions.push("Invalid workspace identity report: "+String(error));}
+        }
+      }
+      if(msg.params?.type==="error"){
+        consoleErrors.push(message);
+        const target=workerTargets.get(msg.sessionId);
+        if(target)workerRuntimeErrors.push({kind:"console",target,message});
+      }
     }
     if(msg.id&&pending.has(msg.id)){
       const call=pending.get(msg.id);pending.delete(msg.id);clearTimeout(call.timer);
@@ -679,12 +689,16 @@ try{
     };
   })()`);
   await sleep(1200);
-  const identity=afterImport.workspaceIdentity;
-  if(!identity?.available||identity.name!=="skill-studio-demo"||
+  const identity=afterImport.workspaceIdentity?.available
+    ?afterImport.workspaceIdentity:workspaceReports.at(-1);
+  if(!identity||identity.workspaceName!=="skill-studio-demo"||
      identity.workspaceFile!==null||
-     !String(identity.root??"").endsWith("/skill-studio-demo"))
+     !String(identity.root??"").endsWith("/skill-studio-demo")||
+     !Array.isArray(identity.workspaceFolders)||identity.workspaceFolders.length!==1||
+     identity.workspaceFolders[0]!==identity.root)
     throw Error("Example did not open as a named single-folder workspace: "+
-      JSON.stringify({documentTitle:afterImport.documentTitle,identity}));
+      JSON.stringify({documentTitle:afterImport.documentTitle,
+        browserIdentity:afterImport.workspaceIdentity,extensionIdentity:identity}));
   const frameTree=await command("Page.getFrameTree");
   const frames=[];
   const walkFrames=node=>{
