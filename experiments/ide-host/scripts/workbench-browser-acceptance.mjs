@@ -2416,60 +2416,47 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await sleep(100);
   }
   if(!masFolder?.found)throw Error('MAS Skill folder missing from native Explorer: '+JSON.stringify(masFolder));
-  let assuranceRows=await explorerRow('assurance');
-  if((assuranceRows?.count??0)<2){
-    // Theia Explorer can expand a directory from its row gesture even when
-    // its arrow receives a click without changing the tree model. Exercise
-    // that normal interaction first, then retry the arrow only if still collapsed.
-    await click(masFolder.x,masFolder.y);
-    for(let attempt=0;attempt<30;attempt++){
-      assuranceRows=await explorerRow('assurance');
-      if((assuranceRows?.count??0)>=2)break;
-      await sleep(100);
-    }
-    if((assuranceRows?.count??0)<2){
-      const current=await explorerRow('establish-pdu-session-mas');
-      if(current?.toggleHit&&
-         String(current.toggleClass).includes('theia-mod-collapsed')){
-        await click(current.toggleX,current.toggleY);
-        for(let attempt=0;attempt<30;attempt++){
-          assuranceRows=await explorerRow('assurance');
-          if((assuranceRows?.count??0)>=2)break;
-          await sleep(100);
-        }
-      }
-    }
+  // Expand the MAS Skill itself, not merely the first two same-named
+  // assurance folders belonging to the candidate and conventional Skills.
+  let currentMasFolder=await explorerRow('establish-pdu-session-mas');
+  if(String(currentMasFolder?.toggleClass).includes('theia-mod-collapsed')){
+    await click(currentMasFolder.toggleHit?currentMasFolder.toggleX:currentMasFolder.x,
+      currentMasFolder.toggleHit?currentMasFolder.toggleY:currentMasFolder.y);
   }
-  if((assuranceRows?.count??0)<2)throw Error('MAS assurance folder did not expand in native Explorer: '+JSON.stringify({masFolder,assuranceRows}));
-  let procedureRows=await explorerRow('procedure.yaml');
-  if((procedureRows?.count??0)<2){
-    const masAssurance=await explorerRow('assurance','last');
-    if(!masAssurance?.found)throw Error('MAS assurance row missing after folder expansion');
-    await click(masAssurance.x,masAssurance.y);
-    for(let attempt=0;attempt<30;attempt++){
-      procedureRows=await explorerRow('procedure.yaml');
-      if((procedureRows?.count??0)>=2)break;
-      await sleep(100);
-    }
-    if((procedureRows?.count??0)<2){
-      const current=await explorerRow('assurance','last');
-      if(current?.toggleHit&&
-         String(current.toggleClass).includes('theia-mod-collapsed')){
-        await click(current.toggleX,current.toggleY);
-        for(let attempt=0;attempt<30;attempt++){
-          procedureRows=await explorerRow('procedure.yaml');
-          if((procedureRows?.count??0)>=2)break;
-          await sleep(100);
-        }
-      }
-    }
+  for(let attempt=0;attempt<30;attempt++){
+    currentMasFolder=await explorerRow('establish-pdu-session-mas');
+    if(!String(currentMasFolder?.toggleClass).includes('theia-mod-collapsed'))break;
+    await sleep(100);
   }
-  // A nested project can virtualize the first Skill's file row off-screen.
-  // Do not require both identical filenames to be mounted in the DOM at once;
-  // the opened CustomEditor URI and MAS graph below prove exact ownership.
+  if(!currentMasFolder?.found||
+     String(currentMasFolder.toggleClass).includes('theia-mod-collapsed'))
+    throw Error('MAS Skill folder did not expand in native Explorer: '+JSON.stringify(currentMasFolder));
+  let assuranceRows=null;
+  for(let attempt=0;attempt<30;attempt++){
+    assuranceRows=await explorerRow('assurance','last');
+    if(assuranceRows?.found)break;
+    await sleep(100);
+  }
+  if(!assuranceRows?.found)
+    throw Error('MAS assurance folder is not visible under the expanded Skill: '+JSON.stringify({currentMasFolder,assuranceRows}));
+  if(String(assuranceRows.toggleClass).includes('theia-mod-collapsed')){
+    await click(assuranceRows.toggleHit?assuranceRows.toggleX:assuranceRows.x,
+      assuranceRows.toggleHit?assuranceRows.toggleY:assuranceRows.y);
+  }
+  for(let attempt=0;attempt<30;attempt++){
+    assuranceRows=await explorerRow('assurance','last');
+    if(!String(assuranceRows?.toggleClass).includes('theia-mod-collapsed'))break;
+    await sleep(100);
+  }
+  if(!assuranceRows?.found||
+     String(assuranceRows.toggleClass).includes('theia-mod-collapsed'))
+    throw Error('MAS assurance folder did not expand in native Explorer: '+JSON.stringify(assuranceRows));
+  const procedureRows=await explorerRow('procedure.yaml','last');
+  // MAS is the final Skill under skills/, so its Procedure is the final visible
+  // procedure.yaml row after its own assurance folder has been expanded.
   if(!procedureRows?.found)
-    throw Error('Explorer did not expose a visible procedure.yaml file: '+
-      JSON.stringify({masFolder,assuranceRows,procedureRows}));
+    throw Error('MAS Procedure file is not visible in native Explorer: '+
+      JSON.stringify({masFolder,currentMasFolder,assuranceRows,procedureRows}));
   const masProcedure=await explorerRow('procedure.yaml','last');
   if(!masProcedure?.found)throw Error('MAS procedure.yaml row missing from Explorer');
   await click(masProcedure.x,masProcedure.y);
