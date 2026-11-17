@@ -11,7 +11,7 @@
 - **VS Code / 本地：** 桌面插件通过本地 Extension Host 处理编辑器操作，默认仍调用配置的在线或内网 Gateway；本机模型或单机部署可连接 loopback Gateway。组织共用 Provider Key 时优先使用受管内网 Gateway，不应复制到每台员工电脑。不能把共享 Provider Key 打包进 VSIX。Web Extension 可作为 Desktop/Web 共用基线，但不提供 Node.js API；必要时再增加 Node Host Adapter。
 - **原生 AI API：** vscode.lm 和 Theia AI 均作为可选适配，不是核心 Agent 运行时。Theia 1.76 的 vscode.lm stub 和 @theia/ai-openai backend RPC 限制继续作为兼容事实，不阻塞通用 Gateway 路径。
 - **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。Compiler Check 仍是候选 Procedure 的权威静态验证。
-- **状态：** 产品决策 APPROVED；跨宿主架构方向 APPROVED；详细设计 PROPOSED；Implementation NOT_STARTED；Acceptance NOT_RUN。尚无 AI Provider / Gateway 集成、无模型调用、无 Runtime / 5GC 能力声明。
+- **状态：** 产品决策 APPROVED；跨宿主架构方向 APPROVED；详细设计 PROPOSED。Gateway Worker pilot scaffold 已实现并通过 exact-head CI；Authoring Core、Theia Host Adapter、Editor Tab、Change Set / Semantic Patch Engine 尚未实施。未部署 Gateway、未配置生产 Provider Key、未发起真实模型调用；Runtime / 5GC 能力不在本项范围。
 
 ## 2026-11-17 · AI Gateway 技术 Spike（设计收敛）
 
@@ -22,8 +22,8 @@
 - **限流与预算：** 基于已验证身份做 per-user rate limit；Cloudflare Rate Limiting 是近似、分区域的突发控制，不是严格总预算。第一阶段另加输出 Token 上限；不声称具备严格全局模型费用账本。可用时配置 Provider 侧费用控制；严格应用级预算需后续设计持久化记账。
 - **流式：** Worker 透传 Response stream，不缓冲完整响应；客户端断开视为不完整响应，不得生成可接受 Change Set。
 - **Free 计划：** 当前官方限制为 100,000 requests/day、10ms CPU/request、128MB memory、6 simultaneous outgoing connections/request；HTTP 请求只要客户端保持连接就没有硬 wall-time 限制。10ms CPU 不包括上游模型推理时间。必须以真实请求验证。
-- **实现：** `gateway/worker/` 已加入独立 Cloudflare Worker、Wrangler 配置、Access 本地模拟、Provider 转发与 SSE 测试；10 项 Node 单测本地 PASS。PR #206 的 exact-head CI / Wrangler dry-run 待验证。
-- **未完成：** Worker 尚未部署；没有生产 Provider Key、真实模型请求、Pages-origin Access 登录验证或生产 CORS 验收。Rate Limiting binding 的真实账号配置待做；无严格全局费用账本。
+- **实现：** `gateway/worker/` 已加入独立 Cloudflare Worker、Wrangler 配置、Access 本地模拟、Provider 转发与 SSE 测试；13 项 Node 单测 PASS；PR #206 exact-head Gateway CI 与 Wrangler dry-run PASS。
+- **未完成：** Worker 尚未部署；没有生产 Provider Key 或真实模型请求；Pages-origin Access 登录 / 第三方 Cookie、生产 CORS 和目标 Cloudflare 账号资格尚未验收。Rate Limiting binding 的真实账号配置待做；无严格全局费用账本。
 
 ## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
 
