@@ -493,9 +493,9 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
     } else {
       const indent = mapIndent(parsed.source, existing.value, id);
       const range = rangeOf(existing.value, id);
-      const newline = parsed.source.includes("\\r\\n") ? "\\r\\n" : "\\n";
+      const newline = parsed.source.includes("\r\n") ? "\r\n" : "\n";
       const replacement = stringify(payload.definition, { indent: 2, lineWidth: 0 }).trimEnd()
-        .split(/\\r\\n|\\n|\\r/).map((line) => indent + line).join(newline);
+        .split(/\r\n|\n|\r/).map((line) => indent + line).join(newline);
       edits.push({ start: range.start, end: range.end, text: replacement, operationIndexes: [operationIndex], operationIds: [id] });
     }
     return;

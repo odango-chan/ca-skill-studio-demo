@@ -43,7 +43,7 @@ nodes:
 
 
 const SOURCE_WITH_WAIT = SOURCE.replace(
-  "  create-session:\\n",
+  "  create-session:\n",
   String.raw`  create-session:
     wait:
       event:
