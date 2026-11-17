@@ -689,15 +689,28 @@ try{
     };
   })()`);
   await sleep(1200);
-  const identity=workspaceReports.at(-1);
+  const identity=await evalJS(`(async()=>{
+    const c=window.theia?.container;
+    if(!c)throw Error("Theia frontend container is unavailable");
+    const key=[...(c._bindingDictionary?._map?.keys?.()??[])].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&
+      k.prototype?.registerCommand&&k.prototype?.getCommand);
+    if(!key)throw Error("Native Theia command registry is unavailable");
+    return c.get(key).executeCommand("skillStudio.internal.workspaceIdentityAcceptance");
+  })()`);
   if(!identity||identity.workspaceName!=="skill-studio-demo"||
      identity.workspaceFile!==null||
      !String(identity.root??"").endsWith("/skill-studio-demo")||
      !Array.isArray(identity.workspaceFolders)||identity.workspaceFolders.length!==1||
-     identity.workspaceFolders[0]!==identity.root)
-    throw Error("Example did not open as a named single-folder workspace: "+
+     identity.workspaceFolders[0]!==identity.root||
+     !identity.legacyProcedureExists||!identity.candidateProcedureExists||
+     !afterImport.documentTitle.includes("skill-studio-demo")||
+     afterImport.documentTitle.includes("Untitled")||
+     !afterImport.workspaceRootVisible||afterImport.noFolderPrompt)
+    throw Error("Example did not open as a named single-folder workspace with both pinned sample sets: "+
       JSON.stringify({documentTitle:afterImport.documentTitle,
-        browserIdentity:afterImport.workspaceIdentity,extensionIdentity:identity}));
+        browserIdentity:afterImport.workspaceIdentity,extensionIdentity:identity,
+        extensionConsoleReports:workspaceReports.slice(-3)}));
   const frameTree=await command("Page.getFrameTree");
   const frames=[];
   const walkFrames=node=>{

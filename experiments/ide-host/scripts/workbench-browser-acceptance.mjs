@@ -1,5 +1,7 @@
 // Runs against actual Theia DOM and CustomEditor frames, never a host mock.
 import {readFile} from 'node:fs/promises';
+// This file is deliberately the Legacy v0.2 5GC regression fixture. The v1alpha4
+// candidate is validated separately through its exact imported workspace URI.
 const publishedProcedure=await readFile(new URL(
   '../../../site/samples/skills/establish-pdu-session/assurance/procedure.yaml',
   import.meta.url),'utf8');
@@ -542,6 +544,22 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   async function nativeCommand(id,...args){
     return evalJS(`(async()=>{const c=window.theia.container;const key=[...c._bindingDictionary._map.keys()].find(k=>typeof k==='function'&&k.prototype?.executeCommand&&k.prototype?.registerCommand&&k.prototype?.getCommand);if(!key)throw Error('Native command registry missing');return c.get(key).executeCommand(${JSON.stringify(id)},...${JSON.stringify(args)});})()`);
   }
+  const workspaceAcceptance=await nativeCommand(
+    "skillStudio.internal.workspaceIdentityAcceptance");
+  if(workspaceAcceptance?.workspaceName!=="skill-studio-demo"||
+     workspaceAcceptance.workspaceFile!==null||
+     workspaceAcceptance.workspaceFolders?.length!==1||
+     workspaceAcceptance.workspaceFolders[0]!==workspaceAcceptance.root||
+     !workspaceAcceptance.legacyProcedureExists||
+     !workspaceAcceptance.candidateProcedureExists||
+     !workspaceAcceptance.legacyProcedure?.endsWith(
+       "/skills/establish-pdu-session/assurance/procedure.yaml")||
+     !workspaceAcceptance.candidateProcedure?.endsWith(
+       "/examples/v1alpha4-candidate/establish-pdu-session/assurance/procedure.yaml"))
+    throw Error("Named Example workspace or exact Legacy/Candidate Procedure URIs are invalid: "+
+      JSON.stringify(workspaceAcceptance));
+  const legacyProcedureUri=workspaceAcceptance.legacyProcedure;
+  const candidateProcedureUri=workspaceAcceptance.candidateProcedure;
   const assertYamlSourceVisualPair=(filename,label)=>
     assertSourceVisualPair(evalJS,sleep,filename,label);
   async function waitNativeMarkdown(predicate,label,attempts=100){
@@ -889,9 +907,8 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Source/Evidence checks so the active Webview frame is unambiguous.
   await invoke('core.close.all.main.tabs');
   await invoke('workbench.files.action.focusFilesExplorer');
-  file=await evalJS(`(()=>{const el=[...document.querySelectorAll('.theia-TreeNode')].find(x=>x.innerText.replace(/\\s+\\d+$/,'').trim()==='procedure.yaml'&&x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&x.getBoundingClientRect().x<innerWidth);el?.scrollIntoView({block:'center',inline:'nearest'});const r=el?.getBoundingClientRect();return r?{x:r.x+r.width/2,y:r.y+r.height/2}:null;})()`);
-  if(!file)throw Error('Procedure file disappeared after closing preview/pinned tabs');
-  await click(file.x,file.y,2);
+  // Multiple packages contain procedure.yaml; reopen the Legacy fixture by URI.
+  await nativeCommand('skillStudio.openProcedure',legacyProcedureUri);
   let singlePinned=null;
   for(let attempt=0;attempt<100&&!singlePinned;attempt++){
     singlePinned=await graph('ue-requested-pdu-session-establishment');
@@ -905,7 +922,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     throw Error('Procedure acceptance requires exactly one native Source and one Designer tab: '+
       JSON.stringify({remainingProcedureTabs,singlePinned}));
   const sourceState=await nativeCommand('skillStudio.internal.sourceVersionAcceptance');
-  if(!sourceState?.uri?.endsWith('/assurance/procedure.yaml'))
+  if(sourceState?.uri!==legacyProcedureUri)
     throw Error('Procedure workbench did not retain the native Source document for Package Audit: '+
       JSON.stringify(sourceState));
   console.log('STUDIO_NATIVE_SOURCE_OPENED_FOR_AUDIT',sourceState);
@@ -986,14 +1003,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       const openerKey=[...container._bindingDictionary._map.keys()].find(key=>
         String(key)==="Symbol(OpenerService)");
       if(!openerKey)throw Error("Native Theia OpenerService missing");
-      const openers=await container.get(openerKey).getOpeners();
-      const custom=openers.find(item=>item.id==="custom-editor-skillStudio.procedurePreview");
-      const widget=custom?.widgetManager.getWidgets("plugin-custom-editor").find(item=>
-        item.resource?.path.toString().endsWith("/assurance/procedure.yaml"));
-      const procedureUri=widget?.resource;
-      if(!procedureUri)throw Error("Active Skill Package Procedure URI missing");
+      const procedureUri=${JSON.stringify(legacyProcedureUri)};
       return registry.executeCommand(
-        "skillStudio.internal.languageProviderAcceptance",procedureUri.toString());
+        "skillStudio.internal.languageProviderAcceptance",procedureUri);
     })()`);
     if(!languageFeatureEvidence?.definition?.endsWith(
       "/scripts/select_establishment_configuration.py")||
@@ -1020,23 +1032,17 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       throw Error("Theia public language-provider acceptance returned incomplete evidence: "+
         JSON.stringify(languageFeatureEvidence));
     console.log("STUDIO_LSP_EDITOR_FEATURES",JSON.stringify(languageFeatureEvidence));
-    const v1alpha4LanguageFeatureEvidence=await evalJS(`(async()=>{
-      const container=window.theia.container;
-      const commandKey=[...container._bindingDictionary._map.keys()].find(key=>
-        typeof key==="function"&&key.prototype?.executeCommand&&
-        key.prototype?.registerCommand&&key.prototype?.getCommand);
-      if(!commandKey)throw Error("Native Theia command registry missing for v1alpha4");
-      const openerKey=[...container._bindingDictionary._map.keys()].find(key=>
-        String(key)==="Symbol(OpenerService)");
-      const openers=await container.get(openerKey).getOpeners();
-      const custom=openers.find(item=>item.id==="custom-editor-skillStudio.procedurePreview");
-      const widget=custom?.widgetManager.getWidgets("plugin-custom-editor").find(item=>
-        item.resource?.path.toString().endsWith("/assurance/procedure.yaml"));
-      const procedureUri=widget?.resource;
-      if(!procedureUri)throw Error("Active Procedure URI missing for v1alpha4 acceptance");
-      return container.get(commandKey).executeCommand(
-        "skillStudio.internal.v1alpha4LanguageProviderAcceptance",procedureUri.toString());
-    })()`);
+    await nativeCommand('skillStudio.openProcedure',candidateProcedureUri);
+    const candidatePair=await assertYamlSourceVisualPair(
+      'procedure.yaml','v1alpha4 Candidate Procedure Designer');
+    const candidateSourceState=await nativeCommand(
+      'skillStudio.internal.sourceVersionAcceptance');
+    if(candidateSourceState?.uri!==candidateProcedureUri||
+       candidatePair.source.uri!==candidateProcedureUri)
+      throw Error("v1alpha4 candidate Procedure was not the active exact source: "+
+        JSON.stringify({candidateSourceState,candidatePair}));
+    const v1alpha4LanguageFeatureEvidence=await nativeCommand(
+      "skillStudio.internal.v1alpha4LanguageProviderAcceptance",candidateProcedureUri);
     if(v1alpha4LanguageFeatureEvidence?.status!=="PARTIAL"||
        v1alpha4LanguageFeatureEvidence?.snapshotCompleteness!=="complete"||
        !v1alpha4LanguageFeatureEvidence.contractPreconditionCompletion?.includes(
@@ -1064,6 +1070,16 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
         JSON.stringify(v1alpha4LanguageFeatureEvidence));
     console.log("STUDIO_LSP_V1ALPHA4_EDITOR_FEATURES",
       JSON.stringify(v1alpha4LanguageFeatureEvidence));
+    await invoke('core.close.all.main.tabs');
+    await nativeCommand('skillStudio.openProcedure',legacyProcedureUri);
+    const legacyPair=await assertYamlSourceVisualPair(
+      'procedure.yaml','Legacy 5GC Procedure after candidate LSP acceptance');
+    const restoredLegacySource=await nativeCommand(
+      'skillStudio.internal.sourceVersionAcceptance');
+    if(restoredLegacySource?.uri!==legacyProcedureUri||
+       legacyPair.source.uri!==legacyProcedureUri)
+      throw Error("Legacy 5GC Procedure was not restored after candidate LSP acceptance: "+
+        JSON.stringify({restoredLegacySource,legacyPair}));
     let diagnosticPublishEvidence=null,diagnosticRepairEvidence=null;
     try{
       diagnosticPublishEvidence=await evalJS(`(async()=>{
@@ -1072,15 +1088,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           typeof k==="function"&&k.prototype?.executeCommand&&
           k.prototype?.registerCommand&&k.prototype?.getCommand);
         const registry=c.get(key);
-        const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
-          String(k)==="Symbol(OpenerService)");
-        const openers=await c.get(openerKey).getOpeners();
-        const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");
-        const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>
-          w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;
-        if(!resource)throw Error("Procedure resource missing for Problems acceptance");
+        const resource=${JSON.stringify(legacyProcedureUri)};
         return registry.executeCommand(
-          "skillStudio.internal.languageDiagnosticsAcceptance",resource.toString(),"publish");
+          "skillStudio.internal.languageDiagnosticsAcceptance",resource,"publish");
       })()`);
       if(!diagnosticPublishEvidence?.appeared||
          diagnosticPublishEvidence.code!=="PROCEDURE_PROJECTION"||
@@ -1133,15 +1143,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
           typeof k==="function"&&k.prototype?.executeCommand&&
           k.prototype?.registerCommand&&k.prototype?.getCommand);
         const registry=c.get(key);
-        const openerKey=[...c._bindingDictionary._map.keys()].find(k=>
-          String(k)==="Symbol(OpenerService)");
-        const openers=await c.get(openerKey).getOpeners();
-        const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");
-        const resource=custom?.widgetManager.getWidgets("plugin-custom-editor").find(w=>
-          w.resource?.path.toString().endsWith("/assurance/procedure.yaml"))?.resource;
-        if(!resource)throw Error("Procedure resource missing for diagnostic repair");
+        const resource=${JSON.stringify(legacyProcedureUri)};
         return registry.executeCommand(
-          "skillStudio.internal.languageDiagnosticsAcceptance",resource.toString(),"repair");
+          "skillStudio.internal.languageDiagnosticsAcceptance",resource,"repair");
       })()`);
     }
     if(!diagnosticRepairEvidence?.cleared||!diagnosticRepairEvidence?.restored)
@@ -1169,15 +1173,9 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
       "if(!key)throw Error('L2-D3 native registry missing');"+
       "const registry=c.get(key);"+
-      "const openerKey=[...c._bindingDictionary._map.keys()].find(k=>"+
-      "String(k)==='Symbol(OpenerService)');"+
-      "const openers=await c.get(openerKey).getOpeners();"+
-      "const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');"+
-      "const uri=custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>"+
-      "w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource;"+
-      "if(!uri)throw Error('L2-D3 Procedure URI missing');"+
+      "const uri="+JSON.stringify(legacyProcedureUri)+";"+
       "return registry.executeCommand('skillStudio.internal.languageUnsavedAcceptance',"+
-      "uri.toString());})()");
+      "uri);})()");
     if(!unsavedEvidence?.restored||!unsavedEvidence.latestPythonHover||
        !unsavedEvidence.originalDiskUnchanged||
        unsavedEvidence.covered?.length!==3)
@@ -2243,7 +2241,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       recoveryBufferPrepared=false,packageLifecyclePrepared=false;
     let procedureUri=null;
     try{
-    procedureUri=await evalJS(`(async()=>{const c=window.theia.container;const opKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');if(!opKey)throw Error('L2-D4 Procedure OpenerService missing');const openers=await c.get(opKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').find(w=>w.resource?.path.toString().endsWith('/assurance/procedure.yaml'))?.resource?.toString()??null;})()`);
+    procedureUri=legacyProcedureUri;
     if(!procedureUri)throw Error("L2-D4 Procedure URI missing");
 
     const diagnostic=await nativeCommand(
@@ -2484,13 +2482,15 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   const masResourcePaths=await evalJS("(async()=>{const c=window.theia.container;const openerKey=[...c._bindingDictionary._map.keys()].find(k=>String(k)==='Symbol(OpenerService)');const openers=await c.get(openerKey).getOpeners();const custom=openers.find(x=>x.id==='custom-editor-skillStudio.procedurePreview');return custom?.widgetManager.getWidgets('plugin-custom-editor').map(w=>w.resource?.path.toString()??'').filter(p=>p.includes('/establish-pdu-session-mas/'))??[];})()");
   if(!masProcedureGraph||masProcedureGraph.procedureValue!=='establish-session'||!masProcedureGraph.bodyText?.includes('verify-eligible')||!masProcedureGraph.bodyText?.includes('validate-subscription')||!masResourcePaths.some(p=>p.endsWith('/establish-pdu-session-mas/assurance/procedure.yaml')))
     throw Error('MAS Procedure did not open from native Explorer: '+JSON.stringify({masFolder,assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths}));
-  // Keep the Explorer proof isolated, then restore the conventional Procedure
-  // so the final browser session remains on the primary example.
+  // Keep the Explorer proof isolated, then restore the conventional Legacy
+  // Procedure by its exact URI; both sample sets use the same basename.
   await invoke('core.close.all.main.tabs');
-  await invoke('workbench.files.action.focusFilesExplorer');
-  const conventionalProcedure=await explorerRow('procedure.yaml','first');
-  if(!conventionalProcedure?.found)throw Error('Conventional 5GC procedure.yaml row missing after MAS open');
-  await click(conventionalProcedure.x,conventionalProcedure.y);
+  await nativeCommand('skillStudio.openProcedure',legacyProcedureUri);
+  const conventionalProcedure=await assertYamlSourceVisualPair(
+    'procedure.yaml','Legacy 5GC Procedure restored after MAS Explorer acceptance');
+  if(conventionalProcedure.source.uri!==legacyProcedureUri)
+    throw Error("Legacy 5GC Procedure was not restored by its exact URI: "+
+      JSON.stringify(conventionalProcedure));
   let conventionalGraph=null;
   for(let attempt=0;attempt<100;attempt++){
     conventionalGraph=await graph('ue-requested-pdu-session-establishment');

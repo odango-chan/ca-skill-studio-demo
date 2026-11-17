@@ -346,6 +346,35 @@ export function activate(context){
     vscode.commands.registerCommand("skillStudio.openAuthoringGuide",()=>vscode.env.openExternal(
       vscode.Uri.parse("https://github.com/odango-chan/ca-skills/blob/main/docs/authoring.zh-CN.md")))
   );
+  // Keep browser acceptance independent of Extension Host console forwarding.
+  // This command is internal (not contributed to the Command Palette) and
+  // returns the authoritative workspace plus the two pinned sample URIs.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.workspaceIdentityAcceptance",async()=>{
+      const folders=vscode.workspace.workspaceFolders??[];
+      const root=folders.length===1?folders[0].uri:null;
+      const legacyProcedure=root?vscode.Uri.joinPath(root,
+        "skills","establish-pdu-session","assurance","procedure.yaml"):null;
+      const candidateProcedure=root?vscode.Uri.joinPath(root,
+        "examples","v1alpha4-candidate","establish-pdu-session",
+        "assurance","procedure.yaml"):null;
+      const exists=async uri=>{
+        if(!uri)return false;
+        try{await vscode.workspace.fs.stat(uri);return true;}
+        catch{return false;}
+      };
+      return {
+        workspaceName:vscode.workspace.name??null,
+        workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
+        root:root?.toString?.()??null,
+        workspaceFolders:folders.map(folder=>folder.uri.toString()),
+        legacyProcedure:legacyProcedure?.toString?.()??null,
+        legacyProcedureExists:await exists(legacyProcedure),
+        candidateProcedure:candidateProcedure?.toString?.()??null,
+        candidateProcedureExists:await exists(candidateProcedure)
+      };
+    }
+  ));
   let exampleLoadPromise=null;
   let projectWelcome=null;
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
