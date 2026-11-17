@@ -268,3 +268,26 @@ test("stage.route.set can add a missing outcome to an existing routes mapping", 
   assert.ok(result.candidateSource.includes("UNKNOWN: UNRESOLVED"));
   assert.ok(result.candidateSource.includes("COMMITTED: FAILED"));
 });
+
+
+test("Patch Engine rejects no-op scalar updates and duplicate nested route additions", async () => {
+  await assert.rejects(
+    plan([
+      op("stage.route.set",
+        { nodeId: "create-session", stage: "operation", outcome: "COMMITTED" },
+        { targetNodeId: "FAILED" }),
+    ]),
+    (error) => error instanceof PatchPlanningError && error.code === "no_op_edit",
+  );
+  await assert.rejects(
+    plan([
+      op("stage.route.set",
+        { nodeId: "create-session", stage: "operation", outcome: "UNKNOWN" },
+        { targetNodeId: "UNRESOLVED" }),
+      op("stage.route.set",
+        { nodeId: "create-session", stage: "operation", outcome: "UNKNOWN" },
+        { targetNodeId: "FAILED" }),
+    ]),
+    (error) => error instanceof PatchPlanningError && error.code === "duplicate_append_key",
+  );
+});
