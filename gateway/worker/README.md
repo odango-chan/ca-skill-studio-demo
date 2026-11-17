@@ -22,7 +22,7 @@ Cloudflare AI Gateway is not called by the browser. It may be added behind this 
 - A Cloudflare Rate Limiting binding is mandatory. Missing or failed rate limiting fails closed.
 - Only configured models and the configured provider endpoint are used. Arbitrary client URLs, provider headers and unknown request fields are rejected.
 - Provider credentials are read only from the Worker secret PROVIDER_API_KEY.
-- Request body, output token ceilings and a provider response-header timeout are enforced.
+- Request body, output token ceilings and a provider response-header timeout are enforced. Optional structured output is restricted to JSON-object mode; the client must still parse and validate the ModelProposal / Change Set schema.
 - Streaming is mandatory. The upstream SSE body is passed through without buffering. Redirects, non-SSE responses and provider error bodies are not forwarded.
 - CORS uses an exact origin allowlist. CORS is not authentication; Access remains mandatory.
 - Prompts, completions, identities and credentials are not logged.
