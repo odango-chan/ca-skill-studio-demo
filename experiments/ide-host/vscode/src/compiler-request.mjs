@@ -32,7 +32,7 @@ function compareUtf8(left, right) {
 }
 
 function validateRelativePath(path) {
-  if (typeof path !== "string" || !path || path.length > 200 ||
+  if (typeof path !== "string" || !path || encoder.encode(path).byteLength > 200 ||
       path !== path.normalize("NFC") || path.includes("\\") ||
       path.includes(":") || path.includes(String.fromCharCode(0)) ||
       path.startsWith("/") ||
@@ -72,7 +72,7 @@ export function createCompilerBuildRequest({
       throw new Error("Skill source is not valid UTF-8 text: " + relativePath);
     }
     const path = "skills/" + packageName + "/" + relativePath;
-    if (path.length > 240 || seen.has(path)) {
+    if (encoder.encode(path).byteLength > 240 || seen.has(path)) {
       throw new Error("Duplicate or overlong Compiler source path: " + path);
     }
     seen.add(path);
