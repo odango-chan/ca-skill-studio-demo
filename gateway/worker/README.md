@@ -52,13 +52,14 @@ Do not deploy until the target Cloudflare account has been configured:
 4. Set ALLOWED_ORIGINS to exact Studio origins, without wildcards.
 5. Set ALLOWED_MODELS to exact approved provider model identifiers.
 6. Set PROVIDER_CHAT_COMPLETIONS_URL to the approved HTTPS Chat Completions endpoint.
-7. Replace the sample Rate Limiting namespace ID with a unique integer for this Cloudflare account.
-8. Set the provider key as a Worker secret:
+7. In the Access application's CORS settings, enable Bypass OPTIONS requests to origin; do not also configure Access-managed CORS headers. This bypass is for preflight only; POST remains protected. The Worker enforces the exact origin allowlist.
+8. Replace the sample Rate Limiting namespace ID with a unique integer for this Cloudflare account.
+9. Set the provider key as a Worker secret:
 
        cd gateway/worker
        npx wrangler@4.157.0 secret put PROVIDER_API_KEY
 
-The sample rate limit is 10 requests per user per 60 seconds. Tune it before a real pilot. A missing Access context, wrong audience, missing binding or missing secret prevents upstream calls.
+The sample rate limit is 10 requests per user per 60 seconds. For the browser client, use credentials: include and test after logging into the Access-protected Worker hostname. GitHub Pages and workers.dev are cross-site; browser third-party-cookie restrictions can prevent the CF_Authorization cookie from being sent. Do not treat a successful unit test as proof of this browser login path. Tune it before a real pilot. A missing Access context, wrong audience, missing binding or missing secret prevents upstream calls.
 
 ## Limits and non-goals
 
