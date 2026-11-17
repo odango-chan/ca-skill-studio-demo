@@ -110,7 +110,7 @@ test("AI Authoring Webview has a nonce-only script/style policy and no direct ne
   assert.match(html, /style-src 'nonce-[a-f0-9]+'/);
   assert.match(html, /connect-src 'none'/);
   assert.doesNotMatch(html, /unsafe-inline|unsafe-eval|fetch\s*\(/);
-  assert.match(html, /CA-SL v1alpha5 · FROZEN / RELEASED/);
+  assert.ok(html.includes("CA-SL v1alpha5 · FROZEN / RELEASED"));
   assert.match(html, /Compiler Check: NOT_RUN/);
   assert.match(html, /不自动保存/);
   assert.throws(() => renderAiAuthoringHtml("not-a-secure-nonce"), /nonce/);
