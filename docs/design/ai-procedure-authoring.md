@@ -293,6 +293,41 @@ Before a public Gateway is enabled, it MUST have an access-control strategy, rat
 
 Host secure storage may hold short-lived Gateway session material where a host provides an appropriate implementation; security behavior must be verified separately for Desktop and browser hosts. It is not a place to distribute a deployment-wide shared provider key to every installed copy of the extension. Do not add a per-user provider-key setup flow to P1.
 
+### 8.5 Online Gateway spike: application Worker and upstream provider
+
+The online path must distinguish the **application Gateway** from Cloudflare's optional **AI Gateway product**:
+
+`Skill Studio (browser) → Application Gateway Worker → OpenAI-compatible provider`
+
+The application Gateway is the public-facing application boundary. It owns application authentication, request validation, per-user limits, model allowlisting, usage ceilings, provider-key injection and safe response streaming. It MUST NOT expose an upstream provider credential or Cloudflare API token to the browser.
+
+Cloudflare AI Gateway may sit behind the application Worker as an optional upstream routing / observability / analytics layer. It is not the browser-facing authentication mechanism. Current Cloudflare documentation states that newly created AI Gateways require authentication; therefore, if used, the Worker must hold the Cloudflare credential server-side and call the authenticated AI Gateway endpoint. The client must never receive a Cloudflare API token. See [Cloudflare AI Gateway authentication change](https://developers.cloudflare.com/changelog/product-group/developer-platform/2/) and [REST API](https://developers.cloudflare.com/ai-gateway/usage/rest-api/).
+
+**First restricted pilot profile:** put the Worker behind Cloudflare Access and verify its signed Access JWT (issuer, audience, expiry and signature) before forwarding a request. This supports a controlled allowlisted pilot without requiring each user to bring a model-provider API key. It is not yet the final general-public identity model: Access policy, identity-provider support, cross-device login and non-browser clients must be evaluated before a public release. Do not replace this with a shared static bearer token embedded in the Studio bundle.
+
+**Provider routing:** start with one configured OpenAI-compatible Chat Completions endpoint and one server-side provider secret. The Worker accepts only the supported route and a strict request envelope; it must reject arbitrary upstream URLs, caller-supplied authorization headers, unknown model IDs, oversized bodies and unsupported request fields. The provider endpoint and model allowlist are deployment configuration. A future self-hosted Gateway implements the same public protocol.
+
+**Streaming:** forward the upstream response body as a stream. Do not buffer the full completion in Worker memory. Propagate client cancellation where the runtime permits; treat an interrupted stream as an incomplete proposal, never as a valid Change Set. Cloudflare documents unlimited wall time for an HTTP Worker request while the client remains connected, and recommends streaming bodies to avoid buffering / memory pressure ([Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [streaming best practices](https://developers.cloudflare.com/workers/best-practices/workers-best-practices/)).
+
+**Abuse and spend controls:** require identity before rate limiting; key the rate limit by verified user / tenant identity rather than IP. Cloudflare's Worker Rate Limiting API is approximate and regional, so it is a burst-control layer, not a strict global spend cap ([Rate Limiting API](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)). Configure provider-side or account-level spend limits and an explicit deployment usage ceiling. Fail closed if identity verification, model allowlisting or budget state is unavailable.
+
+**Free-tier feasibility:** current Workers Free documentation lists 100,000 requests/day, 10 ms CPU time per request and six simultaneous outgoing connections per request. HTTP wall time is not capped while the client remains connected. This is plausibly sufficient for a thin proxy, but the real spike must measure JWT verification, streaming, provider latency, disconnect behavior, request size and actual account eligibility before selecting the plan ([Workers limits](https://developers.cloudflare.com/workers/platform/limits/)). The 10 ms CPU allowance is not a model-inference time limit; model inference happens upstream.
+
+**Spike acceptance:**
+
+1. Pages-origin browser request authenticates through Cloudflare Access and reaches the Worker.
+2. Invalid / expired / wrong-audience JWT is rejected before any upstream request.
+3. Provider secret and any Cloudflare API token are absent from browser assets, Webview messages, response headers and logs.
+4. Only the configured model and Chat Completions route are accepted; arbitrary URL / header forwarding is impossible.
+5. Request size, output token ceiling, timeout and per-user rate limits are enforced.
+6. Streaming works end-to-end; a dropped client connection does not produce a completed proposal.
+7. Provider errors and 429 responses are normalized without leaking secret-bearing upstream headers or bodies.
+8. A configured spend / usage ceiling can stop new calls; rate limiting alone is not treated as a budget.
+9. A fixture provider proves the protocol and negative cases without live credentials; a real provider smoke test is a separate opt-in step.
+
+The spike MUST NOT deploy a publicly usable, unauthenticated proxy. Until identity and spend controls pass, the Worker remains a restricted test deployment and no production model key is configured.
+
+
 ### 8.4 Optional VS Code / Theia model APIs
 
 The VS Code Language Model API can be evaluated as an optional native model source, but P1 must not depend on it: model access requires user consent, availability is dynamic, selectChatModels() may return an empty array and quota failures must be handled. The current Theia 1.76 plugin implementation also stubs this API. See [VS Code Language Model API](https://code.visualstudio.com/api/extension-guides/ai/language-model).
@@ -485,7 +520,7 @@ After Apply, the native document change triggers the existing Source / Visual / 
 | Slice | Deliverable | Gate |
 |---|---|---|
 | A. Cross-host contracts | Platform-neutral Authoring Core types, AuthoringHost, IModelClient, Gateway protocol and versioned ModelProposal / Change Set envelope | Core contract tests; no mandatory VS Code, Theia, DOM or Node imports |
-| B. Online Gateway spike | Deploy a minimal OpenAI-compatible Gateway; Cloudflare Worker Free is the first candidate; prove server-side secret injection, streaming / cancellation, CORS, access authorization, rate limits and usage ceiling | Real GitHub Pages → Gateway → model request; no provider secret in browser assets; confirm Free-tier limits and provider latency |
+| B. Online Gateway spike | Implement a thin application Worker with Cloudflare Access JWT verification, strict Chat Completions allowlist, server-side provider secret and streaming; evaluate Cloudflare AI Gateway only as an optional upstream | Positive / negative JWT tests, route / model / size rejection, streaming and cancellation, per-user rate limiting, spend ceiling; Pages → Worker → fixture provider first, then opt-in real provider smoke test |
 | C. Theia Browser adapter | Bridge the current standalone Editor Tab / Extension Host to the shared core and Gateway | Real Browser-Only and backend-backed Theia Chromium; no Theia AI or vscode.lm dependency |
 | D. Proposal / Change Set contract | Strict ModelProposal schema, Host-owned envelope, Studio Change Set lifecycle, operation allowlist and atomic-group validation | Positive / negative schema, malformed / forged / out-of-scope operation tests |
 | E. v1alpha4 Patch Engine | Source-preserving patch operations for the initial allowlist | Round-trip, comment / unknown-field preservation, stale revision and malformed YAML tests |
@@ -525,8 +560,8 @@ Desktop / Web Extension and intranet Gateway compatibility are explicit follow-u
 
 ## 17. Open decisions before live provider implementation
 
-1. **Gateway access authorization:** choose a low-friction access/session mechanism for the shared Gateway. It must not require per-user model-provider keys, but must prevent an unrestricted public proxy.
-2. **Online Gateway deployment:** verify Cloudflare Workers Free limits, streaming behavior, timeout behavior, secret configuration and operational monitoring against actual model calls; retain a provider-neutral self-hosted implementation path.
+1. **Gateway access authorization:** validate Cloudflare Access JWT for the restricted pilot. Select the general-public identity/session model separately before public launch; it must not require per-user model-provider keys or embed a shared static token in the client.
+2. **Online Gateway deployment:** implement and test the thin application Worker first; decide whether Cloudflare AI Gateway is useful behind it. Verify Free-tier limits, streaming, cancellation, secret injection and spend controls against actual model calls; retain a provider-neutral self-hosted implementation path.
 3. **OpenAI-compatible subset:** confirm Chat Completions compatibility, streaming, cancellation and structured-output support for the selected model endpoint. Do not assume /v1/models or tool calling.
 4. **VS Code host placement:** decide whether the Desktop package can use the Web Extension Host alone or needs a separate Node Extension Host adapter; explicitly test Desktop, Web, Remote and WSL/Container behavior.
 5. **Native model APIs:** determine whether vscode.lm or Theia AI adapters provide meaningful optional value; neither is a required model path.
