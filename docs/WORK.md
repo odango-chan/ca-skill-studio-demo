@@ -1,5 +1,21 @@
 # Skill Studio 当前工作状态
 
+## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
+
+Compiler 已正式发布 `v1.0.0`，目标固定为 CA-SL `connectionagent.io/v1alpha4`，规范 pin 为 `ca-skills@7f84393`。本轮在独立分支 `feat/compiler-v1.0.0-studio-integration-20261117` 接入真实 Go/WASM Core，不再实现模拟 Check / Build。
+
+- **Worker：** 构建时从 Compiler `v1.0.0` tag 编译 Go/WASM，随 Theia Web Extension 发布 `compiler-worker.js`、`skillc.wasm` 和匹配的 `wasm_exec.js`。
+- **CI 凭据：** Compiler 仓为私有仓；Studio Actions 需要 `CA_SKILL_COMPILER_READ_TOKEN`（仅 `Contents: read`）才能检出固定 tag。Token 仅用于 Actions Checkout，不能进入浏览器或 Worker。
+- **命令：** 新增 Check Skill、Build Skill、Inspect Dependencies，均调用 Compiler v1alpha4 API。
+- **Problems：** Compiler 原始 Diagnostic Code / Phase / path / line / column 映射到宿主诊断，不由 Studio 重写。
+- **Build Artifacts：** Package Explorer 增加 Build Artifacts 分区。仅在 Compiler BuildResult 完整性验证通过后显示只读、会话内 Artifact；失败 Build 不保留部分输出。
+- **明确限制：** 当前旧的 `skillc.lock/v0.1` / Tool Contract acquisition 不转换成 v1alpha4 DependencySnapshot。当前请求故意不提供 `resolvedDependencies` 与 `trustedBuildContext`，因此需要外部 Owner / Capability 的 Skill 会按 Compiler 规则 fail-closed。下一工作包是 v1alpha4 digest、Owner Binding 与 CapabilityContracts 的可信快照管线。
+- **Wait：** Compiler v1.0.0 仍是 v1alpha4，不支持 post-v1alpha4 Node-entry Event Wait；不做语法降级或模拟。
+- **验收：** Node 单测与真实 Chromium Worker smoke 已加入 PR workflow；当前尚未取得该分支 exact-head CI / Chromium 结果，不能先行标记 PASS。
+
+详细边界见 [Compiler v1alpha4 Studio Integration](design/compiler-v1alpha4-studio-integration.md)。这轮只证明 Studio 能真实调用 Compiler；不代表真实 5GC Owner / Deployment、Runtime 或 MAS 已 QUALIFIED。
+
+
 ## 2026-11-16 · CA-SL v1alpha4 编辑器基线与 Procedure Designer
 
 本轮以 `main@087a764753dad98ce8af0e4f9377a6378754547b` 为基线；CA-SL v1alpha4 规范唯一权威来源固定为 `odango-chan/ca-skills@7f84393ee8c395e4d8c39a74cb5000a1f896588d`（`connectionagent.io/v1alpha4`，语言语义 FROZEN）。
@@ -7,7 +23,7 @@
 - **LSP / Source projection：** PR #195 已合入。v1alpha4 使用独立 AST 分析路径，支持 Procedure Node / Stage、Predicate 签名、Completion、Hover、Definition、References、Semantic Tokens 与源级诊断；不把 v0.2 / v1alpha3 的 `procedures/call/with/reconcile` 语法转换成 v1alpha4。
 - **Procedure Designer / Inspector：** PR #197 在现有 Theia CustomEditor 上复用同一 v1alpha4 AST，显示 Contract Goal、有效的全局 Precondition Gate、最终 Postcondition PASS → SUCCEEDED、四类有序 Stage、终态 Route，以及 Context / Producer / Predicate 参数 / Evidence 要求的只读 Source Data Flow。Producer 输出 Schema 和 Owner Evidence 保证尚未链接，界面明确保持 NOT QUALIFIED。
 - **Dependency / Capability 边界：** Dependency snapshot 与 Capability Grant 是两个独立概念。PR #197 不猜测 Tool Effect、Owner、Capability 授权或外部 Schema。剩余 §35 工作统一追踪在 [Issue #196](https://github.com/odango-chan/ca-skill-studio-demo/issues/196)。
-- **Compiler 协作：** Studio 等待 Compiler 仓 PR #11（v1alpha4 source admission）与 PR #12（Compiler / Studio 实施契约）形成可消费的稳定接口；在可信快照契约明确前，不实现第二套 Resolver 或 Owner linking。
+- **Compiler 协作（该历史检查点）：** 当时等待 Compiler PR #11 / #12 的稳定接口。该等待已由 2026-11-17 正式发布的 Compiler v1.0.0 取代；当前接入进度与可信依赖限制见本文顶部。
 - **在线部署：** PR #195 resulting-main Pages 部署 [run #43796689593](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/43796689593) 已 PASS。该部署只证明 Theia 工作台可部署与浏览器验收，不代表 Compiler / Owner / Runtime / 5GC 资格成立。
 
 ## 2026-11-13 · Theia-only baseline and Classic retirement

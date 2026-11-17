@@ -47,7 +47,7 @@ import {createSemanticTokenDecorationRenderer}
 import {createPackageLanguageLifecycle}
   from "./package-language-lifecycle.mjs";
 
-export function registerWorkbench(vscode,context,{prepareToolContract}={}){
+export function registerWorkbench(vscode,context,{prepareToolContract,compilerProblemsProvider}={}){
   let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer,
     lastSelectionMessage=null;
@@ -2649,12 +2649,25 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
     const emitter=new vscode.EventEmitter();
     const provider={onDidChangeTreeData:emitter.event,
       getChildren:item=>item?.children??(id==='problems'
-        ? [{label:auditStatus,children:[]},...([...(snapshot?.problems??[]),...audit].map(d=>({label:d.message,line:d.line,uri:d.uri,description:d.code??'Source projection',children:[]})))]
+        ? [{label:auditStatus,children:[]},...([...(snapshot?.problems??[]),...audit,
+          ...(compilerProblemsProvider?.getProblems?.()??[])].map(d=>({
+            kind:d.kind??'problem',label:d.message,line:d.line,column:d.column,
+            uri:d.uri,code:d.code,severity:d.severity,sourcePath:d.sourcePath,
+            description:d.severity
+              ?d.severity.toUpperCase()+' · '+(d.code??'Compiler')
+              :(d.code??'Source projection'),children:[]
+          })))]
         :snapshot?.[id]??[{label:'Open assurance/procedure.yaml',children:[]}]),
       getTreeItem(item){
         const tree=new vscode.TreeItem(item.label,item.children?.length?vscode.TreeItemCollapsibleState.Collapsed:vscode.TreeItemCollapsibleState.None);
         tree.description=item.description;tree.tooltip=item.label+(item.line?' · L'+item.line:'');
         tree.kind=item.kind;
+        if(item.kind==='compiler-diagnostic'){
+          tree.contextValue='skillStudio.compilerDiagnostic';
+          tree.iconPath=new vscode.ThemeIcon(item.severity==='warning'?'warning':'error');
+          tree.command={command:'skillStudio.revealCompilerDiagnostic',
+            title:'Reveal Compiler Diagnostic',arguments:[item]};
+        }
         if(item.kind==='node'){
           const deletable=id==='inspection'&&document&&
             deleteNodeOptions(document.getText(),item.procedureId,item.nodeId);
@@ -2761,7 +2774,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
             tree[key]=item[key];
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
-        if(document&&item.line){
+        if(document&&item.line&&item.kind!=='compiler-diagnostic'){
           const rootInfo=packageRootForProcedure(vscode,document);
           const uri=item.sourcePath&&rootInfo?.uri
             ?vscode.Uri.joinPath(rootInfo.uri,...item.sourcePath.split("/"))
@@ -2780,6 +2793,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract}={}){
   // Audit status belongs to Problems. Do not refresh Inspector/Outline for
   // status-only changes: their Source-backed selection must remain stable.
   const fireProblems=()=>providers.get('problems')?.fire();
+  const compilerProblemsChanged=compilerProblemsProvider?.onDidChange?.(()=>fireProblems());
+  if(compilerProblemsChanged)context.subscriptions.push(compilerProblemsChanged);
   function update(doc,choice){
     if(!isProcedurePath(doc?.uri.path))return;
     const key=doc.uri.toString(),same=document?.uri.toString()===key;

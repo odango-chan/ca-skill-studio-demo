@@ -64,6 +64,10 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     x.name==="Procedure Outline"),
     "domain Procedure Outline remains distinct from native document-symbol Outline");
   assert.ok(plugin.activationEvents.includes("onCommand:skillStudio.refreshPackages"));
+  for(const command of ["checkSkill","buildSkill","inspectCompilerDependencies"]){
+    assert.ok(plugin.activationEvents.includes("onCommand:skillStudio."+command),command);
+    assert.ok(plugin.contributes.commands.some(item=>item.command==="skillStudio."+command),command);
+  }
   assert.ok(plugin.activationEvents.includes("onView:skillStudio.packages"));
   assert.ok(plugin.contributes.menus["view/title"].some(x=>
     x.command==="skillStudio.refreshPackages"&&x.when==="view == skillStudio.packages"));
@@ -90,7 +94,8 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   assert.ok(plugin.contributes.menus?.["view/title"]?.some(x=>
     x.command==="skillStudio.loadExample"),
     "Explorer title toolbar must expose the demo project");
-  for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js","media/procedure.js","media/procedure.css",
+  for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js",
+    "dist/compiler-worker.js","dist/skillc.wasm","dist/wasm_exec.js","media/procedure.js","media/procedure.css",
     "samples/skills/files.json",
     "samples/skills/establish-pdu-session/assurance/procedure.yaml",
     "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml","media/native-markdown-preview.css"])

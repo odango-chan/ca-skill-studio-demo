@@ -26,6 +26,7 @@ import {registerPredicateEditor} from "./predicate-editor.mjs";
 import {registerSchemaEditor} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
 import {registerDependencyIntegration} from "./dependency-integration.mjs";
+import {registerCompilerIntegration} from "./compiler-integration.mjs";
 import {iconShapes} from "../../../../site/icons.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
@@ -57,6 +58,9 @@ export function activate(context){
   // contributions. Its TreeView can paint its loading state immediately;
   // inventory discovery continues asynchronously in the background.
   let workbench=null,packageOverview=null;
+  const compilerIntegration=registerCompilerIntegration(vscode,context,{
+    getActiveDocument:()=>workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
+  });
   const dependencyIntegration=registerDependencyIntegration(vscode,context,{
     onLockChanged:()=>workbench?.invalidateDependencyAnalysis?.(),
     onProjectRootChanged:()=>void packageOverview?.refresh()
@@ -64,11 +68,13 @@ export function activate(context){
   packageOverview=registerPackageOverview(vscode,context,
     ()=>workbench?.getActiveDocument?.()??null,{
       dependenciesProvider:dependencyIntegration.provider,
+      compilerProvider:compilerIntegration.provider,
       getProjectRoot:dependencyIntegration.getProjectRoot,
       onPackagesChanged:packages=>workbench?.syncPackages?.(packages)
     });
   workbench=registerWorkbench(vscode,context,{
-    prepareToolContract:dependencyIntegration.prepareToolContract
+    prepareToolContract:dependencyIntegration.prepareToolContract,
+    compilerProblemsProvider:compilerIntegration.problems
   });
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);

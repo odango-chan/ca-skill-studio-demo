@@ -14,6 +14,7 @@ const externalUrl=process.env.THEIA_URL;
 const basePath=(process.env.THEIA_BASE_PATH||"").replace(/\/+$/,"");
 const requireWebview=process.env.THEIA_REQUIRE_WEBVIEW==="1";
 const requireBrowserLsp=process.env.THEIA_REQUIRE_BROWSER_LSP==="1";
+const requireCompilerWorker=process.env.THEIA_REQUIRE_COMPILER_WORKER==="1";
 const requireEditor=Boolean(externalUrl)||requireWebview;
 const chrome=process.env.CHROME_BIN||
   ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium"].find(existsSync);
@@ -50,6 +51,25 @@ const server=externalUrl?null:createServer((req,res)=>{
   });
 });
 if(server)await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
+if(server&&requireCompilerWorker){
+  const compilerAssets=[
+    "/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js",
+    "/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skillc.wasm",
+    "/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/wasm_exec.js"
+  ];
+  for(const asset of compilerAssets){
+    const path=basePath+asset;
+    const file=join(root,asset);
+    if(!existsSync(file))throw Error("Pinned Compiler asset was not staged: "+file);
+    const response=await fetch("http://127.0.0.1:"+server.address().port+path);
+    if(!response.ok)throw Error("Pages-base-path Compiler asset route failed: "+path+" status="+response.status);
+    const bytes=(await response.arrayBuffer()).byteLength;
+    if(bytes<1000)throw Error("Pinned Compiler asset is unexpectedly small: "+path+" bytes="+bytes);
+    console.log("STUDIO_THEIA_PAGES_BASE_PATH_COMPILER_ASSET",JSON.stringify({
+      path,status:response.status,bytes,basePath
+    }));
+  }
+}
 if(server){
   const workerAssetPath="/hostedPlugin/vscode_markdown_language_features/dist/browser/serverWorkerMain.js";
   const workerPath=basePath+workerAssetPath;
@@ -895,6 +915,26 @@ try{
          !pythonSyntax.text.replace(/\u00a0/g," ").includes("def main"))
         throw Error("Native Python syntax tokenization not active: "+JSON.stringify(pythonSyntax));
       patchEvidence.pythonSyntax=pythonSyntax;
+      if(requireCompilerWorker){
+        const compilerWorker=await evalJS(`(async()=>{
+          const c=window.theia.container;
+          const key=[...c._bindingDictionary._map.keys()].find(k=>
+            typeof k==='function'&&k.prototype?.executeCommand&&
+            k.prototype?.registerCommand&&k.prototype?.getCommand);
+          if(!key)throw Error('Native command registry missing for Compiler Worker acceptance');
+          return c.get(key).executeCommand('skillStudio.internal.compilerWorkerAcceptance');
+        })()`);
+        console.log("STUDIO_THEIA_COMPILER_WORKER_CHROMIUM",JSON.stringify(compilerWorker));
+        if(compilerWorker?.compilerVersion!=="v1.0.0"||
+           compilerWorker?.languageTarget!=="connectionagent.io/v1alpha4"||
+           compilerWorker?.workerTransport!=="PASS"||
+           compilerWorker?.artifactFailureAtomicity!=="PASS"||
+           compilerWorker?.buildSuccess!==false||
+           compilerWorker?.buildOutputFiles!==0)
+          throw Error("Pinned Compiler v1.0.0 Go/WASM Worker acceptance failed: "+
+            JSON.stringify(compilerWorker));
+        patchEvidence.compilerWorker=compilerWorker;
+      }
       // Exercise the exact multi-Designer -> Python -> ordinary YAML -> another
       // Designer sequence in the real Theia extension host, not a mocked API.
       const editorGroupPlacement=await evalJS(`(async()=>{

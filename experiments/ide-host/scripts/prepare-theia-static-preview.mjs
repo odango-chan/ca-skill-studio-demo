@@ -46,19 +46,34 @@ const pluginTarget=join(root,"hostedPlugin","odango_chan_ca_skill_studio_ide_spi
 for(const name of ["samples","media","icons","l10n","package.nls.json","package.nls.zh-cn.json"]){
   await cp(join(pluginSource,name),join(pluginTarget,name),{recursive:true,force:true});
 }
+// The static Theia copier does not guarantee arbitrary binary Worker assets.
+// Stage the pinned Compiler Worker, Go runtime shim and WASM Core explicitly.
+const compilerDistSource=join(pluginSource,"dist");
+const compilerDistTarget=join(pluginTarget,"dist");
+await mkdir(compilerDistTarget,{recursive:true});
+for(const name of ["compiler-worker.js","skillc.wasm","wasm_exec.js"]){
+  const source=join(compilerDistSource,name);
+  const info=await stat(source);
+  if(!info.isFile()||info.size<1000)
+    throw Error("Pinned Compiler Worker asset missing or empty: "+source);
+  await copyFile(source,join(compilerDistTarget,name));
+}
 for(const required of [
   join(pluginTarget,"samples","skills","files.json"),
   join(pluginTarget,"samples","skills","establish-pdu-session","assurance","procedure.yaml"),
   join(pluginTarget,"samples","skills","establish-pdu-session-mas","assurance","procedure.yaml"),
   join(pluginTarget,"media","procedure.js"),
-  join(pluginTarget,"media","procedure.css")
+  join(pluginTarget,"media","procedure.css"),
+  join(pluginTarget,"dist","compiler-worker.js"),
+  join(pluginTarget,"dist","skillc.wasm"),
+  join(pluginTarget,"dist","wasm_exec.js")
 ]){
   const info=await stat(required);
   if(!info.isFile()||info.size<100)
     throw Error("Static hosted plugin asset missing or empty: "+required);
 }
 console.log("STUDIO_THEIA_STATIC_PLUGIN_ASSETS",JSON.stringify({
-  pluginTarget,assets:["samples/**","media/**","icons/**"],sameOriginOnly:true
+  pluginTarget,assets:["samples/**","media/**","icons/**","dist/compiler-worker.js","dist/skillc.wasm","dist/wasm_exec.js"],sameOriginOnly:true
 }));
 // The built-in Markdown extension starts its language server in a browser
 // Worker relative to extensionUri. Stage the complete pinned extension into

@@ -13,7 +13,7 @@ const requiredEditors=["skillStudio.procedurePreview","skillStudio.contractPrevi
 const editorViews=new Set(manifest.contributes.customEditors.map(x=>x.viewType));
 for(const view of requiredEditors)if(!editorViews.has(view))
   throw Error("Required visual editor is missing from prepared Web extension: "+view);
-for(const source of [manifest.browser,"./dist/extension-theia.js","./dist/skill-language-server.js",join("media","procedure.js"),join("media","procedure.css")]){
+for(const source of [manifest.browser,"./dist/extension-theia.js","./dist/skill-language-server.js","./dist/compiler-worker.js","./dist/skillc.wasm","./dist/wasm_exec.js",join("media","procedure.js"),join("media","procedure.css")]){
   const info=await stat(join(ext,source));
   if(!info.isFile()||info.size<1000)throw Error("Missing built Web extension file: "+source);
 }
