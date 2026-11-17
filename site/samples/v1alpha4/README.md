@@ -23,4 +23,11 @@ The source pins versions independently by specification. The current set include
 
 ## Existing Example workspaces
 
-When an existing Example workspace is upgraded, the importer promotes the v1alpha4 packages into `skills/`. Retired v0.2 packages are moved to `archive/legacy-v0.2/` so any local edits remain recoverable; they are not scanned as active Skills and are not part of acceptance.
+The Example project uses one active language baseline: CA-SL v1alpha4. The retired v0.2 sample set is not imported, archived, or used for acceptance.
+
+When an Example project already exists, Skill Studio asks whether to replace it:
+
+- **Replace Example** deletes the entire existing Example project directory, including local edits and retired sample content, then imports this pinned v1alpha4 snapshot.
+- **Cancel** leaves the existing Example project untouched.
+
+This replacement prompt applies only to the built-in Example project. It is never shown for ordinary user projects.
