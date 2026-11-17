@@ -258,14 +258,15 @@ The exact implementation schema is finalized during the patch-engine spike, but 
 | Operation | Allowed intent |
 |---|---|
 | `node.add` | Add a uniquely named Node with one or more valid v1alpha4 stages |
-| `node.stage.set` | Add or replace one explicitly identified stage on an existing Node |
-| `stage.argument.set` | Set one named argument within an Operation / Observation stage |
+| `node.stage.add` | Add one missing stage to an existing Node; an existing stage cannot be replaced |
+| `stage.callable.set` | Set the `tool` or `script` callable field of one explicitly identified Operation / Observation stage |
+| `stage.argument.set` | Set or update one named argument within an Operation / Observation stage |
 | `predicate.call.add` | Add one call to an already declared Predicate in a Precondition / Postcondition |
 | `predicate.call.arguments.set` | Replace the positional arguments of one identified Predicate call |
 | `stage.route.set` | Add or retarget one outcome route within one identified stage |
 | `procedure.start.set` | Change the top-level start Node to an existing Node |
 
-P1 does not allow deleting Nodes, Stages, Predicate calls or Routes; renaming Nodes; modifying Contract / PredicateSet definitions; or changing dependencies. Those operations require separate reference-closure and source-preservation design.
+P1 does not allow deleting Nodes, Stages, Predicate calls, arguments or Routes; replacing an existing Stage wholesale; renaming Nodes; modifying Contract / PredicateSet definitions; or changing dependencies. A Stage can only be added when absent; existing stage fields are changed through their specific allowlisted operations. Those destructive operations require separate reference-closure and source-preservation design.
 
 The allowlist uses v1alpha4's `start`, `nodes`, `precondition`, `operation`, `observation` and `postcondition` source shape. Legacy `procedures`, `call`, `with`, `verify`, `reconcile`, `target`, `on`, plural stage keys or inferred conversions are rejected.
 
