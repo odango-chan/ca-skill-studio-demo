@@ -922,12 +922,12 @@ export async function runWorkbenchAcceptance({
   // source files from the same Skill Package and retain native Source pairing.
   const contractUri=await openPackageFile("skillStudio.openContract","assurance/contract.yaml");
   const contract=await waitWebview(view=>view.title==="SKILL Contract Visual"&&
-    view.bodyText.includes("Package\\nestablish-pdu-session\\n"),
+    view.bodyText.includes("Package\nestablish-pdu-session\n"),
     "v1alpha4 5GC Contract Designer");
   const expectedContractCards=["Goal & Preconditions","Schemas & Context",
     "Capabilities","Dependencies","Limits"];
   const contractCards=contract.view.cards??[];
-  if(!contract.view.bodyText.includes("Package\\nestablish-pdu-session\\n")||
+  if(!contract.view.bodyText.includes("Package\nestablish-pdu-session\n")||
      !contract.view.bodyText.includes("pdu_session.initial_request_fulfilled")||
      !contract.view.bodyText.includes("nudm-sdm-get")||
      expectedContractCards.some(title=>!contract.view.cards.includes(title)))
