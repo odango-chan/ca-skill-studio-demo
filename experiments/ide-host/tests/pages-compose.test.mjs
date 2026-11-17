@@ -23,6 +23,9 @@ test("Pages publishes only Theia and never stages a Classic or legacy fallback",
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json",'{"name":"ca-skill-studio-ide-spike"}');
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js","extension worker");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js","language worker");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js","compiler worker");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skillc.wasm","wasm binary");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/wasm_exec.js","go wasm runtime");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/package.json",'{"name":"skill-studio-theme"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",'{"name":"SKILL Studio Light"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",'{"iconDefinitions":{}}');
@@ -53,6 +56,9 @@ test("Pages refuses a frontend containing a Classic navigation link or missing a
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json","{}");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js","extension");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js","worker");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js","compiler worker");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skillc.wasm","wasm binary");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/wasm_exec.js","go wasm runtime");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/package.json","{}");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json","{}");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json","{}");
