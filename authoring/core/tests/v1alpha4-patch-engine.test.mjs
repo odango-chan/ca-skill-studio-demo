@@ -74,13 +74,14 @@ function op(type, target, payload) {
 }
 
 async function plan(operations, source = SOURCE, overrides = {}) {
+  const { changeSet: changeSetOverrides, ...hostOverrides } = overrides;
   return planV1Alpha4Patch({
     source,
-    changeSet: await makeChangeSet(operations, overrides.changeSet),
+    changeSet: await makeChangeSet(operations, changeSetOverrides),
     currentDocumentUri: "file:///workspace/skill/assurance/procedure.yaml",
     currentDocumentVersion: 7,
     currentPackageGeneration: 3,
-    ...overrides,
+    ...hostOverrides,
   });
 }
 
