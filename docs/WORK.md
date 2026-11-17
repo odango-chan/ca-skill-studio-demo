@@ -13,6 +13,17 @@
 - **v1alpha4 缺口：** 当前 PR #197 的 Procedure 投影是只读。旧版 D1/D2 Patch 不可直接视为 v1alpha4 编辑能力；P1 需要独立的 v1alpha4 Semantic Patch Engine。Compiler Check 仍是候选 Procedure 的权威静态验证。
 - **状态：** 产品决策 APPROVED；跨宿主架构方向 APPROVED；详细设计 PROPOSED；Implementation NOT_STARTED；Acceptance NOT_RUN。尚无 AI Provider / Gateway 集成、无模型调用、无 Runtime / 5GC 能力声明。
 
+## 2026-11-17 · AI Gateway 技术 Spike（设计收敛）
+
+- **架构：** Browser → Application Gateway Worker → OpenAI-compatible provider。Cloudflare AI Gateway 若使用，只作为 Worker 后方的可选路由 / 分析层，不能直接暴露给浏览器。
+- **试点认证：** 第一阶段采用 Cloudflare Access 受限访问；Worker 校验 JWT 的签名、issuer、audience 和有效期。它是受控试点方案，不代表已决定最终面向公众的登录体系。
+- **密钥：** Provider Key 和 Cloudflare API Token 均只保存在 Worker Secret / 服务端；禁止静态 bearer token 打包到网页或 VSIX。
+- **代理边界：** 固定 Chat Completions 路径、上游地址和模型白名单；拒绝任意 URL、任意 Header、超大请求体和未知模型；响应头 / 错误不得泄漏上游密钥。
+- **限流与预算：** 基于已验证身份做 per-user rate limit；Cloudflare Rate Limiting 是近似、分区域的突发控制，不是严格总预算。必须另设 provider / account spend ceiling，并在预算状态不可用时 fail closed。
+- **流式：** Worker 透传 Response stream，不缓冲完整响应；客户端断开视为不完整响应，不得生成可接受 Change Set。
+- **Free 计划：** 当前官方限制为 100,000 requests/day、10ms CPU/request、128MB memory、6 simultaneous outgoing connections/request；HTTP 请求只要客户端保持连接就没有硬 wall-time 限制。10ms CPU 不包括上游模型推理时间。必须以真实请求验证。
+- **状态：** 方案已写入 canonical design；Gateway Worker 尚未部署，尚无 Provider Key、真实模型请求或生产认证。先做 fixture-provider 的正负测试，再做显式授权的真实 Provider smoke test。
+
 ## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
 
 Compiler 已正式发布 `v1.0.0`，目标固定为 CA-SL `connectionagent.io/v1alpha4`，规范 pin 为 `ca-skills@7f84393`。本轮在独立分支 `feat/compiler-v1.0.0-studio-integration-20261117` 接入真实 Go/WASM Core，不再实现模拟 Check / Build。
