@@ -43,9 +43,13 @@ function symbolKey(token,name){
         const matched=/^([A-Za-z][A-Za-z0-9_-]*)\.precondition$/.exec(name);
         return matched?"step\u0000"+matched[1]:null;
       }
-      // v1alpha4 has one procedure with root nodes/<NodeId>.
-      if(token.path?.[0]==="nodes")
-        return "step\u0000"+name;
+      // v1alpha5 has one procedure with root nodes/<NodeId>. A wait.output
+      // SourcePath navigates to the Wait-bearing Node declaration, not to a
+      // synthetic business Stage.
+      if(token.path?.[0]==="nodes"){
+        const waitOutput=/^([A-Za-z][A-Za-z0-9_-]*)\.wait\.output(?:\..*)?$/.exec(name);
+        return "step\u0000"+(waitOutput?waitOutput[1]:name);
+      }
       const procedure=token.path?.[0]==="procedures"?token.path[1]:null;
       return typeof procedure==="string"&&procedure
         ? "step\u0000"+procedure+"\u0000"+name
