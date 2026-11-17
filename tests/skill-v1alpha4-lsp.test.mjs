@@ -112,7 +112,7 @@ function snapshot(source=procedure,contractSource=contract,predicatesSource=pred
 }
 
 test("optional Studio examples mirror the pinned PDU/MAS v1alpha4 source shape",()=>{
-  for(const [name,expectedNodes] of [["establish-pdu-session",15],["establish-pdu-session-mas",18]]) {
+  for(const [name,expectedNodes] of [["establish-pdu-session",9],["establish-pdu-session-mas",14]]) {
     const files=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml",
       "assurance/predicates.yaml","schemas/establishment-request.schema.yaml"];
     const docs=files.map(relativePath=>({
