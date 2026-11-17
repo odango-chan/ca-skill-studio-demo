@@ -589,8 +589,8 @@ connection.onDocumentSymbol(params => {
     })).filter(symbol => symbol.location);
 });
 
-/** v1alpha4 authoring completions are syntax suggestions, not Owner grants. */
-function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
+/** v1alpha5 authoring completions are syntax suggestions, not Owner grants. */
+function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
   const isProcedure=document.relativePath==="assurance/procedure.yaml";
   const isContract=document.relativePath==="assurance/contract.yaml";
   if(!isProcedure&&!isContract)return null;
@@ -600,22 +600,29 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
   // Track the current YAML indentation scope. Looking for the last stage
   // alone leaks stale completion candidates across Nodes and into arguments.
   const lines=document.text.slice(0,lineStart).split(/\r?\n/);
-  let inNodes=false,inNode=false,nodeId=null,stage=null,section=null;
+  let inNodes=false,inNode=false,nodeId=null,stage=null,section=null,inWait=false,waitSection=null;
   for(const line of lines){
     if(/^nodes:\s*$/.test(line)){
-      inNodes=true;inNode=false;nodeId=null;stage=null;section=null;continue;
+      inNodes=true;inNode=false;nodeId=null;stage=null;section=null;inWait=false;waitSection=null;continue;
     }
     if(/^[^\s#]/.test(line)){
-      inNodes=false;inNode=false;nodeId=null;stage=null;section=null;continue;
+      inNodes=false;inNode=false;nodeId=null;stage=null;section=null;inWait=false;waitSection=null;continue;
     }
     if(!inNodes)continue;
     const node=/^ {2}([A-Za-z][A-Za-z0-9_-]*):\s*$/.exec(line);
     if(node){
-      inNode=true;nodeId=node[1];stage=null;section=null;continue;
+      inNode=true;nodeId=node[1];stage=null;section=null;inWait=false;waitSection=null;continue;
     }
     if(!inNode)continue;
+    const nextWait=/^ {4}wait:\s*$/.test(line);
+    if(nextWait){stage=null;section=null;inWait=true;waitSection=null;continue;}
     const nextStage=/^ {4}(precondition|operation|observation|postcondition):\s*$/.exec(line);
-    if(nextStage){stage=nextStage[1];section=null;continue;}
+    if(nextStage){stage=nextStage[1];section=null;inWait=false;waitSection=null;continue;}
+    const waitProperty=/^ {6}([A-Za-z][A-Za-z0-9_-]*):\s*$/.exec(line);
+    if(inWait&&waitProperty){
+      waitSection=["event","response","routes"].includes(waitProperty[1])?waitProperty[1]:null;
+      section=waitSection;continue;
+    }
     const nextSection=/^ {6}(predicates|arguments|routes):\s*$/.exec(line);
     if(nextSection)section=nextSection[1];
   }
@@ -633,7 +640,7 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
   const currentStages=["precondition","operation","observation","postcondition"]
     .filter(name=>isMap(currentNode)&&currentNode.has(name));
   const finalStage=currentStages.at(-1)===stage;
-  const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="CA-SL v1alpha4 source syntax")=>
+  const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="CA-SL v1alpha5 candidate source syntax")=>
     labels.filter(name=>name.startsWith(typed)).map(name=>({
       label:name,kind,detail,
       textEdit:{range:{
@@ -699,8 +706,47 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
   }
 
   const stageField=/^( {4})([a-z]*)$/.exec(prefix);
-  if(stageField && inNode)return make(["precondition:","operation:","observation:","postcondition:"],
+  if(stageField && inNode)return make(["wait:","precondition:","operation:","observation:","postcondition:"],
     stageField[2],lineStart+4);
+
+  // Node-entry Wait is a control field, not a fifth business stage.
+  const waitTopField=/^( {6})([a-z]*)$/.exec(prefix);
+  if(waitTopField&&inWait)return make(["event:","timeout:","response:","routes:"],
+    waitTopField[2],lineStart+6,CompletionItemKind.Keyword,"Node-entry Wait control fields");
+
+  const waitMemberField=/^( {8})([a-zA-Z]*)$/.exec(prefix);
+  if(waitMemberField&&inWait&&waitSection==="event")
+    return make(["source:","service:","operation:"],waitMemberField[2],lineStart+8,
+      CompletionItemKind.Keyword,"Exact Ingress event selector fields");
+  if(waitMemberField&&inWait&&waitSection==="response")
+    return make(["after:"],waitMemberField[2],lineStart+8,
+      CompletionItemKind.Keyword,"Paired response boundary Node reference");
+  if(waitMemberField&&inWait&&waitSection==="routes")
+    return make(["TIMEOUT:"],waitMemberField[2],lineStart+8,
+      CompletionItemKind.EnumMember,"Wait-control timeout edge; event acceptance is implicit");
+
+  const waitResponseTarget=/^ {8}after:[ \\t]*([A-Za-z0-9_-]*)$/.exec(prefix);
+  if(waitResponseTarget&&inWait&&waitSection==="response"&&
+     value.snapshot.completeness==="complete")
+    return make(localNodes.filter(id=>id!==nodeId),waitResponseTarget[1],
+      offset-waitResponseTarget[1].length,CompletionItemKind.Reference,
+      "Declared response-boundary Node on the accepted-event path");
+
+  const waitTimeoutTarget=/^ {8}TIMEOUT:[ \\t]+([A-Za-z0-9_-]*)$/.exec(prefix);
+  if(waitTimeoutTarget&&inWait&&waitSection==="routes"&&
+     value.snapshot.completeness==="complete")
+    return make([...localNodes.filter(id=>id!==nodeId),"FAILED","UNRESOLVED","SAFE_STOPPED"],
+      waitTimeoutTarget[1],offset-waitTimeoutTarget[1].length,
+      CompletionItemKind.Reference,"Wait timeout target; success terminals are forbidden");
+
+  const waitOutputValue=/^ {8}[A-Za-z][A-Za-z0-9_-]*:[ \\t]*([A-Za-z0-9_.-]*)$/.exec(prefix);
+  if(waitOutputValue&&section==="arguments"&&isMap(currentNode)&&
+     isMap(currentNode.get("wait",true))){
+    const candidate=nodeId+".wait.output";
+    return make([candidate],waitOutputValue[1],offset-waitOutputValue[1].length,
+      CompletionItemKind.Reference,
+      "Normalized request input available only after this Wait occurrence is accepted");
+  }
 
   const memberField=/^ {6}([a-zA-Z]*)$/.exec(prefix);
   if(memberField && inNode && stage){
@@ -709,7 +755,7 @@ function v1Alpha4Completions(value, document, prefix, offset, lineStart) {
       stage==="observation"?["tool:","arguments:","routes:"]:
       ["tool:","script:","arguments:","retryOf:","routes:"];
     return make(fields,memberField[1],lineStart+6,
-      CompletionItemKind.Keyword,"CA-SL v1alpha4 "+stage+" stage fields");
+      CompletionItemKind.Keyword,"CA-SL v1alpha5 "+stage+" stage fields");
   }
 
   const routeKey=/^( {8})([A-Z_]*)$/.exec(prefix);
@@ -782,8 +828,8 @@ connection.onCompletion(params => {
   const starts = lineStarts(document.text);
   const lineStart = starts[params.position.line];
   const prefix = document.text.slice(lineStart, offset);
-  const v4 = v1Alpha4Completions(value,document,prefix,offset,lineStart);
-  if(v4!==null)return v4;
+  const v5 = v1Alpha5Completions(value,document,prefix,offset,lineStart);
+  if(v5!==null)return v5;
 
   if (document.relativePath === "assurance/procedure.yaml" &&
       value.analysis.state === "READY" && value.snapshot.completeness === "complete") {
