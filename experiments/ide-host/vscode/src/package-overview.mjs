@@ -126,7 +126,8 @@ function packageNode(pkg) {
       (pkg.dirtyCount?' · '+pkg.dirtyCount+' modified':''),
     tooltip:'Package 文件清点；不代表内容校验或 Runtime 资格。'+
       (pkg.incomplete?' 缺少：'+[...(!pkg.hasSkillMd?['SKILL.md']:[]),...pkg.missingCore].join(', '):''),
-    icon:pkg.incomplete?'warning':'package'
+    icon:pkg.incomplete?'warning':'package',
+    contextValue:'skillStudio.package'
   };
 }
 function groupNode(pkg, group) {
@@ -158,7 +159,7 @@ function treeNode(vscode, node) {
   return item;
 }
 export function registerPackageOverview(vscode,context,getActiveDocument=()=>null,
-  {dependenciesProvider=null,getProjectRoot=()=>null,onPackagesChanged=()=>{}}={}) {
+  {dependenciesProvider=null,compilerProvider=null,getProjectRoot=()=>null,onPackagesChanged=()=>{}}={}) {
   let packages = [], message = '等待扫描当前 Workspace', inventoryState = 'loading', timer = null, generation = 0;
   const emitter = new vscode.EventEmitter();
   let observedRootSignature = null;
@@ -182,6 +183,14 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
   });
   const decorateDependencyNodes=(items,parentNode=null)=>(items??[]).map(item=>({
     ...item,sourceSection:'dependencies',...(parentNode?{parentNode}:{})
+  }));
+  const artifactsSection=()=>({
+    kind:'section',section:'artifacts',label:'Build Artifacts',
+    description:'Verified, read-only Compiler output',
+    icon:'package-check',contextValue:'skillStudio.artifactsSection'
+  });
+  const decorateArtifactNodes=(items,parentNode=null)=>(items??[]).map(item=>({
+    ...item,sourceSection:'artifacts',...(parentNode?{parentNode}:{})
   }));
   const skillsChildren=()=>{
     const summary={
@@ -215,7 +224,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
         node?.sourceSection==='dependencies'?'dependency':
         node?'other':'root';
       treeReadsByKind[readKind]=(treeReadsByKind[readKind]??0)+1;
-      if(!node)return [skillsSection(),dependenciesSection()];
+      if(!node)return [skillsSection(),dependenciesSection(),artifactsSection()];
       if(node.kind==='section'){
         if(node.section==='skills')return skillsChildren();
         if(node.section==='dependencies'){
@@ -225,11 +234,19 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
           }];
           return decorateDependencyNodes(await dependenciesProvider.getChildren());
         }
+        if(node.section==='artifacts'){
+          if(!compilerProvider)return [{kind:'message',text:'Compiler Artifact Service unavailable',sourceSection:'artifacts'}];
+          return decorateArtifactNodes(await compilerProvider.getChildren(),node);
+        }
         return [];
       }
       if(node.sourceSection==='dependencies'){
         if(!dependenciesProvider)return [];
         return decorateDependencyNodes(await dependenciesProvider.getChildren(node),node);
+      }
+      if(node.sourceSection==='artifacts'){
+        if(!compilerProvider)return [];
+        return decorateArtifactNodes(await compilerProvider.getChildren(node),node);
       }
       if(node.kind==='package'){
         const pkg=packages.find(item=>item.rootPath===node.rootPath);
@@ -264,6 +281,8 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
         return dependenciesProvider?.getTreeItem(node)??treeNode(vscode,{
           ...node,label:node.label??node.text??'Dependency'
         });
+      if(node.sourceSection==='artifacts')
+        return compilerProvider?.getTreeItem(node)??treeNode(vscode,node);
       return treeNode(vscode,node);
     },
     // Explicit parent relationships keep TreeView.reveal stable across both
@@ -273,6 +292,11 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
       if(node.sourceSection==='dependencies'){
         if(node.kind==='dependency'||node.kind==='message')return dependenciesSection();
         if(node.kind==='operation')return node.parentNode??dependenciesSection();
+      }
+      if(node.sourceSection==='artifacts'){
+        if(node.kind==='artifact-package'||node.kind==='message')return artifactsSection();
+        const parent=compilerProvider?.getParent?.(node);
+        return parent?{...parent,sourceSection:'artifacts'}:artifactsSection();
       }
       if(node.kind==='package')return skillsSection();
       const pkg=packages.find(item=>item.rootPath===node.packageRoot);
@@ -434,6 +458,8 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
   context.subscriptions.push(...subscriptions);
   const dependencyChanged=dependenciesProvider?.onDidChangeTreeData?.(()=>fire());
   if(dependencyChanged)context.subscriptions.push(dependencyChanged);
+  const artifactChanged=compilerProvider?.onDidChangeTreeData?.(()=>fire());
+  if(artifactChanged)context.subscriptions.push(artifactChanged);
   async function revealPackages(){
     const list=await refresh();
     if(!treeView?.reveal)return false;
