@@ -1,0 +1,22 @@
+name: Verify AI Gateway Worker
+on:
+  pull_request:
+    paths:
+      - 'gateway/worker/**'
+      - '.github/workflows/gateway-worker-verify.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax check
+        run: node --check gateway/worker/src/index.mjs
+      - name: Gateway unit tests
+        run: node --test gateway/worker/tests/*.test.mjs
+      - name: Cloudflare Worker dry-run bundle
+        run: npx --yes wrangler@4.157.0 deploy --dry-run --outdir "$RUNNER_TEMP/ca-skill-studio-ai-gateway"

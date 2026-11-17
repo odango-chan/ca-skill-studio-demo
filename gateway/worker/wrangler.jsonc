@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ca-skill-studio-ai-gateway",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-11-17",
+  "workers_dev": true,
+  "vars": {
+    "ACCESS_AUD": "local-development-audience",
+    "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173",
+    "ALLOWED_MODELS": "gpt-4o-mini",
+    "MAX_REQUEST_BYTES": "65536",
+    "MAX_OUTPUT_TOKENS": "2048",
+    "PROVIDER_CHAT_COMPLETIONS_URL": "https://api.openai.com/v1/chat/completions"
+  },
+  "ratelimits": [
+    {
+      "name": "USER_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
+  "access": {
+    "dev": {
+      "aud": "local-development-audience",
+      "identity": { "email": "developer@example.invalid" }
+    }
+  }
+}
