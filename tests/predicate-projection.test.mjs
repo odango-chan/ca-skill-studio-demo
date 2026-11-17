@@ -4,14 +4,14 @@ import {readFileSync} from 'node:fs';
 import {projectPredicateSet} from '../site/predicate-projection.mjs';
 
 const source = readFileSync(new URL(
-  '../site/samples/v1alpha4/establish-pdu-session/assurance/predicates.yaml',
+  '../site/samples/v1alpha5/establish-pdu-session/assurance/predicates.yaml',
   import.meta.url), 'utf8');
 
-test('CA-SL v1alpha4 PredicateSet projects ordered parameter signatures and Evidence', () => {
+test('CA-SL v1alpha5 PredicateSet projects ordered parameter signatures and Evidence', () => {
   const p = projectPredicateSet(source, {skillName: 'establish-pdu-session'});
   assert.equal(p.state, 'READY');
   assert.equal(p.kind, 'PredicateSet');
-  assert.equal(p.language, 'CA-SL v1alpha4');
+  assert.equal(p.language, 'CA-SL v1alpha5');
   assert.equal(p.skill.value, 'establish-pdu-session');
   assert.equal(p.predicateCount, 12);
 
@@ -34,10 +34,10 @@ test('CA-SL v1alpha4 PredicateSet projects ordered parameter signatures and Evid
   assert.equal(scripted.evaluator.script.value, 'scripts/validate-subscription-request.py');
   assert.ok(scripted.parameters.some(item => item.name === 'requestedDnn'));
   assert.ok(scripted.line > 0);
-  assert.match(source, /^# CA-SL v1alpha4/);
+  assert.match(source, /^# CA-SL v1alpha5/);
 });
 
-test('Unknown v1alpha4 Predicate fields are explicit rather than silently omitted', () => {
+test('Unknown v1alpha5 Predicate fields are explicit rather than silently omitted', () => {
   const changed = source.replace(
     '    evidence:\n      requires:\n        subscription:',
     '    evidence:\n      futureEvidenceMode: strict\n      requires:\n        subscription:');
