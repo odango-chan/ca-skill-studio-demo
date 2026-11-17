@@ -158,13 +158,59 @@ test("SKILL Studio adds one native Theia top-level menu with real extension comm
   assert.match(script,/registerMenuAction/);
   assert.match(script,/registerSubmenu\(TOP,"SKILL Studio"/);
   assert.match(script,/\["menubar","00_skill_studio"\]/);
-  for(const id of ["showWelcome","newProject","openProject","loadExample",
-    "selectProjectRoot","refreshPackages","addDependency",
-    "auditPackage","openLanguageSpec","openAuthoringGuide"])
+  assert.match(script,/registerSubmenu\(groupPath,group\.label/);
+  assert.match(script,/menus\.registerMenuAction\(action\.path/);
+  assert.ok(script.includes('["menubar","1_file","1_new"]'));
+  assert.ok(script.includes('["menubar","1_file","2_open"]'));
+  for(const id of [
+    "showWelcome","newProject","openProject","loadExample","selectProjectRoot",
+    "refreshPackages","checkSkill","buildSkill","inspectCompilerDependencies",
+    "auditPackage","exportPackageZip","addDependency","refreshDependencies",
+    "refreshDependency","updateDependencyLock","inspectDependencyContract",
+    "removeDependency","openProcedure","openContract","openPredicates","openSchema",
+    "refreshInspection","restartLanguageService","openLanguageSpec","openAuthoringGuide"
+  ])
     assert.ok(script.includes('"skillStudio.'+id+'"'),"Native menu lacks "+id);
+  assert.doesNotMatch(script,/commands\.isVisible\(id\)/,
+    "contextual command visibility must not block native menu registration");
   assert.doesNotMatch(script,/createElement\("div"\)|addEventListener\("click"/);
   assert.ok(script.includes('commands.getCommand(id)'),
     "Native menu must wait for real registered extension commands");
+
+  const extension=JSON.parse(readFileSync(join(root,"../vscode/package.json"),"utf8"));
+  const commandById=new Map(extension.contributes.commands.map(item=>[item.command,item]));
+  const publicCommands=[
+    "skillStudio.showWelcome","skillStudio.newProject","skillStudio.openProject",
+    "skillStudio.openLanguageSpec","skillStudio.openAuthoringGuide",
+    "skillStudio.refreshPackages","skillStudio.openSchema","skillStudio.openProcedure",
+    "skillStudio.loadExample","skillStudio.auditPackage","skillStudio.exportPackageZip",
+    "skillStudio.refreshInspection","skillStudio.restartLanguageService",
+    "skillStudio.openPredicates","skillStudio.openContract","skillStudio.selectProjectRoot",
+    "skillStudio.addDependency","skillStudio.refreshDependencies","skillStudio.refreshDependency",
+    "skillStudio.updateDependencyLock","skillStudio.removeDependency",
+    "skillStudio.inspectDependencyContract","skillStudio.checkSkill",
+    "skillStudio.buildSkill","skillStudio.inspectCompilerDependencies"
+  ];
+  for(const id of publicCommands){
+    assert.equal(commandById.get(id)?.category,"SKILL Studio",id+" must be grouped in Command Palette");
+    assert.ok(commandById.get(id)?.title?.startsWith("%"),id+" must use localized short title");
+  }
+  const hiddenPalette=new Set((extension.contributes.menus.commandPalette??[])
+    .filter(item=>item.when==="false").map(item=>item.command));
+  for(const id of [
+    "skillStudio.renameNode","skillStudio.editNodeOperatorValue",
+    "skillStudio.editPhaseInputBinding","skillStudio.editPhaseOutputReference",
+    "skillStudio.editPhaseRouteTarget","skillStudio.repairPhaseOutcome",
+    "skillStudio.insertNode","skillStudio.deleteNode","skillStudio.addPhaseVerify",
+    "skillStudio.editPhaseVerifyStep","skillStudio.renameNamedPhaseStep"
+  ])assert.ok(hiddenPalette.has(id),id+" must remain contextual, not global palette noise");
+  const packageToolbar=extension.contributes.menus["view/title"]
+    .filter(item=>item.when==="view == skillStudio.packages")
+    .map(item=>item.command);
+  assert.deepEqual(packageToolbar,[
+    "skillStudio.refreshPackages","skillStudio.addDependency",
+    "skillStudio.checkSkill","skillStudio.buildSkill"
+  ]);
   const temp=await mkdtemp(join(tmpdir(),"theia-brand-"));
   try{
     await writeFile(join(temp,"index.html"),

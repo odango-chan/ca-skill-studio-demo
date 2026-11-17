@@ -387,7 +387,19 @@ try{
     return {nativeMenuBar:true,
       titles:bar.menus.map(item=>item.title.label),
       items:menu.items.map(item=>({label:item.label,type:item.type,
-        enabled:item.isEnabled})),
+        enabled:item.isEnabled,submenuItems:item.submenu?.items?.map(child=>child.label)??[]})),
+      fileActions:(()=> {
+        const menuKey=keys.find(k=>typeof k==='function'&&
+          k.prototype?.getMenuNode&&k.prototype?.registerMenuAction);
+        if(!menuKey)return {new:[],open:[]};
+        const registry=c.get(menuKey);
+        const newMenu=registry.getMenuNode(['menubar','1_file','1_new']);
+        const openMenu=registry.getMenuNode(['menubar','1_file','2_open']);
+        return {
+          new:(newMenu?.children??[]).map(child=>child.label),
+          open:(openMenu?.children??[]).map(child=>child.label)
+        };
+      })(),
       menuNodeAttached:!!menu.node?.isConnected,
       activeMenu:bar.activeMenu?.title?.label??null};
   })()`);
@@ -420,9 +432,9 @@ try{
     pointerAfter.activeMenu==='SKILL Studio'&&
     pointerAfter.childMenu==='SKILL Studio'&&
     pointerAfter.menuNodes?.some(node=>node.display!=='none'&&
-      node.text.includes('New Project')&&
-      node.text.includes('Open Example Project')&&
-      node.text.includes('Skill Language Specification'));
+      node.text.includes('Project')&&node.text.includes('Skill')&&
+      node.text.includes('Dependencies')&&node.text.includes('Authoring')&&
+      node.text.includes('Tools')&&node.text.includes('Help'));
   if(!pointerHitBefore.insideItem||pointerHitBefore.pointerEvents==='none'||
      !trustedPointerDown||!trustedClick||!popupVisible)
     throw Error('Native Studio menu did not open from a trusted user pointer click: '+
@@ -431,10 +443,40 @@ try{
   console.log('STUDIO_NATIVE_TOP_MENU_CHROMIUM',
     JSON.stringify({pointerMenuItems,nativeStudioMenuWidget}));
   const studioMenuItems=nativeStudioMenuWidget?.items?.map(item=>item.label).join('\n')??'';
-  for(const label of ['New Project','Open Project','Open Example Project',
-    'Skill Language Specification','Authoring Guide'])
+  for(const label of ['Project','Skill','Dependencies','Authoring','Tools','Help'])
     if(!studioMenuItems.includes(label))
-      throw Error('Native Studio menu missing '+label+': '+studioMenuItems);
+      throw Error('Native Studio menu missing submenu '+label+': '+studioMenuItems);
+  for(const [path,labels] of [
+    ['File > New',['New Project']],
+    ['File > Open',['Open Project','Open Example Project']]
+  ]){
+    const actual=path.endsWith('New')
+      ?nativeStudioMenuWidget.fileActions?.new??[]
+      :nativeStudioMenuWidget.fileActions?.open??[];
+    for(const label of labels)
+      if(!actual.includes(label))
+        throw Error(path+' is missing '+label+': '+JSON.stringify(nativeStudioMenuWidget.fileActions));
+  }
+  const revealStudioSubmenu=async(label,expected)=>{
+    const position=await evalJS(`(()=>{
+      const item=[...document.querySelectorAll('.lm-Menu-item')]
+        .find(node=>node.innerText.trim()===${JSON.stringify(label)});
+      if(!item)return null;
+      const r=item.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    })()`);
+    if(!position)throw Error('Native Studio submenu item is not visible: '+label);
+    await command("Input.dispatchMouseEvent",{type:"mouseMoved",...position});
+    await sleep(350);
+    const visibleMenus=await evalJS(`[...document.querySelectorAll('.lm-Menu')]
+      .filter(node=>getComputedStyle(node).display!=='none')
+      .map(node=>node.innerText).join('\\n')`);
+    for(const expectedLabel of expected)
+      if(!visibleMenus.includes(expectedLabel))
+        throw Error('Native Studio '+label+' submenu is missing '+expectedLabel+': '+visibleMenus);
+  };
+  await revealStudioSubmenu('Project',['New Project','Open Project','Open Example Project']);
+  await revealStudioSubmenu('Skill',['Check Skill','Build Skill','Inspect Dependencies']);
   await command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await command("Input.dispatchMouseEvent",{type:"mousePressed",x:390,y:270,button:"left",clickCount:1});
@@ -591,6 +633,23 @@ try{
         return {background:style.backgroundColor,foreground:style.color,
           noWorkspace:document.body.classList.contains("theia-no-open-workspace")};
       })(),
+      documentTitle:document.title,
+      workspaceIdentity:(()=>{
+        const c=window.theia?.container;
+        const keys=[...(c?._bindingDictionary?._map?.keys?.()??[])];
+        const key=keys.find(k=>typeof k==='function'&&
+          k.name==='WorkspaceService'&&k.prototype?.open);
+        if(!key)return {available:false};
+        const service=c.get(key);
+        const workspace=service.workspace;
+        if(!workspace)return {available:false};
+        const workspaceFile=typeof service.isWorkspaceFile==='function'
+          ?(service.isWorkspaceFile(workspace)?workspace.resource.toString():null)
+          :(String(workspace.resource?.path??'').endsWith('.theia-workspace')
+            ?workspace.resource.toString():null);
+        return {available:true,name:workspace.name??null,
+          root:workspace.resource?.path??null,workspaceFile};
+      })(),
       bodyText:document.body.innerText.slice(-2200),
       explorerText:document.querySelector('.theia-Files')?.innerText??'',
       noFolderPrompt:(document.querySelector('.theia-Files')?.innerText??'')
@@ -608,6 +667,12 @@ try{
     };
   })()`);
   await sleep(1200);
+  const identity=afterImport.workspaceIdentity;
+  if(!identity?.available||identity.name!=="skill-studio-demo"||
+     identity.workspaceFile!==null||
+     !String(identity.root??"").endsWith("/skill-studio-demo"))
+    throw Error("Example did not open as a named single-folder workspace: "+
+      JSON.stringify({documentTitle:afterImport.documentTitle,identity}));
   const frameTree=await command("Page.getFrameTree");
   const frames=[];
   const walkFrames=node=>{

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {seedExampleWorkspace} from "../vscode/src/sample-loader.mjs";
+import {seedExampleProject} from "../vscode/src/sample-loader.mjs";
 
 const sampleRoot="site/samples/skills/";
 const manifest=JSON.parse(readFileSync(sampleRoot+"files.json","utf8"));
@@ -64,7 +64,7 @@ function host(manifestOverride=null,existing=[]){
   return {vscode,files,folders,opened,workspace};
 }
 test("Sample creates both exact pinned owner SKILL packages in one source-only project root",async()=>{
-  const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
+  const h=host(),result=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
   assert.equal(result.files,manifest.files.length);
   assert.equal(result.created,manifest.files.length);
   assert.equal(result.skipped,0);
@@ -72,9 +72,9 @@ test("Sample creates both exact pinned owner SKILL packages in one source-only p
   assert.equal(manifest.sourceSha,"3fce09aca32b6a6faf6ec3e9a204d38cc129ec38");
   assert.equal(result.sourceSha,manifest.sourceSha);
   assert.deepEqual(result.skills,["establish-pdu-session","establish-pdu-session-mas"]);
-  assert.ok(result.workspaceUpdated);
-  assert.equal(h.opened.length,1);
-  assert.equal(h.opened[0].folder.uri.path.split("/").at(-1),"skill-studio-demo");
+  assert.equal(h.opened.length,0,"sample import must not mutate or create a Theia workspace");
+  assert.deepEqual(h.workspace.workspaceFolders,[],
+    "the caller opens the imported project through the native folder command");
   assert.equal(result.root.path,"/global-storage/skill-studio-demo");
   assert.equal(result.skillsRoot.path,result.root.path+"/skills");
   assert.ok(h.files.has(result.procedures["establish-pdu-session"].path));
@@ -83,9 +83,8 @@ test("Sample creates both exact pinned owner SKILL packages in one source-only p
   assert.ok(!manifest.files.some(p=>p.includes("/cases/")));
   assert.ok(!manifest.files.some(p=>p.endsWith("n1n2-delivery.schema.yaml")),
     "superseded ca-agent-demo Schemas must not be imported");
-  assert.ok(h.opened[0].folder.uri.path===result.root.path);
-  assert.deepEqual(h.workspace.workspaceFolders.map(folder=>folder.uri.path),
-    [result.root.path],"seed must wait until Theia reports the real project root");
+  assert.deepEqual(h.workspace.workspaceFolders,[],
+    "the importer only creates project files; it never appends a folder to an Untitled workspace");
   assert.equal(h.files.size,manifest.files.length,
     "lib/ and output/ must never contain fabricated compiler inputs or outputs");
   for(const name of result.skills){
@@ -100,7 +99,7 @@ test("Sample creates both exact pinned owner SKILL packages in one source-only p
 });
 test("Sample import reports actual file-count progress and workspace activation without overwriting",async()=>{
   const h=host(),events=[],base=uri("/extension"),storage=uri("/global-storage");
-  const first=await seedExampleWorkspace(h.vscode,base,storage,{
+  const first=await seedExampleProject(h.vscode,base,storage,{
     onProgress:event=>events.push({...event})
   });
   assert.equal(events[0]?.phase,"manifest");
@@ -110,12 +109,12 @@ test("Sample import reports actual file-count progress and workspace activation 
   assert.equal(files[0].total,manifest.files.length);
   assert.deepEqual(files.map(event=>event.completed),
     Array.from({length:manifest.files.length+1},(_,i)=>i));
-  assert.equal(events.at(-1)?.phase,"workspace");
+  assert.equal(events.at(-1)?.phase,"project-ready");
   assert.equal(first.created,manifest.files.length);
   const edited=first.procedures["establish-pdu-session-mas"].path;
   h.files.set(edited,new TextEncoder().encode("user-modified MAS"));
   const repeat=[];
-  const second=await seedExampleWorkspace(h.vscode,base,storage,{
+  const second=await seedExampleProject(h.vscode,base,storage,{
     onProgress:event=>repeat.push(event)
   });
   assert.equal(second.skipped,manifest.files.length);
@@ -126,7 +125,7 @@ test("Sample import reports actual file-count progress and workspace activation 
 });
 
 test("New project does not create legacy lib/ or output/ directories",async()=>{
-  const h=host(),result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
+  const h=host(),result=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
   for(const name of ["lib","output"]){
     await assert.rejects(h.vscode.workspace.fs.stat(uri(result.root.path+"/"+name)),
       error=>error.code==="FileNotFound");
@@ -137,28 +136,27 @@ test("New project does not create legacy lib/ or output/ directories",async()=>{
 
 test("Repeated dual-SKILL import never overwrites user edits, including MAS",async()=>{
   const h=host(),base=uri("/extension"),storage=uri("/global-storage");
-  const a=await seedExampleWorkspace(h.vscode,base,storage);
+  const a=await seedExampleProject(h.vscode,base,storage);
   const originalMas=a.procedures["establish-pdu-session-mas"].path;
   const originalMain=a.procedure.path;
   const one=new TextEncoder().encode("# custom MAS source\\n");
   const two=new TextEncoder().encode("# custom conventional source\\n");
   h.files.set(originalMas,one);h.files.set(originalMain,two);
-  const b=await seedExampleWorkspace(h.vscode,base,storage);
+  const b=await seedExampleProject(h.vscode,base,storage);
   assert.equal(b.created,0);
   assert.equal(b.skipped,b.files);
-  assert.equal(b.workspaceUpdated,false);
   assert.deepEqual(h.files.get(originalMas),one);
   assert.deepEqual(h.files.get(originalMain),two);
 });
 test("A user workspace named skills is not repurposed for the demo",async()=>{
   const userRoot={name:"skills",uri:uri("/user-project/skills")};
   const h=host(null,[userRoot]);
-  const result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"));
+  const result=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"));
   assert.equal(result.root.path,"/global-storage/skill-studio-demo");
   assert.equal(result.skillsRoot.path,result.root.path+"/skills");
-  assert.equal(h.opened.length,1);
-  assert.equal(h.opened[0].start,1);
-  assert.equal(h.opened[0].folder.uri.path.split("/").at(-1),"skill-studio-demo");
+  assert.equal(h.opened.length,0);
+  assert.deepEqual(h.workspace.workspaceFolders,[userRoot],
+    "the sample importer must leave an existing user workspace untouched");
   assert.equal(h.files.has("/user-project/skills/SKILL.md"),false);
 });
 test("Reset replaces the legacy Skills workspace with the canonical named project",async()=>{
@@ -169,7 +167,7 @@ test("Reset replaces the legacy Skills workspace with the canonical named projec
   const edited=oldSkills.path+"/establish-pdu-session/SKILL.md";
   const custom=new TextEncoder().encode("# user edits must be cleared");
   h.files.set(edited,custom);
-  const result=await seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage"),{
+  const result=await seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage"),{
     resetExisting:true
   });
   assert.equal(result.root.path,"/global-storage/skill-studio-demo");
@@ -178,22 +176,22 @@ test("Reset replaces the legacy Skills workspace with the canonical named projec
   assert.equal(result.skipped,0);
   assert.equal(result.resetExisting,true);
   assert.equal(result.resetPackages,1);
-  assert.equal(result.workspaceUpdated,true);
-  assert.deepEqual(h.opened.map(x=>({start:x.start,count:x.count})),[{start:0,count:1}]);
-  assert.deepEqual(h.vscode.workspace.workspaceFolders.map(x=>x.uri.path),[result.root.path]);
+  assert.equal(h.opened.length,0);
+  assert.deepEqual(h.vscode.workspace.workspaceFolders.map(x=>x.uri.path),[oldSkills.path],
+    "resetting sample files must not change the active workspace");
   assert.equal(h.files.has(edited),false,"legacy edited package must be removed from the old location");
   assert.ok(h.files.has(result.skillsRoot.path+"/establish-pdu-session/SKILL.md"));
 });
 test("Explicit online-demo reset overwrites both bundled Skills and removes package-local extras",async()=>{
   const h=host(),base=uri("/extension"),storage=uri("/global-storage");
-  const first=await seedExampleWorkspace(h.vscode,base,storage);
+  const first=await seedExampleProject(h.vscode,base,storage);
   const editedMain=first.procedure.path;
   const editedMas=first.procedures["establish-pdu-session-mas"].path;
   h.files.set(editedMain,new TextEncoder().encode("# modified procedure"));
   h.files.set(editedMas,new TextEncoder().encode("# modified MAS"));
   const extra=first.skillsRoot.path+"/establish-pdu-session/notes.local.md";
   h.files.set(extra,new TextEncoder().encode("local extra"));
-  const reset=await seedExampleWorkspace(h.vscode,base,storage,{resetExisting:true});
+  const reset=await seedExampleProject(h.vscode,base,storage,{resetExisting:true});
   assert.equal(reset.resetPackages,2);
   assert.equal(reset.created,manifest.files.length);
   assert.equal(reset.skipped,0);
@@ -216,7 +214,7 @@ test("Malformed, cross-package, traversing or duplicate manifests refuse writes"
   ];
   for(const data of wrong){
     const h=host(data);
-    await assert.rejects(seedExampleWorkspace(h.vscode,uri("/extension"),uri("/global-storage")));
+    await assert.rejects(seedExampleProject(h.vscode,uri("/extension"),uri("/global-storage")));
     assert.equal(h.files.size,0);
   }
 });
