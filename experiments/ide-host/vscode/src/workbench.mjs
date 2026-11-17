@@ -3271,37 +3271,37 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance',
-    async(skillName,relativePath,openColumn)=>{
-      const name=typeof skillName==='string'?skillName:'establish-pdu-session';
-      const targetPath=typeof relativePath==='string'?relativePath:'SKILL.md';
-      if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
-      if(!/^(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(targetPath))
-        throw Error('Markdown acceptance target must be a known Package-local Markdown path');
+    async(rawUri,openColumn)=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
       if(openColumn!==1&&openColumn!==2)
         throw Error('Markdown acceptance editor column must be one or two');
-      const matches=await vscode.workspace.findFiles(
-        '**/'+name+'/'+targetPath,'**/node_modules/**',5);
-      const suffix='/'+name+'/'+targetPath;
-      const exact=matches.filter(item=>item.path.endsWith(suffix));
-      if(exact.length!==1)
-        throw Error('Expected exactly one '+name+'/'+targetPath+' in the active Workspace');
+      const workspaceFolder=(vscode.workspace.workspaceFolders??[]).find(folder=>{
+        const root=folder.uri.path.replace(/\/$/,'');
+        return target.path.startsWith(root+'/');
+      });
+      if(!workspaceFolder)
+        throw Error('Markdown acceptance URI must be inside the active workspace');
+      const root=workspaceFolder.uri.path.replace(/\/$/,'');
+      const relativePath=target.path.slice(root.length+1);
+      if(!/^skills\/[a-z0-9-]+\/(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(relativePath))
+        throw Error('Markdown acceptance URI must identify a Skill-local Markdown file');
+      try{await vscode.workspace.fs.stat(target);}
+      catch{throw Error('Markdown acceptance target does not exist: '+target.toString());}
       // Open only the editable Source. The active-editor listener must create
       // its native Preview and normalize this right-column open back to the
       // fixed Source-left / Preview-right layout.
-      await vscode.commands.executeCommand('vscode.open',exact[0],{
+      await vscode.commands.executeCommand('vscode.open',target,{
         viewColumn:openColumn===2?vscode.ViewColumn.Two:vscode.ViewColumn.One,
         preview:false
       });
-      return exact[0].toString();
+      return target.toString();
     }));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',async()=>{
-      const matches=await vscode.workspace.findFiles(
-        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
-      const exact=matches.filter(item=>item.path.endsWith('/establish-pdu-session/SKILL.md'));
-      if(exact.length!==1)
-        throw Error('Expected exactly one conventional 5GC Skill guide for live-update acceptance');
-      const target=exact[0],key=target.toString();
+    context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
+      if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
+        throw Error('Live-update acceptance requires the exact Legacy 5GC Skill guide URI');
+      const key=target.toString();
       const doc=await vscode.workspace.openTextDocument(target);
       if(doc.languageId!=='markdown')
         throw Error('The conventional Skill guide is not registered as Markdown: '+doc.languageId);
@@ -3331,33 +3331,26 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
       return key;
     }));
-  context.subscriptions.push(vscode.commands.registerCommand(
+    context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      if(!target.path.endsWith('/establish-pdu-session/SKILL.md'))
-        throw Error('Refusing to restore a non-fixture Markdown guide');
+      if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
+        throw Error('Refusing to restore a non-Legacy 5GC Skill guide');
       const key=target.toString();
       const original=nativeMarkdownLiveOriginals.get(key);
       if(typeof original!=='string')
         throw Error('No original Markdown content is recorded for the live-update fixture');
       const doc=await vscode.workspace.openTextDocument(target);
-      // The browser acceptance invokes the native host Undo command as a
-      // separate top-level action. Never call Undo/WorkspaceEdit *inside*
-      // a plugin command while the native Markdown preview editor is active.
       if(doc.getText()!==original)
         throw Error('Native Markdown Undo did not restore the exact original Source');
       nativeMarkdownLiveOriginals.delete(key);
       return true;
     }));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
-      const matches=await vscode.workspace.findFiles(
-        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
-      const exact=matches.filter(item=>item.path.endsWith(
-        '/establish-pdu-session/SKILL.md'));
-      if(exact.length!==1)
-        throw Error('Expected exactly one existing Skill guide for the security probe');
-      const target=exact[0];
+    context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownSecurityAcceptance',async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
+      if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
+        throw Error('Security acceptance requires the exact Legacy 5GC Skill guide URI');
       const doc=await vscode.workspace.openTextDocument(target);
       if(doc.languageId!=='markdown')
         throw Error('Existing reference is not registered as Markdown: '+doc.languageId);
@@ -3395,10 +3388,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
       return target.toString();
     }));
-  context.subscriptions.push(vscode.commands.registerCommand(
+    context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      const suffix='/establish-pdu-session/SKILL.md';
+      const suffix='/skills/establish-pdu-session/SKILL.md';
       if(!target.path.endsWith(suffix))
         throw Error('Refusing to restore a non-fixture Skill guide');
       const original=nativeMarkdownSecurityOriginals.get(target.toString());

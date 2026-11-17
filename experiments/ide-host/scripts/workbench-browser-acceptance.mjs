@@ -560,6 +560,10 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
       JSON.stringify(workspaceAcceptance));
   const legacyProcedureUri=workspaceAcceptance.legacyProcedure;
   const candidateProcedureUri=workspaceAcceptance.candidateProcedure;
+  const legacyPackageRootUri=legacyProcedureUri.slice(
+    0,-"/assurance/procedure.yaml".length);
+  const legacySkillGuideUri=legacyPackageRootUri+"/SKILL.md";
+  const legacyReferenceUri=legacyPackageRootUri+"/references/3gpp-procedure.md";
   const assertYamlSourceVisualPair=(filename,label)=>
     assertSourceVisualPair(evalJS,sleep,filename,label);
   async function waitNativeMarkdown(predicate,label,attempts=100){
@@ -1905,7 +1909,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // The legacy Studio-owned Markdown renderer has been retired from the default path.
   // Native Markdown Preview acceptance below now owns rendering, navigation and security checks.
   const nativeMarkdownUri=await nativeCommand(
-    'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance','establish-pdu-session','SKILL.md',1);
+    'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance',legacySkillGuideUri,1);
   if(typeof nativeMarkdownUri!=='string'||!nativeMarkdownUri.endsWith('/SKILL.md'))
     throw Error('Native Markdown preview command did not open the exact Skill Source URI: '+
       JSON.stringify(nativeMarkdownUri));
@@ -1965,7 +1969,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // integration, not just the internal Preview helper, is exercised.
   const nativeReferenceUri=await nativeCommand(
     'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance',
-    'establish-pdu-session','references/3gpp-procedure.md',2);
+    legacyReferenceUri,2);
   if(typeof nativeReferenceUri!=='string'||
      !nativeReferenceUri.endsWith('/references/3gpp-procedure.md'))
     throw Error('Native Markdown did not open the exact Package reference Source: '+
@@ -1986,7 +1990,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // Source edit, then exercise both scroll-sync directions through Monaco and
   // the actual Markdown webview in Chromium.
   const nativeLiveUri=await nativeCommand(
-    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance');
+    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',legacySkillGuideUri);
   try{
     const nativeLive=await waitNativeMarkdown(
       view=>view.heading==='Native Markdown Live Update Probe'&&view.nativePreviewRoot,
@@ -2039,7 +2043,7 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
   // The restored document content and native Preview are the user-visible contract.
 
   const nativeSecurityUri=await nativeCommand(
-    'skillStudio.internal.nativeMarkdownSecurityAcceptance');
+    'skillStudio.internal.nativeMarkdownSecurityAcceptance',legacySkillGuideUri);
   if(typeof nativeSecurityUri!=='string'||
      !nativeSecurityUri.endsWith('/SKILL.md'))
     throw Error('Native Markdown security fixture was not created inside the 5GC Skill Package');
