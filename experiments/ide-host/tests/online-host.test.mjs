@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {readFileSync,statSync} from "node:fs";
+import {existsSync,readFileSync,statSync} from "node:fs";
 import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -94,6 +94,8 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   assert.ok(!plugin.contributes.menus?.["view/title"]?.some(x=>
     x.command==="skillStudio.loadExample"),
     "Example loading belongs in native File and SKILL Studio Project menus, not Explorer toolbar noise");
+  assert.equal(existsSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike/samples/skills")),false,
+    "the retired v0.2 sample set must not be bundled");
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js",
     "dist/compiler-worker.js","dist/skillc.wasm","dist/wasm_exec.js","media/procedure.js","media/procedure.css",
     "samples/v1alpha4/files.json","samples/v1alpha4/README.md",
