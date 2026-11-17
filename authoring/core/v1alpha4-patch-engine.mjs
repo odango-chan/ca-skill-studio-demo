@@ -98,6 +98,7 @@ function parseSource(source) {
     nodesMap: nodesPair.value,
     start: scalar(startPair.value),
     nodes,
+    source,
   };
 }
 
@@ -130,14 +131,6 @@ function getStage(parsed, nodeId, stageName, operationId) {
   return getMapValue(node, stageName, operationId);
 }
 
-function getScalarPair(map, key, operationId, description) {
-  const pair = findPair(map, key);
-  if (!pair || !isScalar(pair.value) || typeof pair.value.value !== "string") {
-    reject("target_not_found", description + " was not found as a scalar.", operationId);
-  }
-  return pair;
-}
-
 function rangeOf(node, operationId) {
   if (!node || isAlias(node) || !Array.isArray(node.range) ||
     !Number.isSafeInteger(node.range[0]) || !Number.isSafeInteger(node.range[1]) ||
@@ -151,21 +144,6 @@ function encodedScalar(value, originalRaw) {
   if (originalRaw.startsWith('"')) return JSON.stringify(value);
   if (originalRaw.startsWith("'")) return "'" + value.replace(/'/g, "''") + "'";
   return stringify(value, { lineWidth: 0 }).trimEnd();
-}
-
-function scalarEdit(source, node, value, operationId) {
-  if (!isScalar(node) || typeof value !== "string") {
-    reject("scalar_edit_invalid", "Only string scalar values can be changed by this operation.", operationId);
-  }
-  const range = rangeOf(node, operationId);
-  const original = source.slice(range.start, range.end);
-  return {
-    start: range.start,
-    end: range.end,
-    text: encodedScalar(value, original),
-    operationIndexes: [],
-    operationIds: [],
-  };
 }
 
 function mapIndent(source, map, operationId) {
@@ -369,7 +347,6 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
     assertPayload(operation, ["targetNodeId"]);
     const outcome = nonEmptyString(target.outcome, "route outcome", id, 64);
     const targetNodeId = nonEmptyString(payload.targetNodeId, "route target", id, 128);
-    const tool = findPair(stageMap, "tool");
     const script = findPair(stageMap, "script");
     const allowed = allowedOutcomes(stage, Boolean(script));
     if (!allowed.has(outcome)) reject("route_outcome_invalid", "Outcome is invalid for " + stage + ".", id);
@@ -488,8 +465,6 @@ function operationEditContext(parsed, operation, operationIndex, knownNodeIds, a
 
 function scalarEditFromPair(parsed, node, value, operationId) {
   const range = rangeOf(node, operationId);
-  const original = parsed.document.toString ? parsed.document.options : null;
-  void original;
   const raw = parsed.source.slice(range.start, range.end);
   return { start: range.start, end: range.end, text: encodedScalar(value, raw) };
 }
@@ -512,6 +487,28 @@ function materializeAppendEdits(source, appendMaps, appendSequences) {
     ));
   }
   return edits;
+}
+
+function mergeCoincidentInsertions(edits) {
+  const result = [];
+  const byOffset = new Map();
+  for (const edit of edits) {
+    if (edit.start !== edit.end) {
+      result.push(edit);
+      continue;
+    }
+    const existing = byOffset.get(edit.start);
+    if (!existing) {
+      const copy = { ...edit, operationIndexes: [...edit.operationIndexes], operationIds: [...edit.operationIds] };
+      byOffset.set(edit.start, copy);
+      result.push(copy);
+    } else {
+      existing.text += edit.text;
+      existing.operationIndexes.push(...edit.operationIndexes);
+      existing.operationIds.push(...edit.operationIds);
+    }
+  }
+  return result;
 }
 
 function applyEdits(source, edits) {
@@ -573,11 +570,10 @@ function unionFind(size) {
   return { find, union };
 }
 
-function buildGroups(operations, editRecords, newNodeIds) {
+function buildGroups(operations, editRecords) {
   const uf = unionFind(operations.length);
   const nodeAdds = new Map();
   const stageAdds = new Map();
-  const appendOperations = new Map();
 
   operations.forEach((operation, index) => {
     if (operation.type === "node.add") nodeAdds.set(operation.target.nodeId, index);
@@ -610,7 +606,6 @@ function buildGroups(operations, editRecords, newNodeIds) {
   });
 
   const groups = [];
-  const operationToGroup = new Map();
   for (const indexes of buckets.values()) {
     const id = "group-" + (groups.length + 1);
     const members = indexes.map((index) => operations[index]);
@@ -624,7 +619,6 @@ function buildGroups(operations, editRecords, newNodeIds) {
           ? "Update " + members[0].target.nodeId + (members[0].target.stage ? "." + members[0].target.stage : "")
           : "Related Procedure changes";
     const operationIds = members.map((operation) => operation.id);
-    indexes.forEach((index) => operationToGroup.set(index, id));
     groups.push({ id, label, operationIds, operationIndexes: indexes });
   }
 
@@ -633,7 +627,7 @@ function buildGroups(operations, editRecords, newNodeIds) {
     edits: editRecords.filter((edit) => edit.operationIndexes.some((index) => group.operationIndexes.includes(index)))
       .map(({ start, end, text, operationIds }) => ({ start, end, text, operationIds })),
   }));
-  return { groups: groupedEdits, operationToGroup };
+  return { groups: groupedEdits };
 }
 
 export async function planV1Alpha4Patch({
@@ -673,6 +667,18 @@ export async function planV1Alpha4Patch({
   const appendMaps = new Map();
   const appendSequences = new Map();
 
+  if (operations.length > 128) reject("operation_limit_exceeded", "A Change Set may contain at most 128 operations.");
+  for (const operation of operations) {
+    if (operation?.type === "node.add" && plain(operation.target) &&
+      typeof operation.target.nodeId === "string") {
+      if (!NODE_ID.test(operation.target.nodeId) || TERMINALS.has(operation.target.nodeId) ||
+        operation.target.nodeId === "context" || knownNodeIds.has(operation.target.nodeId)) {
+        reject("node_id_conflict", "Proposed Node ID is invalid, reserved or already exists.", operation.id);
+      }
+      knownNodeIds.add(operation.target.nodeId);
+    }
+  }
+
   for (let index = 0; index < operations.length; index += 1) {
     const operation = operations[index];
     if (!plain(operation) || typeof operation.id !== "string" ||
@@ -684,8 +690,8 @@ export async function planV1Alpha4Patch({
   }
 
   const insertionEdits = materializeAppendEdits(source, appendMaps, appendSequences);
-  const editRecords = [...edits, ...insertionEdits];
-  const { groups } = buildGroups(operations, editRecords, knownNodeIds);
+  const editRecords = mergeCoincidentInsertions([...edits, ...insertionEdits]);
+  const { groups } = buildGroups(operations, editRecords);
   const allEdits = groups.flatMap((group) => group.edits.map((edit) => ({
     ...edit,
     operationIndexes: group.operationIndexes,
