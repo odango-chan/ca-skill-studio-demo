@@ -3281,7 +3281,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       // Check the package-local path shape without rescanning the workspace.
       // openNativeMarkdownPreview applies the authoritative inventoried-file,
       // Package-root and symlink policy before rendering the document.
-      if(!/\\/skills\\/[a-z0-9-]+\\/(?:SKILL\\.md|(?:[a-z0-9-]+\\/)*[a-z0-9-]+\\.md)$/i.test(target.path))
+      if(!/\/skills\/[a-z0-9-]+\/(?:SKILL\.md|(?:[a-z0-9-]+\/)*[a-z0-9-]+\.md)$/i.test(target.path))
         throw Error('Markdown acceptance URI must identify a Markdown file inside a Skill Package: '+
           JSON.stringify({target:target.toString(),workspaceRoot:workspaceFolder.uri.toString()}));
       try{await vscode.workspace.fs.stat(target);}
