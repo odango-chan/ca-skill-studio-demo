@@ -1,12 +1,15 @@
-# CA-SL v1alpha4 — Current specification / 当前语言规范入口
+# CA-SL v1alpha5 — Current Skill Studio target / 当前编辑器目标
 
-**Current normative source / 当前唯一规范正文：** [CA-SL v1alpha4 完整中文单文件规范](skill-language-spec.v1alpha4.zh-CN.md).
+**Candidate normative source / 当前候选规范正文：** [CA-SL v1alpha5 完整中文单文件规范](skill-language-spec.v1alpha5.zh-CN.md).
 
-- **Language:** `connectionagent.io/v1alpha4` — **FROZEN (language only)**.
-- **External profile:** `connectionagent.io/toolcatalog/v1alpha4` and `connectionagent.io/capability-contracts/v1alpha4`; no v1alpha3 fallback (§F.0).
-- **Compiler / Studio / Host / Owner / 5GC:** **NOT_QUALIFIED** until separately tested under §45.2.
-- **Normative coverage:** §0–§45 and Annexes E/F/G/H; E01–E104 in E, E105–E120 in G.9. Annexes I/J/K are informative.
+- **Language:** `connectionagent.io/v1alpha5` — **PUBLIC REVIEW DRAFT; NOT RELEASED**.
+- **Inheritance:** v1alpha5 uses the immutable, frozen v1alpha4 specification as its baseline; Appendix L adds Node-entry Event Wait, typed `wait.output`, TIMEOUT control routing and paired-response boundaries.
+- **Normative source pin:** `odango-chan/ca-skills@12a9512a9eae006ad4578daf37ebe0bdf3070642` (PR #61 candidate).
+- **Compiler pin:** `odango-chan/ca-skill-compiler@34993dc30b66f4cf7d573cbc81d884c356062a12` (PR #30, WP2 only). v1alpha5 Check covers the current Wait parser/AST slice; Build remains fail-closed until WP3–WP8 are implemented.
+- **Compiler / Studio-LSP / Host / Runtime / Integration / Owner / 5GC:** **NOT_QUALIFIED**.
 
-**Historical frozen language:** [CA-SL v1alpha3](skill-language-spec.zh-CN.md) is retained for expressly historical v1alpha3-scoped references. It is **not** the current authoring target. Existing 5GC source files and semantic-token selectors remain legacy and are not v1alpha4-conforming: see [5GC source baseline](current-5gc-skill-baseline.md).
+The upstream `docs/skill-language-spec.md` discovery entry has not yet been updated by PR #61. This local file is a non-normative Studio target pointer to the immutable candidate source; it does not publish or freeze v1alpha5.
 
-To reproduce any freeze/conformance review, pin the exact complete v1alpha4 file by its **immutable Git commit SHA**. `main` is a moving discovery entry, not a frozen artifact identity. Freeze decisions and errata are recorded in §45.1. This index is non-normative.
+**Historical frozen language:** [CA-SL v1alpha4](skill-language-spec.v1alpha4.zh-CN.md) remains an immutable published baseline. Skill Studio's active authoring target is v1alpha5 candidate; v1alpha4 is not retained as a parallel product compatibility mode.
+
+This index is non-normative. The v1alpha5 candidate and its conformance obligations remain subject to independent review and release decision.
