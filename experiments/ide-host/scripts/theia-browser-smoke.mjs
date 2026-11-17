@@ -620,9 +620,9 @@ try{
     )].some(node=>{
       const message=node.innerText;
       return (message.includes('示例项目已载入并打开工作区：skill-studio-demo/')&&
-        message.includes('默认已打开 CA-SL v1alpha4 Procedure（DRAFT / NOT_QUALIFIED）'))||
+        message.includes('默认已打开 CA-SL v1alpha5 Procedure（DRAFT / NOT_QUALIFIED）'))||
         (message.includes('Example project opened: skill-studio-demo/')&&
-        message.includes('CA-SL v1alpha4 Procedure is open (DRAFT / NOT_QUALIFIED)'));
+        message.includes('CA-SL v1alpha5 Procedure is open (DRAFT / NOT_QUALIFIED)'));
     })`);
     if(exampleLoadReady)break;
     await sleep(150);
@@ -706,7 +706,7 @@ try{
      !identity.defaultProcedureExists||!identity.masProcedureExists||
      !afterImport.documentTitle.includes("skill-studio-demo")||
      afterImport.documentTitle.includes("Untitled"))
-    throw Error("Example did not open as a named single-folder v1alpha4 workspace: "+
+    throw Error("Example did not open as a named single-folder v1alpha5 workspace: "+
       JSON.stringify({documentTitle:afterImport.documentTitle,
         browserIdentity:afterImport.workspaceIdentity,
         ui:{workspaceRootVisible:afterImport.workspaceRootVisible,
@@ -726,7 +726,7 @@ try{
        "/skills/establish-pdu-session-mas/assurance/procedure.yaml")||
      !afterImport.documentTitle.includes("skill-studio-demo")||
      afterImport.documentTitle.includes("Untitled"))
-    throw Error("Example did not open as the named single-folder v1alpha4 workspace: "+
+    throw Error("Example did not open as the named single-folder v1alpha5 workspace: "+
       JSON.stringify({documentTitle:afterImport.documentTitle,
         browserIdentity:afterImport.workspaceIdentity,
         ui:{workspaceRootVisible:afterImport.workspaceRootVisible,
@@ -747,7 +747,7 @@ try{
   for(const frame of frames.filter(item=>/webview/i.test(item.url??""))){
     try{
       const world=await command("Page.createIsolatedWorld",{
-        frameId:frame.id,worldName:"skill-studio-v1alpha4-initial-acceptance",
+        frameId:frame.id,worldName:"skill-studio-v1alpha5-initial-acceptance",
         grantUniveralAccess:true
       });
       const evaluated=await command("Runtime.evaluate",{
@@ -769,7 +769,7 @@ try{
     item.view?.procedureRoot&&item.view.procedureValue==="establish-pdu-session");
   const defaultWebviewView=defaultGraphFrame?.view??null;
   if(requireEditor&&(!defaultGraphFrame||!(defaultWebviewView?.graphNodes>0)))
-    throw Error("The default CA-SL v1alpha4 Procedure did not render: "+
+    throw Error("The default CA-SL v1alpha5 Procedure did not render: "+
       JSON.stringify({webviewFrames:webviewFrames.map(item=>({
         url:item.frame.url,error:item.error,view:item.view
       }))}));
@@ -789,7 +789,7 @@ try{
       for(const frame of current.filter(item=>/webview/i.test(item.url??""))){
         try{
           const isolated=await command("Page.createIsolatedWorld",{
-            frameId:frame.id,worldName:"skill-studio-v1alpha4-main-world-probe",
+            frameId:frame.id,worldName:"skill-studio-v1alpha5-main-world-probe",
             grantUniveralAccess:true
           });
           const probe=await command("Runtime.evaluate",{
@@ -810,11 +810,11 @@ try{
       }
       await sleep(80);
     }
-    throw Error("Could not resolve the live v1alpha4 Procedure Webview main realm: "+
+    throw Error("Could not resolve the live v1alpha5 Procedure Webview main realm: "+
       JSON.stringify(latest));
   };
 
-  console.log("STUDIO_THEIA_STAGE","v1alpha4-workbench");
+  console.log("STUDIO_THEIA_STAGE","v1alpha5-workbench");
   const workbenchEvidence=await runWorkbenchAcceptance({
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp,
     procedureUri:identity.defaultProcedure
@@ -822,7 +822,7 @@ try{
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
     ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
-  console.log("STUDIO_THEIA_STAGE","v1alpha4-package-overview");
+  console.log("STUDIO_THEIA_STAGE","v1alpha5-package-overview");
 
   await evalJS("(async()=>{const c=window.theia.container;"+
     "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
@@ -890,29 +890,29 @@ try{
     throw Error("Theia status bar is not Studio Light: "+JSON.stringify(afterImport.statusBar));
   const importedNotification=afterImport.notificationText.some(message=>
     (message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
-     message.includes("默认已打开 CA-SL v1alpha4 Procedure（DRAFT / NOT_QUALIFIED）")&&
-     message.includes("导入 v1alpha4 Skill 文件 14 个"))||
+     message.includes("默认已打开 CA-SL v1alpha5 Procedure（DRAFT / NOT_QUALIFIED）")&&
+     message.includes("导入 v1alpha5 Skill 文件 14 个"))||
     (message.includes("Example project opened: skill-studio-demo/")&&
-     message.includes("CA-SL v1alpha4 Procedure is open (DRAFT / NOT_QUALIFIED)")&&
-     message.includes("Imported 14 CA-SL v1alpha4 Skill files")));
+     message.includes("CA-SL v1alpha5 Procedure is open (DRAFT / NOT_QUALIFIED)")&&
+     message.includes("Imported 14 CA-SL v1alpha5 Skill files")));
   if(!importedNotification||!afterImport.explorerText.includes("skills")||
      !afterImport.explorerText.includes("establish-pdu-session"))
-    throw Error("Theia did not open the v1alpha4 Example project: "+
+    throw Error("Theia did not open the v1alpha5 Example project: "+
       JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
   if(requireEditor&&(!defaultWebviewView?.procedureRoot||
       defaultWebviewView.graphNodes<1||
       defaultWebviewView.procedureValue!=="establish-pdu-session"))
-    throw Error("Default v1alpha4 Procedure CustomEditor did not render: "+
+    throw Error("Default v1alpha5 Procedure CustomEditor did not render: "+
       JSON.stringify({defaultWebviewView,webviewFrames}).slice(0,3000));
   if(requireEditor&&(!workbenchEvidence?.graphEditability?.readOnly||
       !workbenchEvidence.graphEditability.sourceUnchanged))
-    throw Error("v1alpha4 Procedure graph did not remain read-only: "+
+    throw Error("v1alpha5 Procedure graph did not remain read-only: "+
       JSON.stringify(workbenchEvidence?.graphEditability).slice(0,3000));
   if(requireEditor&&(!workbenchEvidence?.phaseEvidence?.ready||
       !workbenchEvidence.phaseEvidence.readOnly||
       !workbenchEvidence?.packageOverview?.skills||
       workbenchEvidence.packageOverview.skills.length!==2))
-    throw Error("v1alpha4 Inspector or Package Overview acceptance did not complete: "+
+    throw Error("v1alpha5 Inspector or Package Overview acceptance did not complete: "+
       JSON.stringify({phaseEvidence:workbenchEvidence?.phaseEvidence,
         packageOverview:workbenchEvidence?.packageOverview}).slice(0,3000));
   console.log("STUDIO_V1ALPHA4_ONLY_ACCEPTANCE",JSON.stringify({
