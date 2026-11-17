@@ -351,22 +351,22 @@ export function activate(context){
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
   const exampleText=progressZh?{
     title:"加载示例项目",
-    starting:"正在准备官方示例…",
+    starting:"正在准备官方参考 Skill 和 v1alpha4 候选示例…",
     manifest:"正在读取示例清单…",
-    files:(completed,total)=>"正在导入官方文件（"+completed+"/"+total+"）…",
+    files:(completed,total)=>"正在导入示例文件（"+completed+"/"+total+"）…",
     workspace:"正在打开示例工作区…",
     packages:"正在加载 Package Explorer…",
-    procedure:"正在打开 5GC Procedure…",
+    procedure:"正在打开 v1alpha4 候选 Procedure…",
     success:"示例项目已打开",
     failure:"示例项目载入失败"
   }:{
     title:"Loading example project",
-    starting:"Preparing official examples…",
-    manifest:"Reading example manifest…",
-    files:(completed,total)=>"Importing official files ("+completed+"/"+total+")…",
+    starting:"Preparing official reference Skills and v1alpha4 candidate examples…",
+    manifest:"Reading example manifests…",
+    files:(completed,total)=>"Importing sample files ("+completed+"/"+total+")…",
     workspace:"Opening example workspace…",
     packages:"Preparing Package Explorer…",
-    procedure:"Opening 5GC Procedure…",
+    procedure:"Opening v1alpha4 candidate Procedure…",
     success:"Example project opened",
     failure:"Example project failed to load"
   };
@@ -409,7 +409,9 @@ export function activate(context){
                 const pending={
                   root:result.root.toString(),
                   procedure:result.procedure.toString(),
-                  files:result.files,skipped:result.skipped,skills:result.skills
+                  files:result.files,officialFiles:result.officialFiles,
+                  candidateFiles:result.candidateFiles,skipped:result.skipped,
+                  skills:result.skills,sourceShas:result.sourceShas
                 };
                 await context.globalState.update(PENDING_EXAMPLE_OPEN_KEY,pending);
                 try{
@@ -461,10 +463,11 @@ export function activate(context){
               // Keep the established success notification used by Chromium
               // acceptance and make create-only / existing-file semantics clear.
               void vscode.window.showInformationMessage(
-                "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+
-                "同步 "+result.files+" 个官方文件；保留 "+result.skipped+" 个已有文件。"+
-                (viewOpened&&revealed?"已展开 Package Explorer（含传统 5GC + MAS）。":
-                  "可在 Explorer → Package Explorer 查看两个 SKILL。"));
+                "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 v1alpha4 候选 Procedure（DRAFT / NOT_QUALIFIED）。"+
+                "导入官方 Legacy 文件 "+result.officialFiles+" 个、v1alpha4 候选文件 "+
+                result.candidateFiles+" 个；保留 "+result.skipped+" 个已有文件。"+
+                (viewOpened&&revealed?"已展开 Package Explorer（官方 Legacy 5GC + MAS）。":
+                  "可在 Explorer → Package Explorer 查看官方参考 Skill。"));
               return result;
             }catch(error){
               const message=exampleText.failure+" ["+stage+"]："+String(error?.message??error);
@@ -672,11 +675,13 @@ export function activate(context){
         editor:VIEW
       }));
       const detail=progressZh
-        ?("同步 "+pending.files+" 个官方文件；保留 "+pending.skipped+" 个已有文件。")
-        :("Imported "+pending.files+" official files; preserved "+pending.skipped+" existing files.");
+        ?("导入官方 Legacy 文件 "+pending.officialFiles+" 个、v1alpha4 候选文件 "+
+          pending.candidateFiles+" 个；保留 "+pending.skipped+" 个已有文件。")
+        :("Imported "+pending.officialFiles+" official legacy files and "+
+          pending.candidateFiles+" v1alpha4 candidate files; preserved "+pending.skipped+" existing files.");
       const message=progressZh
-        ?("示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+detail)
-        :("Example project opened: skill-studio-demo/. The conventional 5GC Procedure is open. "+detail);
+        ?("示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 v1alpha4 候选 Procedure（DRAFT / NOT_QUALIFIED）。"+detail)
+        :("Example project opened: skill-studio-demo/. The v1alpha4 candidate Procedure is open (DRAFT / NOT_QUALIFIED). "+detail);
       void vscode.window.showInformationMessage(message);
     }
   }).catch(error=>{
