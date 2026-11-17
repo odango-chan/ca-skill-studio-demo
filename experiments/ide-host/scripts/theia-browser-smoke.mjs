@@ -1936,6 +1936,40 @@ try{
       }));
     return data.result?.value;
   };
+  // The initial Example acceptance above proves the v1alpha4 candidate is
+  // the default editor. The long-standing workbench regression suite is
+  // intentionally a Legacy 5GC fixture (17-node graph and PCF Outcome repair);
+  // switch explicitly to the official Legacy package for that separate suite.
+  // This keeps its coverage honest instead of pretending those assertions
+  // describe the smaller v1alpha4 candidate graph.
+  const legacyProcedureUri=identity.root+
+    "/skills/establish-pdu-session/assurance/procedure.yaml";
+  await evalJS(`(async()=>{
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==="function"&&k.prototype?.executeCommand&&
+      k.prototype?.registerCommand&&k.prototype?.getCommand);
+    if(!key)throw Error("Native command registry missing before Legacy regression fixture");
+    const registry=c.get(key);
+    await registry.executeCommand("core.close.all.main.tabs");
+    await registry.executeCommand("skillStudio.openProcedure",${JSON.stringify(legacyProcedureUri)});
+    return true;
+  })()`);
+  let legacyOpened=false;
+  for(let attempt=0;attempt<60&&!legacyOpened;attempt++){
+    legacyOpened=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>String(k)==="Symbol(OpenerService)");
+      if(!key)return false;
+      const openers=await c.get(key).getOpeners();
+      const custom=openers.find(x=>x.id==="custom-editor-skillStudio.procedurePreview");
+      return !!custom?.widgetManager.getWidgets("plugin-custom-editor").some(w=>
+        w.resource?.toString()===${JSON.stringify(legacyProcedureUri)});
+    })()`);
+    if(!legacyOpened)await sleep(100);
+  }
+  if(!legacyOpened)throw Error("Could not open the official Legacy Procedure regression fixture: "+legacyProcedureUri);
+  console.log("STUDIO_BROWSER_ACCEPTANCE_SWITCHED_TO_LEGACY_FIXTURE",legacyProcedureUri);
   let workbenchEvidence;
   try{workbenchEvidence=await runWorkbenchAcceptance({
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp
