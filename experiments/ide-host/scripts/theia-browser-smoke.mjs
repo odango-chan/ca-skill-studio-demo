@@ -689,8 +689,7 @@ try{
     };
   })()`);
   await sleep(1200);
-  const identity=afterImport.workspaceIdentity?.available
-    ?afterImport.workspaceIdentity:workspaceReports.at(-1);
+  const identity=workspaceReports.at(-1);
   if(!identity||identity.workspaceName!=="skill-studio-demo"||
      identity.workspaceFile!==null||
      !String(identity.root??"").endsWith("/skill-studio-demo")||
