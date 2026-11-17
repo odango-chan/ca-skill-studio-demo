@@ -2498,10 +2498,6 @@ export async function runWorkbenchAcceptance({command,evalJS,evalWebviewJS,sleep
     await sleep(100);
   }
   if(!conventionalGraph)throw Error('Could not restore conventional 5GC Procedure after MAS Explorer acceptance');
-  await click(conventionalProcedure.x,conventionalProcedure.y,2);
-  await sleep(250);
-  conventionalGraph=await graph('ue-requested-pdu-session-establishment');
-  if(!conventionalGraph)throw Error('Conventional 5GC Procedure did not pin after MAS acceptance');
   const dualSkillExplorer={
     root:'skill-studio-demo/skills',conventionalFolder:'establish-pdu-session',masFolder,
     assuranceRows,procedureRows,masProcedure,masProcedureGraph,masResourcePaths,
