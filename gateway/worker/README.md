@@ -35,6 +35,7 @@ Requires Node.js 24. No Cloudflare account or live provider key is required for 
 
 The access.dev block in wrangler.jsonc simulates an authenticated local Access identity for Wrangler development. It is development-only and is not a production access policy.
 
+    cd gateway/worker
     npx wrangler@4.157.0 dev
 
 To test a real provider locally, put the key in a local .dev.vars file (never commit it):
@@ -54,7 +55,8 @@ Do not deploy until the target Cloudflare account has been configured:
 7. Replace the sample Rate Limiting namespace ID with a unique integer for this Cloudflare account.
 8. Set the provider key as a Worker secret:
 
-       npx wrangler secret put PROVIDER_API_KEY
+       cd gateway/worker
+       npx wrangler@4.157.0 secret put PROVIDER_API_KEY
 
 The sample rate limit is 10 requests per user per 60 seconds. Tune it before a real pilot. A missing Access context, wrong audience, missing binding or missing secret prevents upstream calls.
 
