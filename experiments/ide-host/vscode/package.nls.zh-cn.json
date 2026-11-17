@@ -5,5 +5,6 @@
   "project.example": "SKILL Studio：打开示例项目",
   "help.spec": "SKILL Studio：Skill 语言规范",
   "help.guide": "SKILL Studio：编写指南",
-  "project.welcome.title": "SKILL Studio：欢迎页面"
+  "project.welcome.title": "SKILL Studio：欢迎页面",
+  "ai.authoring": "SKILL Studio：AI 编辑 Procedure"
 }

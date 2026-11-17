@@ -20,6 +20,7 @@ import {registerProjectWelcome} from "./project-welcome.mjs";
 
 import {extendMarkdownIt} from "./markdown-link-policy.mjs";
 import {registerWorkbench} from "./workbench.mjs";
+import {registerAiAuthoringEditor} from "./ai-authoring-editor.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {registerContractEditor} from "./contract-editor.mjs";
 import {registerPredicateEditor} from "./predicate-editor.mjs";
@@ -75,6 +76,9 @@ export function activate(context){
   workbench=registerWorkbench(vscode,context,{
     prepareToolContract:dependencyIntegration.prepareToolContract,
     compilerProblemsProvider:compilerIntegration.problems
+  });
+  registerAiAuthoringEditor(vscode,context,{
+    getActiveDocument:()=>workbench?.getActiveDocument?.()??null
   });
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
