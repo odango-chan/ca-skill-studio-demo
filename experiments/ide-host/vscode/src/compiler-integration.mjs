@@ -419,10 +419,16 @@ export function registerCompilerIntegration(vscode,context,{
         const request={
           apiVersion:"connectionagent.io/compiler-build-request/v1alpha4",
           languageTarget:"connectionagent.io/v1alpha4",
-          files:[{
-            path:"skills/compiler-smoke/SKILL.md",
-            bytes:"IyBDb21waWxlciBzbW9rZQo="
-          }],
+          files:[
+            {
+              path:"skills/compiler-smoke/SKILL.md",
+              bytes:"IyBDb21waWxlciBzbW9rZQo="
+            },
+            {
+              path:"skills/compiler-smoke/assurance/procedure.yaml",
+              bytes:"c3RhcnQ6IFsK"
+            }
+          ],
           resolvedDependencies:[],
           targets:["compiler-smoke"]
         };
@@ -431,7 +437,9 @@ export function registerCompilerIntegration(vscode,context,{
           client.request("build",request),
           client.request("inspect",request)
         ]);
-        if(!Array.isArray(check))throw new Error("Compiler Check did not return Diagnostic[]");
+        if(!Array.isArray(check)||!check.some(item=>item.code==="YAML_PARSE_ERROR")){
+          throw new Error("Compiler Check did not return the expected YAML_PARSE_ERROR diagnostic");
+        }
         if(!isCompilerBuildResult(build)||build.success!==false||
            build.outputFiles.length!==0){
           throw new Error("Compiler Worker did not preserve failure-atomic BuildResult semantics");
