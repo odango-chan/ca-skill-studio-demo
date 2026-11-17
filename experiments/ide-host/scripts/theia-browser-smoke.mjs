@@ -620,9 +620,9 @@ try{
     )].some(node=>{
       const message=node.innerText;
       return (message.includes('示例项目已载入并打开工作区：skill-studio-demo/')&&
-        message.includes('默认已打开 v1alpha4 候选 Procedure（DRAFT / NOT_QUALIFIED）'))||
+        message.includes('默认已打开 CA-SL v1alpha4 Procedure（DRAFT / NOT_QUALIFIED）'))||
         (message.includes('Example project opened: skill-studio-demo/')&&
-        message.includes('v1alpha4 candidate Procedure is open (DRAFT / NOT_QUALIFIED)'));
+        message.includes('CA-SL v1alpha4 Procedure is open (DRAFT / NOT_QUALIFIED)'));
     })`);
     if(exampleLoadReady)break;
     await sleep(150);
@@ -703,10 +703,10 @@ try{
      !String(identity.root??"").endsWith("/skill-studio-demo")||
      !Array.isArray(identity.workspaceFolders)||identity.workspaceFolders.length!==1||
      identity.workspaceFolders[0]!==identity.root||
-     !identity.legacyProcedureExists||!identity.candidateProcedureExists||
+     !identity.defaultProcedureExists||!identity.masProcedureExists||
      !afterImport.documentTitle.includes("skill-studio-demo")||
      afterImport.documentTitle.includes("Untitled"))
-    throw Error("Example did not open as a named single-folder workspace with both pinned sample sets: "+
+    throw Error("Example did not open as a named single-folder v1alpha4 workspace: "+
       JSON.stringify({documentTitle:afterImport.documentTitle,
         browserIdentity:afterImport.workspaceIdentity,
         ui:{workspaceRootVisible:afterImport.workspaceRootVisible,
