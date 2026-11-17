@@ -133,7 +133,8 @@ export function analyzeV1Alpha5Source(
         else{
           timeoutTarget=target;
           timeoutRouteLine=lineAt(p.document,route.key);
-          if(!target||(!WAIT_TERMINALS.has(target)&&!NODE_ID.test(target)))
+          if(!target||TERMINALS.has(target)&&!WAIT_TERMINALS.has(target)||
+             !WAIT_TERMINALS.has(target)&&!NODE_ID.test(target))
             add(p.document,"WAIT_TIMEOUT_ROUTE_INVALID","TIMEOUT must target a declared Node, FAILED, UNRESOLVED or SAFE_STOPPED",route.value);
           else if(NODE_ID.test(target)&&!WAIT_TERMINALS.has(target)&&!declared.has(target))
             add(p.document,"CONTROL_FLOW_DANGLING","Wait TIMEOUT target does not identify a declared Node: "+target,route.value);
