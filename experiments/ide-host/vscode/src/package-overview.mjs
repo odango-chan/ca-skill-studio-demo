@@ -187,7 +187,7 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
   const artifactsSection=()=>({
     kind:'section',section:'artifacts',label:'Build Artifacts',
     description:'Verified, read-only Compiler output',
-    icon:'package-check',contextValue:'skillStudio.artifactsSection'
+    icon:'package',contextValue:'skillStudio.artifactsSection'
   });
   const decorateArtifactNodes=(items,parentNode=null)=>(items??[]).map(item=>({
     ...item,sourceSection:'artifacts',...(parentNode?{parentNode}:{})
