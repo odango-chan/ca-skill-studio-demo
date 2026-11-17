@@ -163,7 +163,7 @@ test("SKILL Studio adds one native Theia top-level menu with real extension comm
   assert.match(script,/MenuModelRegistry/);
   assert.match(script,/registerMenuAction/);
   assert.match(script,/registerSubmenu\(TOP,"SKILL Studio"/);
-  assert.match(script,/\["menubar","00_skill_studio"\]/);
+  assert.match(script,/\["menubar","5z_skill_studio"\]/);
   assert.match(script,/registerSubmenu\(groupPath,group\.label/);
   assert.match(script,/menus\.registerMenuAction\(action\.path/);
   assert.ok(script.includes('["menubar","1_file","1_new"]'));
