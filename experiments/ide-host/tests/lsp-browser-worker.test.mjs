@@ -373,35 +373,26 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
 });
 
 
-function currentV02PackageSnapshot(generation=1,completeness="complete"){
+function currentV1Alpha4PackageSnapshot(generation=1,completeness="complete"){
   const rootUri="file:///workspace/establish-pdu-session";
+  const base="../../../site/samples/v1alpha4/establish-pdu-session/";
   const paths=[
     "assurance/contract.yaml",
     "assurance/predicates.yaml",
     "assurance/procedure.yaml",
-    "schemas/establishment-request.schema.yaml"
+    "schemas/establishment-request.schema.yaml",
+    "scripts/validate-subscription-request.py"
   ];
   const documents=paths.map(relativePath=>({
-    uri:rootUri+"/"+relativePath,relativePath,languageId:"yaml",
+    uri:rootUri+"/"+relativePath,relativePath,
+    languageId:relativePath.endsWith(".py")?"python":"yaml",
     version:relativePath==="assurance/procedure.yaml"?generation:0,
-    text:readFileSync(new URL("../../../site/samples/skills/establish-pdu-session/"+
-      relativePath,import.meta.url),"utf8")
+    text:readFileSync(new URL(base+relativePath,import.meta.url),"utf8")
   }));
-  documents.push({
-    uri:rootUri+"/lib/tools/udm.tool.yaml",
-    relativePath:"lib/tools/udm.tool.yaml",languageId:"yaml",version:0,
-    text:`apiVersion: connectionagent.io/v1alpha1
-kind: ToolCatalog
-spec:
-  contracts:
-    - operation: sbi.udm.sm_data.get
-      effect: READ
-`
-  });
   return {rootUri,packageName:"establish-pdu-session",generation,completeness,documents};
 }
 
-test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported ToolCatalog symbols",async()=>{
+test("browser LSP resolves current v1alpha4 Contract, Procedure, Predicate, Schema and Script references",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   try{
     worker.postMessage({
@@ -415,12 +406,7 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.equal(initialized.result.capabilities.documentSymbolProvider,true);
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
-    const snapshot=currentV02PackageSnapshot();
-    snapshot.dependencyOperations=[
-      {id:"sbi.udm.sm_data.get.next",dependencyId:"udm"},
-      {id:"sbi.udm.sm_data.get.duplicate",dependencyId:"udm"},
-      {id:"sbi.udm.sm_data.get.duplicate",dependencyId:"other"}
-    ];
+    const snapshot=currentV1Alpha4PackageSnapshot();
     const ready=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===snapshot.rootUri&&
@@ -432,19 +418,18 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
     const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
     const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
-    const tools=snapshot.documents.find(x=>x.relativePath==="lib/tools/udm.tool.yaml");
-    assert.ok(contract&&procedure&&predicates&&tools);
+    const schema=snapshot.documents.find(x=>x.relativePath==="schemas/establishment-request.schema.yaml");
+    const script=snapshot.documents.find(x=>x.relativePath==="scripts/validate-subscription-request.py");
+    assert.ok(contract&&procedure&&predicates&&schema&&script);
 
-    const entryName="ue-requested-pdu-session-establishment";
-    const entryDefinition=await lspRequest(worker,302,"textDocument/definition",{
-      textDocument:{uri:contract.uri},position:positionOf(contract.text,entryName)
+    const precondition="get-sm-subscription-data.precondition";
+    const preconditionDefinition=await lspRequest(worker,302,"textDocument/definition",{
+      textDocument:{uri:contract.uri},position:positionOf(contract.text,precondition)
     });
-    assert.equal(entryDefinition.uri,procedure.uri,
-      "Contract entryProcedure resolves to the Procedure declaration");
+    assert.equal(preconditionDefinition.uri,procedure.uri,
+      "Contract precondition resolves to the exact Procedure Node");
 
     const schemaPath="schemas/establishment-request.schema.yaml";
-    const schema=snapshot.documents.find(x=>x.relativePath===schemaPath);
-    assert.ok(schema);
     const schemaDefinition=await lspRequest(worker,311,"textDocument/definition",{
       textDocument:{uri:contract.uri},position:positionOf(contract.text,schemaPath)
     });
@@ -452,40 +437,49 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
       "Contract requestSchema resolves to the exact Package-owned Schema file");
     assert.deepEqual(schemaDefinition.range.start,{line:0,character:0});
 
-    const predicateName="createdsession.ingress.eligible";
+    const predicateName="establishment.request.supported";
     const predicateDefinition=await lspRequest(worker,303,"textDocument/definition",{
       textDocument:{uri:procedure.uri},position:positionOf(procedure.text,predicateName)
     });
     assert.equal(predicateDefinition.uri,predicates.uri,
-      "Procedure applicability/verify references resolve to PredicateSet declarations");
+      "Procedure Predicate references resolve to PredicateSet declarations");
 
-    const nodeName="nudm-sdm-get";
+    const nodeName="subscribe-sm-data";
     const nodeDefinition=await lspRequest(worker,304,"textDocument/definition",{
-      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,nodeName)
+      textDocument:{uri:procedure.uri},
+      position:positionOf(procedure.text,nodeName,0)
     });
     assert.equal(nodeDefinition.uri,procedure.uri,
-      "Procedure start/route references resolve to the scoped node declaration");
+      "Procedure route references resolve to the exact Node declaration");
 
-    const operationName="sbi.udm.sm_data.get";
-    const operationDefinition=await lspRequest(worker,305,"textDocument/definition",{
+    const scriptPath="scripts/validate-subscription-request.py";
+    const scriptDefinition=await lspRequest(worker,305,"textDocument/definition",{
+      textDocument:{uri:predicates.uri},position:positionOf(predicates.text,scriptPath)
+    });
+    assert.equal(scriptDefinition.uri,script.uri,
+      "Predicate evaluator Script references resolve only to Package-owned files");
+
+    const operationName="ca::sbi.udm.sm_data.get";
+    const operationDefinition=await lspRequest(worker,306,"textDocument/definition",{
       textDocument:{uri:procedure.uri},position:positionOf(procedure.text,operationName)
     });
-    assert.equal(operationDefinition.uri,tools.uri,
-      "Operation references resolve only to an imported ToolCatalog declaration");
+    assert.equal(operationDefinition,null,
+      "an unpublished Owner Operation must not receive an invented ToolCatalog Definition");
 
-    const operationCompletion=await lspRequest(worker,399,"textDocument/completion",{
-      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,operationName,operationName.length)
+    const observationName="ca-session-context::context.smf.session.read";
+    const observationDefinition=await lspRequest(worker,307,"textDocument/definition",{
+      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,observationName)
     });
-    assert.ok(operationCompletion.some(item=>item.label===operationName+".next"));
-    assert.ok(!operationCompletion.some(item=>item.label===operationName+".duplicate"));
+    assert.equal(observationDefinition,null,
+      "a read-only Observation is not conflated with a callable Operation");
 
-    const predicateHover=await lspRequest(worker,306,"textDocument/hover",{
+    const predicateHover=await lspRequest(worker,308,"textDocument/hover",{
       textDocument:{uri:procedure.uri},position:positionOf(procedure.text,predicateName)
     });
     assert.match(predicateHover.contents.value,/Predicate/);
     assert.ok(predicateHover.contents.value.includes(predicateName));
 
-    const predicateReferences=await lspRequest(worker,307,"textDocument/references",{
+    const predicateReferences=await lspRequest(worker,309,"textDocument/references",{
       textDocument:{uri:predicates.uri},
       position:positionOf(predicates.text,predicateName),
       context:{includeDeclaration:true}
@@ -493,25 +487,22 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     assert.ok(predicateReferences.some(x=>x.uri===predicates.uri));
     assert.ok(predicateReferences.some(x=>x.uri===procedure.uri));
 
-    const procedureSymbols=await lspRequest(worker,308,"textDocument/documentSymbol",{
+    const procedureSymbols=await lspRequest(worker,310,"textDocument/documentSymbol",{
       textDocument:{uri:procedure.uri}
     });
-    const root=procedureSymbols.find(x=>x.name===entryName);
-    assert.ok(root,"Procedure declaration appears in native Outline");
-    assert.ok(root.children?.some(x=>x.name===nodeName),
-      "Procedure nodes appear as nested Outline symbols");
-    const predicateSymbols=await lspRequest(worker,309,"textDocument/documentSymbol",{
+    assert.ok(procedureSymbols.some(x=>x.name==="get-sm-subscription-data"),
+      "v1alpha4 Procedure Nodes appear in native Outline");
+    const predicateSymbols=await lspRequest(worker,312,"textDocument/documentSymbol",{
       textDocument:{uri:predicates.uri}
     });
     assert.ok(predicateSymbols.some(x=>x.name===predicateName),
-      "PredicateSet declarations appear in native Outline");
+      "Predicate declarations appear in native Outline");
 
-    // Even exact token positions cannot navigate across an incomplete Package.
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageInvalidate",
       params:{rootUri:snapshot.rootUri,generation:2}
     });
-    const partial=currentV02PackageSnapshot(2,"partial");
+    const partial=currentV1Alpha4PackageSnapshot(2,"partial");
     const partialReady=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===snapshot.rootUri&&
@@ -519,27 +510,11 @@ test("browser LSP resolves v0.2 Contract, Procedure, Predicate and imported Tool
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:partial});
     const partialStatus=await partialReady;
     assert.equal(partialStatus.params.state,"PARTIAL");
-    const blocked=await lspRequest(worker,310,"textDocument/definition",{
-      textDocument:{uri:contract.uri},position:positionOf(contract.text,entryName)
+    const blocked=await lspRequest(worker,313,"textDocument/definition",{
+      textDocument:{uri:contract.uri},position:positionOf(contract.text,precondition)
     });
-    assert.equal(blocked,null);
-
-    const locked=currentV02PackageSnapshot(3);
-    locked.documents=locked.documents.filter(item=>item.uri!==tools.uri);
-    const location={
-      uri:"skill-studio-dependency:/udm/example/tool-contract.json",
-      range:{start:{line:4,character:13},end:{line:4,character:31}}
-    };
-    locked.dependencyOperations=[{id:operationName,dependencyId:"udm",location}];
-    const lockedReady=waitForMessage(worker,message=>
-      message?.method==="skillStudio/analysisStatus"&&
-      message.params?.rootUri===snapshot.rootUri&&
-      message.params?.generation===3,15000);
-    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:locked});
-    await lockedReady;
-    assert.deepEqual(await lspRequest(worker,400,"textDocument/definition",{
-      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,operationName)
-    }),location);
+    assert.equal(blocked,null,
+      "cross-file navigation is blocked for an incomplete Package");
   }finally{
     await worker.terminate();
   }
