@@ -2137,15 +2137,18 @@ try{
       !/TextDocument v[2-9]/.test(patchEvidence.applied?.revision??"")))
     throw Error("Source-backed Patch preview/apply did not update the TextDocument: "+
       JSON.stringify(patchEvidence).slice(0,3000));
-  // The default Root view is the proven success path (9 nodes / 8 bundled
-  // edges); the old smoke asserted 46 full-graph edges even before switching
-  // to All Paths. Require both the default restored view and the full graph.
+  // Candidate and Legacy samples intentionally have different graph sizes.
+  // Prove Undo restores the measured Root projection and All Paths expands it,
+  // rather than pinning this shared UI regression to one sample's old counts.
   if(requireEditor&&(!(patchEvidence.sourceEditor?.monacoEditors>0)||
       !/TextDocument v[3-9]/.test(patchEvidence.undo?.revision??"")||
-      patchEvidence.undo?.graphNodes!==9||
-      patchEvidence.undo?.graphEdges!==8||
-      patchEvidence.canvasToolbar?.allPaths?.nodes!==17||
-      patchEvidence.canvasToolbar?.allPaths?.edges!==46))
+      patchEvidence.undo?.graphNodes!==patchEvidence.canvasToolbar?.initial?.nodes||
+      patchEvidence.undo?.graphEdges!==patchEvidence.canvasToolbar?.initial?.edges||
+      patchEvidence.canvasToolbar?.initial?.rootMode!=="root"||
+      patchEvidence.canvasToolbar?.vertical?.rootMode!=="root"||
+      patchEvidence.canvasToolbar?.allPaths?.rootMode!=="all"||
+      !(patchEvidence.canvasToolbar?.allPaths?.nodes>patchEvidence.undo?.graphNodes)||
+      !(patchEvidence.canvasToolbar?.allPaths?.edges>patchEvidence.undo?.graphEdges)))
     throw Error("Native Source editor/undo did not restore the original Procedure projection: "+
       JSON.stringify(patchEvidence).slice(0,3000));
   if(requireEditor&&(!workbenchEvidence?.phaseEvidence?.ready||
