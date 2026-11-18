@@ -6,6 +6,7 @@ import {
   createPackageRevisionTracker,
   renderAiAuthoringHtml,
   isCurrentAuthoringSession,
+  isLiveDocumentRevision,
   isAuthoringApplyAllowed,
 } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 
@@ -201,4 +202,15 @@ test("AI proposals require a complete pinned v1alpha5 Compiler PASS for the exac
     waitMutation: true,
     compilerCheck,
   }), true, "Wait can be enabled only after the full Compiler and trusted binding gates pass");
+});
+
+test("native preview and Apply require the exact live TextDocument revision and bytes", () => {
+  const source = "start: node-a\\nnodes: {}\\n";
+  const revision = { documentVersion: 4, source };
+  const document = { version: 4, getText: () => source };
+  assert.equal(isLiveDocumentRevision(document, revision), true);
+  assert.equal(isLiveDocumentRevision({ ...document, version: 5 }, revision), false);
+  assert.equal(isLiveDocumentRevision({ version: 4, getText: () => source + "# changed\\n" }, revision), false);
+  assert.equal(isLiveDocumentRevision(document, { documentVersion: 4, source: 7 }), false);
+  assert.equal(isLiveDocumentRevision(null, revision), false);
 });

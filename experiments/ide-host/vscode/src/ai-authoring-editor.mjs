@@ -178,6 +178,14 @@ export function isCurrentAuthoringSession(current, expected) {
   return Boolean(current && current === expected && current.disposed !== true);
 }
 
+export function isLiveDocumentRevision(document, revision) {
+  return Boolean(document && revision &&
+    Number.isSafeInteger(revision.documentVersion) &&
+    typeof revision.source === "string" &&
+    document.version === revision.documentVersion &&
+    document.getText() === revision.source);
+}
+
 function nonceValue() {
   const bytes = new Uint8Array(24);
   if (!globalThis.crypto?.getRandomValues) throw new Error("Secure randomness unavailable");
@@ -620,8 +628,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       return;
     }
     const pending = activeSession.pending;
-    if (pending.document.version !== pending.documentVersion ||
-      pending.document.getText() !== pending.source) {
+    if (!isLiveDocumentRevision(pending.document, pending)) {
       activeSession.pending = null;
       post({ type: "error", message: "Procedure 已变化，候选预览失效；请重新生成提案。" });
       return;
@@ -633,6 +640,11 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         acceptedGroupIds: message.groupIds,
       });
       if (!isCurrent() || activeSession.pending !== pending) return;
+      if (!isLiveDocumentRevision(pending.document, pending)) {
+        activeSession.pending = null;
+        post({ type: "error", message: "Procedure 在候选预览生成期间发生变化，旧预览已失效。请刷新上下文并重新生成。" });
+        return;
+      }
       post({
         type: "preview",
         requestId: message.requestId,
@@ -688,6 +700,17 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         acceptedGroupIds: message.groupIds,
       });
       if (!isCurrent() || activeSession.pending !== pending) return;
+      const finalState = await collectAuthoringState(document);
+      if (!isCurrent() || activeSession.pending !== pending) return;
+      if (!isLiveDocumentRevision(document, pending) ||
+        finalState.generation !== pending.packageGeneration) {
+        activeSession.pending = null;
+        await refreshContext();
+        if (isCurrent()) {
+          post({ type: "error", message: "生成候选后 Procedure 或 Package 再次变化，已拒绝应用旧修改。请检查新上下文并重新生成。" });
+        }
+        return;
+      }
       assertStudioMutation(document.uri, vscode.workspace.workspaceFolders ?? [], "edit");
       const edit = new vscode.WorkspaceEdit();
       edit.replace(
