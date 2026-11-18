@@ -261,28 +261,129 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   // publications have been linked.
   if (procedureDocument && isV1Alpha5Procedure(procedureDocument.text)) {
     const projected = analyzeV1Alpha5Source(documentsByPath, snapshot.packageName);
+    const packageContextComplete = snapshot.completeness === "complete" &&
+      projected.procedure.state === "READY";
+    const scriptReferences: ScriptReference[] = [];
+    const schemaReferences: SchemaReference[] = [];
+    const pythonOutlineDiagnostics: LanguageDiagnostic[] = [];
+    const scriptNavigationDiagnostics: LanguageDiagnostic[] = [];
+    const documentAnalyses: DocumentAnalysis[] = [];
+
+    for (const document of normalizedDocuments) {
+      let pythonOutlineState: DocumentAnalysis["pythonOutlineState"] = "NOT_APPLICABLE";
+      if (document.languageId === "python" && document.relativePath.startsWith("scripts/")) {
+        const outline = pythonTopLevelOutline(document.text) as LegacyPythonOutline;
+        pythonOutlineState = outline.status;
+        if (outline.status === "READY") {
+          for (const symbol of outline.symbols) {
+            const range = symbol.range ?? null;
+            pythonSymbols.push({
+              uri: document.uri,
+              relativePath: document.relativePath,
+              name: symbol.name,
+              kind: symbol.kind,
+              line: symbol.line,
+              async: symbol.async,
+              range,
+              navigable: Boolean(range)
+            });
+          }
+        }
+        for (const warning of outline.warnings ?? []) {
+          pythonOutlineDiagnostics.push({
+            code: "PYTHON_OUTLINE",
+            message: warning,
+            severity: "warning",
+            uri: document.uri,
+            relativePath: document.relativePath,
+            source: "python-outline",
+            confidence: "unknown"
+          });
+        }
+
+        const report = scriptNavigationReport(files, document.relativePath) as LegacyScriptReport;
+        if (report.status === "READY") {
+          for (const caller of report.callers) {
+            const sourceDocument = documentsByPath.get(caller.path);
+            if (!sourceDocument) continue;
+            scriptReferences.push({
+              kind: caller.path === "assurance/procedure.yaml"
+                ? "procedure-script-caller"
+                : "predicate-evaluator-caller",
+              sourceUri: sourceDocument.uri,
+              sourcePath: caller.path,
+              targetUri: document.uri,
+              targetPath: document.relativePath,
+              line: caller.line,
+              targetIdentityExact: true,
+              packageContextComplete,
+              sourceRange: caller.sourceRange ?? null,
+              targetRange: caller.targetRange ?? null
+            });
+          }
+          for (const schema of report.schemas) {
+            const targetDocument = documentsByPath.get(schema.path);
+            if (!targetDocument) continue;
+            schemaReferences.push({
+              kind: schema.role === "输入" ? "script-input-schema" : "script-output-schema",
+              sourceUri: document.uri,
+              sourcePath: document.relativePath,
+              targetUri: targetDocument.uri,
+              targetPath: schema.path,
+              targetLine: schema.line,
+              title: schema.title,
+              packageContextComplete,
+              sourceRange: schema.sourceRange ?? null,
+              targetRange: schema.targetRange ?? null
+            });
+          }
+        }
+        for (const warning of report.warnings ?? []) {
+          scriptNavigationDiagnostics.push({
+            code: "SCRIPT_NAVIGATION",
+            message: warning,
+            severity: "warning",
+            uri: document.uri,
+            relativePath: document.relativePath,
+            source: "script-navigation",
+            confidence: "unknown"
+          });
+        }
+      }
+      documentAnalyses.push({
+        uri: document.uri,
+        relativePath: document.relativePath,
+        version: document.version,
+        languageId: document.languageId,
+        pythonOutlineState,
+        pythonSymbols: pythonSymbols.filter(symbol => symbol.uri === document.uri)
+      });
+    }
+
+    const packageAudit: PackageAuditResult = {
+      state: "UNAVAILABLE",
+      reason: snapshot.completeness !== "complete"
+        ? (snapshot.reason ?? "Partial Package snapshot")
+        : "CA-SL v1alpha5 source parsed; static Package qualification requires the v1alpha5 Compiler and trusted Owner/Capability/Schema linking snapshots",
+      diagnostics: []
+    };
+    const diagnostics = [
+      ...projected.diagnostics,
+      ...packageAudit.diagnostics,
+      ...pythonOutlineDiagnostics,
+      ...scriptNavigationDiagnostics
+    ];
     return {
       state: "PARTIAL",
       rootUri: snapshot.rootUri,
       packageName: snapshot.packageName,
       generation: snapshot.generation,
       procedure: projected.procedure,
-      packageAudit: {
-        state: "UNAVAILABLE",
-        reason: snapshot.completeness !== "complete"
-          ? (snapshot.reason ?? "Partial Package snapshot")
-          : "CA-SL v1alpha5 source parsed; static Package qualification requires the v1alpha5 Compiler and trusted Owner/Capability/Schema snapshots",
-        diagnostics: []
-      },
-      documents: normalizedDocuments.map(document => ({
-        uri: document.uri, relativePath: document.relativePath,
-        version: document.version, languageId: document.languageId,
-        pythonOutlineState: "NOT_APPLICABLE" as const,
-        pythonSymbols: []
-      })),
-      scriptReferences: [],
-      schemaReferences: [],
-      diagnostics: projected.diagnostics
+      packageAudit,
+      documents: documentAnalyses,
+      scriptReferences,
+      schemaReferences,
+      diagnostics
     };
   }
   // Skill Studio is v1alpha5-only. A Procedure that does not match the
