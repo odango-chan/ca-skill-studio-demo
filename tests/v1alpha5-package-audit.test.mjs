@@ -181,6 +181,31 @@ test("partial trusted export sets never turn absence or one candidate into a fal
   assert.ok(!diagnostics.some(item=>item.code==="CAPABILITY_DECLARATION_NOT_FOUND"));
 });
 
+test("partial Owner Evidence snapshots never prove absence or uniqueness",()=>{
+  const files=fixture("establish-pdu-session");
+  const partial=auditV1Alpha5Package({files,dependencyContext:{
+    available:false,
+    evidenceDeclarations:[{id:"udm.subscription-owned",trusted:true}]
+  }});
+  assert.ok(partial.some(item=>
+    item.code==="EVIDENCE_DECLARATION_SET_INCOMPLETE"&&
+    item.message.includes("ca::udm.subscription-owned")));
+  assert.ok(partial.some(item=>
+    item.code==="EVIDENCE_DECLARATION_NOT_CHECKED"&&
+    item.message.includes("ca::pcf.association-owned")));
+  assert.ok(!partial.some(item=>item.code==="EVIDENCE_DECLARATION_NOT_FOUND"));
+
+  const complete=auditV1Alpha5Package({files,dependencyContext:{
+    available:false,
+    evidenceDeclarations:[{id:"udm.subscription-owned",trusted:true}],
+    evidenceDeclarationsComplete:true
+  }});
+  assert.ok(complete.some(item=>
+    item.code==="EVIDENCE_DECLARATION_NOT_FOUND"&&
+    item.message.includes("ca::pcf.association-owned")),
+    "only a complete trusted Evidence set can prove a declaration is absent");
+});
+
 test("Schema IDs can resolve from the exact pinned Owner snapshot independent of dependency kind",()=>{
   const files=fixture("establish-pdu-session");
   const schemaId="urn:example:5gc:udm-subscription-result:v1";
