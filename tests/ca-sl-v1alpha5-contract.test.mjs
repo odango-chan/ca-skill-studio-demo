@@ -29,10 +29,13 @@ test("Skill Studio pins the released CA-SL v1alpha5 language and current example
   assert.match(entry,/FROZEN \/ RELEASED/);
 
   assert.equal(lock.compiler.repository,"odango-chan/ca-skill-compiler");
-  assert.equal(lock.compiler.commit,"34993dc30b66f4cf7d573cbc81d884c356062a12");
-  assert.equal(lock.compiler.status,"DRAFT_WP2_ONLY");
-  assert.equal(lock.compiler.build,"FAIL_CLOSED_UNTIL_WP3_WP8");
-  assert.equal(lock.qualification.compiler,"WP2_ONLY_NOT_QUALIFIED");
+  assert.equal(lock.compiler.commit,"ea27f18549725166f304b7d06fd9339bb0554329");
+  assert.equal(lock.compiler.sourceRef,"refs/pull/38/head");
+  assert.equal(lock.compiler.status,"DRAFT_NOT_RELEASED_NOT_INTEGRATED");
+  assert.match(lock.compiler.check,/FULL_LANGUAGE_VALIDATION/);
+  assert.equal(lock.compiler.build,"CANDIDATE_NOT_RELEASED_NOT_INTEGRATED");
+  assert.equal(lock.compiler.dependencyInspection,"CANDIDATE_NOT_RELEASED_NOT_INTEGRATED");
+  assert.equal(lock.qualification.compiler,"NOT_RELEASED_NOT_QUALIFIED");
   assert.equal(lock.qualification.studioLsp,"IN_PROGRESS_NOT_QUALIFIED");
   assert.equal(lock.qualification.host,"NOT_QUALIFIED");
   assert.equal(lock.qualification.integration,"NOT_QUALIFIED");
