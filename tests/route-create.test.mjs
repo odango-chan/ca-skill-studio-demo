@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {projectWorkspace} from "../site/workspace.mjs";
 import {addRouteOutcomeOptions,previewAddRouteOutcome,applyAddRouteOutcome}
   from "../site/route-create.mjs";
-const fixture=skill=>readFileSync(new URL("../site/samples/packages/"+
+const fixture=skill=>readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
   skill+"/assurance/procedure.yaml",import.meta.url),"utf8");
 const ensure=fixture("ensure-pdu-session");
 const created=fixture("establish-pdu-session");
