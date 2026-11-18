@@ -221,6 +221,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
   const markdownEditor={document:markdownDoc,visibleRanges:[{start:{line:0},end:{line:5}}]};
   let changed;
+  const workspaceEvents={};
   const vscode={
     EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
     TreeItem:class {constructor(label,state){this.label=label;this.collapsibleState=state;}},
@@ -280,6 +281,10 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
         doc.version++;changed({document:doc});return true;
       },
       onDidChangeTextDocument(cb){changed=cb;return disposable();},
+      onDidCreateFiles(cb){workspaceEvents.create=cb;return disposable();},
+      onDidDeleteFiles(cb){workspaceEvents.delete=cb;return disposable();},
+      onDidRenameFiles(cb){workspaceEvents.rename=cb;return disposable();},
+      onDidChangeConfiguration(cb){workspaceEvents.configuration=cb;return disposable();},
       openTextDocument:async target=>target.path.endsWith('/establish-pdu-session/SKILL.md')?markdownDoc:
         v1alpha5Mode&&target.path.endsWith('/assurance/contract.yaml')?contractDoc:
         v1alpha5Mode&&target.path.endsWith('/assurance/predicates.yaml')?predicatesDoc:doc},
@@ -810,6 +815,43 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&item.line===expectedCapabilityLine));
   assert.ok(acceptance.packageAudit.editorMarkers.some(item=>
     item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&item.line===expectedCapabilityLine));
+
+  // The accepted diagnostics must immediately become stale on filesystem and
+  // project lock changes, without any Compiler request.
+  const currentRoot='/workspace/establish-pdu-session/';
+  const outsider=uri('/workspace/establish-pdu-session-backup/assurance/contract.yaml');
+  const pending=()=>problems.getChildren()[0].label.includes('pending');
+  const assertMarkersRestored=async()=>{
+    await commands.get('skillStudio.auditPackage')();
+    assert.ok(diagnosticSets.some(([target,items])=>
+      target.path===contractUri.path&&items.some(item=>item.code==='CAPABILITY_GRANT_NOT_CHECKED')));
+  };
+  workspaceEvents.create({files:[outsider]});
+  assert.ok(!pending(),'changes to a sibling Package must not invalidate current Problems');
+  changed({document:{uri:outsider}});
+  assert.ok(!pending(),'unrelated TextDocuments do not invalidate the selected Package');
+  workspaceEvents.create({files:[uri(currentRoot+'schemas/new.schema.yaml')]});
+  assert.equal(diagnosticSets.length,0,'new files clear accepted editor markers immediately');
+  assert.ok(pending(),'new Package files invalidate audit status');
+  await assertMarkersRestored();
+  workspaceEvents.delete({files:[uri(currentRoot+'scripts/validate-subscription-request.py')]});
+  assert.ok(pending(),'deleted Package files invalidate accepted diagnostics');
+  await assertMarkersRestored();
+  workspaceEvents.rename({files:[{
+    oldUri:outsider,newUri:uri(currentRoot+'scripts/renamed.py')
+  }]});
+  assert.ok(pending(),'renames into the Package invalidate current diagnostics');
+  await assertMarkersRestored();
+  workspaceEvents.configuration({
+    affectsConfiguration:section=>section==='editor.fontSize'
+  });
+  assert.ok(!pending(),'unrelated settings changes must not clear Package diagnostics');
+  workspaceEvents.configuration({
+    affectsConfiguration:section=>section==='connectionAgent.skillStudio'
+  });
+  assert.equal(diagnosticSets.length,0,'dependency settings changes clear old editor markers');
+  assert.ok(pending(),'project dependency updates trigger a new Package audit');
+  await assertMarkersRestored();
 
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
