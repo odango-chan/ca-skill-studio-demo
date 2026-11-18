@@ -94,7 +94,7 @@ test("current v1alpha4 Skill guides render safely and expose only explicit Packa
   const source=readFileSync(new URL(
     "../site/samples/v1alpha5/establish-pdu-session-mas/SKILL.md",import.meta.url),"utf8");
   const packageFiles=new Set([
-    "SKILL.md","assurance/openamsm-operation-mapping.md",
+    "SKILL.md","references/openamsm-operation-mapping.md",
     "assurance/contract.yaml","assurance/procedure.yaml","assurance/predicates.yaml"
   ]);
   const linked=renderMarkdown(source,{
@@ -109,7 +109,7 @@ test("Package-local Markdown can link back to SKILL.md, while local navigation i
   const ordinary=renderMarkdown(source).html;
   assert.doesNotMatch(ordinary,/data-local-path=/);
   const linked=renderMarkdown(source,{
-    localLinks:true,localFiles:new Set(["SKILL.md","assurance/openamsm-operation-mapping.md"]),
+    localLinks:true,localFiles:new Set(["SKILL.md","references/openamsm-operation-mapping.md"]),
     relativeDir:"assurance"
   }).html;
   assert.match(linked,/data-local-path="\.\.\/SKILL\.md"/);
