@@ -271,7 +271,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
         state: "UNAVAILABLE",
         reason: snapshot.completeness !== "complete"
           ? (snapshot.reason ?? "Partial Package snapshot")
-          : "CA-SL v1alpha5 source parsed; trusted Owner/Capability/Schema linking requires v1alpha5 Compiler and published snapshots",
+          : "CA-SL v1alpha5 source parsed; static Package qualification requires the v1alpha5 Compiler and trusted Owner/Capability/Schema snapshots",
         diagnostics: []
       },
       documents: normalizedDocuments.map(document => ({
