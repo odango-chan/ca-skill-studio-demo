@@ -144,33 +144,61 @@ test("stale Editor Tab sessions cannot publish asynchronous results into a repla
   assert.equal(isCurrentAuthoringSession(null, first), false);
 });
 
-test("AI proposals remain preview-only until the complete pinned v1alpha5 Compiler returns PASS", () => {
-  const base = {
-    patchPlan: { groups: [{ id: "g1" }] },
-    blockers: [],
-    waitMutation: false,
+test("AI proposals require a complete pinned v1alpha5 Compiler PASS for the exact candidate identity", () => {
+  const changeSet = { base: {
+    documentUri: "file:///workspace/skills/example/assurance/procedure.yaml",
+    documentVersion: 7,
+    packageGeneration: 3,
+    sourceDigest: "sha256:" + "a".repeat(64),
+    languageTarget: "connectionagent.io/v1alpha5",
+  } };
+  const patchPlan = { candidateDigest: "sha256:" + "b".repeat(64) };
+  const compilerCheck = {
+    languageTarget: "connectionagent.io/v1alpha5",
+    state: "PASS",
+    complete: true,
+    documentUri: changeSet.base.documentUri,
+    documentVersion: changeSet.base.documentVersion,
+    packageGeneration: changeSet.base.packageGeneration,
+    sourceDigest: changeSet.base.sourceDigest,
+    candidateDigest: patchPlan.candidateDigest,
+    trustedIngressBinding: true,
   };
-  assert.equal(isAuthoringApplyAllowed(base), false);
+  const base = { patchPlan, changeSet, blockers: [], waitMutation: false };
+  assert.equal(isAuthoringApplyAllowed(base), false, "no Compiler result means preview-only");
   assert.equal(isAuthoringApplyAllowed({
     ...base,
-    compilerCheck: { languageTarget: "connectionagent.io/v1alpha5", state: "CANDIDATE_PARTIAL", complete: false },
-  }), false);
+    compilerCheck: { ...compilerCheck, state: "CANDIDATE_PARTIAL", complete: false },
+  }), false, "partial Compiler candidate cannot authorize Apply");
   assert.equal(isAuthoringApplyAllowed({
     ...base,
-    compilerCheck: { languageTarget: "connectionagent.io/v1alpha4", state: "PASS", complete: true },
-  }), false);
+    compilerCheck: { ...compilerCheck, languageTarget: "connectionagent.io/v1alpha4" },
+  }), false, "v1alpha4 Compiler result cannot authorize v1alpha5 edits");
   assert.equal(isAuthoringApplyAllowed({
     ...base,
-    waitMutation: true,
-    compilerCheck: { languageTarget: "connectionagent.io/v1alpha5", state: "PASS", complete: true },
-  }), false);
+    compilerCheck: { ...compilerCheck, candidateDigest: "sha256:" + "c".repeat(64) },
+  }), false, "Compiler result must identify the exact candidate digest");
+  assert.equal(isAuthoringApplyAllowed({
+    ...base,
+    compilerCheck: { ...compilerCheck, documentVersion: 8 },
+  }), false, "Compiler result must identify the exact live document revision");
   assert.equal(isAuthoringApplyAllowed({
     ...base,
     blockers: ["missing trusted Tool"],
-    compilerCheck: { languageTarget: "connectionagent.io/v1alpha5", state: "PASS", complete: true },
-  }), false);
+    compilerCheck,
+  }), false, "proposal blockers prevent Apply");
   assert.equal(isAuthoringApplyAllowed({
     ...base,
-    compilerCheck: { languageTarget: "connectionagent.io/v1alpha5", state: "PASS", complete: true },
-  }), true);
+    waitMutation: true,
+    compilerCheck: { ...compilerCheck, trustedIngressBinding: false },
+  }), false, "Wait additionally requires a trusted Ingress binding");
+  assert.equal(isAuthoringApplyAllowed({
+    ...base,
+    compilerCheck,
+  }), true, "only an exact full v1alpha5 PASS unlocks a non-Wait proposal");
+  assert.equal(isAuthoringApplyAllowed({
+    ...base,
+    waitMutation: true,
+    compilerCheck,
+  }), true, "Wait can be enabled only after the full Compiler and trusted binding gates pass");
 });

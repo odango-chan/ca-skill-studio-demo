@@ -146,20 +146,31 @@ export function containsWaitMutation(operations) {
 
 export function isAuthoringApplyAllowed({
   patchPlan,
+  changeSet,
   blockers = [],
   waitMutation = false,
   compilerCheck = null,
 } = {}) {
-  // The host normalizes only a complete, authoritative v1alpha5 Compiler PASS
-  // into this shape. A patch plan or partial candidate is never sufficient.
+  // The Host normalizes only a complete, authoritative v1alpha5 Compiler PASS
+  // for this exact document, Package revision and candidate digest.
+  const base = changeSet?.base;
+  const exactCandidate = Boolean(
+    base &&
+    compilerCheck?.documentUri === base.documentUri &&
+    compilerCheck?.documentVersion === base.documentVersion &&
+    compilerCheck?.packageGeneration === base.packageGeneration &&
+    compilerCheck?.sourceDigest === base.sourceDigest &&
+    compilerCheck?.candidateDigest === patchPlan?.candidateDigest
+  );
   return Boolean(
     patchPlan &&
-    !waitMutation &&
+    exactCandidate &&
     Array.isArray(blockers) &&
     blockers.length === 0 &&
     compilerCheck?.languageTarget === LANGUAGE_TARGET &&
     compilerCheck?.state === "PASS" &&
-    compilerCheck?.complete === true
+    compilerCheck?.complete === true &&
+    (!waitMutation || compilerCheck?.trustedIngressBinding === true)
   );
 }
 
@@ -539,6 +550,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       const compilerCheck = null;
       const canApply = isAuthoringApplyAllowed({
         patchPlan,
+        changeSet,
         blockers: proposalResult.proposal.blockers,
         waitMutation: waitGate,
         compilerCheck,
