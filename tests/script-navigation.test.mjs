@@ -1,13 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {SAMPLE_PACKAGES,createFileWorkspace} from "../site/sample-packages.mjs";
+import {createFileWorkspace} from "../site/sample-packages.mjs";
 import {scriptNavigationReport} from "../site/script-navigation.mjs";
 
-const root=new URL("../site/samples/packages/establish-pdu-session/",import.meta.url);
+const root=new URL("./fixtures/establish-pre-hold/",import.meta.url);
 const get=path=>readFileSync(new URL(path,root),"utf8");
+const fixtureFiles=[
+  "SKILL.md","assurance/contract.yaml","assurance/predicates.yaml","assurance/procedure.yaml",
+  "references/3gpp-procedure.md","references/failure-handling.md","references/session-selection.md",
+  "schemas/establishment-request.schema.yaml","schemas/predicate-evaluation-result.schema.yaml",
+  "schemas/selection-input.schema.yaml","schemas/selection.schema.yaml",
+  "schemas/transfer-start-evaluation-input.schema.yaml","schemas/udm-read-evaluation-input.schema.yaml",
+  "scripts/evaluate_transfer_start.py","scripts/evaluate_udm_read.py",
+  "scripts/select_establishment_configuration.py"
+];
 const files=()=>createFileWorkspace("establish-pdu-session",
-  SAMPLE_PACKAGES.establish.files.map(path=>({path,text:get(path)}))).files;
+  fixtureFiles.map(path=>({path,text:get(path)}))).files;
 const select="scripts/select_establishment_configuration.py";
 const udm="scripts/evaluate_udm_read.py";
 const transfer="scripts/evaluate_transfer_start.py";
