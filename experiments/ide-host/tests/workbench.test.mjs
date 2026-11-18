@@ -771,6 +771,11 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.match(problemRoots[0].label,/NOT_CHECKED/);
   assert.ok(problemRoots.some(item=>item.kind==='problem-group'&&item.label==='Capabilities'));
   assert.ok(problemRoots.some(item=>item.kind==='problem-group'&&item.label==='Dependencies'));
+  const capabilityGroup=problemRoots.find(item=>
+    item.kind==='problem-group'&&item.label==='Capabilities');
+  const capabilityGroupTreeItem=providers.get('skillStudio.problems').getTreeItem(capabilityGroup);
+  assert.equal(capabilityGroupTreeItem.collapsibleState,vscode.TreeItemCollapsibleState.Collapsed);
+  assert.match(capabilityGroupTreeItem.description,/NOT_CHECKED/);
 
   const expectedCapabilityLine=contractDoc.text.split('\n').findIndex(line=>
     line.includes('namf-communication-n1n2-transfer'))+1;
