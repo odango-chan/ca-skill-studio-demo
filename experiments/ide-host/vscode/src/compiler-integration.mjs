@@ -392,7 +392,7 @@ export function registerCompilerIntegration(vscode,context,{
       progress.report({message:"Inspecting only independently supplied v1alpha5 immutable snapshots…"});
       const result=await client.request("inspect",prepared.request);
       if(!isCompilerInspection(result)){
-        throw new Error("Compiler DependencyInspection does not match the frozen v1alpha4 output contract");
+        throw new Error("Compiler DependencyInspection does not match the frozen v1alpha5 output contract");
       }
       output.appendLine("DependencyInspection · "+result.callables.length+
         " callable(s) · "+result.schemas.length+" Schema(s) · "+
@@ -404,7 +404,7 @@ export function registerCompilerIntegration(vscode,context,{
       void vscode.window.showInformationMessage(
         "Compiler DependencyInspection: "+result.callables.length+
         " callable(s), "+result.schemas.length+" Schema(s); "+
-        (result.diagnostics.length?"see Compiler Output":"no trusted v1alpha4 snapshots supplied"));
+        (result.diagnostics.length?"see Compiler Output":"no trusted v1alpha5 snapshots supplied"));
       return result;
     });
   }
