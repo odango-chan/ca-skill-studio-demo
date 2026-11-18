@@ -683,7 +683,7 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
     return [...reachable];
   };
   const finalStage=currentStages.at(-1)===stage;
-  const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="CA-SL v1alpha5 candidate source syntax")=>
+  const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="CA-SL v1alpha5 source syntax")=>
     labels.filter(name=>name.startsWith(typed)).map(name=>({
       label:name,kind,detail,
       textEdit:{range:{
