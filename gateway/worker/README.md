@@ -1,6 +1,6 @@
 # CA Skill Studio AI Gateway
 
-A small provider-neutral application Gateway for the first AI Procedure Authoring pilot.
+A restricted application Gateway for Skill Studio AI Authoring, pinned to OpenCode Go's OpenAI-compatible Chat Completions endpoint.
 
     Studio browser / VS Code client
                 |
@@ -8,9 +8,9 @@ A small provider-neutral application Gateway for the first AI Procedure Authorin
                 v
     Cloudflare Access-protected Application Worker
                 |
-                | fixed HTTPS endpoint + server-side Provider Key
+                | fixed OpenCode Go HTTPS endpoint + server-side OpenCode Go API key
                 v
-    Configured OpenAI-compatible Chat Completions provider
+    OpenCode Go (OpenAI-compatible Chat Completions models)
 
 Cloudflare AI Gateway is not called by the browser. It may be added behind this Worker later for routing or observability.
 
@@ -23,7 +23,9 @@ Cloudflare AI Gateway is not called by the browser. It may be added behind this 
 - The deployment selects PROVIDER_MODEL; it must be included in ALLOWED_MODELS. A caller may optionally request another allowlisted model, but cannot choose an arbitrary model. Arbitrary client URLs, provider headers and unknown request fields are rejected.
 - Provider credentials are read only from the Worker secret PROVIDER_API_KEY.
 - Request body, output token ceilings and a provider response-header timeout are enforced. Text-only content-part arrays are supported for the host-neutral Authoring Core. Optional structured output is restricted to JSON-object mode; the client must still parse and validate the ModelProposal / Change Set schema.
-- Both non-streaming JSON and SSE responses are supported for OpenAI-compatible clients. The upstream body is passed through without buffering; response mode and Content-Type must match. Redirects, mismatched response types and provider error bodies are not forwarded.
+- The upstream endpoint is pinned to OpenCode Go's OpenAI-compatible Chat Completions route: `https://opencode.ai/inference/go/openai/v1/chat/completions`. Only OpenCode Go models documented for this Chat Completions protocol are allowed; models exposed only through Responses or Anthropic Messages are not compatible with this Studio client.
+- Each request requires a stable Host-generated `x-opencode-session` ID. The Worker forwards it and injects a product-specific `User-Agent` (`ca-skill-studio-ai-authoring/1.0`) as recommended by OpenCode Go.
+- Both non-streaming JSON and SSE responses are supported. The upstream body is passed through without buffering; response mode and Content-Type must match. Redirects, mismatched response types and provider error bodies are not forwarded.
 - CORS uses an exact origin allowlist. CORS is not authentication; Access remains mandatory.
 - Prompts, completions, identities and credentials are not logged.
 
@@ -40,7 +42,7 @@ The access.dev block in wrangler.jsonc simulates an authenticated local Access i
 
 To test a real provider locally, put the key in a local .dev.vars file (never commit it):
 
-    PROVIDER_API_KEY=replace-with-your-provider-key
+    PROVIDER_API_KEY=replace-with-your-OpenCode-Go-API-key
 
 ## Restricted pilot deployment
 
@@ -51,10 +53,11 @@ Do not deploy until the target Cloudflare account has been configured:
 3. Set ACCESS_AUD to the Access application's audience tag.
 4. Set ALLOWED_ORIGINS to exact Studio origins, without wildcards.
 5. Set ALLOWED_MODELS to exact approved provider model identifiers.
-6. Set PROVIDER_CHAT_COMPLETIONS_URL to the approved HTTPS Chat Completions endpoint.
-7. In the Access application's CORS settings, enable Bypass OPTIONS requests to origin; do not also configure Access-managed CORS headers. This bypass is for preflight only; POST remains protected. The Worker enforces the exact origin allowlist.
-8. Replace the sample Rate Limiting namespace ID with a unique integer for this Cloudflare account.
-9. Set the provider key as a Worker secret:
+6. Set PROVIDER_CHAT_COMPLETIONS_URL to `https://opencode.ai/inference/go/openai/v1/chat/completions`.
+7. Set PROVIDER_MODEL and ALLOWED_MODELS to exact model IDs that OpenCode Go lists under the OpenAI Chat Completions endpoint (for example `deepseek-v4.1-flash` or `deepseek-v4-pro`). Do not select models whose listed endpoint is Responses or Anthropic Messages.
+8. In the Access application's CORS settings, enable Bypass OPTIONS requests to origin; do not also configure Access-managed CORS headers. This bypass is for preflight only; POST remains protected. The Worker enforces the exact origin allowlist.
+9. Replace the sample Rate Limiting namespace ID with a unique integer for this Cloudflare account.
+10. Set the OpenCode Go API key as a Worker secret:
 
        cd gateway/worker
        npx wrangler@4.157.0 secret put PROVIDER_API_KEY

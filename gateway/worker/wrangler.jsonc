@@ -7,12 +7,12 @@
   "vars": {
     "ACCESS_AUD": "local-development-audience",
     "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173",
-    "ALLOWED_MODELS": "gpt-4o-mini",
-    "PROVIDER_MODEL": "gpt-4o-mini",
+    "ALLOWED_MODELS": "deepseek-v4.1-flash,deepseek-v4-pro",
+    "PROVIDER_MODEL": "deepseek-v4.1-flash",
     "MAX_REQUEST_BYTES": "262144",
     "MAX_OUTPUT_TOKENS": "2048",
     "UPSTREAM_TIMEOUT_MS": "120000",
-    "PROVIDER_CHAT_COMPLETIONS_URL": "https://api.openai.com/v1/chat/completions"
+    "PROVIDER_CHAT_COMPLETIONS_URL": "https://opencode.ai/inference/go/openai/v1/chat/completions"
   },
   "ratelimits": [
     {

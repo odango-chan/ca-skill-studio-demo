@@ -1,5 +1,7 @@
 const CHAT_PATH = "/v1/chat/completions";
 const HEALTH_PATH = "/healthz";
+const OPENCODE_GO_CHAT_COMPLETIONS_URL = "https://opencode.ai/inference/go/openai/v1/chat/completions";
+const STUDIO_USER_AGENT = "ca-skill-studio-ai-authoring/1.0";
 const REQUEST_FIELDS = new Set(["model", "messages", "stream", "max_tokens", "temperature", "top_p", "response_format"]);
 const csv = (value) => String(value ?? "").split(",").map((v) => v.trim()).filter(Boolean);
 const int = (value, fallback) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : fallback;
@@ -20,7 +22,9 @@ function configurationError(env) {
   if (!env.ACCESS_AUD || !env.PROVIDER_API_KEY || !env.PROVIDER_CHAT_COMPLETIONS_URL || !env.PROVIDER_MODEL || !csv(env.ALLOWED_MODELS).includes(env.PROVIDER_MODEL) || !csv(env.ALLOWED_ORIGINS).length || typeof env.USER_RATE_LIMITER?.limit !== "function") return true;
   try {
     const endpoint = new URL(env.PROVIDER_CHAT_COMPLETIONS_URL);
-    if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || !endpoint.pathname.endsWith("/chat/completions")) return true;
+    if (endpoint.protocol !== "https:" || endpoint.origin !== "https://opencode.ai" ||
+      endpoint.href !== OPENCODE_GO_CHAT_COMPLETIONS_URL ||
+      endpoint.username || endpoint.password || endpoint.search || endpoint.hash) return true;
     for (const origin of csv(env.ALLOWED_ORIGINS)) {
       const parsed = new URL(origin);
       const localHttp = parsed.protocol === "http:" && ["localhost", "127.0.0.1"].includes(parsed.hostname);
@@ -114,7 +118,7 @@ export async function handleRequest(request, env, ctx, fetchImpl = globalThis.fe
   if (url.pathname !== CHAT_PATH) return error(404, "not_found", headers);
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    headers.set("Access-Control-Allow-Headers", "Content-Type, X-OpenCode-Session");
     headers.set("Access-Control-Max-Age", "600");
     return new Response(null, { status: 204, headers });
   }
@@ -130,6 +134,10 @@ export async function handleRequest(request, env, ctx, fetchImpl = globalThis.fe
     const limited = await env.USER_RATE_LIMITER.limit({ key: email });
     if (limited?.success !== true) return error(429, "rate_limit_exceeded", headers);
   } catch { return error(503, "rate_limit_unavailable", headers); }
+  const sessionId = request.headers.get("x-opencode-session");
+  if (typeof sessionId !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(sessionId)) {
+    return error(400, "invalid_session_id", headers);
+  }
   let payload;
   try { payload = validatePayload(await readJson(request, int(env.MAX_REQUEST_BYTES, 262144)), env); }
   catch (failure) { return error(failure?.status ?? 400, failure?.code ?? "invalid_request", headers); }
@@ -140,7 +148,13 @@ export async function handleRequest(request, env, ctx, fetchImpl = globalThis.fe
       method: "POST",
       redirect: "manual",
       signal: AbortSignal.any([request.signal, timeoutController.signal]),
-      headers: { Authorization: "Bearer " + env.PROVIDER_API_KEY, "Content-Type": "application/json", Accept: payload.stream ? "text/event-stream" : "application/json" },
+      headers: {
+        Authorization: "Bearer " + env.PROVIDER_API_KEY,
+        "Content-Type": "application/json",
+        Accept: payload.stream ? "text/event-stream" : "application/json",
+        "User-Agent": STUDIO_USER_AGENT,
+        "x-opencode-session": sessionId,
+      },
       body: JSON.stringify(payload),
     });
     clearTimeout(timeoutId);
