@@ -54,7 +54,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer,
     lastSelectionMessage=null;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
-  const providers=new Map(),sessions=new Map(),selections=new Map();
+  const providers=new Map(),treeProviders=new Map(),sessions=new Map(),selections=new Map();
   const nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
     nativeMarkdownOpening=new Set();
   let nativeMarkdownWorkerDiagnostics=null;
@@ -219,7 +219,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             line:(item.range?.start?.line??0)+1,
             column:(item.range?.start?.character??0)+1
           })): [];
-        const problemItems=providers.get("problems")?.getChildren?.()??[];
+        const problemItems=treeProviders.get("problems")?.getChildren?.()??[];
         return {
           status:auditStatus,
           diagnostics:audit.map(item=>({
@@ -2878,7 +2878,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         }
         return tree;
       }};
-    providers.set(id,emitter);
+    providers.set(id,emitter);treeProviders.set(id,provider);
     context.subscriptions.push(emitter,vscode.window.registerTreeDataProvider('skillStudio.'+id,provider));
   }
   const fire=()=>{for(const p of providers.values())p.fire();};
