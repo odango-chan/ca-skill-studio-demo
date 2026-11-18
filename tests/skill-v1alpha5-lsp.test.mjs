@@ -145,6 +145,8 @@ test("v1alpha5 5GC sample projects Node-entry Wait, wait.output and the Step 17 
   assert.ok(!a.diagnostics.some(item=>item.severity==="error"),
     JSON.stringify(a.diagnostics));
   const procedureView=a.procedure.procedures[0];
+  assert.equal(procedureView.profile,
+    "CA-SL v1alpha5 (released language; editor source projection only)");
   const waitNode=procedureView.nodes.find(item=>item.id==="update-sm-context");
   assert.deepEqual(waitNode.wait.event,{
     source:"AMF",service:"Nsmf_PDUSession",operation:"UpdateSMContext"
