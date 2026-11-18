@@ -748,6 +748,18 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     'Capability Grant is a visible Problem without Compiler integration');
   assert.equal(capabilityProblem.status,'not_checked');
   assert.equal(capabilityProblem.domain,'capabilities');
+  assert.ok(packageProblems.length>10,
+    'the default Example exposes multiple real dependency and trust-boundary blockers');
+  const dependencyProblem=packageProblems.find(item=>
+    item.kind==='package-diagnostic'&&item.code==='DEPENDENCY_NOT_CONFIGURED');
+  assert.ok(dependencyProblem,'unconfigured Contract dependencies are confirmed Problems');
+  const dependencyTreeItem=providers.get('skillStudio.problems').getTreeItem(dependencyProblem);
+  assert.equal(dependencyTreeItem.iconPath.id,'error');
+  const dependencyMarkerSet=diagnosticSets.find(([target,items])=>
+    target.path===dependencyProblem.uri.path&&items.some(item=>item.code==='DEPENDENCY_NOT_CONFIGURED'));
+  assert.ok(dependencyMarkerSet,'confirmed dependency errors also have editor markers');
+  assert.equal(dependencyMarkerSet[1].find(item=>item.code==='DEPENDENCY_NOT_CONFIGURED').severity,
+    vscode.DiagnosticSeverity.Error);
   assert.ok(packageProblems.some(item=>item.code==='EVIDENCE_GUARANTEE_NOT_CHECKED'));
   assert.ok(packageProblems.some(item=>item.code==='DEPENDENCY_NOT_CONFIGURED'));
   assert.ok(!packageProblems.some(item=>item.kind==='compiler-diagnostic'),
