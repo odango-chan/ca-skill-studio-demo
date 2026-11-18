@@ -3,6 +3,7 @@
 // This adapter owns workspace snapshots, diagnostics and read-only presentation.
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 import {createCompilerWorkerClient} from "./compiler-client.mjs";
+import {normalizeCompilerDiagnostics} from "./compiler-diagnostics.mjs";
 import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
 import {
   COMPILER_VERSION,
@@ -36,15 +37,6 @@ function packageRootFromUri(vscode,uri){
   const match=/^(.*\/skills\/[^/]+)(?:\/|$)/.exec(uri.path);
   if(!match)return null;
   return uri.with({path:match[1]});
-}
-
-function sourcePathForDiagnostic(packageName,path){
-  const prefix="skills/"+packageName+"/";
-  if(typeof path!=="string"||!path.startsWith(prefix))return null;
-  const relative=path.slice(prefix.length);
-  if(!relative||relative.includes("\\")||
-     relative.split("/").some(part=>!part||part==="."||part===".."))return null;
-  return relative;
 }
 
 function makeArtifactProvider(vscode,context,output){
@@ -193,46 +185,49 @@ export function registerCompilerIntegration(vscode,context,{
   }
 
   function publishDiagnostics(packageRoot,packageName,procedureUri,items){
-    clearPackageDiagnostics(packageRoot);
+    // Validate the whole Compiler response before touching any accepted
+    // DiagnosticCollection. Missing or ungrounded source ranges remain
+    // request/file Problems, never synthetic line-1 editor errors.
+    const projected=normalizeCompilerDiagnostics(items,{packageName});
     const grouped=new Map();
     const problemEntries=[];
-    for(const item of items??[]){
-      if(!item.path){
-        output.appendLine("[request] "+item.code+": "+item.message);
-        problemEntries.push({kind:"compiler-diagnostic",message:item.message,
-          code:item.code,severity:item.severity,uri:procedureUri.toString()});
+    for(const item of projected){
+      const sourceUri=item.sourcePath
+        ?vscode.Uri.joinPath(packageRoot,...item.sourcePath.split("/"))
+        :null;
+      const uri=sourceUri??procedureUri;
+      const problem={
+        ...item,uri:uri.toString()
+      };
+      problemEntries.push(problem);
+      if(item.locationKind==="request"){
+        output.appendLine("[request/unmapped] "+item.code+
+          (item.path?" "+item.path:"")+": "+item.message);
         continue;
       }
-      const relative=sourcePathForDiagnostic(packageName,item.path);
-      if(!relative){
-        output.appendLine("[unmapped] "+item.code+" "+item.path+": "+item.message);
-        problemEntries.push({kind:"compiler-diagnostic",message:item.message,
-          code:item.code,severity:item.severity,uri:procedureUri.toString()});
+      if(item.locationKind!=="source"){
+        output.appendLine("[file-only] "+item.code+" "+item.path+
+          ": no authoritative line/column; editor marker not invented");
         continue;
       }
-      const uri=vscode.Uri.joinPath(packageRoot,...relative.split("/"));
-      problemEntries.push({kind:"compiler-diagnostic",message:item.message,
-        code:item.code,severity:item.severity,line:item.line,column:item.column,
-        uri:uri.toString(),sourcePath:relative});
-      const line=Number.isSafeInteger(item.line)&&item.line>0?item.line-1:0;
-      const column=Number.isSafeInteger(item.column)&&item.column>0?item.column-1:0;
-      const start=new vscode.Position(line,column);
-      const end=new vscode.Position(line,column+1);
+      const line=item.line-1,column=item.column-1;
       const severity=item.severity==="warning"
         ?vscode.DiagnosticSeverity.Warning:vscode.DiagnosticSeverity.Error;
       const diagnostic=new vscode.Diagnostic(
-        new vscode.Range(start,end),item.message,severity
+        new vscode.Range(new vscode.Position(line,column),
+          new vscode.Position(line,column+1)),item.message,severity
       );
       diagnostic.source="CA Skill Compiler "+COMPILER_VERSION;
       diagnostic.code=item.code;
       if(!grouped.has(uri.toString()))grouped.set(uri.toString(),{uri,items:[]});
       grouped.get(uri.toString()).items.push(diagnostic);
     }
+    clearPackageDiagnostics(packageRoot);
     for(const {uri,items:group} of grouped.values())diagnostics.set(uri,group);
     compilerProblems.set(packageRoot.toString(),problemEntries);
     problemsEmitter.fire();
-    output.appendLine("Compiler diagnostics: "+(items?.length??0)+
-      " · "+(items??[]).filter(item=>item.severity==="error").length+" error(s)");
+    output.appendLine("Compiler diagnostics: "+projected.length+
+      " · "+projected.filter(item=>item.severity==="error").length+" error(s)");
   }
 
   async function chooseProcedure(target){
