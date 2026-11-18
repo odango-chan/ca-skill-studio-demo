@@ -8,7 +8,7 @@
 - **语言基线：** v1alpha5 Preview 固定 `ca-skills@d3f89dfafbf218e5e95c97a974004362b7b967b6`（PR #61）；IngressCatalog companion contract 固定 `ca-skills@561d14c639e11cc43d0f247111e4971dfb98761e`（PR #62）。两者均为 Draft / NOT RELEASED / NOT QUALIFIED；v1alpha5 继承 v1alpha4 冻结语义并增加 Appendix L Node-entry Wait。
 - **最终架构目标：** 平台无关的 Authoring Core + Host Adapter + OpenAI-compatible AI Gateway。Theia、VS Code Desktop/Web/Remote 与内网部署复用同一套 Context Pack、Procedure Agent、ModelProposal、Change Set 和 v1alpha5 Semantic Patch Engine。
 - **在线优先：** 第一条真实链路是 GitHub Pages / Theia Browser-Only → HTTPS AI Gateway → OpenAI-compatible 模型。Cloudflare Worker Free 是 Gateway 候选，不是核心依赖；GitHub Pages 本身没有可存放共享模型密钥的可信后端。
-- **共享密钥：** 按部署共用一份 Provider API Key，由 Gateway 服务端保存；不要求每位用户配置自己的模型 Key。Gateway 的访问授权、速率限制和用量上限仍须独立设计，CORS 不是身份验证。
+- **共享密钥：** 按部署共用一份 Provider API Key，由 Gateway 服务端保存；不要求每位用户配置自己的模型 Key。受限试点由 Cloudflare Access 认证用户、Gateway 按身份限流并限制请求 / 输出 Token；CORS 不是身份验证。严格全局费用账本暂不纳入无数据库试点。
 - **VS Code / 本地：** 桌面插件通过本地 Extension Host 处理编辑器操作，默认仍调用配置的在线或内网 Gateway；本机模型或单机部署可连接 loopback Gateway。组织共用 Provider Key 时优先使用受管内网 Gateway，不应复制到每台员工电脑。不能把共享 Provider Key 打包进 VSIX。Web Extension 可作为 Desktop/Web 共用基线，但不提供 Node.js API；必要时再增加 Node Host Adapter。
 - **原生 AI API：** vscode.lm 和 Theia AI 均作为可选适配，不是核心 Agent 运行时。Theia 1.76 的 vscode.lm stub 和 @theia/ai-openai backend RPC 限制继续作为兼容事实，不阻塞通用 Gateway 路径。
 - **v1alpha5 缺口：** 当前 PR #197 / LSP 仍是 v1alpha4 只读投影，不能用于 v1alpha5 编辑。旧版 D1/D2 Patch 与 v1alpha4 Patch Engine 不可直接复用；P1 需要独立 v1alpha5 Semantic Patch Engine。Compiler v1.0.0 仅支持 v1alpha4；Compiler PR #30 目前只完成 v1alpha5 WP2 Parser / AST，完整 Check 仍未就绪。
