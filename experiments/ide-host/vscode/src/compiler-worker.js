@@ -1,4 +1,4 @@
-// Classic browser Worker adapter for the pinned Go/WASM Compiler v1.0.0.
+// Classic browser Worker adapter for the pinned Go/WASM Compiler v2.0.0.
 // The Worker has no workspace access, network resolver, credentials or Runtime.
 let boot = null;
 
@@ -20,7 +20,7 @@ async function ensureCompiler() {
             typeof self.skillcVerifyArtifact === "function") return;
         await new Promise(resolve => setTimeout(resolve, 10));
       }
-      throw new Error("Pinned Go/WASM Compiler did not expose its v1alpha4 callbacks");
+      throw new Error("Pinned Go/WASM Compiler did not expose its v1alpha5 callbacks");
     })();
   }
   return boot;
