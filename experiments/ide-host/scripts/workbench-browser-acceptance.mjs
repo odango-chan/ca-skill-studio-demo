@@ -846,7 +846,7 @@ export async function runWorkbenchAcceptance({
     /\/assurance\/procedure\.yaml$/,"/SKILL.md");
   const mappingUri=defaultProcedureUri.replace(
     "/skills/establish-pdu-session/assurance/procedure.yaml",
-    "/skills/establish-pdu-session-mas/assurance/openamsm-operation-mapping.md");
+    "/skills/establish-pdu-session-mas/references/openamsm-operation-mapping.md");
   const nativeMarkdownUri=await nativeCommand(
     "skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance",skillGuideUri,1);
   if(nativeMarkdownUri!==skillGuideUri)
@@ -891,12 +891,12 @@ export async function runWorkbenchAcceptance({
   const secondMarkdownUri=await nativeCommand(
     "skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance",mappingUri,2);
   if(secondMarkdownUri!==mappingUri)
-    throw Error("Native Markdown did not open the v1alpha5 MAS mapping document: "+
+    throw Error("Native Markdown did not open the v1alpha5 MAS reference document: "+
       JSON.stringify(secondMarkdownUri));
   const secondMarkdown=await waitNativeMarkdown(view=>
     view.heading?.includes("OpenAMSM source mapping")&&
     view.styles.some(url=>url.includes("/media/native-markdown-preview.css")),
-    "v1alpha5 MAS mapping Markdown Preview");
+    "v1alpha5 MAS reference Markdown Preview");
   const secondMarkdownLayout=await assertTwoColumns(
     "second v1alpha5 Markdown source opened from the right group",secondMarkdownUri);
   const nativeMarkdownEvidence={
