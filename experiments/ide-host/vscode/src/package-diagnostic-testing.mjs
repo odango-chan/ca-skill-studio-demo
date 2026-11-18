@@ -131,7 +131,7 @@ export function registerPackageDiagnosticTesting(vscode,context,{
     "skillStudio.runDiagnosticTests",async()=>{
       const result=await execute();
       output.show(true);
-      return result;
+      return Object.freeze({...result,nativeTestExplorer:Boolean(controller)});
     }
   ));
   return Object.freeze({
