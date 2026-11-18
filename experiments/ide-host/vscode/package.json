@@ -25,6 +25,7 @@
     "onStartupFinished",
     "onCommand:skillStudio.auditPackage",
     "onCommand:skillStudio.runDiagnosticTests",
+    "onCommand:skillStudio.runRouteScenarios",
     "onCommand:skillStudio.exportPackageZip",
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
@@ -129,6 +130,11 @@
       {
         "command": "skillStudio.runDiagnosticTests",
         "title": "Run Offline Diagnostic Tests (No Runtime)",
+        "category": "SKILL Studio"
+      },
+      {
+        "command": "skillStudio.runRouteScenarios",
+        "title": "Replay Procedure Route Scenarios (No Runtime)",
         "category": "SKILL Studio"
       },
       {
