@@ -498,7 +498,10 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
     activeSession.controller = controller;
     post({ type: "status", message: "正在请求模型并校验语义提案…", busy: true });
     try {
-      const modelClient = createGatewayModelClient({ gatewayBaseUrl: gatewayBaseUrl.trim() });
+      const modelClient = createGatewayModelClient({
+        gatewayBaseUrl: gatewayBaseUrl.trim(),
+        sessionId: activeSession.sessionId,
+      });
       const agent = createProcedureAgent({ modelClient });
       const proposalResult = await agent.propose({
         task,
@@ -774,6 +777,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
           }
           session = {
             document,
+            sessionId: globalThis.crypto.randomUUID(),
             context: null,
             pending: null,
             controller: null,
@@ -796,6 +800,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       );
       session = {
         document,
+        sessionId: globalThis.crypto.randomUUID(),
         context: null,
         pending: null,
         controller: null,
