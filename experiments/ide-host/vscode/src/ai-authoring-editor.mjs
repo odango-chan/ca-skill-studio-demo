@@ -144,6 +144,25 @@ export function containsWaitMutation(operations) {
   );
 }
 
+export function isAuthoringApplyAllowed({
+  patchPlan,
+  blockers = [],
+  waitMutation = false,
+  compilerCheck = null,
+} = {}) {
+  // The host normalizes only a complete, authoritative v1alpha5 Compiler PASS
+  // into this shape. A patch plan or partial candidate is never sufficient.
+  return Boolean(
+    patchPlan &&
+    !waitMutation &&
+    Array.isArray(blockers) &&
+    blockers.length === 0 &&
+    compilerCheck?.languageTarget === LANGUAGE_TARGET &&
+    compilerCheck?.state === "PASS" &&
+    compilerCheck?.complete === true
+  );
+}
+
 export function isCurrentAuthoringSession(current, expected) {
   return Boolean(current && current === expected && current.disposed !== true);
 }
@@ -200,16 +219,17 @@ export function renderAiAuthoringHtml(nonce) {
     "function status(text,kind){const el=byId('status');el.textContent=text||'';el.className='status '+(kind||'');}",
     "function setBusy(value){busy=value;byId('generate').disabled=value||!window.gatewayConfigured||!contextReady;byId('cancel').disabled=!value;byId('refresh').disabled=value;byId('apply').disabled=value||!canApply;}",
     "function clear(el){while(el.firstChild)el.removeChild(el.firstChild);}",
+    "function clearProposal(){canApply=false;previewSequence++;clear(byId('plan'));clear(byId('assumptions'));clear(byId('blockers'));clear(byId('groups'));byId('proposalSummary').textContent='';byId('currentSource').textContent='';byId('candidateSource').textContent='';byId('patchState').textContent='尚未生成';byId('patchError').textContent='';byId('apply').disabled=true;byId('discard').disabled=true;}",
     "function addList(id,items){const root=byId(id);clear(root);if(!items||!items.length)return;const ul=document.createElement('ul');for(const value of items){const li=document.createElement('li');li.textContent=value;ul.appendChild(li);}root.appendChild(ul);}",
     "function requestSourcePreview(){const requestId=++previewSequence;const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);vscode.postMessage({type:'preview',requestId,groupIds});}",
-    "function renderContext(message){contextReady=true;canApply=false;window.gatewayConfigured=message.gatewayConfigured===true;byId('proposalSummary').textContent='';byId('currentSource').textContent='';byId('candidateSource').textContent='';previewSequence++;clear(byId('plan'));clear(byId('assumptions'));clear(byId('blockers'));clear(byId('groups'));byId('patchState').textContent='尚未生成';byId('patchError').textContent='';byId('apply').disabled=true;byId('discard').disabled=true;byId('packageInfo').textContent=message.packageName+' · '+message.documentVersion+' · Package revision '+message.packageGeneration;byId('gatewayNotice').textContent=window.gatewayConfigured?'Gateway URL 已配置；Provider Key 由服务端管理。':'请先在用户设置中配置 connectionAgent.skillStudio.ai.gatewayUrl。';const list=byId('sources');clear(list);for(const item of message.sources||[]){const label=document.createElement('label');label.className='source';const input=document.createElement('input');input.type='checkbox';input.checked=item.selected===true;input.value=item.id;input.disabled=busy;const body=document.createElement('span');body.className='source-main';const kind=document.createElement('span');kind.className='kind';kind.textContent=item.kind;const name=document.createElement('span');name.className='source-label';name.textContent=item.label;const size=document.createElement('span');size.className='source-bytes';size.textContent=item.bytes+' bytes'+(item.explicitOptIn?' · 每次任务需显式选择':'');body.append(kind,name,size);label.append(input,body);list.appendChild(label);}status('上下文已就绪。发送前会再次显示明确的数据披露确认。');setBusy(false);}",
+    "function renderContext(message){contextReady=true;clearProposal();window.gatewayConfigured=message.gatewayConfigured===true;byId('packageInfo').textContent=message.packageName+' · '+message.documentVersion+' · Package revision '+message.packageGeneration;byId('gatewayNotice').textContent=window.gatewayConfigured?'Gateway URL 已配置；Provider Key 由服务端管理。':'请先在用户设置中配置 connectionAgent.skillStudio.ai.gatewayUrl。';const list=byId('sources');clear(list);for(const item of message.sources||[]){const label=document.createElement('label');label.className='source';const input=document.createElement('input');input.type='checkbox';input.checked=item.selected===true;input.value=item.id;input.disabled=busy;const body=document.createElement('span');body.className='source-main';const kind=document.createElement('span');kind.className='kind';kind.textContent=item.kind;const name=document.createElement('span');name.className='source-label';name.textContent=item.label;const size=document.createElement('span');size.className='source-bytes';size.textContent=item.bytes+' bytes'+(item.explicitOptIn?' · 每次任务需显式选择':'');body.append(kind,name,size);label.append(input,body);list.appendChild(label);}status('上下文已就绪。发送前会再次显示明确的数据披露确认。');setBusy(false);}",
     "function renderProposal(message){previewSequence++;canApply=message.canApply===true;byId('proposalSummary').textContent=message.summary||'';byId('currentSource').textContent=message.currentSource||'';byId('candidateSource').textContent=message.candidateSource||'';addList('plan',message.plan||[]);addList('assumptions',message.assumptions||[]);addList('blockers',message.blockers||[]);byId('blockers').className=(message.blockers&&message.blockers.length)?'subsection warning':'subsection';byId('patchState').textContent=message.patchState||'NOT_RUN';byId('patchError').textContent=message.patchError||'';const list=byId('groups');clear(list);for(const group of message.groups||[]){const label=document.createElement('label');label.className='group';const input=document.createElement('input');input.type='checkbox';input.checked=true;input.value=group.id;input.dataset.groupId=group.id;input.addEventListener('change',requestSourcePreview);const body=document.createElement('span');body.className='group-main';const title=document.createElement('span');title.className='group-title';title.textContent=group.label+' · '+group.operationIds.length+' 项';const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='查看操作与理由';const ul=document.createElement('ul');for(const operation of group.operations||[]){const li=document.createElement('li');li.textContent=operation.type+' — '+operation.rationale;ul.appendChild(li);}details.append(summary,ul);body.append(title,details);label.append(input,body);list.appendChild(label);}byId('apply').disabled=!canApply||busy;byId('discard').disabled=false;status(canApply?'本地 Patch Plan READY；这不是 Compiler Check。':'提案已返回，但当前不能应用修改。',canApply?'':'warning');}",
-    "byId('generate').addEventListener('click',()=>{const task=byId('task').value.trim();const selectedIds=[...document.querySelectorAll('#sources input:checked')].map(item=>item.value);vscode.postMessage({type:'generate',task,selectedIds});});",
+    "byId('generate').addEventListener('click',()=>{const task=byId('task').value.trim();const selectedIds=[...document.querySelectorAll('#sources input:checked')].map(item=>item.value);clearProposal();vscode.postMessage({type:'generate',task,selectedIds});});",
     "byId('cancel').addEventListener('click',()=>vscode.postMessage({type:'cancel'}));",
-    "byId('refresh').addEventListener('click',()=>vscode.postMessage({type:'refresh'}));",
+    "byId('refresh').addEventListener('click',()=>{clearProposal();vscode.postMessage({type:'refresh'});});",
     "byId('apply').addEventListener('click',()=>{const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);vscode.postMessage({type:'apply',groupIds});});",
     "byId('discard').addEventListener('click',()=>vscode.postMessage({type:'discard'}));",
-    "window.addEventListener('message',event=>{const message=event.data||{};if(message.type==='context')renderContext(message);else if(message.type==='status'){status(message.message,message.kind);if(message.busy!==undefined)setBusy(message.busy);}else if(message.type==='proposal')renderProposal(message);else if(message.type==='preview'&&message.requestId===previewSequence){byId('candidateSource').textContent=message.candidateSource||'';}else if(message.type==='error'){if(message.contextUnavailable===true){contextReady=false;clear(byId('sources'));}status(message.message,'error');setBusy(false);}else if(message.type==='applied'){canApply=false;byId('apply').disabled=true;byId('discard').disabled=true;status('已应用到原生编辑器缓冲区；尚未保存。Compiler Check: NOT_RUN。');}else if(message.type==='discarded'){canApply=false;previewSequence++;clear(byId('groups'));byId('currentSource').textContent='';byId('candidateSource').textContent='';byId('proposalSummary').textContent='';byId('plan').textContent='';byId('assumptions').textContent='';byId('blockers').textContent='';byId('apply').disabled=true;byId('discard').disabled=true;status('提案已丢弃。');}});",
+    "window.addEventListener('message',event=>{const message=event.data||{};if(message.type==='context')renderContext(message);else if(message.type==='status'){status(message.message,message.kind);if(message.busy!==undefined)setBusy(message.busy);}else if(message.type==='proposal')renderProposal(message);else if(message.type==='preview'&&message.requestId===previewSequence){byId('candidateSource').textContent=message.candidateSource||'';}else if(message.type==='error'){if(message.contextUnavailable===true){contextReady=false;clear(byId('sources'));clearProposal();}status(message.message,'error');setBusy(false);}else if(message.type==='applied'){canApply=false;byId('apply').disabled=true;byId('discard').disabled=true;status('已应用到原生编辑器缓冲区；尚未保存。Compiler Check: NOT_RUN。');}else if(message.type==='discarded'){clearProposal();status('提案已丢弃。');}});",
     "vscode.postMessage({type:'ready'});",
   ].join("\n");
   return [
@@ -301,7 +321,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
     const document = activeSession.document;
     const requestId = (activeSession.contextRequestId ?? 0) + 1;
     activeSession.contextRequestId = requestId;
-    post({ type: "status", message: "正在读取当前 Procedure、Package 文件和锁定依赖…" });
+    activeSession.pending = null;
+    post({ type: "status", message: "正在读取当前 Procedure、Package 文件和锁定依赖…", busy: true });
     try {
       const state = await collectAuthoringState(document);
       if (!isCurrentAuthoringSession(session, activeSession) ||
@@ -330,6 +351,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       if (!isCurrentAuthoringSession(session, activeSession) ||
         activeSession.contextRequestId !== requestId) return;
       activeSession.context = null;
+      activeSession.pending = null;
       post({ type: "error", message: String(error?.message ?? error), contextUnavailable: true });
     }
   }
@@ -369,6 +391,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
     }
 
     activeSession.generating = true;
+    activeSession.pending = null;
     const document = activeSession.document;
     const initial = activeSession.context;
     const selectedResources = initial.resources.map((item) => ({
@@ -510,7 +533,16 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       }
       if (!isCurrent()) return;
       const waitGate = containsWaitMutation(changeSet.operations);
-      const canApply = Boolean(patchPlan && !waitGate && proposalResult.proposal.blockers.length === 0);
+      // Compiler PR #38 is CANDIDATE_PARTIAL and does not implement the full
+      // inherited v1alpha5 static semantics. No proposal is applicable until
+      // the pinned Compiler returns a complete authoritative PASS.
+      const compilerCheck = null;
+      const canApply = isAuthoringApplyAllowed({
+        patchPlan,
+        blockers: proposalResult.proposal.blockers,
+        waitMutation: waitGate,
+        compilerCheck,
+      });
       activeSession.pending = patchPlan ? {
         document,
         source: document.getText(),
@@ -528,11 +560,13 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         assumptions: proposalResult.proposal.assumptions,
         blockers: proposalResult.proposal.blockers,
         patchState: patchPlan
-          ? (waitGate ? "PREVIEW ONLY · Wait qualification gate" : "READY · local source patch only")
+          ? (waitGate ? "PREVIEW ONLY · Wait / Owner qualification gate" : "PREVIEW ONLY · full v1alpha5 Compiler Check unavailable")
           : patchError ? "BLOCKED · patch planning failed" : "NOT_RUN",
         patchError: waitGate
-          ? "Wait edits require a trusted IngressCatalog v1alpha1 Owner binding and a complete v1alpha5 Compiler Check. The current Studio dependency / Compiler path does not provide that proof; Wait changes cannot be applied."
-          : patchError,
+          ? "Wait edits additionally require a trusted IngressCatalog v1alpha1 Owner binding. All edits remain preview-only until the complete v1alpha5 Compiler Check is available and returns PASS."
+          : patchPlan
+            ? "The current v1alpha5 Compiler candidate is CANDIDATE_PARTIAL and does not cover inherited static semantics. No AI-generated change can be applied until a complete authoritative v1alpha5 Compiler Check returns PASS."
+            : patchError,
         canApply,
         currentSource: patchPlan ? document.getText() : "",
         candidateSource: candidateSource ?? "",
@@ -617,7 +651,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
     }
     const pending = activeSession.pending;
     if (pending.canApply !== true) {
-      post({ type: "error", message: "该提案处于 PREVIEW ONLY 状态，尚未满足 v1alpha5 语义 / Owner 验证门槛。" });
+      post({ type: "error", message: "该提案目前仅可预览。必须先由完整、权威的 CA-SL v1alpha5 Compiler 对同一候选 Package 返回 PASS，才能启用 Apply。" });
       return;
     }
     activeSession.applying = true;

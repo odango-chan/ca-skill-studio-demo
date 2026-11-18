@@ -6,6 +6,7 @@ import {
   createPackageRevisionTracker,
   renderAiAuthoringHtml,
   isCurrentAuthoringSession,
+  isAuthoringApplyAllowed,
 } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 
 const base64 = (value) => Buffer.from(value, "utf8").toString("base64");
@@ -141,4 +142,35 @@ test("stale Editor Tab sessions cannot publish asynchronous results into a repla
   first.disposed = true;
   assert.equal(isCurrentAuthoringSession(first, first), false);
   assert.equal(isCurrentAuthoringSession(null, first), false);
+});
+
+test("AI proposals remain preview-only until the complete pinned v1alpha5 Compiler returns PASS", () => {
+  const base = {
+    patchPlan: { groups: [{ id: "g1" }] },
+    blockers: [],
+    waitMutation: false,
+  };
+  assert.equal(isAuthoringApplyAllowed(base), false);
+  assert.equal(isAuthoringApplyAllowed({
+    ...base,
+    compilerCheck: { languageTarget: "connectionagent.io/v1alpha5", state: "CANDIDATE_PARTIAL", complete: false },
+  }), false);
+  assert.equal(isAuthoringApplyAllowed({
+    ...base,
+    compilerCheck: { languageTarget: "connectionagent.io/v1alpha4", state: "PASS", complete: true },
+  }), false);
+  assert.equal(isAuthoringApplyAllowed({
+    ...base,
+    waitMutation: true,
+    compilerCheck: { languageTarget: "connectionagent.io/v1alpha5", state: "PASS", complete: true },
+  }), false);
+  assert.equal(isAuthoringApplyAllowed({
+    ...base,
+    blockers: ["missing trusted Tool"],
+    compilerCheck: { languageTarget: "connectionagent.io/v1alpha5", state: "PASS", complete: true },
+  }), false);
+  assert.equal(isAuthoringApplyAllowed({
+    ...base,
+    compilerCheck: { languageTarget: "connectionagent.io/v1alpha5", state: "PASS", complete: true },
+  }), true);
 });
