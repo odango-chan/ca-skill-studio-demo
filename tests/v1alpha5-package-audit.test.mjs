@@ -158,7 +158,7 @@ test("Schema IDs can resolve from the exact pinned Owner snapshot independent of
     snapshots:[{id:"ca",kind:"tool-catalog",snapshotDigest:"sha256:test"}],
     diagnostics:[],
     schemas:[{dependencyId:"ca",path:"schemas/udm.schema.yaml",
-      text:"$id: "+schemaId+"\\ntype: object\\n"}],
+      text:"$id: "+schemaId+"\ntype: object\n"}],
     operations:[],toolCatalogs:[{dependencyId:"ca",available:true}]
   }});
   assert.ok(!diagnostics.some(item=>
