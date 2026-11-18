@@ -44,6 +44,8 @@ try{
 }
 import {deleteNodeOptions,previewNodeDelete} from '../../../site/node-delete.mjs';
 const root='site/samples/packages/establish-pdu-session/';
+const v1SampleRoot='site/samples/v1alpha5/';
+const v1SampleManifest=JSON.parse(readFileSync(v1SampleRoot+'files.json','utf8'));
 const source=readFileSync(root+'assurance/procedure.yaml','utf8');
 const outputReferenceSource=readFileSync('tests/fixtures/establish-pre-hold/assurance/procedure.yaml','utf8');
 const phaseFull="          'on':\n            FAILED: failed\n            UNRESOLVED: unresolved\n";
@@ -202,16 +204,24 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   const commands=new Map(),providers=new Map(),changes=[],diagnosticSets=[],appliedEdits=[],nativeCommands=[];
   const showDocumentCalls=[];
   const disposable=()=>({dispose(){}});
-  let confirmChoice='确认并应用',markdownExtensionActivated=false;
+  let confirmChoice='确认并应用',markdownExtensionActivated=false,
+    v1alpha5Mode=false,compilerConnected=true;
   function uri(path){return {path,toString(){return 'file://'+path;},with(change){return uri(change.path);}};}
   const file=uri('/workspace/establish-pdu-session/assurance/procedure.yaml');
   const doc={uri:file,version:1,text:source,getText(){return this.text;},positionAt(offset){return {offset};},get lineCount(){return this.text.split('\n').length;}};
   const markdownUri=uri('/workspace/establish-pdu-session/SKILL.md');
+  const contractUri=uri('/workspace/establish-pdu-session/assurance/contract.yaml');
+  const predicatesUri=uri('/workspace/establish-pdu-session/assurance/predicates.yaml');
+  const contractDoc={uri:contractUri,version:1,text:readFileSync(root+'assurance/contract.yaml','utf8'),
+    getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
+  const predicatesDoc={uri:predicatesUri,version:1,text:readFileSync(root+'assurance/predicates.yaml','utf8'),
+    getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
   const markdownDoc={uri:markdownUri,version:1,languageId:'markdown',
     text:'# Preview title\n\nA native Markdown source.',
     getText(){return this.text;},get lineCount(){return this.text.split('\n').length;}};
   const markdownEditor={document:markdownDoc,visibleRanges:[{start:{line:0},end:{line:5}}]};
   let changed;
+  const workspaceEvents={};
   const vscode={
     EventEmitter:class {event=()=>disposable();fire(){changes.push(1);}dispose(){}},
     TreeItem:class {constructor(label,state){this.label=label;this.collapsibleState=state;}},
@@ -224,29 +234,45 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
       }else{this.start=start;this.end=startCharacter;}
     }},
     WorkspaceEdit:class {constructor(){this.changes=[];}replace(uri,range,value){this.changes.push({uri,range,value});}},
-    Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Warning:1},
+    Diagnostic:class {constructor(range,message,severity){Object.assign(this,{range,message,severity});}},DiagnosticSeverity:{Error:0,Warning:1,Information:2},
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
     ViewColumn:{One:1,Two:2,Beside:2},
     FileType:{File:1,Directory:2,SymbolicLink:64},
-    Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
+    Uri:{parse(value){return uri(String(value).replace(/^file:\/\//,''));},
+      joinPath(base,...parts){
+        const joined=uri([base.path.replace(/\/$/,''),...parts].join('/'));
+        joined.toString=()=> 'https://studio.invalid/'+parts.join('/');
+        return joined;
+      }},
     extensions:{getExtension(id){return id==='vscode.markdown-language-features'?{
       extensionUri:uri('/extensions/vscode.markdown-language-features'),isActive:markdownExtensionActivated,
       async activate(){markdownExtensionActivated=true;this.isActive=true;return {};}
     }:null;}},
-    languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
+    languages:{getDiagnostics:target=>diagnosticSets.flatMap(([uri,items])=>
+        uri.path===target.path?items:[]),
+      createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
     commands:{async executeCommand(id,...args){nativeCommands.push({id,args});return true;},
       async getCommands(){return ['markdown.showPreview','vscode.openWith'];},
       registerCommand(name,cb){commands.set(name,cb);return disposable();}},
-    workspace:{textDocuments:[doc,markdownDoc],
+    workspace:{textDocuments:[doc,markdownDoc,contractDoc,predicatesDoc],
+      workspaceFolders:[{uri:uri('/workspace'),name:'workspace'}],
       getWorkspaceFolder:()=>({uri:uri('/workspace')}),
       findFiles:async pattern=>{
         if(pattern==='**/SKILL.md')return [markdownUri];
+        if(v1alpha5Mode&&pattern?.pattern==='**/*')
+          return v1SampleManifest.files.filter(path=>path.startsWith('establish-pdu-session/'))
+            .map(path=>uri('/workspace/establish-pdu-session/'+path.slice('establish-pdu-session/'.length)));
         return ['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md']
           .map(p=>uri('/workspace/establish-pdu-session/'+p));
       },
-      getConfiguration:()=>({get:key=>({scrollEditorWithPreview:true,
-        scrollPreviewWithEditor:true,markEditorSelection:true})[key]}),
-      fs:{readFile:async u=>new TextEncoder().encode(readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8')),
+      getConfiguration:(section)=>({get:(key,fallback)=>section==='connectionAgent.skillStudio'
+        ?({skillsRoot:'skills',dependencies:[],
+          dependencyLock:{version:'skillc.lock/v0.1',entries:[]},
+          defaultBuildTarget:'all'})[key]??fallback
+        :({scrollEditorWithPreview:true,scrollPreviewWithEditor:true,markEditorSelection:true})[key]}),
+      fs:{readFile:async u=>new TextEncoder().encode(v1alpha5Mode
+          ?readFileSync(v1SampleRoot+'establish-pdu-session/'+u.path.split('establish-pdu-session/')[1],'utf8')
+          :readFileSync(root+u.path.split('establish-pdu-session/')[1],'utf8')),
         stat:async target=>({type:target.path==='/workspace/establish-pdu-session'||target.path==='/workspace/establish-pdu-session/assurance'?2:1})},
       async applyEdit(edit){
         appliedEdits.push([...edit.changes]);
@@ -255,7 +281,13 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
         doc.version++;changed({document:doc});return true;
       },
       onDidChangeTextDocument(cb){changed=cb;return disposable();},
-      openTextDocument:async target=>target.path.endsWith('/establish-pdu-session/SKILL.md')?markdownDoc:doc},
+      onDidCreateFiles(cb){workspaceEvents.create=cb;return disposable();},
+      onDidDeleteFiles(cb){workspaceEvents.delete=cb;return disposable();},
+      onDidRenameFiles(cb){workspaceEvents.rename=cb;return disposable();},
+      onDidChangeConfiguration(cb){workspaceEvents.configuration=cb;return disposable();},
+      openTextDocument:async target=>target.path.endsWith('/establish-pdu-session/SKILL.md')?markdownDoc:
+        v1alpha5Mode&&target.path.endsWith('/assurance/contract.yaml')?contractDoc:
+        v1alpha5Mode&&target.path.endsWith('/assurance/predicates.yaml')?predicatesDoc:doc},
     window:{registerTreeDataProvider(id,p){providers.set(id,p);return disposable();},
       onDidChangeActiveTextEditor:()=>disposable(),
       onDidChangeTextEditorVisibleRanges(){return disposable();},
@@ -271,7 +303,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   }];
   let emitCompilerProblems;
   const compilerProblemsProvider={
-    getProblems:()=>compilerProblems,
+    getProblems:()=>compilerConnected?compilerProblems:[],
     onDidChange:listener=>{emitCompilerProblems=listener;return disposable();}
   };
   const context={subscriptions:[],extensionUri:uri('/extension')},
@@ -279,7 +311,8 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   workbench.attach(doc,m=>posted.push(m));
   assert.equal(providers.size,3);
   const problems=providers.get('skillStudio.problems');
-  const compilerProblem=problems.getChildren().find(item=>item.kind==='compiler-diagnostic');
+  const compilerProblem=problems.getChildren().flatMap(item=>item.children??[])
+    .find(item=>item.kind==='compiler-diagnostic');
   assert.ok(compilerProblem,'Compiler diagnostics are projected into the native Skill Studio Problems view');
   assert.equal(compilerProblem.code,'YAML_PARSE_ERROR');
   assert.equal(compilerProblem.severity,'error');
@@ -648,8 +681,9 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.equal(providers.get('skillStudio.inspection').getTreeItem(protectedNode).contextValue,
     'skillStudio.node','Phase-bearing Node does not expose deletion');
   await commands.get('skillStudio.auditPackage')();
-  assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/editor warnings/);
-  assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
+  assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/0 errors \/ 2 warnings/);
+  assert.ok(providers.get('skillStudio.problems').getChildren()
+    .flatMap(item=>item.children??[]).every(x=>!x.label.includes('Audit unavailable')));
   assert.ok(commands.has('skillStudio.exportPackageZip'));
   // Package export uses the complete byte snapshot but overlays every open
   // TextDocument, so unsaved edits are included without writing to OPFS.
@@ -705,7 +739,120 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     'skillStudio.internal.nativeMarkdownSettingsAcceptance')();
   assert.equal(nativeSettings.scrollEditorWithPreview,true);
   assert.equal(nativeSettings.scrollPreviewWithEditor,true);
-  
+
+  // The v1alpha5 Example must keep showing deterministic local and NOT_CHECKED
+  // Package diagnostics while the Compiler provider is disconnected.
+  v1alpha5Mode=true;
+  compilerConnected=false;
+  doc.text=readFileSync(v1SampleRoot+'establish-pdu-session/assurance/procedure.yaml','utf8');
+  doc.version++;changed({document:doc});
+  contractDoc.text=readFileSync(v1SampleRoot+'establish-pdu-session/assurance/contract.yaml','utf8');
+  contractDoc.version++;
+  predicatesDoc.text=readFileSync(v1SampleRoot+'establish-pdu-session/assurance/predicates.yaml','utf8');
+  predicatesDoc.version++;
+  await commands.get('skillStudio.auditPackage')();
+  const problemRoots=providers.get('skillStudio.problems').getChildren();
+  const packageProblems=problemRoots.flatMap(item=>item.children??[])
+    .filter(item=>item.kind==='package-diagnostic');
+  const capabilityProblem=packageProblems.find(item=>
+    item.kind==='package-diagnostic'&&item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&
+    item.message.includes('namf-communication-n1n2-transfer'));
+  assert.ok(capabilityProblem,
+    'Capability Grant is a visible Problem without Compiler integration');
+  assert.equal(capabilityProblem.status,'not_checked');
+  assert.equal(capabilityProblem.domain,'capabilities');
+  assert.ok(packageProblems.length>10,
+    'the default Example exposes multiple real dependency and trust-boundary blockers');
+  const dependencyProblem=packageProblems.find(item=>
+    item.kind==='package-diagnostic'&&item.code==='DEPENDENCY_NOT_CONFIGURED');
+  assert.ok(dependencyProblem,'unconfigured Contract dependencies are confirmed Problems');
+  const dependencyTreeItem=providers.get('skillStudio.problems').getTreeItem(dependencyProblem);
+  assert.equal(dependencyTreeItem.iconPath.id,'error');
+  const dependencyMarkerSet=diagnosticSets.find(([target,items])=>
+    target.path===dependencyProblem.uri.path&&items.some(item=>item.code==='DEPENDENCY_NOT_CONFIGURED'));
+  assert.ok(dependencyMarkerSet,'confirmed dependency errors also have editor markers');
+  assert.equal(dependencyMarkerSet[1].find(item=>item.code==='DEPENDENCY_NOT_CONFIGURED').severity,
+    vscode.DiagnosticSeverity.Error);
+  assert.ok(packageProblems.some(item=>item.code==='EVIDENCE_GUARANTEE_NOT_CHECKED'));
+  assert.ok(packageProblems.some(item=>item.code==='DEPENDENCY_NOT_CONFIGURED'));
+  assert.ok(!problemRoots.some(item=>item.kind==='problem-group'&&item.label==='Compiler'),
+    'Compiler disconnection does not prevent independent Package diagnostics');
+  assert.match(problemRoots[0].label,/NOT_CHECKED/);
+  assert.ok(problemRoots.some(item=>item.kind==='problem-group'&&item.label==='Capabilities'));
+  assert.ok(problemRoots.some(item=>item.kind==='problem-group'&&item.label==='Dependencies'));
+  const capabilityGroup=problemRoots.find(item=>
+    item.kind==='problem-group'&&item.label==='Capabilities');
+  const capabilityGroupTreeItem=providers.get('skillStudio.problems').getTreeItem(capabilityGroup);
+  assert.equal(capabilityGroupTreeItem.collapsibleState,vscode.TreeItemCollapsibleState.Collapsed);
+  assert.match(capabilityGroupTreeItem.description,/NOT_CHECKED/);
+
+  const expectedCapabilityLine=contractDoc.text.split('\n').findIndex(line=>
+    line.includes('namf-communication-n1n2-transfer'))+1;
+  assert.equal(capabilityProblem.line,expectedCapabilityLine);
+  const markerSet=diagnosticSets.find(([target,items])=>
+    target.path===contractUri.path&&items.some(item=>
+      item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&
+      item.message.includes('namf-communication-n1n2-transfer')));
+  assert.ok(markerSet,'Capability Grant also appears in the editor DiagnosticCollection');
+  const capabilityMarker=markerSet[1].find(item=>
+    item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&
+    item.message.includes('namf-communication-n1n2-transfer'));
+  assert.equal(capabilityMarker.severity,vscode.DiagnosticSeverity.Warning);
+  assert.equal(capabilityMarker.range.start.line,expectedCapabilityLine-1);
+
+  const capabilityTreeItem=providers.get('skillStudio.problems').getTreeItem(capabilityProblem);
+  assert.equal(capabilityTreeItem.contextValue,'skillStudio.packageDiagnostic');
+  assert.equal(capabilityTreeItem.iconPath.id,'warning');
+  assert.equal(capabilityTreeItem.command.command,'skillStudio.revealInspection');
+  await commands.get(capabilityTreeItem.command.command)(...capabilityTreeItem.command.arguments);
+  const sourceOpen=nativeCommands.filter(call=>call.id==='vscode.openWith').at(-1);
+  assert.equal(sourceOpen.args[0].path,contractUri.path,
+    'clicking the Capability Problem opens the owning Contract file');
+  assert.equal(sourceOpen.args[2].selection.start.line,expectedCapabilityLine-1,
+    'Problem navigation selects the exact Capability Grant source line');
+  const acceptance=await commands.get('skillStudio.internal.semanticTokenDiagnostics')();
+  assert.ok(acceptance.packageAudit.problems.some(item=>
+    item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&item.line===expectedCapabilityLine));
+  assert.ok(acceptance.packageAudit.editorMarkers.some(item=>
+    item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&item.line===expectedCapabilityLine));
+
+  // The accepted diagnostics must immediately become stale on filesystem and
+  // project lock changes, without any Compiler request.
+  const currentRoot='/workspace/establish-pdu-session/';
+  const outsider=uri('/workspace/establish-pdu-session-backup/assurance/contract.yaml');
+  const pending=()=>problems.getChildren()[0].label==='Package Audit · pending';
+  const assertMarkersRestored=async()=>{
+    await commands.get('skillStudio.auditPackage')();
+    assert.ok(diagnosticSets.some(([target,items])=>
+      target.path===contractUri.path&&items.some(item=>item.code==='CAPABILITY_GRANT_NOT_CHECKED')));
+  };
+  workspaceEvents.create({files:[outsider]});
+  assert.ok(!pending(),'changes to a sibling Package must not invalidate current Problems');
+  changed({document:{uri:outsider}});
+  assert.ok(!pending(),'unrelated TextDocuments do not invalidate the selected Package');
+  workspaceEvents.create({files:[uri(currentRoot+'schemas/new.schema.yaml')]});
+  assert.equal(diagnosticSets.length,0,'new files clear accepted editor markers immediately');
+  assert.ok(pending(),'new Package files invalidate audit status');
+  await assertMarkersRestored();
+  workspaceEvents.delete({files:[uri(currentRoot+'scripts/validate-subscription-request.py')]});
+  assert.ok(pending(),'deleted Package files invalidate accepted diagnostics');
+  await assertMarkersRestored();
+  workspaceEvents.rename({files:[{
+    oldUri:outsider,newUri:uri(currentRoot+'scripts/renamed.py')
+  }]});
+  assert.ok(pending(),'renames into the Package invalidate current diagnostics');
+  await assertMarkersRestored();
+  workspaceEvents.configuration({
+    affectsConfiguration:section=>section==='editor.fontSize'
+  });
+  assert.ok(!pending(),'unrelated settings changes must not clear Package diagnostics');
+  workspaceEvents.configuration({
+    affectsConfiguration:section=>section==='connectionAgent.skillStudio'
+  });
+  assert.equal(diagnosticSets.length,0,'dependency settings changes clear old editor markers');
+  assert.ok(pending(),'project dependency updates trigger a new Package audit');
+  await assertMarkersRestored();
+
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
 });

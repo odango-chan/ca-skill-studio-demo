@@ -6,6 +6,8 @@ import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
+import {auditV1Alpha5Package,indexV1Alpha4ToolCatalogCallables}
+  from '../../../../site/v1alpha5-package-audit.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
@@ -34,6 +36,7 @@ import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
   from '../../../../site/phase-named-verify.mjs';
 import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export.mjs';
 import {resolveLockedDependencies} from "./dependency-service.mjs";
+import {readProjectConfiguration} from "./project-configuration.mjs";
 import {decodeBase64} from "./dependency-snapshot.mjs";
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 import {
@@ -52,7 +55,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer,
     lastSelectionMessage=null;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
-  const providers=new Map(),sessions=new Map(),selections=new Map();
+  const providers=new Map(),treeProviders=new Map(),sessions=new Map(),selections=new Map();
   const nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
     nativeMarkdownOpening=new Set();
   let nativeMarkdownWorkerDiagnostics=null;
@@ -208,6 +211,30 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       })),
       packageLifecycle:packageLanguageLifecycle.snapshot(),
       packageStatuses:[...languagePackageStatuses.entries()].map(([rootUri,status])=>({rootUri,...status})),
+      packageAudit:(()=>{
+        const root=document?packageRootForProcedure(vscode,document):null;
+        const contractUri=root?vscode.Uri.joinPath(root.uri,"assurance","contract.yaml"):null;
+        const editorMarkers=contractUri&&vscode.languages.getDiagnostics
+          ?vscode.languages.getDiagnostics(contractUri).map(item=>({
+            code:item.code,message:item.message,severity:item.severity,source:item.source,
+            line:(item.range?.start?.line??0)+1,
+            column:(item.range?.start?.character??0)+1
+          })): [];
+        const problemItems=(treeProviders.get("problems")?.getChildren?.()??[])
+          .flatMap(item=>item.kind==="problem-group"?(item.children??[]):[item]);
+        return {
+          status:auditStatus,
+          diagnostics:audit.map(item=>({
+            code:item.code,message:item.message,severity:item.severity,status:item.status,
+            domain:item.domain,path:item.path,line:item.line,column:item.column
+          })),
+          problems:problemItems.filter(item=>item.kind==="package-diagnostic").map(item=>({
+            code:item.code,message:item.message,severity:item.severity,status:item.status,
+            domain:item.domain,path:item.path,line:item.line,column:item.column
+          })),
+          editorMarkers
+        };
+      })(),
       languageClientStarted:Boolean(languageClient),
       languageClientPending:Boolean(languageClientPromise),
       languageTransportFailure,
@@ -2696,28 +2723,90 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   }
 
   context.subscriptions.push(diagnostics);
+  const problemDomainLabels={
+    source:"Source",package:"Package",dependencies:"Dependencies",tools:"Tools",
+    capabilities:"Capabilities",schemas:"Schemas",predicates:"Predicates",
+    evidence:"Evidence",compiler:"Compiler",runtime:"Runtime"
+  };
+  function problemTreeChildren(){
+    const groups=new Map();
+    const diagnostics=[
+      ...(snapshot?.problems??[]),...audit,
+      ...(compilerProblemsProvider?.getProblems?.()??[])
+    ];
+    const merged=new Map();
+    for(const diagnostic of diagnostics){
+      const kind=diagnostic.kind??"problem";
+      const location=diagnostic.uri?.toString?.()??diagnostic.path??diagnostic.sourcePath??"";
+      const identity=[diagnostic.code??"",location,diagnostic.line??0,
+        diagnostic.column??0,diagnostic.message??""].join("|");
+      const priority=kind==="compiler-diagnostic"?3:
+        kind==="package-diagnostic"?2:1;
+      const previous=merged.get(identity);
+      if(!previous||priority>previous.priority)
+        merged.set(identity,{diagnostic,priority});
+    }
+    for(const {diagnostic} of merged.values()){
+      const kind=diagnostic.kind??"problem";
+      const domain=diagnostic.domain??(kind==="compiler-diagnostic"?"compiler":"source");
+      if(!groups.has(domain)){
+        groups.set(domain,{
+          kind:"problem-group",domain,
+          label:problemDomainLabels[domain]??domain,
+          description:"",
+          children:[]
+        });
+      }
+      groups.get(domain).children.push({
+        kind,label:diagnostic.message,message:diagnostic.message,
+        line:diagnostic.line,column:diagnostic.column,uri:diagnostic.uri,
+        code:diagnostic.code,severity:diagnostic.severity,
+        status:diagnostic.status,domain,category:diagnostic.category,
+        path:diagnostic.path,sourcePath:diagnostic.sourcePath,
+        source:diagnostic.source,children:[]
+      });
+    }
+    for(const group of groups.values()){
+      const errors=group.children.filter(item=>item.severity==="error").length;
+      const warnings=group.children.filter(item=>item.severity==="warning").length;
+      const notChecked=group.children.filter(item=>item.status==="not_checked").length;
+      group.description=errors+" errors · "+warnings+" warnings"+
+        (notChecked?" · "+notChecked+" NOT_CHECKED":"");
+    }
+    return [{kind:"problem-status",label:auditStatus,children:[]},...groups.values()];
+  }
   for(const id of ['inspection','outline','problems']){
     const emitter=new vscode.EventEmitter();
     const provider={onDidChangeTreeData:emitter.event,
       getChildren:item=>item?.children??(id==='problems'
-        ? [{label:auditStatus,children:[]},...([...(snapshot?.problems??[]),...audit,
-          ...(compilerProblemsProvider?.getProblems?.()??[])].map(d=>({
-            kind:d.kind??'problem',label:d.message,line:d.line,column:d.column,
-            uri:d.uri,code:d.code,severity:d.severity,sourcePath:d.sourcePath,
-            description:d.severity
-              ?d.severity.toUpperCase()+' · '+(d.code??'Compiler')
-              :(d.code??'Source projection'),children:[]
-          })))]
+        ?problemTreeChildren()
         :snapshot?.[id]??[{label:'Open assurance/procedure.yaml',children:[]}]),
       getTreeItem(item){
         const tree=new vscode.TreeItem(item.label,item.children?.length?vscode.TreeItemCollapsibleState.Collapsed:vscode.TreeItemCollapsibleState.None);
         tree.description=item.description;tree.tooltip=item.label+(item.line?' · L'+item.line:'');
         tree.kind=item.kind;
+        if(item.kind==='problem-group'){
+          tree.contextValue='skillStudio.problemGroup';
+          tree.iconPath=new vscode.ThemeIcon('folder');
+          tree.tooltip=item.label+'\n'+item.description;
+        }
         if(item.kind==='compiler-diagnostic'){
           tree.contextValue='skillStudio.compilerDiagnostic';
           tree.iconPath=new vscode.ThemeIcon(item.severity==='warning'?'warning':'error');
           tree.command={command:'skillStudio.revealCompilerDiagnostic',
             title:'Reveal Compiler Diagnostic',arguments:[item]};
+        }
+        if(item.kind==='package-diagnostic'){
+          tree.contextValue='skillStudio.packageDiagnostic';
+          tree.iconPath=new vscode.ThemeIcon(item.severity==='error'?'error':
+            item.severity==='warning'?'warning':'info');
+          tree.tooltip=[
+            item.message,
+            item.domain?'Domain: '+item.domain:null,
+            item.status?'Status: '+item.status:null,
+            item.code?'Code: '+item.code:null,
+            item.source??'Skill Studio · Package Audit'
+          ].filter(Boolean).join('\n');
         }
         if(item.kind==='node'){
           const deletable=id==='inspection'&&document&&
@@ -2837,7 +2926,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         }
         return tree;
       }};
-    providers.set(id,emitter);
+    providers.set(id,emitter);treeProviders.set(id,provider);
     context.subscriptions.push(emitter,vscode.window.registerTreeDataProvider('skillStudio.'+id,provider));
   }
   const fire=()=>{for(const p of providers.values())p.fire();};
@@ -2881,68 +2970,131 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   }
   async function auditCurrent(){
     if(!document)return;
-    // An explicit audit supersedes a pending debounced audit. Letting both
-    // run concurrently can race their package snapshots and tree refreshes.
+    // An explicit audit supersedes a pending debounced audit. One shared,
+    // bounded Package snapshot feeds Source projection and Package diagnostics.
     clearTimeout(timer);timer=undefined;
     const doc=document,version=doc.version,ticket=++generation;
     auditStatus="Package Audit · running";fireProblems();
-    const files=new Map(),uris=new Map();
     try{
-      const base=doc.uri.with({path:doc.uri.path.slice(0,-'assurance/procedure.yaml'.length)});
-      // Bounded by file count and aggregate bytes; never crawl another Package.
-      // OPFS may expose a just-written file in findFiles before it can be
-      // read, especially while Source edits and Package Language snapshots
-      // overlap. Retry the whole bounded inventory only for transient ENOENT;
-      // a genuinely missing core file still fails closed below.
+      let packageSnapshot;
       for(let attempt=0;attempt<3;attempt++){
-        try{
-          const found=await vscode.workspace.findFiles(
-            new vscode.RelativePattern(base,'**/*'),'**/node_modules/**',501);
-          if(found.length>500)throw Error('Package exceeds 500-file audit limit');
-          files.clear();uris.clear();
-          let bytes=0;
-          for(const uri of found){
-            if(!uri.path.startsWith(base.path))continue;
-            const path=uri.path.slice(base.path.length);uris.set(path,uri);
-            if(!/\.(yaml|json|py|md)$/.test(path)){files.set(path,{text:''});continue;}
-            const open=vscode.workspace.textDocuments.find(d=>
-              d.uri.toString()===uri.toString());
-            const text=open?open.getText():new TextDecoder().decode(
-              await vscode.workspace.fs.readFile(uri));
-            bytes+=text.length;
-            if(bytes>4*MAX_SOURCE_BYTES)throw Error('Package exceeds 4 MiB audit limit');
-            files.set(path,{text});
+        packageSnapshot=await collectPackageSnapshot(vscode,doc,ticket);
+        if(ticket!==generation||document!==doc||doc.version!==version)return;
+        const transient=packageSnapshot.completeness==="partial"&&
+          /ENOENT|EntryNotFound|FileNotFound/.test(packageSnapshot.reason??"");
+        if(!transient||attempt===2)break;
+        await new Promise(resolve=>setTimeout(resolve,100*(attempt+1)));
+      }
+      const files=new Map(packageSnapshot.documents.map(item=>
+        [item.relativePath,{text:item.text}]));
+      const uris=new Map(packageSnapshot.documents.map(item=>
+        [item.relativePath,vscode.Uri.parse(item.uri)]));
+      const required=['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml'];
+      const missing=required.filter(path=>!files.has(path));
+      const v1alpha5=isV1Alpha5Procedure(doc.getText());
+      let v1alpha5DependencyContext={available:false};
+      if(v1alpha5){
+        const folder=vscode.workspace.getWorkspaceFolder?.(doc.uri);
+        if(folder){
+          try{
+            const project=readProjectConfiguration(vscode,folder.uri);
+            const resolved=await resolveLockedDependencies(vscode,folder.uri);
+            const operations=[],schemas=[],toolCatalogs=[];
+            const decoder=new TextDecoder("utf-8",{fatal:true});
+            for(const dependency of resolved.snapshots??[]){
+              const decoded=(dependency.files??[])
+                .filter(file=>/\.(?:json|ya?ml)$/i.test(file.path))
+                .map(file=>({
+                  path:file.path,text:decoder.decode(decodeBase64(file.bytes))
+                }));
+              if(dependency.kind==="tool-catalog"){
+                // CA-SL v1alpha5 inherits exact ToolCatalog v1alpha4 (F.1).
+                // A checksum-verified file is not an Owner qualification.
+                const catalog=indexV1Alpha4ToolCatalogCallables(dependency.id,decoded);
+                toolCatalogs.push({dependencyId:dependency.id,
+                  available:catalog.available,reason:catalog.reason});
+                operations.push(...catalog.operations);
+              }
+              for(const file of decoded){
+                const schemaFile=dependency.kind==="schema-bundle"
+                  ?/\.(?:json|ya?ml)$/i.test(file.path)
+                  :/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path);
+                if(!schemaFile)continue;
+                schemas.push({dependencyId:dependency.id,path:file.path,text:file.text});
+              }
+            }
+            v1alpha5DependencyContext={
+              available:true,declarations:project.settings.dependencies,
+              snapshots:resolved.snapshots,diagnostics:resolved.diagnostics,
+              operations,toolCatalogs,schemas
+            };
+          }catch(error){
+            v1alpha5DependencyContext={
+              available:false,reason:String(error?.message??error)
+            };
           }
-          break;
-        }catch(error){
-          if(ticket!==generation||document!==doc||doc.version!==version)return;
-          if(!/ENOENT|EntryNotFound|FileNotFound/.test(String(error?.message??error))||
-             attempt===2)throw error;
-          await new Promise(resolve=>setTimeout(resolve,100*(attempt+1)));
+        }else{
+          v1alpha5DependencyContext={
+            available:false,reason:"The Package is not inside an open project workspace"
+          };
         }
       }
-      const required=['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml'];
-      const missing=required.filter(p=>!files.has(p));
-      const v1alpha5=isV1Alpha5Procedure(doc.getText());
-      const results=missing.length?missing.map(path=>({message:'Audit unavailable: missing '+path,path:'assurance/procedure.yaml',line:1,code:'AUDIT_INCOMPLETE'})):
-        v1alpha5?[]:auditPackageWorkspace({name:base.path.replace(/\/$/,'').split('/').at(-1),files},doc.getText());
+
+      let results;
+      if(v1alpha5){
+        results=auditV1Alpha5Package({
+          files,dependencyContext:v1alpha5DependencyContext,
+          completeness:packageSnapshot.completeness,
+          snapshotReason:packageSnapshot.reason
+        });
+      }else if(packageSnapshot.completeness!=="complete"){
+        results=[{
+          kind:'package-diagnostic',
+          message:'Legacy Package Audit was not run because the Package snapshot is incomplete'+
+            (packageSnapshot.reason?': '+packageSnapshot.reason:''),
+          path:'assurance/procedure.yaml',line:1,column:1,
+          code:'PACKAGE_SNAPSHOT_INCOMPLETE',severity:'warning',
+          status:'not_checked',domain:'package',category:'snapshot'
+        }];
+      }else if(missing.length){
+        results=missing.map(path=>({
+          kind:'package-diagnostic',message:'Audit unavailable: missing '+path,
+          path:'assurance/procedure.yaml',line:1,column:1,code:'AUDIT_INCOMPLETE',
+          severity:'error',status:'blocked',domain:'package',category:'inventory'
+        }));
+      }else{
+        results=auditPackageWorkspace({
+          name:packageSnapshot.packageName,files
+        },doc.getText());
+      }
       if(ticket!==generation||document!==doc||doc.version!==version)return;
-      audit=results.map(d=>({...d,uri:uris.get(d.path)??doc.uri}));
+      audit=results.map(item=>({...item,uri:uris.get(item.path)??doc.uri}));
+      const errors=audit.filter(item=>item.severity==="error").length;
+      const warnings=audit.filter(item=>item.severity==="warning").length;
+      const notChecked=audit.filter(item=>item.status==="not_checked").length;
       auditStatus=v1alpha5
-        ?"v1alpha5 Source · Compiler / Owner qualification pending"
-        :"Package Audit · "+(missing.length?"unavailable":audit.length+" editor warnings");
+        ?"v1alpha5 Package Audit · "+errors+" errors / "+warnings+" warnings / "+
+          notChecked+" NOT_CHECKED · Compiler / Owner qualification pending"
+        :"Package Audit · "+errors+" errors / "+warnings+" warnings";
       diagnostics.clear();
-      if(!missing.length){
+      if(packageSnapshot.completeness==="complete"){
         packageFiles=files;packageFilesUri=doc.uri.toString();packageFilesVersion=version;
-        update(doc);
       }else{
         packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
-        update(doc);
       }
-      for(const uri of new Set(audit.map(d=>d.uri))){
-        diagnostics.set(uri,audit.filter(d=>d.uri===uri).map(d=>{
-          const line=Math.max(0,d.line-1),diagnostic=new vscode.Diagnostic(new vscode.Range(line,0,line,1),d.message,vscode.DiagnosticSeverity.Warning);
-          diagnostic.source='Skill Studio · editor audit';diagnostic.code=d.code;return diagnostic;
+      update(doc);
+      for(const uri of new Set(audit.map(item=>item.uri))){
+        diagnostics.set(uri,audit.filter(item=>item.uri===uri).map(item=>{
+          const line=Math.max(0,(item.line??1)-1);
+          const column=Math.max(0,(item.column??1)-1);
+          const severity=item.severity==="error"?vscode.DiagnosticSeverity.Error:
+            item.severity==="information"
+              ?(vscode.DiagnosticSeverity.Information??vscode.DiagnosticSeverity.Warning)
+              :vscode.DiagnosticSeverity.Warning;
+          const diagnostic=new vscode.Diagnostic(
+            new vscode.Range(line,column,line,column+1),item.message,severity);
+          diagnostic.source=item.source??'Skill Studio · editor audit';
+          diagnostic.code=item.code;return diagnostic;
         }));
       }
       fireProblems();
@@ -2950,7 +3102,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       if(ticket!==generation)return;
       packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
       auditStatus='Package Audit · unavailable';
-      audit=[{message:'Audit unavailable: '+error.message,line:1,uri:doc.uri}];
+      audit=[{kind:'package-diagnostic',message:'Audit unavailable: '+error.message,
+        line:1,column:1,uri:doc.uri,code:'PACKAGE_AUDIT_UNAVAILABLE',
+        severity:'error',status:'blocked',domain:'package',category:'snapshot'}];
       diagnostics.clear();update(doc);fireProblems();
     }
   }
@@ -3026,8 +3180,11 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
          (item.auditGeneration!==undefined&&item.auditGeneration!==generation))return;
       if(item.nodeId){selection={procedureId:item.procedureId,nodeId:item.nodeId};update(document);sessions.get(document.uri.toString())?.({type:'focusNode',...selection,version:document.version});}
       const doc=await vscode.workspace.openTextDocument(item.uri);
-      const line=Math.min(Math.max(0,item.line-1),doc.lineCount-1);
-      await openNativeSource(vscode,doc.uri,{preview:true,selection:new vscode.Range(line,0,line,0)});
+      const line=Math.min(Math.max(0,(item.line??1)-1),doc.lineCount-1);
+      const column=Math.max(0,(item.column??1)-1);
+      await openNativeSource(vscode,doc.uri,{
+        preview:true,selection:new vscode.Range(line,column,line,column)
+      });
     }),
     vscode.commands.registerCommand('skillStudio.auditPackage',auditCurrent),
     vscode.commands.registerCommand('skillStudio.exportPackageZip',async()=>{
@@ -3086,17 +3243,49 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       catch(error){await vscode.window.showWarningMessage('Node 删除未执行：'+error.message);return false;}
     }),
     vscode.workspace.onDidChangeTextDocument(e=>{
-      if(isProcedurePath(e.document.uri.path)&&document?.uri.toString()===e.document.uri.toString())update(e.document);
-      if(document){
-        const predicatePath=document.uri.path.slice(0,-'procedure.yaml'.length)+'predicates.yaml';
-        if(e.document.uri.path===predicatePath){
-          predicateSnapshot=null;predicateGeneration++;
-          void refreshPredicateSnapshot(document);
-        }
-        scheduleAudit();
+      if(!document||!insideCurrentPackage(e.document?.uri))return;
+      if(isProcedurePath(e.document.uri.path)&&document.uri.toString()===e.document.uri.toString())
+        update(e.document);
+      const predicatePath=document.uri.path.slice(0,-'procedure.yaml'.length)+'predicates.yaml';
+      if(e.document.uri.path===predicatePath){
+        predicateSnapshot=null;predicateGeneration++;
+        void refreshPredicateSnapshot(document);
       }
+      scheduleAudit();
     }),
     vscode.window.onDidChangeActiveTextEditor(editor=>{if(isProcedurePath(editor?.document.uri.path)){update(editor.document);scheduleAudit();}}));
+  // Package Audit owns source/lock lifecycle independently from LSP and Compiler.
+  // A missing or changed file in the current Package must invalidate accepted
+  // markers immediately; a change in another Package must not.
+  function insideCurrentPackage(uri){
+    const root=document&&packageRootForProcedure(vscode,document)?.uri;
+    if(!root||!uri||typeof uri.path!=="string")return false;
+    if(root.scheme!==undefined&&uri.scheme!==undefined&&root.scheme!==uri.scheme)return false;
+    if(root.authority!==undefined&&uri.authority!==undefined&&root.authority!==uri.authority)return false;
+    return uri.path.startsWith(root.path.replace(/\/$/,"")+"/");
+  }
+  function watchWorkspace(event,callback){
+    if(typeof event!=="function")return;
+    const disposable=event(callback);
+    if(disposable?.dispose)context.subscriptions.push(disposable);
+  }
+  watchWorkspace(vscode.workspace.onDidCreateFiles,event=>{
+    if(event.files?.some(insideCurrentPackage))scheduleAudit();
+  });
+  watchWorkspace(vscode.workspace.onDidDeleteFiles,event=>{
+    if(event.files?.some(insideCurrentPackage))scheduleAudit();
+  });
+  watchWorkspace(vscode.workspace.onDidRenameFiles,event=>{
+    if(event.files?.some(item=>insideCurrentPackage(item.oldUri)||insideCurrentPackage(item.newUri)))
+      scheduleAudit();
+  });
+  watchWorkspace(vscode.workspace.onDidChangeConfiguration,event=>{
+    if(!document)return;
+    const workspace=vscode.workspace.getWorkspaceFolder?.(document.uri)?.uri;
+    if(!event?.affectsConfiguration||
+       event.affectsConfiguration("connectionAgent.skillStudio",workspace))
+      scheduleAudit();
+  });
   async function activateNativeMarkdownExtension(){
     const markdownExtension=vscode.extensions?.getExtension?.(
       'vscode.markdown-language-features');

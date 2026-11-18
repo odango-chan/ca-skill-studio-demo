@@ -118,6 +118,20 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
         .find(el=>el.getAttribute('data-node-id')===${JSON.stringify(id)});
       const toggle=anchor?.closest('.theia-TreeNode')?.querySelector('.theia-ExpansionToggle');
       if(!toggle)return {found:false};
+      // The native Explorer may have been scrolled to its final row. Center
+      // the target inside the actual tree scroller before dispatching input;
+      // a visible hit-test at the viewport edge is not a reliable click.
+      let scroller=null;
+      for(let parent=toggle.parentElement;parent;parent=parent.parentElement){
+        const style=getComputedStyle(parent);
+        if((style.overflowY==='auto'||style.overflowY==='scroll')&&
+           parent.scrollHeight>parent.clientHeight+4){scroller=parent;break;}
+      }
+      if(scroller){
+        const before=toggle.getBoundingClientRect();
+        const desired=Math.max(120,Math.min(innerHeight-120,innerHeight/2));
+        scroller.scrollTop+=before.top+before.height/2-desired;
+      }
       toggle.scrollIntoView({block:'center',inline:'nearest'});
       const r=toggle.getBoundingClientRect();
       const x=Math.round(r.x+r.width/2),y=Math.round(r.y+r.height/2);
@@ -910,6 +924,29 @@ export async function runWorkbenchAcceptance({
     throw Error("v1alpha5 graph selection did not reach the native Inspector model: "+
       JSON.stringify(inspectorSelection));
   await nativeCommand("skillStudio.auditPackage");
+  const packageDiagnosticState=await nativeCommand(
+    "skillStudio.internal.semanticTokenDiagnostics");
+  const packageAudit=packageDiagnosticState?.packageAudit;
+  const expectedCapabilityId=
+    "urn:example:connectionagent:capability:3gpp:namf-communication-n1n2-transfer:v1";
+  const capabilityProblem=packageAudit?.problems?.find(item=>
+    item.code==="CAPABILITY_GRANT_NOT_CHECKED"&&item.message.includes(expectedCapabilityId));
+  const capabilityMarker=packageAudit?.editorMarkers?.find(item=>
+    item.code==="CAPABILITY_GRANT_NOT_CHECKED"&&item.message.includes(expectedCapabilityId));
+  if(!String(packageAudit?.status??"").includes("NOT_CHECKED")||
+     !capabilityProblem||capabilityProblem.status!=="not_checked"||
+     capabilityProblem.domain!=="capabilities"||!(capabilityProblem.line>0)||
+     !capabilityMarker||capabilityMarker.line!==capabilityProblem.line||
+     !packageAudit.problems.some(item=>item.code==="EVIDENCE_GUARANTEE_NOT_CHECKED")||
+     !packageAudit.problems.some(item=>item.code==="DEPENDENCY_NOT_CONFIGURED"))
+    throw Error("v1alpha5 Package diagnostics must reach Problems and editor markers without Compiler qualification: "+
+      JSON.stringify({packageAudit,expectedCapabilityId}));
+  console.log("STUDIO_V1ALPHA5_PACKAGE_DIAGNOSTICS_CHROMIUM",JSON.stringify({
+    status:packageAudit.status,
+    capabilityProblem,capabilityMarker,
+    problemCount:packageAudit.problems.length,
+    diagnosticCount:packageAudit.diagnostics.length
+  }));
   // Theia 1.76 registers a per-view focus command from PluginViewRegistry.
   // The VS Code workbench.view.extension.<container> command is not registered
   // by this Theia host; silently ignoring it leaves a real but hidden view.
