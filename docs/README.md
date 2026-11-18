@@ -10,7 +10,9 @@ Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相
 4. [Architecture](architecture/studio-boundaries.md) — ownership、Source authority
 5. [Plugin-managed Configuration v0.1](architecture/plugin-managed-configuration-v0.1.md) — 原生 Settings、Dependency Snapshot / Lock、Compiler 输入与所有权边界
 6. [Workbench](design/authoring-workbench.md) — 当前 UX / Patch / Source 交互
-7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — 跨宿主 Authoring Core、OpenAI-compatible Gateway、在线优先及 VS Code / 内网部署边界（Proposed）；[Gateway Worker](../gateway/worker/README.md) — Cloudflare Access 受限试点实现与本地测试
+7. [AI Procedure Authoring](design/ai-procedure-authoring.md) — 跨宿主 Authoring Core、OpenAI-compatible Gateway、在线优先及 VS Code / 内网部署边界（Proposed）
+   - [Authoring Core foundation](../authoring/core/README.md) — 平台无关 Model Client 与 ModelProposal 初始契约（Partial）
+   - [AI Gateway spike](../gateway/worker/README.md) — OpenAI-compatible Worker Gateway、Cloudflare Access 身份认证与部署验证（Partial）
 8. [D3 Route Designer](design/route-designer.md) — `operator.on` 有界编辑已实现；Runtime 资格未验收
 9. [D4 Phase Designer](design/phase-designer.md) — A1/A2.1/A2.2a 已合入；A2.2b1 消费者 ABI 对照通过浏览器测试；A2.2b2/A3/A4 Proposed
 10. [E Source Editor](design/source-editor-workstream.md) — Monaco / shared D4 history and E2–E4 scope
