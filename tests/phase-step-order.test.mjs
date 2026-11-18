@@ -5,7 +5,7 @@ import {projectWorkspace} from "../site/workspace.mjs";
 import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
   applyAdjacentVerifyReorder} from "../site/phase-step-order.mjs";
 
-const source=readFileSync(new URL("../site/samples/packages/"+
+const source=readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
   "establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
 const proc="ue-requested-pdu-session-establishment";
 const node="nudm-sdm-subscribe",phase="preconditions",index=3;

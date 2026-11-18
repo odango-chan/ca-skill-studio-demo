@@ -5,7 +5,7 @@ import {projectWorkspace} from "../site/workspace.mjs";
 import {phaseStepDependencyReport} from "../site/phase-dataflow.mjs";
 const fixture=readFileSync(new URL("./fixtures/establish-pre-hold/assurance/procedure.yaml",import.meta.url),"utf8");
 const proc="ue-requested-pdu-session-establishment";
-const readSample=(path)=>readFileSync(new URL("../site/samples/packages/"+
+const readSample=(path)=>readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
   "establish-pdu-session/"+path,import.meta.url),"utf8");
 const files=new Map([
  ["scripts/select_establishment_configuration.py",{

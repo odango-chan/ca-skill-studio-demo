@@ -17,7 +17,7 @@ function fixture(skill){
      "scripts/evaluate_udm_read.py",
      "scripts/evaluate_transfer_start.py"];
   return createFileWorkspace(skill,paths.map(path=>({path,text:readFileSync(
-    new URL("../site/samples/packages/"+skill+"/"+path,import.meta.url),"utf8")})));
+    new URL("./fixtures/legacy-site-samples/packages/"+skill+"/"+path,import.meta.url),"utf8")})));
 }
 const audit=workspace=>auditPackageWorkspace(workspace);
 const codes=issues=>issues.map(x=>x.code);

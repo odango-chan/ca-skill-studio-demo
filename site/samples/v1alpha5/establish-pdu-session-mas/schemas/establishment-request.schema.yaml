@@ -1,0 +1,28 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:connectionagent:example:mas:establishment-request:v1alpha5
+title: EstablishmentRequest
+description: Skill-owned request constraints for the illustrative initial IPv4/SSC1 PDU session.
+type: object
+additionalProperties: false
+required: [pduSessionId, pti, requestType, dnn, sNssai, servingPlmn, requestedPduSessionType, requestedSscMode]
+properties:
+  pduSessionId: {type: integer, minimum: 1, maximum: 15}
+  pti: {type: integer, minimum: 1, maximum: 254}
+  requestType: {type: integer, const: 1}
+  dnn: {type: string, minLength: 1, maxLength: 100}
+  sNssai:
+    type: object
+    additionalProperties: false
+    required: [sst]
+    properties:
+      sst: {type: integer, minimum: 0, maximum: 255}
+      sd: {type: string, minLength: 6, maxLength: 6}
+  servingPlmn:
+    type: object
+    additionalProperties: false
+    required: [mcc, mnc]
+    properties:
+      mcc: {type: string, minLength: 3, maxLength: 3}
+      mnc: {type: string, minLength: 2, maxLength: 3}
+  requestedPduSessionType: {type: string, const: IPV4}
+  requestedSscMode: {type: integer, const: 1}

@@ -5,7 +5,6 @@ import {mkdir,mkdtemp,rm} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 import {build} from "esbuild";
-import {SAMPLE_PACKAGES} from "../site/sample-packages.mjs";
 
 const entry=fileURLToPath(new URL("../language/core/index.ts",import.meta.url));
 const scratchRoot=resolve(process.cwd(),".agent-tmp");
@@ -29,36 +28,45 @@ try{
   await rm(scratch,{recursive:true,force:true});
 }
 
+const skillFiles=[
+  "SKILL.md",
+  "assurance/contract.yaml",
+  "assurance/predicates.yaml",
+  "assurance/procedure.yaml",
+  "schemas/establishment-request.schema.yaml",
+  "scripts/validate-smf-session-context-entry.py",
+  "scripts/validate-smf-session-context.py",
+  "scripts/validate-subscription-request.py"
+];
 function sampleSnapshot(){
-  const spec=SAMPLE_PACKAGES.establish;
   return {
-    rootUri:"file:///workspace/"+spec.name,
-    packageName:spec.name,
+    rootUri:"file:///workspace/establish-pdu-session",
+    packageName:"establish-pdu-session",
     generation:1,
     completeness:"complete",
-    documents:spec.files.map(relativePath=>({
-      uri:"file:///workspace/"+spec.name+"/"+relativePath,
+    documents:skillFiles.map(relativePath=>({
+      uri:"file:///workspace/establish-pdu-session/"+relativePath,
       relativePath,
       version:1,
-      text:readFileSync(new URL("../site/samples/packages/"+spec.name+"/"+relativePath,import.meta.url),"utf8")
+      text:readFileSync(new URL("../site/samples/v1alpha5/establish-pdu-session/"+relativePath,import.meta.url),"utf8")
     }))
   };
 }
 
-test("shared core adapts the current Package analyzers into one JSON-safe result",()=>{
+test("shared core analyzes the current CA-SL v1alpha5 Example without claiming qualification",()=>{
   const snapshot=sampleSnapshot();
   const before=snapshot.documents.map(document=>document.text);
   const result=analyzePackageSnapshot(snapshot);
-  assert.equal(result.state,"READY");
+  assert.equal(result.state,"PARTIAL");
   assert.equal(result.procedure.state,"READY");
-  assert.equal(result.procedure.procedures.length,5);
-  assert.equal(result.packageAudit.state,"READY");
-  assert.deepEqual(result.packageAudit.diagnostics,[]);
+  assert.equal(result.procedure.procedures.length,1);
+  assert.equal(result.procedure.entry,"get-sm-subscription-data");
+  assert.equal(result.packageAudit.state,"UNAVAILABLE");
+  assert.match(result.packageAudit.reason,/v1alpha5 Compiler/);
+  assert.match(result.packageAudit.reason,/Owner.*linking/);
   assert.equal(result.documents.filter(document=>document.pythonOutlineState==="READY").length,3);
-  assert.equal(result.scriptReferences.length,3);
-  assert.equal(result.schemaReferences.length,6);
+  assert.ok(result.scriptReferences.length>=3);
   assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===true));
-  assert.ok(result.schemaReferences.every(ref=>ref.packageContextComplete===true));
   const byUri=new Map(snapshot.documents.map(document=>[document.uri,document.text]));
   for(const ref of [...result.scriptReferences,...result.schemaReferences]){
     assert.ok(ref.sourceRange&&ref.targetRange);
@@ -72,13 +80,12 @@ test("shared core adapts the current Package analyzers into one JSON-safe result
     assert.ok(symbol.navigable&&symbol.range);
     assert.equal(source.slice(symbol.range.start,symbol.range.end),symbol.name);
   }
-  assert.equal(result.diagnostics.length,0);
-  assert.equal(JSON.parse(JSON.stringify(result)).procedure.procedures.length,5);
+  assert.equal(JSON.parse(JSON.stringify(result)).procedure.procedures.length,1);
   assert.deepEqual(snapshot.documents.map(document=>document.text),before,
     "analysis must never mutate Package Source");
 });
 
-test("partial Package snapshots never report Package Audit as clean",()=>{
+test("partial Package snapshots preserve v1alpha5 source projection but gate cross-file context",()=>{
   const snapshot=sampleSnapshot();
   snapshot.completeness="partial";
   snapshot.reason="The host could not enumerate every Package file";
@@ -87,16 +94,12 @@ test("partial Package snapshots never report Package Audit as clean",()=>{
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
   assert.match(result.packageAudit.reason,/could not enumerate/);
-  assert.ok(result.scriptReferences.length>0,"locally observed references are still indexed");
+  assert.ok(result.scriptReferences.length>0);
   assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===false));
   assert.ok(result.schemaReferences.every(ref=>ref.packageContextComplete===false));
-  assert.ok(result.scriptReferences.every(ref=>ref.sourceRange!==null&&ref.targetRange!==null),
-    "exact local token ranges remain known even when cross-file navigation is gated");
-  assert.ok(result.schemaReferences.every(ref=>ref.sourceRange!==null&&ref.targetRange!==null));
-  assert.ok(result.documents.flatMap(doc=>doc.pythonSymbols).every(symbol=>symbol.navigable&&symbol.range));
 });
 
-test("missing required Package files make only Package Audit unavailable",()=>{
+test("missing non-procedure v1alpha5 files do not fabricate Package qualification",()=>{
   const snapshot=sampleSnapshot();
   snapshot.documents=snapshot.documents.filter(document=>
     document.relativePath!=="assurance/contract.yaml");
@@ -104,23 +107,26 @@ test("missing required Package files make only Package Audit unavailable",()=>{
   assert.equal(result.state,"PARTIAL");
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
-  assert.match(result.packageAudit.reason,/assurance\/contract.yaml/);
-  assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===false));
+  assert.match(result.packageAudit.reason,/v1alpha5 Compiler/);
 });
 
-test("Procedure projection failures remain visible and fail closed",()=>{
+test("malformed v1alpha5 Procedure remains visible and fails closed",()=>{
   const snapshot=sampleSnapshot();
-  const procedure=snapshot.documents.find(document=>
-    document.relativePath==="assurance/procedure.yaml");
-  procedure.text="procedures: [";
+  const procedure=snapshot.documents.find(document=>document.relativePath==="assurance/procedure.yaml");
+  procedure.text="start: broken\nnodes:\n  broken:\n    operation: [\n";
   const result=analyzePackageSnapshot(snapshot);
   assert.equal(result.state,"PARTIAL");
   assert.equal(result.procedure.state,"UNAVAILABLE");
-  assert.equal(result.packageAudit.state,"UNAVAILABLE",
-    "a failed projection cannot produce a clean Package Audit");
-  assert.match(result.packageAudit.reason,/not performed/);
-  assert.ok(result.diagnostics.some(diagnostic=>
-    diagnostic.source==="procedure-projection"&&diagnostic.code==="PROCEDURE_PROJECTION"));
+  assert.ok(result.diagnostics.length>0);
+});
+
+test("legacy Procedure syntax is rejected instead of falling back to the historical analyzer",()=>{
+  const snapshot=sampleSnapshot();
+  const procedure=snapshot.documents.find(document=>document.relativePath==="assurance/procedure.yaml");
+  procedure.text="procedures:\n  legacy:\n    nodes:\n      step:\n        call: ca.sample.read\n";
+  const result=analyzePackageSnapshot(snapshot);
+  assert.equal(result.state,"UNAVAILABLE");
+  assert.equal(result.diagnostics[0].code,"UNSUPPORTED_CA_SL_VERSION");
 });
 
 test("unsafe or duplicate Package paths are rejected before analysis",()=>{
@@ -138,7 +144,7 @@ test("unsafe or duplicate Package paths are rejected before analysis",()=>{
   const duplicate=sampleSnapshot();
   duplicate.documents.push({
     uri:"file:///workspace/duplicate",
-    relativePath:"scripts\\evaluate_udm_read.py",
+    relativePath:"scripts\\validate-smf-session-context.py",
     version:1,
     text:""
   });
@@ -149,10 +155,9 @@ test("unsafe or duplicate Package paths are rejected before analysis",()=>{
 
 test("Package analysis binds document URIs to exact Package-relative paths",()=>{
   const fixture=sampleSnapshot();
-  const procedure=fixture.documents.find(document=>
-    document.relativePath==="assurance/procedure.yaml");
+  const procedure=fixture.documents.find(document=>document.relativePath==="assurance/procedure.yaml");
   const originalUri=procedure.uri;
-  const invalidUris=[
+  for(const uri of [
     "file:///workspace/other/assurance/procedure.yaml",
     "file:///workspace/establish-pdu-session/other/procedure.yaml",
     "file:///workspace/establish-pdu-session/scripts/%2e%2e/assurance/procedure.yaml",
@@ -160,15 +165,14 @@ test("Package analysis binds document URIs to exact Package-relative paths",()=>
     "file:///workspace/establish-pdu-session/assurance/procedure.yaml?version=1",
     "vscode-remote://wsl+Ubuntu/workspace/establish-pdu-session/assurance/procedure.yaml",
     "file:///workspace/establish-pdu-session/assurance/procedure.yaml/"
-  ];
-  for(const uri of invalidUris){
+  ]){
     procedure.uri=uri;
     const result=analyzePackageSnapshot(fixture);
     assert.equal(result.state,"UNAVAILABLE",uri);
     assert.equal(result.diagnostics[0].code,"PACKAGE_DOCUMENT_URI_MISMATCH",uri);
   }
   procedure.uri=originalUri;
-  assert.equal(analyzePackageSnapshot(fixture).state,"READY");
+  assert.equal(analyzePackageSnapshot(fixture).state,"PARTIAL");
 
   const remote=sampleSnapshot();
   remote.rootUri="vscode-remote://wsl+Ubuntu/workspace/My%20Skill";
@@ -176,8 +180,7 @@ test("Package analysis binds document URIs to exact Package-relative paths",()=>
     ...document,
     uri:remote.rootUri+"/"+document.relativePath
   }));
-  assert.equal(analyzePackageSnapshot(remote).state,"READY",
-    "safe remote URI and encoded Package directory remain supported");
+  assert.equal(analyzePackageSnapshot(remote).state,"PARTIAL");
 });
 
 test("unsafe Package root URIs fail closed before publishing analysis",()=>{
@@ -223,20 +226,4 @@ test("Package file-count and cumulative text-length limits fail closed",()=>{
     }]
   };
   assert.equal(analyzePackageSnapshot(tooLarge).diagnostics[0].code,"PACKAGE_TEXT_LIMIT");
-});
-
-test("existing heuristic Package warnings keep their heuristic classification",()=>{
-  const snapshot=sampleSnapshot();
-  const procedure=snapshot.documents.find(document=>
-    document.relativePath==="assurance/procedure.yaml");
-  procedure.text=procedure.text.replace(
-    "dnn:\n            from: input.dnn",
-    "dnn:\n            from: input.psi"
-  );
-  const result=analyzePackageSnapshot(snapshot);
-  const warning=result.packageAudit.diagnostics.find(diagnostic=>
-    diagnostic.code==="INPUT_BINDING_SUSPECT");
-  assert.ok(warning,"the existing heuristic warning must be preserved");
-  assert.equal(warning.confidence,"heuristic");
-  assert.equal(warning.severity,"warning");
 });

@@ -1,0 +1,424 @@
+# CA-SL v1alpha5 MAS policy-first DAG, source-aligned to the OpenAMSM OES plan.
+# All MAS callable IDs, Schemas and Evidence Guarantees are candidate references only;
+# no trusted MAS ToolCatalog / CapabilityContracts publication exists yet.
+# Host/Owner owns admission, exact UE/PSI binding, pending-operation correlation,
+# mutation.reconcile and resource responsibility. The composite SSM Owner Operation
+# retains its own event correlation; this MAS source does not expose a separate Wait Node.
+start: validate-sm-subscription
+nodes:
+  # OpenAMSM OES: SC.VALIDATE_SUBSCRIPTION (NW Agent Plan s1).
+  # The Operation receives the source OES identity fields directly: `ue_identity` from 3GPP `supi` and `psi` from `pduSessionId`.
+  # The source output exposed by the plan is sub_summary ("ok" on validation).
+  # This is a CA adapter around the SMF's UDM SDM Get path, not a new 3GPP API.
+  # The exact UE/PSI context Observation follows this read-only Operation in the same Node, before any mutation.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; NW Agent s1 SC.VALIDATE_SUBSCRIPTION wraps UDM Nudm_SDM_Get. UDM API: TS 29.503 V19.7.0 §6.1 / OpenAPI Annex A.2; callable publication is pending.
+  validate-sm-subscription:
+    precondition:
+      predicates:
+        - predicate: establishment.request.supported
+          arguments:
+            - context.request.requestType
+            - context.request.requestedPduSessionType
+            - context.request.requestedSscMode
+      routes:
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+    operation:
+      tool: mas::SC.VALIDATE_SUBSCRIPTION
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        FAILED: FAILED
+        UNKNOWN: UNRESOLVED
+        DENIED: FAILED
+    observation:
+      tool: ca-session-context::context.smf.session.read
+      arguments:
+        supi: context.supi
+        pduSessionId: context.request.pduSessionId
+      routes:
+        FAILED: UNRESOLVED
+        UNKNOWN: UNRESOLVED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.subscription_validated
+          arguments:
+            - validate-sm-subscription.operation.output
+        - predicate: establishment.smf.session_context_absent
+          arguments:
+            - validate-sm-subscription.observation.output
+      routes:
+        PASS: skip-secondary-authentication
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+  # OpenAMSM OES: SAA.SECONDARY_AUTH (s2, optional). The current plan hard-codes
+  # required="0"; this operation therefore returns phase=SKIPPED. It is not a
+  # dynamic secondary-auth decision and this Skill excludes auth-required profiles.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 6 (optional DN-AAA secondary authentication/authorization); NW Agent s2 fixes required=0, so no 3GPP secondary-authentication exchange runs.
+  skip-secondary-authentication:
+    operation:
+      tool: mas::SAA.SECONDARY_AUTH
+      arguments:
+        ue_identity: context.supi
+        required: "0"
+      routes:
+        FAILED: FAILED
+        OUTCOME_UNKNOWN: UNRESOLVED
+        DENIED: FAILED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.secondary_auth_skipped
+          arguments:
+            - skip-secondary-authentication.operation.output
+      routes:
+        PASS: create-sm-context
+        FAIL: FAILED
+        UNKNOWN: UNRESOLVED
+
+  # OpenAMSM OES: SC.CREATE_SM_CONTEXT (s3). This is the internal context
+  # creation that supports the paired CreateSMContext service boundary; the
+  # early step-5 response is not proof of final PDU Session establishment.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 steps 3/5; NW Agent s3 SC.CREATE_SM_CONTEXT implements SM Context creation at the Nsmf service boundary. SMF API: TS 29.502 V19.7.0 §5.2/§6.1/§6.1.2.4 / OpenAPI Annex A.2; common binary type TS 29.571 V19.7.0 §5.4.4.14 for N1 SM; Step 5 is not final Goal proof.
+  create-sm-context:
+    operation:
+      tool: mas::SC.CREATE_SM_CONTEXT
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+        subSummary: validate-sm-subscription.operation.output.sub_summary
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.context_created
+          arguments:
+            - create-sm-context.operation.output
+      routes:
+        PASS: register-uecm
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: SC.REGISTER_UECM (s3r). The MAS plan places this before PCF/N4;
+  # that is an explicit ordering deviation from TS 23.502 step 16c.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 16c; NW Agent s3r SC.REGISTER_UECM calls UDM Nudm_UECM_Registration. UDM API: TS 29.503 V19.7.0 §6.2 / OpenAPI Annex A.3; MAS ordering is earlier than conventional Step 16c.
+  register-uecm:
+    operation:
+      tool: mas::SC.REGISTER_UECM
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        sessionKeys: create-sm-context.operation.output.session_keys
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.uecm_registered
+          arguments:
+            - register-uecm.operation.output
+      routes:
+        PASS: establish-sm-policy-association
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: PA.CREATE_SM_POLICY (s3p), the MAS adapter for PCF policy
+  # association creation. The Owner must return the real association identity;
+  # the source fallback "bound" is not an acceptable resource identity.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 7b; NW Agent s3p PA.CREATE_SM_POLICY maps to PCF Npcf_SMPolicyControl_Create. PCF API: TS 29.512 V19.6.0 / OpenAPI Annex A.2.
+  establish-sm-policy-association:
+    operation:
+      tool: mas::PA.CREATE_SM_POLICY
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+        pduSessionType: context.request.requestedPduSessionType
+        sessionKeys: create-sm-context.operation.output.session_keys
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.policy_association_created
+          arguments:
+            - establish-sm-policy-association.operation.output
+      routes:
+        PASS: select-upf-anchor
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: UPS.DECIDE_ANCHOR (s4). The source output up_anchor is a
+  # "1"/"0" readiness marker; the selected PFCP node remains SMF-internal.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 8; NW Agent s4 UPS.DECIDE_ANCHOR performs SMF-local UPF selection; no separate external NF Service Operation.
+  select-upf-anchor:
+    operation:
+      tool: mas::UPS.DECIDE_ANCHOR
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.anchor_selected
+          arguments:
+            - select-upf-anchor.operation.output
+      routes:
+        PASS: allocate-pdu-session-address
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: IAM.ALLOCATE_ADDRESS (s5), allocator=LOCAL_POOL.
+  # ue_addr is a "1"/"0" allocation marker, not the actual UE IP address.
+  # The real address stays in the SMF session and is consumed inside later Owners.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 8; NW Agent s5 IAM.ALLOCATE_ADDRESS performs SMF-local address allocation for the fixed LOCAL_POOL profile.
+  allocate-pdu-session-address:
+    operation:
+      tool: mas::IAM.ALLOCATE_ADDRESS
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        dnn: context.request.dnn
+        allocator: "LOCAL_POOL"
+        upAnchorReady: select-upf-anchor.operation.output.up_anchor
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.address_allocated
+          arguments:
+            - allocate-pdu-session-address.operation.output
+      routes:
+        PASS: modify-sm-policy-association
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: PA.UPDATE_SM_POLICY (s6u). The Owner consumes the allocation
+  # marker and exact policy association; it does not receive a fabricated UE IP.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 9 (conditional); NW Agent s6u PA.UPDATE_SM_POLICY maps to PCF Npcf_SMPolicyControl_Update. PCF API: TS 29.512 V19.6.0 / OpenAPI Annex A.2.
+  modify-sm-policy-association:
+    operation:
+      tool: mas::PA.UPDATE_SM_POLICY
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+        pduSessionType: context.request.requestedPduSessionType
+        sessionKeys: create-sm-context.operation.output.session_keys
+        ueAddrAllocated: allocate-pdu-session-address.operation.output.ue_addr
+        policyAssociationId: establish-sm-policy-association.operation.output.policy_assoc_id
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.policy_updated
+          arguments:
+            - modify-sm-policy-association.operation.output
+      routes:
+        PASS: execute-charging-step
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: CA.CREATE_CHARGING (s7). The pinned adapter returns
+  # SMF_MAS_OK with charging_ref="1" and records NOT_IMPL_skip. The required
+  # plan step therefore completes and s8 proceeds, but no charging reservation
+  # is created or claimed by this Skill.
+  # 3GPP: CA_EXTENSION — MAS-specific charging extension; this source revision is a successful skip stub, not a 3GPP charging operation.
+  execute-charging-step:
+    operation:
+      tool: mas::CA.CREATE_CHARGING
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        ratingGroupRefs: "default"
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.charging_step_completed
+          arguments:
+            - execute-charging-step.operation.output
+      routes:
+        PASS: establish-n4-session
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: UPN.CREATE_UP_SESSION (s8). Step-8 UPF selection and address
+  # allocation are already represented by UPS/IAM; the actual UPF/UE IP remain
+  # inside the SMF session. n4_seid is the single UPF SEID, not an N4 SEID pair.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 steps 10a–10b and §4.4.1.2; NW Agent s8 UPN.CREATE_UP_SESSION performs N4 Session Establishment. PFCP/N4: TS 29.244 V19.6.0.
+  establish-n4-session:
+    operation:
+      tool: mas::UPN.CREATE_UP_SESSION
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        upIntent: modify-sm-policy-association.operation.output.up_intent
+        upAnchorReady: select-upf-anchor.operation.output.up_anchor
+        ueAddrAllocated: allocate-pdu-session-address.operation.output.ue_addr
+        dnn: context.request.dnn
+        sNssai: context.request.sNssai
+        pduSessionType: context.request.requestedPduSessionType
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.n4_session_established
+          arguments:
+            - establish-n4-session.operation.output
+      routes:
+        PASS: signal-ue-and-access-network
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: SSM.SIGNAL_UE_AN (s10). This sends the N1/N2 transfer and may
+  # remain pending until the exact later step-15 UpdateSMContext result supplies
+  # the RAN F-TEID. Host correlates that request to this Operation; Runtime
+  # resumes this same Invocation. The AMF transfer ACK alone is not adoption.
+  # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 steps 11 and 15; NW Agent s10 SSM.SIGNAL_UE_AN orchestrates Namf_Communication_N1N2MessageTransfer and the pending Nsmf_PDUSession_UpdateSMContext completion. APIs: TS 29.518 V19.8.0 §5.2 / §6.1.2.4 / OpenAPI Annex A.2; TS 29.502 V19.7.0 §5.2/§6.1/§6.1.2.4 / OpenAPI Annex A.2; common binary type TS 29.571 V19.7.0 §5.4.4.14.
+  signal-ue-and-access-network:
+    operation:
+      tool: mas::SSM.SIGNAL_UE_AN
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        sessionKeys: create-sm-context.operation.output.session_keys
+        ueAddrAllocated: allocate-pdu-session-address.operation.output.ue_addr
+        n4Seid: establish-n4-session.operation.output.n4_seid
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.access_network_ready
+          arguments:
+            - signal-ue-and-access-network.operation.output
+      routes:
+        PASS: modify-n4-session
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: UPN.MODIFY_UP_SESSION (s11), the separate N4 Modification
+  # proof boundary. It consumes the RAN F-TEID returned by the pending SSM call.
+  # 3GPP: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 steps 16a–16b and §4.4.1.3; NW Agent s11 UPN.MODIFY_UP_SESSION performs N4 Session Modification. PFCP/N4: TS 29.244 V19.6.0.
+  modify-n4-session:
+    operation:
+      tool: mas::UPN.MODIFY_UP_SESSION
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        anTunnelTeid: signal-ue-and-access-network.operation.output.an_tunnel_teid
+        anTunnelIp: signal-ue-and-access-network.operation.output.an_tunnel_ip
+        n4Seid: establish-n4-session.operation.output.n4_seid
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.n3_synchronized
+          arguments:
+            - modify-n4-session.operation.output
+      routes:
+        PASS: record-session-establishment-event
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # OpenAMSM OES: SE.EMIT_EVENTS (s13). The current source records a local MAS
+  # event and returns last_event="1"; this is not TS 23.502 step-18 notification.
+  # 3GPP: CA_EXTENSION — TS 23.502 V19.9.0 §4.3.2.2.1 step 18 is SM Context Status Notify on the conditional failure path; NW Agent s13 SE.EMIT_EVENTS records a local MAS event only and is not that 3GPP operation.
+  record-session-establishment-event:
+    operation:
+      tool: mas::SE.EMIT_EVENTS
+      arguments:
+        ue_identity: context.supi
+        psi: context.request.pduSessionId
+        event: "ESTABLISHED"
+        sessionKeys: create-sm-context.operation.output.session_keys
+      routes:
+        FAILED: SAFE_STOPPED
+        OUTCOME_UNKNOWN: SAFE_STOPPED
+        DENIED: SAFE_STOPPED
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.establishment_event_recorded
+          arguments:
+            - record-session-establishment-event.operation.output
+      routes:
+        PASS: verify-pdu-session-establishment
+        FAIL: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
+
+  # Final business proof. Host resource responsibility remains a separate
+  # terminal gate; no Skill-authored finalizer or compensation Node.
+  # 3GPP: CA_EXTENSION — final business Goal proof over typed MAS Owner Results; no direct 3GPP operation.
+  verify-pdu-session-establishment:
+    postcondition:
+      predicates:
+        - predicate: establishment.mas.subscription_validated
+          arguments:
+            - validate-sm-subscription.operation.output
+        - predicate: establishment.mas.secondary_auth_skipped
+          arguments:
+            - skip-secondary-authentication.operation.output
+        - predicate: establishment.mas.context_created
+          arguments:
+            - create-sm-context.operation.output
+        - predicate: establishment.mas.uecm_registered
+          arguments:
+            - register-uecm.operation.output
+        - predicate: establishment.mas.policy_association_created
+          arguments:
+            - establish-sm-policy-association.operation.output
+        - predicate: establishment.mas.anchor_selected
+          arguments:
+            - select-upf-anchor.operation.output
+        - predicate: establishment.mas.address_allocated
+          arguments:
+            - allocate-pdu-session-address.operation.output
+        - predicate: establishment.mas.policy_updated
+          arguments:
+            - modify-sm-policy-association.operation.output
+        - predicate: establishment.mas.charging_step_completed
+          arguments:
+            - execute-charging-step.operation.output
+        - predicate: establishment.mas.n4_session_established
+          arguments:
+            - establish-n4-session.operation.output
+        - predicate: establishment.mas.access_network_ready
+          arguments:
+            - signal-ue-and-access-network.operation.output
+        - predicate: establishment.mas.n3_synchronized
+          arguments:
+            - modify-n4-session.operation.output
+        - predicate: establishment.mas.establishment_event_recorded
+          arguments:
+            - record-session-establishment-event.operation.output
+      routes:
+        PASS: SUCCEEDED
+        FAIL: SAFE_STOPPED
+        UNKNOWN: UNRESOLVED

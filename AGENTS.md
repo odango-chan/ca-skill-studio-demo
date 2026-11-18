@@ -6,6 +6,8 @@
 
 Skill DSL 与正式语言契约由 ca-skills 拥有；Compiler、Host Context、Tool Contract、Runtime 执行结果、MCP Tool Catalog、5GC / 环境状态分别由各自 owner 负责。Studio 只消费这些权威契约，不定义第二份语法或业务规则。
 
+当前唯一活动编辑目标是 `connectionagent.io/v1alpha5`，规范已在 `ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5` 正式冻结发布；权威来源与字节摘要由 `language/contracts/ca-sl-v1alpha5.lock.json` 固定。v1alpha4 仅作为不可变的规范继承基线和历史记录，不是产品编辑模式，也不提供旧项目迁移或兼容。内置 Example 固定为 `ca-skills/main@de8d9f667dd1a445c3f6378e0ca793d7407d2036`。集成的 Compiler v1.0.0 只支持 v1alpha4；当前 v1alpha5 Compiler 候选 PR #38（`ea27f18549725166f304b7d06fd9339bb0554329`）尚未合并、发布或集成，因此 v1alpha5 Check / Build / Inspect 必须 fail-closed。不得把 Node-entry Wait 降级成旧版 Observation、Polling 或第五种业务阶段。
+
 Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台、Classic 发布路径及旧构建入口已经退役；不得重新引入平行工作台、旧菜单或旧项目管理实现。
 
 当前优先建设开发与编辑。Case、Qualification、发布和 Runtime 执行工作台后置。不得把编辑器诊断冒充 Compiler 结果，不得将浏览器测试冒充真实 Runtime / 5GC E2E。
@@ -17,10 +19,9 @@ Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台�
 3. 边界改动读 docs/architecture/studio-boundaries.md 和 docs/architecture/plugin-managed-configuration-v0.1.md；
 4. Extension / Host 改动读 experiments/ide-host/README.md、experiments/ide-host/vscode/ 与对应测试；
 5. UI / Projection / Patch 改动读 docs/design/authoring-workbench.md、相关共享模块和测试；
-6. AI Authoring 改动必须读 docs/design/ai-procedure-authoring.md 与 Issue #200；保持 Authoring Core 平台无关，Theia / VS Code AI API 与 Cloudflare 均不得成为核心依赖；模型输出不是可信 Patch，v1alpha4 变更必须经 Host 侧 Semantic Patch Engine；共享 Provider Key 只能保存在 Gateway 服务端，禁止进入浏览器、Webview、VSIX 或工作区；
-7. Route / Phase 改动读 docs/design/route-designer.md、docs/D1-procedure-designer.md、docs/D2-node-designer.md；
-8. 语言服务改动读 docs/design/skill-lsp-l2d-editor-acceptance.md 与 docs/design/skill-lsp-l2d2-live-problems.md；
-9. 文档改动读 docs/DOCUMENTATION.md，并参考 ConnectionAgent 文档治理。
+6. Route / Phase 改动读 docs/design/route-designer.md、docs/D1-procedure-designer.md、docs/D2-node-designer.md；
+7. 语言服务改动读 docs/design/skill-lsp-l2d-editor-acceptance.md 与 docs/design/skill-lsp-l2d2-live-problems.md；
+8. 文档改动读 docs/DOCUMENTATION.md，并参考 ConnectionAgent 文档治理。
 
 历史 ADR 和迁移对照文档用于解释决策背景，不得把已退役的 Classic 路径当成当前实现或兼容目标。
 
@@ -34,6 +35,7 @@ Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台�
 - LSP、Semantic Tokens、Completion、Hover、Definition、References 与 Diagnostics 消费权威语言契约及项目依赖快照；禁止在 Studio 另维护一套 DSL / Schema 定义。
 - 修改现有行为必须新增 positive 和 negative test；Source revision 冲突、结构保真、Route origin、Root/Child 导航都需回归。
 - 用户项目与工作区数据优先保护；示例导入不得覆盖用户修改，删除旧代码不得删除用户文件或持久化工作区数据。
+- AI Authoring 只支持 CA-SL v1alpha5；改动必须遵循 `docs/design/ai-procedure-authoring.md` 与 Issue #200。模型输出始终是不可信提案，必须经过 Host Change Set / v1alpha5 Patch Engine；Compiler 是唯一权威 Check。使用独立 Go `ai-gateway`；Provider Key 只保存在 Gateway 主机，不得进入浏览器、Webview、VSIX 或工作区。无用户账户 / OAuth / per-user Model Key；非 loopback 只允许一个部署级 `X-Gateway-Token`，它不是用户身份。浏览器 CORS 只允许精确 Origin，不使用 Cookie。
 
 ## Local validation / delivery
 

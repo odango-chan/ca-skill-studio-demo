@@ -1,47 +1,37 @@
 # Skill Studio 当前工作状态
 
-## 2026-11-17 · AI Procedure Authoring P1（跨宿主设计提案）
+## 2026-11-18 · AI Procedure Authoring P1（Go Gateway 集成）
 
-[Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md) · [PR #201](https://github.com/odango-chan/ca-skill-studio-demo/pull/201)
+[Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200) · [Canonical design](design/ai-procedure-authoring.md) · [Go AI Gateway](https://github.com/odango-chan/ai-gateway) · [Gateway browser CORS issue #4](https://github.com/odango-chan/ai-gateway/issues/4)
 
-- **产品决策：** 独立 Editor Tab、Studio 自有结构化 Change Set、接受后应用到原生 TextDocument Buffer、用户自行保存；P1 仅修改现有 CA-SL v1alpha5 Preview Procedure，不回退到 v1alpha4。
-- **语言基线：** v1alpha5 Preview 固定 `ca-skills@d3f89dfafbf218e5e95c97a974004362b7b967b6`（PR #61）；IngressCatalog companion contract 固定 `ca-skills@561d14c639e11cc43d0f247111e4971dfb98761e`（PR #62）。两者均为 Draft / NOT RELEASED / NOT QUALIFIED；v1alpha5 继承 v1alpha4 冻结语义并增加 Appendix L Node-entry Wait。
-- **最终架构目标：** 平台无关的 Authoring Core + Host Adapter + OpenAI-compatible AI Gateway。Theia、VS Code Desktop/Web/Remote 与内网部署复用同一套 Context Pack、Procedure Agent、ModelProposal、Change Set 和 v1alpha5 Semantic Patch Engine。
-- **在线优先：** 第一条真实链路是 GitHub Pages / Theia Browser-Only → HTTPS AI Gateway → OpenAI-compatible 模型。Cloudflare Worker Free 是 Gateway 候选，不是核心依赖；GitHub Pages 本身没有可存放共享模型密钥的可信后端。
-- **共享密钥：** 按部署共用一份 Provider API Key，由 Gateway 服务端保存；不要求每位用户配置自己的模型 Key。Gateway 的访问授权、速率限制和用量上限仍须独立设计，CORS 不是身份验证。
-- **VS Code / 本地：** 桌面插件通过本地 Extension Host 处理编辑器操作，默认仍调用配置的在线或内网 Gateway；本机模型或单机部署可连接 loopback Gateway。组织共用 Provider Key 时优先使用受管内网 Gateway，不应复制到每台员工电脑。不能把共享 Provider Key 打包进 VSIX。Web Extension 可作为 Desktop/Web 共用基线，但不提供 Node.js API；必要时再增加 Node Host Adapter。
-- **原生 AI API：** vscode.lm 和 Theia AI 均作为可选适配，不是核心 Agent 运行时。Theia 1.76 的 vscode.lm stub 和 @theia/ai-openai backend RPC 限制继续作为兼容事实，不阻塞通用 Gateway 路径。
-- **v1alpha5 缺口：** 当前 PR #197 / LSP 仍是 v1alpha4 只读投影，不能用于 v1alpha5 编辑。旧版 D1/D2 Patch 与 v1alpha4 Patch Engine 不可直接复用；P1 需要独立 v1alpha5 Semantic Patch Engine。Compiler v1.0.0 仅支持 v1alpha4；Compiler PR #30 目前只完成 v1alpha5 WP2 Parser / AST，完整 Check 仍未就绪。
-- **状态：** 产品决策 APPROVED；跨宿主架构方向 APPROVED；详细设计 PROPOSED；Implementation NOT_STARTED；Acceptance NOT_RUN。尚无 AI Provider / Gateway 集成、无模型调用、无 Runtime / 5GC 能力声明。
+- **产品边界：** 独立 AI Authoring Editor Tab；模型只输出不可信语义提案；Host 负责 Context Pack、ModelProposal 校验、Change Set、v1alpha5 Patch 和原生 TextDocument Buffer。用户自行保存；不执行 Runtime / Tool。
+- **语言基线：** CA-SL v1alpha5 已 FROZEN / RELEASED（`ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5`）；IngressCatalog v1alpha1 已发布（`ca-skills@9412be9894ef36acf846c757a5870dc0c48b33ac`）。v1alpha4 不作为编辑或兼容路径。
+- **Gateway：** 使用独立 Go 仓 `odango-chan/ai-gateway`，透明转发 OpenAI-compatible HTTP，不做 Prompt 处理、Model 选择、协议转换或用户管理。Gateway 部署在本机 loopback 或可信内网服务器；Provider API Key 只保存在 Gateway 主机。
+- **请求契约：** Studio 的 `gatewayUrl` 是带 upstream label 和上游 path prefix 的路由前缀，例如 `http://127.0.0.1:8787/opencode-go/openai`；Client 追加 `/v1/chat/completions`。Model ID 由 Studio 应用设置提供（初始默认 `deepseek-v4.1-flash`），并放入请求体；Host 生成稳定 `X-Opencode-Session`。
+- **访问边界：** loopback 不需要 Gateway token；非 loopback 使用部署级共享 `X-Gateway-Token`，不是用户认证或用户身份。Host SecretStorage 保存该共享 token；Provider Key 不进入浏览器、Webview、VSIX、工作区或 Context Pack。请求不携带 Cookie。
+- **浏览器跨域：** Gateway 当前默认不启用 CORS；GitHub Pages / Theia Browser-Only 调用本地或内网 Gateway 需要精确 Origin allowlist 和 Private Network preflight 支持，跟踪于 [ai-gateway #4](https://github.com/odango-chan/ai-gateway/issues/4)。CORS 不是认证。
+- **实现 PR 顺序：** [#201 Design](https://github.com/odango-chan/ca-skill-studio-demo/pull/201) → [#203 Authoring Core](https://github.com/odango-chan/ca-skill-studio-demo/pull/203) → [#204 Change Set](https://github.com/odango-chan/ca-skill-studio-demo/pull/204) → [#207 v1alpha5 Patch Engine](https://github.com/odango-chan/ca-skill-studio-demo/pull/207) → [#208 Editor Tab](https://github.com/odango-chan/ca-skill-studio-demo/pull/208)。旧 [#206 Worker prototype](https://github.com/odango-chan/ca-skill-studio-demo/pull/206) 已废弃，不得合并。
+- **当前状态：** Core、Change Set、Patch Engine、Editor Tab 均有实现；Go Gateway 独立仓已存在。Studio → Gateway 真实浏览器 / 模型请求尚未验收；CORS issue #4 未完成。所有 Apply 继续关闭，直到集成的已发布 v1alpha5 Compiler 对同一候选返回完整权威 PASS；Compiler PR #38 仍为 `CANDIDATE_PARTIAL`。
+- **验收纪律：** 本轮刷新会产生新的 PR head，旧 exact-head CI 不能代替新 head 验收；每个 PR 必须重新运行对应单测、IDE Host、Theia Browser Host / Browser-Only Chromium 检查。
 
-## 2026-11-17 · AI Gateway 技术 Spike（设计收敛）
+## 2026-11-18 · CA-SL v1alpha5-only authoring（PR #199）
 
-- **架构：** Browser → Application Gateway Worker → OpenAI-compatible provider。Cloudflare AI Gateway 若使用，只作为 Worker 后方的可选路由 / 分析层，不能直接暴露给浏览器。
-- **试点认证：** 第一阶段采用 Cloudflare Access 受限访问；Worker 校验 JWT 的签名、issuer、audience 和有效期。它是受控试点方案，不代表已决定最终面向公众的登录体系。
-- **密钥：** Provider Key 和 Cloudflare API Token 均只保存在 Worker Secret / 服务端；禁止静态 bearer token 打包到网页或 VSIX。
-- **代理边界：** 固定 Chat Completions 路径、上游地址和模型白名单；拒绝任意 URL、任意 Header、超大请求体和未知模型；响应头 / 错误不得泄漏上游密钥。
-- **限流与预算：** 基于已验证身份做 per-user rate limit；Cloudflare Rate Limiting 是近似、分区域的突发控制，不是严格总预算。必须另设 provider / account spend ceiling，并在预算状态不可用时 fail closed。
-- **流式：** Worker 透传 Response stream，不缓冲完整响应；客户端断开视为不完整响应，不得生成可接受 Change Set。
-- **Free 计划：** 当前官方限制为 100,000 requests/day、10ms CPU/request、128MB memory、6 simultaneous outgoing connections/request；HTTP 请求只要客户端保持连接就没有硬 wall-time 限制。10ms CPU 不包括上游模型推理时间。必须以真实请求验证。
-- **状态：** 方案已写入 canonical design；Gateway Worker 尚未部署，尚无 Provider Key、真实模型请求或生产认证。先做 fixture-provider 的正负测试，再做显式授权的真实 Provider smoke test。
+**语言规范：** CA-SL v1alpha5 已由 [ca-skills PR #66](https://github.com/odango-chan/ca-skills/pull/66) 正式冻结发布，权威 Release Commit 为 `0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5`，目标为 `connectionagent.io/v1alpha5`。v1alpha4 只保留为不可变的规范继承基线和历史记录，不是产品编辑模式；不提供 v1alpha4 兼容入口或旧项目自动迁移。
 
-## 2026-11-17 · CA Skill Compiler v1.0.0 接入（实施中）
+**内置 Example：** 来自 [ca-skills PR #65](https://github.com/odango-chan/ca-skills/pull/65) 合入后的当前 `main@de8d9f667dd1a445c3f6378e0ca793d7407d2036`。Manifest `site/samples/v1alpha5/files.json` 固定来源 commit、14 个文件路径及逐文件 Git blob SHA；只打包 `site/samples/v1alpha5` 下的两个 Skill：`establish-pdu-session` 与 `establish-pdu-session-mas`。替换现有 Example 必须明确确认，只删除专用 Example 工程；普通项目不经过 Example 导入器。旧版样例仅保留必要的回归 fixture，不作为运行时资源、编辑模式或迁移来源。
 
-Compiler 已正式发布 `v1.0.0`，目标固定为 CA-SL `connectionagent.io/v1alpha4`，规范 pin 为 `ca-skills@7f84393`。本轮在独立分支 `feat/compiler-v1.0.0-studio-integration-20261117` 接入真实 Go/WASM Core，不再实现模拟 Check / Build。
+- **Source / LSP：** 使用独立 v1alpha5 AST 投影；Procedure 为 Package 级 `start / nodes` 图，保留四种业务阶段，并将 Node-entry Wait 表示为独立控制字段。Wait 不是第五种业务阶段，也不创建 Wait-only Node。Completion、Definition、References、Outline、诊断和局部 Semantic Tokens 均基于 v1alpha5 Source；不回退到 v0.2 / v1alpha3 / v1alpha4 解析路径。
+- **Designer / Inspector：** Procedure Graph、Inspector 和 Data Flow 都是 Source 派生视图。当前 Wait 展示包括 Event Selector、Timeout、TIMEOUT 路由、Response Boundary 和 `NodeId.wait.output`；图形视图不拥有第二份业务真源，也不因此获得任意结构写入或 Runtime 授权。
+- **Semantic Tokens：** `skillWait` 是 Studio 本地编辑器展示 token，不是上游规范 Token Selector 契约；v1alpha5 上游语义令牌契约尚未发布。
+- **Compiler 边界：** 已发布的 Compiler v1.0.0 只接受 v1alpha4。当前 v1alpha5 Compiler 集成候选为 [PR #38](https://github.com/odango-chan/ca-skill-compiler/pull/38)，精确候选提交 `ea27f18549725166f304b7d06fd9339bb0554329`；PR #30 已被 #38 取代并关闭。#38 仍为 Draft / 未合并，PR 描述报告的 `FULL_LANGUAGE_VALIDATION` 是 Compiler 本地验收结果，不是已发布集成，也不代表 Owner / Host / Runtime 资格。Studio 对 v1alpha5 Check / Build / Inspect 继续 fail-closed。
+- **Studio 精确提交验收：** 最新代码提交 `55f77544231a92aac25caa0e741d6f07c3749bd7` 的四项 GitHub Actions 全部 PASS：PR Verify [#44259595964](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44259595964)、IDE Host [#44259595915](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44259595915)、Theia Browser Host / Chromium [#44259595730](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44259595730)、Theia Browser-Only [#44259595719](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44259595719)。PR Verify 同时通过 `npm test`、Plugin-managed tests、TypeScript 检查、Browser LSP 依赖安装、IDE Host 构建及 Compiler v1.0.0 WASM 打包；两个 Theia Gate 均通过真实 Chromium。后续 WORK / TRACEABILITY 证据记录提交仅修改文档，不改变已验收代码。Pages 尚未部署。
+- **Qualification：** 语言语义为 FROZEN / RELEASED；Studio 编辑器验收不等于 Compiler、Owner、Host、Runtime、Integration、5GC 或 MAS 资格。规范中的 36 个 EW 项仍是 `SPECIFICATION_ONLY`，未执行不能宣称产品通过。Trusted Ingress / Owner / CapabilityContracts、持久化 Wait 续接、EVENT_ACCEPTED occurrence 隔离、tombstone、paired response 与真实 5GC E2E 仍 NOT_QUALIFIED。
 
-- **Worker：** 构建时从 Compiler `v1.0.0` tag 编译 Go/WASM，随 Theia Web Extension 发布 `compiler-worker.js`、`skillc.wasm` 和匹配的 `wasm_exec.js`。
-- **CI 凭据：** Compiler 仓为私有仓；Studio Actions 需要 `CA_SKILL_COMPILER_READ_TOKEN`（仅 `Contents: read`）才能检出固定 tag。Token 仅用于 Actions Checkout，不能进入浏览器或 Worker。
-- **命令：** 新增 Check Skill、Build Skill、Inspect Dependencies，均调用 Compiler v1alpha4 API。
-- **Problems：** Compiler 原始 Diagnostic Code / Phase / path / line / column 映射到宿主诊断，不由 Studio 重写。
-- **Build Artifacts：** Package Explorer 增加 Build Artifacts 分区。仅在 Compiler BuildResult 完整性验证通过后显示只读、会话内 Artifact；失败 Build 不保留部分输出。
-- **明确限制：** 当前旧的 `skillc.lock/v0.1` / Tool Contract acquisition 不转换成 v1alpha4 DependencySnapshot。当前请求故意不提供 `resolvedDependencies` 与 `trustedBuildContext`，因此需要外部 Owner / Capability 的 Skill 会按 Compiler 规则 fail-closed。下一工作包是 v1alpha4 digest、Owner Binding 与 CapabilityContracts 的可信快照管线。
-- **Wait：** Compiler v1.0.0 仍是 v1alpha4，不支持 post-v1alpha4 Node-entry Event Wait；不做语法降级或模拟。
-- **验收：** Node 单测与真实 Chromium Worker smoke 已加入 PR workflow；当前尚未取得该分支 exact-head CI / Chromium 结果，不能先行标记 PASS。
+**当前交付状态：** v1alpha5-only 编辑器适配、规范/Example/Compiler 版本锁和文档权威信息已收敛。最新代码提交四项 Gate 全部通过，PR #199 已具备进入正式 Review 的条件。尚未合并，也尚未部署 Pages。
 
-详细边界见 [Compiler v1alpha4 Studio Integration](design/compiler-v1alpha4-studio-integration.md)。这轮只证明 Studio 能真实调用 Compiler；不代表真实 5GC Owner / Deployment、Runtime 或 MAS 已 QUALIFIED。
+详细边界见 [CA-SL v1alpha5 Studio Integration](design/ca-sl-v1alpha5-studio-preview.md) 与 [Compiler v1alpha4 Studio Integration](design/compiler-v1alpha4-studio-integration.md)。后者只描述 Compiler v1.0.0 的 v1alpha4 接口，不构成 v1alpha5 支持声明。
 
-
-## 2026-11-16 · CA-SL v1alpha4 编辑器基线与 Procedure Designer
+## 历史验收记录 · 2026-11-16 · CA-SL v1alpha4 编辑器基线与 Procedure Designer（非当前产品编辑目标）
 
 本轮以 `main@087a764753dad98ce8af0e4f9377a6378754547b` 为基线；CA-SL v1alpha4 规范唯一权威来源固定为 `odango-chan/ca-skills@7f84393ee8c395e4d8c39a74cb5000a1f896588d`（`connectionagent.io/v1alpha4`，语言语义 FROZEN）。
 
@@ -281,6 +271,14 @@ main browser application remains available at `/classic/`.
 **实现边界：** 不另造图模型。复用 `site/path-focus.mjs`、`site/layout.mjs`、`layoutProcedureELK`、共享 React Flow Canvas 的 `fitAxis` / `captureNodeAnchor` / `restoreNodeAnchor`。布局方向、路径模式和展开集合进入视图缓存键；Child Procedure 不显示 Root 专属筛选。所有按钮只影响视图，不改 YAML、不授予 Runtime / 5GC 权限。
 
 **验收：** [PR #106](https://github.com/odango-chan/ca-skill-studio-demo/pull/106) 已合并，merge commit `5dfa50e0e39e43087f01e1d5fee9ada1e6ce7d63`。exact-head `36a252319281e7c0829100a07455b56af6236176` 三组门禁全部 PASS：[IDE Host #42752173199](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173199)、[Theia Browser-Only #42752173510](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173510)、[Theia Browser Host / real Chromium #42752173208](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173208)。真实 Chromium 记录默认主路径 9 Nodes / 8 visible edges、水平 9/9、恢复垂直、全部路径 17 Nodes / 46 edges；Source、Inspector、Node Focus、Route create/reconnect 与 native Undo 回归通过。resulting-main Pages 对新 merge SHA 的部署仍需单独确认；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
+
+## 2026-11-18 · CA-SL v1alpha5 Root 分支折叠恢复（Issue #209 / PR #210）
+
+**范围：** PR #199 将活动编辑器切换到 v1alpha5 后，Theia CustomEditor 暂时绕过了共享 Root `pathFocus` 投影并隐藏 Root 工具栏，导致全部 Outcome 分支默认展开。PR #210 恢复 v1alpha5 Root 的只读主路径默认视图、主路径／选择路径／全部路径工具栏，以及每个 Node 的 `+N 条 / 收起`。
+
+**实现边界：** 复用既有 `site/path-focus.mjs`、ELK 和 React Flow anchor restore；v1alpha5 Stage-level Outcome Routes 仍按原 Source 身份投影。未知 Outcome 或无法证明成功终态时 fail open 全图。Child / Neighbor / Node Focus 不变；不编辑 Route、不改 YAML、不改变 TextDocument revision。
+
+**验收：** [PR #210](https://github.com/odango-chan/ca-skill-studio-demo/pull/210) 已合入 `main`，Squash commit `79a497c8dbf5029214ce28ce71f7719abab1a7ee`；Issue #209 已关闭。exact-head `8117d528679873ac4bf140852cbe59be69cf19c7` 四项门禁全部 PASS：[PR Verify #44265553245](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44265553245)、[IDE Host #44265553239](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44265553239)、[Theia Browser-Only / Chromium #44265553252](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44265553252)、[Theia Browser Host / Chromium #44265553163](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44265553163)。真实 Chromium：默认主路径 11 Nodes / 10 Edges；全部路径 14 Nodes / 36 Edges；首 Node 展开 11→13 Nodes、10→17 Edges，收起恢复原图；展开和收起的锚点偏移均约 0.00002 px，zoom 不变；两个 v1alpha5 Example 均以紧凑主路径打开，TextDocument URI / version 不变。Resulting-main Pages 部署 [#44266300451](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44266300451) PASS；部署内容的 `sourceSha` / `workflowSha` 均为 `79a497c8dbf5029214ce28ce71f7719abab1a7ee`，真实 Chromium 的 Pages-root acceptance PASS，部署 URL：https://odango-chan.github.io/ca-skill-studio-demo/。Runtime / 5GC NOT_RUN。
 
 ## 2026-11-10 · Theia named Phase Step / Verify authoring（PR #108，已合入 main）
 

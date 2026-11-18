@@ -5,13 +5,22 @@ import {phaseStepDependencyReport} from "../site/phase-dataflow.mjs";
 import {phaseConsumerContractReport} from "../site/phase-consumer-contract.mjs";
 import {bindingEvidenceExplanation,phaseStepEvidenceSummary}
   from "../site/phase-evidence-copy.mjs";
-import {SAMPLE_PACKAGES,createFileWorkspace} from "../site/sample-packages.mjs";
+import {createFileWorkspace} from "../site/sample-packages.mjs";
 
-const root=new URL("../site/samples/packages/establish-pdu-session/",import.meta.url);
+const root=new URL("./fixtures/legacy-site-samples/packages/establish-pdu-session/",import.meta.url);
 const get=path=>readFileSync(new URL(path,root),"utf8");
 const source=get("assurance/procedure.yaml");
+const fixtureFiles=[
+  "SKILL.md","assurance/contract.yaml","assurance/predicates.yaml","assurance/procedure.yaml",
+  "references/3gpp-procedure.md","references/failure-handling.md","references/session-selection.md",
+  "schemas/establishment-request.schema.yaml","schemas/predicate-evaluation-result.schema.yaml",
+  "schemas/selection-input.schema.yaml","schemas/selection.schema.yaml",
+  "schemas/transfer-start-evaluation-input.schema.yaml","schemas/udm-read-evaluation-input.schema.yaml",
+  "scripts/evaluate_transfer_start.py","scripts/evaluate_udm_read.py",
+  "scripts/select_establishment_configuration.py"
+];
 const files=createFileWorkspace("establish-pdu-session",
-  SAMPLE_PACKAGES.establish.files.map(path=>({path,text:get(path)}))).files;
+  fixtureFiles.map(path=>({path,text:get(path)}))).files;
 const proc="ue-requested-pdu-session-establishment";
 function evidence(node){
   const lineage=phaseStepDependencyReport(source,proc,node,files);

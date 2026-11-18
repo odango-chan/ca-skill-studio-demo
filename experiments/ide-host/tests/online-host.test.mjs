@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {readFileSync,statSync} from "node:fs";
+import {existsSync,readFileSync,statSync} from "node:fs";
 import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -91,14 +91,17 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
       entry.command==="skillStudio."+command),
       "Documentation must remain a native extension command: "+command);
   }
-  assert.ok(plugin.contributes.menus?.["view/title"]?.some(x=>
+  assert.ok(!plugin.contributes.menus?.["view/title"]?.some(x=>
     x.command==="skillStudio.loadExample"),
-    "Explorer title toolbar must expose the demo project");
+    "Example loading belongs in native File and SKILL Studio Project menus, not Explorer toolbar noise");
+  assert.equal(existsSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike/samples/skills")),false,
+    "the retired v0.2 sample set must not be bundled");
   for(const f of ["dist/extension-web.cjs","dist/extension-theia.js","dist/skill-language-server.js",
     "dist/compiler-worker.js","dist/skillc.wasm","dist/wasm_exec.js","media/procedure.js","media/procedure.css",
-    "samples/skills/files.json",
-    "samples/skills/establish-pdu-session/assurance/procedure.yaml",
-    "samples/skills/establish-pdu-session-mas/assurance/procedure.yaml","media/native-markdown-preview.css"])
+    "samples/v1alpha5/files.json","samples/v1alpha5/README.md",
+    "samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml",
+    "samples/v1alpha5/establish-pdu-session-mas/assurance/procedure.yaml",
+    "media/native-markdown-preview.css"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });
 test("Trial is isolated from existing Pages distribution",()=>{
@@ -150,21 +153,68 @@ test("Theia bundles offline YAML and Python TextMate grammars independently of L
 test("SKILL Studio adds one native Theia top-level menu with real extension commands",async()=>{
   const css=buildSkillStudioBrandCss();
   const script=buildSkillStudioBrandScript();
-  assert.match(css,/\.lm-MenuBar-item:first-child/);
+  assert.match(css,/\.lm-MenuBar-content/);
+  assert.doesNotMatch(css,/lm-MenuBar-item:first-child/,
+    "the custom menu must not displace the standard File menu from first position");
   assert.match(css,/\.theia-preload\.theia-hidden\s*\{\s*pointer-events:none;/,
     "An invisible startup preload cannot intercept trusted native menu clicks");
   assert.doesNotMatch(css,/\.skill-studio-brand-label|linear-gradient/);
   assert.match(script,/MenuModelRegistry/);
   assert.match(script,/registerMenuAction/);
   assert.match(script,/registerSubmenu\(TOP,"SKILL Studio"/);
-  assert.match(script,/\["menubar","00_skill_studio"\]/);
-  for(const id of ["showWelcome","newProject","openProject","loadExample",
-    "selectProjectRoot","refreshPackages","addDependency",
-    "auditPackage","openLanguageSpec","openAuthoringGuide"])
+  assert.match(script,/\["menubar","5z_skill_studio"\]/);
+  assert.match(script,/registerSubmenu\(groupPath,group\.label/);
+  assert.match(script,/menus\.registerMenuAction\(action\.path/);
+  assert.ok(script.includes('["menubar","1_file","1_new"]'));
+  assert.ok(script.includes('["menubar","1_file","2_open"]'));
+  for(const id of [
+    "showWelcome","newProject","openProject","loadExample","selectProjectRoot",
+    "refreshPackages","checkSkill","buildSkill","inspectCompilerDependencies",
+    "auditPackage","exportPackageZip","addDependency","refreshDependencies",
+    "openProcedure","openContract","openPredicates","openSchema",
+    "refreshInspection","restartLanguageService","openLanguageSpec","openAuthoringGuide"
+  ])
     assert.ok(script.includes('"skillStudio.'+id+'"'),"Native menu lacks "+id);
+  assert.doesNotMatch(script,/commands\.isVisible\(id\)/,
+    "contextual command visibility must not block native menu registration");
   assert.doesNotMatch(script,/createElement\("div"\)|addEventListener\("click"/);
   assert.ok(script.includes('commands.getCommand(id)'),
     "Native menu must wait for real registered extension commands");
+
+  const extension=JSON.parse(readFileSync(join(root,"../vscode/package.json"),"utf8"));
+  const commandById=new Map(extension.contributes.commands.map(item=>[item.command,item]));
+  const publicCommands=[
+    "skillStudio.showWelcome","skillStudio.newProject","skillStudio.openProject",
+    "skillStudio.openLanguageSpec","skillStudio.openAuthoringGuide",
+    "skillStudio.refreshPackages","skillStudio.openSchema","skillStudio.openProcedure",
+    "skillStudio.loadExample","skillStudio.auditPackage","skillStudio.exportPackageZip",
+    "skillStudio.refreshInspection","skillStudio.restartLanguageService",
+    "skillStudio.openPredicates","skillStudio.openContract","skillStudio.selectProjectRoot",
+    "skillStudio.addDependency","skillStudio.refreshDependencies",
+    "skillStudio.checkSkill","skillStudio.buildSkill","skillStudio.inspectCompilerDependencies"
+  ];
+  for(const id of publicCommands){
+    assert.equal(commandById.get(id)?.category,"SKILL Studio",id+" must be grouped in Command Palette");
+    assert.ok(commandById.get(id)?.title?.startsWith("%"),id+" must use localized short title");
+  }
+  const hiddenPalette=new Set((extension.contributes.menus.commandPalette??[])
+    .filter(item=>item.when==="false").map(item=>item.command));
+  for(const id of [
+    "skillStudio.renameNode","skillStudio.editNodeOperatorValue",
+    "skillStudio.editPhaseInputBinding","skillStudio.editPhaseOutputReference",
+    "skillStudio.editPhaseRouteTarget","skillStudio.repairPhaseOutcome",
+    "skillStudio.insertNode","skillStudio.deleteNode","skillStudio.addPhaseVerify",
+    "skillStudio.editPhaseVerifyStep","skillStudio.renameNamedPhaseStep",
+    "skillStudio.refreshDependency","skillStudio.updateDependencyLock",
+    "skillStudio.inspectDependencyContract","skillStudio.removeDependency"
+  ])assert.ok(hiddenPalette.has(id),id+" must remain contextual, not global palette noise");
+  const packageToolbar=extension.contributes.menus["view/title"]
+    .filter(item=>item.when==="view == skillStudio.packages")
+    .map(item=>item.command);
+  assert.deepEqual(packageToolbar,[
+    "skillStudio.refreshPackages","skillStudio.addDependency",
+    "skillStudio.checkSkill","skillStudio.buildSkill"
+  ]);
   const temp=await mkdtemp(join(tmpdir(),"theia-brand-"));
   try{
     await writeFile(join(temp,"index.html"),

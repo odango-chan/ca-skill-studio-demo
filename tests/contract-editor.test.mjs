@@ -3,40 +3,31 @@ import assert from 'node:assert/strict';
 import {registerContractEditor} from '../experiments/ide-host/vscode/src/contract-editor.mjs';
 
 const contract = [
-  'apiVersion: connectionagent.io/v1alpha1',
-  'kind: SkillContract',
-  'metadata:',
-  '  name: browser-contract-test',
-  'spec:',
-  '  skillType: executable',
-  '  goal: demo.ready',
-  '  entryProcedure: begin',
-  '  context:',
-  '    requiredFacts: [ingress]',
-  '    schemas:',
-  '      subject: lib/host/subject.schema.yaml',
-  '  allowedResources:',
-  '    capabilities: [tool.read]',
-  '    localTools: [skill.lookup]',
-  '  postconditions:',
-  '  - predicate: demo.done',
-  '    expect: PASS',
-  '  planning:',
-  '    maxActions: 8',
-  '    allowDynamicProcedure: false',
+  '# CA-SL v1alpha5 Contract',
+  'goal: demo.ready',
+  'precondition: check-registration.precondition',
+  'requestSchema: schemas/request.schema.yaml',
+  'contextSchema: ca-context::urn:connectionagent:ca:context:subject:v1',
+  'dependencies:',
+  '  ca-context: urn:connectionagent:ca:host-context',
+  'capabilities:',
+  '  - ca::capability.read',
+  'limits:',
+  '  maxActions: 8',
   ''
 ].join('\n');
 
-test('Contract custom editor registers independently and renders a nonce-protected read-only view', async () => {
+test('Contract custom editor renders a nonce-protected v1alpha5 read-only projection', async () => {
   const registrations = new Map();
   const commands = new Map();
   const context = {subscriptions: []};
+  let changeHandler, messageHandler, disposeHandler;
   const vscode = {
     window: {
       registerCustomEditorProvider: (view, provider, options) => {
         registrations.set(view, {provider, options});
         return {dispose() {}};
-      },
+      }
     },
     commands: {
       registerCommand: (name, handler) => {
@@ -51,11 +42,11 @@ test('Contract custom editor registers independently and renders a nonce-protect
       }
     }
   };
-  let changeHandler, messageHandler, disposeHandler;
   registerContractEditor(vscode, context);
   assert.ok(registrations.has('skillStudio.contractPreview'));
   assert.ok(commands.has('skillStudio.openContract'));
-  assert.equal(registrations.get('skillStudio.contractPreview').options.webviewOptions.retainContextWhenHidden, true);
+  assert.equal(registrations.get('skillStudio.contractPreview')
+    .options.webviewOptions.retainContextWhenHidden, true);
 
   let text = contract;
   const uri = {path: '/workspace/demo/assurance/contract.yaml',
@@ -78,15 +69,25 @@ test('Contract custom editor registers independently and renders a nonce-protect
   assert.match(webview.html, /Content-Security-Policy/);
   assert.doesNotMatch(webview.html, /unsafe-inline|https?:\/\//);
   assert.match(webview.html, /打开 YAML Source/);
-  assert.match(webview.html, /Context Schemas/);
+  assert.match(webview.html, /Goal & Preconditions/);
+  assert.match(webview.html, /Schemas & Context/);
+  assert.match(webview.html, /Capabilities/);
+  assert.match(webview.html, /Dependencies/);
+  assert.match(webview.html, /Limits/);
 
   await messageHandler({type: 'ready'});
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(messages.at(-1).type, 'snapshot');
   assert.equal(messages.at(-1).projection.state, 'READY');
-  assert.equal(messages.at(-1).projection.name.value, 'browser-contract-test');
-  assert.equal(messages.at(-1).projection.contextSchemas[0].value,
-    'lib/host/subject.schema.yaml');
+  assert.equal(messages.at(-1).projection.language, 'CA-SL v1alpha5');
+  assert.equal(messages.at(-1).projection.name.value, 'demo');
+  assert.equal(messages.at(-1).projection.goal.value, 'demo.ready');
+  assert.equal(messages.at(-1).projection.requestSchema.value, 'schemas/request.schema.yaml');
+  assert.equal(messages.at(-1).projection.contextSchema.value,
+    'ca-context::urn:connectionagent:ca:context:subject:v1');
+  assert.equal(messages.at(-1).projection.capabilities[0].value, 'ca::capability.read');
+  assert.equal(messages.at(-1).projection.dependencies[0].name, 'ca-context');
+  assert.equal(messages.at(-1).projection.limits[0].value, 8);
 
   text = contract.replace('goal: demo.ready', 'goal: demo.updated');
   document.version = 2;

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {pythonTopLevelOutline} from "../site/python-outline.mjs";
 
-const root=new URL("../site/samples/packages/establish-pdu-session/scripts/",import.meta.url);
+const root=new URL("./fixtures/legacy-site-samples/packages/establish-pdu-session/scripts/",import.meta.url);
 const read=name=>readFileSync(new URL(name,root),"utf8");
 
 test("E3-A2 source-aware top-level classes/main in all three owner scripts",()=>{

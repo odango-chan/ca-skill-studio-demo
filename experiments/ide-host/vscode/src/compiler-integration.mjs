@@ -3,9 +3,11 @@
 // This adapter owns workspace snapshots, diagnostics and read-only presentation.
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 import {createCompilerWorkerClient} from "./compiler-client.mjs";
+import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
 import {
   COMPILER_VERSION,
   COMPILER_INSPECTION_VERSION,
+  assertCompilerLanguageTarget,
   createCompilerBuildRequest,
   isCompilerBuildResult,
   isCompilerInspection
@@ -275,6 +277,16 @@ export function registerCompilerIntegration(vscode,context,{
     if(!procedure)return null;
     const root=packageRootForProcedure(vscode,procedure);
     if(!root)throw new Error("The selected document is not a Skill Procedure");
+    const languageTarget=isV1Alpha5Procedure(procedure.getText())
+      ?"connectionagent.io/v1alpha5":COMPILER_LANGUAGE_TARGET;
+    try{assertCompilerLanguageTarget(languageTarget);}
+    catch{
+      throw new Error(
+        "CA-SL v1alpha5 is the active released language target, but this Studio build has no released v1alpha5 Compiler integration. " +
+        "Compiler v1.0.0 targets connectionagent.io/v1alpha4 and MUST NOT Check, Build or Inspect this Package. " +
+        "Use the v1alpha5 Source/LSP projection; Compiler actions remain fail-closed until the v1alpha5 Compiler is released, integrated and validated in Studio."
+      );
+    }
     const expectedSuffix="/skills/"+root.name;
     if(!root.uri.path.endsWith(expectedSuffix)){
       throw new Error("Compiler v1alpha4 requires the Package to live under the project skills/<name>/ source root");

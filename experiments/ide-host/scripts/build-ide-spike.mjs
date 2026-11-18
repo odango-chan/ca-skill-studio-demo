@@ -82,47 +82,58 @@ await build({
   loader:{".tsx":"tsx",".ttf":"file",".woff":"file",".woff2":"file",".svg":"file"},
   assetNames:"assets/[name]-[hash]",logLevel:"info"
 });
-// Bundle only the source-pinned ca-skills inputs listed in the manifest.
-const sampleSource="site/samples/skills";
-const sampleDest=join(root,"samples","skills");
-const sampleManifest=JSON.parse(await readFile(join(sampleSource,"files.json"),"utf8"));
-if(sampleManifest.schemaVersion!==1||
-   sampleManifest.sourceRepo!=="odango-chan/ca-skills"||
-   !/^[0-9a-f]{40}$/.test(sampleManifest.sourceSha)||
-   JSON.stringify([...sampleManifest.skills].sort())!==
-     JSON.stringify(["establish-pdu-session","establish-pdu-session-mas"].sort())||
-   !sampleManifest.blobs||
-   sampleManifest.files.length<6||
-   new Set(sampleManifest.files).size!==sampleManifest.files.length||
-   !sampleManifest.files.every(p=>
-     typeof p==="string"&&!p.includes("\\")&&!p.startsWith("/")&&
-     p.split("/").every(part=>part&&part!=="."&&part!=="..")&&
-     sampleManifest.skills.some(name=>p.startsWith(name+"/"))&&
-     /^[a-f0-9]{40}$/.test(sampleManifest.blobs[p]??""))||
-   !sampleManifest.skills.every(name=>
-     sampleManifest.files.includes(name+"/SKILL.md")&&
-     sampleManifest.files.includes(name+"/assurance/procedure.yaml")))
-  throw Error("Incomplete or divergent pinned two-SKILL sample manifest");
-await rm(sampleDest,{recursive:true,force:true});
-await mkdir(sampleDest,{recursive:true});
-for(const name of ["README.md","files.json"])
-  await cp(join(sampleSource,name),join(sampleDest,name));
-// Public builds use the verified snapshot. An authorized build can read the
-// same input bytes from a local checkout of the private owner repository.
-const ownerCheckout=process.env.STUDIO_CA_SKILLS_CHECKOUT;
-const sourceRoot=ownerCheckout?join(ownerCheckout,"skills"):sampleSource;
-for(const path of sampleManifest.files){
-  const bytes=await readFile(join(sourceRoot,path));
-  const gitBlob=createHash("sha1").update("blob "+bytes.length+"\0").update(bytes).digest("hex");
-  if(gitBlob!==sampleManifest.blobs[path])
-    throw Error("Example input differs from pinned owner blob: "+path);
-  const target=join(sampleDest,path);
-  await mkdir(dirname(target),{recursive:true});
-  await writeFile(target,bytes);
+// Bundle only the pinned CA-SL v1alpha5 released Example. v1alpha4 remains
+// an immutable historical language baseline and is not shipped as an active Example.
+// Remove all previously staged active/legacy sample directories before copying the
+// single selected candidate so an older build cannot leak a second authoring target.
+await rm(join(root,"samples","skills"),{recursive:true,force:true});
+await rm(join(root,"samples","v1alpha4"),{recursive:true,force:true});
+const sampleSets=[
+  {kind:"v1alpha5",source:"site/samples/v1alpha5",destination:join(root,"samples","v1alpha5"),
+    status:"RELEASED_NOT_QUALIFIED",ref:"refs/heads/main",
+    version:"connectionagent.io/v1alpha5"}
+];
+for(const set of sampleSets){
+  const manifest=JSON.parse(await readFile(join(set.source,"files.json"),"utf8"));
+  if(manifest.schemaVersion!==1||manifest.sourceRepo!=="odango-chan/ca-skills"||
+     !/^[0-9a-f]{40}$/.test(manifest.sourceSha)||
+     manifest.sourceStatus!==set.status||manifest.sourceRef!==set.ref||
+     (set.version&&manifest.languageVersion!==set.version)||
+     JSON.stringify([...manifest.skills].sort())!==
+       JSON.stringify(["establish-pdu-session","establish-pdu-session-mas"].sort())||
+     !manifest.blobs||!Array.isArray(manifest.files)||manifest.files.length<5||
+     manifest.files.length>100||new Set(manifest.files).size!==manifest.files.length||
+     !manifest.files.every(path=>
+       typeof path==="string"&&!path.includes("\\")&&!path.startsWith("/")&&
+       path.split("/").every(part=>part&&part!=="."&&part!=="..")&&
+       manifest.skills.some(name=>path.startsWith(name+"/"))&&
+       /^[a-f0-9]{40}$/.test(manifest.blobs[path]??""))||
+     !manifest.skills.every(name=>
+       manifest.files.includes(name+"/SKILL.md")&&
+       manifest.files.includes(name+"/assurance/procedure.yaml")&&
+       manifest.files.includes(name+"/assurance/contract.yaml")&&
+       manifest.files.includes(name+"/assurance/predicates.yaml")))
+    throw Error("Incomplete, divergent or incorrectly qualified "+set.kind+" manifest");
+  await rm(set.destination,{recursive:true,force:true});
+  await mkdir(set.destination,{recursive:true});
+  await cp(join(set.source,"files.json"),join(set.destination,"files.json"));
+  if(manifest.projectReadme!=="README.md")
+    throw Error("Example project README is not pinned");
+  await cp(join(set.source,manifest.projectReadme),join(set.destination,manifest.projectReadme));
+  for(const path of manifest.files){
+    const bytes=await readFile(join(set.source,path));
+    const gitBlob=createHash("sha1").update("blob "+bytes.length+"\0").update(bytes).digest("hex");
+    if(gitBlob!==manifest.blobs[path])
+      throw Error(set.kind+" example differs from pinned owner blob: "+path);
+    const target=join(set.destination,path);
+    await mkdir(dirname(target),{recursive:true});
+    await writeFile(target,bytes);
+  }
+  console.log("STUDIO_PREPARED_SAMPLE",JSON.stringify({
+    kind:set.kind,root:set.destination,skills:manifest.skills,
+    files:manifest.files.length,sourceSha:manifest.sourceSha,
+    sourceStatus:manifest.sourceStatus
+  }));
 }
-console.log("STUDIO_PREPARED_SAMPLE",JSON.stringify({
-  root:sampleDest,skills:sampleManifest.skills,files:sampleManifest.files.length,
-  sourceSha:sampleManifest.sourceSha
-}));
 console.log("SKILL Studio IDE host: built Node and browser extension entries, isolated LSP Worker and ReactFlow webview assets; Theia application build and Pages release are separate.");
 // Owner Skill snapshots are pinned and validated; the demo does not auto-sync.

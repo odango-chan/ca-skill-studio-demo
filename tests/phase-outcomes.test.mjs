@@ -8,7 +8,7 @@ import {phaseOutcomeEditOptions,previewAddObservedPhaseOutcome,
   applyAddObservedPhaseOutcome,applyRenameNoncorePhaseOutcome,
   applyDeleteNoncorePhaseOutcome} from "../site/phase-outcomes.mjs";
 
-const original=readFileSync(new URL("../site/samples/packages/"+
+const original=readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
  "establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
 const pid="ue-requested-pdu-session-establishment";
 const subscribe="nudm-sdm-subscribe",pcf="npcf-sm-policy-control-create";

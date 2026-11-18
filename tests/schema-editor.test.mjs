@@ -5,7 +5,7 @@ import {isSkillSchema,localSchemaReference,registerSchemaEditor}
   from '../experiments/ide-host/vscode/src/schema-editor.mjs';
 
 const source=readFileSync(new URL(
-  '../site/samples/packages/establish-pdu-session/schemas/establishment-request.schema.yaml',
+  '../site/samples/v1alpha5/establish-pdu-session/schemas/establishment-request.schema.yaml',
   import.meta.url),'utf8');
 
 function mock() {
@@ -81,6 +81,7 @@ test('C3 custom editor presents read-only source-backed state, refresh and versi
   await m.receive({type:'ready'});
   assert.equal(m.sent.at(-1).projection.state,'READY');
   assert.equal(m.sent.at(-1).projection.title,'EstablishmentRequest');
+  assert.equal(m.sent.at(-1).packageName,'establish-pdu-session');
   const changed=source.replace('maximum: 15','maximum: 14');
   m.change(changed);
   await new Promise(resolve=>setImmediate(resolve));

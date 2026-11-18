@@ -1,9 +1,11 @@
 # Skill Studio ↔ CA Skill Compiler v1.0.0 integration
 
-**Status:** implementation slice in progress; exact-head CI and real Chromium acceptance are the qualification gates.  
+**Status:** Historical v1alpha4-only adapter boundary; retained for the pinned v1alpha4 Compiler Worker path and regression evidence, not an active product authoring mode.  
 **Compiler release:** `odango-chan/ca-skill-compiler@v1.0.0`  
 **Language target:** `connectionagent.io/v1alpha4`  
 **Normative Skill authority:** `odango-chan/ca-skills@7f84393ee8c395e4d8c39a74cb5000a1f896588d`
+
+> **Version boundary:** This document describes only the released Compiler v1.0.0 / CA-SL v1alpha4 integration. The active Studio authoring target is CA-SL v1alpha5, whose language is FROZEN / RELEASED. Studio explicitly blocks Check / Build / Inspect for v1alpha5 because the current v1alpha5 Compiler candidate [PR #38](https://github.com/odango-chan/ca-skill-compiler/pull/38) is still Draft / unmerged and is not integrated. This document must not be read as v1alpha5 Compiler support. See [CA-SL v1alpha5 Studio Integration](ca-sl-v1alpha5-studio-preview.md).
 
 ## 1. Ownership
 
@@ -69,7 +71,7 @@ The next integration work package must implement the exact v1alpha4 immutable sn
 
 ## 6. Wait and language-version boundary
 
-The Compiler release targets CA-SL v1alpha4. It does not accept the post-v1alpha4 Node-entry Event Wait revision. Studio must not author, translate or silently lower Wait into an older Observation / polling pattern. The frozen Wait semantics and the pending normative / Integration / Host contracts remain a separate language-upgrade workstream.
+The Compiler v1.0.0 release targets CA-SL v1alpha4. It does not accept the Node-entry Event Wait semantics released in CA-SL v1alpha5. Studio must not send v1alpha5 source to this Compiler or silently lower Wait into an older Observation / polling pattern. The current v1alpha5 Compiler candidate is PR #38; until it is released and integrated, Studio compiler actions remain fail-closed. Host / Runtime / Integration qualification remains a separate workstream.
 
 ## 7. Acceptance boundary
 

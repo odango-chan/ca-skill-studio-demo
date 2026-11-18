@@ -77,51 +77,63 @@
     "commands": [
       {
         "command": "skillStudio.showWelcome",
-        "title": "%project.welcome.title%"
+        "title": "%project.welcome.title%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.newProject",
-        "title": "%project.new%"
+        "title": "%project.new%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.openProject",
-        "title": "%project.open%"
+        "title": "%project.open%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.openLanguageSpec",
-        "title": "%help.spec%"
+        "title": "%help.spec%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.openAuthoringGuide",
-        "title": "%help.guide%"
+        "title": "%help.guide%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.refreshPackages",
-        "title": "SKILL Studio: Refresh Packages"
+        "title": "%command.refreshPackages%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.openSchema",
-        "title": "SKILL Studio: Open Schema Visual"
+        "title": "%command.openSchema%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.openProcedure",
-        "title": "SKILL Studio: Open Procedure Visual"
+        "title": "%command.openProcedure%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.loadExample",
-        "title": "%project.example%"
+        "title": "%project.example%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.auditPackage",
-        "title": "SKILL Studio: Audit Current Package"
+        "title": "%command.auditPackage%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.exportPackageZip",
-        "title": "SKILL Studio: Export Current Package ZIP"
+        "title": "%command.exportPackageZip%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.refreshInspection",
-        "title": "SKILL Studio: Refresh Inspection"
+        "title": "%command.refreshInspection%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.renameNode",
@@ -169,55 +181,64 @@
       },
       {
         "command": "skillStudio.restartLanguageService",
-        "title": "SKILL Studio: Restart Language Service"
+        "title": "%command.restartLanguageService%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.openPredicates",
-        "title": "SKILL Studio: Open Predicate Visual"
+        "title": "%command.openPredicates%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.openContract",
-        "title": "SKILL Studio: Open Contract Visual"
+        "title": "%command.openContract%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.selectProjectRoot",
-        "title": "Skill Studio: Select Project Root"
+        "title": "%command.selectProjectRoot%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.addDependency",
-        "title": "Skill Studio: Add Dependency"
+        "title": "%command.addDependency%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.refreshDependencies",
-        "title": "Skill Studio: Refresh Dependencies"
+        "title": "%command.refreshDependencies%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.refreshDependency",
-        "title": "Skill Studio: Refresh Upstream Dependency"
+        "title": "%command.refreshDependency%"
       },
       {
         "command": "skillStudio.updateDependencyLock",
-        "title": "Skill Studio: Update Dependency Lock"
+        "title": "%command.updateDependencyLock%"
       },
       {
         "command": "skillStudio.removeDependency",
-        "title": "Skill Studio: Remove Dependency"
+        "title": "%command.removeDependency%"
       },
       {
         "command": "skillStudio.inspectDependencyContract",
-        "title": "Skill Studio: Inspect Locked Contract"
+        "title": "%command.inspectDependencyContract%"
       },
       {
         "command": "skillStudio.checkSkill",
-        "title": "SKILL Studio: Check Skill (Compiler v1.0.0)"
+        "title": "%command.checkSkill%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.buildSkill",
-        "title": "SKILL Studio: Build Skill (Compiler v1.0.0)"
+        "title": "%command.buildSkill%",
+        "category": "SKILL Studio"
       },
       {
         "command": "skillStudio.inspectCompilerDependencies",
-        "title": "SKILL Studio: Inspect Dependencies (Compiler v1.0.0)"
+        "title": "%command.inspectCompilerDependencies%",
+        "category": "SKILL Studio"
       }
     ],
     "markdown.markdownItPlugins": true,
@@ -268,16 +289,6 @@
           "group": "navigation"
         },
         {
-          "command": "skillStudio.loadExample",
-          "when": "view == skillStudio.packages",
-          "group": "navigation"
-        },
-        {
-          "command": "skillStudio.loadExample",
-          "when": "view == workbench.explorer.fileView",
-          "group": "navigation"
-        },
-        {
           "command": "skillStudio.auditPackage",
           "when": "view == skillStudio.inspection || view == skillStudio.problems",
           "group": "navigation"
@@ -293,16 +304,6 @@
           "group": "navigation@3"
         },
         {
-          "command": "skillStudio.refreshDependencies",
-          "when": "view == skillStudio.packages",
-          "group": "navigation@4"
-        },
-        {
-          "command": "skillStudio.selectProjectRoot",
-          "when": "view == skillStudio.packages",
-          "group": "navigation@5"
-        },
-        {
           "command": "skillStudio.checkSkill",
           "when": "view == skillStudio.packages",
           "group": "navigation@6"
@@ -311,11 +312,6 @@
           "command": "skillStudio.buildSkill",
           "when": "view == skillStudio.packages",
           "group": "navigation@7"
-        },
-        {
-          "command": "skillStudio.inspectCompilerDependencies",
-          "when": "view == skillStudio.packages",
-          "group": "navigation@8"
         }
       ],
       "view/item/context": [
@@ -483,6 +479,68 @@
           "command": "skillStudio.inspectCompilerDependencies",
           "when": "view == skillStudio.packages && viewItem == skillStudio.package",
           "group": "7_compiler"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "skillStudio.renameNode",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.editNodeOperatorValue",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.editPhaseOutputReference",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.editPhaseRouteTarget",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.repairPhaseOutcome",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.insertNode",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.deleteNode",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.addPhaseVerify",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.refreshDependency",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.updateDependencyLock",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.inspectDependencyContract",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.removeDependency",
+          "when": "false"
         }
       ]
     },

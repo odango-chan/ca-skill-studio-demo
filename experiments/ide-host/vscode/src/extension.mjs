@@ -14,8 +14,9 @@ function newNonce(){
 }
 import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
-import {isV1Alpha4Procedure} from "../../../../language/core/v1alpha4.ts";
-import {exposeWorkspaceRoot,seedExampleWorkspace} from "./sample-loader.mjs";
+import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
+import {EXAMPLE_PROJECT_NAME,seedExampleProject} from "./sample-loader.mjs";
+import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
 import {extendMarkdownIt} from "./markdown-link-policy.mjs";
@@ -211,11 +212,11 @@ export function activate(context){
           void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB Procedure editor limit"});
           return;
         }
-        // Legacy Packages do not need the v1alpha4 Contract / PredicateSet
+        // Legacy Packages do not need the v1alpha5 Contract / PredicateSet
         // visual projection. Avoid extra filesystem reads for the legacy
         // default Example and keep the Theia virtual filesystem load bounded.
         let contract={text:null,version:0},predicates={text:null,version:0};
-        if(isV1Alpha4Procedure(text)){
+        if(isV1Alpha5Procedure(text)){
           contract=await readPackageText("assurance/contract.yaml");
           predicates=await readPackageText("assurance/predicates.yaml");
         }
@@ -329,42 +330,77 @@ export function activate(context){
       }catch(error){
         if(error?.code!=="FileNotFound")throw error;
       }
+      await vscode.workspace.fs.createDirectory(root);
       await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root,"skills"));
-      await exposeWorkspaceRoot(vscode.workspace,root);
+      await openProjectFolder(vscode,root);
     }),
     vscode.commands.registerCommand("skillStudio.openProject",async()=>{
       const folders=await vscode.window.showOpenDialog({
         canSelectFiles:false,canSelectFolders:true,canSelectMany:false,
         openLabel:projectText("Open Project")
       });
-      if(folders?.[0])await exposeWorkspaceRoot(vscode.workspace,folders[0]);
+      if(folders?.[0])await openProjectFolder(vscode,folders[0]);
     }),
     vscode.commands.registerCommand("skillStudio.openLanguageSpec",()=>vscode.env.openExternal(
       vscode.Uri.parse("https://github.com/odango-chan/ca-skills/blob/main/docs/skill-language-spec.zh-CN.md"))),
     vscode.commands.registerCommand("skillStudio.openAuthoringGuide",()=>vscode.env.openExternal(
       vscode.Uri.parse("https://github.com/odango-chan/ca-skills/blob/main/docs/authoring.zh-CN.md")))
   );
+  // Keep browser acceptance independent of Extension Host console forwarding.
+  // This command is internal (not contributed to the Command Palette) and
+  // returns the authoritative workspace and the two v1alpha5 Skill URIs.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.workspaceIdentityAcceptance",async()=>{
+      const folders=vscode.workspace.workspaceFolders??[];
+      const root=folders.length===1?folders[0].uri:null;
+      const defaultProcedure=root?vscode.Uri.joinPath(root,
+        "skills","establish-pdu-session","assurance","procedure.yaml"):null;
+      const masProcedure=root?vscode.Uri.joinPath(root,
+        "skills","establish-pdu-session-mas","assurance","procedure.yaml"):null;
+      const exists=async uri=>{
+        if(!uri)return false;
+        try{await vscode.workspace.fs.stat(uri);return true;}
+        catch{return false;}
+      };
+      return {
+        workspaceName:vscode.workspace.name??null,
+        workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
+        root:root?.toString?.()??null,
+        workspaceFolders:folders.map(folder=>folder.uri.toString()),
+        defaultProcedure:defaultProcedure?.toString?.()??null,
+        defaultProcedureExists:await exists(defaultProcedure),
+        masProcedure:masProcedure?.toString?.()??null,
+        masProcedureExists:await exists(masProcedure)
+      };
+    }
+  ));
   let exampleLoadPromise=null;
   let projectWelcome=null;
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
   const exampleText=progressZh?{
     title:"加载示例项目",
-    starting:"正在准备官方示例…",
+    replacePrompt:"检测到已有 Example 项目。是否替换为最新 CA-SL v1alpha5 示例？替换将删除整个 Example 目录中的现有内容，包括本地修改和旧版样例。",
+    replaceAction:"替换 Example",
+    cancelAction:"取消",
+    starting:"正在准备 CA-SL v1alpha5 Skills…",
     manifest:"正在读取示例清单…",
-    files:(completed,total)=>"正在导入官方文件（"+completed+"/"+total+"）…",
+    files:(completed,total)=>"正在导入示例文件（"+completed+"/"+total+"）…",
     workspace:"正在打开示例工作区…",
     packages:"正在加载 Package Explorer…",
-    procedure:"正在打开 5GC Procedure…",
+    procedure:"正在打开 v1alpha5 Procedure…",
     success:"示例项目已打开",
     failure:"示例项目载入失败"
   }:{
     title:"Loading example project",
-    starting:"Preparing official examples…",
-    manifest:"Reading example manifest…",
-    files:(completed,total)=>"Importing official files ("+completed+"/"+total+")…",
+    replacePrompt:"An Example project already exists. Replace the entire Example folder with the latest CA-SL v1alpha5 sample? This deletes all existing Example contents, including local edits and retired samples.",
+    replaceAction:"Replace Example",
+    cancelAction:"Cancel",
+    starting:"Preparing CA-SL v1alpha5 Skills…",
+    manifest:"Reading example manifests…",
+    files:(completed,total)=>"Importing sample files ("+completed+"/"+total+")…",
     workspace:"Opening example workspace…",
     packages:"Preparing Package Explorer…",
-    procedure:"Opening 5GC Procedure…",
+    procedure:"Opening the v1alpha5 Procedure…",
     success:"Example project opened",
     failure:"Example project failed to load"
   };
@@ -376,9 +412,23 @@ export function activate(context){
       exampleLoadPromise=(async()=>{
         // Also show the native status bar for hosts where notifications are
         // delayed or don't render until the extension's first awaited I/O.
-        const statusBar=typeof vscode.window.setStatusBarMessage==="function"
-          ?vscode.window.setStatusBarMessage(exampleText.starting):null;
+        let statusBar=null;
         try{
+          const exampleRoot=vscode.Uri.joinPath(context.globalStorageUri,EXAMPLE_PROJECT_NAME);
+          let existingExample=false;
+          try{await vscode.workspace.fs.stat(exampleRoot);existingExample=true;}
+          catch(error){if(error?.code!=="FileNotFound")throw error;}
+          let replaceExisting=false;
+          if(existingExample){
+            const choice=await vscode.window.showWarningMessage(
+              exampleText.replacePrompt,{modal:true},
+              exampleText.replaceAction,exampleText.cancelAction
+            );
+            if(choice!==exampleText.replaceAction)return null;
+            replaceExisting=true;
+          }
+          statusBar=typeof vscode.window.setStatusBarMessage==="function"
+            ?vscode.window.setStatusBarMessage(exampleText.starting):null;
           const run=async progress=>{
             const report=(message,details={})=>{
               progress?.report?.({message});
@@ -387,15 +437,40 @@ export function activate(context){
             let stage="seed-example";
             try{
               report(exampleText.starting);
-              const result=await seedExampleWorkspace(
+              const result=await seedExampleProject(
                 vscode,context.extensionUri,context.globalStorageUri,{
+                  replaceExisting,
                   onProgress:({phase,completed,total})=>{
                     if(phase==="manifest")report(exampleText.manifest);
                     else if(phase==="files")report(
                       exampleText.files(completed,total),{completed,total});
-                    else if(phase==="workspace")report(exampleText.workspace);
+                    else if(phase==="project-ready")report(exampleText.workspace);
                   }
                 });
+              // A Theia browser-only session may currently be backed by an
+              // Untitled multi-root workspace file. Opening the project folder
+              // natively replaces that workspace and gives the workbench its
+              // real folder identity. Resume the default Procedure after the
+              // extension host is reactivated in the newly opened folder.
+              if(!isSingleFolderWorkspace(vscode,result.root)){
+                stage="open-project";
+                report(exampleText.workspace);
+                const pending={
+                  root:result.root.toString(),
+                  procedure:result.procedure.toString(),
+                  files:result.files,candidateFiles:result.candidateFiles,
+                  replacedExisting:result.replacedExisting,
+                  skills:result.skills,sourceShas:result.sourceShas
+                };
+                await context.globalState.update(PENDING_EXAMPLE_OPEN_KEY,pending);
+                try{
+                  await openProjectFolder(vscode,result.root);
+                }catch(error){
+                  await context.globalState.update(PENDING_EXAMPLE_OPEN_KEY,undefined);
+                  throw error;
+                }
+                return result;
+              }
               stage="show-packages";
               report(exampleText.packages);
               // End in the real Package Explorer, not a custom duplicate view.
@@ -420,9 +495,13 @@ export function activate(context){
                 .map(folder=>folder.uri.toString());
               if(!confirmedFolders.includes(result.root.toString()))
                 throw Error("Theia has not confirmed the skill-studio-demo workspace root");
+              if(!isSingleFolderWorkspace(vscode,result.root))
+                throw Error("Theia did not open the project as a named single-folder workspace");
               await vscode.commands.executeCommand("skillStudio.openProcedure",result.procedure);
               console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
                 root:result.root.toString(),
+                workspaceName:vscode.workspace.name??null,
+                workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
                 workspaceFolders:confirmedFolders,
                 defaultProcedure:result.procedure.toString(),
                 editor:VIEW
@@ -431,12 +510,13 @@ export function activate(context){
                 state:"success",message:exampleText.success
               });
               // Keep the established success notification used by Chromium
-              // acceptance and make create-only / existing-file semantics clear.
+              // acceptance and report whether the existing Example was replaced.
               void vscode.window.showInformationMessage(
-                "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开传统 5GC Procedure。"+
-                "同步 "+result.files+" 个官方文件；保留 "+result.skipped+" 个已有文件。"+
-                (viewOpened&&revealed?"已展开 Package Explorer（含传统 5GC + MAS）。":
-                  "可在 Explorer → Package Explorer 查看两个 SKILL。"));
+                "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL v1alpha5 Procedure（DRAFT / NOT_QUALIFIED）。"+
+                (result.replacedExisting?"已替换原有 Example 内容。":"")+
+                "导入 v1alpha5 Skill 文件 "+result.candidateFiles+" 个。"+
+                (viewOpened&&revealed?"已展开 Package Explorer（两个 CA-SL v1alpha5 Skills）。":
+                  "可在 Explorer → Package Explorer 查看 v1alpha5 Skills。"));
               return result;
             }catch(error){
               const message=exampleText.failure+" ["+stage+"]："+String(error?.message??error);
@@ -456,6 +536,10 @@ export function activate(context){
             },run);
           }
           return await run({report(){}});
+        }catch(error){
+          void vscode.window.showErrorMessage(
+            "SKILL Example replacement check failed: "+String(error?.message??error));
+          return null;
         }finally{
           statusBar?.dispose?.();
         }
@@ -538,9 +622,18 @@ export function activate(context){
   // The command is deliberately not contributed to the user command palette.
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.editorGroupAcceptance",async()=>{
-      const procedures=await vscode.workspace.findFiles(
+      const discoveredProcedures=await vscode.workspace.findFiles(
         "**/assurance/procedure.yaml","**/node_modules/**",20);
-      if(procedures.length<1)throw Error("No real Skill Procedure files found for editor-group acceptance");
+      if(discoveredProcedures.length<1)throw Error("No real Skill Procedure files found for editor-group acceptance");
+      // The Example contains both the baseline 5GC Skill and its MAS
+      // adaptation. Keep the editor-group baseline deterministic instead of
+      // relying on filesystem enumeration order.
+      const baseline=discoveredProcedures.find(uri=>
+        /\/skills\/establish-pdu-session\/assurance\/procedure\.yaml$/i.test(uri.path));
+      const procedures=baseline
+        ? [baseline,...discoveredProcedures.filter(uri=>uri.toString()!==baseline.toString())
+            .sort((a,b)=>a.path.localeCompare(b.path))]
+        : [...discoveredProcedures].sort((a,b)=>a.path.localeCompare(b.path));
       const visualUris=[];
       const add=uri=>{
         if(uri&&sourceViewType(uri)&&!visualUris.some(item=>item.toString()===uri.toString()))
@@ -564,8 +657,8 @@ export function activate(context){
       const firstPackageVisuals=visualUris.filter(uri=>uri.path.startsWith(firstRoot.path+"/"));
       for(const uri of firstPackageVisuals)await openSourceViewPair(vscode,uri);
       const pythonFiles=await vscode.workspace.findFiles(
-        "**/scripts/evaluate_transfer_start.py","**/node_modules/**",5);
-      if(!pythonFiles.length)throw Error("Bundled Python acceptance fixture is missing");
+        "**/scripts/validate-subscription-request.py","**/node_modules/**",5);
+      if(!pythonFiles.length)throw Error("CA-SL v1alpha5 Python acceptance fixture is missing");
       const python=await vscode.workspace.openTextDocument(pythonFiles[0]);
       await vscode.window.showTextDocument(python,{
         viewColumn:vscode.ViewColumn.Two,preserveFocus:false,preview:false
@@ -620,6 +713,44 @@ export function activate(context){
   // A real empty-workspace editor page is required: Theia currently does not
   // render Explorer viewsWelcome without a workspace folder.
   projectWelcome=registerProjectWelcome(vscode,context);
+  // Open Example switches to a named folder, which restarts the extension host.
+  // Complete the user-requested default Procedure open only after the new
+  // single-folder workspace is active; never auto-open on unrelated projects.
+  void restorePendingExampleProject(vscode,context,{
+    revealPackages:async()=>{
+      for(const id of ["workbench.view.explorer","skillStudio.packages.focus"]){
+        try{await vscode.commands.executeCommand(id);break;}
+        catch{/* The alternative is optional. */}
+      }
+      try{await packageOverview?.revealPackages?.();}
+      catch{await packageOverview?.refresh?.();}
+    },
+    onRestored:pending=>{
+      const folders=(vscode.workspace.workspaceFolders??[])
+        .map(folder=>folder.uri.toString());
+      console.log("STUDIO_DEFAULT_WORKSPACE_OPENED",JSON.stringify({
+        root:pending.root,
+        workspaceName:vscode.workspace.name??null,
+        workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
+        workspaceFolders:folders,
+        defaultProcedure:pending.procedure,
+        editor:VIEW
+      }));
+      const detail=progressZh
+        ?((pending.replacedExisting?"已替换原有 Example 内容。":"")+
+          "导入 v1alpha5 Skill 文件 "+pending.candidateFiles+" 个。")
+        :((pending.replacedExisting?"Replaced the previous Example contents. ":"")+
+          "Imported "+pending.candidateFiles+" CA-SL v1alpha5 Skill files.");
+      const message=progressZh
+        ?("示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL v1alpha5 Procedure（DRAFT / NOT_QUALIFIED）。"+detail)
+        :("Example project opened: skill-studio-demo/. The CA-SL v1alpha5 Procedure is open (DRAFT / NOT_QUALIFIED). "+detail);
+      void vscode.window.showInformationMessage(message);
+    }
+  }).catch(error=>{
+    void vscode.window.showErrorMessage(
+      "SKILL Studio could not finish opening the Example Procedure: "+
+      String(error?.message??error));
+  });
   return {extendMarkdownIt};
 }
 export function deactivate(){}

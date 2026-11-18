@@ -4,7 +4,7 @@ import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {prepareNativeMarkdownPackagePolicy} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
-import {isV1Alpha4Procedure} from "../../../../language/core/v1alpha4.ts";
+import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
@@ -970,26 +970,26 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     ));
   }
 
-  // Exercise frozen v1alpha4 providers through the public VS Code commands
+  // Exercise candidate v1alpha5 providers through the public VS Code commands
   // in real Theia. A uniquely named sibling Package is created inside the
   // selected workspace and always removed; user-authored files are untouched.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
     context.subscriptions.push(vscode.commands.registerCommand(
-      "skillStudio.internal.v1alpha4LanguageProviderAcceptance",
+      "skillStudio.internal.v1alpha5LanguageProviderAcceptance",
       async procedureUriValue=>{
         const sourceUri=vscode.Uri.parse(String(procedureUriValue??""));
         const sourceDocument=await vscode.workspace.openTextDocument(sourceUri);
         const sourceRoot=packageRootForProcedure(vscode,sourceDocument);
-        if(!sourceRoot)throw Error("v1alpha4 acceptance requires an active Skill Package");
+        if(!sourceRoot)throw Error("v1alpha5 acceptance requires an active Skill Package");
         const sourcePath=sourceRoot.uri.path.replace(/\/$/,"");
         const workspaceFolder=(vscode.workspace.workspaceFolders??[]).find(folder=>{
           const path=folder.uri.path.replace(/\/$/,"");
           return sourcePath===path||sourcePath.startsWith(path+"/");
         });
-        if(!workspaceFolder)throw Error("v1alpha4 acceptance requires the selected workspace root");
+        if(!workspaceFolder)throw Error("v1alpha5 acceptance requires the selected workspace root");
         const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
         const packageRoot=vscode.Uri.joinPath(
-          workspaceFolder.uri,"skill-studio-v1alpha4-lsp-"+suffix);
+          workspaceFolder.uri,"skill-studio-v1alpha5-lsp-"+suffix);
         const fs=vscode.workspace.fs;
         const contract=[
           "goal: pdu_session.initial_request_fulfilled",
@@ -1032,9 +1032,37 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           "      tool: ca::session.mutate",
           "      arguments: {}",
           "      routes:",
+          "        SUCCEEDED: await-event",
+          "        FAILED: SAFE_STOPPED",
+          "        OUTCOME_UNKNOWN: SAFE_STOPPED",
+          "  await-event:",
+          "    wait:",
+          "      event:",
+          "        source: AMF",
+          "        service: Nsmf_PDUSession",
+          "        operation: UpdateSMContext",
+          "      timeout: PT30S",
+          "      response:",
+          "        after: final",
+          "      routes:",
+          "        TIMEOUT: timeout-handler",
+          "    operation:",
+          "      tool: ca::session.resume",
+          "      arguments:",
+          "        request: await-event.wait.output",
+          "      routes:",
           "        SUCCEEDED: run-script",
           "        FAILED: SAFE_STOPPED",
           "        OUTCOME_UNKNOWN: SAFE_STOPPED",
+          "  timeout-handler:",
+          "    observation:",
+          "      tool: ca::session.read",
+          "      arguments:",
+          "        ueRef: context.ueRef",
+          "      routes:",
+          "        SUCCEEDED: SAFE_STOPPED",
+          "        FAILED: SAFE_STOPPED",
+          "        UNKNOWN: SAFE_STOPPED",
           "  run-script:",
           "    operation:",
           "      ",
@@ -1097,12 +1125,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           ]);
           release=attachLanguagePackage(procedureDocument);
           state=languagePackages.get(packageRoot.toString());
-          if(!state||state.disposed)throw Error("v1alpha4 Package did not attach to Language Service");
+          if(!state||state.disposed)throw Error("v1alpha5 Package did not attach to Language Service");
           const status=await waitForLanguagePackageStatus(state,state.generation,20000);
           if(status.state!=="PARTIAL")
             throw Error("Unqualified fixture must remain editor-only PARTIAL, got "+status.state);
           if(state.lastSentSnapshot?.completeness!=="complete")
-            throw Error("v1alpha4 acceptance snapshot is incomplete: "+
+            throw Error("v1alpha5 acceptance snapshot is incomplete: "+
               JSON.stringify(state.lastSentSnapshot));
           const labels=result=>(Array.isArray(result)?result:
             result?.items??result?.suggestions??[]).map(item=>
@@ -1110,7 +1138,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const complete=async(document,needle,offsetInNeedle)=>{
             const source=document.getText();
             const start=source.indexOf(needle);
-            if(start<0)throw Error("v1alpha4 completion probe anchor missing: "+needle);
+            if(start<0)throw Error("v1alpha5 completion probe anchor missing: "+needle);
             const position=document.positionAt(start+
               (offsetInNeedle??needle.length));
             const result=await languageClient.provideCompletion(
@@ -1132,6 +1160,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const mutationRouteKeys=await complete(procedureDocument,
             "  mutate:\n    operation:\n      tool: ca::session.mutate\n      arguments: {}\n      routes:\n        ");
           const scriptPath=await complete(procedureDocument,"scripts/runner.py",8);
+          const waitNodeFields=await complete(procedureDocument,"  await-event:\n    ");
+          const waitFields=await complete(procedureDocument,"    wait:\n      ");
+          const waitEventFields=await complete(procedureDocument,"      event:\n        ");
+          const waitResponseFields=await complete(procedureDocument,"      response:\n        ");
+          const waitRouteKeys=await complete(procedureDocument,"  await-event:\n    wait:\n      event:\n        source: AMF\n        service: Nsmf_PDUSession\n        operation: UpdateSMContext\n      timeout: PT30S\n      response:\n        after: final\n      routes:\n        ");
+          const waitResponseAfter=await complete(procedureDocument,"        after: ");
+          const waitTimeoutTarget=await complete(procedureDocument,"        TIMEOUT: ");
+          const waitOutput=await complete(procedureDocument,
+            "        request: await-event.wait.output");
           const unknownTarget=await complete(procedureDocument,
             "OUTCOME_UNKNOWN: ");
           const require=(items,label,description)=>{
@@ -1163,14 +1200,24 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               JSON.stringify(routeKeys));
           require(mutationRouteKeys,"OUTCOME_UNKNOWN:","Mutation unresolved route key");
           require(scriptPath,"scripts/runner.py","Package Script path");
+          require(waitNodeFields,"wait:","Node-entry Wait field");
+          for(const field of ["event:","timeout:","response:","routes:"])
+            require(waitFields,field,"Wait control field");
+          for(const field of ["source:","service:","operation:"])
+            require(waitEventFields,field,"Wait event selector");
+          require(waitResponseFields,"after:","Wait response boundary");
+          require(waitRouteKeys,"TIMEOUT:","Wait timeout route key");
+          require(waitResponseAfter,"final","Wait response boundary Node");
+          require(waitTimeoutTarget,"timeout-handler","Wait timeout target Node");
+          require(waitOutput,"await-event.wait.output","typed Wait output binding");
           require(unknownTarget,"SAFE_STOPPED","OUTCOME_UNKNOWN terminal");
-          if(unknownTarget.some(item=>["check","read","mutate","run-script","final"].includes(item)))
+          if(unknownTarget.some(item=>["check","read","mutate","await-event","timeout-handler","run-script","final"].includes(item)))
             throw Error("OUTCOME_UNKNOWN offered a business Node target: "+
               JSON.stringify(unknownTarget));
 
           const at=(document,needle,offset=0)=>{
             const source=document.getText(),start=source.indexOf(needle);
-            if(start<0)throw Error("v1alpha4 navigation probe anchor missing: "+needle);
+            if(start<0)throw Error("v1alpha5 navigation probe anchor missing: "+needle);
             return document.positionAt(start+offset);
           };
           const definitionItems=result=>Array.isArray(result)?result:
@@ -1207,14 +1254,16 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             at(procedureDocument,"scripts/runner.py",5)));
           if(!scriptDefinition.some(item=>
             (item?.uri??item?.targetUri)?.toString()===scriptDocument.uri.toString()))
-            throw Error("Native Theia v1alpha4 Script Definition did not reach its Package-owned file");
+            throw Error("Native Theia v1alpha5 Script Definition did not reach its Package-owned file");
           const symbols=definitionItems(await vscode.commands.executeCommand(
             "vscode.executeDocumentSymbolProvider",procedureDocument.uri));
           if(!symbols.some(item=>item.name==="check")||
              !symbols.some(item=>item.name==="mutate")||
+             !symbols.some(item=>item.name==="await-event")||
+             !symbols.some(item=>item.name==="timeout-handler")||
              !symbols.some(item=>item.name==="run-script")||
              !symbols.some(item=>item.name==="final"))
-            throw Error("Native Theia Outline did not expose v1alpha4 Node declarations");
+            throw Error("Native Theia Outline did not expose v1alpha5 Node declarations");
           return {
             status:status.state,snapshotCompleteness:state.lastSentSnapshot.completeness,
             contractPreconditionCompletion:contractGate,
@@ -1222,6 +1271,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             predicateCompletion:predicate,
             preconditionFields,observationFields,operationFields,
             operationRouteKeys:routeKeys,mutationRouteKeys,scriptPathCompletion:scriptPath,
+            waitNodeFields,waitFields,waitEventFields,waitResponseFields,
+            waitRouteKeys,waitResponseAfter,waitTimeoutTarget,waitOutput,
             outcomeUnknownTargets:unknownTarget,
             contractDefinition:gateDefinition.length,
             predicateDefinition:predicateDefinition.length,
@@ -2676,8 +2727,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
-        if(item.kind==='v1alpha4-node'&&document){
-          tree.contextValue='skillStudio.v1alpha4Node';
+        if(item.kind==='v1alpha5-node'&&document){
+          tree.contextValue='skillStudio.v1alpha5Node';
           item.sourceVersion=document.version;item.documentUri=document.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
@@ -2820,9 +2871,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       snapshot={...inspectionSnapshot(text,selection,projected,evidenceFiles,
         rootInfo?.name??"skill",rootInfo?.uri?.toString?.()??"file:///skill"),
         text,evidenceStamp};
-      const v1alpha4=[...(snapshot.model?.procedures?.values?.()??[])]
-        .some(procedure=>String(procedure.profile??"").includes("v1alpha4"));
-      bindingOptions=!v1alpha4&&snapshot.model.state==='READY'&&
+      const v1alpha5=[...(snapshot.model?.procedures?.values?.()??[])]
+        .some(procedure=>String(procedure.profile??"").includes("v1alpha5"));
+      bindingOptions=!v1alpha5&&snapshot.model.state==='READY'&&
         selection.procedureId&&selection.nodeId
         ?phaseStepBindingOptions(text,selection.procedureId,selection.nodeId):[];
       fire();
@@ -2872,13 +2923,13 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
       const required=['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml'];
       const missing=required.filter(p=>!files.has(p));
-      const v1alpha4=isV1Alpha4Procedure(doc.getText());
+      const v1alpha5=isV1Alpha5Procedure(doc.getText());
       const results=missing.length?missing.map(path=>({message:'Audit unavailable: missing '+path,path:'assurance/procedure.yaml',line:1,code:'AUDIT_INCOMPLETE'})):
-        v1alpha4?[]:auditPackageWorkspace({name:base.path.replace(/\/$/,'').split('/').at(-1),files},doc.getText());
+        v1alpha5?[]:auditPackageWorkspace({name:base.path.replace(/\/$/,'').split('/').at(-1),files},doc.getText());
       if(ticket!==generation||document!==doc||doc.version!==version)return;
       audit=results.map(d=>({...d,uri:uris.get(d.path)??doc.uri}));
-      auditStatus=v1alpha4
-        ?"v1alpha4 Source · Compiler / Owner qualification pending"
+      auditStatus=v1alpha5
+        ?"v1alpha5 Source · Compiler / Owner qualification pending"
         :"Package Audit · "+(missing.length?"unavailable":audit.length+" editor warnings");
       diagnostics.clear();
       if(!missing.length){
@@ -3271,37 +3322,36 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance',
-    async(skillName,relativePath,openColumn)=>{
-      const name=typeof skillName==='string'?skillName:'establish-pdu-session';
-      const targetPath=typeof relativePath==='string'?relativePath:'SKILL.md';
-      if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
-      if(!/^(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(targetPath))
-        throw Error('Markdown acceptance target must be a known Package-local Markdown path');
+    async(rawUri,openColumn)=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
       if(openColumn!==1&&openColumn!==2)
         throw Error('Markdown acceptance editor column must be one or two');
-      const matches=await vscode.workspace.findFiles(
-        '**/'+name+'/'+targetPath,'**/node_modules/**',5);
-      const suffix='/'+name+'/'+targetPath;
-      const exact=matches.filter(item=>item.path.endsWith(suffix));
-      if(exact.length!==1)
-        throw Error('Expected exactly one '+name+'/'+targetPath+' in the active Workspace');
+      const workspaceFolder=vscode.workspace.getWorkspaceFolder(target);
+      if(!workspaceFolder)
+        throw Error('Markdown acceptance URI must be inside the active workspace');
+      // Check the package-local path shape without rescanning the workspace.
+      // openNativeMarkdownPreview applies the authoritative inventoried-file,
+      // Package-root and symlink policy before rendering the document.
+      if(!/\/skills\/[a-z0-9-]+\/(?:SKILL\.md|(?:[a-z0-9-]+\/)*[a-z0-9-]+\.md)$/i.test(target.path))
+        throw Error('Markdown acceptance URI must identify a Markdown file inside a Skill Package: '+
+          JSON.stringify({target:target.toString(),workspaceRoot:workspaceFolder.uri.toString()}));
+      try{await vscode.workspace.fs.stat(target);}
+      catch{throw Error('Markdown acceptance target does not exist: '+target.toString());}
       // Open only the editable Source. The active-editor listener must create
       // its native Preview and normalize this right-column open back to the
       // fixed Source-left / Preview-right layout.
-      await vscode.commands.executeCommand('vscode.open',exact[0],{
+      await vscode.commands.executeCommand('vscode.open',target,{
         viewColumn:openColumn===2?vscode.ViewColumn.Two:vscode.ViewColumn.One,
         preview:false
       });
-      return exact[0].toString();
+      return target.toString();
     }));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',async()=>{
-      const matches=await vscode.workspace.findFiles(
-        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
-      const exact=matches.filter(item=>item.path.endsWith('/establish-pdu-session/SKILL.md'));
-      if(exact.length!==1)
-        throw Error('Expected exactly one conventional 5GC Skill guide for live-update acceptance');
-      const target=exact[0],key=target.toString();
+    context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
+      if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
+        throw Error('Live-update acceptance requires the exact v1alpha5 5GC Skill guide URI');
+      const key=target.toString();
       const doc=await vscode.workspace.openTextDocument(target);
       if(doc.languageId!=='markdown')
         throw Error('The conventional Skill guide is not registered as Markdown: '+doc.languageId);
@@ -3331,33 +3381,26 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
       return key;
     }));
-  context.subscriptions.push(vscode.commands.registerCommand(
+    context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      if(!target.path.endsWith('/establish-pdu-session/SKILL.md'))
-        throw Error('Refusing to restore a non-fixture Markdown guide');
+      if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
+        throw Error('Refusing to restore a non-v1alpha5 5GC Skill guide');
       const key=target.toString();
       const original=nativeMarkdownLiveOriginals.get(key);
       if(typeof original!=='string')
         throw Error('No original Markdown content is recorded for the live-update fixture');
       const doc=await vscode.workspace.openTextDocument(target);
-      // The browser acceptance invokes the native host Undo command as a
-      // separate top-level action. Never call Undo/WorkspaceEdit *inside*
-      // a plugin command while the native Markdown preview editor is active.
       if(doc.getText()!==original)
         throw Error('Native Markdown Undo did not restore the exact original Source');
       nativeMarkdownLiveOriginals.delete(key);
       return true;
     }));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownSecurityAcceptance',async()=>{
-      const matches=await vscode.workspace.findFiles(
-        '**/establish-pdu-session/SKILL.md','**/node_modules/**',5);
-      const exact=matches.filter(item=>item.path.endsWith(
-        '/establish-pdu-session/SKILL.md'));
-      if(exact.length!==1)
-        throw Error('Expected exactly one existing Skill guide for the security probe');
-      const target=exact[0];
+    context.subscriptions.push(vscode.commands.registerCommand(
+    'skillStudio.internal.nativeMarkdownSecurityAcceptance',async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??''));
+      if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
+        throw Error('Security acceptance requires the exact v1alpha5 5GC Skill guide URI');
       const doc=await vscode.workspace.openTextDocument(target);
       if(doc.languageId!=='markdown')
         throw Error('Existing reference is not registered as Markdown: '+doc.languageId);
@@ -3371,7 +3414,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         '<script>window.skillStudioNativeMarkdownXss = true;</script>',
         '<img src="https://example.invalid/raw-html-pixel.png" onerror="window.skillStudioNativeMarkdownXss = true">',
         '',
-        '[Safe package reference](references/3gpp-procedure.md)',
+        '[Safe package reference](assurance/contract.yaml)',
         '[Escaping package link](../../outside.md)',
         '[Missing package link](missing.md)',
         '![Remote pixel](https://example.invalid/markdown-pixel.png)',
@@ -3395,10 +3438,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
       return target.toString();
     }));
-  context.subscriptions.push(vscode.commands.registerCommand(
+    context.subscriptions.push(vscode.commands.registerCommand(
     'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
       const target=vscode.Uri.parse(String(rawUri??''));
-      const suffix='/establish-pdu-session/SKILL.md';
+      const suffix='/skills/establish-pdu-session/SKILL.md';
       if(!target.path.endsWith(suffix))
         throw Error('Refusing to restore a non-fixture Skill guide');
       const original=nativeMarkdownSecurityOriginals.get(target.toString());
@@ -3410,8 +3453,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       const restored=await vscode.workspace.applyEdit(edit);
       if(!restored)throw Error('Could not restore the original Skill guide after security probe');
       nativeMarkdownSecurityOriginals.delete(target.toString());
-      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,target);
-      if(!policyReady)throw Error('Could not restore the Package link policy for the original Skill guide');
+      // The probe changed only document contents. The Package inventory and
+      // link policy established before Preview creation are still valid.
       return true;
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
