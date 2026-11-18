@@ -42,6 +42,21 @@ test("both released v1alpha5 Examples surface local and NOT_CHECKED blockers wit
   }
 });
 
+test("the default Example reports confirmed missing project dependencies without Compiler",()=>{
+  const files=fixture("establish-pdu-session");
+  const diagnostics=auditV1Alpha5Package({files,dependencyContext:{
+    available:true,declarations:[],snapshots:[],diagnostics:[]
+  }});
+  const errors=diagnostics.filter(item=>item.severity==="error");
+  assert.ok(errors.length>=10,"the incomplete default project should expose multiple real link blockers");
+  assert.ok(errors.some(item=>item.code==="DEPENDENCY_NOT_CONFIGURED"));
+  assert.ok(diagnostics.some(item=>item.code==="CAPABILITY_GRANT_NOT_CHECKED"&&
+    item.status==="not_checked"),
+    "Capability authority remains NOT_CHECKED rather than inventing a missing declaration");
+  assert.ok(!diagnostics.some(item=>item.code==="CAPABILITY_DECLARATION_NOT_FOUND"),
+    "no trusted CapabilityContracts input means no confirmed missing-declaration claim");
+});
+
 test("Capability Grant diagnostics point to the exact Contract source line",()=>{
   const files=fixture("establish-pdu-session");
   const source=files.get("assurance/contract.yaml").text;
