@@ -5,6 +5,7 @@ import {
   containsWaitMutation,
   createPackageRevisionTracker,
   renderAiAuthoringHtml,
+  isCurrentAuthoringSession,
 } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 
 const base64 = (value) => Buffer.from(value, "utf8").toString("base64");
@@ -130,4 +131,14 @@ test("Wait proposals are preview-only until trusted IngressCatalog and full v1al
   assert.equal(containsWaitMutation([
     { type: "node.stage.add", payload: { definition: { operation: {} } } },
   ]), false);
+});
+
+test("stale Editor Tab sessions cannot publish asynchronous results into a replacement session", () => {
+  const first = { disposed: false };
+  const second = { disposed: false };
+  assert.equal(isCurrentAuthoringSession(first, first), true);
+  assert.equal(isCurrentAuthoringSession(second, first), false);
+  first.disposed = true;
+  assert.equal(isCurrentAuthoringSession(first, first), false);
+  assert.equal(isCurrentAuthoringSession(null, first), false);
 });

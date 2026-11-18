@@ -144,6 +144,10 @@ export function containsWaitMutation(operations) {
   );
 }
 
+export function isCurrentAuthoringSession(current, expected) {
+  return Boolean(current && current === expected && current.disposed !== true);
+}
+
 function nonceValue() {
   const bytes = new Uint8Array(24);
   if (!globalThis.crypto?.getRandomValues) throw new Error("Secure randomness unavailable");
@@ -292,19 +296,25 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
   }
 
   async function refreshContext() {
-    if (!session || session.disposed) return;
+    const activeSession = session;
+    if (!isCurrentAuthoringSession(session, activeSession)) return;
+    const document = activeSession.document;
+    const requestId = (activeSession.contextRequestId ?? 0) + 1;
+    activeSession.contextRequestId = requestId;
     post({ type: "status", message: "正在读取当前 Procedure、Package 文件和锁定依赖…" });
     try {
-      const state = await collectAuthoringState(session.document);
-      session.context = state;
-      session.pending = null;
+      const state = await collectAuthoringState(document);
+      if (!isCurrentAuthoringSession(session, activeSession) ||
+        activeSession.contextRequestId !== requestId) return;
+      activeSession.context = state;
+      activeSession.pending = null;
       const gatewayBaseUrl = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai")
         .get("gatewayUrl", "");
       post({
         type: "context",
         languageTarget: LANGUAGE_TARGET,
         packageName: state.snapshot.packageName,
-        documentVersion: session.document.version,
+        documentVersion: document.version,
         packageGeneration: state.generation,
         gatewayConfigured: typeof gatewayBaseUrl === "string" && gatewayBaseUrl.trim().length > 0,
         sources: state.resources.map((item) => ({
@@ -317,17 +327,21 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         })),
       });
     } catch (error) {
-      session.context = null;
+      if (!isCurrentAuthoringSession(session, activeSession) ||
+        activeSession.contextRequestId !== requestId) return;
+      activeSession.context = null;
       post({ type: "error", message: String(error?.message ?? error), contextUnavailable: true });
     }
   }
 
   async function handleGenerate(message) {
-    if (!session || session.disposed || !session.context) {
+    const activeSession = session;
+    const isCurrent = () => isCurrentAuthoringSession(session, activeSession);
+    if (!isCurrent() || !activeSession.context) {
       post({ type: "error", message: "当前上下文尚未就绪，请先刷新。" });
       return;
     }
-    if (session.generating || session.controller) {
+    if (activeSession.generating || activeSession.controller) {
       post({ type: "error", message: "已有模型请求正在准备或运行。" });
       return;
     }
@@ -343,7 +357,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
     }
     const selectedIds = new Set(message.selectedIds);
     if (selectedIds.size !== message.selectedIds.length ||
-      [...selectedIds].some((id) => !session.context.resources.some((item) => item.id === id))) {
+      [...selectedIds].some((id) => !activeSession.context.resources.some((item) => item.id === id))) {
       post({ type: "error", message: "上下文来源包含重复或未知项目。" });
       return;
     }
@@ -354,9 +368,9 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       return;
     }
 
-    session.generating = true;
-    const document = session.document;
-    const initial = session.context;
+    activeSession.generating = true;
+    const document = activeSession.document;
+    const initial = activeSession.context;
     const selectedResources = initial.resources.map((item) => ({
       ...item,
       selected: selectedIds.has(item.id),
@@ -378,8 +392,10 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         resources: selectedResources,
         maxBytes: MAX_CONTEXT_PACK_BYTES,
       });
+      if (!isCurrent()) return;
     } catch (error) {
-      if (session) session.generating = false;
+      if (!isCurrent()) return;
+      activeSession.generating = false;
       post({ type: "error", message: String(error?.message ?? error) });
       return;
     }
@@ -402,32 +418,36 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       { modal: true, detail },
       "发送并生成提案",
     );
+    if (!isCurrent()) return;
     if (confirmed !== "发送并生成提案") {
-      if (session) session.generating = false;
+      activeSession.generating = false;
       post({ type: "status", message: "已取消发送；没有向模型发送数据。" });
       return;
     }
-    if (!session || session.disposed) return;
 
     try {
       const current = await collectAuthoringState(document);
+      if (!isCurrent()) return;
       if (document.version !== initial.procedure.version ||
         current.generation !== initial.generation ||
         document.getText() !== initial.procedure.text) {
-        if (session) session.generating = false;
+        activeSession.generating = false;
         await refreshContext();
-        post({ type: "error", message: "生成期间 Package 或 Procedure 已变化。上下文已刷新，请重新检查后再生成。" });
+        if (isCurrent()) {
+          post({ type: "error", message: "生成期间 Package 或 Procedure 已变化。上下文已刷新，请重新检查后再生成。" });
+        }
         return;
       }
     } catch (error) {
-      if (session) session.generating = false;
+      if (!isCurrent()) return;
+      activeSession.generating = false;
       post({ type: "error", message: String(error?.message ?? error) });
       return;
     }
 
-    if (!session || session.disposed) return;
+    if (!isCurrent()) return;
     const controller = new AbortController();
-    session.controller = controller;
+    activeSession.controller = controller;
     post({ type: "status", message: "正在请求模型并校验语义提案…", busy: true });
     try {
       const modelClient = createGatewayModelClient({ gatewayBaseUrl: gatewayBaseUrl.trim() });
@@ -440,12 +460,16 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         signal: controller.signal,
         maxTokens: 2048,
       });
+      if (!isCurrent()) return;
       const current = await collectAuthoringState(document);
+      if (!isCurrent()) return;
       if (document.version !== initial.procedure.version ||
         current.generation !== initial.generation ||
         document.getText() !== initial.procedure.text) {
         await refreshContext();
-        post({ type: "error", message: "模型响应期间 Package 或 Procedure 已变化。提案已丢弃，没有应用任何修改。" });
+        if (isCurrent()) {
+          post({ type: "error", message: "模型响应期间 Package 或 Procedure 已变化。提案已丢弃，没有应用任何修改。" });
+        }
         return;
       }
 
@@ -471,19 +495,23 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
             currentDocumentVersion: document.version,
             currentPackageGeneration: initial.generation,
           });
+          if (!isCurrent()) return;
           const preview = await materializeAcceptedPatchGroups({
             source: document.getText(),
             plan: patchPlan,
             acceptedGroupIds: patchPlan.groups.map((group) => group.id),
           });
+          if (!isCurrent()) return;
           candidateSource = preview.source;
         } catch (error) {
+          if (!isCurrent()) return;
           patchError = String(error?.message ?? error);
         }
       }
+      if (!isCurrent()) return;
       const waitGate = containsWaitMutation(changeSet.operations);
       const canApply = Boolean(patchPlan && !waitGate && proposalResult.proposal.blockers.length === 0);
-      session.pending = patchPlan ? {
+      activeSession.pending = patchPlan ? {
         document,
         source: document.getText(),
         documentVersion: document.version,
@@ -520,30 +548,35 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         })) : [],
       });
     } catch (error) {
+      if (!isCurrent()) return;
       const aborted = error?.name === "AbortError" || controller.signal.aborted;
       post({
         type: "error",
         message: aborted ? "模型请求已取消。" : String(error?.message ?? error),
       });
     } finally {
-      if (session?.controller === controller) session.controller = null;
-      if (session) session.generating = false;
-      post({ type: "status", message: "请求结束。Compiler Check: NOT_RUN。", busy: false });
+      if (isCurrent()) {
+        if (activeSession.controller === controller) activeSession.controller = null;
+        activeSession.generating = false;
+        post({ type: "status", message: "请求结束。Compiler Check: NOT_RUN。", busy: false });
+      }
     }
   }
 
   async function handlePreview(message) {
-    if (!session?.pending) return;
+    const activeSession = session;
+    const isCurrent = () => isCurrentAuthoringSession(session, activeSession);
+    if (!isCurrent() || !activeSession.pending) return;
     if (!Array.isArray(message.groupIds) ||
       message.groupIds.some((id) => typeof id !== "string") ||
       !Number.isSafeInteger(message.requestId)) {
       post({ type: "error", message: "预览修改组选择无效。" });
       return;
     }
-    const pending = session.pending;
+    const pending = activeSession.pending;
     if (pending.document.version !== pending.documentVersion ||
       pending.document.getText() !== pending.source) {
-      session.pending = null;
+      activeSession.pending = null;
       post({ type: "error", message: "Procedure 已变化，候选预览失效；请重新生成提案。" });
       return;
     }
@@ -553,22 +586,27 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         plan: pending.patchPlan,
         acceptedGroupIds: message.groupIds,
       });
+      if (!isCurrent() || activeSession.pending !== pending) return;
       post({
         type: "preview",
         requestId: message.requestId,
         candidateSource: preview.source,
       });
     } catch (error) {
+      if (!isCurrent() || activeSession.pending !== pending) return;
       post({ type: "error", message: "候选 YAML 生成失败：" + String(error?.message ?? error) });
     }
   }
 
   async function handleApply(message) {
-    if (session?.applying) {
+    const activeSession = session;
+    const isCurrent = () => isCurrentAuthoringSession(session, activeSession);
+    if (!isCurrent()) return;
+    if (activeSession.applying) {
       post({ type: "error", message: "正在应用已选修改，请稍候。" });
       return;
     }
-    if (!session?.pending) {
+    if (!activeSession.pending) {
       post({ type: "error", message: "没有可应用的 READY Patch Plan。" });
       return;
     }
@@ -577,22 +615,25 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       post({ type: "error", message: "请至少选择一个完整修改组。" });
       return;
     }
-    const pending = session.pending;
+    const pending = activeSession.pending;
     if (pending.canApply !== true) {
       post({ type: "error", message: "该提案处于 PREVIEW ONLY 状态，尚未满足 v1alpha5 语义 / Owner 验证门槛。" });
       return;
     }
-    session.applying = true;
+    activeSession.applying = true;
     const document = pending.document;
     post({ type: "status", message: "正在检查文档与 Package revision…", busy: true });
     try {
       const current = await collectAuthoringState(document);
+      if (!isCurrent()) return;
       if (document.version !== pending.documentVersion ||
         current.generation !== pending.packageGeneration ||
         document.getText() !== pending.source) {
-        session.pending = null;
+        activeSession.pending = null;
         await refreshContext();
-        post({ type: "error", message: "文档或 Package 已变化，旧提案失效。请基于新上下文重新生成。" });
+        if (isCurrent()) {
+          post({ type: "error", message: "文档或 Package 已变化，旧提案失效。请基于新上下文重新生成。" });
+        }
         return;
       }
       const materialized = await materializeAcceptedPatchGroups({
@@ -600,6 +641,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         plan: pending.patchPlan,
         acceptedGroupIds: message.groupIds,
       });
+      if (!isCurrent() || activeSession.pending !== pending) return;
       assertStudioMutation(document.uri, vscode.workspace.workspaceFolders ?? [], "edit");
       const edit = new vscode.WorkspaceEdit();
       edit.replace(
@@ -609,7 +651,8 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       );
       const applied = await vscode.workspace.applyEdit(edit);
       if (!applied) throw new Error("Host rejected the native WorkspaceEdit; no save was attempted.");
-      session.pending = null;
+      if (!isCurrent()) return;
+      activeSession.pending = null;
       post({
         type: "applied",
         acceptedGroupIds: materialized.acceptedGroupIds,
@@ -619,10 +662,13 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       });
       await refreshContext();
     } catch (error) {
+      if (!isCurrent()) return;
       post({ type: "error", message: String(error?.message ?? error) });
     } finally {
-      if (session) session.applying = false;
-      post({ type: "status", message: "应用操作结束。Compiler Check: NOT_RUN。", busy: false });
+      if (isCurrent()) {
+        activeSession.applying = false;
+        post({ type: "status", message: "应用操作结束。Compiler Check: NOT_RUN。", busy: false });
+      }
     }
   }
 
@@ -632,7 +678,22 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       document = await resolveProcedureDocument();
       if (!document) return false;
       if (panel) {
-        session.document = document;
+        if (!session || session.document !== document) {
+          if (session) {
+            session.disposed = true;
+            session.controller?.abort();
+          }
+          session = {
+            document,
+            context: null,
+            pending: null,
+            controller: null,
+            disposed: false,
+            generating: false,
+            applying: false,
+            contextRequestId: 0,
+          };
+        }
         panel.title = "AI Procedure Authoring";
         panel.reveal(vscode.ViewColumn.Active, false);
         await refreshContext();
@@ -644,7 +705,16 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         vscode.ViewColumn.Active,
         { enableScripts: true, retainContextWhenHidden: true },
       );
-      session = { document, context: null, pending: null, controller: null, disposed: false };
+      session = {
+        document,
+        context: null,
+        pending: null,
+        controller: null,
+        disposed: false,
+        generating: false,
+        applying: false,
+        contextRequestId: 0,
+      };
       panel.webview.options = { enableScripts: true, localResourceRoots: [] };
       panel.webview.html = renderAiAuthoringHtml(nonceValue());
       context.subscriptions.push(panel.webview.onDidReceiveMessage(async (message) => {
