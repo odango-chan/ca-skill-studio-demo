@@ -144,7 +144,41 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     if(!target?.found||!target.hitWithinToggle)
       throw Error('Native Package toggle is not reachable by mouse: '+label+' '+
         JSON.stringify({target,row}));
-    await click(target.x,target.y);
+    const originallyCollapsed=String(row.toggleClass??'').includes('theia-mod-collapsed');
+    const stateFor=async()=>evalJS(`(()=>{
+      const anchor=[...document.querySelectorAll('[data-node-id]')]
+        .find(el=>el.getAttribute('data-node-id')===${JSON.stringify(id)});
+      const toggle=anchor?.closest('.theia-TreeNode')?.querySelector('.theia-ExpansionToggle');
+      return toggle?{found:true,collapsed:toggle.classList.contains('theia-mod-collapsed')}:
+        {found:false};
+    })()`);
+    let after=null;
+    for(let attempt=0;attempt<3;attempt++){
+      if(attempt){
+        // Re-resolve a virtualized tree row after a missed input dispatch.
+        await revealTreeRow(row,label);
+        const retried=await evalJS(`(()=>{
+          const anchor=[...document.querySelectorAll('[data-node-id]')]
+            .find(el=>el.getAttribute('data-node-id')===${JSON.stringify(id)});
+          const toggle=anchor?.closest('.theia-TreeNode')?.querySelector('.theia-ExpansionToggle');
+          if(!toggle)return null;
+          const r=toggle.getBoundingClientRect();
+          const x=Math.round(r.x+r.width/2),y=Math.round(r.y+r.height/2);
+          const hit=document.elementFromPoint(x,y);
+          return {x,y,hitWithinToggle:hit===toggle||toggle.contains(hit)};
+        })()`);
+        if(!retried?.hitWithinToggle)continue;
+        target.x=retried.x;target.y=retried.y;
+      }
+      await click(target.x,target.y);
+      for(let poll=0;poll<12;poll++){
+        await sleep(100);
+        after=await stateFor();
+        if(after?.found&&after.collapsed!==originallyCollapsed)return;
+      }
+    }
+    throw Error('Trusted native Package toggle click did not change expansion state: '+
+      label+' '+JSON.stringify({row,target,after}));
   }
   let rows=[];
   for(let attempt=0;attempt<100;attempt++){
