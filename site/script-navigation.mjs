@@ -175,20 +175,20 @@ export function scriptNavigationReport(files,path) {
         (matches.length?" 存在多个同名声明":" 未在 Package 中找到"));
     }
   }else if(main){
-    // New canonical ca-skills Predicate references carry an exact Package-
-    // relative script path, not the old skill.<tool-name> alias.
+    // CA-SL v1alpha5 PredicateSet references carry the exact Package-relative
+    // script path in evaluator.script. Do not invent a tool-name alias.
     const predicates=parse(files,"assurance/predicates.yaml",warnings);
     const records=field(predicates?.root,"predicates");
     if(isMap(records))for(const pair of records.items){
       const evaluator=field(pair.value,"evaluator");
-      const ref=field(evaluator,"ref");
-      if(scalar(field(evaluator,"type"))==="script"&&scalar(ref)===path&&
-         Array.isArray(ref?.range)){
+      const scriptRef=field(evaluator,"script");
+      if(scalar(field(evaluator,"type"))==="script"&&scalar(scriptRef)===path&&
+         Array.isArray(scriptRef?.range)){
         callers.push(freeze({
           path:"assurance/predicates.yaml",
-          line:lineOf(ref,predicates.lines),
+          line:lineOf(scriptRef,predicates.lines),
           label:"Predicate · "+scalar(pair.key),
-          sourceRange:freeze({start:ref.range[0],end:ref.range[1]}),
+          sourceRange:freeze({start:scriptRef.range[0],end:scriptRef.range[1]}),
           targetRange:entryRange
         }));
       }
