@@ -112,7 +112,7 @@ function snapshot(source=procedure,contractSource=contract,predicatesSource=pred
 }
 
 test("optional Studio examples mirror the pinned PDU/MAS v1alpha5 source shape",()=>{
-  for(const [name,expectedNodes] of [["establish-pdu-session",11],["establish-pdu-session-mas",14]]) {
+  for(const [name,expectedNodes] of [["establish-pdu-session",10],["establish-pdu-session-mas",14]]) {
     const files=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml",
       "assurance/predicates.yaml","schemas/establishment-request.schema.yaml"];
     const docs=files.map(relativePath=>({
@@ -150,14 +150,14 @@ test("v1alpha5 5GC sample projects Node-entry Wait, wait.output and the Step 17 
     source:"AMF",service:"Nsmf_PDUSession",operation:"UpdateSMContext"
   });
   assert.equal(waitNode.wait.timeout,"PT30S");
-  assert.equal(waitNode.wait.timeoutTarget,"handle-update-timeout");
+  assert.equal(waitNode.wait.timeoutTarget,"SAFE_STOPPED");
   assert.equal(waitNode.wait.responseAfter,"prepare-step17-response");
   assert.ok(waitNode.stages.some(stage=>stage.name==="operation"));
   assert.ok(!waitNode.stages.some(stage=>stage.name==="wait"),
     "Wait is Node-entry control, not a fifth business stage");
   assert.ok(procedureView.routes.some(route=>route.source==="update-sm-context"&&
     route.routeSource==="wait"&&route.outcome==="TIMEOUT"&&
-    route.target==="handle-update-timeout"));
+    route.target==="SAFE_STOPPED"));
 
   const files=new Map([
     ["assurance/contract.yaml",{text:contractText}],
@@ -192,7 +192,7 @@ test("v1alpha5 Wait rejects invalid duration, timeout routes, response boundarie
   assert.ok(invalidDuration.diagnostics.some(item=>item.code==="WAIT_TIMEOUT_INVALID"));
 
   const invalidTimeoutRoute=analyzePackageSnapshot(snapshot(
-    procedureText.replace("TIMEOUT: handle-update-timeout","SUCCEEDED: handle-update-timeout"),
+    procedureText.replace("TIMEOUT: SAFE_STOPPED","SUCCEEDED: SAFE_STOPPED"),
     contractText,predicateText));
   assert.ok(invalidTimeoutRoute.diagnostics.some(item=>
     item.code==="WAIT_TIMEOUT_ROUTE_INVALID"));
