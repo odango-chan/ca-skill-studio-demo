@@ -82,7 +82,7 @@ test("all three current CreatedSession business References render safely in Mark
   assert.doesNotMatch(gpp.html,/href="\.\.\/SKILL.md"/);
 });
 
-test("current v1alpha4 Skill guides render safely and expose only explicit Package-local paths",()=>{
+test("current v1alpha5 Skill guides render safely and expose only explicit Package-local paths",()=>{
   for(const name of ["establish-pdu-session","establish-pdu-session-mas"]){
     const source=readFileSync(new URL("../site/samples/v1alpha5/"+name+"/SKILL.md",import.meta.url),"utf8");
     const preview=renderMarkdown(source);
