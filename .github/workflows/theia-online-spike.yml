@@ -36,11 +36,11 @@ jobs:
           npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
       - name: Build Node and browser Procedure extensions
         run: node experiments/ide-host/scripts/build-ide-spike.mjs
-      - name: Checkout pinned CA Skill Compiler v1.0.0 source
+      - name: Checkout pinned CA Skill Compiler v2.0.0 source
         uses: actions/checkout@v4
         with:
           repository: odango-chan/ca-skill-compiler
-          ref: v1.0.0
+          ref: v2.0.0
           path: compiler-source
           token: ${{ secrets.CA_SKILL_COMPILER_READ_TOKEN }}
           persist-credentials: false
@@ -48,7 +48,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.6"
-      - name: Build pinned Compiler v1.0.0 Go/WASM Core
+      - name: Build pinned Compiler v2.0.0 Go/WASM Core
         working-directory: compiler-source
         run: |
           mkdir -p dist
