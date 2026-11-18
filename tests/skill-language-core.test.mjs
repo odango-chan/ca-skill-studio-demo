@@ -29,14 +29,14 @@ try{
 }
 
 const skillFiles=[
-  "establish-pdu-session/SKILL.md",
-  "establish-pdu-session/assurance/contract.yaml",
-  "establish-pdu-session/assurance/predicates.yaml",
-  "establish-pdu-session/assurance/procedure.yaml",
-  "establish-pdu-session/schemas/establishment-request.schema.yaml",
-  "establish-pdu-session/scripts/validate-smf-session-context-entry.py",
-  "establish-pdu-session/scripts/validate-smf-session-context.py",
-  "establish-pdu-session/scripts/validate-subscription-request.py"
+  "SKILL.md",
+  "assurance/contract.yaml",
+  "assurance/predicates.yaml",
+  "assurance/procedure.yaml",
+  "schemas/establishment-request.schema.yaml",
+  "scripts/validate-smf-session-context-entry.py",
+  "scripts/validate-smf-session-context.py",
+  "scripts/validate-subscription-request.py"
 ];
 function sampleSnapshot(){
   return {
