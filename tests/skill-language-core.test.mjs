@@ -28,8 +28,16 @@ try{
   await rm(scratch,{recursive:true,force:true});
 }
 
-const manifest=JSON.parse(readFileSync(new URL("../site/samples/v1alpha5/files.json",import.meta.url),"utf8"));
-const skillFiles=manifest.files.filter(path=>path.startsWith("establish-pdu-session/"));
+const skillFiles=[
+  "establish-pdu-session/SKILL.md",
+  "establish-pdu-session/assurance/contract.yaml",
+  "establish-pdu-session/assurance/predicates.yaml",
+  "establish-pdu-session/assurance/procedure.yaml",
+  "establish-pdu-session/schemas/establishment-request.schema.yaml",
+  "establish-pdu-session/scripts/validate-smf-session-context-entry.py",
+  "establish-pdu-session/scripts/validate-smf-session-context.py",
+  "establish-pdu-session/scripts/validate-subscription-request.py"
+];
 function sampleSnapshot(){
   return {
     rootUri:"file:///workspace/establish-pdu-session",
