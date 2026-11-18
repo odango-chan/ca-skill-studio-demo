@@ -15,7 +15,7 @@
     "establish-pdu-session-mas/assurance/contract.yaml",
     "establish-pdu-session-mas/assurance/predicates.yaml",
     "establish-pdu-session-mas/assurance/procedure.yaml",
-    "establish-pdu-session-mas/assurance/openamsm-operation-mapping.md",
+    "establish-pdu-session-mas/references/openamsm-operation-mapping.md",
     "establish-pdu-session-mas/schemas/establishment-request.schema.yaml",
     "establish-pdu-session/SKILL.md",
     "establish-pdu-session/assurance/contract.yaml",
@@ -31,7 +31,6 @@
     "establish-pdu-session-mas/assurance/contract.yaml": "3dcd2a3fa3cfb9842092ce388fc9b3e8c1d600d0",
     "establish-pdu-session-mas/assurance/predicates.yaml": "c28900038f8a6f531efcc35777f15825c294b555",
     "establish-pdu-session-mas/assurance/procedure.yaml": "ed7e8e16a78be76595844a45044c96e4c17ab7b4",
-    "establish-pdu-session-mas/assurance/openamsm-operation-mapping.md": "f5c786053493b9687a93f37434affa06e199d3ea",
     "establish-pdu-session-mas/schemas/establishment-request.schema.yaml": "a17059464dfd3958e5c5761ec38f80fe53cf46c5",
     "establish-pdu-session/SKILL.md": "266191a8bc0ab0d1452621866fac27e8b19b06f8",
     "establish-pdu-session/assurance/contract.yaml": "a624cec5caf462382e0e789d937ec83ef2ef93b8",
@@ -40,6 +39,7 @@
     "establish-pdu-session/schemas/establishment-request.schema.yaml": "c30ebd0a95006e6be57a2ab51132e0a5c0ceb4d1",
     "establish-pdu-session/scripts/validate-smf-session-context-entry.py": "c3b525f99f3106bfce571b514ddfadea5e3af8f2",
     "establish-pdu-session/scripts/validate-smf-session-context.py": "03be904f2742c71eef18ca390db1a412e5a942ca",
-    "establish-pdu-session/scripts/validate-subscription-request.py": "806c9384e827a4a37f394194e9444dce7fc44c5a"
+    "establish-pdu-session/scripts/validate-subscription-request.py": "806c9384e827a4a37f394194e9444dce7fc44c5a",
+    "establish-pdu-session-mas/references/openamsm-operation-mapping.md": "f5c786053493b9687a93f37434affa06e199d3ea"
   }
 }
