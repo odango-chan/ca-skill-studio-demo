@@ -246,17 +246,23 @@ export function mountProcedureCanvas(host,callbacks){
       const p=scene.graph?.positions.get(id);
       if(!p||!instance)return null;
       const viewport=instance.getViewport();
-      return {id,position:{x:p.x,y:p.y},viewport:{...viewport}};
+      const hostRect=host.getBoundingClientRect();
+      return {id,position:{x:p.x,y:p.y},viewport:{...viewport},
+        hostRect:{x:hostRect.x,y:hostRect.y}};
     },
     restoreNodeAnchor(anchor,nextGraph){
       const p=anchor&&nextGraph?.positions?.get(anchor.id);
       if(!p||!instance)return false;
       const {viewport,position}=anchor;
-      // ELK repositions graph-world nodes; compensate only the translation.
-      // Keep the clicked card's screen position AND the user's current zoom.
+      const hostRect=host.getBoundingClientRect();
+      // ELK can move graph-world nodes, while showing the optional Root filter
+      // row can also move the canvas host in page space. Compensate for both
+      // offsets so the clicked card keeps its exact screen position and zoom.
+      const hostOffsetX=(anchor.hostRect?.x??hostRect.x)-hostRect.x;
+      const hostOffsetY=(anchor.hostRect?.y??hostRect.y)-hostRect.y;
       instance.setViewport({
-        x:viewport.x+(position.x-p.x)*viewport.zoom,
-        y:viewport.y+(position.y-p.y)*viewport.zoom,
+        x:viewport.x+(position.x-p.x)*viewport.zoom+hostOffsetX,
+        y:viewport.y+(position.y-p.y)*viewport.zoom+hostOffsetY,
         zoom:viewport.zoom
       },{duration:0});
       return true;
