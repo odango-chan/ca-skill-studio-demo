@@ -143,8 +143,143 @@ function parseOne(name, entry, counter, text) {
   return {name,start,nodes,routes,children,line:at(entry.keyNode,counter),profile:"multi-procedure-readonly-v1"};
 }
 
+function projectV1Alpha5(text) {
+  const counter=new LineCounter();
+  const doc=parseDocument(text,{
+    version:"1.2",schema:"core",uniqueKeys:true,stringKeys:true,
+    strict:true,keepSourceTokens:true,lineCounter:counter,logLevel:"silent"
+  });
+  if(doc.errors.length) return null;
+  if(!isMap(doc.contents)||!doc.contents.has("start")||!doc.contents.has("nodes")) return null;
+  const scalarValue=node=>isScalar(node)&&typeof node.value==="string"?node.value:"";
+  const lineAt=node=>counter.linePos(Array.isArray(node?.range)?node.range[0]:0).line||1;
+  const rootNodes=doc.contents.get("nodes",true);
+  if(!isMap(rootNodes)||!rootNodes.items.length) return null;
+  const start=scalarValue(doc.contents.get("start",true));
+  const declared=new Set(rootNodes.items.map(item=>scalarValue(item.key)));
+  if(!start||!declared.has(start)) return null;
+  const nodes=[],routes=[];
+  const stages=["precondition","operation","observation","postcondition"];
+  for(const item of rootNodes.items){
+    const id=scalarValue(item.key),body=item.value;
+    if(!id||!isMap(body)) return null;
+    const stageViews=[];
+    let wait=null;
+    for(const stage of stages){
+      const part=body.get(stage,true);
+      if(part===undefined)continue;
+      if(!isMap(part))return null;
+      const target=stage==="precondition"||stage==="postcondition"
+        ?"":(scalarValue(part.get("tool",true))||scalarValue(part.get("script",true)));
+      const calls=(stage==="precondition"||stage==="postcondition")&&
+        isSeq(part.get("predicates",true))
+        ?part.get("predicates",true).items.map(call=>({
+          predicate:isMap(call)?scalarValue(call.get("predicate",true)):"",
+          line:lineAt(call),
+          arguments:isSeq(isMap(call)?call.get("arguments",true):null)
+            ?call.get("arguments",true).items.map(scalarValue):[]
+        })):undefined;
+      const args=isMap(part.get("arguments",true))
+        ?part.get("arguments",true).items.map(pair=>({
+          name:scalarValue(pair.key),value:scalarValue(pair.value),line:lineAt(pair.value)
+        })):undefined;
+      const rawRoutes=part.get("routes",true);
+      const routeOutcomes=[];
+      if(isMap(rawRoutes))for(const route of rawRoutes.items){
+        const outcome=scalarValue(route.key),targetRoute=scalarValue(route.value);
+        routeOutcomes.push(outcome);
+        routes.push({
+          id:id+"."+stage+"."+outcome,source:id,outcome,target:targetRoute,
+          routeSource:stage,line:lineAt(route.key),
+          sourceSpan:{
+            start:Array.isArray(route.value?.range)?route.value.range[0]:0,
+            end:Array.isArray(route.value?.range)?route.value.range[1]:0
+          },
+          patchable:false
+        });
+      }
+      stageViews.push({
+        name:stage,line:lineAt(part),
+        count:(calls?.length??1),
+        ...(target?{target}:{}),
+        ...(routeOutcomes.length?{routeOutcomes}:{}),
+        ...(calls?.length?{calls}:{}),
+        ...(args?.length?{arguments:args}:{})
+      });
+    }
+    const waitNode=body.get("wait",true);
+    if(waitNode!==undefined){
+      if(!isMap(waitNode))return null;
+      const event=waitNode.get("event",true);
+      const response=waitNode.get("response",true);
+      const rawRoutes=waitNode.get("routes",true);
+      const timeoutTarget=isMap(rawRoutes)?scalarValue(rawRoutes.get("TIMEOUT",true)):"";
+      wait={
+        event:isMap(event)?{
+          source:scalarValue(event.get("source",true)),
+          service:scalarValue(event.get("service",true)),
+          operation:scalarValue(event.get("operation",true))
+        }:{source:"",service:"",operation:""},
+        timeout:scalarValue(waitNode.get("timeout",true)),
+        timeoutTarget,
+        ...(isMap(response)&&scalarValue(response.get("after",true))
+          ?{responseAfter:scalarValue(response.get("after",true))}:{}),
+        line:lineAt(waitNode)
+      };
+      if(timeoutTarget){
+        const routeNode=isMap(rawRoutes)?rawRoutes.get("TIMEOUT",true):null;
+        routes.push({
+          id:id+".wait.TIMEOUT",source:id,outcome:"TIMEOUT",target:timeoutTarget,
+          routeSource:"wait",line:lineAt(routeNode??waitNode),
+          sourceSpan:{
+            start:Array.isArray(routeNode?.range)?routeNode.range[0]:0,
+            end:Array.isArray(routeNode?.range)?routeNode.range[1]:0
+          },patchable:false
+        });
+      }
+    }
+    const finalGoal=stageViews.some(stage=>stage.name==="postcondition"&&
+      stage.routeOutcomes?.includes("PASS")&&
+      routes.some(route=>route.source===id&&route.routeSource==="postcondition"&&
+        route.outcome==="PASS"&&route.target==="SUCCEEDED"));
+    nodes.push({
+      id,operator:"node",
+      value:stageViews.map(stage=>stage.name).join(" → "),
+      line:lineAt(item.key),phases:[],children:[],stages:stageViews,
+      ...(wait?{wait}:{}),
+      globalPrecondition:false,finalGoal
+    });
+  }
+  const reachable=new Set([start]),queue=[start];
+  while(queue.length){
+    const source=queue.shift();
+    for(const route of routes.filter(route=>route.source===source)){
+      if(declared.has(route.target)&&!reachable.has(route.target)){
+        reachable.add(route.target);queue.push(route.target);
+      }
+    }
+  }
+  const diagnostics=nodes.filter(node=>!reachable.has(node.id)).map(node=>({
+    message:"Node "+node.id+" is not reachable from start",line:node.line
+  }));
+  const finalPostconditionNodes=nodes.filter(node=>node.finalGoal).map(node=>node.id);
+  const procedure={
+    name:"establish-pdu-session",start,nodes,routes,children:[],
+    line:1,profile:"CA-SL v1alpha5",finalPostconditionNodes
+  };
+  return {
+    state:"READY",diagnostics,entry:start,procedures:new Map([[procedure.name,procedure]]),
+    procedure
+  };
+}
+
 export function projectWorkspace(text) {
   try {
+    if(typeof text==="string" && /^(?:start|nodes):[ \t]*/m.test(text)) {
+      const projected=projectV1Alpha5(text);
+      if(projected)return projected;
+      return {state:"UNAVAILABLE",diagnostics:[{message:"无法投影 CA-SL v1alpha5 Procedure",line:1}],entry:null,procedures:new Map(),procedure:null};
+    }
     if(typeof text!=="string" || text.length>MAX_FILE)fail("文件超过 1 MiB 预览上限");
     if(text.split(/\r\n|\n|\r/).length>20000)fail("行数超出预览上限");
     const counter=new LineCounter();
