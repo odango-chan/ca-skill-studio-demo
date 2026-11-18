@@ -5,7 +5,7 @@ This folder contains the first host-neutral model-client and proposal-validation
 ## Boundaries
 
 - No imports from VS Code, Theia, DOM, Node-only modules or Cloudflare.
-- The Gateway client receives a Fetch implementation from its Host Adapter and sends browser requests with credentials included so the configured Access session can authenticate them. It never receives a provider key or client-supplied model.
+- The Gateway client receives a Fetch implementation from its Host Adapter and sends browser requests with credentials included so the configured Access session can authenticate them. It sends a stable Host-generated `x-opencode-session` ID for the Editor Tab session; the Gateway injects the product User-Agent and forwards the session header to OpenCode Go. It never receives a provider key or client-supplied model.
 - The Context Pack builder accepts only the live v1alpha5 Preview Procedure and allowlisted Package-relative context; references and scripts require explicit opt-in; dependencies require verified metadata.
 - The Procedure Agent orchestrates one bounded proposal request, verifies the exact manifest and validates every model-authored reference; it exposes no file-write or Runtime operation.
 - Context Pack size is checked against the serialized JSON envelope in UTF-8 bytes. The initial cap is 128 KiB to leave room for the system prompt and request metadata; oversized input is rejected, never silently truncated.

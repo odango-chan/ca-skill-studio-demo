@@ -18,6 +18,13 @@ function gatewayEndpoint(value) {
   return url.toString().replace(/\/+$/, "") + "/v1/chat/completions";
 }
 
+function validateSessionId(value) {
+  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(value)) {
+    throw new TypeError("A stable OpenCode Go session ID is required.");
+  }
+  return value;
+}
+
 function validateMessages(messages) {
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > 64) {
     throw new TypeError("At least one and at most 64 model messages are required.");
@@ -68,11 +75,13 @@ function gatewayError(payload, status) {
 
 export function createGatewayModelClient({
   gatewayBaseUrl,
+  sessionId,
   fetchImpl = globalThis.fetch,
   maxOutputTokens = 2048,
   maxRequestBytes = 245760,
 } = {}) {
   const endpoint = gatewayEndpoint(gatewayBaseUrl);
+  const stableSessionId = validateSessionId(sessionId);
   if (typeof fetchImpl !== "function") throw new TypeError("A Fetch-compatible implementation is required.");
   if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 8192) {
     throw new TypeError("maxOutputTokens must be between 1 and 8192.");
@@ -111,7 +120,10 @@ export function createGatewayModelClient({
         response = await fetchImpl(endpoint, {
           method: "POST",
           credentials: "include",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            "x-opencode-session": stableSessionId,
+          },
           body: serializedBody,
           signal,
         });
