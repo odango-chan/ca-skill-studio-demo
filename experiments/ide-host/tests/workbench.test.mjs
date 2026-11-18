@@ -243,7 +243,9 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
       extensionUri:uri('/extensions/vscode.markdown-language-features'),isActive:markdownExtensionActivated,
       async activate(){markdownExtensionActivated=true;this.isActive=true;return {};}
     }:null;}},
-    languages:{createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
+    languages:{getDiagnostics:target=>diagnosticSets.flatMap(([uri,items])=>
+        uri.path===target.path?items:[]),
+      createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
     commands:{async executeCommand(id,...args){nativeCommands.push({id,args});return true;},
       async getCommands(){return ['markdown.showPreview','vscode.openWith'];},
       registerCommand(name,cb){commands.set(name,cb);return disposable();}},
@@ -771,6 +773,11 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     'clicking the Capability Problem opens the owning Contract file');
   assert.equal(showDocumentCalls.at(-1).options.selection.start.line,expectedCapabilityLine-1,
     'Problem navigation selects the exact Capability Grant source line');
+  const acceptance=await commands.get('skillStudio.internal.semanticTokenDiagnostics')();
+  assert.ok(acceptance.packageAudit.problems.some(item=>
+    item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&item.line===expectedCapabilityLine));
+  assert.ok(acceptance.packageAudit.editorMarkers.some(item=>
+    item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&item.line===expectedCapabilityLine));
 
   for(const sub of context.subscriptions)sub.dispose();
   assert.ok(changes.length>3);
