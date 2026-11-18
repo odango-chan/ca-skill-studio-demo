@@ -62,7 +62,7 @@ function tokenFor(source,items,text,type,modifier,from=0){
   return found;
 }
 
-test("legacy v0.2 token registry remains isolated from the v1alpha5 candidate authoring target",()=>{
+test("legacy v0.2 token registry remains isolated from the v1alpha5 authoring target",()=>{
   const blobSha=createHash("sha1")
     .update("blob "+Buffer.byteLength(contractText)+"\0")
     .update(contractText).digest("hex");
@@ -84,8 +84,9 @@ test("legacy v0.2 token registry remains isolated from the v1alpha5 candidate au
   assert.match(sourceReadme,/semantic-tokens\.v1\.json.*legacy/i);
   const types=contract.legend.tokenTypes.map(item=>item.id);
   const modifiers=contract.legend.tokenModifiers.map(item=>item.id);
-  assert.ok(types.every(type=>semantic.SKILL_SEMANTIC_TOKEN_TYPES.includes(type)),
-    "the local v1alpha5 legend retains every legacy v0.2 token identity");
+  assert.ok(types.every(type=>!semantic.SKILL_SEMANTIC_TOKEN_TYPES.includes(type)),
+    "legacy v0.2 token identities are not part of the v1alpha5 legend");
+  assert.ok(!semantic.SKILL_SEMANTIC_TOKEN_TYPES.includes("skillProcedure"));
   assert.ok(semantic.SKILL_SEMANTIC_TOKEN_TYPES.includes("skillWait"),
     "v1alpha5 adds a local editor-only Wait token identity");
   assert.deepEqual(semantic.SKILL_SEMANTIC_TOKEN_TYPES,

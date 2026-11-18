@@ -98,11 +98,6 @@
         "description": "Procedure node or step operator"
       },
       {
-        "id": "skillProcedure",
-        "superType": "type",
-        "description": "Declared or referenced Procedure identity"
-      },
-      {
         "id": "skillStep",
         "superType": "type",
         "description": "Declared or referenced Procedure node/step identity"
