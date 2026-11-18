@@ -282,9 +282,9 @@ export function registerCompilerIntegration(vscode,context,{
     try{assertCompilerLanguageTarget(languageTarget);}
     catch{
       throw new Error(
-        "CA-SL v1alpha5 Preview is editor-only in this Studio build. " +
+        "CA-SL v1alpha5 is the active released language target, but this Studio build has no released v1alpha5 Compiler integration. " +
         "Compiler v1.0.0 targets connectionagent.io/v1alpha4 and MUST NOT Check, Build or Inspect this Package. " +
-        "Use the v1alpha5 Source/LSP projection; Compiler actions remain blocked until a released v1alpha5 Compiler with the required WP3–WP8 support is integrated."
+        "Use the v1alpha5 Source/LSP projection; Compiler actions remain fail-closed until the v1alpha5 Compiler is released, integrated and validated in Studio."
       );
     }
     const expectedSuffix="/skills/"+root.name;
