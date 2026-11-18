@@ -829,7 +829,7 @@ try{
     "typeof k==='function'&&k.prototype?.executeCommand&&"+
     "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
     "if(!key)throw Error('Native command registry missing');"+
-    "return c.get(key).executeCommand('workbench.files.action.focusFilesExplorer');})()");
+    "await c.get(key).executeCommand('workbench.files.action.focusFilesExplorer');return true;})()");
   await sleep(400);
   const nativeExplorer=await evalJS("(()=>{const explorer=document.querySelector('.theia-Files');"+
     "const text=explorer?.innerText??'';return {visible:!!explorer,text,"+
