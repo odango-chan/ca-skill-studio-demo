@@ -83,6 +83,72 @@ function schemaIds(text){
   }
   return {ids,parseable:true};
 }
+/**
+ * Index callable identities from a previously verified immutable snapshot.
+ * v1alpha5 inherits ToolCatalog v1alpha4 (F.1); a legacy skillc.tool/v0.1
+ * JSON file or an arbitrary 'operations' list is never a trusted substitute.
+ *
+ * This index proves only structural declaration presence. It does not qualify
+ * Owner identity, Capability authorization, Schema typing or runtime effects.
+ */
+export function indexV1Alpha4ToolCatalogCallables(dependencyId,files){
+  const fail=reason=>({dependencyId,available:false,reason,operations:[]});
+  if(!Array.isArray(files))return fail("The verified snapshot has no file inventory");
+  const operations=[];
+  let catalogCount=0;
+  for(const file of [...files].sort((a,b)=>String(a.path).localeCompare(String(b.path)))){
+    if(typeof file.path!=="string"||!/\.(?:json|ya?ml)$/i.test(file.path))continue;
+    const filenameHint=/(?:^|\/)tool[-_]?catalog(?:[.-]|$)/i.test(file.path);
+    if(typeof file.text!=="string"){
+      if(filenameHint)return fail("ToolCatalog "+file.path+" has no decodable text");
+      continue;
+    }
+    let document;
+    try{
+      document=parseDocument(file.text,{version:"1.2",schema:"core",
+        strict:true,uniqueKeys:true,stringKeys:true,logLevel:"silent"});
+    }catch(error){
+      if(filenameHint)return fail("ToolCatalog "+file.path+" is unreadable: "+String(error?.message??error));
+      continue;
+    }
+    const root=document.contents;
+    const kind=scalar(get(root,"kind"));
+    if(kind!=="ToolCatalog"&&!filenameHint)continue;
+    if(document.errors?.length||!isMap(root))
+      return fail("ToolCatalog "+file.path+" has invalid YAML/JSON syntax");
+    if(kind!=="ToolCatalog")
+      return fail("ToolCatalog "+file.path+" must declare kind: ToolCatalog");
+    if(scalar(get(root,"apiVersion"))!=="connectionagent.io/toolcatalog/v1alpha4")
+      return fail("ToolCatalog "+file.path+" requires apiVersion connectionagent.io/toolcatalog/v1alpha4; no legacy fallback");
+    const owner=scalar(get(get(root,"metadata"),"owner"));
+    const contracts=get(get(root,"spec"),"contracts");
+    if(!owner?.trim()||!isSeq(contracts)||contracts.items.length===0)
+      return fail("ToolCatalog "+file.path+" requires metadata.owner and nonempty spec.contracts");
+    catalogCount++;
+    for(const item of contracts.items){
+      const id=scalar(get(item,"id")),callableKind=scalar(get(item,"kind"));
+      const effect=scalar(get(item,"effect")),output=get(get(item,"outputSchema"),"$ref");
+      const input=get(get(item,
+        callableKind==="observation"?"queryContextSchema":"inputSchema"),"$ref");
+      const outcomes=get(item,"ownerOutcomes");
+      const validOutcomes=isSeq(outcomes)&&outcomes.items.some(v=>scalar(v)==="SUCCEEDED");
+      if(!isMap(item)||!id?.trim()||
+         !["operation","observation"].includes(callableKind)||
+         !["READ","MUTATION"].includes(effect)||
+         (callableKind==="observation"&&effect!=="READ")||
+         !scalar(output)||!scalar(input)||!validOutcomes)
+        return fail("ToolCatalog "+file.path+" has an invalid callable identity or required F.1 fields");
+      if(callableKind==="observation"&&get(item,"inputSchema")!=null||
+         callableKind==="operation"&&get(item,"queryContextSchema")!=null)
+        return fail("ToolCatalog "+file.path+" mixes Operation and Observation input Schema fields");
+      operations.push({dependencyId,id,kind:callableKind,owner,effect});
+    }
+  }
+  if(!catalogCount)
+    return fail("No v1alpha4 ToolCatalog declaration is present in the locked snapshot");
+  return {dependencyId,available:true,operations};
+}
+
 function addNotChecked(list,path,parsed,node,code,message,domain){
   add(list,path,parsed,node,code,message,{
     severity:"warning",status:"not_checked",domain,category:"linking"
