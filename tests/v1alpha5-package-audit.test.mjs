@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {auditV1Alpha5Package} from "../site/v1alpha5-package-audit.mjs";
+import {auditV1Alpha5Package,indexV1Alpha4ToolCatalogCallables}
+  from "../site/v1alpha5-package-audit.mjs";
 
 const sampleRoot=new URL("../site/samples/v1alpha5/",import.meta.url);
 const manifest=JSON.parse(readFileSync(new URL("files.json",sampleRoot),"utf8"));
@@ -142,6 +143,120 @@ test("project dependency state distinguishes unconfigured dependencies from unav
   assert.ok(codes(blocked).includes("DEPENDENCY_SNAPSHOT_UNAVAILABLE"));
   assert.ok(codes(blocked).includes("TOOL_DEPENDENCY_UNAVAILABLE"));
   assert.ok(blocked.some(item=>item.status==="blocked"));
+});
+
+test("ToolCatalog v1alpha4 indexes exact Operation and Observation callables",()=>{
+  const text=[
+    "apiVersion: connectionagent.io/toolcatalog/v1alpha4",
+    "kind: ToolCatalog",
+    "metadata:",
+    "  owner: smf-owner",
+    "spec:",
+    "  contracts:",
+    "    - kind: operation",
+    "      id: sbi.udm.sm_data.get",
+    "      effect: READ",
+    "      ownerOutcomes: [SUCCEEDED, FAILED]",
+    "      inputSchema: {$ref: 'urn:ca:input:v1'}",
+    "      outputSchema: {$ref: 'urn:ca:output:v1'}",
+    "    - kind: observation",
+    "      id: context.smf.session.read",
+    "      effect: READ",
+    "      ownerOutcomes: [SUCCEEDED, FAILED]",
+    "      queryContextSchema: {$ref: 'urn:ca:query:v1'}",
+    "      outputSchema: {$ref: 'urn:ca:read-result:v1'}"
+  ].join("\n");
+  const index=indexV1Alpha4ToolCatalogCallables("ca",[
+    {path:"schemas/input.schema.yaml",text:"$id: urn:ca:input:v1\ntype: object\n"},
+    {path:"contracts/smf.yaml",text}
+  ]);
+  assert.equal(index.available,true);
+  assert.deepEqual(index.operations.map(item=>[item.id,item.kind,item.owner,item.effect]),[
+    ["sbi.udm.sm_data.get","operation","smf-owner","READ"],
+    ["context.smf.session.read","observation","smf-owner","READ"]
+  ]);
+  const files=fixture("establish-pdu-session");
+  const diagnostics=auditV1Alpha5Package({files,dependencyContext:{
+    available:true,
+    declarations:[{id:"ca",kind:"tool-catalog",source:{type:"builtin"}}],
+    snapshots:[{id:"ca",kind:"tool-catalog",snapshotDigest:"sha256:test"}],
+    operations:index.operations,
+    toolCatalogs:[{dependencyId:"ca",available:true}],
+    schemas:[],diagnostics:[]
+  }});
+  assert.ok(!find(diagnostics,"TOOL_DECLARATION_NOT_FOUND","ca::sbi.udm.sm_data.get"),
+    "exact v1alpha4 callable is locally declared without asserting Owner qualification");
+});
+
+test("legacy and malformed ToolCatalog sources never qualify as callable declarations",()=>{
+  const legacy=indexV1Alpha4ToolCatalogCallables("ca",[
+    {path:"tool-contract.json",text:JSON.stringify({
+      apiVersion:"skillc.tool/v0.1",operations:[{id:"sbi.udm.sm_data.get"}]
+    })}
+  ]);
+  assert.equal(legacy.available,false);
+  assert.deepEqual(legacy.operations,[]);
+
+  const oldVersion=indexV1Alpha4ToolCatalogCallables("ca",[
+    {path:"tool-catalog.yaml",text:[
+      "apiVersion: connectionagent.io/toolcatalog/v1alpha3",
+      "kind: ToolCatalog",
+      "metadata: {owner: owner}",
+      "spec: {contracts: []}"
+    ].join("\n")}
+  ]);
+  assert.equal(oldVersion.available,false);
+  assert.match(oldVersion.reason,/v1alpha4/);
+
+  const missingInput=indexV1Alpha4ToolCatalogCallables("ca",[
+    {path:"other.yaml",text:[
+      "apiVersion: connectionagent.io/toolcatalog/v1alpha4",
+      "kind: ToolCatalog",
+      "metadata: {owner: owner}",
+      "spec:",
+      "  contracts:",
+      "    - kind: observation",
+      "      id: read",
+      "      effect: READ",
+      "      ownerOutcomes: [SUCCEEDED, FAILED]",
+      "      inputSchema: {$ref: urn:wrong:input}",
+      "      outputSchema: {$ref: urn:result}"
+    ].join("\n")}
+  ]);
+  assert.equal(missingInput.available,false);
+  assert.match(missingInput.reason,/invalid callable/);
+});
+
+test("duplicate ToolCatalog export IDs remain visible for ambiguous-link diagnostics",()=>{
+  const catalog=(kind)=>[
+    "apiVersion: connectionagent.io/toolcatalog/v1alpha4",
+    "kind: ToolCatalog",
+    "metadata: {owner: owner}",
+    "spec:",
+    "  contracts:",
+    "    - kind: "+kind,
+    "      id: sbi.udm.sm_data.get",
+    "      effect: READ",
+    "      ownerOutcomes: [SUCCEEDED, FAILED]",
+    kind==="operation"?"      inputSchema: {$ref: urn:ca:input}":
+      "      queryContextSchema: {$ref: urn:ca:input}",
+    "      outputSchema: {$ref: urn:ca:output}"
+  ].join("\n");
+  const index=indexV1Alpha4ToolCatalogCallables("ca",[
+    {path:"catalog/one.yaml",text:catalog("operation")},
+    {path:"catalog/two.yaml",text:catalog("observation")}
+  ]);
+  assert.equal(index.available,true);
+  assert.equal(index.operations.length,2);
+  const diagnostics=auditV1Alpha5Package({
+    files:fixture("establish-pdu-session"),
+    dependencyContext:{
+      available:true,declarations:[{id:"ca",kind:"tool-catalog"}],
+      snapshots:[{id:"ca",kind:"tool-catalog"}],
+      toolCatalogs:[{dependencyId:"ca",available:true}],operations:index.operations
+    }
+  });
+  assert.ok(find(diagnostics,"TOOL_DECLARATION_AMBIGUOUS","ca::sbi.udm.sm_data.get"));
 });
 
 test("a verified Tool Catalog resolves exact callable identity and reports absent callables",()=>{
