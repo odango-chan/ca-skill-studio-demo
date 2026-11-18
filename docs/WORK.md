@@ -258,6 +258,16 @@ main browser application remains available at `/classic/`.
 
 **验收：** [PR #106](https://github.com/odango-chan/ca-skill-studio-demo/pull/106) 已合并，merge commit `5dfa50e0e39e43087f01e1d5fee9ada1e6ce7d63`。exact-head `36a252319281e7c0829100a07455b56af6236176` 三组门禁全部 PASS：[IDE Host #42752173199](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173199)、[Theia Browser-Only #42752173510](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173510)、[Theia Browser Host / real Chromium #42752173208](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/42752173208)。真实 Chromium 记录默认主路径 9 Nodes / 8 visible edges、水平 9/9、恢复垂直、全部路径 17 Nodes / 46 edges；Source、Inspector、Node Focus、Route create/reconnect 与 native Undo 回归通过。resulting-main Pages 对新 merge SHA 的部署仍需单独确认；Runtime / 5GC / desktop VS Code GUI NOT_RUN。
 
+## 2026-11-18 · CA-SL v1alpha5 Root 分支折叠恢复（Issue #209 / PR #210）
+
+**范围：** PR #199 将活动编辑器切换到 v1alpha5 后，Theia CustomEditor 暂时绕过了共享 Root `pathFocus` 投影并隐藏 Root 工具栏，导致全部 Outcome 分支默认展开。PR #210 恢复 v1alpha5 Root 的只读主路径默认视图、主路径／选择路径／全部路径工具栏，以及每个 Node 的 `+N 条 / 收起`。
+
+**实现边界：** 复用既有 `site/path-focus.mjs`、ELK 和 React Flow anchor restore；v1alpha5 Stage-level Outcome Routes 仍按原 Source 身份投影。未知 Outcome 或无法证明成功终态时 fail open 全图。Child / Neighbor / Node Focus 不变；不编辑 Route、不改 YAML、不改变 TextDocument revision。
+
+**验收：** [PR #210](https://github.com/odango-chan/ca-skill-studio-demo/pull/210) 当前为 Draft，等待 exact-head Node / TypeScript / IDE Host / Theia Browser-Only / real Chromium 门禁。测试新增两个 v1alpha5 Example 的路径聚焦单测，以及真实 Chromium 对默认折叠、逐 Node 展开／收起、锚点偏移小于 2 px、zoom 不变和 Source 不变的检查。尚未宣称 CI、Pages 部署或在线验收 PASS。
+
+
+
 ## 2026-11-10 · Theia named Phase Step / Verify authoring（PR #108，已合入 main）
 
 **范围：** 原生 Inspector 迁移命名 Phase Step 原子重命名，以及普通 / 命名 Verify 的安全生命周期操作。命名 Step 重命名只在同 Procedure 的完整 `from` 引用闭包可证明时开放；身份与所有已证明引用通过一个 WorkspaceEdit 同步更新。普通 Verify 仅在 Source 邻接行归属明确时可命名；命名 Verify 仅在零消费者证明成立时可删除，换序复用相邻独立 Verify 的共享规则。
