@@ -2721,27 +2721,61 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   }
 
   context.subscriptions.push(diagnostics);
+  const problemDomainLabels={
+    source:"Source",package:"Package",dependencies:"Dependencies",tools:"Tools",
+    capabilities:"Capabilities",schemas:"Schemas",predicates:"Predicates",
+    evidence:"Evidence",compiler:"Compiler",runtime:"Runtime"
+  };
+  function problemTreeChildren(){
+    const groups=new Map();
+    const diagnostics=[
+      ...(snapshot?.problems??[]),...audit,
+      ...(compilerProblemsProvider?.getProblems?.()??[])
+    ];
+    for(const diagnostic of diagnostics){
+      const kind=diagnostic.kind??"problem";
+      const domain=diagnostic.domain??(kind==="compiler-diagnostic"?"compiler":"source");
+      if(!groups.has(domain)){
+        groups.set(domain,{
+          kind:"problem-group",domain,
+          label:problemDomainLabels[domain]??domain,
+          description:"",
+          children:[]
+        });
+      }
+      groups.get(domain).children.push({
+        kind,label:diagnostic.message,message:diagnostic.message,
+        line:diagnostic.line,column:diagnostic.column,uri:diagnostic.uri,
+        code:diagnostic.code,severity:diagnostic.severity,
+        status:diagnostic.status,domain,category:diagnostic.category,
+        path:diagnostic.path,sourcePath:diagnostic.sourcePath,
+        source:diagnostic.source,children:[]
+      });
+    }
+    for(const group of groups.values()){
+      const errors=group.children.filter(item=>item.severity==="error").length;
+      const warnings=group.children.filter(item=>item.severity==="warning").length;
+      const notChecked=group.children.filter(item=>item.status==="not_checked").length;
+      group.description=errors+" errors · "+warnings+" warnings"+
+        (notChecked?" · "+notChecked+" NOT_CHECKED":"");
+    }
+    return [{kind:"problem-status",label:auditStatus,children:[]},...groups.values()];
+  }
   for(const id of ['inspection','outline','problems']){
     const emitter=new vscode.EventEmitter();
     const provider={onDidChangeTreeData:emitter.event,
       getChildren:item=>item?.children??(id==='problems'
-        ? [{label:auditStatus,children:[]},...([...(snapshot?.problems??[]),...audit,
-          ...(compilerProblemsProvider?.getProblems?.()??[])].map(d=>({
-            kind:d.kind??'problem',label:d.message,message:d.message,line:d.line,column:d.column,
-            uri:d.uri,code:d.code,severity:d.severity,status:d.status,
-            domain:d.domain,category:d.category,sourcePath:d.sourcePath,
-            description:[
-              d.domain??(d.kind==='compiler-diagnostic'?'compiler':'source'),
-              d.status??'confirmed',
-              d.severity?.toUpperCase()??'INFO',
-              d.code??'Source projection'
-            ].join(' · '),children:[]
-          })))]
+        ?problemTreeChildren()
         :snapshot?.[id]??[{label:'Open assurance/procedure.yaml',children:[]}]),
       getTreeItem(item){
         const tree=new vscode.TreeItem(item.label,item.children?.length?vscode.TreeItemCollapsibleState.Collapsed:vscode.TreeItemCollapsibleState.None);
         tree.description=item.description;tree.tooltip=item.label+(item.line?' · L'+item.line:'');
         tree.kind=item.kind;
+        if(item.kind==='problem-group'){
+          tree.contextValue='skillStudio.problemGroup';
+          tree.iconPath=new vscode.ThemeIcon('folder');
+          tree.tooltip=item.label+'\\n'+item.description;
+        }
         if(item.kind==='compiler-diagnostic'){
           tree.contextValue='skillStudio.compilerDiagnostic';
           tree.iconPath=new vscode.ThemeIcon(item.severity==='warning'?'warning':'error');
@@ -2824,24 +2858,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             namedVerify.names.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
           const canDeleteNamedVerify=item.stepOperator==='verify'&&Boolean(item.stepName)&&
             namedVerify.deletions.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          const namedReorder=item.stepOperator==='verify'&&Boolean(item.stepName)&&
-            namedVerify.swaps.some(x=>x.phaseName===item.phaseName&&
-              (x.stepIndex===item.stepIndex||x.stepIndex===item.stepIndex-1));
-          const namedStep=item.stepName?namedPhaseStepImpactReport(source,
-            item.procedureId,item.nodeId).find(x=>x.phaseName===item.phaseName&&
-              x.stepIndex===item.stepIndex&&x.stepName===item.stepName):null;
-          const canRenameNamed=Boolean(namedStep?.editEligible);
-          if(item.stepOperator==='verify'&&(canDeleteNamedVerify||namedReorder)){
-            tree.contextValue=hasBinding?'skillStudio.namedVerifyStepAndBinding':'skillStudio.namedVerifyStep';
-          }else if(canRenameNamed){
-            tree.contextValue=hasBinding?'skillStudio.namedPhaseStepAndBinding':'skillStudio.namedPhaseStep';
-          }else if(item.stepOperator==='verify'&&(canNameVerify||canEditVerify)){
-            tree.contextValue=hasBinding?'skillStudio.verifyStepAndBinding':'skillStudio.verifyStep';
-          }else{
-            tree.contextValue=hasBinding
-              ?(canEditVerify?'skillStudio.phaseStepAndVerify':'skillStudio.phaseStep')
-              :(canEditVerify?'skillStudio.verifyStep':'skillStudio.phaseStepPlain');
-          }
+          tree.contextValue=hasBinding?'skillStudio.phaseStepBinding':
+            canNameVerify?'skillStudio.phaseStepNameVerify':
+            canDeleteNamedVerify?'skillStudio.phaseStepDeleteNamedVerify':
+            canEditVerify?'skillStudio.phaseStepVerify':'skillStudio.phaseStepPlain';
           item.sourceVersion=document.version;item.documentUri=document.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.phaseName=item.phaseName;tree.stepIndex=item.stepIndex;
