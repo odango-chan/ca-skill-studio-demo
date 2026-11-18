@@ -7,7 +7,7 @@ import {projectNodeFocusFlow,makeNodeFocusElements,currentNodeBoundary}
   from "../site/node-focus-graph.mjs";
 
 const owner=projectWorkspace(readFileSync(new URL(
-  "../site/samples/packages/establish-pdu-session/assurance/procedure.yaml",
+  "./fixtures/legacy-site-samples/packages/establish-pdu-session/assurance/procedure.yaml",
   import.meta.url),"utf8"));
 assert.equal(owner.state,"READY");
 const procedure=owner.procedure;

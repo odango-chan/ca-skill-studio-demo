@@ -5,7 +5,7 @@ import {projectWorkspace} from "../site/workspace.mjs";
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue,
         previewNodeBindingFrom,applyNodeBindingFrom} from "../site/node-attributes.mjs";
 const read=(skill,path)=>readFileSync(new URL(
-  (skill==="establish-pdu-session"?"./fixtures/establish-pre-hold/assurance/":"../site/samples/packages/"+skill+"/assurance/")+path,import.meta.url),"utf8");
+  (skill==="establish-pdu-session"?"./fixtures/establish-pre-hold/assurance/":"./fixtures/legacy-site-samples/packages/"+skill+"/assurance/")+path,import.meta.url),"utf8");
 const ensure=read("ensure-pdu-session","procedure.yaml");
 const ensurePred=read("ensure-pdu-session","predicates.yaml");
 const created=read("establish-pdu-session","procedure.yaml");
