@@ -1,22 +1,23 @@
 # Skill Studio 当前工作状态
 
-## 2026-11-17 · CA-SL v1alpha5 Preview（适配实施中）
+## 2026-11-18 · CA-SL v1alpha5-only authoring（PR #199）
 
-**当前活动编辑目标：** `connectionagent.io/v1alpha5`，使用 `ca-skills@12a9512a9eae006ad4578daf37ebe0bdf3070642` 的完整单文件 PUBLIC REVIEW DRAFT。该候选尚未发布、尚未冻结；v1alpha4 保持历史冻结基线，不再作为并行活动 Example。
+**语言规范：** CA-SL v1alpha5 已由 [ca-skills PR #66](https://github.com/odango-chan/ca-skills/pull/66) 正式冻结发布，权威 Release Commit 为 `0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5`，目标为 `connectionagent.io/v1alpha5`。v1alpha4 只保留为不可变的规范继承基线和历史记录，不是产品编辑模式；不提供 v1alpha4 兼容入口或旧项目自动迁移。
 
-**Example 来源：** `ca-skills@84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef`（PR #65）。Studio 构建产物仅打包 `site/samples/v1alpha5`，并按固定 manifest、source ref 和 Git blob SHA 校验全部示例文件。现有 Example 只有在用户明确确认替换时才会整体重建；普通项目不经过 Example 导入器。
+**内置 Example：** 来自 [ca-skills PR #65](https://github.com/odango-chan/ca-skills/pull/65) 合入后的当前 `main@de8d9f667dd1a445c3f6378e0ca793d7407d2036`。Manifest `site/samples/v1alpha5/files.json` 固定来源 commit、14 个文件路径及逐文件 Git blob SHA；只打包 `site/samples/v1alpha5` 下的两个 Skill：`establish-pdu-session` 与 `establish-pdu-session-mas`。替换现有 Example 必须明确确认，只删除专用 Example 工程；普通项目不经过 Example 导入器。旧版样例仅保留必要的回归 fixture，不作为运行时资源、编辑模式或迁移来源。
 
-- **Source / LSP：** 已有独立 v1alpha5 AST 源码投影；保留四种业务阶段，并把 Node-entry Wait 单独表示为控制字段。Wait 不作为第五种阶段或 Wait-only Node。
-- **Wait 编辑提示：** 正在接入 Wait 字段、Ingress event selector、TIMEOUT 路由、response.after 和同 Node wait.output 的 Completion / Definition / Inspector 展示。响应边界 Completion 只应来自事件接受后的业务路径，不得把仅从 TIMEOUT 可达的 Node 当成响应边界。
-- **Semantic Tokens：** 增加 Studio 本地 `skillWait` token 与主题颜色。它是编辑器展示元数据，不是上游 v1alpha5 Token Selector 契约。
-- **Compiler 边界：** 集成的 Compiler v1.0.0 仍只接受 v1alpha4。Studio 对 v1alpha5 的 Check / Build / Inspect Dependencies 必须 fail-closed；不得把 Wait 降级为旧语法。Compiler PR #30 当前仅有 WP2 AST slice，不是可发布或可资格化的集成版本。
-- **Qualification：** v1alpha5 36 个 EW 用例是规范性验收义务，尚不能据此宣称 Host / Runtime / Integration 通过。Trusted IngressCatalog、Owner / CapabilityContracts、Wait 持久化续接、EVENT_ACCEPTED occurrence 隔离、tombstone 和 paired response 仍 NOT_QUALIFIED。
-- **在线验收：** 需要 exact-head CI、Theia Browser-Only / Browser Host 和真实 Chromium 验收通过后，才考虑合并和 Pages 部署。当前 PR #199 保持 Draft；未通过的验收不能以放宽断言替代。
+- **Source / LSP：** 使用独立 v1alpha5 AST 投影；Procedure 为 Package 级 `start / nodes` 图，保留四种业务阶段，并将 Node-entry Wait 表示为独立控制字段。Wait 不是第五种业务阶段，也不创建 Wait-only Node。Completion、Definition、References、Outline、诊断和局部 Semantic Tokens 均基于 v1alpha5 Source；不回退到 v0.2 / v1alpha3 / v1alpha4 解析路径。
+- **Designer / Inspector：** Procedure Graph、Inspector 和 Data Flow 都是 Source 派生视图。当前 Wait 展示包括 Event Selector、Timeout、TIMEOUT 路由、Response Boundary 和 `NodeId.wait.output`；图形视图不拥有第二份业务真源，也不因此获得任意结构写入或 Runtime 授权。
+- **Semantic Tokens：** `skillWait` 是 Studio 本地编辑器展示 token，不是上游规范 Token Selector 契约；v1alpha5 上游语义令牌契约尚未发布。
+- **Compiler 边界：** 已发布的 Compiler v1.0.0 只接受 v1alpha4。当前 v1alpha5 Compiler 集成候选为 [PR #38](https://github.com/odango-chan/ca-skill-compiler/pull/38)，精确候选提交 `ea27f18549725166f304b7d06fd9339bb0554329`；PR #30 已被 #38 取代并关闭。#38 仍为 Draft / 未合并，PR 描述报告的 `FULL_LANGUAGE_VALIDATION` 是 Compiler 本地验收结果，不是已发布集成，也不代表 Owner / Host / Runtime 资格。Studio 对 v1alpha5 Check / Build / Inspect 继续 fail-closed。
+- **Studio 精确提交验收基线：** 代码提交 `ed58914da0b4979b15ba732135e66aa650e890ed` 的四项 GitHub Actions 全部 PASS：PR Verify [#44256316497](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44256316497)、IDE Host [#44256316369](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44256316369)、Theia Browser Host / Chromium [#44256316371](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44256316371)、Theia Browser-Only [#44256316392](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44256316392)。PR Verify 同时通过 `npm test`、Plugin-managed tests、TypeScript 检查、Browser LSP 依赖安装、IDE Host 构建及 Compiler v1.0.0 WASM 打包。文档/锁文件刷新后仍需在最新 PR Head 重跑这些 Gate。
+- **Qualification：** 语言语义为 FROZEN / RELEASED；Studio 编辑器验收不等于 Compiler、Owner、Host、Runtime、Integration、5GC 或 MAS 资格。规范中的 36 个 EW 项仍是 `SPECIFICATION_ONLY`，未执行不能宣称产品通过。Trusted Ingress / Owner / CapabilityContracts、持久化 Wait 续接、EVENT_ACCEPTED occurrence 隔离、tombstone、paired response 与真实 5GC E2E 仍 NOT_QUALIFIED。
 
-详细边界见 [CA-SL v1alpha5 Studio Preview](design/ca-sl-v1alpha5-studio-preview.md) 与 [Compiler v1alpha4 Studio Integration](design/compiler-v1alpha4-studio-integration.md)。后者仅描述 v1alpha4 Compiler v1.0.0，不构成 v1alpha5 支持声明。
+**当前交付状态：** PR #199 仍为 Draft。当前工作仅收敛版本锁、错误提示和文档权威信息；本轮提交后必须以最新 Head 重跑四项 Gate，再进行最终 Review。尚未合并或部署 Pages。
 
+详细边界见 [CA-SL v1alpha5 Studio Integration](design/ca-sl-v1alpha5-studio-preview.md) 与 [Compiler v1alpha4 Studio Integration](design/compiler-v1alpha4-studio-integration.md)。后者只描述 Compiler v1.0.0 的 v1alpha4 接口，不构成 v1alpha5 支持声明。
 
-## 2026-11-16 · CA-SL v1alpha4 编辑器基线与 Procedure Designer
+## 历史验收记录 · 2026-11-16 · CA-SL v1alpha4 编辑器基线与 Procedure Designer（非当前产品编辑目标）
 
 本轮以 `main@087a764753dad98ce8af0e4f9377a6378754547b` 为基线；CA-SL v1alpha4 规范唯一权威来源固定为 `odango-chan/ca-skills@7f84393ee8c395e4d8c39a74cb5000a1f896588d`（`connectionagent.io/v1alpha4`，语言语义 FROZEN）。
 
