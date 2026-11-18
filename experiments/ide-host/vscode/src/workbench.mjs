@@ -2763,6 +2763,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         code:diagnostic.code,severity:diagnostic.severity,
         status:diagnostic.status,domain,category:diagnostic.category,
         path:diagnostic.path,sourcePath:diagnostic.sourcePath,
+        locationKind:diagnostic.locationKind,phase:diagnostic.phase,
         source:diagnostic.source,children:[]
       });
     }
@@ -2793,8 +2794,16 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         if(item.kind==='compiler-diagnostic'){
           tree.contextValue='skillStudio.compilerDiagnostic';
           tree.iconPath=new vscode.ThemeIcon(item.severity==='warning'?'warning':'error');
-          tree.command={command:'skillStudio.revealCompilerDiagnostic',
-            title:'Reveal Compiler Diagnostic',arguments:[item]};
+          tree.tooltip=[
+            item.message,
+            item.code?'Code: '+item.code:null,
+            item.path?'Compiler path: '+item.path:null,
+            item.locationKind?'Location: '+item.locationKind:null
+          ].filter(Boolean).join('\n');
+          if(item.uri){
+            tree.command={command:'skillStudio.revealCompilerDiagnostic',
+              title:'Reveal Compiler Diagnostic',arguments:[item]};
+          }
         }
         if(item.kind==='package-diagnostic'){
           tree.contextValue='skillStudio.packageDiagnostic';
