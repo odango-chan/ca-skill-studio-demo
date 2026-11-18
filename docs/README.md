@@ -2,9 +2,9 @@
 
 **Status: Accepted · Date: 2026-11-03**
 
-Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相。当前活动语言目标为 CA-SL v1alpha5 Preview；v1alpha4 仅作为历史冻结基线。阅读当前代码前按以下顺序：
+Studio 拥有浏览器编辑器，不拥有正式 Skill/Runtime/MCP 业务真相。当前唯一活动语言目标为 CA-SL v1alpha5（FROZEN / RELEASED）；Studio 编辑器集成仍与 Compiler、Host、Runtime 资格分开。v1alpha4 仅作为不可变的规范继承基线和历史记录，不是产品兼容模式。阅读当前代码前按以下顺序：
 
-- [CA-SL v1alpha5 Studio Preview](design/ca-sl-v1alpha5-studio-preview.md) — 规范来源 pin、Node-entry Wait 编辑投影、Compiler fail-closed 与未资格化边界
+- [CA-SL v1alpha5 Studio Integration](design/ca-sl-v1alpha5-studio-preview.md) — 正式规范来源 pin、Node-entry Wait 编辑投影、Compiler fail-closed 与产品资格边界
 
 1. [README](../README.md) 与 [AGENTS](../AGENTS.md) — 目标/开发规约
 2. [WORK](WORK.md) — **唯一当前实现与验收状态**
