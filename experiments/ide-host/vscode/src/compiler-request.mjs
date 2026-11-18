@@ -1,11 +1,11 @@
-// BuildRequest adapter for the pinned CA Skill Compiler v1.0.0 / CA-SL v1alpha4.
+// BuildRequest adapter for the released CA Skill Compiler v2.0.0 / CA-SL v1alpha5.
 // This module only serializes authored Skill bytes. It never translates legacy
 // syntax or manufactures Dependency / Owner / Capability trust metadata.
-export const COMPILER_VERSION = "v1.0.0";
-export const COMPILER_API_VERSION = "connectionagent.io/compiler-build-request/v1alpha4";
-export const COMPILER_LANGUAGE_TARGET = "connectionagent.io/v1alpha4";
-export const COMPILER_BUILD_RESULT_VERSION = "connectionagent.io/compiler-build-result/v1alpha4";
-export const COMPILER_INSPECTION_VERSION = "connectionagent.io/compiler-dependency-inspection/v1alpha4";
+export const COMPILER_VERSION = "v2.0.0";
+export const COMPILER_API_VERSION = "connectionagent.io/compiler-build-request/v1alpha5";
+export const COMPILER_LANGUAGE_TARGET = "connectionagent.io/v1alpha5";
+export const COMPILER_BUILD_RESULT_VERSION = "connectionagent.io/compiler-build-result/v1alpha5";
+export const COMPILER_INSPECTION_VERSION = "connectionagent.io/compiler-dependency-inspection/v1alpha5";
 
 /** Refuse a language target that the pinned Compiler release does not own. */
 export function assertCompilerLanguageTarget(languageTarget) {
@@ -52,17 +52,20 @@ function validateRelativePath(path) {
 }
 
 /**
- * Construct the exact v1alpha4 transport envelope from one complete Package
- * snapshot. Dependencies are deliberately empty until the Studio's immutable
- * snapshot store is upgraded to the v1alpha4 digest and trusted-binding contract.
+ * Construct the exact v1alpha5 transport envelope from a complete Package.
+ * Compiler Source includes authored Skill files only; Package-local Studio
+ * scenario tests are editor-only sidecars and MUST NOT enter BuildRequest.
+ * The caller must provide independently authenticated dependency/Owner inputs;
+ * this adapter never manufactures trust from local source or lock metadata.
  */
 export function createCompilerBuildRequest({
   packageName,
   documents,
-  resolvedDependencies = []
+  resolvedDependencies = [],
+  trustedBuildContext
 } = {}) {
   if (typeof packageName !== "string" || !PACKAGE_NAME.test(packageName)) {
-    throw new Error("Skill Package name is not a valid v1alpha4 target");
+    throw new Error("Skill Package name is not a valid v1alpha5 target");
   }
   if (!Array.isArray(documents) || !documents.length) {
     throw new Error("A complete Skill source snapshot is required");
@@ -75,6 +78,8 @@ export function createCompilerBuildRequest({
   const files = [];
   let totalBytes = 0;
   for (const document of documents) {
+    if (typeof document?.relativePath === "string" &&
+        /^tests\/[^/]+\.route-scenario\.json$/i.test(document.relativePath)) continue;
     if (!isCompilerTextSource(document?.relativePath)) continue;
     const relativePath = validateRelativePath(document.relativePath);
     if (typeof document.text !== "string") {
@@ -103,8 +108,30 @@ export function createCompilerBuildRequest({
     languageTarget: COMPILER_LANGUAGE_TARGET,
     files,
     resolvedDependencies: [...resolvedDependencies],
-    targets: [packageName]
+    targets: [packageName],
+    ...(trustedBuildContext === undefined ? {} : {trustedBuildContext})
   };
+}
+
+/**
+ * Compiler v2 artifact projection: one root manifest and only the selected
+ * Skill's compiled output directory. These paths remain read-only and are
+ * not re-admitted as source on a later BuildRequest.
+ */
+export function compilerArtifactRelativePath(packageName,path){
+  const prefix="skills/"+packageName+"/compiled/";
+  if(!PACKAGE_NAME.test(packageName??"")||
+     typeof path!=="string"||encoder.encode(path).length>240||
+     path!==path.normalize("NFC")||
+     path.includes("\\")||path.includes(":")||
+     /[\u0000-\u001f\u007f]/.test(path))
+    throw new Error("Invalid Compiler v2 Artifact path");
+  if(path==="manifest.json")return "manifest.json";
+  if(!path.startsWith(prefix))throw new Error("Compiler Artifact is outside the selected compiled Skill");
+  const relative=path.slice(("skills/"+packageName+"/").length);
+  if(!relative||relative.split("/").some(segment=>!segment||segment==="."||segment===".."))
+    throw new Error("Unsafe Compiler v2 Artifact path");
+  return relative;
 }
 
 export function isCompilerBuildResult(value) {

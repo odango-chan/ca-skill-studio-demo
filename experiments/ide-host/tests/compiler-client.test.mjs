@@ -52,7 +52,7 @@ test("Compiler Worker client serializes requests and preserves response correlat
     const worker=FakeWorker.instances[0];
     assert.equal(worker.messages.length,2);
     assert.deepEqual(worker.messages.map(item=>item.command),["check","inspect"]);
-    assert.equal(worker.options.name,"skill-studio-compiler-v1alpha4");
+    assert.equal(worker.options.name,"skill-studio-compiler-v1alpha5");
   }finally{client.dispose();}
 });
 

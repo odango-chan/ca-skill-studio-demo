@@ -1,15 +1,15 @@
-// Theia / VS Code host adapter for the pinned CA Skill Compiler v1.0.0.
+// Theia / VS Code host adapter for released CA Skill Compiler v2.0.0.
 // The Compiler is the sole authority for Check, Build, linking and Artifact output.
 // This adapter owns workspace snapshots, diagnostics and read-only presentation.
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 import {createCompilerWorkerClient} from "./compiler-client.mjs";
 import {normalizeCompilerDiagnostics} from "./compiler-diagnostics.mjs";
-import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
 import {
   COMPILER_VERSION,
   COMPILER_INSPECTION_VERSION,
-  assertCompilerLanguageTarget,
+  COMPILER_LANGUAGE_TARGET,
   createCompilerBuildRequest,
+  compilerArtifactRelativePath,
   isCompilerBuildResult,
   isCompilerInspection
 } from "./compiler-request.mjs";
@@ -106,14 +106,7 @@ function makeArtifactProvider(vscode,context,output){
       const files=[];
       if(result.success){
         for(const file of result.outputFiles){
-          if(typeof file?.path!=="string"||!file.path.startsWith(prefix)){
-            throw new Error("Compiler returned an Artifact path outside the selected Skill: "+String(file?.path));
-          }
-          const relativePath=file.path.slice(prefix.length);
-          if(!relativePath||relativePath.split("/").some(part=>
-            !part||part==="."||part==="..")||relativePath.includes("\\")){
-            throw new Error("Compiler returned an unsafe Artifact path: "+file.path);
-          }
+          const relativePath=compilerArtifactRelativePath(packageName,file?.path);
           let text;
           try{
             const binary=atob(file.bytes);
@@ -188,7 +181,7 @@ export function registerCompilerIntegration(vscode,context,{
     // Validate the whole Compiler response before touching any accepted
     // DiagnosticCollection. Missing or ungrounded source ranges remain
     // request/file Problems, never synthetic line-1 editor errors.
-    const projected=normalizeCompilerDiagnostics(items,{packageName});
+    const projected=normalizeCompilerDiagnostics(items,{packageName,requirePhase:true});
     const grouped=new Map();
     const problemEntries=[];
     for(const item of projected){
@@ -262,7 +255,7 @@ export function registerCompilerIntegration(vscode,context,{
         label:vscode.workspace.asRelativePath(file),
         description:file.path,
         uri:file
-      })),{placeHolder:"Select a Skill Package for Compiler v1.0.0"});
+      })),{placeHolder:"Select a Skill Package for Compiler v2.0.0"});
       if(!choice) return null;
       selected=choice.uri;
     }
@@ -274,19 +267,13 @@ export function registerCompilerIntegration(vscode,context,{
     if(!procedure)return null;
     const root=packageRootForProcedure(vscode,procedure);
     if(!root)throw new Error("The selected document is not a Skill Procedure");
-    const languageTarget=isV1Alpha5Procedure(procedure.getText())
-      ?"connectionagent.io/v1alpha5":COMPILER_LANGUAGE_TARGET;
-    try{assertCompilerLanguageTarget(languageTarget);}
-    catch{
-      throw new Error(
-        "CA-SL v1alpha5 is the active released language target, but this Studio build has no released v1alpha5 Compiler integration. " +
-        "Compiler v1.0.0 targets connectionagent.io/v1alpha4 and MUST NOT Check, Build or Inspect this Package. " +
-        "Use the v1alpha5 Source/LSP projection; Compiler actions remain fail-closed until the v1alpha5 Compiler is released, integrated and validated in Studio."
-      );
-    }
+    // Compiler v2 accepts only the released v1alpha5 language target.
+    // Let Compiler produce errors for malformed or legacy source bytes:
+    // never silently re-target or translate source syntax in the editor.
+    const languageTarget=COMPILER_LANGUAGE_TARGET;
     const expectedSuffix="/skills/"+root.name;
     if(!root.uri.path.endsWith(expectedSuffix)){
-      throw new Error("Compiler v1alpha4 requires the Package to live under the project skills/<name>/ source root");
+      throw new Error("Compiler v2 requires the Package to live under the project skills/<name>/ source root");
     }
     const snapshot=await collectPackageSnapshot(vscode,procedure,++snapshotGeneration);
     if(snapshot.completeness!=="complete"){
@@ -306,15 +293,15 @@ export function registerCompilerIntegration(vscode,context,{
         const legacy=settings.get("dependencies",[]);
         if(Array.isArray(legacy)&&legacy.length){
           output.appendLine("TRUST BOUNDARY: "+legacy.length+
-            " existing v0.1 dependency snapshot(s) were not converted. Compiler v1alpha4 accepts only exact v1alpha4 DependencySnapshot + trusted Owner / CapabilityContracts inputs; this request intentionally supplies none.");
+            " existing project dependency record(s) are not independently authenticated v1alpha5 Compiler BuildRequest bindings. No snapshot was forwarded as a trusted Owner/Deployment authorization.");
         }
       }catch(error){
         output.appendLine("Project dependency settings unavailable: "+String(error?.message??error));
       }
     }
-    output.appendLine("Compiler "+COMPILER_VERSION+" · CA-SL v1alpha4 · "+
+    output.appendLine("Compiler "+COMPILER_VERSION+" · CA-SL v1alpha5 · "+
       root.name+" · "+request.files.length+" source file(s)");
-    output.appendLine("No v1alpha4 trusted dependency or deployment snapshot was supplied by this integration slice.");
+    output.appendLine("No independently trusted dependency, CapabilityContracts, Evidence or IngressCatalog publication is currently attached to this Compiler request. Compiler Check will report resulting linking gaps; Studio does not synthesize Owner authorization.");
     return {procedure,root,request};
   }
 
@@ -332,7 +319,7 @@ export function registerCompilerIntegration(vscode,context,{
     const prepared=await assembleRequest(target);
     if(!prepared)return null;
     return withProgress("Checking Skill · Compiler "+COMPILER_VERSION,async progress=>{
-      progress.report({message:"Running authoritative CA-SL v1alpha4 Check…"});
+      progress.report({message:"Running CA-SL v1alpha5 Compiler Check…"});
       const result=await client.request("check",prepared.request);
       if(!Array.isArray(result))throw new Error("Compiler Check returned an invalid Diagnostic[] response");
       publishDiagnostics(prepared.root.uri,prepared.root.name,
@@ -355,10 +342,10 @@ export function registerCompilerIntegration(vscode,context,{
     const prepared=await assembleRequest(target);
     if(!prepared)return null;
     return withProgress("Building Skill · Compiler "+COMPILER_VERSION,async progress=>{
-      progress.report({message:"Compiling and linking CA-SL v1alpha4…"});
+      progress.report({message:"Compiling and linking CA-SL v1alpha5…"});
       const result=await client.request("build",prepared.request);
       if(!isCompilerBuildResult(result)){
-        throw new Error("Compiler BuildResult does not match the frozen v1alpha4 output contract");
+        throw new Error("Compiler BuildResult does not match the frozen v1alpha5 output contract");
       }
       if(!result.success&&result.outputFiles.length){
         throw new Error("Compiler violated failure-atomicity: failed BuildResult contains output files");
@@ -392,22 +379,22 @@ export function registerCompilerIntegration(vscode,context,{
     const prepared=await assembleRequest(target);
     if(!prepared)return null;
     return withProgress("Inspecting Dependencies · Compiler "+COMPILER_VERSION,async progress=>{
-      progress.report({message:"Inspecting only supplied v1alpha4 immutable snapshots…"});
+      progress.report({message:"Inspecting only independently supplied v1alpha5 immutable snapshots…"});
       const result=await client.request("inspect",prepared.request);
       if(!isCompilerInspection(result)){
-        throw new Error("Compiler DependencyInspection does not match the frozen v1alpha4 output contract");
+        throw new Error("Compiler DependencyInspection does not match the frozen v1alpha5 output contract");
       }
       output.appendLine("DependencyInspection · "+result.callables.length+
         " callable(s) · "+result.schemas.length+" Schema(s) · "+
         result.diagnostics.length+" diagnostic(s)");
       if(!result.callables.length&&!result.schemas.length){
-        output.appendLine("No trusted v1alpha4 dependency snapshots were supplied; legacy v0.1 imports are intentionally not exposed as verified Owner contracts.");
+        output.appendLine("No trusted dependency snapshots were supplied; Studio-only project records are not Owner qualification evidence.");
       }
       output.show(true);
       void vscode.window.showInformationMessage(
         "Compiler DependencyInspection: "+result.callables.length+
         " callable(s), "+result.schemas.length+" Schema(s); "+
-        (result.diagnostics.length?"see Compiler Output":"no trusted v1alpha4 snapshots supplied"));
+        (result.diagnostics.length?"see Compiler Output":"no trusted v1alpha5 snapshots supplied"));
       return result;
     });
   }
@@ -456,8 +443,8 @@ export function registerCompilerIntegration(vscode,context,{
     context.subscriptions.push(vscode.commands.registerCommand(
       "skillStudio.internal.compilerWorkerAcceptance",async()=>{
         const request={
-          apiVersion:"connectionagent.io/compiler-build-request/v1alpha4",
-          languageTarget:"connectionagent.io/v1alpha4",
+          apiVersion:"connectionagent.io/compiler-build-request/v1alpha5",
+          languageTarget:"connectionagent.io/v1alpha5",
           files:[
             {
               path:"skills/compiler-smoke/SKILL.md",
@@ -484,10 +471,10 @@ export function registerCompilerIntegration(vscode,context,{
           throw new Error("Compiler Worker did not preserve failure-atomic BuildResult semantics");
         }
         if(!isCompilerInspection(inspect)){
-          throw new Error("Compiler Worker did not return DependencyInspection v1alpha4");
+          throw new Error("Compiler Worker did not return DependencyInspection v1alpha5");
         }
         return {
-          compilerVersion:COMPILER_VERSION,languageTarget:"connectionagent.io/v1alpha4",
+          compilerVersion:COMPILER_VERSION,languageTarget:COMPILER_LANGUAGE_TARGET,
           checkDiagnostics:check.length,buildSuccess:build.success,
           buildOutputFiles:build.outputFiles.length,
           inspectCallables:inspect.callables.length,inspectSchemas:inspect.schemas.length,

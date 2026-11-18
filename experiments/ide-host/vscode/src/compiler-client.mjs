@@ -1,4 +1,4 @@
-// Request/response transport to the pinned Compiler v1.0.0 Go/WASM Worker.
+// Request/response transport to the pinned Compiler v2.0.0 Go/WASM Worker.
 // All filesystem access and BuildRequest assembly remain in the extension host.
 function workerResourceUrl(uri) {
   const value = uri.toString(true);
@@ -42,11 +42,11 @@ export function createCompilerWorkerClient(vscode, context, {
     if (disposed) throw new Error("Compiler Worker client has been disposed");
     if (worker) return worker;
     if (typeof WorkerCtor !== "function") {
-      throw new Error("This host does not provide browser Web Workers; Compiler v1.0.0 is available in the browser-only Theia host");
+      throw new Error("This host does not provide browser Web Workers; Compiler v2.0.0 is available in the Theia browser host when Web Workers are available");
     }
     const uri = vscode.Uri.joinPath(context.extensionUri, "dist", "compiler-worker.js");
     const current = new WorkerCtor(workerResourceUrl(uri), {
-      name: "skill-studio-compiler-v1alpha4"
+      name: "skill-studio-compiler-v1alpha5"
     });
     worker = current;
     current.addEventListener("error", event => {
