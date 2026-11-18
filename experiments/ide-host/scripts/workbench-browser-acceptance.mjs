@@ -712,7 +712,7 @@ export async function runWorkbenchAcceptance({
     const packageSnapshot=languageServiceDiagnostics?.languagePackages?.find(
       item=>item.rootUri===expectedPackageRoot);
     const expectedPartialReason=
-      "CA-SL v1alpha5 source parsed; trusted Owner/Capability/Schema linking requires v1alpha5 Compiler and published snapshots";
+      "CA-SL v1alpha5 source parsed; static Package qualification requires the v1alpha5 Compiler";
     if(languageServiceDiagnostics?.languageClientStarted!==true||
        languageServiceDiagnostics?.languageTransportFailure||
        !languagePackage||
