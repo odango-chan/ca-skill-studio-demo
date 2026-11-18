@@ -106,12 +106,16 @@ test("Unicode, unsafe and overlong source paths cannot escape current package",(
     "skills/establish-pdu-session/assurance\\contract.yaml",
     "skills/establish-pdu-session//contract.yaml",
     "skills/establish-pdu-session/assurance/./contract.yaml",
-    "skills/establish-pdu-session/a\u0000b.yaml",
-    "skills/establish-pdu-session/"+"x".repeat(260)+".yaml"
+    "skills/establish-pdu-session/a\u0000b.yaml"
   ]){
     const [item]=normalizeCompilerDiagnostics([
       diagnostic({path,code:"SOURCE_PATH_INVALID"})
     ],options);
     assert.equal(item.locationKind,"request",path);
   }
+  assert.throws(()=>normalizeCompilerDiagnostics([
+    diagnostic({path:"skills/establish-pdu-session/"+"x".repeat(260)+".yaml",
+      code:"SOURCE_PATH_INVALID"})
+  ],options),/Malformed Compiler diagnostic envelope/,
+  "a path exceeding the Compiler v1alpha5 envelope limit is rejected outright");
 });
