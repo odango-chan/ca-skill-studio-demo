@@ -15,7 +15,7 @@ This folder contains the first host-neutral model-client and proposal-validation
 - The model cannot author source offsets, file paths, candidate YAML, WorkspaceEdit, atomic groups or validation state.
 - Every evidence reference must resolve to an ID in the exact Context Pack manifest supplied by the host.
 
-The host-neutral model / proposal core is still separate from editor integration. The v1alpha5 Semantic Patch Engine now exists as a separate Host-owned module and computes atomic groups / source edits, but it is not yet wired to the Authoring Editor Tab, Theia Host Adapter, native WorkspaceEdit or Compiler Check.
+The host-neutral model / proposal core and v1alpha5 Semantic Patch Engine are integrated by PR #208 into a standalone Editor Tab and Host orchestration. The Editor generates source-preserving candidate previews and has a native WorkspaceEdit apply path, but Apply is deliberately disabled until the complete authoritative v1alpha5 Compiler returns PASS for the exact candidate and base revision.
 
 ## Tests
 
@@ -31,6 +31,6 @@ npm test
 - The core accepts only `connectionagent.io/v1alpha5`; it never falls back to the published v1alpha4 Compiler or parser.
 - The model prompt treats Node-entry Wait as control before the first business stage. It cannot invent trusted IngressCatalog / Owner / correlation contracts.
 - `wait.event.source` is a legitimate selector field only inside the typed Wait event object; generic source-authority fields remain rejected.
-- The full v1alpha5 Compiler is not yet available. A partial WP2 parser result is not a full candidate Check PASS.
+- Compiler PR #38 consolidates WP1–WP8 but remains CANDIDATE_PARTIAL; inherited package admission and ordinary non-Wait Tool / Owner / Schema linking and other inherited static semantics are incomplete. A partial candidate is not a full v1alpha5 Check PASS.
 
 See [v1alpha5 Semantic Patch Engine](PATCH-ENGINE-v1alpha5.md) for the patch allowlist and explicit validation boundary.

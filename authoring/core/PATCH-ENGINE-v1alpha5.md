@@ -36,4 +36,4 @@ All Wait field edits for one Node are one atomic group. A complete Wait replacem
 
 The patcher does not resolve the selector against trusted Ingress Operation exports, prove correlation registration before a triggering Operation, construct `armInputSchema`, prove the Wait control-flow graph, perform path-sensitive `wait.output` availability / type checks, validate response-boundary post-dominance, or qualify a protocol response mapping. These are authoritative v1alpha5 Compiler / trusted Integration responsibilities.
 
-The published Compiler v1.0.0 is v1alpha4-only and must never be used for a v1alpha5 candidate. Compiler PR #30 currently has a v1alpha5 WP2 parser / AST slice; until its full static pipeline is available, the candidate Check state remains BLOCKED / NOT_RUN rather than PASS.
+The published Compiler v1.0.0 is v1alpha4-only and must never be used for a v1alpha5 candidate. Compiler PR #38 is the sole v1alpha5 integration candidate. It consolidates WP1–WP8 but remains CANDIDATE_PARTIAL; until the inherited static pipeline is complete, the candidate Check state remains BLOCKED / NOT_RUN rather than PASS.
