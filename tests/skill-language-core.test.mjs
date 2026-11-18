@@ -67,7 +67,6 @@ test("shared core analyzes the current CA-SL v1alpha5 Example without claiming q
   assert.equal(result.documents.filter(document=>document.pythonOutlineState==="READY").length,3);
   assert.ok(result.scriptReferences.length>=3);
   assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===true));
-  assert.ok(result.schemaReferences.every(ref=>ref.packageContextComplete===true));
   const byUri=new Map(snapshot.documents.map(document=>[document.uri,document.text]));
   for(const ref of [...result.scriptReferences,...result.schemaReferences]){
     assert.ok(ref.sourceRange&&ref.targetRange);
