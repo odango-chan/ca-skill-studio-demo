@@ -2971,12 +2971,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
                   }
                 }
               }
-              if(dependency.kind==="schema-bundle"){
-                for(const file of dependency.files){
-                  if(!/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path))continue;
-                  schemas.push({dependencyId:dependency.id,path:file.path,
-                    text:decoder.decode(decodeBase64(file.bytes))});
-                }
+              for(const file of dependency.files){
+                if(!/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path))continue;
+                schemas.push({dependencyId:dependency.id,path:file.path,
+                  text:decoder.decode(decodeBase64(file.bytes))});
               }
             }
             v1alpha5DependencyContext={
