@@ -72,7 +72,7 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(1,"procedures: [\n")
+      params:packageSnapshot(1,"start: check\nnodes:\n  check:\n    operation: [\n")
     });
     const published = await waitForMessage(worker,message=>
       message?.method==="textDocument/publishDiagnostics" &&
@@ -93,7 +93,7 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
     // A delayed old snapshot must not republish its diagnostic after invalidation.
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(1,"procedures: [\n")
+      params:packageSnapshot(1,"start: check\nnodes:\n  check:\n    operation: [\n")
     });
     const stalePublication=await expectNoMessage(worker,message=>
       message?.method==="textDocument/publishDiagnostics" &&
@@ -104,7 +104,7 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
     assert.equal(stalePublication,null,"old generation must not republish diagnostics");
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(2,"procedures: [\n")
+      params:packageSnapshot(2,"start: check\nnodes:\n  check:\n    operation: [\n")
     });
     const latest=await waitForMessage(worker,message=>
       message?.method==="textDocument/publishDiagnostics" &&
@@ -408,11 +408,11 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
     const diagnosticBWait=wait("Package B initial diagnostic",diagnosticFor(procedureB,1));
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(1,"procedures: [\n",rootA)
+      params:packageSnapshot(1,"start: check\nnodes:\n  check:\n    operation: [\n",rootA)
     });
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(1,"procedures: [\n",rootB)
+      params:packageSnapshot(1,"start: check\nnodes:\n  check:\n    operation: [\n",rootB)
     });
     const [statusA,statusB,publishedA,publishedB]=await Promise.all([
       statusAWait,statusBWait,diagnosticAWait,diagnosticBWait
@@ -441,7 +441,7 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
     const republishedAWait=wait("Package A reopened diagnostic",diagnosticFor(procedureA,2));
     worker.postMessage({
       jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
-      params:packageSnapshot(2,"procedures: [\n",rootA)
+      params:packageSnapshot(2,"start: check\nnodes:\n  check:\n    operation: [\n",rootA)
     });
     const [reopened,republishedA]=await Promise.all([
       reopenedStatusWait,republishedAWait
