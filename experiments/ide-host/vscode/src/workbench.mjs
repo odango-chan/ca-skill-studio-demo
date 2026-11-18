@@ -2727,7 +2727,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       getChildren:item=>item?.children??(id==='problems'
         ? [{label:auditStatus,children:[]},...([...(snapshot?.problems??[]),...audit,
           ...(compilerProblemsProvider?.getProblems?.()??[])].map(d=>({
-            kind:d.kind??'problem',label:d.message,line:d.line,column:d.column,
+            kind:d.kind??'problem',label:d.message,message:d.message,line:d.line,column:d.column,
             uri:d.uri,code:d.code,severity:d.severity,status:d.status,
             domain:d.domain,category:d.category,sourcePath:d.sourcePath,
             description:[
