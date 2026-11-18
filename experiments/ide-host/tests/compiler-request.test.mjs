@@ -7,6 +7,7 @@ import {
   COMPILER_INSPECTION_VERSION,
   assertCompilerLanguageTarget,
   createCompilerBuildRequest,
+  compilerArtifactRelativePath,
   isCompilerBuildResult,
   isCompilerInspection
 } from "../vscode/src/compiler-request.mjs";
@@ -114,4 +115,21 @@ test("Studio may pass only explicitly supplied v1alpha5 trusted build context",(
     trustedBuildContext
   });
   assert.deepEqual(request.trustedBuildContext,trustedBuildContext);
+});
+
+test("Compiler v2 Artifact projection admits root manifest and selected compiled source only",()=>{
+  assert.equal(compilerArtifactRelativePath("establish-pdu-session","manifest.json"),
+    "manifest.json");
+  assert.equal(compilerArtifactRelativePath("establish-pdu-session",
+    "skills/establish-pdu-session/compiled/procedure.json"),"compiled/procedure.json");
+  assert.equal(compilerArtifactRelativePath("establish-pdu-session",
+    "skills/establish-pdu-session/compiled/ingress-links.json"),"compiled/ingress-links.json");
+  for(const path of [
+    "skills/other/compiled/procedure.json",
+    "skills/establish-pdu-session/assurance/procedure.yaml",
+    "skills/establish-pdu-session/compiled/../outside.json",
+    "skills/establish-pdu-session/compiled/",
+    "other-manifest.json",
+    "skills/establish-pdu-session/compiled/x\\y.json"
+  ])assert.throws(()=>compilerArtifactRelativePath("establish-pdu-session",path));
 });
