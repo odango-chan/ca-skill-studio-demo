@@ -322,13 +322,6 @@ export function auditV1Alpha5Package({
         "schemas");
       return;
     }
-    if(declaration.kind!=="schema-bundle"){
-      add(diagnostics,path,source,node,"SCHEMA_DEPENDENCY_KIND_MISMATCH",
-        label+" requires a Schema Bundle, but dependency "+alias+
-          " is declared as "+declaration.kind,
-        {domain:"schemas",category:"linking"});
-      return;
-    }
     const candidates=schemas.filter(item=>item.dependencyId===alias);
     if(!candidates.length){
       addNotChecked(diagnostics,path,source,node,"SCHEMA_EXPORT_NOT_CHECKED",
