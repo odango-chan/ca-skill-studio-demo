@@ -237,7 +237,8 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     RelativePattern:class {constructor(base,pattern){Object.assign(this,{base,pattern});}},
     ViewColumn:{One:1,Two:2,Beside:2},
     FileType:{File:1,Directory:2,SymbolicLink:64},
-    Uri:{joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
+    Uri:{parse(value){return uri(String(value).replace(/^file:\/\//,''));},
+      joinPath(_base,...parts){return {toString(){return 'https://studio.invalid/'+parts.join('/');}};}},
     extensions:{getExtension(id){return id==='vscode.markdown-language-features'?{
       extensionUri:uri('/extensions/vscode.markdown-language-features'),isActive:markdownExtensionActivated,
       async activate(){markdownExtensionActivated=true;this.isActive=true;return {};}
