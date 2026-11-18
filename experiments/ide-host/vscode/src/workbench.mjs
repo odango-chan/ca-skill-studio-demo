@@ -2972,7 +2972,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
                 }
               }
               for(const file of dependency.files){
-                if(!/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path))continue;
+                const schemaFile=dependency.kind==="schema-bundle"
+                  ?/\.(?:json|ya?ml)$/i.test(file.path)
+                  :/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path);
+                if(!schemaFile)continue;
                 schemas.push({dependencyId:dependency.id,path:file.path,
                   text:decoder.decode(decodeBase64(file.bytes))});
               }
