@@ -2922,7 +2922,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           for(const uri of found){
             if(!uri.path.startsWith(base.path))continue;
             const path=uri.path.slice(base.path.length);uris.set(path,uri);
-            if(!/\.(yaml|json|py|md)$/.test(path)){files.set(path,{text:''});continue;}
+            if(!/\.(?:ya?ml|json|py|md|txt|sh|toml|xml|csv|jsonl|ini|cfg|js|ts|mjs|cjs)$/i.test(path)){files.set(path,{text:''});continue;}
             const open=vscode.workspace.textDocuments.find(d=>
               d.uri.toString()===uri.toString());
             const text=open?open.getText():new TextDecoder().decode(
