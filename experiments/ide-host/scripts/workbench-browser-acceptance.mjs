@@ -568,7 +568,8 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
 
 
 export async function runWorkbenchAcceptance({
-  command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false,procedureUri
+  command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp=false,
+  requireCompilerWorker=false,procedureUri
 }){
   if(!requireEditor)return {required:false};
   const defaultProcedureUri=String(procedureUri??"");
@@ -1258,6 +1259,33 @@ export async function runWorkbenchAcceptance({
     view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
     "final default v1alpha5 Procedure graph");
 
+  // This is the actual released Go/WASM Worker, not a JS contract mock.
+  // An unqualified Example must yield source-backed Compiler diagnostics, and
+  // Build must remain failure-atomic without trusted Owner/Deployment inputs.
+  if(requireCompilerWorker){
+    const smoke=await nativeCommand("skillStudio.internal.compilerWorkerAcceptance");
+    if(smoke?.compilerVersion!=="v2.0.0"||
+       smoke?.languageTarget!=="connectionagent.io/v1alpha5"||
+       smoke?.workerTransport!=="PASS"||
+       smoke?.artifactFailureAtomicity!=="PASS")
+      throw Error("Released Compiler v2 Worker smoke failed: "+JSON.stringify(smoke));
+    const check=await nativeCommand("skillStudio.checkSkill",defaultProcedureUri);
+    if(!Array.isArray(check?.diagnostics)||!check.errors||
+       !check.diagnostics.every(item=>item.phase==="C_STATIC"||
+         item.phase==="C_WARNING"))
+      throw Error("Real Compiler v2 Check failed to report trusted-link gaps: "+
+        JSON.stringify({errors:check?.errors,warnings:check?.warnings,
+          codes:check?.diagnostics?.map(x=>x.code).slice(0,20)}));
+    const build=await nativeCommand("skillStudio.buildSkill",defaultProcedureUri);
+    if(build?.success!==false||build.outputFiles?.length!==0)
+      throw Error("Unqualified Example emitted an unexpected Compiler v2 Artifact: "+
+        JSON.stringify({success:build?.success,outputs:build?.outputFiles?.length}));
+    console.log("STUDIO_COMPILER_V2_REAL_WORKER_CHROMIUM",JSON.stringify({
+      ...smoke,checkErrors:check.errors,checkWarnings:check.warnings,
+      checkCodes:[...new Set(check.diagnostics.map(item=>item.code))].slice(0,16),
+      buildSuccess:build.success,buildOutputFiles:build.outputFiles.length
+    }));
+  }
   const dualSkillExplorer={
     root:"skill-studio-demo/skills",
     conventionalFolder:"establish-pdu-session",
