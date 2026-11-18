@@ -15,7 +15,7 @@ This folder contains the first host-neutral model-client and proposal-validation
 - The model cannot author source offsets, file paths, candidate YAML, WorkspaceEdit, atomic groups or validation state.
 - Every evidence reference must resolve to an ID in the exact Context Pack manifest supplied by the host.
 
-This is not yet the full Authoring Core. It does not provide the Authoring Editor Tab, compute atomic groups, patch YAML or apply edits. The v1alpha5 Semantic Patch Engine remains a separate Host-owned implementation gate.
+The host-neutral model / proposal core is still separate from editor integration. The v1alpha5 Semantic Patch Engine now exists as a separate Host-owned module and computes atomic groups / source edits, but it is not yet wired to the Authoring Editor Tab, Theia Host Adapter, native WorkspaceEdit or Compiler Check.
 
 ## Tests
 
@@ -32,3 +32,5 @@ npm test
 - The model prompt treats Node-entry Wait as control before the first business stage. It cannot invent trusted IngressCatalog / Owner / correlation contracts.
 - `wait.event.source` is a legitimate selector field only inside the typed Wait event object; generic source-authority fields remain rejected.
 - The full v1alpha5 Compiler is not yet available. A partial WP2 parser result is not a full candidate Check PASS.
+
+See [v1alpha5 Semantic Patch Engine](PATCH-ENGINE-v1alpha5.md) for the patch allowlist and explicit validation boundary.

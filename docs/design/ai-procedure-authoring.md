@@ -1,7 +1,7 @@
 # AI Procedure Authoring Workbench
 
 **Status: Proposed · Product decisions approved; CA-SL v1alpha5 Preview target · detailed design awaiting review**  
-**Implementation: Gateway spike PARTIAL · Authoring Core foundation PARTIAL · Editor / Agent integration NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
+**Implementation: Gateway PARTIAL · Authoring Core PARTIAL · v1alpha5 Semantic Patch Engine PARTIAL (PR #207) · Editor / Host integration NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
 **Tracking: [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200)**
 
 This document defines the first AI-assisted authoring capability for Skill Studio. It is a Studio editing feature, not a CA-SL language extension, Compiler feature, Host capability or Runtime feature.
@@ -42,7 +42,7 @@ The current Theia workbench already provides useful host infrastructure:
 - The production GitHub Pages application is static hosting. It has no trusted server process in which to keep a shared provider key. The Pages bundle, browser storage, Webview and VSIX are all client-controlled and must never contain the shared provider credential. A separate Gateway service is required.
 - The current Studio extension is a VS Code Web Extension hosted by Theia. VS Code documents that Web Extensions can also run on Desktop and Web, but their runtime does not provide Node.js APIs. This makes the current browser-compatible extension a useful portability baseline, not proof that every Desktop / Remote host mode is already supported ([VS Code Web Extensions](https://code.visualstudio.com/api/extension-guides/web-extensions)).
 
-There is an important version boundary. The current Studio LSP / Procedure Designer baseline is still the published, frozen CA-SL v1alpha4 projection; it is read-only and MUST NOT be used to interpret or patch a v1alpha5 Procedure. CA-SL v1alpha5 Preview inherits the immutable v1alpha4 normative baseline and adds Node-entry Event Wait through Appendix L. P1 MUST implement a v1alpha5-specific semantic patch layer and MUST NOT fall back to the v1alpha4 parser, patch engine or Compiler API.
+There is an important version boundary. The current Studio LSP / Procedure Designer baseline is still the published, frozen CA-SL v1alpha4 projection; it is read-only and MUST NOT be used to interpret or patch a v1alpha5 Procedure. PR #207 now provides a separate v1alpha5 patch engine, but no v1alpha5 LSP / Designer or Theia Host Adapter has been integrated yet. CA-SL v1alpha5 Preview inherits the immutable v1alpha4 normative baseline and adds Node-entry Event Wait through Appendix L. P1 MUST implement a v1alpha5-specific semantic patch layer and MUST NOT fall back to the v1alpha4 parser, patch engine or Compiler API.
 
 The exact development pins are:
 - CA-SL v1alpha5 Preview single-file candidate: `odango-chan/ca-skills@d3f89dfafbf218e5e95c97a974004362b7b967b6` (PR #61).
@@ -388,7 +388,7 @@ The initial Studio-private envelope is `ca-studio.ai-model-proposal/v1`:
 }
 ~~~
 
-The model does not author operation IDs, atomic groups, base revision, write scope, source spans, candidate Source or validation state. `target` contains semantic identifiers only; `references` must resolve to IDs in the exact Context Pack manifest supplied to the model. `payload` is bounded JSON and the generic validator rejects source text, paths, offsets, WorkspaceEdit and host-owned fields. Each operation's payload still requires operation-specific validation by the v1alpha4 Patch Engine before it can enter an applicable Change Set. This private envelope is an initial implementation contract, not a CA-SL normative syntax or a frozen public API.
+The model does not author operation IDs, atomic groups, base revision, write scope, source spans, candidate Source or validation state. `target` contains semantic identifiers only; `references` must resolve to IDs in the exact Context Pack manifest supplied to the model. `payload` is bounded JSON and the generic validator rejects source text, paths, offsets, WorkspaceEdit and host-owned fields. Each operation's payload still requires operation-specific validation by the v1alpha5 Patch Engine before it can enter an applicable Change Set. This private envelope is an initial implementation contract, not a CA-SL normative syntax or a frozen public API.
 
 The model MUST NOT return trusted source offsets, arbitrary file paths, raw replacement Source, a complete candidate YAML file, a direct WorkspaceEdit or instructions to execute Tools / Runtime actions.
 
@@ -541,9 +541,9 @@ After Apply, the native document change triggers the existing Source / Visual / 
 
 A fixture provider may be used for deterministic UI / Patch Engine tests. It must be clearly identified as a test fixture and cannot be reported as a working AI integration.
 
-**Current Slice A status:** the host-neutral Context Pack builder, Access-credentialed Gateway client, Procedure proposal orchestrator and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203). A cross-layer test invokes the Worker handler through the Core client; the full PR workflow passed [run #44078436663](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44078436663). The Host-owned Change Set envelope is implemented in [PR #204](https://github.com/odango-chan/ca-skill-studio-demo/pull/204); its full PR workflow passed [run #44078544757](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44078544757). Host-side collection from live TextDocuments, Editor Tab integration, atomic grouping and the Patch Engine remain NOT_STARTED.
+**Current Slice A status:** the host-neutral Context Pack builder, Access-credentialed Gateway client, Procedure proposal orchestrator and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203), now aligned to v1alpha5 Preview. The Host-owned Change Set envelope is implemented in [PR #204](https://github.com/odango-chan/ca-skill-studio-demo/pull/204), also aligned to v1alpha5. Their exact-head CI must be rerun after the v1alpha5 changes; older v1alpha4-targeted run results are not acceptance evidence for the current heads. The first v1alpha5 source patcher and atomic Wait groups are implemented in [PR #207](https://github.com/odango-chan/ca-skill-studio-demo/pull/207); exact-head CI is in progress after fixing two first-run test failures. Live TextDocument collection, Editor Tab, Theia Host Adapter, native WorkspaceEdit and full v1alpha5 Compiler Check remain NOT_STARTED.
 
-**Current Slice B status:** the restricted Cloudflare Access Worker, per-identity Rate Limiting binding, deployment-selected model, request / output limits, JSON + SSE response modes, cancellation and deterministic tests are implemented in [PR #206](https://github.com/odango-chan/ca-skill-studio-demo/pull/206). Exact-head Gateway CI and Wrangler dry-run passed [run #44077321845](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44077321845); live Cloudflare deployment, Pages-origin Access login and provider request remain NOT_RUN.
+**Current Slice B status:** the restricted Cloudflare Access Worker, per-identity Rate Limiting binding, deployment-selected model, request / output limits, JSON + SSE response modes, cancellation and deterministic tests are implemented in [PR #206](https://github.com/odango-chan/ca-skill-studio-demo/pull/206). The Worker implementation commit passed CI and Wrangler dry-run [run #44077321845](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44077321845); the current stacked branch includes documentation alignment and requires exact-head recheck. Live Cloudflare deployment, Pages-origin Access login and provider request remain NOT_RUN.
 
 The online path is implemented first, but every P1 boundary is designed so the later Desktop and intranet profiles reuse the same Authoring Core, Gateway protocol, proposal schema and patch engine.
 
@@ -582,7 +582,7 @@ Desktop / Web Extension and intranet Gateway compatibility are explicit follow-u
 6. **Initial Context Pack byte budget:** the core starts at a 128 KiB serialized cap, leaving headroom under the Gateway's 256 KiB body limit. Validate actual prompt overhead and provider context limits during the live model spike; never silently truncate.
 7. **Operation allowlist:** finalize exact v1alpha5 CST patch operations, including Node-entry Wait, and source-preservation limits during Slice E.
 
-The product decisions in Section 1 and the cross-host architecture direction are approved. The detailed technical design remains Proposed until the online Gateway is deployed and exercised, the shared-core / proposal contracts are reviewed, and the v1alpha4 patch-engine spike is completed.
+The product decisions in Section 1 and the cross-host architecture direction are approved. The detailed technical design remains Proposed until the v1alpha5 Compiler pipeline is complete, the Gateway is deployed and exercised, the shared-core / proposal contracts and v1alpha5 patch engine are reviewed, and the full Editor Tab → Patch → Compiler Check → native buffer apply workflow passes browser acceptance.
 
 ## Implementation ownership summary
 
