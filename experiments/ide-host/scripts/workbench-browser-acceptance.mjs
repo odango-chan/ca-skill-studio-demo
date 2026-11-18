@@ -91,6 +91,22 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     "contentPos:cr.width>0&&cr.height>0?{x:Math.round(cr.x+cr.width/2),y:Math.round(cr.y+cr.height/2)}:null,"+
     "visible:cr.width>0&&cr.height>0&&cr.x<innerWidth&&cr.y<innerHeight&&cr.right>0&&cr.bottom>0};"+
     "});})()");
+  async function revealTreeRow(row,label){
+    const id=row?.nodeIds?.[0];
+    if(!id)throw Error('Native tree row has no node ID: '+label+' '+JSON.stringify(row));
+    const target=await evalJS(`(()=>{
+      const anchor=[...document.querySelectorAll('[data-node-id]')].
+        find(el=>el.getAttribute('data-node-id')===${JSON.stringify(id)});
+      const rowEl=anchor?.closest('.theia-TreeNode');
+      if(!rowEl)return {found:false};
+      rowEl.scrollIntoView({block:'center',inline:'nearest'});
+      const r=rowEl.getBoundingClientRect();
+      return {found:true,visible:r.width>0&&r.height>0&&r.x<innerWidth&&r.y<innerHeight&&r.right>0&&r.bottom>0};
+    })()`);
+    if(!target?.found)throw Error('Native tree row is not reachable: '+label+' '+JSON.stringify({target,row}));
+    return target;
+  }
+
   // Resolve the exact live TreeView node after scrolling it into view. A
   // stale centre point can hit an overlapping selected row instead of the
   // requested Theia expansion toggle, particularly in the second Package.
@@ -268,8 +284,15 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       const range=packageRange(rows,name);
       if(!range){await sleep(120);continue;}
       const group=rows.slice(range.index+1,range.end).find(row=>
-        row.visible&&row.text.includes('Assurance · 3/3 core'));
-      if(group)return {rows,range};
+        row.text.includes('Assurance · 3/3 core'));
+      if(group){
+        if(!group.visible){
+          await revealTreeRow(group,name+' Assurance group');
+          await sleep(80);
+          continue;
+        }
+        return {rows,range};
+      }
       const packageRow=rows[range.index];
       const toggle=packageRow.togglePos;
       if(!toggle)throw Error('Package row has no visible expansion toggle: '+
