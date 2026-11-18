@@ -2733,9 +2733,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       ...(snapshot?.problems??[]),...audit,
       ...(compilerProblemsProvider?.getProblems?.()??[])
     ];
+    const seen=new Set();
     for(const diagnostic of diagnostics){
       const kind=diagnostic.kind??"problem";
       const domain=diagnostic.domain??(kind==="compiler-diagnostic"?"compiler":"source");
+      const location=diagnostic.uri?.toString?.()??diagnostic.path??diagnostic.sourcePath??"";
+      const identity=[diagnostic.code??"",location,diagnostic.line??0,
+        diagnostic.column??0,diagnostic.message??""].join("|");
+      if(seen.has(identity))continue;
+      seen.add(identity);
       if(!groups.has(domain)){
         groups.set(domain,{
           kind:"problem-group",domain,
