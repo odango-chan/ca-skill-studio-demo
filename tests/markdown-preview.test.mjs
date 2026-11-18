@@ -22,7 +22,7 @@ test("SKILL.md frontmatter is readable and actual fixture renders as a document"
     assert.equal(result.available,true);
     assert.match(result.html,/<details class="md-frontmatter" data-source-line="0">/);
     assert.match(result.html,/<h1(?: id="[^"]+")? data-source-line="\d+">[^<]+<\/h1>/);
-    assert.match(result.html,/<h2(?: id="[^"]+")? data-source-line="\d+">Purpose<\/h2>/);
+    assert.match(result.html,/<h2(?: id="[^"]+")? data-source-line="\d+">Scope and successful progression<\/h2>/);
     assert.doesNotMatch(result.html,/<script\b/i);
   }
 });
@@ -100,7 +100,7 @@ test("current v1alpha5 Skill guides render safely and expose only explicit Packa
   const linked=renderMarkdown(source,{
     localLinks:true,localFiles:packageFiles,relativeDir:""
   }).html;
-  assert.match(linked,/data-local-path="assurance\/openamsm-operation-mapping\.md"/);
+  assert.match(linked,/data-local-path="references\/openamsm-operation-mapping\.md"/);
   assert.doesNotMatch(linked,/data-local-path="\.\.\//);
 });
 
