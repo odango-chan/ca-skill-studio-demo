@@ -6,7 +6,7 @@ import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
   from "../site/route-connect.mjs";
 import {applyAddRouteOutcome} from "../site/route-create.mjs";
 
-const load=name=>readFileSync(new URL("../site/samples/packages/"+
+const load=name=>readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
   name+"/assurance/procedure.yaml",import.meta.url),"utf8");
 const ensure=load("ensure-pdu-session");
 const created=load("establish-pdu-session");

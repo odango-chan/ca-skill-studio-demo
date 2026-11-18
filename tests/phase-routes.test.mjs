@@ -6,7 +6,7 @@ import {routeProjectionSignature} from "../site/route-create.mjs";
 import {phaseRouteTargetOptions,previewPhaseRouteTarget,
   applyPhaseRouteTarget} from "../site/phase-routes.mjs";
 
-const source=readFileSync(new URL("../site/samples/packages/"+
+const source=readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
   "establish-pdu-session/assurance/procedure.yaml",import.meta.url),"utf8");
 const pid="ue-requested-pdu-session-establishment";
 const sub="nudm-sdm-subscribe";
