@@ -59,7 +59,8 @@
     "onCommand:skillStudio.showWelcome",
     "onCommand:skillStudio.checkSkill",
     "onCommand:skillStudio.buildSkill",
-    "onCommand:skillStudio.inspectCompilerDependencies"
+    "onCommand:skillStudio.inspectCompilerDependencies",
+    "onCommand:skillStudio.openAiAuthoring"
   ],
   "contributes": {
     "colors": [
@@ -106,6 +107,10 @@
       {
         "command": "skillStudio.openProcedure",
         "title": "SKILL Studio: Open Procedure Visual"
+      },
+      {
+        "command": "skillStudio.openAiAuthoring",
+        "title": "%ai.authoring%"
       },
       {
         "command": "skillStudio.loadExample",
@@ -238,7 +243,13 @@
       }
     ],
     "menus": {
-      "editor/title": [],
+      "editor/title": [
+        {
+          "command": "skillStudio.openAiAuthoring",
+          "when": "resourceFilename == procedure.yaml",
+          "group": "navigation@1"
+        }
+      ],
       "explorer/context": [
         {
           "command": "skillStudio.openSchema",
@@ -607,6 +618,12 @@
           "default": "all",
           "scope": "application",
           "markdownDescription": "Default Compiler v1.0.0 target selection. The current integration builds the selected Skill Package explicitly."
+        },
+        "connectionAgent.skillStudio.ai.gatewayUrl": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "markdownDescription": "Base HTTPS URL of the Cloudflare Access-protected AI Gateway Worker. The Studio appends /v1/chat/completions. Do not enter a Provider API Key here; provider credentials remain server-side."
         }
       }
     }

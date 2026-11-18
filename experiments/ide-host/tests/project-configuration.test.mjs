@@ -36,13 +36,15 @@ function host(roots=[path("/workspace/a"),path("/workspace/b")]){
   };
   return {vscode,writes,configs,listeners};
 }
-test("extension contributes exactly the four native settings with correct scopes",()=>{
+test("extension contributes project settings and a separate user-scoped AI Gateway URL",()=>{
   const props=manifest.contributes.configuration.properties;
   assert.deepEqual(Object.keys(props).sort(),[
     "connectionAgent.skillStudio.skillsRoot","connectionAgent.skillStudio.dependencies",
     "connectionAgent.skillStudio.dependencyLock",
-    "connectionAgent.skillStudio.defaultBuildTarget"].sort());
+    "connectionAgent.skillStudio.defaultBuildTarget",
+    "connectionAgent.skillStudio.ai.gatewayUrl"].sort());
   assert.equal(props["connectionAgent.skillStudio.defaultBuildTarget"].scope,"application");
+  assert.equal(props["connectionAgent.skillStudio.ai.gatewayUrl"].scope,"application");
   for(const key of ["skillsRoot","dependencies","dependencyLock"])
     assert.equal(props["connectionAgent.skillStudio."+key].scope,"resource");
 });

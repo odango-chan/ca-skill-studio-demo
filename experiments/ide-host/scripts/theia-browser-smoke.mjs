@@ -2040,8 +2040,116 @@ try{
       !String(patchEvidence.routeCreate?.reconnect?.undo?.routeOption??"").includes("→ unresolved")))
     throw Error("Theia Node Focus / PRE-OP-POST / Source line jump acceptance failed: "+
       JSON.stringify({nodeFocus:patchEvidence.nodeFocus,routeCreate:patchEvidence.routeCreate}).slice(0,5000));
+  let aiAuthoringEvidence=null;
+  if(requireEditor){
+    // Exercise the real VS Code-compatible WebviewPanel command in the
+    // backend-backed Theia host. The static Browser-Only shell has no mounted
+    // Package workspace and therefore cannot perform this workspace-bound test.
+    const opened=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      if(!key)throw Error('Native command registry missing for AI Authoring');
+      const result=await c.get(key).executeCommand('skillStudio.openAiAuthoring');
+      window.__aiAuthoringOpenResult=result;
+      return result;
+    })()`);
+    if(opened!==true)
+      throw Error('AI Authoring command did not open the standalone Editor Tab: '+String(opened));
+    let aiContextId=null,aiFrame=null,aiState=null,aiProbes=[];
+    for(let attempt=0;attempt<80&&!aiState;attempt++){
+      const frameTree=await command('Page.getFrameTree');
+      const frames=[];
+      const collectFrames=node=>{
+        if(!node)return;
+        frames.push(node.frame);
+        for(const child of node.childFrames??[])collectFrames(child);
+      };
+      collectFrames(frameTree.frameTree);
+      for(const frame of frames){
+        if(frame.id===page.frameId)continue;
+        let isolated;
+        try{
+          isolated=await command('Page.createIsolatedWorld',{
+            frameId:frame.id,worldName:'skill-studio-ai-authoring-probe',
+            grantUniveralAccess:true
+          });
+          const probe=await command('Runtime.evaluate',{
+            contextId:isolated.executionContextId,returnByValue:true,
+            expression:`Boolean(document.querySelector('#task')&&
+              document.querySelector('#sources')&&document.querySelector('#apply'))`
+          });
+          const found=probe.result?.value===true;
+          aiProbes.push({frameId:frame.id,url:frame.url,found});
+          if(found){aiFrame=frame;aiContextId=isolated.executionContextId;break;}
+        }catch(error){
+          aiProbes.push({frameId:frame.id,url:frame.url,error:String(error).slice(0,180)});
+        }
+      }
+      if(aiContextId){
+        const inspected=await command('Runtime.evaluate',{
+          contextId:aiContextId,returnByValue:true,awaitPromise:true,
+          expression:`(()=>{
+            const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content??'';
+            const sources=[...document.querySelectorAll('#sources .source')].map(row=>({
+              label:row.querySelector('.source-label')?.textContent??'',
+              kind:row.querySelector('.kind')?.textContent??'',
+              checked:row.querySelector('input')?.checked===true,
+              explicitOptIn:row.querySelector('.source-bytes')?.textContent?.includes('每次任务需显式选择')===true
+            }));
+            return {
+              title:document.querySelector('header .heading strong')?.textContent??'',
+              packageInfo:document.querySelector('#packageInfo')?.textContent??'',
+              gatewayNotice:document.querySelector('#gatewayNotice')?.textContent??'',
+              languageBadge:document.querySelector('.topbar .compiler')?.textContent??'',
+              compiler:document.querySelector('.proposal .compiler')?.textContent??'',
+              patchState:document.querySelector('#patchState')?.textContent??'',
+              applyDisabled:document.querySelector('#apply')?.disabled===true,
+              sourceCount:sources.length,sources,
+              csp
+            };
+          })()`
+        });
+        aiState=inspected.result?.value??null;
+        if(aiState?.packageInfo&&!aiState.packageInfo.includes('读取当前 Package'))break;
+        aiState=null;
+      }
+      await sleep(150);
+    }
+    if(!aiState||!aiFrame)
+      throw Error('AI Authoring WebviewPanel did not become ready: '+JSON.stringify({
+        opened,aiFrame,aiProbes,body:(await evalJS('document.body.innerText')).slice(-1600)
+      }));
+    const labels=aiState.sources.map(item=>item.label);
+    const explicit=aiState.sources.filter(item=>item.explicitOptIn);
+    aiAuthoringEvidence={
+      opened,frame:{id:aiFrame.id,url:aiFrame.url},
+      title:aiState.title,packageInfo:aiState.packageInfo,
+      gatewayNotice:aiState.gatewayNotice,languageBadge:aiState.languageBadge,
+      compiler:aiState.compiler,patchState:aiState.patchState,
+      applyDisabled:aiState.applyDisabled,sourceCount:aiState.sourceCount,
+      sourceLabels:labels,explicitOptInDefaults:explicit.map(item=>({
+        label:item.label,checked:item.checked
+      })),
+      csp:aiState.csp
+    };
+    if(aiState.title!=='AI Procedure Authoring'||
+       !aiState.packageInfo.includes('establish-pdu-session')||
+       !aiState.languageBadge.includes('CA-SL v1alpha5')||
+       !aiState.compiler.includes('NOT_RUN')||
+       aiState.applyDisabled!==true||
+       aiState.sourceCount===0||
+       labels.some(label=>label.startsWith('lib/')||label.startsWith('output/'))||
+       explicit.some(item=>item.checked)||
+       !aiState.csp.includes("connect-src 'none'")||
+       !aiState.csp.includes("script-src 'nonce-"))
+      throw Error('AI Authoring Webview context / preview / safety gate acceptance failed: '+
+        JSON.stringify(aiAuthoringEvidence));
+    console.log('STUDIO_AI_AUTHORING_EDITOR_TAB_CHROMIUM',JSON.stringify(aiAuthoringEvidence));
+  }
   if(requireEditor)
-    console.log("THEIA_SAMPLE_IMPORT_PASS; THEIA_NATIVE_CODICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; PHASE_DATAFLOW_EVIDENCE_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS; PACKAGE_OVERVIEW_TWO_SKILLS_PASS");
+    console.log("THEIA_SAMPLE_IMPORT_PASS; THEIA_NATIVE_CODICONS_PASS; SKILL_STUDIO_BRAND_PASS; PROCEDURE_CUSTOM_EDITOR_GRAPH_PASS; SOURCE_PATCH_APPLY_PASS; NATIVE_SOURCE_UNDO_PASS; PHASE_NAMED_STEP_RENAME_PASS; NAMED_VERIFY_AUTHORING_PASS; PHASE_DATAFLOW_EVIDENCE_PASS; NODE_FOCUS_PRE_OP_POST_PASS; SOURCE_LINE_JUMP_PASS; CANVAS_ROUTE_CREATE_DIFF_APPLY_UNDO_PASS; CANVAS_ROUTE_RECONNECT_AMBIGUITY_DIFF_APPLY_UNDO_PASS; PACKAGE_OVERVIEW_TWO_SKILLS_PASS; AI_AUTHORING_EDITOR_TAB_CONTEXT_PREVIEW_PASS");
   else
     console.log("THEIA_BROWSER_ONLY_SAMPLE_IMPORT_PASS; THEIA_NATIVE_CODICONS_PASS; SKILL_STUDIO_BRAND_PASS; WEBVIEW_CUSTOM_EDITOR_NOT_REQUIRED");
 }catch(error){

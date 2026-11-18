@@ -1,7 +1,7 @@
 # AI Procedure Authoring Workbench
 
-**Status: Proposed · Product decisions approved; CA-SL v1alpha5 Preview target · detailed design awaiting review**  
-**Implementation: Gateway PARTIAL · Authoring Core PARTIAL · v1alpha5 Semantic Patch Engine PARTIAL (PR #207) · Editor / Host integration NOT_STARTED · Acceptance: NOT_RUN · Date: 2026-11-17**  
+**Status: Implementation in progress · CA-SL v1alpha5 FROZEN / RELEASED · Studio / Host / Compiler qualification NOT_QUALIFIED**  
+**Implementation: Gateway PARTIAL · Authoring Core PARTIAL · v1alpha5 Semantic Patch Engine CI PASS (PR #207) · standalone Editor Tab / Host integration in PR #208 · exact-head CI / backend Theia Chromium acceptance in progress · Apply disabled pending complete v1alpha5 Compiler PASS · Date: 2026-11-18**  
 **Tracking: [Issue #200](https://github.com/odango-chan/ca-skill-studio-demo/issues/200)**
 
 This document defines the first AI-assisted authoring capability for Skill Studio. It is a Studio editing feature, not a CA-SL language extension, Compiler feature, Host capability or Runtime feature.
@@ -13,9 +13,9 @@ This document defines the first AI-assisted authoring capability for Skill Studi
 | Main surface | A standalone Editor Tab named **AI Authoring** |
 | Editing model | A Studio-owned, versioned semantic Change Set; host-native ChangeSet APIs are optional adapters, not the source of truth |
 | Apply behavior | Apply accepted changes to the existing native TextDocument buffer; the user saves |
-| First release | Modify an existing CA-SL v1alpha5 Preview Procedure only; no v1alpha4 fallback |
+| First release | Modify an existing CA-SL v1alpha5 Procedure only; no v1alpha4 fallback |
 | Architecture target | One cross-host Authoring core for Theia Browser, VS Code Desktop/Web/Remote and self-hosted intranet deployments |
-| First implementation target | The existing Theia Browser-Only / GitHub Pages product, using an external OpenAI-compatible AI Gateway |
+| First implementation target | The existing Theia Browser-Only / GitHub Pages product, using OpenCode Go's OpenAI-compatible Chat Completions API through a restricted AI Gateway |
 | Model credentials | One deployment-scoped shared provider credential, held by the Gateway; no per-user model API keys |
 | Deployment portability | Cloudflare Worker is a candidate online Gateway deployment, not a dependency of the Authoring core |
 
@@ -33,23 +33,23 @@ The current Theia workbench already provides useful host infrastructure:
 - A Procedure CustomEditor implemented as a Webview, paired with the native Source editor.
 - Native TextDocument versions, native WorkspaceEdit, editor dirty state and Undo/Redo.
 - A Package snapshot collector that prefers open TextDocuments over persisted bytes.
-- A pinned CA-SL v1alpha5 Preview candidate and exact IngressCatalog companion contract; v1alpha5 status remains NOT RELEASED / NOT QUALIFIED.
-- The published Compiler v1.0.0 integration is v1alpha4-only. Compiler PR #30 adds a v1alpha5 candidate API / WP2 parser-AST, but full v1alpha5 Check is not yet available.
-- **No model / Agent integration is currently installed in the Studio workbench.** The current Theia 1.76.0 application manifests do not include the Theia AI packages. Existing LSP completion, diagnostics and semantic tokens are language tooling, not LLM-based AI.
+- CA-SL v1alpha5 is FROZEN / RELEASED at `odango-chan/ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5`; IngressCatalog v1alpha1 is released at `odango-chan/ca-skills@9412be9894ef36acf846c757a5870dc0c48b33ac`. Studio / Compiler / Host / Runtime / Integration / Owner / 5GC product qualification remains separate.
+- The published Compiler v1.0.0 integration is v1alpha4-only. Compiler PR #38 is the sole v1alpha5 integration candidate; it contains WP1–WP8 slices but explicitly reports `CANDIDATE_PARTIAL`. Full inherited v1alpha5 Check is not yet available.
+- **AI Authoring Editor Tab implementation now exists in PR #208.** It is a standalone VS Code-compatible WebviewPanel with Host-owned Context Pack collection, explicit disclosure modal, Gateway / Agent request path, ModelProposal validation, Change Set grouping and v1alpha5 source preview. It does not depend on Theia AI packages or Copilot Chat. Live Gateway deployment / model request and real Editor Tab browser acceptance remain separate gates.
 - A first portable Gateway implementation now exists under `gateway/`: a Fetch-API request handler, a thin Cloudflare Worker adapter, Wrangler configuration and deterministic Node tests. It is not yet deployed and has not made a live provider request.
 - The first host-neutral Authoring Core slices now exist under `authoring/core/`: an allowlisted Context Pack builder with a serialized byte budget, an OpenAI-compatible Gateway client that requires explicit context-disclosure acceptance and sends browser Access credentials, a Procedure proposal orchestrator, and a strict Studio ModelProposal validator. It has no VS Code, Theia, DOM, Node-only or Cloudflare imports.
 - The Worker pilot requires direct Cloudflare Access protection, an exact CORS origin allowlist and a per-identity Cloudflare Rate Limiting binding. The provider credential remains a Worker secret. The general-public identity policy remains undecided; the restricted pilot must not be treated as a public endpoint.
 - The production GitHub Pages application is static hosting. It has no trusted server process in which to keep a shared provider key. The Pages bundle, browser storage, Webview and VSIX are all client-controlled and must never contain the shared provider credential. A separate Gateway service is required.
 - The current Studio extension is a VS Code Web Extension hosted by Theia. VS Code documents that Web Extensions can also run on Desktop and Web, but their runtime does not provide Node.js APIs. This makes the current browser-compatible extension a useful portability baseline, not proof that every Desktop / Remote host mode is already supported ([VS Code Web Extensions](https://code.visualstudio.com/api/extension-guides/web-extensions)).
 
-There is an important version boundary. The current Studio LSP / Procedure Designer baseline is still the published, frozen CA-SL v1alpha4 projection; it is read-only and MUST NOT be used to interpret or patch a v1alpha5 Procedure. PR #207 now provides a separate v1alpha5 patch engine, but no v1alpha5 LSP / Designer or Theia Host Adapter has been integrated yet. CA-SL v1alpha5 Preview inherits the immutable v1alpha4 normative baseline and adds Node-entry Event Wait through Appendix L. P1 MUST implement a v1alpha5-specific semantic patch layer and MUST NOT fall back to the v1alpha4 parser, patch engine or Compiler API.
+There is an important version boundary. The current Studio LSP / Procedure Designer baseline is still the published, frozen CA-SL v1alpha4 projection; it MUST NOT be used to interpret or patch a v1alpha5 Procedure. PR #207 provides a separate v1alpha5 patch engine; PR #208 adds the independent AI Authoring Editor Tab, Host orchestration, candidate preview and native WorkspaceEdit path. This does not convert the legacy LSP / Designer to v1alpha5. CA-SL v1alpha5 is FROZEN / RELEASED, inherits the immutable v1alpha4 normative baseline and adds Node-entry Event Wait through Appendix L. P1 MUST use the exact v1alpha5 normative and Ingress companion release identities and MUST NOT fall back to the v1alpha4 parser, patch engine or Compiler API. The native Apply handler is wired but disabled for every proposal until a complete authoritative Compiler PASS identifies the exact document URI/version, Package generation, source digest and candidate digest; Wait additionally requires a trusted Ingress binding.
 
 The exact development pins are:
-- CA-SL v1alpha5 Preview single-file candidate: `odango-chan/ca-skills@d3f89dfafbf218e5e95c97a974004362b7b967b6` (PR #61).
-- Integration Ingress Operation / IngressCatalog companion contract: `odango-chan/ca-skills@561d14c639e11cc43d0f247111e4971dfb98761e` (PR #62).
-These are Preview review refs, not published production dependencies. v1alpha5 remains PUBLIC REVIEW DRAFT / NOT RELEASED / NOT QUALIFIED; Studio must display that status and pin the exact commits used for development.
+- CA-SL v1alpha5 normative single-file release: `odango-chan/ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5` (PR #66 MERGED).
+- Integration Ingress Operation / IngressCatalog v1alpha1 companion release: `odango-chan/ca-skills@9412be9894ef36acf846c757a5870dc0c48b33ac` (PR #62 MERGED).
+These are immutable released normative identities. CA-SL v1alpha5 is FROZEN / RELEASED; Studio, Compiler, Host, Runtime, Integration, Owner and 5GC remain NOT_QUALIFIED until their own applicable acceptance evidence exists. Studio must pin these exact commits.
 
-The published Compiler v1.0.0 targets v1alpha4 and MUST NOT be used to validate v1alpha5 candidates. Compiler PR #30 introduces the independent v1alpha5 API and WP2 Procedure / Wait parser-AST, but its WP3-WP8 linking, graph, SourcePath, response-boundary and conformance work is not complete. Until the v1alpha5 Compiler returns a complete authoritative result, candidate validation remains BLOCKED / NOT_RUN; AI Authoring must never translate Wait away, simulate it, or report a partial parser result as a full Check PASS.
+The published Compiler v1.0.0 targets v1alpha4 and MUST NOT be used to validate v1alpha5 candidates. Compiler PR #38 is the sole v1alpha5 integration candidate. It includes WP1–WP8 slices but remains `CANDIDATE_PARTIAL`; inherited package, Contract, PredicateSet, dependency, Owner, ToolCatalog, Capability, Schema/CEL, Predicate/Script, Evidence, Mutation/Reconcile and complete EW/IN static semantics remain incomplete. Until the v1alpha5 Compiler returns a complete authoritative result, candidate validation remains BLOCKED / NOT_RUN; AI Authoring must never translate Wait away, simulate it, or report a partial candidate as a full Check PASS. Therefore all proposals remain PREVIEW ONLY, not just Wait proposals.
 
 ## 3. Cross-host architecture and reuse strategy
 
@@ -93,9 +93,11 @@ The VS Code Web Extension runtime is supported by VS Code on Desktop and Web, bu
 
 ### 3.3 Model Client and Gateway boundary
 
-The shared core depends on an IModelClient, not on Theia AI or a particular provider SDK. The production implementation is an OpenAI-compatible HTTP adapter targeting an AI Gateway.
+The shared core depends on an IModelClient, not on Theia AI or a provider SDK. The production implementation uses OpenCode Go's OpenAI-compatible Chat Completions endpoint through the restricted Gateway.
 
 The Gateway owns deployment-specific concerns:
+
+- The OpenCode Go adapter requires a stable Host-generated `x-opencode-session` identifier and injects a product-specific `User-Agent`; it never trusts browser-supplied provider credentials.
 
 - Provider endpoint, model routing and the shared provider API credential.
 - Gateway-side authentication / session verification.
@@ -118,7 +120,7 @@ This avoids building two generic chat products. Skill Studio implements only the
 
 ### 3.5 Keep CA-SL and host Agent Skills separate
 
-VS Code / Theia Agent Skills, prompt instructions and chat tools are host-specific AI integration mechanisms. They are not CA-SL Skill Packages, do not define Procedure semantics and are not Compiler inputs. They may provide optional prompt knowledge only; the pinned CA-SL v1alpha5 Preview candidate and its matching Compiler implementation remain authoritative for this authoring path.
+VS Code / Theia Agent Skills, prompt instructions and chat tools are host-specific AI integration mechanisms. They are not CA-SL Skill Packages, do not define Procedure semantics and are not Compiler inputs. They may provide optional prompt knowledge only; the pinned CA-SL v1alpha5 candidate and its matching Compiler implementation remain authoritative for this authoring path.
 
 ### 3.6 No generic file-editing agents
 
@@ -167,9 +169,9 @@ The current menu reorganization is being handled separately by PR #199. The AI c
 
 ### 5.2 Target resolution
 
-- If the active editor belongs to a supported v1alpha5 Preview Procedure, use that document.
+- If the active editor belongs to the current v1alpha5 authoring target, use that document.
 - If no Procedure is active, offer a picker limited to the current workspace's `assurance/procedure.yaml` files.
-- If the selected file is not v1alpha5 Preview, show an explicit unsupported-version explanation. Do not fall back to v1alpha4 or attempt Legacy conversion.
+- If the current build target is not explicitly v1alpha5, show an unsupported-target explanation. Do not fall back to v1alpha4 or attempt Legacy conversion.
 - One live Authoring session is allowed per Procedure URI. Reopening the command focuses the existing tab rather than opening a duplicate session.
 
 
@@ -266,11 +268,11 @@ Before the first request in a task, the user sees the provider destination and e
 
 ### 8.1 Canonical model protocol
 
-**Provider family: OpenAI-compatible API.** The model endpoint and model ID are deployment configuration, not CA-SL or Authoring-core configuration.
+**Provider: OpenCode Go.** The transport is OpenAI-compatible Chat Completions; the model endpoint and model ID are Gateway deployment configuration, not CA-SL or Authoring-core configuration.
 
-The first client adapter targets the OpenAI Chat Completions-compatible request / response shape. The adapter must support cancellation and may support streaming. Structured output / JSON Schema response modes are capability-negotiated; the Host MUST validate every completed response against the Studio-owned ModelProposal schema even when the provider claims schema-constrained output.
+The first client adapter targets OpenCode Go's OpenAI-compatible Chat Completions request / response shape. The adapter must support cancellation and may support streaming. Structured output / JSON Schema response modes are capability-negotiated; the Host MUST validate every completed response against the Studio-owned ModelProposal schema even when the provider claims schema-constrained output.
 
-The Gateway is intentionally thin. It authenticates the caller, applies per-user rate limits and request / output-token ceilings, injects the deployment's shared provider credential, and forwards OpenAI-compatible JSON or SSE responses. It does not own the Agent or editing semantics. It MUST NOT become a second Procedure Agent, parse CA-SL semantics, edit source or claim Compiler validity.
+The Gateway is intentionally thin. It authenticates the caller, applies per-user rate limits and request / output-token ceilings, injects the deployment's shared provider credential, and forwards OpenCode Go Chat Completions JSON or SSE responses. It does not own the Agent or editing semantics. It MUST NOT become a second Procedure Agent, parse CA-SL semantics, edit source or claim Compiler validity.
 
 ### 8.2 Deployment profiles
 
@@ -432,7 +434,7 @@ For v1alpha5 Wait operations it MUST enforce Appendix L.1 / L.1.1 exactly: exact
 
 For every operation it must:
 
-1. Verify the target document is the selected v1alpha5 Preview Procedure.
+1. Verify the active build / authoring target is v1alpha5 and the target document is `assurance/procedure.yaml`.
 2. Parse the current live Source with the pinned YAML 1.2 parser and v1alpha5 source projection, including Appendix L Wait structure.
 3. Resolve Node / Stage / Predicate / Route targets from the parsed source; never trust model-provided offsets.
 4. Check the operation allowlist, current structure, uniqueness, reserved IDs, references and graph invariants.
@@ -541,7 +543,7 @@ After Apply, the native document change triggers the existing Source / Visual / 
 
 A fixture provider may be used for deterministic UI / Patch Engine tests. It must be clearly identified as a test fixture and cannot be reported as a working AI integration.
 
-**Current Slice A status:** the host-neutral Context Pack builder, Access-credentialed Gateway client, Procedure proposal orchestrator and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203), now aligned to v1alpha5 Preview. The Host-owned Change Set envelope is implemented in [PR #204](https://github.com/odango-chan/ca-skill-studio-demo/pull/204), also aligned to v1alpha5. Their exact-head CI must be rerun after the v1alpha5 changes; older v1alpha4-targeted run results are not acceptance evidence for the current heads. The first v1alpha5 source patcher and atomic Wait groups are implemented in [PR #207](https://github.com/odango-chan/ca-skill-studio-demo/pull/207); exact-head CI is in progress after fixing two first-run test failures. Live TextDocument collection, Editor Tab, Theia Host Adapter, native WorkspaceEdit and full v1alpha5 Compiler Check remain NOT_STARTED.
+**Current Slice A status:** the host-neutral Context Pack builder, Access-credentialed Gateway client, Procedure proposal orchestrator and ModelProposal validator are implemented in [PR #203](https://github.com/odango-chan/ca-skill-studio-demo/pull/203); the Host-owned Change Set envelope is implemented in [PR #204](https://github.com/odango-chan/ca-skill-studio-demo/pull/204); and the v1alpha5 source patcher / atomic Wait groups are implemented in [PR #207](https://github.com/odango-chan/ca-skill-studio-demo/pull/207), whose exact-head CI passed [run #44093747817](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44093747817). [PR #208](https://github.com/odango-chan/ca-skill-studio-demo/pull/208) adds the standalone Editor Tab, complete Package Context collection, host-owned proposal / Change Set / Patch orchestration, candidate preview and native WorkspaceEdit path. A backend-backed Theia Chromium smoke opens the actual Editor Tab and checks Package context, v1alpha5 labeling, preview-only Apply state, opt-in defaults and CSP. Apply is deliberately disabled for all proposals because Compiler PR #38 remains `CANDIDATE_PARTIAL`; it must return a complete authoritative PASS for the exact candidate identity before any native edit is allowed. The latest exact-head IDE Host / PR Verify workflows passed at the previous commit; the current exact-head workflow set is running. Cloudflare deploy, Access login, live provider request and full v1alpha5 Compiler Check remain NOT_RUN.
 
 **Current Slice B status:** the restricted Cloudflare Access Worker, per-identity Rate Limiting binding, deployment-selected model, request / output limits, JSON + SSE response modes, cancellation and deterministic tests are implemented in [PR #206](https://github.com/odango-chan/ca-skill-studio-demo/pull/206). The Worker implementation commit passed CI and Wrangler dry-run [run #44077321845](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44077321845); the current stacked branch includes documentation alignment and requires exact-head recheck. Live Cloudflare deployment, Pages-origin Access login and provider request remain NOT_RUN.
 
@@ -551,11 +553,11 @@ The online path is implemented first, but every P1 boundary is designed so the l
 ## 16. P1 acceptance checklist
 
 - [ ] Opens one independent AI Authoring Editor Tab and preserves the existing Source / Visual pair.
-- [ ] Uses the live unsaved v1alpha5 Preview Procedure buffer and exact base revision.
+- [ ] Uses the live unsaved v1alpha5 Procedure buffer and exact base revision.
 - [ ] Shows and gates the exact Context Pack before external transmission.
 - [ ] Does not expose provider credentials to the Webview, browser bundle, workspace or extension package.
 - [ ] Uses the Studio-owned Authoring Core and Host Adapter boundary; domain logic has no mandatory Theia / VS Code imports.
-- [ ] Uses the OpenAI-compatible Gateway for the first online path; shared provider credential is stored server-side.
+- [ ] Uses OpenCode Go Chat Completions through the restricted Gateway for the first online path; shared provider credential is stored server-side.
 - [ ] Gateway access authorization, rate limits and usage ceiling are enforced independently of CORS.
 - [ ] The restricted pilot authenticates through Cloudflare Access; browser credentials and CORS are configured correctly; general-public identity / invitation policy is selected separately.
 - [ ] Materializes only validated proposals into the Studio Change Set model; host-native ChangeSet APIs remain optional adapters.
@@ -576,7 +578,7 @@ Desktop / Web Extension and intranet Gateway compatibility are explicit follow-u
 
 1. **Gateway access authorization:** the restricted pilot now uses native Worker `ctx.access` audience and verified-identity APIs. Validate the Pages-origin cookie flow and choose the general-public identity / invitation model separately before public launch; it must not require per-user model-provider keys or embed a shared static token in the client.
 2. **Online Gateway deployment:** configure Access, the Rate Limiting namespace, production CORS origins and the server-side provider secret. Verify Workers Free limits, Access login / third-party-cookie behavior, JSON and SSE responses, timeout / cancellation, secret configuration and provider-side spending controls against actual model calls; retain a provider-neutral self-hosted implementation path.
-3. **OpenAI-compatible subset:** confirm Chat Completions compatibility, streaming, cancellation and structured-output support for the selected model endpoint. Do not assume /v1/models or tool calling.
+3. **OpenCode Go Chat Completions subset:** select only models exposed by OpenCode Go through its Chat Completions endpoint; confirm streaming, cancellation and structured-output support for the selected model. Do not assume /v1/models or tool calling.
 4. **VS Code host placement:** decide whether the Desktop package can use the Web Extension Host alone or needs a separate Node Extension Host adapter; explicitly test Desktop, Web, Remote and WSL/Container behavior.
 5. **Native model APIs:** determine whether vscode.lm or Theia AI adapters provide meaningful optional value; neither is a required model path.
 6. **Initial Context Pack byte budget:** the core starts at a 128 KiB serialized cap, leaving headroom under the Gateway's 256 KiB body limit. Validate actual prompt overhead and provider context limits during the live model spike; never silently truncate.
@@ -586,10 +588,10 @@ The product decisions in Section 1 and the cross-host architecture direction are
 
 ## Implementation ownership summary
 
-- **CA-SL / ca-skills:** owns the v1alpha5 Preview language candidate and its publication decision; v1alpha4 remains frozen.
+- **CA-SL / ca-skills:** owns the v1alpha5 language candidate and its publication decision; v1alpha4 remains frozen.
 - **CA Skill Compiler:** owns authoritative Check / Build / linking diagnostics.
 - **Skill Studio:** owns the Authoring UI, context disclosure, Studio semantic proposal / Change Set schema, v1alpha5 source patching and host-neutral candidate generation.
 - **Host Adapters:** bridge the shared Authoring Core to Theia / VS Code editor APIs; they own live document access and native buffer application.
-- **AI Gateway:** stores the deployment-scoped provider credential, authorizes and limits requests, and forwards OpenAI-compatible model calls; it does not own CA-SL semantics or Procedure patch authority.
+- **AI Gateway:** stores the deployment-scoped provider credential, authorizes and limits requests, and forwards OpenCode Go Chat Completions calls; it does not own CA-SL semantics or Procedure patch authority.
 - **Optional Theia AI / VS Code Language Model adapters:** may provide alternate model sources, but are not required for the canonical workflow.
 - **Host / Runtime / Tool Owners:** remain outside P1; no invocation or execution is performed.
