@@ -2899,58 +2899,37 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   }
   async function auditCurrent(){
     if(!document)return;
-    // An explicit audit supersedes a pending debounced audit. Letting both
-    // run concurrently can race their package snapshots and tree refreshes.
+    // An explicit audit supersedes a pending debounced audit. One shared,
+    // bounded Package snapshot feeds Source projection and Package diagnostics.
     clearTimeout(timer);timer=undefined;
     const doc=document,version=doc.version,ticket=++generation;
     auditStatus="Package Audit · running";fireProblems();
-    const files=new Map(),uris=new Map();
     try{
-      const base=doc.uri.with({path:doc.uri.path.slice(0,-'assurance/procedure.yaml'.length)});
-      // Bounded by file count and aggregate bytes; never crawl another Package.
-      // OPFS may expose a just-written file in findFiles before it can be
-      // read, especially while Source edits and Package Language snapshots
-      // overlap. Retry the whole bounded inventory only for transient ENOENT;
-      // a genuinely missing core file still fails closed below.
+      let packageSnapshot;
       for(let attempt=0;attempt<3;attempt++){
-        try{
-          const found=await vscode.workspace.findFiles(
-            new vscode.RelativePattern(base,'**/*'),'**/node_modules/**',501);
-          if(found.length>500)throw Error('Package exceeds 500-file audit limit');
-          files.clear();uris.clear();
-          let bytes=0;
-          for(const uri of found){
-            if(!uri.path.startsWith(base.path))continue;
-            const path=uri.path.slice(base.path.length);uris.set(path,uri);
-            if(!/\.(?:ya?ml|json|py|md|txt|sh|toml|xml|csv|jsonl|ini|cfg|js|ts|mjs|cjs)$/i.test(path)){files.set(path,{text:''});continue;}
-            const open=vscode.workspace.textDocuments.find(d=>
-              d.uri.toString()===uri.toString());
-            const text=open?open.getText():new TextDecoder().decode(
-              await vscode.workspace.fs.readFile(uri));
-            bytes+=text.length;
-            if(bytes>4*MAX_SOURCE_BYTES)throw Error('Package exceeds 4 MiB audit limit');
-            files.set(path,{text});
-          }
-          break;
-        }catch(error){
-          if(ticket!==generation||document!==doc||doc.version!==version)return;
-          if(!/ENOENT|EntryNotFound|FileNotFound/.test(String(error?.message??error))||
-             attempt===2)throw error;
-          await new Promise(resolve=>setTimeout(resolve,100*(attempt+1)));
-        }
+        packageSnapshot=await collectPackageSnapshot(vscode,doc,ticket);
+        if(ticket!==generation||document!==doc||doc.version!==version)return;
+        const transient=packageSnapshot.completeness==="partial"&&
+          /ENOENT|EntryNotFound|FileNotFound/.test(packageSnapshot.reason??"");
+        if(!transient||attempt===2)break;
+        await new Promise(resolve=>setTimeout(resolve,100*(attempt+1)));
       }
+      const files=new Map(packageSnapshot.documents.map(item=>
+        [item.relativePath,{text:item.text}]));
+      const uris=new Map(packageSnapshot.documents.map(item=>
+        [item.relativePath,vscode.Uri.parse(item.uri)]));
       const required=['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml'];
-      const missing=required.filter(p=>!files.has(p));
+      const missing=required.filter(path=>!files.has(path));
       const v1alpha5=isV1Alpha5Procedure(doc.getText());
       let v1alpha5DependencyContext={available:false};
-      if(!missing.length&&v1alpha5){
+      if(v1alpha5){
         const folder=vscode.workspace.getWorkspaceFolder?.(doc.uri);
         if(folder){
           try{
             const project=readProjectConfiguration(vscode,folder.uri);
             const resolved=await resolveLockedDependencies(vscode,folder.uri);
             const operations=[],schemas=[],toolCatalogs=[],decoder=new TextDecoder();
-            for(const dependency of resolved.snapshots){
+            for(const dependency of resolved.snapshots??[]){
               if(dependency.kind==="tool-catalog"){
                 const file=dependency.files.find(item=>item.path==="tool-contract.json");
                 if(!file){
@@ -2971,7 +2950,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
                   }
                 }
               }
-              for(const file of dependency.files){
+              for(const file of dependency.files??[]){
                 const schemaFile=dependency.kind==="schema-bundle"
                   ?/\.(?:json|ya?ml)$/i.test(file.path)
                   :/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path);
@@ -2996,46 +2975,62 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           };
         }
       }
-      const packageName=base.path.replace(/\/$/,'').split('/').at(-1);
-      const results=missing.length?missing.map(path=>({
-        kind:'package-diagnostic',message:'Audit unavailable: missing '+path,
-        path:'assurance/procedure.yaml',line:1,column:1,code:'AUDIT_INCOMPLETE',
-        severity:'error',status:'blocked',domain:'package',category:'inventory'
-      })):
-        v1alpha5?auditV1Alpha5Package({
-          files,dependencyContext:v1alpha5DependencyContext
-        }):auditPackageWorkspace({name:packageName,files},doc.getText());
+
+      let results;
+      if(v1alpha5){
+        results=auditV1Alpha5Package({
+          files,dependencyContext:v1alpha5DependencyContext,
+          completeness:packageSnapshot.completeness,
+          snapshotReason:packageSnapshot.reason
+        });
+      }else if(packageSnapshot.completeness!=="complete"){
+        results=[{
+          kind:'package-diagnostic',
+          message:'Legacy Package Audit was not run because the Package snapshot is incomplete'+
+            (packageSnapshot.reason?': '+packageSnapshot.reason:''),
+          path:'assurance/procedure.yaml',line:1,column:1,
+          code:'PACKAGE_SNAPSHOT_INCOMPLETE',severity:'warning',
+          status:'not_checked',domain:'package',category:'snapshot'
+        }];
+      }else if(missing.length){
+        results=missing.map(path=>({
+          kind:'package-diagnostic',message:'Audit unavailable: missing '+path,
+          path:'assurance/procedure.yaml',line:1,column:1,code:'AUDIT_INCOMPLETE',
+          severity:'error',status:'blocked',domain:'package',category:'inventory'
+        }));
+      }else{
+        results=auditPackageWorkspace({
+          name:packageSnapshot.packageName,files
+        },doc.getText());
+      }
       if(ticket!==generation||document!==doc||doc.version!==version)return;
-      audit=results.map(d=>({...d,uri:uris.get(d.path)??doc.uri}));
+      audit=results.map(item=>({...item,uri:uris.get(item.path)??doc.uri}));
       const errors=audit.filter(item=>item.severity==="error").length;
       const warnings=audit.filter(item=>item.severity==="warning").length;
       const notChecked=audit.filter(item=>item.status==="not_checked").length;
       auditStatus=v1alpha5
-        ?"v1alpha5 Package Audit · "+(missing.length?"unavailable":
-          errors+" errors / "+warnings+" warnings / "+notChecked+" NOT_CHECKED")+
-          " · Compiler / Owner qualification pending"
-        :"Package Audit · "+(missing.length?"unavailable":
-          errors+" errors / "+warnings+" warnings");
+        ?"v1alpha5 Package Audit · "+errors+" errors / "+warnings+" warnings / "+
+          notChecked+" NOT_CHECKED · Compiler / Owner qualification pending"
+        :"Package Audit · "+errors+" errors / "+warnings+" warnings";
       diagnostics.clear();
-      if(!missing.length){
+      if(packageSnapshot.completeness==="complete"){
         packageFiles=files;packageFilesUri=doc.uri.toString();packageFilesVersion=version;
-        update(doc);
       }else{
         packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
-        update(doc);
       }
-      for(const uri of new Set(audit.map(d=>d.uri))){
-        diagnostics.set(uri,audit.filter(d=>d.uri===uri).map(d=>{
-          const line=Math.max(0,(d.line??1)-1);
-          const column=Math.max(0,(d.column??1)-1);
-          const severity=d.severity==="error"?vscode.DiagnosticSeverity.Error:
-            d.severity==="information"
+      update(doc);
+      for(const uri of new Set(audit.map(item=>item.uri))){
+        diagnostics.set(uri,audit.filter(item=>item.uri===uri).map(item=>{
+          const line=Math.max(0,(item.line??1)-1);
+          const column=Math.max(0,(item.column??1)-1);
+          const severity=item.severity==="error"?vscode.DiagnosticSeverity.Error:
+            item.severity==="information"
               ?(vscode.DiagnosticSeverity.Information??vscode.DiagnosticSeverity.Warning)
               :vscode.DiagnosticSeverity.Warning;
           const diagnostic=new vscode.Diagnostic(
-            new vscode.Range(line,column,line,column+1),d.message,severity);
-          diagnostic.source=d.source??'Skill Studio · editor audit';
-          diagnostic.code=d.code;return diagnostic;
+            new vscode.Range(line,column,line,column+1),item.message,severity);
+          diagnostic.source=item.source??'Skill Studio · editor audit';
+          diagnostic.code=item.code;return diagnostic;
         }));
       }
       fireProblems();
