@@ -48,7 +48,7 @@ function sampleSnapshot(){
       uri:"file:///workspace/establish-pdu-session/"+relativePath,
       relativePath,
       version:1,
-      text:readFileSync(new URL("../site/samples/v1alpha5/"+relativePath,import.meta.url),"utf8")
+      text:readFileSync(new URL("../site/samples/v1alpha5/establish-pdu-session/"+relativePath,import.meta.url),"utf8")
     }))
   };
 }
