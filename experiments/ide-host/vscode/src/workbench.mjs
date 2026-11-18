@@ -1164,7 +1164,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const waitFields=await complete(procedureDocument,"    wait:\n      ");
           const waitEventFields=await complete(procedureDocument,"      event:\n        ");
           const waitResponseFields=await complete(procedureDocument,"      response:\n        ");
-          const waitRouteKeys=await complete(procedureDocument,"      routes:\n        ");
+          const waitRouteKeys=await complete(procedureDocument,"  await-event:\n    wait:\n      event:\n        source: AMF\n        service: Nsmf_PDUSession\n        operation: UpdateSMContext\n      timeout: PT30S\n      response:\n        after: final\n      routes:\n        ");
           const waitResponseAfter=await complete(procedureDocument,"        after: ");
           const waitTimeoutTarget=await complete(procedureDocument,"        TIMEOUT: ");
           const waitOutput=await complete(procedureDocument,
