@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { configureAiGatewayToken } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 import {
   buildAuthoringResourceInventory,
   containsWaitMutation,
@@ -229,4 +230,47 @@ test("AI Authoring prefers the active Procedure or current workbench Procedure w
   assert.equal(preferredProcedureDocument(procedure, python), procedure);
   assert.equal(preferredProcedureDocument(python, procedure), procedure);
   assert.equal(preferredProcedureDocument(python, null), null);
+});
+
+
+test("shared Gateway token is stored in Extension SecretStorage and can be cleared", async () => {
+  const calls = [];
+  let input = " shared-network-token ";
+  const vscode = {
+    window: {
+      async showInputBox(options) {
+        assert.equal(options.password, true);
+        assert.equal(options.ignoreFocusOut, true);
+        return input;
+      },
+      async showInformationMessage(message) { calls.push(["message", message]); }
+    }
+  };
+  const secrets = {
+    async store(key, value) { calls.push(["store", key, value]); },
+    async delete(key) { calls.push(["delete", key]); }
+  };
+
+  assert.equal(await configureAiGatewayToken(vscode, secrets), true);
+  assert.deepEqual(calls[0], ["store", "connectionAgent.skillStudio.ai.gatewayToken", "shared-network-token"]);
+
+  input = "";
+  assert.equal(await configureAiGatewayToken(vscode, secrets), true);
+  assert.deepEqual(calls[2], ["delete", "connectionAgent.skillStudio.ai.gatewayToken"]);
+});
+
+test("shared Gateway token setup is cancelled without changing SecretStorage", async () => {
+  let changed = false;
+  const vscode = { window: { async showInputBox() { return undefined; } } };
+  const secrets = {
+    async store() { changed = true; },
+    async delete() { changed = true; }
+  };
+  assert.equal(await configureAiGatewayToken(vscode, secrets), false);
+  assert.equal(changed, false);
+});
+
+test("shared Gateway token setup fails closed without Host SecretStorage", async () => {
+  const vscode = { window: { async showInputBox() { return "token"; } } };
+  await assert.rejects(configureAiGatewayToken(vscode, undefined), /SecretStorage/);
 });

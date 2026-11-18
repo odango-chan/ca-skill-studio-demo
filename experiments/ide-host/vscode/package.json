@@ -60,7 +60,8 @@
     "onCommand:skillStudio.checkSkill",
     "onCommand:skillStudio.buildSkill",
     "onCommand:skillStudio.inspectCompilerDependencies",
-    "onCommand:skillStudio.openAiAuthoring"
+    "onCommand:skillStudio.openAiAuthoring",
+    "onCommand:skillStudio.setAiGatewayToken"
   ],
   "contributes": {
     "colors": [
@@ -223,6 +224,10 @@
       {
         "command": "skillStudio.inspectCompilerDependencies",
         "title": "SKILL Studio: Inspect Dependencies (Compiler v1.0.0)"
+      },
+      {
+        "command": "skillStudio.setAiGatewayToken",
+        "title": "%ai.gateway.token%"
       }
     ],
     "markdown.markdownItPlugins": true,
@@ -623,7 +628,14 @@
           "type": "string",
           "default": "",
           "scope": "application",
-          "markdownDescription": "Base HTTPS URL of the Cloudflare Access-protected AI Gateway Worker. The Studio appends /v1/chat/completions. Do not enter a Provider API Key here; provider credentials remain server-side."
+          "markdownDescription": "Base route URL for the Go ai-gateway, including the upstream label and optional upstream path prefix. Example: http://127.0.0.1:8787/opencode-go/openai. Studio appends /v1/chat/completions. HTTP is allowed only for loopback; use HTTPS for remote Gateways.",
+          "description": "Base route URL for the Go ai-gateway, including the upstream label and optional upstream path prefix. Example: http://127.0.0.1:8787/opencode-go/openai. Studio appends /v1/chat/completions. HTTP is allowed only for loopback; use HTTPS for remote Gateways."
+        },
+        "connectionAgent.skillStudio.ai.model": {
+          "type": "string",
+          "default": "deepseek-v4.1-flash",
+          "scope": "application",
+          "markdownDescription": "Model ID sent in the OpenAI-compatible Chat Completions request body. It must be supported by the selected Gateway upstream."
         }
       }
     }

@@ -36,15 +36,18 @@ function host(roots=[path("/workspace/a"),path("/workspace/b")]){
   };
   return {vscode,writes,configs,listeners};
 }
-test("extension contributes project settings and a separate user-scoped AI Gateway URL",()=>{
+test("extension contributes project settings and application-scoped AI Gateway route / Model ID",()=>{
   const props=manifest.contributes.configuration.properties;
   assert.deepEqual(Object.keys(props).sort(),[
     "connectionAgent.skillStudio.skillsRoot","connectionAgent.skillStudio.dependencies",
     "connectionAgent.skillStudio.dependencyLock",
     "connectionAgent.skillStudio.defaultBuildTarget",
-    "connectionAgent.skillStudio.ai.gatewayUrl"].sort());
+    "connectionAgent.skillStudio.ai.gatewayUrl","connectionAgent.skillStudio.ai.model"].sort());
   assert.equal(props["connectionAgent.skillStudio.defaultBuildTarget"].scope,"application");
   assert.equal(props["connectionAgent.skillStudio.ai.gatewayUrl"].scope,"application");
+  assert.equal(props["connectionAgent.skillStudio.ai.model"].scope,"application");
+  assert.equal(props["connectionAgent.skillStudio.ai.model"].default,"deepseek-v4.1-flash");
+  assert.ok(manifest.contributes.commands.some(command=>command.command==="skillStudio.setAiGatewayToken"));
   for(const key of ["skillsRoot","dependencies","dependencyLock"])
     assert.equal(props["connectionAgent.skillStudio."+key].scope,"resource");
 });

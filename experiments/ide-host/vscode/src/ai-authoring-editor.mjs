@@ -19,6 +19,7 @@ const LANGUAGE_TARGET = "connectionagent.io/v1alpha5";
 const MAX_CONTEXT_ITEMS = 512;
 const TEXT_DEPENDENCY_FILE = /\.(?:json|ya?ml|md)$/i;
 const SENSITIVE_SEGMENT = /(?:^|[._-])(?:secrets?|credentials?|passwords?|api[-_]?keys?|private[-_]?keys?|access[-_]?tokens?|tokens?|auth)(?:[._-]|$)/i;
+const GATEWAY_TOKEN_SECRET_KEY = "connectionAgent.skillStudio.ai.gatewayToken";
 const encoder = new TextEncoder();
 
 async function sha256Hex(value) {
@@ -250,7 +251,7 @@ export function renderAiAuthoringHtml(nonce) {
     "function clearProposal(){canApply=false;previewSequence++;clear(byId('plan'));clear(byId('assumptions'));clear(byId('blockers'));clear(byId('groups'));byId('proposalSummary').textContent='';byId('currentSource').textContent='';byId('candidateSource').textContent='';byId('patchState').textContent='尚未生成';byId('patchError').textContent='';byId('apply').disabled=true;byId('discard').disabled=true;}",
     "function addList(id,items){const root=byId(id);clear(root);if(!items||!items.length)return;const ul=document.createElement('ul');for(const value of items){const li=document.createElement('li');li.textContent=value;ul.appendChild(li);}root.appendChild(ul);}",
     "function requestSourcePreview(){const requestId=++previewSequence;const groupIds=[...document.querySelectorAll('[data-group-id]:checked')].map(item=>item.dataset.groupId);vscode.postMessage({type:'preview',requestId,groupIds});}",
-    "function renderContext(message){contextReady=true;clearProposal();window.gatewayConfigured=message.gatewayConfigured===true;byId('packageInfo').textContent=message.packageName+' · '+message.documentVersion+' · Package revision '+message.packageGeneration;byId('gatewayNotice').textContent=window.gatewayConfigured?'Gateway URL 已配置；OpenCode Go API Key 由 Gateway 服务端管理。':'请先在用户设置中配置 connectionAgent.skillStudio.ai.gatewayUrl。';const list=byId('sources');clear(list);for(const item of message.sources||[]){const label=document.createElement('label');label.className='source';const input=document.createElement('input');input.type='checkbox';input.checked=item.selected===true;input.value=item.id;input.disabled=busy;const body=document.createElement('span');body.className='source-main';const kind=document.createElement('span');kind.className='kind';kind.textContent=item.kind;const name=document.createElement('span');name.className='source-label';name.textContent=item.label;const size=document.createElement('span');size.className='source-bytes';size.textContent=item.bytes+' bytes'+(item.explicitOptIn?' · 每次任务需显式选择':'');body.append(kind,name,size);label.append(input,body);list.appendChild(label);}status('上下文已就绪。发送前会再次显示明确的数据披露确认。');setBusy(false);}",
+    "function renderContext(message){contextReady=true;clearProposal();window.gatewayConfigured=message.gatewayConfigured===true;byId('packageInfo').textContent=message.packageName+' · '+message.documentVersion+' · Package revision '+message.packageGeneration;byId('gatewayNotice').textContent=window.gatewayConfigured?'Gateway 路由与模型 '+message.modelId+' 已配置；Provider API Key 只保留在 Gateway 主机。远程 Gateway 可通过命令面板配置共享访问令牌。':'请先在应用设置中配置 connectionAgent.skillStudio.ai.gatewayUrl 与 connectionAgent.skillStudio.ai.model。';const list=byId('sources');clear(list);for(const item of message.sources||[]){const label=document.createElement('label');label.className='source';const input=document.createElement('input');input.type='checkbox';input.checked=item.selected===true;input.value=item.id;input.disabled=busy;const body=document.createElement('span');body.className='source-main';const kind=document.createElement('span');kind.className='kind';kind.textContent=item.kind;const name=document.createElement('span');name.className='source-label';name.textContent=item.label;const size=document.createElement('span');size.className='source-bytes';size.textContent=item.bytes+' bytes'+(item.explicitOptIn?' · 每次任务需显式选择':'');body.append(kind,name,size);label.append(input,body);list.appendChild(label);}status('上下文已就绪。发送前会再次显示明确的数据披露确认。');setBusy(false);}",
     "function renderProposal(message){previewSequence++;canApply=message.canApply===true;byId('proposalSummary').textContent=message.summary||'';byId('currentSource').textContent=message.currentSource||'';byId('candidateSource').textContent=message.candidateSource||'';addList('plan',message.plan||[]);addList('assumptions',message.assumptions||[]);addList('blockers',message.blockers||[]);byId('blockers').className=(message.blockers&&message.blockers.length)?'subsection warning':'subsection';byId('patchState').textContent=message.patchState||'NOT_RUN';byId('patchError').textContent=message.patchError||'';const list=byId('groups');clear(list);for(const group of message.groups||[]){const label=document.createElement('label');label.className='group';const input=document.createElement('input');input.type='checkbox';input.checked=true;input.value=group.id;input.dataset.groupId=group.id;input.addEventListener('change',requestSourcePreview);const body=document.createElement('span');body.className='group-main';const title=document.createElement('span');title.className='group-title';title.textContent=group.label+' · '+group.operationIds.length+' 项';const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='查看操作与理由';const ul=document.createElement('ul');for(const operation of group.operations||[]){const li=document.createElement('li');li.textContent=operation.type+' — '+operation.rationale;ul.appendChild(li);}details.append(summary,ul);body.append(title,details);label.append(input,body);list.appendChild(label);}byId('apply').disabled=!canApply||busy;byId('discard').disabled=false;status(canApply?'本地 Patch Plan READY；这不是 Compiler Check。':'提案已返回，但当前不能应用修改。',canApply?'':'warning');}",
     "byId('generate').addEventListener('click',()=>{const task=byId('task').value.trim();const selectedIds=[...document.querySelectorAll('#sources input:checked')].map(item=>item.value);clearProposal();vscode.postMessage({type:'generate',task,selectedIds});});",
     "byId('cancel').addEventListener('click',()=>vscode.postMessage({type:'cancel'}));",
@@ -267,7 +268,7 @@ export function renderAiAuthoringHtml(nonce) {
     "<title>AI Procedure Authoring</title><style nonce=\"" + nonce + "\">" + css + "</style></head><body>",
     "<header class=\"topbar\"><div class=\"heading\"><strong>AI Procedure Authoring</strong><small id=\"packageInfo\">读取当前 Package…</small></div><div class=\"top-actions\"><span class=\"compiler\">CA-SL v1alpha5 · FROZEN / RELEASED</span><button id=\"refresh\" class=\"secondary\">刷新上下文</button></div></header>",
     "<main>",
-    "<section class=\"card\"><h2>任务说明</h2><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只会提出语义修改，不会直接写文件或执行 Tool。\"></textarea><div class=\"note\"><strong>数据披露：</strong>选中的上下文将在你确认后发送到配置的 AI Gateway。OpenCode Go API Key 不存储在 Studio 中。</div><div id=\"gatewayNotice\" class=\"note warning\"></div><div class=\"actions\"><button id=\"generate\">生成修改提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div></section>",
+    "<section class=\"card\"><h2>任务说明</h2><textarea id=\"task\" maxlength=\"4000\" placeholder=\"描述希望如何修改当前 Procedure。模型只会提出语义修改，不会直接写文件或执行 Tool。\"></textarea><div class=\"note\"><strong>数据披露：</strong>选中的上下文将在你确认后发送到配置的 AI Gateway。Provider API Key 只保留在 Gateway 主机。</div><div id=\"gatewayNotice\" class=\"note warning\"></div><div class=\"actions\"><button id=\"generate\">生成修改提案</button><button id=\"cancel\" class=\"secondary\" disabled>取消请求</button></div></section>",
     "<section class=\"card\"><h2>上下文来源</h2><p class=\"note\">Procedure 当前缓冲区必定包含。Contract、Predicate、Schema 和已验证依赖默认选中；Reference / Script 需要逐任务显式选择。</p><div id=\"sources\" class=\"source-list\"></div></section>",
     "<section class=\"card proposal\"><div class=\"top-actions spread\"><h2>修改提案</h2><span class=\"compiler\">Compiler Check: NOT_RUN</span></div><div id=\"proposalSummary\" class=\"summary\"></div><div class=\"subsection\"><h3>执行计划</h3><div id=\"plan\"></div></div><div class=\"subsection\"><h3>假设</h3><div id=\"assumptions\"></div></div><div class=\"subsection\"><h3>阻塞项</h3><div id=\"blockers\"></div></div><div class=\"subsection\"><h3>可独立接受的原子修改组</h3><div id=\"patchState\" class=\"kind\">尚未生成</div><div id=\"patchError\" class=\"note error\"></div><div id=\"groups\" class=\"group-list\"></div></div><div class=\"subsection\"><h3>Host 生成的 YAML 候选预览</h3><p class=\"note\">左侧是当前缓冲区，右侧是所选原子修改组生成的候选内容；模型不能直接提交原始 YAML。</p><div class=\"source-preview\"><div><h4>当前 YAML</h4><pre id=\"currentSource\"></pre></div><div><h4>候选 YAML</h4><pre id=\"candidateSource\"></pre></div></div></div><div class=\"actions\"><button id=\"apply\" disabled>应用选中修改</button><button id=\"discard\" class=\"secondary\" disabled>丢弃提案</button></div></section>",
     "</main><footer class=\"status\"><span id=\"status\">正在初始化…</span><span>仅修改当前 Procedure 缓冲区 · 不自动保存 · Compiler Check 不在本阶段执行</span></footer>",
@@ -354,15 +355,19 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         activeSession.contextRequestId !== requestId) return;
       activeSession.context = state;
       activeSession.pending = null;
-      const gatewayBaseUrl = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai")
-        .get("gatewayUrl", "");
+      const aiSettings = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai");
+      const gatewayBaseUrl = aiSettings.get("gatewayUrl", "");
+      const modelId = aiSettings.get("model", "deepseek-v4.1-flash");
+      const gatewayConfigured = typeof gatewayBaseUrl === "string" && gatewayBaseUrl.trim().length > 0 &&
+        typeof modelId === "string" && modelId.trim().length > 0;
       post({
         type: "context",
         languageTarget: LANGUAGE_TARGET,
         packageName: state.snapshot.packageName,
         documentVersion: document.version,
         packageGeneration: state.generation,
-        gatewayConfigured: typeof gatewayBaseUrl === "string" && gatewayBaseUrl.trim().length > 0,
+        gatewayConfigured,
+        modelId: typeof modelId === "string" ? modelId.trim() : "",
         sources: state.resources.map((item) => ({
           id: item.id,
           kind: item.kind,
@@ -408,10 +413,12 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       post({ type: "error", message: "上下文来源包含重复或未知项目。" });
       return;
     }
-    const gatewayBaseUrl = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai")
-      .get("gatewayUrl", "");
-    if (typeof gatewayBaseUrl !== "string" || !gatewayBaseUrl.trim()) {
-      post({ type: "error", message: "尚未配置 AI Gateway。请在用户设置中填写 connectionAgent.skillStudio.ai.gatewayUrl。" });
+    const aiSettings = vscode.workspace.getConfiguration("connectionAgent.skillStudio.ai");
+    const gatewayBaseUrl = aiSettings.get("gatewayUrl", "");
+    const modelId = aiSettings.get("model", "deepseek-v4.1-flash");
+    if (typeof gatewayBaseUrl !== "string" || !gatewayBaseUrl.trim() ||
+      typeof modelId !== "string" || !modelId.trim()) {
+      post({ type: "error", message: "尚未配置 AI Gateway。请在应用设置中填写 connectionAgent.skillStudio.ai.gatewayUrl 和 connectionAgent.skillStudio.ai.model。" });
       return;
     }
 
@@ -459,7 +466,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       ...disclosure.slice(0, 12),
       ...(disclosure.length > 12 ? ["…另有 " + (disclosure.length - 12) + " 项"] : []),
       "",
-      "内容将发送到你配置的 AI Gateway。OpenCode Go API Key 不会从服务端暴露给 Studio。",
+      "内容将发送到你配置的 AI Gateway。Provider API Key 不会从服务端暴露给 Studio。",
     ].join("\n");
     const confirmed = await vscode.window.showWarningMessage(
       "确认将当前 Procedure 和所选上下文发送到 AI 服务？",
@@ -498,8 +505,13 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
     activeSession.controller = controller;
     post({ type: "status", message: "正在请求模型并校验语义提案…", busy: true });
     try {
+      const gatewayToken = typeof context.secrets?.get === "function"
+        ? await context.secrets.get(GATEWAY_TOKEN_SECRET_KEY)
+        : undefined;
       const modelClient = createGatewayModelClient({
         gatewayBaseUrl: gatewayBaseUrl.trim(),
+        modelId: modelId.trim(),
+        gatewayToken,
         sessionId: activeSession.sessionId,
       });
       const agent = createProcedureAgent({ modelClient });
@@ -842,6 +854,13 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
   }
 
   const command = vscode.commands.registerCommand("skillStudio.openAiAuthoring", open);
-  context.subscriptions.push(command);
-  return Object.freeze({ open });
+  const gatewayTokenCommand = vscode.commands.registerCommand("skillStudio.setAiGatewayToken", async () => {
+    try {
+      await configureAiGatewayToken(vscode, context.secrets);
+    } catch (error) {
+      void vscode.window.showErrorMessage("配置共享 AI Gateway 访问令牌失败：" + String(error?.message ?? error));
+    }
+  });
+  context.subscriptions.push(command, gatewayTokenCommand);
+  return Object.freeze({ open, configureAiGatewayToken: () => configureAiGatewayToken(vscode, context.secrets) });
 }

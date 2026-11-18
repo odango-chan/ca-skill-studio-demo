@@ -6,5 +6,6 @@
   "help.spec": "SKILL Studio：Skill 语言规范",
   "help.guide": "SKILL Studio：编写指南",
   "project.welcome.title": "SKILL Studio：欢迎页面",
-  "ai.authoring": "SKILL Studio：AI 编辑 Procedure"
+  "ai.authoring": "SKILL Studio：AI 编辑 Procedure",
+  "ai.gateway.token": "SKILL Studio：配置共享 AI Gateway 访问令牌"
 }
