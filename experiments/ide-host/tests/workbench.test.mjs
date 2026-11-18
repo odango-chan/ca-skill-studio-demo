@@ -302,7 +302,8 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   workbench.attach(doc,m=>posted.push(m));
   assert.equal(providers.size,3);
   const problems=providers.get('skillStudio.problems');
-  const compilerProblem=problems.getChildren().find(item=>item.kind==='compiler-diagnostic');
+  const compilerProblem=problems.getChildren().flatMap(item=>item.children??[])
+    .find(item=>item.kind==='compiler-diagnostic');
   assert.ok(compilerProblem,'Compiler diagnostics are projected into the native Skill Studio Problems view');
   assert.equal(compilerProblem.code,'YAML_PARSE_ERROR');
   assert.equal(compilerProblem.severity,'error');
@@ -672,7 +673,8 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     'skillStudio.node','Phase-bearing Node does not expose deletion');
   await commands.get('skillStudio.auditPackage')();
   assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/0 errors \/ 2 warnings/);
-  assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
+  assert.ok(providers.get('skillStudio.problems').getChildren()
+    .flatMap(item=>item.children??[]).every(x=>!x.label.includes('Audit unavailable')));
   assert.ok(commands.has('skillStudio.exportPackageZip'));
   // Package export uses the complete byte snapshot but overlays every open
   // TextDocument, so unsaved edits are included without writing to OPFS.
@@ -740,7 +742,9 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   predicatesDoc.text=readFileSync(v1SampleRoot+'establish-pdu-session/assurance/predicates.yaml','utf8');
   predicatesDoc.version++;
   await commands.get('skillStudio.auditPackage')();
-  const packageProblems=providers.get('skillStudio.problems').getChildren();
+  const problemRoots=providers.get('skillStudio.problems').getChildren();
+  const packageProblems=problemRoots.flatMap(item=>item.children??[])
+    .filter(item=>item.kind==='package-diagnostic');
   const capabilityProblem=packageProblems.find(item=>
     item.kind==='package-diagnostic'&&item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&
     item.message.includes('namf-communication-n1n2-transfer'));
@@ -764,7 +768,9 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.ok(packageProblems.some(item=>item.code==='DEPENDENCY_NOT_CONFIGURED'));
   assert.ok(!packageProblems.some(item=>item.kind==='compiler-diagnostic'),
     'Compiler disconnection does not prevent independent Package diagnostics');
-  assert.match(packageProblems[0].label,/NOT_CHECKED/);
+  assert.match(problemRoots[0].label,/NOT_CHECKED/);
+  assert.ok(problemRoots.some(item=>item.kind==='problem-group'&&item.label==='Capabilities'));
+  assert.ok(problemRoots.some(item=>item.kind==='problem-group'&&item.label==='Dependencies'));
 
   const expectedCapabilityLine=contractDoc.text.split('\n').findIndex(line=>
     line.includes('namf-communication-n1n2-transfer'))+1;
