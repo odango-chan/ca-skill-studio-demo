@@ -6,7 +6,8 @@ import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
 import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
-import {auditV1Alpha5Package} from '../../../../site/v1alpha5-package-audit.mjs';
+import {auditV1Alpha5Package,indexV1Alpha4ToolCatalogCallables}
+  from '../../../../site/v1alpha5-package-audit.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
@@ -2998,35 +2999,28 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           try{
             const project=readProjectConfiguration(vscode,folder.uri);
             const resolved=await resolveLockedDependencies(vscode,folder.uri);
-            const operations=[],schemas=[],toolCatalogs=[],decoder=new TextDecoder();
+            const operations=[],schemas=[],toolCatalogs=[];
+            const decoder=new TextDecoder("utf-8",{fatal:true});
             for(const dependency of resolved.snapshots??[]){
+              const decoded=(dependency.files??[])
+                .filter(file=>/\.(?:json|ya?ml)$/i.test(file.path))
+                .map(file=>({
+                  path:file.path,text:decoder.decode(decodeBase64(file.bytes))
+                }));
               if(dependency.kind==="tool-catalog"){
-                const file=dependency.files.find(item=>item.path==="tool-contract.json");
-                if(!file){
-                  toolCatalogs.push({dependencyId:dependency.id,available:false,
-                    reason:"Pinned snapshot has no tool-contract.json"});
-                }else{
-                  try{
-                    const contract=JSON.parse(decoder.decode(decodeBase64(file.bytes)));
-                    if(contract.apiVersion!=="skillc.tool/v0.1"||!Array.isArray(contract.operations))
-                      throw Error("Unsupported Tool Contract shape");
-                    toolCatalogs.push({dependencyId:dependency.id,available:true});
-                    for(const operation of contract.operations)
-                      if(typeof operation?.id==="string")
-                        operations.push({id:operation.id,dependencyId:dependency.id});
-                  }catch(error){
-                    toolCatalogs.push({dependencyId:dependency.id,available:false,
-                      reason:String(error?.message??error)});
-                  }
-                }
+                // CA-SL v1alpha5 inherits exact ToolCatalog v1alpha4 (F.1).
+                // A checksum-verified file is not an Owner qualification.
+                const catalog=indexV1Alpha4ToolCatalogCallables(dependency.id,decoded);
+                toolCatalogs.push({dependencyId:dependency.id,
+                  available:catalog.available,reason:catalog.reason});
+                operations.push(...catalog.operations);
               }
-              for(const file of dependency.files??[]){
+              for(const file of decoded){
                 const schemaFile=dependency.kind==="schema-bundle"
                   ?/\.(?:json|ya?ml)$/i.test(file.path)
                   :/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path);
                 if(!schemaFile)continue;
-                schemas.push({dependencyId:dependency.id,path:file.path,
-                  text:decoder.decode(decodeBase64(file.bytes))});
+                schemas.push({dependencyId:dependency.id,path:file.path,text:file.text});
               }
             }
             v1alpha5DependencyContext={
