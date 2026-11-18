@@ -151,7 +151,7 @@ function isRootPath(){
 }
 function updateGraphTools(){
   $("graphTools").hidden=!state.procedures||Boolean(state.nodeFocusId);
-  const root=isRootPath()&&!state.nodeFocusId&&state.languageTarget!=="v1alpha5";
+  const root=isRootPath()&&!state.nodeFocusId;
   $("rootPathToolbar").hidden=!root;
   $("rootPathFilters").hidden=!root||state.rootPathMode!=="custom";
   $("rootPathMode").value=state.rootPathMode;
@@ -379,7 +379,8 @@ async function layoutCurrentProcedure({anchorId=null}={}){
   const started=performance.now();
   const anchor=anchorId?canvas.captureNodeAnchor(anchorId):null;
   const focus=state.neighborsOnly&&state.selection?.kind==="node"?state.selection.id:null;
-  const pathFocus=isRootPath()&&state.languageTarget!=="v1alpha5"?{
+  // Path focus is a read-only graph projection for both legacy and released v1alpha5 sources.
+  const pathFocus=isRootPath()?{
     mode:state.rootPathMode,categories:[...state.pathCategories],
     expandedNodes:[...state.expandedNodes]
   }:null;
