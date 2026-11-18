@@ -265,6 +265,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       projected.procedure.state === "READY";
     const scriptReferences: ScriptReference[] = [];
     const schemaReferences: SchemaReference[] = [];
+    const pythonSymbols: PythonOutlineSymbol[] = [];
     const pythonOutlineDiagnostics: LanguageDiagnostic[] = [];
     const scriptNavigationDiagnostics: LanguageDiagnostic[] = [];
     const documentAnalyses: DocumentAnalysis[] = [];
