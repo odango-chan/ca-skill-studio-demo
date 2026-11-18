@@ -168,7 +168,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     definition:1,assurance:3,schemas:1,scripts:3
   });
   assertGroupInventory(scan,'establish-pdu-session-mas',{
-    definition:1,assurance:4,schemas:1
+    definition:1,assurance:3,schemas:1,references:1
   });
 
   // Dependencies must be a real section in the same native TreeView in both
