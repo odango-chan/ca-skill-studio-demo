@@ -2774,7 +2774,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         if(item.kind==='problem-group'){
           tree.contextValue='skillStudio.problemGroup';
           tree.iconPath=new vscode.ThemeIcon('folder');
-          tree.tooltip=item.label+'\\n'+item.description;
+          tree.tooltip=item.label+'\n'+item.description;
         }
         if(item.kind==='compiler-diagnostic'){
           tree.contextValue='skillStudio.compilerDiagnostic';
@@ -2858,10 +2858,24 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             namedVerify.names.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
           const canDeleteNamedVerify=item.stepOperator==='verify'&&Boolean(item.stepName)&&
             namedVerify.deletions.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          tree.contextValue=hasBinding?'skillStudio.phaseStepBinding':
-            canNameVerify?'skillStudio.phaseStepNameVerify':
-            canDeleteNamedVerify?'skillStudio.phaseStepDeleteNamedVerify':
-            canEditVerify?'skillStudio.phaseStepVerify':'skillStudio.phaseStepPlain';
+          const namedReorder=item.stepOperator==='verify'&&Boolean(item.stepName)&&
+            namedVerify.swaps.some(x=>x.phaseName===item.phaseName&&
+              (x.stepIndex===item.stepIndex||x.stepIndex===item.stepIndex-1));
+          const namedStep=item.stepName?namedPhaseStepImpactReport(source,
+            item.procedureId,item.nodeId).find(x=>x.phaseName===item.phaseName&&
+              x.stepIndex===item.stepIndex&&x.stepName===item.stepName):null;
+          const canRenameNamed=Boolean(namedStep?.editEligible);
+          if(item.stepOperator==='verify'&&(canDeleteNamedVerify||namedReorder)){
+            tree.contextValue=hasBinding?'skillStudio.namedVerifyStepAndBinding':'skillStudio.namedVerifyStep';
+          }else if(canRenameNamed){
+            tree.contextValue=hasBinding?'skillStudio.namedPhaseStepAndBinding':'skillStudio.namedPhaseStep';
+          }else if(item.stepOperator==='verify'&&(canNameVerify||canEditVerify)){
+            tree.contextValue=hasBinding?'skillStudio.verifyStepAndBinding':'skillStudio.verifyStep';
+          }else{
+            tree.contextValue=hasBinding
+              ?(canEditVerify?'skillStudio.phaseStepAndVerify':'skillStudio.phaseStep')
+              :(canEditVerify?'skillStudio.verifyStep':'skillStudio.phaseStepPlain');
+          }
           item.sourceVersion=document.version;item.documentUri=document.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.phaseName=item.phaseName;tree.stepIndex=item.stepIndex;
