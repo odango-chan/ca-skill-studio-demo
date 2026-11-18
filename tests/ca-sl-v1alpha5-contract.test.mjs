@@ -18,7 +18,7 @@ test("Skill Studio pins the released CA-SL v1alpha5 language and current example
   assert.equal(lock.authority.commit,"0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5");
   assert.equal(lock.authority.status,"FROZEN_RELEASED");
   assert.equal(lock.language.target,"connectionagent.io/v1alpha5");
-  assert.match(lock.language.status,"FROZEN_RELEASED");
+  assert.equal(lock.language.status,"FROZEN_RELEASED");
   assert.equal(lock.language.inheritedBaseline,"connectionagent.io/v1alpha4");
   assert.equal(blobSha(spec),lock.normativeSource.blobSha,
     "the local normative candidate must be byte-identical to the pinned ca-skills blob");

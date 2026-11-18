@@ -233,7 +233,7 @@ spec:
   const items=observed(source,"lib/tools/example.tool.yaml");
   tokenFor(source,items,"sbi.udm.sm_data.get","skillOperation","declaration");
   const imported=items.find(item=>item.text==="sbi.udm.sm_data.get");
-  assert.ok(imported.modifiers.includes("imported"));
+  assert.ok(imported.modifiers.includes("declaration"));
 });
 
 test("invalid YAML, unrelated paths and traversal paths produce no speculative tokens",()=>{

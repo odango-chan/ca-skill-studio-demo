@@ -21,7 +21,7 @@ test('CA-SL v1alpha5 Contract projects its actual source fields and coordinates'
   assert.equal(p.dependencies.length, 5);
   assert.equal(p.dependencies[0].name, 'ca-context');
   assert.equal(p.dependencies[0].value, 'urn:connectionagent:ca:host-context');
-  assert.equal(p.capabilities.length, 11);
+  assert.equal(p.capabilities.length, 10);
   assert.equal(p.limits[0].name, 'maxActions');
   assert.equal(p.limits[0].value, 32);
   assert.deepEqual(p.unprojectedPaths, []);

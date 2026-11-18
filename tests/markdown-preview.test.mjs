@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {renderMarkdown} from "../site/markdown-preview.mjs";
 const fixture=name=>readFileSync(
-  new URL("../site/samples/packages/"+name+"/SKILL.md",import.meta.url),"utf8");
+  new URL("../site/samples/v1alpha5/"+name+"/SKILL.md",import.meta.url),"utf8");
 
 test("Markdown preview renders headings, emphasis, inline code, lists and blockquotes",()=>{
   const source="# Demo\n\nA **bold** and *italic* word with \x60code\x60.\n\n- First\n- Second\n\n> A quote\n";

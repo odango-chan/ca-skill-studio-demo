@@ -1,32 +1,32 @@
-// The only selectable sample matches the owner Skill path at ca-agent-demo@eaadf948.
-// Legacy Ensure regression YAML is kept separately, never as a selectable Package.
-// This UI manifest is not inserted into the exported SKILL Package.
+// Built-in Example manifest for the active CA-SL v1alpha5 authoring target.
+// The source assets are mirrored from ca-skills/main and are not a qualification claim.
 const core=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml","assurance/predicates.yaml"];
 const establishExtras=[
-  "references/3gpp-procedure.md",
-  "references/session-selection.md",
-  "references/failure-handling.md",
   "schemas/establishment-request.schema.yaml",
-  "schemas/predicate-evaluation-result.schema.yaml",
-  "schemas/selection-input.schema.yaml",
-  "schemas/selection.schema.yaml",
-  "schemas/transfer-start-evaluation-input.schema.yaml",
-  "schemas/udm-read-evaluation-input.schema.yaml",
-  "scripts/evaluate_transfer_start.py",
-  "scripts/evaluate_udm_read.py",
-  "scripts/select_establishment_configuration.py"
+  "scripts/validate-smf-session-context-entry.py",
+  "scripts/validate-smf-session-context.py",
+  "scripts/validate-subscription-request.py"
+];
+const masExtras=[
+  "schemas/establishment-request.schema.yaml",
+  "references/openamsm-operation-mapping.md"
 ];
 export const SAMPLE_PACKAGES=Object.freeze({
-  establish:Object.freeze({name:"establish-pdu-session",entry:"assurance/procedure.yaml",files:Object.freeze([...core,...establishExtras])}),
-  establishV4:Object.freeze({name:"establish-pdu-session",entry:"assurance/procedure.yaml",sourceDir:"v1alpha4",files:Object.freeze([...core,"schemas/establishment-request.schema.yaml"])}),
-  masV4:Object.freeze({name:"establish-pdu-session-mas",entry:"assurance/procedure.yaml",sourceDir:"v1alpha4",files:Object.freeze([...core,"schemas/establishment-request.schema.yaml"])})
+  establish:Object.freeze({
+    name:"establish-pdu-session",entry:"assurance/procedure.yaml",sourceDir:"v1alpha5",
+    files:Object.freeze([...core,...establishExtras])
+  }),
+  mas:Object.freeze({
+    name:"establish-pdu-session-mas",entry:"assurance/procedure.yaml",sourceDir:"v1alpha5",
+    files:Object.freeze([...core,...masExtras])
+  })
 });
 
 export function packageFilesForSample(key) {
   const spec=SAMPLE_PACKAGES[key];
   if(!spec)throw new Error("Unknown sample package");
   return spec.files.map(path=>({
-    path,url:"./samples/"+(spec.sourceDir??"packages")+"/"+spec.name+"/"+path
+    path,url:"./samples/"+spec.sourceDir+"/"+spec.name+"/"+path
   }));
 }
 
