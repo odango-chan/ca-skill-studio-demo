@@ -668,7 +668,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.equal(providers.get('skillStudio.inspection').getTreeItem(protectedNode).contextValue,
     'skillStudio.node','Phase-bearing Node does not expose deletion');
   await commands.get('skillStudio.auditPackage')();
-  assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/editor warnings/);
+  assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/0 errors \/ 2 warnings/);
   assert.ok(providers.get('skillStudio.problems').getChildren().every(x=>!x.label.includes('Audit unavailable')));
   assert.ok(commands.has('skillStudio.exportPackageZip'));
   // Package export uses the complete byte snapshot but overlays every open
