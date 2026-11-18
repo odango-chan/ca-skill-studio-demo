@@ -781,9 +781,13 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     line.includes('namf-communication-n1n2-transfer'))+1;
   assert.equal(capabilityProblem.line,expectedCapabilityLine);
   const markerSet=diagnosticSets.find(([target,items])=>
-    target.path===contractUri.path&&items.some(item=>item.code==='CAPABILITY_GRANT_NOT_CHECKED'));
+    target.path===contractUri.path&&items.some(item=>
+      item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&
+      item.message.includes('namf-communication-n1n2-transfer')));
   assert.ok(markerSet,'Capability Grant also appears in the editor DiagnosticCollection');
-  const capabilityMarker=markerSet[1].find(item=>item.code==='CAPABILITY_GRANT_NOT_CHECKED');
+  const capabilityMarker=markerSet[1].find(item=>
+    item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&
+    item.message.includes('namf-communication-n1n2-transfer'));
   assert.equal(capabilityMarker.severity,vscode.DiagnosticSeverity.Warning);
   assert.equal(capabilityMarker.range.start.line,expectedCapabilityLine-1);
 
