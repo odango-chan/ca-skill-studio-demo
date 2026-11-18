@@ -135,6 +135,42 @@ function classifyV1Alpha5Tokens(text, relativePath) {
 }
 
 
+function classifyImportedLibraryTokens(text, relativePath) {
+  if (!relativePath.startsWith("lib/") || !/^kind:\s*ToolCatalog\s*$/m.test(text)) return [];
+  let doc;
+  try {
+    doc = parseDocument(text, {
+      version:"1.2",strict:true,uniqueKeys:true,
+      keepSourceTokens:true,logLevel:"silent"
+    });
+  } catch { return []; }
+  if (doc.errors.length || !isMap(doc.contents)) return [];
+  const result=[];
+  function push(value,type,modifiers,path,part){
+    const span=scalarSpan(text,value);
+    if (span) result.push({...span,type,modifiers,path,part});
+  }
+  function visit(value,path,depth){
+    if (depth>MAX_DEPTH) return;
+    if (isSeq(value)) {
+      for (const item of value.items) visit(item,[...path,"*"],depth+1);
+      return;
+    }
+    if (!isMap(value)) return;
+    for (const pair of value.items) {
+      if (!isScalar(pair.key) || typeof pair.key.value!=="string") continue;
+      const key=pair.key.value,next=[...path,key];
+      if (key==="operation" && path.includes("contracts"))
+        push(pair.value,"skillOperation",["declaration"],next,"value");
+      else if (["apiVersion","kind","contracts","operation","effect"].includes(key))
+        push(pair.key,"skillKeyword",[],next,"key");
+      visit(pair.value,next,depth+1);
+    }
+  }
+  try {visit(doc.contents,[],0);} catch {return [];}
+  return result.sort((a,b)=>a.start-b.start||a.end-b.end);
+}
+
 /**
  * Classify an existing YAML document using exact YAML AST scalar spans.
  *
@@ -145,9 +181,9 @@ function classifyV1Alpha5Tokens(text, relativePath) {
  * @returns {{start:number,end:number,type:string,modifiers:string[]}[]}
  */
 export function classifySkillSemanticTokens(text, relativePath) {
-  if (typeof text !== "string" || typeof relativePath !== "string" ||
-      text.length > MAX_SOURCE_LENGTH || !isV1Alpha5Source(text, relativePath)) return [];
-  return classifyV1Alpha5Tokens(text, relativePath);
+  if (typeof text !== "string" || typeof relativePath !== "string" || text.length > MAX_SOURCE_LENGTH) return [];
+  if (isV1Alpha5Source(text, relativePath)) return classifyV1Alpha5Tokens(text, relativePath);
+  return classifyImportedLibraryTokens(text, relativePath);
 }
 
 export const SKILL_SEMANTIC_TOKEN_TYPES = SKILL_SEMANTIC_LEGEND.tokenTypes;
@@ -158,10 +194,9 @@ const MODIFIER_INDEX = new Map(SKILL_SEMANTIC_TOKEN_MODIFIERS.map((name, index) 
 const PROVIDER_REGISTRATIONS = new WeakMap();
 
 /**
- * Compatibility projection consumed by Monaco and browser LSP adapters.
- * v1alpha5 identities are local editor-only AST projections; historical
- * v0.2 identities come from the separately pinned legacy registry. This adds
- * protocol numeric indexes without granting grammar or linking authority.
+ * Protocol projection consumed by Monaco and browser LSP adapters.
+ * v1alpha5 identities are local editor-only AST projections; imported Library
+ * declarations are presentation-only and never grant grammar or linking authority.
  */
 export function collectSkillSemanticTokenSpans(text, relativePath = "") {
   return classifySkillSemanticTokens(text, relativePath).map(token => {
@@ -247,8 +282,6 @@ export function registerSkillSemanticTokens(monaco) {
   const existing = PROVIDER_REGISTRATIONS.get(monaco);
   if (existing) return existing;
   const provider = createSkillSemanticTokensProvider();
-  // The v0.2 registry defines YAML profiles only. Python and Markdown retain
-  // their independent TextMate grammars and Python LSP symbol support.
   const registrations = [monaco.languages.registerDocumentSemanticTokensProvider("yaml", provider)];
   const registration = {
     languages: ["yaml"],
