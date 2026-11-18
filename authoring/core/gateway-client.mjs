@@ -1,25 +1,49 @@
-export class GatewayRequestError extends Error {
-  constructor(status, code, requestId = null) {
-    super("AI Gateway request failed (" + status + ", " + code + ").");
-    this.name = "GatewayRequestError";
-    this.status = status;
-    this.code = code;
-    this.requestId = requestId;
-  }
+function isLoopbackHostname(hostname) {
+  const value = String(hostname || "").toLowerCase();
+  return value === "localhost" || value === "127.0.0.1" || value === "::1" || value === "[::1]";
 }
 
 function gatewayEndpoint(value) {
   let url;
-  try { url = new URL(String(value)); }
-  catch { throw new TypeError("Gateway URL must be an absolute HTTPS URL."); }
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
-    throw new TypeError("Gateway URL must use HTTPS and cannot contain credentials, query or fragment.");
+  try { url = new URL(String(value ?? "").trim()); }
+  catch { throw new TypeError("Gateway URL must be an absolute HTTP(S) URL."); }
+
+  const loopback = isLoopbackHostname(url.hostname);
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
+    throw new TypeError("Gateway URL must use HTTPS for non-loopback hosts; HTTP is allowed only for loopback.");
   }
-  return url.toString().replace(/\/+$/, "") + "/v1/chat/completions";
+  if (url.username || url.password || url.search || url.hash) {
+    throw new TypeError("Gateway URL must not contain credentials, query parameters or fragments.");
+  }
+  const routePrefix = url.pathname.replace(/\/+$/, "");
+  if (!routePrefix || routePrefix === "/") {
+    throw new TypeError("Gateway URL must include an upstream route label and optional upstream path prefix.");
+  }
+  return `${url.origin}${routePrefix}/v1/chat/completions`;
+}
+
+function validateModelId(value) {
+  if (typeof value !== "string") throw new TypeError("A configured Model ID is required.");
+  const modelId = value.trim();
+  if (!new RegExp("^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$").test(modelId)) {
+    throw new TypeError("The configured Model ID is invalid.");
+  }
+  return modelId;
+}
+
+function validateGatewayToken(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string") throw new TypeError("Gateway token must be a printable string.");
+  const token = value.trim();
+  if (!token) return undefined;
+  if (token.length > 8192 || !/^[\x21-\x7E]+$/.test(token)) {
+    throw new TypeError("Gateway token must be a printable value no longer than 8192 characters.");
+  }
+  return token;
 }
 
 function validateSessionId(value) {
-  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(value)) {
+  if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(value)) {
     throw new TypeError("A stable OpenCode Go session ID is required.");
   }
   return value;
@@ -27,124 +51,89 @@ function validateSessionId(value) {
 
 function validateMessages(messages) {
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > 64) {
-    throw new TypeError("At least one and at most 64 model messages are required.");
+    throw new TypeError("Messages must be a non-empty array with at most 64 entries.");
   }
-  for (const message of messages) {
-    if (!message || typeof message !== "object" || Array.isArray(message) ||
-      Object.keys(message).some((key) => key !== "role" && key !== "content")) {
-      throw new TypeError("Every model message must contain only role and content.");
+  return messages.map(message => {
+    if (!message || !["system", "user", "assistant"].includes(message.role) || typeof message.content !== "string") {
+      throw new TypeError("Each message must contain a supported role and string content.");
     }
-    if (!["system", "user", "assistant"].includes(message.role)) {
-      throw new TypeError("Unsupported model message role.");
-    }
-    if (typeof message.content !== "string" &&
-      !(Array.isArray(message.content) && message.content.length > 0 &&
-        message.content.every((part) => part && part.type === "text" &&
-          typeof part.text === "string" &&
-          Object.keys(part).every((key) => key === "type" || key === "text")))) {
-      throw new TypeError("Model message content must be text.");
-    }
-  }
+    return { role: message.role, content: message.content };
+  });
 }
 
 function validateResponseFormat(value) {
   if (value === undefined) return undefined;
-  if (!value || typeof value !== "object" || Array.isArray(value) ||
-    value.type !== "json_object") {
-    throw new TypeError("Unsupported response format.");
-  }
-  return value;
+  if (!value || value.type !== "json_object") throw new TypeError("Only the JSON object response format is supported.");
+  return { type: "json_object" };
 }
 
-function tokenLimit(value, ceiling) {
-  if (value === undefined) return ceiling;
-  if (!Number.isSafeInteger(value) || value < 1) {
-    throw new TypeError("maxTokens must be a positive integer.");
+export class GatewayRequestError extends Error {
+  constructor(message, { status = 0, requestId = undefined } = {}) {
+    super(message);
+    this.name = "GatewayRequestError";
+    this.status = status;
+    this.requestId = requestId;
   }
-  return Math.min(value, ceiling);
-}
-
-function gatewayError(payload, status) {
-  const rawCode = payload && payload.error && payload.error.code;
-  const code = typeof rawCode === "string" && /^[a-z0-9_]{1,80}$/.test(rawCode)
-    ? rawCode : "gateway_request_failed";
-  const requestId = payload && payload.error && typeof payload.error.request_id === "string"
-    ? payload.error.request_id : null;
-  return new GatewayRequestError(status, code, requestId);
 }
 
 export function createGatewayModelClient({
-  gatewayBaseUrl,
-  sessionId,
-  fetchImpl = globalThis.fetch,
-  maxOutputTokens = 2048,
-  maxRequestBytes = 245760,
-} = {}) {
-  const endpoint = gatewayEndpoint(gatewayBaseUrl);
-  const stableSessionId = validateSessionId(sessionId);
+  gatewayBaseUrl, modelId, gatewayToken, sessionId,
+  fetchImpl = globalThis.fetch, maxRequestBytes = 245760, maxOutputTokens = 2048
+}) {
   if (typeof fetchImpl !== "function") throw new TypeError("A Fetch-compatible implementation is required.");
-  if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 8192) {
-    throw new TypeError("maxOutputTokens must be between 1 and 8192.");
-  }
-  if (!Number.isSafeInteger(maxRequestBytes) || maxRequestBytes < 1024 || maxRequestBytes > 262144) {
-    throw new TypeError("maxRequestBytes must be between 1024 and 262144.");
-  }
+  const endpoint = gatewayEndpoint(gatewayBaseUrl);
+  const selectedModelId = validateModelId(modelId);
+  const sharedGatewayToken = validateGatewayToken(gatewayToken);
+  const stableSessionId = validateSessionId(sessionId);
+  const outputTokenLimit = Number.isFinite(maxOutputTokens) ? Math.max(1, Math.min(Math.trunc(maxOutputTokens), 8192)) : 2048;
+  const requestByteLimit = Number.isFinite(maxRequestBytes) ? Math.max(1024, Math.min(Math.trunc(maxRequestBytes), 1048576)) : 245760;
 
   return Object.freeze({
-    async complete({
-      messages,
-      contextDisclosureAccepted = false,
-      responseFormat,
-      maxTokens,
-      signal,
-    } = {}) {
+    async complete({ messages, signal, contextDisclosureAccepted = false, maxTokens = outputTokenLimit, responseFormat = { type: "json_object" } }) {
       if (contextDisclosureAccepted !== true) {
-        throw new Error("Context disclosure must be explicitly accepted before sending a model request.");
+        throw new TypeError("Explicit context disclosure acceptance is required before sending a model request.");
       }
-      validateMessages(messages);
-      const body = {
-        messages,
-        stream: false,
-        max_tokens: tokenLimit(maxTokens, maxOutputTokens),
-      };
+      const requestMessages = validateMessages(messages);
+      const tokenCount = Number.isFinite(maxTokens) ? Math.max(1, Math.min(Math.trunc(maxTokens), outputTokenLimit)) : outputTokenLimit;
+      const body = { model: selectedModelId, messages: requestMessages, max_tokens: tokenCount, stream: false };
       const format = validateResponseFormat(responseFormat);
-      if (format !== undefined) body.response_format = format;
-      const serializedBody = JSON.stringify(body);
-      const requestBytes = new TextEncoder().encode(serializedBody).byteLength;
-      if (requestBytes > maxRequestBytes) {
-        throw new RangeError("Model request exceeds the configured UTF-8 byte limit.");
+      if (format) body.response_format = format;
+      const serialized = JSON.stringify(body);
+      if (new TextEncoder().encode(serialized).byteLength > requestByteLimit) {
+        throw new TypeError("The model request exceeds the configured byte limit.");
       }
+      const headers = { "content-type": "application/json", "x-opencode-session": stableSessionId };
+      if (sharedGatewayToken) headers["x-gateway-token"] = sharedGatewayToken;
 
       let response;
       try {
-        response = await fetchImpl(endpoint, {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "content-type": "application/json",
-            "x-opencode-session": stableSessionId,
-          },
-          body: serializedBody,
-          signal,
-        });
-      } catch (error) {
-        if (error && error.name === "AbortError") throw error;
-        throw new GatewayRequestError(0, "gateway_unavailable");
+        response = await fetchImpl(endpoint, { method: "POST", credentials: "omit", headers, body: serialized, signal });
+      } catch {
+        throw new GatewayRequestError("The AI Gateway request could not be completed.");
       }
-
+      if (!response || typeof response.ok !== "boolean") throw new GatewayRequestError("The AI Gateway returned an invalid response.");
       if (!response.ok) {
-        let payload = null;
-        try { payload = await response.json(); } catch { payload = null; }
-        throw gatewayError(payload, response.status);
+        throw new GatewayRequestError("The AI Gateway rejected the model request.", {
+          status: response.status,
+          requestId: response.headers?.get?.("x-request-id") || undefined
+        });
       }
-
       let payload;
       try { payload = await response.json(); }
-      catch { throw new GatewayRequestError(502, "invalid_gateway_response"); }
-      const content = payload && payload.choices && payload.choices[0] &&
-        payload.choices[0].message && payload.choices[0].message.content;
-      if (typeof content !== "string") throw new GatewayRequestError(502, "missing_model_content");
-      return content;
-    },
+      catch {
+        throw new GatewayRequestError("The AI Gateway returned a non-JSON response.", {
+          status: response.status,
+          requestId: response.headers?.get?.("x-request-id") || undefined
+        });
+      }
+      const content = payload?.choices?.[0]?.message?.content;
+      if (typeof content !== "string" || !content.trim()) throw new GatewayRequestError("The model response did not contain a usable proposal.");
+      return Object.freeze({
+        content,
+        model: typeof payload.model === "string" ? payload.model : selectedModelId,
+        usage: payload.usage && typeof payload.usage === "object" ? payload.usage : undefined,
+        requestId: response.headers?.get?.("x-request-id") || undefined
+      });
+    }
   });
 }
