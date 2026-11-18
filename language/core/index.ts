@@ -12,6 +12,7 @@ import type {
   PythonOutlineSymbol,
   SchemaReference,
   ScriptReference,
+  SourceOffsetRange,
   SkillLanguageAnalysis
 } from "./types.js";
 
