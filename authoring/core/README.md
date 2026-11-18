@@ -1,36 +1,26 @@
-# AI Authoring Core foundation
+# AI Authoring Core
 
-This folder contains the first host-neutral model-client and proposal-validation contracts.
+The Core is platform-neutral. It contains no VS Code, Theia, DOM, Webview, browser UI, Gateway-server implementation or provider SDK dependency.
 
-## Boundaries
+## Current modules
 
-- No imports from VS Code, Theia, DOM, Node-only modules or Cloudflare.
-- The Gateway client receives a Fetch implementation from its Host Adapter and sends browser requests with credentials included so the configured Access session can authenticate them. It sends a stable Host-generated `x-opencode-session` ID for the Editor Tab session; the Gateway injects the product User-Agent and forwards the session header to OpenCode Go. It never receives a provider key or client-supplied model.
-- The Context Pack builder accepts only the live v1alpha5 Preview Procedure and allowlisted Package-relative context; references and scripts require explicit opt-in; dependencies require verified metadata.
-- The Procedure Agent orchestrates one bounded proposal request, verifies the exact manifest and validates every model-authored reference; it exposes no file-write or Runtime operation.
-- Context Pack size is checked against the serialized JSON envelope in UTF-8 bytes. The initial cap is 128 KiB to leave room for the system prompt and request metadata; oversized input is rejected, never silently truncated.
-- No provider API key or model identifier is accepted from the client.
-- A request cannot be sent until the caller confirms the Context Pack disclosure.
-- ModelProposal is untrusted and validated against a versioned Studio-owned schema.
-- The model cannot author source offsets, file paths, candidate YAML, WorkspaceEdit, atomic groups or validation state.
-- Every evidence reference must resolve to an ID in the exact Context Pack manifest supplied by the host.
+- `context-pack.mjs` builds a bounded, allowlisted context projection from Host-provided snapshots. It does not scan the workspace or open files itself.
+- `procedure-agent.mjs` builds the domain-specific Procedure Authoring prompt and invokes the injected Model Client only after explicit disclosure acceptance.
+- `model-proposal.mjs` validates model output as an untrusted, typed proposal. It does not treat model output as a Patch or executable instruction.
+- `gateway-client.mjs` implements the OpenAI-compatible Chat Completions client for the independent Go Gateway.
 
-The host-neutral model / proposal core is still separate from editor integration. The v1alpha5 Semantic Patch Engine now exists as a separate Host-owned module and computes atomic groups / source edits, but it is not yet wired to the Authoring Editor Tab, Theia Host Adapter, native WorkspaceEdit or Compiler Check.
+## Go Gateway client contract
+
+- `gatewayBaseUrl` is the Gateway route prefix, including the configured upstream label and any upstream path prefix. The client appends `/v1/chat/completions`.
+- `modelId` comes from trusted application configuration and is sent in the request body. It is never selected by model output.
+- `sessionId` is a stable Host-generated `X-Opencode-Session` value for the Editor Tab session.
+- `gatewayToken` is optional and represents the one deployment-wide `X-Gateway-Token` for a non-loopback Gateway. The Host may read it from Extension SecretStorage; it is not a provider credential or user identity.
+- Requests use `credentials: omit`. No browser cookies or provider Authorization header are sent by Studio.
+- HTTP is accepted only for loopback Gateway URLs; non-loopback Gateway URLs must use HTTPS.
+- The provider API Key is configured only on the Go Gateway host, normally through its environment-backed upstream configuration. It never enters this package, the Webview, VSIX, workspace, Context Pack or diagnostics.
+
+The Go Gateway is a transparent reverse proxy. It routes by upstream label, injects server-side provider headers and forwards the request / response. It does not parse prompts, choose Model IDs, transform OpenAI-compatible payloads or implement user accounts. Browser CORS is disabled by default; exact-origin support for browser-hosted Studio is tracked in [ai-gateway Issue #4](https://github.com/odango-chan/ai-gateway/issues/4).
 
 ## Tests
 
-Run from the repository root:
-
-~~~bash
-npm test
-~~~
-
-
-## v1alpha5 Preview boundary
-
-- The core accepts only `connectionagent.io/v1alpha5`; it never falls back to the published v1alpha4 Compiler or parser.
-- The model prompt treats Node-entry Wait as control before the first business stage. It cannot invent trusted IngressCatalog / Owner / correlation contracts.
-- `wait.event.source` is a legitimate selector field only inside the typed Wait event object; generic source-authority fields remain rejected.
-- The full v1alpha5 Compiler is not yet available. A partial WP2 parser result is not a full candidate Check PASS.
-
-See [v1alpha5 Semantic Patch Engine](PATCH-ENGINE-v1alpha5.md) for the patch allowlist and explicit validation boundary.
+Run the repository's `npm test`. Gateway client tests use a Fetch-compatible stub and verify the public Go Gateway route / header contract without embedding or invoking a Worker implementation.
