@@ -23,9 +23,9 @@ The Example is illustrative and remains **NOT_QUALIFIED** for Compiler, Owner, H
 
 ## Compiler boundary
 
-The published v1alpha5 language does not make the published v1alpha4 Compiler v1.0.0 compatible with v1alpha5. Studio must fail closed for compiler actions until a v1alpha5 Compiler implementation with the required static semantics is available.
+The published v1alpha5 language does not make the published v1alpha4 Compiler v1.0.0 compatible with v1alpha5. Studio must fail closed for compiler actions until a v1alpha5 Compiler release is integrated and the Studio adapter is validated.
 
-The current Compiler PR #30 remains a development candidate and is not a released integration target.
+The current v1alpha5 Compiler candidate is [PR #38](https://github.com/odango-chan/ca-skill-compiler/pull/38), pinned for status tracking at commit `ea27f18549725166f304b7d06fd9339bb0554329`. It remains Draft / unmerged and is not integrated into Studio. Its PR description reports `FULL_LANGUAGE_VALIDATION` with local acceptance evidence; this is not a released Compiler or product qualification. PR #30 has been superseded by #38 and must not be used as the current candidate.
 
 ## Historical source
 
