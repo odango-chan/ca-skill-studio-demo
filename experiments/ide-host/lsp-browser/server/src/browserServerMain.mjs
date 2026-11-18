@@ -756,15 +756,6 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
   if(waitTopField&&inWait)return make(["event:","timeout:","response:","routes:"],
     waitTopField[2],lineStart+6,CompletionItemKind.Keyword,"Node-entry Wait control fields");
 
-  // Keep Wait-control completion isolated from generic stage-route outcomes.
-  // Some clients report the current empty mapping key without preserving the
-  // complete line context; recognize the exact Node.wait routes structure.
-  const rawWaitRoutes=/wait:\s*\n {6}routes:\s*\n {8}([A-Z_]*)$/.exec(prefix);
-  if(rawWaitRoutes&&inWait&&waitSection==="routes")
-    return make(["TIMEOUT:"],rawWaitRoutes[1],
-      offset-rawWaitRoutes[1].length,CompletionItemKind.EnumMember,
-      "Wait-control timeout edge; event acceptance is implicit");
-
   const waitMemberField=/^( {8})([a-zA-Z]*)$/.exec(prefix);
   if(waitMemberField&&inWait&&waitSection==="event")
     return make(["source:","service:","operation:"],waitMemberField[2],lineStart+8,
