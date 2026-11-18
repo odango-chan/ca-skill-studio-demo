@@ -9,6 +9,7 @@ import {
   COMPILER_INSPECTION_VERSION,
   COMPILER_LANGUAGE_TARGET,
   createCompilerBuildRequest,
+  compilerArtifactRelativePath,
   isCompilerBuildResult,
   isCompilerInspection
 } from "./compiler-request.mjs";
@@ -105,18 +106,7 @@ function makeArtifactProvider(vscode,context,output){
       const files=[];
       if(result.success){
         for(const file of result.outputFiles){
-          // Compiler v2 emits root manifest.json plus skills/<name>/compiled/*.
-          // These paths are verified against the compiled BuildResult first.
-          if(typeof file?.path!=="string"||
-             (file.path!=="manifest.json"&&!file.path.startsWith(prefix))){
-            throw new Error("Compiler returned an Artifact path outside the selected Skill: "+String(file?.path));
-          }
-          const relativePath=file.path==="manifest.json"
-            ?"manifest.json":file.path.slice(prefix.length);
-          if(!relativePath||relativePath.split("/").some(part=>
-            !part||part==="."||part==="..")||relativePath.includes("\\")){
-            throw new Error("Compiler returned an unsafe Artifact path: "+file.path);
-          }
+          const relativePath=compilerArtifactRelativePath(packageName,file?.path);
           let text;
           try{
             const binary=atob(file.bytes);
