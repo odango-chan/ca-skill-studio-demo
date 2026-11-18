@@ -67,7 +67,7 @@ Create a platform-neutral TypeScript core with no imports from VS Code, Theia, D
 - v1alpha5 semantic patch planning and candidate-source generation, including Node-entry Wait edits.
 - Provider-neutral request / response / streaming / cancellation interfaces.
 
-The core never reads or writes workspace files by itself. It receives snapshots and revision metadata through a Host Adapter and returns typed results. It does not own the model provider credential or Gateway deployment.
+The core never reads or writes workspace files by itself. It receives snapshots and revision metadata through a Host Adapter and returns typed results. It does not own the OpenCode Go credential or Gateway deployment.
 
 ### 3.2 Host Adapter contract
 
@@ -97,14 +97,16 @@ The shared core depends on an IModelClient, not on Theia AI or a provider SDK. T
 
 The Gateway owns deployment-specific concerns:
 
-- The OpenCode Go adapter requires a stable Host-generated `x-opencode-session` identifier and injects a product-specific `User-Agent`; it never trusts browser-supplied provider credentials.
+- The upstream is pinned to `https://opencode.ai/inference/go/openai/v1/chat/completions`; the Worker rejects other provider origins / paths.
+- The OpenCode Go adapter requires a stable Host-generated `x-opencode-session` identifier and injects `User-Agent: ca-skill-studio-ai-authoring/1.0`; it never trusts browser-supplied provider credentials.
+- Only OpenCode Go model IDs documented for its OpenAI Chat Completions endpoint may be allowlisted (the pilot config currently defaults to `deepseek-v4.1-flash` and also allows `deepseek-v4-pro`). Models exposed only through Responses or Anthropic Messages are outside this client protocol.
 
-- Provider endpoint, model routing and the shared provider API credential.
+- The OpenCode Go endpoint is pinned in the Worker; model routing and the shared OpenCode Go API credential remain deployment configuration.
 - Gateway-side authentication / session verification.
 - Rate limits, request-size limits, timeout / cancellation propagation and usage controls.
 - Safe forwarding of the supported OpenAI-compatible request / response stream.
 
-The Studio client owns the task prompt, Context Pack, proposal schema and strict response validation. The Gateway is a transport / credential boundary; it does not parse CA-SL, decide whether a Procedure is valid, generate trusted source offsets or apply edits.
+The Studio client owns the task prompt, Context Pack, proposal schema and strict response validation. The Gateway is an OpenCode Go transport / credential boundary; it does not parse CA-SL, decide whether a Procedure is valid, generate trusted source offsets or apply edits.
 
 The baseline protocol should target the broadly supported OpenAI Chat Completions request / response shape. Streaming may be used for progress and response delivery, but a proposal is not reviewable until the complete payload has passed host-side schema validation. Do not assume every compatible provider supports /v1/models, strict JSON Schema mode, tool calling or identical cancellation semantics.
 
@@ -116,7 +118,7 @@ Native host AI APIs are optional adapters, not the canonical Agent runtime:
 - **Theia AI** may be reused behind a Theia-specific adapter if a supported host path is proven. It is not installed in the current application, and its backend-dependent provider path is not the Browser-Only production architecture.
 - A future integration may expose the Gateway as a native VS Code model provider, but the standalone AI Authoring Editor Tab must work without opening Copilot Chat or depending on a Chat Participant.
 
-This avoids building two generic chat products. Skill Studio implements only the domain-specific Authoring orchestration and typed Change Set workflow; it uses the common OpenAI-compatible Gateway for the first production path.
+This avoids building two generic chat products. Skill Studio implements only the domain-specific Authoring orchestration and typed Change Set workflow; its first production model path is OpenCode Go through the restricted Gateway.
 
 ### 3.5 Keep CA-SL and host Agent Skills separate
 
@@ -270,7 +272,7 @@ Before the first request in a task, the user sees the provider destination and e
 
 **Provider: OpenCode Go.** The transport is OpenAI-compatible Chat Completions; the model endpoint and model ID are Gateway deployment configuration, not CA-SL or Authoring-core configuration.
 
-The first client adapter targets OpenCode Go's OpenAI-compatible Chat Completions request / response shape. The adapter must support cancellation and may support streaming. Structured output / JSON Schema response modes are capability-negotiated; the Host MUST validate every completed response against the Studio-owned ModelProposal schema even when the provider claims schema-constrained output.
+The first client adapter targets OpenCode Go's OpenAI-compatible Chat Completions request / response shape and sends one stable `x-opencode-session` value for the lifetime of an AI Authoring Editor Tab session. The adapter must support cancellation and may support streaming. Structured output / JSON Schema response modes are capability-negotiated; the Host MUST validate every completed response against the Studio-owned ModelProposal schema even when the provider claims schema-constrained output.
 
 The Gateway is intentionally thin. It authenticates the caller, applies per-user rate limits and request / output-token ceilings, injects the deployment's shared provider credential, and forwards OpenCode Go Chat Completions JSON or SSE responses. It does not own the Agent or editing semantics. It MUST NOT become a second Procedure Agent, parse CA-SL semantics, edit source or claim Compiler validity.
 
