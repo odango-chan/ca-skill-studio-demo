@@ -2735,7 +2735,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             item.status?'Status: '+item.status:null,
             item.code?'Code: '+item.code:null,
             item.source??'Skill Studio · Package Audit'
-          ].filter(Boolean).join('\\n');
+          ].filter(Boolean).join('\n');
         }
         if(item.kind==='node'){
           const deletable=id==='inspection'&&document&&
