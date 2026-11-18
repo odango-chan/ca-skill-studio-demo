@@ -153,8 +153,10 @@ export function auditV1Alpha5Package({
     ?dependencyContext.schemas:[];
   const capabilityDeclarations=Array.isArray(dependencyContext.capabilityDeclarations)
     ?dependencyContext.capabilityDeclarations:null;
+  const capabilityDeclarationsComplete=dependencyContext.capabilityDeclarationsComplete===true;
   const evidenceDeclarations=Array.isArray(dependencyContext.evidenceDeclarations)
     ?dependencyContext.evidenceDeclarations:null;
+  const evidenceDeclarationsComplete=dependencyContext.evidenceDeclarationsComplete===true;
   const contextAvailable=dependencyContext.available===true;
   const declarationById=new Map(declarations.map(item=>[item.id,item]));
   const snapshotById=new Map(snapshots.map(item=>[item.id,item]));
@@ -235,15 +237,22 @@ export function auditV1Alpha5Package({
           continue;
         }
         const matches=capabilityDeclarations.filter(value=>value?.id===id);
-        if(matches.length===0){
-          add(diagnostics,FILES.contract,contract,item,
-            "CAPABILITY_DECLARATION_NOT_FOUND",
-            "No trusted CapabilityContracts declaration matches "+id,
-            {domain:"capabilities",category:"linking"});
-        }else if(matches.length>1){
+        if(matches.length>1){
           add(diagnostics,FILES.contract,contract,item,
             "CAPABILITY_DECLARATION_AMBIGUOUS",
             "Multiple trusted CapabilityContracts declarations match "+id,
+            {domain:"capabilities",category:"linking"});
+        }else if(!capabilityDeclarationsComplete){
+          addNotChecked(diagnostics,FILES.contract,contract,item,
+            matches.length===0?"CAPABILITY_DECLARATION_NOT_CHECKED":"CAPABILITY_DECLARATION_SET_INCOMPLETE",
+            matches.length===0
+              ?"No match for "+id+" was found in the partial CapabilityContracts snapshot; absence is NOT_CHECKED"
+              :"Capability "+id+" has a candidate declaration, but the CapabilityContracts snapshot is incomplete; uniqueness and Owner binding are NOT_CHECKED",
+            "capabilities");
+        }else if(matches.length===0){
+          add(diagnostics,FILES.contract,contract,item,
+            "CAPABILITY_DECLARATION_NOT_FOUND",
+            "No trusted CapabilityContracts declaration matches "+id,
             {domain:"capabilities",category:"linking"});
         }else if(matches[0].trusted!==true){
           addNotChecked(diagnostics,FILES.contract,contract,item,
@@ -416,15 +425,22 @@ export function auditV1Alpha5Package({
           }else{
             const matches=evidenceDeclarations.filter(value=>
               value?.id===reference||value?.id===match[2]);
-            if(matches.length===0){
-              add(diagnostics,FILES.predicates,predicates,item,
-                "EVIDENCE_DECLARATION_NOT_FOUND",
-                "No trusted Owner Evidence declaration matches "+reference,
-                {domain:"evidence",category:"linking"});
-            }else if(matches.length>1){
+            if(matches.length>1){
               add(diagnostics,FILES.predicates,predicates,item,
                 "EVIDENCE_DECLARATION_AMBIGUOUS",
                 "Multiple trusted Owner Evidence declarations match "+reference,
+                {domain:"evidence",category:"linking"});
+            }else if(!evidenceDeclarationsComplete){
+              addNotChecked(diagnostics,FILES.predicates,predicates,item,
+                matches.length===0?"EVIDENCE_DECLARATION_NOT_CHECKED":"EVIDENCE_DECLARATION_SET_INCOMPLETE",
+                matches.length===0
+                  ?"No match for "+reference+" was found in the partial Owner Evidence snapshot; absence is NOT_CHECKED"
+                  :"Evidence "+reference+" has a candidate declaration, but the Owner Evidence snapshot is incomplete; uniqueness and Owner binding are NOT_CHECKED",
+                "evidence");
+            }else if(matches.length===0){
+              add(diagnostics,FILES.predicates,predicates,item,
+                "EVIDENCE_DECLARATION_NOT_FOUND",
+                "No trusted Owner Evidence declaration matches "+reference,
                 {domain:"evidence",category:"linking"});
             }else if(matches[0].trusted!==true){
               addNotChecked(diagnostics,FILES.predicates,predicates,item,
