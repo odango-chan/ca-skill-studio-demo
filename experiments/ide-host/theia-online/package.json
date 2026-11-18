@@ -37,6 +37,7 @@
     "@theia/keymaps": "1.76.0",
     "@theia/markers": "1.76.0",
     "@theia/messages": "1.76.0",
+    "@theia/test": "1.76.0",
     "@theia/plugin-ext": "1.76.0",
     "@theia/plugin-ext-vscode": "1.76.0",
     "@theia/bulk-edit": "1.76.0",
