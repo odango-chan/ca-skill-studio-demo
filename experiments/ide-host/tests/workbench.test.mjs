@@ -766,7 +766,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     vscode.DiagnosticSeverity.Error);
   assert.ok(packageProblems.some(item=>item.code==='EVIDENCE_GUARANTEE_NOT_CHECKED'));
   assert.ok(packageProblems.some(item=>item.code==='DEPENDENCY_NOT_CONFIGURED'));
-  assert.ok(!packageProblems.some(item=>item.kind==='compiler-diagnostic'),
+  assert.ok(!problemRoots.some(item=>item.kind==='problem-group'&&item.label==='Compiler'),
     'Compiler disconnection does not prevent independent Package diagnostics');
   assert.match(problemRoots[0].label,/NOT_CHECKED/);
   assert.ok(problemRoots.some(item=>item.kind==='problem-group'&&item.label==='Capabilities'));
