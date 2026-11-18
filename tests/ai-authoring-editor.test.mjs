@@ -7,6 +7,7 @@ import {
   renderAiAuthoringHtml,
   isCurrentAuthoringSession,
   isLiveDocumentRevision,
+  preferredProcedureDocument,
   isAuthoringApplyAllowed,
 } from "../experiments/ide-host/vscode/src/ai-authoring-editor.mjs";
 
@@ -213,4 +214,12 @@ test("native preview and Apply require the exact live TextDocument revision and 
   assert.equal(isLiveDocumentRevision({ version: 4, getText: () => source + "# changed\\n" }, revision), false);
   assert.equal(isLiveDocumentRevision(document, { documentVersion: 4, source: 7 }), false);
   assert.equal(isLiveDocumentRevision(null, revision), false);
+});
+
+test("AI Authoring prefers the active Procedure or current workbench Procedure without failing on another active file", () => {
+  const procedure = { uri: { path: "/workspace/skills/example/assurance/procedure.yaml" } };
+  const python = { uri: { path: "/workspace/skills/example/scripts/run.py" } };
+  assert.equal(preferredProcedureDocument(procedure, python), procedure);
+  assert.equal(preferredProcedureDocument(python, procedure), procedure);
+  assert.equal(preferredProcedureDocument(python, null), null);
 });

@@ -186,6 +186,12 @@ export function isLiveDocumentRevision(document, revision) {
     document.getText() === revision.source);
 }
 
+export function preferredProcedureDocument(activeDocument, workbenchDocument) {
+  if (activeDocument && isProcedurePath(activeDocument.uri?.path)) return activeDocument;
+  if (workbenchDocument && isProcedurePath(workbenchDocument.uri?.path)) return workbenchDocument;
+  return null;
+}
+
 function nonceValue() {
   const bytes = new Uint8Array(24);
   if (!globalThis.crypto?.getRandomValues) throw new Error("Secure randomness unavailable");
@@ -277,12 +283,9 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
 
   async function resolveProcedureDocument() {
     const active = vscode.window.activeTextEditor?.document ?? null;
-    if (active) {
-      if (isProcedurePath(active.uri.path)) return active;
-      throw new Error("请先打开目标 Skill 的 assurance/procedure.yaml，再启动 AI Authoring。");
-    }
     const workbenchDocument = getActiveDocument?.() ?? null;
-    if (workbenchDocument && isProcedurePath(workbenchDocument.uri.path)) return workbenchDocument;
+    const preferred = preferredProcedureDocument(active, workbenchDocument);
+    if (preferred) return preferred;
     const matches = await vscode.workspace.findFiles(
       "**/assurance/procedure.yaml", "**/node_modules/**", 50
     );
