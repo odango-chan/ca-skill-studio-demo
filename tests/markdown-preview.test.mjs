@@ -68,7 +68,7 @@ test("unsupported oversized Markdown fails closed to Source only",()=>{
 test("all three current CreatedSession business References render safely in Markdown Visual",()=>{
   const paths=["3gpp-procedure.md","session-selection.md","failure-handling.md"];
   for(const name of paths){
-    const source=readFileSync(new URL("../site/samples/packages/"+
+    const source=readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
       "establish-pdu-session/references/"+name,import.meta.url),"utf8");
     const rendered=renderMarkdown(source);
     assert.equal(rendered.available,true,name);
@@ -76,7 +76,7 @@ test("all three current CreatedSession business References render safely in Mark
     assert.doesNotMatch(rendered.html,/<script\b|<iframe\b|<img\b/i,name);
     assert.ok(rendered.html.length>1000,name);
   }
-  const gpp=renderMarkdown(readFileSync(new URL("../site/samples/packages/"+
+  const gpp=renderMarkdown(readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
     "establish-pdu-session/references/3gpp-procedure.md",import.meta.url),"utf8"));
   assert.match(gpp.html,/md-unresolved-link/);
   assert.doesNotMatch(gpp.html,/href="\.\.\/SKILL.md"/);
@@ -84,7 +84,7 @@ test("all three current CreatedSession business References render safely in Mark
 
 test("current v1alpha4 Skill guides render safely and expose only explicit Package-local paths",()=>{
   for(const name of ["establish-pdu-session","establish-pdu-session-mas"]){
-    const source=readFileSync(new URL("../site/samples/v1alpha4/"+name+"/SKILL.md",import.meta.url),"utf8");
+    const source=readFileSync(new URL("../site/samples/v1alpha5/"+name+"/SKILL.md",import.meta.url),"utf8");
     const preview=renderMarkdown(source);
     assert.equal(preview.available,true,name);
     assert.match(preview.html,/<details class="md-frontmatter" data-source-line="0">/,name);
@@ -92,7 +92,7 @@ test("current v1alpha4 Skill guides render safely and expose only explicit Packa
     assert.doesNotMatch(preview.html,/<script\b|<iframe\b|<img\b/i,name);
   }
   const source=readFileSync(new URL(
-    "../site/samples/v1alpha4/establish-pdu-session-mas/SKILL.md",import.meta.url),"utf8");
+    "../site/samples/v1alpha5/establish-pdu-session-mas/SKILL.md",import.meta.url),"utf8");
   const packageFiles=new Set([
     "SKILL.md","assurance/openamsm-operation-mapping.md",
     "assurance/contract.yaml","assurance/procedure.yaml","assurance/predicates.yaml"

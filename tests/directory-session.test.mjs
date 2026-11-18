@@ -19,7 +19,7 @@ function file(name,value,{bad=false,bytes=null}={}){
 }
 function sample(path){
   return new Uint8Array(readFileSync(new URL(
-    "../site/samples/packages/establish-pdu-session/"+path,import.meta.url)));
+    "./fixtures/legacy-site-samples/packages/establish-pdu-session/"+path,import.meta.url)));
 }
 test("E4 session handle: read-only open retains same handle and imports all 16 owner files",async()=>{
   const paths=[

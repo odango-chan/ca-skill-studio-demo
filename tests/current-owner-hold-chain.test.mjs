@@ -10,7 +10,7 @@ import {namedStepMutationImpactReport} from "../site/phase-step-impact.mjs";
 import {phaseOutputReferenceOptions} from "../site/phase-output-refs.mjs";
 
 const source=readFileSync(new URL(
-  "../site/samples/packages/establish-pdu-session/assurance/procedure.yaml",
+  "./fixtures/legacy-site-samples/packages/establish-pdu-session/assurance/procedure.yaml",
   import.meta.url),"utf8");
 const pid="ue-requested-pdu-session-establishment";
 const udm="nudm-sdm-subscribe";
