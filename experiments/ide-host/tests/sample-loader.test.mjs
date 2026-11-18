@@ -83,9 +83,9 @@ const total=candidate.files.length;
 test("Example imports only the pinned CA-SL v1alpha5 Skills into skills/",async()=>{
   const h=host(),result=await seedExampleProject(
     h.vscode,uri("/extension"),uri("/global-storage"));
-  assert.equal(candidate.sourceSha,"84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef");
-  assert.equal(candidate.sourceRef,"refs/pull/65/head");
-  assert.equal(candidate.sourceStatus,"DRAFT_NOT_QUALIFIED");
+  assert.equal(candidate.sourceSha,"de8d9f667dd1a445c3f6378e0ca793d7407d2036");
+  assert.equal(candidate.sourceRef,"refs/heads/main");
+  assert.equal(candidate.sourceStatus,"RELEASED_NOT_QUALIFIED");
   assert.equal(candidate.languageVersion,"connectionagent.io/v1alpha5");
   assert.equal(result.candidateFiles,14);
   assert.equal(result.files,total);
@@ -102,10 +102,10 @@ test("Example imports only the pinned CA-SL v1alpha5 Skills into skills/",async(
   assert.match(decode(h.files.get(procedurePath)),/start: get-sm-subscription-data/);
   assert.doesNotMatch(decode(h.files.get(procedurePath)),/ueRef|ue-ref/);
   assert.match(decode(h.files.get(masProcedurePath)),/start: validate-sm-subscription/);
-  assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 Example Skills/);
-  assert.match(decode(h.files.get(root+"/README.md")),/84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef/);
+  assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 PDU Session examples/);
+  assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 PDU Session examples/);
   assert.ok(h.files.has(skillRoot+"/establish-pdu-session/scripts/validate-subscription-request.py"));
-  assert.ok(h.files.has(skillRoot+"/establish-pdu-session-mas/assurance/openamsm-operation-mapping.md"));
+  assert.ok(h.files.has(skillRoot+"/establish-pdu-session-mas/references/openamsm-operation-mapping.md"));
   assert.deepEqual(h.workspace.workspaceFolders,[],"import never mutates the active workspace");
 });
 

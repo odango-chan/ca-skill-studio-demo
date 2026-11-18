@@ -24,7 +24,7 @@ test("Skill Studio pins the complete frozen CA-SL v1alpha4 source",()=>{
   assert.ok(entry.includes("skill-language-spec.v1alpha5.zh-CN.md"));
   assert.match(entry,/PUBLIC REVIEW DRAFT; NOT RELEASED/);
   assert.ok(readme.includes(lock.authority.commit));
-  assert.ok(readme.includes("Active Skill Studio target: v1alpha5 candidate"));
+  assert.ok(readme.includes("Active Skill Studio target: v1alpha5"));
   assert.ok(readme.includes("Historical frozen v1alpha4 source"));
   assert.equal(lock.externalProfiles.toolCatalog,"connectionagent.io/toolcatalog/v1alpha4");
   assert.equal(lock.externalProfiles.capabilityContracts,"connectionagent.io/capability-contracts/v1alpha4");
