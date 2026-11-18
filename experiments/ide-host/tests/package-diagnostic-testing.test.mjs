@@ -56,7 +56,11 @@ function host({native=true,activeProcedure=active,sourceSnapshot=snapshot}={}){
   const context={subscriptions:[]};
   const testing=registerPackageDiagnosticTesting(vscode,context,{
     getActiveProcedure:()=>activeProcedure,
-    snapshotProvider:async()=>sourceSnapshot
+    snapshotProvider:async(_vscode,_document,generation)=>{
+      assert.ok(Number.isSafeInteger(generation)&&generation>=0,
+        "Testing must supply a valid bounded Package generation");
+      return sourceSnapshot;
+    }
   });
   return {commands,lines,runs,results,testing,controller,context,
     get profile(){return profile;},get rootItem(){return rootItem;}};
