@@ -219,7 +219,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             line:(item.range?.start?.line??0)+1,
             column:(item.range?.start?.character??0)+1
           })): [];
-        const problemItems=treeProviders.get("problems")?.getChildren?.()??[];
+        const problemItems=(treeProviders.get("problems")?.getChildren?.()??[])
+          .flatMap(item=>item.kind==="problem-group"?(item.children??[]):[item]);
         return {
           status:auditStatus,
           diagnostics:audit.map(item=>({
