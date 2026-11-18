@@ -503,7 +503,7 @@ export function analyzeV1Alpha5Source(
     finalPostconditionNodes,
     procedures:[{
       name:packageName,start,nodes,routes,children:[],
-      line:1,profile:"CA-SL v1alpha5 (candidate editor source projection only)"
+      line:1,profile:"CA-SL v1alpha5 (released language; editor source projection only)"
     }]
   };
   return {procedure:projection,diagnostics};
