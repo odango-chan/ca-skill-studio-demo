@@ -5,7 +5,7 @@ import {projectWorkspace} from "../site/workspace.mjs";
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from "../site/node-create.mjs";
 
 const read=(skill,file="procedure.yaml")=>readFileSync(new URL(
-  (skill==="establish-pdu-session"?"./fixtures/establish-pre-hold/assurance/":"../site/samples/packages/"+skill+"/assurance/")+file,import.meta.url),"utf8");
+  (skill==="establish-pdu-session"?"./fixtures/establish-pre-hold/assurance/":"./fixtures/legacy-site-samples/packages/"+skill+"/assurance/")+file,import.meta.url),"utf8");
 const ensure=read("ensure-pdu-session"),created=read("establish-pdu-session");
 const ensureProc=projectWorkspace(ensure).procedure;
 const root=projectWorkspace(created).procedure;

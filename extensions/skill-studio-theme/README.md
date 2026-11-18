@@ -6,7 +6,8 @@ in VS Code and Eclipse Theia.
 ## Included
 
 - **SKILL Studio Light** — workbench surfaces, editor chrome, terminal palette,
-  YAML/Python/JSON/Markdown token colors and semantic highlighting.
+  YAML/Python/JSON/Markdown token colors and semantic highlighting, including the
+  Studio-local CA-SL v1alpha5 Node-entry Wait token.
 - **SKILL Studio File Icons** — file and folder SVGs use the same 24px
   rounded-outline geometry and file-type mapping as Classic. Compiler-style
   project roots use distinct icons: `skills/` (Source), `lib/` (lock), and

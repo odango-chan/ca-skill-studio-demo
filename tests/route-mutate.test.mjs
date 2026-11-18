@@ -6,7 +6,7 @@ import {routeOutcomeEditOptions,previewRenameRouteOutcome,
   previewDeleteRouteOutcome,applyRenameRouteOutcome,applyDeleteRouteOutcome}
   from "../site/route-mutate.mjs";
 
-const source=skill=>readFileSync(new URL("../site/samples/packages/"+
+const source=skill=>readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
   skill+"/assurance/procedure.yaml",import.meta.url),"utf8");
 const ensure=source("ensure-pdu-session");
 const created=source("establish-pdu-session");

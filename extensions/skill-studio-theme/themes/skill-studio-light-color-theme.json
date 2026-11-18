@@ -319,6 +319,7 @@
     "skillSchema": "#287D9B",
     "skillReference": "#16846F",
     "skillBinding": "#697E97",
-    "skillOperation": "#286CA8"
+    "skillOperation": "#286CA8",
+    "skillWait": "#7B5BA7"
   }
 }

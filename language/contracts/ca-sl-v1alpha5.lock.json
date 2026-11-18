@@ -1,0 +1,53 @@
+{
+  "authority": {
+    "repository": "odango-chan/ca-skills",
+    "commit": "0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5",
+    "sourceRef": "refs/heads/main",
+    "status": "FROZEN_RELEASED"
+  },
+  "language": {
+    "target": "connectionagent.io/v1alpha5",
+    "status": "FROZEN_RELEASED",
+    "inheritedBaseline": "connectionagent.io/v1alpha4"
+  },
+  "externalProfiles": {
+    "toolCatalog": "connectionagent.io/toolcatalog/v1alpha4",
+    "capabilityContracts": "connectionagent.io/capability-contracts/v1alpha4",
+    "legacyFallback": false
+  },
+  "normativeSource": {
+    "path": "docs/skill-language-spec.v1alpha5.zh-CN.md",
+    "blobSha": "caef0a03ce1db53aeeca6717cd3c8c0c70d952c3",
+    "localPath": "language/contracts/source/skill-language-spec.v1alpha5.zh-CN.md"
+  },
+  "compiler": {
+    "repository": "odango-chan/ca-skill-compiler",
+    "commit": "ea27f18549725166f304b7d06fd9339bb0554329",
+    "sourceRef": "refs/pull/38/head",
+    "status": "DRAFT_NOT_RELEASED_NOT_INTEGRATED",
+    "check": "FULL_LANGUAGE_VALIDATION (local acceptance reported by PR #38; not released)",
+    "build": "CANDIDATE_NOT_RELEASED_NOT_INTEGRATED",
+    "dependencyInspection": "CANDIDATE_NOT_RELEASED_NOT_INTEGRATED"
+  },
+  "qualification": {
+    "language": "FROZEN_RELEASED",
+    "compiler": "NOT_RELEASED_NOT_QUALIFIED",
+    "studioLsp": "IN_PROGRESS_NOT_QUALIFIED",
+    "host": "NOT_QUALIFIED",
+    "runtime": "NOT_QUALIFIED",
+    "integration": "NOT_QUALIFIED",
+    "owner": "NOT_QUALIFIED",
+    "fiveGc": "NOT_QUALIFIED"
+  },
+  "semanticTokens": {
+    "legacy": {
+      "path": "language/contracts/semantic-tokens.v1.json",
+      "languageVersion": "0.2.0",
+      "status": "legacy-only"
+    },
+    "v1alpha5": {
+      "upstreamContract": "NOT_PUBLISHED",
+      "localProjection": "editor-only; not normative"
+    }
+  }
+}

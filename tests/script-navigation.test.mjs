@@ -1,13 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {SAMPLE_PACKAGES,createFileWorkspace} from "../site/sample-packages.mjs";
+import {createFileWorkspace} from "../site/sample-packages.mjs";
 import {scriptNavigationReport} from "../site/script-navigation.mjs";
 
-const root=new URL("../site/samples/packages/establish-pdu-session/",import.meta.url);
+const root=new URL("./fixtures/establish-pre-hold/",import.meta.url);
 const get=path=>readFileSync(new URL(path,root),"utf8");
+const fixtureFiles=[
+  "SKILL.md","assurance/contract.yaml","assurance/predicates.yaml","assurance/procedure.yaml",
+  "references/3gpp-procedure.md","references/failure-handling.md","references/session-selection.md",
+  "schemas/establishment-request.schema.yaml","schemas/predicate-evaluation-result.schema.yaml",
+  "schemas/selection-input.schema.yaml","schemas/selection.schema.yaml",
+  "schemas/transfer-start-evaluation-input.schema.yaml","schemas/udm-read-evaluation-input.schema.yaml",
+  "scripts/evaluate_transfer_start.py","scripts/evaluate_udm_read.py",
+  "scripts/select_establishment_configuration.py"
+];
 const files=()=>createFileWorkspace("establish-pdu-session",
-  SAMPLE_PACKAGES.establish.files.map(path=>({path,text:get(path)}))).files;
+  fixtureFiles.map(path=>({path,text:get(path)}))).files;
 const select="scripts/select_establishment_configuration.py";
 const udm="scripts/evaluate_udm_read.py";
 const transfer="scripts/evaluate_transfer_start.py";
@@ -102,37 +111,4 @@ test("E3-A1 YAML and Python metadata references expose exact UTF-16 source and t
     const target=f.get(schema.path).text.slice(schema.targetRange.start,schema.targetRange.end);
     assert.equal(target,schema.title);
   }
-});
-
-test("canonical ca-skills Python main() resolves exact Procedure and Predicate script paths",()=>{
-  const manifest=JSON.parse(readFileSync(new URL("../site/samples/skills/files.json",import.meta.url),"utf8"));
-  const current=new Map(manifest.files.filter(p=>p.startsWith("establish-pdu-session/"))
-    .map(p=>[p.slice("establish-pdu-session/".length),{
-      text:readFileSync(new URL("../site/samples/skills/"+p,import.meta.url),"utf8")
-    }]));
-  const procedure="scripts/select_establishment_configuration.py";
-  const report=scriptNavigationReport(current,procedure);
-  assert.equal(report.status,"READY");
-  assert.deepEqual(report.warnings,[]);
-  assert.deepEqual(report.schemas,[],"new Python annotations are not legacy Schema files");
-  const caller=report.callers.find(item=>item.path==="assurance/procedure.yaml");
-  assert.ok(caller?.sourceRange&&caller?.targetRange);
-  assert.equal(current.get(procedure).text.slice(caller.targetRange.start,caller.targetRange.end),"main");
-  assert.equal(current.get("assurance/procedure.yaml").text.slice(
-    caller.sourceRange.start,caller.sourceRange.end),procedure);
-
-  const evaluator="scripts/evaluate_transfer_start.py";
-  const predicateReport=scriptNavigationReport(current,evaluator);
-  assert.equal(predicateReport.status,"READY");
-  const predicateCaller=predicateReport.callers.find(item=>item.path==="assurance/predicates.yaml");
-  assert.ok(predicateCaller?.sourceRange&&predicateCaller?.targetRange);
-  assert.equal(current.get(evaluator).text.slice(
-    predicateCaller.targetRange.start,predicateCaller.targetRange.end),"main");
-  assert.equal(current.get("assurance/predicates.yaml").text.slice(
-    predicateCaller.sourceRange.start,predicateCaller.sourceRange.end),evaluator);
-
-  const copy=new Map(current);
-  copy.set(evaluator,{text:current.get(evaluator).text+"\ndef main(input: dict): pass\n"});
-  const duplicate=scriptNavigationReport(copy,evaluator);
-  assert.equal(duplicate.callers.length,0,"duplicate main() must not create ambiguous links");
 });

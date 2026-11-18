@@ -7,6 +7,15 @@ export const COMPILER_LANGUAGE_TARGET = "connectionagent.io/v1alpha4";
 export const COMPILER_BUILD_RESULT_VERSION = "connectionagent.io/compiler-build-result/v1alpha4";
 export const COMPILER_INSPECTION_VERSION = "connectionagent.io/compiler-dependency-inspection/v1alpha4";
 
+/** Refuse a language target that the pinned Compiler release does not own. */
+export function assertCompilerLanguageTarget(languageTarget) {
+  if(languageTarget!==COMPILER_LANGUAGE_TARGET){
+    throw new Error("Compiler "+COMPILER_VERSION+" supports only "+COMPILER_LANGUAGE_TARGET+
+      "; refusing language target "+String(languageTarget));
+  }
+  return languageTarget;
+}
+
 const TEXT_SOURCE = /\.(?:ya?ml|json|py|md|txt|sh|toml|xml|csv|jsonl|ini|cfg|js|ts|mjs|cjs)$/i;
 const PACKAGE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const encoder = new TextEncoder();

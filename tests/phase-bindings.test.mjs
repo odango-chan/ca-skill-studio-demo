@@ -5,10 +5,10 @@ import {projectWorkspace} from "../site/workspace.mjs";
 import {phaseStepBindingOptions,previewPhaseInputBinding,
         applyPhaseInputBinding} from "../site/phase-bindings.mjs";
 const procedure=readFileSync(new URL(
-  "../site/samples/packages/establish-pdu-session/assurance/procedure.yaml",
+  "./fixtures/legacy-site-samples/packages/establish-pdu-session/assurance/procedure.yaml",
   import.meta.url),"utf8");
 const ensure=readFileSync(new URL(
-  "../site/samples/packages/ensure-pdu-session/assurance/procedure.yaml",
+  "./fixtures/legacy-site-samples/packages/ensure-pdu-session/assurance/procedure.yaml",
   import.meta.url),"utf8");
 const pid="ue-requested-pdu-session-establishment";
 const node="nudm-sdm-subscribe";
@@ -43,7 +43,7 @@ test("D4-A1 only rebinds one physical Phase Step from scalar and preserves graph
   assert.ok(after.includes("dnn:\n                  from: input.ue-ref"));
   assert.ok(after.includes("selection:\n            from: preconditions.select-subscription-configuration.output"));
   assert.equal(procedure,readFileSync(new URL(
-    "../site/samples/packages/establish-pdu-session/assurance/procedure.yaml",
+    "./fixtures/legacy-site-samples/packages/establish-pdu-session/assurance/procedure.yaml",
     import.meta.url),"utf8"));
 });
 test("D4-A1 rejects wrong types, invented and cross-procedure references",()=>{

@@ -31,7 +31,7 @@ function unpack(zip){
   return entries;
 }
 const sample=(file)=>readFileSync(new URL(
-  "../site/samples/packages/establish-pdu-session/"+file,import.meta.url));
+  "./fixtures/legacy-site-samples/packages/establish-pdu-session/"+file,import.meta.url));
 
 test("E4-A1 selects the real 16-file Skill and retains Procedure/Reference Source",async()=>{
   const paths=[

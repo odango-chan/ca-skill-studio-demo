@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {renderMarkdown} from "../site/markdown-preview.mjs";
 const fixture=name=>readFileSync(
-  new URL("../site/samples/packages/"+name+"/SKILL.md",import.meta.url),"utf8");
+  new URL("../site/samples/v1alpha5/"+name+"/SKILL.md",import.meta.url),"utf8");
 
 test("Markdown preview renders headings, emphasis, inline code, lists and blockquotes",()=>{
   const source="# Demo\n\nA **bold** and *italic* word with \x60code\x60.\n\n- First\n- Second\n\n> A quote\n";
@@ -22,7 +22,7 @@ test("SKILL.md frontmatter is readable and actual fixture renders as a document"
     assert.equal(result.available,true);
     assert.match(result.html,/<details class="md-frontmatter" data-source-line="0">/);
     assert.match(result.html,/<h1(?: id="[^"]+")? data-source-line="\d+">[^<]+<\/h1>/);
-    assert.match(result.html,/<h2(?: id="[^"]+")? data-source-line="\d+">Purpose<\/h2>/);
+    assert.match(result.html,/<h2(?: id="[^"]+")? data-source-line="\d+">Scope and successful progression<\/h2>/);
     assert.doesNotMatch(result.html,/<script\b/i);
   }
 });
@@ -68,7 +68,7 @@ test("unsupported oversized Markdown fails closed to Source only",()=>{
 test("all three current CreatedSession business References render safely in Markdown Visual",()=>{
   const paths=["3gpp-procedure.md","session-selection.md","failure-handling.md"];
   for(const name of paths){
-    const source=readFileSync(new URL("../site/samples/packages/"+
+    const source=readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
       "establish-pdu-session/references/"+name,import.meta.url),"utf8");
     const rendered=renderMarkdown(source);
     assert.equal(rendered.available,true,name);
@@ -76,15 +76,15 @@ test("all three current CreatedSession business References render safely in Mark
     assert.doesNotMatch(rendered.html,/<script\b|<iframe\b|<img\b/i,name);
     assert.ok(rendered.html.length>1000,name);
   }
-  const gpp=renderMarkdown(readFileSync(new URL("../site/samples/packages/"+
+  const gpp=renderMarkdown(readFileSync(new URL("./fixtures/legacy-site-samples/packages/"+
     "establish-pdu-session/references/3gpp-procedure.md",import.meta.url),"utf8"));
   assert.match(gpp.html,/md-unresolved-link/);
   assert.doesNotMatch(gpp.html,/href="\.\.\/SKILL.md"/);
 });
 
-test("current dual Skill guides render safely and expose only explicit Package-local paths",()=>{
+test("current v1alpha5 Skill guides render safely and expose only explicit Package-local paths",()=>{
   for(const name of ["establish-pdu-session","establish-pdu-session-mas"]){
-    const source=readFileSync(new URL("../site/samples/skills/"+name+"/SKILL.md",import.meta.url),"utf8");
+    const source=readFileSync(new URL("../site/samples/v1alpha5/"+name+"/SKILL.md",import.meta.url),"utf8");
     const preview=renderMarkdown(source);
     assert.equal(preview.available,true,name);
     assert.match(preview.html,/<details class="md-frontmatter" data-source-line="0">/,name);
@@ -92,34 +92,25 @@ test("current dual Skill guides render safely and expose only explicit Package-l
     assert.doesNotMatch(preview.html,/<script\b|<iframe\b|<img\b/i,name);
   }
   const source=readFileSync(new URL(
-    "../site/samples/skills/establish-pdu-session/SKILL.md",import.meta.url),"utf8");
+    "../site/samples/v1alpha5/establish-pdu-session-mas/SKILL.md",import.meta.url),"utf8");
   const packageFiles=new Set([
-    "SKILL.md","assurance/procedure.yaml",
-    "references/3gpp-procedure.md","references/session-selection.md",
-    "references/failure-handling.md"
+    "SKILL.md","references/openamsm-operation-mapping.md",
+    "assurance/contract.yaml","assurance/procedure.yaml","assurance/predicates.yaml"
   ]);
   const linked=renderMarkdown(source,{
     localLinks:true,localFiles:packageFiles,relativeDir:""
   }).html;
-  assert.match(linked,/data-local-path="assurance\/procedure\.yaml"/);
-  assert.match(linked,/data-local-path="references\/3gpp-procedure\.md"/);
-  assert.match(linked,/data-local-path="references\/session-selection\.md"/);
-  assert.match(linked,/data-local-path="references\/failure-handling\.md"/);
-  // Do not couple the canonical guide to an obsolete repository-level link:
-  // an updated ca-skills SKILL.md may legitimately contain only local links.
-  assert.doesNotMatch(linked,/data-local-path="\.\.\/\.\.\/docs/);
-  assert.doesNotMatch(linked,/data-local-path="docs\/design\/llm-skill-execution-baseline\.md"/);
+  assert.match(linked,/data-local-path="references\/openamsm-operation-mapping\.md"/);
+  assert.doesNotMatch(linked,/data-local-path="\.\.\//);
 });
 
-test("Reference Markdown can link back to SKILL.md, while local navigation is opt-in",()=>{
-  const source=readFileSync(new URL(
-    "../site/samples/skills/establish-pdu-session/references/3gpp-procedure.md",
-    import.meta.url),"utf8");
+test("Package-local Markdown can link back to SKILL.md, while local navigation is opt-in",()=>{
+  const source="[Back to Skill](../SKILL.md)";
   const ordinary=renderMarkdown(source).html;
   assert.doesNotMatch(ordinary,/data-local-path=/);
   const linked=renderMarkdown(source,{
-    localLinks:true,localFiles:new Set(["SKILL.md","references/3gpp-procedure.md"]),
-    relativeDir:"references"
+    localLinks:true,localFiles:new Set(["SKILL.md","references/openamsm-operation-mapping.md"]),
+    relativeDir:"assurance"
   }).html;
   assert.match(linked,/data-local-path="\.\.\/SKILL\.md"/);
 });

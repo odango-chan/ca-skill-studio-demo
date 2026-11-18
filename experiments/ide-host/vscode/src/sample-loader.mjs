@@ -1,9 +1,7 @@
-// Explicit Sample Package import for VS Code desktop/web or Theia browser-only OPFS.
-// Online demo reset replaces the two bundled SKILL packages with their pinned
-// source; desktop/user workspaces remain create-only unless reset is explicit.
-const SRC=["samples","skills"];
-// The project owns authored skills/ Source. Dependencies and BuildResults are
-// managed by their services; the sample importer never creates lib/ or output/.
+// Explicit Example project import for VS Code desktop/web or Theia browser-only OPFS.
+// Replacing an existing Example is a deliberate, user-confirmed operation that
+// deletes the Example root and recreates it from the single pinned v1alpha5 source.
+// Ordinary projects are never passed to this importer. It never creates lib/ or output/.
 export const EXAMPLE_PROJECT_NAME="skill-studio-demo";
 const SKILLS=Object.freeze(["establish-pdu-session","establish-pdu-session-mas"]);
 const decoder=new TextDecoder();
@@ -66,202 +64,120 @@ async function readBundledResource(vscode,uri){
   }
   return vscode.workspace.fs.readFile(uri);
 }
-function workspaceHasRoot(workspace,root){
-  const target=root.toString();
-  return (workspace.workspaceFolders??[]).some(folder=>
-    folder?.uri?.toString?.()===target);
-}
-export async function exposeWorkspaceRoot(workspace,root,legacyRoots=[]){
-  if(workspaceHasRoot(workspace,root))return false;
-  if(typeof workspace.updateWorkspaceFolders!=="function"||
-     typeof workspace.onDidChangeWorkspaceFolders!=="function")
-    fail("Host cannot open a native workspace folder");
-  const folders=workspace.workspaceFolders??[];
-  const legacySet=new Set(legacyRoots.map(uri=>uri.toString()));
-  const legacyIndex=folders.findIndex(folder=>
-    legacySet.has(folder?.uri?.toString?.()));
-  const start=legacyIndex>=0?legacyIndex:folders.length;
-  const deleteCount=legacyIndex>=0?1:0;
-  let subscription=null,timer=null,settled=false;
-  const waitForRoot=new Promise((resolve,reject)=>{
-    const finish=(error)=>{
-      if(settled)return;
-      settled=true;
-      subscription?.dispose?.();
-      if(timer!==null)clearTimeout(timer);
-      if(error)reject(error);else resolve(true);
-    };
-    subscription=workspace.onDidChangeWorkspaceFolders(()=>{
-      if(workspaceHasRoot(workspace,root))finish();
-    });
-    timer=setTimeout(()=>{
-      const current=(workspace.workspaceFolders??[]).map(folder=>
-        folder?.uri?.toString?.()??"<invalid-uri>");
-      finish(Error("Timed out waiting for Theia to open project root "+
-        root.toString()+"; current workspace folders: "+JSON.stringify(current)));
-    },15000);
-    let accepted=false;
-    try{
-      accepted=workspace.updateWorkspaceFolders(start,deleteCount,{uri:root});
-    }catch(error){
-      finish(Error("Workspace update request failed: "+String(error?.message??error)));
-      return;
-    }
-    if(!accepted){
-      if(workspaceHasRoot(workspace,root))finish();
-      else finish(Error("Theia rejected the project workspace root update"));
-      return;
-    }
-    // Some hosts publish the new folder before returning from the API call;
-    // others report it only through onDidChangeWorkspaceFolders.
-    if(workspaceHasRoot(workspace,root))finish();
-  });
-  await waitForRoot;
-  if(!workspaceHasRoot(workspace,root))
-    fail("Workspace change event arrived without the requested project root");
-  return true;
-}
-function validate(manifest){
-  if(manifest?.schemaVersion!==1||
-     manifest?.sourceRepo!=="odango-chan/ca-skills"||
-     !/^[a-f0-9]{40}$/.test(manifest?.sourceSha??"")||
+function validate(manifest,{sourceSha,sourceStatus,sourceRef,languageVersion,projectReadme}={}){
+  if(manifest?.schemaVersion!==1||manifest?.sourceRepo!=="odango-chan/ca-skills"||
+     manifest?.sourceSha!==sourceSha||manifest?.sourceStatus!==sourceStatus||
+     manifest?.sourceRef!==sourceRef||
+     (languageVersion&&manifest?.languageVersion!==languageVersion)||
+     (projectReadme&&manifest?.projectReadme!==projectReadme)||
      !Array.isArray(manifest.skills)||
      JSON.stringify(manifest.skills)!==JSON.stringify(SKILLS)||
-     !Array.isArray(manifest.files)||manifest.files.length<6||
-     manifest.files.length>100)
-    fail("Unrecognized two-SKILL sample manifest");
+     !Array.isArray(manifest.files)||manifest.files.length<5||
+     manifest.files.length>100||!manifest.blobs||typeof manifest.blobs!=="object")
+    fail("Unrecognized or stale pinned sample manifest");
   const seen=new Set();
   for(const item of manifest.files){
-    if(typeof item!=="string"||item.length>180||
-       item.startsWith("/")||item.includes("\\")||
-       item.split("/").some(p=>!p||p==="."||p==="..")||
-       !SKILLS.includes(item.split("/")[0])||seen.has(item))
-      fail("Unsafe or unexpected sample path");
+    if(typeof item!=="string"||item.length>180||item.startsWith("/")||
+       item.includes("\\")||item.split("/").some(part=>!part||part==="."||part==="..")||
+       !SKILLS.includes(item.split("/")[0])||seen.has(item)||
+       !/^[a-f0-9]{40}$/.test(manifest.blobs[item]??""))
+      fail("Unsafe, duplicate or unpinned sample path");
     seen.add(item);
   }
   for(const skill of SKILLS)
-    if(!seen.has(skill+"/SKILL.md")||
-       !seen.has(skill+"/assurance/procedure.yaml")||
-       !seen.has(skill+"/assurance/contract.yaml")||
-       !seen.has(skill+"/assurance/predicates.yaml"))
-      fail("Missing required "+skill+" package files");
+    for(const required of ["SKILL.md","assurance/contract.yaml",
+      "assurance/procedure.yaml","assurance/predicates.yaml"])
+      if(!seen.has(skill+"/"+required))fail("Missing required "+skill+"/"+required);
   return manifest;
 }
-export async function seedExampleWorkspace(vscode,extensionUri,storageUri,
-  {resetExisting=false,onProgress=()=>{}}={}){
+export async function seedExampleProject(vscode,extensionUri,storageUri,
+  {replaceExisting=false,onProgress=()=>{}}={}){
   let phase="initial";
   const report=event=>{if(typeof onProgress==="function")onProgress(event);};
   try{
-  if(!vscode?.workspace?.fs||!vscode.Uri?.file||!vscode.Uri.joinPath)
-    fail("Host file system unavailable");
-  const fileSystem=vscode.workspace.fs;
-  const manifestUri=vscode.Uri.joinPath(extensionUri,...SRC,"files.json");
-  const extensionInfo=describeUri(extensionUri);
-  const manifestInfo=describeUri(manifestUri);
-  phase="read-bundled-manifest";
-  report({phase:"manifest"});
-  let manifestBytes;
-  try{
-    manifestBytes=await readBundledResource(vscode,manifestUri);
-  }catch(error){
-    fail("Cannot read bundled manifest; extensionUri="+JSON.stringify(extensionInfo)+
-      "; manifestUri="+JSON.stringify(manifestInfo)+
-      "; resourceRead="+JSON.stringify(describeError(error)));
-  }
-  const manifest=validate(JSON.parse(decoder.decode(manifestBytes)));
-  const files=manifest.files;
-  report({phase:"files",completed:0,total:files.length});
-  // The actual folder basename must be the project name: Theia 1.76
-  // ignores WorkspaceFolder.name passed to updateWorkspaceFolders().
-  if(!storageUri)fail("No writable extension storage URI");
-  const legacyRoot=vscode.Uri.joinPath(storageUri,"workspaces");
-  const legacySkillsRoot=vscode.Uri.joinPath(legacyRoot,"skills");
-  const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
-  const skillsRoot=vscode.Uri.joinPath(root,"skills");
-  let created=0,skipped=0,overwritten=0,resetPackages=0;
-  phase="create-project-layout";
-  await fileSystem.createDirectory(root);
-  await fileSystem.createDirectory(skillsRoot);
-  if(resetExisting){
-    // Reset only the two known bundled Skill package directories. This clears
-    // edited and untracked files inside those packages, but leaves other Skills,
-    // lib/, output/, and every unrelated/user-selected workspace untouched.
-    for(const skill of SKILLS){
-      let found=false;
-      for(const packageRoot of [
-        vscode.Uri.joinPath(skillsRoot,skill),
-        vscode.Uri.joinPath(legacySkillsRoot,skill)
-      ]){
-        phase="reset-package:"+skill;
-        try{
-          await fileSystem.stat(packageRoot);
-          found=true;
-          await fileSystem.delete(packageRoot,{recursive:true,useTrash:false});
-        }catch(error){
-          if(error?.code!=="FileNotFound")throw error;
-        }
+    if(!vscode?.workspace?.fs||!vscode.Uri?.file||!vscode.Uri.joinPath)
+      fail("Host file system unavailable");
+    if(!storageUri)fail("No writable extension storage URI");
+    const fs=vscode.workspace.fs;
+    const readManifest=async()=>{
+      const uri=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5","files.json");
+      phase="read-v1alpha5-manifest";
+      report({phase:"manifest"});
+      let bytes;
+      try{bytes=await readBundledResource(vscode,uri);}
+      catch(error){fail("Cannot read CA-SL v1alpha5 manifest: "+JSON.stringify(describeError(error)));}
+      return validate(JSON.parse(decoder.decode(bytes)),{
+        kind:"CA-SL v1alpha5",
+        sourceSha:"de8d9f667dd1a445c3f6378e0ca793d7407d2036",
+        sourceStatus:"RELEASED_NOT_QUALIFIED",
+        sourceRef:"refs/heads/main",
+        languageVersion:"connectionagent.io/v1alpha5",
+        projectReadme:"README.md"
+      });
+    };
+    const candidate=await readManifest();
+    const root=vscode.Uri.joinPath(storageUri,EXAMPLE_PROJECT_NAME);
+    const skillsRoot=vscode.Uri.joinPath(root,"skills");
+    const exists=async uri=>{
+      try{await fs.stat(uri);return true;}
+      catch(error){if(error?.code==="FileNotFound")return false;throw error;}
+    };
+    const hadExisting=await exists(root);
+    const replacedExisting=Boolean(replaceExisting&&hadExisting);
+    if(replacedExisting){
+      phase="replace-existing-example";
+      await fs.delete(root,{recursive:true,useTrash:false});
+    }
+    phase="create-project-layout";
+    await fs.createDirectory(root);
+    await fs.createDirectory(skillsRoot);
+
+    const readmeSource=vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",candidate.projectReadme);
+    const readmeDestination=vscode.Uri.joinPath(root,"README.md");
+    let readmeUpdated=false;
+    if(!(await exists(readmeDestination))){
+      phase="write-v1alpha5-project-readme";
+      const bytes=await readBundledResource(vscode,readmeSource);
+      await fs.writeFile(readmeDestination,bytes);
+      readmeUpdated=true;
+    }
+
+    const total=candidate.files.length;
+    let created=0,skipped=0;
+    report({phase:"files",completed:0,total});
+    for(const file of candidate.files){
+      const parts=file.split("/");
+      const destination=vscode.Uri.joinPath(skillsRoot,...parts);
+      phase="stat-existing:"+file;
+      if(await exists(destination)){
+        skipped++;
+        report({phase:"files",completed:created+skipped,total});
+        continue;
       }
-      if(found)resetPackages++;
-    }
-  }
-  for(const file of files){
-    const segments=file.split("/");
-    const destination=vscode.Uri.joinPath(skillsRoot,...segments);
-    phase="stat-existing:"+file;
-    let exists=false;
-    try{await fileSystem.stat(destination);exists=true;}
-    catch(error){
-      if(error?.code!=="FileNotFound")throw error;
-    }
-    if(exists&&!resetExisting){
-      skipped++;
-      report({phase:"files",completed:created+skipped+overwritten,total:files.length});
-      continue;
-    }
-    const source=vscode.Uri.joinPath(extensionUri,...SRC,...segments);
-    phase="read-bundled-file:"+file;
-    const bytes=await readBundledResource(vscode,source);
-    if(!(bytes instanceof Uint8Array))fail("Unrecognized sample file");
-    phase="create-parent:"+file;
-    if(segments.length>1)
-      await fileSystem.createDirectory(vscode.Uri.joinPath(skillsRoot,...segments.slice(0,-1)));
-    // Normal imports remain create-only. The online demo's explicit reset
-    // intentionally replaces every pinned manifest file with canonical bytes.
-    if(!exists){
-      try{await fileSystem.stat(destination);fail("Sample file changed during import");}
+      phase="read-bundled-file:"+file;
+      const bytes=await readBundledResource(vscode,
+        vscode.Uri.joinPath(extensionUri,"samples","v1alpha5",...parts));
+      if(!(bytes instanceof Uint8Array))fail("Unrecognized v1alpha5 sample file");
+      if(parts.length>1)
+        await fs.createDirectory(vscode.Uri.joinPath(skillsRoot,...parts.slice(0,-1)));
+      try{await fs.stat(destination);fail("v1alpha5 sample file changed during import");}
       catch(error){if(error?.code!=="FileNotFound")throw error;}
+      phase="write-v1alpha5-file:"+file;
+      await fs.writeFile(destination,bytes);
+      created++;
+      report({phase:"files",completed:created+skipped,total});
     }
-    phase="write-file:"+file;
-    await fileSystem.writeFile(destination,bytes);
-    if(exists)overwritten++;else created++;
-    report({phase:"files",completed:created+skipped+overwritten,total:files.length});
-  }
-  phase="workspace-update-confirmation";
-  report({phase:"workspace"});
-  const workspaceUpdated=await exposeWorkspaceRoot(vscode.workspace,root,[
-    legacyRoot,legacySkillsRoot
-  ]);
-  if(resetExisting){
-    // Remove only the two legacy bundled package directories from the previous
-    // extension-owned workspace location. Other Skills and unrelated data stay.
-    for(const skill of SKILLS){
-      const legacyPackage=vscode.Uri.joinPath(legacySkillsRoot,skill);
-      phase="clear-legacy-package:"+skill;
-      try{
-        await fileSystem.stat(legacyPackage);
-        await fileSystem.delete(legacyPackage,{recursive:true,useTrash:false});
-      }catch(error){
-        if(error?.code!=="FileNotFound")throw error;
-      }
-    }
-  }
-  const procedures=Object.fromEntries(SKILLS.map(name=>
-    [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
-  return {root,skillsRoot,
-    procedure:procedures[SKILLS[0]],procedures,skills:[...SKILLS],
-    sourceSha:manifest.sourceSha,files:files.length,created,skipped,overwritten,
-    resetPackages,resetExisting,workspaceUpdated};
-  }catch(error){
-    throw Error(phase+": "+String(error?.message??error));
-  }
+
+    report({phase:"project-ready"});
+    const procedures=Object.fromEntries(SKILLS.map(name=>
+      [name,vscode.Uri.joinPath(skillsRoot,name,"assurance","procedure.yaml")]));
+    return {
+      root,skillsRoot,procedure:procedures[SKILLS[0]],procedures,
+      skills:[...SKILLS],
+      sourceSha:candidate.sourceSha,
+      sourceShas:{v1alpha5:candidate.sourceSha},
+      candidateFiles:candidate.files.length,
+      files:total,created,skipped,replacedExisting,readmeUpdated
+    };
+  }catch(error){throw Error(phase+": "+String(error?.message??error));}
 }

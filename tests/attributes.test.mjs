@@ -8,7 +8,7 @@ import {
 import {projectWorkspace} from "../site/workspace.mjs";
 
 const read=(skill,path)=>readFileSync(
-  new URL("../site/samples/packages/"+skill+"/"+path,import.meta.url),"utf8");
+  new URL("./fixtures/legacy-site-samples/packages/"+skill+"/"+path,import.meta.url),"utf8");
 const ensure="ensure-pdu-session";
 const proc=read(ensure,"assurance/procedure.yaml");
 const predicates=read(ensure,"assurance/predicates.yaml");

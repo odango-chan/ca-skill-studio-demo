@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {projectJsonSchema, resolveSchemaPointer} from '../site/schema-projection.mjs';
 
 const sample = readFileSync(new URL(
-  '../site/samples/packages/establish-pdu-session/schemas/establishment-request.schema.yaml',
+  '../site/samples/v1alpha5/establish-pdu-session/schemas/establishment-request.schema.yaml',
   import.meta.url), 'utf8');
 const find = (node, name) => node?.name === name ? node :
   node?.children.flatMap(c => [find(c,name)]).find(Boolean);
@@ -24,7 +24,8 @@ test('C3 projects real Skill request JSON Schema with source lines and nested re
   const sst = find(result.tree,'sst');
   assert.equal(sst.required,true);
   assert.equal(sd.required,false);
-  assert.equal(sd.constraints.find(c=>c.key==='maximum').value,16777214);
+  assert.equal(sd.constraints.find(c=>c.key==='maxLength').value,6);
+  assert.equal(sd.constraints.some(c=>c.key==='maximum'),false);
   assert.equal(find(result.tree,'requestedPduSessionType')
     .constraints.find(c=>c.key==='const').value,'IPV4');
 });
@@ -110,7 +111,7 @@ test('C3 fails closed on malformed/unsafe/unsupported or unbounded YAML', () => 
 });
 
 test('C3 rejects malformed recognized fields rather than claiming complete visualization',()=>{
-  const source = sample.replace('    required:\n    - sst',
+  const source = sample.replace('    required: [sst]',
     '    required: 5');
   const p = projectJsonSchema(source);
   assert.equal(p.state,'PARTIAL');

@@ -112,6 +112,22 @@ export interface ProcedureStage {
   readonly arguments?: readonly ProcedureStageArgument[];
 }
 
+export interface ProcedureWait {
+  readonly event: {
+    readonly source: string;
+    readonly service: string;
+    readonly operation: string;
+  };
+  readonly timeout: string;
+  readonly timeoutTarget: string;
+  readonly responseAfter?: string;
+  readonly line: number;
+  readonly eventLine: number;
+  readonly timeoutLine: number;
+  readonly timeoutRouteLine: number;
+  readonly responseAfterLine?: number;
+}
+
 export interface ProcedureNode {
   readonly id: string;
   readonly operator: string;
@@ -119,7 +135,9 @@ export interface ProcedureNode {
   readonly line: number;
   readonly phases: readonly ProcedurePhase[];
   readonly children: readonly ProcedureChildReference[];
-  /** v1alpha4 ordered stages; these are not additional business Nodes. */
+  /** v1alpha5 Node-entry event control; not a business stage. */
+  readonly wait?: ProcedureWait;
+  /** Ordered business stages; Wait remains separate from these four stages. */
   readonly stages?: readonly ProcedureStage[];
   /** Contract-level gate reference, projected onto its real Node. */
   readonly globalPrecondition?: boolean;
@@ -155,7 +173,7 @@ export interface ProcedureProjection {
   readonly entry: string | null;
   readonly procedures: readonly ProcedureDefinition[];
   readonly diagnostics: readonly LanguageDiagnostic[];
-  /** Read-only Contract metadata for the v1alpha4 Procedure Designer. */
+  /** Read-only Contract metadata for the v1alpha5 Procedure Designer. */
   readonly goal?: string;
   readonly goalLine?: number;
   readonly precondition?: string;

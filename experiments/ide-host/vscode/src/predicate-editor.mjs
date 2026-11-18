@@ -15,6 +15,14 @@ function nonce() {
 function predicatePath(path) {
   return typeof path === 'string' && path.toLowerCase().endsWith(SUFFIX);
 }
+function packageRoot(uri) {
+  return uri.path.slice(0, -SUFFIX.length);
+}
+function safeScriptPath(value) {
+  return typeof value === 'string' && value.startsWith('scripts/') &&
+    !value.startsWith('/') && !value.includes('\\') &&
+    value.split('/').every(part => part && part !== '.' && part !== '..');
+}
 function commandUri(vscode,value) {
   if (value && typeof value.path === 'string') return value;
   const serialized = typeof value === 'string' ? value : value?.toString?.();
@@ -58,7 +66,7 @@ function webviewHtml(token) {
     ".predicate{background:#fff;border:1px solid var(--line);border-radius:11px;margin:0 0 10px;overflow:hidden}.predicate summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;padding:11px 14px;min-height:48px}.predicate summary::-webkit-details-marker{display:none}",
     ".predicate summary:before{content:'›';font-size:20px;color:#7890a0;line-height:1;transition:transform .12s}.predicate[open] summary:before{transform:rotate(90deg)}",
     ".pid{font-weight:700;overflow-wrap:anywhere;flex:1}.meta{font-size:10px;color:var(--muted);white-space:nowrap}.type{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:#edf5f3;color:#176f64}",
-    ".body{border-top:1px solid #edf1f4;padding:12px 14px 14px}.flow{display:grid;grid-template-columns:minmax(0,3fr) 32px minmax(260px,2fr);align-items:stretch;gap:10px}",
+    ".body{border-top:1px solid #edf1f4;padding:12px 14px 14px}.flow{display:grid;grid-template-columns:minmax(180px,2fr) 24px minmax(180px,2fr) 24px minmax(260px,3fr);align-items:stretch;gap:10px}",
     ".observations{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px}.observation,.evaluator{border:1px solid #dfe8ed;border-radius:9px;background:#fbfdfe;padding:11px;min-width:0}",
     ".section-title{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:8px}.oname{font-weight:700;margin-bottom:7px;display:flex;justify-content:space-between;gap:8px}",
     ".kv{display:grid;grid-template-columns:72px minmax(0,1fr);gap:5px 9px;padding-top:6px;border-top:1px solid #edf1f4;margin-top:6px}.key{font-size:10px;color:var(--muted)}.val{font-size:11px;overflow-wrap:anywhere;white-space:pre-wrap}",
@@ -73,15 +81,15 @@ function webviewHtml(token) {
     "const api=acquireVsCodeApi(),$=id=>document.getElementById(id);let currentVersion=0;",
     "const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined&&text!==null)n.textContent=String(text);return n;};",
     "function action(label,type,value){const b=el('button','line',label);b.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();api.postMessage({type,value,version:currentVersion});});return b;}",
-    "function kv(parent,key,value,line,scope=false){if(value===null||value===undefined)return;const k=el('div','key',key),v=el('div',scope?'val scope':'val',value);parent.append(k,v);if(line){const a=action('Source L'+line,'revealLine',line);a.style.gridColumn='2';parent.append(el('div','key',''),a);}}",
+    "function kv(parent,key,value,line){if(value===null||value===undefined)return;const k=el('div','key',key),v=el('div','val',value);parent.append(k,v);if(line){const a=action('Source L'+line,'revealLine',line);a.style.gridColumn='2';parent.append(el('div','key',''),a);}}",
     "function render(data){currentVersion=data.version;const p=data.projection;$('status').textContent='SOURCE VERSION '+data.version;$('skill').textContent=p.skill?.value||'未命名 Skill';$('content').replaceChildren();$('banner').replaceChildren();",
-    "if(p.state==='SOURCE_ONLY'){const f=el('section','fallback');f.append(el('h2','','当前 PredicateSet 暂不支持图形投影'));f.append(el('p','',p.reason||'请使用原生 YAML 编辑器查看当前文件。'));f.append(action('打开 YAML Source','openSource'));$('content').append(f);return;}",
+    "if(p.state==='SOURCE_ONLY'){const f=el('section','fallback');f.append(el('h2','','当前 Predicate Source 无法安全投影'));f.append(el('p','',p.reason||'请使用原生 YAML 编辑器查看当前文件。'));f.append(action('打开 YAML Source','openSource'));$('content').append(f);return;}",
     "if(p.state==='PARTIAL'||p.projectionWarnings?.length){const b=el('div','banner');b.append(el('strong','','部分可视化 · 原始 Source 保持完整'));b.append(el('div','','以下字段未被当前视图解释或结构不完整：'));const ul=el('ul');for(const path of [...(p.unprojectedPaths||[]),...(p.projectionWarnings||[])])ul.append(el('li','',path));b.append(ul);$('banner').append(b);}",
-    "$('summary').replaceChildren(el('span','pill',p.predicateCount+' 个 Predicate'),el('span','pill','Observation → Evaluator'),el('span','pill','声明式配置 · 非运行结果'));",
-    "for(const [index,predicate] of p.predicates.entries()){const d=el('details','predicate');d.open=index===0;const s=el('summary');s.append(el('span','pid',predicate.id));s.append(el('span','meta',predicate.observations.length+' observations'));s.append(el('span','type',String(predicate.evaluator?.type?.value??'UNKNOWN').toUpperCase()));s.append(action('L'+predicate.line,'revealLine',predicate.line));d.append(s);",
-    "const body=el('div','body'),flow=el('div','flow'),left=el('div',''),obsTitle=el('div','section-title','Observations');left.append(obsTitle);const obs=el('div','observations');",
-    "for(const observation of predicate.observations){const card=el('section','observation'),name=el('div','oname',observation.name);if(observation.line)name.append(action('L'+observation.line,'revealLine',observation.line));card.append(name);const values=el('div','kv');kv(values,'Ref',observation.ref?.value,observation.ref?.line);kv(values,'Scope',observation.scope?.value,observation.scope?.line,true);kv(values,'Freshness',observation.freshness?.value,observation.freshness?.line);kv(values,'When',observation.when?.value,observation.when?.line);card.append(values);obs.append(card);}left.append(obs);",
-    "const arrow=el('div','arrow','→'),ev=el('section','evaluator');ev.append(el('div','section-title','Evaluator'));ev.append(el('div','oname',predicate.evaluator?.type?.value?.toUpperCase()||'UNRESOLVED'));if(predicate.evaluator?.type?.value==='cel'){const pre=el('pre','',predicate.evaluator.expression?.value||'Expression not declared');ev.append(pre);}else if(predicate.evaluator?.type?.value==='script'){ev.append(el('div','val','Skill evaluator reference'));ev.append(el('pre','',predicate.evaluator.ref?.value||'Script reference not declared'));}else ev.append(el('div','val','Unsupported evaluator variant · inspect Source'));if(predicate.evaluator?.line)ev.append(action('Source L'+predicate.evaluator.line,'revealLine',predicate.evaluator.line));flow.append(left,arrow,ev);body.append(flow);d.append(body);$('content').append(d);}",
+    "$('summary').replaceChildren(el('span','pill',p.predicateCount+' 个 Predicate'),el('span','pill','Parameters → Evidence → Evaluator'),el('span','pill','声明式签名 · 不执行 CEL / Script'));",
+    "for(const [index,predicate] of p.predicates.entries()){const d=el('details','predicate');d.open=index===0;const s=el('summary');s.append(el('span','pid',predicate.id));s.append(el('span','meta',predicate.parameters.length+' parameters'));s.append(el('span','type',String(predicate.evaluator?.type?.value??'UNKNOWN').toUpperCase()));s.append(action('L'+predicate.line,'revealLine',predicate.line));d.append(s);",
+    "const body=el('div','body'),flow=el('div','flow'),parameterSection=el('section','evaluator'),parameterGrid=el('div','observations');parameterSection.append(el('div','section-title','Parameters'));for(const parameter of predicate.parameters){const item=el('section','observation'),name=el('div','oname',parameter.name);name.append(el('span','type',parameter.type));if(parameter.nameLine)name.append(action('L'+parameter.nameLine,'revealLine',parameter.nameLine));item.append(name);const values=el('div','kv');kv(values,'Parameter Type',parameter.type,parameter.line);item.append(values);parameterGrid.append(item);}if(!predicate.parameters.length)parameterGrid.append(el('div','val','No parameters declared'));parameterSection.append(parameterGrid);",
+    "const arrow1=el('div','arrow','→'),evidenceSection=el('section','evaluator');evidenceSection.append(el('div','section-title','Evidence Requirements'));if(predicate.evidence.length){for(const requirement of predicate.evidence){const values=el('div','kv');kv(values,requirement.parameter,requirement.guarantees.map(item=>item.value).join(', '),requirement.line);evidenceSection.append(values);}}else evidenceSection.append(el('div','val','No Evidence Requirements declared'));",
+    "const arrow2=el('div','arrow','→'),evaluatorSection=el('section','evaluator'),evaluator=predicate.evaluator;evaluatorSection.append(el('div','section-title','Evaluator'));evaluatorSection.append(el('div','oname',evaluator?.type?.value?.toUpperCase()||'UNRESOLVED'));if(evaluator?.type?.value==='cel'){evaluatorSection.append(el('pre','',evaluator.expression?.value||'Expression not declared'));}else if(evaluator?.type?.value==='script'){evaluatorSection.append(el('div','val','Package-relative Script'));evaluatorSection.append(el('pre','',evaluator.script?.value||'Script path not declared'));if(evaluator.script?.value)evaluatorSection.append(action('打开 Script','openScript',evaluator.script.value));}else evaluatorSection.append(el('div','val','Unsupported evaluator variant · inspect Source'));if(evaluator?.line)evaluatorSection.append(action('Source L'+evaluator.line,'revealLine',evaluator.line));flow.append(parameterSection,arrow1,evidenceSection,arrow2,evaluatorSection);body.append(flow);d.append(body);$('content').append(d);}",
     "}",
     "$('openSource').addEventListener('click',()=>api.postMessage({type:'openSource',version:currentVersion}));",
     "window.addEventListener('message',event=>{const msg=event.data;if(msg?.type==='snapshot')render(msg);else if(msg?.type==='error')$('status').textContent=msg.message||'Webview error';});api.postMessage({type:'ready'});"
@@ -94,9 +102,9 @@ function webviewHtml(token) {
     '<h1>Predicate Designer · <span id="skill"></span></h1></div><div class="head-actions">' +
     '<span id="status" class="status"></span><button id="openSource" class="primary">打开 YAML Source</button></div></header>' +
     '<main><div class="intro"><div><strong>PredicateSet</strong>' +
-    '<p>Observation → Evaluator · 展示声明关系，不执行表达式、不推断当前证据结果</p></div></div>' +
+    '<p>Parameters → Evidence → Evaluator · 展示签名与证据要求，不执行表达式、不推断当前结果</p></div></div>' +
     '<div id="banner"></div><div id="summary" class="summary"></div><div id="content"></div>' +
-    '<div class="footer">Predicate 是对 Observation 的声明式判定定义，不是当前运行证据。CEL 不在 Studio 中执行；Script ref 不代表脚本已加载或已获准执行。</div>' +
+    '<div class="footer">Predicate 声明参数签名、Evidence 要求与 Evaluator。CEL / Script 均不在 Designer 中执行；Script 引用不代表脚本已获准执行。</div>' +
     '</main><script nonce="' + token + '">' + script + '</script></body></html>';
 }
 export function registerPredicateEditor(vscode, context) {
@@ -115,7 +123,7 @@ export function registerPredicateEditor(vscode, context) {
       const push = () => {
         if (disposed || !ready) return;
         const text = document.getText();
-        const projection = projectPredicateSet(text);
+        const projection = projectPredicateSet(text,{skillName:packageRoot(document.uri).split('/').pop()});
         void webview.postMessage({type: 'snapshot', text, version: document.version,
           path: document.uri.path, projection});
       };
@@ -138,6 +146,13 @@ export function registerPredicateEditor(vscode, context) {
             });
           } else if (message.type === 'revealLine') {
             await reveal(vscode, document.uri, message.value);
+          } else if (message.type === 'openScript') {
+            const relative = message.value;
+            if (!safeScriptPath(relative))
+              throw Error('Script reference must stay inside the Skill Package scripts/ directory');
+            const scriptUri = document.uri.with({path: packageRoot(document.uri) + '/' + relative});
+            await vscode.workspace.openTextDocument(scriptUri);
+            await reveal(vscode, scriptUri, 1);
           }
         } catch (error) {
           await vscode.window.showWarningMessage(

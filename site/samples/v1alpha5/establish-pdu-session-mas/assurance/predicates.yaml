@@ -1,0 +1,155 @@
+# CA-SL v1alpha5 predicates for the OpenAMSM MAS policy-first example.
+# Every MAS Schema and Evidence Guarantee below is an unpublished source-derived
+# placeholder. Linking must fail closed until the MAS Owner publishes exact exports.
+predicates:
+  establishment.request.supported:
+    parameters:
+      - requestType: integer
+      - requestedPduSessionType: string
+      - requestedSscMode: integer
+    evaluator:
+      type: cel
+      expression: requestType == 1 && requestedPduSessionType == "IPV4" && requestedSscMode == 1
+
+  establishment.smf.session_context_absent:
+    parameters:
+      - sessionContext: ca-session-context::urn:connectionagent:ca:observation:smf-session-context-read-result:v1
+    evidence:
+      requires:
+        sessionContext: [ca-session-context::smf.session-context.read-evidence]
+    evaluator:
+      type: cel
+      expression: sessionContext.sessionPresence == "ABSENT"
+
+  establishment.mas.subscription_validated:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:sc-validate-subscription-result:v1
+    evidence:
+      requires:
+        result: [mas::sc.subscription-validated]
+    evaluator:
+      type: cel
+      expression: result.sub_summary == "ok"
+
+  establishment.mas.secondary_auth_skipped:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:saa-secondary-auth-result:v1
+    evidence:
+      requires:
+        result: [mas::saa.secondary-auth-disposition]
+    evaluator:
+      type: cel
+      expression: result.phase == "SKIPPED"
+
+  establishment.mas.context_created:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:sc-create-sm-context-result:v1
+    evidence:
+      requires:
+        result: [mas::sc.context-created]
+    evaluator:
+      type: cel
+      expression: result.lifecycle == "OPERATIONAL" && result.session_keys != ""
+
+  establishment.mas.uecm_registered:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:sc-register-uecm-result:v1
+    evidence:
+      requires:
+        result: [mas::sc.uecm-registered]
+    evaluator:
+      type: cel
+      expression: result.uecm_registered == "1"
+
+  establishment.mas.policy_association_created:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:pa-policy-result:v1
+    evidence:
+      requires:
+        result: [mas::pa.policy-association-created]
+    evaluator:
+      type: cel
+      expression: result.policy_assoc_id != "" && result.policy_assoc_id != "bound"
+
+  establishment.mas.anchor_selected:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:ups-anchor-result:v1
+    evidence:
+      requires:
+        result: [mas::ups.anchor-selected]
+    evaluator:
+      type: cel
+      expression: result.up_anchor == "1"
+
+  establishment.mas.address_allocated:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:iam-address-result:v1
+    evidence:
+      requires:
+        result: [mas::iam.address-allocated]
+    evaluator:
+      type: cel
+      expression: result.ue_addr == "1"
+
+  establishment.mas.policy_updated:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:pa-policy-result:v1
+    evidence:
+      requires:
+        result: [mas::pa.policy-updated]
+    evaluator:
+      type: cel
+      expression: result.policy_assoc_id != "" && result.policy_assoc_id != "bound"
+
+  # The pinned NW Agent source returns SMF_MAS_OK, charging_ref="1" and
+  # records NOT_IMPL_skip. This proves only that the required s7 plan step
+  # completed under the current stub; it does not prove a charging reservation.
+  establishment.mas.charging_step_completed:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:ca-charging-result:v1
+    evidence:
+      requires:
+        result: [mas::ca.charging-step-skipped]
+    evaluator:
+      type: cel
+      expression: result.charging_ref == "1"
+
+  establishment.mas.n4_session_established:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:upn-create-up-session-result:v1
+    evidence:
+      requires:
+        result: [mas::upn.n4-session-established]
+    evaluator:
+      type: cel
+      expression: result.est_done == "1" && result.n4_seid != "" && result.n4_seid != "0"
+
+  establishment.mas.access_network_ready:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:ssm-signal-ue-an-result:v1
+    evidence:
+      requires:
+        result: [mas::ssm.access-network-ready]
+    evaluator:
+      type: cel
+      expression: result.an_tunnel == "1" && result.an_tunnel_teid != "" && result.an_tunnel_ip != ""
+
+  establishment.mas.n3_synchronized:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:upn-modify-up-session-result:v1
+    evidence:
+      requires:
+        result: [mas::upn.n3-synchronized]
+    evaluator:
+      type: cel
+      expression: result.n3_synced == "1"
+
+  establishment.mas.establishment_event_recorded:
+    parameters:
+      - result: mas::urn:example:openamsm:mas:se-emit-events-result:v1
+    evidence:
+      requires:
+        result: [mas::se.establishment-event-recorded]
+    evaluator:
+      type: cel
+      expression: result.last_event == "1"

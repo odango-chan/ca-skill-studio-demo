@@ -6,6 +6,8 @@
 
 Skill DSL 与正式语言契约由 ca-skills 拥有；Compiler、Host Context、Tool Contract、Runtime 执行结果、MCP Tool Catalog、5GC / 环境状态分别由各自 owner 负责。Studio 只消费这些权威契约，不定义第二份语法或业务规则。
 
+当前唯一活动编辑目标是 `connectionagent.io/v1alpha5`，规范已在 `ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5` 正式冻结发布；权威来源与字节摘要由 `language/contracts/ca-sl-v1alpha5.lock.json` 固定。v1alpha4 仅作为不可变的规范继承基线和历史记录，不是产品编辑模式，也不提供旧项目迁移或兼容。内置 Example 固定为 `ca-skills/main@de8d9f667dd1a445c3f6378e0ca793d7407d2036`。集成的 Compiler v1.0.0 只支持 v1alpha4；当前 v1alpha5 Compiler 候选 PR #38（`ea27f18549725166f304b7d06fd9339bb0554329`）尚未合并、发布或集成，因此 v1alpha5 Check / Build / Inspect 必须 fail-closed。不得把 Node-entry Wait 降级成旧版 Observation、Polling 或第五种业务阶段。
+
 Theia browser-only 是唯一在线工作台。独立 Classic 浏览器工作台、Classic 发布路径及旧构建入口已经退役；不得重新引入平行工作台、旧菜单或旧项目管理实现。
 
 当前优先建设开发与编辑。Case、Qualification、发布和 Runtime 执行工作台后置。不得把编辑器诊断冒充 Compiler 结果，不得将浏览器测试冒充真实 Runtime / 5GC E2E。

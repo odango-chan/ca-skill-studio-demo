@@ -1,78 +1,23 @@
 import {isMap, isScalar, isSeq, parseDocument} from "yaml";
-import legacyContract from "./contracts/semantic-tokens.v1.json";
-
-// The pinned ca-skills token registry is v0.2-only. v1alpha4 has no upstream
-// token-selector contract at the frozen language commit, so its presentation
-// vocabulary is deliberately local/editor-only and carries no grammar authority.
-export const V1_ALPHA4_SEMANTIC_TOKEN_TYPES = Object.freeze([
+// CA-SL v1alpha5 has no normative upstream semantic-token selector registry.
+// These names are Studio presentation metadata only and never grant grammar or linking authority.
+export const V1_ALPHA5_SEMANTIC_TOKEN_TYPES = Object.freeze([
   "skillKeyword","skillOperator","skillStep","skillCapability","skillPredicate",
   "skillObservation","skillOutcome","skillDataType","skillSchema",
-  "skillReference","skillBinding","skillOperation"
+  "skillReference","skillBinding","skillOperation","skillWait"
 ]);
-export const V1_ALPHA4_SEMANTIC_TOKEN_MODIFIERS = Object.freeze([
+export const V1_ALPHA5_SEMANTIC_TOKEN_MODIFIERS = Object.freeze([
   "declaration","reference","imported"
 ]);
-const LEGACY_SEMANTIC_TOKEN_TYPES = legacyContract.legend.tokenTypes.map(type=>type.id);
-const LEGACY_SEMANTIC_TOKEN_MODIFIERS = legacyContract.legend.tokenModifiers.map(item=>item.id);
 export const SKILL_SEMANTIC_LEGEND = Object.freeze({
-  tokenTypes:Object.freeze([...new Set([
-    ...LEGACY_SEMANTIC_TOKEN_TYPES,...V1_ALPHA4_SEMANTIC_TOKEN_TYPES
-  ])]),
-  tokenModifiers:Object.freeze([...new Set([
-    ...V1_ALPHA4_SEMANTIC_TOKEN_MODIFIERS,...LEGACY_SEMANTIC_TOKEN_MODIFIERS
-  ])])
+  tokenTypes:Object.freeze([...V1_ALPHA5_SEMANTIC_TOKEN_TYPES]),
+  tokenModifiers:Object.freeze([...V1_ALPHA5_SEMANTIC_TOKEN_MODIFIERS])
 });
 
 const MAX_SOURCE_LENGTH = 4 * 1024 * 1024;
 const MAX_NODES = 50000;
 const MAX_DEPTH = 64;
 const MAX_TOKENS = 20000;
-
-function segmentMatches(pattern, value) {
-  if (pattern === "*") return !!value;
-  const index = pattern.indexOf("*");
-  if (index < 0) return pattern === value;
-  if (pattern.indexOf("*", index + 1) >= 0) return false;
-  const prefix = pattern.slice(0, index);
-  const suffix = pattern.slice(index + 1);
-  return value.length > prefix.length + suffix.length &&
-    value.startsWith(prefix) && value.endsWith(suffix);
-}
-
-function patternMatches(pattern, parts) {
-  const segments = pattern ? pattern.split("/") : [];
-  return segments.length === parts.length &&
-    segments.every((part, index) => segmentMatches(part, parts[index]));
-}
-
-function profileFor(relativePath) {
-  if (typeof relativePath !== "string" || !relativePath || relativePath.includes("\\"))
-    return null;
-  const path = relativePath.startsWith("/") ? relativePath.slice(1) : relativePath;
-  const segments = path.split("/");
-  if (segments.some(segment => !segment || segment === "." || segment === ".."))
-    return null;
-  for (const profile of Object.values(legacyContract.profiles)) {
-    const suffix = profile.file.split("/");
-    if (segments.length < suffix.length) continue;
-    if (suffix.every((part, index) =>
-      segmentMatches(part, segments[segments.length - suffix.length + index])))
-      return profile;
-  }
-  return null;
-}
-
-function ruleAt(profile, path, part) {
-  return profile.rules.find(rule =>
-    rule.part === part && patternMatches(rule.path, path));
-}
-
-function isKeyword(profile, parent, key) {
-  for (const [pattern, keywords] of Object.entries(profile.keywords)) {
-    if (patternMatches(pattern, parent) && keywords.includes(key)) return true;
-  }
-  return false;
-}
 
 function scalarSpan(text, scalar) {
   if (!isScalar(scalar) || typeof scalar.value !== "string") return null;
@@ -91,7 +36,7 @@ function scalarSpan(text, scalar) {
   return end > start ? {start, end} : null;
 }
 
-function isV1Alpha4Source(text, relativePath) {
+function isV1Alpha5Source(text, relativePath) {
   if (relativePath.endsWith("/procedure.yaml"))
     return /^(?:start|nodes):[ \t]*/m.test(text);
   if (relativePath.endsWith("/contract.yaml"))
@@ -101,7 +46,7 @@ function isV1Alpha4Source(text, relativePath) {
   return false;
 }
 
-function classifyV1Alpha4Tokens(text, relativePath) {
+function classifyV1Alpha5Tokens(text, relativePath) {
   let doc;
   try {
     doc = parseDocument(text, {
@@ -120,7 +65,7 @@ function classifyV1Alpha4Tokens(text, relativePath) {
     if (span) result.push({...span,type,modifiers,path,part});
   }
   function visit(value,path,depth) {
-    if (++visited>MAX_NODES || depth>MAX_DEPTH || result.length>MAX_TOKENS) throw Error("CA-SL v1alpha4 semantic budget");
+    if (++visited>MAX_NODES || depth>MAX_DEPTH || result.length>MAX_TOKENS) throw Error("CA-SL v1alpha5 semantic budget");
     if (isSeq(value)) {
       for (const item of value.items) visit(item,[...path,"*"],depth+1);
       return;
@@ -135,8 +80,15 @@ function classifyV1Alpha4Tokens(text, relativePath) {
         push(value,parent[2]==="observation"?"skillObservation":"skillOperation",["reference"],path,"value");
       else if(root==="procedure" && last==="script" && parent[0]==="nodes")
         push(value,"skillReference",["reference"],path,"value");
+      else if(root==="predicates" && last==="script")
+        push(value,"skillReference",["reference"],path,"value");
       else if(root==="procedure" && last==="predicate" && parent.includes("predicates"))
         push(value,"skillPredicate",["reference"],path,"value");
+      else if(root==="procedure" && parent[0]==="nodes" && parent[2]==="wait" && last==="after")
+        push(value,"skillStep",["reference"],path,"value");
+      else if(root==="procedure" && parent.includes("arguments") &&
+        /^([A-Za-z][A-Za-z0-9_-]*)\.wait\.output(?:\.[A-Za-z][A-Za-z0-9_-]*)*$/.test(value.value))
+        push(value,"skillStep",["reference"],path,"value");
       else if(root==="procedure" && parent.includes("routes"))
         push(value,["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(value.value)?"skillOutcome":"skillStep",
           ["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(value.value)?[]:["reference"],path,"value");
@@ -159,9 +111,13 @@ function classifyV1Alpha4Tokens(text, relativePath) {
       const key=pair.key.value,next=[...path,key];
       if(root==="procedure" && path.length===1 && path[0]==="nodes")
         push(pair.key,"skillStep",["declaration"],next,"key");
+      else if(root==="procedure" && path.length===2 && path[0]==="nodes" && key==="wait")
+        push(pair.key,"skillWait",[],next,"key");
       else if(root==="procedure" && path.length===2 && path[0]==="nodes" &&
         ["precondition","operation","observation","postcondition"].includes(key))
         push(pair.key,"skillOperator",[],next,"key");
+      else if(root==="procedure" && path.includes("wait") && path.includes("routes"))
+        push(pair.key,"skillWait",[],next,"key");
       else if(root==="procedure" && path.includes("routes"))
         push(pair.key,"skillOutcome",[],next,"key");
       else if(root==="predicates" && path.length===1 && path[0]==="predicates")
@@ -179,6 +135,42 @@ function classifyV1Alpha4Tokens(text, relativePath) {
 }
 
 
+function classifyImportedLibraryTokens(text, relativePath) {
+  if (!relativePath.startsWith("lib/") || !/^kind:\s*ToolCatalog\s*$/m.test(text)) return [];
+  let doc;
+  try {
+    doc = parseDocument(text, {
+      version:"1.2",strict:true,uniqueKeys:true,
+      keepSourceTokens:true,logLevel:"silent"
+    });
+  } catch { return []; }
+  if (doc.errors.length || !isMap(doc.contents)) return [];
+  const result=[];
+  function push(value,type,modifiers,path,part){
+    const span=scalarSpan(text,value);
+    if (span) result.push({...span,type,modifiers,path,part});
+  }
+  function visit(value,path,depth){
+    if (depth>MAX_DEPTH) return;
+    if (isSeq(value)) {
+      for (const item of value.items) visit(item,[...path,"*"],depth+1);
+      return;
+    }
+    if (!isMap(value)) return;
+    for (const pair of value.items) {
+      if (!isScalar(pair.key) || typeof pair.key.value!=="string") continue;
+      const key=pair.key.value,next=[...path,key];
+      if (key==="operation" && path.includes("contracts"))
+        push(pair.value,"skillOperation",["declaration","imported"],next,"value");
+      else if (["apiVersion","kind","contracts","operation","effect"].includes(key))
+        push(pair.key,"skillKeyword",[],next,"key");
+      visit(pair.value,next,depth+1);
+    }
+  }
+  try {visit(doc.contents,[],0);} catch {return [];}
+  return result.sort((a,b)=>a.start-b.start||a.end-b.end);
+}
+
 /**
  * Classify an existing YAML document using exact YAML AST scalar spans.
  *
@@ -189,64 +181,10 @@ function classifyV1Alpha4Tokens(text, relativePath) {
  * @returns {{start:number,end:number,type:string,modifiers:string[]}[]}
  */
 export function classifySkillSemanticTokens(text, relativePath) {
-  if (typeof text==="string" && typeof relativePath==="string" &&
-      text.length<=MAX_SOURCE_LENGTH && isV1Alpha4Source(text,relativePath))
-    return classifyV1Alpha4Tokens(text,relativePath);
-  const profile = profileFor(relativePath);
-  if (!profile || typeof text !== "string" || !text ||
-      text.length > MAX_SOURCE_LENGTH) return [];
-
-  let doc;
-  try {
-    doc = parseDocument(text, {
-      version: "1.2",
-      strict: true,
-      uniqueKeys: true,
-      keepSourceTokens: true,
-      logLevel: "silent"
-    });
-  } catch {
-    return [];
-  }
-  if (doc.errors.length || !doc.contents) return [];
-
-  const result = [];
-  const counter = {nodes: 0};
-  function add(scalar, type, modifiers = [], path = [], part = "value") {
-    const span = scalarSpan(text, scalar);
-    if (!span) return;
-    result.push({ ...span, type, modifiers: [...modifiers], path: [...path], part });
-  }
-  function visit(node, path, depth) {
-    if (!node || ++counter.nodes > MAX_NODES || depth > MAX_DEPTH ||
-        result.length > MAX_TOKENS) throw Error("Skill semantic projection limit");
-    if (isScalar(node)) {
-      const match = ruleAt(profile, path, "value");
-      if (match) add(node, match.type, match.modifiers, path, "value");
-      return;
-    }
-    if (isSeq(node)) {
-      for (const item of node.items) visit(item, [...path, "*"], depth + 1);
-      return;
-    }
-    if (!isMap(node)) return;
-    for (const pair of node.items) {
-      if (!isScalar(pair.key) || typeof pair.key.value !== "string") continue;
-      const key = pair.key.value;
-      const next = [...path, key];
-      const match = ruleAt(profile, next, "key");
-      if (match) add(pair.key, match.type, match.modifiers, next, "key");
-      else if (isKeyword(profile, path, key)) add(pair.key, "skillKeyword", [], next, "key");
-      visit(pair.value, next, depth + 1);
-    }
-  }
-
-  try { visit(doc.contents, [], 0); }
-  catch { return []; }
-  if (result.length > MAX_TOKENS) return [];
-  return result.sort((a, b) => a.start - b.start || a.end - b.end);
+  if (typeof text !== "string" || typeof relativePath !== "string" || text.length > MAX_SOURCE_LENGTH) return [];
+  if (isV1Alpha5Source(text, relativePath)) return classifyV1Alpha5Tokens(text, relativePath);
+  return classifyImportedLibraryTokens(text, relativePath);
 }
-
 
 export const SKILL_SEMANTIC_TOKEN_TYPES = SKILL_SEMANTIC_LEGEND.tokenTypes;
 export const SKILL_SEMANTIC_TOKEN_MODIFIERS = SKILL_SEMANTIC_LEGEND.tokenModifiers;
@@ -256,10 +194,9 @@ const MODIFIER_INDEX = new Map(SKILL_SEMANTIC_TOKEN_MODIFIERS.map((name, index) 
 const PROVIDER_REGISTRATIONS = new WeakMap();
 
 /**
- * Compatibility projection consumed by Monaco and browser LSP adapters.
- * v1alpha4 identities are local editor-only AST projections; historical
- * v0.2 identities come from the separately pinned legacy registry. This adds
- * protocol numeric indexes without granting grammar or linking authority.
+ * Protocol projection consumed by Monaco and browser LSP adapters.
+ * v1alpha5 identities are local editor-only AST projections; imported Library
+ * declarations are presentation-only and never grant grammar or linking authority.
  */
 export function collectSkillSemanticTokenSpans(text, relativePath = "") {
   return classifySkillSemanticTokens(text, relativePath).map(token => {
@@ -345,8 +282,6 @@ export function registerSkillSemanticTokens(monaco) {
   const existing = PROVIDER_REGISTRATIONS.get(monaco);
   if (existing) return existing;
   const provider = createSkillSemanticTokensProvider();
-  // The v0.2 registry defines YAML profiles only. Python and Markdown retain
-  // their independent TextMate grammars and Python LSP symbol support.
   const registrations = [monaco.languages.registerDocumentSemanticTokensProvider("yaml", provider)];
   const registration = {
     languages: ["yaml"],

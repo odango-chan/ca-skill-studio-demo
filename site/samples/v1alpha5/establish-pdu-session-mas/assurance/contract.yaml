@@ -1,0 +1,27 @@
+# CA-SL v1alpha5 author syntax. MAS ToolCatalog / CapabilityContracts are NOT published.
+# Subject Context carries the 3GPP SUPI from the admitted CreateSMContext request; HostBusinessInstance and Runtime identities remain private.
+goal: pdu_session.initial_request_fulfilled
+precondition: validate-sm-subscription.precondition
+requestSchema: schemas/establishment-request.schema.yaml
+contextSchema: ca-context::urn:connectionagent:ca:context:subject:v1
+dependencies:
+  ca-context: urn:connectionagent:ca:host-context
+  ca-session-context: urn:connectionagent:ca:host:smf-session-context
+  mas: urn:example:connectionagent:openamsm-mas-tool-contracts
+capabilities:
+  - urn:example:connectionagent:capability:ca:smf-session-context-read:v1
+  - urn:example:connectionagent:capability:mas:sc-validate-subscription:v1
+  - urn:example:connectionagent:capability:mas:saa-secondary-auth:v1
+  - urn:example:connectionagent:capability:mas:sc-create-sm-context:v1
+  - urn:example:connectionagent:capability:mas:sc-register-uecm:v1
+  - urn:example:connectionagent:capability:mas:pa-create-sm-policy:v1
+  - urn:example:connectionagent:capability:mas:ups-decide-anchor:v1
+  - urn:example:connectionagent:capability:mas:iam-allocate-address:v1
+  - urn:example:connectionagent:capability:mas:pa-update-sm-policy:v1
+  - urn:example:connectionagent:capability:mas:ca-create-charging:v1
+  - urn:example:connectionagent:capability:mas:upn-create-up-session:v1
+  - urn:example:connectionagent:capability:mas:ssm-signal-ue-an:v1
+  - urn:example:connectionagent:capability:mas:upn-modify-up-session:v1
+  - urn:example:connectionagent:capability:mas:se-emit-events:v1
+limits:
+  maxActions: 32

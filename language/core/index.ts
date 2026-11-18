@@ -1,8 +1,6 @@
-import { projectWorkspace } from "../../site/workspace.mjs";
-import { auditPackageWorkspace } from "../../site/package-audit.mjs";
 import { scriptNavigationReport } from "../../site/script-navigation.mjs";
 import { pythonTopLevelOutline } from "../../site/python-outline.mjs";
-import { isV1Alpha4Procedure, analyzeV1Alpha4Source } from "./v1alpha4.js";
+import { isV1Alpha5Procedure, analyzeV1Alpha5Source } from "./v1alpha5.js";
 import type {
   AnalysisState,
   DocumentAnalysis,
@@ -10,7 +8,6 @@ import type {
   PackageAuditResult,
   PackageDocumentSnapshot,
   PackageSnapshot,
-  ProcedureDefinition,
   ProcedureProjection,
   PythonOutlineSymbol,
   SchemaReference,
@@ -21,25 +18,7 @@ import type {
 
 const MAX_PACKAGE_FILES = 500;
 const MAX_PACKAGE_TEXT_LENGTH = 4 * 1024 * 1024;
-const REQUIRED_AUDIT_FILES = [
-  "assurance/contract.yaml",
-  "assurance/predicates.yaml",
-  "assurance/procedure.yaml"
-] as const;
-
-type LegacyProjection = {
-  state: "READY" | "UNAVAILABLE";
-  entry: string | null;
-  procedures: Map<string, ProcedureDefinition>;
-  diagnostics: Array<{ message: string; line: number }>;
-};
-type LegacyAuditItem = {
-  code?: string;
-  path?: string;
-  line?: number;
-  message?: string;
-};
-type LegacyScriptReport = {
+type ScriptNavigationReport = {
   status: "READY" | "UNAVAILABLE";
   callers: Array<{
     path: string; line: number; label: string;
@@ -51,7 +30,7 @@ type LegacyScriptReport = {
   }>;
   warnings: string[];
 };
-type LegacyPythonOutline = {
+type PythonOutlineReport = {
   status: "READY" | "UNAVAILABLE";
   symbols: Array<{
     name: string;
@@ -168,25 +147,6 @@ function unavailable(
   };
 }
 
-function toDiagnostic(
-  item: LegacyAuditItem,
-  documentsByPath: ReadonlyMap<string, PackageDocumentSnapshot>
-): LanguageDiagnostic {
-  const relativePath = typeof item.path === "string" ? item.path : "";
-  const document = documentsByPath.get(relativePath);
-  const code = typeof item.code === "string" ? item.code : "PACKAGE_AUDIT";
-  return {
-    code,
-    message: typeof item.message === "string" ? item.message : "Package audit warning",
-    severity: "warning",
-    uri: document?.uri ?? "",
-    relativePath,
-    source: "package-audit",
-    confidence: code === "INPUT_BINDING_SUSPECT" ? "heuristic" : "exact",
-    ...(Number.isSafeInteger(item.line) && (item.line ?? 0) > 0 ? { line: item.line } : {})
-  };
-}
-
 /**
  * Build a single, JSON-safe editor analysis view from the current Package text.
  *
@@ -254,246 +214,147 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   const files = new Map(normalizedDocuments.map(document => [document.relativePath, { text: document.text }] as const));
   const procedureDocument = documentsByPath.get("assurance/procedure.yaml");
 
-  // CA-SL v1alpha4 is a breaking syntax target. Do not run the v0.2
+  // CA-SL v1alpha5 is a breaking syntax target. Do not run the v0.2
   // procedures/call/with Package analyzer against the root start/nodes model.
   // Source projection can supply exact editor locations without any claim
-  // that trusted v1alpha4 ToolCatalog, CapabilityContracts or Host Schema
+  // that trusted v1alpha5 ToolCatalog, CapabilityContracts or Host Schema
   // publications have been linked.
-  if (procedureDocument && isV1Alpha4Procedure(procedureDocument.text)) {
-    const projected = analyzeV1Alpha4Source(documentsByPath, snapshot.packageName);
+  if (procedureDocument && isV1Alpha5Procedure(procedureDocument.text)) {
+    const projected = analyzeV1Alpha5Source(documentsByPath, snapshot.packageName);
+    const packageContextComplete = snapshot.completeness === "complete" &&
+      projected.procedure.state === "READY";
+    const scriptReferences: ScriptReference[] = [];
+    const schemaReferences: SchemaReference[] = [];
+    const pythonSymbols: PythonOutlineSymbol[] = [];
+    const pythonOutlineDiagnostics: LanguageDiagnostic[] = [];
+    const scriptNavigationDiagnostics: LanguageDiagnostic[] = [];
+    const documentAnalyses: DocumentAnalysis[] = [];
+
+    for (const document of normalizedDocuments) {
+      let pythonOutlineState: DocumentAnalysis["pythonOutlineState"] = "NOT_APPLICABLE";
+      if (document.languageId === "python" && document.relativePath.startsWith("scripts/")) {
+        const outline = pythonTopLevelOutline(document.text) as PythonOutlineReport;
+        pythonOutlineState = outline.status;
+        if (outline.status === "READY") {
+          for (const symbol of outline.symbols) {
+            const range = symbol.range ?? null;
+            pythonSymbols.push({
+              uri: document.uri,
+              relativePath: document.relativePath,
+              name: symbol.name,
+              kind: symbol.kind,
+              line: symbol.line,
+              async: symbol.async,
+              range,
+              navigable: Boolean(range)
+            });
+          }
+        }
+        for (const warning of outline.warnings ?? []) {
+          pythonOutlineDiagnostics.push({
+            code: "PYTHON_OUTLINE",
+            message: warning,
+            severity: "warning",
+            uri: document.uri,
+            relativePath: document.relativePath,
+            source: "python-outline",
+            confidence: "unknown"
+          });
+        }
+
+        const report = scriptNavigationReport(files, document.relativePath) as ScriptNavigationReport;
+        if (report.status === "READY") {
+          for (const caller of report.callers) {
+            const sourceDocument = documentsByPath.get(caller.path);
+            if (!sourceDocument) continue;
+            scriptReferences.push({
+              kind: caller.path === "assurance/procedure.yaml"
+                ? "procedure-script-caller"
+                : "predicate-evaluator-caller",
+              sourceUri: sourceDocument.uri,
+              sourcePath: caller.path,
+              targetUri: document.uri,
+              targetPath: document.relativePath,
+              line: caller.line,
+              targetIdentityExact: true,
+              packageContextComplete,
+              sourceRange: caller.sourceRange ?? null,
+              targetRange: caller.targetRange ?? null
+            });
+          }
+          for (const schema of report.schemas) {
+            const targetDocument = documentsByPath.get(schema.path);
+            if (!targetDocument) continue;
+            schemaReferences.push({
+              kind: schema.role === "输入" ? "script-input-schema" : "script-output-schema",
+              sourceUri: document.uri,
+              sourcePath: document.relativePath,
+              targetUri: targetDocument.uri,
+              targetPath: schema.path,
+              targetLine: schema.line,
+              title: schema.title,
+              packageContextComplete,
+              sourceRange: schema.sourceRange ?? null,
+              targetRange: schema.targetRange ?? null
+            });
+          }
+        }
+        for (const warning of report.warnings ?? []) {
+          scriptNavigationDiagnostics.push({
+            code: "SCRIPT_NAVIGATION",
+            message: warning,
+            severity: "warning",
+            uri: document.uri,
+            relativePath: document.relativePath,
+            source: "script-navigation",
+            confidence: "unknown"
+          });
+        }
+      }
+      documentAnalyses.push({
+        uri: document.uri,
+        relativePath: document.relativePath,
+        version: document.version,
+        languageId: document.languageId,
+        pythonOutlineState,
+        pythonSymbols: pythonSymbols.filter(symbol => symbol.uri === document.uri)
+      });
+    }
+
+    const packageAudit: PackageAuditResult = {
+      state: "UNAVAILABLE",
+      reason: snapshot.completeness !== "complete"
+        ? (snapshot.reason ?? "Partial Package snapshot")
+        : "CA-SL v1alpha5 source parsed; static Package qualification requires the v1alpha5 Compiler and trusted Owner/Capability/Schema linking snapshots",
+      diagnostics: []
+    };
+    const diagnostics = [
+      ...projected.diagnostics,
+      ...packageAudit.diagnostics,
+      ...pythonOutlineDiagnostics,
+      ...scriptNavigationDiagnostics
+    ];
     return {
       state: "PARTIAL",
       rootUri: snapshot.rootUri,
       packageName: snapshot.packageName,
       generation: snapshot.generation,
       procedure: projected.procedure,
-      packageAudit: {
-        state: "UNAVAILABLE",
-        reason: snapshot.completeness !== "complete"
-          ? (snapshot.reason ?? "Partial Package snapshot")
-          : "CA-SL v1alpha4 source parsed; trusted Owner/Capability/Schema linking requires v1alpha4 Compiler and published snapshots",
-        diagnostics: []
-      },
-      documents: normalizedDocuments.map(document => ({
-        uri: document.uri, relativePath: document.relativePath,
-        version: document.version, languageId: document.languageId,
-        pythonOutlineState: "NOT_APPLICABLE" as const,
-        pythonSymbols: []
-      })),
-      scriptReferences: [],
-      schemaReferences: [],
-      diagnostics: projected.diagnostics
-    };
-  }
-  let procedure: ProcedureProjection;
-
-  if (!procedureDocument) {
-    procedure = emptyProcedure({
-      code: "PROCEDURE_SOURCE_MISSING",
-      message: "Package is missing assurance/procedure.yaml",
-      severity: "error",
-      uri: snapshot.rootUri,
-      relativePath: "assurance/procedure.yaml",
-      source: "procedure-projection",
-      confidence: "exact"
-    });
-  } else {
-    const parsed = projectWorkspace(procedureDocument.text) as LegacyProjection;
-    if (parsed.state === "READY") {
-      procedure = {
-        state: "READY",
-        entry: parsed.entry,
-        procedures: [...parsed.procedures.values()],
-        diagnostics: []
-      };
-    } else {
-      const diagnostics = (parsed.diagnostics ?? []).map(item => ({
-        code: "PROCEDURE_PROJECTION",
-        message: item.message,
-        severity: "error" as const,
-        uri: procedureDocument.uri,
-        relativePath: procedureDocument.relativePath,
-        source: "procedure-projection" as const,
-        confidence: "exact" as const,
-        ...(Number.isSafeInteger(item.line) && item.line > 0 ? { line: item.line } : {})
-      }));
-      procedure = {
-        state: "UNAVAILABLE",
-        entry: null,
-        procedures: [],
-        diagnostics
-      };
-    }
-  }
-
-  const missingAuditFiles = REQUIRED_AUDIT_FILES.filter(path => !documentsByPath.has(path));
-  let packageAudit: PackageAuditResult;
-  if (snapshot.completeness !== "complete") {
-    packageAudit = {
-      state: "UNAVAILABLE",
-      reason: snapshot.reason ?? "Package snapshot is not complete",
-      diagnostics: []
-    };
-  } else if (missingAuditFiles.length) {
-    packageAudit = {
-      state: "UNAVAILABLE",
-      reason: "Package Audit requires " + missingAuditFiles.join(", "),
-      diagnostics: []
-    };
-  } else if (procedure.state !== "READY") {
-    // Legacy Package Audit returns [] when Procedure projection fails.
-    // Do not misrepresent that skipped audit as READY with zero warnings.
-    packageAudit = {
-      state: "UNAVAILABLE",
-      reason: "Procedure projection is unavailable; Package Audit was not performed",
-      diagnostics: []
-    };
-  } else {
-    const auditItems = auditPackageWorkspace({
-      name: snapshot.packageName,
-      files
-    }) as LegacyAuditItem[];
-    const diagnostics = auditItems
-      .filter(item => !(item.code === "YAML_PARSE" &&
-        item.path === "assurance/procedure.yaml" &&
-        procedure.state === "UNAVAILABLE"))
-      .map(item => toDiagnostic(item, documentsByPath));
-    packageAudit = {
-      state: "READY",
+      packageAudit,
+      documents: documentAnalyses,
+      scriptReferences,
+      schemaReferences,
       diagnostics
     };
   }
+  // Skill Studio is v1alpha5-only. A Procedure that does not match the
+  // v1alpha5 root graph is rejected rather than being reinterpreted using a
+  // historical analyzer. v1alpha4 remains a normative inheritance baseline,
+  // not a product compatibility mode.
+  return unavailable(snapshot, "UNSUPPORTED_CA_SL_VERSION",
+    "Skill Studio accepts CA-SL connectionagent.io/v1alpha5 only");
 
-  // A locally observed target can be exact even when the surrounding Package
-  // cannot be fully analyzed. Future LSP Definition/References handlers must
-  // check this flag as well as exact token ranges before publishing locations.
-  const packageContextComplete = snapshot.completeness === "complete" &&
-    procedure.state === "READY" && packageAudit.state === "READY";
-  const scriptReferences: ScriptReference[] = [];
-  const schemaReferences: SchemaReference[] = [];
-  const pythonSymbols: PythonOutlineSymbol[] = [];
-  const pythonOutlineDiagnostics: LanguageDiagnostic[] = [];
-  const scriptNavigationDiagnostics: LanguageDiagnostic[] = [];
-  const documentAnalyses: DocumentAnalysis[] = [];
 
-  for (const document of normalizedDocuments) {
-    let pythonOutlineState: DocumentAnalysis["pythonOutlineState"] = "NOT_APPLICABLE";
-    if (document.languageId === "python" && document.relativePath.startsWith("scripts/")) {
-      const outline = pythonTopLevelOutline(document.text) as LegacyPythonOutline;
-      pythonOutlineState = outline.status;
-      if (outline.status === "READY") {
-        for (const symbol of outline.symbols) {
-          pythonSymbols.push({
-            uri: document.uri,
-            relativePath: document.relativePath,
-            name: symbol.name,
-            kind: symbol.kind,
-            line: symbol.line,
-            async: symbol.async,
-            range: symbol.range ?? null,
-            navigable: Boolean(symbol.range)
-          });
-        }
-      }
-      for (const warning of outline.warnings ?? []) {
-        const diagnostic: LanguageDiagnostic = {
-          code: "PYTHON_OUTLINE",
-          message: warning,
-          severity: "warning",
-          uri: document.uri,
-          relativePath: document.relativePath,
-          source: "python-outline",
-          confidence: "unknown"
-        };
-        // Keep warnings in the package-level diagnostics list below.
-        pythonOutlineDiagnostics.push(diagnostic);
-      }
-
-      const report = scriptNavigationReport(files, document.relativePath) as LegacyScriptReport;
-      if (report.status === "READY") {
-        for (const caller of report.callers) {
-          const sourceDocument = documentsByPath.get(caller.path);
-          if (!sourceDocument) continue;
-          scriptReferences.push({
-            kind: caller.path === "assurance/procedure.yaml"
-              ? "procedure-script-caller"
-              : "predicate-evaluator-caller",
-            sourceUri: sourceDocument.uri,
-            sourcePath: caller.path,
-            targetUri: document.uri,
-            targetPath: document.relativePath,
-            line: caller.line,
-            targetIdentityExact: true,
-            packageContextComplete,
-            sourceRange: caller.sourceRange ?? null,
-            targetRange: caller.targetRange ?? null
-          });
-        }
-        for (const schema of report.schemas) {
-          const targetDocument = documentsByPath.get(schema.path);
-          if (!targetDocument) continue;
-          schemaReferences.push({
-            kind: schema.role === "输入" ? "script-input-schema" : "script-output-schema",
-            sourceUri: document.uri,
-            sourcePath: document.relativePath,
-            targetUri: targetDocument.uri,
-            targetPath: schema.path,
-            targetLine: schema.line,
-            title: schema.title,
-            packageContextComplete,
-            sourceRange: schema.sourceRange ?? null,
-            targetRange: schema.targetRange ?? null
-          });
-        }
-      }
-      for (const warning of report.warnings ?? []) {
-        scriptNavigationDiagnostics.push({
-          code: "SCRIPT_NAVIGATION",
-          message: warning,
-          severity: "warning",
-          uri: document.uri,
-          relativePath: document.relativePath,
-          source: "script-navigation",
-          confidence: "unknown"
-        });
-      }
-    }
-    documentAnalyses.push({
-      uri: document.uri,
-      relativePath: document.relativePath,
-      version: document.version,
-      languageId: document.languageId,
-      pythonOutlineState,
-      pythonSymbols: pythonSymbols.filter(symbol => symbol.uri === document.uri)
-    });
-  }
-
-  // Diagnostics are collected after document analysis to keep the document
-  // result shape stable and to avoid mutating the source snapshot.
-  const diagnostics = [
-    ...procedure.diagnostics,
-    ...packageAudit.diagnostics,
-    ...pythonOutlineDiagnostics,
-    ...scriptNavigationDiagnostics
-  ];
-
-  const partial = snapshot.completeness !== "complete" ||
-    packageAudit.state === "UNAVAILABLE" ||
-    procedure.state === "UNAVAILABLE";
-  const state: AnalysisState = partial ? "PARTIAL" : "READY";
-
-  return {
-    state,
-    rootUri: snapshot.rootUri,
-    packageName: snapshot.packageName,
-    generation: snapshot.generation,
-    procedure,
-    packageAudit,
-    documents: documentAnalyses,
-    scriptReferences,
-    schemaReferences,
-    diagnostics
-  };
 }
 
 export type * from "./types.js";

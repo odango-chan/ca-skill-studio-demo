@@ -9,11 +9,11 @@ import {makeFlowElements,resolveReconnectedRoute,flowBundleSelectionId,FLOW_NODE
   from "../site/react-flow-projection.mjs";
 
 const read=name=>readFileSync(
-  new URL("../site/samples/"+name+".procedure.yaml",import.meta.url),"utf8");
+  new URL("./fixtures/legacy-site-samples/"+name+".procedure.yaml",import.meta.url),"utf8");
 const created=projectWorkspace(read("establish-pdu-session"));
 const ensure=projectWorkspace(read("ensure-pdu-session"));
 const owner=projectWorkspace(readFileSync(
-  new URL("../site/samples/packages/establish-pdu-session/assurance/procedure.yaml",
+  new URL("./fixtures/legacy-site-samples/packages/establish-pdu-session/assurance/procedure.yaml",
     import.meta.url),"utf8"));
 assert.equal(owner.state,"READY");
 assert.equal(created.state,"READY");
