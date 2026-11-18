@@ -1,181 +1,88 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGatewayModelClient, GatewayRequestError } from "../gateway-client.mjs";
-import { handleRequest } from "../../../gateway/worker/src/index.mjs";
 
-test("Gateway client requires explicit context disclosure before sending", async () => {
+const base = { gatewayBaseUrl: "http://127.0.0.1:8787/opencode-go/openai", modelId: "deepseek-v4.1-flash", sessionId: "editor-session-123" };
+const messages = [{ role: "user", content: "Return a JSON proposal." }];
+const ok = (payload = { choices: [{ message: { content: "{\"ok\":true}" } }] }) =>
+  new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
+
+test("requires explicit context disclosure before any network request", async () => {
   let called = false;
-  const client = createGatewayModelClient({
-    sessionId: "test-session-123",
-    gatewayBaseUrl: "https://ai-gateway.example",
-    fetchImpl: async () => { called = true; return Response.json({ choices: [] }); },
-  });
-  await assert.rejects(
-    client.complete({ messages: [{ role: "user", content: "hello" }] }),
-    /Context disclosure must be explicitly accepted/,
-  );
+  const client = createGatewayModelClient({ ...base, fetchImpl: async () => { called = true; return ok(); } });
+  await assert.rejects(client.complete({ messages, contextDisclosureAccepted: false }), /Explicit context disclosure acceptance/);
   assert.equal(called, false);
 });
 
-test("Gateway client sends a credentialed OpenAI-compatible request without client model or provider secrets", async () => {
+test("calls the Go Gateway route prefix with an explicit Model ID and stable OpenCode session", async () => {
   let request;
-  const client = createGatewayModelClient({
-    sessionId: "test-session-123",
-    gatewayBaseUrl: "https://ai-gateway.example/",
-    fetchImpl: async (url, init) => {
-      request = { url, init };
-      return Response.json({ choices: [{ message: { content: "{\"schema\":\"ca-studio.ai-model-proposal/v1\"}" } }] });
-    },
-  });
-  const content = await client.complete({
-    contextDisclosureAccepted: true,
-    messages: [{ role: "user", content: "Change the route." }],
-    maxTokens: 9000,
-    responseFormat: { type: "json_object" },
-  });
-  assert.equal(content, "{\"schema\":\"ca-studio.ai-model-proposal/v1\"}");
-  assert.equal(request.url, "https://ai-gateway.example/v1/chat/completions");
-  assert.equal(request.init.credentials, "include");
-  assert.equal(request.init.headers["x-opencode-session"], "test-session-123");
-  assert.equal("authorization" in request.init.headers, false);
-  assert.equal("x-turnstile-token" in request.init.headers, false);
+  const client = createGatewayModelClient({ ...base, fetchImpl: async (url, init) => { request = { url, init }; return ok(); } });
+  const result = await client.complete({ messages, contextDisclosureAccepted: true });
+  assert.equal(request.url, "http://127.0.0.1:8787/opencode-go/openai/v1/chat/completions");
+  assert.equal(request.init.method, "POST");
+  assert.equal(request.init.credentials, "omit");
+  assert.equal(request.init.headers["content-type"], "application/json");
+  assert.equal(request.init.headers["x-opencode-session"], "editor-session-123");
+  assert.equal(request.init.headers.authorization, undefined);
+  assert.equal(request.init.headers["x-gateway-token"], undefined);
   const body = JSON.parse(request.init.body);
+  assert.equal(body.model, "deepseek-v4.1-flash");
+  assert.deepEqual(body.messages, messages);
   assert.equal(body.stream, false);
-  assert.equal(body.max_tokens, 2048);
-  assert.equal("model" in body, false);
-  assert.equal("tools" in body, false);
-  assert.deepEqual(body.response_format, { type: "json_object" });
+  assert.equal(result.content, "{\"ok\":true}");
 });
 
-test("Authoring Core and Access Gateway interoperate using the deployment model and JSON response mode", async () => {
-  const accessAudience = "studio-gateway-audience";
-  const gatewayEnv = {
-    ACCESS_AUD: accessAudience,
-    ALLOWED_ORIGINS: "https://studio.example",
-    ALLOWED_MODELS: "fixture-model",
-    PROVIDER_MODEL: "fixture-model",
-    MAX_REQUEST_BYTES: "262144",
-    MAX_OUTPUT_TOKENS: "2048",
-    PROVIDER_API_KEY: "server-only-provider-secret",
-    PROVIDER_CHAT_COMPLETIONS_URL: "https://opencode.ai/inference/go/openai/v1/chat/completions",
-    USER_RATE_LIMITER: { async limit({ key }) { assert.equal(key, "author@example.com"); return { success: true }; } },
-  };
-  const accessContext = {
-    access: { aud: accessAudience, async getIdentity() { return { email: "Author@Example.com" }; } },
-  };
-  const client = createGatewayModelClient({
-    sessionId: "test-session-123",
-    gatewayBaseUrl: "https://gateway.example",
-    fetchImpl: async (url, init) => {
-      assert.equal(init.credentials, "include");
-      const request = new Request(url, {
-        ...init,
-        headers: { ...init.headers, Origin: "https://studio.example" },
-      });
-      return handleRequest(request, gatewayEnv, accessContext, async (_upstreamUrl, upstreamInit) => {
-        assert.equal(upstreamInit.headers.Authorization, "Bearer server-only-provider-secret");
-        assert.equal(upstreamInit.headers["User-Agent"], "ca-skill-studio-ai-authoring/1.0");
-        assert.equal(upstreamInit.headers["x-opencode-session"], "test-session-123");
-        const body = JSON.parse(upstreamInit.body);
-        assert.equal(body.model, "fixture-model");
-        assert.equal(body.stream, false);
-        assert.deepEqual(body.response_format, { type: "json_object" });
-        return Response.json({
-          choices: [{ message: { content: "{\"schema\":\"ca-studio.ai-model-proposal/v1\"}" } }],
-        });
-      });
-    },
-  });
-  const content = await client.complete({
-    contextDisclosureAccepted: true,
-    messages: [
-      { role: "system", content: "Return a valid proposal JSON object." },
-      { role: "user", content: "Propose one safe operation." },
-    ],
-    responseFormat: { type: "json_object" },
-  });
-  assert.equal(content, "{\"schema\":\"ca-studio.ai-model-proposal/v1\"}");
+test("adds the optional shared Gateway token without exposing provider credentials", async () => {
+  let request;
+  const client = createGatewayModelClient({ ...base, gatewayToken: "shared-network-token", fetchImpl: async (url, init) => { request = { url, init }; return ok(); } });
+  await client.complete({ messages, contextDisclosureAccepted: true });
+  assert.equal(request.init.headers["x-gateway-token"], "shared-network-token");
+  assert.equal(request.init.headers.authorization, undefined);
+  assert.equal(request.init.credentials, "omit");
 });
 
-test("Gateway client clamps output tokens to the configured ceiling", async () => {
+test("allows loopback HTTP and remote HTTPS but rejects remote HTTP", () => {
+  assert.doesNotThrow(() => createGatewayModelClient({ ...base, gatewayBaseUrl: "http://localhost:8787/opencode-go/openai", fetchImpl: async () => ok() }));
+  assert.doesNotThrow(() => createGatewayModelClient({ ...base, gatewayBaseUrl: "https://ai-gateway.internal.example/opencode-go/openai", fetchImpl: async () => ok() }));
+  assert.throws(() => createGatewayModelClient({ ...base, gatewayBaseUrl: "http://10.0.0.5:8787/opencode-go/openai", fetchImpl: async () => ok() }), /HTTPS for non-loopback/);
+});
+
+test("requires a route label and rejects URL credentials, query and fragment", () => {
+  assert.throws(() => createGatewayModelClient({ ...base, gatewayBaseUrl: "http://127.0.0.1:8787", fetchImpl: async () => ok() }), /upstream route label/);
+  for (const gatewayBaseUrl of ["http://user:pass@127.0.0.1:8787/route","http://127.0.0.1:8787/route?token=secret","http://127.0.0.1:8787/route#fragment"]) {
+    assert.throws(() => createGatewayModelClient({ ...base, gatewayBaseUrl, fetchImpl: async () => ok() }), /must not contain credentials/);
+  }
+});
+
+test("requires a configured Model ID and validates shared Gateway token", () => {
+  assert.throws(() => createGatewayModelClient({ ...base, modelId: "", fetchImpl: async () => ok() }), /Model ID is required/);
+  assert.throws(() => createGatewayModelClient({ ...base, gatewayToken: "bad\ntoken", fetchImpl: async () => ok() }), /printable value/);
+});
+
+test("clamps output tokens to the configured upper bound", async () => {
   let body;
-  const client = createGatewayModelClient({
-    sessionId: "test-session-123",
-    gatewayBaseUrl: "https://ai-gateway.example",
-    maxOutputTokens: 512,
-    fetchImpl: async (_url, init) => {
-      body = JSON.parse(init.body);
-      return Response.json({ choices: [{ message: { content: "ok" } }] });
-    },
-  });
-  await client.complete({
-    contextDisclosureAccepted: true,
-    messages: [{ role: "user", content: "hello" }],
-    maxTokens: 1024,
-  });
-  assert.equal(body.max_tokens, 512);
+  const client = createGatewayModelClient({ ...base, maxOutputTokens: 1024, fetchImpl: async (url, init) => { body = JSON.parse(init.body); return ok(); } });
+  await client.complete({ messages, maxTokens: 9000, contextDisclosureAccepted: true });
+  assert.equal(body.max_tokens, 1024);
 });
 
-test("Gateway client sanitizes structured Gateway errors", async () => {
-  const client = createGatewayModelClient({
-    sessionId: "test-session-123",
-    gatewayBaseUrl: "https://ai-gateway.example",
-    fetchImpl: async () => Response.json({
-      error: { code: "rate_limit_exceeded", message: "do not trust raw message", request_id: "req-123" },
-    }, { status: 429 }),
-  });
-  await assert.rejects(
-    client.complete({ contextDisclosureAccepted: true, messages: [{ role: "user", content: "hello" }] }),
-    (error) => error instanceof GatewayRequestError && error.status === 429 &&
-      error.code === "rate_limit_exceeded" && error.requestId === "req-123" &&
-      !error.message.includes("do not trust raw message"),
-  );
+test("rejects a request that exceeds the byte limit before fetch", async () => {
+  let called = false;
+  const client = createGatewayModelClient({ ...base, maxRequestBytes: 1024, fetchImpl: async () => { called = true; return ok(); } });
+  await assert.rejects(client.complete({ messages: [{ role: "user", content: "x".repeat(3000) }], contextDisclosureAccepted: true }), /byte limit/);
+  assert.equal(called, false);
 });
 
-test("Gateway client rejects non-HTTPS endpoints", () => {
-  assert.throws(() => createGatewayModelClient({
-    sessionId: "test-session-123",
-    gatewayBaseUrl: "http://ai-gateway.example",
-  }), /must use HTTPS/);
+test("sanitizes transport and HTTP errors", async () => {
+  const networkClient = createGatewayModelClient({ ...base, fetchImpl: async () => { throw new Error("secret provider key leaked"); } });
+  await assert.rejects(networkClient.complete({ messages, contextDisclosureAccepted: true }), error => error instanceof GatewayRequestError && !error.message.includes("secret provider key"));
+  const rejectedClient = createGatewayModelClient({ ...base, fetchImpl: async () => new Response("upstream secret", { status: 401 }) });
+  await assert.rejects(rejectedClient.complete({ messages, contextDisclosureAccepted: true }), error => error instanceof GatewayRequestError && error.status === 401 && !error.message.includes("upstream secret"));
 });
 
-test("Gateway client rejects malformed Chat Completions content", async () => {
-  const client = createGatewayModelClient({
-    sessionId: "test-session-123",
-    gatewayBaseUrl: "https://ai-gateway.example",
-    fetchImpl: async () => Response.json({ choices: [{ message: { content: null } }] }),
-  });
-  await assert.rejects(
-    client.complete({ contextDisclosureAccepted: true, messages: [{ role: "user", content: "hello" }] }),
-    (error) => error instanceof GatewayRequestError && error.code === "missing_model_content",
-  );
-});
-
-
-test("Gateway client rejects an oversized serialized request before sending it", async () => {
-  let fetchCalled = false;
-  const client = createGatewayModelClient({
-    sessionId: "test-session-123",
-    gatewayBaseUrl: "https://ai-gateway.example",
-    maxRequestBytes: 1024,
-    fetchImpl: async () => { fetchCalled = true; return Response.json({ choices: [] }); },
-  });
-  await assert.rejects(
-    client.complete({
-      contextDisclosureAccepted: true,
-      messages: [{ role: "user", content: "x".repeat(4096) }],
-    }),
-    /exceeds the configured UTF-8 byte limit/,
-  );
-  assert.equal(fetchCalled, false);
-});
-
-test("Gateway client requires a stable, safe OpenCode Go session ID", () => {
-  assert.throws(() => createGatewayModelClient({
-    gatewayBaseUrl: "https://ai-gateway.example",
-  }), /stable OpenCode Go session ID/);
-  assert.throws(() => createGatewayModelClient({
-    gatewayBaseUrl: "https://ai-gateway.example",
-    sessionId: "invalid session id",
-  }), /stable OpenCode Go session ID/);
+test("rejects a successful non-JSON or empty proposal response", async () => {
+  const nonJsonClient = createGatewayModelClient({ ...base, fetchImpl: async () => new Response("not json", { status: 200 }) });
+  await assert.rejects(nonJsonClient.complete({ messages, contextDisclosureAccepted: true }), /non-JSON response/);
+  const emptyClient = createGatewayModelClient({ ...base, fetchImpl: async () => ok({ choices: [{ message: { content: "" } }] }) });
+  await assert.rejects(emptyClient.complete({ messages, contextDisclosureAccepted: true }), /usable proposal/);
 });
