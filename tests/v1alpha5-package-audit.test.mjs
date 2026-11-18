@@ -164,6 +164,23 @@ test("a verified Tool Catalog resolves exact callable identity and reports absen
     item.message.includes("ca::sbi.udm.sm_data.get")));
 });
 
+test("partial trusted export sets never turn absence or one candidate into a false missing/unique result",()=>{
+  const files=fixture("establish-pdu-session");
+  const capability=files.get("assurance/contract.yaml").text.match(
+    /- (urn:example:connectionagent:capability:3gpp:nudm-sdm-get:v1)/)?.[1];
+  assert.ok(capability);
+  const diagnostics=auditV1Alpha5Package({files,dependencyContext:{
+    available:false,
+    capabilityDeclarations:[{id:capability,trusted:true}]
+  }});
+  assert.ok(diagnostics.some(item=>
+    item.code==="CAPABILITY_DECLARATION_SET_INCOMPLETE"&&item.message.includes(capability)));
+  assert.ok(diagnostics.some(item=>
+    item.code==="CAPABILITY_DECLARATION_NOT_CHECKED"&&
+    item.message.includes("namf-communication-n1n2-transfer")));
+  assert.ok(!diagnostics.some(item=>item.code==="CAPABILITY_DECLARATION_NOT_FOUND"));
+});
+
 test("Schema IDs can resolve from the exact pinned Owner snapshot independent of dependency kind",()=>{
   const files=fixture("establish-pdu-session");
   const schemaId="urn:example:5gc:udm-subscription-result:v1";
@@ -189,10 +206,11 @@ test("trusted CapabilityContracts input can resolve a unique declaration without
   assert.ok(capability);
   const diagnostics=auditV1Alpha5Package({files,dependencyContext:{
     available:false,
-    capabilityDeclarations:[{id:capability,trusted:true}]
+    capabilityDeclarations:[{id:capability,trusted:true}],
+    capabilityDeclarationsComplete:true
   }});
   assert.ok(!diagnostics.some(item=>item.code==="CAPABILITY_GRANT_NOT_CHECKED"&&
     item.message.includes(capability)));
   assert.ok(diagnostics.some(item=>item.code==="CAPABILITY_DECLARATION_NOT_FOUND"),
-    "other grants still fail closed when the supplied trusted declaration set is incomplete");
+    "a complete trusted declaration set can prove that another grant is absent");
 });
