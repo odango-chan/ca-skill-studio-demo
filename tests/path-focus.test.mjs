@@ -5,6 +5,7 @@ import {projectWorkspace} from "../site/workspace.mjs";
 import {projectPathFocus,branchCategory} from "../site/path-focus.mjs";
 import {selectGraphScope,layoutProcedureELK} from "../site/layout.mjs";
 import {makeFlowElements} from "../site/react-flow-projection.mjs";
+import {analyzeV1Alpha5Source} from "../language/core/v1alpha5.ts";
 
 const source=readFileSync(new URL(
   "../site/samples/packages/establish-pdu-session/assurance/procedure.yaml",
@@ -13,6 +14,30 @@ const workspace=projectWorkspace(source);
 assert.equal(workspace.state,"READY");
 const root=workspace.procedure;
 const snapshot=JSON.stringify(root);
+
+function v1alpha5Procedure(packageName){
+  const packageRoot=new URL("../site/samples/v1alpha5/"+packageName+"/",import.meta.url);
+  const document=(relativePath)=>({
+    uri:"file:///workspace/"+packageName+"/"+relativePath,
+    relativePath,version:1,
+    text:readFileSync(new URL(relativePath,packageRoot),"utf8")
+  });
+  const documents=new Map([
+    ["assurance/procedure.yaml",document("assurance/procedure.yaml")],
+    ["assurance/contract.yaml",document("assurance/contract.yaml")],
+    ["assurance/predicates.yaml",document("assurance/predicates.yaml")]
+  ]);
+  const analyzed=analyzeV1Alpha5Source(documents,packageName);
+  assert.equal(analyzed.procedure.state,"READY",
+    packageName+": "+JSON.stringify(analyzed.diagnostics));
+  const source=analyzed.procedure.procedures[0];
+  const terminalIds=[...new Set(source.routes.map(route=>route.target)
+    .filter(target=>["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(target)))];
+  const terminals=terminalIds.map(id=>({
+    id,operator:"terminal",value:id,line:0,phases:[],children:[],viewOnly:true
+  }));
+  return {...source,nodes:[...source.nodes,...terminals]};
+}
 const names=scope=>new Set(scope.nodes.map(n=>n.id));
 const ids=scope=>new Set(scope.routes.map(r=>r.id));
 const connected=scope=>{
@@ -156,6 +181,52 @@ test("branch categorization uses explicit source operator and outcome, never nod
   assert.equal(branchCategory({source:"a",target:"b",outcome:"FAILED"},new Map()),"failure");
   assert.equal(branchCategory({source:"a",target:"b",outcome:"UNKNOWN"},new Map()),"uncertain");
   assert.equal(branchCategory({source:"a",target:"b",outcome:"COMMITTED"},new Map()),"other");
+});
+
+test("released v1alpha5 Root defaults to a folded success backbone with per-Node expand/collapse",()=>{
+  for(const packageName of ["establish-pdu-session","establish-pdu-session-mas"]){
+    const procedure=v1alpha5Procedure(packageName);
+    const sourceSnapshot=JSON.stringify(procedure);
+    const base=projectPathFocus(procedure);
+    assert.ok(base.isFiltered,packageName+" should collapse non-success branches by default");
+    assert.ok(base.nodes.length<procedure.nodes.length,packageName+" should have a compact Root view");
+    assert.ok(base.routes.length<procedure.routes.length,packageName+" should hide detour Outcome Routes");
+    assert.ok((base.hiddenByNode.get(procedure.start)??0)>0,
+      packageName+" start Node should expose a per-Node disclosure control");
+    assert.ok(base.routes.every(route=>
+      ["PASS","SUCCEEDED","SUCCESS","COMMITTED"].includes(route.outcome)));
+    assert.ok(base.nodes.some(node=>node.operator==="terminal"&&node.value==="SUCCEEDED"));
+    connected(base);
+    for(const route of base.routes)
+      assert.strictEqual(procedure.routes.find(item=>item.id===route.id),route);
+
+    const expanded=projectPathFocus(procedure,{mode:"custom",expandedNodes:[procedure.start]});
+    assert.ok(expanded.routes.length>base.routes.length);
+    assert.ok(names(expanded).size>names(base).size);
+    assert.equal(expanded.hiddenByNode.has(procedure.start),false);
+    assert.equal(expanded.expandedNodeIds.has(procedure.start),true);
+    connected(expanded);
+
+    const collapsed=projectPathFocus(procedure,{mode:"custom",expandedNodes:[]});
+    assert.deepEqual([...ids(collapsed)].sort(),[...ids(base)].sort());
+    assert.equal(collapsed.hiddenByNode.get(procedure.start),base.hiddenByNode.get(procedure.start));
+    assert.equal(collapsed.expandedNodeIds.has(procedure.start),false);
+    connected(collapsed);
+
+    const all=projectPathFocus(procedure,{mode:"all"});
+    assert.strictEqual(all.nodes,procedure.nodes);
+    assert.strictEqual(all.routes,procedure.routes);
+    assert.equal(all.isFiltered,false);
+
+    const unknown={...procedure,routes:[...procedure.routes,{
+      ...procedure.routes[0],id:"unrecognized-view-only-route",outcome:"NEW_UNCLASSIFIED_OUTCOME"
+    }]};
+    const failOpen=projectPathFocus(unknown);
+    assert.equal(failOpen.isFiltered,false);
+    assert.match(failOpen.reason,/无法可靠分类/);
+    assert.equal(JSON.stringify(procedure),sourceSnapshot,
+      packageName+" path folding must not mutate the source projection");
+  }
 });
 
 test("ELK and React Flow remain exact on the focused subset",async()=>{
