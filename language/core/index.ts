@@ -285,6 +285,13 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       diagnostics: projected.diagnostics
     };
   }
+  // Skill Studio is v1alpha5-only. A Procedure that does not match the
+  // v1alpha5 root graph is rejected rather than being reinterpreted using a
+  // historical analyzer. v1alpha4 remains a normative inheritance baseline,
+  // not a product compatibility mode.
+  return unavailable(snapshot, "UNSUPPORTED_CA_SL_VERSION",
+    "Skill Studio accepts CA-SL connectionagent.io/v1alpha5 only");
+
   let procedure: ProcedureProjection;
 
   if (!procedureDocument) {

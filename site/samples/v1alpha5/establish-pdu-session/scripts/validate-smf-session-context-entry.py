@@ -3,7 +3,7 @@
 The generic Host Observation normalizes the SC compatibility response:
 - 404 SESSION_NOT_FOUND -> ABSENT + NOT_APPLICABLE + SESSION_NOT_FOUND
 - 200 AVAILABLE/UNAVAILABLE -> PRESENT + corresponding projectionStatus + CONTEXT_RESPONSE
-- indeterminate transport/authentication failures -> Owner UNKNOWN outcome
+- indeterminate read results -> Runtime UNKNOWN outcome
 
 Only an evidenced ABSENT result selects initial creation. PRESENT is not absence.
 """

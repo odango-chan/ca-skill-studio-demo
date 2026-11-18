@@ -1,15 +1,14 @@
-# CA-SL v1alpha5 — Current Skill Studio target / 当前编辑器目标
+# CA-SL v1alpha5 — Current specification / 当前语言规范入口
 
-**Candidate normative source / 当前候选规范正文：** [CA-SL v1alpha5 完整中文单文件规范](skill-language-spec.v1alpha5.zh-CN.md).
+**Current normative source / 当前唯一规范正文：** [CA-SL v1alpha5 完整中文单文件规范](skill-language-spec.v1alpha5.zh-CN.md).
 
-- **Language:** `connectionagent.io/v1alpha5` — **PUBLIC REVIEW DRAFT; NOT RELEASED**.
-- **Inheritance:** v1alpha5 uses the immutable, frozen v1alpha4 specification as its baseline; Appendix L adds Node-entry Event Wait, typed `wait.output`, TIMEOUT control routing and paired-response boundaries.
-- **Normative source pin:** `odango-chan/ca-skills@12a9512a9eae006ad4578daf37ebe0bdf3070642` (PR #61 candidate).
-- **Compiler pin:** `odango-chan/ca-skill-compiler@34993dc30b66f4cf7d573cbc81d884c356062a12` (PR #30, WP2 only). v1alpha5 Check covers the current Wait parser/AST slice; Build remains fail-closed until WP3–WP8 are implemented.
-- **Compiler / Studio-LSP / Host / Runtime / Integration / Owner / 5GC:** **NOT_QUALIFIED**.
+- **Language:** `connectionagent.io/v1alpha5` — **FROZEN / RELEASED (2026-11-17; language only)**.
+- **Ingress contract:** `connectionagent.io/ingresscatalog/v1alpha1` — **FROZEN / RELEASED (logical contract only)**.
+- **Ingress diagnostics:** `connectionagent.io/ingress-diagnostics/v1alpha1` — **FROZEN / RELEASED**.
+- **Inherited external profiles:** `connectionagent.io/toolcatalog/v1alpha4` and `connectionagent.io/capability-contracts/v1alpha4`; these retain their own exact version identities and are not silently rewritten by the language upgrade.
+- **Compiler / Studio / Host / Runtime / Owner / Integration / 5GC:** **NOT_QUALIFIED** until separately tested and backed by trusted publication/deployment evidence under §45.2 / §L.13.2.
+- **Normative coverage:** the complete v1alpha5 single file, including inherited normative clauses, updated Appendix H and normative Appendix L. EW-001–EW-036 are defined obligations; their product fixtures remain unexecuted.
 
-The upstream `docs/skill-language-spec.md` discovery entry has not yet been updated by PR #61. This local file is a non-normative Studio target pointer to the immutable candidate source; it does not publish or freeze v1alpha5.
+**Historical frozen language:** [CA-SL v1alpha4](skill-language-spec.v1alpha4.zh-CN.md) remains immutable for explicitly selected v1alpha4 targets. It is not the current authoring target. [CA-SL v1alpha3](skill-language-spec.zh-CN.md) remains historical.
 
-**Historical frozen language:** [CA-SL v1alpha4](skill-language-spec.v1alpha4.zh-CN.md) remains an immutable published baseline. Skill Studio's active authoring target is v1alpha5 candidate; v1alpha4 is not retained as a parallel product compatibility mode.
-
-This index is non-normative. The v1alpha5 candidate and its conformance obligations remain subject to independent review and release decision.
+The exact immutable v1alpha5 specification commit is recorded in [the v1alpha5 release record](releases/ca-sl-v1alpha5.md). `main` is a moving discovery entry, not an immutable release identity.

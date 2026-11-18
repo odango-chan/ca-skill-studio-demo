@@ -3,7 +3,7 @@
 The Observation is a fresh, read-only business query after the Step 15
 continuation. ABSENT is a known business failure at this point;
 PRESENT+UNAVAILABLE is known presence but insufficient data. Indeterminate
-query failures are Owner UNKNOWN outcomes and do not fabricate an output.
+read results use the Runtime UNKNOWN outcome without producing an output.
 """
 from __future__ import annotations
 

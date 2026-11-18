@@ -50,10 +50,7 @@ function symbolKey(token,name){
         const waitOutput=/^([A-Za-z][A-Za-z0-9_-]*)\.wait\.output(?:\..*)?$/.exec(name);
         return "step\u0000"+(waitOutput?waitOutput[1]:name);
       }
-      const procedure=token.path?.[0]==="procedures"?token.path[1]:null;
-      return typeof procedure==="string"&&procedure
-        ? "step\u0000"+procedure+"\u0000"+name
-        : null;
+      return null;
     }
     case "skillPredicate":
       return "predicate\u0000"+name;

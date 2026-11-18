@@ -3,12 +3,12 @@
 **中文名称：** ConnectionAgent Skill 语言规范  
 **简称：** CA-SL  
 **目标版本：** `connectionagent.io/v1alpha5`（简称 v1alpha5；v1alpha4 为不可变继承基线）  
-**状态：** PUBLIC REVIEW DRAFT — NORMATIVE INTEGRATION（v1alpha4 保持 FROZEN；v1alpha5 语义基线已冻结，完整规范文本与符合性材料仍待独立评审；NOT RELEASED / NOT QUALIFIED）  
+**状态：** FROZEN / RELEASED — NORMATIVE LANGUAGE SPECIFICATION（2026-11-17；产品与真实 Owner 资格独立，仍为 NOT_QUALIFIED）  
 **规范所有者：** odango-chan/ca-skills  
 **适用对象：** Skill 作者、Skill Studio、Compiler、Agent Host / Runtime、Tool Owner、Schema Owner、语言服务及符合性评审机构  
 **更新日期：** 2026-11-17
 
-**文件效力。** 本文件是 CA-SL v1alpha5 的完整单文件评审候选，以已发布并保持不可变的 v1alpha4 规范为继承基线。除本文件附录 L 明确增补或替代的条款外，v1alpha4 的规范性条款继续适用于 v1alpha5。附录 L 是 v1alpha5 的规范性组成部分；当其明确修订某一 v1alpha4 条款时，以附录 L 对 v1alpha5 的规定为准。v1alpha4 原文件不作修改。当前文件仍为 PUBLIC REVIEW DRAFT，尚未发布或冻结；在发布裁决完成前，不得把 `connectionagent.io/v1alpha5` 当作已准入的生产语言目标。
+**文件效力。** 本文件是 CA-SL v1alpha5 的完整、唯一规范性单文件，以已发布并保持不可变的 v1alpha4 规范为继承基线。除本文件附录 L 明确增补或替代的条款外，v1alpha4 的规范性条款继续适用于 v1alpha5。附录 L 是 v1alpha5 的规范性组成部分；当其明确修订某一 v1alpha4 条款时，以附录 L 对 v1alpha5 的规定为准。v1alpha4 原文件不作修改。`connectionagent.io/v1alpha5` 已于 2026-11-17 作出 FROZEN / RELEASED 裁决；本文件的不可变提交身份记录于 `docs/releases/ca-sl-v1alpha5.md`。该语言发布不代表任何产品已获资格。
 
 **规范性用语。** MUST、MUST NOT、REQUIRED、SHOULD、SHOULD NOT、MAY、OPTIONAL 按 RFC 2119 和 RFC 8174 解释。相应中文规范性措辞包括“必须”“不得”“应当”“不建议”“可以”。
 
@@ -26,16 +26,16 @@
 
 ## 0. 规范状态与适用范围
 
-v1alpha4 的作者源码语法、静态语义、运行语义及附录 F/G/H 已 FROZEN 并发布。本 v1alpha5 候选继承这些规范内容，并仅由附录 L 明确增加 Node-entry Event Wait 及其 Ingress/Host/Runtime 互操作边界。此候选不改变 v1alpha4，不构成任何产品符合性承诺。
+v1alpha4 的作者源码语法、静态语义、运行语义及附录 F/G/H 已 FROZEN 并发布。本 v1alpha5 规范继承这些规范内容，并由附录 L 明确增加 Node-entry Event Wait 及其 Ingress/Host/Runtime 互操作边界。v1alpha5 不改变 v1alpha4 原文件，不构成任何产品符合性承诺。
 
 | 术语或状态 | 含义 | 效力 |
 |---|---|---|
 | `vNext` | 本规范对应的演进版语言系列名称，不独立指定机器可解析版本 | 资料性别名 |
 | `connectionagent.io/v1alpha4` | v1alpha4 继承基线的精确语言标识；构建时仍由 BuildRequest 明确指定 | 已发布规范性目标 |
-| `connectionagent.io/v1alpha5` | 本文件拟发布的下一语言目标；完整规范和 EW 符合性材料通过独立评审及发布裁决前不得作为生产目标 | 候选目标，尚未发布 |
+| `connectionagent.io/v1alpha5` | 本文件的精确语言标识；完整规范及附录 L 已冻结并发布，构建时仍由 BuildRequest 明确指定 | 当前已发布规范性目标 |
 | `API v1alpha4` | v1alpha4 继承基线的抽象互操作语言版本 | 规范性语义边界 |
-| `API v1alpha5` | 本候选的作者语言与 Node-entry Wait 语义目标；ToolCatalog、CapabilityContracts、IngressCatalog、BuildRequest 和 Artifact 仍按各自独立的精确版本契约解析，不因语言目标升级而自动改写 | 候选语义边界 |
-| `FROZEN` | v1alpha4 规范性语言语义冻结；v1alpha3 原版独立保持冻结；v1alpha5 在正式发布前不继承该状态 | v1alpha4 状态 |
+| `API v1alpha5` | 本版作者语言与 Node-entry Wait 语义目标；ToolCatalog、CapabilityContracts、IngressCatalog、BuildRequest 和 Artifact 仍按各自独立的精确版本契约解析，不因语言目标升级而自动改写 | 已发布规范性语义边界 |
+| `FROZEN` | v1alpha3、v1alpha4 和 v1alpha5 各自按对应不可变规范文件独立冻结；v1alpha5 的冻结范围包括本文件及附录 L | 语言规范状态 |
 | `语言冻结 ≠ 产品符合` | §45.1 语言语义裁决与 §45.2 产品/Owner 验收属于独立层次 | 状态边界 |
 | `NOT QUALIFIED` | §45.2 的独立产品符合性门槛尚未完成，不得推断 Compiler、Studio、Host、Tool Owner 或真实 5GC 已通过验收 | 产品状态 |
 
@@ -52,11 +52,11 @@ v1alpha4 的作者源码语法、静态语义、运行语义及附录 F/G/H 已 
 | Skill Eligibility / Root Routing 的选中算法和完整 `Applicability` YAML 作者语法 | **未在 v1alpha4 作者源码语法中定义或冻结**；属于独立 Host/Root Routing 契约。§12.8 已冻结的“不能唯一匹配则拒绝准入”安全要求仍有效，但不得把此条件误认作完整选择协议已发布；不得默许旧 `applicability.when` |
 | Compiler Artifact、Runtime Trace、BuildRequest 的物理 framing/运输及真实 Tool Owner 的发布物 | **由各自版本契约拥有**；不得从 CA-SL FROZEN 推断其序列化格式或产品符合性已通过 |
 
-**符合性声明类型矩阵（Informative）。** 本矩阵继承 v1alpha3 的产品分层原则，**v1alpha4 语言已经 FROZEN**；任何产品仍须完成适用的 §45.2 机器/Owner 验收并提交原始证据，才能宣称对应产品通过。
+**符合性声明类型矩阵（Informative）。** 本矩阵继承 v1alpha3 的产品分层原则，**v1alpha5 语言已经 FROZEN / RELEASED**；任何产品仍须完成适用的 §45.2 / §L.13.2 机器/Owner 验收并提交原始证据，才能宣称对应产品通过。
 
 | 可声明的范围 | 所需精确边界与已存在的验收门槛 | 不得推导的结论 |
 |---|---|---|
-| **语言规范评审/冻结状态** | `connectionagent.io/v1alpha4` 已按 §45.1.1 冻结；发布身份为包含本冻结修订的规范提交 | 不能由此推定任何产品已获 PASS |
+| **语言规范评审/冻结状态** | `connectionagent.io/v1alpha5` 已按 §45.3 冻结并发布；发布身份为 `docs/releases/ca-sl-v1alpha5.md` 所固定的不可变规范提交 | 不能由此推定任何产品已获 PASS |
 | **Compiler 静态符合性** | §45.2 第 2/3/4/8 项中适用于静态链接的受信输入、E 变体和 H 的 `C_STATIC/C_WARNING` 诊断；Native/WASM 使用同一冻结源与原始结果 | 不表示 Runtime/Owner、Root Routing 或完整部署已验收 |
 | **Studio/LSP 静态一致性** | 相同源码与依赖快照下与 Compiler 的诊断/语言行为一致；§45.2 第 4/8 项，注明该产品实现版本 | 不表示 Studio 实现了 Runtime 或取得真实 Owner 证据 |
 | **Host/Runtime 执行符合性** | §45.2 第 1/2/5/7/8 项及适用动态用例，要求经版本化的 Artifact/Trace、隔离、Scope、责任和真实回包/模拟证据 | 不包含未交付的 Owner 物理协议或完整 Root Routing 自动选中能力 |
@@ -66,7 +66,7 @@ v1alpha4 的作者源码语法、静态语义、运行语义及附录 F/G/H 已 
 
 **声明规则：** 在报告中按实际执行层分别注明 `claimScope`、规范提交、所用外部协议版本、确切 Fixture/测试套件版本、已执行变体、失败/未覆盖、原始结果与发布者授权；未覆盖的层写 `NOT_TESTED` 或 `NOT_QUALIFIED`。其中 `claimScope` 等名称只描述附录 K 的**资料性报告视图**，不是本语言新增的线协议字段。E01–E114 的**用例编号**从旧版继承，其中涉及恢复/路由/成功优先级的预期已按本次 v1alpha4 **明确 C 类复审**更新，不再声称与 v1alpha3 的旧语义相同；E115–E120 是本版新增预期。完整 E 列表和 H 的诊断集合均**不意味着已存在可执行套件**；套件的具体版本、覆盖率与执行证据须单独登记（§45.2、K.4）。
 
-**规范文件完整性。** v1alpha4 的附录 E/F/G/H 与 §0–§91 保持原冻结文本效力；本文件在同一完整单文件中继承这些条款，并以附录 L 作为 v1alpha5 的规范性增补、以更新后的附录 H 作为 v1alpha5 诊断索引。第十一部分 §46–§91 为继承的资料性技术问答/设计说明。附录 I/J/K 为 Informative；它们不增加字段或放宽 Normative 条款。v1alpha4 唯一中文冻结文本仍为 `docs/skill-language-spec.v1alpha4.zh-CN.md`；本文件 `docs/skill-language-spec.v1alpha5.zh-CN.md` 是 v1alpha5 的完整单文件评审候选。v1alpha5 全文评审须以本文件的**同一受审提交**为准，不得通过跨文件拼合或单独审阅 Appendix L 代替全文审查。
+**规范文件完整性。** v1alpha4 的附录 E/F/G/H 与 §0–§91 保持原冻结文本效力；本文件在同一完整单文件中继承这些条款，并以附录 L 作为 v1alpha5 的规范性增补、以更新后的附录 H 作为 v1alpha5 诊断索引。第十一部分 §46–§91 为继承的资料性技术问答/设计说明。附录 I/J/K 为 Informative；它们不增加字段或放宽 Normative 条款。v1alpha4 原始冻结文本仍保留于 `docs/skill-language-spec.v1alpha4.zh-CN.md`；本文件 `docs/skill-language-spec.v1alpha5.zh-CN.md` 是 v1alpha5 当前唯一完整规范性单文件。不得通过跨文件拼合或单独审阅 Appendix L 代替本文件。
 
 BuildRequest 传输格式、Compiler Artifact、Runtime Trace 及 Tool Owner 发布物分别受其自身的版本契约管理。本文件的评审状态不构成上述产品或发布物通过符合性验收的证明。历史 v1alpha2 冻结记录及 v1alpha4 修订记录不覆盖本文件；互操作字段以附录 F/G 为准。
 
@@ -2595,6 +2595,20 @@ v1alpha4 是破坏性收敛，不要求保留 v0.2 隐式输入、旧 Observatio
 
 ---
 
+
+
+### 45.3 CA-SL v1alpha5 语言冻结与发布裁决（2026-11-17）
+
+**正式裁决：** `connectionagent.io/v1alpha5` **FROZEN / RELEASED**。本裁决发布完整单文件规范 `docs/skill-language-spec.v1alpha5.zh-CN.md`，其规范效力包括继承的 v1alpha4 Normative 条款、按 v1alpha5 更新的 Appendix H，以及新增的 Normative Appendix L。
+
+**冻结范围：** Contract / Procedure / PredicateSet 语法与语义、四种业务阶段、SourcePath、Evidence、Capability、Dependency Linking、诊断索引、Node-entry Event Wait、Ingress 逻辑导出引用、同一 Run 续接、事件 occurrence 隔离、超时路由、配对协议响应边界及 Host / Runtime / Integration 责任边界。v1alpha4 原文件不修改；v1alpha4 与 v1alpha5 是显式选择的独立语言目标，不允许自动回退或静默重解释。
+
+**跨契约版本：** IngressCatalog 为 `connectionagent.io/ingresscatalog/v1alpha1`，其诊断注册表为 `connectionagent.io/ingress-diagnostics/v1alpha1`；两者独立版本化，并由本版 Appendix H.1 组合进 Compiler 诊断索引。
+
+**发布身份：** 规范文件不能在自身内容中嵌入自身 Git commit SHA。精确不可变规范提交由 `docs/releases/ca-sl-v1alpha5.md` 记录；不得以浮动 `main` 或候选分支代替。
+
+**资格边界：** 语言冻结不表示 Compiler、Studio/LSP、Host、Runtime、Integration Adapter、Owner 或真实 5GC 已通过产品符合性验收。上述状态继续按 §45.2 与 §L.13.2 分别保持 `NOT_QUALIFIED`，直至真实执行证据经独立核验。
+
 # 第十一部分：设计依据与技术说明
 
 **本部分为资料性说明（Informative）。** 其内容用于解释前述规范性条款，不构成额外要求；不一致时以相应规范性条款为准。
@@ -4757,12 +4771,9 @@ gates:
 
 **执行证据分离：** 附录 E/H 的规范预期状态仅代表文本已定义。附录 K.4 的 `specExpected` 不能转化为 `passed`；`fixtureExists`、`executed`、`passed` 和 `rawResultRef` 应逐变体记录并由原始报告核验。真实实现不能仅凭“规范用例已定义”或空白报告模板声称符合。
 
-**实现真实性：** 本次单文件整合与 Source Hygiene 检查最多说明文档结构及基本校验完成；只有实际 Owner 发布物、受信部署输入、Native/WASM/Studio 的机器 Fixture、Runtime Trace、真实 5GC Case 结果及 §45.2 的逐项报告经独立核验后才能改变相应产品状态。本版裁决为 **CA-SL v1alpha4 语言 FROZEN；产品 NOT QUALIFIED**；v1alpha3 原版仍 FROZEN。
+**实现真实性：** 本次单文件整合与 Source Hygiene 检查最多说明文档结构及基本校验完成；只有实际 Owner 发布物、受信部署输入、Native/WASM/Studio 的机器 Fixture、Runtime Trace、真实 5GC Case 结果及 §45.2 的逐项报告经独立核验后才能改变相应产品状态。本文件的发布裁决为 **CA-SL v1alpha5 语言 FROZEN / RELEASED；产品 NOT_QUALIFIED**；v1alpha3 和 v1alpha4 原版仍分别保持其独立 FROZEN 状态。
 
 ---
-
-**全文结束。**
-
 
 # 附录 L：v1alpha5 Node-entry Event Wait 规范性增补
 
@@ -4770,7 +4781,7 @@ gates:
 
 ## L.0 效力与兼容性
 
-本附录定义 CA-SL v1alpha5 的 Node-level Event Wait 规范性条款。它在 v1alpha4 冻结语义基线上增加 Node-entry 控制与配套 Ingress/Host/Runtime 契约；v1alpha4 原规范及其作者语法保持不可变。
+本附录定义 CA-SL v1alpha5 的 Node-level Event Wait 规范性条款。它在 v1alpha4 冻结语义基线上增加 Node-entry 控制与配套 Ingress/Host/Runtime 契约；v1alpha4 原规范及其作者语法保持不可变。本附录只定义已创建 Run 内由 Wait 消费的后续入站事件；不定义初始 Start Ingress 如何创建 Invocation/Run，也不定义该初始请求的配对响应（例如 CreateSMContext Step 3/5）。初始 Start Ingress / Service-exit 属于独立契约；不得将 wait.response.after 用作初始 Start 响应边界。
 
 The following v1alpha4 rules remain unchanged for connectionagent.io/v1alpha4:
 
@@ -5027,14 +5038,18 @@ nodes:
         SUCCEEDED: classify-step17-result
         FAILED: SAFE_STOPPED
         OUTCOME_UNKNOWN: UNRESOLVED
-    # This Observation runs after one of three Step 16 outcomes: successful N4
-    # Modification plus optional UDM registration; N2 resource-setup failure
-    # with the mandated pre-response N4 Release; or required UPE unavailable,
-    # where Step 16 is skipped without that pre-response Release. It queries the
-    # exact SM Context identified by wait.output.smContextRef and returns the
-    # typed Step 17 response DTO. On either rejection branch, the Operation
-    # output carries the prepared N1 SM Reject binary reference. This Node is
-    # the response boundary; Step 18 cleanup is deliberately later.
+    # This is an intentional standalone Observation-only Node under the
+    # paired protocol-response-boundary exception: no single adjacent Operation
+    # can own this read without moving Step 17 before the branch-specific Step 16
+    # actions. It runs after successful N4 Modification plus optional UDM
+    # registration, the required pre-response N4 Release for N2 setup failure,
+    # or the required-UPE branch that skips Step 16 without that Release.
+    # It queries only the exact SM Context identified by wait.output.smContextRef.
+    # The earlier update-sm-context Operation supplies the N1 SM Reject binary
+    # reference on either rejection branch; this Observation combines that
+    # explicit result with current SMF state into the complete typed Step 17
+    # response DTO. It is the Ingress response Producer, not polling or a
+    # generic context-read Node. Step 18 cleanup is deliberately later.
 
   classify-step17-result:
     precondition:
@@ -5316,6 +5331,8 @@ The trusted Integration export MUST declare:
 
 The Compiler resolves the exact response SourcePath deterministically from wait.response.after (or the default Wait-bearing Node) and the export's Producer stage type: <response-boundary-node>.<producer>.output. It MUST NOT accept a Skill-specific NodeId or SourcePath embedded in the reusable Integration export. The selected Producer MUST exist at the response-boundary Node, MUST be available on every normal path reaching that boundary, and its Output Schema MUST be assignable to responseResultSchema. The Compiler MUST verify that the Integration mapping supplies each required protocol response field.
 
+A response-boundary Node whose selected Producer is an Observation MAY be Observation-only only as a narrow paired-protocol-response exception: it MUST be the exact boundary selected by the trusted Ingress contract; the Observation MUST run after every branch-required business Operation on every accepted path; no single adjacent Operation may own the read without moving the response before required work or misrepresenting the 3GPP interaction; and the Observation MUST return the complete typed response-result Schema. It MUST NOT be used for a generic context read, Host admission/lifecycle check or polling loop. This exception does not change the normal rule that supplementary Observations belong in the same Node as the Operation they support.
+
 If response data originates in an earlier Node, the Skill MUST pass the required values explicitly through the boundary Node's Operation/Observation arguments, and that Producer MUST expose the complete typed response result. Runtime/Integration MUST NOT read arbitrary historical Run outputs, infer the latest output or construct an untyped aggregate.
 
 A single fixed bodyless protocol response disposition MAY declare no response-result Producer. If multiple normal response dispositions must be selected, or any disposition is body-bearing, the Integration export MUST declare a response-result Producer and mapping. A body-bearing disposition without a valid Producer stage, compatible Output Schema or complete mapping is rejected as WAIT_RESPONSE_MAPPING_INVALID. If the Producer has not produced an available result because the Run terminates before it, the declared early-failure response mapping applies. A completed Producer result may be mapped even when a later Postcondition does not prove the Skill Goal; protocol response mapping is not Goal proof.
@@ -5508,15 +5525,15 @@ The following semantic cases are REQUIRED for v1alpha5 language/Host/Runtime/Int
 
 ### L.13.1 v1alpha5 规范发布
 
-正式发布本语言版本前，必须完成：
+本版本发布门槛完成记录（2026-11-17）：
 
-1. 对本完整 v1alpha5 单文件候选的独立全文评审，包括全部继承条款、附录 H 和附录 L；
-2. 对 [ca-skills PR #62](https://github.com/odango-chan/ca-skills/pull/62) 的 package-scoped Integration Ingress Operation 逻辑导出契约、Schema、诊断注册表及 response-result binding 完成独立交叉评审；该契约须有独立、明确的版本和稳定逻辑字段；
-3. EW-001–EW-036 每项均具有明确输入条件、精确预期诊断/控制结果、分支和恢复语义；机器义务清单可以保持 `SPECIFICATION_ONLY`，但不得用缺失预期的占位条目代替规范定义；
-4. 完成 CA-SL 内部与已冻结 Wait 语义（#60/#64）、Ingress 逻辑契约（#62）的交叉一致性审查；本节已经定义的 Host/Runtime/Integration 抽象职责须可独立理解，不以某个产品实现的物理 DTO 或持久化格式为前提；
-5. 对候选语言标识 `connectionagent.io/v1alpha5` 作出明确发布裁决，并固定唯一规范提交。
+1. 已完成对本完整 v1alpha5 单文件的独立全文技术复核，包括全部继承条款、附录 H 和附录 L；
+2. 已完成对 package-scoped Integration Ingress Operation 逻辑导出契约、Schema、诊断注册表及 response-result binding 的交叉复核；其独立版本 `connectionagent.io/ingresscatalog/v1alpha1` 与诊断注册表 `connectionagent.io/ingress-diagnostics/v1alpha1` 已明确冻结；
+3. EW-001–EW-036 每项均已具有明确输入条件、精确预期诊断/控制结果、分支和恢复语义；机器义务清单保持 `SPECIFICATION_ONLY`，仅表示产品 Fixture 尚未执行，不影响规范义务已定义；
+4. 已完成 CA-SL 内部与 Wait 语义（#60/#64）、Ingress 逻辑契约的交叉一致性审查；本节定义的 Host/Runtime/Integration 抽象职责可独立理解，不以某个产品实现的物理 DTO 或持久化格式为前提；
+5. 已对语言标识 `connectionagent.io/v1alpha5` 作出明确 FROZEN / RELEASED 裁决；唯一规范提交由发布记录固定。
 
-以上是语言规范发布门槛。它们不要求 Compiler、Host、Runtime 或 Integration Adapter 已经执行通过产品测试，也不要求真实 Owner 已发布生产包。
+以上语言发布门槛均已满足。它们不要求 Compiler、Host、Runtime 或 Integration Adapter 已经执行通过产品测试，也不要求真实 Owner 已发布生产包。
 
 ### L.13.2 产品与 Owner 资格（独立门槛）
 
@@ -5530,4 +5547,8 @@ The following semantic cases are REQUIRED for v1alpha5 language/Host/Runtime/Int
 
 上述产品资格工作可在语言发布后继续独立推进；在完成前不得将 `SPECIFICATION_ONLY` 写成测试 PASS，不得把 `SAFE_STOPPED` 写成资源清理已完成，也不得声称真实 Owner 或 5GC 互操作已通过。
 
-Until release, v1alpha4 remains the only applicable published authoring contract. No implementation or product-conformance claim follows from this candidate.
+This release makes `connectionagent.io/v1alpha5` the current published authoring contract. The immutable v1alpha4 specification remains available only as a historical, explicitly selected language target. No implementation or product-conformance claim follows from language publication.
+
+---
+
+**全文结束。**

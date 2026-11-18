@@ -5,7 +5,7 @@ description: CA-SL v1alpha5 illustrative OpenAMSM MAS policy-first initial PDU S
 
 # Establish PDU Session — OpenAMSM MAS policy-first profile
 
-**Source language:** CA-SL v1alpha5 (pinned normative specification `12a9512a9eae006ad4578daf37ebe0bdf3070642`).
+**Source language:** [CA-SL v1alpha5](https://github.com/odango-chan/ca-skills/blob/0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5/docs/skill-language-spec.v1alpha5.zh-CN.md).
 
 **Adoption state: NOT_QUALIFIED / NOT_LINKABLE.** This is a source-aligned authoring example, not a linked, executable or Owner-approved Skill. The MAS ToolCatalog, operation Schemas, Evidence Guarantees and CapabilityContracts are not published. The `mas` dependency and all source-derived MAS IDs remain placeholders; Compiler linking must fail closed.
 
@@ -45,7 +45,7 @@ The optional IAM `CONFIRM_ADDRESS` step is omitted because this profile fixes `L
 - The MAS plan registers UECM before PCF/N4, earlier than the conventional TS 23.502 V19.9.0 §4.3.2.2.1 step-16c placement. This is a deliberate MAS ordering deviation.
 - The plan hard-codes secondary authentication as not required. The legacy case requiring secondary authentication is not supported by this plan and remains an explicit migration gap.
 
-The full source-by-source mapping, exact outputs, candidate callable identities and qualification gates are in [OpenAMSM Operation Mapping](assurance/openamsm-operation-mapping.md).
+The full source-by-source mapping, exact outputs, candidate callable identities and qualification gates are in [OpenAMSM Operation Mapping](references/openamsm-operation-mapping.md).
 
 ## Host and asynchronous boundary
 
@@ -70,7 +70,7 @@ The MAS graph is a CA policy-first implementation profile, not a normative 3GPP 
 
 ## 3GPP Traceability
 
-**Pinned 3GPP baseline (checked 2026-11-17):** TS 23.502 V19.9.0 (Release 19), §4.3.2.2.1; TS 23.501 V19.9.0; TS 23.503 V19.8.0; Stage 3: TS 29.502 V19.7.0, TS 29.500 V19.7.1, TS 29.571 V19.7.0, TS 29.503 V19.7.0, TS 29.512 V19.6.0, TS 29.518 V19.8.0 and TS 29.244 V19.6.0. Versions are independently pinned per specification. This table records the 3GPP interactions supported or adapted by the MAS source plan; it does not make the MAS sequence a normative 3GPP procedure. The authoritative OES operation/input/output mapping is in [OpenAMSM Operation Mapping](assurance/openamsm-operation-mapping.md).
+**Pinned 3GPP baseline (checked 2026-11-17):** TS 23.502 V19.9.0 (Release 19), §4.3.2.2.1; TS 23.501 V19.9.0; TS 23.503 V19.8.0; Stage 3: TS 29.502 V19.7.0, TS 29.500 V19.7.1, TS 29.571 V19.7.0, TS 29.503 V19.7.0, TS 29.512 V19.6.0, TS 29.518 V19.8.0 and TS 29.244 V19.6.0. Versions are independently pinned per specification. This table records the 3GPP interactions supported or adapted by the MAS source plan; it does not make the MAS sequence a normative 3GPP procedure. The authoritative OES operation/input/output mapping is in [OpenAMSM Operation Mapping](references/openamsm-operation-mapping.md).
 
 | Procedure Node | NW Agent / OES source | 3GPP interaction and classification |
 |---|---|---|
@@ -98,7 +98,7 @@ The MAS adapter boundary uses the same Release 19 SBI payload contract as the co
 1. MAS Owner ToolCatalog, exact callable IDs, input/output Schemas and CapabilityContracts are unpublished.
 2. The Skill request Schema now represents `sNssai.sd` as the 3GPP six-hex-digit string, matching the OES input type. The MAS Owner must still publish and test the exact `sNssai.sd → s_nssai_sd` mapping and the plan's absent-value default.
 3. MAS Operation Evidence Guarantees and source-to-Host Scope/Correlation contracts are unpublished.
-4. Charging is a source-confirmed stub; the charging Predicate intentionally rejects its `"1"` marker.
+4. Charging is a source-confirmed stub. The `"1"` marker and the corresponding skip Evidence attest only to completion of the skipped plan step.
 5. The SAA path is hard-coded to skip; auth-required legacy case 06 is unsupported.
 6. The generic SMF session-context Observation package and its temporal Evidence guarantee are not published.
 7. Host/Owner pending SSM continuation, duplicate/late result, Deadline and paired step-17 response contracts are not qualified.

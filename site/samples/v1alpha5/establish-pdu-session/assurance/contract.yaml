@@ -19,7 +19,6 @@ capabilities:
   - urn:example:connectionagent:capability:3gpp:namf-communication-n1n2-transfer:v1
   - urn:example:connectionagent:capability:3gpp:nsmf-pdu-session-update-sm-context:v1
   - urn:example:connectionagent:capability:ca:smf-step17-response-observation:v1
-  - urn:example:connectionagent:capability:ca:smf-update-timeout-handle:v1
   # Generic read-only SMF session-context Observation; callable and Evidence contract NOT PUBLISHED.
   - urn:example:connectionagent:capability:ca:smf-session-context-read:v1
   - urn:example:connectionagent:capability:3gpp:n4-session-modification:v1

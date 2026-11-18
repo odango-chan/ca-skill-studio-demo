@@ -1,13 +1,13 @@
 {
   "authority": {
     "repository": "odango-chan/ca-skills",
-    "commit": "12a9512a9eae006ad4578daf37ebe0bdf3070642",
-    "sourceRef": "refs/pull/61/head",
-    "status": "PUBLIC_REVIEW_DRAFT"
+    "commit": "0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5",
+    "sourceRef": "refs/heads/main",
+    "status": "FROZEN_RELEASED"
   },
   "language": {
     "target": "connectionagent.io/v1alpha5",
-    "status": "PUBLIC_REVIEW_DRAFT — NOT_RELEASED",
+    "status": "FROZEN_RELEASED",
     "inheritedBaseline": "connectionagent.io/v1alpha4"
   },
   "externalProfiles": {
@@ -17,7 +17,7 @@
   },
   "normativeSource": {
     "path": "docs/skill-language-spec.v1alpha5.zh-CN.md",
-    "blobSha": "2916fa78bd095ee5809136389cda4cdb6302b9d9",
+    "blobSha": "caef0a03ce1db53aeeca6717cd3c8c0c70d952c3",
     "localPath": "language/contracts/source/skill-language-spec.v1alpha5.zh-CN.md"
   },
   "compiler": {

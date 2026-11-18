@@ -5,9 +5,9 @@ description: CA-SL v1alpha5 illustrative conventional 5GC / UE-requested initial
 
 # Establish PDU Session — 5GC
 
-**Source language:** CA-SL v1alpha5 (pinned normative specification `12a9512a9eae006ad4578daf37ebe0bdf3070642`).
+**Source language:** [CA-SL v1alpha5](https://github.com/odango-chan/ca-skills/blob/0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5/docs/skill-language-spec.v1alpha5.zh-CN.md).
 
-**Adoption state: NOT_QUALIFIED.** This is an authoring and editor example, not yet linked to trusted v1alpha5 ToolCatalog and CapabilityContracts publications. All `urn:example:` identities and Evidence guarantees are illustrative. The Compiler must fail closed until exact Owner exports, Schema identities and trust bindings are published.
+**Adoption state: NOT_QUALIFIED.** Linking this authoring example requires trusted Owner ToolCatalog and CapabilityContracts v1alpha4 exports, which CA-SL v1alpha5 inherits, and the companion IngressCatalog v1alpha1 export. All `urn:example:` identities and Evidence guarantees are illustrative.
 
 ## Scope and successful progression
 
@@ -37,7 +37,7 @@ The Skill keeps the business decisions visible:
 
 ## Tool and Owner boundary
 
-The Skill-facing callable identities are business/NF-oriented: `smf::n4.session.establish`, `smf::nsmf.pdu_session.update_sm_context` and `smf::n4.session.modify`. The Skill does not expose internal SMF module names.
+The SMF Operations use the illustrative callable identities `smf::n4.session.establish`, `ca::smf.session.update_from_amf` and `smf::n4.session.modify`.
 
 Owner-specific handles remain private: UDM transaction/invocation refs, SDM subscription refs, PCF association/policy refs, N1/N2 transfer-operation refs, holds, claims, waiter refs, response-artifact refs and journal refs are not Skill arguments. The responsible Owner resolves these from trusted Invocation and business-instance state. The Skill passes only the SUPI, request and typed business results needed by the next 3GPP action.
 
@@ -48,6 +48,7 @@ The Skill does not expose Host/Runtime/Integration plumbing. Host admission, exa
 This example deliberately prioritizes the complete successful path. Detailed failure-only cleanup is documented here rather than expanded into dedicated business Nodes:
 
 - A definitive failure after resource creation routes to `SAFE_STOPPED`; an indeterminate mutation remains safely stopped with its original responsibility retained.
+- If the authored Step 15 Wait deadline wins, the Run routes directly to `SAFE_STOPPED` and Host/Runtime retains responsibility for the already-dispatched Step 11 transfer.
 - The paired Step 17 reject response, Step 18 `Nsmf_PDUSession_SMContextStatusNotify (Release)`, release of any created N4 sessions, allocated PDU Session address and PCF association remain Host/Owner responsibilities when the standard's failure trigger applies. Step 21 `Nudm_SDM_Unsubscribe` applies only after failure following Step 4 and only if the SMF no longer handles another PDU Session for the same SUPI, DNN and HPLMN S-NSSAI.
 - The comments and stop routes do not claim that any of those cleanup actions have already completed. A future failure-path profile must add its own authoritative Owner Results/Evidence before it may publish a definitive `FAILED` terminal.
 - Host/Runtime performs the terminal resource-responsibility finalizer before it publishes `SUCCEEDED`. This is a §12.8 terminal publish gate, not a Skill-authored Operation or Node.
@@ -76,6 +77,7 @@ The Skill's global Contract Precondition validates only the admitted business re
 | `update-sm-context` | TS 23.502 V19.9.0 §4.3.2.2.1 step 15 — `Nsmf_PDUSession_UpdateSMContext Request` (AMF → SMF); exact `AMF / Nsmf_PDUSession / UpdateSMContext` Ingress Operation selector; followed by a fresh SM Context read | Node-entry Wait accepts the normalized request as `update-sm-context.wait.output`, then the `CA_ADAPTER` Operation and supplementary `CA_EXTENSION` Observation execute in the same Node. The preceding Step 11 Operation is the declared trigger. |
 | `modify-n4-session` | TS 23.502 V19.9.0 §4.3.2.2.1 steps 16a–16b; §4.4.1.3 N4 Session Modification; PFCP/N4 TS 29.244 V19.6.0 | `CA_ADAPTER`: SMF N4 Owner completes forwarding modification using the validated RAN result. |
 | `ensure-uecm-registration` | TS 23.502 V19.9.0 §4.3.2.2.1 step 16c — `Nudm_UECM_Registration`; UDM API TS 29.503 V19.7.0 §6.2 / OpenAPI Annex A.3, when the exact PSI is not already registered | `3GPP_NATIVE`: UDM Owner ensures the per-SUPI/PSI registration and returns durable Evidence. |
+| `prepare-step17-response` | TS 23.502 §4.3.2.2.1 step 17 — `Nsmf_PDUSession_UpdateSMContext Response` | `CA_ADAPTER`: Reads the typed response result at the paired response boundary after Step 16. |
 | `verify-pdu-session-establishment` | final facts derived from steps 15–17 and Step 16c | `CA_EXTENSION`: final Goal proof over authoritative network and UDM registration facts. |
 
 Step 6 secondary authentication is outside this fixed profile and must be rejected before Step 7b dispatch when required. Step 9 is omitted only when the PCF response has no applicable modification trigger. Step 18 applies to failure after Step 5 and releases any created N4 sessions, allocated PDU Session address and PCF association. Step 21 applies only after failure following Step 4 when the SMF no longer handles another PDU Session for the same SUPI/DNN/HPLMN S-NSSAI. Step 19 IPv6 Router Advertisement and Step 20 Bridge/Router policy modification are outside this IPv4-only profile.
@@ -96,6 +98,7 @@ The following are illustrative IDs only; they are **not** published CapabilityCo
 | `urn:example:connectionagent:capability:3gpp:n4-session-establishment:v1` | SMF N4 Session Establishment toward UPF |
 | `urn:example:connectionagent:capability:3gpp:namf-communication-n1n2-transfer:v1` | AMF `Namf_Communication_N1N2MessageTransfer` |
 | `urn:example:connectionagent:capability:3gpp:nsmf-pdu-session-update-sm-context:v1` | SMF handling of AMF `Nsmf_PDUSession_UpdateSMContext` |
+| `urn:example:connectionagent:capability:ca:smf-step17-response-observation:v1` | Read of the typed Step 17 response result |
 | `urn:example:connectionagent:capability:ca:smf-session-context-read:v1` | Read-only access to current SMF session context |
 | `urn:example:connectionagent:capability:3gpp:n4-session-modification:v1` | SMF N4 Session Modification toward UPF |
 | `urn:example:connectionagent:capability:3gpp:nudm-uecm-registration:v1` | UDM `Nudm_UECM_Registration` |

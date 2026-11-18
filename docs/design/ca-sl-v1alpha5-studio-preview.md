@@ -1,6 +1,6 @@
 # CA-SL v1alpha5 Preview — Studio Integration Boundary
 
-**Status:** Implementation in progress · Preview only · NOT_QUALIFIED  
+**Status:** v1alpha5-only integration · Preview only · NOT_QUALIFIED  
 **Language target:** `connectionagent.io/v1alpha5`  
 **Current normative candidate:** `odango-chan/ca-skills@12a9512a9eae006ad4578daf37ebe0bdf3070642` (PR #61)  
 **Example source:** `odango-chan/ca-skills@84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef` (PR #65)  
@@ -8,9 +8,9 @@
 
 ## 1. Version authority
 
-The Studio's active authoring target is the complete CA-SL v1alpha5 public-review candidate pinned above. It inherits the immutable v1alpha4 language baseline and adds Node-entry Event Wait through the v1alpha5 normative amendment. The v1alpha5 candidate is **not released and not frozen**. The v1alpha4 specification remains frozen as a historical inheritance baseline; it is not a parallel active Example or authoring mode.
+The Studio's active authoring target is the released CA-SL v1alpha5 specification pinned above. It inherits the immutable v1alpha4 language baseline and adds Node-entry Event Wait through the v1alpha5 normative amendment. The v1alpha5 candidate is **FROZEN / RELEASED**. The v1alpha4 specification remains frozen as a historical inheritance baseline; it is not a parallel active Example or authoring mode.
 
-The Example files are copied from the exact ca-skills PR #65 source commit. The build validates the manifest, source ref, language target, every declared file path and every Git blob hash. The online Extension packages only `site/samples/v1alpha5`; a previously staged v1alpha4 sample directory is removed from the generated extension assets.
+The Example files are copied from the exact ca-skills main snapshot commit. The build validates the manifest, source ref, language target, every declared file path and every Git blob hash. The online Extension packages only `site/samples/v1alpha5`; a previously staged v1alpha4 sample directory is removed from the generated extension assets.
 
 ## 2. Preview capabilities
 
@@ -37,7 +37,7 @@ The v1alpha5 Compiler candidate in ca-skill-compiler PR #30 is not a released in
 
 The Preview does not claim:
 
-- a released or frozen v1alpha5 language specification;
+- a qualified v1alpha5 product implementation;
 - full Compiler v1alpha5 Check / Build / Dependency Inspection / Artifact support;
 - trusted IngressCatalog or exact Ingress Operation export resolution;
 - Owner ToolCatalog, CapabilityContracts, Schema or deployment trust publication;

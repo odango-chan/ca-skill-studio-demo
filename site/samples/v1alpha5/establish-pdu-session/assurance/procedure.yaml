@@ -10,8 +10,7 @@
 # Host performs ingress admission, identity/instance association, duplicate suppression and
 # execution lifecycle before this graph starts. Host execution metadata is not a Procedure input.
 # 3GPP reference: TS 23.502 V19.9.0 (Release 19); per-NF Stage 3 API versions are pinned
-# independently in SKILL.md and docs/authoring-5gc-3gpp-profile.md. Step 3/5 and 15/17
-# Nsmf service request/response continuity is Host/Integration-owned, not a Skill Node.
+# independently in SKILL.md. Host/Integration owns wire request/response handling.
 start: get-sm-subscription-data
 nodes:
   # Primary action: 3GPP_NATIVE — TS 23.502 V19.9.0 §4.3.2.2.1 step 4; SMF → UDM Nudm_SDM_Get.
@@ -182,7 +181,7 @@ nodes:
   # Step 15 is admitted as a Node-entry Event Wait, not a new Skill invocation.
   # The preceding Step 11 transfer Operation is the declared trigger in the trusted
   # Integration IngressCatalog dependency. The normalized request is exposed only as
-  # update-sm-context.wait.output after EVENT_RECEIVED for this exact Wait occurrence.
+  # update-sm-context.wait.output after EVENT_ACCEPTED for this exact Wait occurrence.
   # Step 17 is committed at prepare-step17-response, after all applicable Step 16 work.
   # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 step 15; Nsmf_PDUSession_UpdateSMContext.
   # SMF API: TS 29.502 V19.7.0 §5.2/§6.1/§6.1.2.4 / OpenAPI Annex A.2.
@@ -196,7 +195,7 @@ nodes:
       response:
         after: prepare-step17-response
       routes:
-        TIMEOUT: handle-update-timeout
+        TIMEOUT: SAFE_STOPPED
     operation:
       tool: ca::smf.session.update_from_amf
       arguments:
@@ -229,17 +228,6 @@ nodes:
         PASS: modify-n4-session
         FAIL: SAFE_STOPPED
         UNKNOWN: SAFE_STOPPED
-
-  # The timeout is a business-safe branch; Host/Runtime retains the exact
-  # response obligation and does not restart the Run or replay the Step 11 mutation.
-  handle-update-timeout:
-    operation:
-      tool: ca::smf.update_timeout.handle
-      arguments: {}
-      routes:
-        SUCCEEDED: SAFE_STOPPED
-        FAILED: UNRESOLVED
-        OUTCOME_UNKNOWN: SAFE_STOPPED
 
   # 3GPP: CA_ADAPTER — TS 23.502 V19.9.0 §4.3.2.2.1 steps 16a–16b; §4.4.1.3 N4 Session Modification. N4/PFCP: TS 29.244 V19.6.0.
   modify-n4-session:
@@ -311,7 +299,8 @@ nodes:
       routes:
         SUCCEEDED: verify-pdu-session-establishment
         FAILED: SAFE_STOPPED
-        UNKNOWN: UNRESOLVED
+        DENIED: SAFE_STOPPED
+        UNKNOWN: SAFE_STOPPED
 
   # Final business proof. Host/Runtime separately enforces its terminal resource-responsibility
   # gate before publishing SUCCEEDED; this is a §12.8 publish gate, not a Skill Node.

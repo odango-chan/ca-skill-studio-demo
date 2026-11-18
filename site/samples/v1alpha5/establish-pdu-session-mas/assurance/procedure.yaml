@@ -32,7 +32,7 @@ nodes:
         sNssai: context.request.sNssai
       routes:
         FAILED: FAILED
-        OUTCOME_UNKNOWN: UNRESOLVED
+        UNKNOWN: UNRESOLVED
         DENIED: FAILED
     observation:
       tool: ca-session-context::context.smf.session.read
