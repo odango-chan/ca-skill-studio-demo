@@ -695,10 +695,10 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
   if(isPredicateSet){
     // v1alpha5 PredicateSet script evaluators reference Package-local
     // Python scripts directly through evaluator.script.
-    const script=/^ {6}script:[ \\t]*([A-Za-z0-9_./-]*)$/.exec(prefix);
+    const script=/^ {6}script:[ \t]*([A-Za-z0-9_./-]*)$/.exec(prefix);
     if(script&&value.snapshot.completeness==="complete"){
       const names=value.snapshot.documents
-        .filter(item=>/^scripts\\/[A-Za-z0-9_.-]+\\.py$/.test(item.relativePath))
+        .filter(item=>/^scripts\/[A-Za-z0-9_.-]+\.py$/.test(item.relativePath))
         .map(item=>item.relativePath);
       return make(names,script[1],offset-script[1].length,
         CompletionItemKind.File,"Package-local Predicate Script");
