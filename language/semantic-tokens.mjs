@@ -161,7 +161,7 @@ function classifyImportedLibraryTokens(text, relativePath) {
       if (!isScalar(pair.key) || typeof pair.key.value!=="string") continue;
       const key=pair.key.value,next=[...path,key];
       if (key==="operation" && path.includes("contracts"))
-        push(pair.value,"skillOperation",["declaration"],next,"value");
+        push(pair.value,"skillOperation",["declaration","imported"],next,"value");
       else if (["apiVersion","kind","contracts","operation","effect"].includes(key))
         push(pair.key,"skillKeyword",[],next,"key");
       visit(pair.value,next,depth+1);
