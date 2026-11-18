@@ -113,6 +113,27 @@ export function createCompilerBuildRequest({
   };
 }
 
+/**
+ * Compiler v2 artifact projection: one root manifest and only the selected
+ * Skill's compiled output directory. These paths remain read-only and are
+ * not re-admitted as source on a later BuildRequest.
+ */
+export function compilerArtifactRelativePath(packageName,path){
+  const prefix="skills/"+packageName+"/compiled/";
+  if(!PACKAGE_NAME.test(packageName??"")||
+     typeof path!=="string"||encoder.encode(path).length>240||
+     path!==path.normalize("NFC")||
+     path.includes("\\")||path.includes(":")||
+     /[\u0000-\u001f\u007f]/.test(path))
+    throw new Error("Invalid Compiler v2 Artifact path");
+  if(path==="manifest.json")return "manifest.json";
+  if(!path.startsWith(prefix))throw new Error("Compiler Artifact is outside the selected compiled Skill");
+  const relative=path.slice(("skills/"+packageName+"/").length);
+  if(!relative||relative.split("/").some(segment=>!segment||segment==="."||segment===".."))
+    throw new Error("Unsafe Compiler v2 Artifact path");
+  return relative;
+}
+
 export function isCompilerBuildResult(value) {
   return value !== null && typeof value === "object" &&
     value.apiVersion === COMPILER_BUILD_RESULT_VERSION &&
