@@ -910,6 +910,29 @@ export async function runWorkbenchAcceptance({
     throw Error("v1alpha5 graph selection did not reach the native Inspector model: "+
       JSON.stringify(inspectorSelection));
   await nativeCommand("skillStudio.auditPackage");
+  const packageDiagnosticState=await nativeCommand(
+    "skillStudio.internal.semanticTokenDiagnostics");
+  const packageAudit=packageDiagnosticState?.packageAudit;
+  const expectedCapabilityId=
+    "urn:example:connectionagent:capability:3gpp:namf-communication-n1n2-transfer:v1";
+  const capabilityProblem=packageAudit?.problems?.find(item=>
+    item.code==="CAPABILITY_GRANT_NOT_CHECKED"&&item.message.includes(expectedCapabilityId));
+  const capabilityMarker=packageAudit?.editorMarkers?.find(item=>
+    item.code==="CAPABILITY_GRANT_NOT_CHECKED"&&item.message.includes(expectedCapabilityId));
+  if(!String(packageAudit?.status??"").includes("NOT_CHECKED")||
+     !capabilityProblem||capabilityProblem.status!=="not_checked"||
+     capabilityProblem.domain!=="capabilities"||!(capabilityProblem.line>0)||
+     !capabilityMarker||capabilityMarker.line!==capabilityProblem.line||
+     !packageAudit.problems.some(item=>item.code==="EVIDENCE_GUARANTEE_NOT_CHECKED")||
+     !packageAudit.problems.some(item=>item.code==="DEPENDENCY_NOT_CONFIGURED"))
+    throw Error("v1alpha5 Package diagnostics must reach Problems and editor markers without Compiler qualification: "+
+      JSON.stringify({packageAudit,expectedCapabilityId}));
+  console.log("STUDIO_V1ALPHA5_PACKAGE_DIAGNOSTICS_CHROMIUM",JSON.stringify({
+    status:packageAudit.status,
+    capabilityProblem,capabilityMarker,
+    problemCount:packageAudit.problems.length,
+    diagnosticCount:packageAudit.diagnostics.length
+  }));
   // Theia 1.76 registers a per-view focus command from PluginViewRegistry.
   // The VS Code workbench.view.extension.<container> command is not registered
   // by this Theia host; silently ignoring it leaves a real but hidden view.
