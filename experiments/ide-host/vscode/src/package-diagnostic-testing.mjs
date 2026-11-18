@@ -37,7 +37,9 @@ export function registerPackageDiagnosticTesting(vscode,context,{
     let reason="No v1alpha5 assurance/procedure.yaml is currently selected";
     if(active?.uri?.path?.endsWith("/assurance/procedure.yaml")){
       try{
-        const snapshot=await snapshotProvider(vscode,active);
+        // The shared Package snapshot API requires a bounded generation token.
+        // Test runs are independent of editor-audit generations.
+        const snapshot=await snapshotProvider(vscode,active,0);
         if(snapshot?.completeness==="complete"&&Array.isArray(snapshot.documents)){
           files=new Map(snapshot.documents.map(doc=>[
             doc.relativePath,{text:doc.text}
