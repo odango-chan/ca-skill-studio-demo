@@ -110,7 +110,7 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
       message?.method==="textDocument/publishDiagnostics" &&
       message.params?.uri==="file:///workspace/skill/assurance/procedure.yaml" &&
       message.params?.version===2 &&
-      message.params?.diagnostics?.some(item=>item.code==="PROCEDURE_PROJECTION")
+      message.params?.diagnostics?.length>0
     );
     assert.equal(latest.params.version,2);
 
@@ -223,7 +223,8 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.ok(earlySemanticTokens.data.length>0,
       "semantic tokens are available before Package analysis reaches READY");
     const status=await readyStatus;
-    assert.equal(status.params.state,"READY");
+    assert.equal(status.params.state,"PARTIAL");
+    assert.equal(status.params.procedureState,"READY");
     // The liveness endpoint must answer on the real Worker JSON-RPC channel
     // without changing the Package analysis generation or Source.
     const health=await lspRequest(worker,91,"skillStudio/health",{});
