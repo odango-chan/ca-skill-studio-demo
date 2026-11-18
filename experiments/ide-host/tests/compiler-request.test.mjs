@@ -15,7 +15,7 @@ function decode(value){
   return new TextDecoder().decode(Uint8Array.from(atob(value),character=>character.charCodeAt(0)));
 }
 
-test("Compiler BuildRequest uses exact independent API and CA-SL v1alpha4 targets",()=>{
+test("Compiler BuildRequest uses exact independent API and CA-SL v1alpha5 targets",()=>{
   const request=createCompilerBuildRequest({
     packageName:"example-skill",
     documents:[
@@ -38,12 +38,12 @@ test("Compiler BuildRequest uses exact independent API and CA-SL v1alpha4 target
   assert.equal(decode(request.files[1].bytes),"start: run\nnodes: {}\n");
 });
 
-test("Compiler language gate refuses the v1alpha5 Preview target",()=>{
+test("released Compiler v2 accepts v1alpha5 and rejects v1alpha4",()=>{
   assert.equal(assertCompilerLanguageTarget(COMPILER_LANGUAGE_TARGET),COMPILER_LANGUAGE_TARGET);
-  assert.throws(()=>assertCompilerLanguageTarget("connectionagent.io/v1alpha5"),
-    /supports only connectionagent.io\/v1alpha4; refusing language target connectionagent.io\/v1alpha5/);
+  assert.throws(()=>assertCompilerLanguageTarget("connectionagent.io/v1alpha4"),
+    /supports only connectionagent.io\/v1alpha5; refusing language target connectionagent.io\/v1alpha4/);
   assert.throws(()=>assertCompilerLanguageTarget("connectionagent.io/v1alpha6"),
-    /supports only connectionagent.io\/v1alpha4/);
+    /supports only connectionagent.io\/v1alpha5/);
 });
 
 test("Compiler request refuses path traversal, duplicate files and invalid package targets",()=>{
@@ -68,7 +68,7 @@ test("Compiler request refuses path traversal, duplicate files and invalid packa
   }),/unsafe Skill-relative source path/);
 });
 
-test("Compiler result guards require the frozen v1alpha4 output identities",()=>{
+test("Compiler result guards require the frozen v1alpha5 output identities",()=>{
   assert.equal(isCompilerBuildResult({
     apiVersion:COMPILER_BUILD_RESULT_VERSION,success:true,
     diagnostics:[],dependencyClosure:[],outputFiles:[]
@@ -83,4 +83,35 @@ test("Compiler result guards require the frozen v1alpha4 output identities",()=>
   assert.equal(isCompilerInspection({
     apiVersion:"skillc.inspect/v0.1",diagnostics:[],callables:[],schemas:[]
   }),false);
+});
+
+test("v1alpha5 BuildRequest excludes Studio-only route test files from Compiler source",()=>{
+  const request=createCompilerBuildRequest({
+    packageName:"establish-pdu-session",
+    documents:[
+      {relativePath:"assurance/contract.yaml",text:"goal: example\n"},
+      {relativePath:"assurance/procedure.yaml",text:"start: run\nnodes: {}\n"},
+      {relativePath:"tests/entry.route-scenario.json",text:'{"apiVersion":"skill-studio-route-scenario/v1"}'},
+      {relativePath:"references/readme.md",text:"# user-authored reference"}
+    ]
+  });
+  assert.equal(request.apiVersion,"connectionagent.io/compiler-build-request/v1alpha5");
+  assert.equal(request.languageTarget,"connectionagent.io/v1alpha5");
+  assert.deepEqual(request.files.map(file=>file.path),[
+    "skills/establish-pdu-session/assurance/contract.yaml",
+    "skills/establish-pdu-session/assurance/procedure.yaml",
+    "skills/establish-pdu-session/references/readme.md"
+  ]);
+  assert.deepEqual(request.resolvedDependencies,[]);
+  assert.equal(request.trustedBuildContext,undefined,
+    "absence of independent Owner proof must not be turned into claimed authority");
+});
+test("Studio may pass only explicitly supplied v1alpha5 trusted build context",()=>{
+  const trustedBuildContext={dependencyBindings:[]};
+  const request=createCompilerBuildRequest({
+    packageName:"test",
+    documents:[{relativePath:"SKILL.md",text:"# Test"}],
+    trustedBuildContext
+  });
+  assert.deepEqual(request.trustedBuildContext,trustedBuildContext);
 });
