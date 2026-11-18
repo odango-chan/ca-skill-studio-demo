@@ -14,11 +14,11 @@ This folder contains the shared VS Code API extension used by the online Theia h
 
 Package Explorer inventory is not semantic validation or Compiler qualification. Imported dependency snapshots remain Plugin-owned and read-only by default. Build Artifacts are not shown without a real Compiler BuildResult.
 
-## CA-SL v1alpha5 Preview
+## CA-SL v1alpha5 authoring
 
-The active Example is pinned to the CA-SL v1alpha5 candidate from `ca-skills@84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef`; the normative candidate is separately pinned in `language/contracts/ca-sl-v1alpha5.lock.json`. The v1alpha5 Procedure projection exposes Node-entry Wait as a control field, separate from the four business stages. It is an editor-time source projection, not Compiler conformance.
+The active language is the frozen CA-SL v1alpha5 release at `ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5`. The built-in Example is pinned separately to `ca-skills/main@de8d9f667dd1a445c3f6378e0ca793d7407d2036` by `site/samples/v1alpha5/files.json`. The v1alpha5 Procedure projection exposes Node-entry Wait as a control field, separate from the four business stages. This is an editor-time Source projection, not Compiler conformance.
 
-The bundled Compiler v1.0.0 targets v1alpha4. Check, Build and Inspect Dependencies are deliberately blocked for v1alpha5 until a released v1alpha5 Compiler with the required language and linking support is integrated. Do not lower Wait into legacy syntax or infer trusted Ingress / Owner contracts from completion hints. See [the Preview boundary](../../../docs/design/ca-sl-v1alpha5-studio-preview.md).
+The bundled Compiler v1.0.0 targets v1alpha4. The current v1alpha5 Compiler candidate [PR #38](https://github.com/odango-chan/ca-skill-compiler/pull/38) remains Draft / unmerged and is not integrated. Check, Build and Inspect Dependencies therefore remain blocked for v1alpha5. Do not lower Wait into legacy syntax or infer trusted Ingress / Owner contracts from completion hints. See [the Studio integration boundary](../../../docs/design/ca-sl-v1alpha5-studio-preview.md).
 
 ## Build
 
