@@ -908,8 +908,8 @@ try{
       !workbenchEvidence.graphEditability.sourceUnchanged))
     throw Error("v1alpha5 Procedure graph did not remain read-only: "+
       JSON.stringify(workbenchEvidence?.graphEditability).slice(0,3000));
-  if(requireEditor&&(!workbenchEvidence?.phaseEvidence?.ready||
-      !workbenchEvidence.phaseEvidence.readOnly||
+  if(requireEditor&&(!workbenchEvidence?.phaseEvidence?.visible||
+      !workbenchEvidence.phaseEvidence.sourceOnly||
       !workbenchEvidence?.packageOverview?.skills||
       workbenchEvidence.packageOverview.skills.length!==2))
     throw Error("v1alpha5 Inspector or Package Overview acceptance did not complete: "+
