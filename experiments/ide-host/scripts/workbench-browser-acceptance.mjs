@@ -118,6 +118,20 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
         .find(el=>el.getAttribute('data-node-id')===${JSON.stringify(id)});
       const toggle=anchor?.closest('.theia-TreeNode')?.querySelector('.theia-ExpansionToggle');
       if(!toggle)return {found:false};
+      // The native Explorer may have been scrolled to its final row. Center
+      // the target inside the actual tree scroller before dispatching input;
+      // a visible hit-test at the viewport edge is not a reliable click.
+      let scroller=null;
+      for(let parent=toggle.parentElement;parent;parent=parent.parentElement){
+        const style=getComputedStyle(parent);
+        if((style.overflowY==='auto'||style.overflowY==='scroll')&&
+           parent.scrollHeight>parent.clientHeight+4){scroller=parent;break;}
+      }
+      if(scroller){
+        const before=toggle.getBoundingClientRect();
+        const desired=Math.max(120,Math.min(innerHeight-120,innerHeight/2));
+        scroller.scrollTop+=before.top+before.height/2-desired;
+      }
       toggle.scrollIntoView({block:'center',inline:'nearest'});
       const r=toggle.getBoundingClientRect();
       const x=Math.round(r.x+r.width/2),y=Math.round(r.y+r.height/2);
