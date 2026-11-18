@@ -3249,17 +3249,49 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       catch(error){await vscode.window.showWarningMessage('Node 删除未执行：'+error.message);return false;}
     }),
     vscode.workspace.onDidChangeTextDocument(e=>{
-      if(isProcedurePath(e.document.uri.path)&&document?.uri.toString()===e.document.uri.toString())update(e.document);
-      if(document){
-        const predicatePath=document.uri.path.slice(0,-'procedure.yaml'.length)+'predicates.yaml';
-        if(e.document.uri.path===predicatePath){
-          predicateSnapshot=null;predicateGeneration++;
-          void refreshPredicateSnapshot(document);
-        }
-        scheduleAudit();
+      if(!document||!insideCurrentPackage(e.document?.uri))return;
+      if(isProcedurePath(e.document.uri.path)&&document.uri.toString()===e.document.uri.toString())
+        update(e.document);
+      const predicatePath=document.uri.path.slice(0,-'procedure.yaml'.length)+'predicates.yaml';
+      if(e.document.uri.path===predicatePath){
+        predicateSnapshot=null;predicateGeneration++;
+        void refreshPredicateSnapshot(document);
       }
+      scheduleAudit();
     }),
     vscode.window.onDidChangeActiveTextEditor(editor=>{if(isProcedurePath(editor?.document.uri.path)){update(editor.document);scheduleAudit();}}));
+  // Package Audit owns source/lock lifecycle independently from LSP and Compiler.
+  // A missing or changed file in the current Package must invalidate accepted
+  // markers immediately; a change in another Package must not.
+  function insideCurrentPackage(uri){
+    const root=document&&packageRootForProcedure(vscode,document)?.uri;
+    if(!root||!uri||typeof uri.path!=="string")return false;
+    if(root.scheme!==undefined&&uri.scheme!==undefined&&root.scheme!==uri.scheme)return false;
+    if(root.authority!==undefined&&uri.authority!==undefined&&root.authority!==uri.authority)return false;
+    return uri.path.startsWith(root.path.replace(/\/$/,"")+"/");
+  }
+  function watchWorkspace(event,callback){
+    if(typeof event!=="function")return;
+    const disposable=event(callback);
+    if(disposable?.dispose)context.subscriptions.push(disposable);
+  }
+  watchWorkspace(vscode.workspace.onDidCreateFiles,event=>{
+    if(event.files?.some(insideCurrentPackage))scheduleAudit();
+  });
+  watchWorkspace(vscode.workspace.onDidDeleteFiles,event=>{
+    if(event.files?.some(insideCurrentPackage))scheduleAudit();
+  });
+  watchWorkspace(vscode.workspace.onDidRenameFiles,event=>{
+    if(event.files?.some(item=>insideCurrentPackage(item.oldUri)||insideCurrentPackage(item.newUri)))
+      scheduleAudit();
+  });
+  watchWorkspace(vscode.workspace.onDidChangeConfiguration,event=>{
+    if(!document)return;
+    const workspace=vscode.workspace.getWorkspaceFolder?.(document.uri)?.uri;
+    if(!event?.affectsConfiguration||
+       event.affectsConfiguration("connectionAgent.skillStudio",workspace))
+      scheduleAudit();
+  });
   async function activateNativeMarkdownExtension(){
     const markdownExtension=vscode.extensions?.getExtension?.(
       'vscode.markdown-language-features');
