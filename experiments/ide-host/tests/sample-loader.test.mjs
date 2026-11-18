@@ -146,7 +146,7 @@ test("Existing Example stays untouched unless replacement is explicitly requeste
   assert.equal(h.files.size,total+1);
   assert.match(decode(h.files.get(procedurePath)),/^# Illustrative CA-SL v1alpha5/m);
   assert.match(decode(h.files.get(masProcedurePath)),/start: validate-sm-subscription/);
-  assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 Example Skills/);
+  assert.match(decode(h.files.get(root+"/README.md")),/CA-SL v1alpha5 PDU Session examples/);
   for(const retiredPath of [
     root+"/archive/legacy-v0.2/old.txt",
     root+"/examples/v1alpha4-candidate/README.md",
