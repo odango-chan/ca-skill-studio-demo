@@ -29,6 +29,7 @@ import {registerPackageOverview} from "./package-overview.mjs";
 import {registerDependencyIntegration} from "./dependency-integration.mjs";
 import {registerCompilerIntegration} from "./compiler-integration.mjs";
 import {registerPackageDiagnosticTesting} from "./package-diagnostic-testing.mjs";
+import {registerPackageRouteTesting} from "./package-route-testing.mjs";
 import {iconShapes} from "../../../../site/icons.mjs";
 const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
@@ -81,6 +82,10 @@ export function activate(context){
   // Diagnostic regression results live in the native Test Explorer (when the
   // host exposes Testing API), never in the Problems or Runtime evidence views.
   registerPackageDiagnosticTesting(vscode,context,{
+    getActiveProcedure:()=>
+      workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
+  });
+  registerPackageRouteTesting(vscode,context,{
     getActiveProcedure:()=>
       workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
   });
