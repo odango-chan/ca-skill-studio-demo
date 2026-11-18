@@ -210,6 +210,29 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       })),
       packageLifecycle:packageLanguageLifecycle.snapshot(),
       packageStatuses:[...languagePackageStatuses.entries()].map(([rootUri,status])=>({rootUri,...status})),
+      packageAudit:(()=>{
+        const root=document?packageRootForProcedure(vscode,document):null;
+        const contractUri=root?vscode.Uri.joinPath(root.uri,"assurance","contract.yaml"):null;
+        const editorMarkers=contractUri&&vscode.languages.getDiagnostics
+          ?vscode.languages.getDiagnostics(contractUri).map(item=>({
+            code:item.code,message:item.message,severity:item.severity,source:item.source,
+            line:(item.range?.start?.line??0)+1,
+            column:(item.range?.start?.character??0)+1
+          })): [];
+        const problemItems=providers.get("problems")?.getChildren?.()??[];
+        return {
+          status:auditStatus,
+          diagnostics:audit.map(item=>({
+            code:item.code,message:item.message,severity:item.severity,status:item.status,
+            domain:item.domain,path:item.path,line:item.line,column:item.column
+          })),
+          problems:problemItems.filter(item=>item.kind==="package-diagnostic").map(item=>({
+            code:item.code,message:item.message,severity:item.severity,status:item.status,
+            domain:item.domain,path:item.path,line:item.line,column:item.column
+          })),
+          editorMarkers
+        };
+      })(),
       languageClientStarted:Boolean(languageClient),
       languageClientPending:Boolean(languageClientPromise),
       languageTransportFailure,
