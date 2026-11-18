@@ -387,6 +387,24 @@ connection.onReferences(params => {
   const snapshot=packageSnapshotForUri(uri);
   const source=snapshot?snapshotDocumentFor(snapshot,uri):null;
   const offset=source?offsetAt(source.text,params.position):null;
+  const value=packageForUri(uri);
+  if(!value||value.analysis.state==="UNAVAILABLE"||offset===null)return [];
+  const document=documentFor(value,uri);
+  if(!document)return [];
+  const hit=referenceAt(value,document.uri,offset);
+  if(hit&&hit.reference.packageContextComplete){
+    const references=allReferences(value.analysis).filter(item=>
+      item.packageContextComplete&&sameTarget(item,hit.reference));
+    const locations=references.map(item=>
+      location(item.sourceUri,documentFor(value,item.sourceUri),item.sourceRange)
+    ).filter(Boolean);
+    if(params.context?.includeDeclaration){
+      const target=location(hit.reference.targetUri,
+        documentFor(value,hit.reference.targetUri),hit.reference.targetRange);
+      if(target)locations.unshift(target);
+    }
+    return locations;
+  }
   const index=snapshot?symbolIndexes.get(snapshot.rootUri):null;
   const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
   if(symbolHit){
@@ -396,23 +414,7 @@ connection.onReferences(params => {
       .map(item=>location(item.uri,snapshotDocumentFor(snapshot,item.uri),item.range))
       .filter(Boolean);
   }
-  const value=packageForUri(uri);
-  if(!value||value.analysis.state==="UNAVAILABLE"||offset===null)return [];
-  const document=documentFor(value,uri);
-  if(!document)return [];
-  const hit=referenceAt(value,document.uri,offset);
-  if(!hit||!hit.reference.packageContextComplete)return [];
-  const references=allReferences(value.analysis).filter(item=>
-    item.packageContextComplete&&sameTarget(item,hit.reference));
-  const locations=references.map(item=>
-    location(item.sourceUri,documentFor(value,item.sourceUri),item.sourceRange)
-  ).filter(Boolean);
-  if(params.context?.includeDeclaration){
-    const target=location(hit.reference.targetUri,
-      documentFor(value,hit.reference.targetUri),hit.reference.targetRange);
-    if(target)locations.unshift(target);
-  }
-  return locations;
+  return [];
 });
 
 connection.onHover(params => {
@@ -753,6 +755,15 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
   const waitTopField=/^( {6})([a-z]*)$/.exec(prefix);
   if(waitTopField&&inWait)return make(["event:","timeout:","response:","routes:"],
     waitTopField[2],lineStart+6,CompletionItemKind.Keyword,"Node-entry Wait control fields");
+
+  // Keep Wait-control completion isolated from generic stage-route outcomes.
+  // Some clients report the current empty mapping key without preserving the
+  // complete line context; recognize the exact Node.wait routes structure.
+  const rawWaitRoutes=/wait:\s*\n {6}routes:\s*\n {8}([A-Z_]*)$/.exec(prefix);
+  if(rawWaitRoutes&&inWait&&waitSection==="routes")
+    return make(["TIMEOUT:"],rawWaitRoutes[1],
+      offset-rawWaitRoutes[1].length,CompletionItemKind.EnumMember,
+      "Wait-control timeout edge; event acceptance is implicit");
 
   const waitMemberField=/^( {8})([a-zA-Z]*)$/.exec(prefix);
   if(waitMemberField&&inWait&&waitSection==="event")
