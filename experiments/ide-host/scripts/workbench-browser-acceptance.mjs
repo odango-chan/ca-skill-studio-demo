@@ -710,7 +710,11 @@ export async function runWorkbenchAcceptance({
         "rect:rect?{x:rect.x,y:rect.y}:null,zoom:transform==='none'?1:new DOMMatrixReadOnly(transform).a,"+
         "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
         "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length};})()");
-    if(branchExpanded?.buttonText==="收起")break;
+    const anchorDelta=branchExpanded?.rect?Math.max(
+      Math.abs(branchExpanded.rect.x-branchInitial.rect.x),
+      Math.abs(branchExpanded.rect.y-branchInitial.rect.y)):Infinity;
+    if(branchExpanded?.buttonText==="收起"&&anchorDelta<2&&
+       Math.abs(branchExpanded.zoom-branchInitial.zoom)<0.001)break;
     await sleep(100);
   }
   const anchorExpandedDelta=branchExpanded?.rect?Math.max(
@@ -739,7 +743,11 @@ export async function runWorkbenchAcceptance({
         "rect:rect?{x:rect.x,y:rect.y}:null,zoom:transform==='none'?1:new DOMMatrixReadOnly(transform).a,"+
         "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
         "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length};})()");
-    if(branchCollapsed?.buttonText?.startsWith('+'))break;
+    const anchorDelta=branchCollapsed?.rect?Math.max(
+      Math.abs(branchCollapsed.rect.x-branchInitial.rect.x),
+      Math.abs(branchCollapsed.rect.y-branchInitial.rect.y)):Infinity;
+    if(branchCollapsed?.buttonText?.startsWith('+')&&anchorDelta<2&&
+       Math.abs(branchCollapsed.zoom-branchInitial.zoom)<0.001)break;
     await sleep(100);
   }
   const anchorCollapsedDelta=branchCollapsed?.rect?Math.max(
