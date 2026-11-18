@@ -657,7 +657,8 @@ export async function runWorkbenchAcceptance({
   graphEditability.sourceUnchanged=true;
   console.log("STUDIO_V1ALPHA5_GRAPH_READ_ONLY_CHROMIUM",JSON.stringify(graphEditability));
 
-  // Toolbar defaults and layout/path controls are checked against the v1alpha5 graph.
+  // The released v1alpha5 Root graph keeps the same read-only path-focus UX:
+  // default success backbone, optional route-category filters and per-Node folding.
   const toolbarInitial=await evalWebviewJS("(()=>({"+
     "layout:document.querySelector('#layoutDirection')?.value??null,"+
     "rootMode:document.querySelector('#rootPathMode')?.value??null,"+
@@ -665,31 +666,118 @@ export async function runWorkbenchAcceptance({
     "rootFiltersVisible:document.querySelector('#rootPathFilters')?.hidden===false,"+
     "toolbarVisible:document.querySelector('#graphTools')?.hidden===false,"+
     "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
+    "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length,"+
     "controls:['columns-2','network','eye','locate-fixed','zoom-out','zoom-in','maximize','fit-width','fit-height']"+
     ".map(name=>({name,found:[...document.querySelectorAll('#graphTools svg[data-icon]')].some(el=>el.getAttribute('data-icon')===name)}))"+
     "}))()");
-  // Root-path filtering is a legacy Procedure control. v1alpha5 has its own
-  // typed stage projection and must not expose that legacy path-editing surface.
-  if(toolbarInitial?.layout!=="DOWN"||toolbarInitial.rootVisible||
-     toolbarInitial.rootFiltersVisible||!toolbarInitial.toolbarVisible||
+  if(toolbarInitial?.layout!=="DOWN"||toolbarInitial.rootMode!=="normal"||
+     !toolbarInitial.rootVisible||toolbarInitial.rootFiltersVisible||
+     !toolbarInitial.toolbarVisible||!(toolbarInitial.nodes>0)||!(toolbarInitial.edges>0)||
      toolbarInitial.controls.some(item=>!item.found))
-    throw Error("v1alpha5 Procedure canvas toolbar is incomplete or exposes legacy path controls: "+
+    throw Error("v1alpha5 Root graph must open on the compact main path with path controls available: "+
       JSON.stringify(toolbarInitial));
-  await evalWebviewJS("(()=>{const s=document.querySelector('#layoutDirection');s.value='RIGHT';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
-  await sleep(180);
-  const horizontal=await evalWebviewJS("document.querySelector('#layoutDirection')?.value??null");
-  await evalWebviewJS("(()=>{const s=document.querySelector('#layoutDirection');s.value='DOWN';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
+
+  const branchInitial=await evalWebviewJS("(()=>{"+
+    "const button=[...document.querySelectorAll('#reactFlowRoot .designer-hidden-branches')]"+
+      ".find(item=>/^\\+\\d+ 条$/.test(item.textContent.trim()));"+
+    "const card=button?.closest('.react-flow__node');"+
+    "const rect=card?.getBoundingClientRect();"+
+    "const viewport=document.querySelector('#reactFlowRoot .react-flow__viewport');"+
+    "const transform=viewport?getComputedStyle(viewport).transform:'none';"+
+    "const zoom=transform==='none'?1:new DOMMatrixReadOnly(transform).a;"+
+    "return {buttonText:button?.textContent.trim()??null,nodeId:card?.querySelector('.designer-node-id')?.textContent.trim()??null,"+
+      "rect:rect?{x:rect.x,y:rect.y}:null,zoom,"+
+      "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
+      "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length};})()");
+  if(!branchInitial?.buttonText?.startsWith('+')||!branchInitial.nodeId||!branchInitial.rect)
+    throw Error("v1alpha5 main path did not expose a per-Node hidden-branch control: "+
+      JSON.stringify({toolbarInitial,branchInitial}));
+
+  await evalWebviewJS("(()=>{const id="+JSON.stringify(branchInitial.nodeId)+";"+
+    "const card=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')]"+
+      ".find(item=>item.querySelector('.designer-node-id')?.textContent.trim()===id);"+
+    "card?.querySelector('.designer-hidden-branches')?.click();return true;})()");
+  let branchExpanded=null;
+  for(let attempt=0;attempt<40;attempt++){
+    branchExpanded=await evalWebviewJS("(()=>{const id="+JSON.stringify(branchInitial.nodeId)+";"+
+      "const card=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')]"+
+        ".find(item=>item.querySelector('.designer-node-id')?.textContent.trim()===id);"+
+      "const button=card?.querySelector('.designer-hidden-branches');"+
+      "const rect=card?.getBoundingClientRect();"+
+      "const viewport=document.querySelector('#reactFlowRoot .react-flow__viewport');"+
+      "const transform=viewport?getComputedStyle(viewport).transform:'none';"+
+      "return {buttonText:button?.textContent.trim()??null,pressed:button?.getAttribute('aria-pressed')??null,"+
+        "rect:rect?{x:rect.x,y:rect.y}:null,zoom:transform==='none'?1:new DOMMatrixReadOnly(transform).a,"+
+        "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
+        "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length};})()");
+    if(branchExpanded?.buttonText==="收起")break;
+    await sleep(100);
+  }
+  const anchorExpandedDelta=branchExpanded?.rect?Math.max(
+    Math.abs(branchExpanded.rect.x-branchInitial.rect.x),
+    Math.abs(branchExpanded.rect.y-branchInitial.rect.y)):Infinity;
+  if(branchExpanded?.buttonText!=="收起"||branchExpanded.pressed!=="true"||
+     !(branchExpanded.nodes>branchInitial.nodes)||!(branchExpanded.edges>branchInitial.edges)||
+     anchorExpandedDelta>=2||Math.abs(branchExpanded.zoom-branchInitial.zoom)>0.001)
+    throw Error("v1alpha5 per-Node branch expansion must preserve its screen anchor and zoom: "+
+      JSON.stringify({branchInitial,branchExpanded,anchorExpandedDelta}));
+
+  await evalWebviewJS("(()=>{const id="+JSON.stringify(branchInitial.nodeId)+";"+
+    "const card=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')]"+
+      ".find(item=>item.querySelector('.designer-node-id')?.textContent.trim()===id);"+
+    "card?.querySelector('.designer-hidden-branches')?.click();return true;})()");
+  let branchCollapsed=null;
+  for(let attempt=0;attempt<40;attempt++){
+    branchCollapsed=await evalWebviewJS("(()=>{const id="+JSON.stringify(branchInitial.nodeId)+";"+
+      "const card=[...document.querySelectorAll('#reactFlowRoot .react-flow__node')]"+
+        ".find(item=>item.querySelector('.designer-node-id')?.textContent.trim()===id);"+
+      "const button=card?.querySelector('.designer-hidden-branches');"+
+      "const rect=card?.getBoundingClientRect();"+
+      "const viewport=document.querySelector('#reactFlowRoot .react-flow__viewport');"+
+      "const transform=viewport?getComputedStyle(viewport).transform:'none';"+
+      "return {buttonText:button?.textContent.trim()??null,pressed:button?.getAttribute('aria-pressed')??null,"+
+        "rect:rect?{x:rect.x,y:rect.y}:null,zoom:transform==='none'?1:new DOMMatrixReadOnly(transform).a,"+
+        "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
+        "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length};})()");
+    if(branchCollapsed?.buttonText?.startsWith('+'))break;
+    await sleep(100);
+  }
+  const anchorCollapsedDelta=branchCollapsed?.rect?Math.max(
+    Math.abs(branchCollapsed.rect.x-branchInitial.rect.x),
+    Math.abs(branchCollapsed.rect.y-branchInitial.rect.y)):Infinity;
+  if(!branchCollapsed?.buttonText?.startsWith('+')||branchCollapsed.pressed!=="false"||
+     branchCollapsed.nodes!==branchInitial.nodes||branchCollapsed.edges!==branchInitial.edges||
+     anchorCollapsedDelta>=2||Math.abs(branchCollapsed.zoom-branchInitial.zoom)>0.001)
+    throw Error("v1alpha5 per-Node branch collapse must restore the compact graph without moving its anchor: "+
+      JSON.stringify({branchInitial,branchCollapsed,anchorCollapsedDelta}));
+
+  await evalWebviewJS("(()=>{const s=document.querySelector('#rootPathMode');s.value='all';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
   await sleep(350);
   const allPaths=await evalWebviewJS("(()=>({layout:document.querySelector('#layoutDirection')?.value??null,"+
     "rootMode:document.querySelector('#rootPathMode')?.value??null,"+
     "rootToolbarVisible:document.querySelector('#rootPathToolbar')?.hidden===false,"+
     "nodes:document.querySelectorAll('#reactFlowRoot .react-flow__node').length,"+
     "edges:document.querySelectorAll('#reactFlowRoot .react-flow__edge').length}))()");
-  if(horizontal!=="RIGHT"||allPaths.layout!=="DOWN"||allPaths.rootMode!=="normal"||
-     allPaths.rootToolbarVisible||!(allPaths.nodes>0)||!(allPaths.edges>0))
-    throw Error("v1alpha5 canvas layout or legacy-control isolation failed: "+
-      JSON.stringify({toolbarInitial,horizontal,allPaths}));
-  const canvasToolbar={initial:toolbarInitial,horizontal,allPaths};
+  if(allPaths.layout!=="DOWN"||allPaths.rootMode!=="all"||!allPaths.rootToolbarVisible||
+     !(allPaths.nodes>branchCollapsed.nodes)||!(allPaths.edges>branchCollapsed.edges))
+    throw Error("v1alpha5 All Paths mode did not reveal the full graph: "+
+      JSON.stringify({toolbarInitial,allPaths,branchCollapsed}));
+
+  await evalWebviewJS("(()=>{const s=document.querySelector('#rootPathMode');s.value='normal';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
+  await sleep(350);
+  const sourceAfterBranchFolding=await nativeCommand("skillStudio.internal.sourceVersionAcceptance");
+  if(sourceAfterBranchFolding?.uri!==defaultProcedureUri||
+     sourceAfterBranchFolding.version!==sourceState.version)
+    throw Error("v1alpha5 graph path filtering or branch folding changed authoritative Source: "+
+      JSON.stringify({sourceState,sourceAfterBranchFolding,branchInitial,branchExpanded,branchCollapsed,allPaths}));
+
+  await evalWebviewJS("(()=>{const s=document.querySelector('#layoutDirection');s.value='RIGHT';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
+  await sleep(180);
+  const horizontal=await evalWebviewJS("document.querySelector('#layoutDirection')?.value??null");
+  await evalWebviewJS("(()=>{const s=document.querySelector('#layoutDirection');s.value='DOWN';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
+  await sleep(350);
+  const canvasToolbar={initial:toolbarInitial,horizontal,allPaths,branchInitial,
+    branchExpanded,branchCollapsed,anchorExpandedDelta,anchorCollapsedDelta,sourceUnchanged:true};
   console.log("STUDIO_V1ALPHA5_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbar));
 
   // Package ZIP must be produced from the exact active v1alpha5 Package snapshot.
