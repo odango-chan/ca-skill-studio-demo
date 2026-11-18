@@ -230,7 +230,7 @@ test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbol
     assert.match(scriptHover.contents.value,/Skill Script/);
 
     const references=await lspRequest(worker,14,"textDocument/references",{
-      textDocument:{uri:script.uri},position:positionOf(script.text,"def main"),context:{includeDeclaration:true}});
+      textDocument:{uri:script.uri},position:positionOf(script.text,"main("),context:{includeDeclaration:true}});
     assert.ok(references.some(item=>item.uri===predicates.uri));
     assert.ok(references.some(item=>item.uri===script.uri));
 
