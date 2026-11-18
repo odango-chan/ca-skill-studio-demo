@@ -24,6 +24,7 @@
     "onCommand:skillStudio.openAuthoringGuide",
     "onStartupFinished",
     "onCommand:skillStudio.auditPackage",
+    "onCommand:skillStudio.runDiagnosticTests",
     "onCommand:skillStudio.exportPackageZip",
     "onCommand:skillStudio.refreshInspection",
     "onCommand:skillStudio.renameNode",
@@ -123,6 +124,11 @@
       {
         "command": "skillStudio.auditPackage",
         "title": "%command.auditPackage%",
+        "category": "SKILL Studio"
+      },
+      {
+        "command": "skillStudio.runDiagnosticTests",
+        "title": "Run Offline Diagnostic Tests (No Runtime)",
         "category": "SKILL Studio"
       },
       {

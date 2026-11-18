@@ -947,6 +947,20 @@ export async function runWorkbenchAcceptance({
     problemCount:packageAudit.problems.length,
     diagnosticCount:packageAudit.diagnostics.length
   }));
+  // Run in-memory static diagnostic regression cases. These results belong
+  // to the native Test Explorer, never to Source Problems or Runtime Evidence.
+  const offlineTests=await nativeCommand("skillStudio.runDiagnosticTests");
+  if(!offlineTests||offlineTests.apiVersion!=="skill-studio-diagnostic-regression/v1"||
+     offlineTests.qualification!=="NOT_QUALIFIED"||
+     offlineTests.summary?.PASS!==11||offlineTests.summary?.FAIL!==0||
+     offlineTests.summary?.NOT_RUN!==0||
+     !offlineTests.nativeTestExplorer)
+    throw Error("Native Test Explorer did not run all 11 offline static diagnostic regression cases: "+
+      JSON.stringify(offlineTests));
+  console.log("STUDIO_OFFLINE_DIAGNOSTIC_TEST_EXPLORER_CHROMIUM",JSON.stringify({
+    nativeTestExplorer:offlineTests.nativeTestExplorer,
+    summary:offlineTests.summary,qualification:offlineTests.qualification
+  }));
   // Theia 1.76 registers a per-view focus command from PluginViewRegistry.
   // The VS Code workbench.view.extension.<container> command is not registered
   // by this Theia host; silently ignoring it leaves a real but hidden view.
