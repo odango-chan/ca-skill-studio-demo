@@ -161,7 +161,7 @@ export function auditV1Alpha5Package({
   const contractDependencies=new Map();
   const dependencyNode=get(contract.root,"dependencies");
 
-  if(dependencyNode!==null&&!isMap(dependencyNode)){
+  if(dependencyNode!=null&&!isMap(dependencyNode)){
     add(diagnostics,FILES.contract,contract,dependencyNode,
       "DEPENDENCIES_INVALID","Contract dependencies must be a mapping");
   }else{
@@ -205,7 +205,7 @@ export function auditV1Alpha5Package({
   }
 
   const capabilityNode=get(contract.root,"capabilities");
-  if(capabilityNode!==null){
+  if(capabilityNode!=null){
     if(!isSeq(capabilityNode)){
       add(diagnostics,FILES.contract,contract,capabilityNode,
         "CAPABILITY_GRANTS_INVALID","Contract capabilities must be an ordered list",
@@ -256,7 +256,7 @@ export function auditV1Alpha5Package({
   }
 
   const requestSchema=get(contract.root,"requestSchema");
-  if(requestSchema!==null){
+  if(requestSchema!=null){
     const requestSchemaPath=scalar(requestSchema);
     if(!requestSchemaPath||!safePath(requestSchemaPath)){
       add(diagnostics,FILES.contract,contract,requestSchema,
@@ -363,7 +363,7 @@ export function auditV1Alpha5Package({
   };
 
   const contextSchema=get(contract.root,"contextSchema");
-  if(contextSchema!==null)
+  if(contextSchema!=null)
     checkSchemaReference(FILES.contract,contract,contextSchema,
       scalar(contextSchema),"Contract contextSchema");
 
@@ -384,7 +384,7 @@ export function auditV1Alpha5Package({
       }
       const evidence=get(body,"evidence");
       const requirements=get(evidence,"requires");
-      if(requirements!==null&&!isMap(requirements)){
+      if(requirements!=null&&!isMap(requirements)){
         add(diagnostics,FILES.predicates,predicates,requirements,
           "EVIDENCE_REQUIREMENTS_INVALID",
           "Predicate "+predicateId+" evidence.requires must be a mapping",
@@ -481,7 +481,7 @@ export function auditV1Alpha5Package({
         {domain:"procedure",category:"linking"});
       return;
     }
-    if(stage==="wait"?get(body,"wait")===null:get(body,stage)===null){
+    if(stage==="wait"?get(body,"wait")==null:get(body,stage)==null){
       add(diagnostics,path,source,node,"PRODUCER_STAGE_NOT_FOUND",
         "Source reference "+value+" names a Node without the declared "+stage+" stage/control",
         {domain:"procedure",category:"linking"});
@@ -563,9 +563,9 @@ export function auditV1Alpha5Package({
       const stage=get(body,stageName);
       if(!isMap(stage))continue;
       const tool=get(stage,"tool");
-      if(tool!==null)checkTool(nodeId,FILES.procedure,procedure,tool,scalar(tool));
+      if(tool!=null)checkTool(nodeId,FILES.procedure,procedure,tool,scalar(tool));
       const script=get(stage,"script"),scriptPath=scalar(script);
-      if(script!==null){
+      if(script!=null){
         if(!scriptPath||!safePath(scriptPath)){
           add(diagnostics,FILES.procedure,procedure,script,
             "PROCEDURE_SCRIPT_REFERENCE_INVALID",
