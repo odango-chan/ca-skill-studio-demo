@@ -595,7 +595,8 @@ connection.onDocumentSymbol(params => {
 function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
   const isProcedure=document.relativePath==="assurance/procedure.yaml";
   const isContract=document.relativePath==="assurance/contract.yaml";
-  if(!isProcedure&&!isContract)return null;
+  const isPredicateSet=document.relativePath==="assurance/predicates.yaml";
+  if(!isProcedure&&!isContract&&!isPredicateSet)return null;
   if(isProcedure&&!/^(?:start|nodes):[ \t]*/m.test(document.text))
     return null;
 
@@ -691,6 +692,19 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
       },newText:name}
     }));
 
+  if(isPredicateSet){
+    // v1alpha5 PredicateSet script evaluators reference Package-local
+    // Python scripts directly through evaluator.script.
+    const script=/^ {6}script:[ \\t]*([A-Za-z0-9_./-]*)$/.exec(prefix);
+    if(script&&value.snapshot.completeness==="complete"){
+      const names=value.snapshot.documents
+        .filter(item=>/^scripts\\/[A-Za-z0-9_.-]+\\.py$/.test(item.relativePath))
+        .map(item=>item.relativePath);
+      return make(names,script[1],offset-script[1].length,
+        CompletionItemKind.File,"Package-local Predicate Script");
+    }
+    return null;
+  }
   if(isContract){
     // Only suggest actual, locally declared Precondition stages from this
     // Package. An unresolved or partial Procedure is not a declaration source.
