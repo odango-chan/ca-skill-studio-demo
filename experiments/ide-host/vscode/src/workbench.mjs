@@ -2973,7 +2973,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               }
               if(dependency.kind==="schema-bundle"){
                 for(const file of dependency.files){
-                  if(!/(?:^|\\/)schemas\\/.*\\.(?:json|ya?ml)$/i.test(file.path))continue;
+                  if(!/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path))continue;
                   schemas.push({dependencyId:dependency.id,path:file.path,
                     text:decoder.decode(decodeBase64(file.bytes))});
                 }
@@ -2995,7 +2995,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           };
         }
       }
-      const packageName=base.path.replace(/\\/$/,'').split('/').at(-1);
+      const packageName=base.path.replace(/\/$/,'').split('/').at(-1);
       const results=missing.length?missing.map(path=>({
         kind:'package-diagnostic',message:'Audit unavailable: missing '+path,
         path:'assurance/procedure.yaml',line:1,column:1,code:'AUDIT_INCOMPLETE',
