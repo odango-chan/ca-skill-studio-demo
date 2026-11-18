@@ -1,18 +1,18 @@
-# CA-SL v1alpha5 Preview — Studio Integration Boundary
+# CA-SL v1alpha5 Studio Integration Boundary
 
-**Status:** v1alpha5-only integration · Preview only · NOT_QUALIFIED  
+**Status:** v1alpha5-only authoring · Language FROZEN / RELEASED · Studio product qualification NOT_QUALIFIED  
 **Language target:** `connectionagent.io/v1alpha5`  
-**Current normative candidate:** `odango-chan/ca-skills@12a9512a9eae006ad4578daf37ebe0bdf3070642` (PR #61)  
-**Example source:** `odango-chan/ca-skills@84039bb8ad73ec1bc2aa0c93e2834e3bd7aeceef` (PR #65)  
-**Compiler:** CA Skill Compiler v1.0.0 targets v1alpha4; v1alpha5 Compiler candidate PR #30 is WP2-only and is not integrated as a released compiler.
+**Normative release:** `odango-chan/ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5` (PR #66)  
+**Example source:** `odango-chan/ca-skills/main@de8d9f667dd1a445c3f6378e0ca793d7407d2036` (current manifest snapshot; PR #65 introduced the v1alpha5 examples)  
+**Compiler:** released CA Skill Compiler v1.0.0 targets v1alpha4. The current v1alpha5 candidate is [PR #38](https://github.com/odango-chan/ca-skill-compiler/pull/38), head `ea27f18549725166f304b7d06fd9339bb0554329`; it remains Draft, unmerged and not integrated. PR #30 was superseded by #38. PR #38 reports local `FULL_LANGUAGE_VALIDATION` acceptance, not a released integration or product qualification.
 
 ## 1. Version authority
 
-The Studio's active authoring target is the released CA-SL v1alpha5 specification pinned above. It inherits the immutable v1alpha4 language baseline and adds Node-entry Event Wait through the v1alpha5 normative amendment. The v1alpha5 candidate is **FROZEN / RELEASED**. The v1alpha4 specification remains frozen as a historical inheritance baseline; it is not a parallel active Example or authoring mode.
+The Studio's only active authoring target is the released CA-SL v1alpha5 specification pinned above. It inherits the immutable v1alpha4 language baseline and includes Node-entry Event Wait as normative language semantics. CA-SL v1alpha5 is **FROZEN / RELEASED**. The v1alpha4 specification remains only a historical inheritance baseline; it is not a parallel active Example, authoring mode or compatibility target.
 
 The Example files are copied from the exact ca-skills main snapshot commit. The build validates the manifest, source ref, language target, every declared file path and every Git blob hash. The online Extension packages only `site/samples/v1alpha5`; a previously staged v1alpha4 sample directory is removed from the generated extension assets.
 
-## 2. Preview capabilities
+## 2. Implemented editor capabilities
 
 The following are editor-time projections and authoring conveniences, not language conformance claims:
 
@@ -23,19 +23,19 @@ The following are editor-time projections and authoring conveniences, not langua
 - Definition, Outline, source diagnostics and local semantic-token projection are editor assistance. The local `skillWait` semantic token is Studio-owned presentation metadata; it is not an upstream CA-SL token contract.
 - Example import and replacement use the exact v1alpha5 sample manifest. Replacement is explicit and deletes only the dedicated Example workspace; ordinary workspaces are not passed to the Example importer.
 
-The local source analyzer and LSP do not replace the authoritative Compiler. Completion results are hints, not trusted declarations or authorization grants.
+The local source analyzer and LSP do not replace the authoritative Compiler. Completion results are hints, not trusted declarations or authorization grants. Passing Studio tests does not qualify Compiler, Owner, Host, Runtime or 5GC behavior.
 
 ## 3. Compiler fail-closed boundary
 
-The integrated Compiler v1.0.0 BuildRequest and BuildResult contracts target CA-SL v1alpha4. They must not receive v1alpha5 source.
+The integrated Compiler v1.0.0 BuildRequest and BuildResult contracts target CA-SL v1alpha4. They must not receive v1alpha5 source, even though the v1alpha5 language itself is now frozen and released.
 
-Accordingly, Studio blocks **Check Skill**, **Build Skill** and **Inspect Dependencies** when the selected Procedure is v1alpha5. The UI must report that the Package is in Preview and identify the Compiler version boundary. It must not silently lower Wait to Observation, polling, a legacy stage, or a v1alpha4 source shape.
+Accordingly, Studio blocks **Check Skill**, **Build Skill** and **Inspect Dependencies** when the selected Procedure is v1alpha5. The UI must explain that the language is released but this Studio build has no released v1alpha5 Compiler integration. It must not silently lower Wait to Observation, polling, a legacy stage, or a v1alpha4 source shape.
 
-The v1alpha5 Compiler candidate in ca-skill-compiler PR #30 is not a released integration target. Its current WP2 AST slice does not establish full Check, Build, trusted dependency linking, Artifact conformance or product qualification. Studio must not switch to that draft merely because it can parse a Wait AST.
+The v1alpha5 Compiler candidate in ca-skill-compiler PR #38 is not a released integration target. Its PR description reports `FULL_LANGUAGE_VALIDATION` with local acceptance evidence, but the PR remains Draft / unmerged and is not integrated into Studio. This does not establish released Studio Check / Build / Dependency Inspection / Artifact support or Owner / Host / Runtime qualification. PR #30 is superseded and must not be treated as the active candidate.
 
 ## 4. Explicitly not qualified
 
-The Preview does not claim:
+This Studio editor integration does not claim:
 
 - a qualified v1alpha5 product implementation;
 - full Compiler v1alpha5 Check / Build / Dependency Inspection / Artifact support;
@@ -62,7 +62,7 @@ Before calling the Studio Preview implementation complete:
 
 ## 6. Source locations
 
-- Normative candidate lock: `language/contracts/ca-sl-v1alpha5.lock.json`
+- Normative release lock: `language/contracts/ca-sl-v1alpha5.lock.json`
 - Historical v1alpha4 lock: `language/contracts/ca-sl-v1alpha4.lock.json`
 - Source projection: `language/core/v1alpha5.ts`
 - Browser LSP completion and semantic tokens: `experiments/ide-host/lsp-browser/server/src/browserServerMain.mjs`, `language/semantic-tokens.mjs`
