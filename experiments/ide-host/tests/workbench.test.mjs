@@ -820,7 +820,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   // project lock changes, without any Compiler request.
   const currentRoot='/workspace/establish-pdu-session/';
   const outsider=uri('/workspace/establish-pdu-session-backup/assurance/contract.yaml');
-  const pending=()=>problems.getChildren()[0].label.includes('pending');
+  const pending=()=>problems.getChildren()[0].label==='Package Audit · pending';
   const assertMarkersRestored=async()=>{
     await commands.get('skillStudio.auditPackage')();
     assert.ok(diagnosticSets.some(([target,items])=>
