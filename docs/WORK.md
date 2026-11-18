@@ -264,9 +264,7 @@ main browser application remains available at `/classic/`.
 
 **实现边界：** 复用既有 `site/path-focus.mjs`、ELK 和 React Flow anchor restore；v1alpha5 Stage-level Outcome Routes 仍按原 Source 身份投影。未知 Outcome 或无法证明成功终态时 fail open 全图。Child / Neighbor / Node Focus 不变；不编辑 Route、不改 YAML、不改变 TextDocument revision。
 
-**验收：** [PR #210](https://github.com/odango-chan/ca-skill-studio-demo/pull/210) 当前为 Draft，等待 exact-head Node / TypeScript / IDE Host / Theia Browser-Only / real Chromium 门禁。测试新增两个 v1alpha5 Example 的路径聚焦单测，以及真实 Chromium 对默认折叠、逐 Node 展开／收起、锚点偏移小于 2 px、zoom 不变和 Source 不变的检查。尚未宣称 CI、Pages 部署或在线验收 PASS。
-
-
+**验收：** [PR #210](https://github.com/odango-chan/ca-skill-studio-demo/pull/210) 已合入 `main`，Squash commit `79a497c8dbf5029214ce28ce71f7719abab1a7ee`；Issue #209 已关闭。exact-head `8117d528679873ac4bf140852cbe59be69cf19c7` 四项门禁全部 PASS：[PR Verify #44265553245](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44265553245)、[IDE Host #44265553239](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44265553239)、[Theia Browser-Only / Chromium #44265553252](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44265553252)、[Theia Browser Host / Chromium #44265553163](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44265553163)。真实 Chromium：默认主路径 11 Nodes / 10 Edges；全部路径 14 Nodes / 36 Edges；首 Node 展开 11→13 Nodes、10→17 Edges，收起恢复原图；展开和收起的锚点偏移均约 0.00002 px，zoom 不变；两个 v1alpha5 Example 均以紧凑主路径打开，TextDocument URI / version 不变。Resulting-main Pages 部署由 [#44266300451](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44266300451) 执行，部署结果另行记录。Runtime / 5GC NOT_RUN。
 
 ## 2026-11-10 · Theia named Phase Step / Verify authoring（PR #108，已合入 main）
 
