@@ -300,6 +300,10 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     kind:'compiler-diagnostic',message:'Malformed Procedure YAML',
     code:'YAML_PARSE_ERROR',severity:'error',line:2,column:1,
     uri:'file:///workspace/establish-pdu-session/assurance/procedure.yaml'
+  },{
+    kind:'compiler-diagnostic',message:'Trusted deployment context is missing',
+    code:'BUILD_REQUEST_INVALID',severity:'error',uri:null,
+    locationKind:'request',phase:'C_STATIC',path:''
   }];
   let emitCompilerProblems;
   const compilerProblemsProvider={
@@ -319,6 +323,13 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.equal(problems.getTreeItem(compilerProblem).command.command,
     'skillStudio.revealCompilerDiagnostic',
     'Compiler Problems navigate to the exact source file through the Compiler reveal command');
+  const requestProblem=problems.getChildren().flatMap(item=>item.children??[])
+    .find(item=>item.code==='BUILD_REQUEST_INVALID');
+  assert.ok(requestProblem,'Compiler request diagnostics remain visible without source spans');
+  const requestTree=problems.getTreeItem(requestProblem);
+  assert.equal(requestTree.command,undefined,
+    'a request-level Compiler diagnostic must never navigate to an arbitrary Procedure');
+  assert.match(requestTree.tooltip,/Location: request/);
   const beforeCompilerRefresh=changes.length;
   emitCompilerProblems?.();
   assert.ok(changes.length>beforeCompilerRefresh,
