@@ -22,16 +22,16 @@
   },
   "compiler": {
     "repository": "odango-chan/ca-skill-compiler",
-    "commit": "34993dc30b66f4cf7d573cbc81d884c356062a12",
-    "sourceRef": "refs/pull/30/head",
-    "status": "DRAFT_WP2_ONLY",
-    "check": "v1alpha5 Wait AST / syntax Check only",
-    "build": "FAIL_CLOSED_UNTIL_WP3_WP8",
-    "dependencyInspection": "NOT_IMPLEMENTED"
+    "commit": "ea27f18549725166f304b7d06fd9339bb0554329",
+    "sourceRef": "refs/pull/38/head",
+    "status": "DRAFT_NOT_RELEASED_NOT_INTEGRATED",
+    "check": "FULL_LANGUAGE_VALIDATION (local acceptance reported by PR #38; not released)",
+    "build": "CANDIDATE_NOT_RELEASED_NOT_INTEGRATED",
+    "dependencyInspection": "CANDIDATE_NOT_RELEASED_NOT_INTEGRATED"
   },
   "qualification": {
     "language": "FROZEN_RELEASED",
-    "compiler": "WP2_ONLY_NOT_QUALIFIED",
+    "compiler": "NOT_RELEASED_NOT_QUALIFIED",
     "studioLsp": "IN_PROGRESS_NOT_QUALIFIED",
     "host": "NOT_QUALIFIED",
     "runtime": "NOT_QUALIFIED",
