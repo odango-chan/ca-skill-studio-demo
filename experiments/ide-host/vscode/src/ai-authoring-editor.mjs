@@ -147,20 +147,23 @@ export function containsWaitMutation(operations) {
 export function isAuthoringApplyAllowed({
   patchPlan,
   changeSet,
+  candidateDigest,
   blockers = [],
   waitMutation = false,
   compilerCheck = null,
 } = {}) {
-  // The Host normalizes only a complete, authoritative v1alpha5 Compiler PASS
-  // for this exact document, Package revision and candidate digest.
+  // candidateDigest MUST be computed by the Host from the exact selected
+  // atomic groups, not assumed from the all-groups Patch Plan candidate.
+  // The Compiler result must identify this exact document / Package / source / candidate.
   const base = changeSet?.base;
   const exactCandidate = Boolean(
     base &&
+    typeof candidateDigest === "string" &&
     compilerCheck?.documentUri === base.documentUri &&
     compilerCheck?.documentVersion === base.documentVersion &&
     compilerCheck?.packageGeneration === base.packageGeneration &&
     compilerCheck?.sourceDigest === base.sourceDigest &&
-    compilerCheck?.candidateDigest === patchPlan?.candidateDigest
+    compilerCheck?.candidateDigest === candidateDigest
   );
   return Boolean(
     patchPlan &&
@@ -562,6 +565,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
       const canApply = isAuthoringApplyAllowed({
         patchPlan,
         changeSet,
+        candidateDigest: patchPlan?.candidateDigest,
         blockers: proposalResult.proposal.blockers,
         waitMutation: waitGate,
         compilerCheck,
@@ -574,6 +578,7 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         proposalResult,
         changeSet,
         patchPlan,
+        compilerCheck,
         canApply,
       } : null;
       post({
@@ -712,6 +717,18 @@ export function registerAiAuthoringEditor(vscode, context, { getActiveDocument }
         if (isCurrent()) {
           post({ type: "error", message: "生成候选后 Procedure 或 Package 再次变化，已拒绝应用旧修改。请检查新上下文并重新生成。" });
         }
+        return;
+      }
+      const selectedCandidateAllowed = isAuthoringApplyAllowed({
+        patchPlan: pending.patchPlan,
+        changeSet: pending.changeSet,
+        candidateDigest: materialized.digest,
+        blockers: pending.proposalResult.proposal.blockers,
+        waitMutation: containsWaitMutation(pending.changeSet.operations),
+        compilerCheck: pending.compilerCheck,
+      });
+      if (!selectedCandidateAllowed) {
+        post({ type: "error", message: "所选修改组对应的候选摘要没有完整、权威且精确匹配的 v1alpha5 Compiler PASS；仍保持 PREVIEW ONLY。" });
         return;
       }
       assertStudioMutation(document.uri, vscode.workspace.workspaceFolders ?? [], "edit");

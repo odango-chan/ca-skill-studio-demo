@@ -166,7 +166,8 @@ test("AI proposals require a complete pinned v1alpha5 Compiler PASS for the exac
     candidateDigest: patchPlan.candidateDigest,
     trustedIngressBinding: true,
   };
-  const base = { patchPlan, changeSet, blockers: [], waitMutation: false };
+  const candidateDigest = patchPlan.candidateDigest;
+  const base = { patchPlan, changeSet, candidateDigest, blockers: [], waitMutation: false };
   assert.equal(isAuthoringApplyAllowed(base), false, "no Compiler result means preview-only");
   assert.equal(isAuthoringApplyAllowed({
     ...base,
@@ -178,8 +179,14 @@ test("AI proposals require a complete pinned v1alpha5 Compiler PASS for the exac
   }), false, "v1alpha4 Compiler result cannot authorize v1alpha5 edits");
   assert.equal(isAuthoringApplyAllowed({
     ...base,
+    candidateDigest: "sha256:" + "c".repeat(64),
+    compilerCheck,
+  }), false, "Compiler result must identify the exact selected-group candidate digest");
+  assert.equal(isAuthoringApplyAllowed({
+    ...base,
+    candidateDigest: "sha256:" + "c".repeat(64),
     compilerCheck: { ...compilerCheck, candidateDigest: "sha256:" + "c".repeat(64) },
-  }), false, "Compiler result must identify the exact candidate digest");
+  }), true, "a Compiler PASS for the selected-group candidate is accepted");
   assert.equal(isAuthoringApplyAllowed({
     ...base,
     compilerCheck: { ...compilerCheck, documentVersion: 8 },
