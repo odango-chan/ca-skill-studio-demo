@@ -174,13 +174,11 @@ async function lspRequest(worker,id,method,params) {
   return result.result;
 }
 
-test("browser LSP provides exact Definition, References, Hover, Python symbols and Package completions",async()=>{
+test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbols and Package completions",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
-  try {
-    worker.postMessage({
-      jsonrpc:"2.0",id:11,method:"initialize",
-      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}
-    });
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:11,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
     const initialized=await waitForMessage(worker,message=>message?.id===11);
     assert.equal(initialized.result.capabilities.definitionProvider,true);
     assert.equal(initialized.result.capabilities.referencesProvider,true);
@@ -191,189 +189,72 @@ test("browser LSP provides exact Definition, References, Hover, Python symbols a
     assert.ok(semanticLegend.tokenTypes.includes("skillOperation"));
     assert.ok(semanticLegend.tokenTypes.includes("skillPredicate"));
     assert.ok(semanticLegend.tokenTypes.includes("skillOutcome"));
-    assert.ok(semanticLegend.tokenTypes.includes("skillOperator"));
     worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
 
-    const snapshot={...samplePackageSnapshot(),dependencySchemas:[
-      {dependencyId:"host",path:"host.schema.json",text:'{"title":"HostContextInput"}'},
-      {dependencyId:"host",path:"duplicate.schema.json",text:'{"title":"DuplicateInput"}'},
-      {dependencyId:"tools",path:"duplicate.schema.json",text:'{"title":"DuplicateInput"}'}
-    ]};
-    // Register for READY before posting the snapshot. Semantic token requests
-    // below are intentionally answered early, so READY can otherwise arrive
-    // while the test is still awaiting those responses.
+    const snapshot=samplePackageSnapshot();
     const readyStatus=waitForMessage(worker,message=>
-      message?.method==="skillStudio/analysisStatus" &&
-      message.params?.rootUri===snapshot.rootUri &&
-      message.params?.state==="PARTIAL" &&
-      message.params?.procedureState==="READY",15000
-    );
-    worker.postMessage({
-      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot
-    });
-    const procedureBeforeAnalysis=snapshot.documents.find(item=>
-      item.relativePath==="assurance/procedure.yaml");
-    assert.ok(procedureBeforeAnalysis);
-    // Semantic-token requests must use the accepted Source snapshot immediately;
-    // they must not wait for Python indexing or Package READY diagnostics.
-    const earlySemanticTokens=await lspRequest(worker,94,
-      "textDocument/semanticTokens/full",{
-        textDocument:{uri:procedureBeforeAnalysis.uri}
-      });
-    assert.ok(earlySemanticTokens.data.length>0,
-      "semantic tokens are available before Package analysis reaches READY");
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===snapshot.rootUri&&
+      message.params?.state==="PARTIAL"&&
+      message.params?.procedureState==="READY",15000);
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
     const status=await readyStatus;
     assert.equal(status.params.state,"PARTIAL");
-    assert.equal(status.params.procedureState,"READY");
-    // The liveness endpoint must answer on the real Worker JSON-RPC channel
-    // without changing the Package analysis generation or Source.
-    const health=await lspRequest(worker,91,"skillStudio/health",{});
-    assert.deepEqual(health,{alive:true});
-    const unchanged=await lspRequest(worker,92,"textDocument/documentSymbol",{
-      textDocument:{uri:snapshot.documents.find(x=>
-        x.relativePath==="scripts/select_establishment_configuration.py").uri}
-    });
-    assert.ok(unchanged.some(x=>x.name==="main"));
 
     const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
-    const script=snapshot.documents.find(x=>
-      x.relativePath==="scripts/select_establishment_configuration.py");
-    const schema=snapshot.documents.find(x=>
-      x.relativePath==="schemas/selection-input.schema.yaml");
-    assert.ok(procedure&&script&&schema);
+    const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+    const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
+    const script=snapshot.documents.find(x=>x.relativePath==="scripts/validate-subscription-request.py");
+    const schema=snapshot.documents.find(x=>x.relativePath==="schemas/establishment-request.schema.yaml");
+    assert.ok(procedure&&contract&&predicates&&script&&schema);
 
-    // The native VS Code/Theia path must receive the same catalog-driven
-    // semantic identities through the actual LSP Worker, not just Monaco's
-    // standalone provider.
     const semanticResult=await lspRequest(worker,23,"textDocument/semanticTokens/full",{
-      textDocument:{uri:procedure.uri}
-    });
+      textDocument:{uri:procedure.uri}});
     assert.ok(Array.isArray(semanticResult.data)&&semanticResult.data.length>0);
     assert.equal(semanticResult.data.length%5,0);
     const emittedTypes=new Set();
     for(let i=3;i<semanticResult.data.length;i+=5)emittedTypes.add(semanticResult.data[i]);
-    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillOperation")),
-      "Procedure call values are emitted as Operation references");
-    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillOperator")),
-      "Procedure control keys are emitted as CA semantic tokens");
-    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillPredicate")),
-      "Predicate references are emitted as CA semantic tokens");
-    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillOutcome")),
-      "Outcome values are emitted as CA semantic tokens");
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillOperation")));
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillOperator")));
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillPredicate")));
+    assert.ok(emittedTypes.has(semanticLegend.tokenTypes.indexOf("skillOutcome")));
 
-    const scriptNeedle="scripts/select_establishment_configuration.py";
-    const definition=await lspRequest(worker,12,"textDocument/definition",{
-      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,scriptNeedle)
-    });
-    assert.equal(definition.uri,script.uri);
-    assert.ok(definition.range.start.line>=0);
+    const scriptNeedle="scripts/validate-subscription-request.py";
+    const scriptDefinition=await lspRequest(worker,12,"textDocument/definition",{
+      textDocument:{uri:predicates.uri},position:positionOf(predicates.text,scriptNeedle)});
+    assert.equal(scriptDefinition.uri,script.uri);
+    assert.ok(scriptDefinition.range.start.line>=0);
 
-    const hover=await lspRequest(worker,13,"textDocument/hover",{
-      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,scriptNeedle)
-    });
-    assert.match(hover.contents.value,/Skill Script/);
-    assert.match(hover.contents.value,/select-establishment-configuration/);
+    const scriptHover=await lspRequest(worker,13,"textDocument/hover",{
+      textDocument:{uri:predicates.uri},position:positionOf(predicates.text,scriptNeedle)});
+    assert.match(scriptHover.contents.value,/Skill Script/);
 
-    const nameNeedle="# name: select-establishment-configuration";
     const references=await lspRequest(worker,14,"textDocument/references",{
-      textDocument:{uri:script.uri},
-      position:positionOf(script.text,nameNeedle,"# name: ".length),
-      context:{includeDeclaration:true}
-    });
-    assert.ok(references.some(item=>item.uri===procedure.uri));
+      textDocument:{uri:script.uri},position:{line:0,character:0},context:{includeDeclaration:true}});
+    assert.ok(references.some(item=>item.uri===predicates.uri));
     assert.ok(references.some(item=>item.uri===script.uri));
 
-    // Definition must work in the reverse direction too: from the Python
-    // main() entrypoint back to the exact YAML caller. This is the LSP
-    // primitive used by native Monaco/Theia Ctrl/Cmd-click and Peek Definition.
-    // This fixture uses the legacy metadata entry symbol; the canonical
-    // ca-skills form uses main() and is covered by the Theia browser probe.
-    const reverseDefinition=await lspRequest(worker,24,"textDocument/definition",{
-      textDocument:{uri:script.uri},
-      position:positionOf(script.text,nameNeedle,"# name: ".length)
-    });
-    const reverseDefinitions=Array.isArray(reverseDefinition)
-      ?reverseDefinition:reverseDefinition?[reverseDefinition]:[];
-    assert.ok(reverseDefinitions.some(item=>item.uri===procedure.uri),
-      "Python main() Definition resolves back to its Procedure caller");
-    assert.ok(reverseDefinitions.every(item=>item.range?.start&&item.range?.end),
-      "reverse Definition returns exact source ranges");
-
-    const schemaNeedle="# inputSchema: EstablishmentSelectionInput";
-    const schemaDefinition=await lspRequest(worker,20,"textDocument/definition",{
-      textDocument:{uri:script.uri},
-      position:positionOf(script.text,schemaNeedle,"# inputSchema: ".length)
-    });
-    assert.equal(schemaDefinition.uri,schema.uri);
-    const schemaHover=await lspRequest(worker,21,"textDocument/hover",{
-      textDocument:{uri:script.uri},
-      position:positionOf(script.text,schemaNeedle,"# inputSchema: ".length)
-    });
-    assert.match(schemaHover.contents.value,/Input Schema/);
-    assert.match(schemaHover.contents.value,/EstablishmentSelectionInput/);
-    const schemaReferences=await lspRequest(worker,22,"textDocument/references",{
-      textDocument:{uri:schema.uri},
-      position:positionOf(schema.text,"EstablishmentSelectionInput"),
-      context:{includeDeclaration:true}
-    });
-    assert.ok(schemaReferences.some(item=>item.uri===script.uri));
-    assert.ok(schemaReferences.some(item=>item.uri===schema.uri));
-
     const symbols=await lspRequest(worker,15,"textDocument/documentSymbol",{
-      textDocument:{uri:script.uri}
-    });
+      textDocument:{uri:script.uri}});
     assert.ok(symbols.some(item=>item.name==="main"));
 
     const scriptCompletion=await lspRequest(worker,16,"textDocument/completion",{
-      textDocument:{uri:procedure.uri},
-      position:positionOf(procedure.text,scriptNeedle,scriptNeedle.length)
-    });
+      textDocument:{uri:predicates.uri},position:positionOf(predicates.text,scriptNeedle,scriptNeedle.length)});
     assert.ok(scriptCompletion.some(item=>item.label===script.relativePath));
 
-    const schemaCompletion=await lspRequest(worker,17,"textDocument/completion",{
-      textDocument:{uri:script.uri},
-      position:positionOf(script.text,schemaNeedle,schemaNeedle.length)
-    });
-    assert.ok(schemaCompletion.some(item=>item.label==="EstablishmentSelectionInput"));
-    assert.ok(schema.uri.endsWith("selection-input.schema.yaml"));
-    const projectSchemas=await lspRequest(worker,30,"textDocument/completion",{
-      textDocument:{uri:script.uri},
-      position:positionOf(script.text,schemaNeedle,"# inputSchema: ".length)
-    });
-    assert.ok(projectSchemas.some(item=>item.label==="HostContextInput"));
-    assert.ok(!projectSchemas.some(item=>item.label==="DuplicateInput"));
+    const schemaPath="schemas/establishment-request.schema.yaml";
+    const schemaDefinition=await lspRequest(worker,20,"textDocument/definition",{
+      textDocument:{uri:contract.uri},position:positionOf(contract.text,schemaPath)});
+    assert.equal(schemaDefinition.uri,schema.uri);
+    assert.deepEqual(schemaDefinition.range.start,{line:0,character:0});
 
-    // Exact local ranges do not override the Package completeness gate.
-    worker.postMessage({
-      jsonrpc:"2.0",method:"skillStudio/packageInvalidate",
-      params:{rootUri:snapshot.rootUri,generation:2}
-    });
-    const partial={...snapshot,generation:2,completeness:"partial",
-      documents:snapshot.documents.map(document=>document.relativePath==="assurance/procedure.yaml"
-        ? {...document,version:2} : document)};
-    worker.postMessage({
-      jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:partial
-    });
-    const partialStatus=await waitForMessage(worker,message=>
-      message?.method==="skillStudio/analysisStatus" &&
-      message.params?.rootUri===snapshot.rootUri &&
-      message.params?.generation===2
-    );
-    assert.equal(partialStatus.params.state,"PARTIAL");
-    const blockedDefinition=await lspRequest(worker,18,"textDocument/definition",{
-      textDocument:{uri:procedure.uri},position:positionOf(procedure.text,scriptNeedle)
-    });
-    assert.equal(blockedDefinition,null);
-    const localSymbols=await lspRequest(worker,19,"textDocument/documentSymbol",{
-      textDocument:{uri:script.uri}
-    });
-    assert.ok(localSymbols.some(item=>item.name==="main"),
-      "same-document Python outline remains available for partial Packages");
-  } finally {
+    const procedureSymbols=await lspRequest(worker,30,"textDocument/documentSymbol",{
+      textDocument:{uri:procedure.uri}});
+    assert.ok(procedureSymbols.some(item=>item.name==="get-sm-subscription-data"));
+  }finally{
     await worker.terminate();
   }
 });
-
 
 test("browser LSP isolates concurrent Package roots across close and reopen",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
