@@ -51,6 +51,8 @@ The 36 EW cases in the v1alpha5 specification are normative acceptance obligatio
 
 ## 5. Acceptance gates
 
+**Current editor evidence:** code-bearing PR head `55f77544231a92aac25caa0e741d6f07c3749bd7` passed all four exact-head Studio gates: PR Verify [#44259595964](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44259595964), IDE Host [#44259595915](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44259595915), Theia Browser Host / Chromium [#44259595730](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44259595730), and Theia Browser-Only [#44259595719](https://github.com/odango-chan/ca-skill-studio-demo/actions/runs/44259595719). These results qualify only the tested Studio editor/host behavior; they do not qualify Compiler, Owner, Host Runtime, Integration or 5GC. Pages deployment remains pending merge.
+
 Before calling the Studio Preview implementation complete:
 
 1. Exact pinned source and Example manifest tests pass.
