@@ -195,9 +195,11 @@ export function registerCompilerIntegration(vscode,context,{
       const sourceUri=item.sourcePath
         ?vscode.Uri.joinPath(packageRoot,...item.sourcePath.split("/"))
         :null;
-      const uri=sourceUri??procedureUri;
+      // A request-level Compiler error has no owning source document.
+      // Do not attach it to the active Procedure merely to enable a click.
+      const uri=sourceUri;
       const problem={
-        ...item,uri:uri.toString()
+        ...item,uri:uri?.toString()??null
       };
       problemEntries.push(problem);
       if(item.locationKind==="request"){
