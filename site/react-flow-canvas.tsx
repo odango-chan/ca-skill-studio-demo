@@ -245,20 +245,38 @@ export function mountProcedureCanvas(host,callbacks){
     captureNodeAnchor(id){
       const p=scene.graph?.positions.get(id);
       if(!p||!instance)return null;
-      const viewport=instance.getViewport();
-      return {id,position:{x:p.x,y:p.y},viewport:{...viewport}};
+      const node=[...host.querySelectorAll(".react-flow__node")]
+        .find(element=>element.querySelector(".designer-node-id")?.textContent.trim()===id);
+      const rect=node?.getBoundingClientRect();
+      if(!rect)return null;
+      return {id,screen:{x:rect.x,y:rect.y},viewport:{...instance.getViewport()}};
     },
     restoreNodeAnchor(anchor,nextGraph){
-      const p=anchor&&nextGraph?.positions?.get(anchor.id);
-      if(!p||!instance)return false;
-      const {viewport,position}=anchor;
-      // ELK repositions graph-world nodes; compensate only the translation.
-      // Keep the clicked card's screen position AND the user's current zoom.
-      instance.setViewport({
-        x:viewport.x+(position.x-p.x)*viewport.zoom,
-        y:viewport.y+(position.y-p.y)*viewport.zoom,
-        zoom:viewport.zoom
-      },{duration:0});
+      if(!anchor||!nextGraph?.positions?.has(anchor.id)||!instance)return false;
+      // Wait for React Flow to commit the new ELK graph and its fitView effects.
+      // Then restore zoom first and compensate using the real DOM screen rect.
+      // This also covers host-layout changes (for example, showing Root filters).
+      const restore=()=>{
+        const node=[...host.querySelectorAll(".react-flow__node")]
+          .find(element=>element.querySelector(".designer-node-id")?.textContent.trim()===anchor.id);
+        if(!node)return;
+        const current=instance.getViewport();
+        if(Math.abs(current.zoom-anchor.viewport.zoom)>0.0001)
+          instance.setViewport({...current,zoom:anchor.viewport.zoom},{duration:0});
+        requestAnimationFrame(()=>{
+          const currentNode=[...host.querySelectorAll(".react-flow__node")]
+            .find(element=>element.querySelector(".designer-node-id")?.textContent.trim()===anchor.id);
+          const rect=currentNode?.getBoundingClientRect();
+          if(!rect)return;
+          const viewport=instance.getViewport();
+          instance.setViewport({
+            x:viewport.x+anchor.screen.x-rect.x,
+            y:viewport.y+anchor.screen.y-rect.y,
+            zoom:anchor.viewport.zoom
+          },{duration:0});
+        });
+      };
+      requestAnimationFrame(()=>requestAnimationFrame(restore));
       return true;
     },
     center(id){

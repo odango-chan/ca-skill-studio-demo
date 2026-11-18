@@ -223,6 +223,18 @@ Source Span 和 ELK 端点，不能生成虚拟 Runtime Route。每个业务 Nod
 空白画布双击不再触发缩放；画布缩放仍可使用现有控件和滚轮。
 所有路径筛选都不改变 Node Focus 的完整上下游投影。
 
+### v1alpha5 Root Projection 适配（2026-11-18）
+
+CA-SL v1alpha5 使用 Node + 四种有序 Stage + Node-entry Wait 的 source projection；它不因此失去 Root 路径聚焦。Theia CustomEditor 对 v1alpha5 复用同一套只读 `site/path-focus.mjs`，输入为 v1alpha5 投影出来的真实 Node / Outcome Route 与显式成功终态，不读取旧语法、不按 Node 名称猜测语义。
+
+- Root 初始模式仍为「主路径」；失败、未决及其他非主干 Outcome 默认折叠。
+- `+N 条 / 收起` 以原始 Outcome Route 计数，逐 Node 独立展开和撤销。
+- 「选择路径 / 全部路径」和失败、未决、恢复／其他筛选仍只改变视图；Child Procedure 保持全图，Neighbor / Node Focus 不受影响。
+- 未知 Outcome、悬空目标或无法证明成功终态时 fail open 为全图并解释原因。
+- 展开／收起保留点击 Node 的屏幕锚点和当前 zoom；所有 Route 的 source、target、`routeSource`、Outcome ID 和 Source Span 保持原样。Source / TextDocument revision 不变。
+
+回归由 `tests/path-focus.test.mjs` 覆盖两个已发布 v1alpha5 Example，并由 `experiments/ide-host/scripts/workbench-browser-acceptance.mjs` 在真实 Theia Chromium 验证默认折叠、展开／收起、锚点与 zoom、全部路径及 Source 不变性。
+
 该功能的可见性变化与 Source 修改严格隔离。验证分层：
 `tests/path-focus.test.mjs` 检查成功/异常/未知结果/循环/汇合与 ELK 记账；
 `scripts/edge-smoke.mjs` 验证真实 DOM 的默认聚焦、按需添加分支、
