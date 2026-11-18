@@ -149,6 +149,24 @@ test("a verified Tool Catalog resolves exact callable identity and reports absen
     item.message.includes("ca::sbi.udm.sm_data.get")));
 });
 
+test("Schema IDs can resolve from the exact pinned Owner snapshot independent of dependency kind",()=>{
+  const files=fixture("establish-pdu-session");
+  const schemaId="urn:example:5gc:udm-subscription-result:v1";
+  const diagnostics=auditV1Alpha5Package({files,dependencyContext:{
+    available:true,
+    declarations:[{id:"ca",kind:"tool-catalog",source:{type:"builtin"}}],
+    snapshots:[{id:"ca",kind:"tool-catalog",snapshotDigest:"sha256:test"}],
+    diagnostics:[],
+    schemas:[{dependencyId:"ca",path:"schemas/udm.schema.yaml",
+      text:"$id: "+schemaId+"\\ntype: object\\n"}],
+    operations:[],toolCatalogs:[{dependencyId:"ca",available:true}]
+  }});
+  assert.ok(!diagnostics.some(item=>
+    item.code==="SCHEMA_DEPENDENCY_KIND_MISMATCH"||
+    (item.code==="SCHEMA_DECLARATION_NOT_FOUND"&&item.message.includes(schemaId))),
+    "Schema identity is resolved from the exact dependency snapshot, not inferred from dependency kind");
+});
+
 test("trusted CapabilityContracts input can resolve a unique declaration without Compiler",()=>{
   const files=fixture("establish-pdu-session");
   const contract=files.get("assurance/contract.yaml").text;
