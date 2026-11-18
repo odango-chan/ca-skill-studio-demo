@@ -30,7 +30,7 @@
     "dependencyInspection": "NOT_IMPLEMENTED"
   },
   "qualification": {
-    "language": "PUBLIC_REVIEW_DRAFT",
+    "language": "FROZEN_RELEASED",
     "compiler": "WP2_ONLY_NOT_QUALIFIED",
     "studioLsp": "IN_PROGRESS_NOT_QUALIFIED",
     "host": "NOT_QUALIFIED",
