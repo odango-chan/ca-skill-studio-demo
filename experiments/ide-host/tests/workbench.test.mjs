@@ -787,9 +787,10 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.equal(capabilityTreeItem.iconPath.id,'warning');
   assert.equal(capabilityTreeItem.command.command,'skillStudio.revealInspection');
   await commands.get(capabilityTreeItem.command.command)(...capabilityTreeItem.command.arguments);
-  assert.equal(showDocumentCalls.at(-1).document,contractDoc,
+  const sourceOpen=nativeCommands.filter(call=>call.id==='vscode.openWith').at(-1);
+  assert.equal(sourceOpen.args[0].path,contractUri.path,
     'clicking the Capability Problem opens the owning Contract file');
-  assert.equal(showDocumentCalls.at(-1).options.selection.start.line,expectedCapabilityLine-1,
+  assert.equal(sourceOpen.args[2].selection.start.line,expectedCapabilityLine-1,
     'Problem navigation selects the exact Capability Grant source line');
   const acceptance=await commands.get('skillStudio.internal.semanticTokenDiagnostics')();
   assert.ok(acceptance.packageAudit.problems.some(item=>
