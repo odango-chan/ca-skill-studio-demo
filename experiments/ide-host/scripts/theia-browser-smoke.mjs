@@ -817,7 +817,7 @@ try{
   console.log("STUDIO_THEIA_STAGE","v1alpha5-workbench");
   const workbenchEvidence=await runWorkbenchAcceptance({
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp,
-    procedureUri:identity.defaultProcedure
+    requireCompilerWorker,procedureUri:identity.defaultProcedure
   });
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
     ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
