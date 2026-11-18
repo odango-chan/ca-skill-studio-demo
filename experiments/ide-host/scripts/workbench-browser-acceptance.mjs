@@ -961,6 +961,20 @@ export async function runWorkbenchAcceptance({
     nativeTestExplorer:offlineTests.nativeTestExplorer,
     summary:offlineTests.summary,qualification:offlineTests.qualification
   }));
+  // Route replays consume scripted Stage Outcomes only. The real browser
+  // verifies the native test controller and the exact pinned 5GC route suite.
+  const routeTests=await nativeCommand("skillStudio.runRouteScenarios");
+  if(routeTests?.apiVersion!=="skill-studio-route-test-results/v1"||
+     routeTests.qualification!=="NOT_QUALIFIED"||
+     routeTests.summary?.PASS!==5||routeTests.summary?.FAIL!==0||
+     routeTests.summary?.NOT_RUN!==0||!routeTests.nativeTestExplorer)
+    throw Error("Native Route Test Explorer must replay five 5GC scenarios without Runtime qualification: "+
+      JSON.stringify({summary:routeTests?.summary,apiVersion:routeTests?.apiVersion,
+        qualification:routeTests?.qualification,nativeTestExplorer:routeTests?.nativeTestExplorer}));
+  console.log("STUDIO_ROUTE_SCENARIO_TEST_EXPLORER_CHROMIUM",JSON.stringify({
+    nativeTestExplorer:routeTests.nativeTestExplorer,
+    summary:routeTests.summary,qualification:routeTests.qualification
+  }));
   // Theia 1.76 registers a per-view focus command from PluginViewRegistry.
   // The VS Code workbench.view.extension.<container> command is not registered
   // by this Theia host; silently ignoring it leaves a real but hidden view.
