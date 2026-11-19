@@ -71,8 +71,9 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
       // intentionally has no tab bar. Count its single Main Editor panel as
       // one group when a Source widget is visible; do not mistake tabBarCount=0
       // for the absence of an Editor group.
-      const visibleEditorGroups=tabBars.length
-        ?tabBars.filter(x=>x.visible).length
+      const visibleTabBarCount=tabBars.filter(x=>x.visible).length;
+      const visibleEditorGroups=visibleTabBarCount>0
+        ?visibleTabBarCount
         :(main.some(widget=>widget.visible)?1:0);
       return {main,right,left,source,preview,selectedPreview:rightPreview??null,
         commandIds,availableViewCommands,tabBars,visibleEditorGroups};
