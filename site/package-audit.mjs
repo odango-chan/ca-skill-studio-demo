@@ -312,11 +312,22 @@ export function auditPackage({
           continue;
         }
         const matches=capabilityDeclarations.filter(value=>value?.id===id);
-        if(matches.length>1){
+        const trustedMatches=matches.filter(value=>value?.trusted===true);
+        if(trustedMatches.length>1){
+          // Two individually verified declarations prove ambiguity even
+          // when the export inventory is incomplete.
           add(diagnostics,FILES.contract,contract,item,
             "CAPABILITY_DECLARATION_AMBIGUOUS",
             "Multiple trusted CapabilityContracts declarations match "+id,
             {domain:"capabilities",category:"linking"});
+        }else if(matches.length>1){
+          // An unverified Owner export is not evidence of two authoritative
+          // declarations. Do not turn its presence into a confirmed error.
+          addNotChecked(diagnostics,FILES.contract,contract,item,
+            "CAPABILITY_OWNER_NOT_VERIFIED",
+            "Multiple candidate declarations match "+id+
+              ", but at least one Owner publication is unverified; declaration ambiguity and authorization remain NOT_CHECKED",
+            "capabilities");
         }else if(!capabilityDeclarationsComplete){
           addNotChecked(diagnostics,FILES.contract,contract,item,
             matches.length===0?"CAPABILITY_DECLARATION_NOT_CHECKED":"CAPABILITY_DECLARATION_SET_INCOMPLETE",
@@ -511,11 +522,18 @@ export function auditPackage({
           }else{
             const matches=evidenceDeclarations.filter(value=>
               value?.id===reference||value?.id===match[2]);
-            if(matches.length>1){
+            const trustedMatches=matches.filter(value=>value?.trusted===true);
+            if(trustedMatches.length>1){
               add(diagnostics,FILES.predicates,predicates,item,
                 "EVIDENCE_DECLARATION_AMBIGUOUS",
                 "Multiple trusted Owner Evidence declarations match "+reference,
                 {domain:"evidence",category:"linking"});
+            }else if(matches.length>1){
+              addNotChecked(diagnostics,FILES.predicates,predicates,item,
+                "EVIDENCE_OWNER_NOT_VERIFIED",
+                "Multiple candidate Evidence declarations match "+reference+
+                  ", but at least one Owner publication is unverified; ambiguity and guarantee remain NOT_CHECKED",
+                "evidence");
             }else if(!evidenceDeclarationsComplete){
               addNotChecked(diagnostics,FILES.predicates,predicates,item,
                 matches.length===0?"EVIDENCE_DECLARATION_NOT_CHECKED":"EVIDENCE_DECLARATION_SET_INCOMPLETE",
