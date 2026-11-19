@@ -47,7 +47,7 @@ const contract=[
   "dependencies:",
   "  ca-context: urn:example:host",
   "  ca: urn:example:tools",
-  "capabilities: [session-read]",
+  "capabilities: [urn:example:capability:session-read]",
   ""
 ].join("\n");
 const procedure=[
@@ -96,14 +96,28 @@ const predicates=[
   ""
 ].join("\n");
 
+const sampleScriptRoot=new URL(
+  "../site/samples/v1alpha5/establish-pdu-session/scripts/",import.meta.url
+);
+const sampleSchemaRoot=new URL(
+  "../site/samples/v1alpha5/establish-pdu-session/schemas/",import.meta.url
+);
 function snapshot(source=procedure,contractSource=contract,predicatesSource=predicates) {
   const files={
-    "SKILL.md":"---\nname: sample\ndescription: v1alpha5\n---\n",
+    "SKILL.md":"---\nname: sample\ndescription: current CA-SL\n---\n",
     "assurance/contract.yaml":contractSource,
     "assurance/procedure.yaml":source,
     "assurance/predicates.yaml":predicatesSource,
     "schemas/request.schema.yaml":"$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\n",
-    "scripts/runner.py":"def main():\n    return {}\n"
+    "schemas/establishment-request.schema.yaml":readFileSync(
+      new URL("establishment-request.schema.yaml",sampleSchemaRoot),"utf8"),
+    "scripts/runner.py":"def main():\n    return {}\n",
+    "scripts/validate-subscription-request.py":readFileSync(
+      new URL("validate-subscription-request.py",sampleScriptRoot),"utf8"),
+    "scripts/validate-smf-session-context-entry.py":readFileSync(
+      new URL("validate-smf-session-context-entry.py",sampleScriptRoot),"utf8"),
+    "scripts/validate-smf-session-context.py":readFileSync(
+      new URL("validate-smf-session-context.py",sampleScriptRoot),"utf8")
   };
   return {rootUri:"file:///workspace/sample",packageName:"sample",generation:1,
     completeness:"partial",documents:Object.entries(files).map(([relativePath,text])=>({
@@ -113,12 +127,15 @@ function snapshot(source=procedure,contractSource=contract,predicatesSource=pred
 
 test("optional Studio examples mirror the pinned PDU/MAS v1alpha5 source shape",()=>{
   for(const [name,expectedNodes] of [["establish-pdu-session",10],["establish-pdu-session-mas",14]]) {
-    const files=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml",
-      "assurance/predicates.yaml","schemas/establishment-request.schema.yaml"];
-    const docs=files.map(relativePath=>({
-      relativePath,uri:"file:///workspace/"+name+"/"+relativePath,version:1,
-      text:readFileSync(new URL("../site/samples/v1alpha5/"+name+"/"+relativePath,import.meta.url),"utf8")
-    }));
+    const sampleManifest=JSON.parse(readFileSync(new URL(
+      "../site/samples/v1alpha5/files.json",import.meta.url),"utf8"));
+    const docs=sampleManifest.files.filter(path=>path.startsWith(name+"/")).map(path=>{
+      const relativePath=path.slice(name.length+1);
+      return {
+        relativePath,uri:"file:///workspace/"+name+"/"+relativePath,version:1,
+        text:readFileSync(new URL("../site/samples/v1alpha5/"+path,import.meta.url),"utf8")
+      };
+    });
     const result=analyzePackageSnapshot({rootUri:"file:///workspace/"+name,
       packageName:name,generation:1,completeness:"partial",documents:docs});
     assert.equal(result.state,"PARTIAL");
