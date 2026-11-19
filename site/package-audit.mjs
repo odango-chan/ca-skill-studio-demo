@@ -207,8 +207,9 @@ export function auditPackage({
   const contract=parsed.get(FILES.contract);
   const procedure=parsed.get(FILES.procedure);
   const predicates=parsed.get(FILES.predicates);
-  if(!contract||!procedure||!predicates)
-    return Object.freeze(sortDiagnostics(diagnostics));
+  // Continue independent checks when one core document is missing or malformed.
+  // Cross-document checks below emit NOT_CHECKED where the missing document is
+  // required to establish an identity; they never silently stop the audit.
 
   const declarations=Array.isArray(dependencyContext.declarations)
     ?dependencyContext.declarations:[];
@@ -232,12 +233,12 @@ export function auditPackage({
   const declarationById=new Map(declarations.map(item=>[item.id,item]));
   const snapshotById=new Map(snapshots.map(item=>[item.id,item]));
   const contractDependencies=new Map();
-  const dependencyNode=get(contract.root,"dependencies");
+  const dependencyNode=contract?get(contract.root,"dependencies"):null;
 
-  if(dependencyNode!=null&&!isMap(dependencyNode)){
+  if(contract&&dependencyNode!=null&&!isMap(dependencyNode)){
     add(diagnostics,FILES.contract,contract,dependencyNode,
       "DEPENDENCIES_INVALID","Contract dependencies must be a mapping");
-  }else{
+  }else if(contract){
     for(const pair of entries(dependencyNode)){
       const alias=scalar(pair.key),reference=scalar(pair.value);
       if(!alias||!ALIAS.test(alias)){
@@ -277,7 +278,7 @@ export function auditPackage({
     }
   }
 
-  const capabilityNode=get(contract.root,"capabilities");
+  const capabilityNode=contract?get(contract.root,"capabilities"):null;
   if(capabilityNode!=null){
     if(!isSeq(capabilityNode)){
       add(diagnostics,FILES.contract,contract,capabilityNode,
@@ -335,7 +336,7 @@ export function auditPackage({
     }
   }
 
-  const requestSchema=get(contract.root,"requestSchema");
+  const requestSchema=contract?get(contract.root,"requestSchema"):null;
   if(requestSchema!=null){
     const requestSchemaPath=scalar(requestSchema);
     if(!requestSchemaPath||!safePath(requestSchemaPath)){
@@ -360,6 +361,12 @@ export function auditPackage({
 
   const checkSchemaReference=(path,source,node,reference,label)=>{
     if(typeof reference!=="string")return;
+    if(!contract){
+      addNotChecked(diagnostics,path,source,node,"CONTRACT_DEPENDENCIES_NOT_CHECKED",
+        label+" cannot resolve dependency aliases because Contract is missing or could not be parsed",
+        "dependencies");
+      return;
+    }
     const match=QUALIFIED_REF.exec(reference);
     if(!match){
       if(!safePath(reference)){
@@ -435,12 +442,12 @@ export function auditPackage({
     }
   };
 
-  const contextSchema=get(contract.root,"contextSchema");
+  const contextSchema=contract?get(contract.root,"contextSchema"):null;
   if(contextSchema!=null)
     checkSchemaReference(FILES.contract,contract,contextSchema,
       scalar(contextSchema),"Contract contextSchema");
 
-  const predicateRoot=get(predicates.root,"predicates");
+  const predicateRoot=predicates?get(predicates.root,"predicates"):null;
   const predicateIds=new Set(entries(predicateRoot).map(pair=>scalar(pair.key)).filter(Boolean));
   if(isMap(predicateRoot)){
     for(const pair of predicateRoot.items){
@@ -482,7 +489,12 @@ export function auditPackage({
             continue;
           }
           const alias=match[1];
-          if(!contractDependencies.has(alias)){
+          if(!contract){
+            addNotChecked(diagnostics,FILES.predicates,predicates,item,
+              "EVIDENCE_DEPENDENCY_NOT_CHECKED",
+              "Evidence dependency "+alias+" cannot be resolved because Contract is missing or could not be parsed",
+              "dependencies");
+          }else if(!contractDependencies.has(alias)){
             add(diagnostics,FILES.predicates,predicates,item,
               "EVIDENCE_DEPENDENCY_UNDECLARED",
               "Evidence reference "+reference+" uses undeclared dependency alias "+alias,
@@ -547,7 +559,7 @@ export function auditPackage({
     }
   }
 
-  const nodes=get(procedure.root,"nodes");
+  const nodes=procedure?get(procedure.root,"nodes"):null;
   const declaredNodes=new Map(entries(nodes).map(pair=>[scalar(pair.key),pair.value]));
   const checkProducer=(path,source,node,value)=>{
     if(typeof value!=="string")return;
@@ -577,6 +589,13 @@ export function auditPackage({
       return;
     }
     const [,alias,callableId]=match;
+    if(!contract){
+      addNotChecked(diagnostics,path,source,node,"TOOL_DEPENDENCY_NOT_CHECKED",
+        "Tool "+value+" cannot resolve dependency alias "+alias+
+          " because Contract is missing or could not be parsed",
+        "dependencies");
+      return;
+    }
     if(!contractDependencies.has(alias)){
       add(diagnostics,path,source,node,"TOOL_DEPENDENCY_UNDECLARED",
         "Node "+nodeId+" references Tool "+value+
@@ -671,7 +690,13 @@ export function auditPackage({
       const calls=get(stage,"predicates");
       if(isSeq(calls))for(const call of calls.items){
         const predicate=get(call,"predicate"),predicateId=scalar(predicate);
-        if(predicateId&&!predicateIds.has(predicateId)){
+        if(predicateId&&!predicates){
+          addNotChecked(diagnostics,FILES.procedure,procedure,predicate,
+            "PREDICATE_REFERENCE_NOT_CHECKED",
+            "Node "+nodeId+" references Predicate "+predicateId+
+              ", but PredicateSet is missing or could not be parsed",
+            "predicates");
+        }else if(predicateId&&!predicateIds.has(predicateId)){
           add(diagnostics,FILES.procedure,procedure,predicate,
             "PREDICATE_REFERENCE_NOT_FOUND",
             "Node "+nodeId+" references an undeclared Predicate: "+predicateId,
