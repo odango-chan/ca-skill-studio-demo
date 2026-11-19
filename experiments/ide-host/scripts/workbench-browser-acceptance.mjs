@@ -1215,15 +1215,18 @@ export async function runWorkbenchAcceptance({
     throw Error("Markdown Preview scrolling did not reveal the matching Source lines: "+
       JSON.stringify({sourceAfterPreviewScroll,previewScrollStart,scrollDiagnostics}));
   }
-  await evaluateStudioMarkdown(blockedMissingView,"(()=>{window.scrollTo(0,0);return true;})()");
-  await waitStudioMarkdown(view=>view.scrollY===0,"reset Markdown Preview scroll before reverse sync");
+  const previewBeforeSourceReveal=await evaluateStudioMarkdown(blockedMissingView,
+    "window.scrollY");
   const sourceReveal=await nativeCommand(
     "skillStudio.internal.markdownPreviewRevealSourceAcceptance",markdownFixture.uri,120);
   if(sourceReveal?.line!==120)throw Error("Could not reveal Markdown Source line 120");
-  const sourceToPreview=await waitStudioMarkdown(view=>view.scrollY>0,
+  const sourceToPreview=await waitStudioMarkdown(view=>
+    view.scrollY>0&&view.scrollY!==previewBeforeSourceReveal,
     "Markdown Source-to-Preview scroll synchronization");
-  if(!(sourceToPreview.view.scrollY>0))
-    throw Error("Markdown Source scrolling did not move the right Preview");
+  if(!(sourceToPreview.view.scrollY>0)||
+     sourceToPreview.view.scrollY===previewBeforeSourceReveal)
+    throw Error("Markdown Source scrolling did not move the right Preview: "+
+      JSON.stringify({previewBeforeSourceReveal,sourceToPreview:sourceToPreview.view.scrollY}));
   const markdownEvidence={
     uri:markdownFixture.uri,initialVersion:markdownFixture.version,
     updatedVersion:live.version,blocks:updatedMarkdown.view.markdownBlockCount,
