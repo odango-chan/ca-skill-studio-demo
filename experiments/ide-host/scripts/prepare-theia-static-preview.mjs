@@ -222,32 +222,32 @@ for(const required of [
 console.log("STUDIO_THEIA_STATIC_THEME_ASSETS",JSON.stringify({
   themePluginTarget,assets:["package.json","themes/**","icons/**","styles/**"],offlinePackage:true,
 }));
-// The static frontend's hostedPlugin copier omits arbitrary declarative
-// extension assets just as it does for the theme package. Stage the pinned
-// TextMate grammar package explicitly; otherwise YAML/Python documents fall
-// back to plain-text tokenization even though the plugin manifest is listed.
-const syntaxPluginSource=resolve("experiments/ide-host/theia-online/plugins/odango-chan.skill-studio-languages");
-const syntaxPluginTarget=join(root,"hostedPlugin","odango_chan_skill_studio_languages");
-const syntaxManifest=JSON.parse(await readFile(join(syntaxPluginSource,"package.json"),"utf8"));
-if(syntaxManifest.main||syntaxManifest.browser)
-  throw Error("Static syntax extension must remain declarative");
-await mkdir(syntaxPluginTarget,{recursive:true});
-await copyFile(join(syntaxPluginSource,"package.json"),join(syntaxPluginTarget,"package.json"));
-await cp(join(syntaxPluginSource,"upstream"),join(syntaxPluginTarget,"upstream"),
-  {recursive:true,force:true});
+// The primary extension owns the YAML/Python TextMate contributions.
+// Its complete media directory was staged above; verify the exact paths that
+// the extension manifest references instead of copying a second plugin.
+const primarySyntaxManifest=JSON.parse(await readFile(
+  join(pluginTarget,"package.json"),"utf8"));
+for(const language of ["yaml","python"]){
+  if(!primarySyntaxManifest.contributes?.languages?.some(item=>item.id===language)||
+     !primarySyntaxManifest.contributes?.grammars?.some(item=>item.language===language))
+    throw Error("Static primary extension is missing "+language+" TextMate contributions");
+}
 const missingSyntaxAssets=[];
-for(const grammar of syntaxManifest.contributes?.grammars??[]){
-  const asset=join(syntaxPluginTarget,grammar.path);
+for(const grammar of primarySyntaxManifest.contributes.grammars){
+  if(!String(grammar.path??"").startsWith("./media/languages/"))
+    throw Error("Static primary extension grammar path must remain package-local: "+grammar.path);
+  const asset=join(pluginTarget,grammar.path);
   try{
     const info=await stat(asset);
     if(!info.isFile()||info.size<100)missingSyntaxAssets.push(grammar.path);
   }catch{missingSyntaxAssets.push(grammar.path);}
 }
 if(missingSyntaxAssets.length)
-  throw Error("Static hosted syntax grammar assets missing: "+missingSyntaxAssets.join(", "));
+  throw Error("Static primary extension TextMate assets missing: "+missingSyntaxAssets.join(", "));
 console.log("STUDIO_THEIA_STATIC_SYNTAX_ASSETS",JSON.stringify({
-  syntaxPluginTarget,languages:syntaxManifest.contributes.languages.map(item=>item.id),
-  grammarCount:syntaxManifest.contributes.grammars.length,offlinePackage:true
+  pluginTarget,languages:["yaml","python"],
+  grammarCount:primarySyntaxManifest.contributes.grammars.length,
+  owner:"primary-extension",offlinePackage:true
 }));
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,
