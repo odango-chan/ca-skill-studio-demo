@@ -61,7 +61,8 @@
     "onCommand:skillStudio.showWelcome",
     "onCommand:skillStudio.checkSkill",
     "onCommand:skillStudio.buildSkill",
-    "onCommand:skillStudio.inspectCompilerDependencies"
+    "onCommand:skillStudio.inspectCompilerDependencies",
+    "onView:skillStudio.preview"
   ],
   "contributes": {
     "colors": [
@@ -616,6 +617,12 @@
     },
     "views": {
       "skillStudioInspector": [
+        {
+          "id": "skillStudio.preview",
+          "name": "Preview",
+          "type": "webview",
+          "visibility": "hidden"
+        },
         {
           "id": "skillStudio.inspection",
           "name": "Inspector"
