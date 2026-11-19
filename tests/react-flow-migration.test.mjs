@@ -25,8 +25,10 @@ test("React Flow projects the current CA-SL source graph without mutation",async
   assert.equal(flow.edges.reduce((n,e)=>n+e.data.bundle.routes.length,0),
     created.procedure.routes.length);
   assert.equal(flow.nodes.find(n=>n.id===created.procedure.start).data.start,true);
-  assert.deepEqual(flow.nodes.map(n=>n.id),\n    (graph.visibleNodes??created.procedure.nodes).map(n=>n.id));
-  assert.ok(flow.nodes.every(n=>n.draggable===false&&\n    n.connectable===!n.data.terminal&&!n.data.viewOnly));
+  assert.deepEqual(flow.nodes.map(n=>n.id),
+    (graph.visibleNodes??created.procedure.nodes).map(n=>n.id));
+  assert.ok(flow.nodes.every(n=>n.draggable===false&&
+    n.connectable===!n.data.terminal&&!n.data.viewOnly));
   assert.ok(flow.edges.every(e=>e.reconnectable===false),
     "existing Route targets stay read-only until a current-source patch contract exists");
   assert.ok(flow.edges.every(e=>e.markerEnd?.type==="arrow"));
