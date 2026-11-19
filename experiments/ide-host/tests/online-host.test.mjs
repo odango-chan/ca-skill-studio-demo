@@ -131,23 +131,30 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
   ])assert.ok(statSync(join(themeRoot,path)).size>80,path);
 });
 
-test("Theia bundles offline YAML and Python TextMate grammars independently of LSP",()=>{
-  const rootSyntax=join(root,"plugins/odango-chan.skill-studio-languages");
-  const manifest=JSON.parse(readFileSync(join(rootSyntax,"package.json"),"utf8"));
-  assert.equal(manifest.main,undefined);
-  assert.equal(manifest.browser,undefined);
+test("The primary Skill Studio extension owns offline YAML/Python TextMate grammars",()=>{
+  const primary=join(root,"plugins/odango-chan.ca-skill-studio-ide-spike");
+  const manifest=JSON.parse(readFileSync(join(primary,"package.json"),"utf8"));
   for(const [id,suffix] of [["yaml",".yaml"],["python",".py"]]){
-    assert.ok(manifest.contributes.languages.some(x=>
-      x.id===id&&x.extensions.includes(suffix)),id+" language id");
-    assert.ok(manifest.contributes.grammars.some(x=>x.language===id),id+" grammar");
+    assert.ok(manifest.contributes.languages.some(item=>
+      item.id===id&&item.extensions.includes(suffix)),id+" language id");
+    assert.ok(manifest.contributes.grammars.some(item=>item.language===id),id+" grammar");
+    const language=manifest.contributes.languages.find(item=>item.id===id);
+    assert.ok(language.configuration.startsWith("./dist/grammars/"),id+" configuration is packaged");
+    assert.ok(statSync(join(primary,language.configuration)).size>80,id+" configuration asset");
   }
   for(const grammar of manifest.contributes.grammars){
-    const path=join(rootSyntax,grammar.path);
+    assert.ok(grammar.path.startsWith("./dist/grammars/"),grammar.scopeName+" is in primary extension");
+    const path=join(primary,grammar.path);
     const syntax=JSON.parse(readFileSync(path,"utf8"));
     assert.equal(syntax.scopeName,grammar.scopeName);
     assert.ok(statSync(path).size>100);
   }
-  assert.ok(statSync(join(rootSyntax,"LICENSE.txt")).size>500);
+  assert.ok(manifest.contributes.semanticTokenTypes.some(item=>item.id==="skillOperation"));
+  assert.ok(manifest.contributes.semanticTokenTypes.some(item=>item.id==="skillWait"));
+  assert.ok(manifest.contributes.semanticTokenModifiers.some(item=>item.id==="reference"));
+  assert.ok(statSync(join(primary,"dist/grammars/LICENSE.txt")).size>500);
+  assert.equal(existsSync(join(root,"plugins/odango-chan.skill-studio-languages")),false,
+    "basic syntax must not depend on a separately discovered plugin");
 });
 
 test("SKILL Studio adds one native Theia top-level menu with real extension commands",async()=>{
