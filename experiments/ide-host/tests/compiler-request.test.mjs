@@ -50,14 +50,14 @@ test("released Compiler v2 accepts v1alpha5 and rejects v1alpha4",()=>{
 test("old Example may invoke Compiler Check/Build without Studio pre-rejecting the source",()=>{
   // The request envelope targets the installed Compiler; its original bytes
   // remain unchanged. The Compiler alone decides that v1alpha1 is unsupported.
-  const legacy="procedures:\\n  old:\\n    start: step\\n";
-  const predicate="apiVersion: connectionagent.io/v1alpha1\\nkind: PredicateSet\\n";
+  const legacy="procedures:\n  old:\n    start: step\n";
+  const predicate="apiVersion: connectionagent.io/v1alpha1\nkind: PredicateSet\n";
   const request=createCompilerBuildRequest({
     packageName:"legacy-example",
     documents:[
       {relativePath:"assurance/procedure.yaml",text:legacy},
       {relativePath:"assurance/predicates.yaml",text:predicate},
-      {relativePath:"SKILL.md",text:"# Legacy Example\\n"}
+      {relativePath:"SKILL.md",text:"# Legacy Example\n"}
     ]
   });
   assert.equal(request.languageTarget,COMPILER_LANGUAGE_TARGET);
