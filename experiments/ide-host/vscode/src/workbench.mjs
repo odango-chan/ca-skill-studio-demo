@@ -1040,21 +1040,21 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   // selected workspace and always removed; user-authored files are untouched.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
     context.subscriptions.push(vscode.commands.registerCommand(
-      "skillStudio.internal.v1alpha5LanguageProviderAcceptance",
+      "skillStudio.internal.currentLanguageProviderAcceptance",
       async procedureUriValue=>{
         const sourceUri=vscode.Uri.parse(String(procedureUriValue??""));
         const sourceDocument=await vscode.workspace.openTextDocument(sourceUri);
         const sourceRoot=packageRootForProcedure(vscode,sourceDocument);
-        if(!sourceRoot)throw Error("v1alpha5 acceptance requires an active Skill Package");
+        if(!sourceRoot)throw Error("current-language acceptance requires an active Skill Package");
         const sourcePath=sourceRoot.uri.path.replace(/\/$/,"");
         const workspaceFolder=(vscode.workspace.workspaceFolders??[]).find(folder=>{
           const path=folder.uri.path.replace(/\/$/,"");
           return sourcePath===path||sourcePath.startsWith(path+"/");
         });
-        if(!workspaceFolder)throw Error("v1alpha5 acceptance requires the selected workspace root");
+        if(!workspaceFolder)throw Error("current-language acceptance requires the selected workspace root");
         const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
         const packageRoot=vscode.Uri.joinPath(
-          workspaceFolder.uri,"skill-studio-v1alpha5-lsp-"+suffix);
+          workspaceFolder.uri,"skill-studio-current-lsp-"+suffix);
         const fs=vscode.workspace.fs;
         const contract=[
           "goal: pdu_session.initial_request_fulfilled",
@@ -1190,12 +1190,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           ]);
           release=attachLanguagePackage(procedureDocument);
           state=languagePackages.get(packageRoot.toString());
-          if(!state||state.disposed)throw Error("v1alpha5 Package did not attach to Language Service");
+          if(!state||state.disposed)throw Error("current Package did not attach to Language Service");
           const status=await waitForLanguagePackageStatus(state,state.generation,20000);
           if(status.state!=="PARTIAL")
             throw Error("Unqualified fixture must remain editor-only PARTIAL, got "+status.state);
           if(state.lastSentSnapshot?.completeness!=="complete")
-            throw Error("v1alpha5 acceptance snapshot is incomplete: "+
+            throw Error("current-language acceptance snapshot is incomplete: "+
               JSON.stringify(state.lastSentSnapshot));
           const labels=result=>(Array.isArray(result)?result:
             result?.items??result?.suggestions??[]).map(item=>
@@ -1319,7 +1319,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             at(procedureDocument,"scripts/runner.py",5)));
           if(!scriptDefinition.some(item=>
             (item?.uri??item?.targetUri)?.toString()===scriptDocument.uri.toString()))
-            throw Error("Native Theia v1alpha5 Script Definition did not reach its Package-owned file");
+            throw Error("Native Theia current Script Definition did not reach its Package-owned file");
           const symbols=definitionItems(await vscode.commands.executeCommand(
             "vscode.executeDocumentSymbolProvider",procedureDocument.uri));
           if(!symbols.some(item=>item.name==="check")||
@@ -1328,7 +1328,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
              !symbols.some(item=>item.name==="timeout-handler")||
              !symbols.some(item=>item.name==="run-script")||
              !symbols.some(item=>item.name==="final"))
-            throw Error("Native Theia Outline did not expose v1alpha5 Node declarations");
+            throw Error("Native Theia Outline did not expose current Node declarations");
           return {
             status:status.state,snapshotCompleteness:state.lastSentSnapshot.completeness,
             contractPreconditionCompletion:contractGate,
@@ -2868,8 +2868,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
-        if(item.kind==='v1alpha5-node'&&document){
-          tree.contextValue='skillStudio.v1alpha5Node';
+        if(item.kind==='current-node'&&document){
+          tree.contextValue='skillStudio.currentNode';
           item.sourceVersion=document.version;item.documentUri=document.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
