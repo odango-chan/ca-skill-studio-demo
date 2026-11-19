@@ -18,7 +18,7 @@ test("Pages publishes only Theia and never stages a Classic or legacy fallback",
     await put(site,"CNAME","studio.example.com\n");
     await put(theia,"index.html",'<!doctype html><html><body><div id="skill-studio-preview-warning">在线演示 · Webview 使用同源模式</div><div id="theia-app-shell"></div></body></html>');
     await put(theia,"bundle.js","window.theia=true;");
-    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]');
+    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme"]');
     await put(theia,"webview/index.html","<html>webview</html>");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json",'{"name":"ca-skill-studio-ide-spike"}');
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js","extension worker");
@@ -26,11 +26,12 @@ test("Pages publishes only Theia and never stages a Classic or legacy fallback",
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js","compiler worker");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skillc.wasm","wasm binary");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/wasm_exec.js","go wasm runtime");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/grammars/yaml/syntaxes/yaml.tmLanguage.json",'{"scopeName":"source.yaml"}');
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/grammars/python/syntaxes/MagicPython.tmLanguage.json",'{"scopeName":"source.python"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/package.json",'{"name":"skill-studio-theme"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",'{"name":"SKILL Studio Light"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",'{"iconDefinitions":{}}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg","<svg></svg>");
-    await put(theia,"hostedPlugin/odango_chan_skill_studio_languages/package.json",'{"name":"skill-studio-languages"}');
 
     const result=await composePagesRelease({theiaFrontend:theia,outputDist:output,siteRoot:site});
     assert.equal(result.defaultHost,"theia-browser-only");
@@ -51,7 +52,7 @@ test("Pages refuses a frontend containing a Classic navigation link or missing a
   try{
     await put(theia,"index.html",'<!doctype html><html><body><div id="skill-studio-preview-warning">在线演示</div><a href="/classic/">old</a></body></html>');
     await put(theia,"bundle.js","bundle");
-    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]');
+    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme"]');
     await put(theia,"webview/index.html","webview");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json","{}");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js","extension");
@@ -59,11 +60,12 @@ test("Pages refuses a frontend containing a Classic navigation link or missing a
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js","compiler worker");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skillc.wasm","wasm binary");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/wasm_exec.js","go wasm runtime");
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/grammars/yaml/syntaxes/yaml.tmLanguage.json",'{"scopeName":"source.yaml"}');
+    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/grammars/python/syntaxes/MagicPython.tmLanguage.json",'{"scopeName":"source.python"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/package.json","{}");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json","{}");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json","{}");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg","<svg></svg>");
-    await put(theia,"hostedPlugin/odango_chan_skill_studio_languages/package.json","{}");
     await assert.rejects(composePagesRelease({theiaFrontend:theia,outputDist:output}),/Classic navigation/);
     await assert.rejects(stat(output),{code:"ENOENT"});
   }finally{await rm(temp,{recursive:true,force:true});}
