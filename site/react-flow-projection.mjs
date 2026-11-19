@@ -29,39 +29,20 @@ export function classifyRouteTone(outcomes){
 // The node card and contextual legend are read-only views of existing YAML.
 // A Phase Step's operator is not a new graph Node or an assertion that TOOL
 // and CALL have the same Runtime semantics.
-const PHASE_LABELS=Object.freeze({
-  preconditions:"PRE",postconditions:"POST",
+const STAGE_LABELS=Object.freeze({
   precondition:"PRE",operation:"OP",observation:"OBS",postcondition:"POST"
 });
-export function summarizeNodePhases(node){
-  if(Array.isArray(node?.stages)){
-    return node.stages.map(stage=>({
-      name:stage.name,label:PHASE_LABELS[stage.name]??String(stage.name).toUpperCase(),
-      count:Number.isSafeInteger(stage.count)?stage.count:1,
-      countLabel:stage.name==="precondition"||stage.name==="postcondition"
-        ?"Predicates":"Stage",
-      operators:stage.target?[{kind:stage.name==="observation"?"OBSERVATION":
-        stage.name==="operation"?"TOOL":"PREDICATE",count:1}]:[],
-      routeCount:Array.isArray(stage.routeOutcomes)?stage.routeOutcomes.length:0
-    }));
-  }
-  const phases=[];
-  for(const name of ["preconditions","postconditions"]){
-    const phase=node?.phases?.find(item=>item.name===name);
-    if(!phase)continue;
-    const steps=Array.isArray(phase.steps)?phase.steps:[];
-    const operators=new Map();
-    for(const step of steps){
-      const kind=String(step.operator||"").toUpperCase();
-      operators.set(kind,(operators.get(kind)||0)+1);
-    }
-    phases.push({
-      name,label:PHASE_LABELS[name],count:steps.length,
-      operators:[...operators].map(([kind,count])=>({kind,count})),
-      routeCount:phase.routeCount??0
-    });
-  }
-  return phases;
+export function summarizeNodeStages(node){
+  if(!Array.isArray(node?.stages))return [];
+  return node.stages.map(stage=>({
+    name:stage.name,label:STAGE_LABELS[stage.name]??String(stage.name).toUpperCase(),
+    count:Number.isSafeInteger(stage.count)?stage.count:1,
+    countLabel:stage.name==="precondition"||stage.name==="postcondition"
+      ?"Predicates":"Stage",
+    operators:stage.target?[{kind:stage.name==="observation"?"OBSERVATION":
+      stage.name==="operation"?"TOOL":"PREDICATE",count:1}]:[],
+    routeCount:Array.isArray(stage.routeOutcomes)?stage.routeOutcomes.length:0
+  }));
 }
 export function describeProcedureLegend(procedure,visibleNodes=null){
   const nodes=visibleNodes??procedure?.nodes??[];
@@ -70,9 +51,9 @@ export function describeProcedureLegend(procedure,visibleNodes=null){
   for(const node of nodes){
     const kind=String(node.operator||"").toUpperCase();
     nodeKinds.set(kind,(nodeKinds.get(kind)||0)+1);
-    for(const phase of summarizeNodePhases(node)){
-      if(phase.name==="preconditions"||phase.name==="precondition")preNodes++;
-      if(phase.name==="postconditions"||phase.name==="postcondition")postNodes++;
+    for(const phase of summarizeNodeStages(node)){
+      if(phase.name==="precondition")preNodes++;
+      if(phase.name==="postcondition")postNodes++;
       for(const {kind:stepKind,count} of phase.operators)
         stepKinds.set(stepKind,(stepKinds.get(stepKind)||0)+count);
     }
@@ -87,11 +68,10 @@ export function flowBundleSelectionId(bundle){
     bundle.routes.map(route=>route.id).sort().join("|");
 }
 export function routeOrigin(routeSource){
-  if(routeSource==="preconditions.on"||routeSource==="precondition")return "PRE";
-  if(routeSource==="postconditions.on"||routeSource==="postcondition")return "POST";
+  if(routeSource==="precondition")return "PRE";
+  if(routeSource==="postcondition")return "POST";
   if(routeSource==="operation")return "OP";
   if(routeSource==="observation")return "OBS";
-  if(routeSource==="operator.on")return "OP";
   return "OTHER";
 }
 
@@ -99,7 +79,6 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
   routeCreationSourceId=null){
   if(!graph||!procedure)return {nodes:[],edges:[],direction:"DOWN"};
   const direction=graph.direction==="RIGHT"?"RIGHT":"DOWN";
-  const v1alpha4=String(procedure.profile??"").includes("v1alpha4");
   const present=new Set((graph.visibleNodes??procedure.nodes).map(n=>n.id));
   const selectedRoute=selection?.kind==="route"?selection.id:null;
   const selectedBundle=selection?.kind==="bundle"?selection.id:null;
@@ -124,9 +103,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       targetPosition:direction==="DOWN"?"top":"left",
       draggable:false,
       selectable:true,
-      // v1alpha4 is a source projection until trusted Compiler/Owner linking
-      // supplies exact Outcome eligibility. Disable all graph connections.
-      connectable:!v1alpha4,
+      // The current grammar owns all graph interaction policy. Node dragging is
+      // disabled; only the explicit selected-node Route creation handle is active.
+      connectable:true,
       selected:selection?.kind==="node"&&selection.id===node.id,
       data:{
         id:node.id,operator:node.operator,value:node.value,
@@ -141,10 +120,10 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         childProcedure:node.operator==="procedure"&&
           node.children?.some(ref=>ref.via==="operator"&&ref.procedure===node.value)
           ?node.value:null,
-        phaseBadges:summarizeNodePhases(node),
+        phaseBadges:summarizeNodeStages(node),
         hiddenBranchCount:graph.hiddenByNode?.get(node.id)??0,
         branchesExpanded:graph.expandedNodeIds?.has(node.id)??false,
-        canAddRoute:!node.viewOnly&&!String(procedure.profile??"").includes("v1alpha4")&&
+        canAddRoute:!node.viewOnly&&
           node.operator!=="terminal"&&selection?.kind==="node"&&
           selection.id===node.id&&routeCreationSourceId===node.id,
         ports:ports.get(node.id)??[],
@@ -181,9 +160,9 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
         strokeWidth:1.2,
         markerUnits:"userSpaceOnUse"
       },
-      // v1alpha4 routes are strictly view-only; legacy routes retain their
-      // existing guarded reconnect/Preview/Diff workflow.
-      reconnectable:!v1alpha4,
+      // Existing Routes remain read-only until a current-grammar target-patch
+      // contract exists. Route creation is a separate explicit source patch.
+      reconnectable:false,
       data:{
         bundle,sourceRouteIds:bundle.routes.map(route=>route.id),
         selected,important,tone,label,origin,
