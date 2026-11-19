@@ -309,5 +309,5 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     refresh();onLockChanged();return result;
   });
   const getProjectRoot=()=>selectedRoot??(roots().length===1?roots()[0].uri:null);
-  return {refresh,getProjectRoot,provider,prepareToolContract};
+  return {refresh,getProjectRoot,provider,prepareToolCatalog};
 }
