@@ -828,7 +828,7 @@ try{
     ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
   const markdownLanguageWorker=markdownWorkerRequests.filter(item=>
-    /serverWorkerMain\\.js/i.test(item.url));
+    item.url.toLowerCase().includes("serverworkermain.js"));
   if(requireEditor&&!markdownLanguageWorker.length)
     throw Error("Native Markdown language features did not activate its browser Worker after Markdown Source selection: "+
       JSON.stringify({markdownWorkerRequests,workerRuntimeErrors,exceptions:exceptions.slice(-8)}));
