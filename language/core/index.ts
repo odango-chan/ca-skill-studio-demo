@@ -325,7 +325,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       state: "UNAVAILABLE",
       reason: snapshot.completeness !== "complete"
         ? (snapshot.reason ?? "Partial Package snapshot")
-        : "CA-SL current CA-SL source parsed; static Package qualification requires the current Compiler and trusted Owner/Capability/Schema linking snapshots",
+        : "Current CA-SL source parsed; static Package qualification requires the current Compiler and trusted Owner/Capability/Schema linking snapshots",
       diagnostics: []
     };
     const diagnostics = [
