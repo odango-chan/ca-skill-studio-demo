@@ -336,8 +336,11 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
         uri: sourceDocument?.uri ?? snapshot.rootUri,
         relativePath: item.path,
         source: "package-audit",
-        confidence: "exact",
-        ...(Number.isSafeInteger(item.line) && item.line > 0 ? { line: item.line } : {}),
+        // An audit with only a fallback file/line hint does not own a token
+        // position. Do not publish it as an exact editor finding.
+        confidence: item.sourceRange ? "exact" : "unknown",
+        ...(item.sourceRange && Number.isSafeInteger(item.line) && item.line > 0
+          ? { line: item.line } : {}),
         ...(item.sourceRange ? { range: item.sourceRange } : {}),
         status: item.status,
         domain: item.domain,
