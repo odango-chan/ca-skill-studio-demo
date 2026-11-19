@@ -729,7 +729,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   const zipMessage=posted.slice(beforeZipMessages).find(x=>x.type==='packageZipReady');
   assert.ok(zipMessage,'Package ZIP is delivered to the active Procedure Webview');
   assert.equal(zipMessage.filename,'establish-pdu-session.zip');
-  assert.equal(zipMessage.fileCount,4);
+  assert.equal(zipMessage.fileCount,8);
   assert.equal(zipMessage.opaqueCount,0);
   const zipBytes=Buffer.from(zipMessage.base64,'base64');
   assert.equal(zipBytes.readUInt32LE(0),0x04034b50,'export is a real ZIP archive');
