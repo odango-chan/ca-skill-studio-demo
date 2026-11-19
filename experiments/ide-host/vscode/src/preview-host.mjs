@@ -113,32 +113,55 @@ export function createPreviewHostController({mountProcedure,mountContract,mountP
       if(closed)return;
       closed=true;++generation;clear();view=null;
     },
-    get state(){return {uri:activeUri,kind:activeKind,generation,attached:!!view};}
+    get state(){return {uri:activeUri,kind:activeKind,generation,
+      attached:!!view,visible:!!view?.visible};}
   };
 }
 
 export function registerPreviewHost(vscode,context,renderers) {
   const controller=createPreviewHostController(renderers);
   // A non-Theia/older VS Code-compatible host may not expose WebviewView.
-  // Preserve native Source/CustomEditor behavior rather than blocking startup.
+  // Preserve native Source editing rather than blocking startup.
   if(typeof vscode.window.registerWebviewViewProvider!=="function"){
     console.warn("SKILL Studio Preview Host unavailable: WebviewViewProvider API missing");
     context.subscriptions.push({dispose:()=>controller.dispose()});
     return controller;
   }
+  // A contributed view with visibility=visible can still live inside a
+  // collapsed Secondary Sidebar container. Reveal the container when the
+  // first visualizable Source becomes active; otherwise the WebviewView never
+  // resolves and the preview silently remains an inactive EditorGroup iframe.
+  const containerCommand="workbench.view.extension.skillStudioInspector";
+  let lastDocument=vscode.window.activeTextEditor?.document??null;
+  let revealInFlight=null;
+  const revealContainer=()=>{
+    if(revealInFlight)return revealInFlight;
+    revealInFlight=Promise.resolve(vscode.commands.executeCommand(containerCommand))
+      .catch(error=>console.warn("SKILL Studio could not reveal Preview container:",
+        String(error?.message??error)))
+      .finally(()=>{revealInFlight=null;});
+    return revealInFlight;
+  };
   const subscription=vscode.window.registerWebviewViewProvider(PREVIEW_VIEW_ID,{
     resolveWebviewView(view){
-      controller.resolve(view,vscode.window.activeTextEditor?.document??null);
+      controller.resolve(view,lastDocument);
       // Theia can recreate a view after it has been closed. Do not register
       // process-global Webview subscriptions or survive a disposed instance.
       const release=view.onDidDispose(()=>{controller.disposeView(view);release.dispose();});
     }
   },{webviewOptions:{retainContextWhenHidden:true}});
   const active=vscode.window.onDidChangeActiveTextEditor(editor=>{
-    // The active text editor can momentarily be null while focus transfers to
-    // a sidebar view. Keep the last Source document rather than clearing it.
-    if(editor?.document)controller.update(editor.document);
+    // Focus can temporarily move away from Source when the Preview is revealed.
+    // Retain the last document and ignore the transient null editor event.
+    if(!editor?.document)return;
+    lastDocument=editor.document;
+    controller.update(lastDocument);
+    if(previewDocumentKind(lastDocument.uri)!=="none"&&!controller.state.visible)
+      void revealContainer();
   });
+  // The extension may activate after the initial Source editor is already open.
+  if(lastDocument&&previewDocumentKind(lastDocument.uri)!=="none")
+    void revealContainer();
   context.subscriptions.push(subscription,active,{dispose:()=>controller.dispose()});
   return controller;
 }
