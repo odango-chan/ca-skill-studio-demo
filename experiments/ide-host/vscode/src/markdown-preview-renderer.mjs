@@ -9,11 +9,11 @@ const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,ch=>({
 
 export function markdownLinkCandidate(href) {
   if(typeof href!=="string"||href.length===0||href.length>2048)return false;
-  if(/^[\\x00-\\x1f\\x7f]/.test(href)||/[\\r\\n\\t]/.test(href))return false;
+  if(/^[\x00-\x1f\x7f]/.test(href)||/[\r\n\t]/.test(href))return false;
   if(href.startsWith("#"))return true;
   if(/^(?:https?:|mailto:|tel:)/i.test(href))return true;
   if(/^[a-z][a-z0-9+.-]*:/i.test(href)||href.startsWith("//"))return false;
-  if(href.startsWith("/")||href.includes("\\\\")||/%(?:2f|5c)/i.test(href))return false;
+  if(href.startsWith("/")||href.includes("\\")||/%(?:2f|5c)/i.test(href))return false;
   return /^[^?#]+(?:[?#].*)?$/.test(href);
 }
 
