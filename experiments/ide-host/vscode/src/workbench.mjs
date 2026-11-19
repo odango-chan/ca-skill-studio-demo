@@ -11,27 +11,6 @@ import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from '../../../../site/node-create.mjs';
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from '../../../../site/node-delete.mjs';
-import {previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
-import {phaseOutputReferenceOptions,previewPhaseOutputReference,
-  applyPhaseOutputReference} from '../../../../site/phase-output-refs.mjs';
-import {phaseRouteTargetOptions,previewPhaseRouteTarget,applyPhaseRouteTarget}
-  from '../../../../site/phase-routes.mjs';
-import {phaseOutcomeEditOptions,previewAddObservedPhaseOutcome,
-  previewRenameNoncorePhaseOutcome,previewDeleteNoncorePhaseOutcome,
-  applyAddObservedPhaseOutcome,applyRenameNoncorePhaseOutcome,
-  applyDeleteNoncorePhaseOutcome} from '../../../../site/phase-outcomes.mjs';
-import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
-  previewAddPhaseVerify,applyAddPhaseVerify,
-  previewDeletePhaseVerify,applyDeletePhaseVerify}
-  from '../../../../site/phase-step-structural.mjs';
-import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
-  applyAdjacentVerifyReorder} from '../../../../site/phase-step-order.mjs';
-import {namedPhaseStepImpactReport,previewNamedPhaseStepRename,
-  applyNamedPhaseStepRename} from '../../../../site/phase-step-rename.mjs';
-import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
-  previewDeleteUnreferencedNamedVerify,applyDeleteUnreferencedNamedVerify,
-  previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
-  from '../../../../site/phase-named-verify.mjs';
 import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export.mjs';
 import {resolveLockedDependencies} from "./dependency-service.mjs";
 import {readProjectConfiguration} from "./project-configuration.mjs";
@@ -49,7 +28,7 @@ import {createPackageLanguageLifecycle}
   from "./package-language-lifecycle.mjs";
 
 export function registerWorkbench(vscode,context,{prepareToolContract,compilerProblemsProvider}={}){
-  let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
+  let document=null,selection={},snapshot=null,predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,
     lastSelectionMessage=null;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
@@ -2249,17 +2228,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     predicateSnapshot={uri,version,...next};
     fire();
   }
-  function singleSourceChange(preview){
-    const {start,end}=preview.sourceSpan;
-    const delta=preview.candidateSource.length-preview.baseSource.length;
-    if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||
-       start<0||end<start||end>preview.baseSource.length||
-       end+delta<start||end+delta>preview.candidateSource.length)
-      throw Error("Phase Patch Source span is invalid");
-    return [{start,end,
-      oldValue:preview.baseSource.slice(start,end),
-      newValue:preview.candidateSource.slice(start,end+delta)}];
-  }
   async function confirmAndApply({doc,source,version,preview,changes,verify}){
     const message=[preview.summary,preview.diff].filter(Boolean).join("\n\n");
     const choice=await vscode.window.showInformationMessage(
@@ -2294,326 +2262,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
      const applied=await vscode.workspace.applyEdit(edit);
     if(!applied)throw Error("Host rejected WorkspaceEdit");
     return true;
-  }
-
-  async function editPhaseInputBinding(item,bindingKey,newValue){
-    if(item?.kind!=="phase-step"||typeof item.phaseName!=="string"||
-       !Number.isSafeInteger(item.stepIndex))
-      throw Error("Select an eligible Phase Step in the native Inspector");
-    const ctx=currentNode(item);
-    const options=phaseStepBindingOptions(ctx.source,ctx.procedureId,ctx.nodeId)
-      .filter(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-    if(!options.length)throw Error("This Phase Step has no qualified same-type input bindings");
-    let key=bindingKey;
-    if(typeof key!=="string"){
-      const picked=await vscode.window.showQuickPick(options.map(x=>({
-        label:x.bindingKey,description:x.value,detail:x.inputType+" · "+x.stepName
-      })),{placeHolder:"选择要修改的 Phase Step 输入绑定"});
-      key=picked?.label??picked;
-    }
-    const binding=options.find(x=>x.bindingKey===key);
-    if(!binding)throw Error("Selected binding is not part of the current Phase Step");
-    let value=newValue;
-    if(typeof value!=="string"){
-      value=await vscode.window.showQuickPick(binding.choices.filter(x=>x!==binding.value),{
-        placeHolder:"选择同类型的 Procedure 输入来源"
-      });
-    }
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the Phase binding");
-    const preview=previewPhaseInputBinding(ctx.source,ctx.procedureId,ctx.nodeId,
-      item.phaseName,item.stepIndex,key,value);
-    return confirmAndApply({
-      ...ctx,preview,
-      changes:p=>[{
-        start:p.sourceSpan.start,end:p.sourceSpan.end,
-        oldValue:p.oldValue,newValue:p.newValue
-      }],
-      verify:text=>applyPhaseInputBinding(text,preview)
-    });
-  }
-
-  async function editPhaseOutputReference(item,bindingKey,newValue){
-    if(item?.kind!=='phase-output-reference'||
-       typeof item.phaseName!=='string'||!Number.isSafeInteger(item.stepIndex)||
-       !Number.isSafeInteger(item.sourceVersion))
-      throw Error("Select a current eligible Phase output reference in the native Inspector");
-    const ctx=currentNode(item);
-    const options=phaseOutputReferenceOptions(ctx.source,ctx.procedureId,ctx.nodeId)
-      .filter(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex&&
-        x.bindingKey===(bindingKey??item.bindingKey));
-    if(options.length!==1)throw Error("Output reference is no longer uniquely eligible");
-    const reference=options[0];
-    let value=newValue;
-    if(typeof value!=='string'){
-      const picked=await vscode.window.showQuickPick(
-        reference.choices.filter(choice=>choice!==reference.value).map(choice=>({
-          label:choice,
-          description:choice.startsWith(reference.producerPhase+".")
-            ?"本地 Phase 引用":"完整 Node + Phase 引用",
-          detail:"同一生产 Node / Phase Step / output suffix"
-        })),{placeHolder:"选择同一生产 Step 的输出引用写法"});
-      value=typeof picked==='string'?picked:picked?.label;
-    }
-    if(typeof value!=='string'||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the output reference form");
-    const preview=previewPhaseOutputReference(ctx.source,ctx.procedureId,ctx.nodeId,
-      item.phaseName,item.stepIndex,reference.bindingKey,value);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>[{
-        start:p.sourceSpan.start,end:p.sourceSpan.end,
-        oldValue:p.oldValue,newValue:p.newValue
-      }],
-      verify:text=>applyPhaseOutputReference(text,preview)
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function editPhaseRouteTarget(item,newTarget){
-    if(item?.kind!=='route'||typeof item.routeId!=='string'||
-       !Number.isSafeInteger(item.sourceVersion))
-      throw Error("Select a current eligible Phase failure/unknown Route");
-    const ctx=currentNode(item);
-    const option=phaseRouteTargetOptions(ctx.source,ctx.procedureId,ctx.nodeId)
-      .find(candidate=>candidate.routeId===item.routeId);
-    if(!option?.targets?.length)
-      throw Error("Phase Route has no Source-observed eligible target");
-    let target=newTarget;
-    if(typeof target!=='string'){
-      const picked=await vscode.window.showQuickPick(
-        option.targets.map(value=>({label:value,
-          description:option.phaseName+'.on · '+option.outcome,
-          detail:'来自同 Procedure、同 Phase、同 Outcome 的现有 Route'})),
-        {placeHolder:"选择已在当前 Source 出现的 Phase Route 目标"});
-      target=typeof picked==='string'?picked:picked?.label;
-    }
-    if(typeof target!=='string'||!target.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the Phase Route target");
-    const preview=previewPhaseRouteTarget(ctx.source,ctx.procedureId,
-      item.routeId,target);
-    const applied=await confirmAndApply({
-      ...ctx,preview,changes:singleSourceChange,
-      verify:text=>applyPhaseRouteTarget(text,preview)
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function repairPhaseOutcome(item,requestedAction){
-    if(item?.kind!=='phase-outcome-repair'||typeof item.phaseName!=='string'||
-       !Number.isSafeInteger(item.sourceVersion))
-      throw Error('Select a current eligible Phase Outcome repair in native Inspector');
-    const ctx=currentNode(item);
-    const phase=phaseOutcomeEditOptions(ctx.source,ctx.procedureId,ctx.nodeId)
-      .find(option=>option.phaseName===item.phaseName);
-    if(!phase)throw Error('Phase Outcome Source is not qualified for repair');
-    const actions=[
-      ...phase.adds.map(option=>({mode:'add',outcome:option.outcome,target:option.target,
-        label:'补齐 '+option.outcome,description:'→ '+option.target})),
-      ...phase.renames.map(option=>({mode:'rename',oldOutcome:option.oldOutcome,
-        newOutcome:option.newOutcome,target:option.target,
-        label:'纠正 '+option.oldOutcome+' → '+option.newOutcome,
-        description:'现有目标 '+option.target})),
-      ...phase.deletions.map(option=>({mode:'delete',outcome:option.outcome,
-        target:option.target,label:'删除非核心 '+option.outcome,
-        description:'当前目标 '+option.target}))
-    ];
-    if(!actions.length)throw Error('No owner-observed Phase Outcome repair is available');
-    let choice=requestedAction;
-    if(choice===undefined){
-      const picked=await vscode.window.showQuickPick(actions.map(action=>({
-        label:action.label,description:action.description,
-        detail:'仅修复当前 Source 已证明的 Outcome；不代表 Runtime Outcome 完整性',
-        spec:action
-      })),{placeHolder:'选择可证明的 Phase Outcome 修复'});
-      choice=picked?.spec??null;
-    }
-    if(choice===null)return false;
-    const identity=action=>JSON.stringify([
-      action?.mode??null,action?.outcome??null,action?.oldOutcome??null,
-      action?.newOutcome??null,action?.target??null]);
-    const selected=actions.find(action=>identity(action)===identity(choice));
-    if(!selected)throw Error('Phase Outcome action is not qualified by current Source');
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error('Source changed while selecting Phase Outcome repair');
-    const {source,procedureId,nodeId}=ctx,phaseName=item.phaseName;
-    let preview,verify;
-    if(selected.mode==='add'){
-      preview=previewAddObservedPhaseOutcome(source,procedureId,nodeId,phaseName,
-        selected.outcome,selected.target);
-      verify=text=>applyAddObservedPhaseOutcome(text,preview);
-    }else if(selected.mode==='rename'){
-      preview=previewRenameNoncorePhaseOutcome(source,procedureId,nodeId,phaseName,
-        selected.oldOutcome,selected.newOutcome);
-      verify=text=>applyRenameNoncorePhaseOutcome(text,preview);
-    }else if(selected.mode==='delete'){
-      preview=previewDeleteNoncorePhaseOutcome(source,procedureId,nodeId,phaseName,
-        selected.outcome);
-      verify=text=>applyDeleteNoncorePhaseOutcome(text,preview);
-    }else throw Error('Unsupported Phase Outcome action');
-    const applied=await confirmAndApply({
-      ...ctx,preview,changes:singleSourceChange,verify
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function addPhaseVerify(item,predicate){
-    if(item?.kind!=="phase"||typeof item.phaseName!=="string")
-      throw Error("Select an eligible Phase in the native Inspector");
-    const ctx=currentNode(item);
-    const predicates=await predicateContext(ctx.doc);
-    const options=phaseVerifyAddOptions(ctx.source,ctx.procedureId,ctx.nodeId,
-      predicates.predicateSource,predicates.skillName);
-    const phase=options.find(x=>x.phaseName===item.phaseName);
-    if(!phase){
-      // Diagnostic-only: preserve the structural editer's fail-closed decision
-      // while reporting which source/predicate precondition disqualified it.
-      let detail="unknown";
-      try{
-        previewAddPhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
-          item.phaseName,typeof predicate==="string"?predicate:"createdsession.n4.initial_resources_ready",
-          predicates.predicateSource,predicates.skillName);
-        detail="unexpected preview eligible";
-      }catch(error){detail=String(error?.message??error);}
-      console.warn("STUDIO_PHASE_VERIFY_INELIGIBLE",JSON.stringify({
-        documentVersion:ctx.doc.version,isDirty:ctx.doc.isDirty,
-        sourceBytes:ctx.source.length,
-        predicateBytes:predicates.predicateSource?.length??null,
-        skillName:predicates.skillName,phase:item.phaseName,
-        procedureId:ctx.procedureId,nodeId:ctx.nodeId,detail
-      }));
-      throw Error("Selected Phase has no safe Verify append anchor or available PredicateSet entry");
-    }
-    let value=predicate;
-    if(typeof value!=="string"){
-      const picked=await vscode.window.showQuickPick(phase.choices,{
-        placeHolder:"选择要追加到 Phase 末尾的 Package Predicate"
-      });
-      value=typeof picked==="string"?picked:picked?.value??picked?.label;
-    }
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the new Verify Step");
-    const preview=previewAddPhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
-      item.phaseName,value,predicates.predicateSource,predicates.skillName);
-    const applied=await confirmAndApply({
-      ...ctx,preview,changes:singleSourceChange,
-      verify:text=>applyAddPhaseVerify(text,preview,predicates.predicateSource)
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function editPhaseVerifyStep(item,requestedAction){
-    if(item?.kind!=="phase-step"||item.stepOperator!=="verify"||
-       typeof item.phaseName!=="string"||!Number.isSafeInteger(item.stepIndex))
-      throw Error("Select an eligible Verify Step in the native Inspector");
-    const ctx=currentNode(item);
-    const deletions=phaseVerifyDeleteOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    const reorder=adjacentVerifyReorderOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    const named=namedVerifyEditOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    const at=(rows,index)=>rows.some(x=>x.phaseName===item.phaseName&&x.stepIndex===index);
-    const canName=!item.stepName&&at(named.names,item.stepIndex);
-    const canDelete=at(deletions,item.stepIndex);
-    const canMoveUp=at(reorder,item.stepIndex-1);
-    const canMoveDown=at(reorder,item.stepIndex);
-    const canDeleteNamed=Boolean(item.stepName)&&at(named.deletions,item.stepIndex);
-    const canMoveUpNamed=Boolean(item.stepName)&&at(named.swaps,item.stepIndex-1);
-    const canMoveDownNamed=Boolean(item.stepName)&&at(named.swaps,item.stepIndex);
-    const choices=[
-      ...(canName?[{label:"Name Verify Step",value:"name"}]:[]),
-      ...(canMoveUp||canMoveUpNamed?[{label:"Move Verify Up",value:"move-up"}]:[]),
-      ...(canMoveDown||canMoveDownNamed?[{label:"Move Verify Down",value:"move-down"}]:[]),
-      ...(canDelete||canDeleteNamed?[{label:"Delete Verify Step",value:"delete"}]:[])
-    ];
-    let action=typeof requestedAction==="object"&&requestedAction
-      ?requestedAction.action:requestedAction;
-    let newName=typeof requestedAction==="object"&&requestedAction
-      ?requestedAction.newName:undefined;
-    if(typeof action!=="string"){
-      const picked=await vscode.window.showQuickPick(choices,{
-        placeHolder:"选择此 Verify Step 的安全编辑操作"
-      });
-      action=typeof picked==="string"?picked:picked?.value;
-    }
-    if(!choices.some(x=>x.value===action))return false;
-    if(action==="name"&&typeof newName!=="string"){
-      newName=await vscode.window.showInputBox({
-        value:"verify-"+item.stepValue.split(".").at(-1).replace(/[^A-Za-z0-9_-]/g,"-"),
-        prompt:"为这个 Verify Step 设置稳定名称",
-        placeHolder:"verify-step-name"
-      });
-    }
-    if(action==="name"&&(typeof newName!=="string"||!newName.trim()))return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the Verify Step operation");
-    let preview,verify;
-    if(action==="name"){
-      preview=previewNamePlainVerify(ctx.source,ctx.procedureId,ctx.nodeId,
-        item.phaseName,item.stepIndex,newName);
-      verify=text=>applyNamePlainVerify(text,preview);
-    }else if(action==="delete"&&canDeleteNamed){
-      preview=previewDeleteUnreferencedNamedVerify(ctx.source,ctx.procedureId,
-        ctx.nodeId,item.phaseName,item.stepIndex);
-      verify=text=>applyDeleteUnreferencedNamedVerify(text,preview);
-    }else if(action==="move-up"&&canMoveUpNamed||
-             action==="move-down"&&canMoveDownNamed){
-      const pairIndex=action==="move-up"?item.stepIndex-1:item.stepIndex;
-      preview=previewSwapAdjacentNamedVerify(ctx.source,ctx.procedureId,
-        ctx.nodeId,item.phaseName,pairIndex);
-      verify=text=>applySwapAdjacentNamedVerify(text,preview);
-    }else if(action==="delete"){
-      preview=previewDeletePhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
-        item.phaseName,item.stepIndex);
-      verify=text=>applyDeletePhaseVerify(text,preview);
-    }else{
-      const pairIndex=action==="move-up"?item.stepIndex-1:item.stepIndex;
-      preview=previewAdjacentVerifyReorder(ctx.source,ctx.procedureId,ctx.nodeId,
-        item.phaseName,pairIndex);
-      verify=text=>applyAdjacentVerifyReorder(text,preview);
-    }
-    const applied=await confirmAndApply({
-      ...ctx,preview,changes:singleSourceChange,verify
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function renameNamedPhaseStep(item,newName){
-    if(item?.kind!=="phase-step"||typeof item.phaseName!=="string"||
-       !Number.isSafeInteger(item.stepIndex)||typeof item.stepName!=="string"||
-       !item.stepName)
-      throw Error("Select a named Phase Step in the native Inspector");
-    const ctx=currentNode(item);
-    const impact=namedPhaseStepImpactReport(ctx.source,ctx.procedureId,ctx.nodeId)
-      .find(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-    if(!impact?.editEligible||impact.stepName!==item.stepName)
-      throw Error("Named Step references are ambiguous or Source-only");
-    let value=newName;
-    if(typeof value!=="string")value=await vscode.window.showInputBox({
-      value:item.stepName,prompt:"输入新的 Phase Step 名称",
-      placeHolder:"new-step-name"
-    });
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the new Phase Step name");
-    const preview=previewNamedPhaseStepRename(ctx.source,ctx.procedureId,
-      ctx.nodeId,item.phaseName,item.stepIndex,value);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>p.sourceSpans.map(span=>({
-        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
-      })),
-      verify:text=>applyNamedPhaseStepRename(text,preview)
-    });
-    if(applied)update(ctx.doc);
-    return applied;
   }
 
   async function insertNode(item,spec){
@@ -2892,94 +2540,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         if(item.kind==='route'&&id==='inspection'&&document){
           const canInsert=Boolean(insertNodeOptions(
             document.getText(),item.procedureId,item.routeId));
-          const canRetarget=Array.isArray(item.phaseTargetChoices)&&
-            item.phaseTargetChoices.length>0;
-          if(canRetarget)
-            tree.contextValue=canInsert
-              ?'skillStudio.routeAndPhaseTarget':'skillStudio.phaseRouteTarget';
-          else if(canInsert)tree.contextValue='skillStudio.route';
-          if(canInsert||canRetarget){
+          if(canInsert){
+            tree.contextValue='skillStudio.route';
             item.sourceVersion=document.version;
             item.documentUri=document.uri.toString();
-            for(const key of ['procedureId','nodeId','routeId','phaseName',
-              'routeSource','outcome','target','phaseTargetChoices'])
+            for(const key of ['procedureId','nodeId','routeId'])
               tree[key]=item[key];
             tree.sourceVersion=item.sourceVersion;
             tree.documentUri=item.documentUri;
           }
-        }
-        if(item.kind==='phase'&&id==='inspection'&&document){
-          const cached=predicateSnapshot?.uri===document.uri.toString()&&
-            predicateSnapshot.version===document.version?predicateSnapshot:null;
-          const canAdd=cached&&phaseVerifyAddOptions(document.getText(),
-            item.procedureId,item.nodeId,cached.predicateSource,cached.skillName)
-            .some(x=>x.phaseName===item.phaseName);
-          tree.contextValue=canAdd?'skillStudio.phaseWithVerifyAdd':'skillStudio.phase';
-          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
-          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.phaseName=item.phaseName;tree.sourceVersion=item.sourceVersion;
-          tree.documentUri=item.documentUri;
-        }
-        if(item.kind==='phase-step'&&id==='inspection'&&document){
-          const source=document.getText();
-          const hasBinding=bindingOptions.some(x=>
-            x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          const deletable=item.stepOperator==='verify'&&
-            phaseVerifyDeleteOptions(source,item.procedureId,item.nodeId).some(x=>
-              x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          const reorder=item.stepOperator==='verify'
-            ?adjacentVerifyReorderOptions(source,item.procedureId,item.nodeId):[];
-          const canMoveUp=reorder.some(x=>x.phaseName===item.phaseName&&
-            x.stepIndex===item.stepIndex-1);
-          const canMoveDown=reorder.some(x=>x.phaseName===item.phaseName&&
-            x.stepIndex===item.stepIndex);
-          const canEditVerify=deletable||canMoveUp||canMoveDown;
-          const namedVerify=namedVerifyEditOptions(source,item.procedureId,item.nodeId);
-          const canNameVerify=item.stepOperator==='verify'&&!item.stepName&&
-            namedVerify.names.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          const canDeleteNamedVerify=item.stepOperator==='verify'&&Boolean(item.stepName)&&
-            namedVerify.deletions.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          const namedReorder=item.stepOperator==='verify'&&Boolean(item.stepName)&&
-            namedVerify.swaps.some(x=>x.phaseName===item.phaseName&&
-              (x.stepIndex===item.stepIndex||x.stepIndex===item.stepIndex-1));
-          const namedStep=item.stepName?namedPhaseStepImpactReport(source,
-            item.procedureId,item.nodeId).find(x=>x.phaseName===item.phaseName&&
-              x.stepIndex===item.stepIndex&&x.stepName===item.stepName):null;
-          const canRenameNamed=Boolean(namedStep?.editEligible);
-          if(item.stepOperator==='verify'&&(canDeleteNamedVerify||namedReorder)){
-            tree.contextValue=hasBinding?'skillStudio.namedVerifyStepAndBinding':'skillStudio.namedVerifyStep';
-          }else if(canRenameNamed){
-            tree.contextValue=hasBinding?'skillStudio.namedPhaseStepAndBinding':'skillStudio.namedPhaseStep';
-          }else if(item.stepOperator==='verify'&&(canNameVerify||canEditVerify)){
-            tree.contextValue=hasBinding?'skillStudio.verifyStepAndBinding':'skillStudio.verifyStep';
-          }else{
-            tree.contextValue=hasBinding
-              ?(canEditVerify?'skillStudio.phaseStepAndVerify':'skillStudio.phaseStep')
-              :(canEditVerify?'skillStudio.verifyStep':'skillStudio.phaseStepPlain');
-          }
-          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
-          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.phaseName=item.phaseName;tree.stepIndex=item.stepIndex;
-          tree.stepName=item.stepName;tree.stepOperator=item.stepOperator;
-          tree.stepValue=item.stepValue;
-          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
-        }
-        if(item.kind==='phase-outcome-repair'&&id==='inspection'&&document){
-          tree.contextValue='skillStudio.phaseOutcomeRepair';
-          item.sourceVersion=document.version;
-          item.documentUri=document.uri.toString();
-          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.phaseName=item.phaseName;tree.sourceVersion=item.sourceVersion;
-          tree.documentUri=item.documentUri;
-        }
-        if(item.kind==='phase-output-reference'&&id==='inspection'&&document){
-          tree.contextValue='skillStudio.phaseOutputReference';
-          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
-          for(const key of ['procedureId','nodeId','phaseName','stepIndex',
-            'bindingKey','currentValue','choices','producerPhase','producerStep',
-            'producerStepIndex','outputSuffix'])
-            tree[key]=item[key];
-          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
         if(document&&item.line&&item.kind!=='compiler-diagnostic'){
           const rootInfo=packageRootForProcedure(vscode,document);
@@ -3058,7 +2627,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       snapshot={...inspectionSnapshot(text,selection,projected,evidenceFiles,
         rootInfo?.name??"skill",rootInfo?.uri?.toString?.()??"file:///skill"),
         text,evidenceStamp};
-      bindingOptions=[];
       fire();
     }
     const activeRoot=packageRootForProcedure(vscode,doc);
@@ -3175,37 +2743,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     vscode.commands.registerCommand('skillStudio.editNodeOperatorValue',async(item,newValue)=>{
       try{return await editNodeOperatorValue(item,newValue);}
       catch(error){await vscode.window.showWarningMessage('Operator 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editPhaseInputBinding',async(item,bindingKey,newValue)=>{
-      try{return await editPhaseInputBinding(item,bindingKey,newValue);}
-      catch(error){await vscode.window.showWarningMessage('Phase Binding 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editPhaseOutputReference',async(item,bindingKey,newValue)=>{
-      try{return await editPhaseOutputReference(item,bindingKey,newValue);}
-      catch(error){await vscode.window.showWarningMessage('Phase Output Reference 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editPhaseRouteTarget',async(item,newTarget)=>{
-      try{return await editPhaseRouteTarget(item,newTarget);}
-      catch(error){await vscode.window.showWarningMessage('Phase Route 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.repairPhaseOutcome',async(item,requestedAction)=>{
-      try{return await repairPhaseOutcome(item,requestedAction);}
-      catch(error){
-        await vscode.window.showWarningMessage('Phase Outcome 修复未执行：'+error.message);
-        return false;
-      }
-    }),
-    vscode.commands.registerCommand('skillStudio.addPhaseVerify',async(item,predicate)=>{
-      try{return await addPhaseVerify(item,predicate);}
-      catch(error){await vscode.window.showWarningMessage('新增 Verify Step 未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editPhaseVerifyStep',async(item,action)=>{
-      try{return await editPhaseVerifyStep(item,action);}
-      catch(error){await vscode.window.showWarningMessage('Verify Step 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.renameNamedPhaseStep',async(item,newName)=>{
-      try{return await renameNamedPhaseStep(item,newName);}
-      catch(error){await vscode.window.showWarningMessage('Phase Step 重命名未执行：'+error.message);return false;}
     }),
     vscode.commands.registerCommand('skillStudio.insertNode',async(item,spec)=>{
       try{return await insertNode(item,spec);}
