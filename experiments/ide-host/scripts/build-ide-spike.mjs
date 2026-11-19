@@ -5,6 +5,7 @@ import {mkdir,rm,cp,readFile,appendFile,writeFile,stat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {dirname,join} from "node:path";
 const root="experiments/ide-host/vscode";
+const buildId=JSON.stringify(process.env.GITHUB_SHA??"local");
 await rm(join(root,"dist"),{recursive:true,force:true});
 await rm(join(root,"media"),{recursive:true,force:true});
 await mkdir(join(root,"dist"),{recursive:true});
@@ -53,6 +54,7 @@ await build({
   entryPoints:[join(root,"src/extension.mjs")],
   outfile:join(root,"dist/extension.cjs"),
   bundle:true,format:"cjs",platform:"node",target:"node20",
+  define:{STUDIO_BUILD_ID:buildId},
   loader:{".yaml":"text",".yml":"text"},
   external:["vscode"],logLevel:"info"
 });
@@ -63,6 +65,7 @@ await build({
   entryPoints:[join(root,"src/extension.mjs")],
   outfile:join(root,"dist/extension-web.cjs"),
   bundle:true,format:"cjs",platform:"browser",target:"es2022",
+  define:{STUDIO_BUILD_ID:buildId},
   loader:{".yaml":"text",".yml":"text"},
   external:["vscode"],logLevel:"info"
 });
@@ -75,7 +78,10 @@ const theiaWorkerEntry=join(root,"dist/extension-theia.js");
 await build({
   entryPoints:[join(root,"src/extension.mjs")],
   outfile:theiaWorkerEntry,
-  define:{STUDIO_THEIA_HOST:"true"},
+  define:{
+    STUDIO_THEIA_HOST:"true",
+    STUDIO_BUILD_ID:buildId
+  },
   bundle:true,format:"iife",globalName:"__skillStudioTheiaModule",
   platform:"browser",target:"es2022",logLevel:"info",
   loader:{".yaml":"text",".yml":"text"},

@@ -269,9 +269,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
           const epoch=++languageClientEpoch;
           candidate=createSkillLanguageClient(vscode,context,{
-            // The primary extension provides source-local semantic tokens in
-            // Theia. LSP remains responsible for diagnostics and navigation.
-            manualSemanticTokens:false,
+            // The primary extension owns semantic tokens in Theia.
+            // Keep the LSP Worker responsible for diagnostics and navigation.
+            localSemanticTokens:(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
+              /theia/i.test(String(vscode.env?.appName??"")),
             onStatus:status=>{
               if(epoch!==languageClientEpoch)return;
               const state=languagePackages.get(status?.rootUri);
@@ -981,6 +982,30 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
     ));
   }
+
+  // Open the exact Procedure as native Source before inspecting semantic
+  // highlighting. The broader acceptance flow may finish on a Python editor,
+  // whose source-local CA-SL semantic token count is correctly zero.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.openProcedureSourceForHighlightDiagnostics",
+    async procedureUriValue=>{
+      const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
+      if(!/\/assurance\/procedure\.ya?ml$/i.test(procedureUri.path))
+        throw Error("Highlight diagnostics require an exact assurance/procedure.yaml URI");
+      const document=await vscode.workspace.openTextDocument(procedureUri);
+      await openNativeSource(vscode,procedureUri,{
+        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
+      });
+      const editor=vscode.window.activeTextEditor;
+      return {
+        uri:document.uri.toString(),
+        languageId:document.languageId,
+        viewColumn:editor?.document?.uri?.toString()===document.uri.toString()
+          ?editor.viewColumn:null,
+        textLength:document.getText().length
+      };
+    }
+  ));
 
   // Exercise candidate v1alpha5 providers through the public VS Code commands
   // in real Theia. A uniquely named sibling Package is created inside the

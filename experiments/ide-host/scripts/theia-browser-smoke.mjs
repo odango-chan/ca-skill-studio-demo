@@ -985,6 +985,34 @@ try{
       JSON.stringify({phaseEvidence:workbenchEvidence?.phaseEvidence,
         packageOverview:workbenchEvidence?.packageOverview}).slice(0,3000));
 
+  const highlightingSource=await evalJS(`(async()=>{
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&
+      k.prototype?.registerCommand&&k.prototype?.getCommand);
+    if(!key)throw Error("Native Theia command registry is unavailable");
+    return c.get(key).executeCommand(
+      "skillStudio.internal.openProcedureSourceForHighlightDiagnostics",
+      ${JSON.stringify(identity.defaultProcedure)}
+    );
+  })()`);
+  if(!highlightingSource?.uri?.endsWith("/assurance/procedure.yaml")||
+     highlightingSource.languageId!=="yaml"||highlightingSource.viewColumn!==1)
+    throw Error("The exact Procedure did not open as native YAML Source for highlighting: "+
+      JSON.stringify(highlightingSource));
+  let semanticTokenState=null;
+  for(let attempt=0;attempt<50;attempt++){
+    semanticTokenState=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      return c.get(key).executeCommand("skillStudio.internal.semanticTokenDiagnostics");
+    })()`);
+    if(semanticTokenState?.lastUri===highlightingSource.uri&&
+       semanticTokenState.lastTokenCount>0&&semanticTokenState.renderedTokenCount>0)break;
+    await sleep(100);
+  }
   const activationDiagnostics=await evalJS(`(async()=>{
     const c=window.theia.container;
     const key=[...c._bindingDictionary._map.keys()].find(k=>
@@ -997,11 +1025,24 @@ try{
      activationDiagnostics.components?.Workbench!=="READY"||
      activationDiagnostics.components?.["Package Explorer"]!=="READY"||
      activationDiagnostics.packageInventory?.packageCount!==2||
-     activationDiagnostics.packageInventory?.state!=="ready")
-    throw Error("The primary extension did not report a healthy activation: "+
-      JSON.stringify(activationDiagnostics).slice(0,3000));
+     activationDiagnostics.packageInventory?.state!=="ready"||
+     !/^[0-9a-f]{40}$/.test(activationDiagnostics.buildId??"")||
+     activationDiagnostics.welcomeCommandRegistered!==true||
+     activationDiagnostics.welcome?.createWebviewPanelAvailable!==true||
+     activationDiagnostics.semanticTokens?.registered!==true||
+     activationDiagnostics.semanticTokens?.renderer!=="theia-text-editor-decoration"||
+     activationDiagnostics.semanticTokens?.lastUri!==highlightingSource.uri||
+     !(activationDiagnostics.semanticTokens?.lastTokenCount>0)||
+     !(activationDiagnostics.semanticTokens?.renderedTokenCount>0)||
+     activationDiagnostics.semanticTokens?.renderError)
+    throw Error("The primary extension did not report healthy activation, Welcome and semantic highlighting: "+
+      JSON.stringify(activationDiagnostics).slice(0,3500));
   console.log("STUDIO_ACTIVATION_DIAGNOSTICS_CHROMIUM",JSON.stringify({
+    buildId:activationDiagnostics.buildId,
     components:activationDiagnostics.components,
+    welcome:activationDiagnostics.welcome,
+    highlightingSource,
+    semanticTokens:activationDiagnostics.semanticTokens,
     packageInventory:activationDiagnostics.packageInventory
   }));
 
@@ -1046,7 +1087,20 @@ try{
   }
   if(!reopenedWelcome)
     throw Error("The explicit Welcome command did not reopen its editor in an existing workspace");
-  console.log("STUDIO_WELCOME_REOPEN_CHROMIUM",JSON.stringify(reopenedWelcome));
+  const reopenedWelcomeDiagnostics=await evalJS(`(async()=>{
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&
+      k.prototype?.registerCommand&&k.prototype?.getCommand);
+    return c.get(key).executeCommand("skillStudio.showActivationDiagnostics");
+  })()`);
+  if(reopenedWelcomeDiagnostics?.welcome?.panelOpen!==true||
+     reopenedWelcomeDiagnostics?.welcome?.lastError)
+    throw Error("Welcome opened but its live diagnostics do not report a healthy panel: "+
+      JSON.stringify(reopenedWelcomeDiagnostics?.welcome));
+  console.log("STUDIO_WELCOME_REOPEN_CHROMIUM",JSON.stringify({
+    ...reopenedWelcome,welcome:reopenedWelcomeDiagnostics.welcome
+  }));
 
   // Keep the same Chromium user-data directory and OPFS workspace, then reload
   // the page. This is the persistent-profile regression the fresh-profile test

@@ -262,7 +262,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         { language: "python" }
       ],
       synchronize: {},
-      initializationOptions: {},
+      initializationOptions: handlers.localSemanticTokens === true
+        ? {disableSemanticTokens:true} : {},
       outputChannel: output,
       errorHandler: {
         error(error) {
