@@ -37,7 +37,7 @@ export function previewEmptyHtml(kind) {
     <body><h2>${title}</h2><p>${message}</p></body></html>`;
 }
 
-export function createPreviewHostController({mountProcedure,mountContract,mountPredicate,mountSchema}) {
+export function createPreviewHostController({mountProcedure,mountContract,mountPredicate,mountSchema,mountMarkdown}) {
   let view=null,activeSession=null,activeUri=null,activeKind=null,closed=false,generation=0;
   const clear=()=>{
     const former=activeSession;
@@ -59,7 +59,8 @@ export function createPreviewHostController({mountProcedure,mountContract,mountP
       procedure:mountProcedure,
       "skillStudio.contractPreview":mountContract,
       "skillStudio.predicatePreview":mountPredicate,
-      "skillStudio.schemaPreview":mountSchema
+      "skillStudio.schemaPreview":mountSchema,
+      "markdown":mountMarkdown
     }[kind];
     if(!mountForKind){
       view.webview.options={enableScripts:false};
