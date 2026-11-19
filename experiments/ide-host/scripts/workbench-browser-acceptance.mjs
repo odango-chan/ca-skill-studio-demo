@@ -1142,9 +1142,8 @@ export async function runWorkbenchAcceptance({
      markdownPreview.view.scriptMarkers!==0||
      markdownPreview.view.scriptExecuted||
      !markdownPreview.view.csp.includes("default-src 'none'")||
-     !markdownPreview.view.studioMarkdownStatus||
-     !markdownPreview.view.studioMarkdownStatus.includes("Loading Markdown preview")&&
-       markdownPreview.view.studioMarkdownStatus.includes("inventory unavailable"))
+     markdownPreview.view.studioMarkdownStatus.includes("inventory unavailable")||
+     markdownPreview.view.studioMarkdownStatus.includes("Preview unavailable"))
     throw Error("Studio Markdown Preview did not enforce its safe Package-backed projection: "+
       JSON.stringify(markdownPreview.view));
   const safeMarkdownLink=markdownPreview.view.anchorDetails.find(anchor=>
@@ -1186,7 +1185,7 @@ export async function runWorkbenchAcceptance({
     view.heading==="Studio Markdown Preview Acceptance"&&
     view.bodyText.includes("UPDATED")&&!view.bodyText.includes("INITIAL"),
     "v1alpha5 Markdown unsaved Source update");
-  const previewScrollStart=await evaluateStudioMarkdown(updatedMarkdown,
+  const previewScrollStart=await evaluateStudioMarkdown(blockedMissingView,
     "(()=>{window.scrollTo(0,document.body.scrollHeight*0.72);return document.body.scrollHeight;})()");
   if(!(previewScrollStart>1000))
     throw Error("Markdown Preview fixture did not provide a scrollable document: "+previewScrollStart);
@@ -1200,6 +1199,8 @@ export async function runWorkbenchAcceptance({
   if((sourceAfterPreviewScroll?.visibleRanges?.[0]?.start??1)<=35)
     throw Error("Markdown Preview scrolling did not reveal the matching Source lines: "+
       JSON.stringify(sourceAfterPreviewScroll));
+  await evaluateStudioMarkdown(blockedMissingView,"(()=>{window.scrollTo(0,0);return true;})()");
+  await waitStudioMarkdown(view=>view.scrollY===0,"reset Markdown Preview scroll before reverse sync");
   const sourceReveal=await nativeCommand(
     "skillStudio.internal.markdownPreviewRevealSourceAcceptance",markdownFixture.uri,120);
   if(sourceReveal?.line!==120)throw Error("Could not reveal Markdown Source line 120");
@@ -1209,7 +1210,7 @@ export async function runWorkbenchAcceptance({
     throw Error("Markdown Source scrolling did not move the right Preview");
   const markdownEvidence={
     uri:markdownFixture.uri,initialVersion:markdownFixture.version,
-    updatedVersion:updatedMarkdown.view.version,blocks:updatedMarkdown.view.markdownBlockCount,
+    updatedVersion:live.version,blocks:updatedMarkdown.view.markdownBlockCount,
     previewScrollHeight:previewScrollStart,
     sourceAfterPreviewScroll,sourceReveal,previewScrollAfterSource:sourceToPreview.view.scrollY,
     security:{images:blockedMissingView.view.imageCount,
