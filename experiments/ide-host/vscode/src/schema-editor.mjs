@@ -2,7 +2,6 @@ import {openNativeSource,revealNativeSourceLine} from './native-source.mjs';
 
 import {projectJsonSchema, resolveSchemaPointer} from '../../../../site/schema-projection.mjs';
 
-export const SCHEMA_VIEW = 'skillStudio.schemaPreview';
 const SCHEMA_PATH = /\/schemas\/(?:[^/]+\/)*[^/]+\.schema\.ya?ml$/i;
 const LOCAL_FILE = /^[A-Za-z0-9_-]+(?:[._-][A-Za-z0-9_-]+)*\.schema\.ya?ml$/;
 
