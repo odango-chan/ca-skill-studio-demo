@@ -1,11 +1,6 @@
 import { LanguageClient, ErrorAction, CloseAction, State } from "vscode-languageclient/browser";
-import { CompletionRequest, SemanticTokensRequest } from "vscode-languageserver-protocol";
-import { SKILL_SEMANTIC_TOKEN_TYPES, SKILL_SEMANTIC_TOKEN_MODIFIERS } from "../../../../../language/semantic-tokens.mjs";
-import studioLightTheme from "../../../../../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json";
-import { createSemanticTokenDecorationRenderer } from "./semantic-token-decorations.mjs";
 
 export const PACKAGE_SNAPSHOT_NOTIFICATION = "skillStudio/packageSnapshot";
-export const PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION = "skillStudio/packageSnapshotAccepted";
 export const PACKAGE_INVALIDATE_NOTIFICATION = "skillStudio/packageInvalidate";
 export const PACKAGE_CLOSE_NOTIFICATION = "skillStudio/packageClose";
 export const ANALYSIS_STATUS_NOTIFICATION = "skillStudio/analysisStatus";
@@ -46,19 +41,6 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   let heartbeatTimer = null;
   let clientStopPromise = null;
   let client = null;
-  let semanticTokenRegistration = null;
-  let semanticTokenChangeEmitter = null;
-  let semanticTokenRenderer = null;
-  let semanticTokenRefreshQueued = false;
-  function refreshTheiaSemanticTokens() {
-    if (stopped || terminalFailure || !semanticTokenChangeEmitter ||
-        semanticTokenRefreshQueued) return;
-    semanticTokenRefreshQueued = true;
-    queueMicrotask(() => {
-      semanticTokenRefreshQueued = false;
-      if (!stopped && !terminalFailure) semanticTokenChangeEmitter?.fire();
-    });
-  }
   function stopClientAfterFailure() {
     if (!started || !client) return Promise.resolve();
     if (!clientStopPromise) {
@@ -94,157 +76,6 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   worker.addEventListener("messageerror", () => {
     fatal("Browser language Worker message could not be decoded", { stopClient: true });
   });
-  function registerTheiaSemanticTokenProvider(){
-    if(!handlers.manualSemanticTokens||semanticTokenRegistration)return;
-    if(typeof vscode.languages?.registerDocumentSemanticTokensProvider!=="function"||
-       typeof vscode.SemanticTokensLegend!=="function"||
-       typeof vscode.SemanticTokens!=="function"){
-      output.appendLine("Native semantic-token API unavailable in this host");
-      return;
-    }
-    const legend=new vscode.SemanticTokensLegend(
-      [...SKILL_SEMANTIC_TOKEN_TYPES],
-      [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
-    );
-    try{
-      semanticTokenRenderer=createSemanticTokenDecorationRenderer(
-        vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
-      );
-      handlers.onSemanticTokenRendererRegistered?.({
-        renderer:"theia-text-editor-decoration",
-        tokenTypeCount:SKILL_SEMANTIC_TOKEN_TYPES.length
-      });
-    }catch(error){
-      semanticTokenRenderer=null;
-      handlers.onSemanticTokenRendererUnavailable?.(String(error?.message??error));
-      output.appendLine("Theia semantic decoration adapter unavailable: "+
-        String(error?.message??error));
-    }
-    semanticTokenChangeEmitter=new vscode.EventEmitter();
-    const provider={
-      onDidChangeSemanticTokens:semanticTokenChangeEmitter.event,
-      async provideDocumentSemanticTokens(document,cancellationToken){
-        if(stopped||terminalFailure||cancellationToken?.isCancellationRequested)
-          return new vscode.SemanticTokens(new Uint32Array());
-        const uri=document.uri.toString();
-        handlers.onSemanticTokenRequest?.(uri);
-        try{
-          const requestTokens=()=>client.sendRequest(
-            SemanticTokensRequest.type,
-            {textDocument:{uri:document.uri.toString()}},
-            cancellationToken
-          );
-          let result=await requestTokens();
-          if(cancellationToken?.isCancellationRequested)
-            return new vscode.SemanticTokens(new Uint32Array());
-          let data=Uint32Array.from(result?.data??[]);
-          let serverDiagnostics=null;
-          if(data.length===0){
-            try{
-              serverDiagnostics=await client.sendRequest(
-                "skillStudio/semanticTokenDiagnostics",{uri}
-              );
-              // On first open, the editor can request tokens before the
-              // Package snapshot notification has reached the Worker. Wait
-              // briefly for that exact snapshot to become queryable, then
-              // retry once. Empty tokens for a known Package remain valid.
-              for(let attempt=0;!serverDiagnostics?.packageFound&&attempt<40;attempt++){
-                if(cancellationToken?.isCancellationRequested)
-                  return new vscode.SemanticTokens(new Uint32Array());
-                await new Promise(resolve=>setTimeout(resolve,50));
-                serverDiagnostics=await client.sendRequest(
-                  "skillStudio/semanticTokenDiagnostics",{uri}
-                );
-              }
-              if(serverDiagnostics?.packageFound){
-                result=await requestTokens();
-                if(cancellationToken?.isCancellationRequested)
-                  return new vscode.SemanticTokens(new Uint32Array());
-                data=Uint32Array.from(result?.data??[]);
-              }
-              handlers.onSemanticTokenServerDiagnostics?.(serverDiagnostics);
-            }catch{/* Diagnostics are acceptance-only and optional. */}
-          }
-          handlers.onSemanticTokenResult?.(uri,data.length/5);
-          if(semanticTokenRenderer){
-            try{
-              const rendering=semanticTokenRenderer.render(document,data);
-              handlers.onSemanticTokenRendered?.(uri,rendering);
-            }catch(error){
-              handlers.onSemanticTokenRenderError?.(uri,String(error?.message??error));
-              output.appendLine("Semantic token decoration failed: "+
-                String(error?.message??error));
-            }
-          }
-          if(data.length!==0)handlers.onSemanticTokenServerDiagnostics?.(null);
-          return new vscode.SemanticTokens(data,result?.resultId);
-        }catch(error){
-          if(!stopped&&!terminalFailure){
-            handlers.onSemanticTokenError?.(uri,String(error?.message??error));
-            output.appendLine("Semantic token request failed: "+
-              String(error?.message??error));
-          }
-          return new vscode.SemanticTokens(new Uint32Array());
-        }
-      }
-    };
-    semanticTokenRegistration=vscode.languages.registerDocumentSemanticTokensProvider(
-      [
-        {scheme:"file",pattern:"**/*.yaml"},
-        {scheme:"file",pattern:"**/*.yml"},
-        {scheme:"file",pattern:"**/*.py"},
-        {scheme:"file",pattern:"**/SKILL.md"}
-      ],
-      provider,
-      legend
-    );
-    handlers.onSemanticTokenProviderRegistered?.({
-      registered:true,tokenTypeCount:SKILL_SEMANTIC_TOKEN_TYPES.length
-    });
-    output.appendLine("Registered Theia semantic-token adapter from the canonical Skill Language catalog");
-  }
-
-  // Register the cross-language Definition adapter before LanguageClient
-  // installs its generic providers. For a Python Skill entrypoint, the
-  // Package index knows the authoritative YAML caller range; return that
-  // location first so native Go to Definition / Ctrl-click / Peek prefers
-  // the Skill declaration over a Python provider's same-file symbol result.
-  // Returning undefined preserves ordinary Python Definition behavior.
-  let crossLanguageDefinitionRegistration = null;
-  if (typeof vscode.languages?.registerDefinitionProvider === "function") {
-    crossLanguageDefinitionRegistration = vscode.languages.registerDefinitionProvider(
-      { scheme: "file", pattern: "**/*.py" },
-      {
-        async provideDefinition(document, position, cancellationToken) {
-          if (stopped || terminalFailure || !started ||
-              cancellationToken?.isCancellationRequested) return undefined;
-          try {
-            const result = await client.sendRequest("textDocument/definition", {
-              textDocument: { uri: document.uri.toString() },
-              position: { line: position.line, character: position.character }
-            }, cancellationToken);
-            if (cancellationToken?.isCancellationRequested) return undefined;
-            const locations = (Array.isArray(result) ? result : result ? [result] : [])
-              .filter(item => typeof item?.uri === "string" &&
-                /\.ya?ml$/i.test(item.uri) && item.range?.start && item.range?.end)
-              .map(item => new vscode.Location(
-                vscode.Uri.parse(item.uri),
-                new vscode.Range(
-                  item.range.start.line, item.range.start.character,
-                  item.range.end.line, item.range.end.character
-                )
-              ));
-            return locations.length ? locations : undefined;
-          } catch (error) {
-            output.appendLine("Cross-language Definition request failed: " +
-              String(error?.message ?? error));
-            return undefined;
-          }
-        }
-      }
-    );
-  }
-
   client = new LanguageClient(
     "skillStudioLanguageService",
     "Skill Studio Language Service",
@@ -262,7 +93,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
         { language: "python" }
       ],
       synchronize: {},
-      initializationOptions: {},
+      initializationOptions: handlers.localSemanticTokens === true
+        ? {disableSemanticTokens:true} : {},
       outputChannel: output,
       errorHandler: {
         error(error) {
@@ -304,17 +136,8 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     if (started && !stopped && event.newState === State.Stopped)
       fatal("Browser LanguageClient stopped unexpectedly");
   });
-  client.onNotification(PACKAGE_SNAPSHOT_ACCEPTED_NOTIFICATION, accepted => {
-    if (!terminalFailure && accepted?.rootUri && Number.isSafeInteger(accepted.generation)) {
-      handlers.onPackageSnapshotAccepted?.(accepted);
-      refreshTheiaSemanticTokens();
-    }
-  });
   client.onNotification(ANALYSIS_STATUS_NOTIFICATION, status => {
     if (!terminalFailure) handlers.onStatus?.(status);
-    // The manual Theia provider is an adapter over the same LSP endpoint.
-    // Refresh it whenever the accepted Package generation changes state.
-    refreshTheiaSemanticTokens();
     if (status?.state === "UNAVAILABLE" && status?.reason)
       output.appendLine("Analysis unavailable: " + status.reason);
   });
@@ -329,7 +152,6 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       if (!startPromise) {
         startPromise = client.start().then(() => {
           started = true;
-          registerTheiaSemanticTokenProvider();
           scheduleHeartbeat();
         });
       }
@@ -339,16 +161,11 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     invalidatePackage(rootUri, generation) {
       if (!started || stopped || terminalFailure) return;
       client.sendNotification(PACKAGE_INVALIDATE_NOTIFICATION, { rootUri, generation });
-      refreshTheiaSemanticTokens();
     },
     sendPackageSnapshot(snapshot) {
       if (!started || stopped || terminalFailure)
         throw new Error("Language Worker unavailable: " + (terminalFailure ?? "not running"));
       client.sendNotification(PACKAGE_SNAPSHOT_NOTIFICATION, snapshot);
-      // The editor may request tokens before the first Package snapshot exists.
-      // Refresh after posting the snapshot so the next provider request is
-      // ordered behind it on the same Worker message channel; the server stores
-      // the snapshot before awaiting its independent analysis session.
       refreshTheiaSemanticTokens();
     },
     provideCompletion(uri,position) {
@@ -401,12 +218,6 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       } finally {
         crossLanguageDefinitionRegistration?.dispose?.();
         crossLanguageDefinitionRegistration=null;
-        semanticTokenRegistration?.dispose?.();
-        semanticTokenRegistration=null;
-        semanticTokenRenderer?.dispose?.();
-        semanticTokenRenderer=null;
-        semanticTokenChangeEmitter?.dispose?.();
-        semanticTokenChangeEmitter=null;
         worker.terminate();
         output.dispose();
       }
