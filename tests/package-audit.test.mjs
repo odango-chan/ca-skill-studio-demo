@@ -150,6 +150,43 @@ test("project dependency state distinguishes unconfigured dependencies from unav
   assert.ok(blocked.some(item=>item.status==="blocked"));
 });
 
+test("audit continues Predicate Script checks when Procedure is missing",()=>{
+  const files=fixture("establish-pdu-session");
+  files.delete("assurance/procedure.yaml");
+  const predicates=files.get("assurance/predicates.yaml");
+  predicates.text=predicates.text.replace(
+    "scripts/validate-subscription-request.py","scripts/missing-script.py");
+  const diagnostics=auditPackage({files,completeness:"complete",
+    dependencyContext:{available:false}});
+  assert.ok(codes(diagnostics).includes("PACKAGE_CORE_FILE_MISSING"));
+  const script=find(diagnostics,"PREDICATE_SCRIPT_NOT_FOUND","scripts/missing-script.py");
+  assert.ok(script,"available PredicateSet checks must continue after Procedure is missing");
+  assert.equal(script.path,"assurance/predicates.yaml");
+});
+
+test("audit reports Predicate references as NOT_CHECKED when PredicateSet is unavailable",()=>{
+  const files=fixture("establish-pdu-session");
+  files.delete("assurance/predicates.yaml");
+  const diagnostics=auditPackage({files,completeness:"complete",
+    dependencyContext:{available:false}});
+  assert.ok(codes(diagnostics).includes("PACKAGE_CORE_FILE_MISSING"));
+  assert.ok(codes(diagnostics).includes("PREDICATE_REFERENCE_NOT_CHECKED"));
+  assert.ok(!codes(diagnostics).includes("PREDICATE_REFERENCE_NOT_FOUND"),
+    "missing PredicateSet cannot prove a reference is undeclared");
+});
+
+test("audit does not invent dependency errors when Contract is unavailable",()=>{
+  const files=fixture("establish-pdu-session");
+  files.delete("assurance/contract.yaml");
+  const diagnostics=auditPackage({files,completeness:"complete",
+    dependencyContext:{available:false}});
+  assert.ok(codes(diagnostics).includes("PACKAGE_CORE_FILE_MISSING"));
+  assert.ok(codes(diagnostics).includes("TOOL_DEPENDENCY_NOT_CHECKED"));
+  assert.ok(codes(diagnostics).includes("EVIDENCE_DEPENDENCY_NOT_CHECKED"));
+  assert.ok(!codes(diagnostics).includes("TOOL_DEPENDENCY_UNDECLARED"));
+  assert.ok(!codes(diagnostics).includes("EVIDENCE_DEPENDENCY_UNDECLARED"));
+});
+
 test("ToolCatalog v1alpha4 indexes exact Operation and Observation callables",()=>{
   const text=[
     "apiVersion: connectionagent.io/toolcatalog/v1alpha4",
