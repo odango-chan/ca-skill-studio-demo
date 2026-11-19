@@ -1,7 +1,7 @@
 import {openNativeSource} from "./native-source.mjs";
 import {registerPreviewHost} from "./preview-host.mjs";
-import {createSourceOnlyEditorNormalizer} from "./editor-group-placement.mjs";
-import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair} from "./source-view-pair.mjs";
+
+import {openSourceViewPair,sourceViewType,forgetSourceViewPair} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
@@ -612,44 +612,12 @@ export function activate(context){
       if(!isProcedurePath(target.path))return;
       await openSourceViewPair(vscode,target);
     }));
-  const pairActiveYamlSource=uri=>{
-    if(!uri||!sourceViewType(uri)||hasSourceViewPair(uri))return;
-    void openSourceViewPair(vscode,uri).catch(error=>{
-      console.warn("SKILL Studio Source/Visual pairing failed:",String(error?.message??error));
-      void vscode.window.showWarningMessage(
-        "无法打开对应的 Skill Designer；原始 Source 仍可继续编辑。");
-    });
-  };
-  // Keep ordinary editable documents in the primary Source group. Without
-  // this normalization, opening a Python/unsupported YAML file while a
-  // Designer is focused inherits the right-hand Visual group; the next
-  // Source/Visual pair can then cause Theia to create a third editor column.
-  // Paired YAML is deliberately excluded because openSourceViewPair owns its
-  // two fixed positions. Moving an ordinary tab preserves its TextDocument,
-  // dirty state, native Undo history and editor identity.
-  const normalizeSourceOnlyEditor=createSourceOnlyEditorNormalizer(vscode,{
-    sourceViewType,hasSourceViewPair,
-    onError:error=>console.warn(
-      "SKILL Studio could not return a Source-only editor to the primary group:",
-      String(error?.message??error))
-  });
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
-    pairActiveYamlSource(editor?.document?.uri);
-    normalizeSourceOnlyEditor(editor);
-  }));
-  // A restored YAML Source may already be active before onStartupFinished
-  // activates this extension, so apply the same pairing once after activation.
-  const initiallyActiveYaml=vscode.window.activeTextEditor?.document?.uri;
-  if(initiallyActiveYaml)setTimeout(()=>{
-    if(vscode.window.activeTextEditor?.document?.uri?.toString()===initiallyActiveYaml.toString()){
-      pairActiveYamlSource(initiallyActiveYaml);
-      // Also normalize a Source-only document restored by the host before
-      // extension activation (there is no active-editor event in that case).
-      normalizeSourceOnlyEditor(vscode.window.activeTextEditor);
-    }
-  },0);
-  // Real-Chromium acceptance only: exercise several Designer tabs followed by
-  // ordinary Python/YAML Source documents while the Visual group is focused.
+  // The right-side Preview Host follows the active TextEditor itself.
+  // Do not reopen a Source file from active-editor callbacks or move tabs
+  // between groups after the fact: those repairs caused the third-column
+  // regression and can trigger recursive open events.
+  // Real-Chromium acceptance only: exercise multiple visualizable Source tabs
+  // followed by ordinary Python/YAML Source documents in the same editor group.
   // The command is deliberately not contributed to the user command palette.
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.editorGroupAcceptance",async()=>{
@@ -692,7 +660,7 @@ export function activate(context){
       if(!pythonFiles.length)throw Error("CA-SL v1alpha5 Python acceptance fixture is missing");
       const python=await vscode.workspace.openTextDocument(pythonFiles[0]);
       await vscode.window.showTextDocument(python,{
-        viewColumn:vscode.ViewColumn.Two,preserveFocus:false,preview:false
+        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
       const waitForPrimary=async uri=>{
         const started=Date.now();
@@ -702,7 +670,7 @@ export function activate(context){
           if(editor?.viewColumn===vscode.ViewColumn.One)return editor;
           await new Promise(resolve=>setTimeout(resolve,25));
         }
-        throw Error("Source-only editor was not normalized into the primary group: "+uri.toString());
+        throw Error("Source-only editor did not open in the primary group: "+uri.toString());
       };
       const pythonColumn=(await waitForPrimary(python.uri)).viewColumn;
       // Use a saved, temporary ordinary YAML file rather than an Untitled
@@ -719,13 +687,12 @@ export function activate(context){
       if(yamlDocument.isDirty)
         throw Error("Temporary YAML fixture remained dirty after save");
       await vscode.window.showTextDocument(yamlDocument,{
-        viewColumn:vscode.ViewColumn.Two,preserveFocus:false,preview:false
+        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
       const ordinaryYamlColumn=(await waitForPrimary(yamlDocument.uri)).viewColumn;
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
       await vscode.workspace.fs.delete(yamlUri);
-      // Open a second Package's Designer after the Source-only tabs have been
-      // normalized. This catches the original two-to-three-column regression.
+      // Opening a second Skill's Source must not create another EditorGroup.
       const secondProcedure=procedures.find(uri=>
         !uri.path.startsWith(firstRoot.path+"/"));
       if(secondProcedure)await openSourceViewPair(vscode,secondProcedure);
