@@ -291,14 +291,16 @@ connection.onInitialize(() => ({
     textDocumentSync: TextDocumentSyncKind.None,
     definitionProvider: true,
     referencesProvider: true,
-    semanticTokensProvider: {
-      legend: {
-        tokenTypes: [...SKILL_SEMANTIC_TOKEN_TYPES],
-        tokenModifiers: [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
-      },
-      full: true,
-      range: false
-    },
+    ...(params?.initializationOptions?.disableSemanticTokens === true ? {} : {
+      semanticTokensProvider: {
+        legend: {
+          tokenTypes: [...SKILL_SEMANTIC_TOKEN_TYPES],
+          tokenModifiers: [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
+        },
+        full: true,
+        range: false
+      }
+    }),
     hoverProvider: true,
     documentSymbolProvider: true,
     completionProvider: {
