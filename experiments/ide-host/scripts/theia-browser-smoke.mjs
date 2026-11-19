@@ -819,6 +819,51 @@ try{
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp,
     requireCompilerWorker,procedureUri:identity.defaultProcedure
   });
+  // Native Python TextMate colors must be visible in both hosts, independent
+  // of CA-SL semantic token/LSP analysis. Use the extension's exact Example
+  // Source opener: Quick Open can inherit focus from Compiler Output.
+  if(requireEditor){
+    const opened=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      if(!key)throw Error('Native command registry missing for Python syntax');
+      return c.get(key).executeCommand(
+        'skillStudio.internal.openPythonSyntaxAcceptance');
+    })()`);
+    if(!opened?.uri?.endsWith("/scripts/validate-subscription-request.py")||
+       opened.languageId!=="python"||opened.viewColumn!==1)
+      throw Error("Exact native Python Source did not open in the primary group: "+
+        JSON.stringify(opened));
+    let pythonTextMate=null;
+    for(let attempt=0;attempt<35;attempt++){
+      pythonTextMate=await evalJS(`(()=>{
+        const editor=[...document.querySelectorAll('.monaco-editor')]
+          .find(node=>{
+            const r=node.getBoundingClientRect();
+            if(r.width<=150||r.height<=100||!node.querySelector('.view-lines'))
+              return false;
+            for(let parent=node;parent;parent=parent.parentElement)
+              if(String(parent.id??'').includes('validate-subscription-request.py'))
+                return true;
+            return false;
+          });
+        const tokens=[...(editor?.querySelectorAll('.view-lines span')??[])];
+        return {matchingFile:!!editor,title:document.title,
+          tokenCount:tokens.length,
+          colors:[...new Set(tokens.map(node=>getComputedStyle(node).color))],
+          visibleText:editor?.querySelector('.view-lines')?.innerText?.slice(0,250)??''};
+      })()`);
+      if(pythonTextMate.matchingFile&&pythonTextMate.colors.length>=3)break;
+      await sleep(120);
+    }
+    console.log("STUDIO_NATIVE_PYTHON_TEXTMATE_CHROMIUM",
+      JSON.stringify(pythonTextMate));
+    if(!pythonTextMate?.matchingFile||!(pythonTextMate?.colors?.length>=3))
+      throw Error("Native Python TextMate colors absent in the exact Source: "+
+        JSON.stringify(pythonTextMate));
+  }
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
     ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};

@@ -3,7 +3,7 @@
 // provision wildcard webview DNS/certificates, so this isolated preview uses
 // same-origin sandboxed webviews. Do not use this build for sensitive files
 // or production. The full backend host keeps the normal isolated host pattern.
-import {copyFile,cp,mkdir,readdir,readFile,stat,writeFile} from "node:fs/promises";
+import {copyFile,cp,mkdir,readdir,readFile,rm,stat,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 const root=resolve("experiments/ide-host/theia-online/lib/frontend");
 const bundlePath=join(root,"bundle.js");
@@ -46,6 +46,10 @@ const pluginTarget=join(root,"hostedPlugin","odango_chan_ca_skill_studio_ide_spi
 for(const name of ["samples","media","icons","l10n","package.nls.json","package.nls.zh-cn.json"]){
   await cp(join(pluginSource,name),join(pluginTarget,name),{recursive:true,force:true});
 }
+// The static Theia copier does not guarantee arbitrary primary-extension
+// assets. Stage TextMate grammars alongside the extension that contributes them.
+await cp(join(pluginSource,"dist","grammars"),join(pluginTarget,"dist","grammars"),
+  {recursive:true,force:true});
 // The static Theia copier does not guarantee arbitrary binary Worker assets.
 // Stage the pinned Compiler Worker, Go runtime shim and WASM Core explicitly.
 const compilerDistSource=join(pluginSource,"dist");
@@ -222,32 +226,45 @@ for(const required of [
 console.log("STUDIO_THEIA_STATIC_THEME_ASSETS",JSON.stringify({
   themePluginTarget,assets:["package.json","themes/**","icons/**","styles/**"],offlinePackage:true,
 }));
-// The static frontend's hostedPlugin copier omits arbitrary declarative
-// extension assets just as it does for the theme package. Stage the pinned
-// TextMate grammar package explicitly; otherwise YAML/Python documents fall
-// back to plain-text tokenization even though the plugin manifest is listed.
-const syntaxPluginSource=resolve("experiments/ide-host/theia-online/plugins/odango-chan.skill-studio-languages");
-const syntaxPluginTarget=join(root,"hostedPlugin","odango_chan_skill_studio_languages");
-const syntaxManifest=JSON.parse(await readFile(join(syntaxPluginSource,"package.json"),"utf8"));
-if(syntaxManifest.main||syntaxManifest.browser)
-  throw Error("Static syntax extension must remain declarative");
-await mkdir(syntaxPluginTarget,{recursive:true});
-await copyFile(join(syntaxPluginSource,"package.json"),join(syntaxPluginTarget,"package.json"));
-await cp(join(syntaxPluginSource,"upstream"),join(syntaxPluginTarget,"upstream"),
-  {recursive:true,force:true});
+// The standalone syntax plugin is retired. Verify that both languages and
+// every grammar contribution resolve inside the primary hosted extension.
+const primaryManifest=JSON.parse(await readFile(join(pluginTarget,"package.json"),"utf8"));
+for(const language of ["yaml","python"]){
+  if(!primaryManifest.contributes?.languages?.some(item=>item.id===language)||
+     !primaryManifest.contributes?.grammars?.some(item=>item.language===language))
+    throw Error("Static primary extension is missing "+language+" syntax contributions");
+}
 const missingSyntaxAssets=[];
-for(const grammar of syntaxManifest.contributes?.grammars??[]){
-  const asset=join(syntaxPluginTarget,grammar.path);
+for(const grammar of primaryManifest.contributes.grammars??[]){
+  if(!grammar.path.startsWith("./dist/grammars/")){
+    missingSyntaxAssets.push(grammar.path);
+    continue;
+  }
+  const asset=join(pluginTarget,grammar.path);
   try{
     const info=await stat(asset);
     if(!info.isFile()||info.size<100)missingSyntaxAssets.push(grammar.path);
   }catch{missingSyntaxAssets.push(grammar.path);}
 }
+for(const language of ["yaml","python"]){
+  const contribution=primaryManifest.contributes.languages.find(item=>item.id===language);
+  const asset=join(pluginTarget,contribution?.configuration??"");
+  try{
+    const info=await stat(asset);
+    if(!info.isFile()||info.size<80)missingSyntaxAssets.push(contribution?.configuration??language);
+  }catch{missingSyntaxAssets.push(contribution?.configuration??language);}
+}
 if(missingSyntaxAssets.length)
-  throw Error("Static hosted syntax grammar assets missing: "+missingSyntaxAssets.join(", "));
-console.log("STUDIO_THEIA_STATIC_SYNTAX_ASSETS",JSON.stringify({
-  syntaxPluginTarget,languages:syntaxManifest.contributes.languages.map(item=>item.id),
-  grammarCount:syntaxManifest.contributes.grammars.length,offlinePackage:true
+  throw Error("Static primary extension syntax assets missing: "+missingSyntaxAssets.join(", "));
+const retiredSyntaxPlugin=join(root,"hostedPlugin","odango_chan_skill_studio_languages");
+await rm(retiredSyntaxPlugin,{recursive:true,force:true});
+const hostedPluginRegistryText=await readFile(join(root,"hostedPlugin","list.json"),"utf8");
+if(hostedPluginRegistryText.includes("skill-studio-languages"))
+  throw Error("Standalone syntax plugin remains in the static hostedPlugin registry");
+console.log("STUDIO_THEIA_STATIC_PRIMARY_EXTENSION_SYNTAX_ASSETS",JSON.stringify({
+  pluginTarget,languages:["yaml","python"],
+  grammarCount:primaryManifest.contributes.grammars.length,
+  standaloneSyntaxPluginRemoved:true
 }));
 console.log("STUDIO_THEIA_STATIC_WEBVIEW_PREVIEW",JSON.stringify({
   theiaVersion:"1.76.0",hostPattern:"{{hostname}}",sameOriginDemoOnly:true,

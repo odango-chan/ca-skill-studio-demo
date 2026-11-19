@@ -632,6 +632,23 @@ export function activate(context){
   // Real-Chromium acceptance only: exercise several Designer tabs followed by
   // ordinary Python/YAML Source documents while the Visual group is focused.
   // The command is deliberately not contributed to the user command palette.
+  // Acceptance-only native Python Source activation. This is intentionally
+  // independent of Quick Open focus (which may be owned by Compiler Output).
+  // Only the pinned Example's known source file can be selected here.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.openPythonSyntaxAcceptance",async()=>{
+      const folders=vscode.workspace.workspaceFolders??[];
+      if(folders.length!==1)throw Error("Python syntax probe needs one Example workspace");
+      const uri=vscode.Uri.joinPath(folders[0].uri,"skills",
+        "establish-pdu-session","scripts","validate-subscription-request.py");
+      const doc=await vscode.workspace.openTextDocument(uri);
+      const editor=await vscode.window.showTextDocument(doc,{
+        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
+      });
+      return {uri:doc.uri.toString(),languageId:doc.languageId,
+        viewColumn:editor.viewColumn};
+    }
+  ));
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.editorGroupAcceptance",async()=>{
       const discoveredProcedures=await vscode.workspace.findFiles(

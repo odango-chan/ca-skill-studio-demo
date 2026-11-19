@@ -41,10 +41,11 @@ const packageSnapshots = new Map();
 const symbolIndexes = new Map();
 const requestedGeneration = new Map();
 
-function reportError(message, rootUri = undefined) {
+function reportError(message, rootUri = undefined, generation = undefined) {
   connection.sendNotification(SERVER_ERROR_NOTIFICATION, {
     message: String(message),
-    ...(typeof rootUri === "string" ? { rootUri } : {})
+    ...(typeof rootUri === "string" ? { rootUri } : {}),
+    ...(Number.isSafeInteger(generation) ? { generation } : {})
   });
 }
 
@@ -1007,22 +1008,25 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
     if (!result.accepted && result.reason !== "SUPERSEDED" &&
         result.reason !== "STALE_GENERATION" &&
         result.reason !== "STALE_DOCUMENT") {
-      packageAnalyses.delete(rootUri);
+      // Analysis failure invalidates navigation/diagnostics, not the admitted
+      // source snapshot. Semantic coloring is an independent AST projection
+      // and must continue to work for an invalid or unqualified Package.
       if(packageSnapshots.get(rootUri)===snapshot){
-        packageSnapshots.delete(rootUri);
+        packageAnalyses.delete(rootUri);
         symbolIndexes.delete(rootUri);
+        refreshSemanticTokens();
       }
-      refreshSemanticTokens();
-      reportError("Package analysis rejected: " + result.reason, rootUri);
+      reportError("Package analysis rejected: " + result.reason, rootUri, snapshot.generation);
     }
   } catch (error) {
-    packageAnalyses.delete(rootUri);
+    // An analyzer exception must never remove the current source used by
+    // semantic tokens. Also protect a newer generation from a stale failure.
     if(packageSnapshots.get(rootUri)===snapshot){
-      packageSnapshots.delete(rootUri);
+      packageAnalyses.delete(rootUri);
       symbolIndexes.delete(rootUri);
+      refreshSemanticTokens();
     }
-    refreshSemanticTokens();
-    reportError(error?.message ?? error, rootUri);
+    reportError(error?.message ?? error, rootUri, snapshot.generation);
   }
 });
 

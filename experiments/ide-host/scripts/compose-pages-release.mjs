@@ -28,7 +28,8 @@ export async function composePagesRelease({theiaFrontend,outputDist,siteRoot=nul
     "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
     "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
     "hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg",
-    "hostedPlugin/odango_chan_skill_studio_languages/package.json"
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/grammars/yaml/syntaxes/yaml.tmLanguage.json",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/grammars/python/syntaxes/MagicPython.tmLanguage.json"
   ])await requireFile(theia,asset);
 
   const html=await readFile(join(theia,"index.html"),"utf8");
@@ -39,9 +40,11 @@ export async function composePagesRelease({theiaFrontend,outputDist,siteRoot=nul
     throw new Error("Theia index must show the same-origin demo safety warning and contain no Classic navigation/assets");
 
   const pluginList=await readFile(join(theia,"hostedPlugin/list.json"),"utf8");
-  for(const id of ["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]){
+  for(const id of ["ca-skill-studio-ide-spike","skill-studio-theme"]){
     if(!pluginList.includes(id))throw new Error("Theia hostedPlugin list is missing "+id);
   }
+  if(pluginList.includes("skill-studio-languages"))
+    throw new Error("The retired standalone syntax plugin must not be published");
 
   await rm(output,{recursive:true,force:true});
   await mkdir(output,{recursive:true});
