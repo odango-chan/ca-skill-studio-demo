@@ -91,11 +91,11 @@ test("legacy persisted Example sends actionable Package status without generic s
       String(message.params?.message??"").includes("ANALYSIS_UNAVAILABLE"),300);
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(1,
-        "apiVersion: connectionagent.io/v1alpha1\\nprocedures: {}\\n",rootUri)});
+        "apiVersion: connectionagent.io/v1alpha1\nprocedures: {}\n",rootUri)});
     const result=await status;
     assert.equal(result.params.state,"UNAVAILABLE");
     assert.match(result.params.reason,/UNSUPPORTED_CA_SL_VERSION/);
-    assert.match(result.params.reason,/start\\/nodes/);
+    assert.match(result.params.reason,/start\/nodes/);
     assert.ok(result.params.unlocated.some(item=>
       item.code==="UNSUPPORTED_CA_SL_VERSION"));
     assert.equal(await duplicateError,null,
