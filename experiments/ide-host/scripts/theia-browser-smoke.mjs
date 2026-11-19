@@ -85,7 +85,12 @@ if(server){
     basePath
   }));
 }
-const url=externalUrl||("http://127.0.0.1:"+server.address().port+basePath+"/");
+let url=externalUrl||("http://127.0.0.1:"+server.address().port+basePath+"/");
+if(requireEditor){
+  const acceptanceUrl=new URL(url);
+  acceptanceUrl.searchParams.set("skillStudioFixedLayoutTest","1");
+  url=acceptanceUrl.toString();
+}
 const profile=await mkdtemp(join(tmpdir(),"theia-online-chrome-"));
 const child=spawn(chrome,["--headless=new","--no-sandbox","--disable-gpu",
   "--disable-dev-shm-usage","--no-first-run","--no-default-browser-check",
