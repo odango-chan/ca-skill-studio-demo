@@ -135,7 +135,25 @@ export function registerPreviewHost(vscode,context,renderers) {
   const isTheiaHost=vscode.env?.uriScheme==="theia"||
     (typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST);
   let lastDocument=vscode.window.activeTextEditor?.document??null;
-  let revealInFlight=null;
+  let revealInFlight=null,markdownActivation=null;
+  const activateMarkdownLanguageFeatures=()=>{
+    const extension=vscode.extensions?.getExtension?.("vscode.markdown-language-features");
+    if(!extension||extension.isActive)return Promise.resolve(Boolean(extension));
+    if(markdownActivation)return markdownActivation;
+    // Browser-only Theia removes onLanguage:markdown to prevent the built-in
+    // extension racing the first-open lifecycle. Activate its language
+    // features explicitly when Markdown Source becomes active; do not invoke
+    // any of its Preview commands or CustomEditor providers.
+    markdownActivation=Promise.resolve().then(()=>extension.activate())
+      .then(()=>true)
+      .catch(error=>{
+        console.warn("SKILL Studio could not activate native Markdown language features:",
+          String(error?.message??error));
+        return false;
+      })
+      .finally(()=>{markdownActivation=null;});
+    return markdownActivation;
+  };
   const revealContainer=()=>{
     // Theia's generated view-container commands are not exposed to the plugin
     // host. Its native ApplicationShell contribution opens this container.
@@ -160,13 +178,18 @@ export function registerPreviewHost(vscode,context,renderers) {
     // Retain the last document and ignore the transient null editor event.
     if(!editor?.document)return;
     lastDocument=editor.document;
+    const kind=previewDocumentKind(lastDocument.uri);
+    if(kind==="markdown")void activateMarkdownLanguageFeatures();
     controller.update(lastDocument);
-    if(previewDocumentKind(lastDocument.uri)!=="none"&&!controller.state.visible)
+    if(kind!=="none"&&!controller.state.visible)
       void revealContainer();
   });
   // The extension may activate after the initial Source editor is already open.
-  if(lastDocument&&previewDocumentKind(lastDocument.uri)!=="none")
-    void revealContainer();
+  if(lastDocument){
+    const kind=previewDocumentKind(lastDocument.uri);
+    if(kind==="markdown")void activateMarkdownLanguageFeatures();
+    if(kind!=="none")void revealContainer();
+  }
   context.subscriptions.push(subscription,active,{dispose:()=>controller.dispose()});
   return controller;
 }
