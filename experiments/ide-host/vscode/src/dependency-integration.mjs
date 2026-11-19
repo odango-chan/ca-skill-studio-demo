@@ -91,9 +91,9 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         item.iconPath=new vscode.ThemeIcon("symbol-method");
         item.tooltip="ToolCatalog declaration · Owner: "+
           (node.operation.owner??"UNKNOWN")+" (DECLARED, NOT AUTHORIZED)"+
-          "\\nEffect: "+(node.operation.effect??"UNKNOWN")+
-          "\\nOwner/Capability authorization: NOT_CHECKED"+
-          "\\nRuntime readiness: NOT_CHECKED";
+          "\nEffect: "+(node.operation.effect??"UNKNOWN")+
+          "\nOwner/Capability authorization: NOT_CHECKED"+
+          "\nRuntime readiness: NOT_CHECKED";
         item.command={command:"skillStudio.inspectDependencyContract",
           title:"Inspect Contract",arguments:[node.dependency.id,node.operation.id]};
         return item;
@@ -126,8 +126,10 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
     "skill-studio-dependency",{
       provideTextDocumentContent(uri){return previews.get(uri.path)??"";}
     }));
-  function prepareToolContract(snapshot,text){
-    const path="/"+snapshot.id+"/"+snapshot.snapshotDigest.slice(7)+"/tool-contract.json";
+  function prepareToolCatalog(snapshot,sourcePath,text){
+    // This is a virtual read-only view of the exact verified lock bytes.
+    // Never change the underlying snapshot or open an unpinned remote URL.
+    const path="/"+snapshot.id+"/"+snapshot.snapshotDigest.slice(7)+"/"+sourcePath;
     const uri=vscode.Uri.from({scheme:"skill-studio-dependency",path});
     previews.set(path,text);
     return uri;
@@ -135,23 +137,29 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
   async function inspect(id,operationId=null){
     const root=await ensureRoot(),resolved=await resolveLockedDependencies(vscode,root);
     const snap=resolved.snapshots.find(entry=>entry.id===id);
-    if(!snap)throw Error("Locked contract missing or invalid; refusing to use remote latest");
-    const file=snap.files.find(item=>item.path==="tool-contract.json");
-    if(!file)throw Error("No canonical Tool Contract in snapshot");
-    const text=JSON.stringify(JSON.parse(new TextDecoder().decode(decodeBase64(file.bytes))),null,2);
-    const document=await vscode.workspace.openTextDocument(prepareToolContract(snap,text));
-    const editor=await vscode.window.showTextDocument(document,
-      {preview:true,preserveFocus:false});
-    if(typeof operationId==="string"&&operationId){
-      const marker='\n      "id": '+JSON.stringify(operationId);
-      const offset=text.indexOf(marker);
-      if(offset>=0&&typeof document.positionAt==="function"){
-        const start=document.positionAt(offset+'\n      "id": '.length);
-        const end=document.positionAt(offset+marker.length);
-        editor.selection=new vscode.Selection(start,end);
-        editor.revealRange?.(new vscode.Range(start,end),
-          vscode.TextEditorRevealType?.InCenter);
-      }
+    if(!snap)throw Error("Locked snapshot missing or invalid; refusing to use remote latest");
+    const catalog=projectLockedToolCatalog(snap);
+    if(!catalog.available)throw Error("Locked ToolCatalog is not available: "+catalog.reason);
+    const matches=typeof operationId==="string"&&operationId
+      ?catalog.operations.filter(item=>item.id===operationId):catalog.operations;
+    if(matches.length!==1)throw Error(matches.length
+      ?"ToolCatalog callable selection is ambiguous"
+      :"ToolCatalog callable was not found in the verified lock");
+    const selected=matches[0];
+    const file=snap.files.find(item=>item.path===selected.catalogPath);
+    if(!file)throw Error("ToolCatalog declaration file is missing from verified lock");
+    const text=new TextDecoder("utf-8",{fatal:true}).decode(decodeBase64(file.bytes));
+    const document=await vscode.workspace.openTextDocument(
+      prepareToolCatalog(snap,selected.catalogPath,text));
+    const editor=await vscode.window.showTextDocument(document,{
+      viewColumn:vscode.ViewColumn.One,preview:true,preserveFocus:false
+    });
+    if(selected.idRange&&typeof document.positionAt==="function"){
+      const start=document.positionAt(selected.idRange.start);
+      const end=document.positionAt(selected.idRange.end);
+      editor.selection=new vscode.Selection(start,end);
+      editor.revealRange?.(new vscode.Range(start,end),
+        vscode.TextEditorRevealType?.InCenter);
     }
   }
   async function askAlias(){
