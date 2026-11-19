@@ -58,6 +58,61 @@ function packageSnapshot(generation, procedureText, rootUri = "file:///workspace
   };
 }
 
+test("analysis rejection preserves independent v1alpha5 source semantic colors until Package close",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  const rootUri="file:///workspace/semantic-rejection";
+  const source=[
+    "start: check",
+    "nodes:",
+    "  check:",
+    "    operation:",
+    "      tool: ca::demo.read",
+    "      routes:",
+    "        SUCCEEDED: SUCCEEDED",
+    ""
+  ].join("\n");
+  const snapshot=packageSnapshot(1,source,rootUri);
+  const procedureUri=snapshot.documents[0].uri;
+  // An invalid contract document version triggers the real diagnostic
+  // session's INVALID_SNAPSHOT rejection *after* the exact source is admitted.
+  snapshot.documents[1].version="invalid";
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:51,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
+    const initialized=await waitForMessage(worker,message=>message?.id===51);
+    assert.equal(initialized.result.capabilities.semanticTokensProvider.full,true);
+    worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
+    const admitted=waitForMessage(worker,message=>
+      message?.method==="skillStudio/packageSnapshotAccepted"&&
+      message.params?.rootUri===rootUri&&message.params?.generation===1);
+    const rejected=waitForMessage(worker,message=>
+      message?.method==="skillStudio/serverError"&&
+      message.params?.rootUri===rootUri&&
+      String(message.params?.message??"").includes("INVALID_SNAPSHOT"));
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
+    await Promise.all([admitted,rejected]);
+    const diagnostic=await lspRequest(worker,52,"skillStudio/semanticTokenDiagnostics",
+      {uri:procedureUri});
+    assert.equal(diagnostic.packageFound,true,
+      "rejected analysis must not delete the accepted source snapshot");
+    assert.ok(diagnostic.tokenCount>0);
+    const tokens=await lspRequest(worker,53,"textDocument/semanticTokens/full",
+      {textDocument:{uri:procedureUri}});
+    assert.ok(tokens.data.length>0,
+      "source-based coloring must survive invalid diagnostic data");
+    assert.equal(tokens.data.length%5,0);
+
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageClose",
+      params:{rootUri}});
+    const afterClose=await lspRequest(worker,54,"skillStudio/semanticTokenDiagnostics",
+      {uri:procedureUri});
+    assert.equal(afterClose.packageFound,false,
+      "explicit Package close still revokes the source snapshot");
+  }finally{
+    await worker.terminate();
+  }
+});
+
 test("browser LSP Worker initializes, publishes diagnostics and clears a closed Package",async()=>{
   const worker = new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   try {
