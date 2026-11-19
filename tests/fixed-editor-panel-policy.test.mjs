@@ -162,7 +162,9 @@ test("Theia Source lifecycle reveals the exact Preview view, not only its Inspec
   const content = readFileSync(
     "experiments/ide-host/theia-fixed-workbench/src/browser/fixed-workbench-frontend-module.ts",
     "utf8");
-  assert.match(content,/pluginViews\.openView\(PREVIEW_VIEW_ID, \{ reveal: true \}\)/);
+  assert.match(content,/commands\.executeCommand\(openCommand\)/);
+  assert.match(content,/shell\.revealWidget\(PREVIEW_WIDGET_ID\)/);
+  assert.doesNotMatch(content,/@theia\/plugin-ext\/lib\/main/);
   assert.match(content,/previewViewVisible:/);
   assert.match(content,/shell\.getCurrentWidget\('main'\)/);
   assert.match(content,/shell\.isExpanded\('right'\)/);

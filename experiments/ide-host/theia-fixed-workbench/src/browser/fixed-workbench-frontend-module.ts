@@ -6,7 +6,7 @@ import { CorePreferences } from '@theia/core/lib/common/core-preferences';
 import { MAIN_AREA_CLASS } from '@theia/core/lib/browser/shell/application-shell';
 import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
 import type { DockPanel } from '@lumino/widgets';
-import { PluginViewRegistry } from '@theia/plugin-ext/lib/main/browser/view/plugin-view-registry';
+import { CommandRegistry } from '@theia/core/lib/common/command';
 import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference, hasVisualizableSourceEditor } from './fixed-editor-panel-policy.mjs';
 
 const PREVIEW_CONTAINER_WIDGET_ID = 'plugin-view-container:workbench.view.extension.skillStudioInspector';
@@ -20,7 +20,7 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
     // can resolve on both backend and browser-only Theia.
     bind(FrontendApplicationContribution).toDynamicValue(({ container }) => {
         const state = container.get(FrontendApplicationStateService);
-        const pluginViews = container.get(PluginViewRegistry);
+        const commands = container.get(CommandRegistry);
         let stopped = false;
         let added: { dispose(): void } | undefined;
         let changed: { dispose(): void } | undefined;
@@ -66,6 +66,18 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                 (window as unknown as {
                     __skillStudioPreviewActivation?: () => ReturnType<typeof getStatus>;
                 }).__skillStudioPreviewActivation = getStatus;
+                const openNestedPreview = async () => {
+                    // Theia plugin view commands are registered on the Core
+                    // CommandRegistry. Avoid importing plugin-ext internals:
+                    // its browser-only and backend bundles resolve differently.
+                    if (shell.getWidgetById(PREVIEW_WIDGET_ID)) {
+                        return shell.revealWidget(PREVIEW_WIDGET_ID);
+                    }
+                    const openCommand = PREVIEW_VIEW_ID + '.open';
+                    if (!commands.getCommand(openCommand)) return undefined;
+                    await commands.executeCommand(openCommand);
+                    return shell.getWidgetById(PREVIEW_WIDGET_ID);
+                };
                 const revealView = () => {
                     if (stopped || selectingPreview) return;
                     selectingPreview = true;
@@ -73,7 +85,7 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                     // contain an expanded Inspector and a collapsed Preview.
                     // Theia's PluginViewRegistry opens the exact contributed
                     // WebviewView without allocating a second EditorGroup.
-                    void pluginViews.openView(PREVIEW_VIEW_ID, { reveal: true })
+                    void openNestedPreview()
                         .catch(error => console.warn('SKILL Studio Preview view could not be revealed:', error))
                         .finally(() => { selectingPreview = false; });
                 };
@@ -103,7 +115,7 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                         void shell.revealWidget(PREVIEW_CONTAINER_WIDGET_ID)
                             .then(async revealed => {
                                 if (stopped || !revealed) return;
-                                const preview = await pluginViews.openView(PREVIEW_VIEW_ID, { reveal: true });
+                                const preview = await openNestedPreview();
                                 if (stopped) return;
                                 const visible = !!preview && container.isVisible &&
                                     shell.isExpanded('right') &&
