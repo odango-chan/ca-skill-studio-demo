@@ -3140,7 +3140,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       'Package ZIP 已准备好；请在 Procedure 画布上点击“下载 ZIP”。');
     return true;
   }
-  context.subscriptions.push({dispose(){clearTimeout(timer);generation++;sessions.clear();selections.clear();}},
+  context.subscriptions.push({dispose(){generation++;sessions.clear();selections.clear();}},
     vscode.commands.registerCommand('skillStudio.revealInspection',async item=>{
       if(!document||item.version!==document.version||
          (item.auditGeneration!==undefined&&item.auditGeneration!==generation))return;
