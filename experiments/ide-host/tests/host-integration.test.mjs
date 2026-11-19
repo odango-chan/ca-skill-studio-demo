@@ -100,8 +100,10 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   activate(context);
   assert.ok(previewProvider);
   assert.ok(commands.has("skillStudio.openProcedure"));
-  assert.ok(commands.has("skillStudio.renameNode"));
-  assert.ok(commands.has("skillStudio.editNodeOperatorValue"));
+  for(const retired of ["skillStudio.renameNode","skillStudio.editNodeOperatorValue",
+    "skillStudio.insertNode","skillStudio.deleteNode"])
+    assert.equal(commands.has(retired),false,
+      "retired Procedure-AST command must not be exposed: "+retired);
   assert.ok(commands.has("skillStudio.exportPackageZip"));
   const webview={
     cspSource:"vscode-resource:",
