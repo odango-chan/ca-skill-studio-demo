@@ -346,14 +346,22 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
     });
     const uncheckedCount = packageAuditDiagnostics.filter(item =>
       item.status === "not_checked" || item.status === "blocked").length;
+    const errorCount = packageAuditDiagnostics.filter(item =>
+      item.severity === "error").length;
+    const qualificationReason = "Full qualification requires the current Compiler and trusted Owner, Capability and Schema linking";
+    const reasons = [];
+    if (uncheckedCount) reasons.push(
+      uncheckedCount + " Package checks remain NOT_CHECKED or blocked"
+    );
+    if (errorCount) reasons.push(errorCount + " confirmed Package errors");
+    if (snapshot.completeness !== "complete")
+      reasons.push(snapshot.reason ?? "Package snapshot is incomplete");
+    if (uncheckedCount || errorCount || snapshot.completeness !== "complete")
+      reasons.push(qualificationReason);
     const packageAudit: PackageAuditResult = {
-      state: snapshot.completeness === "complete" && uncheckedCount === 0
-        ? "READY" : "UNAVAILABLE",
-      ...(uncheckedCount ? {
-        reason: uncheckedCount + " Package checks remain NOT_CHECKED or blocked; see individual diagnostics"
-      } : snapshot.completeness !== "complete" ? {
-        reason: snapshot.reason ?? "Package snapshot is incomplete"
-      } : {}),
+      state: snapshot.completeness === "complete" &&
+        uncheckedCount === 0 && errorCount === 0 ? "READY" : "UNAVAILABLE",
+      ...(reasons.length ? { reason: reasons.join("; ") + "; see individual diagnostics" } : {}),
       diagnostics: packageAuditDiagnostics
     };
     const diagnostics = [
