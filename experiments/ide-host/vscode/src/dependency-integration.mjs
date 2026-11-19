@@ -10,6 +10,8 @@ import {acquireUpload,acquireMcp,acquireGit,acquireBuiltin}
 import {discoverMcpHttpTools,readGitHubPinnedFile}
   from "./acquisition-transports.mjs";
 import {decodeBase64} from "./dependency-snapshot.mjs";
+import {projectDependencyReadiness,projectLockedToolCatalog}
+  from "./dependency-catalog-projection.mjs";
 const aliasPattern=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>{},
   onProjectRootChanged=()=>{}}={}){
@@ -32,22 +34,31 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
   async function ensureRoot(){const root=await chooseRoot();if(!root)throw Error("No project root selected");return root;}
   const report=error=>vscode.window.showErrorMessage(
     "Skill Studio Dependencies: "+String(error?.message??error));
-  function operationRecords(snapshot){
-    const file=snapshot.files.find(item=>item.path==="tool-contract.json");
-    if(!file)return [];
-    try{return JSON.parse(new TextDecoder().decode(decodeBase64(file.bytes))).operations??[];}
-    catch{return [];}
-  }
+  // Declaration indexing is shared with the active Package Audit; never
+  // interpret a retired skillc.tool/v0.1 tool-contract.json as ToolCatalog.
   const provider={
     onDidChangeTreeData:emitter.event,
     async getChildren(node){
       if(node?.kind==="dependency"){
         const resolved=latest??await resolveLockedDependencies(vscode,selectedRoot);
-        const snapshot=resolved.snapshots.find(s=>s.id===node.dependency.id);
-        if(!snapshot)return [{kind:"message",text:"BLOCKED · locked contract unavailable"}];
-        return operationRecords(snapshot).map(operation=>({
+        if(node.state!=="SNAPSHOT_VERIFIED")
+          return [{kind:"message",text:node.blocked?.message??
+            "BLOCKED · verified locked snapshot unavailable"}];
+        const snapshot=resolved.snapshots.find(s=>s.id===node.dependency.id&&
+          s.snapshotDigest===node.entry?.snapshotDigest);
+        if(!snapshot)return [{kind:"message",text:
+          "BLOCKED · verified locked snapshot unavailable"}];
+        if(node.dependency.kind!=="tool-catalog")
+          return [{kind:"message",text:
+            "Schema Bundle snapshot verified · Owner/Schema export authorization NOT_CHECKED"}];
+        const catalog=projectLockedToolCatalog(snapshot);
+        if(!catalog.available)
+          return [{kind:"message",text:"BLOCKED · "+catalog.reason}];
+        const operations=catalog.operations.map(operation=>({
           kind:"operation",dependency:node.dependency,operation
         }));
+        return operations.length?operations:[{kind:"message",text:
+          "ToolCatalog has no declared callables · Owner authorization NOT_CHECKED"}];
       }
       if(node)return [];
       if(!selectedRoot){
@@ -61,9 +72,7 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
           return [{kind:"message",text:"No dependencies · Add Dependency"}];
         return config.settings.dependencies.map(dependency=>{
           const entry=config.settings.dependencyLock.entries.find(e=>e.id===dependency.id);
-          const blocked=latest.diagnostics.find(d=>d.dependencyId===dependency.id);
-          return {kind:"dependency",dependency,entry,blocked,
-            state:blocked?latest.status:"READY"};
+          return projectDependencyReadiness(dependency,entry,latest);
         });
       }catch(error){return [{kind:"message",text:"BLOCKED · "+String(error.message)}];}
     },
@@ -77,24 +86,31 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
       if(node.kind==="operation"){
         const item=new vscode.TreeItem(node.operation.id,state.None);
         item.id="operation:"+node.dependency.id+":"+node.operation.id;
-        item.description=node.operation.effect?.classification??"UNKNOWN";
+        item.description=(node.operation.kind??"callable")+
+          " · "+(node.operation.effect??"UNKNOWN");
         item.iconPath=new vscode.ThemeIcon("symbol-method");
-        item.tooltip="Effect: "+item.description+
-          " · "+(node.operation.effect?.authority??"UNVERIFIED")+
-          " (not Runtime READY)";
+        item.tooltip="ToolCatalog declaration · Owner: "+
+          (node.operation.owner??"UNKNOWN")+" (DECLARED, NOT AUTHORIZED)"+
+          "\\nEffect: "+(node.operation.effect??"UNKNOWN")+
+          "\\nOwner/Capability authorization: NOT_CHECKED"+
+          "\\nRuntime readiness: NOT_CHECKED";
         item.command={command:"skillStudio.inspectDependencyContract",
           title:"Inspect Contract",arguments:[node.dependency.id,node.operation.id]};
         return item;
       }
       const item=new vscode.TreeItem(node.dependency.id,state.Collapsed);
-      item.description=node.state+" · "+node.dependency.source.type;
+      item.description=node.state+
+        " · Owner "+node.ownerState+" · "+node.dependency.source.type;
       item.id="dependency:"+node.dependency.id;
       item.contextValue="skillStudio.dependency";
-      item.iconPath=new vscode.ThemeIcon(node.state==="READY"?"package":
-        "warning");
+      item.iconPath=new vscode.ThemeIcon(
+        node.state==="SNAPSHOT_VERIFIED"?"package":"warning");
       item.tooltip=[node.dependency.kind,node.entry?.snapshotDigest??"UNLOCKED",
         JSON.stringify(node.dependency.source),node.blocked?.message??"",
-        "Dependency READY does not establish Tool Runtime READY"].join("\n");
+        "Snapshot status: "+node.state,
+        "Owner/Capability/Evidence publication: NOT_CHECKED",
+        "A pinned snapshot does not establish Owner authorization or Runtime readiness"
+      ].filter(Boolean).join("\n");
       return item;
     }
   };
