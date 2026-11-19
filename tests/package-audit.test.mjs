@@ -22,9 +22,15 @@ function fixture(skill){
 const audit=workspace=>auditPackageWorkspace(workspace);
 const codes=issues=>issues.map(x=>x.code);
 
-test("A5 baseline Ensure and CreatedSession packages are supported without speculative warnings",()=>{
-  assert.deepEqual(audit(fixture("ensure-pdu-session")),[]);
-  assert.deepEqual(audit(fixture("establish-pdu-session")),[]);
+test("Legacy baseline runs source checks and reports checks outside the browser audit boundary",()=>{
+  for(const skill of ["ensure-pdu-session","establish-pdu-session"]){
+    const issues=audit(fixture(skill));
+    assert.ok(!issues.some(item=>item.severity==="error"),JSON.stringify(issues));
+    assert.ok(codes(issues).includes("CAPABILITY_AUTHORIZATION_NOT_CHECKED"));
+    if(skill==="establish-pdu-session")
+      assert.ok(codes(issues).includes("PYTHON_SYNTAX_NOT_CHECKED"));
+    assert.ok(issues.every(item=>item.path&&item.line>0&&item.status));
+  }
 });
 test("A5 checks Contract entry, PredicateSet skill and missing schema",()=>{
   const w=fixture("ensure-pdu-session");
@@ -40,7 +46,7 @@ test("A5 checks Contract entry, PredicateSet skill and missing schema",()=>{
   assert.ok(codes(issues).includes("CONTRACT_NAME"));
   assert.ok(codes(issues).includes("PREDICATE_SKILL"));
   assert.ok(codes(issues).includes("REQUEST_SCHEMA"));
-  assert.ok(issues.every(x=>x.path&&x.line>0&&x.severity==="warning"));
+  assert.ok(issues.every(x=>x.path&&x.line>0&&["confirmed","not_checked"].includes(x.status)));
 });
 test("A5 detects unsupported Call and a missing Predicate without refusing authored Source",()=>{
   const w=fixture("ensure-pdu-session");
@@ -76,13 +82,39 @@ test("A5 reports unknown input source, absent producer and missing script",()=>{
   assert.ok(codes(issues).includes("PRODUCER_MISSING"));
   assert.ok(codes(issues).includes("SCRIPT_MISSING"));
 });
-test("A5 handles partial workspace, invalid companion YAML and invalid Procedure safely",()=>{
+test("partial inventory and malformed YAML never become an empty successful audit",()=>{
   const partial=createFileWorkspace("single",[{path:"assurance/procedure.yaml",text:"bad: ["}]);
-  assert.deepEqual(audit(partial),[]);
+  const partialIssues=auditPackageWorkspace({...partial,completeness:"partial"});
+  assert.ok(codes(partialIssues).includes("PACKAGE_SNAPSHOT_INCOMPLETE"));
+  assert.ok(codes(partialIssues).includes("CORE_FILE_NOT_OBSERVED"));
+  assert.ok(codes(partialIssues).includes("YAML_PARSE"));
+  assert.ok(codes(partialIssues).includes("PROCEDURE_CHECKS_NOT_CHECKED"));
+
   const w=fixture("ensure-pdu-session");
+  w.files.get("assurance/contract.yaml").text=w.files.get("assurance/contract.yaml").text
+    .replace("entryProcedure: ensure-session","entryProcedure: missing-entry");
   w.files.get("assurance/predicates.yaml").text="bad: [";
-  assert.equal(audit(w)[0].code,"YAML_PARSE");
-  w.files.get("assurance/predicates.yaml").text="kind: PredicateSet\nmetadata:\n  skill: ensure-pdu-session\npredicates: {}\n";
   w.files.get("assurance/procedure.yaml").text="bad: [";
-  assert.equal(audit(w)[0].code,"YAML_PARSE");
+  const issues=audit(w);
+  assert.ok(codes(issues).filter(code=>code==="YAML_PARSE").length>=2);
+  assert.ok(codes(issues).includes("ENTRY_PROCEDURE"));
+  assert.ok(codes(issues).includes("PREDICATE_CHECKS_NOT_CHECKED"));
+  assert.ok(codes(issues).includes("PROCEDURE_CHECKS_NOT_CHECKED"));
+});
+
+test("invalid legacy graph projection does not suppress independent Contract and Predicate checks",()=>{
+  const w=fixture("ensure-pdu-session");
+  w.files.get("assurance/contract.yaml").text=w.files.get("assurance/contract.yaml").text
+    .replace("entryProcedure: ensure-session","entryProcedure: missing-entry")
+    .replace("name: ensure-pdu-session","name: wrong-name");
+  w.files.get("assurance/predicates.yaml").text=w.files.get("assurance/predicates.yaml").text
+    .replace("skill: ensure-pdu-session","skill: wrong-name");
+  w.files.get("assurance/procedure.yaml").text=w.files.get("assurance/procedure.yaml").text
+    .replace("verify: pdu_session.target.satisfied","unknownOperator: pdu_session.target.satisfied");
+  const issues=audit(w);
+  assert.ok(codes(issues).includes("PROCEDURE_GRAPH_PROJECTION_NOT_CHECKED"));
+  assert.ok(codes(issues).includes("CONTRACT_NAME"));
+  assert.ok(codes(issues).includes("PREDICATE_SKILL"));
+  assert.ok(codes(issues).includes("ENTRY_PROCEDURE"));
+  assert.ok(codes(issues).includes("NODE_OPERATOR_COUNT"));
 });
