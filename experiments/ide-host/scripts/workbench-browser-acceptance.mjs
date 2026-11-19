@@ -1,41 +1,78 @@
-// Runs against actual Theia DOM and CustomEditor frames, never a host mock.
-// All browser acceptance fixtures use the pinned CA-SL v1alpha5 sample set.
+// Runs against actual Theia DOM. Source stays in the single Main Editor group;
+// its contextual visualizer is a WebviewView in the right Secondary Sidebar.
 export async function assertSourceVisualPair(evalJS,sleep,filename,label){
   let state;
-  for(let attempt=0;attempt<30;attempt++){
+  for(let attempt=0;attempt<40;attempt++){
     state=await evalJS(`(()=>{
       const c=window.theia.container;
       const key=[...c._bindingDictionary._map.keys()].find(k=>
         typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);
       if(!key)throw Error('Theia shell missing');
-      const shell=c.get(key),bars=shell.mainAreaTabBars;
-      return shell.getWidgets('main').map(widget=>{
+      const shell=c.get(key);
+      const inspect=(area,widget)=>{
+        const node=widget.node,rect=node?.getBoundingClientRect?.();
+        const visible=!!rect&&rect.width>0&&rect.height>0&&!widget.isHidden;
+        const nested=[...(node?.querySelectorAll?.('.lm-Widget')??[])];
+        const elements=[node,...nested].filter(Boolean);
+        const webviews=elements.flatMap(el=>[...(el.querySelectorAll?.('iframe')??[])])
+          .map(frame=>{const r=frame.getBoundingClientRect();return {
+            src:frame.getAttribute('src')??'',title:frame.title??'',
+            visible:r.width>0&&r.height>0,
+            rect:{x:r.x,y:r.y,width:r.width,height:r.height}
+          };}).filter(frame=>frame.visible);
+        return {id:widget.id??node?.id??null,area,viewId:widget.viewId??null,
+          title:widget.title?.label??widget.title?.caption??null,
+          className:typeof node?.className==='string'?node.className:'',
+          text:(node?.innerText??'').slice(0,160),visible,
+          rect:rect?{x:rect.x,y:rect.y,width:rect.width,height:rect.height}:null,
+          webviews};
+      };
+      const bars=shell.mainAreaTabBars??[];
+      const main=shell.getWidgets('main').map(widget=>{
         const uri=widget.editor?.uri??widget.resource;
-        if(!uri?.path?.toString().endsWith('/'+${JSON.stringify(filename)}))return null;
-        const rect=widget.node.getBoundingClientRect();
-        return {id:widget.id,uri:uri.toString(),
+        const rect=widget.node?.getBoundingClientRect?.();
+        return {id:widget.id,uri:uri?.toString?.()??null,
           kind:widget.editor?'source':widget.viewType??'unknown',
           column:bars.findIndex(bar=>bar.titles.some(title=>title.owner===widget))+1,
-          visible:!widget.isHidden&&rect.width>0&&rect.height>0,
-          rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}};
-      }).filter(Boolean);
+          visible:!widget.isHidden&&!!rect&&rect.width>0&&rect.height>0,
+          rect:rect?{x:rect.x,y:rect.y,width:rect.width,height:rect.height}:null};
+      });
+      const right=shell.getWidgets('right').map(widget=>inspect('right',widget));
+      const left=shell.getWidgets('left').map(widget=>inspect('left',widget));
+      const source=main.filter(widget=>widget.kind==='source'&&widget.visible&&
+        widget.uri?.endsWith('/'+${JSON.stringify(filename)}));
+      const preview=[...right,...left].flatMap(widget=>[
+        {widget,frame:null},...widget.webviews.map(frame=>({widget,frame}))
+      ]).filter(item=>item.widget.visible&&item.frame?.visible&&
+        item.frame.rect.x>=0);
+      const sourceRight=source[0]?.rect?.x+source[0]?.rect?.width;
+      const rightPreview=preview.find(item=>item.frame.rect.x>=sourceRight-2);
+      const tabBars=bars.map(bar=>{
+        const r=bar.node?.getBoundingClientRect?.();
+        return {visible:!!r&&r.width>0&&r.height>0,
+          tabs:bar.titles?.length??0,
+          rect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};
+      });
+      return {main,right,left,source,preview,selectedPreview:rightPreview??null,
+        tabBars,visibleEditorGroups:tabBars.filter(x=>x.visible).length};
     })()`);
-    // Theia may retain a hidden duplicate CodeEditor widget for the same
-    // URI while the CustomEditor owns the visible second column. The contract
-    // is exactly one VISIBLE native Source beside the visible Designer.
-    const sources=state.filter(w=>w.kind==='source'&&w.visible);
-    const visuals=state.filter(w=>w.kind.startsWith('skillStudio.')&&w.visible);
-    if(sources.length===1&&visuals.length===1&&sources[0].uri===visuals[0].uri&&
-       sources[0].column===1&&visuals[0].column===2&&
-       sources[0].visible&&visuals[0].visible&&
-       sources[0].rect.x+sources[0].rect.width<=visuals[0].rect.x+2){
-      const evidence={filename,label,source:sources[0],visual:visuals[0]};
-      console.log('STUDIO_YAML_SOURCE_VISUAL_PAIR_CHROMIUM',JSON.stringify(evidence));
+    const source=state.source??[];
+    const preview=state.selectedPreview;
+    // Preview is deliberately NOT a Main Editor widget. It must be a visible
+    // Webview iframe hosted in the right-hand sidebar, beyond the Source pane.
+    if(source.length===1&&source[0].column===1&&preview&&
+       state.visibleEditorGroups===1&&
+       source[0].rect.x+source[0].rect.width<=preview.frame.rect.x+2){
+      const evidence={filename,label,source:source[0],preview:{
+        area:preview.widget.area,id:preview.widget.id,viewId:preview.widget.viewId,
+        title:preview.widget.title,frame:preview.frame
+      },visibleEditorGroups:state.visibleEditorGroups};
+      console.log('STUDIO_YAML_SOURCE_PREVIEW_CHROMIUM',JSON.stringify(evidence));
       return evidence;
     }
-    await sleep(100);
+    await sleep(120);
   }
-  throw Error(label+' requires one visible native Source in column one and its Designer in column two: '+JSON.stringify(state));
+  throw Error(label+' requires exactly one Main Editor Source group and a visible right-side Preview WebviewView: '+JSON.stringify(state));
 }
 
 export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
