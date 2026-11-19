@@ -53,7 +53,7 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
     diagnostics.push(Object.freeze({
       kind:"package-diagnostic",severity,status,code,path,relativePath:path,
       line:position?.line||1,column:position?.col||1,message,domain,category,
-      source:"Skill Studio · Legacy Package Audit"
+      source:"Skill Studio · Package Audit"
     }));
   };
   const warn=(code,path,node,message)=>add(code,path,node,message);
