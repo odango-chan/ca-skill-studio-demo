@@ -283,21 +283,23 @@ function schemaTitleCatalog(snapshot) {
     .map(([title, path]) => ({ title, path }));
 }
 
-connection.onInitialize(() => ({
+connection.onInitialize(params => ({
   capabilities: {
     // The extension host sends bounded Package snapshots as a custom
     // notification. Do not establish a second competing TextDocument store.
     textDocumentSync: TextDocumentSyncKind.None,
     definitionProvider: true,
     referencesProvider: true,
-    semanticTokensProvider: {
-      legend: {
-        tokenTypes: [...SKILL_SEMANTIC_TOKEN_TYPES],
-        tokenModifiers: [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
-      },
-      full: true,
-      range: false
-    },
+    ...(params?.initializationOptions?.disableSemanticTokens === true ? {} : {
+      semanticTokensProvider: {
+        legend: {
+          tokenTypes: [...SKILL_SEMANTIC_TOKEN_TYPES],
+          tokenModifiers: [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
+        },
+        full: true,
+        range: false
+      }
+    }),
     hoverProvider: true,
     documentSymbolProvider: true,
     completionProvider: {
