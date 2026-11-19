@@ -2,7 +2,7 @@ import {openNativeSource} from "./native-source.mjs";
 import {registerPreviewHost} from "./preview-host.mjs";
 import {mountMarkdownPreview} from "./markdown-preview.mjs";
 
-import {openSourceViewPair,sourceViewType,forgetSourceViewPair} from "./source-view-pair.mjs";
+import {sourceViewType} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
@@ -94,7 +94,7 @@ export function activate(context){
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
   registerSchemaEditor(vscode,context);
-  function mountProcedurePreview(document,panel,{forgetPairOnDispose=true,isCurrent=()=>true}={}){
+  function mountProcedurePreview(document,panel,{isCurrent=()=>true}={}){
       if(!isProcedurePath(document.uri.path)){
         vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
         return;
@@ -102,9 +102,8 @@ export function activate(context){
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
-      // Source is the active editor after the fixed split is established, so
-      // initialize the Procedure workbench explicitly instead of relying on
-      // the visual Webview becoming the active tab.
+      // Source remains the sole Main Editor. The right Preview WebviewView
+      // is not an Editor tab, so initialize the workbench from the Source document.
       workbench.activate(document);
       let wasActive=panel.active;
       const viewState=panel.onDidChangeViewState(()=>{
@@ -321,7 +320,6 @@ export function activate(context){
       const cleanup=()=>{
         if(cleaned)return;
         cleaned=true;disposed=true;
-        if(forgetPairOnDispose)forgetSourceViewPair(document.uri);
         detach();viewState.dispose();changed.dispose();incoming.dispose();
         releasePanel?.dispose?.();
       };
@@ -612,7 +610,7 @@ export function activate(context){
         }
       }
       if(!isProcedurePath(target.path))return;
-      await openSourceViewPair(vscode,target);
+      await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
     }));
   // The right-side Preview Host follows the active TextEditor itself.
   // Do not reopen a Source file from active-editor callbacks or move tabs
@@ -656,7 +654,7 @@ export function activate(context){
       }
       const firstRoot=procedureRoots[0].root;
       const firstPackageVisuals=visualUris.filter(uri=>uri.path.startsWith(firstRoot.path+"/"));
-      for(const uri of firstPackageVisuals)await openSourceViewPair(vscode,uri);
+      for(const uri of firstPackageVisuals)await openNativeSource(vscode,uri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
       const pythonFiles=await vscode.workspace.findFiles(
         "**/scripts/validate-subscription-request.py","**/node_modules/**",5);
       if(!pythonFiles.length)throw Error("CA-SL v1alpha5 Python acceptance fixture is missing");
@@ -697,7 +695,7 @@ export function activate(context){
       // Opening a second Skill's Source must not create another EditorGroup.
       const secondProcedure=procedures.find(uri=>
         !uri.path.startsWith(firstRoot.path+"/"));
-      if(secondProcedure)await openSourceViewPair(vscode,secondProcedure);
+      if(secondProcedure)await openNativeSource(vscode,secondProcedure,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
       const groups=(vscode.window.tabGroups?.all??[]).map(group=>({
         viewColumn:group.viewColumn,tabCount:group.tabs?.length??0
       }));
