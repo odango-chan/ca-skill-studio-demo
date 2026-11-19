@@ -28,7 +28,17 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                         return;
                     }
                     shell.expandPanel('right');
-                    void shell.activateWidget(PREVIEW_CONTAINER_WIDGET_ID).catch(error => {
+                    void shell.activateWidget(PREVIEW_CONTAINER_WIDGET_ID).then(() => {
+                        if (stopped) return;
+                        // The stock Secondary Sidebar defaults to ~227px, which
+                        // cannot display a readable React Flow canvas. Only grow
+                        // cramped initial layouts; preserve user-resized widths.
+                        const preview = shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID);
+                        const width = preview?.node?.getBoundingClientRect().width ?? 0;
+                        if (width > 0 && width < 400 && window.innerWidth >= 1050) {
+                            shell.resize(Math.min(620, Math.round(window.innerWidth * 0.43)), 'right');
+                        }
+                    }).catch(error => {
                         console.warn('SKILL Studio Preview container could not be activated:', error);
                     });
                 };
