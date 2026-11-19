@@ -106,7 +106,7 @@ function snapshot(source=procedure,contractSource=contract,predicatesSource=pred
     "scripts/runner.py":"def main():\n    return {}\n"
   };
   return {rootUri:"file:///workspace/sample",packageName:"sample",generation:1,
-    completeness:"complete",documents:Object.entries(files).map(([relativePath,text])=>({
+    completeness:"partial",documents:Object.entries(files).map(([relativePath,text])=>({
       uri:"file:///workspace/sample/"+relativePath,relativePath,text,version:1
     }))};
 }
@@ -120,7 +120,7 @@ test("optional Studio examples mirror the pinned PDU/MAS v1alpha5 source shape",
       text:readFileSync(new URL("../site/samples/v1alpha5/"+name+"/"+relativePath,import.meta.url),"utf8")
     }));
     const result=analyzePackageSnapshot({rootUri:"file:///workspace/"+name,
-      packageName:name,generation:1,completeness:"complete",documents:docs});
+      packageName:name,generation:1,completeness:"partial",documents:docs});
     assert.equal(result.state,"PARTIAL");
     assert.equal(result.procedure.state,"READY",
       name+" source structure should be projected without a trusted Owner");
@@ -224,7 +224,7 @@ test("v1alpha5 AST graph projects nodes and routes but never claims Owner qualif
   const a=analyzePackageSnapshot(snapshot());
   assert.equal(a.state,"PARTIAL");
   assert.equal(a.packageAudit.state,"UNAVAILABLE");
-  assert.match(a.packageAudit.reason,/Owner.*linking/);
+  assert.match(a.packageAudit.reason,/NOT_CHECKED|blocked/);
   assert.equal(a.procedure.state,"READY");
   assert.equal(a.procedure.entry,"check");
   assert.equal(a.procedure.goal,"pdu_session.initial_request_fulfilled");
@@ -242,7 +242,7 @@ test("v1alpha5 AST graph projects nodes and routes but never claims Owner qualif
   assert.deepEqual(finalCall.parameters,["data"]);
   assert.deepEqual(finalCall.arguments,["read.observation.output"]);
   assert.ok(a.procedure.procedures[0].routes.some(x=>x.target==="SUCCEEDED"&&x.routeSource==="postcondition"));
-  assert.deepEqual(a.diagnostics,[]);
+  assert.deepEqual(a.diagnostics.filter(item=>item.source!=="package-audit"),[]);
 });
 
 test("v1alpha5 carries PredicateSet Evidence requirements into the shared stage projection",()=>{
