@@ -31,7 +31,7 @@ function collectActions(node,fn){
     for(const pair of node.items){
       const field=v(pair.key),value=pair.value;
       if(field==="from"||field==="call"||field==="tool"||
-         field==="verify"||field==="predicate"||field==="script"){
+         field==="verify"||field==="predicate"||field==="script"||field==="procedure"){
         if(isScalar(value)&&typeof value.value==="string")
           fn(field,value,node);
       }
@@ -196,10 +196,57 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
     add("REQUEST_SCHEMA",FILES.contract,get(contract,"spec","inputs","requestSchema"),
       "Contract Schema 文件未包含在 Package："+schema,
       {severity:"error",domain:"schemas"});
+  else if(typeof schema==="string"){
+    const schemaNode=parsed.get(schema);
+    if(!schemaNode){
+      notChecked("REQUEST_SCHEMA_CHECKS_NOT_CHECKED",schema,
+        "Request Schema 文件存在于快照中，但其 YAML/JSON 无法解析或未被当前解析器识别","schemas");
+    }else{
+      if(!isMap(schemaNode)||v(get(schemaNode,"type"))!=="object"||
+         !isMap(get(schemaNode,"properties")))
+        add("REQUEST_SCHEMA_SHAPE_INVALID",schema,schemaNode,
+          "Request Schema 必须是声明 type: object 与 properties mapping 的 JSON Schema",
+          {severity:"error",domain:"schemas"});
+      const properties=get(schemaNode,"properties"),requiredFields=values(get(schemaNode,"required"));
+      for(const field of requiredFields){
+        if(!get(properties,field))
+          add("REQUEST_SCHEMA_REQUIRED_UNDECLARED",schema,get(schemaNode,"required"),
+            "Request Schema required 引用了未声明的 property："+field,
+            {severity:"error",domain:"schemas"});
+      }
+      if(isMap(properties))for(const property of properties.items){
+        if(!isMap(property.value)||typeof v(get(property.value,"type"))!=="string")
+          add("REQUEST_SCHEMA_PROPERTY_INVALID",schema,property.value,
+            "Request Schema property "+v(property.key)+" 缺少有效的 type",
+            {severity:"error",domain:"schemas"});
+      }
+    }
+  }else if(contract){
+    notChecked("REQUEST_SCHEMA_NOT_DECLARED",FILES.contract,
+      "Contract 未声明 spec.inputs.requestSchema；Schema 约束未检查","schemas");
+  }
   const allowed=new Set([
     ...values(get(contract,"spec","allowedResources","capabilities")),
     ...values(get(contract,"spec","allowedResources","localTools"))
   ]);
+  if(contract){
+    const spec=get(contract,"spec");
+    if(!isMap(spec))
+      add("CONTRACT_SPEC_INVALID",FILES.contract,spec??contract,
+        "SkillContract 缺少 spec mapping",{severity:"error",domain:"contract"});
+    else{
+      if(typeof v(get(spec,"goal"))!=="string"||!v(get(spec,"goal")))
+        add("CONTRACT_GOAL_MISSING",FILES.contract,spec,
+          "SkillContract spec.goal 缺失",{severity:"error",domain:"contract"});
+      if(typeof v(get(spec,"skillType"))!=="string"||!v(get(spec,"skillType")))
+        add("CONTRACT_SKILL_TYPE_MISSING",FILES.contract,spec,
+          "SkillContract spec.skillType 缺失",{severity:"error",domain:"contract"});
+      const resources=get(spec,"allowedResources");
+      if(resources!==null&&!isMap(resources))
+        add("ALLOWED_RESOURCES_INVALID",FILES.contract,resources,
+          "Contract spec.allowedResources 必须是 mapping",{severity:"error",domain:"capabilities"});
+    }
+  }
   // Contract's explicit predicate references.
   if(contract&&predicates){
     for(const section of ["preconditions","postconditions"]){
@@ -311,6 +358,45 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
         continue;
       }
       const nodeEntries=nodes.items,nodeIds=new Set(nodeEntries.map(item=>v(item.key)));
+      if(inputs!==null&&!isMap(inputs))
+        add("PROCEDURE_INPUTS_INVALID",FILES.procedure,inputs,
+          "Procedure "+procId+" 的 inputs 必须是 mapping",{severity:"error",domain:"procedure"});
+      if(isMap(inputs))for(const input of inputs.items){
+        if(!isMap(input.value))
+          add("PROCEDURE_INPUT_INVALID",FILES.procedure,input.value,
+            "Procedure "+procId+" 的 input "+v(input.key)+" 必须是 mapping",
+            {severity:"error",domain:"procedure"});
+        else{
+          if(typeof v(get(input.value,"type"))!=="string")
+            add("PROCEDURE_INPUT_TYPE_MISSING",FILES.procedure,input.value,
+              "Procedure "+procId+" 的 input "+v(input.key)+" 缺少 type",
+              {severity:"error",domain:"procedure"});
+          if(typeof v(get(input.value,"from"))!=="string")
+            add("PROCEDURE_INPUT_SOURCE_MISSING",FILES.procedure,input.value,
+              "Procedure "+procId+" 的 input "+v(input.key)+" 缺少 from",
+              {severity:"error",domain:"procedure"});
+        }
+      }
+      const applicability=get(procNode,"applicability");
+      const applicabilityPredicates=get(applicability,"predicates");
+      if(applicability!==null&&!isMap(applicability))
+        add("PROCEDURE_APPLICABILITY_INVALID",FILES.procedure,applicability,
+          "Procedure "+procId+" 的 applicability 必须是 mapping",
+          {severity:"error",domain:"procedure"});
+      if(applicabilityPredicates!==null&&!isMap(applicabilityPredicates))
+        add("PROCEDURE_APPLICABILITY_PREDICATES_INVALID",FILES.procedure,applicabilityPredicates,
+          "Procedure "+procId+" 的 applicability.predicates 必须是 mapping",
+          {severity:"error",domain:"predicates"});
+      if(isMap(applicabilityPredicates))for(const predicate of applicabilityPredicates.items){
+        const id=v(predicate.key);
+        if(predicates&&!predIds.has(id))
+          add("APPLICABILITY_PREDICATE_NOT_FOUND",FILES.procedure,predicate.key,
+            "Procedure "+procId+" applicability 引用了未定义 Predicate："+id,
+            {severity:"error",domain:"predicates"});
+        else if(!predicates)
+          notChecked("APPLICABILITY_PREDICATE_NOT_CHECKED",FILES.procedure,
+            "Cannot resolve applicability Predicate "+id+" because PredicateSet is unavailable","predicates");
+      }
       const inputKeys=new Set(entries(inputs).map(item=>v(item.key)));
       const inputByNormalized=new Map([...inputKeys].map(key=>[normalized(key),key]));
       const startNode=v(get(procNode,"start"));
@@ -404,6 +490,11 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
             else if(!contract)
               notChecked("CAPABILITY_DECLARATION_NOT_CHECKED",FILES.procedure,
                 "Cannot resolve "+field+" "+value+" because Contract is unavailable","capabilities");
+          }else if(field==="procedure"){
+            if(!ids.has(value))
+              add("CHILD_PROCEDURE_NOT_FOUND",FILES.procedure,scalar,
+                procId+"/"+nodeId+" 引用了不存在的 Child Procedure："+value,
+                {severity:"error",domain:"procedure"});
           }else if(field==="script"){
             if(/\.py$/i.test(value))referencedScripts.add(value);
             if(!sources.has(value))
