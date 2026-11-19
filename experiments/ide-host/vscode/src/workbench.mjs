@@ -3090,9 +3090,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
       update(doc);
       for(const uri of new Set(audit.map(item=>item.uri))){
-        diagnostics.set(uri,audit.filter(item=>item.uri===uri).map(item=>{
-          const line=Math.max(0,(item.line??1)-1);
-          const column=Math.max(0,(item.column??1)-1);
+        const located=audit.filter(item=>item.uri===uri&&
+          Number.isSafeInteger(item.line)&&item.line>0&&
+          Number.isSafeInteger(item.column)&&item.column>0);
+        if(!located.length)continue;
+        diagnostics.set(uri,located.map(item=>{
+          const line=item.line-1,column=item.column-1;
           const severity=item.severity==="error"?vscode.DiagnosticSeverity.Error:
             item.severity==="information"
               ?(vscode.DiagnosticSeverity.Information??vscode.DiagnosticSeverity.Warning)
