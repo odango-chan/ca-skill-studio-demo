@@ -1083,7 +1083,7 @@ export async function runWorkbenchAcceptance({
      !capabilityMarker||capabilityMarker.line!==capabilityProblem.line||
      capabilityMarker.endLine!==capabilityMarker.line||
      capabilityMarker.endColumn-capabilityMarker.column!==expectedCapabilityId.length||
-     !/\\d+ files/.test(packageAudit.status)||
+     !/\d+ files/.test(packageAudit.status)||
      packageAudit.problems.some(item=>item.code==="PREDICATE_SCRIPT_REF_UNDECLARED")||
      !packageAudit.problems.some(item=>item.code==="EVIDENCE_GUARANTEE_NOT_CHECKED")||
      !packageAudit.problems.some(item=>item.code==="DEPENDENCY_NOT_CONFIGURED"))
