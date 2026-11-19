@@ -67,8 +67,15 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
           tabs:bar.titles?.length??0,
           rect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};
       });
+      // The fixed Theia Main Editor uses single-document mode, which
+      // intentionally has no tab bar. Count its single Main Editor panel as
+      // one group when a Source widget is visible; do not mistake tabBarCount=0
+      // for the absence of an Editor group.
+      const visibleEditorGroups=tabBars.length
+        ?tabBars.filter(x=>x.visible).length
+        :(main.some(widget=>widget.visible)?1:0);
       return {main,right,left,source,preview,selectedPreview:rightPreview??null,
-        commandIds,availableViewCommands,tabBars,visibleEditorGroups:tabBars.filter(x=>x.visible).length};
+        commandIds,availableViewCommands,tabBars,visibleEditorGroups};
     })()`);
     const source=state.source??[];
     const preview=state.selectedPreview;
