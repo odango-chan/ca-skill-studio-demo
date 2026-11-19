@@ -150,19 +150,22 @@ export function diagnosticsFromAnalysis(
     });
   }
 
-  // A missing/partial Package is not equivalent to a clean audit. Surface it
-  // explicitly in the source editor when an actual Procedure document exists.
+  // A missing/partial Package is not equivalent to a clean audit, but it
+  // has no verified token location. Keep the warning at Package level instead
+  // of inventing a zero-width marker at Procedure line 1.
   if (analysis.packageAudit.state === "UNAVAILABLE" && analysis.packageAudit.diagnostics.length === 0) {
-    const procedure = documents.find(doc => doc.relativePath === "assurance/procedure.yaml");
-    if (procedure) {
-      indexed.get(procedure.uri)!.diagnostics.push({
-        range: { start: {line: 0, character: 0}, end: {line: 0, character: 0} },
-        severity: 2,
-        code: "PACKAGE_AUDIT_UNAVAILABLE",
-        source: "Skill Studio · package-audit",
-        message: "Package Audit unavailable: " + (analysis.packageAudit.reason ?? "incomplete Package")
-      });
-    }
+    unlocated.push({
+      code: "PACKAGE_AUDIT_UNAVAILABLE",
+      message: "Package Audit unavailable: " + (analysis.packageAudit.reason ?? "incomplete Package"),
+      severity: "warning",
+      uri: snapshot.rootUri,
+      relativePath: "",
+      source: "package-audit",
+      confidence: "unknown",
+      status: "not_checked",
+      domain: "package",
+      category: "availability"
+    });
   }
 
   return {
