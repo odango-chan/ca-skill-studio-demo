@@ -417,3 +417,57 @@ test("trusted CapabilityContracts input can resolve a unique declaration without
   assert.ok(diagnostics.some(item=>item.code==="CAPABILITY_DECLARATION_NOT_FOUND"),
     "a complete trusted declaration set can prove that another grant is absent");
 });
+
+test("unverified Capability export candidates cannot manufacture a confirmed Owner ambiguity",()=>{
+  const files=fixture("establish-pdu-session");
+  const capability="urn:example:connectionagent:capability:3gpp:nudm-sdm-get:v1";
+  for(const complete of [false,true]){
+    const diagnostics=auditPackage({files,dependencyContext:{
+      available:false,
+      capabilityDeclarationsComplete:complete,
+      capabilityDeclarations:[
+        {id:capability,trusted:true},{id:capability,trusted:false}
+      ]
+    }});
+    const pending=find(diagnostics,"CAPABILITY_OWNER_NOT_VERIFIED",capability);
+    assert.equal(pending?.status,"not_checked");
+    assert.equal(pending?.severity,"warning");
+    assert.ok(!find(diagnostics,"CAPABILITY_DECLARATION_AMBIGUOUS",capability),
+      "an unverified candidate is not proof of a duplicate Owner export");
+  }
+  const verified=auditPackage({files,dependencyContext:{
+    capabilityDeclarations:[
+      {id:capability,trusted:true},{id:capability,trusted:true}
+    ]
+  }});
+  const ambiguous=find(verified,"CAPABILITY_DECLARATION_AMBIGUOUS",capability);
+  assert.equal(ambiguous?.status,"confirmed",
+    "two verified declarations already prove ambiguity even in a partial export set");
+});
+
+test("unverified Evidence export candidates cannot manufacture a confirmed Owner ambiguity",()=>{
+  const files=fixture("establish-pdu-session");
+  const reference="ca::udm.subscription-owned";
+  for(const complete of [false,true]){
+    const diagnostics=auditPackage({files,dependencyContext:{
+      available:false,
+      evidenceDeclarationsComplete:complete,
+      evidenceDeclarations:[
+        {id:"udm.subscription-owned",trusted:true},
+        {id:"udm.subscription-owned",trusted:false}
+      ]
+    }});
+    const pending=find(diagnostics,"EVIDENCE_OWNER_NOT_VERIFIED",reference);
+    assert.equal(pending?.status,"not_checked");
+    assert.equal(pending?.severity,"warning");
+    assert.ok(!find(diagnostics,"EVIDENCE_DECLARATION_AMBIGUOUS",reference));
+  }
+  const verified=auditPackage({files,dependencyContext:{
+    evidenceDeclarations:[
+      {id:"udm.subscription-owned",trusted:true},
+      {id:"udm.subscription-owned",trusted:true}
+    ]
+  }});
+  assert.equal(find(verified,"EVIDENCE_DECLARATION_AMBIGUOUS",reference)?.status,
+    "confirmed");
+});

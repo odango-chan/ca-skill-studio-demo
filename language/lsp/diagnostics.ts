@@ -135,6 +135,14 @@ export function diagnosticsFromAnalysis(
       unlocated.push(item);
       continue;
     }
+    // Package-level, inventory and dependency-state findings can carry a
+    // path for grouping without owning a token. Never turn a default line 1
+    // hint into a red squiggle. Exact Package Audit findings have AST spans.
+    if (item.source === "package-audit" &&
+        (item.confidence !== "exact" || !item.range)) {
+      unlocated.push(item);
+      continue;
+    }
     const range = diagnosticRange(item, source.text, target.starts);
     if (!range) {
       unlocated.push(item);

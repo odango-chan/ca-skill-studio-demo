@@ -97,6 +97,20 @@ test("partial Package snapshots preserve v1alpha5 source projection but gate cro
   assert.ok(result.scriptReferences.length>0);
   assert.ok(result.scriptReferences.every(ref=>ref.packageContextComplete===false));
   assert.ok(result.schemaReferences.every(ref=>ref.packageContextComplete===false));
+  const packageStatus=result.diagnostics.find(item=>
+    item.code==="PACKAGE_SNAPSHOT_INCOMPLETE");
+  assert.ok(packageStatus);
+  assert.equal(packageStatus.status,"not_checked");
+  assert.equal(packageStatus.confidence,"unknown");
+  assert.equal(packageStatus.range,undefined,
+    "a partial inventory has no real AST scalar to underline");
+  assert.equal(packageStatus.line,undefined,
+    "Package status must not be disguised as Procedure line 1");
+  const capability=result.diagnostics.find(item=>
+    item.code==="CAPABILITY_GRANT_NOT_CHECKED");
+  assert.equal(capability?.confidence,"exact");
+  assert.ok(capability?.range,
+    "an existing Capability grant still has an exact source range");
 });
 
 test("missing non-procedure v1alpha5 files do not fabricate Package qualification",()=>{
