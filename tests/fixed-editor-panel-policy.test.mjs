@@ -107,7 +107,7 @@ test("production shell waits for native Source and verifies visible right Previe
   const source = readFileSync(
     "experiments/ide-host/theia-fixed-workbench/src/browser/fixed-workbench-frontend-module.ts",
     "utf8");
-  assert.match(source,/hasVisibleSourceEditor\(shell\.getWidgets\('main'\)\)/);
+  assert.match(source,/hasVisualizableSourceEditor\(shell\.getWidgets\('main'\)\)/);
   assert.match(source,/shell\.onDidChangeCurrentWidget/);
   assert.match(source,/shell\.revealWidget\(PREVIEW_CONTAINER_WIDGET_ID\)/);
   assert.match(source,/container\.isVisible/);
