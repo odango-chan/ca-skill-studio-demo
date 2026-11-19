@@ -110,6 +110,44 @@ test("missing non-procedure v1alpha5 files do not fabricate Package qualificatio
   assert.match(result.packageAudit.reason,/current Compiler/);
 });
 
+test("Language Service includes current Package Audit Script diagnostics with exact scalar ranges",()=>{
+  const snapshot=sampleSnapshot();
+  const predicates=snapshot.documents.find(document=>
+    document.relativePath==="assurance/predicates.yaml");
+  predicates.text=predicates.text.replace(
+    "scripts/validate-subscription-request.py","scripts/missing-script.py");
+  const result=analyzePackageSnapshot(snapshot);
+  const diagnostic=result.diagnostics.find(item=>
+    item.code==="PREDICATE_SCRIPT_NOT_FOUND");
+  assert.ok(diagnostic,JSON.stringify(result.diagnostics));
+  assert.equal(diagnostic.source,"package-audit");
+  assert.equal(diagnostic.relativePath,"assurance/predicates.yaml");
+  assert.ok(diagnostic.range);
+  assert.equal(predicates.text.slice(diagnostic.range.start,diagnostic.range.end),
+    "scripts/missing-script.py");
+  assert.ok(result.packageAudit.diagnostics.includes(diagnostic));
+});
+
+test("missing Procedure does not stop independent Contract and Predicate checks",()=>{
+  const snapshot=sampleSnapshot();
+  snapshot.documents=snapshot.documents.filter(document=>
+    document.relativePath!=="assurance/procedure.yaml");
+  const contract=snapshot.documents.find(document=>
+    document.relativePath==="assurance/contract.yaml");
+  contract.text=contract.text.replace(
+    "requestSchema: schemas/establishment-request.schema.yaml",
+    "requestSchema: ../outside/request.schema.yaml");
+  const result=analyzePackageSnapshot(snapshot);
+  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.procedure.state,"UNAVAILABLE");
+  const codes=new Set(result.diagnostics.map(item=>item.code));
+  assert.ok(codes.has("PACKAGE_CORE_FILE_MISSING"));
+  assert.ok(codes.has("REQUEST_SCHEMA_REFERENCE_INVALID"));
+  assert.ok(!codes.has("UNSUPPORTED_CA_SL_VERSION"));
+  assert.equal(result.documents.length,snapshot.documents.length,
+    "all available Package documents still receive analysis");
+});
+
 test("malformed v1alpha5 Procedure remains visible and fails closed",()=>{
   const snapshot=sampleSnapshot();
   const procedure=snapshot.documents.find(document=>document.relativePath==="assurance/procedure.yaml");
