@@ -15,38 +15,39 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
     // commands through its extension host. Reveal the contributed secondary
     // sidebar through ApplicationShell instead, so the Preview WebviewView
     // can resolve on both backend and browser-only Theia.
-    bind(FrontendApplicationContribution).toDynamicValue(() => ({
-        onStart(app: FrontendApplication) {
-            const shell = app.shell;
-            let stopped = false;
-            const reveal = () => {
-                if (stopped || !shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID)) {
-                    return;
-                }
-                shell.expandPanel('right');
-                void shell.activateWidget(PREVIEW_CONTAINER_WIDGET_ID).catch(error => {
-                    console.warn('SKILL Studio Preview container could not be activated:', error);
+    bind(FrontendApplicationContribution).toDynamicValue(() => {
+        let stopped = false;
+        let added: { dispose(): void } | undefined;
+        return {
+            onStart(app: FrontendApplication) {
+                const shell = app.shell;
+                const reveal = () => {
+                    if (stopped || !shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID)) {
+                        return;
+                    }
+                    shell.expandPanel('right');
+                    void shell.activateWidget(PREVIEW_CONTAINER_WIDGET_ID).catch(error => {
+                        console.warn('SKILL Studio Preview container could not be activated:', error);
+                    });
+                };
+                const scheduleReveal = () => {
+                    // onStart precedes shell attachment; defer activation until
+                    // the frontend startup continuation has attached the shell.
+                    window.setTimeout(reveal, 0);
+                };
+                added = shell.onDidAddWidget(widget => {
+                    if (widget.id === PREVIEW_CONTAINER_WIDGET_ID) {
+                        scheduleReveal();
+                    }
                 });
-            };
-            const scheduleReveal = () => {
-                // onStart precedes shell attachment; defer activation until
-                // the frontend startup continuation has attached the shell.
-                window.setTimeout(reveal, 0);
-            };
-            const added = shell.onDidAddWidget(widget => {
-                if (widget.id === PREVIEW_CONTAINER_WIDGET_ID) {
-                    scheduleReveal();
-                }
-            });
-            scheduleReveal();
-            return {
-                onStop() {
-                    stopped = true;
-                    added.dispose();
-                }
-            };
-        }
-    })).inSingletonScope();
+                scheduleReveal();
+            },
+            onStop() {
+                stopped = true;
+                added?.dispose();
+            }
+        };
+    }).inSingletonScope();
 
     // Keep the Main Editor DockPanel override test-gated until all real
     // Chromium acceptance cases have verified the one-group invariant.
