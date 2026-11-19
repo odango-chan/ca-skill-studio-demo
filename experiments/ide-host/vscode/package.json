@@ -250,10 +250,6 @@
         "category": "SKILL Studio"
       }
     ],
-    "markdown.markdownItPlugins": true,
-    "markdown.previewStyles": [
-      "./media/native-markdown-preview.css"
-    ],
     "languages": [
       {
         "id": "markdown",
