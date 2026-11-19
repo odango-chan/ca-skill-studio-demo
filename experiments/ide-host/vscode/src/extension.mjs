@@ -24,9 +24,9 @@ import {registerProjectWelcome} from "./project-welcome.mjs";
 import {extendMarkdownIt} from "./markdown-link-policy.mjs";
 import {registerWorkbench} from "./workbench.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
-import {registerContractEditor,mountContractPreview} from "./contract-editor.mjs";
-import {registerPredicateEditor,mountPredicatePreview} from "./predicate-editor.mjs";
-import {registerSchemaEditor,mountSchemaPreview} from "./schema-editor.mjs";
+import {registerContractCommands,mountContractPreview} from "./contract-editor.mjs";
+import {registerPredicateCommands,mountPredicatePreview} from "./predicate-editor.mjs";
+import {registerSchemaCommands,mountSchemaPreview} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
 import {registerDependencyIntegration} from "./dependency-integration.mjs";
 import {registerCompilerIntegration} from "./compiler-integration.mjs";
@@ -91,9 +91,9 @@ export function activate(context){
     getActiveProcedure:()=>
       workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
   });
-  registerContractEditor(vscode,context);
-  registerPredicateEditor(vscode,context);
-  registerSchemaEditor(vscode,context);
+  registerContractCommands(vscode,context);
+  registerPredicateCommands(vscode,context);
+  registerSchemaCommands(vscode,context);
   function mountProcedurePreview(document,panel,{isCurrent=()=>true}={}){
       if(!isProcedurePath(document.uri.path)){
         vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
