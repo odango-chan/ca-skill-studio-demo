@@ -1389,7 +1389,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             item.uri.toString()===key)??null
         );
         const lspProcedureDiagnostics=items=>items.filter(item=>
-          String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"&&
+          String(item.code?.value??item.code??"")==="YAML_PARSE_ERROR"&&
           item.source==="Skill Studio · procedure-projection");
         const waitForGeneration=async(state,afterGeneration,expectedState,predicate,label)=>{
           const started=Date.now();
@@ -1451,17 +1451,19 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               diagnostics=>lspProcedureDiagnostics(diagnostics).length===1,
               "Live Procedure diagnostic publication");
             const procedureDiagnostics=lspProcedureDiagnostics(invalid.diagnostics);
-            if(invalid.diagnostics.some(item=>
-              item.source==="Skill Studio · package-audit"||
-              String(item.code?.value??item.code??"")==="PACKAGE_AUDIT_UNAVAILABLE"))
-              throw Error("LSP duplicated Package Audit diagnostics in the native Problems collection");
+            const packageAuditDiagnostics=invalid.diagnostics.filter(item=>
+              item.source==="Skill Studio · package-audit");
+            if(packageAuditDiagnostics.filter(item=>
+              String(item.code?.value??item.code??"")==="PACKAGE_YAML_PARSE_ERROR").length!==1)
+              throw Error("Current Package Audit must publish exactly one matching YAML parse finding");
             const message=procedureDiagnostics[0].message;
-            if(!message.includes("YAML 解析失败"))
-              throw Error("Native Procedure diagnostic did not identify the malformed YAML: "+message);
+            if(!/YAML/i.test(message))
+              throw Error("Current Procedure diagnostic did not identify malformed YAML: "+message);
             return {
-              phase:"publish",appeared:true,code:"PROCEDURE_PROJECTION",
+              phase:"publish",appeared:true,code:"YAML_PARSE_ERROR",
               source:"Skill Studio · procedure-projection",message,
-              generation:invalid.generation,packageAuditDuplicates:0
+              generation:invalid.generation,
+              packageAuditDiagnostics:packageAuditDiagnostics.length
             };
           }catch(error){
             try{
@@ -1469,7 +1471,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
                 const beforeRestore=packageState.generation;
                 await replaceSource(state,state.original);
                 state.temporarySourceApplied=false;
-                await waitForGeneration(state,beforeRestore,"READY",
+                await waitForGeneration(state,beforeRestore,"PARTIAL",
                   diagnostics=>lspProcedureDiagnostics(diagnostics).length===0,
                   "Emergency Procedure Source restoration");
               }
@@ -1523,7 +1525,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               await replaceSource(state,state.original);
               state.temporarySourceApplied=false;
             }
-            const repaired=await waitForGeneration(state,beforeRepair,"READY",
+            const repaired=await waitForGeneration(state,beforeRepair,"PARTIAL",
               diagnostics=>lspProcedureDiagnostics(diagnostics).length===0,
               "Live Procedure diagnostic clear after repair");
             const restoredDocument=currentDocument();
@@ -1575,7 +1577,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             throw Error("L2-D4b diagnostic ownership probe is already active");
           const lsp=languageClient?.diagnosticsForAcceptance(key)??[];
           if(!lsp.some(item=>
-            String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"))
+            String(item.code?.value??item.code??"")==="YAML_PARSE_ERROR"))
             throw Error("L2-D4b requires a live LSP Procedure diagnostic");
           const guard=vscode.languages.createDiagnosticCollection(
             "skill-studio-d4b-control");
@@ -1599,7 +1601,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const visible=vscode.languages.getDiagnostics(uri);
           const lspCollectionPresent=languageClient?.hasDiagnosticCollectionForAcceptance()??false;
           const lspStillVisible=visible.some(item=>
-            String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"&&
+            String(item.code?.value??item.code??"")==="YAML_PARSE_ERROR"&&
             item.source==="Skill Studio · procedure-projection");
           const hostProbePresent=controls.some(item=>
             String(item.code?.value??item.code??"")==="D4B_HOST_DIAGNOSTIC_OWNERSHIP");
