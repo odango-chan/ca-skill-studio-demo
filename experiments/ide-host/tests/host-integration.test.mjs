@@ -312,13 +312,14 @@ test("Skill Studio authoring views live in native Explorer while Inspector stays
   assert.equal(manifest.contributes.views.skillStudio,undefined);
   assert.ok(!explorer.some(view=>view.name==="Outline"),
     "semantic Procedure Outline must not impersonate Theia's document-symbol Outline");
-  const inspector=manifest.contributes.viewsContainers?.secondarySidebar;
-  assert.ok(inspector?.some(container=>container.id==="skillStudioInspector"),
-    "Inspector keeps its native right-side Secondary Sidebar container");
+  const containers=manifest.contributes.viewsContainers?.secondarySidebar;
+  assert.deepEqual(containers?.map(container=>container.id),[
+    "skillStudioPreview","skillStudioInspector"
+  ],"Preview is its own primary right panel, distinct from Inspector");
+  assert.deepEqual(manifest.contributes.views.skillStudioPreview?.map(view=>[
+    view.id,view.name
+  ]),[["skillStudio.preview","Preview"]]);
   assert.deepEqual(manifest.contributes.views.skillStudioInspector?.map(view=>[
     view.id,view.name
-  ]),[
-    ["skillStudio.preview","Preview"],
-    ["skillStudio.inspection","Inspector"]
-  ]);
+  ]),[["skillStudio.inspection","Inspector"]]);
 });
