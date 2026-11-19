@@ -325,6 +325,13 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   };
   const context={subscriptions:[],extensionUri:uri('/extension')},
     workbench=registerWorkbench(vscode,context,{compilerProblemsProvider}),posted=[];
+  assert.ok(commands.has('skillStudio.internal.currentGrammarRejectionAcceptance'));
+  const currentGrammar=commands.get('skillStudio.internal.currentGrammarRejectionAcceptance')();
+  assert.equal(currentGrammar.status,'PASS');
+  assert.equal(currentGrammar.analysis,'CURRENT_GRAMMAR_ONLY');
+  assert.equal(currentGrammar.compatibilityFallback,false);
+  assert.ok(currentGrammar.codes.includes('UNKNOWN_FIELD'));
+  assert.ok(currentGrammar.codes.includes('SOURCE_ROOT_INVALID'));
   workbench.attach(doc,m=>posted.push(m));
   assert.equal(providers.size,3);
   const problems=providers.get('skillStudio.problems');
