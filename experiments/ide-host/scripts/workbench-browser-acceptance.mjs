@@ -1208,12 +1208,13 @@ export async function runWorkbenchAcceptance({
     if((sourceAfterPreviewScroll?.visibleRanges?.[0]?.start??1)>35)break;
     await sleep(80);
   }
-  if((sourceAfterPreviewScroll?.visibleRanges?.[0]?.start??1)<=35)
+  if((sourceAfterPreviewScroll?.visibleRanges?.[0]?.start??1)<=35){
     const scrollDiagnostics=await evaluateStudioMarkdown(blockedMissingView,
       "({lastScroll:window.__skillStudioLastPreviewScroll??null,"+
       "lastAck:window.__skillStudioLastPreviewScrollAck??null,scrollY:window.scrollY})");
     throw Error("Markdown Preview scrolling did not reveal the matching Source lines: "+
       JSON.stringify({sourceAfterPreviewScroll,previewScrollStart,scrollDiagnostics}));
+  }
   await evaluateStudioMarkdown(blockedMissingView,"(()=>{window.scrollTo(0,0);return true;})()");
   await waitStudioMarkdown(view=>view.scrollY===0,"reset Markdown Preview scroll before reverse sync");
   const sourceReveal=await nativeCommand(
