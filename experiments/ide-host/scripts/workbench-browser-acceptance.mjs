@@ -20,6 +20,9 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
         'workbench.action.focusSideBar',
         'workbench.action.toggleSidebar'
       ].map(id=>({id,registered:Boolean(registry?.getCommand?.(id))}));
+      const availableViewCommands=(registry?.getCommands?.()??[])
+        .map(item=>typeof item==='string'?item:item?.id??item?.commandId??'')
+        .filter(id=>/view|sidebar|auxiliary|container|widget/i.test(id)).slice(0,180);
       const inspect=(area,widget)=>{
         const node=widget.node,rect=node?.getBoundingClientRect?.();
         const visible=!!rect&&rect.width>0&&rect.height>0&&!widget.isHidden;
@@ -65,7 +68,7 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
           rect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};
       });
       return {main,right,left,source,preview,selectedPreview:rightPreview??null,
-        commandIds,tabBars,visibleEditorGroups:tabBars.filter(x=>x.visible).length};
+        commandIds,availableViewCommands,tabBars,visibleEditorGroups:tabBars.filter(x=>x.visible).length};
     })()`);
     const source=state.source??[];
     const preview=state.selectedPreview;
