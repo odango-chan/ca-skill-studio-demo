@@ -3115,8 +3115,20 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             item.severity==="information"
               ?(vscode.DiagnosticSeverity.Information??vscode.DiagnosticSeverity.Warning)
               :vscode.DiagnosticSeverity.Warning;
-          const diagnostic=new vscode.Diagnostic(
-            new vscode.Range(line,column,line,column+1),item.message,severity);
+          const sourceText=files.get(item.path)?.text;
+          const span=item.sourceRange;
+          const positionAtOffset=(text,offset)=>{
+            const lines=text.slice(0,offset).split(/\\r\\n|\\r|\\n/);
+            return {line:lines.length-1,character:lines.at(-1).length};
+          };
+          const range=sourceText&&span&&Number.isSafeInteger(span.start)&&
+            Number.isSafeInteger(span.end)&&span.start>=0&&span.end>span.start&&
+            span.end<=sourceText.length
+            ?(()=>{const start=positionAtOffset(sourceText,span.start);
+              const end=positionAtOffset(sourceText,span.end);
+              return new vscode.Range(start.line,start.character,end.line,end.character);})()
+            :new vscode.Range(line,column,line,column+1);
+          const diagnostic=new vscode.Diagnostic(range,item.message,severity);
           diagnostic.source=item.source??'Skill Studio · editor audit';
           diagnostic.code=item.code;return diagnostic;
         }));
