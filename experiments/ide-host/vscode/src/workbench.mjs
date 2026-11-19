@@ -989,28 +989,26 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   // Open the exact Procedure as native Source before inspecting semantic
   // highlighting. The broader acceptance flow may finish on a Python editor,
   // whose source-local CA-SL semantic token count is correctly zero.
-  if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
-    context.subscriptions.push(vscode.commands.registerCommand(
-      "skillStudio.internal.openProcedureSourceForHighlightDiagnostics",
-      async procedureUriValue=>{
-        const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
-        if(!/\/assurance\/procedure\.ya?ml$/i.test(procedureUri.path))
-          throw Error("Highlight diagnostics require an exact assurance/procedure.yaml URI");
-        const document=await vscode.workspace.openTextDocument(procedureUri);
-        await openNativeSource(vscode,procedureUri,{
-          viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
-        });
-        const editor=vscode.window.activeTextEditor;
-        return {
-          uri:document.uri.toString(),
-          languageId:document.languageId,
-          viewColumn:editor?.document?.uri?.toString()===document.uri.toString()
-            ?editor.viewColumn:null,
-          textLength:document.getText().length
-        };
-      }
-    ));
-  }
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.openProcedureSourceForHighlightDiagnostics",
+    async procedureUriValue=>{
+      const procedureUri=vscode.Uri.parse(String(procedureUriValue??""));
+      if(!/\/assurance\/procedure\.ya?ml$/i.test(procedureUri.path))
+        throw Error("Highlight diagnostics require an exact assurance/procedure.yaml URI");
+      const document=await vscode.workspace.openTextDocument(procedureUri);
+      await openNativeSource(vscode,procedureUri,{
+        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
+      });
+      const editor=vscode.window.activeTextEditor;
+      return {
+        uri:document.uri.toString(),
+        languageId:document.languageId,
+        viewColumn:editor?.document?.uri?.toString()===document.uri.toString()
+          ?editor.viewColumn:null,
+        textLength:document.getText().length
+      };
+    }
+  ));
 
   // Exercise candidate v1alpha5 providers through the public VS Code commands
   // in real Theia. A uniquely named sibling Package is created inside the
