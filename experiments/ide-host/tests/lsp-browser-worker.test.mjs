@@ -101,7 +101,7 @@ test("older source is diagnosed by the one current grammar without a version-spe
       String(message.params?.message??"").includes("ANALYSIS_UNAVAILABLE"),300);
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(1,
-        "apiVersion: connectionagent.io/v1alpha1\\nprocedures: {}\\n",rootUri)});
+        "apiVersion: connectionagent.io/v1alpha1\nprocedures: {}\n",rootUri)});
     const [result,procedure,contract]=await Promise.all([
       status,procedureDiagnostics,contractDiagnostics
     ]);
