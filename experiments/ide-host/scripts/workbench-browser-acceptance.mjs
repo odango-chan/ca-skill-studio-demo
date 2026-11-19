@@ -1194,9 +1194,10 @@ export async function runWorkbenchAcceptance({
     view.bodyText.includes("UPDATED")&&!view.bodyText.includes("INITIAL"),
     "v1alpha5 Markdown unsaved Source update");
   const previewScrollStart=await evaluateStudioMarkdown(blockedMissingView,
-    "(()=>{window.scrollTo(0,document.body.scrollHeight*0.72);return document.body.scrollHeight;})()");
-  if(!(previewScrollStart>1000))
-    throw Error("Markdown Preview fixture did not provide a scrollable document: "+previewScrollStart);
+    "(()=>{window.scrollTo(0,document.body.scrollHeight*0.72);return {height:document.body.scrollHeight,scrollY:window.scrollY};})()");
+  if(!(previewScrollStart?.height>1000)||!(previewScrollStart?.scrollY>0))
+    throw Error("Markdown Preview fixture did not scroll to a non-zero position: "+
+      JSON.stringify(previewScrollStart));
   let sourceAfterPreviewScroll=null;
   for(let attempt=0;attempt<50;attempt++){
     sourceAfterPreviewScroll=await nativeCommand(
@@ -1219,7 +1220,7 @@ export async function runWorkbenchAcceptance({
   const markdownEvidence={
     uri:markdownFixture.uri,initialVersion:markdownFixture.version,
     updatedVersion:live.version,blocks:updatedMarkdown.view.markdownBlockCount,
-    previewScrollHeight:previewScrollStart,
+    previewScrollHeight:previewScrollStart.height,previewScrollY:previewScrollStart.scrollY,
     sourceAfterPreviewScroll,sourceReveal,previewScrollAfterSource:sourceToPreview.view.scrollY,
     security:{images:blockedMissingView.view.imageCount,
       scripts:blockedMissingView.view.scriptMarkers,
@@ -1406,7 +1407,7 @@ export async function runWorkbenchAcceptance({
     dualSkillExplorer,packageOverview:packageOverviewEvidence.evidence,
     graphEditability,canvasToolbar,
     v1alpha5LanguageFeatures,semanticTokenEvidence,
-    nativeMarkdownEvidence,designerEvidence:{
+    markdownEvidence,designerEvidence:{
       contract:contract.view,predicates:predicates.view,schema:schema.view
     }
   };
