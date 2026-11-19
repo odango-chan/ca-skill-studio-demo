@@ -220,7 +220,8 @@ test("SKILL Studio adds one native Theia top-level menu with real extension comm
     .map(item=>item.command);
   assert.deepEqual(packageToolbar,[
     "skillStudio.refreshPackages","skillStudio.addDependency",
-    "skillStudio.checkSkill","skillStudio.buildSkill"
+    "skillStudio.checkSkill","skillStudio.buildSkill",
+    "skillStudio.showWelcome","skillStudio.showActivationDiagnostics"
   ]);
   const temp=await mkdtemp(join(tmpdir(),"theia-brand-"));
   try{
