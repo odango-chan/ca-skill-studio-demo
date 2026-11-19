@@ -11,7 +11,7 @@ if(!manifest.browser||manifest.contributes?.customEditors?.length)
 const previewViews=manifest.contributes?.views?.skillStudioInspector??[];
 if(!previewViews.some(view=>view.id==="skillStudio.preview"&&view.type==="webview"))
   throw Error("Shared right-side skillStudio.preview WebviewView is missing from the prepared Web extension");
-for(const source of [manifest.browser,"./dist/extension-theia.js","./dist/skill-language-server.js","./dist/compiler-worker.js","./dist/skillc.wasm","./dist/wasm_exec.js",join("media","procedure.js"),join("media","procedure.css")]){
+for(const source of [manifest.browser,"./dist/extension-theia.js","./dist/skill-language-server.js","./dist/compiler-worker.js","./dist/skillc.wasm","./dist/wasm_exec.js",join("media","procedure.js"),join("media","procedure.css"),join("media","studio-markdown-preview.css")]){
   const info=await stat(join(ext,source));
   if(!info.isFile()||info.size<1000)throw Error("Missing built Web extension file: "+source);
 }
