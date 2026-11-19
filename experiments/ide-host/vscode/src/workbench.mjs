@@ -211,6 +211,16 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   // Command Palette. The Chromium harness queries this internal command in
   // both browser-Worker and Node extension-host variants.
   context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.openSourceDocumentAcceptance",async uriString=>{
+      const uri=vscode.Uri.parse(String(uriString));
+      const sourceDocument=await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(sourceDocument,{
+        viewColumn:vscode.ViewColumn.One,preview:false
+      });
+      return {uri:sourceDocument.uri.toString(),languageId:sourceDocument.languageId};
+    }
+  ));
+  context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
       languagePackages:[...languagePackages.values()].map(state=>({
