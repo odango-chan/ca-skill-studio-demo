@@ -13,6 +13,7 @@ npm ci --prefix experiments/ide-host/lsp-browser/server --no-audit --no-fund
 node experiments/ide-host/scripts/build-ide-spike.mjs
 node experiments/ide-host/scripts/prepare-theia-online.mjs
 npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
+npm run build:fixed-workbench --prefix experiments/ide-host/theia-online
 npm run download:plugins --prefix experiments/ide-host/theia-online
 npm run build --prefix experiments/ide-host/theia-online
 ```
@@ -21,7 +22,7 @@ The Pages workflow then prepares the same-origin Webview assets, brand and host 
 
 ## Bundled extensions and ownership
 
-The web extension, Skill Studio theme, YAML/Python TextMate grammars and pinned `vscode.markdown-language-features@1.95.3` extension are bundled at application build time. Browser-only Theia does not install the VSIX dynamically through its Extensions UI.
+The web extension, Skill Studio theme, YAML/Python TextMate grammars, fixed-workbench Theia frontend module and pinned `vscode.markdown-language-features@1.95.3` extension are bundled at application build time. Browser-only Theia does not install the VSIX dynamically through its Extensions UI. The fixed Main Editor DockPanel override is currently test-gated by the `skillStudioFixedLayoutTest=1` URL query and is not enabled in the deployed workbench until the shared Preview Host migration is complete.
 
 Package Explorer is one native Explorer TreeView that composes Skills and Plugin-managed Dependencies. Native Files remains available. The right-side Inspector contains Source-derived read-only Data Flow; the retired standalone Evidence view is not part of this host. The native Markdown extension owns Preview rendering and lifecycle; Studio supplies the shared theme and Package-local link/security policy.
 
