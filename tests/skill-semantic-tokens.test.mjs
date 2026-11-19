@@ -129,6 +129,30 @@ test("v1alpha5 MAS Procedure receives the same graph token projection",()=>{
   tokenFor(source,items,"PASS","skillOutcome");
 });
 
+test("persisted v1alpha1 Example retains editor-only semantic colors despite unsupported analysis",()=>{
+  const base="../tests/fixtures/legacy-site-samples/packages/establish-pdu-session/assurance/";
+  const legacyProcedure=readFileSync(new URL(base+"procedure.yaml",import.meta.url),"utf8");
+  const procedureTokens=observed(legacyProcedure,"skills/establish-pdu-session/assurance/procedure.yaml");
+  tokenFor(legacyProcedure,procedureTokens,"ue-requested-pdu-session-establishment",
+    "skillStep","declaration");
+  tokenFor(legacyProcedure,procedureTokens,"nudm-sdm-get","skillStep","declaration");
+  tokenFor(legacyProcedure,procedureTokens,"sbi.udm.sm_data.get","skillOperation","reference");
+  tokenFor(legacyProcedure,procedureTokens,"PASS","skillOutcome");
+  const legacyPredicates=readFileSync(new URL(base+"predicates.yaml",import.meta.url),"utf8");
+  const predicateTokens=observed(legacyPredicates,"skills/establish-pdu-session/assurance/predicates.yaml");
+  tokenFor(legacyPredicates,predicateTokens,"createdsession.ingress.eligible",
+    "skillPredicate","declaration");
+  tokenFor(legacyPredicates,predicateTokens,"createdsession.procedure_context",
+    "skillObservation","reference");
+  const legacyContract=readFileSync(new URL(base+"contract.yaml",import.meta.url),"utf8");
+  const contractTokens=observed(legacyContract,"skills/establish-pdu-session/assurance/contract.yaml");
+  tokenFor(legacyContract,contractTokens,"apiVersion","skillKeyword");
+  tokenFor(legacyContract,contractTokens,"requestSchema","skillKeyword");
+  assert.deepEqual(observed(legacyProcedure,"unrelated/values.yaml"),[]);
+  assert.deepEqual(observed(legacyProcedure,"skills/../demo/assurance/procedure.yaml"),[]);
+  assert.deepEqual(observed("procedures: [","skills/demo/assurance/procedure.yaml"),[]);
+});
+
 test("v1alpha5 uses its own AST semantic projection for the candidate single-graph grammar",()=>{
   const contractSource=[
     "goal: demo.session_established",
