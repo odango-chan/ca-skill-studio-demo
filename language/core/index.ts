@@ -371,7 +371,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       ...scriptNavigationDiagnostics
     ];
     return {
-      state: "PARTIAL",
+      state: projected.procedure.state === "READY" ? "READY" : "PARTIAL",
       rootUri: snapshot.rootUri,
       packageName: snapshot.packageName,
       generation: snapshot.generation,
