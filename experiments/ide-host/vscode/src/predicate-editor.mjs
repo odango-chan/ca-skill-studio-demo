@@ -2,7 +2,6 @@ import {openNativeSource,revealNativeSourceLine} from './native-source.mjs';
 
 import {projectPredicateSet} from '../../../../site/predicate-projection.mjs';
 
-const VIEW = 'skillStudio.predicatePreview';
 const SUFFIX = '/assurance/predicates.yaml';
 
 function nonce() {
