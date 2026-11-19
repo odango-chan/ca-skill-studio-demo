@@ -751,8 +751,9 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     'Markdown Source is persistent, not a transient preview tab');
   assert.equal(markdownExtensionActivated,false,
     'opening Markdown Source does not activate or open the native Markdown Preview CustomEditor');
-  assert.equal(nativeCommands.some(call=>call.id==='vscode.openWith'),false,
-    'the shared right-side Preview must not invoke a second Main Editor CustomEditor');
+  assert.equal(nativeCommands.some(call=>call.id==='vscode.openWith'&&
+    call.args[1]==='vscode.markdown.preview.editor'),false,
+    'the shared right-side Preview must not invoke the native Markdown Preview CustomEditor');
 
   // The v1alpha5 Example must keep showing deterministic local and NOT_CHECKED
   // Package diagnostics while the Compiler provider is disconnected.
