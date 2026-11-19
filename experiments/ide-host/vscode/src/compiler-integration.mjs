@@ -4,6 +4,7 @@
 import {collectPackageSnapshot,packageRootForProcedure} from "./package-snapshot.mjs";
 import {createCompilerWorkerClient} from "./compiler-client.mjs";
 import {normalizeCompilerDiagnostics} from "./compiler-diagnostics.mjs";
+import {createCompilerResultGate} from "./compiler-result-gate.mjs";
 import {
   COMPILER_VERSION,
   COMPILER_INSPECTION_VERSION,
@@ -161,6 +162,7 @@ export function registerCompilerIntegration(vscode,context,{
   const output=vscode.window.createOutputChannel("Skill Compiler · "+COMPILER_VERSION);
   const diagnostics=vscode.languages.createDiagnosticCollection("skill-compiler");
   const compilerProblems=new Map();
+  const resultGate=createCompilerResultGate();
   const problemsEmitter=new vscode.EventEmitter();
   const problemsProvider={
     onDidChange:problemsEmitter.event,
@@ -173,11 +175,67 @@ export function registerCompilerIntegration(vscode,context,{
   function clearPackageDiagnostics(packageRoot){
     const prefix=packageRoot.path.replace(/\/$/,"")+"/";
     diagnostics.forEach(uri=>{
-      if(uri.path.startsWith(prefix))diagnostics.delete(uri);
+      if(uri.scheme===packageRoot.scheme&&
+         uri.authority===packageRoot.authority&&
+         uri.path.startsWith(prefix))diagnostics.delete(uri);
     });
   }
 
-  function publishDiagnostics(packageRoot,packageName,procedureUri,items){
+  function invalidatePackage(packageRoot){
+    if(!packageRoot)return;
+    const rootKey=packageRoot.toString();
+    resultGate.advance(rootKey);
+    clearPackageDiagnostics(packageRoot);
+    if(compilerProblems.delete(rootKey))problemsEmitter.fire();
+  }
+
+  function invalidateAll(){
+    const known=new Set([...resultGate.knownRoots(),...compilerProblems.keys()]);
+    resultGate.invalidateAll();
+    for(const key of known){
+      const root=asUri(vscode,key);
+      if(root)clearPackageDiagnostics(root);
+    }
+    if(compilerProblems.size){
+      compilerProblems.clear();
+      problemsEmitter.fire();
+    }
+  }
+
+  function onWorkspaceFile(uri){
+    if(!uri||uri.scheme==="skill-studio-artifact")return;
+    if(/\/\.vscode\/settings\.json$/i.test(uri.path??"")){
+      invalidateAll();
+      return;
+    }
+    const root=packageRootFromUri(vscode,uri);
+    if(root)invalidatePackage(root);
+  }
+  // Keep Editor/Compiler generations separate. Source changes invalidate
+  // Compiler-owned findings immediately, never Language Service diagnostics.
+  const listen=(event,callback)=>{
+    if(typeof event!=="function")return;
+    const subscription=event(callback);
+    if(subscription?.dispose)context.subscriptions.push(subscription);
+  };
+  listen(vscode.workspace.onDidChangeTextDocument,event=>
+    onWorkspaceFile(event.document?.uri));
+  listen(vscode.workspace.onDidCreateFiles,event=>
+    event.files?.forEach(onWorkspaceFile));
+  listen(vscode.workspace.onDidDeleteFiles,event=>
+    event.files?.forEach(onWorkspaceFile));
+  listen(vscode.workspace.onDidRenameFiles,event=>
+    event.files?.forEach(file=>{
+      onWorkspaceFile(file.oldUri);
+      onWorkspaceFile(file.newUri);
+    }));
+  listen(vscode.workspace.onDidChangeConfiguration,event=>{
+    if(typeof event.affectsConfiguration!=="function"||
+       event.affectsConfiguration("connectionAgent.skillStudio"))invalidateAll();
+  });
+  listen(vscode.workspace.onDidChangeWorkspaceFolders,()=>invalidateAll());
+
+  function publishDiagnostics(packageRoot,packageName,procedureUri,items,compilerRevision){
     // Validate the whole Compiler response before touching any accepted
     // DiagnosticCollection. Missing or ungrounded source ranges remain
     // request/file Problems, never synthetic line-1 editor errors.
@@ -192,7 +250,7 @@ export function registerCompilerIntegration(vscode,context,{
       // Do not attach it to the active Procedure merely to enable a click.
       const uri=sourceUri;
       const problem={
-        ...item,uri:uri?.toString()??null
+        ...item,uri:uri?.toString()??null,compilerRevision
       };
       problemEntries.push(problem);
       if(item.locationKind==="request"){
@@ -275,7 +333,11 @@ export function registerCompilerIntegration(vscode,context,{
     if(!root.uri.path.endsWith(expectedSuffix)){
       throw new Error("Compiler v2 requires the Package to live under the project skills/<name>/ source root");
     }
+    const rootKey=root.uri.toString();
+    const sourceRevision=resultGate.current(rootKey);
     const snapshot=await collectPackageSnapshot(vscode,procedure,++snapshotGeneration);
+    if(!resultGate.isCurrent(rootKey,sourceRevision))
+      throw Error("Skill Source changed during Compiler snapshot assembly; rerun Check/Build");
     if(snapshot.completeness!=="complete"){
       throw new Error("Compiler input snapshot is "+snapshot.completeness+
         "; refusing to compile incomplete source: "+(snapshot.reason??"unknown snapshot error"));
@@ -302,7 +364,7 @@ export function registerCompilerIntegration(vscode,context,{
     output.appendLine("Compiler "+COMPILER_VERSION+" · CA-SL v1alpha5 · "+
       root.name+" · "+request.files.length+" source file(s)");
     output.appendLine("No independently trusted dependency, CapabilityContracts, Evidence or IngressCatalog publication is currently attached to this Compiler request. Compiler Check will report resulting linking gaps; Studio does not synthesize Owner authorization.");
-    return {procedure,root,request};
+    return {procedure,root,request,sourceRevision};
   }
 
   async function withProgress(title,task){
@@ -318,12 +380,20 @@ export function registerCompilerIntegration(vscode,context,{
   async function checkSkill(target){
     const prepared=await assembleRequest(target);
     if(!prepared)return null;
+    const rootKey=prepared.root.uri.toString();
+    if(!resultGate.isCurrent(rootKey,prepared.sourceRevision))
+      throw Error("Skill Source changed while preparing Compiler Check; rerun Check");
+    const revision=resultGate.advance(rootKey);
     return withProgress("Checking Skill · Compiler "+COMPILER_VERSION,async progress=>{
       progress.report({message:"Running CA-SL v1alpha5 Compiler Check…"});
       const result=await client.request("check",prepared.request);
       if(!Array.isArray(result))throw new Error("Compiler Check returned an invalid Diagnostic[] response");
+      if(!resultGate.isCurrent(rootKey,revision)){
+        output.appendLine("Compiler Check result discarded: Source or Package state changed during the request");
+        return null;
+      }
       publishDiagnostics(prepared.root.uri,prepared.root.name,
-        prepared.procedure.uri,result);
+        prepared.procedure.uri,result,revision);
       const errors=result.filter(item=>item.severity==="error").length;
       const warnings=result.filter(item=>item.severity==="warning").length;
       output.show(true);
@@ -341,6 +411,10 @@ export function registerCompilerIntegration(vscode,context,{
   async function buildSkill(target){
     const prepared=await assembleRequest(target);
     if(!prepared)return null;
+    const rootKey=prepared.root.uri.toString();
+    if(!resultGate.isCurrent(rootKey,prepared.sourceRevision))
+      throw Error("Skill Source changed while preparing Compiler Build; rerun Build");
+    const revision=resultGate.advance(rootKey);
     return withProgress("Building Skill · Compiler "+COMPILER_VERSION,async progress=>{
       progress.report({message:"Compiling and linking CA-SL v1alpha5…"});
       const result=await client.request("build",prepared.request);
@@ -357,8 +431,12 @@ export function registerCompilerIntegration(vscode,context,{
           throw new Error("Compiler Artifact integrity verification failed: "+String(verification));
         }
       }
+      if(!resultGate.isCurrent(rootKey,revision)){
+        output.appendLine("Compiler Build result discarded: Source or Package state changed during the request");
+        return null;
+      }
       publishDiagnostics(prepared.root.uri,prepared.root.name,
-        prepared.procedure.uri,result.diagnostics);
+        prepared.procedure.uri,result.diagnostics,revision);
       artifacts.setBuild(prepared.root.uri,prepared.root.name,result);
       output.show(true);
       if(result.success){
@@ -417,7 +495,11 @@ export function registerCompilerIntegration(vscode,context,{
     vscode.commands.registerCommand("skillStudio.revealCompilerDiagnostic",async item=>{
       const uri=asUri(vscode,item?.uri);
       if(!uri)return;
+      const root=packageRootFromUri(vscode,uri);
+      const rootKey=root?.toString();
+      if(!rootKey||!resultGate.isCurrent(rootKey,item?.compilerRevision))return;
       const document=await vscode.workspace.openTextDocument(uri);
+      if(!resultGate.isCurrent(rootKey,item.compilerRevision))return;
       const editor=await vscode.window.showTextDocument(document,{
         preview:false,viewColumn:vscode.ViewColumn.One
       });
