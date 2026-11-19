@@ -3084,7 +3084,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         }
       }
 
-      const results=auditV1Alpha5Package({
+      const results=auditPackage({
         files,dependencyContext,
         completeness:packageSnapshot.completeness,
         snapshotReason:packageSnapshot.reason
