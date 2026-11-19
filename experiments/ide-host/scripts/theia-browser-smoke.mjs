@@ -819,6 +819,81 @@ try{
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp,
     requireCompilerWorker,procedureUri:identity.defaultProcedure
   });
+  // The browser-only host must ship Python's own TextMate grammar; CA-SL
+  // semantic tokens intentionally do not color ordinary Python syntax.
+  // Probe the *actual rendered* Source through native Quick Open in both hosts.
+  if(requireEditor){
+    const sourcePoint=await evalJS(`(()=>{
+      const editor=[...document.querySelectorAll('.monaco-editor')].find(node=>{
+        const r=node.getBoundingClientRect();
+        return r.width>150&&r.height>100&&node.querySelector('.view-lines');
+      });
+      const r=editor?.getBoundingClientRect();
+      return r?{x:r.x+Math.min(120,r.width/2),y:r.y+Math.min(60,r.height/2)}:null;
+    })()`);
+    if(!sourcePoint)throw Error("No visible Monaco Source for Python TextMate check");
+    await command("Input.dispatchMouseEvent",{
+      type:"mousePressed",...sourcePoint,button:"left",clickCount:1
+    });
+    await command("Input.dispatchMouseEvent",{
+      type:"mouseReleased",...sourcePoint,button:"left",clickCount:1
+    });
+    await command("Input.dispatchKeyEvent",{
+      type:"keyDown",key:"p",code:"KeyP",modifiers:2,
+      windowsVirtualKeyCode:80,nativeVirtualKeyCode:80
+    });
+    await command("Input.dispatchKeyEvent",{
+      type:"keyUp",key:"p",code:"KeyP",modifiers:2,
+      windowsVirtualKeyCode:80,nativeVirtualKeyCode:80
+    });
+    let quickOpen=false;
+    for(let attempt=0;attempt<30;attempt++){
+      quickOpen=await evalJS(`Boolean([...document.querySelectorAll('input')].some(el=>{
+        const r=el.getBoundingClientRect();
+        return r.width>0&&r.height>0&&
+          (el.closest('.quick-input-widget,.monaco-quick-open-widget,.theia-quick-view')||
+           /quick|file|search/i.test(el.getAttribute('aria-label')||el.placeholder||''));
+      }))`);
+      if(quickOpen)break;
+      await sleep(100);
+    }
+    if(!quickOpen)throw Error("Native Quick Open missing for Python TextMate check");
+    await command("Input.insertText",{text:"build_pcf_policy_inputs.py"});
+    await sleep(600);
+    await command("Input.dispatchKeyEvent",{
+      type:"keyDown",key:"Enter",code:"Enter",
+      windowsVirtualKeyCode:13,nativeVirtualKeyCode:13
+    });
+    await command("Input.dispatchKeyEvent",{
+      type:"keyUp",key:"Enter",code:"Enter",
+      windowsVirtualKeyCode:13,nativeVirtualKeyCode:13
+    });
+    let pythonTextMate=null;
+    for(let attempt=0;attempt<35;attempt++){
+      pythonTextMate=await evalJS(`(()=>{
+        const visible=[...document.querySelectorAll('.monaco-editor')].filter(node=>{
+          const r=node.getBoundingClientRect();
+          return r.width>150&&r.height>100&&node.querySelector('.view-lines');
+        });
+        const editor=visible.find(node=>node.contains(document.activeElement))||
+          visible.at(-1);
+        const tokens=[...(editor?.querySelectorAll('.view-lines span')??[])];
+        return {title:document.title,
+          tokenCount:tokens.length,
+          colors:[...new Set(tokens.map(node=>getComputedStyle(node).color))],
+          visibleText:editor?.querySelector('.view-lines')?.innerText?.slice(0,250)??''};
+      })()`);
+      if(pythonTextMate.title.startsWith("build_pcf_policy_inputs.py")&&
+         pythonTextMate.colors.length>=3)break;
+      await sleep(120);
+    }
+    console.log("STUDIO_NATIVE_PYTHON_TEXTMATE_CHROMIUM",
+      JSON.stringify(pythonTextMate));
+    if(!pythonTextMate?.title?.startsWith("build_pcf_policy_inputs.py")||
+       !(pythonTextMate?.colors?.length>=3))
+      throw Error("Native Python TextMate syntax colors were not rendered: "+
+        JSON.stringify(pythonTextMate));
+  }
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
     ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
