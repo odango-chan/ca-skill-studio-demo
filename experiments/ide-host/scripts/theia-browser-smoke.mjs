@@ -1033,7 +1033,20 @@ try{
   }
   if(!reopenedWelcome)
     throw Error("The explicit Welcome command did not reopen its editor in an existing workspace");
-  console.log("STUDIO_WELCOME_REOPEN_CHROMIUM",JSON.stringify(reopenedWelcome));
+  const reopenedWelcomeDiagnostics=await evalJS(`(async()=>{
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&
+      k.prototype?.registerCommand&&k.prototype?.getCommand);
+    return c.get(key).executeCommand("skillStudio.showActivationDiagnostics");
+  })()`);
+  if(reopenedWelcomeDiagnostics?.welcome?.panelOpen!==true||
+     reopenedWelcomeDiagnostics?.welcome?.lastError)
+    throw Error("Welcome opened but its live diagnostics do not report a healthy panel: "+
+      JSON.stringify(reopenedWelcomeDiagnostics?.welcome));
+  console.log("STUDIO_WELCOME_REOPEN_CHROMIUM",JSON.stringify({
+    ...reopenedWelcome,welcome:reopenedWelcomeDiagnostics.welcome
+  }));
 
   // Keep the same Chromium user-data directory and OPFS workspace, then reload
   // the page. This is the persistent-profile regression the fresh-profile test
