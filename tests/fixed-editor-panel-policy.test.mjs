@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import {
   constrainMainEditorPanelOptions,
   isMainEditorPanelOptions
@@ -40,4 +41,13 @@ test("leaves bottom and side panel options unchanged", () => {
   assert.equal(constrainMainEditorPanelOptions(bottom, MAIN), bottom);
   const side = { mode: "single-document" };
   assert.equal(constrainMainEditorPanelOptions(side, MAIN), side);
+});
+
+test("production shell enforces the fixed Main Editor without a test-only URL flag", () => {
+  const source=readFileSync(
+    "experiments/ide-host/theia-fixed-workbench/src/browser/fixed-workbench-frontend-module.ts",
+    "utf8");
+  assert.match(source,/rebind\(TheiaDockPanel\.Factory\)/);
+  assert.match(source,/constrainMainEditorPanelOptions\(options, MAIN_AREA_CLASS\)/);
+  assert.doesNotMatch(source,/skillStudioFixedLayoutTest|FIXED_LAYOUT_TEST_QUERY|if \(!enabled\)/);
 });
