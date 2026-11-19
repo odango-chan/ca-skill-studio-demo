@@ -14,7 +14,7 @@ export function previewDocumentKind(uri) {
   const pair=sourceViewType(uri);
   if(pair==="skillStudio.procedurePreview")return "procedure";
   if(pair)return pair;
-  if(/\\.(md|markdown)$/i.test(uri.path))return "markdown";
+  if(/\.(md|markdown)$/i.test(uri.path))return "markdown";
   return "none";
 }
 
