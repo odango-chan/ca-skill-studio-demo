@@ -1,5 +1,5 @@
 import {openNativeSource,revealNativeSourceLine} from './native-source.mjs';
-import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
+
 import {projectPredicateSet} from '../../../../site/predicate-projection.mjs';
 
 const VIEW = 'skillStudio.predicatePreview';
@@ -48,8 +48,8 @@ async function choosePredicateSet(vscode, uri) {
   })), {placeHolder: 'Choose the PredicateSet Source file'});
   return picked?.uri ?? null;
 }
-async function reveal(vscode, uri, line, sourceOnly=false) {
-  return sourceOnly?revealNativeSourceLine(vscode,uri,line):openSourceViewPair(vscode,uri,{line});
+async function reveal(vscode,uri,line) {
+  return revealNativeSourceLine(vscode,uri,line);
 }
 function webviewHtml(token) {
   const csp = "default-src 'none'; img-src data:; style-src 'nonce-" + token +
@@ -107,7 +107,7 @@ function webviewHtml(token) {
     '<div class="footer">Predicate 声明参数签名、Evidence 要求与 Evaluator。CEL / Script 均不在 Designer 中执行；Script 引用不代表脚本已获准执行。</div>' +
     '</main><script nonce="' + token + '">' + script + '</script></body></html>';
 }
-export function mountPredicatePreview(vscode,document,panel,{forgetPairOnDispose=true,isCurrent=()=>true}={}) {
+export function mountPredicatePreview(vscode,document,panel,{isCurrent=()=>true}={}) {
       if (!predicatePath(document.uri.path)) {
         void vscode.window.showWarningMessage(
           'Only assurance/predicates.yaml is supported by Predicate Designer');
@@ -143,14 +143,14 @@ export function mountPredicatePreview(vscode,document,panel,{forgetPairOnDispose
               viewColumn: vscode.ViewColumn.One, preserveFocus: false, preview: false
             });
           } else if (message.type === 'revealLine') {
-            await reveal(vscode, document.uri, message.value, !forgetPairOnDispose);
+            await reveal(vscode,document.uri,message.value);
           } else if (message.type === 'openScript') {
             const relative = message.value;
             if (!safeScriptPath(relative))
               throw Error('Script reference must stay inside the Skill Package scripts/ directory');
             const scriptUri = document.uri.with({path: packageRoot(document.uri) + '/' + relative});
             await vscode.workspace.openTextDocument(scriptUri);
-            await reveal(vscode, scriptUri, 1, !forgetPairOnDispose);
+            await reveal(vscode,scriptUri,1);
           }
         } catch (error) {
           await vscode.window.showWarningMessage(
@@ -161,24 +161,15 @@ export function mountPredicatePreview(vscode,document,panel,{forgetPairOnDispose
       const cleanup=()=>{
         if(disposed)return;
         disposed=true;
-        if(forgetPairOnDispose)forgetSourceViewPair(document.uri);
         changed.dispose();incoming.dispose();releasePanel?.dispose?.();
       };
       releasePanel=panel.onDidDispose(cleanup);
       return {dispose:cleanup};
 }
 export function registerPredicateEditor(vscode,context) {
-  const provider={
-    async resolveCustomTextEditor(document,panel) {
-      mountPredicatePreview(vscode,document,panel);
-    }
-  };
-  context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW, provider, {
-    webviewOptions: {retainContextWhenHidden: true}
-  }));
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openPredicates',
     async uri => {
       const target = await choosePredicateSet(vscode, uri);
-      if (target) await openSourceViewPair(vscode,target);
+      if (target) await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
     }));
 }
