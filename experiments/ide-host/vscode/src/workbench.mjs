@@ -3671,39 +3671,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         }))
       }))
     })));
-  // Opening Markdown in the native Explorer/editor automatically creates its
-  // paired read-only Preview. The timer lets an explicit Preview command finish
-  // first; its panel is then already registered and no duplicate is opened.
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
-    const target=editor?.document?.uri;
-    if(!target||!isNativeMarkdownPath(target.path))return;
-    const key=target.toString();
-    setTimeout(()=>{
-      if(nativeMarkdownOpening.has(key))return;
-      if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
-      void openNativeMarkdownPreview(target).catch(error=>{
-        void vscode.window.showWarningMessage(
-          '原生 Markdown 预览未能打开：'+String(error?.message??error));
-      });
-    },0);
-  }));
-  // An editor restored before extension activation does not emit a new active
-  // editor event. Apply the same default pairing to that already-active Source.
-  const initiallyActiveMarkdown=vscode.window.activeTextEditor?.document;
-  if(initiallyActiveMarkdown&&isNativeMarkdownPath(initiallyActiveMarkdown.uri.path)){
-    const target=initiallyActiveMarkdown.uri,key=target.toString();
-    setTimeout(()=>{
-      if(vscode.window.activeTextEditor?.document.uri.toString()===key)
-        void openNativeMarkdownPreview(target);
-    },0);
-  }
-  if(typeof vscode.workspace.onDidCloseTextDocument==='function'){
-    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document=>{
-      if(!isNativeMarkdownPath(document.uri.path))return;
-      const key=document.uri.toString();
-      nativeMarkdownOpening.delete(key);
-    }));
-  }
+  // Markdown Source activation is now observed by skillStudio.preview.
+  // The native Markdown language extension remains installed for language
+  // features; do not auto-create its CustomEditor Preview or editor groups.
   // Internal acceptance probe reports the authoritative VS Code TextDocument
   // version; the custom-editor webview's display revision is not that version.
   context.subscriptions.push(vscode.commands.registerCommand(
