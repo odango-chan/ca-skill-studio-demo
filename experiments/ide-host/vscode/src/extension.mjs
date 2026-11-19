@@ -186,6 +186,9 @@ export function activate(context){
   registerSafely("Contract Editor",()=>registerContractEditor(vscode,context));
   registerSafely("Predicate Editor",()=>registerPredicateEditor(vscode,context));
   registerSafely("Schema Editor",()=>registerSchemaEditor(vscode,context));
+  // Keep the extension host alive if a later, non-core editor/menu contribution
+  // fails. The already registered Welcome and diagnostic command remain usable.
+  try{
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
@@ -885,5 +888,9 @@ export function activate(context){
       String(error?.message??error));
   });
   return {extendMarkdownIt};
+  }catch(error){
+    recordActivationFailure("Remaining Workbench Contributions",error);
+    return {extendMarkdownIt};
+  }
 }
 export function deactivate(){}

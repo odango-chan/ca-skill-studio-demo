@@ -472,18 +472,6 @@ export function registerPackageOverview(vscode,context,getActiveDocument=()=>nul
     return list.length>0;
   }
   void refresh();
-  function getDiagnostics(){
-    return {
-      state:inventoryState,message,
-      rootSignature:observedRootSignature,
-      packageCount:packages.length,
-      packages:packages.map(pkg=>({
-        name:pkg.name,relativeRoot:pkg.relativeRoot,
-        fileCount:pkg.fileCount,corePresent:pkg.corePresent
-      })),
-      treeReads,treeReadsByKind:{...treeReadsByKind}
-    };
-  }
-  return {refresh,revealPackages,getDiagnostics,
+  return {refresh,revealPackages,
     dispose(){clearTimeout(timer);generation++;emitter.dispose?.();}};
 }

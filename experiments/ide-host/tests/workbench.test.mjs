@@ -227,10 +227,6 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     TreeItem:class {constructor(label,state){this.label=label;this.collapsibleState=state;}},
     TreeItemCollapsibleState:{None:0,Collapsed:1},
     ThemeIcon:class {constructor(id){this.id=id;}},
-    SemanticTokensLegend:class {constructor(tokenTypes,tokenModifiers){
-      this.tokenTypes=tokenTypes;this.tokenModifiers=tokenModifiers;
-    }},
-    SemanticTokens:class {constructor(data){this.data=data;}},
     Range:class {constructor(start,startCharacter,end,endCharacter){
       if(typeof start==='number'){
         this.start={line:start,character:startCharacter};
@@ -252,14 +248,9 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
       extensionUri:uri('/extensions/vscode.markdown-language-features'),isActive:markdownExtensionActivated,
       async activate(){markdownExtensionActivated=true;this.isActive=true;return {};}
     }:null;}},
-    languages:{
-      registerDocumentSemanticTokensProvider(){
-        throw new Error("simulated semantic-token provider registration failure");
-      },
-      getDiagnostics:target=>diagnosticSets.flatMap(([uri,items])=>
+    languages:{getDiagnostics:target=>diagnosticSets.flatMap(([uri,items])=>
         uri.path===target.path?items:[]),
-      createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})
-    },
+      createDiagnosticCollection:()=>({clear(){diagnosticSets.length=0;},set(...args){diagnosticSets.push(args);},dispose(){}})},
     commands:{async executeCommand(id,...args){nativeCommands.push({id,args});return true;},
       async getCommands(){return ['markdown.showPreview','vscode.openWith'];},
       registerCommand(name,cb){commands.set(name,cb);return disposable();}},
@@ -831,9 +822,6 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.equal(sourceOpen.args[2].selection.start.line,expectedCapabilityLine-1,
     'Problem navigation selects the exact Capability Grant source line');
   const acceptance=await commands.get('skillStudio.internal.semanticTokenDiagnostics')();
-  assert.match(acceptance.registrationError,
-    /simulated semantic-token provider registration failure/,
-    "a semantic-token host API failure must be reported without aborting workbench activation");
   assert.ok(acceptance.packageAudit.problems.some(item=>
     item.code==='CAPABILITY_GRANT_NOT_CHECKED'&&item.line===expectedCapabilityLine));
   assert.ok(acceptance.packageAudit.editorMarkers.some(item=>

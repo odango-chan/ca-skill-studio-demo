@@ -69,7 +69,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     languageStatusItem=null,languageTransportFailure=null,languagePackageFailure=null;
   const semanticTokenDiagnostics={
     registered:false,tokenTypeCount:0,requests:0,lastUri:null,lastTokenCount:0,lastError:null,
-    registrationError:null,
     renderer:null,renderedTokenCount:0,renderedTypeCount:0,renderError:null,
     server:null,transport:null,packageAttachAttempts:0,lastPackageRoot:null,
     lastPackageAttachReason:null
@@ -246,17 +245,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         .get("semanticHighlighting.enabled")
     })
   ));
-  // Semantic highlighting is an enhancement, not an activation prerequisite.
-  // A host-specific API failure must not prevent Package Explorer, Outline,
-  // Problems, Welcome or the remaining workbench providers from registering.
-  try{
-    registerExtensionHostSemanticTokens();
-  }catch(error){
-    const reason=String(error?.message??error);
-    semanticTokenDiagnostics.registrationError=reason;
-    semanticTokenDiagnostics.lastError=reason;
-    console.error("SKILL Studio semantic-token registration failed; continuing activation:",reason);
-  }
+  registerExtensionHostSemanticTokens();
 
   function languagePackageContains(root,uri){
     if(!uri||uri.scheme!==root.scheme||uri.authority!==root.authority)return false;
