@@ -432,6 +432,18 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         }
       }
       snapshot.dependencyContext=dependencyContext;
+      const activeRoot=document?packageRootForProcedure(vscode,document):null;
+      if(activeRoot?.uri.toString()===state.key){
+        if(snapshot.completeness==="complete"){
+          packageFiles=new Map(snapshot.documents.map(item=>
+            [item.relativePath,{text:item.text}]));
+          packageFilesUri=state.procedureDocument.uri.toString();
+          packageFilesVersion=state.procedureDocument.version;
+        }else{
+          packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
+        }
+        update(state.procedureDocument);
+      }
       if(state.disposed||ticket!==state.ticket){
         if(strict)throw Error("Package refresh was superseded during dependency resolution");
         return null;
