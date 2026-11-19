@@ -992,6 +992,8 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
   // LanguageDiagnosticSession analysis may still be pending or PARTIAL; color
   // projection must not wait for Python indexing or diagnostics completion.
   packageSnapshots.set(rootUri, snapshot);
+  // Refresh VS Code Web semantic tokens now, not after diagnostic analysis.
+  refreshSemanticTokens();
   let session = sessions.get(rootUri);
   if (!session) {
     session = createSession(rootUri);
