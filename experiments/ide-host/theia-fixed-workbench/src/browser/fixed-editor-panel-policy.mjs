@@ -40,3 +40,10 @@ export function createPreviewAutoRevealPreference(storage) {
     }
   };
 }
+
+// A native Source widget has an editor model and is not explicitly hidden.
+// Do not consume the one-time Preview reveal on the Welcome-only landing page.
+export function hasVisibleSourceEditor(widgets) {
+  return Array.from(widgets ?? []).some(widget =>
+    Boolean(widget?.editor) && widget.isHidden !== true);
+}

@@ -76,6 +76,7 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
         ?visibleTabBarCount
         :(main.some(widget=>widget.visible)?1:0);
       return {main,right,left,source,preview,selectedPreview:rightPreview??null,
+        previewActivation:window.__skillStudioPreviewActivation?.()??null,
         commandIds,availableViewCommands,tabBars,visibleEditorGroups};
     })()`);
     const source=state.source??[];

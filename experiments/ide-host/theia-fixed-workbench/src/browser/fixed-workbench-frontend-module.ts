@@ -6,7 +6,7 @@ import { CorePreferences } from '@theia/core/lib/common/core-preferences';
 import { MAIN_AREA_CLASS } from '@theia/core/lib/browser/shell/application-shell';
 import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
 import type { DockPanel } from '@lumino/widgets';
-import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference } from './fixed-editor-panel-policy.mjs';
+import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference, hasVisibleSourceEditor } from './fixed-editor-panel-policy.mjs';
 
 const PREVIEW_CONTAINER_WIDGET_ID = 'plugin-view-container:workbench.view.extension.skillStudioInspector';
 
@@ -19,6 +19,7 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
         const state = container.get(FrontendApplicationStateService);
         let stopped = false;
         let added: { dispose(): void } | undefined;
+        let changed: { dispose(): void } | undefined;
         return {
             onStart(app: FrontendApplication) {
                 const shell = app.shell;
@@ -26,57 +27,99 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                 try {
                     storage = window.localStorage;
                 } catch {
-                    // The Preview remains usable; only the cross-reload preference
-                    // is unavailable in this browser context.
+                    // Browser profiles can disallow persistent storage.
                 }
                 const autoReveal = createPreviewAutoRevealPreference(storage);
                 let revealInFlight = false;
+                let attempts = 0;
+                let lastOutcome = 'not-attempted';
+                const getStatus = () => {
+                    const container = shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID);
+                    return {
+                        attempts,
+                        lastOutcome,
+                        autoRevealPending: autoReveal.shouldReveal(),
+                        sourceVisible: hasVisibleSourceEditor(shell.getWidgets('main')),
+                        containerExists: !!container,
+                        containerVisible: !!container?.isVisible,
+                        rightExpanded: shell.isExpanded('right'),
+                        appState: state.state
+                    };
+                };
+                // This diagnostic is read by real Chromium acceptance after an
+                // actual Source open; it never alters layout or editor state.
+                (window as unknown as {
+                    __skillStudioPreviewActivation?: () => ReturnType<typeof getStatus>;
+                }).__skillStudioPreviewActivation = getStatus;
                 const reveal = () => {
+                    // First-run Welcome does not open a Source document. Marking
+                    // the Preview as auto-revealed before the Example workspace
+                    // reload caused Theia to restore a hidden right sidebar on
+                    // the second page load and skip Preview activation forever.
                     if (stopped || !autoReveal.shouldReveal() || revealInFlight ||
-                        !shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID)) {
+                        !hasVisibleSourceEditor(shell.getWidgets('main'))) {
+                        return;
+                    }
+                    const container = shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID);
+                    if (!container) {
+                        lastOutcome = 'waiting-for-preview-container';
                         return;
                     }
                     revealInFlight = true;
+                    attempts++;
+                    lastOutcome = 'revealing';
                     try {
+                        // revealWidget selects the right-hand widget without
+                        // stealing focus from the native Source editor. Unlike
+                        // activateWidget, it does not require the WebviewView
+                        // content itself to accept focus.
                         shell.expandPanel('right');
-                        void Promise.resolve(shell.activateWidget(PREVIEW_CONTAINER_WIDGET_ID))
-                            .then(() => {
+                        void shell.revealWidget(PREVIEW_CONTAINER_WIDGET_ID)
+                            .then(revealed => {
                                 if (stopped) return;
+                                const visible = !!revealed && container.isVisible &&
+                                    shell.isExpanded('right');
+                                lastOutcome = visible ? 'visible' : 'still-hidden';
+                                if (!visible) return;
+                                // Persist success only after a real Source and
+                                // the Preview container are both visible.
                                 autoReveal.markRevealed();
-                                // The stock Secondary Sidebar defaults to ~227px, which
-                                // cannot display a readable React Flow canvas. Only grow
-                                // cramped initial layouts; preserve user-resized widths.
-                                const preview = shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID);
-                                const width = preview?.node?.getBoundingClientRect().width ?? 0;
+                                const width = container.node.getBoundingClientRect().width;
                                 if (width > 0 && width < 400 && window.innerWidth >= 1050) {
                                     shell.resize(Math.min(620, Math.round(window.innerWidth * 0.43)), 'right');
                                 }
                             })
                             .catch(error => {
-                                console.warn('SKILL Studio Preview container could not be activated:', error);
+                                lastOutcome = 'error: ' + String(error);
+                                console.warn('SKILL Studio Preview could not be revealed:', error);
                             })
                             .finally(() => {
                                 revealInFlight = false;
                             });
                     } catch (error) {
                         revealInFlight = false;
-                        console.warn('SKILL Studio Preview container could not be activated:', error);
+                        lastOutcome = 'error: ' + String(error);
+                        console.warn('SKILL Studio Preview could not be revealed:', error);
                     }
                 };
-                // Wait until Theia has attached the shell and restored persisted
-                // layout; otherwise the restored layout could immediately hide
-                // the right panel again.
+                // Theia restores its shell before the Example is imported.
+                // Listen for Source widgets after that handoff, not just for
+                // the creation of the Preview container on the Welcome page.
                 const ready = state.reachedState('ready');
                 added = shell.onDidAddWidget(widget => {
-                    if (widget.id === PREVIEW_CONTAINER_WIDGET_ID) {
+                    if (widget.id === PREVIEW_CONTAINER_WIDGET_ID || !!(widget as { editor?: unknown }).editor) {
                         void ready.then(reveal);
                     }
+                });
+                changed = shell.onDidChangeCurrentWidget(() => {
+                    void ready.then(reveal);
                 });
                 void ready.then(reveal);
             },
             onStop() {
                 stopped = true;
                 added?.dispose();
+                changed?.dispose();
             }
         };
     }).inSingletonScope();

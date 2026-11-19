@@ -4,7 +4,8 @@ import {readFileSync} from "node:fs";
 import {
   constrainMainEditorPanelOptions,
   isMainEditorPanelOptions,
-  createPreviewAutoRevealPreference
+  createPreviewAutoRevealPreference,
+  hasVisibleSourceEditor
 } from "../experiments/ide-host/theia-fixed-workbench/src/browser/fixed-editor-panel-policy.mjs";
 
 const MAIN = "theia-app-main";
@@ -85,4 +86,24 @@ test("real Chromium fixed-layout smoke exercises the production URL without a te
   const source = readFileSync(
     "experiments/ide-host/scripts/theia-fixed-layout-smoke.mjs", "utf8");
   assert.doesNotMatch(source, /skillStudioFixedLayoutTest|FIXED_LAYOUT_TEST_QUERY/);
+});
+
+test("Preview auto-reveal is deferred on Welcome and available when native Source opens", () => {
+  assert.equal(hasVisibleSourceEditor([]), false);
+  assert.equal(hasVisibleSourceEditor([{id:"skill-studio-welcome", isHidden:false}]), false);
+  assert.equal(hasVisibleSourceEditor([{editor:{uri:"file:///procedure.yaml"}, isHidden:true}]), false);
+  assert.equal(hasVisibleSourceEditor([{id:"skill-studio-welcome"},{
+    editor:{uri:"file:///procedure.yaml"}, isHidden:false
+  }]), true);
+});
+
+test("production shell waits for native Source and verifies visible right Preview before persisting", () => {
+  const source = readFileSync(
+    "experiments/ide-host/theia-fixed-workbench/src/browser/fixed-workbench-frontend-module.ts",
+    "utf8");
+  assert.match(source,/hasVisibleSourceEditor\(shell\.getWidgets\('main'\)\)/);
+  assert.match(source,/shell\.onDidChangeCurrentWidget/);
+  assert.match(source,/shell\.revealWidget\(PREVIEW_CONTAINER_WIDGET_ID\)/);
+  assert.match(source,/container\.isVisible/);
+  assert.match(source,/if \(!visible\) return;[\s\S]*?autoReveal\.markRevealed\(\)/);
 });
