@@ -56,13 +56,13 @@ console.log("STUDIO_THEIA_PREPARED_THEME_EXTENSION",JSON.stringify({
   runtimeDependencies:Object.keys(themeManifest.dependencies??{}).length
 }));
 
-// YAML/Python language and TextMate contributions now belong to the
+// Markdown/YAML/Python language and TextMate contributions now belong to the
 // primary Skill Studio extension. Validate the packaged assets there and
 // remove any stale copy of the former standalone syntax plugin.
 const syntaxSource="extensions/skill-studio-languages";
 const syntaxTarget=join(app,"plugins","odango-chan.skill-studio-languages");
 const syntaxManifest=JSON.parse(await readFile(join(syntaxSource,"package.json"),"utf8"));
-for(const language of ["yaml","python"]){
+for(const language of ["markdown","yaml","python"]){
   if(!manifest.contributes?.languages?.some(x=>x.id===language)||
      !manifest.contributes.grammars?.some(x=>x.language===language))
     throw Error("Primary Skill Studio extension is missing "+language+" language/grammar contributions");
@@ -85,6 +85,6 @@ for(const language of syntaxManifest.contributes.languages){
 }
 await rm(syntaxTarget,{recursive:true,force:true});
 console.log("STUDIO_THEIA_PRIMARY_EXTENSION_SYNTAX_ASSETS",JSON.stringify({
-  target,syntaxes:["yaml","python"],grammarCount:syntaxManifest.contributes.grammars.length,
+  target,syntaxes:["markdown","yaml","python"],grammarCount:syntaxManifest.contributes.grammars.length,
   standaloneSyntaxPluginRemoved:true
 }));
