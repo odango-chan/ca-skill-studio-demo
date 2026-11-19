@@ -1,4 +1,4 @@
-name: Verify Theia Browser Host Custom Editor
+name: Verify Theia Browser Host Source + Preview
 # Browser acceptance asserts native YAML and Python TextMate tokenization without LSP.
 
 on:
