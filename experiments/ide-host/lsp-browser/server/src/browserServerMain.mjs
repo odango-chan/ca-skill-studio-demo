@@ -431,11 +431,6 @@ connection.onHover(params => {
   const symbolHit=offset===null?null:skillSymbolAt(index,uri,offset);
   if(symbolHit){
     const declaration=uniqueSkillSymbolDeclaration(symbolHit);
-    const procedureSource=snapshot.documents.find(item=>
-      item.relativePath==="assurance/procedure.yaml");
-    const v1alpha5Package=Boolean(procedureSource&&
-      /^start:[ \t]*/m.test(procedureSource.text)&&
-      /^nodes:[ \t]*/m.test(procedureSource.text));
     const scriptDocument=declaration&&symbolHit.token.type==="skillReference"
       ?snapshot.documents.find(item=>item.relativePath===declaration.relativePath):null;
     const scriptName=scriptDocument?scriptToolName(scriptDocument.text):null;
@@ -456,7 +451,7 @@ connection.onHover(params => {
       ["skillOperation","skillCapability"].includes(symbolHit.token.type)
       ? projectOperationCatalog(snapshot,index).get(symbolHit.token.name) : null;
     let predicateSignature=null;
-    if(v1alpha5Package&&resolved&&symbolHit.token.type==="skillPredicate"){
+    if(resolved&&symbolHit.token.type==="skillPredicate"){
       const source=snapshot.documents.find(item=>
         item.relativePath==="assurance/predicates.yaml");
       if(source){
@@ -572,7 +567,7 @@ connection.onDocumentSymbol(params => {
       if(range)symbols.push({name:item.name,kind:SymbolKind.Function,
         range,selectionRange:range});
     }
-    // v1alpha5 has one root Node graph and no named Procedure declaration.
+    // The current CA-SL grammar has one root Node graph and no named Procedure declaration.
     // Show those Nodes in native Outline rather than returning an empty list.
     if(!procedures.length && source.relativePath==="assurance/procedure.yaml"){
       for(const item of steps.filter(item=>item.path?.[0]==="nodes")){
@@ -596,14 +591,12 @@ connection.onDocumentSymbol(params => {
     })).filter(symbol => symbol.location);
 });
 
-/** v1alpha5 authoring completions are syntax suggestions, not Owner grants. */
-function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
+/** Current CA-SL authoring completions are syntax suggestions, not Owner grants. */
+function currentGrammarCompletions(value, document, prefix, offset, lineStart) {
   const isProcedure=document.relativePath==="assurance/procedure.yaml";
   const isContract=document.relativePath==="assurance/contract.yaml";
   const isPredicateSet=document.relativePath==="assurance/predicates.yaml";
   if(!isProcedure&&!isContract&&!isPredicateSet)return null;
-  if(isProcedure&&!/^(?:start|nodes):[ \t]*/m.test(document.text))
-    return null;
 
   // Track the current YAML indentation scope. Looking for the last stage
   // alone leaks stale completion candidates across Nodes and into arguments.
@@ -688,7 +681,7 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
     return [...reachable];
   };
   const finalStage=currentStages.at(-1)===stage;
-  const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="CA-SL v1alpha5 source syntax")=>
+  const make=(labels,typed,start,kind=CompletionItemKind.Keyword,detail="Current CA-SL source syntax")=>
     labels.filter(name=>name.startsWith(typed)).map(name=>({
       label:name,kind,detail,
       textEdit:{range:{
@@ -698,7 +691,7 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
     }));
 
   if(isPredicateSet){
-    // v1alpha5 PredicateSet script evaluators reference Package-local
+    // Current PredicateSet script evaluators reference Package-local
     // Python scripts directly through evaluator.script.
     const script=/^ {6}script:[ \t]*([A-Za-z0-9_./-]*)$/.exec(prefix);
     if(script&&value.snapshot.completeness==="complete"){
@@ -816,7 +809,7 @@ function v1Alpha5Completions(value, document, prefix, offset, lineStart) {
       stage==="observation"?["tool:","arguments:","routes:"]:
       ["tool:","script:","arguments:","retryOf:","routes:"];
     return make(fields,memberField[1],lineStart+6,
-      CompletionItemKind.Keyword,"CA-SL v1alpha5 "+stage+" stage fields");
+      CompletionItemKind.Keyword,"Current CA-SL "+stage+" stage fields");
   }
 
   const routeKey=/^( {8})([A-Z_]*)$/.exec(prefix);
@@ -889,8 +882,8 @@ connection.onCompletion(params => {
   const starts = lineStarts(document.text);
   const lineStart = starts[params.position.line];
   const prefix = document.text.slice(lineStart, offset);
-  const v5 = v1Alpha5Completions(value,document,prefix,offset,lineStart);
-  if(v5!==null)return v5;
+  const currentCompletions = currentGrammarCompletions(value,document,prefix,offset,lineStart);
+  if(currentCompletions!==null)return currentCompletions;
 
   if (document.relativePath === "assurance/procedure.yaml" &&
       value.analysis.state === "READY" && value.snapshot.completeness === "complete") {
