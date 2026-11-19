@@ -973,11 +973,10 @@ export async function runWorkbenchAcceptance({
   let currentLanguageFeatures=null,semanticTokenEvidence=null;
   if(requireBrowserLsp){
     // A v1alpha5 Package is intentionally PARTIAL until trusted Owner,
-    // Capability and Schema snapshots are linked. PARTIAL is not a Worker
-    // failure: verify the browser Language Client is alive and the exact
-    // current Package generation parsed completely, without claiming
+    // The current source analysis can be READY while trust/Package qualification
+    // remains unavailable. Verify these independent states without claiming
     // qualification that the bundled NOT_QUALIFIED Example does not have.
-    languageServiceStatus=await waitForStatus("PARTIAL");
+    languageServiceStatus=await waitForStatus("READY");
     const languageServiceDiagnostics=await nativeCommand(
       "skillStudio.internal.semanticTokenDiagnostics");
     const expectedPackageRoot=defaultProcedureUri.replace(
@@ -986,19 +985,18 @@ export async function runWorkbenchAcceptance({
       item=>item.rootUri===expectedPackageRoot);
     const packageSnapshot=languageServiceDiagnostics?.languagePackages?.find(
       item=>item.rootUri===expectedPackageRoot);
-    const expectedPartialReason=
-      "CA-SL v1alpha5 source parsed; static Package qualification requires the v1alpha5 Compiler";
+    const expectedQualificationReason="current Compiler";
     if(languageServiceDiagnostics?.languageClientStarted!==true||
        languageServiceDiagnostics?.languageTransportFailure||
        !languagePackage||
-       languagePackage.state!=="PARTIAL"||
+       languagePackage.state!=="READY"||
        languagePackage.procedureState!=="READY"||
        languagePackage.packageAuditState!=="UNAVAILABLE"||
-       !String(languagePackage.packageAuditReason??"").includes(expectedPartialReason)||
+       !String(languagePackage.packageAuditReason??"").includes(expectedQualificationReason)||
        packageSnapshot?.lastSentSnapshot?.completeness!=="complete")
-      throw Error("current Language Service must be available while its unqualified Package remains PARTIAL: "+
+      throw Error("current Language Service must be READY while Package qualification remains UNAVAILABLE: "+
         JSON.stringify({languageServiceDiagnostics,expectedPackageRoot,languagePackage,packageSnapshot}));
-    console.log("STUDIO_CURRENT_LANGUAGE_LSP_PARTIAL_IS_EXPECTED_CHROMIUM",JSON.stringify({
+    console.log("STUDIO_CURRENT_LANGUAGE_LSP_READY_PACKAGE_UNQUALIFIED_CHROMIUM",JSON.stringify({
       status:languageServiceStatus,
       languageClientStarted:languageServiceDiagnostics.languageClientStarted,
       languagePackage,
@@ -1006,7 +1004,8 @@ export async function runWorkbenchAcceptance({
     }));
     currentLanguageFeatures=await nativeCommand(
       "skillStudio.internal.currentLanguageProviderAcceptance",defaultProcedureUri);
-    if(currentLanguageFeatures?.status!=="PARTIAL"||
+    if(currentLanguageFeatures?.status!=="READY"||
+       currentLanguageFeatures?.packageAuditState!=="UNAVAILABLE"||
        currentLanguageFeatures?.snapshotCompleteness!=="complete"||
        !currentLanguageFeatures.contractPreconditionCompletion?.includes("check.precondition")||
        !currentLanguageFeatures.requestSchemaCompletion?.includes("schemas/request.schema.yaml")||
