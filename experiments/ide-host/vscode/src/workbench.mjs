@@ -73,6 +73,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     server:null,transport:null,packageAttachAttempts:0,lastPackageRoot:null,
     lastPackageAttachReason:null
   };
+  let extensionHostSemanticTokenRegistration=null;
+  let extensionHostSemanticTokenRenderer=null;
   function encodeNativeSemanticTokens(document,spans){
     const segments=[];
     const text=document.getText();
@@ -110,29 +112,35 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     return new vscode.SemanticTokens(Uint32Array.from(data));
   }
   function registerExtensionHostSemanticTokens(){
-    // Browser extension hosts use the LSP-backed adapter in browserClient.mjs.
-    // Node extension hosts (VS Code desktop / backend-backed Theia) have no
-    // browser Worker transport; they use this adapter over the SAME canonical
-    // source classifier, rather than silently losing CA semantic colors.
-    if(typeof Worker==="function"&&typeof globalThis.location!=="undefined")return;
+    // Theia's browser and Node hosts use the same source-local classifier.
+    // Other VS Code web hosts use the LSP semantic-token provider.
+    const isTheia=(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
+      /theia/i.test(String(vscode.env?.appName??""));
+    if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"&&!isTheia)return;
     if(typeof vscode.languages?.registerDocumentSemanticTokensProvider!=="function"||
        typeof vscode.SemanticTokensLegend!=="function"||
        typeof vscode.SemanticTokens!=="function"){
       semanticTokenDiagnostics.lastError="Native semantic-token API unavailable";
       return;
     }
+    // Re-register after LanguageClient.start() in Theia so this source-local
+    // provider wins over any late LSP provider registration. The first
+    // registration remains available if the Worker fails before it starts.
+    extensionHostSemanticTokenRegistration?.dispose?.();
+    extensionHostSemanticTokenRegistration=null;
+    extensionHostSemanticTokenRenderer?.dispose?.();
+    extensionHostSemanticTokenRenderer=null;
     const legend=new vscode.SemanticTokensLegend(
       [...SKILL_SEMANTIC_TOKEN_TYPES],
       [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
     );
     let renderer=null;
-    const isTheia=(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
-      /theia/i.test(String(vscode.env?.appName??""));
     if(isTheia){
       try{
         renderer=createSemanticTokenDecorationRenderer(
           vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
         );
+        extensionHostSemanticTokenRenderer=renderer;
         semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
         context.subscriptions.push({dispose:()=>renderer?.dispose()});
       }catch(error){
@@ -148,7 +156,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         const spans=collectSkillSemanticTokenSpans(document.getText(),relativePath);
         semanticTokenDiagnostics.requests++;
         semanticTokenDiagnostics.lastUri=document.uri.toString();
-        semanticTokenDiagnostics.transport="extension-host";
+        semanticTokenDiagnostics.transport="source-local";
         const result=encodeNativeSemanticTokens(document,spans);
         semanticTokenDiagnostics.lastTokenCount=result.data.length/5;
         semanticTokenDiagnostics.lastError=null;
@@ -176,9 +184,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       provider,
       legend
     );
+    extensionHostSemanticTokenRegistration=registration;
     semanticTokenDiagnostics.registered=true;
     semanticTokenDiagnostics.tokenTypeCount=SKILL_SEMANTIC_TOKEN_TYPES.length;
-    semanticTokenDiagnostics.transport="extension-host";
+    semanticTokenDiagnostics.transport="source-local";
     context.subscriptions.push(registration);
   }
   function updateLanguageStatus(state,detail){
@@ -260,50 +269,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
           const epoch=++languageClientEpoch;
           candidate=createSkillLanguageClient(vscode,context,{
-            // Theia 1.76's browser plugin host does not consistently register
-            // server-advertised semantic tokens. Register the native provider
-            // explicitly, but keep VS Code's normal LSP feature path unchanged.
-            manualSemanticTokens:typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST,
-            onSemanticTokenProviderRegistered:status=>{
-              semanticTokenDiagnostics.registered=status?.registered===true;
-              semanticTokenDiagnostics.tokenTypeCount=status?.tokenTypeCount??0;
-              semanticTokenDiagnostics.transport="browser-lsp";
-            },
-            onSemanticTokenRendererRegistered:status=>{
-              semanticTokenDiagnostics.renderer=status?.renderer??null;
-              semanticTokenDiagnostics.renderError=null;
-            },
-            onSemanticTokenRendererUnavailable:error=>{
-              semanticTokenDiagnostics.renderError=String(error);
-            },
-            onSemanticTokenRendered:(uri,result)=>{
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
-              semanticTokenDiagnostics.renderedTokenCount=result?.tokenCount??0;
-              semanticTokenDiagnostics.renderedTypeCount=result?.tokenTypeCount??0;
-              semanticTokenDiagnostics.renderError=null;
-            },
-            onSemanticTokenRenderError:(uri,error)=>{
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.renderError=String(error);
-            },
-            onSemanticTokenRequest:uri=>{
-              semanticTokenDiagnostics.requests++;
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.transport="browser-lsp";
-            },
-            onSemanticTokenResult:(uri,count)=>{
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.lastTokenCount=count;
-              semanticTokenDiagnostics.lastError=null;
-            },
-            onSemanticTokenServerDiagnostics:diagnostics=>{
-              semanticTokenDiagnostics.server=diagnostics;
-            },
-            onSemanticTokenError:(uri,error)=>{
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.lastError=error;
-            },
             onStatus:status=>{
               if(epoch!==languageClientEpoch)return;
               const state=languagePackages.get(status?.rootUri);
@@ -342,6 +307,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           updateLanguageStatus("STARTING","Starting browser language Worker");
           await candidate.start();
           languageClient=candidate;
+          if(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)
+            registerExtensionHostSemanticTokens();
           updateLanguageStatus("STARTED","Browser language Worker initialized");
           return candidate;
         }catch(error){
