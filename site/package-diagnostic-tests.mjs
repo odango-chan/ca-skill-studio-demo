@@ -126,7 +126,7 @@ export function runDiagnosticRegressionCase(id,{files}={}){
   });
   const copy=clonePackage(files);
   if(!copy||REQUIRED.some(path=>!copy.has(path)))
-    return notRun("Complete v1alpha5 Contract/Procedure/PredicateSet source is unavailable");
+    return notRun("Complete current CA-SL Contract/Procedure/PredicateSet source is unavailable");
   let setup;
   try{setup=setupCase(id,copy);}
   catch(error){return notRun("Fixture setup was not applicable: "+String(error?.message??error));}
