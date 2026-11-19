@@ -116,6 +116,27 @@ test("local Schema, Script, Predicate, Tool and producer references are checked"
     "Package Audit must preserve the complete YAML scalar span");
 });
 
+test("current Predicate Script references use Package paths, not obsolete localTools declarations",()=>{
+  const files=fixture("establish-pdu-session");
+  const predicates=files.get("assurance/predicates.yaml");
+  predicates.text += [
+    "",
+    "  createdsession.udm.subscription_usable:",
+    "    parameters: []",
+    "    evaluator:",
+    "      type: script",
+    "      script: scripts/evaluate_udm_read.py",
+    ""
+  ].join("\n");
+  files.set("scripts/evaluate_udm_read.py",{text:"def main():\n    return {}\n"});
+  const diagnostics=auditPackage({files,completeness:"complete",
+    dependencyContext:{available:false}});
+  assert.ok(!codes(diagnostics).includes("PREDICATE_SCRIPT_REF_UNDECLARED"),
+    "current language analysis must not require the removed Contract.localTools list");
+  assert.ok(!find(diagnostics,"PREDICATE_SCRIPT_NOT_FOUND","evaluate_udm_read.py"),
+    "a declared current Package-relative Script path is resolved from Package inventory");
+});
+
 test("a complete inventory confirms a missing local Schema, partial inventory does not",()=>{
   const complete=fixture("establish-pdu-session");
   complete.delete("schemas/establishment-request.schema.yaml");
