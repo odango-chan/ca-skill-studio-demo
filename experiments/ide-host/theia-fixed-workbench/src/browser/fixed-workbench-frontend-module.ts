@@ -8,7 +8,6 @@ import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
 import type { DockPanel } from '@lumino/widgets';
 import { constrainMainEditorPanelOptions, isMainEditorPanelOptions } from './fixed-editor-panel-policy.mjs';
 
-const FIXED_LAYOUT_TEST_QUERY = 'skillStudioFixedLayoutTest';
 const PREVIEW_CONTAINER_WIDGET_ID = 'plugin-view-container:workbench.view.extension.skillStudioInspector';
 
 export default new ContainerModule((bind, unbind, isBound, rebind) => {
@@ -60,14 +59,9 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
         };
     }).inSingletonScope();
 
-    // Keep the Main Editor DockPanel override test-gated until all real
-    // Chromium acceptance cases have verified the one-group invariant.
-    const enabled = typeof window !== 'undefined' &&
-        new URLSearchParams(window.location.search).get(FIXED_LAYOUT_TEST_QUERY) === '1';
-    if (!enabled) {
-        return;
-    }
-
+    // Product invariant: one native Main Editor group, with a dedicated
+    // contextual Preview in the right secondary sidebar. Enforce this for
+    // normal Pages and backend-backed hosts, not only acceptance URLs.
     if (!isBound(TheiaDockPanel.Factory)) {
         throw new Error('TheiaDockPanel.Factory is not bound; fixed editor layout cannot be installed.');
     }
