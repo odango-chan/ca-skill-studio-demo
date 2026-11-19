@@ -35,7 +35,7 @@ function markdownViewHtml(webview,style,sessionKey){
       const api=acquireVsCodeApi(),key="${sessionKey}";
       const content=document.getElementById("studio-content");
       const status=document.getElementById("studio-status");
-      let uri=null,version=-1,lastHostScroll=0,lastPreviewSent=0,scrollFrame=0;
+      let uri=null,version=-1,lastHostScroll=0,lastHostScrollY=0,lastPreviewSent=0,scrollFrame=0,scrollTimer=0;
       const blocks=()=>Array.from(content.querySelectorAll("[data-source-line]"));
       const blockAt=(line)=>{
         let candidate=null;
@@ -59,6 +59,7 @@ function markdownViewHtml(webview,style,sessionKey){
         if(!anchor)return;
         lastHostScroll=Date.now();
         window.scrollTo({top:window.scrollY+anchor.getBoundingClientRect().top-24,behavior:"instant"});
+         lastHostScrollY=window.scrollY;
       };
       const scrollFragment=fragment=>{
         let slug;
@@ -111,18 +112,37 @@ function markdownViewHtml(webview,style,sessionKey){
         if((event.key==="Enter"||event.key===" ")&&activate(event.target))
           event.preventDefault();
       });
+      // A scroll arriving during the host-to-preview echo guard must not be
+      // discarded: the user can start scrolling immediately after a snapshot.
+      // Debounce it and compare the final position with the host's destination.
+      // This prevents a lost preview-to-Source sync without feeding back a
+      // Source-originated scroll in an endless loop.
+      const sendPreviewScroll=()=>{
+        scrollTimer=0;
+        if(!uri||version<0)return;
+        if(Date.now()-lastHostScroll<140){
+          scrollTimer=setTimeout(sendPreviewScroll,150);
+          return;
+        }
+        if(Math.abs(window.scrollY-lastHostScrollY)<2)return;
+        const line=firstVisible(),now=Date.now();
+        if(now-lastPreviewSent<80){
+          scrollTimer=setTimeout(sendPreviewScroll,90);
+          return;
+        }
+        lastPreviewSent=now;
+        const diagnostic={line,version,scrollY:window.scrollY,at:now};
+        window.__skillStudioLastPreviewScroll=diagnostic;
+        document.documentElement.dataset.studioLastPreviewScroll=JSON.stringify(diagnostic);
+        api.postMessage({type:"previewScroll",sessionKey:key,uri,version,line});
+      };
       window.addEventListener("scroll",()=>{
-        if(Date.now()-lastHostScroll<120||!uri||version<0)return;
+        if(!uri||version<0)return;
         if(scrollFrame)cancelAnimationFrame(scrollFrame);
+        if(scrollTimer)clearTimeout(scrollTimer);
         scrollFrame=requestAnimationFrame(()=>{
           scrollFrame=0;
-          const line=firstVisible(),now=Date.now();
-          if(now-lastPreviewSent<80)return;
-          lastPreviewSent=now;
-          const diagnostic={line,version,scrollY:window.scrollY,at:now};
-          window.__skillStudioLastPreviewScroll=diagnostic;
-          document.documentElement.dataset.studioLastPreviewScroll=JSON.stringify(diagnostic);
-          api.postMessage({type:"previewScroll",sessionKey:key,uri,version,line});
+          scrollTimer=setTimeout(sendPreviewScroll,45);
         });
       },{passive:true});
       api.postMessage({type:"ready",sessionKey:key});
