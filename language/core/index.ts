@@ -1,6 +1,6 @@
 import { scriptNavigationReport } from "../../site/script-navigation.mjs";
 import { pythonTopLevelOutline } from "../../site/python-outline.mjs";
-import { analyzeV1Alpha5Source } from "./source.js";
+import { analyzeCurrentSource } from "./source.js";
 import type {
   AnalysisState,
   DocumentAnalysis,
@@ -214,13 +214,13 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   const files = new Map(normalizedDocuments.map(document => [document.relativePath, { text: document.text }] as const));
   const procedureDocument = documentsByPath.get("assurance/procedure.yaml");
 
-  // CA-SL v1alpha5 is a breaking syntax target. Do not run the v0.2
-  // procedures/call/with Package analyzer against the root start/nodes model.
+  // The current CA-SL grammar is authoritative. Do not run the historical
+  // procedures/call/with Package analyzer.
   // Source projection can supply exact editor locations without any claim
-  // that trusted v1alpha5 ToolCatalog, CapabilityContracts or Host Schema
+  // that trusted ToolCatalog, CapabilityContracts or Host Schema
   // publications have been linked.
   if (procedureDocument) {
-    const projected = analyzeV1Alpha5Source(documentsByPath, snapshot.packageName);
+    const projected = analyzeCurrentSource(documentsByPath, snapshot.packageName);
     const packageContextComplete = snapshot.completeness === "complete" &&
       projected.procedure.state === "READY";
     const scriptReferences: ScriptReference[] = [];
