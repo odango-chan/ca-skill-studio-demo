@@ -64,7 +64,8 @@ jobs:
         run: node --test experiments/ide-host/tests/online-host.test.mjs
       - name: Install isolated pinned Theia 1.76 dependencies
         run: npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
-          npm run build:fixed-workbench --prefix experiments/ide-host/theia-online
+      - name: Compile fixed-workbench Theia frontend module
+        run: npm run build:fixed-workbench --prefix experiments/ide-host/theia-online
       - name: Download pinned built-in Markdown extension from Open VSX
         run: npm run download:plugins --prefix experiments/ide-host/theia-online
       - name: Build real Theia browser-only app
