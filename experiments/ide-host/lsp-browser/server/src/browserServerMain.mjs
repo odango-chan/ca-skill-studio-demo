@@ -1007,22 +1007,26 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
     if (!result.accepted && result.reason !== "SUPERSEDED" &&
         result.reason !== "STALE_GENERATION" &&
         result.reason !== "STALE_DOCUMENT") {
-      packageAnalyses.delete(rootUri);
+      // Keep the accepted source snapshot available to semantic-token
+      // requests even when diagnostics reject it. Only analysis/index state is
+      // discarded, and only if this is still the current generation.
       if(packageSnapshots.get(rootUri)===snapshot){
-        packageSnapshots.delete(rootUri);
+        packageAnalyses.delete(rootUri);
         symbolIndexes.delete(rootUri);
+        refreshSemanticTokens();
+        reportError("Package analysis rejected: " + result.reason, rootUri);
       }
-      refreshSemanticTokens();
-      reportError("Package analysis rejected: " + result.reason, rootUri);
     }
   } catch (error) {
-    packageAnalyses.delete(rootUri);
+    // A failed analysis must not erase the independent source snapshot.
+    // Guard cleanup by object identity so a late failure from an older
+    // generation cannot invalidate a newer Package analysis.
     if(packageSnapshots.get(rootUri)===snapshot){
-      packageSnapshots.delete(rootUri);
+      packageAnalyses.delete(rootUri);
       symbolIndexes.delete(rootUri);
+      refreshSemanticTokens();
+      reportError(error?.message ?? error, rootUri);
     }
-    refreshSemanticTokens();
-    reportError(error?.message ?? error, rootUri);
   }
 });
 
