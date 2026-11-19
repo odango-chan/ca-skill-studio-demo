@@ -1,5 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {registerPreviewHost} from "./preview-host.mjs";
+import {mountMarkdownPreview} from "./markdown-preview.mjs";
 
 import {openSourceViewPair,sourceViewType,forgetSourceViewPair} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
@@ -342,7 +343,8 @@ export function activate(context){
     mountProcedure:mountProcedurePreview,
     mountContract:(document,panel,options)=>mountContractPreview(vscode,document,panel,options),
     mountPredicate:(document,panel,options)=>mountPredicatePreview(vscode,document,panel,options),
-    mountSchema:(document,panel,options)=>mountSchemaPreview(vscode,document,panel,options)
+    mountSchema:(document,panel,options)=>mountSchemaPreview(vscode,document,panel,options),
+    mountMarkdown:(document,panel,options)=>mountMarkdownPreview(vscode,context,document,panel,options)
   });
   const projectText=value=>vscode.l10n?.t(value)??value;
   context.subscriptions.push(
