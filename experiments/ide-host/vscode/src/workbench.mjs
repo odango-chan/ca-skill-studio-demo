@@ -3,7 +3,7 @@ import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
-import {analyzeV1Alpha5Source} from "../../../../language/core/v1alpha5.ts";
+import {analyzeCurrentSource} from "../../../../language/core/source.ts";
 import {auditPackage,indexV1Alpha4ToolCatalogCallables}
   from '../../../../site/package-audit.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
@@ -11,7 +11,7 @@ import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from '../../../../site/node-create.mjs';
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from '../../../../site/node-delete.mjs';
-import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
+import {previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
 import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from '../../../../site/phase-output-refs.mjs';
 import {phaseRouteTargetOptions,previewPhaseRouteTarget,applyPhaseRouteTarget}
@@ -215,7 +215,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           version:1,text:"procedures:\n  entry:\n    nodes:\n      start:\n        call: operation.missing\n"
         }]
       ]);
-      const result=analyzeV1Alpha5Source(documents,"current-grammar-acceptance");
+      const result=analyzeCurrentSource(documents,"current-grammar-acceptance");
       const codes=new Set(result.diagnostics.map(item=>item.code));
       const required=["UNKNOWN_FIELD","SOURCE_ROOT_INVALID"];
       const missing=required.filter(code=>!codes.has(code));
@@ -3012,11 +3012,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       snapshot={...inspectionSnapshot(text,selection,projected,evidenceFiles,
         rootInfo?.name??"skill",rootInfo?.uri?.toString?.()??"file:///skill"),
         text,evidenceStamp};
-      const v1alpha5=[...(snapshot.model?.procedures?.values?.()??[])]
-        .some(procedure=>String(procedure.profile??"").includes("v1alpha5"));
-      bindingOptions=!v1alpha5&&snapshot.model.state==='READY'&&
-        selection.procedureId&&selection.nodeId
-        ?phaseStepBindingOptions(text,selection.procedureId,selection.nodeId):[];
+      bindingOptions=[];
       fire();
     }
   }
