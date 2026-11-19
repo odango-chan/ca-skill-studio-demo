@@ -3739,7 +3739,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   return {syncPackages:packages=>packageLanguageLifecycle.sync(packages),attach(doc,post){
     sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();
     const releaseLanguagePackage=attachLanguagePackage(doc);
-    return ()=>{sessions.delete(doc.uri.toString());releaseLanguagePackage();};
+    return ()=>{if(sessions.get(doc.uri.toString())===post)
+      sessions.delete(doc.uri.toString());releaseLanguagePackage();};
   },select(doc,message){
     lastSelectionMessage={
       messageVersion:message.version,documentVersion:doc.version,
