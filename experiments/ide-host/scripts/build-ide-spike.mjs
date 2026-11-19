@@ -14,7 +14,7 @@ await mkdir(join(root,"media"),{recursive:true});
 await cp(join(root,"src/compiler-worker.js"),join(root,"dist/compiler-worker.js"));
 // The pinned native Markdown extension owns Preview rendering; Studio supplies its shared theme.
 await cp("extensions/skill-studio-theme/styles/markdown-preview.css",
-  join(root,"media/native-markdown-preview.css"));
+  join(root,"media/studio-markdown-preview.css"));
 
 // The browser LSP server is a separate classic Worker bundle. It imports the
 // same transport-neutral LanguageDiagnosticSession as the host tests; no Node
