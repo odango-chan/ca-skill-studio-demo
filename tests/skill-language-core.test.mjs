@@ -120,9 +120,13 @@ test("malformed v1alpha5 Procedure remains visible and fails closed",()=>{
   assert.ok(result.diagnostics.length>0);
 });
 
-test("historical Procedure syntax receives ordinary current-grammar diagnostics",()=>{
+test("historical Package source receives ordinary current-grammar diagnostics across files",()=>{
   const snapshot=sampleSnapshot();
+  const contract=snapshot.documents.find(document=>document.relativePath==="assurance/contract.yaml");
+  const predicates=snapshot.documents.find(document=>document.relativePath==="assurance/predicates.yaml");
   const procedure=snapshot.documents.find(document=>document.relativePath==="assurance/procedure.yaml");
+  contract.text="apiVersion: connectionagent.io/v1alpha1\nkind: SkillContract\nmetadata: {}\nspec: {}\n";
+  predicates.text="apiVersion: connectionagent.io/v1alpha1\nkind: PredicateSet\nmetadata: {}\npredicates: {}\n";
   procedure.text="procedures:\n  legacy:\n    nodes:\n      step:\n        call: ca.sample.read\n";
   const result=analyzePackageSnapshot(snapshot);
   assert.equal(result.state,"PARTIAL");
@@ -131,6 +135,15 @@ test("historical Procedure syntax receives ordinary current-grammar diagnostics"
   assert.ok(codes.has("UNKNOWN_FIELD"),JSON.stringify(result.diagnostics));
   assert.ok(codes.has("SOURCE_ROOT_INVALID"),JSON.stringify(result.diagnostics));
   assert.ok(!codes.has("UNSUPPORTED_CA_SL_VERSION"));
+  const paths=new Set(result.diagnostics.map(item=>item.relativePath));
+  assert.ok(paths.has("assurance/contract.yaml"));
+  assert.ok(paths.has("assurance/predicates.yaml"));
+  assert.ok(paths.has("assurance/procedure.yaml"));
+  const procedureDiagnostic=result.diagnostics.find(item=>
+    item.relativePath==="assurance/procedure.yaml"&&item.code==="UNKNOWN_FIELD"&&item.range);
+  assert.ok(procedureDiagnostic);
+  assert.equal(procedure.text.slice(procedureDiagnostic.range.start,procedureDiagnostic.range.end),
+    "procedures","current grammar diagnostics underline the complete unsupported YAML key");
 });
 
 test("unsafe or duplicate Package paths are rejected before analysis",()=>{
