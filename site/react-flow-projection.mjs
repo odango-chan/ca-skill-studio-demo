@@ -105,7 +105,7 @@ export function makeFlowElements(graph,procedure,selection=null,showAllLabels=fa
       selectable:true,
       // The current grammar owns all graph interaction policy. Node dragging is
       // disabled; only the explicit selected-node Route creation handle is active.
-      connectable:true,
+      connectable:!node.viewOnly&&node.operator!=="terminal",
       selected:selection?.kind==="node"&&selection.id===node.id,
       data:{
         id:node.id,operator:node.operator,value:node.value,
