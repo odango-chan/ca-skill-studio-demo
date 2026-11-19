@@ -40,7 +40,7 @@ test("current Stage routes remain read-only until a current-grammar patch contra
 
 test("historical procedures/call syntax is ordinary invalid source, never a fallback profile",()=>{
   const historical=projectWorkspace(
-    "procedures:\\n  legacy:\\n    nodes:\\n      step:\\n        call: ca.sample.read\\n");
+    "procedures:\n  legacy:\n    nodes:\n      step:\n        call: ca.sample.read\n");
   assert.equal(historical.state,"UNAVAILABLE");
   assert.ok(historical.diagnostics.some(item=>item.code==="UNKNOWN_FIELD"));
   assert.ok(historical.diagnostics.some(item=>item.code==="SOURCE_ROOT_INVALID"));
