@@ -640,7 +640,7 @@ export function activate(context){
       const folders=vscode.workspace.workspaceFolders??[];
       if(folders.length!==1)throw Error("Python syntax probe needs one Example workspace");
       const uri=vscode.Uri.joinPath(folders[0].uri,"skills",
-        "establish-pdu-session","scripts","build_pcf_policy_inputs.py");
+        "establish-pdu-session","scripts","validate-subscription-request.py");
       const doc=await vscode.workspace.openTextDocument(uri);
       const editor=await vscode.window.showTextDocument(doc,{
         viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
