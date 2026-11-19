@@ -2795,12 +2795,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           children:[]
         });
       }
+      const sourcePath=diagnostic.path??diagnostic.relativePath??diagnostic.sourcePath;
+      const description=[sourcePath,diagnostic.line?("L"+diagnostic.line):null]
+        .filter(Boolean).join(" · ");
       groups.get(domain).children.push({
-        kind,label:diagnostic.message,message:diagnostic.message,
+        kind,label:diagnostic.message,message:diagnostic.message,description,
         line:diagnostic.line,column:diagnostic.column,uri:diagnostic.uri,
         code:diagnostic.code,severity:diagnostic.severity,
         status:diagnostic.status,domain,category:diagnostic.category,
-        path:diagnostic.path,sourcePath:diagnostic.sourcePath,
+        path:sourcePath,sourcePath:diagnostic.sourcePath,
         locationKind:diagnostic.locationKind,phase:diagnostic.phase,
         source:diagnostic.source,children:[]
       });
@@ -2809,8 +2812,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       const errors=group.children.filter(item=>item.severity==="error").length;
       const warnings=group.children.filter(item=>item.severity==="warning").length;
       const notChecked=group.children.filter(item=>item.status==="not_checked").length;
-      group.description=errors+" errors · "+warnings+" warnings"+
-        (notChecked?" · "+notChecked+" NOT_CHECKED":"");
+      const affectedFiles=new Set(group.children.map(item=>
+        item.path??item.uri?.toString?.()).filter(Boolean)).size;
+      group.description=errors+" errors · "+warnings+" warnings · "+
+        affectedFiles+" files"+(notChecked?" · "+notChecked+" NOT_CHECKED":"");
     }
     return [{kind:"problem-status",label:auditStatus,children:[]},...groups.values()];
   }
