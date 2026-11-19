@@ -1,4 +1,3 @@
-import {createRequire} from "node:module";
 import {existsSync,readFileSync,readdirSync,statSync} from "node:fs";
 import {join} from "node:path";
 const root="experiments/ide-host/theia-online/lib/frontend";
@@ -88,28 +87,21 @@ console.log("STUDIO_THEIA_LSP_WORKER_ASSET",JSON.stringify({
   path:languageServerWorker,bytes:statSync(languageServerWorker).size
 }));
 
-// Exercise the pinned host matcher, including Windows URI separators. A plain
-// **/assurance/procedure.yaml takes a platform-separator fast path in Theia.
-const {match}=createRequire(import.meta.url)("../theia-online/node_modules/@theia/core/lib/common/glob.js");
+// The Theia static host uses one native Source Editor and a single
+// right-side Preview WebviewView. No visualizer may register a Main Editor
+// CustomEditor or rely on per-file editor association globs.
 const manifest=JSON.parse(readFileSync("experiments/ide-host/vscode/package.json","utf8"));
-const editors=new Map(manifest.contributes.customEditors.map(x=>[
-  x.viewType,x.selector[0].filenamePattern
-]));
-const expected=[
-  ["skillStudio.procedurePreview","file:/workspace/assurance/procedure.yaml"],
-  ["skillStudio.contractPreview","file:/workspace/assurance/contract.yaml"],
-  ["skillStudio.predicatePreview","file:/workspace/assurance/predicates.yaml"]
-];
-for(const [view,path] of expected){
-  const pattern=editors.get(view);
-  if(!pattern)throw Error("Native CustomEditor selector missing: "+view);
-  for(const candidate of [path,path.replace("file:/workspace","file:/C:/workspace"),
-      path.replace("file:/workspace","file:/.theia/globalStorage/demo")]){
-    if(!match(pattern,candidate))throw Error("Native CustomEditor selector failed: "+view+" "+candidate);
-  }
-  for(const [,other] of expected.filter(([otherView])=>otherView!==view)){
-    const otherPattern=editors.get(other);
-    if(match(otherPattern,path))throw Error("CustomEditor selector overlap: "+view+" / "+other);
-  }
-}
-console.log("STUDIO_NATIVE_EDITOR_ASSOCIATION_MATCH_PASS",JSON.stringify(expected.map(([view])=>view)));
+const previewViews=manifest.contributes?.views?.skillStudioInspector??[];
+const secondaryContainers=manifest.contributes?.viewsContainers?.secondarySidebar??[];
+if(manifest.contributes?.customEditors?.length)
+  throw Error("Theia shared Preview architecture must not register Main Editor CustomEditors");
+if(!previewViews.some(view=>view.id==="skillStudio.preview"&&view.type==="webview"))
+  throw Error("Theia shared right-side Preview WebviewView contribution is missing");
+if(!secondaryContainers.some(container=>container.id==="skillStudioInspector"))
+  throw Error("Theia right-side Inspector container contribution is missing");
+if(!manifest.activationEvents?.includes("onView:skillStudio.preview"))
+  throw Error("Theia Preview WebviewView activation event is missing");
+console.log("STUDIO_SHARED_PREVIEW_VIEW_CONTRIBUTION_PASS",JSON.stringify({
+  previewView:"skillStudio.preview",container:"skillStudioInspector",
+  legacyCustomEditors:manifest.contributes?.customEditors?.length??0
+}));
