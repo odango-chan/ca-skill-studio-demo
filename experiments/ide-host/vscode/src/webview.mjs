@@ -3,9 +3,7 @@
 import "../../../../site/studio.css";
 import "../../../../site/light.css";
 import "./webview.css";
-import {projectWorkspace} from "../../../../site/workspace.mjs";
-import {isV1Alpha5Procedure,analyzeV1Alpha5Source}
-  from "../../../../language/core/v1alpha5.ts";
+import {analyzeCurrentSource} from "../../../../language/core/source.ts";
 import {layoutProcedureELK} from "../../../../site/layout.mjs";
 import {mountProcedureCanvas} from "../../../../site/react-flow-canvas.tsx";
 import {mountNodeFocusCanvas} from "../../../../site/node-focus-flow.tsx";
@@ -20,7 +18,7 @@ const vscode=acquireVsCodeApi();
 const $=id=>document.getElementById(id);
 let state={text:"",version:0,procedures:null,procedureId:null,entry:null,graph:null,
   selection:null,pending:null,pendingKind:null,routeProposal:null,nodeFocusId:null,
-  languageTarget:"legacy",goal:null,preconditionGate:null,projectionDiagnostics:[],
+  readOnly:true,goal:null,preconditionGate:null,projectionDiagnostics:[],
   layoutDirection:"DOWN",fitMode:"all",showAllLabels:false,neighborsOnly:false,
   rootPathMode:"normal",pathCategories:new Set(),expandedNodes:new Set()},epoch=0,focusTicket=0;
 const layouts=new Map();
@@ -60,18 +58,12 @@ const canvas=mountProcedureCanvas($("reactFlowRoot"),{
     state.selection={kind:"node",id};
     renderRoutes({preserveSelection:true});repaint();
     if(state.neighborsOnly)void layoutCurrentProcedure();
-    const options=state.languageTarget==="v1alpha5"?null:
-      addRouteOutcomeOptions(state.text,state.procedureId,id);
-    status(state.languageTarget==="v1alpha5"
-      ?"已选择 Node "+id+" · 显示 v1alpha5 有序 Stage 与只读 Route"
-      :options?.outcomes?.length
-        ?"已选择 "+id+" · 可从节点专用添加端口提出新 Route"
-        :"已选择节点 "+id+" · 仅显示当前 Source 明确允许的 Route 操作");
+    status("已选择 Node "+id+" · 显示当前 CA-SL 有序 Stage 与只读 Route");
   },
   onEdgeSelect(bundle){
     const routes=bundle?.routes??[];
     if(!routes.length)return;
-    if(state.languageTarget==="v1alpha5"){
+    if(state.readOnly){
       state.selection={kind:"bundle",id:flowBundleSelectionId(bundle)};
       state.pending=null;state.pendingKind=null;state.routeProposal=null;
       repaint();
@@ -133,11 +125,8 @@ function repaint(){
   updateGraphTools();
   if(state.graph&&!state.nodeFocusId){
     const selected=state.selection?.kind==="node"?state.selection.id:null;
-    const options=selected&&!state.routeProposal&&state.languageTarget!=="v1alpha5"
-      ?addRouteOutcomeOptions(state.text,state.procedureId,selected):null;
-    const routeCreationSourceId=options?.outcomes?.length?selected:null;
     canvas.render(state.graph,state.procedures.get(state.procedureId),
-      state.selection,state.showAllLabels,routeCreationSourceId);
+      state.selection,state.showAllLabels,null);
   }
 }
 function option(select,text,value){
@@ -243,7 +232,7 @@ function openNodeFocus(id){
 }
 function routeChoices(routeId){
   const procedure=getProcedure();
-  if(!procedure||state.languageTarget==="v1alpha5")return [];
+  if(!procedure||state.readOnly)return [];
   return routeTargetChoices(procedure,routeId);
 }
 function refreshTargets(){
@@ -262,7 +251,7 @@ function refreshTargets(){
   repaint();
 }
 function renderRoutes({preserveSelection=false}={}){
-  if(state.languageTarget==="v1alpha5"){
+  if(state.readOnly){
     $("patch").hidden=true;
     state.pending=null;state.pendingKind=null;state.routeProposal=null;
     $("commit").disabled=true;$("diff").textContent="";
@@ -317,7 +306,7 @@ function renderRoutes({preserveSelection=false}={}){
   }
 }
 function prepareRouteCreation(connection){
-  if(state.languageTarget==="v1alpha5"){
+  if(state.readOnly){
     status("CA-SL v1alpha5 Route 为只读视图；不能使用旧语法 Patch。");
     return;
   }
@@ -345,7 +334,7 @@ function prepareRouteCreation(connection){
   }
 }
 function prepareReconnect(routeId,sourceId,targetId){
-  if(state.languageTarget==="v1alpha5"){
+  if(state.readOnly){
     status("CA-SL v1alpha5 Route 目标不可通过旧版 Patch 修改。");
     return;
   }
@@ -379,7 +368,7 @@ async function layoutCurrentProcedure({anchorId=null}={}){
   const started=performance.now();
   const anchor=anchorId?canvas.captureNodeAnchor(anchorId):null;
   const focus=state.neighborsOnly&&state.selection?.kind==="node"?state.selection.id:null;
-  // Path focus is a read-only graph projection for both legacy and released v1alpha5 sources.
+  // Path focus is a read-only graph projection of the current CA-SL source.
   const pathFocus=isRootPath()?{
     mode:state.rootPathMode,categories:[...state.pathCategories],
     expandedNodes:[...state.expandedNodes]
@@ -413,8 +402,7 @@ async function layoutCurrentProcedure({anchorId=null}={}){
     const businessNodeCount=procedure.nodes.filter(node=>!node.viewOnly).length;
     status(state.procedureId+" · "+businessNodeCount+" Nodes / "+procedure.routes.length+
       " Outcomes / "+graph.bundles.length+" Bundles"+summary+
-      (state.languageTarget==="v1alpha5"
-        ?" · v1alpha5 Source projection only · not qualified":" · YAML Source 由 IDE 管理"));
+      " · current Source projection only · not qualified");
   }catch(error){
     if(ticket!==epoch)return;
     status("布局失败："+String(error?.message??error));
@@ -439,7 +427,7 @@ function updateGoalSummary(goal,gate){
     ?"GLOBAL PRECONDITION · "+gate:"GLOBAL PRECONDITION · 未声明";
   $("goalQualification").textContent=
     "Source projection only · Owner / Capability / Runtime NOT QUALIFIED";
-  summary.hidden=!state.languageTarget||state.languageTarget!=="v1alpha5";
+  summary.hidden=!state.languageTarget||!state.readOnly;
 }
 function receiveSnapshot(data){
   if(typeof data.text!=="string"||data.text.length>1024*1024||
@@ -451,59 +439,52 @@ function receiveSnapshot(data){
   clearNodeFocus();
   state={...state,text:data.text,version:data.version,graph:null,selection:null,
     contractText:data.contractText??null,predicatesText:data.predicatesText??null,
-    languageTarget:"legacy",goal:null,preconditionGate:null,projectionDiagnostics:[],
+    readOnly:true,goal:null,preconditionGate:null,projectionDiagnostics:[],
     pending:null,pendingKind:null,routeProposal:null};
   $("revision").textContent="TextDocument v"+data.version;
   $("patch").hidden=true;
   const started=performance.now();
-  let model=null;
-  if(isV1Alpha5Procedure(data.text)){
-    const rootUri=String(data.packageRootUri??data.path??"")
-      .replace(/\/assurance\/procedure\.yaml$/,"").replace(/\/$/,"");
-    const packageName=String(data.packageName??rootUri.split("/").at(-1)??"sample");
-    const document=(relativePath,text,version)=>({
-      uri:rootUri+"/"+relativePath,relativePath,text,version
-    });
-    const documents=new Map([
-      ["assurance/procedure.yaml",document("assurance/procedure.yaml",data.text,data.version)]
-    ]);
-    if(typeof data.contractText==="string")
-      documents.set("assurance/contract.yaml",document(
-        "assurance/contract.yaml",data.contractText,data.contractVersion??0));
-    if(typeof data.predicatesText==="string")
-      documents.set("assurance/predicates.yaml",document(
-        "assurance/predicates.yaml",data.predicatesText,data.predicatesVersion??0));
-    const projected=analyzeV1Alpha5Source(documents,packageName);
-    projectionMs=performance.now()-started;
-    state.languageTarget="v1alpha5";
-    state.goal=projected.procedure.goal??null;
-    state.preconditionGate=projected.procedure.precondition??null;
-    state.projectionDiagnostics=projected.diagnostics;
-    updateGoalSummary(state.goal,state.preconditionGate);
-    if(projected.procedure.state!=="READY"||!projected.procedure.procedures.length){
-      state.procedures=null;state.graph=null;state.entry=null;
-      canvas.render(null,null,null,false);updateGraphTools();
-      const first=projected.diagnostics.find(item=>item.relativePath==="assurance/procedure.yaml");
-      status("CA-SL v1alpha5 Source-only · "+
-        (first?.message??"Procedure 尚不能安全投影")+
-        " · Owner / Capability linking NOT QUALIFIED");
-      return;
-    }
-    const sourceProcedure=projected.procedure.procedures[0];
-    const terminalIds=[...new Set(sourceProcedure.routes
-      .map(route=>route.target)
-      .filter(target=>["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(target)))];
-    const terminalNodes=terminalIds.map(id=>({
-      id,operator:"terminal",value:id,line:0,phases:[],children:[],viewOnly:true
-    }));
-    const procedure={...sourceProcedure,nodes:[...sourceProcedure.nodes,...terminalNodes]};
-    model={state:"READY",entry:procedure.name,
-      procedures:new Map([[procedure.name,procedure]])};
-  }else{
-    model=projectWorkspace(data.text);
-    projectionMs=performance.now()-started;
-    updateGoalSummary(null,null);
+  const rootUri=String(data.packageRootUri??data.path??"")
+    .replace(/\\/assurance\\/procedure\\.yaml$/, "").replace(/\\/$/,"");
+  const packageName=String(data.packageName??rootUri.split("/").at(-1)??"sample");
+  const document=(relativePath,text,version)=>({
+    uri:rootUri+"/"+relativePath,relativePath,text,version
+  });
+  const documents=new Map([
+    ["assurance/procedure.yaml",document("assurance/procedure.yaml",data.text,data.version)]
+  ]);
+  if(typeof data.contractText==="string")
+    documents.set("assurance/contract.yaml",document(
+      "assurance/contract.yaml",data.contractText,data.contractVersion??0));
+  if(typeof data.predicatesText==="string")
+    documents.set("assurance/predicates.yaml",document(
+      "assurance/predicates.yaml",data.predicatesText,data.predicatesVersion??0));
+  const projected=analyzeCurrentSource(documents,packageName);
+  projectionMs=performance.now()-started;
+  state.readOnly=true;
+  state.goal=projected.procedure.goal??null;
+  state.preconditionGate=projected.procedure.precondition??null;
+  state.projectionDiagnostics=projected.diagnostics;
+  updateGoalSummary(state.goal,state.preconditionGate);
+  if(projected.procedure.state!=="READY"||!projected.procedure.procedures.length){
+    state.procedures=null;state.graph=null;state.entry=null;
+    canvas.render(null,null,null,false);updateGraphTools();
+    const first=projected.diagnostics.find(item=>item.relativePath==="assurance/procedure.yaml");
+    status("Current CA-SL Source-only · "+
+      (first?.message??"Procedure 尚不能安全投影")+
+      " · Owner / Capability linking NOT QUALIFIED");
+    return;
   }
+  const sourceProcedure=projected.procedure.procedures[0];
+  const terminalIds=[...new Set(sourceProcedure.routes
+    .map(route=>route.target)
+    .filter(target=>["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"].includes(target)))];
+  const terminalNodes=terminalIds.map(id=>({
+    id,operator:"terminal",value:id,line:0,phases:[],children:[],viewOnly:true
+  }));
+  const procedure={...sourceProcedure,nodes:[...sourceProcedure.nodes,...terminalNodes]};
+  const model={state:"READY",entry:procedure.name,
+    procedures:new Map([[procedure.name,procedure]])};
   if(model.state!=="READY"){
     state.procedures=null;
     state.graph=null;
@@ -523,9 +504,9 @@ function receiveSnapshot(data){
     option(list,proc.name+" ("+count+" Nodes)",proc.name);
   }
   void showProcedure(model.procedures.has(previous)?previous:model.entry);
-  if(state.languageTarget==="v1alpha5"){
+  if(state.readOnly){
     const errors=state.projectionDiagnostics.filter(item=>item.severity==="error").length;
-    status("CA-SL v1alpha5 · "+model.procedures.get(model.entry).nodes.length+
+    status("Current CA-SL · "+model.procedures.get(model.entry).nodes.length+
       " visual Nodes · "+(errors?errors+" source diagnostics":"source shape parsed")+
       " · Owner / Capability linking NOT QUALIFIED");
   }
