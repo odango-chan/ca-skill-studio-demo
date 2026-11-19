@@ -23,7 +23,7 @@ function get(node,...path){
     if(!isMap(n))return null;
     n=n.get(part,true);
   }
-  return n;
+  return n??null;
 }
 function normalized(s){return String(s).replace(/[^a-zA-Z0-9]/g,"").toLowerCase();}
 function collectActions(node,fn){
@@ -164,9 +164,12 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
         "Legacy analyzer detected an unexpected Contract apiVersion: "+apiVersion);
   }
   if(predicates){
-    if(predName&&contractName&&predName!==contractName)
+    if(predName&&predName!==workspace?.name)
       warn("PREDICATE_SKILL",FILES.predicates,get(predicates,"metadata","skill"),
-        "PredicateSet 的 Skill 名称与 Contract 不一致");
+        "PredicateSet 的 Skill 名称与当前 Package 不一致");
+    if(predName&&contractName&&predName!==contractName)
+      warn("PREDICATE_CONTRACT_NAME_MISMATCH",FILES.predicates,get(predicates,"metadata","skill"),
+        "PredicateSet 的 Skill 名称与 Contract metadata.name 不一致");
     if(v(get(predicates,"kind"))&&v(get(predicates,"kind"))!=="PredicateSet")
       add("PREDICATE_KIND_INVALID",FILES.predicates,get(predicates,"kind"),
         "PredicateSet kind 必须为 PredicateSet",{severity:"error",domain:"predicates"});
