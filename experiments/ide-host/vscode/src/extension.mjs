@@ -21,7 +21,6 @@ import {EXAMPLE_PROJECT_NAME,seedExampleProject} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
-import {extendMarkdownIt} from "./markdown-link-policy.mjs";
 import {registerWorkbench} from "./workbench.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {registerContractCommands,mountContractPreview} from "./contract-editor.mjs";
@@ -740,6 +739,6 @@ export function activate(context){
       "SKILL Studio could not finish opening the Example Procedure: "+
       String(error?.message??error));
   });
-  return {extendMarkdownIt};
+  return {};
 }
 export function deactivate(){}
