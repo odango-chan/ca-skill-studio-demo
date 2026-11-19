@@ -16,7 +16,6 @@
   "main": "./dist/extension.cjs",
   "activationEvents": [
     "onCommand:skillStudio.openProcedure",
-    "onCustomEditor:skillStudio.procedurePreview",
     "onCommand:skillStudio.loadExample",
     "onCommand:skillStudio.newProject",
     "onCommand:skillStudio.openProject",
@@ -40,11 +39,8 @@
     "onCommand:skillStudio.editPhaseVerifyStep",
     "onCommand:skillStudio.renameNamedPhaseStep",
     "onCommand:skillStudio.restartLanguageService",
-    "onCustomEditor:skillStudio.contractPreview",
     "onCommand:skillStudio.openContract",
-    "onCustomEditor:skillStudio.predicatePreview",
     "onCommand:skillStudio.openPredicates",
-    "onCustomEditor:skillStudio.schemaPreview",
     "onCommand:skillStudio.openSchema",
     "onCommand:skillStudio.refreshPackages",
     "onView:skillStudio.packages",
@@ -557,48 +553,6 @@
         }
       ]
     },
-    "customEditors": [
-      {
-        "viewType": "skillStudio.procedurePreview",
-        "displayName": "SKILL Procedure Visual",
-        "selector": [
-          {
-            "filenamePattern": "**/assurance/[p]rocedure.yaml"
-          }
-        ],
-        "priority": "option"
-      },
-      {
-        "viewType": "skillStudio.contractPreview",
-        "displayName": "SKILL Contract Visual",
-        "selector": [
-          {
-            "filenamePattern": "**/assurance/[c]ontract.yaml"
-          }
-        ],
-        "priority": "option"
-      },
-      {
-        "viewType": "skillStudio.predicatePreview",
-        "displayName": "SKILL Predicate Visual",
-        "selector": [
-          {
-            "filenamePattern": "**/assurance/[p]redicates.yaml"
-          }
-        ],
-        "priority": "option"
-      },
-      {
-        "viewType": "skillStudio.schemaPreview",
-        "displayName": "SKILL Schema Visual",
-        "selector": [
-          {
-            "filenamePattern": "**/schemas/*.schema.yaml"
-          }
-        ],
-        "priority": "option"
-      }
-    ],
     "viewsWelcome": [
       {
         "view": "workbench.explorer.fileView",
