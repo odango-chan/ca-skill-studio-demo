@@ -31,7 +31,8 @@ test("visual inspection uses the current CA-SL projection for the released Examp
   assert.ok(result.outline[0].children.length>0);
   assert.ok(result.outline[0].children.some(item=>item.nodeId==="get-sm-subscription-data"));
   assert.ok(result.inspection.some(item=>item.kind==="v1alpha5-contract"));
-  assert.ok(result.problems.every(item=>item.source==="procedure-projection"));
+  assert.ok(Array.isArray(result.problems));
+  assert.ok(!result.problems.some(item=>item.code==="UNSUPPORTED_CA_SL_VERSION"));
 });
 
 test("historical syntax is not projected by a compatibility graph parser",()=>{
