@@ -19,6 +19,9 @@ const contract=JSON.parse(contractText);
 const manifest=JSON.parse(readFileSync(new URL(
   "../extensions/skill-studio-languages/package.json",import.meta.url
 ),"utf8"));
+const ideManifest=JSON.parse(readFileSync(new URL(
+  "../experiments/ide-host/vscode/package.json",import.meta.url
+),"utf8"));
 const theme=JSON.parse(readFileSync(new URL(
   "../extensions/skill-studio-theme/themes/skill-studio-light-color-theme.json",
   import.meta.url
@@ -93,6 +96,21 @@ test("legacy v0.2 token registry remains isolated from the v1alpha5 authoring ta
   assert.deepEqual(
     semantic.SKILL_SEMANTIC_TOKEN_MODIFIERS.filter(item=>item!=="declaration").sort(),
     manifest.contributes.semanticTokenModifiers.map(item=>item.id).sort()
+  );
+  assert.deepEqual(ideManifest.contributes.semanticTokenTypes,
+    manifest.contributes.semanticTokenTypes,
+    "the primary extension must declare the same canonical semantic-token types");
+  assert.deepEqual(ideManifest.contributes.semanticTokenModifiers,
+    manifest.contributes.semanticTokenModifiers,
+    "the primary extension must declare the same canonical semantic-token modifiers");
+  const rewrite=path=>path.replace(/^\.\/upstream\//,"./media/languages/");
+  assert.deepEqual(
+    ideManifest.contributes.languages.filter(item=>["yaml","python"].includes(item.id)),
+    manifest.contributes.languages.map(item=>({...item,configuration:rewrite(item.configuration)}))
+  );
+  assert.deepEqual(
+    ideManifest.contributes.grammars,
+    manifest.contributes.grammars.map(item=>({...item,path:rewrite(item.path)}))
   );
   assert.equal(theme.semanticHighlighting,true);
   for(const type of types)
