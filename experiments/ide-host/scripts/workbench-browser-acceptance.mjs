@@ -744,6 +744,32 @@ export async function runWorkbenchAcceptance({
   const started=Date.now();
   const procedurePair=await assertSourceVisualPair(
     evalJS,sleep,"procedure.yaml","CA-SL v1alpha5 Procedure Designer");
+  // Native TextMate is a separate baseline from CA semantic tokens and LSP.
+  // Inspect real rendered Monaco text colors, not just the grammar manifest.
+  let yamlTextMate=null;
+  for(let attempt=0;attempt<35;attempt++){
+    yamlTextMate=await evalJS(`(()=>{
+      const widget=document.getElementById(${JSON.stringify(procedurePair.source.id)});
+      const editor=widget?.querySelector('.monaco-editor')??
+        [...document.querySelectorAll('.monaco-editor')].find(node=>{
+          const r=node.getBoundingClientRect();
+          return r.width>150&&r.height>100&&node.querySelector('.view-lines');
+        });
+      const tokens=[...(editor?.querySelectorAll('.view-lines span')??[])];
+      return {sourceWidget:${JSON.stringify(procedurePair.source.id)},
+        visible:!!editor&&editor.getBoundingClientRect().width>150,
+        tokenCount:tokens.length,
+        colors:[...new Set(tokens.map(node=>getComputedStyle(node).color))],
+        visibleText:editor?.querySelector('.view-lines')?.innerText?.slice(0,120)??''};
+    })()`);
+    if(yamlTextMate?.visible&&yamlTextMate?.colors?.length>=3)break;
+    await sleep(120);
+  }
+  if(!yamlTextMate?.visible||!(yamlTextMate.colors.length>=3))
+    throw Error("Native v1alpha5 YAML TextMate coloring was not rendered: "+
+      JSON.stringify(yamlTextMate));
+  console.log("STUDIO_V1ALPHA5_NATIVE_YAML_TEXTMATE_CHROMIUM",
+    JSON.stringify(yamlTextMate));
   const sourceState=await nativeCommand("skillStudio.internal.sourceVersionAcceptance");
   if(sourceState?.uri!==defaultProcedureUri||!Number.isSafeInteger(sourceState.version))
     throw Error("Native Source is not the exact v1alpha5 Procedure TextDocument: "+

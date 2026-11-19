@@ -58,7 +58,8 @@
     "onCommand:skillStudio.checkSkill",
     "onCommand:skillStudio.buildSkill",
     "onCommand:skillStudio.inspectCompilerDependencies",
-    "onView:skillStudio.preview"
+    "onView:skillStudio.preview",
+    "onCommand:skillStudio.showActivationDiagnostics"
   ],
   "contributes": {
     "colors": [
@@ -77,6 +78,11 @@
       {
         "command": "skillStudio.showWelcome",
         "title": "%project.welcome.title%",
+        "category": "SKILL Studio"
+      },
+      {
+        "command": "skillStudio.showActivationDiagnostics",
+        "title": "%command.showActivationDiagnostics%",
         "category": "SKILL Studio"
       },
       {
@@ -261,6 +267,31 @@
           ".md",
           ".markdown"
         ]
+      },
+      {
+        "id": "yaml",
+        "aliases": [
+          "YAML",
+          "yaml"
+        ],
+        "extensions": [
+          ".yaml",
+          ".yml"
+        ],
+        "configuration": "./dist/grammars/yaml/language-configuration.json"
+      },
+      {
+        "id": "python",
+        "aliases": [
+          "Python",
+          "python"
+        ],
+        "extensions": [
+          ".py",
+          ".pyw",
+          ".pyi"
+        ],
+        "configuration": "./dist/grammars/python/language-configuration.json"
       }
     ],
     "menus": {
@@ -292,6 +323,16 @@
           "command": "skillStudio.refreshPackages",
           "when": "view == skillStudio.packages",
           "group": "navigation"
+        },
+        {
+          "command": "skillStudio.showWelcome",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@1"
+        },
+        {
+          "command": "skillStudio.showActivationDiagnostics",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@2"
         },
         {
           "command": "skillStudio.auditPackage",
@@ -636,7 +677,132 @@
           "markdownDescription": "Default Compiler v1.0.0 target selection. The current integration builds the selected Skill Package explicitly."
         }
       }
-    }
+    },
+    "grammars": [
+      {
+        "language": "yaml",
+        "scopeName": "source.yaml",
+        "path": "./dist/grammars/yaml/syntaxes/yaml.tmLanguage.json",
+        "unbalancedBracketScopes": [
+          "invalid.illegal",
+          "meta.scalar.yaml"
+        ]
+      },
+      {
+        "scopeName": "source.yaml.1.3",
+        "path": "./dist/grammars/yaml/syntaxes/yaml-1.3.tmLanguage.json"
+      },
+      {
+        "scopeName": "source.yaml.1.2",
+        "path": "./dist/grammars/yaml/syntaxes/yaml-1.2.tmLanguage.json"
+      },
+      {
+        "scopeName": "source.yaml.1.1",
+        "path": "./dist/grammars/yaml/syntaxes/yaml-1.1.tmLanguage.json"
+      },
+      {
+        "scopeName": "source.yaml.1.0",
+        "path": "./dist/grammars/yaml/syntaxes/yaml-1.0.tmLanguage.json"
+      },
+      {
+        "scopeName": "source.yaml.embedded",
+        "path": "./dist/grammars/yaml/syntaxes/yaml-embedded.tmLanguage.json"
+      },
+      {
+        "language": "python",
+        "scopeName": "source.python",
+        "path": "./dist/grammars/python/syntaxes/MagicPython.tmLanguage.json"
+      },
+      {
+        "scopeName": "source.regexp.python",
+        "path": "./dist/grammars/python/syntaxes/MagicRegExp.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[yaml]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "[python]": {
+        "editor.semanticHighlighting.enabled": true
+      }
+    },
+    "semanticTokenTypes": [
+      {
+        "id": "skillKeyword",
+        "superType": "keyword",
+        "description": "Skill Language structural field"
+      },
+      {
+        "id": "skillOperator",
+        "superType": "keyword",
+        "description": "Procedure node or step operator"
+      },
+      {
+        "id": "skillStep",
+        "superType": "type",
+        "description": "Declared or referenced Procedure node/step identity"
+      },
+      {
+        "id": "skillCapability",
+        "superType": "variable",
+        "description": "Skill resource-grant identity"
+      },
+      {
+        "id": "skillPredicate",
+        "superType": "type",
+        "description": "Predicate identity"
+      },
+      {
+        "id": "skillObservation",
+        "superType": "variable",
+        "description": "Externally sourced Observation identifier"
+      },
+      {
+        "id": "skillOutcome",
+        "superType": "enumMember",
+        "description": "Outcome or Predicate verdict"
+      },
+      {
+        "id": "skillDataType",
+        "superType": "type",
+        "description": "Source-declared basic data type"
+      },
+      {
+        "id": "skillSchema",
+        "superType": "variable",
+        "description": "Skill-owned Schema path or external Schema reference"
+      },
+      {
+        "id": "skillReference",
+        "superType": "variable",
+        "description": "Skill-owned Script or Reference path"
+      },
+      {
+        "id": "skillBinding",
+        "superType": "variable",
+        "description": "Explicit Procedure binding"
+      },
+      {
+        "id": "skillOperation",
+        "superType": "function",
+        "description": "Exact callable Operation identity from an imported ToolCatalog"
+      },
+      {
+        "id": "skillWait",
+        "superType": "keyword",
+        "description": "CA-SL v1alpha5 Node-entry Event Wait control; not a business stage"
+      }
+    ],
+    "semanticTokenModifiers": [
+      {
+        "id": "reference",
+        "description": "Source reference, not necessarily resolved"
+      },
+      {
+        "id": "imported",
+        "description": "Imported read-only Library declaration"
+      }
+    ]
   },
   "scripts": {
     "build": "node ../scripts/build-ide-spike.mjs",

@@ -59,10 +59,10 @@ console.log("STUDIO_THEIA_STATIC_MARKDOWN_EXTENSION",JSON.stringify({
   markdownPluginRoot,version:markdownManifest.version,
   browser:markdownManifest.browser,workerBytes:statSync(markdownWorker).size
 }));
-const syntaxPluginRoot=join(root,"hostedPlugin/odango_chan_skill_studio_languages");
+const syntaxPluginRoot=join(root,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike");
 const syntaxManifestPath=join(syntaxPluginRoot,"package.json");
 if(!existsSync(syntaxManifestPath))
-  throw Error("Theia static preview lacks the built-in YAML/Python syntax extension manifest");
+  throw Error("Theia static preview lacks the primary Skill Studio extension syntax manifest");
 const syntaxManifest=JSON.parse(readFileSync(syntaxManifestPath,"utf8"));
 const syntaxAssets=(syntaxManifest.contributes?.grammars??[]).map(item=>
   join(syntaxPluginRoot,item.path));
@@ -74,7 +74,7 @@ if(missingSyntaxAssets.length)
 for(const language of ["yaml","python"]){
   if(!syntaxManifest.contributes?.languages?.some(item=>item.id===language)||
      !syntaxManifest.contributes?.grammars?.some(item=>item.language===language))
-    throw Error("Theia static preview syntax extension is missing "+language);
+    throw Error("Theia static preview primary extension is missing "+language);
 }
 console.log("STUDIO_THEIA_STATIC_SYNTAX_EXTENSION",JSON.stringify({
   syntaxPluginRoot,languages:syntaxManifest.contributes.languages.map(item=>item.id),

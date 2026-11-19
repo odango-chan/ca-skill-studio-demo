@@ -56,27 +56,35 @@ console.log("STUDIO_THEIA_PREPARED_THEME_EXTENSION",JSON.stringify({
   runtimeDependencies:Object.keys(themeManifest.dependencies??{}).length
 }));
 
-// Syntax highlighting must not depend on the deferred LSP workstream.
-// Browser-only Theia does not ship VS Code's default language extensions:
-// bundle a declarative, pinned YAML/Python TextMate plugin at build time.
+// YAML/Python language and TextMate contributions now belong to the
+// primary Skill Studio extension. Validate the packaged assets there and
+// remove any stale copy of the former standalone syntax plugin.
 const syntaxSource="extensions/skill-studio-languages";
 const syntaxTarget=join(app,"plugins","odango-chan.skill-studio-languages");
 const syntaxManifest=JSON.parse(await readFile(join(syntaxSource,"package.json"),"utf8"));
 for(const language of ["yaml","python"]){
-  if(!syntaxManifest.contributes?.languages?.some(x=>x.id===language)||
-     !syntaxManifest.contributes.grammars?.some(x=>x.language===language))
-    throw Error("Missing bundled "+language+" language and TextMate grammar");
+  if(!manifest.contributes?.languages?.some(x=>x.id===language)||
+     !manifest.contributes.grammars?.some(x=>x.language===language))
+    throw Error("Primary Skill Studio extension is missing "+language+" language/grammar contributions");
 }
-if(syntaxManifest.main||syntaxManifest.browser)
-  throw Error("Syntax extension must remain declarative");
 for(const grammar of syntaxManifest.contributes.grammars){
-  const info=await stat(join(syntaxSource,grammar.path));
+  const packaged=manifest.contributes.grammars.find(item=>item.scopeName===grammar.scopeName);
+  if(!packaged||!packaged.path.startsWith("./dist/grammars/"))
+    throw Error("Primary extension does not own grammar scope "+grammar.scopeName);
+  const info=await stat(join(target,packaged.path));
   if(!info.isFile()||info.size<100)
-    throw Error("Bundled grammar missing: "+grammar.path);
+    throw Error("Primary extension grammar asset missing: "+packaged.path);
+}
+for(const language of syntaxManifest.contributes.languages){
+  const packaged=manifest.contributes.languages.find(item=>item.id===language.id);
+  if(!packaged||!packaged.configuration?.startsWith("./dist/grammars/"))
+    throw Error("Primary extension does not own "+language.id+" language configuration");
+  const info=await stat(join(target,packaged.configuration));
+  if(!info.isFile()||info.size<80)
+    throw Error("Primary extension language configuration missing: "+packaged.configuration);
 }
 await rm(syntaxTarget,{recursive:true,force:true});
-await cp(syntaxSource,syntaxTarget,{recursive:true});
-console.log("STUDIO_THEIA_PREPARED_SYNTAX_EXTENSION",JSON.stringify({
-  target:syntaxTarget,syntaxes:syntaxManifest.contributes.languages.map(x=>x.id),
-  grammarCount:syntaxManifest.contributes.grammars.length
+console.log("STUDIO_THEIA_PRIMARY_EXTENSION_SYNTAX_ASSETS",JSON.stringify({
+  target,syntaxes:["yaml","python"],grammarCount:syntaxManifest.contributes.grammars.length,
+  standaloneSyntaxPluginRemoved:true
 }));

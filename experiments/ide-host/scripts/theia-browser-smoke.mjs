@@ -819,6 +819,51 @@ try{
     command,evalJS,evalWebviewJS,sleep,requireEditor,requireBrowserLsp,
     requireCompilerWorker,procedureUri:identity.defaultProcedure
   });
+  // Native Python TextMate colors must be visible in both hosts, independent
+  // of CA-SL semantic token/LSP analysis. Use the extension's exact Example
+  // Source opener: Quick Open can inherit focus from Compiler Output.
+  if(requireEditor){
+    const opened=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      if(!key)throw Error('Native command registry missing for Python syntax');
+      return c.get(key).executeCommand(
+        'skillStudio.internal.openPythonSyntaxAcceptance');
+    })()`);
+    if(!opened?.uri?.endsWith("/scripts/validate-subscription-request.py")||
+       opened.languageId!=="python"||opened.viewColumn!==1)
+      throw Error("Exact native Python Source did not open in the primary group: "+
+        JSON.stringify(opened));
+    let pythonTextMate=null;
+    for(let attempt=0;attempt<35;attempt++){
+      pythonTextMate=await evalJS(`(()=>{
+        const editor=[...document.querySelectorAll('.monaco-editor')]
+          .find(node=>{
+            const r=node.getBoundingClientRect();
+            if(r.width<=150||r.height<=100||!node.querySelector('.view-lines'))
+              return false;
+            for(let parent=node;parent;parent=parent.parentElement)
+              if(String(parent.id??'').includes('validate-subscription-request.py'))
+                return true;
+            return false;
+          });
+        const tokens=[...(editor?.querySelectorAll('.view-lines span')??[])];
+        return {matchingFile:!!editor,title:document.title,
+          tokenCount:tokens.length,
+          colors:[...new Set(tokens.map(node=>getComputedStyle(node).color))],
+          visibleText:editor?.querySelector('.view-lines')?.innerText?.slice(0,250)??''};
+      })()`);
+      if(pythonTextMate.matchingFile&&pythonTextMate.colors.length>=3)break;
+      await sleep(120);
+    }
+    console.log("STUDIO_NATIVE_PYTHON_TEXTMATE_CHROMIUM",
+      JSON.stringify(pythonTextMate));
+    if(!pythonTextMate?.matchingFile||!(pythonTextMate?.colors?.length>=3))
+      throw Error("Native Python TextMate colors absent in the exact Source: "+
+        JSON.stringify(pythonTextMate));
+  }
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
     ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
@@ -939,6 +984,137 @@ try{
     throw Error("v1alpha5 Inspector or Package Overview acceptance did not complete: "+
       JSON.stringify({phaseEvidence:workbenchEvidence?.phaseEvidence,
         packageOverview:workbenchEvidence?.packageOverview}).slice(0,3000));
+
+  const activationDiagnostics=await evalJS(`(async()=>{
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&
+      k.prototype?.registerCommand&&k.prototype?.getCommand);
+    if(!key)throw Error("Native Theia command registry is unavailable");
+    return c.get(key).executeCommand("skillStudio.showActivationDiagnostics");
+  })()`);
+  if(!activationDiagnostics||activationDiagnostics.failures?.length||
+     activationDiagnostics.components?.Workbench!=="READY"||
+     activationDiagnostics.components?.["Package Explorer"]!=="READY"||
+     activationDiagnostics.packageInventory?.packageCount!==2||
+     activationDiagnostics.packageInventory?.state!=="ready")
+    throw Error("The primary extension did not report a healthy activation: "+
+      JSON.stringify(activationDiagnostics).slice(0,3000));
+  console.log("STUDIO_ACTIVATION_DIAGNOSTICS_CHROMIUM",JSON.stringify({
+    components:activationDiagnostics.components,
+    packageInventory:activationDiagnostics.packageInventory
+  }));
+
+  // A restored project must still be able to reopen Welcome on demand. The
+  // page is not auto-opened over a user workspace, but its command is always live.
+  await evalJS(`(async()=>{
+    const c=window.theia.container;
+    const key=[...c._bindingDictionary._map.keys()].find(k=>
+      typeof k==='function'&&k.prototype?.executeCommand&&
+      k.prototype?.registerCommand&&k.prototype?.getCommand);
+    return c.get(key).executeCommand("skillStudio.showWelcome");
+  })()`);
+  let reopenedWelcome=null;
+  for(let attempt=0;attempt<40&&!reopenedWelcome;attempt++){
+    const currentTree=await command("Page.getFrameTree");
+    const currentFrames=[];
+    const collect=node=>{
+      if(!node)return;
+      currentFrames.push(node.frame);
+      for(const child of node.childFrames??[])collect(child);
+    };
+    collect(currentTree.frameTree);
+    for(const frame of currentFrames.filter(item=>/webview/i.test(item.url??""))){
+      try{
+        const world=await command("Page.createIsolatedWorld",{
+          frameId:frame.id,worldName:"skill-studio-restored-welcome-probe",
+          grantUniveralAccess:true
+        });
+        const body=await command("Runtime.evaluate",{
+          contextId:world.executionContextId,returnByValue:true,
+          expression:"document.body?.innerText??''"
+        });
+        const content=String(body.result?.value??"");
+        if(content.includes("Welcome to SKILL Studio")||
+           content.includes("欢迎使用 SKILL Studio")){
+          reopenedWelcome={frameId:frame.id,url:frame.url,text:content.slice(0,400)};
+          break;
+        }
+      }catch{}
+    }
+    if(!reopenedWelcome)await sleep(100);
+  }
+  if(!reopenedWelcome)
+    throw Error("The explicit Welcome command did not reopen its editor in an existing workspace");
+  console.log("STUDIO_WELCOME_REOPEN_CHROMIUM",JSON.stringify(reopenedWelcome));
+
+  // Keep the same Chromium user-data directory and OPFS workspace, then reload
+  // the page. This is the persistent-profile regression the fresh-profile test
+  // previously missed.
+  await command("Page.reload",{ignoreCache:false});
+  let persistedIdentity=null;
+  for(let attempt=0;attempt<120&&!persistedIdentity;attempt++){
+    try{
+      persistedIdentity=await evalJS(`(async()=>{
+        const c=window.theia?.container;
+        if(!c)return null;
+        const key=[...(c._bindingDictionary?._map?.keys?.()??[])].find(k=>
+          typeof k==='function'&&k.prototype?.executeCommand&&
+          k.prototype?.registerCommand&&k.prototype?.getCommand);
+        if(!key)return null;
+        return c.get(key).executeCommand("skillStudio.internal.workspaceIdentityAcceptance");
+      })()`);
+      if(persistedIdentity?.workspaceName!=="skill-studio-demo")persistedIdentity=null;
+    }catch{persistedIdentity=null;}
+    if(!persistedIdentity)await sleep(250);
+  }
+  if(!persistedIdentity||persistedIdentity.workspaceFile!==null||
+     !String(persistedIdentity.root??"").endsWith("/skill-studio-demo")||
+     persistedIdentity.workspaceFolders?.length!==1)
+    throw Error("The existing Example workspace was not restored after a same-profile reload: "+
+      JSON.stringify(persistedIdentity));
+  // Workspace identity becomes visible before OPFS findFiles and Package
+  // inventory finish. Wait for a settled restored scan rather than sampling
+  // the transient "loading / 0 Packages" state immediately after activation.
+  // This is a wait for readiness, NOT a new Example import or storage reset.
+  let persistedEvidence=null;
+  for(let attempt=0;attempt<90;attempt++){
+    persistedEvidence=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      const registry=c.get(key);
+      const activation=await registry.executeCommand("skillStudio.showActivationDiagnostics");
+      const inventoryState=activation?.packageInventory?.state;
+      const inventory=inventoryState==="loading"||inventoryState===null
+        ?null:await registry.executeCommand("skillStudio.refreshPackages");
+      const semantic=await registry.executeCommand("skillStudio.internal.semanticTokenDiagnostics");
+      return {inventory,activation,semantic};
+    })()`);
+    const inventory=persistedEvidence?.inventory??persistedEvidence?.activation?.packageInventory;
+    if(inventory?.state==="ready"&&inventory?.packages?.length===2&&
+       persistedEvidence.activation?.workbenchReady===true&&
+       persistedEvidence.semantic?.registered===true)break;
+    await sleep(200);
+  }
+  // Normalize the ready inventory captured via activation diagnostics so the
+  // following gate can inspect the same evidence shape on both Theia hosts.
+  if(!persistedEvidence?.inventory&&persistedEvidence?.activation?.packageInventory)
+    persistedEvidence.inventory=persistedEvidence.activation.packageInventory;
+  if(persistedEvidence.inventory?.state!=="ready"||
+     persistedEvidence.inventory?.packages?.length!==2||
+     persistedEvidence.activation?.failures?.length||
+     persistedEvidence.activation?.workbenchReady!==true||
+     persistedEvidence.semantic?.registered!==true)
+    throw Error("The persisted workspace lost Package, Workbench or semantic highlighting after reload: "+
+      JSON.stringify(persistedEvidence).slice(0,3500));
+  console.log("STUDIO_PERSISTED_WORKSPACE_RELOAD_PASS",JSON.stringify({
+    workspace:persistedIdentity.workspaceName,
+    packages:persistedEvidence.inventory.packages.map(item=>item.name),
+    activation:persistedEvidence.activation.components,
+    semanticRegistered:persistedEvidence.semantic.registered
+  }));
   console.log("STUDIO_V1ALPHA5_ONLY_ACCEPTANCE",JSON.stringify({
     procedure:identity.defaultProcedure,masProcedure:identity.masProcedure,
     packageCount:workbenchEvidence?.packageOverview?.skills?.length??0,

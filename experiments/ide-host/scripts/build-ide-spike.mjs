@@ -1,7 +1,7 @@
 // Build the shared VS Code-compatible extension bundles used by Theia and optional local hosts.
 // This step creates extension assets only; Theia app builds and Pages releases are separate.
 import {build} from "esbuild";
-import {mkdir,rm,cp,readFile,appendFile,writeFile} from "node:fs/promises";
+import {mkdir,rm,cp,readFile,appendFile,writeFile,stat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {dirname,join} from "node:path";
 const root="experiments/ide-host/vscode";
@@ -9,6 +9,29 @@ await rm(join(root,"dist"),{recursive:true,force:true});
 await rm(join(root,"media"),{recursive:true,force:true});
 await mkdir(join(root,"dist"),{recursive:true});
 await mkdir(join(root,"media"),{recursive:true});
+
+// YAML/Python TextMate grammars are vendored as source metadata under
+// extensions/skill-studio-languages, but are packaged inside the primary
+// Skill Studio extension so no second plugin discovery/activation is needed.
+const syntaxSource="extensions/skill-studio-languages";
+const syntaxManifest=JSON.parse(await readFile(join(syntaxSource,"package.json"),"utf8"));
+const grammarRoot=join(root,"dist","grammars");
+await cp(join(syntaxSource,"upstream"),grammarRoot,{recursive:true});
+await cp(join(syntaxSource,"LICENSE.txt"),join(grammarRoot,"LICENSE.txt"));
+for(const grammar of syntaxManifest.contributes?.grammars??[]){
+  const relative=grammar.path.replace(/^\.\/upstream\//,"");
+  const asset=join(grammarRoot,relative);
+  const info=await stat(asset);
+  if(!info.isFile()||info.size<100)
+    throw Error("Primary extension grammar asset missing or empty: "+asset);
+}
+for(const language of syntaxManifest.contributes?.languages??[]){
+  const relative=language.configuration.replace(/^\.\/upstream\//,"");
+  const asset=join(grammarRoot,relative);
+  const info=await stat(asset);
+  if(!info.isFile()||info.size<80)
+    throw Error("Primary extension language configuration missing or empty: "+asset);
+}
 // Keep the Go/WASM Compiler adapter as a separate classic Worker entry; the
 // pinned wasm_exec.js and skillc.wasm are staged by the CI Go build step.
 await cp(join(root,"src/compiler-worker.js"),join(root,"dist/compiler-worker.js"));

@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import {registerProjectWelcome} from "../vscode/src/project-welcome.mjs";
 
-function setupWelcome(language="en"){
+function setupWelcome(language="en",workspaceFolders=[],invokeWelcome=false){
   const commands=new Map(),sent=[],subscriptions=[],messages=[];
-  let receiveMessage=null,disposePanel=null;
+  let receiveMessage=null,disposePanel=null,panelCreated=0;
   const webview={
     html:"",
     postMessage(message){messages.push(message);return Promise.resolve(true);},
@@ -21,11 +21,11 @@ function setupWelcome(language="en"){
     ViewColumn:{One:1},
     env:{language},
     workspace:{
-      workspaceFolders:[],
+      workspaceFolders,
       onDidChangeWorkspaceFolders(){return {dispose(){}};}
     },
     window:{
-      createWebviewPanel(){return panel;},
+      createWebviewPanel(){panelCreated++;return panel;},
       showErrorMessage(message){sent.push({error:message});}
     },
     commands:{
@@ -34,6 +34,8 @@ function setupWelcome(language="en"){
     }
   };
   const handle=registerProjectWelcome(vscode,{subscriptions});
+  const panelCreatedOnActivation=panelCreated;
+  if(invokeWelcome)commands.get("skillStudio.showWelcome")();
   assert.ok(webview.html.includes('data-action="example"'));
   const source=webview.html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
   assert.ok(source,"welcome must contain its own CSP-authorized script");
@@ -75,7 +77,8 @@ function setupWelcome(language="en"){
     })
   });
   return {handle,webview,messages,sent,elements,status,listeners,
-    browserListeners,clientMessages,receiveMessage};
+    browserListeners,clientMessages,receiveMessage,commands,
+    panelCreatedOnActivation,panelCreated:()=>panelCreated};
 }
 
 test("Welcome immediately shows a loading spinner and prevents duplicate example clicks",()=>{
@@ -115,4 +118,15 @@ test("Progress messages update the welcome page without remounting it, errors al
   h.browserListeners.get("message")({data:h.messages.at(-1)});
   assert.equal(h.elements.example.disabled,false);
   assert.equal(h.status.dataset.state,"success");
+});
+
+
+test("Welcome can be explicitly reopened while an existing project workspace is active",()=>{
+  const h=setupWelcome("en",[{uri:{toString(){return "file:///project";}}}],true);
+  assert.equal(h.panelCreatedOnActivation,0,
+    "an existing workspace must not force-open the Welcome page on every startup");
+  assert.equal(h.panelCreated(),1,
+    "the registered Welcome command must create the page on demand");
+  assert.match(h.webview.html,/v1alpha5 candidate examples/,
+    "Welcome must describe the current v1alpha5 Example rather than retired v1alpha4");
 });

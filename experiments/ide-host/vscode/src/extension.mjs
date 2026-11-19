@@ -57,44 +57,147 @@ function toolbarIconButton(id,name,label,{pressed=false}={}){
     (pressed?' aria-pressed="false"':'')+'>'+svgIcon(name)+'</button>';
 }
 export function activate(context){
-  // Register the Package Explorer before the heavier editor/workbench
-  // contributions. Its TreeView can paint its loading state immediately;
-  // inventory discovery continues asynchronously in the background.
-  let workbench=null,packageOverview=null;
-  const compilerIntegration=registerCompilerIntegration(vscode,context,{
-    getActiveDocument:()=>workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
-  });
-  const dependencyIntegration=registerDependencyIntegration(vscode,context,{
-    onLockChanged:()=>workbench?.invalidateDependencyAnalysis?.(),
-    onProjectRootChanged:()=>void packageOverview?.refresh()
-  });
-  packageOverview=registerPackageOverview(vscode,context,
-    ()=>workbench?.getActiveDocument?.()??null,{
-      dependenciesProvider:dependencyIntegration.provider,
-      compilerProvider:compilerIntegration.provider,
-      getProjectRoot:dependencyIntegration.getProjectRoot,
-      onPackagesChanged:packages=>workbench?.syncPackages?.(packages)
+  let workbench=null,packageOverview=null,projectWelcome=null,workbenchReady=false;
+  const activationFailures=[];
+  const activationComponents=Object.create(null);
+  let activationWarningShown=false;
+  const recordActivationFailure=(component,error)=>{
+    const failure={component,message:String(error?.message??error)};
+    activationFailures.push(failure);
+    activationComponents[component]="FAILED";
+    console.error("SKILL_STUDIO_ACTIVATION_FAILURE",JSON.stringify(failure));
+    if(!activationWarningShown){
+      activationWarningShown=true;
+      try{
+        void vscode.window.showWarningMessage(
+          "SKILL Studio could not initialize "+component+": "+failure.message+
+          ". Run SKILL Studio: Show Activation Diagnostics."
+        );
+      }catch{}
+    }
+  };
+  const registerSafely=(component,register,fallback=null)=>{
+    try{
+      const value=register();
+      activationComponents[component]="READY";
+      return value??fallback;
+    }catch(error){
+      recordActivationFailure(component,error);
+      return fallback;
+    }
+  };
+  // Welcome must be registered before optional editors and providers. A failure
+  // in Compiler, Preview or semantic highlighting must not strand the user.
+  projectWelcome=registerSafely("Welcome",()=>registerProjectWelcome(vscode,context));
+  if(!projectWelcome){
+    registerSafely("Welcome fallback",()=>context.subscriptions.push(
+      vscode.commands.registerCommand("skillStudio.showWelcome",()=>{
+        void vscode.window.showWarningMessage(
+          "SKILL Studio Welcome is unavailable. Run Show Activation Diagnostics."
+        );
+      })
+    ));
+  }
+  registerSafely("Activation Diagnostics",()=>context.subscriptions.push(
+    vscode.commands.registerCommand("skillStudio.showActivationDiagnostics",async()=>{
+      const activeDocument=vscode.window.activeTextEditor?.document??null;
+      const packageInventory=packageOverview?.getDiagnostics?.()??null;
+      let extension=null;
+      try{
+        extension=vscode.extensions?.getExtension?.(
+          "odango-chan.ca-skill-studio-ide-spike"
+        )??null;
+      }catch{}
+      const report={
+        extensionId:"odango-chan.ca-skill-studio-ide-spike",
+        extensionVersion:extension?.packageJSON?.version??null,
+        extensionActive:extension?.isActive??true,
+        workspaceName:vscode.workspace.name??null,
+        workspaceFolders:(vscode.workspace.workspaceFolders??[])
+          .map(folder=>folder.uri.toString()),
+        activeDocument:activeDocument?{
+          uri:activeDocument.uri.toString(),languageId:activeDocument.languageId
+        }:null,
+        components:{...activationComponents},
+        failures:[...activationFailures],
+        packageInventory,
+        workbenchReady
+      };
+      console.info("SKILL_STUDIO_ACTIVATION_DIAGNOSTICS",JSON.stringify(report));
+      const failureSummary=activationFailures.length
+        ?"Activation failures: "+activationFailures.map(item=>item.component).join(", ")
+        :"No startup failures recorded";
+      const packageSummary=packageInventory
+        ?" · Package "+packageInventory.state+" ("+packageInventory.packageCount+")":"";
+      void vscode.window.showInformationMessage(
+        "SKILL Studio · "+failureSummary+packageSummary
+      );
+      return report;
+    })
+  ));
+  const compilerIntegration=registerSafely("Compiler",
+    ()=>registerCompilerIntegration(vscode,context,{
+      getActiveDocument:()=>workbench?.getActiveDocument?.()??
+        vscode.window.activeTextEditor?.document??null
+    }),{provider:null,problems:null,dispose(){}});
+  const dependencyIntegration=registerSafely("Dependencies",
+    ()=>registerDependencyIntegration(vscode,context,{
+      onLockChanged:()=>workbench?.invalidateDependencyAnalysis?.(),
+      onProjectRootChanged:()=>void packageOverview?.refresh()
+    }),{
+      provider:null,getProjectRoot:()=>null,prepareToolContract:()=>null,dispose(){}
     });
-  workbench=registerWorkbench(vscode,context,{
-    prepareToolContract:dependencyIntegration.prepareToolContract,
-    compilerProblemsProvider:compilerIntegration.problems
-  });
-  // Diagnostic regression results live in the native Test Explorer (when the
-  // host exposes Testing API), never in the Problems or Runtime evidence views.
-  registerPackageDiagnosticTesting(vscode,context,{
-    getActiveProcedure:()=>
-      workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
-  });
-  registerPackageRouteTesting(vscode,context,{
-    getActiveProcedure:()=>
-      workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
-  });
-  registerContractCommands(vscode,context);
-  registerPredicateCommands(vscode,context);
-  registerSchemaCommands(vscode,context);
+  packageOverview=registerSafely("Package Explorer",
+    ()=>registerPackageOverview(vscode,context,
+      ()=>workbench?.getActiveDocument?.()??null,{
+        dependenciesProvider:dependencyIntegration.provider,
+        compilerProvider:compilerIntegration.provider,
+        getProjectRoot:dependencyIntegration.getProjectRoot,
+        onPackagesChanged:packages=>workbench?.syncPackages?.(packages)
+      }),{
+        refresh:async()=>[],revealPackages:async()=>false,
+        getDiagnostics:()=>({
+          state:"unavailable",message:"Package Explorer registration failed",
+          packageCount:0,packages:[],treeReads:0,treeReadsByKind:{}
+        }),
+        dispose(){}
+      });
+  const unavailableWorkbench={
+    getActiveDocument:()=>vscode.window.activeTextEditor?.document??null,
+    syncPackages(){},invalidateDependencyAnalysis(){},
+    attach(){return ()=>{};},activate(){},select(){}
+  };
+  workbench=registerSafely("Workbench",
+    ()=>registerWorkbench(vscode,context,{
+      prepareToolContract:dependencyIntegration.prepareToolContract,
+      compilerProblemsProvider:compilerIntegration.problems
+    }),unavailableWorkbench);
+  workbenchReady=workbench!==unavailableWorkbench;
+  registerSafely("Package diagnostic tests",()=>registerPackageDiagnosticTesting(vscode,context,{
+    getActiveProcedure:()=>workbench?.getActiveDocument?.()??
+      vscode.window.activeTextEditor?.document??null
+  }));
+  registerSafely("Package route tests",()=>registerPackageRouteTesting(vscode,context,{
+    getActiveProcedure:()=>workbench?.getActiveDocument?.()??
+      vscode.window.activeTextEditor?.document??null
+  }));
+  registerSafely("Contract Commands",()=>registerContractCommands(vscode,context));
+  registerSafely("Predicate Commands",()=>registerPredicateCommands(vscode,context));
+  registerSafely("Schema Commands",()=>registerSchemaCommands(vscode,context));
   function mountProcedurePreview(document,panel,{isCurrent=()=>true}={}){
       if(!isProcedurePath(document.uri.path)){
         vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure Preview");
+        return;
+      }
+      if(!workbenchReady){
+        const details=activationFailures.map(item=>
+          item.component+": "+item.message).join("\n")||
+          "The Procedure Preview did not initialize.";
+        panel.webview.options={enableScripts:false};
+        panel.webview.html='<!doctype html><html lang="en"><meta charset="utf-8">'+
+          '<body><main><h2>SKILL Studio Preview unavailable</h2>'+
+          '<p>Source files remain available. Open Activation Diagnostics to inspect the failed component.</p>'+
+          '<pre>'+escaped(details)+'</pre></main></body></html>';
         return;
       }
       const openedAt=performance.now();
@@ -327,13 +430,14 @@ export function activate(context){
   // The single right-side Preview Host owns all contextual visualizations.
   // Visual open commands reveal only the native Source editor; the Preview
   // follows active Source documents without creating another EditorGroup.
-  registerPreviewHost(vscode,context,{
+  registerSafely("Preview Host",()=>registerPreviewHost(vscode,context,{
     mountProcedure:mountProcedurePreview,
     mountContract:(document,panel,options)=>mountContractPreview(vscode,document,panel,options),
     mountPredicate:(document,panel,options)=>mountPredicatePreview(vscode,document,panel,options),
     mountSchema:(document,panel,options)=>mountSchemaPreview(vscode,document,panel,options),
     mountMarkdown:(document,panel,options)=>mountMarkdownPreview(vscode,context,document,panel,options)
-  });
+  }));
+  try{
   const projectText=value=>vscode.l10n?.t(value)??value;
   context.subscriptions.push(
     vscode.commands.registerCommand("skillStudio.newProject",async()=>{
@@ -609,6 +713,22 @@ export function activate(context){
   // Real-Chromium acceptance only: exercise multiple visualizable Source tabs
   // followed by ordinary Python/YAML Source documents in the same editor group.
   // The command is deliberately not contributed to the user command palette.
+  // Real-Chromium acceptance opens the exact Example Python Source file
+  // directly, independent of Quick Open focus or Compiler Output ownership.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.openPythonSyntaxAcceptance",async()=>{
+      const folders=vscode.workspace.workspaceFolders??[];
+      if(folders.length!==1)throw Error("Python syntax probe needs one Example workspace");
+      const uri=vscode.Uri.joinPath(folders[0].uri,"skills",
+        "establish-pdu-session","scripts","validate-subscription-request.py");
+      const doc=await vscode.workspace.openTextDocument(uri);
+      const editor=await vscode.window.showTextDocument(doc,{
+        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
+      });
+      return {uri:doc.uri.toString(),languageId:doc.languageId,
+        viewColumn:editor.viewColumn};
+    }
+  ));
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.editorGroupAcceptance",async()=>{
       const discoveredProcedures=await vscode.workspace.findFiles(
@@ -698,9 +818,7 @@ export function activate(context){
         groups,visibleEditors,maxViewColumn,
         pythonColumn,ordinaryYamlColumn};
     }));
-  // A real empty-workspace editor page is required: Theia currently does not
-  // render Explorer viewsWelcome without a workspace folder.
-  projectWelcome=registerProjectWelcome(vscode,context);
+  // Welcome was registered first so it remains available after optional failures.
   // Open Example switches to a named folder, which restarts the extension host.
   // Complete the user-requested default Procedure open only after the new
   // single-folder workspace is active; never auto-open on unrelated projects.
@@ -735,10 +853,16 @@ export function activate(context){
       void vscode.window.showInformationMessage(message);
     }
   }).catch(error=>{
+    recordActivationFailure("Pending Example restore",error);
     void vscode.window.showErrorMessage(
       "SKILL Studio could not finish opening the Example Procedure: "+
       String(error?.message??error));
   });
   return {};
+  }catch(error){
+    recordActivationFailure("Remaining Workbench Contributions",error);
+    return {};
+  }
+
 }
 export function deactivate(){}

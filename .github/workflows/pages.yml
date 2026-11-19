@@ -204,7 +204,8 @@ jobs:
           test -s dist/hostedPlugin/odango_chan_skill_studio_theme/package.json
           test -s dist/hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json
           test -s dist/hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json
-          test -s dist/hostedPlugin/odango_chan_skill_studio_languages/package.json
+          test -s dist/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/grammars/yaml/syntaxes/yaml.tmLanguage.json
+          test -s dist/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/grammars/python/syntaxes/MagicPython.tmLanguage.json
           test -s dist/webview/index.html
           test -s dist/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js
           test -s dist/hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js
