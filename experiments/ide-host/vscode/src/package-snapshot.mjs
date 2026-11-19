@@ -131,6 +131,7 @@ export async function collectPackageSnapshot(vscode, procedureDocument, generati
     const relativePath = entry.relativePath;
     const open = openDocuments.get(uri.toString());
     let text = "";
+    let readable = true;
     if (TEXT_FILE.test(relativePath)) {
       try {
         if (open) {
@@ -150,6 +151,9 @@ export async function collectPackageSnapshot(vscode, procedureDocument, generati
       } catch (error) {
         completeness = "partial";
         reasons.push(relativePath + ": " + String(error?.message ?? error));
+        // Empty real Source and unreadable Source must not be conflated:
+        // downstream Language Service must skip parsing this document.
+        readable = false;
         text = "";
       }
     }
@@ -159,7 +163,8 @@ export async function collectPackageSnapshot(vscode, procedureDocument, generati
       languageId: languageId(relativePath),
       version: open && Number.isSafeInteger(open.version) && open.version >= 0
         ? open.version : 0,
-      text
+      text,
+      ...(readable ? {} : { readable: false })
     });
   }
 
