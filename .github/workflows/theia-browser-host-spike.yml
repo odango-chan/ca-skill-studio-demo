@@ -133,7 +133,7 @@ jobs:
           done
           cat /tmp/theia-browser.log
           exit 1
-      - name: Real Chromium import, CustomEditor and React Flow graph
+      - name: Real Chromium import, single Source group, right Preview Host and React Flow graph
         env:
           THEIA_URL: "http://127.0.0.1:3000/"
         run: node experiments/ide-host/scripts/theia-browser-smoke.mjs
