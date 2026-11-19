@@ -60,6 +60,10 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
   const notChecked=(code,path,message,domain="package")=>add(code,path,null,message,{
     severity:"warning",status:"not_checked",domain,category:"analysis"
   });
+  if(completeness!=="complete")
+    notChecked("PACKAGE_SNAPSHOT_INCOMPLETE",FILES.procedure,
+      "Package inventory is "+completeness+"; only the captured files can be checked"+
+      (workspace?.snapshotReason?": "+workspace.snapshotReason:""));
   if(!(fileMap instanceof Map)){
     notChecked("PACKAGE_INVENTORY_UNAVAILABLE",FILES.procedure,
       "Package file inventory is unavailable; no source or cross-file checks were run");
@@ -375,7 +379,7 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
               notChecked("CAPABILITY_DECLARATION_NOT_CHECKED",FILES.procedure,
                 "Cannot resolve "+field+" "+value+" because Contract is unavailable","capabilities");
           }else if(field==="script"){
-            referencedScripts.add(value);
+            if(/\.py$/i.test(value))referencedScripts.add(value);
             if(!sources.has(value))
               add("SCRIPT_MISSING",FILES.procedure,scalar,
                 procId+"/"+nodeId+" 的脚本不在当前 Package："+value,
