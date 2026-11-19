@@ -171,3 +171,35 @@ test("Theia Source lifecycle reveals the exact Preview view, not only its Inspec
   assert.match(content,/hasVisualizableSourceEditor\(\[current\]\)/);
   assert.doesNotMatch(content,/vscode\.openWith/);
 });
+
+test("Preview is the primary dedicated right sidebar container, Inspector separate", () => {
+  const manifest=JSON.parse(readFileSync("experiments/ide-host/vscode/package.json","utf8"));
+  const containers=manifest.contributes.viewsContainers.secondarySidebar;
+  assert.equal(containers.filter(x=>x.id==="skillStudioPreview").length,1);
+  assert.equal(containers.filter(x=>x.id==="skillStudioInspector").length,1);
+  assert.equal(containers[0].id,"skillStudioPreview","Preview must be first and discoverable");
+  assert.ok(containers[0].icon.endsWith("preview.svg"));
+  assert.deepEqual(manifest.contributes.views.skillStudioPreview.map(x=>x.id),
+    ["skillStudio.preview"],"no Inspector stacked below the visualization");
+  assert.deepEqual(manifest.contributes.views.skillStudioInspector.map(x=>x.id),
+    ["skillStudio.inspection"]);
+  const frontend=readFileSync(
+    "experiments/ide-host/theia-fixed-workbench/src/browser/fixed-workbench-frontend-module.ts","utf8");
+  assert.match(frontend,/plugin-view-container:workbench\.view\.extension\.skillStudioPreview/);
+  const plugin=readFileSync("experiments/ide-host/vscode/src/preview-host.mjs","utf8");
+  assert.match(plugin,/workbench\.view\.extension\.skillStudioPreview/);
+  assert.doesNotMatch(plugin,/workbench\.view\.extension\.skillStudioInspector/);
+});
+
+test("migration key forces first reveal in a restored old Inspector layout", () => {
+  const policy=readFileSync(
+    "experiments/ide-host/theia-fixed-workbench/src/browser/fixed-editor-panel-policy.mjs","utf8");
+  assert.match(policy,/skill-studio\.preview\.auto-revealed\.v3/);
+  const legacy=new Map([["skill-studio.preview.auto-revealed.v2:#/old", "1"]]);
+  const preference=createPreviewAutoRevealPreference({
+    getItem(key){return legacy.get(key)??null;},
+    setItem(key,value){legacy.set(key,value);}
+  },"#/old");
+  assert.equal(preference.shouldReveal(),true,
+    "previous Inspector nesting must not suppress the new dedicated Preview");
+});

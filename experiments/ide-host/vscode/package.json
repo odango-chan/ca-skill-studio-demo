@@ -600,6 +600,11 @@
     "viewsContainers": {
       "secondarySidebar": [
         {
+          "id": "skillStudioPreview",
+          "title": "Preview",
+          "icon": "icons/preview.svg"
+        },
+        {
           "id": "skillStudioInspector",
           "title": "Inspector",
           "icon": "icons/skill-studio.svg"
@@ -607,13 +612,15 @@
       ]
     },
     "views": {
-      "skillStudioInspector": [
+      "skillStudioPreview": [
         {
           "id": "skillStudio.preview",
           "name": "Preview",
           "type": "webview",
           "visibility": "visible"
-        },
+        }
+      ],
+      "skillStudioInspector": [
         {
           "id": "skillStudio.inspection",
           "name": "Inspector"

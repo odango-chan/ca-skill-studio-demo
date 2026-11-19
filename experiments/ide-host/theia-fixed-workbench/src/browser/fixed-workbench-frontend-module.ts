@@ -9,7 +9,8 @@ import type { DockPanel } from '@lumino/widgets';
 import { CommandRegistry } from '@theia/core/lib/common/command';
 import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference, hasVisualizableSourceEditor } from './fixed-editor-panel-policy.mjs';
 
-const PREVIEW_CONTAINER_WIDGET_ID = 'plugin-view-container:workbench.view.extension.skillStudioInspector';
+// Dedicated Preview container: never nest the visualization beneath Inspector.
+const PREVIEW_CONTAINER_WIDGET_ID = 'plugin-view-container:workbench.view.extension.skillStudioPreview';
 const PREVIEW_VIEW_ID = 'skillStudio.preview';
 const PREVIEW_WIDGET_ID = 'plugin-view:skillStudio.preview';
 

@@ -14,6 +14,7 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
         k.prototype?.registerCommand&&k.prototype?.getCommand);
       const registry=commandKey?c.get(commandKey):null;
       const commandIds=[
+        'workbench.view.extension.skillStudioPreview',
         'workbench.view.extension.skillStudioInspector',
         'workbench.action.focusAuxiliaryBar',
         'workbench.action.toggleAuxiliaryBar',
@@ -84,6 +85,8 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
     // Preview is deliberately NOT a Main Editor widget. It must be a visible
     // Webview iframe hosted in the right-hand sidebar, beyond the Source pane.
     if(source.length===1&&source[0].column===1&&preview&&
+       preview.widget.id==='plugin-view-container:workbench.view.extension.skillStudioPreview'&&
+       !state.right.some(w=>w.id==='plugin-view-container:workbench.view.extension.skillStudioInspector'&&w.webviews.some(f=>f.visible))&&
        state.visibleEditorGroups===1&&
        source[0].rect.x+source[0].rect.width<=preview.frame.rect.x+2){
       const evidence={filename,label,source:source[0],preview:{
@@ -1145,6 +1148,22 @@ export async function runWorkbenchAcceptance({
       JSON.stringify({phaseEvidence,inspectorSelection,
         inspectorText:inspectorText.slice(-2200),
         inspectorContainer:await evalJS("(()=>{const el=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');return {text:el?.innerText??'',html:el?.innerHTML?.slice(-3500)??'',visible:!!el&&el.getBoundingClientRect().width>0};})()") }));
+  // Inspector lives in a separate tab/container, not stacked underneath
+  // the Preview Webview. Selecting Inspector must not generate a third
+  // editor group or move the Preview iframe into Inspector.
+  const separated=await evalJS(`(()=>{
+    const preview=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioPreview');
+    const inspector=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');
+    const show=el=>{const r=el?.getBoundingClientRect();return !!r&&r.width>0&&r.height>0;};
+    return {previewExists:!!preview,inspectorExists:!!inspector,
+      inspectorVisible:show(inspector),previewVisible:show(preview),
+      inspectorOwnsPreview:!!inspector?.querySelector('iframe[src*="webview"]')};
+  })()`);
+  if(!separated.previewExists||!separated.inspectorExists||
+     !separated.inspectorVisible||separated.inspectorOwnsPreview)
+    throw Error("Preview and Inspector must be independent right sidebar containers: "+
+      JSON.stringify(separated));
+  console.log("STUDIO_PREVIEW_INSPECTOR_SEPARATE_CHROMIUM",JSON.stringify(separated));
   console.log("STUDIO_V1ALPHA5_INSPECTOR_CHROMIUM",JSON.stringify(phaseEvidence));
 
   // One Main EditorGroup must contain every Source document. Visual projections
