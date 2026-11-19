@@ -130,6 +130,6 @@ test("Welcome can be explicitly reopened while an existing project workspace is 
   assert.equal(h.handle.getDiagnostics().panelOpen,true);
   assert.equal(h.handle.getDiagnostics().createWebviewPanelAvailable,true);
   assert.equal(h.handle.getDiagnostics().lastError,null);
-  assert.match(h.webview.html,/v1alpha5 candidate examples/,
-    "Welcome must describe the current v1alpha5 Example rather than retired v1alpha4");
+  assert.match(h.webview.html,/current CA-SL 5GC\/MAS reference Skills/,
+    "Welcome must describe the single current CA-SL Example without legacy/version split");
 });
