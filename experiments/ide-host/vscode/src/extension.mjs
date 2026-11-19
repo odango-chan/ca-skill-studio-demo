@@ -511,7 +511,7 @@ export function activate(context){
               }
               stage="open-procedure";
               report(exampleText.procedure);
-              // Preserve the established Source/Visual pairing and editor focus.
+              // Open the authoritative native Source; the shared right Preview follows it.
               const confirmedFolders=(vscode.workspace.workspaceFolders??[])
                 .map(folder=>folder.uri.toString());
               if(!confirmedFolders.includes(result.root.toString()))
@@ -525,7 +525,7 @@ export function activate(context){
                 workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
                 workspaceFolders:confirmedFolders,
                 defaultProcedure:result.procedure.toString(),
-                editor:VIEW
+                editor:"native-source",preview:"skillStudio.preview"
               }));
               projectWelcome?.setImportStatus({
                 state:"success",message:exampleText.success
@@ -722,7 +722,7 @@ export function activate(context){
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
         workspaceFolders:folders,
         defaultProcedure:pending.procedure,
-        editor:VIEW
+        editor:"native-source",preview:"skillStudio.preview"
       }));
       const detail=progressZh
         ?((pending.replacedExisting?"已替换原有 Example 内容。":"")+
