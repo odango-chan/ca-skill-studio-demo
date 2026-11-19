@@ -307,7 +307,7 @@ function renderRoutes({preserveSelection=false}={}){
 }
 function prepareRouteCreation(connection){
   if(state.readOnly){
-    status("CA-SL v1alpha5 Route 为只读视图；不能使用旧语法 Patch。");
+    status("Current CA-SL Route 为只读视图；不能使用旧语法 Patch。");
     return;
   }
   if(state.nodeFocusId||!state.graph||!state.procedures?.has(state.procedureId)){
@@ -335,7 +335,7 @@ function prepareRouteCreation(connection){
 }
 function prepareReconnect(routeId,sourceId,targetId){
   if(state.readOnly){
-    status("CA-SL v1alpha5 Route 目标不可通过旧版 Patch 修改。");
+    status("Current CA-SL Route 目标不可通过旧版 Patch 修改。");
     return;
   }
   const route=getProcedure()?.routes.find(item=>item.id===routeId);
@@ -427,7 +427,7 @@ function updateGoalSummary(goal,gate){
     ?"GLOBAL PRECONDITION · "+gate:"GLOBAL PRECONDITION · 未声明";
   $("goalQualification").textContent=
     "Source projection only · Owner / Capability / Runtime NOT QUALIFIED";
-  summary.hidden=!state.languageTarget||!state.readOnly;
+  summary.hidden=false;
 }
 function receiveSnapshot(data){
   if(typeof data.text!=="string"||data.text.length>1024*1024||
@@ -445,7 +445,7 @@ function receiveSnapshot(data){
   $("patch").hidden=true;
   const started=performance.now();
   const rootUri=String(data.packageRootUri??data.path??"")
-    .replace(/\\/assurance\\/procedure\\.yaml$/, "").replace(/\\/$/,"");
+    .replace(/\/assurance\/procedure\.yaml$/, "").replace(/\/$/,"");
   const packageName=String(data.packageName??rootUri.split("/").at(-1)??"sample");
   const document=(relativePath,text,version)=>({
     uri:rootUri+"/"+relativePath,relativePath,text,version
