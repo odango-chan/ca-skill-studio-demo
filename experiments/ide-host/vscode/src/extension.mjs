@@ -626,9 +626,9 @@ export function activate(context){
               void vscode.window.showInformationMessage(
                 "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL current Procedure（DRAFT / NOT_QUALIFIED）。"+
                 (result.replacedExisting?"已替换原有 Example 内容。":"")+
-                "导入 v1alpha5 Skill 文件 "+result.candidateFiles+" 个。"+
+                "导入当前 CA-SL Skill 文件 "+result.candidateFiles+" 个。"+
                 (viewOpened&&revealed?"已展开 Package Explorer（两个 current CA-SL Skills）。":
-                  "可在 Explorer → Package Explorer 查看 v1alpha5 Skills。"));
+                  "可在 Explorer → Package Explorer 查看当前 CA-SL Skills。"));
               return result;
             }catch(error){
               const message=exampleText.failure+" ["+stage+"]："+String(error?.message??error);
@@ -832,7 +832,7 @@ export function activate(context){
       }));
       const detail=progressZh
         ?((pending.replacedExisting?"已替换原有 Example 内容。":"")+
-          "导入 v1alpha5 Skill 文件 "+pending.candidateFiles+" 个。")
+          "导入当前 CA-SL Skill 文件 "+pending.candidateFiles+" 个。")
         :((pending.replacedExisting?"Replaced the previous Example contents. ":"")+
           "Imported "+pending.candidateFiles+" current CA-SL Skill files.");
       const message=progressZh
