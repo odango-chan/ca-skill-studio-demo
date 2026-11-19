@@ -61,7 +61,8 @@
     "onCommand:skillStudio.showWelcome",
     "onCommand:skillStudio.checkSkill",
     "onCommand:skillStudio.buildSkill",
-    "onCommand:skillStudio.inspectCompilerDependencies"
+    "onCommand:skillStudio.inspectCompilerDependencies",
+    "onCommand:skillStudio.showActivationDiagnostics"
   ],
   "contributes": {
     "colors": [
@@ -80,6 +81,11 @@
       {
         "command": "skillStudio.showWelcome",
         "title": "%project.welcome.title%",
+        "category": "SKILL Studio"
+      },
+      {
+        "command": "skillStudio.showActivationDiagnostics",
+        "title": "%command.showActivationDiagnostics%",
         "category": "SKILL Studio"
       },
       {
@@ -349,6 +355,16 @@
           "command": "skillStudio.buildSkill",
           "when": "view == skillStudio.packages",
           "group": "navigation@7"
+        },
+        {
+          "command": "skillStudio.showWelcome",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@1"
+        },
+        {
+          "command": "skillStudio.showActivationDiagnostics",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
