@@ -3008,8 +3008,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         [item.relativePath,{text:item.text}]));
       const uris=new Map(packageSnapshot.documents.map(item=>
         [item.relativePath,vscode.Uri.parse(item.uri)]));
-      const required=['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml'];
-      const missing=required.filter(path=>!files.has(path));
       const v1alpha5=isV1Alpha5Procedure(doc.getText());
       let v1alpha5DependencyContext={available:false};
       if(v1alpha5){
