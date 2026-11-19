@@ -827,13 +827,30 @@ try{
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
     ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
+  const nativeMarkdownActivation=requireEditor
+    ?await evalJS("(async()=>{const c=window.theia.container;"+
+      "const key=[...c._bindingDictionary._map.keys()].find(k=>"+
+      "typeof k==='function'&&k.prototype?.executeCommand&&"+
+      "k.prototype?.registerCommand&&k.prototype?.getCommand);"+
+      "if(!key)throw Error('Theia command registry missing');"+
+      "return c.get(key).executeCommand('skillStudio.internal.nativeMarkdownLanguageActivationAcceptance');})()")
+    :null;
   const markdownLanguageWorker=markdownWorkerRequests.filter(item=>
     item.url.toLowerCase().includes("serverworkermain.js"));
-  if(requireEditor&&!markdownLanguageWorker.length)
-    throw Error("Native Markdown language features did not activate its browser Worker after Markdown Source selection: "+
-      JSON.stringify({markdownWorkerRequests,workerRuntimeErrors,exceptions:exceptions.slice(-8)}));
+  // The native Markdown extension is a language-service dependency. Its
+  // browser Worker starts lazily for operations that need it; Studio's
+  // separate Preview Webview must not force a native preview editor launch.
+  // Require actual activation, preserving separate reporting of worker IO.
+  if(requireEditor&&!nativeMarkdownActivation?.isActive)
+    throw Error("Native Markdown language extension did not activate: "+
+      JSON.stringify({nativeMarkdownActivation,markdownWorkerRequests}));
+  if(workerRuntimeErrors.length)
+    throw Error("Native Markdown worker raised runtime errors: "+
+      JSON.stringify(workerRuntimeErrors));
   console.log("STUDIO_THEIA_MARKDOWN_LANGUAGE_WORKER_CHROMIUM",
-    JSON.stringify({requests:markdownLanguageWorker,workerRuntimeErrors}));
+    JSON.stringify({activation:nativeMarkdownActivation,
+      requests:markdownLanguageWorker,workerStartup:markdownLanguageWorker.length?"observed":"lazy",
+      workerRuntimeErrors}));
   console.log("STUDIO_THEIA_STAGE","v1alpha5-package-overview");
 
   await evalJS("(async()=>{const c=window.theia.container;"+
