@@ -258,10 +258,26 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
         if(typeof type!=="string"||!type)
           add("PREDICATE_EVALUATOR_TYPE_MISSING",FILES.predicates,evaluator,
             "Predicate "+id+" 的 evaluator 缺少 type",{severity:"error",domain:"predicates"});
-        if(typeof expression!=="string"||!expression.trim())
-          add("PREDICATE_EXPRESSION_MISSING",FILES.predicates,evaluator,
-            "Predicate "+id+" 的 evaluator 缺少非空 expression",
-            {severity:"error",domain:"predicates"});
+        else if(type==="cel"){
+          if(typeof expression!=="string"||!expression.trim())
+            add("PREDICATE_EXPRESSION_MISSING",FILES.predicates,evaluator,
+              "CEL Predicate "+id+" 的 evaluator 缺少非空 expression",
+              {severity:"error",domain:"predicates"});
+        }else if(type==="script"){
+          const reference=v(get(evaluator,"ref"));
+          if(typeof reference!=="string"||!reference.trim())
+            add("PREDICATE_SCRIPT_REF_MISSING",FILES.predicates,evaluator,
+              "Script Predicate "+id+" 的 evaluator 缺少 ref",
+              {severity:"error",domain:"predicates"});
+          else if(contract&&!values(get(contract,"spec","allowedResources","localTools")).includes(reference))
+            add("PREDICATE_SCRIPT_REF_UNDECLARED",FILES.predicates,get(evaluator,"ref"),
+              "Predicate "+id+" 引用了未在 Contract localTools 声明的 Script："+reference,
+              {severity:"error",domain:"scripts"});
+        }else{
+          add("PREDICATE_EVALUATOR_TYPE_UNSUPPORTED",FILES.predicates,get(evaluator,"type"),
+            "Predicate "+id+" 使用无法由当前 Legacy Audit 检查的 evaluator.type："+type,
+            {severity:"warning",status:"not_checked",domain:"predicates",category:"analysis"});
+        }
       }
     }
   }
