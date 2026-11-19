@@ -50,8 +50,14 @@ test("A5 small neighbor scope still supports detailed layout with all its Routes
   assert.equal(fallback.positions.size,3);
   assert.equal(groupRouteEntries(scope.routes).reduce((s,x)=>s+x.routes.length,0),10);
 });
-test("A5 over-budget file fails closed rather than displaying an incomplete graph",()=>{
+test("A5 over-budget graph falls back without dropping any current Nodes or Routes",()=>{
   const p=projectWorkspace(largeYaml(302));
-  assert.equal(p.state,"UNAVAILABLE");
-  assert.ok(p.diagnostics.length);
+  assert.equal(p.state,"READY");
+  assert.equal(p.procedure.nodes.length,302);
+  assert.equal(p.procedure.routes.length,1505);
+  const scope=selectGraphScope(p.procedure);
+  assert.equal(detailedLayoutAllowed(scope),false);
+  const fallback=layoutProcedure(p.procedure,"DOWN");
+  assert.equal(fallback.positions.size,302);
+  assert.equal(groupRouteEntries(scope.routes).reduce((sum,item)=>sum+item.routes.length,0),1505);
 });
