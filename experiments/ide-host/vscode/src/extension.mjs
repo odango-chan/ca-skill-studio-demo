@@ -1,4 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
+import {registerPreviewHost} from "./preview-host.mjs";
 import {createSourceOnlyEditorNormalizer} from "./editor-group-placement.mjs";
 import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
@@ -92,8 +93,7 @@ export function activate(context){
   registerContractEditor(vscode,context);
   registerPredicateEditor(vscode,context);
   registerSchemaEditor(vscode,context);
-  const provider={
-    async resolveCustomTextEditor(document,panel){
+  function mountProcedurePreview(document,panel,{forgetPairOnDispose=true,isCurrent=()=>true}={}){
       if(!isProcedurePath(document.uri.path)){
         vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
         return;
@@ -218,7 +218,7 @@ export function activate(context){
         }catch{return {text:null,version:0};}
       };
       const push=async()=>{
-        if(disposed||!ready)return;
+        if(disposed||!ready||!isCurrent())return;
         const ticket=++pushTicket,version=document.version,text=document.getText();
         if(text.length>MAX_SOURCE_BYTES){
           void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB Procedure editor limit"});
@@ -249,7 +249,7 @@ export function activate(context){
         if(relatedPaths.has(event.document.uri.path))void push();
       });
       const incoming=webview.onDidReceiveMessage(async message=>{
-        if(disposed||typeof message!=="object"||!message)return;
+        if(disposed||!isCurrent()||typeof message!=="object"||!message)return;
         if(message.type==="selection"){
           // A visible Procedure editor can lose active status when the user
           // opens the Inspector sidebar. Its real graph selection still belongs
@@ -316,15 +316,29 @@ export function activate(context){
           await push();
         }
       });
-      panel.onDidDispose(()=>{
-        disposed=true;forgetSourceViewPair(document.uri);
+      let releasePanel=null,cleaned=false;
+      const cleanup=()=>{
+        if(cleaned)return;
+        cleaned=true;disposed=true;
+        if(forgetPairOnDispose)forgetSourceViewPair(document.uri);
         detach();viewState.dispose();changed.dispose();incoming.dispose();
-      });
+        releasePanel?.dispose?.();
+      };
+      releasePanel=panel.onDidDispose(cleanup);
+      return {dispose:cleanup};
+  }
+  const provider={
+    async resolveCustomTextEditor(document,panel){
+      mountProcedurePreview(document,panel);
     }
   };
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
     webviewOptions:{retainContextWhenHidden:true}
   }));
+  // Experimental right-side Preview Host shares the exact Procedure webview,
+  // parser and Source-backed mutation path with the established CustomEditor.
+  // The view stays hidden until the fixed layout migration is accepted.
+  registerPreviewHost(vscode,context,{mountProcedure:mountProcedurePreview});
   const projectText=value=>vscode.l10n?.t(value)??value;
   context.subscriptions.push(
     vscode.commands.registerCommand("skillStudio.newProject",async()=>{
