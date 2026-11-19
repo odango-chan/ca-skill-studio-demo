@@ -395,7 +395,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const decoder=new TextDecoder("utf-8",{fatal:true});
           for(const dependency of resolved.snapshots??[]){
             const decoded=(dependency.files??[])
-              .filter(file=>/\\.(?:json|ya?ml)$/i.test(file.path))
+              .filter(file=>/\.(?:json|ya?ml)$/i.test(file.path))
               .map(file=>({
                 path:file.path,text:decoder.decode(decodeBase64(file.bytes))
               }));
@@ -409,8 +409,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             }
             for(const file of decoded){
               const schemaFile=dependency.kind==="schema-bundle"
-                ?/\\.(?:json|ya?ml)$/i.test(file.path)
-                :/(?:^|\\/)schemas\\/.*\\.(?:json|ya?ml)$/i.test(file.path);
+                ?/\.(?:json|ya?ml)$/i.test(file.path)
+                :/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path);
               if(!schemaFile)continue;
               schemas.push({dependencyId:dependency.id,path:file.path,text:file.text});
             }
