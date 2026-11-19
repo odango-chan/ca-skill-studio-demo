@@ -1049,17 +1049,35 @@ try{
      persistedIdentity.workspaceFolders?.length!==1)
     throw Error("The existing Example workspace was not restored after a same-profile reload: "+
       JSON.stringify(persistedIdentity));
-  const persistedEvidence=await evalJS(`(async()=>{
-    const c=window.theia.container;
-    const key=[...c._bindingDictionary._map.keys()].find(k=>
-      typeof k==='function'&&k.prototype?.executeCommand&&
-      k.prototype?.registerCommand&&k.prototype?.getCommand);
-    const registry=c.get(key);
-    const inventory=await registry.executeCommand("skillStudio.refreshPackages");
-    const activation=await registry.executeCommand("skillStudio.showActivationDiagnostics");
-    const semantic=await registry.executeCommand("skillStudio.internal.semanticTokenDiagnostics");
-    return {inventory,activation,semantic};
-  })()`);
+  // Workspace identity becomes visible before OPFS findFiles and Package
+  // inventory finish. Wait for a settled restored scan rather than sampling
+  // the transient "loading / 0 Packages" state immediately after activation.
+  // This is a wait for readiness, NOT a new Example import or storage reset.
+  let persistedEvidence=null;
+  for(let attempt=0;attempt<90;attempt++){
+    persistedEvidence=await evalJS(`(async()=>{
+      const c=window.theia.container;
+      const key=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      const registry=c.get(key);
+      const activation=await registry.executeCommand("skillStudio.showActivationDiagnostics");
+      const inventoryState=activation?.packageInventory?.state;
+      const inventory=inventoryState==="loading"||inventoryState===null
+        ?null:await registry.executeCommand("skillStudio.refreshPackages");
+      const semantic=await registry.executeCommand("skillStudio.internal.semanticTokenDiagnostics");
+      return {inventory,activation,semantic};
+    })()`);
+    const inventory=persistedEvidence?.inventory??persistedEvidence?.activation?.packageInventory;
+    if(inventory?.state==="ready"&&inventory?.packages?.length===2&&
+       persistedEvidence.activation?.workbenchReady===true&&
+       persistedEvidence.semantic?.registered===true)break;
+    await sleep(200);
+  }
+  // Normalize the ready inventory captured via activation diagnostics so the
+  // following gate can inspect the same evidence shape on both Theia hosts.
+  if(!persistedEvidence?.inventory&&persistedEvidence?.activation?.packageInventory)
+    persistedEvidence.inventory=persistedEvidence.activation.packageInventory;
   if(persistedEvidence.inventory?.state!=="ready"||
      persistedEvidence.inventory?.packages?.length!==2||
      persistedEvidence.activation?.failures?.length||
