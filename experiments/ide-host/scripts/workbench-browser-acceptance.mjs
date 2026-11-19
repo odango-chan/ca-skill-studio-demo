@@ -656,6 +656,26 @@ export async function runWorkbenchAcceptance({
     await sleep(250);
     return target;
   };
+  const inspectTextMateTokens=async marker=>evalJS(String.raw`(()=>{
+    const markerText=${JSON.stringify(marker)};
+    const visibleEditors=[...document.querySelectorAll(".monaco-editor")].filter(editor=>{
+      const rect=editor.getBoundingClientRect();
+      return rect.width>0&&rect.height>0;
+    });
+    const editor=visibleEditors.find(candidate=>
+      (candidate.querySelector(".view-lines")?.textContent??"").includes(markerText));
+    if(!editor)return {found:false,visibleEditorCount:visibleEditors.length,
+      visibleText:visibleEditors.map(item=>
+        item.querySelector(".view-lines")?.textContent?.slice(0,180)??"")};
+    const lines=editor.querySelector(".view-lines");
+    const spans=[...lines.querySelectorAll("span")].filter(span=>
+      /\bmtk\d+\b/.test(span.className));
+    const classes=[...new Set(spans.flatMap(span=>
+      span.className.match(/\bmtk\d+\b/g)??[]))];
+    const colors=[...new Set(spans.map(span=>getComputedStyle(span).color))];
+    return {found:true,tokenSpanCount:spans.length,tokenClassCount:classes.length,
+      colors,sampleClasses:classes.slice(0,12),visibleText:lines.textContent.slice(0,500)};
+  })()`);
   const waitForStatus=async(expected,attempts=120)=>{
     let status="";
     for(let i=0;i<attempts;i++){
@@ -675,6 +695,12 @@ export async function runWorkbenchAcceptance({
   if(sourceState?.uri!==defaultProcedureUri||!Number.isSafeInteger(sourceState.version))
     throw Error("Native Source is not the exact v1alpha5 Procedure TextDocument: "+
       JSON.stringify({expected:defaultProcedureUri,sourceState,procedurePair}));
+  const yamlTextMate=await inspectTextMateTokens("start:");
+  if(!yamlTextMate.found||yamlTextMate.tokenSpanCount<10||
+     yamlTextMate.tokenClassCount<3||yamlTextMate.colors.length<3)
+    throw Error("YAML TextMate grammar is not producing real colored editor tokens: "+
+      JSON.stringify(yamlTextMate));
+  console.log("STUDIO_YAML_TEXTMATE_CHROMIUM",JSON.stringify(yamlTextMate));
   const initialGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
     "default v1alpha5 Procedure graph");
@@ -932,14 +958,24 @@ export async function runWorkbenchAcceptance({
        v1alpha5LanguageFeatures.ownerQualification!=="NOT_QUALIFIED")
       throw Error("Native v1alpha5 language-provider acceptance failed: "+
         JSON.stringify(v1alpha5LanguageFeatures));
-    semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
+    semanticTokenEvidence=null;
+    for(let attempt=0;attempt<40;attempt++){
+      semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
+      if(semanticTokenEvidence?.registered===true&&
+         semanticTokenEvidence?.lastUri===defaultProcedureUri&&
+         semanticTokenEvidence?.lastTokenCount>0&&
+         semanticTokenEvidence?.renderedTokenCount>0)break;
+      await sleep(100);
+    }
     if(semanticTokenEvidence?.registered!==true||
+       semanticTokenEvidence?.transport!=="source-local"||
+       semanticTokenEvidence?.lastUri!==defaultProcedureUri||
        !(semanticTokenEvidence?.lastTokenCount>0)||
        semanticTokenEvidence?.renderer!=="theia-text-editor-decoration"||
        !(semanticTokenEvidence?.renderedTokenCount>0)||
        !(semanticTokenEvidence?.renderedTypeCount>=2)||
        semanticTokenEvidence?.renderError)
-      throw Error("Native v1alpha5 semantic tokens were not rendered: "+
+      throw Error("Native v1alpha5 source-local semantic tokens were not rendered: "+
         JSON.stringify(semanticTokenEvidence));
     console.log("STUDIO_V1ALPHA5_LANGUAGE_FEATURES_CHROMIUM",
       JSON.stringify(v1alpha5LanguageFeatures));
@@ -1304,6 +1340,22 @@ export async function runWorkbenchAcceptance({
     bodyText:finalRestoredGraph.view.bodyText
   };
   const warmTiming={type:"rendered",cacheHit:true,revision:finalRestoredGraph.view.revision};
+  const pythonUri=defaultProcedureUri.replace(
+    /\/assurance\/procedure\.yaml$/,"")+"/scripts/build_pcf_policy_inputs.py";
+  const pythonSource=await nativeCommand(
+    "skillStudio.internal.openSourceDocumentAcceptance",pythonUri);
+  if(pythonSource?.uri!==pythonUri||pythonSource?.languageId!=="python")
+    throw Error("Python Source did not resolve to the registered Python language: "+
+      JSON.stringify({pythonUri,pythonSource}));
+  await sleep(350);
+  const pythonTextMate=await inspectTextMateTokens("from typing import");
+  if(!pythonTextMate.found||pythonTextMate.tokenSpanCount<10||
+     pythonTextMate.tokenClassCount<3||pythonTextMate.colors.length<3)
+    throw Error("Python TextMate grammar is not producing real colored editor tokens: "+
+      JSON.stringify({pythonSource,pythonTextMate}));
+  console.log("STUDIO_PYTHON_TEXTMATE_CHROMIUM",JSON.stringify({
+    languageId:pythonSource.languageId,...pythonTextMate
+  }));
   console.log("STUDIO_V1ALPHA5_DUAL_SKILL_EXPLORER_CHROMIUM",
     JSON.stringify(dualSkillExplorer));
   console.log("STUDIO_LAYOUT_TIMING",JSON.stringify({initialTiming,warmTiming}));
@@ -1320,6 +1372,7 @@ export async function runWorkbenchAcceptance({
     dualSkillExplorer,packageOverview:packageOverviewEvidence.evidence,
     graphEditability,canvasToolbar,
     v1alpha5LanguageFeatures,semanticTokenEvidence,
+    textMateEvidence:{yaml:yamlTextMate,python:pythonTextMate},
     nativeMarkdownEvidence,designerEvidence:{
       contract:contract.view,predicates:predicates.view,schema:schema.view
     }
