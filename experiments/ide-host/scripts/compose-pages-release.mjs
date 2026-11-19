@@ -28,8 +28,26 @@ export async function composePagesRelease({theiaFrontend,outputDist,siteRoot=nul
     "hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",
     "hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",
     "hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg",
-    "hostedPlugin/odango_chan_skill_studio_languages/package.json"
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/media/languages/LICENSE.txt",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/media/languages/yaml/language-configuration.json",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/media/languages/yaml/syntaxes/yaml.tmLanguage.json",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/media/languages/python/language-configuration.json",
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/media/languages/python/syntaxes/MagicPython.tmLanguage.json"
   ])await requireFile(theia,asset);
+
+  const primaryManifest=JSON.parse(await readFile(join(theia,
+    "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json"),"utf8"));
+  for(const language of ["yaml","python"]){
+    if(!primaryManifest.contributes?.languages?.some(item=>item.id===language)||
+       !primaryManifest.contributes?.grammars?.some(item=>item.language===language))
+      throw new Error("Primary Pages extension is missing "+language+" TextMate contributions");
+  }
+  for(const grammar of primaryManifest.contributes.grammars){
+    if(!String(grammar.path??"").startsWith("./media/languages/"))
+      throw new Error("Primary Pages grammar path must remain package-local: "+grammar.path);
+    await requireFile(theia,
+      "hostedPlugin/odango_chan_ca_skill_studio_ide_spike/"+grammar.path.replace(/^\.\//,""));
+  }
 
   const html=await readFile(join(theia,"index.html"),"utf8");
   if(!html.includes('id="skill-studio-preview-warning"')||
@@ -39,7 +57,7 @@ export async function composePagesRelease({theiaFrontend,outputDist,siteRoot=nul
     throw new Error("Theia index must show the same-origin demo safety warning and contain no Classic navigation/assets");
 
   const pluginList=await readFile(join(theia,"hostedPlugin/list.json"),"utf8");
-  for(const id of ["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]){
+  for(const id of ["ca-skill-studio-ide-spike","skill-studio-theme"]){
     if(!pluginList.includes(id))throw new Error("Theia hostedPlugin list is missing "+id);
   }
 
