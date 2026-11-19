@@ -3095,8 +3095,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       const errors=audit.filter(item=>item.severity==="error").length;
       const warnings=audit.filter(item=>item.severity==="warning").length;
       const notChecked=audit.filter(item=>item.status==="not_checked").length;
+      const affectedFiles=new Set(audit.map(item=>item.path).filter(Boolean)).size;
       auditStatus="Package Audit · "+errors+" errors / "+warnings+" warnings / "+
-        notChecked+" NOT_CHECKED"+
+        affectedFiles+" files / "+notChecked+" NOT_CHECKED"+
         " · Compiler / Owner qualification pending";
       diagnostics.clear();
       if(packageSnapshot.completeness==="complete"){
