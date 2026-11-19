@@ -320,7 +320,9 @@ test("browser LSP provides current CA-SL Definition, References, Hover, Python s
     const readyStatus=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===snapshot.rootUri&&
-      message.params?.generation===snapshot.generation,15000);
+      message.params?.generation===snapshot.generation&&
+      message.params?.state==="READY"&&
+      message.params?.procedureState==="READY",15000);
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
     const status=await readyStatus;
     assert.equal(status.params.state,"READY",JSON.stringify(status.params));
