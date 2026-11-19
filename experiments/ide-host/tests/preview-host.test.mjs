@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  PREVIEW_VIEW_ID,previewDocumentKind,previewEmptyHtml,createPreviewHostController
+  PREVIEW_VIEW_ID,previewDocumentKind,previewEmptyHtml,createPreviewHostController,registerPreviewHost
 } from "../vscode/src/preview-host.mjs";
 
 const doc=(path,version=1)=>({uri:{path,toString(){return "file://"+path;}},version});
@@ -81,4 +81,49 @@ test("disposed and replaced Preview WebviewViews cannot retain old Source sessio
   controller.disposeView(second);
   assert.equal(sessions[1].disposed,true);
   assert.equal(controller.state.attached,false);
+});
+
+test("active visual Source reveals the collapsed right Inspector and mounts the Preview View",async()=>{
+  const calls=[],sessions=[];
+  let provider=null,activeListener=null;
+  const context={subscriptions:[]};
+  const vscode={
+    commands:{executeCommand:async id=>{calls.push(id);return true;}},
+    window:{
+      activeTextEditor:{document:doc("/skills/demo/assurance/procedure.yaml")},
+      registerWebviewViewProvider(id,value){
+        assert.equal(id,PREVIEW_VIEW_ID);provider=value;return {dispose(){}};
+      },
+      onDidChangeActiveTextEditor(listener){activeListener=listener;return {dispose(){}};}
+    }
+  };
+  const controller=registerPreviewHost(vscode,context,{
+    mountProcedure(document,panel,options){
+      const session={document,panel,options,disposed:false,dispose(){this.disposed=true;}};
+      sessions.push(session);return session;
+    }
+  });
+  await Promise.resolve();await Promise.resolve();
+  assert.ok(calls.includes("workbench.view.extension.skillStudioInspector"),
+    "the hidden secondary sidebar must be revealed for the initial Procedure");
+  assert.ok(provider);
+  const view=makeView();
+  view.onDidDispose=()=>({dispose(){}});
+  provider.resolveWebviewView(view);
+  assert.equal(sessions.length,1);
+  assert.equal(controller.state.visible,true);
+  assert.equal(controller.state.kind,"procedure");
+  assert.equal(sessions[0].panel.webview,view.webview);
+  assert.equal(sessions[0].options.isCurrent(),true);
+  activeListener(null);
+  assert.equal(controller.state.kind,"procedure","focus transfer must retain the active Source");
+  activeListener({document:doc("/skills/demo/scripts/check.py")});
+  assert.equal(controller.state.kind,"none");
+  assert.equal(sessions[0].disposed,true);
+  view.visible=false;
+  activeListener({document:doc("/skills/demo/assurance/contract.yaml")});
+  await Promise.resolve();await Promise.resolve();
+  assert.ok(calls.filter(x=>x==="workbench.view.extension.skillStudioInspector").length>=2,
+    "opening a visual Source after the right container was hidden must reveal it again");
+  controller.dispose();
 });
