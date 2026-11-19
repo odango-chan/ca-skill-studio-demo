@@ -7,8 +7,7 @@ import {applyDependency,removeDependency,refreshDependency,
   resolveLockedDependencies} from "./dependency-service.mjs";
 import {acquireUpload,acquireMcp,acquireGit,acquireBuiltin}
   from "./contract-acquisition.mjs";
-import {discoverMcpHttpTools,readGitHubPinnedFile}
-  from "./acquisition-transports.mjs";
+import {readGitHubPinnedFile} from "./acquisition-transports.mjs";
 import {decodeBase64} from "./dependency-snapshot.mjs";
 import {projectDependencyReadiness,projectLockedToolCatalog}
   from "./dependency-catalog-projection.mjs";
@@ -184,19 +183,11 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         return acquireGit({...source,
           readPinnedFile:params=>readGitHubPinnedFile({...params,token})});
       }
-      case "mcp":{
-        const endpoint=await vscode.window.showInputBox({
-          prompt:"MCP HTTPS Streamable HTTP endpoint (not saved in Workspace Settings)",
-          placeHolder:"https://example.org/mcp"});
-        if(!endpoint)throw Error("MCP endpoint not supplied");
-        const token=await askSecret("skillStudio.mcp."+source.connectionId);
-        return acquireMcp({...source,selectedTools:source.tools,
-          toolsList:()=>discoverMcpHttpTools({endpoint,token})});
-      }
+      case "mcp":return acquireMcp({connectionId:source.connectionId});
       case "upload":{
         const picked=await vscode.window.showOpenDialog({canSelectMany:false,
           canSelectFiles:true,canSelectFolders:false,
-          filters:{"Tool Contracts":["yaml","yml","json"]}});
+          filters:{"Current ToolCatalog":["yaml","yml","json"]}});
         if(!picked?.length)throw Error("Upload Refresh/Update needs the selected new file");
         const format=picked[0].path.toLowerCase().endsWith(".json")?"json":"yaml";
         return acquireUpload({upload:source.upload,format,
@@ -207,11 +198,11 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
   }
   async function acquireNew(type){
     if(type==="builtin")return acquireBuiltin({
-      bundleId:"studio-example-tools",version:"1.0.0"});
+      bundleId:"studio-example-toolcatalog",version:"1.0.0"});
     if(type==="upload"){
       const picked=await vscode.window.showOpenDialog({canSelectMany:false,
         canSelectFiles:true,canSelectFolders:false,
-        filters:{"Tool Contracts":["yaml","yml","json"]}});
+        filters:{"Current ToolCatalog":["yaml","yml","json"]}});
       if(!picked?.length)return null;
       const name=picked[0].path.toLowerCase();
       const format=name.endsWith(".json")?"json":"yaml";
@@ -225,7 +216,8 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
         prompt:"Git HTTPS repository (GitHub supported in Browser-only v0.1)",
         placeHolder:"https://github.com/owner/repository"});
       if(!repository)return null;
-      const path=await vscode.window.showInputBox({prompt:"Exact Tool Contract YAML/JSON path"});
+      const path=await vscode.window.showInputBox({
+        prompt:"Exact Owner-published ToolCatalog YAML/JSON path"});
       if(!path)return null;
       const ref=await vscode.window.showInputBox({prompt:"Requested Git revision",value:"main"});
       if(!ref)return null;
@@ -233,23 +225,8 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
       return acquireGit({repository,path,ref,
         readPinnedFile:params=>readGitHubPinnedFile({...params,token})});
     }
-    if(type==="mcp"){
-      const connectionId=await vscode.window.showInputBox({
-        prompt:"MCP discovery connection alias",value:"sample-mcp",
-        validateInput:value=>aliasPattern.test(value)?null:"Use lowercase kebab-case"});
-      if(!connectionId)return null;
-      const endpoint=await vscode.window.showInputBox({
-        prompt:"MCP HTTPS Streamable HTTP endpoint (not stored in Workspace Settings)"});
-      if(!endpoint)return null;
-      const token=await askSecret("skillStudio.mcp."+connectionId);
-      const tools=await discoverMcpHttpTools({endpoint,token});
-      const chosen=await vscode.window.showQuickPick(tools.map(tool=>({
-        label:tool.name,description:tool.description??"",value:tool.name
-      })),{canPickMany:true,placeHolder:"Select MCP tools (discovery only)"});
-      if(!chosen?.length)return null;
-      return acquireMcp({connectionId,selectedTools:chosen.map(x=>x.value),
-        toolsList:async()=>tools});
-    }
+    // MCP tools/list alone cannot produce an Owner-issued ToolCatalog or
+    // trusted CapabilityContracts. Discovery must remain separate.
     throw Error("Unsupported dependency acquisition source");
   }
   async function confirm(message,button){
@@ -265,17 +242,16 @@ export function registerDependencyIntegration(vscode,context,{onLockChanged=()=>
   command("skillStudio.addDependency",async()=>{
     const root=await ensureRoot();
     const type=await vscode.window.showQuickPick([
-      {label:"Upload YAML / JSON Tool Contract",value:"upload"},
-      {label:"MCP tools/list Discovery",value:"mcp"},
-      {label:"Git pinned contract",value:"git"},
-      {label:"Built-in example contract",value:"builtin"}
+      {label:"Upload current ToolCatalog YAML / JSON",value:"upload"},
+      {label:"Git pinned Owner ToolCatalog",value:"git"},
+      {label:"Built-in unqualified ToolCatalog example",value:"builtin"}
     ],{placeHolder:"Choose Dependency Contract source"});
     if(!type)return;
     const alias=await askAlias();if(!alias)return;
     const acquired=await acquireNew(type.value);if(!acquired)return;
     const result=await applyDependency(vscode,root,alias,acquired,{
       confirm:()=>confirm("Pin "+alias+" from "+acquired.source.type+
-        "? Effect remains UNKNOWN until Owner verification.","Add Dependency")});
+        "? Declaration effects come from source; Owner and Capability authorization remain NOT_CHECKED.","Add Dependency")});
     refresh();onLockChanged();return result;
   });
   const aliasOf=node=>typeof node==="string"?node:node?.dependency?.id;
