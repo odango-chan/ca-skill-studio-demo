@@ -26,11 +26,21 @@ import {createSemanticTokenDecorationRenderer}
   from "../../lsp-browser/client/src/semantic-token-decorations.mjs";
 import {createPackageLanguageLifecycle}
   from "./package-language-lifecycle.mjs";
+import {LanguageDiagnosticSession} from "../../../../language/lsp/session.ts";
 
 export function registerWorkbench(vscode,context,{prepareToolContract,compilerProblemsProvider}={}){
+  const isTheiaHost=(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
+    /theia/i.test(String(vscode.env?.appName??""));
+  const browserLanguageWorkerAvailable=typeof Worker==="function"&&
+    typeof globalThis.location!=="undefined";
+  const useInProcessLanguageService=isTheiaHost&&!browserLanguageWorkerAvailable;
   let document=null,selection={},snapshot=null,predicateSnapshot=null,
     predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,
     lastSelectionMessage=null;
+  const localDiagnosticCollection=useInProcessLanguageService&&
+    typeof vscode.languages?.createDiagnosticCollection==="function"
+      ?vscode.languages.createDiagnosticCollection("skillStudioLanguageService"):null;
+  if(localDiagnosticCollection)context.subscriptions.push(localDiagnosticCollection);
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
   const providers=new Map(),treeProviders=new Map(),sessions=new Map(),selections=new Map();
   const markdownPreviewAcceptanceOriginals=new Map();
@@ -88,9 +98,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     // Every Theia host uses the same source-local CA-SL classifier.
     // Semantic colors must not depend on an LSP Worker, Package diagnostics,
     // trust linking or Compiler. VS Code Web hosts retain LSP-provided tokens.
-    const browserWorkerHost=typeof Worker==="function"&&typeof globalThis.location!=="undefined";
-    const theiaBrowserHost=typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST;
-    if(browserWorkerHost&&!theiaBrowserHost)return;
+    if(browserLanguageWorkerAvailable&&!isTheiaHost)return;
     if(typeof vscode.languages?.registerDocumentSemanticTokensProvider!=="function"||
        typeof vscode.SemanticTokensLegend!=="function"||
        typeof vscode.SemanticTokens!=="function"){
@@ -102,9 +110,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
     );
     let renderer=null;
-    const isTheia=(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
-      /theia/i.test(String(vscode.env?.appName??""));
-    if(isTheia){
+    if(isTheiaHost){
       try{
         renderer=createSemanticTokenDecorationRenderer(
           vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
@@ -161,7 +167,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     // A terminal Worker failure must never be overwritten by stale READY or
     // another scheduled ANALYZING refresh. Native Source editing is separate.
     if(languageTransportFailure && state!=="UNAVAILABLE" && state!=="IDLE")return;
-    if(typeof Worker!=="function"||typeof globalThis.location==="undefined")return;
+    if(!browserLanguageWorkerAvailable&&!useInProcessLanguageService)return;
     if(!languageStatusItem){
       languageStatusItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left,20);
       languageStatusItem.name="SKILL Studio Language Service";
@@ -248,6 +254,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           editorMarkers
         };
       })(),
+      languageServiceMode:useInProcessLanguageService?"shared-session-in-process":
+        browserLanguageWorkerAvailable?"shared-session-browser-worker":"unavailable",
       languageClientStarted:Boolean(languageClient),
       languageClientPending:Boolean(languageClientPromise),
       languageTransportFailure,
@@ -434,11 +442,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         if(strict)throw Error("Package refresh was superseded during dependency resolution");
         return null;
       }
-      const client=await ensureLanguageClient();
-      if(!client||state.disposed||ticket!==state.ticket||languageTransportFailure){
-        if(strict)throw Error("Package refresh lost its active Language Worker");
-        return null;
-      }
       state.lastSentSnapshot={
         generation:snapshot.generation,
         completeness:snapshot.completeness,
@@ -450,6 +453,72 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       };
       updateLanguageStatus("ANALYZING","Analyzing "+snapshot.packageName+
         " · generation "+snapshot.generation);
+      if(useInProcessLanguageService){
+        if(!state.localSession){
+          state.localSession=new LanguageDiagnosticSession({
+            publish(result){
+              if(state.disposed||languagePackages.get(state.key)!==state)return;
+              const diagnostics=(result.diagnostics??[]).map(item=>{
+                const severity=item.severity===1?vscode.DiagnosticSeverity.Error:
+                  item.severity===2?vscode.DiagnosticSeverity.Warning:
+                  (vscode.DiagnosticSeverity.Information??vscode.DiagnosticSeverity.Warning);
+                const range=new vscode.Range(
+                  item.range.start.line,item.range.start.character,
+                  item.range.end.line,item.range.end.character);
+                const diagnostic=new vscode.Diagnostic(range,item.message,severity);
+                diagnostic.code=item.code;
+                diagnostic.source=item.source;
+                return diagnostic;
+              });
+              state.localPublishedCounts.set(result.uri,diagnostics.length);
+              localDiagnosticCollection?.set(vscode.Uri.parse(result.uri),diagnostics);
+            },
+            analysis(_acceptedSnapshot,analysis){
+              state.localAnalysis=analysis;
+            },
+            status(result){
+              if(state.disposed||languagePackages.get(state.key)!==state||
+                 result.generation!==state.generation)return;
+              const analysis=state.localAnalysis?.generation===result.generation
+                ?state.localAnalysis:null;
+              const status={
+                ...result,rootUri:state.key,
+                publishedDiagnosticCount:[...state.localPublishedCounts.values()]
+                  .reduce((total,count)=>total+count,0),
+                procedureState:analysis?.procedure.state??"UNAVAILABLE",
+                procedureDiagnosticCount:analysis?.procedure.diagnostics.length??0,
+                packageAuditState:analysis?.packageAudit.state??"UNAVAILABLE",
+                packageAuditReason:analysis?.packageAudit.reason??null,
+                packageAuditDiagnosticCount:analysis?.packageAudit.diagnostics.length??0,
+                analysisDiagnostics:analysis?.diagnostics??[]
+              };
+              languagePackageStatuses.set(state.key,status);
+              applyLanguageAnalysisStatus(status);
+              updateLanguageStatus(
+                status.state==="UNAVAILABLE"?"PARTIAL":status.state,
+                status.reason??("Package "+state.key+" · generation "+status.generation+
+                  " · "+status.publishedDiagnosticCount+" diagnostics"+
+                  " · Audit "+status.packageAuditState)
+              );
+            }
+          });
+        }
+        const submitted=await state.localSession.submit(snapshot);
+        if(!submitted.accepted&&submitted.reason!=="ANALYSIS_UNAVAILABLE"){
+          if(submitted.reason==="SUPERSEDED"||submitted.reason==="STALE_GENERATION"||
+             submitted.reason==="STALE_DOCUMENT")return null;
+          throw Error("Shared Language Service rejected Package snapshot: "+
+            String(submitted.reason??"unknown reason"));
+        }
+        languagePackageFailure=null;
+        if(snapshot.completeness==="complete")state.transientReadRetries=0;
+        return snapshot;
+      }
+      const client=await ensureLanguageClient();
+      if(!client||state.disposed||ticket!==state.ticket||languageTransportFailure){
+        if(strict)throw Error("Package refresh lost its active Language Worker");
+        return null;
+      }
       client.sendPackageSnapshot(snapshot);
       languagePackageFailure=null;
       // Workspace import can briefly enumerate a file before its content is
@@ -625,8 +694,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       semanticTokenDiagnostics.lastPackageAttachReason="document is not a supported assurance/procedure.yaml";
       return ()=>{};
     }
-    if(typeof Worker!=="function"||typeof globalThis.location==="undefined"){
-      semanticTokenDiagnostics.lastPackageAttachReason="browser Worker or location is unavailable";
+    if(!browserLanguageWorkerAvailable&&!useInProcessLanguageService){
+      semanticTokenDiagnostics.lastPackageAttachReason="no supported Language Service runtime is available";
       return ()=>{};
     }
     semanticTokenDiagnostics.lastPackageAttachReason=null;
@@ -644,7 +713,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         root,key,procedureDocument:doc,refs:1,
         generation:languagePackageGenerations.get(key)??0,ticket:0,
         timer:null,disposed:false,subscriptions:[],
-        lastSentSnapshot:null,transientReadRetries:0
+        lastSentSnapshot:null,transientReadRetries:0,
+        localSession:null,localAnalysis:null,localPublishedCounts:new Map()
       };
       languagePackageStatuses.delete(key);
       languagePackages.set(key,state);
@@ -699,6 +769,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       clearTimeout(state.timer);
       for(const subscription of state.subscriptions)subscription.dispose();
       state.subscriptions.length=0;
+      state.localSession?.dispose();
+      state.localSession=null;
       languagePackages.delete(key);
       languagePackageStatuses.delete(key);
       if(languagePackages.size===0)updateLanguageStatus("IDLE","No open Procedure Package");
