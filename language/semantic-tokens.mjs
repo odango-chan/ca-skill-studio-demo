@@ -191,6 +191,8 @@ function classifyLegacySkillSource(text, relativePath) {
           terminal.has(node.value)?[]:["reference"],path,"value");
       else if(last==="from"||path.includes("with"))
         push(node,"skillBinding",[],path,"value");
+      else if(terminal.has(node.value))
+        push(node,"skillOutcome",[],path,"value");
       return;
     }
     for(const pair of node.items){
