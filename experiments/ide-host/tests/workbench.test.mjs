@@ -271,8 +271,12 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
         if(v1alpha5Mode&&pattern?.pattern==='**/*')
           return v1SampleManifest.files.filter(path=>path.startsWith('establish-pdu-session/'))
             .map(path=>uri('/workspace/establish-pdu-session/'+path.slice('establish-pdu-session/'.length)));
-        return ['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md']
-          .map(p=>uri('/workspace/establish-pdu-session/'+p));
+        return [
+          'assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml',
+          'SKILL.md','schemas/establishment-request.schema.yaml',
+          'scripts/select_establishment_configuration.py','scripts/evaluate_udm_read.py',
+          'scripts/evaluate_transfer_start.py'
+        ].map(p=>uri('/workspace/establish-pdu-session/'+p));
       },
       getConfiguration:(section)=>({get:(key,fallback)=>section==='connectionAgent.skillStudio'
         ?({skillsRoot:'skills',dependencies:[],
@@ -709,7 +713,13 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   assert.equal(providers.get('skillStudio.inspection').getTreeItem(protectedNode).contextValue,
     'skillStudio.node','Phase-bearing Node does not expose deletion');
   await commands.get('skillStudio.auditPackage')();
-  assert.match(providers.get('skillStudio.problems').getChildren()[0].label,/0 errors \/ 2 warnings/);
+  const legacyAuditLabel=providers.get('skillStudio.problems').getChildren()[0].label;
+  assert.match(legacyAuditLabel,/0 errors/,
+    JSON.stringify(diagnosticSets.map(([target,items])=>({
+      uri:target.path,items:items.map(item=>({code:item.code,message:item.message}))
+    }))));
+  assert.match(legacyAuditLabel,/NOT_CHECKED/,
+    'legacy audit must disclose checks that require CEL, Runtime or Owner evidence');
   assert.ok(providers.get('skillStudio.problems').getChildren()
     .flatMap(item=>item.children??[]).every(x=>!x.label.includes('Audit unavailable')));
   assert.ok(commands.has('skillStudio.exportPackageZip'));
@@ -722,7 +732,7 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
   const zipMessage=posted.slice(beforeZipMessages).find(x=>x.type==='packageZipReady');
   assert.ok(zipMessage,'Package ZIP is delivered to the active Procedure Webview');
   assert.equal(zipMessage.filename,'establish-pdu-session.zip');
-  assert.equal(zipMessage.fileCount,4);
+  assert.equal(zipMessage.fileCount,8);
   assert.equal(zipMessage.opaqueCount,0);
   const zipBytes=Buffer.from(zipMessage.base64,'base64');
   assert.equal(zipBytes.readUInt32LE(0),0x04034b50,'export is a real ZIP archive');

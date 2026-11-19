@@ -23,7 +23,7 @@ function get(node,...path){
     if(!isMap(n))return null;
     n=n.get(part,true);
   }
-  return n;
+  return n??null;
 }
 function normalized(s){return String(s).replace(/[^a-zA-Z0-9]/g,"").toLowerCase();}
 function collectActions(node,fn){
@@ -31,7 +31,7 @@ function collectActions(node,fn){
     for(const pair of node.items){
       const field=v(pair.key),value=pair.value;
       if(field==="from"||field==="call"||field==="tool"||
-         field==="verify"||field==="predicate"||field==="script"){
+         field==="verify"||field==="predicate"||field==="script"||field==="procedure"){
         if(isScalar(value)&&typeof value.value==="string")
           fn(field,value,node);
       }
@@ -43,130 +43,537 @@ function collectActions(node,fn){
 }
 export function auditPackageWorkspace(workspace,procedureOverride=null){
   const fileMap=workspace?.files;
-  if(!(fileMap instanceof Map)||
-     ![FILES.procedure,FILES.contract,FILES.predicates]
-       .every(path=>typeof fileMap.get(path)?.text==="string"))return [];
-  const sources=new Map([...fileMap].map(([path,file])=>[
-    path,path===FILES.procedure&&typeof procedureOverride==="string"?
-      procedureOverride:file.text
-  ]));
-  const diagnostics=[],parsed=new Map(),counters=new Map();
-  const warn=(code,path,node,message)=>{
-    if(diagnostics.length>=80)return;
+  const diagnostics=[],parsed=new Map(),counters=new Map(),sources=new Map();
+  const completeness=workspace?.completeness??"complete";
+  const add=(code,path,node,message,{severity="warning",status="confirmed",
+    domain="source",category="structure"}={})=>{
+    if(diagnostics.length>=300)return;
     const counter=counters.get(path);
-    const line=counter&&node?.range?counter.linePos(node.range[0]).line||1:1;
-    diagnostics.push(Object.freeze({
-      severity:"warning",code,path,line,message
-    }));
+    const position=counter&&node?.range?counter.linePos(node.range[0]):null;
+    const diagnostic={
+      kind:"package-diagnostic",severity,status,code,path,relativePath:path,
+      message,domain,category,source:"Skill Studio · Package Audit"
+    };
+    // Do not invent line 1 for Package-level or NOT_CHECKED results. They stay
+    // visible in Problems but receive no misleading editor marker.
+    if(position?.line>0&&position?.col>0){
+      diagnostic.line=position.line;
+      diagnostic.column=position.col;
+    }
+    diagnostics.push(Object.freeze(diagnostic));
   };
-  for(const path of [FILES.contract,FILES.predicates,FILES.procedure]){
+  const warn=(code,path,node,message)=>add(code,path,node,message);
+  const notChecked=(code,path,message,domain="package")=>add(code,path,null,message,{
+    severity:"warning",status:"not_checked",domain,category:"analysis"
+  });
+  if(completeness!=="complete")
+    notChecked("PACKAGE_SNAPSHOT_INCOMPLETE",FILES.procedure,
+      "Package inventory is "+completeness+"; only the captured files can be checked"+
+      (workspace?.snapshotReason?": "+workspace.snapshotReason:""));
+  if(!(fileMap instanceof Map)){
+    notChecked("PACKAGE_INVENTORY_UNAVAILABLE",FILES.procedure,
+      "Package file inventory is unavailable; no source or cross-file checks were run");
+    return Object.freeze(diagnostics);
+  }
+  for(const [path,file] of fileMap){
+    if(typeof path!=="string"||typeof file?.text!=="string"){
+      notChecked("PACKAGE_FILE_UNREADABLE",FILES.procedure,
+        "At least one Package entry has no readable text; affected checks were not run");
+      continue;
+    }
+    sources.set(path,path===FILES.procedure&&typeof procedureOverride==="string"?
+      procedureOverride:file.text);
+  }
+  const required=[FILES.procedure,FILES.contract,FILES.predicates];
+  for(const path of required){
+    if(sources.has(path))continue;
+    const observedMissing=completeness==="complete";
+    add(observedMissing?"CORE_FILE_MISSING":"CORE_FILE_NOT_OBSERVED",
+      path,null,observedMissing
+        ?"Required Package source file is missing: "+path
+        :"Cannot confirm whether required Package source file exists because the Package inventory is "+completeness,
+      {severity:observedMissing?"error":"warning",
+       status:observedMissing?"confirmed":"not_checked",
+       domain:"package",category:"inventory"});
+  }
+  // Parse every available YAML file independently. One malformed file must
+  // not prevent syntax checks or source-local checks in its siblings.
+  for(const [path,text] of sources){
+    if(!/\.ya?ml$/i.test(path))continue;
     const counter=new LineCounter();
     counters.set(path,counter);
-    const doc=parseDocument(sources.get(path),{
+    const doc=parseDocument(text,{
       version:"1.2",schema:"core",strict:true,uniqueKeys:true,
       stringKeys:true,lineCounter:counter,logLevel:"silent"
     });
     if(doc.errors.length){
-      const err=doc.errors[0];
-      warn("YAML_PARSE",path,err.pos?
-        {range:[err.pos[0],err.pos[1]]}:null,"YAML 无法解析："+err.message);
-      return Object.freeze(diagnostics);
+      for(const err of doc.errors){
+        add("YAML_PARSE",path,err.pos?
+          {range:[err.pos[0],err.pos[1]]}:null,"YAML 无法解析："+err.message,
+          {severity:"error",domain:"syntax",category:"yaml"});
+      }
+      continue;
     }
     parsed.set(path,doc.contents);
+  }
+  // JSON source is independent of YAML/Procedure analysis too.
+  for(const [path,text] of sources){
+    if(!/\.json$/i.test(path))continue;
+    try{JSON.parse(text);}
+    catch(error){
+      const match=String(error?.message??"").match(/position\s+(\d+)/i);
+      const offset=match?Number(match[1]):0;
+      const prefix=text.slice(0,offset),line=prefix.split(/\r\n|\r|\n/).length;
+      const column=offset-(Math.max(prefix.lastIndexOf("\n"),prefix.lastIndexOf("\r"))+1)+1;
+      diagnostics.push(Object.freeze({
+        kind:"package-diagnostic",severity:"error",status:"confirmed",
+        code:"JSON_PARSE",path,relativePath:path,line,column,
+        message:"JSON 无法解析："+String(error?.message??error),
+        domain:"syntax",category:"json",source:"Skill Studio · Legacy Package Audit"
+      }));
+    }
   }
   const contract=parsed.get(FILES.contract);
   const predicates=parsed.get(FILES.predicates);
   const procedureAst=parsed.get(FILES.procedure);
+  if(!contract)notChecked("CONTRACT_CHECKS_NOT_CHECKED",FILES.contract,
+    "Contract checks were not run because the file is missing or its YAML could not be parsed");
+  if(!predicates)notChecked("PREDICATE_CHECKS_NOT_CHECKED",FILES.predicates,
+    "PredicateSet checks were not run because the file is missing or its YAML could not be parsed","predicates");
+  if(!procedureAst)notChecked("PROCEDURE_CHECKS_NOT_CHECKED",FILES.procedure,
+    "Procedure structure and reference checks were not run because the file is missing or its YAML could not be parsed","procedure");
   const predIds=new Set(entries(get(predicates,"predicates")).map(pair=>v(pair.key)));
-  const procedureModel=projectWorkspace(sources.get(FILES.procedure));
-  // Procedure projection itself reports the authoritative source errors.
-  if(procedureModel.state!=="READY")return Object.freeze(diagnostics);
-  const ids=new Set(procedureModel.procedures.keys());
-  const contractName=v(get(contract,"metadata","name"));
-  const predName=v(get(predicates,"metadata","skill"));
-  if(contractName!==workspace.name)
-    warn("CONTRACT_NAME",FILES.contract,get(contract,"metadata","name"),
-      "Contract 名称与当前 Package 不一致");
-  if(predName!==workspace.name)
-    warn("PREDICATE_SKILL",FILES.predicates,get(predicates,"metadata","skill"),
-      "PredicateSet 的 Skill 名称与 Package 不一致");
-  const entry=v(get(contract,"spec","entryProcedure"));
-  if(!ids.has(entry))
-    warn("ENTRY_PROCEDURE",FILES.contract,
-      get(contract,"spec","entryProcedure"),"Contract entryProcedure 不存在："+entry);
-  const schema=v(get(contract,"spec","inputs","requestSchema"));
+  const contractVersion=contract?v(get(contract,"apiVersion")):null;
+  if(contractVersion==="connectionagent.io/v1alpha1"||
+     isMap(get(procedureAst,"procedures")))
+    notChecked("V1ALPHA5_LSP_NOT_APPLICABLE",FILES.procedure,
+      "当前源码属于 CA-SL v1alpha1 / legacy procedures Profile；v1alpha5 专用 Language Service 不会解析该语法。Legacy Package Audit 仍继续执行可识别的静态检查","language");
+  const procedureModel=procedureAst
+    ?projectWorkspace(sources.get(FILES.procedure))
+    :{state:"UNAVAILABLE",diagnostics:[]};
+  if(procedureAst&&procedureModel.state!=="READY"){
+    const detail=procedureModel.diagnostics?.[0]?.message??"legacy graph projection unavailable";
+    notChecked("PROCEDURE_GRAPH_PROJECTION_NOT_CHECKED",FILES.procedure,
+      "The visual graph projection could not be built: "+detail+
+      ". Independent YAML, metadata and reference checks continue.","procedure");
+  }
+  const procedureRoot=get(procedureAst,"procedures");
+  const procedureEntries=entries(procedureRoot);
+  const ids=new Set(procedureEntries.map(pair=>v(pair.key)));
+  const contractName=contract?v(get(contract,"metadata","name")):null;
+  const predName=predicates?v(get(predicates,"metadata","skill")):null;
+  if(contract){
+    if(contractName!==workspace?.name)
+      warn("CONTRACT_NAME",FILES.contract,get(contract,"metadata","name"),
+        "Contract metadata.name 与当前 Package 不一致");
+    if(v(get(contract,"kind"))&&v(get(contract,"kind"))!=="SkillContract")
+      add("CONTRACT_KIND_INVALID",FILES.contract,get(contract,"kind"),
+        "Contract kind 必须为 SkillContract",{severity:"error",domain:"contract"});
+    const apiVersion=v(get(contract,"apiVersion"));
+    if(apiVersion&&apiVersion!=="connectionagent.io/v1alpha1")
+      warn("CONTRACT_API_VERSION_UNRECOGNIZED",FILES.contract,get(contract,"apiVersion"),
+        "Legacy analyzer detected an unexpected Contract apiVersion: "+apiVersion);
+  }
+  if(predicates){
+    if(predName&&predName!==workspace?.name)
+      warn("PREDICATE_SKILL",FILES.predicates,get(predicates,"metadata","skill"),
+        "PredicateSet 的 Skill 名称与当前 Package 不一致");
+    if(predName&&contractName&&predName!==contractName)
+      warn("PREDICATE_CONTRACT_NAME_MISMATCH",FILES.predicates,get(predicates,"metadata","skill"),
+        "PredicateSet 的 Skill 名称与 Contract metadata.name 不一致");
+    if(v(get(predicates,"kind"))&&v(get(predicates,"kind"))!=="PredicateSet")
+      add("PREDICATE_KIND_INVALID",FILES.predicates,get(predicates,"kind"),
+        "PredicateSet kind 必须为 PredicateSet",{severity:"error",domain:"predicates"});
+    const apiVersion=v(get(predicates,"apiVersion"));
+    const contractVersion=v(get(contract,"apiVersion"));
+    if(apiVersion&&contractVersion&&apiVersion!==contractVersion)
+      add("API_VERSION_MISMATCH",FILES.predicates,get(predicates,"apiVersion"),
+        "Contract 与 PredicateSet apiVersion 不一致",{severity:"error",domain:"language"});
+  }
+  const entry=contract?v(get(contract,"spec","entryProcedure")):null;
+  if(contract&&typeof entry==="string"&&!ids.has(entry))
+    add("ENTRY_PROCEDURE",FILES.contract,get(contract,"spec","entryProcedure"),
+      "Contract entryProcedure 不存在："+entry,{severity:"error",domain:"contract"});
+  if(contract&&!entry)
+    add("ENTRY_PROCEDURE_MISSING",FILES.contract,get(contract,"spec"),
+      "Contract 缺少 spec.entryProcedure",{severity:"error",domain:"contract"});
+  const schema=contract?v(get(contract,"spec","inputs","requestSchema")):null;
   if(typeof schema==="string"&&!sources.has(schema))
-    warn("REQUEST_SCHEMA",FILES.contract,
-      get(contract,"spec","inputs","requestSchema"),"Contract Schema 文件未包含在 Package："+schema);
+    add("REQUEST_SCHEMA",FILES.contract,get(contract,"spec","inputs","requestSchema"),
+      "Contract Schema 文件未包含在 Package："+schema,
+      {severity:"error",domain:"schemas"});
+  else if(typeof schema==="string"){
+    const schemaNode=parsed.get(schema);
+    if(!schemaNode){
+      notChecked("REQUEST_SCHEMA_CHECKS_NOT_CHECKED",schema,
+        "Request Schema 文件存在于快照中，但其 YAML/JSON 无法解析或未被当前解析器识别","schemas");
+    }else{
+      if(!isMap(schemaNode)||v(get(schemaNode,"type"))!=="object"||
+         !isMap(get(schemaNode,"properties")))
+        add("REQUEST_SCHEMA_SHAPE_INVALID",schema,schemaNode,
+          "Request Schema 必须是声明 type: object 与 properties mapping 的 JSON Schema",
+          {severity:"error",domain:"schemas"});
+      const properties=get(schemaNode,"properties"),requiredFields=values(get(schemaNode,"required"));
+      for(const field of requiredFields){
+        if(!get(properties,field))
+          add("REQUEST_SCHEMA_REQUIRED_UNDECLARED",schema,get(schemaNode,"required"),
+            "Request Schema required 引用了未声明的 property："+field,
+            {severity:"error",domain:"schemas"});
+      }
+      if(isMap(properties))for(const property of properties.items){
+        if(!isMap(property.value)||typeof v(get(property.value,"type"))!=="string")
+          add("REQUEST_SCHEMA_PROPERTY_INVALID",schema,property.value,
+            "Request Schema property "+v(property.key)+" 缺少有效的 type",
+            {severity:"error",domain:"schemas"});
+      }
+    }
+  }else if(contract){
+    notChecked("REQUEST_SCHEMA_NOT_DECLARED",FILES.contract,
+      "Contract 未声明 spec.inputs.requestSchema；Schema 约束未检查","schemas");
+  }
   const allowed=new Set([
     ...values(get(contract,"spec","allowedResources","capabilities")),
     ...values(get(contract,"spec","allowedResources","localTools"))
   ]);
-  // Contract's explicit predicate references.
-  for(const section of ["preconditions","postconditions"]){
-    for(const record of (isSeq(get(contract,"spec",section))?
-      get(contract,"spec",section).items:[])){
-      const ref=get(record,"predicate");
-      if(typeof v(ref)==="string"&&!predIds.has(v(ref)))
-        warn("CONTRACT_PREDICATE",FILES.contract,ref,
-          "Contract 引用了未定义 Predicate："+v(ref));
+  if(contract){
+    const spec=get(contract,"spec");
+    if(!isMap(spec))
+      add("CONTRACT_SPEC_INVALID",FILES.contract,spec??contract,
+        "SkillContract 缺少 spec mapping",{severity:"error",domain:"contract"});
+    else{
+      if(typeof v(get(spec,"goal"))!=="string"||!v(get(spec,"goal")))
+        add("CONTRACT_GOAL_MISSING",FILES.contract,spec,
+          "SkillContract spec.goal 缺失",{severity:"error",domain:"contract"});
+      if(typeof v(get(spec,"skillType"))!=="string"||!v(get(spec,"skillType")))
+        add("CONTRACT_SKILL_TYPE_MISSING",FILES.contract,spec,
+          "SkillContract spec.skillType 缺失",{severity:"error",domain:"contract"});
+      const resources=get(spec,"allowedResources");
+      if(resources!==null&&!isMap(resources))
+        add("ALLOWED_RESOURCES_INVALID",FILES.contract,resources,
+          "Contract spec.allowedResources 必须是 mapping",{severity:"error",domain:"capabilities"});
     }
   }
-  for(const pair of entries(get(procedureAst,"procedures"))){
-    const procId=v(pair.key);
-    const proc=procedureModel.procedures.get(procId);
-    if(!proc)continue;
-    const nodes=get(pair.value,"nodes");
-    const inputs=get(pair.value,"inputs");
-    const inputKeys=new Set(entries(inputs).map(x=>v(x.key)));
-    const inputByNormalized=new Map([...inputKeys].map(k=>[normalized(k),k]));
-    const nodeIds=new Set(proc.nodes.map(n=>n.id));
-    for(const nodePair of entries(nodes)){
-      const nodeId=v(nodePair.key);
-      const node=nodePair.value;
-      // Existing output source references may be qualified syntactically but
-      // still unresolved. We check only identities, not output-field schema.
-      collectActions(node,(field,scalar)=>{
-        const val=v(scalar);
-        if((field==="verify"||field==="predicate")&&!predIds.has(val)){
-          warn("NODE_PREDICATE",FILES.procedure,scalar,
-            procId+"/"+nodeId+" 使用未定义 Predicate："+val);
-        }else if((field==="call"||field==="tool")&&
-                 !allowed.has(val)){
-          warn("CAPABILITY_UNDECLARED",FILES.procedure,scalar,
-            procId+"/"+nodeId+" 的 "+field+" 未列入 Contract capabilities/localTools："+val);
-        }else if(field==="script"&&val.startsWith("scripts/")&&!sources.has(val)){
-          warn("SCRIPT_MISSING",FILES.procedure,scalar,
-            procId+"/"+nodeId+" 的脚本不在当前 Package："+val);
-        }else if(field==="from"){
-          if(val.startsWith("input.")){
-            const key=val.slice(6);
-            if(!inputKeys.has(key))
-              warn("INPUT_MISSING",FILES.procedure,scalar,
-                procId+"/"+nodeId+" 引用了未声明 Procedure input："+key);
-          }else{
-            const match=val.match(/^([A-Za-z_][A-Za-z0-9_-]*)\.(?:output(?:\.|$)|preconditions\.|postconditions\.)/);
-            if(match&&!nodeIds.has(match[1])&&!["preconditions","postconditions"].includes(match[1]))
-              warn("PRODUCER_MISSING",FILES.procedure,scalar,
-                procId+"/"+nodeId+" 引用了不存在的 Node："+match[1]);
-          }
+  // Contract's explicit predicate references.
+  if(contract&&predicates){
+    for(const section of ["preconditions","postconditions"]){
+      const records=get(contract,"spec",section);
+      if(records!==null&&!isSeq(records)){
+        add("CONTRACT_PREDICATE_SECTION_INVALID",FILES.contract,records,
+          "Contract spec."+section+" 必须是列表",{severity:"error",domain:"contract"});
+        continue;
+      }
+      for(const record of (isSeq(records)?records.items:[])){
+        const ref=get(record,"predicate");
+        if(typeof v(ref)==="string"&&!predIds.has(v(ref)))
+          add("CONTRACT_PREDICATE",FILES.contract,ref,
+            "Contract 引用了未定义 Predicate："+v(ref),
+            {severity:"error",domain:"predicates"});
+      }
+    }
+  }else if(contract&&!predicates){
+    notChecked("CONTRACT_PREDICATE_LINKS_NOT_CHECKED",FILES.contract,
+      "Contract Predicate 引用无法核对：PredicateSet 缺失或 YAML 解析失败","predicates");
+  }
+
+  // Validate PredicateSet structure independently of Procedure graph projection.
+  let celPredicateCount=0;
+  if(predicates){
+    const definitions=get(predicates,"predicates");
+    if(!isMap(definitions)){
+      add("PREDICATE_SET_INVALID",FILES.predicates,definitions,
+        "PredicateSet 必须包含 predicates mapping",{severity:"error",domain:"predicates"});
+    }else for(const pair of definitions.items){
+      const id=v(pair.key),body=pair.value;
+      if(!isMap(body)){
+        add("PREDICATE_DEFINITION_INVALID",FILES.predicates,body,
+          "Predicate "+id+" 必须是 mapping",{severity:"error",domain:"predicates"});
+        continue;
+      }
+      const observations=get(body,"observations"),evaluator=get(body,"evaluator");
+      if(!isMap(observations)||observations.items.length===0)
+        add("PREDICATE_OBSERVATIONS_INVALID",FILES.predicates,observations??body,
+          "Predicate "+id+" 必须声明非空 observations mapping",
+          {severity:"error",domain:"predicates"});
+      else for(const observation of observations.items){
+        if(!isMap(observation.value)){
+          add("OBSERVATION_INVALID",FILES.predicates,observation.value,
+            "Predicate "+id+" 的 Observation "+v(observation.key)+" 必须是 mapping",
+            {severity:"error",domain:"observations"});
+          continue;
         }
-      });
-      // Heuristic only: a with key whose canonical name equals one declared
-      // input is probably bound incorrectly if it points to another input.
-      const withMap=get(node,"with");
-      for(const bind of entries(withMap)){
-        const key=v(bind.key),ref=get(bind.value,"from");
-        const target=v(ref);
-        const matching=inputByNormalized.get(normalized(key));
-        if(matching&&typeof target==="string"&&target.startsWith("input.")&&
-           target!=="input."+matching)
-          warn("INPUT_BINDING_SUSPECT",FILES.procedure,ref,
-            procId+"/"+nodeId+" 的 with."+key+
-            " 通常对应 input."+matching+"，当前却绑定 "+target+
-            "；请人工确认类型与语义");
+        for(const field of ["ref","scope","freshness"]){
+          if(typeof v(get(observation.value,field))!=="string")
+            add("OBSERVATION_FIELD_MISSING",FILES.predicates,observation.value,
+              "Predicate "+id+" 的 Observation "+v(observation.key)+" 缺少字符串字段 "+field,
+              {severity:"error",domain:"observations"});
+        }
+      }
+      if(!isMap(evaluator))
+        add("PREDICATE_EVALUATOR_INVALID",FILES.predicates,evaluator??body,
+          "Predicate "+id+" 缺少 evaluator mapping",
+          {severity:"error",domain:"predicates"});
+      else{
+        const type=v(get(evaluator,"type")),expression=v(get(evaluator,"expression"));
+        if(typeof type!=="string"||!type)
+          add("PREDICATE_EVALUATOR_TYPE_MISSING",FILES.predicates,evaluator,
+            "Predicate "+id+" 的 evaluator 缺少 type",{severity:"error",domain:"predicates"});
+        else if(type==="cel"){
+          celPredicateCount++;
+          if(typeof expression!=="string"||!expression.trim())
+            add("PREDICATE_EXPRESSION_MISSING",FILES.predicates,evaluator,
+              "CEL Predicate "+id+" 的 evaluator 缺少非空 expression",
+              {severity:"error",domain:"predicates"});
+        }else if(type==="script"){
+          const reference=v(get(evaluator,"ref"));
+          if(typeof reference!=="string"||!reference.trim())
+            add("PREDICATE_SCRIPT_REF_MISSING",FILES.predicates,evaluator,
+              "Script Predicate "+id+" 的 evaluator 缺少 ref",
+              {severity:"error",domain:"predicates"});
+          else if(contract&&!values(get(contract,"spec","allowedResources","localTools")).includes(reference))
+            add("PREDICATE_SCRIPT_REF_UNDECLARED",FILES.predicates,get(evaluator,"ref"),
+              "Predicate "+id+" 引用了未在 Contract localTools 声明的 Script："+reference,
+              {severity:"error",domain:"scripts"});
+        }else{
+          add("PREDICATE_EVALUATOR_TYPE_UNSUPPORTED",FILES.predicates,get(evaluator,"type"),
+            "Predicate "+id+" 使用无法由当前 Legacy Audit 检查的 evaluator.type："+type,
+            {severity:"warning",status:"not_checked",domain:"predicates",category:"analysis"});
+        }
       }
     }
   }
+
+  const operators=new Set(["call","verify","terminal","procedure","reconcile","tool","script","predicate"]);
+  const referencedScripts=new Set();
+  if(procedureAst){
+    if(!isMap(procedureRoot)||procedureEntries.length===0){
+      add("PROCEDURES_ROOT_INVALID",FILES.procedure,procedureRoot,
+        "Legacy Procedure 必须包含非空 procedures mapping",
+        {severity:"error",domain:"procedure"});
+    }
+    for(const pair of procedureEntries){
+      const procId=v(pair.key),procNode=pair.value;
+      if(!isMap(procNode)){
+        add("PROCEDURE_INVALID",FILES.procedure,procNode,
+          "Procedure "+procId+" 必须是 mapping",{severity:"error",domain:"procedure"});
+        continue;
+      }
+      const nodes=get(procNode,"nodes"),inputs=get(procNode,"inputs");
+      if(!isMap(nodes)){
+        add("PROCEDURE_NODES_INVALID",FILES.procedure,nodes??procNode,
+          "Procedure "+procId+" 缺少 nodes mapping",{severity:"error",domain:"procedure"});
+        continue;
+      }
+      const nodeEntries=nodes.items,nodeIds=new Set(nodeEntries.map(item=>v(item.key)));
+      if(inputs!==null&&!isMap(inputs))
+        add("PROCEDURE_INPUTS_INVALID",FILES.procedure,inputs,
+          "Procedure "+procId+" 的 inputs 必须是 mapping",{severity:"error",domain:"procedure"});
+      if(isMap(inputs))for(const input of inputs.items){
+        if(!isMap(input.value))
+          add("PROCEDURE_INPUT_INVALID",FILES.procedure,input.value,
+            "Procedure "+procId+" 的 input "+v(input.key)+" 必须是 mapping",
+            {severity:"error",domain:"procedure"});
+        else{
+          if(typeof v(get(input.value,"type"))!=="string")
+            add("PROCEDURE_INPUT_TYPE_MISSING",FILES.procedure,input.value,
+              "Procedure "+procId+" 的 input "+v(input.key)+" 缺少 type",
+              {severity:"error",domain:"procedure"});
+          if(typeof v(get(input.value,"from"))!=="string")
+            add("PROCEDURE_INPUT_SOURCE_MISSING",FILES.procedure,input.value,
+              "Procedure "+procId+" 的 input "+v(input.key)+" 缺少 from",
+              {severity:"error",domain:"procedure"});
+        }
+      }
+      const applicability=get(procNode,"applicability");
+      const applicabilityPredicates=get(applicability,"predicates");
+      if(applicability!==null&&!isMap(applicability))
+        add("PROCEDURE_APPLICABILITY_INVALID",FILES.procedure,applicability,
+          "Procedure "+procId+" 的 applicability 必须是 mapping",
+          {severity:"error",domain:"procedure"});
+      if(applicabilityPredicates!==null&&!isMap(applicabilityPredicates))
+        add("PROCEDURE_APPLICABILITY_PREDICATES_INVALID",FILES.procedure,applicabilityPredicates,
+          "Procedure "+procId+" 的 applicability.predicates 必须是 mapping",
+          {severity:"error",domain:"predicates"});
+      if(isMap(applicabilityPredicates))for(const predicate of applicabilityPredicates.items){
+        const id=v(predicate.key);
+        if(predicates&&!predIds.has(id))
+          add("APPLICABILITY_PREDICATE_NOT_FOUND",FILES.procedure,predicate.key,
+            "Procedure "+procId+" applicability 引用了未定义 Predicate："+id,
+            {severity:"error",domain:"predicates"});
+        else if(!predicates)
+          notChecked("APPLICABILITY_PREDICATE_NOT_CHECKED",FILES.procedure,
+            "Cannot resolve applicability Predicate "+id+" because PredicateSet is unavailable","predicates");
+      }
+      const inputKeys=new Set(entries(inputs).map(item=>v(item.key)));
+      const inputByNormalized=new Map([...inputKeys].map(key=>[normalized(key),key]));
+      const startNode=v(get(procNode,"start"));
+      if(!startNode)
+        add("PROCEDURE_START_MISSING",FILES.procedure,procNode,
+          "Procedure "+procId+" 缺少 start",{severity:"error",domain:"procedure"});
+      else if(!nodeIds.has(startNode))
+        add("PROCEDURE_START_NOT_FOUND",FILES.procedure,get(procNode,"start"),
+          "Procedure "+procId+" 的 start 指向不存在的 Node："+startNode,
+          {severity:"error",domain:"procedure"});
+      const adjacency=new Map(nodeEntries.map(item=>[v(item.key),[]]));
+      for(const nodePair of nodeEntries){
+        const nodeId=v(nodePair.key),node=nodePair.value;
+        if(!isMap(node)){
+          add("NODE_INVALID",FILES.procedure,node,
+            "Node "+procId+"/"+nodeId+" 必须是 mapping",
+            {severity:"error",domain:"procedure"});
+          continue;
+        }
+        const nodeOperators=node.items.filter(item=>operators.has(v(item.key)));
+        if(nodeOperators.length!==1)
+          add("NODE_OPERATOR_COUNT",FILES.procedure,node,
+            "Node "+procId+"/"+nodeId+" 必须且只能声明一个 Operator；当前为 "+nodeOperators.length,
+            {severity:"error",domain:"procedure"});
+        const validateRoutes=(routeNode,routeLabel)=>{
+          if(routeNode===null)return;
+          if(!isMap(routeNode)){
+            add("ROUTES_INVALID",FILES.procedure,routeNode,
+              procId+"/"+nodeId+" 的 "+routeLabel+" 必须是 mapping",
+              {severity:"error",domain:"procedure"});
+            return;
+          }
+          for(const route of routeNode.items){
+            const target=v(route.value);
+            if(typeof target!=="string"||!target){
+              add("ROUTE_TARGET_INVALID",FILES.procedure,route.value,
+                procId+"/"+nodeId+" 的 "+routeLabel+"."+v(route.key)+" 必须指向 Node ID",
+                {severity:"error",domain:"procedure"});
+            }else if(!nodeIds.has(target)){
+              add("ROUTE_TARGET_MISSING",FILES.procedure,route.value,
+                procId+"/"+nodeId+" 的 "+routeLabel+" 指向不存在的 Node："+target,
+                {severity:"error",domain:"procedure"});
+            }else adjacency.get(nodeId)?.push(target);
+          }
+        };
+        validateRoutes(get(node,"on"),"on");
+        for(const phaseName of ["preconditions","postconditions"]){
+          const phase=get(node,phaseName);
+          if(phase===null)continue;
+          if(!isMap(phase)){
+            add("PHASE_INVALID",FILES.procedure,phase,
+              procId+"/"+nodeId+" 的 "+phaseName+" 必须是 mapping",
+              {severity:"error",domain:"procedure"});
+            continue;
+          }
+          const steps=get(phase,"steps");
+          if(steps!==null&&!isSeq(steps))
+            add("PHASE_STEPS_INVALID",FILES.procedure,steps,
+              procId+"/"+nodeId+" 的 "+phaseName+".steps 必须是有序列表",
+              {severity:"error",domain:"procedure"});
+          for(const step of (isSeq(steps)?steps.items:[])){
+            if(!isMap(step)){
+              add("PHASE_STEP_INVALID",FILES.procedure,step,
+                procId+"/"+nodeId+" 的 "+phaseName+" Step 必须是 mapping",
+                {severity:"error",domain:"procedure"});
+              continue;
+            }
+            const stepOperators=step.items.filter(item=>operators.has(v(item.key)));
+            if(stepOperators.length!==1)
+              add("PHASE_STEP_OPERATOR_COUNT",FILES.procedure,step,
+                procId+"/"+nodeId+" 的 "+phaseName+" Step 必须且只能包含一个 Operator",
+                {severity:"error",domain:"procedure"});
+          }
+          validateRoutes(get(phase,"on"),phaseName+".on");
+        }
+        collectActions(node,(field,scalar)=>{
+          const value=v(scalar);
+          if(field==="verify"||field==="predicate"){
+            if(predicates&&!predIds.has(value))
+              add("NODE_PREDICATE",FILES.procedure,scalar,
+                procId+"/"+nodeId+" 使用未定义 Predicate："+value,
+                {severity:"error",domain:"predicates"});
+            else if(!predicates)
+              notChecked("NODE_PREDICATE_NOT_CHECKED",FILES.procedure,
+                "Cannot resolve Predicate "+value+" because PredicateSet is unavailable","predicates");
+          }else if(field==="call"||field==="tool"){
+            if(contract&&!allowed.has(value))
+              add("CAPABILITY_UNDECLARED",FILES.procedure,scalar,
+                procId+"/"+nodeId+" 的 "+field+" 未列入 Contract capabilities/localTools："+value,
+                {severity:"error",domain:"capabilities"});
+            else if(!contract)
+              notChecked("CAPABILITY_DECLARATION_NOT_CHECKED",FILES.procedure,
+                "Cannot resolve "+field+" "+value+" because Contract is unavailable","capabilities");
+          }else if(field==="procedure"){
+            if(!ids.has(value))
+              add("CHILD_PROCEDURE_NOT_FOUND",FILES.procedure,scalar,
+                procId+"/"+nodeId+" 引用了不存在的 Child Procedure："+value,
+                {severity:"error",domain:"procedure"});
+          }else if(field==="script"){
+            if(/\.py$/i.test(value))referencedScripts.add(value);
+            if(!sources.has(value))
+              add("SCRIPT_MISSING",FILES.procedure,scalar,
+                procId+"/"+nodeId+" 的脚本不在当前 Package："+value,
+                {severity:"error",domain:"scripts"});
+          }else if(field==="from"){
+            if(value.startsWith("input.")){
+              const key=value.slice(6);
+              if(!inputKeys.has(key))
+                add("INPUT_MISSING",FILES.procedure,scalar,
+                  procId+"/"+nodeId+" 引用了未声明 Procedure input："+key,
+                  {severity:"error",domain:"procedure"});
+            }else{
+              const match=value.match(/^([A-Za-z_][A-Za-z0-9_-]*)\.(?:output(?:\.|$)|preconditions\.|postconditions\.)/);
+              if(match&&!nodeIds.has(match[1])&&!["preconditions","postconditions"].includes(match[1]))
+                add("PRODUCER_MISSING",FILES.procedure,scalar,
+                  procId+"/"+nodeId+" 引用了不存在的 Node："+match[1],
+                  {severity:"error",domain:"procedure"});
+            }
+          }
+        });
+        const withMap=get(node,"with");
+        for(const bind of entries(withMap)){
+          const key=v(bind.key),ref=get(bind.value,"from"),target=v(ref);
+          const matching=inputByNormalized.get(normalized(key));
+          if(matching&&typeof target==="string"&&target.startsWith("input.")&&
+             target!=="input."+matching)
+            warn("INPUT_BINDING_SUSPECT",FILES.procedure,ref,
+              procId+"/"+nodeId+" 的 with."+key+
+              " 通常对应 input."+matching+"，当前却绑定 "+target+
+              "；这是启发式提示，需要人工确认类型与语义");
+        }
+      }
+      if(startNode&&nodeIds.has(startNode)){
+        const reachable=new Set([startNode]),queue=[startNode];
+        while(queue.length){
+          const current=queue.shift();
+          for(const target of adjacency.get(current)??[]){
+            if(!reachable.has(target)){reachable.add(target);queue.push(target);}
+          }
+        }
+        for(const item of nodeEntries){
+          const id=v(item.key);
+          if(!reachable.has(id))
+            warn("NODE_UNREACHABLE",FILES.procedure,item.key,
+              "Node "+procId+"/"+id+" 无法从 start "+startNode+" 到达");
+        }
+      }
+    }
+  }
+
+  if(celPredicateCount)
+    notChecked("CEL_EXPRESSION_SYNTAX_NOT_CHECKED",FILES.predicates,
+      "已检查 "+celPredicateCount+" 个 CEL Predicate 的 expression 字段存在性；当前浏览器端 Legacy Audit 未运行 CEL parser/type checker","predicates");
+  if(predIds.size)
+    notChecked("PREDICATE_RUNTIME_NOT_CHECKED",FILES.predicates,
+      "已检查 Predicate 声明结构与静态引用；没有执行任何 Observation 查询或 Predicate Runtime 求值","predicates");
+  const requiredFacts=values(get(contract,"spec","context","requiredFacts"));
+  if(requiredFacts.length)
+    notChecked("CONTEXT_FACTS_NOT_CHECKED",FILES.contract,
+      "已读取 "+requiredFacts.length+" 个 requiredFacts 标识；其运行时来源、UE/Session 绑定与新鲜度不能由本地 Package 静态检查证明","context");
+  if(sources.has(FILES.procedure)&&!contract)
+    notChecked("PROCEDURE_CONTRACT_LINKS_NOT_CHECKED",FILES.procedure,
+      "Procedure 的 Capability / Contract 引用无法完整核对：Contract 不可用","contract");
+  if(sources.has(FILES.procedure)&&!predicates)
+    notChecked("PROCEDURE_PREDICATE_LINKS_NOT_CHECKED",FILES.procedure,
+      "Procedure 的 Predicate 引用无法完整核对：PredicateSet 不可用","predicates");
+  if(referencedScripts.size)
+    notChecked("PYTHON_SYNTAX_NOT_CHECKED",FILES.procedure,
+      "已检查 "+referencedScripts.size+" 个脚本引用的文件存在性；Python 语法/类型未由当前浏览器端 Package Audit 执行","scripts");
+  if(allowed.size)
+    notChecked("CAPABILITY_AUTHORIZATION_NOT_CHECKED",FILES.contract,
+      "已检查 Capability 是否在本地 Contract 声明；Owner 身份、发布证明与运行授权不在本地静态检查范围内","capabilities");
   return Object.freeze(diagnostics);
 }

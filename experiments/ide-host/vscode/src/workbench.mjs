@@ -200,6 +200,107 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   // Acceptance-only diagnostics are deliberately not contributed to the
   // Command Palette. The Chromium harness queries this internal command in
   // both browser-Worker and Node extension-host variants.
+  // Acceptance-only fixture proving the legacy analyzer remains active even
+  // when the v1alpha5 Language Service cannot parse the persisted source shape.
+  // It is entirely in-memory and never writes to the user's Package.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.legacyPackageAuditAcceptance",()=>{
+      const files=new Map([
+        ["assurance/contract.yaml",{text:[
+          "apiVersion: connectionagent.io/v1alpha1",
+          "kind: SkillContract",
+          "metadata:",
+          "  name: legacy-audit-acceptance",
+          "spec:",
+          "  skillType: executable",
+          "  goal: demo.goal",
+          "  entryProcedure: missing-entry",
+          "  inputs:",
+          "    requestSchema: schemas/request.yaml",
+          "  context:",
+          "    requiredFacts: [createdsession_ingress]",
+          "  allowedResources:",
+          "    capabilities: [operation.allowed]",
+          "    localTools: [skill.local]"
+        ].join("\n")}],
+        ["assurance/predicates.yaml",{text:[
+          "apiVersion: connectionagent.io/v1alpha1",
+          "kind: PredicateSet",
+          "metadata:",
+          "  skill: legacy-audit-acceptance",
+          "predicates:",
+          "  demo.eligible:",
+          "    observations:",
+          "      state:",
+          "        ref: demo.state",
+          "        scope: '{\"supi\": subject.supi}'",
+          "        freshness: 5s",
+          "    evaluator:",
+          "      type: cel",
+          "      expression: true"
+        ].join("\n")}],
+        ["assurance/procedure.yaml",{text:[
+          "procedures:",
+          "  entry:",
+          "    inputs:",
+          "      supi:",
+          "        type: string",
+          "        from: context.subject.supi",
+          "    start: start",
+          "    nodes:",
+          "      start:",
+          "        call: operation.missing",
+          "        with:",
+          "          supi:",
+          "            from: input.unknown",
+          "        preconditions:",
+          "          steps:",
+          "            - script: scripts/missing.py",
+          "          'on':",
+          "            FAILED: done",
+          "        postconditions:",
+          "          steps:",
+          "            - verify: demo.missing",
+          "        'on':",
+          "          PASS: absent",
+          "          FAILED: done",
+          "      done:",
+          "        terminal: SUCCEEDED",
+          "      unreachable:",
+          "        terminal: FAILED"
+        ].join("\n")}],
+        ["schemas/request.yaml",{text:[
+          "type: object",
+          "required: [supi, missing]",
+          "properties:",
+          "  supi:",
+          "    type: string"
+        ].join("\n")}]
+      ]);
+      const diagnostics=auditPackageWorkspace({
+        name:"legacy-audit-acceptance",files,completeness:"complete"
+      });
+      const codes=new Set(diagnostics.map(item=>item.code));
+      const required=[
+        "V1ALPHA5_LSP_NOT_APPLICABLE","ENTRY_PROCEDURE",
+        "CAPABILITY_UNDECLARED","INPUT_MISSING","NODE_PREDICATE",
+        "SCRIPT_MISSING","ROUTE_TARGET_MISSING","NODE_UNREACHABLE",
+        "REQUEST_SCHEMA_REQUIRED_UNDECLARED","CEL_EXPRESSION_SYNTAX_NOT_CHECKED",
+        "PREDICATE_RUNTIME_NOT_CHECKED","CONTEXT_FACTS_NOT_CHECKED"
+      ];
+      const missing=required.filter(code=>!codes.has(code));
+      if(missing.length)
+        throw Error("Legacy Package Audit omitted expected independent findings: "+
+          JSON.stringify({missing,diagnostics}));
+      return {
+        status:"PASS",profile:"connectionagent.io/v1alpha1",
+        errorCount:diagnostics.filter(item=>item.severity==="error").length,
+        warningCount:diagnostics.filter(item=>item.severity==="warning").length,
+        notCheckedCount:diagnostics.filter(item=>item.status==="not_checked").length,
+        diagnosticCount:diagnostics.length,codes:[...codes].sort(),
+        qualification:"NOT_QUALIFIED",sourceMutation:"NONE"
+      };
+    }));
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
@@ -3008,8 +3109,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         [item.relativePath,{text:item.text}]));
       const uris=new Map(packageSnapshot.documents.map(item=>
         [item.relativePath,vscode.Uri.parse(item.uri)]));
-      const required=['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml'];
-      const missing=required.filter(path=>!files.has(path));
       const v1alpha5=isV1Alpha5Procedure(doc.getText());
       let v1alpha5DependencyContext={available:false};
       if(v1alpha5){
@@ -3066,24 +3165,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           completeness:packageSnapshot.completeness,
           snapshotReason:packageSnapshot.reason
         });
-      }else if(packageSnapshot.completeness!=="complete"){
-        results=[{
-          kind:'package-diagnostic',
-          message:'Legacy Package Audit was not run because the Package snapshot is incomplete'+
-            (packageSnapshot.reason?': '+packageSnapshot.reason:''),
-          path:'assurance/procedure.yaml',line:1,column:1,
-          code:'PACKAGE_SNAPSHOT_INCOMPLETE',severity:'warning',
-          status:'not_checked',domain:'package',category:'snapshot'
-        }];
-      }else if(missing.length){
-        results=missing.map(path=>({
-          kind:'package-diagnostic',message:'Audit unavailable: missing '+path,
-          path:'assurance/procedure.yaml',line:1,column:1,code:'AUDIT_INCOMPLETE',
-          severity:'error',status:'blocked',domain:'package',category:'inventory'
-        }));
       }else{
+        // Legacy analysis is deliberately best-effort and multi-pass. A partial
+        // snapshot or one malformed companion file must not suppress checks on
+        // every other source file; the audit emits NOT_CHECKED reasons per gap.
         results=auditPackageWorkspace({
-          name:packageSnapshot.packageName,files
+          name:packageSnapshot.packageName,files,
+          completeness:packageSnapshot.completeness,
+          snapshotReason:packageSnapshot.reason
         },doc.getText());
       }
       if(ticket!==generation||document!==doc||doc.version!==version)return;
@@ -3091,10 +3180,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       const errors=audit.filter(item=>item.severity==="error").length;
       const warnings=audit.filter(item=>item.severity==="warning").length;
       const notChecked=audit.filter(item=>item.status==="not_checked").length;
-      auditStatus=v1alpha5
-        ?"v1alpha5 Package Audit · "+errors+" errors / "+warnings+" warnings / "+
-          notChecked+" NOT_CHECKED · Compiler / Owner qualification pending"
-        :"Package Audit · "+errors+" errors / "+warnings+" warnings";
+      auditStatus="Package Audit · "+errors+" errors / "+warnings+" warnings / "+
+        notChecked+" NOT_CHECKED"+
+        (v1alpha5?" · Compiler / Owner qualification pending":"");
       diagnostics.clear();
       if(packageSnapshot.completeness==="complete"){
         packageFiles=files;packageFilesUri=doc.uri.toString();packageFilesVersion=version;
@@ -3103,9 +3191,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
       update(doc);
       for(const uri of new Set(audit.map(item=>item.uri))){
-        diagnostics.set(uri,audit.filter(item=>item.uri===uri).map(item=>{
-          const line=Math.max(0,(item.line??1)-1);
-          const column=Math.max(0,(item.column??1)-1);
+        const located=audit.filter(item=>item.uri===uri&&
+          Number.isSafeInteger(item.line)&&item.line>0&&
+          Number.isSafeInteger(item.column)&&item.column>0);
+        if(!located.length)continue;
+        diagnostics.set(uri,located.map(item=>{
+          const line=item.line-1,column=item.column-1;
           const severity=item.severity==="error"?vscode.DiagnosticSeverity.Error:
             item.severity==="information"
               ?(vscode.DiagnosticSeverity.Information??vscode.DiagnosticSeverity.Warning)
