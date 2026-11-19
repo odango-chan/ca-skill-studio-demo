@@ -294,17 +294,20 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               // Ignore delayed notifications from an old Package generation.
               if(!state||state.disposed||status.generation!==state.generation)return;
               languagePackageStatuses.set(status.rootUri,status);
-              updateLanguageStatus(
-                status.state,
-                status.reason||(status.state==="PARTIAL" ?
-                  ("Package "+status.rootUri+" · generation "+status.generation+
-                    " · Procedure "+(status.procedureState??"unknown")+
-                    " ("+(status.procedureDiagnosticCount??"?")+" diagnostics)"+
-                    " · Audit "+(status.packageAuditState??"unknown")+
-                    (status.packageAuditReason?" · "+status.packageAuditReason:"")) :
-                  ("Package "+status.rootUri+" · generation "+status.generation+
-                    " · "+(status.publishedDiagnosticCount??0)+" diagnostics"))
-              );
+              const detail=status.reason||(status.state==="PARTIAL" ?
+                ("Package "+status.rootUri+" · generation "+status.generation+
+                  " · Procedure "+(status.procedureState??"unknown")+
+                  " ("+(status.procedureDiagnosticCount??"?")+" diagnostics)"+
+                  " · Audit "+(status.packageAuditState??"unknown")+
+                  (status.packageAuditReason?" · "+status.packageAuditReason:"")) :
+                ("Package "+status.rootUri+" · generation "+status.generation+
+                  " · "+(status.publishedDiagnosticCount??0)+" diagnostics"));
+              const unlocatedSummary=Array.isArray(status.unlocated)
+                ?status.unlocated.slice(0,4).map(item=>
+                  String(item.code??"LANGUAGE")+": "+String(item.message??"")).join("; ")
+                :"";
+              updateLanguageStatus(status.state,
+                unlocatedSummary?detail+" · "+unlocatedSummary:detail);
             },
             onError:error=>{
               if(epoch!==languageClientEpoch)return;
