@@ -74,9 +74,11 @@ test("Theia host-local semantic token mode avoids a competing LSP provider",asyn
   }
 });
 
-test("legacy persisted Example sends actionable Package status without generic server error",async()=>{
+test("older source is diagnosed by the one current grammar without a version-specific server error",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
-  const rootUri="file:///workspace/persisted-legacy-example";
+  const rootUri="file:///workspace/persisted-old-example";
+  const procedureUri=rootUri+"/assurance/procedure.yaml";
+  const contractUri=rootUri+"/assurance/contract.yaml";
   try{
     worker.postMessage({jsonrpc:"2.0",id:43,method:"initialize",
       params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
@@ -85,27 +87,41 @@ test("legacy persisted Example sends actionable Package status without generic s
     const status=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===rootUri&&message.params?.generation===1);
+    const procedureDiagnostics=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===procedureUri&&
+      message.params?.diagnostics?.some(item=>item.code==="SOURCE_ROOT_INVALID"));
+    const contractDiagnostics=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===contractUri&&
+      message.params?.diagnostics?.some(item=>item.code==="UNKNOWN_FIELD"));
     const duplicateError=expectNoMessage(worker,message=>
       message?.method==="skillStudio/serverError"&&
       message.params?.rootUri===rootUri&&
       String(message.params?.message??"").includes("ANALYSIS_UNAVAILABLE"),300);
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(1,
-        "apiVersion: connectionagent.io/v1alpha1\nprocedures: {}\n",rootUri)});
-    const result=await status;
-    assert.equal(result.params.state,"UNAVAILABLE");
-    assert.match(result.params.reason,/UNSUPPORTED_CA_SL_VERSION/);
-    assert.match(result.params.reason,/start\/nodes/);
-    assert.ok(result.params.unlocated.some(item=>
+        "apiVersion: connectionagent.io/v1alpha1\\nprocedures: {}\\n",rootUri)});
+    const [result,procedure,contract]=await Promise.all([
+      status,procedureDiagnostics,contractDiagnostics
+    ]);
+    assert.equal(result.params.state,"PARTIAL");
+    assert.equal(result.params.procedureState,"UNAVAILABLE");
+    assert.ok(result.params.publishedDiagnosticCount>0);
+    assert.ok(procedure.params.diagnostics.some(item=>item.code==="SOURCE_ROOT_INVALID"));
+    assert.ok(contract.params.diagnostics.some(item=>item.code==="UNKNOWN_FIELD"));
+    assert.ok(result.params.analysisDiagnostics.some(item=>
+      item.relativePath==="assurance/predicates.yaml"&&item.code==="UNKNOWN_FIELD"));
+    assert.ok(!result.params.analysisDiagnostics.some(item=>
       item.code==="UNSUPPORTED_CA_SL_VERSION"));
     assert.equal(await duplicateError,null,
-      "only the exact generation-scoped analysis status should explain a legacy Package");
+      "source defects are ordinary current-grammar diagnostics, not analysis transport failures");
   }finally{
     await worker.terminate();
   }
 });
 
-test("analysis rejection preserves independent v1alpha5 source semantic colors until Package close",async()=>{
+test("source semantic colors remain available when diagnostic snapshot admission is rejected",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   const rootUri="file:///workspace/semantic-rejection";
   const source=[
