@@ -1,5 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
 import {diagnosticSourcePosition} from "./diagnostic-navigation.mjs";
+import {reconcileProblemDiagnostics} from "./problem-diagnostics.mjs";
 
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
@@ -2295,19 +2296,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   function problemTreeChildren(){
     const groups=new Map();
     const diagnostics=[...audit,...(compilerProblemsProvider?.getProblems?.()??[])];
-    const merged=new Map();
-    for(const diagnostic of diagnostics){
-      const kind=diagnostic.kind??"problem";
-      const location=diagnostic.uri?.toString?.()??diagnostic.path??diagnostic.sourcePath??"";
-      const identity=[diagnostic.code??"",location,diagnostic.line??0,
-        diagnostic.column??0,diagnostic.message??""].join("|");
-      const priority=kind==="compiler-diagnostic"?3:
-        kind==="package-diagnostic"?2:1;
-      const previous=merged.get(identity);
-      if(!previous||priority>previous.priority)
-        merged.set(identity,{diagnostic,priority});
-    }
-    for(const {diagnostic} of merged.values()){
+    for(const {diagnostic,sources} of reconcileProblemDiagnostics(diagnostics)){
       const kind=diagnostic.kind??"problem";
       const domain=diagnostic.domain??(kind==="compiler-diagnostic"?"compiler":"source");
       if(!groups.has(domain)){
@@ -2318,7 +2307,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           children:[]
         });
       }
-      const sourcePath=diagnostic.path??diagnostic.relativePath??diagnostic.sourcePath;
+      // Display owning Package-relative locations even for Compiler records
+      // whose raw Diagnostic.path is prefixed with skills/<package>/.
+      const sourcePath=diagnostic.sourcePath??diagnostic.relativePath??diagnostic.path;
       const description=[sourcePath,diagnostic.line?("L"+diagnostic.line):null]
         .filter(Boolean).join(" · ");
       groups.get(domain).children.push({
@@ -2329,7 +2320,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         path:sourcePath,sourcePath:diagnostic.sourcePath,
         range:diagnostic.range,analysisGeneration:diagnostic.analysisGeneration,
         locationKind:diagnostic.locationKind,phase:diagnostic.phase,
-        source:diagnostic.source,children:[]
+        source:diagnostic.source,contributors:sources,children:[]
       });
     }
     for(const group of groups.values()){
@@ -2365,7 +2356,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             item.message,
             item.code?'Code: '+item.code:null,
             item.path?'Compiler path: '+item.path:null,
-            item.locationKind?'Location: '+item.locationKind:null
+            item.locationKind?'Location: '+item.locationKind:null,
+            item.contributors?.length>1
+              ?'Also reported by: '+item.contributors.filter(x=>x!=='Compiler').join(', ')
+              :null
           ].filter(Boolean).join('\n');
           if(item.uri){
             tree.command={command:'skillStudio.revealCompilerDiagnostic',
@@ -2381,7 +2375,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             item.domain?'Domain: '+item.domain:null,
             item.status?'Status: '+item.status:null,
             item.code?'Code: '+item.code:null,
-            item.source??'Skill Studio · Package Audit'
+            item.source??'Skill Studio · Package Audit',
+            item.contributors?.length>1
+              ?'Sources: '+item.contributors.join(', '):null
           ].filter(Boolean).join('\n');
         }
         if(item.kind==='current-node'&&document){
