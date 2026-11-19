@@ -325,16 +325,6 @@
           "group": "navigation"
         },
         {
-          "command": "skillStudio.showWelcome",
-          "when": "view == skillStudio.packages",
-          "group": "navigation@1"
-        },
-        {
-          "command": "skillStudio.showActivationDiagnostics",
-          "when": "view == skillStudio.packages",
-          "group": "navigation@2"
-        },
-        {
           "command": "skillStudio.auditPackage",
           "when": "view == skillStudio.inspection || view == skillStudio.problems",
           "group": "navigation"
@@ -358,6 +348,16 @@
           "command": "skillStudio.buildSkill",
           "when": "view == skillStudio.packages",
           "group": "navigation@7"
+        },
+        {
+          "command": "skillStudio.showWelcome",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@1"
+        },
+        {
+          "command": "skillStudio.showActivationDiagnostics",
+          "when": "view == skillStudio.packages",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
