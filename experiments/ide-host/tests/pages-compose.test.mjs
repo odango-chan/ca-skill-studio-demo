@@ -11,6 +11,28 @@ async function put(root,path,content){
   await writeFile(target,content);
 }
 
+async function putPrimaryExtension(theia){
+  const root="hostedPlugin/odango_chan_ca_skill_studio_ide_spike";
+  const manifest={
+    name:"ca-skill-studio-ide-spike",
+    contributes:{
+      languages:[{id:"yaml"},{id:"python"}],
+      grammars:[
+        {language:"yaml",scopeName:"source.yaml",path:"./media/languages/yaml/syntaxes/yaml.tmLanguage.json"},
+        {language:"python",scopeName:"source.python",path:"./media/languages/python/syntaxes/MagicPython.tmLanguage.json"}
+      ]
+    }
+  };
+  await put(theia,root+"/package.json",JSON.stringify(manifest));
+  for(const file of [
+    "media/languages/LICENSE.txt",
+    "media/languages/yaml/language-configuration.json",
+    "media/languages/yaml/syntaxes/yaml.tmLanguage.json",
+    "media/languages/python/language-configuration.json",
+    "media/languages/python/syntaxes/MagicPython.tmLanguage.json"
+  ])await put(theia,root+"/"+file,"{}");
+}
+
 test("Pages publishes only Theia and never stages a Classic or legacy fallback",async()=>{
   const temp=await mkdtemp(join(tmpdir(),"studio-pages-compose-"));
   const theia=join(temp,"theia"),output=join(temp,"dist"),site=join(temp,"site");
@@ -18,9 +40,9 @@ test("Pages publishes only Theia and never stages a Classic or legacy fallback",
     await put(site,"CNAME","studio.example.com\n");
     await put(theia,"index.html",'<!doctype html><html><body><div id="skill-studio-preview-warning">在线演示 · Webview 使用同源模式</div><div id="theia-app-shell"></div></body></html>');
     await put(theia,"bundle.js","window.theia=true;");
-    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]');
+    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme"]');
     await put(theia,"webview/index.html","<html>webview</html>");
-    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json",'{"name":"ca-skill-studio-ide-spike"}');
+    await putPrimaryExtension(theia);
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js","extension worker");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js","language worker");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js","compiler worker");
@@ -30,7 +52,6 @@ test("Pages publishes only Theia and never stages a Classic or legacy fallback",
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json",'{"name":"SKILL Studio Light"}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json",'{"iconDefinitions":{}}');
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg","<svg></svg>");
-    await put(theia,"hostedPlugin/odango_chan_skill_studio_languages/package.json",'{"name":"skill-studio-languages"}');
 
     const result=await composePagesRelease({theiaFrontend:theia,outputDist:output,siteRoot:site});
     assert.equal(result.defaultHost,"theia-browser-only");
@@ -51,9 +72,9 @@ test("Pages refuses a frontend containing a Classic navigation link or missing a
   try{
     await put(theia,"index.html",'<!doctype html><html><body><div id="skill-studio-preview-warning">在线演示</div><a href="/classic/">old</a></body></html>');
     await put(theia,"bundle.js","bundle");
-    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme","skill-studio-languages"]');
+    await put(theia,"hostedPlugin/list.json",'["ca-skill-studio-ide-spike","skill-studio-theme"]');
     await put(theia,"webview/index.html","webview");
-    await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/package.json","{}");
+    await putPrimaryExtension(theia);
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/extension-theia.js","extension");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/skill-language-server.js","worker");
     await put(theia,"hostedPlugin/odango_chan_ca_skill_studio_ide_spike/dist/compiler-worker.js","compiler worker");
@@ -63,7 +84,6 @@ test("Pages refuses a frontend containing a Classic navigation link or missing a
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/themes/skill-studio-light-color-theme.json","{}");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill-studio-file-icon-theme.json","{}");
     await put(theia,"hostedPlugin/odango_chan_skill_studio_theme/icons/skill.svg","<svg></svg>");
-    await put(theia,"hostedPlugin/odango_chan_skill_studio_languages/package.json","{}");
     await assert.rejects(composePagesRelease({theiaFrontend:theia,outputDist:output}),/Classic navigation/);
     await assert.rejects(stat(output),{code:"ENOENT"});
   }finally{await rm(temp,{recursive:true,force:true});}
