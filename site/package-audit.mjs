@@ -171,6 +171,9 @@ function addBlocked(list,path,parsed,node,code,message,domain){
  *
  * External declarations are checked only when their exact trusted snapshot is
  * supplied. Missing trust inputs produce visible NOT_CHECKED diagnostics.
+ *
+ * @param {{files?: Map<string, {text: string}>, dependencyContext?: Record<string, unknown>,
+ *   completeness?: string, snapshotReason?: string}} options
  */
 export function auditPackage({
   files,dependencyContext={},completeness="complete",snapshotReason=""
