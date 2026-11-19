@@ -30,7 +30,7 @@ test("visual inspection uses the current CA-SL projection for the released Examp
   assert.equal(result.outline.length,1);
   assert.ok(result.outline[0].children.length>0);
   assert.ok(result.outline[0].children.some(item=>item.nodeId==="get-sm-subscription-data"));
-  assert.ok(result.inspection.some(item=>item.kind==="v1alpha5-contract"));
+  assert.ok(result.inspection.some(item=>item.kind==="current-contract"));
   assert.ok(Array.isArray(result.problems));
   assert.ok(!result.problems.some(item=>item.code==="UNSUPPORTED_CA_SL_VERSION"));
 });
