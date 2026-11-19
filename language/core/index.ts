@@ -1,6 +1,7 @@
 import { scriptNavigationReport } from "../../site/script-navigation.mjs";
 import { pythonTopLevelOutline } from "../../site/python-outline.mjs";
 import { analyzeCurrentSource } from "./source.js";
+import { auditPackage } from "../../site/package-audit.mjs";
 import type {
   AnalysisState,
   DocumentAnalysis,
@@ -321,12 +322,40 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       });
     }
 
+    const packageAuditSource = auditPackage({
+      files,
+      dependencyContext: snapshot.dependencyContext ?? {},
+      completeness: snapshot.completeness,
+      snapshotReason: snapshot.reason ?? ""
+    });
+    const packageAuditDiagnostics: LanguageDiagnostic[] = packageAuditSource.map(item => {
+      const sourceDocument = documentsByPath.get(item.path) ?? procedureDocument;
+      return {
+        code: item.code,
+        message: item.message,
+        severity: item.severity,
+        uri: sourceDocument.uri,
+        relativePath: sourceDocument.relativePath,
+        source: "package-audit",
+        confidence: "exact",
+        ...(Number.isSafeInteger(item.line) && item.line > 0 ? { line: item.line } : {}),
+        ...(item.sourceRange ? { range: item.sourceRange } : {}),
+        status: item.status,
+        domain: item.domain,
+        category: item.category
+      };
+    });
+    const uncheckedCount = packageAuditDiagnostics.filter(item =>
+      item.status === "not_checked" || item.status === "blocked").length;
     const packageAudit: PackageAuditResult = {
-      state: "UNAVAILABLE",
-      reason: snapshot.completeness !== "complete"
-        ? (snapshot.reason ?? "Partial Package snapshot")
-        : "Current CA-SL source parsed; static Package qualification requires the current Compiler and trusted Owner/Capability/Schema linking snapshots",
-      diagnostics: []
+      state: snapshot.completeness === "complete" && uncheckedCount === 0
+        ? "READY" : "UNAVAILABLE",
+      ...(uncheckedCount ? {
+        reason: uncheckedCount + " Package checks remain NOT_CHECKED or blocked; see individual diagnostics"
+      } : snapshot.completeness !== "complete" ? {
+        reason: snapshot.reason ?? "Package snapshot is incomplete"
+      } : {}),
+      diagnostics: packageAuditDiagnostics
     };
     const diagnostics = [
       ...projected.diagnostics,
