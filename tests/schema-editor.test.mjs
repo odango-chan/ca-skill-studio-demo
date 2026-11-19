@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {isSkillSchema,localSchemaReference,registerSchemaEditor}
+import {isSkillSchema,localSchemaReference,registerSchemaCommands,mountSchemaPreview}
   from '../experiments/ide-host/vscode/src/schema-editor.mjs';
 
 const source=readFileSync(new URL(
@@ -9,7 +9,7 @@ const source=readFileSync(new URL(
   import.meta.url),'utf8');
 
 function mock() {
-  const providers=new Map(),commands=new Map(),sent=[];
+  let customEditorRegistrations=0;const commands=new Map(),sent=[];
   let changed,received,dispose;
   const schemaUri={path:'/workspace/establish-pdu-session/schemas/establishment-request.schema.yaml',
     toString(){return 'file://'+this.path;},
@@ -19,8 +19,8 @@ function mock() {
   let text=source;
   const vscode={
     window:{
-      registerCustomEditorProvider(view,p,opts) {
-        providers.set(view,{p,opts});return {dispose(){}};
+      registerCustomEditorProvider() {
+        customEditorRegistrations++;return {dispose(){}};
       },
       visibleTextEditors:[],
       async showWarningMessage() {},
@@ -36,7 +36,7 @@ function mock() {
     onDidReceiveMessage(fn){received=fn;return {dispose(){}};},
     postMessage(message){sent.push(message);return Promise.resolve(true);}
   },onDidDispose(fn){dispose=fn;}};
-  return {vscode,providers,commands,document,panel,sent,
+  return {vscode,commands,document,panel,sent,get customEditorRegistrations(){return customEditorRegistrations;},
     change(next){text=next;document.version++;changed({document});},
     async receive(msg){await received(msg);await new Promise(resolve=>setImmediate(resolve));},
     dispose(){dispose();}};
@@ -65,14 +65,13 @@ test('C3 local reference policy refuses remote, traversal and unsafe schemes',()
   ]) assert.equal(localSchemaReference(uri,bad),null,bad);
 });
 
-test('C3 custom editor presents read-only source-backed state, refresh and version guard',async()=>{
+test('C3 shared Preview renderer presents read-only source-backed state, refresh and version guard',async()=>{
   const m=mock(),context={subscriptions:[]};
-  registerSchemaEditor(m.vscode,context);
-  assert.ok(m.providers.has('skillStudio.schemaPreview'));
+  registerSchemaCommands(m.vscode,context);
   assert.ok(m.commands.has('skillStudio.openSchema'));
-  const {p,opts}=m.providers.get('skillStudio.schemaPreview');
-  assert.equal(opts.webviewOptions.retainContextWhenHidden,true);
-  await p.resolveCustomTextEditor(m.document,m.panel);
+  assert.equal(m.customEditorRegistrations,0,
+    'Schema visualizer is mounted by the shared Preview Host, not a CustomEditor');
+  await mountSchemaPreview(m.vscode,m.document,m.panel);
   assert.equal(m.panel.webview.options.enableScripts,true);
   assert.deepEqual(m.panel.webview.options.localResourceRoots,[]);
   assert.match(m.panel.webview.html,/SKILL Schema Visual/);
