@@ -383,52 +383,54 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         return null;
       }
       const folder=vscode.workspace.getWorkspaceFolder?.(state.procedureDocument.uri);
+      let dependencyContext={
+        available:false,
+        reason:"The Package is not inside an open project workspace"
+      };
       if(folder){
-        const resolved=await resolveLockedDependencies(vscode,folder.uri);
-        const schemas=[];
-        const operations=[];
-        const decoder=new TextDecoder();
-        for(const dependency of resolved.snapshots){
-          if(dependency.kind==="tool-catalog"){
-            const file=dependency.files.find(item=>item.path==="tool-contract.json");
-            if(file){
-              try{
-                const contract=JSON.parse(decoder.decode(decodeBase64(file.bytes)));
-                if(contract.apiVersion==="skillc.tool/v0.1"&&Array.isArray(contract.operations)){
-                  const text=JSON.stringify(contract,null,2);
-                  const uri=prepareToolContract?.(dependency,text)?.toString();
-                  const prefix='\n      "id": ';
-                  for(const item of contract.operations){
-                    if(typeof item?.id!=="string")continue;
-                    const literal=JSON.stringify(item.id);
-                    const offset=text.indexOf(prefix+literal);
-                    const line=offset<0?0:text.slice(0,offset).split("\n").length;
-                    const character=prefix.length;
-                    const location=uri&&offset>=0?{uri,range:{
-                      start:{line,character},
-                      end:{line,character:character+literal.length-2}
-                    }}:undefined;
-                    operations.push({id:item.id,dependencyId:dependency.id,location});
-                  }
-                }
-              }catch(error){
-                console.warn("Cannot read locked Tool contract",dependency.id,error);
-              }
+        try{
+          const project=readProjectConfiguration(vscode,folder.uri);
+          const resolved=await resolveLockedDependencies(vscode,folder.uri);
+          const operations=[],schemas=[],toolCatalogs=[];
+          const decoder=new TextDecoder("utf-8",{fatal:true});
+          for(const dependency of resolved.snapshots??[]){
+            const decoded=(dependency.files??[])
+              .filter(file=>/\\.(?:json|ya?ml)$/i.test(file.path))
+              .map(file=>({
+                path:file.path,text:decoder.decode(decodeBase64(file.bytes))
+              }));
+            if(dependency.kind==="tool-catalog"){
+              const catalog=indexV1Alpha4ToolCatalogCallables(dependency.id,decoded);
+              toolCatalogs.push({
+                dependencyId:dependency.id,
+                available:catalog.available,reason:catalog.reason
+              });
+              operations.push(...catalog.operations);
+            }
+            for(const file of decoded){
+              const schemaFile=dependency.kind==="schema-bundle"
+                ?/\\.(?:json|ya?ml)$/i.test(file.path)
+                :/(?:^|\\/)schemas\\/.*\\.(?:json|ya?ml)$/i.test(file.path);
+              if(!schemaFile)continue;
+              schemas.push({dependencyId:dependency.id,path:file.path,text:file.text});
             }
           }
-          if(dependency.kind!=="schema-bundle")continue;
-          for(const file of dependency.files){
-            if(!/\.schema\.(?:json|ya?ml)$/.test(file.path))continue;
-            schemas.push({
-              dependencyId:dependency.id,
-              path:file.path,
-              text:decoder.decode(decodeBase64(file.bytes))
-            });
-          }
+          dependencyContext={
+            available:true,
+            declarations:project.settings.dependencies,
+            snapshots:(resolved.snapshots??[]).map(item=>({id:item.id,kind:item.kind})),
+            diagnostics:resolved.diagnostics??[],
+            operations,toolCatalogs,schemas
+          };
+          snapshot.dependencyOperations=operations;
+          snapshot.dependencySchemas=schemas;
+        }catch(error){
+          dependencyContext={
+            available:false,reason:String(error?.message??error)
+          };
         }
-        snapshot.dependencySchemas=schemas;
-        snapshot.dependencyOperations=operations;
       }
+      snapshot.dependencyContext=dependencyContext;
       if(state.disposed||ticket!==state.ticket){
         if(strict)throw Error("Package refresh was superseded during dependency resolution");
         return null;
