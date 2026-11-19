@@ -719,6 +719,7 @@ export function activate(context){
       }
       if(!isProcedurePath(target.path))return;
       await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
+      await vscode.commands.executeCommand("skillStudio.showPreview",target);
     }));
   // The right-side Preview Host follows the active TextEditor itself.
   // Do not reopen a Source file from active-editor callbacks or move tabs

@@ -208,3 +208,48 @@ test("a persisted hidden Preview is not auto-opened on extension activation",asy
     "the host must respect the persisted hidden preference on reload");
   controller.dispose();
 });
+
+test("explicit YAML Designer opens the nested Preview without using a CustomEditor",async()=>{
+  let openView=0,provider=null,show=null;
+  const source=doc("/skills/demo/assurance/contract.yaml");
+  const view=makeView();
+  const context={subscriptions:[],globalState:{
+    get(){return false;},update(){return Promise.resolve();}
+  }};
+  const vscode={
+    env:{uriScheme:"theia"},
+    Uri:{parse(value){return doc(new URL(value).pathname).uri;}},
+    workspace:{async openTextDocument(uri){return {uri};}},
+    commands:{
+      registerCommand(id,listener){if(id==="skillStudio.showPreview")show=listener;
+        return {dispose(){}};},
+      async executeCommand(id){
+        assert.equal(id,"skillStudio.preview.open");
+        openView++;
+        provider.resolveWebviewView(view);
+      }
+    },
+    window:{
+      activeTextEditor:null,
+      registerWebviewViewProvider(id,p){assert.equal(id,PREVIEW_VIEW_ID);
+        provider=p;return {dispose(){}};},
+      onDidChangeActiveTextEditor(){return {dispose(){}};}
+    }
+  };
+  let rendered=0;
+  const ctrl=registerPreviewHost(vscode,context,{
+    mountContract(document){
+      assert.equal(document.uri.toString(),source.uri.toString());
+      rendered++;
+      return {dispose(){}};
+    }
+  });
+  assert.equal(typeof show,"function");
+  assert.equal(await show(source.uri),true);
+  assert.equal(openView,1);
+  assert.equal(rendered,1);
+  assert.equal(ctrl.state.kind,"skillStudio.contractPreview");
+  assert.equal(await show(doc("/random/unrelated.yaml").uri),false);
+  assert.equal(openView,1,"unsupported YAML must remain Source-only");
+  ctrl.dispose();
+});
