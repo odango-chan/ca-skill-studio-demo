@@ -209,6 +209,11 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
+      activeDocumentUri:document?.uri?.toString?.()??null,
+      activePackageRootUri:document
+        ?packageRootForProcedure(vscode,document)?.uri?.toString?.()??null:null,
+      activePackageAuditStatus:auditStatus,
+      activePackageAuditDiagnosticCount:audit.length,
       languagePackages:[...languagePackages.values()].map(state=>({
         rootUri:state.key,refs:state.refs,generation:state.generation,
         ticket:state.ticket,disposed:state.disposed,
