@@ -1,5 +1,5 @@
 import {openNativeSource} from "./native-source.mjs";
-import {openSourceViewPair} from "./source-view-pair.mjs";
+
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {prepareNativeMarkdownPackagePolicy} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
@@ -966,9 +966,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           schemaCompletion="EstablishmentSelectionInput";
         }
         // The native provider probe opened a Python editor. Restore the
-        // Procedure CustomEditor so subsequent workbench actions (notably
-        // native Undo) continue to target the visual editor under test.
-        await openSourceViewPair(vscode,procedureUri);
+        // authoritative Procedure Source; the right Preview follows it.
+        await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
         return {
           definition:scriptPath,
           yamlDefinitions:{
@@ -1498,7 +1497,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             };
           }finally{
             languageDiagnosticAcceptance.delete(key);
-            await openSourceViewPair(vscode,procedureUri);
+            await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
           }
         }
         throw Error("Unknown live diagnostic acceptance phase: "+String(phase));
@@ -1649,7 +1648,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             return {phase,restored:true,originalDiskUnchanged:true};
           }finally{
             languageRecoveryAcceptance.delete(key);
-            await openSourceViewPair(vscode,procedureUri);
+            await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
           }
         }
         if(phase==="verify-and-restore"){
@@ -1719,7 +1718,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               if(generation<=before)throw Error("Post-recovery restoration did not advance Package generation");
             }catch(error){cleanup.push(String(error?.message??error));}
             languageRecoveryAcceptance.delete(key);
-            try{await openSourceViewPair(vscode,procedureUri);}
+            try{await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});}
             catch(error){cleanup.push("Procedure focus: "+String(error?.message??error));}
             if(cleanup.length)throw Error("L2-D4b recovery cleanup failed: "+cleanup.join("; "));
           }
@@ -2066,7 +2065,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
                 throw Error("clean Source state was not restored");
             }catch(error){problems.push("clean "+entry.name+": "+String(error?.message??error));}
           }
-          try{await openSourceViewPair(vscode,procedureUri);}
+          try{await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});}
           catch(error){problems.push("Procedure focus: "+String(error?.message??error));}
           if(problems.length)throw Error("L2-D3 cleanup: "+problems.join("; "));
         }
