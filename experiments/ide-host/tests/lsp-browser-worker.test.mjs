@@ -209,7 +209,8 @@ test("semantic tokens retain the latest accepted source when Package analysis is
       message.params?.state==="UNAVAILABLE",15000);
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
     const status=await unavailable;
-    assert.match(status.params.reason,/Package name is invalid/);
+    assert.equal(status.params.reason,"Package analysis unavailable");
+    assert.ok(status.params.unlocated?.some(item=>item.code==="INVALID_PACKAGE_NAME"));
 
     const procedure=snapshot.documents.find(item=>
       item.relativePath==="assurance/procedure.yaml");
