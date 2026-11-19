@@ -53,16 +53,13 @@ function createSession(rootUri) {
   const published = new Map();
   return new LanguageDiagnosticSession({
     publish(result) {
-      // Package Audit remains owned by the existing host audit collection in
-      // this integration slice. Avoid publishing the same warnings twice.
-      const diagnostics = result.diagnostics.filter(item =>
-        item.code !== "PACKAGE_AUDIT_UNAVAILABLE" &&
-        item.source !== "Skill Studio · package-audit"
-      );
-      published.set(result.uri, diagnostics.length);
+      // The shared Language Service owns the complete diagnostic set,
+      // including current Package Audit findings. The host Problems tree
+      // consumes the matching generation metadata from analysisStatus.
+      published.set(result.uri, result.diagnostics.length);
       connection.sendDiagnostics({
         uri: result.uri,
-        diagnostics,
+        diagnostics: result.diagnostics,
         ...(Number.isSafeInteger(result.version) ? { version: result.version } : {})
       });
     },
@@ -85,7 +82,8 @@ function createSession(rootUri) {
         ...result,
         ...partialDetail,
         rootUri,
-        publishedDiagnosticCount
+        publishedDiagnosticCount,
+        analysisDiagnostics: analysis?.diagnostics ?? []
       });
     },
     analysis(snapshot, analysis) {
