@@ -827,6 +827,13 @@ try{
   const packageOverviewEvidence=workbenchEvidence?.packageOverview
     ?{required:true,twoSkills:true,evidence:workbenchEvidence.packageOverview}
     :{required:false};
+  const markdownLanguageWorker=markdownWorkerRequests.filter(item=>
+    /serverWorkerMain\\.js/i.test(item.url));
+  if(requireEditor&&!markdownLanguageWorker.length)
+    throw Error("Native Markdown language features did not activate its browser Worker after Markdown Source selection: "+
+      JSON.stringify({markdownWorkerRequests,workerRuntimeErrors,exceptions:exceptions.slice(-8)}));
+  console.log("STUDIO_THEIA_MARKDOWN_LANGUAGE_WORKER_CHROMIUM",
+    JSON.stringify({requests:markdownLanguageWorker,workerRuntimeErrors}));
   console.log("STUDIO_THEIA_STAGE","v1alpha5-package-overview");
 
   await evalJS("(async()=>{const c=window.theia.container;"+
@@ -853,7 +860,7 @@ try{
   const listingResponse=await fetch(url+"hostedPlugin/list.json");
   const listing=await listingResponse.text();
   const evidence={
-    shellReadyMs,workbenchEvidence,packageOverviewEvidence,
+    shellReadyMs,workbenchEvidence,packageOverviewEvidence,markdownLanguageWorker,
     view,warningDismissed,diagnostics,paletteBefore,paletteAfter,viewPosition,
     viewMenu,paletteItemPos,paletteMenuOpened,registeredCommands,loadExampleRow,
     afterImport,identity,defaultWebviewView,
