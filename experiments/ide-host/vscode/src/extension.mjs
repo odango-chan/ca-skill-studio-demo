@@ -102,6 +102,16 @@ export function activate(context){
     vscode.commands.registerCommand("skillStudio.showActivationDiagnostics",async()=>{
       const activeDocument=vscode.window.activeTextEditor?.document??null;
       const packageInventory=packageOverview?.getDiagnostics?.()??null;
+      let registeredCommands=[];
+      try{registeredCommands=await vscode.commands.getCommands(true);}catch{}
+      let semanticTokens=null;
+      try{
+        semanticTokens=await vscode.commands.executeCommand(
+          "skillStudio.internal.semanticTokenDiagnostics"
+        );
+      }catch(error){
+        semanticTokens={error:String(error?.message??error)};
+      }
       let extension=null;
       try{
         extension=vscode.extensions?.getExtension?.(
@@ -111,7 +121,11 @@ export function activate(context){
       const report={
         extensionId:"odango-chan.ca-skill-studio-ide-spike",
         extensionVersion:extension?.packageJSON?.version??null,
+        buildId:typeof STUDIO_BUILD_ID!=="undefined"?STUDIO_BUILD_ID:null,
         extensionActive:extension?.isActive??true,
+        welcomeCommandRegistered:registeredCommands.includes("skillStudio.showWelcome"),
+        welcome:projectWelcome?.getDiagnostics?.()??null,
+        semanticTokens,
         workspaceName:vscode.workspace.name??null,
         workspaceFolders:(vscode.workspace.workspaceFolders??[])
           .map(folder=>folder.uri.toString()),

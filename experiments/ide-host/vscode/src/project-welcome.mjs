@@ -16,7 +16,7 @@ function nonce(){
 }
 
 export function registerProjectWelcome(vscode,context){
-  let panel=null;
+  let panel=null,lastError=null,lastOpenedAt=null;
   const language=String(vscode.env?.language??"en").toLowerCase();
   const zh=language.startsWith("zh");
   const labels=zh?{
@@ -44,15 +44,23 @@ export function registerProjectWelcome(vscode,context){
     }catch{/* The welcome editor may close as soon as the workspace opens. */}
   }
   function show({explicit=false}={}){
-    if(!explicit&&(vscode.workspace.workspaceFolders??[]).length)return;
-    // Unit-test harnesses and lightweight VS Code-compatible hosts may omit
-    // this UI API; production Theia/VS Code supplies the native panel.
-    if(typeof vscode.window.createWebviewPanel!=="function")return;
-    if(panel){panel.reveal(vscode.ViewColumn.One);return;}
-    panel=vscode.window.createWebviewPanel(
-      "skillStudio.welcome","SKILL Studio Welcome",vscode.ViewColumn.One,
-      {enableScripts:true,retainContextWhenHidden:true}
-    );
+    if(!explicit&&(vscode.workspace.workspaceFolders??[]).length)return false;
+    // A missing/throwing host Webview API must be visible, never a silent no-op.
+    if(typeof vscode.window.createWebviewPanel!=="function"){
+      lastError="The host does not expose window.createWebviewPanel";
+      return false;
+    }
+    try{
+      if(panel){
+        panel.reveal(vscode.ViewColumn.One);
+        lastError=null;
+        lastOpenedAt=new Date().toISOString();
+        return true;
+      }
+      panel=vscode.window.createWebviewPanel(
+        "skillStudio.welcome","SKILL Studio Welcome",vscode.ViewColumn.One,
+        {enableScripts:true,retainContextWhenHidden:true}
+      );
     const token=nonce();
     panel.webview.html=`<!doctype html>
 <html lang="${zh?"zh-CN":"en"}"><head><meta charset="UTF-8">
@@ -141,14 +149,38 @@ window.addEventListener("message",event=>{
           void vscode.window.showErrorMessage("SKILL Studio: "+detail);
         });
     });
-    panel.onDidDispose(()=>{events.dispose();panel=null;});
+      panel.onDidDispose(()=>{events.dispose();panel=null;});
+      lastError=null;
+      lastOpenedAt=new Date().toISOString();
+      return true;
+    }catch(error){
+      lastError=String(error?.message??error);
+      try{panel?.dispose?.();}catch{}
+      panel=null;
+      return false;
+    }
   }
-  context.subscriptions.push(vscode.commands.registerCommand("skillStudio.showWelcome",()=>show({explicit:true})));
+  context.subscriptions.push(vscode.commands.registerCommand("skillStudio.showWelcome",()=>{
+    const opened=show({explicit:true});
+    if(!opened)void vscode.window.showErrorMessage(
+      "SKILL Studio Welcome could not be opened"+(lastError?": "+lastError:"")
+    );
+    return opened;
+  }));
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(()=>{
     if((vscode.workspace.workspaceFolders??[]).length){
       panel?.dispose();panel=null;
     }else show();
   }));
   if(!(vscode.workspace.workspaceFolders??[]).length)show();
-  return {show,setImportStatus};
+  return {
+    show,setImportStatus,
+    getDiagnostics:()=>({
+      commandRegistered:true,
+      panelOpen:Boolean(panel),
+      createWebviewPanelAvailable:typeof vscode.window.createWebviewPanel==="function",
+      workspaceFolderCount:(vscode.workspace.workspaceFolders??[]).length,
+      lastError,lastOpenedAt
+    })
+  };
 }

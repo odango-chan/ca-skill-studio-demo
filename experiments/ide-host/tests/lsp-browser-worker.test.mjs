@@ -58,6 +58,22 @@ function packageSnapshot(generation, procedureText, rootUri = "file:///workspace
   };
 }
 
+test("Theia host-local semantic token mode avoids a competing LSP provider",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:5,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{},
+        initializationOptions:{disableSemanticTokens:true}}});
+    const initialized=await waitForMessage(worker,message=>message?.id===5);
+    assert.equal(initialized.result.capabilities.semanticTokensProvider,undefined);
+    assert.equal(initialized.result.capabilities.definitionProvider,true);
+    assert.equal(initialized.result.capabilities.referencesProvider,true);
+    assert.equal(initialized.result.capabilities.hoverProvider,true);
+  }finally{
+    await worker.terminate();
+  }
+});
+
 test("analysis rejection preserves independent v1alpha5 source semantic colors until Package close",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   const rootUri="file:///workspace/semantic-rejection";
