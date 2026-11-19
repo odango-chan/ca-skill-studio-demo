@@ -140,9 +140,16 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         renderer=createSemanticTokenDecorationRenderer(
           vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
         );
-        extensionHostSemanticTokenRenderer=renderer;
+        let rendererDisposed=false;
+        extensionHostSemanticTokenRenderer={
+          dispose(){
+            if(rendererDisposed)return;
+            rendererDisposed=true;
+            renderer?.dispose();
+          }
+        };
         semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
-        context.subscriptions.push({dispose:()=>renderer?.dispose()});
+        context.subscriptions.push(extensionHostSemanticTokenRenderer);
       }catch(error){
         semanticTokenDiagnostics.renderError=String(error?.message??error);
       }
@@ -174,21 +181,29 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         return result;
       }
     };
-    const registration=vscode.languages.registerDocumentSemanticTokensProvider(
+    const nativeRegistration=vscode.languages.registerDocumentSemanticTokensProvider(
       [
         {scheme:"file",pattern:"**/*.yaml"},
         {scheme:"file",pattern:"**/*.yml"},
-        {scheme:"file",pattern:"**/*.py"},
-        {scheme:"file",pattern:"**/SKILL.md"}
+        {language:"yaml"},
+        {language:"plaintext",pattern:"**/*.yaml"},
+        {language:"plaintext",pattern:"**/*.yml"}
       ],
       provider,
       legend
     );
-    extensionHostSemanticTokenRegistration=registration;
+    let registrationDisposed=false;
+    extensionHostSemanticTokenRegistration={
+      dispose(){
+        if(registrationDisposed)return;
+        registrationDisposed=true;
+        nativeRegistration.dispose();
+      }
+    };
     semanticTokenDiagnostics.registered=true;
     semanticTokenDiagnostics.tokenTypeCount=SKILL_SEMANTIC_TOKEN_TYPES.length;
     semanticTokenDiagnostics.transport="source-local";
-    context.subscriptions.push(registration);
+    context.subscriptions.push(extensionHostSemanticTokenRegistration);
   }
   function updateLanguageStatus(state,detail){
     // A terminal Worker failure must never be overwritten by stale READY or
