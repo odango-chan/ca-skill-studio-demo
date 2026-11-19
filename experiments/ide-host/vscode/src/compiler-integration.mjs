@@ -6,6 +6,9 @@ import {createCompilerWorkerClient} from "./compiler-client.mjs";
 import {normalizeCompilerDiagnostics} from "./compiler-diagnostics.mjs";
 import {createCompilerResultGate} from "./compiler-result-gate.mjs";
 import {
+  compilerMarkerShadowed,compilerMarkerSignature
+} from "./compiler-marker-reconciliation.mjs";
+import {
   COMPILER_VERSION,
   COMPILER_INSPECTION_VERSION,
   COMPILER_LANGUAGE_TARGET,
@@ -157,16 +160,21 @@ function makeArtifactProvider(vscode,context,output){
 }
 
 export function registerCompilerIntegration(vscode,context,{
-  getActiveDocument=()=>vscode.window.activeTextEditor?.document??null
+  getActiveDocument=()=>vscode.window.activeTextEditor?.document??null,
+  getAcceptedLanguageFindings=()=>[]
 }={}){
   const output=vscode.window.createOutputChannel("Skill Compiler · "+COMPILER_VERSION);
   const diagnostics=vscode.languages.createDiagnosticCollection("skill-compiler");
   const compilerProblems=new Map();
+  // Only the Compiler's public editor-marker view is reconciled. The raw
+  // Compiler Problems and the LSP-owned collection are never rewritten.
+  const compilerMarkerSignatures=new Map();
   const resultGate=createCompilerResultGate();
   const problemsEmitter=new vscode.EventEmitter();
   const problemsProvider={
     onDidChange:problemsEmitter.event,
-    getProblems:()=>[...compilerProblems.values()].flat()
+    getProblems:()=>[...compilerProblems.values()].flat(),
+    refreshMarkers:rootUri=>refreshCompilerMarkers(rootUri)
   };
   const client=createCompilerWorkerClient(vscode,context);
   const artifacts=makeArtifactProvider(vscode,context,output);
@@ -179,27 +187,95 @@ export function registerCompilerIntegration(vscode,context,{
          uri.authority===packageRoot.authority&&
          uri.path.startsWith(prefix))diagnostics.delete(uri);
     });
+    for(const key of compilerMarkerSignatures.keys()){
+      const uri=asUri(vscode,key);
+      if(uri&&uri.scheme===packageRoot.scheme&&
+         uri.authority===packageRoot.authority&&
+         uri.path.startsWith(prefix))compilerMarkerSignatures.delete(key);
+    }
+  }
+
+  // Only confirmed, current-generation Studio LSP markers may shadow
+  // identical Compiler squiggles. If the LSP marker disappears, the Compiler
+  // marker is restored from its original Check/Build result.
+  function refreshCompilerMarkers(rootUri){
+    const root=asUri(vscode,rootUri);
+    if(!root)return;
+    const key=root.toString(),items=compilerProblems.get(key);
+    if(!items)return;
+    let accepted=[];
+    try{
+      const current=getAcceptedLanguageFindings(key);
+      if(Array.isArray(current))accepted=current;
+    }catch(error){
+      console.warn("Studio local diagnostic reconciliation unavailable",error);
+    }
+    const grouped=new Map();
+    for(const item of items){
+      if(item.locationKind!=="source"||!item.uri||
+         !resultGate.isCurrent(key,item.compilerRevision))continue;
+      const uri=asUri(vscode,item.uri);
+      if(!uri)continue;
+      const uriKey=uri.toString();
+      if(!grouped.has(uriKey))grouped.set(uriKey,{uri,items:[]});
+      let visible=[];
+      try{visible=vscode.languages.getDiagnostics?.(uri)??[];}
+      catch{/* Missing local markers must never suppress Compiler evidence. */}
+      if(compilerMarkerShadowed(item,visible,accepted))continue;
+      grouped.get(uriKey).items.push(item);
+    }
+    const prefix=root.path.replace(/\/$/,"")+"/";
+    const previous=[...compilerMarkerSignatures.keys()].filter(uriKey=>{
+      const uri=asUri(vscode,uriKey);
+      return uri?.scheme===root.scheme&&uri.authority===root.authority&&
+        uri.path.startsWith(prefix);
+    });
+    for(const uriKey of previous){
+      if(!grouped.has(uriKey)){
+        compilerMarkerSignatures.delete(uriKey);
+        diagnostics.delete(asUri(vscode,uriKey));
+      }
+    }
+    for(const [uriKey,entry] of grouped){
+      const signature=compilerMarkerSignature(entry.items);
+      if(signature===compilerMarkerSignatures.get(uriKey))continue;
+      const markers=entry.items.map(item=>{
+        const line=item.line-1,column=item.column-1;
+        const severity=item.severity==="warning"
+          ?vscode.DiagnosticSeverity.Warning:vscode.DiagnosticSeverity.Error;
+        const marker=new vscode.Diagnostic(new vscode.Range(
+          new vscode.Position(line,column),new vscode.Position(line,column+1)),
+        item.message,severity);
+        marker.source="CA Skill Compiler "+COMPILER_VERSION;
+        marker.code=item.code;
+        return marker;
+      });
+      // Commit the signature before the native diagnostic event can fire.
+      compilerMarkerSignatures.set(uriKey,signature);
+      if(markers.length)diagnostics.set(entry.uri,markers);
+      else diagnostics.delete(entry.uri);
+    }
   }
 
   function invalidatePackage(packageRoot){
     if(!packageRoot)return;
     const rootKey=packageRoot.toString();
     resultGate.advance(rootKey);
+    const removed=compilerProblems.delete(rootKey);
     clearPackageDiagnostics(packageRoot);
-    if(compilerProblems.delete(rootKey))problemsEmitter.fire();
+    if(removed)problemsEmitter.fire();
   }
 
   function invalidateAll(){
     const known=new Set([...resultGate.knownRoots(),...compilerProblems.keys()]);
     resultGate.invalidateAll();
+    const hadProblems=compilerProblems.size>0;
+    compilerProblems.clear();
     for(const key of known){
       const root=asUri(vscode,key);
       if(root)clearPackageDiagnostics(root);
     }
-    if(compilerProblems.size){
-      compilerProblems.clear();
-      problemsEmitter.fire();
-    }
+    if(hadProblems)problemsEmitter.fire();
   }
 
   function onWorkspaceFile(uri){
@@ -234,13 +310,25 @@ export function registerCompilerIntegration(vscode,context,{
        event.affectsConfiguration("connectionAgent.skillStudio"))invalidateAll();
   });
   listen(vscode.workspace.onDidChangeWorkspaceFolders,()=>invalidateAll());
+  // Native LSP publications are asynchronous; redo only the Compiler-owned
+  // projection when LSP markers are added/removed. Stable signatures break
+  // onDidChangeDiagnostics loops caused by our own collection updates.
+  listen(vscode.languages.onDidChangeDiagnostics,event=>{
+    const uris=event?.uris??[];
+    for(const rootKey of compilerProblems.keys()){
+      const root=asUri(vscode,rootKey);
+      const prefix=root?.path.replace(/\/$/,"")+"/";
+      if(root&&uris.some(uri=>uri.scheme===root.scheme&&
+         uri.authority===root.authority&&uri.path.startsWith(prefix)))
+        refreshCompilerMarkers(rootKey);
+    }
+  });
 
   function publishDiagnostics(packageRoot,packageName,procedureUri,items,compilerRevision){
     // Validate the whole Compiler response before touching any accepted
     // DiagnosticCollection. Missing or ungrounded source ranges remain
     // request/file Problems, never synthetic line-1 editor errors.
     const projected=normalizeCompilerDiagnostics(items,{packageName,requirePhase:true});
-    const grouped=new Map();
     const problemEntries=[];
     for(const item of projected){
       const sourceUri=item.sourcePath
@@ -263,21 +351,11 @@ export function registerCompilerIntegration(vscode,context,{
           ": no authoritative line/column; editor marker not invented");
         continue;
       }
-      const line=item.line-1,column=item.column-1;
-      const severity=item.severity==="warning"
-        ?vscode.DiagnosticSeverity.Warning:vscode.DiagnosticSeverity.Error;
-      const diagnostic=new vscode.Diagnostic(
-        new vscode.Range(new vscode.Position(line,column),
-          new vscode.Position(line,column+1)),item.message,severity
-      );
-      diagnostic.source="CA Skill Compiler "+COMPILER_VERSION;
-      diagnostic.code=item.code;
-      if(!grouped.has(uri.toString()))grouped.set(uri.toString(),{uri,items:[]});
-      grouped.get(uri.toString()).items.push(diagnostic);
+      // Keep the validated source Problem even if LSP already owns an
+      // identical visual marker; only refreshCompilerMarkers filters squiggles.
     }
-    clearPackageDiagnostics(packageRoot);
-    for(const {uri,items:group} of grouped.values())diagnostics.set(uri,group);
     compilerProblems.set(packageRoot.toString(),problemEntries);
+    refreshCompilerMarkers(packageRoot);
     problemsEmitter.fire();
     output.appendLine("Compiler diagnostics: "+projected.length+
       " · "+projected.filter(item=>item.severity==="error").length+" error(s)");

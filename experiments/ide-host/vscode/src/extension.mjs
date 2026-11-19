@@ -151,7 +151,9 @@ export function activate(context){
   const compilerIntegration=registerSafely("Compiler",
     ()=>registerCompilerIntegration(vscode,context,{
       getActiveDocument:()=>workbench?.getActiveDocument?.()??
-        vscode.window.activeTextEditor?.document??null
+        vscode.window.activeTextEditor?.document??null,
+      getAcceptedLanguageFindings:rootUri=>
+        workbench?.getAcceptedPackageDiagnostics?.(rootUri)??[]
     }),{provider:null,problems:null,dispose(){}});
   const dependencyIntegration=registerSafely("Dependencies",
     ()=>registerDependencyIntegration(vscode,context,{
