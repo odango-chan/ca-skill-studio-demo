@@ -29,6 +29,12 @@ export function readToolCatalog(bytes,format,sourcePath=formatPath(format)){
     {path,text}
   ]);
   if(!result.available)fail(result.reason);
+  const identities=new Set();
+  for(const operation of result.operations){
+    if(identities.has(operation.id))
+      fail("duplicate ToolCatalog callable ID: "+operation.id);
+    identities.add(operation.id);
+  }
   return {path,text,operations:result.operations};
 }
 
