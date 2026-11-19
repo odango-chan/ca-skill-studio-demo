@@ -97,7 +97,6 @@ try{
     width:1440,height:1000,deviceScaleFactor:1,mobile:false
   });
   const target=new URL("http://127.0.0.1:"+server.address().port+basePath+"/");
-  target.searchParams.set("skillStudioFixedLayoutTest","1");
   await command("Page.navigate",{url:target.toString()});
 
   let state=null;

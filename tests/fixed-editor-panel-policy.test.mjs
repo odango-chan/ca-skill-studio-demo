@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {
   constrainMainEditorPanelOptions,
-  isMainEditorPanelOptions
+  isMainEditorPanelOptions,
+  createPreviewAutoRevealPreference
 } from "../experiments/ide-host/theia-fixed-workbench/src/browser/fixed-editor-panel-policy.mjs";
 
 const MAIN = "theia-app-main";
@@ -50,4 +51,38 @@ test("production shell enforces the fixed Main Editor without a test-only URL fl
   assert.match(source,/rebind\(TheiaDockPanel\.Factory\)/);
   assert.match(source,/constrainMainEditorPanelOptions\(options, MAIN_AREA_CLASS\)/);
   assert.doesNotMatch(source,/skillStudioFixedLayoutTest|FIXED_LAYOUT_TEST_QUERY|if \(!enabled\)/);
+});
+
+test("Preview auto-reveals once per browser profile and then respects restored layout", () => {
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, value); }
+  };
+  const firstLaunch = createPreviewAutoRevealPreference(storage);
+  assert.equal(firstLaunch.shouldReveal(), true);
+  firstLaunch.markRevealed();
+  assert.equal(firstLaunch.shouldReveal(), false);
+
+  const restoredLaunch = createPreviewAutoRevealPreference(storage);
+  assert.equal(restoredLaunch.shouldReveal(), false,
+    "a later launch must not override the user's saved hidden / visible layout");
+});
+
+test("Preview auto-reveal remains safe when browser storage is unavailable", () => {
+  const preference = createPreviewAutoRevealPreference({
+    getItem() { throw new Error("storage blocked"); },
+    setItem() { throw new Error("storage blocked"); }
+  });
+  assert.equal(preference.shouldReveal(), true,
+    "storage failure must not prevent the initial Preview from appearing");
+  preference.markRevealed();
+  assert.equal(preference.shouldReveal(), false,
+    "the in-memory guard still prevents duplicate activation during this session");
+});
+
+test("real Chromium fixed-layout smoke exercises the production URL without a test-only flag", () => {
+  const source = readFileSync(
+    "experiments/ide-host/scripts/theia-fixed-layout-smoke.mjs", "utf8");
+  assert.doesNotMatch(source, /skillStudioFixedLayoutTest|FIXED_LAYOUT_TEST_QUERY/);
 });

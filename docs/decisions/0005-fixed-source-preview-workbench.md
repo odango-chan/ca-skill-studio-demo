@@ -36,7 +36,7 @@ The left, right and bottom panel modes remain host defaults. Do not change the E
 Contribute a single `skillStudio.preview` WebviewView to the existing `skillStudioInspector` container in the Secondary Sidebar.
 
 - Use one stable view identity and one `WebviewViewProvider`; do not create a WebviewPanel, CustomEditor or editor tab for a preview.
-- Show Preview by default on first workspace open. After that, respect the user's native view visibility, movement, sizing and layout preferences.
+- Show Preview by default on the first successful browser-profile launch. Persist that one-time reveal; on later launches, let Theia restore the user's saved visibility, movement, sizing and layout preferences. A user can reopen Preview from the native View menu.
 - Keep Inspector and its existing Source-derived Data Flow behavior as a separate view in the same Secondary Sidebar.
 - The Preview Host follows the active Source editor. Switching Source tabs updates the same view in place.
 - A Source file without a supported visual projection shows a neutral empty state; it does not open a new group or create a new preview.
@@ -108,7 +108,7 @@ All Skill-language parsing, projection, diagnostics, Source Patch rules, Package
 ### Preview lifecycle
 
 - Exactly one Preview view identity and one active provider exist.
-- Preview is visible on first workspace open and later respects the user's layout choices.
+- Preview is auto-revealed once for a new browser profile; hiding it and reloading the same profile keeps it hidden, while manually reopening it remains a native Theia view action.
 - Switching tabs and editing Source updates the same Preview view without creating tabs or losing the Source's native editing state.
 - Unsupported files show a neutral empty state.
 - Source navigation always opens in the single Source group.

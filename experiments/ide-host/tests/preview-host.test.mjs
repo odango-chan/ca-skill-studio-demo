@@ -6,12 +6,14 @@ import {
 
 const doc=(path,version=1)=>({uri:{path,toString(){return "file://"+path;}},version});
 const makeView=()=>{
-  const calls={html:[],options:[]};
+  const calls={html:[],options:[]},visibilityListeners=[];
   const webview={};
   Object.defineProperty(webview,"html",{set(v){calls.html.push(v);},get(){return calls.html.at(-1);}});
   Object.defineProperty(webview,"options",{set(v){calls.options.push(v);},get(){return calls.options.at(-1);}});
-  return {visible:true,webview,calls,onDidDispose(){return {dispose(){}};},
-    onDidChangeVisibility(){return {dispose(){}};}};
+  return {visible:true,webview,calls,
+    setVisible(value){this.visible=value;for(const listener of visibilityListeners)listener();},
+    onDidDispose(){return {dispose(){}};},
+    onDidChangeVisibility(listener){visibilityListeners.push(listener);return {dispose(){}};}};
 };
 
 test("one stable preview identity maps all supported source kinds",()=>{
@@ -132,10 +134,13 @@ test("Markdown Source activates native language features without opening the nat
   controller.dispose();
 });
 
-test("active visual Source reveals the collapsed right Inspector and mounts the Preview View",async()=>{
-  const calls=[],sessions=[];
+test("first visual Source reveals Preview, then the user's hidden preference is respected",async()=>{
+  const calls=[],sessions=[],stored=new Map();
   let provider=null,activeListener=null;
-  const context={subscriptions:[]};
+  const context={subscriptions:[],globalState:{
+    get(key){return stored.get(key);},
+    update(key,value){stored.set(key,value);return Promise.resolve();}
+  }};
   const vscode={
     commands:{executeCommand:async id=>{calls.push(id);return true;}},
     window:{
@@ -153,26 +158,53 @@ test("active visual Source reveals the collapsed right Inspector and mounts the 
     }
   });
   await Promise.resolve();await Promise.resolve();
-  assert.ok(calls.includes("workbench.view.extension.skillStudioInspector"),
-    "the hidden secondary sidebar must be revealed for the initial Procedure");
+  assert.equal(calls.filter(x=>x==="workbench.view.extension.skillStudioInspector").length,1,
+    "the default Preview container is revealed for the first visual Source");
   assert.ok(provider);
   const view=makeView();
-  view.onDidDispose=()=>({dispose(){}});
   provider.resolveWebviewView(view);
   assert.equal(sessions.length,1);
   assert.equal(controller.state.visible,true);
   assert.equal(controller.state.kind,"procedure");
   assert.equal(sessions[0].panel.webview,view.webview);
   assert.equal(sessions[0].options.isCurrent(),true);
-  activeListener(null);
-  assert.equal(controller.state.kind,"procedure","focus transfer must retain the active Source");
-  activeListener({document:doc("/skills/demo/scripts/check.py")});
-  assert.equal(controller.state.kind,"none");
-  assert.equal(sessions[0].disposed,true);
-  view.visible=false;
+  assert.equal(stored.get("skillStudio.preview.visible"),true);
+
+  view.setVisible(false);
+  assert.equal(stored.get("skillStudio.preview.visible"),false,
+    "a deliberate hide is persisted");
   activeListener({document:doc("/skills/demo/assurance/contract.yaml")});
   await Promise.resolve();await Promise.resolve();
-  assert.ok(calls.filter(x=>x==="workbench.view.extension.skillStudioInspector").length>=2,
-    "opening a visual Source after the right container was hidden must reveal it again");
+  assert.equal(calls.filter(x=>x==="workbench.view.extension.skillStudioInspector").length,1,
+    "switching to another visual Source must not undo the user's hide choice");
+
+  // A manual reopen from the native View menu is observed and persisted.
+  view.setVisible(true);
+  assert.equal(stored.get("skillStudio.preview.visible"),true);
+  view.setVisible(false);
+  activeListener({document:doc("/skills/demo/assurance/predicates.yaml")});
+  await Promise.resolve();await Promise.resolve();
+  assert.equal(calls.filter(x=>x==="workbench.view.extension.skillStudioInspector").length,1);
+  controller.dispose();
+});
+
+test("a persisted hidden Preview is not auto-opened on extension activation",async()=>{
+  const calls=[],stored=new Map([["skillStudio.preview.visible",false]]);
+  const context={subscriptions:[],globalState:{
+    get(key){return stored.get(key);},
+    update(key,value){stored.set(key,value);return Promise.resolve();}
+  }};
+  const vscode={
+    commands:{executeCommand:async id=>{calls.push(id);return true;}},
+    window:{
+      activeTextEditor:{document:doc("/skills/demo/assurance/procedure.yaml")},
+      registerWebviewViewProvider(){return {dispose(){}};},
+      onDidChangeActiveTextEditor(){return {dispose(){}};}
+    }
+  };
+  const controller=registerPreviewHost(vscode,context,{mountProcedure(){}});
+  await Promise.resolve();await Promise.resolve();
+  assert.deepEqual(calls,[],
+    "the host must respect the persisted hidden preference on reload");
   controller.dispose();
 });

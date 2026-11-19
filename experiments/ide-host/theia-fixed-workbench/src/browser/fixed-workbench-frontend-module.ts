@@ -6,7 +6,7 @@ import { CorePreferences } from '@theia/core/lib/common/core-preferences';
 import { MAIN_AREA_CLASS } from '@theia/core/lib/browser/shell/application-shell';
 import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
 import type { DockPanel } from '@lumino/widgets';
-import { constrainMainEditorPanelOptions, isMainEditorPanelOptions } from './fixed-editor-panel-policy.mjs';
+import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference } from './fixed-editor-panel-policy.mjs';
 
 const PREVIEW_CONTAINER_WIDGET_ID = 'plugin-view-container:workbench.view.extension.skillStudioInspector';
 
@@ -22,24 +22,46 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
         return {
             onStart(app: FrontendApplication) {
                 const shell = app.shell;
+                let storage: Storage | undefined;
+                try {
+                    storage = window.localStorage;
+                } catch {
+                    // The Preview remains usable; only the cross-reload preference
+                    // is unavailable in this browser context.
+                }
+                const autoReveal = createPreviewAutoRevealPreference(storage);
+                let revealInFlight = false;
                 const reveal = () => {
-                    if (stopped || !shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID)) {
+                    if (stopped || !autoReveal.shouldReveal() || revealInFlight ||
+                        !shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID)) {
                         return;
                     }
-                    shell.expandPanel('right');
-                    void shell.activateWidget(PREVIEW_CONTAINER_WIDGET_ID).then(() => {
-                        if (stopped) return;
-                        // The stock Secondary Sidebar defaults to ~227px, which
-                        // cannot display a readable React Flow canvas. Only grow
-                        // cramped initial layouts; preserve user-resized widths.
-                        const preview = shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID);
-                        const width = preview?.node?.getBoundingClientRect().width ?? 0;
-                        if (width > 0 && width < 400 && window.innerWidth >= 1050) {
-                            shell.resize(Math.min(620, Math.round(window.innerWidth * 0.43)), 'right');
-                        }
-                    }).catch(error => {
+                    revealInFlight = true;
+                    try {
+                        shell.expandPanel('right');
+                        void Promise.resolve(shell.activateWidget(PREVIEW_CONTAINER_WIDGET_ID))
+                            .then(() => {
+                                if (stopped) return;
+                                autoReveal.markRevealed();
+                                // The stock Secondary Sidebar defaults to ~227px, which
+                                // cannot display a readable React Flow canvas. Only grow
+                                // cramped initial layouts; preserve user-resized widths.
+                                const preview = shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID);
+                                const width = preview?.node?.getBoundingClientRect().width ?? 0;
+                                if (width > 0 && width < 400 && window.innerWidth >= 1050) {
+                                    shell.resize(Math.min(620, Math.round(window.innerWidth * 0.43)), 'right');
+                                }
+                            })
+                            .catch(error => {
+                                console.warn('SKILL Studio Preview container could not be activated:', error);
+                            })
+                            .finally(() => {
+                                revealInFlight = false;
+                            });
+                    } catch (error) {
+                        revealInFlight = false;
                         console.warn('SKILL Studio Preview container could not be activated:', error);
-                    });
+                    }
                 };
                 // Wait until Theia has attached the shell and restored persisted
                 // layout; otherwise the restored layout could immediately hide

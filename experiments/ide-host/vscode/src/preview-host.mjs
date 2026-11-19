@@ -135,6 +135,21 @@ export function registerPreviewHost(vscode,context,renderers) {
   const isTheiaHost=vscode.env?.uriScheme==="theia"||
     (typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST);
   let lastDocument=vscode.window.activeTextEditor?.document??null;
+  const visibilityKey="skillStudio.preview.visible";
+  let previewVisibilityPreference;
+  try{previewVisibilityPreference=context.globalState?.get(visibilityKey);}
+  catch{previewVisibilityPreference=undefined;}
+  let previewWasVisible=false;
+  const persistPreviewVisibility=visible=>{
+    previewVisibilityPreference=visible;
+    try{
+      const pending=context.globalState?.update?.(visibilityKey,visible);
+      if(pending&&typeof pending.catch==="function")
+        void pending.catch(error=>console.warn("SKILL Studio could not persist Preview visibility:",String(error)));
+    }catch(error){
+      console.warn("SKILL Studio could not persist Preview visibility:",String(error));
+    }
+  };
   let revealInFlight=null,markdownActivation=null;
   const activateMarkdownLanguageFeatures=()=>{
     const extension=vscode.extensions?.getExtension?.("vscode.markdown-language-features");
@@ -168,9 +183,25 @@ export function registerPreviewHost(vscode,context,renderers) {
   const subscription=vscode.window.registerWebviewViewProvider(PREVIEW_VIEW_ID,{
     resolveWebviewView(view){
       controller.resolve(view,lastDocument);
+      const syncVisibility=()=>{
+        if(view.visible){
+          previewWasVisible=true;
+          if(previewVisibilityPreference!==true)persistPreviewVisibility(true);
+        }else if(previewWasVisible&&previewVisibilityPreference!==false){
+          // Only record a hide after this view has actually been shown. A
+          // provider resolved inside a collapsed container is not user intent.
+          persistPreviewVisibility(false);
+        }
+      };
+      if(view.visible)syncVisibility();
+      const visibility=view.onDidChangeVisibility?.(syncVisibility);
       // Theia can recreate a view after it has been closed. Do not register
       // process-global Webview subscriptions or survive a disposed instance.
-      const release=view.onDidDispose(()=>{controller.disposeView(view);release.dispose();});
+      const release=view.onDidDispose(()=>{
+        visibility?.dispose?.();
+        controller.disposeView(view);
+        release.dispose();
+      });
     }
   },{webviewOptions:{retainContextWhenHidden:true}});
   const active=vscode.window.onDidChangeActiveTextEditor(editor=>{
@@ -181,14 +212,14 @@ export function registerPreviewHost(vscode,context,renderers) {
     const kind=previewDocumentKind(lastDocument.uri);
     if(kind==="markdown")void activateMarkdownLanguageFeatures();
     controller.update(lastDocument);
-    if(kind!=="none"&&!controller.state.visible)
+    if(kind!=="none"&&!controller.state.visible&&previewVisibilityPreference!==false)
       void revealContainer();
   });
   // The extension may activate after the initial Source editor is already open.
   if(lastDocument){
     const kind=previewDocumentKind(lastDocument.uri);
     if(kind==="markdown")void activateMarkdownLanguageFeatures();
-    if(kind!=="none")void revealContainer();
+    if(kind!=="none"&&previewVisibilityPreference!==false)void revealContainer();
   }
   context.subscriptions.push(subscription,active,{dispose:()=>controller.dispose()});
   return controller;
