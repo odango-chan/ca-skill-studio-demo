@@ -135,6 +135,85 @@ function classifyV1Alpha5Tokens(text, relativePath) {
 }
 
 
+// Presentation-only fallback for persisted pre-v1alpha5 Example Source.
+// A legacy Package remains UNSUPPORTED for analysis/Compiler/Host. Coloring
+// should still identify exact YAML identities, without treating them as
+// resolved capabilities, admitted operations or valid v1alpha5 declarations.
+function classifyLegacySkillSource(text, relativePath) {
+  const segments=relativePath.split("/").filter(Boolean);
+  if(segments.some(part=>part==="."||part==="..") ||
+      !/(?:^|\\/)assurance\\/(?:procedure|contract|predicates)\\.yaml$/.test(relativePath))
+    return [];
+  let doc;
+  try {
+    doc=parseDocument(text,{version:"1.2",strict:true,uniqueKeys:true,
+      keepSourceTokens:true,logLevel:"silent"});
+  } catch { return []; }
+  if(doc.errors.length||!isMap(doc.contents))return [];
+  const rootKeys=new Set(doc.contents.items
+    .filter(pair=>isScalar(pair.key)).map(pair=>String(pair.key.value)));
+  if(!["apiVersion","kind","metadata","spec","procedures"].some(key=>rootKeys.has(key)) &&
+      !(relativePath.endsWith("/predicates.yaml")&&rootKeys.has("predicates")))
+    return [];
+  const tokens=[];
+  let visited=0;
+  const keywords=new Set(["apiVersion","kind","metadata","spec","procedures",
+    "nodes","inputs","outputs","start","applicability","preconditions",
+    "postconditions","steps","on","routes","with","from","predicates",
+    "observations","ref","parameters","evaluator","expression","type",
+    "goal","requestSchema","contextSchema","capabilities","dependencies",
+    "call","verify","reconcile","resolve","effects","outcomes"]);
+  const terminal=new Set(["PASS","FAIL","UNKNOWN","SUCCEEDED","FAILED",
+    "UNRESOLVED","SAFE_STOPPED","DENIED","OUTCOME_UNKNOWN"]);
+  const push=(node,type,modifiers,path,part)=>{
+    const span=scalarSpan(text,node);
+    if(span)tokens.push({...span,type,modifiers,path,part});
+  };
+  const visit=(node,path,depth)=>{
+    if(++visited>MAX_NODES||depth>MAX_DEPTH||tokens.length>MAX_TOKENS)
+      throw Error("Legacy source semantic budget");
+    if(isSeq(node)){
+      for(const item of node.items)visit(item,[...path,"*"],depth+1);
+      return;
+    }
+    if(!isMap(node)){
+      if(!isScalar(node)||typeof node.value!=="string")return;
+      const last=path.at(-1),parent=path.at(-2);
+      if(last==="call")push(node,"skillOperation",["reference"],path,"value");
+      else if(last==="verify"||last==="predicate")
+        push(node,"skillPredicate",["reference"],path,"value");
+      else if(last==="ref")push(node,"skillObservation",["reference"],path,"value");
+      else if(last==="requestSchema"||last==="contextSchema")
+        push(node,"skillSchema",["reference"],path,"value");
+      else if(last==="start")push(node,"skillStep",["reference"],path,"value");
+      else if(parent==="on"||parent==="routes")
+        push(node,terminal.has(node.value)?"skillOutcome":"skillStep",
+          terminal.has(node.value)?[]:["reference"],path,"value");
+      else if(last==="from"||path.includes("with"))
+        push(node,"skillBinding",[],path,"value");
+      return;
+    }
+    for(const pair of node.items){
+      if(!isScalar(pair.key)||typeof pair.key.value!=="string")continue;
+      const key=pair.key.value,next=[...path,key],parent=path.at(-1);
+      if(parent==="procedures"||parent==="nodes")
+        push(pair.key,"skillStep",["declaration"],next,"key");
+      else if(parent==="predicates")
+        push(pair.key,"skillPredicate",["declaration"],next,"key");
+      else if(parent==="on"||parent==="routes")
+        push(pair.key,"skillOutcome",[],next,"key");
+      else if(key==="call"||key==="verify")
+        push(pair.key,"skillOperator",[],next,"key");
+      else if(keywords.has(key))
+        push(pair.key,"skillKeyword",[],next,"key");
+      visit(pair.value,next,depth+1);
+    }
+  };
+  try{visit(doc.contents,[],0);}catch{return [];}
+  return tokens.sort((a,b)=>a.start-b.start||a.end-b.end);
+}
+
+
 function classifyImportedLibraryTokens(text, relativePath) {
   if (!relativePath.startsWith("lib/") || !/^kind:\s*ToolCatalog\s*$/m.test(text)) return [];
   let doc;
@@ -183,7 +262,8 @@ function classifyImportedLibraryTokens(text, relativePath) {
 export function classifySkillSemanticTokens(text, relativePath) {
   if (typeof text !== "string" || typeof relativePath !== "string" || text.length > MAX_SOURCE_LENGTH) return [];
   if (isV1Alpha5Source(text, relativePath)) return classifyV1Alpha5Tokens(text, relativePath);
-  return classifyImportedLibraryTokens(text, relativePath);
+  const imported=classifyImportedLibraryTokens(text, relativePath);
+  return imported.length ? imported : classifyLegacySkillSource(text, relativePath);
 }
 
 export const SKILL_SEMANTIC_TOKEN_TYPES = SKILL_SEMANTIC_LEGEND.tokenTypes;
