@@ -1,4 +1,3 @@
-import {projectWorkspace} from '../../../../site/workspace.mjs';
 import {phaseStepDependencyReport} from '../../../../site/phase-dataflow.mjs';
 import {phaseConsumerContractReport} from '../../../../site/phase-consumer-contract.mjs';
 import {phaseStepEvidenceSummary,bindingEvidenceExplanation}
@@ -7,15 +6,15 @@ import {phaseOutputReferenceOptions,previewPhaseOutputReference}
   from '../../../../site/phase-output-refs.mjs';
 import {phaseRouteTargetOptions} from '../../../../site/phase-routes.mjs';
 import {phaseOutcomeEditOptions} from '../../../../site/phase-outcomes.mjs';
-import {isV1Alpha5Procedure,analyzeV1Alpha5Source}
-  from '../../../../language/core/v1alpha5.ts';
+import {analyzeCurrentSource}
+  from '../../../../language/core/source.ts';
 
 // UI adapter only: every fact below comes from the shared language source projection.
 const row=(label,line,children=[],extra={})=>({label,line,children,...extra});
 const sameBinding=(a,b)=>a.phaseName===b.phaseName&&a.stepIndex===b.stepIndex&&
   a.bindingKey===b.bindingKey;
 const display=value=>value===undefined||value===null||value===''?'未声明':String(value);
-function classifyV1Alpha5Source(value){
+function classifyCurrentSource(value){
   const raw=String(value??"").trim();
   if(/^context\./.test(raw))return {
     kind:"Context",description:"Context reference · Host Context Schema not linked"
@@ -36,7 +35,7 @@ function classifyV1Alpha5Source(value){
     return {kind:"Literal",description:"Literal argument"};
   return {kind:"Expression",description:"Source expression · no implicit resolution"};
 }
-function v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRootUri){
+function currentInspectionSnapshot(text,selection,files,packageName,packageRootUri){
   const uriFor=path=>String(packageRootUri??"file:///skill").replace(/\/$/,"")+"/"+path;
   const documents=new Map();
   documents.set("assurance/procedure.yaml",{
@@ -49,7 +48,7 @@ function v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRoot
       uri:uriFor(path),relativePath:path,version:0,text:source
     });
   }
-  const analysis=analyzeV1Alpha5Source(documents,packageName||"skill");
+  const analysis=analyzeCurrentSource(documents,packageName||"skill");
   const projection=analysis.procedure,procedure=projection.procedures[0];
   if(projection.state!=="READY"||!procedure)return {
     model:{state:"UNAVAILABLE",entry:null,procedures:new Map(),diagnostics:projection.diagnostics},
@@ -106,7 +105,7 @@ function v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRoot
   const stageRows=(node?.stages??[]).map(stage=>{
     const children=[];
     for(const argument of stage.arguments??[]){
-      const source=classifyV1Alpha5Source(argument.value);
+      const source=classifyCurrentSource(argument.value);
       const binding={consumer:stage.name+" · "+argument.name,
         value:argument.value,line:argument.line,...source,evidenceRequirements:[]};
       bindings.push(binding);
@@ -120,7 +119,7 @@ function v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRoot
       call.arguments.forEach((value,index)=>{
         const parameter=call.parameters[index]||"arg"+(index+1);
         const line=call.argumentLines?.[index]??call.line;
-        const source=classifyV1Alpha5Source(value);
+        const source=classifyCurrentSource(value);
         const requirements=call.evidenceRequirements.filter(item=>
           item.parameter===parameter);
         const binding={consumer:call.predicate+" · "+parameter,value,
@@ -184,14 +183,11 @@ function v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRoot
 }
 export function inspectionSnapshot(text,selection={},projected=null,files=null,
   packageName="skill",packageRootUri="file:///skill"){
-  if(isV1Alpha5Procedure(text))
-    return v1alpha5InspectionSnapshot(text,selection,files,packageName,packageRootUri);
-  const model=projected??projectWorkspace(text);
-  if(model.state!=='READY')return {
-    model,outline:[],inspection:[],problems:model.diagnostics,
-    dataflow:null,consumerContracts:null
-  };
-  const procedure=model.procedures.get(selection.procedureId)??model.procedures.get(model.entry);
+  // The current CA-SL projection is the only authoring model. Invalid or
+  // historical source stays visible through current-grammar Problems; it is
+  // never reinterpreted by a fallback graph parser.
+  return currentInspectionSnapshot(text,selection,files,packageName,packageRootUri);
+  const model=projected;
   const node=procedure.nodes.find(n=>n.id===selection.nodeId);
   const dataflow=node?phaseStepDependencyReport(text,procedure.name,node.id,files):null;
   const consumerContracts=node?phaseConsumerContractReport(text,procedure.name,node.id,files):null;
