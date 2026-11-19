@@ -3,7 +3,6 @@ import {registerPreviewHost} from "./preview-host.mjs";
 import {mountMarkdownPreview} from "./markdown-preview.mjs";
 
 import {sourceViewType} from "./source-view-pair.mjs";
-import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
 // workers. Do not import node:crypto: the online host has no Node APIs.
@@ -14,14 +13,15 @@ function newNonce(){
   globalThis.crypto.getRandomValues(bytes);
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
-import {isProcedurePath,validateRouteProposal,
-  validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
 import {EXAMPLE_PROJECT_NAME,seedExampleProject} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
+const MAX_SOURCE_BYTES=1024*1024;
+const isProcedurePath=path=>typeof path==="string"&&
+  /(?:^|\\/)assurance\\/procedure\\.yaml$/.test(path);
 import {registerContractCommands,mountContractPreview} from "./contract-editor.mjs";
 import {registerPredicateCommands,mountPredicatePreview} from "./predicate-editor.mjs";
 import {registerSchemaCommands,mountSchemaPreview} from "./schema-editor.mjs";
@@ -402,29 +402,7 @@ export function activate(context){
           }
           return;
         }
-        if(message.type!=="applyRoute"&&message.type!=="applyRouteCreation")return;
-        try{
-          const source=document.getText();
-          const creating=message.type==="applyRouteCreation";
-          const edit=creating
-            ?validateCanvasRouteCreationProposal(source,document.version,message)
-            :validateRouteProposal(source,document.version,message);
-          // Native TextDocument remains the only write owner. Existing Route
-          // edits replace one scalar; new Route creation inserts one exact
-          // source line at a zero-length CST span. Both use native Undo/Save.
-          assertStudioMutation(document.uri,vscode.workspace.workspaceFolders??[],"edit");
-          const patch=new vscode.WorkspaceEdit();
-          patch.replace(document.uri,new vscode.Range(
-            document.positionAt(edit.start),document.positionAt(edit.end)),
-            creating?edit.newText:edit.newTarget);
-          const applied=await vscode.workspace.applyEdit(patch);
-          if(!applied)throw Error("Host rejected WorkspaceEdit");
-          await push();
-          void webview.postMessage({type:"applied",routeId:edit.routeId});
-        }catch(error){
-          void webview.postMessage({type:"error",message:String(error?.message??error)});
-          await push();
-        }
+        return;
       });
       let releasePanel=null,cleaned=false;
       const cleanup=()=>{
