@@ -244,7 +244,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           ?vscode.languages.getDiagnostics(contractUri).map(item=>({
             code:item.code,message:item.message,severity:item.severity,source:item.source,
             line:(item.range?.start?.line??0)+1,
-            column:(item.range?.start?.character??0)+1
+            column:(item.range?.start?.character??0)+1,
+            endLine:(item.range?.end?.line??0)+1,
+            endColumn:(item.range?.end?.character??0)+1
           })): [];
         const problemItems=(treeProviders.get("problems")?.getChildren?.()??[])
           .flatMap(item=>item.kind==="problem-group"?(item.children??[]):[item]);
@@ -256,7 +258,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           })),
           problems:problemItems.filter(item=>item.kind==="package-diagnostic").map(item=>({
             code:item.code,message:item.message,severity:item.severity,status:item.status,
-            domain:item.domain,path:item.path,line:item.line,column:item.column
+            domain:item.domain,path:item.path,line:item.line,column:item.column,
+            description:item.description
           })),
           editorMarkers
         };
