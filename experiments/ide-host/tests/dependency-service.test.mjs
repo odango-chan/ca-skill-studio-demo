@@ -75,7 +75,7 @@ test("pinned built-in snapshot persists, reloads and is verified byte for byte",
   assert.equal(h.values.dependencyLock.entries.length,1);
   assert.equal((await resolveLockedDependencies(h.vscode,h.root)).status,"READY");
   const digest=h.values.dependencyLock.entries[0].snapshotDigest.slice(7);
-  const file="/workspace/.skill-studio/dependencies/"+digest+"/tool-contract.json";
+  const file="/workspace/.skill-studio/dependencies/"+digest+"/tool-catalog.yaml";
   assert.ok(h.files.has(file));
   h.files.set(file,new TextEncoder().encode("tampered"));
   const error=await resolveLockedDependencies(h.vscode,h.root);
