@@ -46,14 +46,14 @@ child.stderr?.on("data",chunk=>{stderr=(stderr+chunk.toString()).slice(-4000);})
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let ws,sequence=0;
 const pending=new Map();
-const command=(method,params={})=>new Promise((resolve,reject)=>{
+const command=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
   const id=++sequence;
   const timer=setTimeout(()=>{
     pending.delete(id);
     reject(Error("Chromium command timed out: "+method));
   },30000);
   pending.set(id,{resolve,reject,timer});
-  ws.send(JSON.stringify({id,method,params}));
+  ws.send(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})}));
 });
 const evaluate=async expression=>{
   const result=await command("Runtime.evaluate",{
@@ -121,6 +121,59 @@ try{
     throw Error("Theia Main Editor did not enforce a single-document DockPanel: "+
       JSON.stringify(state));
   console.log("THEIA_FIXED_EDITOR_LAYOUT_SMOKE_PASS");
+
+  // Regression: browser tabs share localStorage, but their first Preview
+  // reveal must be independent. Earlier production builds persisted a
+  // site-wide one-shot flag, causing tab B's YAML Preview to stay hidden
+  // after tab A had successfully opened Markdown.
+  const originalTab=await evaluate(`(()=>{
+    const id=window.location.hash;
+    const key="skill-studio.preview.auto-revealed.v2:"+id;
+    window.localStorage.setItem("skill-studio.preview.auto-revealed.v1","1");
+    window.sessionStorage.setItem(key,"1");
+    return {url:window.location.href,key,
+      legacyFlag:window.localStorage.getItem("skill-studio.preview.auto-revealed.v1"),
+      tabFlag:window.sessionStorage.getItem(key)};
+  })()`);
+  if(originalTab.legacyFlag!=="1"||originalTab.tabFlag!=="1")
+    throw Error("Could not seed the first tab's Preview state");
+  const created=await command("Target.createTarget",{url:originalTab.url});
+  if(!created?.targetId)throw Error("Could not open an independent Chromium tab");
+  const attached=await command("Target.attachToTarget",{
+    targetId:created.targetId,flatten:true
+  });
+  if(!attached?.sessionId)throw Error("Could not attach to the second Chromium tab");
+  const secondSession=attached.sessionId;
+  await command("Runtime.enable",{},secondSession);
+  let secondTab=null;
+  for(let attempt=0;attempt<300;attempt++){
+    const result=await command("Runtime.evaluate",{
+      expression:`(()=>{
+        const probe=window.__skillStudioPreviewActivation;
+        if(typeof probe!=="function")return null;
+        const key="skill-studio.preview.auto-revealed.v2:"+window.location.hash;
+        return {url:window.location.href,key,
+          legacyFlag:window.localStorage.getItem("skill-studio.preview.auto-revealed.v1"),
+          tabFlag:window.sessionStorage.getItem(key),
+          activation:probe()};
+      })()`,
+      returnByValue:true
+    },secondSession);
+    if(result.exceptionDetails)throw Error("Second tab evaluation failed: "+
+      (result.exceptionDetails.exception?.description??result.exceptionDetails.text));
+    secondTab=result.result?.value;
+    if(secondTab?.activation)break;
+    await sleep(100);
+  }
+  if(!secondTab?.activation?.autoRevealPending||
+     secondTab.tabFlag!==null||secondTab.legacyFlag!=="1"||
+     secondTab.key!==originalTab.key)
+    throw Error("A newly opened YAML tab inherited another tab's Preview reveal: "+
+      JSON.stringify({originalTab,secondTab}));
+  console.log("THEIA_PREVIEW_TAB_ISOLATION_CHROMIUM_PASS",
+    JSON.stringify({originalTab,secondTab}));
+  await command("Target.closeTarget",{targetId:created.targetId});
+
 }catch(error){
   console.error("THEIA_FIXED_EDITOR_LAYOUT_SMOKE_FAIL",String(error?.stack??error));
   throw error;
