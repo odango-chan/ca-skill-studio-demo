@@ -19,9 +19,6 @@ import {registerProjectWelcome} from "./project-welcome.mjs";
 
 import {registerWorkbench} from "./workbench.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
-const MAX_SOURCE_BYTES=1024*1024;
-const isProcedurePath=path=>typeof path==="string"&&
-  /(?:^|\\/)assurance\\/procedure\\.yaml$/.test(path);
 import {registerContractCommands,mountContractPreview} from "./contract-editor.mjs";
 import {registerPredicateCommands,mountPredicatePreview} from "./predicate-editor.mjs";
 import {registerSchemaCommands,mountSchemaPreview} from "./schema-editor.mjs";
@@ -31,6 +28,9 @@ import {registerCompilerIntegration} from "./compiler-integration.mjs";
 import {registerPackageDiagnosticTesting} from "./package-diagnostic-testing.mjs";
 import {registerPackageRouteTesting} from "./package-route-testing.mjs";
 import {iconShapes} from "../../../../site/icons.mjs";
+const MAX_SOURCE_BYTES=1024*1024;
+const isProcedurePath=path=>typeof path==="string"&&
+  /(?:^|\/)assurance\/procedure\.yaml$/.test(path);
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
 // plugin worker; normal VS Code and backend-backed Theia retain host URIs.
