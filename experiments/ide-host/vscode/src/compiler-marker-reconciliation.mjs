@@ -27,7 +27,8 @@ export function compilerMarkerShadowed(item,localMarkers=[],acceptedFindings=[])
   if(!sameLine.length||sameLine.some(finding=>
     finding.status!=="confirmed"&&
     !(finding.status==null&&finding.source==="procedure-projection")))return false;
-  if(!sameLine.some(finding=>finding.severity===item.severity))return false;
+  if(!sameLine.some(finding=>finding.severity===item.severity&&
+    finding.confidence==="exact"))return false;
   return localMarkers.some(marker=>{
     const source=String(marker?.source??"");
     return source.startsWith("Skill Studio · ")&&
