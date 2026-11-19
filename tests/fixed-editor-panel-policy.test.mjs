@@ -54,20 +54,25 @@ test("production shell enforces the fixed Main Editor without a test-only URL fl
   assert.doesNotMatch(source,/skillStudioFixedLayoutTest|FIXED_LAYOUT_TEST_QUERY|if \(!enabled\)/);
 });
 
-test("Preview auto-reveals once per browser profile and then respects restored layout", () => {
+test("Preview auto-reveals once per tab/workspace, preserving a hidden layout on reload", () => {
   const values = new Map();
   const storage = {
     getItem(key) { return values.get(key) ?? null; },
     setItem(key, value) { values.set(key, value); }
   };
-  const firstLaunch = createPreviewAutoRevealPreference(storage);
+  const workspace = "#/.theia/globalStorage/example";
+  const firstLaunch = createPreviewAutoRevealPreference(storage,workspace);
   assert.equal(firstLaunch.shouldReveal(), true);
   firstLaunch.markRevealed();
   assert.equal(firstLaunch.shouldReveal(), false);
 
-  const restoredLaunch = createPreviewAutoRevealPreference(storage);
+  const restoredLaunch = createPreviewAutoRevealPreference(storage,workspace);
   assert.equal(restoredLaunch.shouldReveal(), false,
-    "a later launch must not override the user's saved hidden / visible layout");
+    "a reload in the same tab/workspace must not override the user's hidden layout");
+  const nextWorkspace = createPreviewAutoRevealPreference(storage,
+    "#/.theia/globalStorage/another-project");
+  assert.equal(nextWorkspace.shouldReveal(), true,
+    "a different workspace starts its own Preview lifecycle");
 });
 
 test("Preview auto-reveal remains safe when browser storage is unavailable", () => {
@@ -106,4 +111,33 @@ test("production shell waits for native Source and verifies visible right Previe
   assert.match(source,/shell\.revealWidget\(PREVIEW_CONTAINER_WIDGET_ID\)/);
   assert.match(source,/container\.isVisible/);
   assert.match(source,/if \(!visible\) return;[\s\S]*?autoReveal\.markRevealed\(\)/);
+});
+
+test("a new tab can open YAML Preview even after another tab opened Markdown", () => {
+  const makeStorage = () => {
+    const values = new Map();
+    return {
+      getItem(key) { return values.get(key) ?? null; },
+      setItem(key, value) { values.set(key, value); }
+    };
+  };
+  const workspace = "#/.theia/globalStorage/example";
+  const markdownTabStorage = makeStorage();
+  const yamlTabStorage = makeStorage();
+  const markdownTab = createPreviewAutoRevealPreference(markdownTabStorage,workspace);
+  markdownTab.markRevealed();
+  assert.equal(markdownTab.shouldReveal(), false);
+  assert.equal(createPreviewAutoRevealPreference(markdownTabStorage,workspace).shouldReveal(), false,
+    "refreshing the Markdown tab preserves its own layout");
+  assert.equal(createPreviewAutoRevealPreference(yamlTabStorage,workspace).shouldReveal(), true,
+    "the YAML tab must not inherit an unrelated tab's already-revealed flag");
+});
+
+test("production Preview initialization uses tab-scoped storage, never origin-wide localStorage", () => {
+  const source=readFileSync(
+    "experiments/ide-host/theia-fixed-workbench/src/browser/fixed-workbench-frontend-module.ts",
+    "utf8");
+  assert.match(source,/storage = window\.sessionStorage;/);
+  assert.match(source,/createPreviewAutoRevealPreference\(storage, window\.location\.hash\)/);
+  assert.doesNotMatch(source,/storage = window\.localStorage;/);
 });

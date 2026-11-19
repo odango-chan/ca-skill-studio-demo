@@ -25,11 +25,17 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                 const shell = app.shell;
                 let storage: Storage | undefined;
                 try {
-                    storage = window.localStorage;
+                    // sessionStorage belongs to this browser tab. A global
+                    // localStorage marker suppressed the Preview in new tabs
+                    // after another tab had already opened Markdown.
+                    storage = window.sessionStorage;
                 } catch {
                     // Browser profiles can disallow persistent storage.
                 }
-                const autoReveal = createPreviewAutoRevealPreference(storage);
+                // Each workspace has its own restored layout. Reset first
+                // reveal for another workspace without clearing the current
+                // tab's intentional hide/resize choice.
+                const autoReveal = createPreviewAutoRevealPreference(storage, window.location.hash);
                 let revealInFlight = false;
                 let attempts = 0;
                 let lastOutcome = 'not-attempted';
