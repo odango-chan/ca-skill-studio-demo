@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   PREVIEW_VIEW_ID,previewDocumentKind,previewEmptyHtml,createPreviewHostController
-} from "../experiments/ide-host/vscode/src/preview-host.mjs";
+} from "../vscode/src/preview-host.mjs";
 
 const doc=(path,version=1)=>({uri:{path,toString(){return "file://"+path;}},version});
 const makeView=()=>{
