@@ -11,7 +11,7 @@ import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
   from "../../../site/route-connect.mjs";
 
 test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and native Source",async()=>{
-  const source=readFileSync("site/samples/packages/establish-pdu-session/assurance/procedure.yaml","utf8");
+  const source=readFileSync("site/samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml","utf8");
   const makeUri=path=>({path,toString(){return "file://"+this.path;},with(change){return makeUri(change.path??this.path);}});
   const uri=makeUri("/workspace/assurance/procedure.yaml");
   const document={uri,text:source,version:21,
@@ -60,8 +60,8 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       },
       fs:{readFile:async uri=>new TextEncoder().encode(readFileSync(
         uri.path.endsWith("/assurance/contract.yaml")
-          ?"site/samples/packages/establish-pdu-session/assurance/contract.yaml"
-          :"site/samples/packages/establish-pdu-session/assurance/predicates.yaml","utf8"))},
+          ?"site/samples/v1alpha5/establish-pdu-session/assurance/contract.yaml"
+          :"site/samples/v1alpha5/establish-pdu-session/assurance/predicates.yaml","utf8"))},
       findFiles:async()=>[uri],
       asRelativePath:file=>file.path
     },
@@ -147,10 +147,12 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(posted.at(-1).version,21);
   assert.equal(posted.at(-1).packageRootUri,"file:///workspace");
   assert.equal(posted.at(-1).packageName,"workspace");
-  assert.equal(posted.at(-1).contractText,null,
-    "legacy Procedure snapshots must not trigger extra Contract reads");
-  assert.equal(posted.at(-1).predicatesText,null,
-    "legacy Procedure snapshots must not trigger extra PredicateSet reads");
+  assert.equal(typeof posted.at(-1).contractText,"string",
+    "the current Language Service snapshot must include Contract even when Procedure is invalid");
+  assert.equal(typeof posted.at(-1).predicatesText,"string",
+    "the current Language Service snapshot must include PredicateSet independently");
+  assert.match(posted.at(-1).contractText,/goal:/);
+  assert.match(posted.at(-1).predicatesText,/predicates:/);
   await onMessage({type:"exportPackageZip"});
   assert.ok(registered.some(args=>args[0]==="skillStudio.exportPackageZip"),
     "the native Procedure Webview routes ZIP export to the host command");
