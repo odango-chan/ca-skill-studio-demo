@@ -110,6 +110,13 @@ test("older source is diagnosed by the one current grammar without a version-spe
     assert.ok(result.params.publishedDiagnosticCount>0);
     assert.ok(procedure.params.diagnostics.some(item=>item.code==="SOURCE_ROOT_INVALID"));
     assert.ok(contract.params.diagnostics.some(item=>item.code==="UNKNOWN_FIELD"));
+    const unsupportedRootKey=procedure.params.diagnostics.find(item=>
+      item.code==="UNKNOWN_FIELD"&&item.message.includes("procedures")&&
+      item.source==="Skill Studio · procedure-projection");
+    assert.ok(unsupportedRootKey,"the current grammar must report the old root key");
+    assert.deepEqual(unsupportedRootKey.range,{
+      start:{line:1,character:0},end:{line:1,character:10}
+    },"the LSP marker must cover the entire YAML key, not one character");
     assert.ok(result.params.analysisDiagnostics.some(item=>
       item.relativePath==="assurance/predicates.yaml"&&item.code==="UNKNOWN_FIELD"));
     assert.ok(!result.params.analysisDiagnostics.some(item=>
