@@ -12,17 +12,10 @@ import type { PackageDocumentSnapshot, LanguageDiagnostic, ProcedureProjection, 
 const CONTRACT_FIELDS = new Set(["goal","precondition","requestSchema","contextSchema","dependencies","capabilities","limits"]);
 const STAGES = ["precondition","operation","observation","postcondition"] as const;
 const TERMINALS = new Set(["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"]);
-const OLD_FIELDS = new Set(["procedures","with","call","verify","reconcile","resolve","preconditions","postconditions","on","terminal","entryProcedure","apiVersion","kind","metadata","target"]);
 const EVAL_FIELDS = new Set(["parameters","evidence","evaluator"]);
 const WAIT_TERMINALS = new Set(["FAILED","UNRESOLVED","SAFE_STOPPED"]);
 const NODE_ID = /^[A-Za-z][A-Za-z0-9_-]*$/;
 const WAIT_DURATION = /^P(?:(?:[1-9][0-9]*D)(?:T(?:[1-9][0-9]*H(?:(?:[1-9][0-9]*M)(?:[1-9][0-9]*S)?)?|[1-9][0-9]*M(?:[1-9][0-9]*S)?|[1-9][0-9]*S))?|T(?:[1-9][0-9]*H(?:(?:[1-9][0-9]*M)(?:[1-9][0-9]*S)?)?|[1-9][0-9]*M(?:[1-9][0-9]*S)?|[1-9][0-9]*S))$/;
-
-export function isV1Alpha5Procedure(text: string): boolean {
-  // Detect incomplete authoring snapshots too: deleting one root key in the editor
-  // must not silently re-route the document into the legacy v0.2 analyzer.
-  return /^(?:start|nodes):[ \t]*/m.test(text);
-}
 
 type SyntaxResult = {root: any; document: PackageDocumentSnapshot} | null;
 
@@ -69,7 +62,7 @@ export function analyzeV1Alpha5Source(
     }
     for (const pair of root.items) {
       const key = isScalar(pair.key) ? String(pair.key.value) : "";
-      if (!allowed.has(key)) add(document,OLD_FIELDS.has(key)?"UNKNOWN_FIELD":"UNKNOWN_FIELD","Unsupported CA-SL v1alpha5 field: "+key,pair.key);
+      if (!allowed.has(key)) add(document,"UNKNOWN_FIELD","Unsupported field in the current CA-SL grammar: "+key,pair.key);
     }
   }
   function scalar(node: any): string {
