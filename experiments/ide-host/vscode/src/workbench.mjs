@@ -110,11 +110,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     return new vscode.SemanticTokens(Uint32Array.from(data));
   }
   function registerExtensionHostSemanticTokens(){
-    // Browser extension hosts use the LSP-backed adapter in browserClient.mjs.
-    // Node extension hosts (VS Code desktop / backend-backed Theia) have no
-    // browser Worker transport; they use this adapter over the SAME canonical
-    // source classifier, rather than silently losing CA semantic colors.
-    if(typeof Worker==="function"&&typeof globalThis.location!=="undefined")return;
+    // Every Theia host uses the same source-local CA-SL classifier.
+    // Semantic colors must not depend on an LSP Worker, Package diagnostics,
+    // trust linking or Compiler. VS Code Web hosts retain LSP-provided tokens.
+    const browserWorkerHost=typeof Worker==="function"&&typeof globalThis.location!=="undefined";
+    const theiaBrowserHost=typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST;
+    if(browserWorkerHost&&!theiaBrowserHost)return;
     if(typeof vscode.languages?.registerDocumentSemanticTokensProvider!=="function"||
        typeof vscode.SemanticTokensLegend!=="function"||
        typeof vscode.SemanticTokens!=="function"){
@@ -260,50 +261,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const {createSkillLanguageClient}=await import("../../lsp-browser/client/src/browserClient.mjs");
           const epoch=++languageClientEpoch;
           candidate=createSkillLanguageClient(vscode,context,{
-            // Theia 1.76's browser plugin host does not consistently register
-            // server-advertised semantic tokens. Register the native provider
-            // explicitly, but keep VS Code's normal LSP feature path unchanged.
-            manualSemanticTokens:typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST,
-            onSemanticTokenProviderRegistered:status=>{
-              semanticTokenDiagnostics.registered=status?.registered===true;
-              semanticTokenDiagnostics.tokenTypeCount=status?.tokenTypeCount??0;
-              semanticTokenDiagnostics.transport="browser-lsp";
-            },
-            onSemanticTokenRendererRegistered:status=>{
-              semanticTokenDiagnostics.renderer=status?.renderer??null;
-              semanticTokenDiagnostics.renderError=null;
-            },
-            onSemanticTokenRendererUnavailable:error=>{
-              semanticTokenDiagnostics.renderError=String(error);
-            },
-            onSemanticTokenRendered:(uri,result)=>{
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.renderer="theia-text-editor-decoration";
-              semanticTokenDiagnostics.renderedTokenCount=result?.tokenCount??0;
-              semanticTokenDiagnostics.renderedTypeCount=result?.tokenTypeCount??0;
-              semanticTokenDiagnostics.renderError=null;
-            },
-            onSemanticTokenRenderError:(uri,error)=>{
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.renderError=String(error);
-            },
-            onSemanticTokenRequest:uri=>{
-              semanticTokenDiagnostics.requests++;
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.transport="browser-lsp";
-            },
-            onSemanticTokenResult:(uri,count)=>{
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.lastTokenCount=count;
-              semanticTokenDiagnostics.lastError=null;
-            },
-            onSemanticTokenServerDiagnostics:diagnostics=>{
-              semanticTokenDiagnostics.server=diagnostics;
-            },
-            onSemanticTokenError:(uri,error)=>{
-              semanticTokenDiagnostics.lastUri=uri;
-              semanticTokenDiagnostics.lastError=error;
-            },
+            // The primary extension provides source-local semantic tokens in
+            // Theia. LSP remains responsible for diagnostics and navigation.
+            manualSemanticTokens:false,
             onStatus:status=>{
               if(epoch!==languageClientEpoch)return;
               const state=languagePackages.get(status?.rootUri);
