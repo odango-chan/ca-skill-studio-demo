@@ -9,6 +9,11 @@ export interface PackageDocumentSnapshot {
   readonly languageId?: string;
   readonly version: number;
   readonly text: string;
+  /**
+   * false means filesystem reads failed: text is a transport placeholder,
+   * never an authored empty document. Absent means readable for existing clients.
+   */
+  readonly readable?: boolean;
 }
 
 export interface PackageSnapshot {

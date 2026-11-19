@@ -93,7 +93,13 @@ test("read errors and oversized files mark the snapshot partial instead of clean
   assert.equal(snapshot.completeness,"partial");
   assert.match(snapshot.reason,/permission denied/);
   assert.match(snapshot.reason,/exceeds 1 MiB/);
-  assert.equal(snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml").text,"");
+  const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
+  const predicates=snapshot.documents.find(x=>x.relativePath==="assurance/predicates.yaml");
+  assert.equal(contract.text,"");
+  assert.equal(contract.readable,false,"read failure must not become an authored empty Contract");
+  assert.equal(predicates.readable,false,"oversized file is also unavailable to local analysis");
+  assert.equal(snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml").readable,
+    undefined,"open Procedure Source remains readable");
 });
 
 test("enumeration failure yields unavailable snapshot with current Procedure text",async()=>{

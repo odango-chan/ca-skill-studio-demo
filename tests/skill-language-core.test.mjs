@@ -296,3 +296,46 @@ test("Package file-count and cumulative text-length limits fail closed",()=>{
   };
   assert.equal(analyzePackageSnapshot(tooLarge).diagnostics[0].code,"PACKAGE_TEXT_LIMIT");
 });
+
+test("unreadable Contract is NOT_CHECKED, never a confirmed empty-YAML source defect",()=>{
+  const snapshot=sampleSnapshot();
+  const contract=snapshot.documents.find(doc=>doc.relativePath==="assurance/contract.yaml");
+  contract.text="";
+  contract.readable=false;
+  snapshot.completeness="partial";
+  snapshot.reason="assurance/contract.yaml: EIO while reading persisted Source";
+  const result=analyzePackageSnapshot(snapshot);
+  assert.equal(result.packageAudit.state,"UNAVAILABLE");
+  const status=result.diagnostics.find(item=>item.code==="PACKAGE_SNAPSHOT_INCOMPLETE");
+  assert.equal(status?.status,"not_checked");
+  assert.match(status.message,/EIO/);
+  assert.ok(!result.diagnostics.some(item=>
+    item.relativePath==="assurance/contract.yaml"&&
+    ["SOURCE_ROOT_INVALID","PACKAGE_YAML_ROOT_INVALID","YAML_PARSE_ERROR","PACKAGE_YAML_PARSE_ERROR"]
+      .includes(item.code)),"unreadable text must never be treated as user-authored empty YAML");
+  assert.ok(result.documents.some(doc=>doc.relativePath==="assurance/contract.yaml"),
+    "the unreadable document identity remains in the published Package generation");
+});
+
+test("genuinely empty readable YAML still has a confirmed source error",()=>{
+  const snapshot=sampleSnapshot();
+  const contract=snapshot.documents.find(doc=>doc.relativePath==="assurance/contract.yaml");
+  contract.text="";
+  const result=analyzePackageSnapshot(snapshot);
+  assert.ok(result.diagnostics.some(item=>
+    item.relativePath==="assurance/contract.yaml"&&
+    item.code==="SOURCE_ROOT_INVALID"));
+  assert.ok(result.diagnostics.some(item=>
+    item.relativePath==="assurance/contract.yaml"&&
+    item.code==="PACKAGE_YAML_ROOT_INVALID"));
+});
+
+test("contradictory unreadable files in COMPLETE snapshots fail closed",()=>{
+  const snapshot=sampleSnapshot();
+  const contract=snapshot.documents.find(doc=>doc.relativePath==="assurance/contract.yaml");
+  contract.text="";
+  contract.readable=false;
+  const result=analyzePackageSnapshot(snapshot);
+  assert.equal(result.state,"UNAVAILABLE");
+  assert.equal(result.diagnostics[0].code,"INVALID_PACKAGE_READ_STATE");
+});

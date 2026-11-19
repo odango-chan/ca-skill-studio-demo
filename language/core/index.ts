@@ -184,6 +184,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
         typeof document.uri !== "string" || !document.uri.trim() ||
         typeof document.relativePath !== "string" ||
         typeof document.text !== "string" ||
+        (document.readable !== undefined && typeof document.readable !== "boolean") ||
         !Number.isSafeInteger(document.version) || document.version < 0) {
       return unavailable(snapshot, "INVALID_PACKAGE_DOCUMENT", "Package contains an invalid document snapshot");
     }
@@ -196,6 +197,10 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       return unavailable(snapshot, "PACKAGE_DOCUMENT_URI_MISMATCH", "Document URI does not match its relative path inside Package root");
     if (document.text.includes("\u0000"))
       return unavailable(snapshot, "INVALID_PACKAGE_TEXT", "Package contains text with a NUL character");
+    if (document.readable === false &&
+        (snapshot.completeness === "complete" || document.text.length !== 0))
+      return unavailable(snapshot, "INVALID_PACKAGE_READ_STATE",
+        "Unreadable files require an incomplete snapshot and empty placeholder text");
     paths.add(relativePath);
     uris.add(document.uri);
     totalTextLength += document.text.length;
@@ -211,8 +216,12 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   if (totalTextLength > MAX_PACKAGE_TEXT_LENGTH)
     return unavailable(snapshot, "PACKAGE_TEXT_LIMIT", "Package exceeds the 4 MiB cumulative text-length limit");
 
-  const documentsByPath = new Map(normalizedDocuments.map(document => [document.relativePath, document] as const));
-  const files = new Map(normalizedDocuments.map(document => [document.relativePath, { text: document.text }] as const));
+  // A read failure is not an authored empty YAML/Python/Schema document.
+  // Preserve it in the response inventory for LSP clearing/version ownership,
+  // but never feed placeholder text into current-source or Package Audit rules.
+  const readableDocuments = normalizedDocuments.filter(document => document.readable !== false);
+  const documentsByPath = new Map(readableDocuments.map(document => [document.relativePath, document] as const));
+  const files = new Map(readableDocuments.map(document => [document.relativePath, { text: document.text }] as const));
 
   // The current CA-SL grammar is authoritative. Do not run the historical
   // procedures/call/with Package analyzer.
@@ -231,8 +240,10 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
     const documentAnalyses: DocumentAnalysis[] = [];
 
     for (const document of normalizedDocuments) {
-      let pythonOutlineState: DocumentAnalysis["pythonOutlineState"] = "NOT_APPLICABLE";
-      if (document.languageId === "python" && document.relativePath.startsWith("scripts/")) {
+      let pythonOutlineState: DocumentAnalysis["pythonOutlineState"] =
+        document.readable === false && document.languageId === "python" ? "UNAVAILABLE" : "NOT_APPLICABLE";
+      if (document.readable !== false && document.languageId === "python" &&
+          document.relativePath.startsWith("scripts/")) {
         const outline = pythonTopLevelOutline(document.text) as PythonOutlineReport;
         pythonOutlineState = outline.status;
         if (outline.status === "READY") {
