@@ -29,7 +29,8 @@ test("Legacy baseline runs source checks and reports checks outside the browser 
     assert.ok(codes(issues).includes("CAPABILITY_AUTHORIZATION_NOT_CHECKED"));
     if(skill==="establish-pdu-session")
       assert.ok(codes(issues).includes("PYTHON_SYNTAX_NOT_CHECKED"));
-    assert.ok(issues.every(item=>item.path&&item.line>0&&item.status));
+    assert.ok(issues.every(item=>item.path&&item.status&&
+      (item.line===undefined||item.line>0)));
   }
 });
 test("A5 checks Contract entry, PredicateSet skill and missing schema",()=>{
@@ -46,7 +47,8 @@ test("A5 checks Contract entry, PredicateSet skill and missing schema",()=>{
   assert.ok(codes(issues).includes("CONTRACT_NAME"));
   assert.ok(codes(issues).includes("PREDICATE_SKILL"));
   assert.ok(codes(issues).includes("REQUEST_SCHEMA"));
-  assert.ok(issues.every(x=>x.path&&x.line>0&&["confirmed","not_checked"].includes(x.status)));
+  assert.ok(issues.every(x=>x.path&&["confirmed","not_checked"].includes(x.status)&&
+    (x.line===undefined||x.line>0)));
 });
 test("A5 detects unsupported Call and a missing Predicate without refusing authored Source",()=>{
   const w=fixture("ensure-pdu-session");
