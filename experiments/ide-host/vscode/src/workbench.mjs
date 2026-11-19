@@ -200,6 +200,107 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   // Acceptance-only diagnostics are deliberately not contributed to the
   // Command Palette. The Chromium harness queries this internal command in
   // both browser-Worker and Node extension-host variants.
+  // Acceptance-only fixture proving the legacy analyzer remains active even
+  // when the v1alpha5 Language Service cannot parse the persisted source shape.
+  // It is entirely in-memory and never writes to the user's Package.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.legacyPackageAuditAcceptance",()=>{
+      const files=new Map([
+        ["assurance/contract.yaml",{text:[
+          "apiVersion: connectionagent.io/v1alpha1",
+          "kind: SkillContract",
+          "metadata:",
+          "  name: legacy-audit-acceptance",
+          "spec:",
+          "  skillType: executable",
+          "  goal: demo.goal",
+          "  entryProcedure: missing-entry",
+          "  inputs:",
+          "    requestSchema: schemas/request.yaml",
+          "  context:",
+          "    requiredFacts: [createdsession_ingress]",
+          "  allowedResources:",
+          "    capabilities: [operation.allowed]",
+          "    localTools: [skill.local]"
+        ].join("\n")}],
+        ["assurance/predicates.yaml",{text:[
+          "apiVersion: connectionagent.io/v1alpha1",
+          "kind: PredicateSet",
+          "metadata:",
+          "  skill: legacy-audit-acceptance",
+          "predicates:",
+          "  demo.eligible:",
+          "    observations:",
+          "      state:",
+          "        ref: demo.state",
+          "        scope: '{\"supi\": subject.supi}'",
+          "        freshness: 5s",
+          "    evaluator:",
+          "      type: cel",
+          "      expression: true"
+        ].join("\n")}],
+        ["assurance/procedure.yaml",{text:[
+          "procedures:",
+          "  entry:",
+          "    inputs:",
+          "      supi:",
+          "        type: string",
+          "        from: context.subject.supi",
+          "    start: start",
+          "    nodes:",
+          "      start:",
+          "        call: operation.missing",
+          "        with:",
+          "          supi:",
+          "            from: input.unknown",
+          "        preconditions:",
+          "          steps:",
+          "            - script: scripts/missing.py",
+          "          'on':",
+          "            FAILED: done",
+          "        postconditions:",
+          "          steps:",
+          "            - verify: demo.missing",
+          "        'on':",
+          "          PASS: absent",
+          "          FAILED: done",
+          "      done:",
+          "        terminal: SUCCEEDED",
+          "      unreachable:",
+          "        terminal: FAILED"
+        ].join("\n")}],
+        ["schemas/request.yaml",{text:[
+          "type: object",
+          "required: [supi, missing]",
+          "properties:",
+          "  supi:",
+          "    type: string"
+        ].join("\n")}]
+      ]);
+      const diagnostics=auditPackageWorkspace({
+        name:"legacy-audit-acceptance",files,completeness:"complete"
+      });
+      const codes=new Set(diagnostics.map(item=>item.code));
+      const required=[
+        "V1ALPHA5_LSP_NOT_APPLICABLE","ENTRY_PROCEDURE",
+        "CAPABILITY_UNDECLARED","INPUT_MISSING","NODE_PREDICATE",
+        "SCRIPT_MISSING","ROUTE_TARGET_MISSING","NODE_UNREACHABLE",
+        "REQUEST_SCHEMA_REQUIRED_UNDECLARED","CEL_EXPRESSION_SYNTAX_NOT_CHECKED",
+        "PREDICATE_RUNTIME_NOT_CHECKED","CONTEXT_FACTS_NOT_CHECKED"
+      ];
+      const missing=required.filter(code=>!codes.has(code));
+      if(missing.length)
+        throw Error("Legacy Package Audit omitted expected independent findings: "+
+          JSON.stringify({missing,diagnostics}));
+      return {
+        status:"PASS",profile:"connectionagent.io/v1alpha1",
+        errorCount:diagnostics.filter(item=>item.severity==="error").length,
+        warningCount:diagnostics.filter(item=>item.severity==="warning").length,
+        notCheckedCount:diagnostics.filter(item=>item.status==="not_checked").length,
+        diagnosticCount:diagnostics.length,codes:[...codes].sort(),
+        qualification:"NOT_QUALIFIED",sourceMutation:"NONE"
+      };
+    }));
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
