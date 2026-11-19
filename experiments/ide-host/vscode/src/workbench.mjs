@@ -4,8 +4,8 @@ import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {analyzeV1Alpha5Source} from "../../../../language/core/v1alpha5.ts";
-import {auditV1Alpha5Package,indexV1Alpha4ToolCatalogCallables}
-  from '../../../../site/v1alpha5-package-audit.mjs';
+import {auditPackage,indexV1Alpha4ToolCatalogCallables}
+  from '../../../../site/package-audit.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
 import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
