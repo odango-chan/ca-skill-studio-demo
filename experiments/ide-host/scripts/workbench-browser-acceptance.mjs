@@ -748,7 +748,7 @@ export async function runWorkbenchAcceptance({
   const yamlTextMateEvidence=await waitForTextMateTokens(
     "schemas/establishment-request.schema.yaml","yaml","type:");
   const pythonTextMateEvidence=await waitForTextMateTokens(
-    "scripts/build_pcf_policy_inputs.py","python","from typing import");
+    "scripts/validate-subscription-request.py","python","from __future__ import");
   await nativeCommand("skillStudio.internal.openSyntaxAcceptanceSource",
     defaultProcedureUri,"__restore__");
   await sleep(200);
