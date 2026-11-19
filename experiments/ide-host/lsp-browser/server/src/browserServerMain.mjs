@@ -72,15 +72,19 @@ function createSession(rootUri) {
       const current = packageAnalyses.get(rootUri);
       const analysis = current?.snapshot.generation === result.generation ?
         current.analysis : null;
-      const partialDetail = result.state === "PARTIAL" && analysis ? {
+      // Expose component state for every accepted generation, including
+      // READY source projection with an UNAVAILABLE trust/Package qualification.
+      // The top-level state is source-analysis readiness, not release qualification.
+      const analysisDetail = analysis ? {
         procedureState: analysis.procedure.state,
         procedureDiagnosticCount: analysis.procedure.diagnostics.length,
         packageAuditState: analysis.packageAudit.state,
-        packageAuditReason: analysis.packageAudit.reason ?? null
+        packageAuditReason: analysis.packageAudit.reason ?? null,
+        packageAuditDiagnosticCount: analysis.packageAudit.diagnostics.length
       } : {};
       connection.sendNotification(ANALYSIS_STATUS_NOTIFICATION, {
         ...result,
-        ...partialDetail,
+        ...analysisDetail,
         rootUri,
         publishedDiagnosticCount,
         analysisDiagnostics: analysis?.diagnostics ?? []
