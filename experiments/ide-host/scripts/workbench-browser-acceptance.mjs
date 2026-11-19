@@ -751,7 +751,7 @@ export async function runWorkbenchAcceptance({
 
   const started=Date.now();
   const procedurePair=await assertSourceVisualPair(
-    evalJS,sleep,"procedure.yaml","CA-SL v1alpha5 Procedure Designer");
+    evalJS,sleep,"procedure.yaml","CA-SL current Procedure Designer");
   // Native TextMate is a separate baseline from CA semantic tokens and LSP.
   // Inspect real rendered Monaco text colors, not just the grammar manifest.
   let yamlTextMate=null;
@@ -776,15 +776,15 @@ export async function runWorkbenchAcceptance({
   if(!yamlTextMate?.visible||!(yamlTextMate.colors.length>=3))
     throw Error("Native v1alpha5 YAML TextMate coloring was not rendered: "+
       JSON.stringify(yamlTextMate));
-  console.log("STUDIO_V1ALPHA5_NATIVE_YAML_TEXTMATE_CHROMIUM",
+  console.log("STUDIO_CURRENT_LANGUAGE_NATIVE_YAML_TEXTMATE_CHROMIUM",
     JSON.stringify(yamlTextMate));
   const sourceState=await nativeCommand("skillStudio.internal.sourceVersionAcceptance");
   if(sourceState?.uri!==defaultProcedureUri||!Number.isSafeInteger(sourceState.version))
-    throw Error("Native Source is not the exact v1alpha5 Procedure TextDocument: "+
+    throw Error("Native Source is not the exact current Procedure TextDocument: "+
       JSON.stringify({expected:defaultProcedureUri,sourceState,procedurePair}));
   const initialGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
-    "default v1alpha5 Procedure graph");
+    "default current Procedure graph");
   const initialTiming=initialGraph.view.timing?JSON.parse(initialGraph.view.timing):{
     type:"rendered",revision:initialGraph.view.revision,nodes:initialGraph.view.graphNodes
   };
@@ -803,7 +803,7 @@ export async function runWorkbenchAcceptance({
     "routeOptions:routes?.options.length??0,targetOptions:targets?.options.length??0,"+
     "status:document.querySelector('#message')?.textContent??''};})()");
   if(!graphEditability?.readOnly)
-    throw Error("v1alpha5 Procedure graph exposed legacy interactive Route editing: "+
+    throw Error("current Procedure graph exposed legacy interactive Route editing: "+
       JSON.stringify(graphEditability));
   const sourceAfterGraph=await nativeCommand("skillStudio.internal.sourceVersionAcceptance");
   if(sourceAfterGraph?.uri!==defaultProcedureUri||
@@ -811,7 +811,7 @@ export async function runWorkbenchAcceptance({
     throw Error("Read-only v1alpha5 graph interaction changed authoritative Source: "+
       JSON.stringify({sourceState,sourceAfterGraph,graphEditability}));
   graphEditability.sourceUnchanged=true;
-  console.log("STUDIO_V1ALPHA5_GRAPH_READ_ONLY_CHROMIUM",JSON.stringify(graphEditability));
+  console.log("STUDIO_CURRENT_LANGUAGE_GRAPH_READ_ONLY_CHROMIUM",JSON.stringify(graphEditability));
 
   // The released v1alpha5 Root graph keeps the same read-only path-focus UX:
   // default success backbone, optional route-category filters and per-Node folding.
@@ -942,7 +942,7 @@ export async function runWorkbenchAcceptance({
   await sleep(350);
   const canvasToolbar={initial:toolbarInitial,horizontal,allPaths,branchInitial,
     branchExpanded,branchCollapsed,anchorExpandedDelta,anchorCollapsedDelta,sourceUnchanged:true};
-  console.log("STUDIO_V1ALPHA5_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbar));
+  console.log("STUDIO_CURRENT_LANGUAGE_CANVAS_TOOLBAR_CHROMIUM",JSON.stringify(canvasToolbar));
 
   // Package ZIP must be produced from the exact active v1alpha5 Package snapshot.
   await evalWebviewJS("document.querySelector('#exportPackageZip')?.click();true");
@@ -967,10 +967,10 @@ export async function runWorkbenchAcceptance({
     throw Error("v1alpha5 Package ZIP did not produce a browser Blob download: "+
       JSON.stringify(packageZip));
   packageZip.details=zipNotice.details;
-  console.log("STUDIO_V1ALPHA5_PACKAGE_ZIP_CHROMIUM",JSON.stringify(packageZip));
+  console.log("STUDIO_CURRENT_LANGUAGE_PACKAGE_ZIP_CHROMIUM",JSON.stringify(packageZip));
 
   let languageServiceStatus="NOT_REQUIRED_NODE_HOST";
-  let v1alpha5LanguageFeatures=null,semanticTokenEvidence=null;
+  let currentLanguageFeatures=null,semanticTokenEvidence=null;
   if(requireBrowserLsp){
     // A v1alpha5 Package is intentionally PARTIAL until trusted Owner,
     // Capability and Schema snapshots are linked. PARTIAL is not a Worker
@@ -996,49 +996,49 @@ export async function runWorkbenchAcceptance({
        languagePackage.packageAuditState!=="UNAVAILABLE"||
        !String(languagePackage.packageAuditReason??"").includes(expectedPartialReason)||
        packageSnapshot?.lastSentSnapshot?.completeness!=="complete")
-      throw Error("v1alpha5 Language Service must be available while its unqualified Package remains PARTIAL: "+
+      throw Error("current Language Service must be available while its unqualified Package remains PARTIAL: "+
         JSON.stringify({languageServiceDiagnostics,expectedPackageRoot,languagePackage,packageSnapshot}));
-    console.log("STUDIO_V1ALPHA5_LSP_PARTIAL_IS_EXPECTED_CHROMIUM",JSON.stringify({
+    console.log("STUDIO_CURRENT_LANGUAGE_LSP_PARTIAL_IS_EXPECTED_CHROMIUM",JSON.stringify({
       status:languageServiceStatus,
       languageClientStarted:languageServiceDiagnostics.languageClientStarted,
       languagePackage,
       snapshot:packageSnapshot?.lastSentSnapshot
     }));
-    v1alpha5LanguageFeatures=await nativeCommand(
-      "skillStudio.internal.v1alpha5LanguageProviderAcceptance",defaultProcedureUri);
-    if(v1alpha5LanguageFeatures?.status!=="PARTIAL"||
-       v1alpha5LanguageFeatures?.snapshotCompleteness!=="complete"||
-       !v1alpha5LanguageFeatures.contractPreconditionCompletion?.includes("check.precondition")||
-       !v1alpha5LanguageFeatures.requestSchemaCompletion?.includes("schemas/request.schema.yaml")||
-       !v1alpha5LanguageFeatures.startNodeCompletion?.includes("check")||
-       !v1alpha5LanguageFeatures.predicateCompletion?.includes("demo.ready")||
-       !v1alpha5LanguageFeatures.preconditionFields?.includes("predicates:")||
-       !v1alpha5LanguageFeatures.observationFields?.includes("tool:")||
-       !v1alpha5LanguageFeatures.operationFields?.includes("script:")||
-       !v1alpha5LanguageFeatures.scriptPathCompletion?.includes("scripts/runner.py")||
-       !v1alpha5LanguageFeatures.waitNodeFields?.includes("wait:")||
-       !v1alpha5LanguageFeatures.waitFields?.includes("event:")||
-       !v1alpha5LanguageFeatures.waitFields?.includes("routes:")||
-       !v1alpha5LanguageFeatures.waitEventFields?.includes("operation:")||
-       !v1alpha5LanguageFeatures.waitResponseFields?.includes("after:")||
-       !v1alpha5LanguageFeatures.waitRouteKeys?.includes("TIMEOUT:")||
-       !v1alpha5LanguageFeatures.waitResponseAfter?.includes("final")||
-       v1alpha5LanguageFeatures.waitResponseAfter?.includes("timeout-handler")||
-       !v1alpha5LanguageFeatures.waitTimeoutTarget?.includes("timeout-handler")||
-       !v1alpha5LanguageFeatures.waitOutput?.includes("await-event.wait.output")||
-       v1alpha5LanguageFeatures.waitTimeoutTarget?.includes("SUCCEEDED")||
-       !v1alpha5LanguageFeatures.outcomeUnknownTargets?.includes("SAFE_STOPPED")||
-       !v1alpha5LanguageFeatures.contractDefinition||
-       !v1alpha5LanguageFeatures.predicateDefinition||
-       !v1alpha5LanguageFeatures.predicateHoverSignature||
-       !v1alpha5LanguageFeatures.predicateReferences||
-       !v1alpha5LanguageFeatures.scriptDefinition||
-       !v1alpha5LanguageFeatures.procedureOutline?.includes("run-script")||
-       !v1alpha5LanguageFeatures.procedureOutline?.includes("await-event")||
-       !v1alpha5LanguageFeatures.procedureOutline?.includes("timeout-handler")||
-       v1alpha5LanguageFeatures.ownerQualification!=="NOT_QUALIFIED")
-      throw Error("Native v1alpha5 language-provider acceptance failed: "+
-        JSON.stringify(v1alpha5LanguageFeatures));
+    currentLanguageFeatures=await nativeCommand(
+      "skillStudio.internal.currentLanguageProviderAcceptance",defaultProcedureUri);
+    if(currentLanguageFeatures?.status!=="PARTIAL"||
+       currentLanguageFeatures?.snapshotCompleteness!=="complete"||
+       !currentLanguageFeatures.contractPreconditionCompletion?.includes("check.precondition")||
+       !currentLanguageFeatures.requestSchemaCompletion?.includes("schemas/request.schema.yaml")||
+       !currentLanguageFeatures.startNodeCompletion?.includes("check")||
+       !currentLanguageFeatures.predicateCompletion?.includes("demo.ready")||
+       !currentLanguageFeatures.preconditionFields?.includes("predicates:")||
+       !currentLanguageFeatures.observationFields?.includes("tool:")||
+       !currentLanguageFeatures.operationFields?.includes("script:")||
+       !currentLanguageFeatures.scriptPathCompletion?.includes("scripts/runner.py")||
+       !currentLanguageFeatures.waitNodeFields?.includes("wait:")||
+       !currentLanguageFeatures.waitFields?.includes("event:")||
+       !currentLanguageFeatures.waitFields?.includes("routes:")||
+       !currentLanguageFeatures.waitEventFields?.includes("operation:")||
+       !currentLanguageFeatures.waitResponseFields?.includes("after:")||
+       !currentLanguageFeatures.waitRouteKeys?.includes("TIMEOUT:")||
+       !currentLanguageFeatures.waitResponseAfter?.includes("final")||
+       currentLanguageFeatures.waitResponseAfter?.includes("timeout-handler")||
+       !currentLanguageFeatures.waitTimeoutTarget?.includes("timeout-handler")||
+       !currentLanguageFeatures.waitOutput?.includes("await-event.wait.output")||
+       currentLanguageFeatures.waitTimeoutTarget?.includes("SUCCEEDED")||
+       !currentLanguageFeatures.outcomeUnknownTargets?.includes("SAFE_STOPPED")||
+       !currentLanguageFeatures.contractDefinition||
+       !currentLanguageFeatures.predicateDefinition||
+       !currentLanguageFeatures.predicateHoverSignature||
+       !currentLanguageFeatures.predicateReferences||
+       !currentLanguageFeatures.scriptDefinition||
+       !currentLanguageFeatures.procedureOutline?.includes("run-script")||
+       !currentLanguageFeatures.procedureOutline?.includes("await-event")||
+       !currentLanguageFeatures.procedureOutline?.includes("timeout-handler")||
+       currentLanguageFeatures.ownerQualification!=="NOT_QUALIFIED")
+      throw Error("Native current language-provider acceptance failed: "+
+        JSON.stringify(currentLanguageFeatures));
     semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
     if(semanticTokenEvidence?.registered!==true||
        !(semanticTokenEvidence?.lastTokenCount>0)||
@@ -1048,9 +1048,9 @@ export async function runWorkbenchAcceptance({
        semanticTokenEvidence?.renderError)
       throw Error("Native v1alpha5 semantic tokens were not rendered: "+
         JSON.stringify(semanticTokenEvidence));
-    console.log("STUDIO_V1ALPHA5_LANGUAGE_FEATURES_CHROMIUM",
-      JSON.stringify(v1alpha5LanguageFeatures));
-    console.log("STUDIO_V1ALPHA5_SEMANTIC_TOKENS_CHROMIUM",
+    console.log("STUDIO_CURRENT_LANGUAGE_LANGUAGE_FEATURES_CHROMIUM",
+      JSON.stringify(currentLanguageFeatures));
+    console.log("STUDIO_CURRENT_LANGUAGE_SEMANTIC_TOKENS_CHROMIUM",
       JSON.stringify(semanticTokenEvidence));
   }
 
@@ -1059,7 +1059,7 @@ export async function runWorkbenchAcceptance({
     ".find(el=>el.getAttribute('data-id')==='get-sm-subscription-data');node?.click();return !!node;})()");
   await sleep(120);
   const inspectorSelection=await nativeCommand("skillStudio.internal.selectionAcceptance");
-  console.log("STUDIO_V1ALPHA5_INSPECTOR_SELECTION_CHROMIUM",
+  console.log("STUDIO_CURRENT_LANGUAGE_INSPECTOR_SELECTION_CHROMIUM",
     JSON.stringify(inspectorSelection));
   if(inspectorSelection?.nodeId!=="get-sm-subscription-data"||
      inspectorSelection?.snapshotState!=="READY")
@@ -1083,7 +1083,7 @@ export async function runWorkbenchAcceptance({
      !packageAudit.problems.some(item=>item.code==="DEPENDENCY_NOT_CONFIGURED"))
     throw Error("v1alpha5 Package diagnostics must reach Problems and editor markers without Compiler qualification: "+
       JSON.stringify({packageAudit,expectedCapabilityId}));
-  console.log("STUDIO_V1ALPHA5_PACKAGE_DIAGNOSTICS_CHROMIUM",JSON.stringify({
+  console.log("STUDIO_CURRENT_LANGUAGE_PACKAGE_DIAGNOSTICS_CHROMIUM",JSON.stringify({
     status:packageAudit.status,
     capabilityProblem,capabilityMarker,
     problemCount:packageAudit.problems.length,
@@ -1180,7 +1180,7 @@ export async function runWorkbenchAcceptance({
     throw Error("Preview and Inspector must be independent right sidebar containers: "+
       JSON.stringify(separated));
   console.log("STUDIO_PREVIEW_INSPECTOR_SEPARATE_CHROMIUM",JSON.stringify(separated));
-  console.log("STUDIO_V1ALPHA5_INSPECTOR_CHROMIUM",JSON.stringify(phaseEvidence));
+  console.log("STUDIO_CURRENT_LANGUAGE_INSPECTOR_CHROMIUM",JSON.stringify(phaseEvidence));
 
   // One Main EditorGroup must contain every Source document. Visual projections
   // live only in the independent right-side Preview WebviewView.
@@ -1192,7 +1192,7 @@ export async function runWorkbenchAcceptance({
      editorGroupPlacement?.ordinaryYamlColumn!==1)
     throw Error("v1alpha5 Sources escaped the single Main Editor group: "+
       JSON.stringify(editorGroupPlacement));
-  console.log("STUDIO_V1ALPHA5_EDITOR_GROUPS_CHROMIUM",JSON.stringify(editorGroupPlacement));
+  console.log("STUDIO_CURRENT_LANGUAGE_EDITOR_GROUPS_CHROMIUM",JSON.stringify(editorGroupPlacement));
 
   // Markdown Source remains native; all rendering, links and scrolling belong
   // to the single right-side Studio Preview WebviewView.
@@ -1239,7 +1239,7 @@ export async function runWorkbenchAcceptance({
   const blockedMissingView=await waitStudioMarkdown(view=>
     view.studioMarkdownStatus.includes("Blocked unverified Package link."),
     "blocked missing Markdown Package link");
-  console.log("STUDIO_V1ALPHA5_MARKDOWN_SECURITY_CHROMIUM",JSON.stringify({
+  console.log("STUDIO_CURRENT_LANGUAGE_MARKDOWN_SECURITY_CHROMIUM",JSON.stringify({
     uri:markdownFixture.uri,images:blockedMissingView.view.imageCount,
     scripts:blockedMissingView.view.scriptMarkers,scriptExecuted:blockedMissingView.view.scriptExecuted,
     safeLink:safeMarkdownLink,traversalLink:traversalMarkdownLink,
@@ -1326,7 +1326,7 @@ export async function runWorkbenchAcceptance({
       safeLink:safeMarkdownLink,traversalLink:traversalMarkdownLink,
       missingLink:missingMarkdownLink}
   };
-  console.log("STUDIO_V1ALPHA5_MARKDOWN_PREVIEW_CHROMIUM",JSON.stringify(markdownEvidence));
+  console.log("STUDIO_CURRENT_LANGUAGE_MARKDOWN_PREVIEW_CHROMIUM",JSON.stringify(markdownEvidence));
   await nativeCommand("skillStudio.internal.restoreMarkdownPreviewAcceptance",markdownFixture.uri);
   const restoredMarkdown=await waitStudioMarkdown(view=>
     view.heading?.includes("Establish PDU Session"),
@@ -1348,7 +1348,7 @@ export async function runWorkbenchAcceptance({
     "v1alpha5 MAS reference Markdown Preview");
   await assertSourceVisualPair(evalJS,sleep,"openamsm-operation-mapping.md",
     "v1alpha5 MAS Markdown Source + Preview");
-  console.log("STUDIO_V1ALPHA5_MARKDOWN_SHARED_HOST_CHROMIUM",JSON.stringify({
+  console.log("STUDIO_CURRENT_LANGUAGE_MARKDOWN_SHARED_HOST_CHROMIUM",JSON.stringify({
     firstUri:markdownFixture.uri,secondUri:secondMarkdownUri,
     secondHeading:secondMarkdown.view.heading,
     visibleEditorGroups:secondMarkdown.visibleEditorGroups??1
@@ -1403,7 +1403,7 @@ export async function runWorkbenchAcceptance({
       JSON.stringify(schema.view).slice(0,2600));
   await assertSourceVisualPair(evalJS,sleep,"establishment-request.schema.yaml",
     "v1alpha5 Schema Designer");
-  console.log("STUDIO_V1ALPHA5_DESIGNERS_CHROMIUM",JSON.stringify({
+  console.log("STUDIO_CURRENT_LANGUAGE_DESIGNERS_CHROMIUM",JSON.stringify({
     contract:{uri:contractUri,cards:contractCards},
     predicates:{uri:predicateUri,heading:predicates.view.title},
     schema:{uri:schemaUri,heading:schema.view.title}
@@ -1442,7 +1442,7 @@ export async function runWorkbenchAcceptance({
     evalJS,sleep,"procedure.yaml","final v1alpha5 default Procedure Designer");
   const finalRestoredGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
-    "final default v1alpha5 Procedure graph");
+    "final default current Procedure graph");
 
   // This is the actual released Go/WASM Worker, not a JS contract mock.
   // An unqualified Example must yield source-backed Compiler diagnostics, and
@@ -1489,7 +1489,7 @@ export async function runWorkbenchAcceptance({
     bodyText:finalRestoredGraph.view.bodyText
   };
   const warmTiming={type:"rendered",cacheHit:true,revision:finalRestoredGraph.view.revision};
-  console.log("STUDIO_V1ALPHA5_DUAL_SKILL_EXPLORER_CHROMIUM",
+  console.log("STUDIO_CURRENT_LANGUAGE_DUAL_SKILL_EXPLORER_CHROMIUM",
     JSON.stringify(dualSkillExplorer));
   console.log("STUDIO_LAYOUT_TIMING",JSON.stringify({initialTiming,warmTiming}));
   console.log("STUDIO_WORKBENCH_CHROMIUM",JSON.stringify({
@@ -1504,7 +1504,7 @@ export async function runWorkbenchAcceptance({
     nativeSingleClick:true,nativeDoubleClick:true,reopenMs:Date.now()-started,
     dualSkillExplorer,packageOverview:packageOverviewEvidence.evidence,
     graphEditability,canvasToolbar,
-    v1alpha5LanguageFeatures,semanticTokenEvidence,
+    currentLanguageFeatures,semanticTokenEvidence,
     markdownEvidence,designerEvidence:{
       contract:contract.view,predicates:predicates.view,schema:schema.view
     }
