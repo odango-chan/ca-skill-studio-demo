@@ -3291,6 +3291,27 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
        event.affectsConfiguration("connectionAgent.skillStudio",workspace))
       scheduleAudit();
   });
+  // The pinned Markdown language extension is separate from the right-side
+  // Studio Preview. Activation should be verified explicitly, not inferred
+  // from whether it eagerly starts an optional Markdown preview Worker.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.nativeMarkdownLanguageActivationAcceptance",async()=>{
+      const extension=vscode.extensions?.getExtension?.(
+        "vscode.markdown-language-features");
+      if(!extension)throw Error("Pinned native Markdown language extension is missing");
+      const activated=await Promise.race([
+        Promise.resolve(extension.activate()).then(()=>true),
+        new Promise((_,reject)=>setTimeout(()=>reject(
+          Error("Native Markdown language extension activation timed out")),8000))
+      ]);
+      if(!activated||!extension.isActive)
+        throw Error("Pinned Markdown language extension did not become active");
+      const commands=await vscode.commands.getCommands(true);
+      return {id:extension.id,isActive:extension.isActive,
+        languageId:"markdown",
+        commands:commands.filter(id=>id.startsWith("markdown.")).slice(0,40),
+        workerStartup:"lazy-not-required-for-studio-preview"};
+    }));
   async function findMarkdownAcceptanceDocument(skillName,relativePath){
     const name=typeof skillName==="string"?skillName:"establish-pdu-session";
     const target=typeof relativePath==="string"?relativePath:"SKILL.md";
