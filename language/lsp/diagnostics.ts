@@ -98,9 +98,18 @@ export function diagnosticsFromAnalysis(
     return { state: "UNAVAILABLE", generation: snapshot.generation,
       documents: [], unlocated: [], reason: "Analysis identity does not match Package snapshot" };
 
-  if (analysis.state === "UNAVAILABLE")
+  if (analysis.state === "UNAVAILABLE") {
+    // Carry the original fail-closed diagnostic to the editor status. The
+    // generic ANALYSIS_UNAVAILABLE transport result cannot distinguish an
+    // old Example from a malformed Package snapshot or analyzer failure.
+    const cause = analysis.diagnostics.find(item =>
+      item.severity === "error" && item.source === "snapshot");
+    const detail = cause
+      ? cause.code + ": " + cause.message
+      : analysis.packageAudit.reason ?? "Package analysis unavailable";
     return { state: "UNAVAILABLE", generation: snapshot.generation,
-      documents: [], unlocated: analysis.diagnostics, reason: "Package analysis unavailable" };
+      documents: [], unlocated: analysis.diagnostics, reason: detail };
+  }
 
   const analyzed = new Map(analysis.documents.map(doc => [doc.uri, doc] as const));
   const documents = snapshot.documents.filter(doc =>
