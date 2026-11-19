@@ -2426,7 +2426,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           ?vscode.Uri.joinPath(rootInfo.uri,...segments):null;
       // Missing files and Package-level findings have a Package-root URI.
       // Never manufacture a clickable Source path for those findings.
-      const sourceUri=candidate&&item.uri===candidate.toString()?candidate:null;
+      const sourceUri=candidate&&item.uri===candidate.toString()&&
+        (item.source!=="package-audit"||
+         (item.confidence==="exact"&&item.range))?candidate:null;
       return {
         kind:"package-diagnostic",code:item.code,message:item.message,
         severity:item.severity,status:item.status,domain:item.domain??"source",
