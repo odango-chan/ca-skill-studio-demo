@@ -203,8 +203,13 @@ export function registerCompilerIntegration(vscode,context,{
     if(!root)return;
     const key=root.toString(),items=compilerProblems.get(key);
     if(!items)return;
-    const accepted=Array.isArray(getAcceptedLanguageFindings(key))
-      ?getAcceptedLanguageFindings(key):[];
+    let accepted=[];
+    try{
+      const current=getAcceptedLanguageFindings(key);
+      if(Array.isArray(current))accepted=current;
+    }catch(error){
+      console.warn("Studio local diagnostic reconciliation unavailable",error);
+    }
     const grouped=new Map();
     for(const item of items){
       if(item.locationKind!=="source"||!item.uri||
@@ -227,8 +232,8 @@ export function registerCompilerIntegration(vscode,context,{
     });
     for(const uriKey of previous){
       if(!grouped.has(uriKey)){
-        diagnostics.delete(asUri(vscode,uriKey));
         compilerMarkerSignatures.delete(uriKey);
+        diagnostics.delete(asUri(vscode,uriKey));
       }
     }
     for(const [uriKey,entry] of grouped){
@@ -245,9 +250,10 @@ export function registerCompilerIntegration(vscode,context,{
         marker.code=item.code;
         return marker;
       });
+      // Commit the signature before the native diagnostic event can fire.
+      compilerMarkerSignatures.set(uriKey,signature);
       if(markers.length)diagnostics.set(entry.uri,markers);
       else diagnostics.delete(entry.uri);
-      compilerMarkerSignatures.set(uriKey,signature);
     }
   }
 
