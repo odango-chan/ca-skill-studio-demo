@@ -36,7 +36,7 @@ function analysis(input,diagnostics=[],auditState="READY"){
     scriptReferences:[],schemaReferences:[],diagnostics};
 }
 const diagnostic=(text,overrides={})=>({uri,relativePath:"assurance/procedure.yaml",
-  code:"TEST",message:text,severity:"warning",source:"package-audit",
+  code:"TEST",message:text,severity:"warning",source:"procedure-projection",
   confidence:"exact",line:1,...overrides});
 
 test("diagnostic conversion uses UTF-16 positions across CRLF, preserving line-only confidence",()=>{
@@ -56,6 +56,27 @@ test("diagnostic conversion uses UTF-16 positions across CRLF, preserving line-o
   assert.deepEqual(line.range,{start:{line:1,character:0},end:{line:1,character:0}});
   assert.equal(output.unlocated.length,3);
   assert.equal(exact.severity,2);
+});
+
+test("unlocated Package Audit status remains in Problems but never generates a line-one squiggle",()=>{
+  const input=snapshot(1,1,"a: b\n");
+  const result=diagnosticsFromAnalysis(input,analysis(input,[
+    diagnostic("Snapshot inventory incomplete",{
+      source:"package-audit",code:"PACKAGE_SNAPSHOT_INCOMPLETE",
+      confidence:"unknown",status:"not_checked",line:1
+    }),
+    diagnostic("Missing exact requestSchema target",{
+      source:"package-audit",code:"REQUEST_SCHEMA_NOT_FOUND",
+      status:"confirmed",range:{start:3,end:4}
+    })
+  ]));
+  assert.deepEqual(result.documents[0].diagnostics.map(item=>item.code),
+    ["REQUEST_SCHEMA_NOT_FOUND"]);
+  assert.deepEqual(result.documents[0].diagnostics[0].range,{
+    start:{line:0,character:3},end:{line:0,character:4}
+  });
+  assert.equal(result.unlocated.find(item=>
+    item.code==="PACKAGE_SNAPSHOT_INCOMPLETE")?.status,"not_checked");
 });
 
 test("partial Package reports audit unavailable without inventing a Procedure marker",()=>{
