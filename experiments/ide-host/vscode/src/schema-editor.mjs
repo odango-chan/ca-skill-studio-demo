@@ -1,4 +1,4 @@
-import {openNativeSource} from './native-source.mjs';
+import {openNativeSource,revealNativeSourceLine} from './native-source.mjs';
 import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
 import {projectJsonSchema, resolveSchemaPointer} from '../../../../site/schema-projection.mjs';
 
@@ -38,10 +38,10 @@ export function localSchemaReference(uri, ref) {
   const target = uri.with({path:parent+'/'+file});
   return {uri:target,pointer};
 }
-async function reveal(vscode, uri, line) {
-  return openSourceViewPair(vscode,uri,{line});
+async function reveal(vscode, uri, line, sourceOnly=false) {
+  return sourceOnly?revealNativeSourceLine(vscode,uri,line):openSourceViewPair(vscode,uri,{line});
 }
-async function followReference(vscode, document, projection, sourcePointer) {
+async function followReference(vscode, document, projection, sourcePointer, sourceOnly=false) {
   if (projection.state === 'SOURCE_ONLY') return;
   const entry = projection.allRefs.find(x => x.sourcePointer === sourcePointer);
   if (!entry || typeof entry.reference !== 'string') {
@@ -61,7 +61,7 @@ async function followReference(vscode, document, projection, sourcePointer) {
       'Schema $ref does not uniquely resolve in the current target Source: '+entry.reference);
     return;
   }
-  await reveal(vscode,target.uri,resolved.line);
+  await reveal(vscode,target.uri,resolved.line,sourceOnly);
 }
 function html(token) {
   const csp = "default-src 'none'; img-src data:; style-src 'nonce-" + token +
@@ -151,19 +151,17 @@ async function chooseSchema(vscode, uri) {
   })),{placeHolder:'Select a JSON Schema source'});
   return picked?.uri??null;
 }
-export function registerSchemaEditor(vscode,context) {
-  const provider = {
-    async resolveCustomTextEditor(document,panel) {
+export function mountSchemaPreview(vscode,document,panel,{forgetPairOnDispose=true,isCurrent=()=>true}={}) {
       if (!isSkillSchema(document.uri.path)) {
-        await vscode.window.showWarningMessage('Only Skill schemas/*.schema.yaml is supported');
-        return;
+        void vscode.window.showWarningMessage('Only Skill schemas/*.schema.yaml is supported');
+        return {dispose(){}};
       }
       const webview = panel.webview;
       webview.options={enableScripts:true,localResourceRoots:[]};
       webview.html=html(nonce());
       let disposed=false, ready=false;
       const push=()=>{
-        if(disposed||!ready)return;
+        if(disposed||!ready||!isCurrent())return;
         const projection=projectJsonSchema(document.getText());
         void webview.postMessage({type:'snapshot',version:document.version,
           packageName:schemaPackageName(document.uri),projection});
@@ -172,7 +170,7 @@ export function registerSchemaEditor(vscode,context) {
         if(e.document.uri.toString()===document.uri.toString())push();
       });
       const onMessage=webview.onDidReceiveMessage(async message=>{
-        if(disposed||!message||typeof message!=='object')return;
+        if(disposed||!isCurrent()||!message||typeof message!=='object')return;
         if(message.type==='ready'){ready=true;push();return;}
         if(message.version!==document.version){
           void webview.postMessage({type:'error',message:'Schema Source 已变化，请使用最新字段视图。'});
@@ -184,16 +182,29 @@ export function registerSchemaEditor(vscode,context) {
               viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
             });
           } else if(message.type==='revealLine') {
-            await reveal(vscode,document.uri,message.value);
+            await reveal(vscode,document.uri,message.value,!forgetPairOnDispose);
           } else if(message.type==='followReference'){
             const projection=projectJsonSchema(document.getText());
-            await followReference(vscode,document,projection,message.value);
+            await followReference(vscode,document,projection,message.value,!forgetPairOnDispose);
           }
         }catch(e) {
           await vscode.window.showWarningMessage('Schema Designer: '+String(e?.message??e));
         }
       });
-      panel.onDidDispose(()=>{disposed=true;forgetSourceViewPair(document.uri);onChange.dispose();onMessage.dispose();});
+      let releasePanel=null;
+      const cleanup=()=>{
+        if(disposed)return;
+        disposed=true;
+        if(forgetPairOnDispose)forgetSourceViewPair(document.uri);
+        onChange.dispose();onMessage.dispose();releasePanel?.dispose?.();
+      };
+      releasePanel=panel.onDidDispose(cleanup);
+      return {dispose:cleanup};
+}
+export function registerSchemaEditor(vscode,context) {
+  const provider={
+    async resolveCustomTextEditor(document,panel) {
+      mountSchemaPreview(vscode,document,panel);
     }
   };
   context.subscriptions.push(vscode.window.registerCustomEditorProvider(
