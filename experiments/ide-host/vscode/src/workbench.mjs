@@ -3118,7 +3118,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const sourceText=files.get(item.path)?.text;
           const span=item.sourceRange;
           const positionAtOffset=(text,offset)=>{
-            const lines=text.slice(0,offset).split(/\\r\\n|\\r|\\n/);
+            const lines=text.slice(0,offset).split(/\r\n|\r|\n/);
             return {line:lines.length-1,character:lines.at(-1).length};
           };
           const range=sourceText&&span&&Number.isSafeInteger(span.start)&&
