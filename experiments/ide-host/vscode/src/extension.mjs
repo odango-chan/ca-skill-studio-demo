@@ -57,45 +57,153 @@ function toolbarIconButton(id,name,label,{pressed=false}={}){
     (pressed?' aria-pressed="false"':'')+'>'+svgIcon(name)+'</button>';
 }
 export function activate(context){
-  // Register the Package Explorer before the heavier editor/workbench
-  // contributions. Its TreeView can paint its loading state immediately;
-  // inventory discovery continues asynchronously in the background.
-  let workbench=null,packageOverview=null;
-  const compilerIntegration=registerCompilerIntegration(vscode,context,{
-    getActiveDocument:()=>workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
-  });
-  const dependencyIntegration=registerDependencyIntegration(vscode,context,{
-    onLockChanged:()=>workbench?.invalidateDependencyAnalysis?.(),
-    onProjectRootChanged:()=>void packageOverview?.refresh()
-  });
-  packageOverview=registerPackageOverview(vscode,context,
-    ()=>workbench?.getActiveDocument?.()??null,{
-      dependenciesProvider:dependencyIntegration.provider,
-      compilerProvider:compilerIntegration.provider,
-      getProjectRoot:dependencyIntegration.getProjectRoot,
-      onPackagesChanged:packages=>workbench?.syncPackages?.(packages)
+  // Register Welcome first. A failure in Compiler, Dependency or semantic
+  // token integration must never prevent users from reopening the project UI.
+  let workbench=null,packageOverview=null,projectWelcome=null,workbenchReady=false;
+  const activationFailures=[];
+  const activationComponents=Object.create(null);
+  let activationWarningShown=false;
+  const recordActivationFailure=(component,error)=>{
+    const failure={component,message:String(error?.message??error)};
+    activationFailures.push(failure);
+    activationComponents[component]="FAILED";
+    console.error("SKILL_STUDIO_ACTIVATION_FAILURE",JSON.stringify(failure));
+    if(!activationWarningShown){
+      activationWarningShown=true;
+      try{
+        void vscode.window.showWarningMessage(
+          "SKILL Studio could not initialize "+component+": "+failure.message+
+          ". Run SKILL Studio: Show Activation Diagnostics."
+        );
+      }catch{}
+    }
+  };
+  const registerSafely=(component,register,fallback=null)=>{
+    try{
+      const value=register();
+      activationComponents[component]="READY";
+      return value??fallback;
+    }catch(error){
+      recordActivationFailure(component,error);
+      return fallback;
+    }
+  };
+  projectWelcome=registerSafely("Welcome",()=>registerProjectWelcome(vscode,context));
+  if(!projectWelcome){
+    registerSafely("Welcome fallback",()=>context.subscriptions.push(
+      vscode.commands.registerCommand("skillStudio.showWelcome",()=>{
+        void vscode.window.showWarningMessage(
+          "SKILL Studio Welcome is unavailable. Run Show Activation Diagnostics."
+        );
+      })
+    ));
+  }
+  registerSafely("Activation Diagnostics",()=>context.subscriptions.push(
+    vscode.commands.registerCommand("skillStudio.showActivationDiagnostics",async()=>{
+      const activeDocument=vscode.window.activeTextEditor?.document??null;
+      const packageInventory=packageOverview?.getDiagnostics?.()??null;
+      let extension=null;
+      try{
+        extension=vscode.extensions?.getExtension?.(
+          "odango-chan.ca-skill-studio-ide-spike"
+        )??null;
+      }catch{}
+      const report={
+        extensionId:"odango-chan.ca-skill-studio-ide-spike",
+        extensionVersion:extension?.packageJSON?.version??null,
+        extensionActive:extension?.isActive??true,
+        workspaceName:vscode.workspace.name??null,
+        workspaceFolders:(vscode.workspace.workspaceFolders??[])
+          .map(folder=>folder.uri.toString()),
+        activeDocument:activeDocument?{
+          uri:activeDocument.uri.toString(),languageId:activeDocument.languageId
+        }:null,
+        components:{...activationComponents},
+        failures:[...activationFailures],
+        packageInventory,
+        workbenchReady
+      };
+      console.info("SKILL_STUDIO_ACTIVATION_DIAGNOSTICS",JSON.stringify(report));
+      const failureSummary=activationFailures.length
+        ?"Activation failures: "+activationFailures.map(item=>item.component).join(", ")
+        :"No startup failures recorded";
+      const packageSummary=packageInventory
+        ?" · Package "+packageInventory.state+" ("+packageInventory.packageCount+")":"";
+      void vscode.window.showInformationMessage(
+        "SKILL Studio · "+failureSummary+packageSummary
+      );
+      return report;
+    })
+  ));
+  const compilerIntegration=registerSafely("Compiler",
+    ()=>registerCompilerIntegration(vscode,context,{
+      getActiveDocument:()=>workbench?.getActiveDocument?.()??
+        vscode.window.activeTextEditor?.document??null
+    }),{provider:null,problems:null,dispose(){}});
+  const dependencyIntegration=registerSafely("Dependencies",
+    ()=>registerDependencyIntegration(vscode,context,{
+      onLockChanged:()=>workbench?.invalidateDependencyAnalysis?.(),
+      onProjectRootChanged:()=>void packageOverview?.refresh()
+    }),{
+      provider:null,getProjectRoot:()=>null,prepareToolContract:()=>null,dispose(){}
     });
-  workbench=registerWorkbench(vscode,context,{
-    prepareToolContract:dependencyIntegration.prepareToolContract,
-    compilerProblemsProvider:compilerIntegration.problems
-  });
+  packageOverview=registerSafely("Package Explorer",
+    ()=>registerPackageOverview(vscode,context,
+      ()=>workbench?.getActiveDocument?.()??null,{
+        dependenciesProvider:dependencyIntegration.provider,
+        compilerProvider:compilerIntegration.provider,
+        getProjectRoot:dependencyIntegration.getProjectRoot,
+        onPackagesChanged:packages=>workbench?.syncPackages?.(packages)
+      }),{
+        refresh:async()=>[],revealPackages:async()=>false,
+        getDiagnostics:()=>({
+          state:"unavailable",message:"Package Explorer registration failed",
+          packageCount:0,packages:[],treeReads:0,treeReadsByKind:{}
+        }),
+        dispose(){}
+      });
+  const unavailableWorkbench={
+    getActiveDocument:()=>vscode.window.activeTextEditor?.document??null,
+    syncPackages(){},invalidateDependencyAnalysis(){},
+    attach(){return ()=>{};},activate(){},select(){}
+  };
+  workbench=registerSafely("Workbench",
+    ()=>registerWorkbench(vscode,context,{
+      prepareToolContract:dependencyIntegration.prepareToolContract,
+      compilerProblemsProvider:compilerIntegration.problems
+    }),unavailableWorkbench);
+  workbenchReady=workbench!==unavailableWorkbench;
   // Diagnostic regression results live in the native Test Explorer (when the
   // host exposes Testing API), never in the Problems or Runtime evidence views.
-  registerPackageDiagnosticTesting(vscode,context,{
+  registerSafely("Package diagnostic tests",()=>registerPackageDiagnosticTesting(vscode,context,{
     getActiveProcedure:()=>
       workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
-  });
-  registerPackageRouteTesting(vscode,context,{
+  }));
+  registerSafely("Package route tests",()=>registerPackageRouteTesting(vscode,context,{
     getActiveProcedure:()=>
       workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
-  });
-  registerContractEditor(vscode,context);
-  registerPredicateEditor(vscode,context);
-  registerSchemaEditor(vscode,context);
+  }));
+  registerSafely("Contract Editor",()=>registerContractEditor(vscode,context));
+  registerSafely("Predicate Editor",()=>registerPredicateEditor(vscode,context));
+  registerSafely("Schema Editor",()=>registerSchemaEditor(vscode,context));
+  // Keep the extension host alive if a later, non-core editor/menu contribution
+  // fails. The already registered Welcome and diagnostic command remain usable.
+  try{
   const provider={
     async resolveCustomTextEditor(document,panel){
       if(!isProcedurePath(document.uri.path)){
         vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
+        return;
+      }
+      if(!workbenchReady){
+        const details=activationFailures.map(item=>
+          item.component+": "+item.message).join("\n")||
+          "The Procedure workbench did not initialize.";
+        panel.webview.options={enableScripts:false};
+        panel.webview.html='<!doctype html><html lang="en"><meta charset="utf-8">'+
+          '<body><main><h2>SKILL Studio Workbench unavailable</h2>'+
+          '<p>Source files remain available. Open Activation Diagnostics to inspect the failed component.</p>'+
+          '<pre>'+escaped(details)+'</pre></main></body></html>';
         return;
       }
       const openedAt=performance.now();
@@ -387,7 +495,6 @@ export function activate(context){
     }
   ));
   let exampleLoadPromise=null;
-  let projectWelcome=null;
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
   const exampleText=progressZh?{
     title:"加载示例项目",
@@ -739,9 +846,8 @@ export function activate(context){
         groups,visibleEditors,maxViewColumn,
         pythonColumn,ordinaryYamlColumn};
     }));
-  // A real empty-workspace editor page is required: Theia currently does not
-  // render Explorer viewsWelcome without a workspace folder.
-  projectWelcome=registerProjectWelcome(vscode,context);
+  // Welcome was registered before optional integrations so it remains
+  // reachable even when a downstream provider fails during activation.
   // Open Example switches to a named folder, which restarts the extension host.
   // Complete the user-requested default Procedure open only after the new
   // single-folder workspace is active; never auto-open on unrelated projects.
@@ -776,10 +882,15 @@ export function activate(context){
       void vscode.window.showInformationMessage(message);
     }
   }).catch(error=>{
+    recordActivationFailure("Pending Example restore",error);
     void vscode.window.showErrorMessage(
       "SKILL Studio could not finish opening the Example Procedure: "+
       String(error?.message??error));
   });
   return {extendMarkdownIt};
+  }catch(error){
+    recordActivationFailure("Remaining Workbench Contributions",error);
+    return {extendMarkdownIt};
+  }
 }
 export function deactivate(){}

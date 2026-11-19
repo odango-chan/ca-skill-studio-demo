@@ -198,4 +198,13 @@ test("manifest puts the visible Package Explorer in native Explorer without a St
   assert.equal(manifest.contributes.viewsContainers?.activitybar,undefined);
   assert.equal(manifest.contributes.views.explorer.some(item=>
     item.id==="skillStudio.dependencies"||item.id==="skillStudio.build"),false);
+  const toolbar=manifest.contributes.menus["view/title"];
+  assert.ok(toolbar.some(item=>item.command==="skillStudio.showWelcome"&&
+    item.when==="view == skillStudio.packages"),
+    "Welcome must remain directly reachable from the Package Explorer after a workspace is open");
+  assert.ok(toolbar.some(item=>item.command==="skillStudio.showActivationDiagnostics"&&
+    item.when==="view == skillStudio.packages"),
+    "the Package Explorer must expose startup diagnostics when a provider is empty");
+  assert.ok(manifest.contributes.commands.some(item=>
+    item.command==="skillStudio.showActivationDiagnostics"));
 });
