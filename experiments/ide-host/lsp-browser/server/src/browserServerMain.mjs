@@ -1018,7 +1018,12 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
         symbolIndexes.delete(rootUri);
         refreshSemanticTokens();
       }
-      reportError("Package analysis rejected: " + result.reason, rootUri, snapshot.generation);
+      // The session already publishes a generation-scoped UNAVAILABLE
+      // status with the exact diagnostic code and reason. Reporting the
+      // generic ANALYSIS_UNAVAILABLE as a separate transport error hid that
+      // actionable cause and produced a misleading "analysis failed" banner.
+      if (result.reason !== "ANALYSIS_UNAVAILABLE")
+        reportError("Package analysis rejected: " + result.reason, rootUri, snapshot.generation);
     }
   } catch (error) {
     // An analyzer exception must never remove the current source used by

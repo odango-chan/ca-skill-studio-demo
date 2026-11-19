@@ -352,7 +352,9 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   // historical analyzer. v1alpha4 remains a normative inheritance baseline,
   // not a product compatibility mode.
   return unavailable(snapshot, "UNSUPPORTED_CA_SL_VERSION",
-    "Skill Studio accepts CA-SL connectionagent.io/v1alpha5 only");
+    "Procedure must use CA-SL connectionagent.io/v1alpha5 top-level start/nodes. " +
+    "Legacy Example content is not migrated automatically; Open Example Project " +
+    "offers a confirmation before replacing the Example.");
 
 
 }
