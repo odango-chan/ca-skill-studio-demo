@@ -832,7 +832,7 @@ try{
       return c.get(key).executeCommand(
         'skillStudio.internal.openPythonSyntaxAcceptance');
     })()`);
-    if(!opened?.uri?.endsWith("/scripts/build_pcf_policy_inputs.py")||
+    if(!opened?.uri?.endsWith("/scripts/validate-subscription-request.py")||
        opened.languageId!=="python"||opened.viewColumn!==1)
       throw Error("Exact native Python Source did not open in the primary group: "+
         JSON.stringify(opened));
@@ -845,7 +845,7 @@ try{
             if(r.width<=150||r.height<=100||!node.querySelector('.view-lines'))
               return false;
             for(let parent=node;parent;parent=parent.parentElement)
-              if(String(parent.id??'').includes('build_pcf_policy_inputs.py'))
+              if(String(parent.id??'').includes('validate-subscription-request.py'))
                 return true;
             return false;
           });
