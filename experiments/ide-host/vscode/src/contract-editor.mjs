@@ -1,5 +1,5 @@
 import {openNativeSource,revealNativeSourceLine} from './native-source.mjs';
-import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
+
 import {projectSkillContract} from '../../../../site/contract-projection.mjs';
 import {projectWorkspace} from '../../../../site/workspace.mjs';
 import {parseDocument, LineCounter, isMap, isScalar} from 'yaml';
@@ -43,10 +43,10 @@ function predicateLine(source, predicateId) {
   }
   return 1;
 }
-async function reveal(vscode, uri, line, sourceOnly=false) {
-  return sourceOnly?revealNativeSourceLine(vscode,uri,line):openSourceViewPair(vscode,uri,{line});
+async function reveal(vscode,uri,line) {
+  return revealNativeSourceLine(vscode,uri,line);
 }
-async function openReference(vscode, contractDocument, message, sourceOnly=false) {
+async function openReference(vscode,contractDocument,message) {
   const root = packageRoot(contractDocument.uri);
   if (message.type === 'openProcedure') {
     if (typeof message.value !== 'string') throw new Error('Procedure ID is missing');
@@ -58,15 +58,15 @@ async function openReference(vscode, contractDocument, message, sourceOnly=false
     if (!procedure) {
       await vscode.window.showWarningMessage(
         'Procedure "' + message.value + '" is not uniquely available in the current Source; opening the file at its beginning.');
-      await reveal(vscode, uri, 1, sourceOnly);
+      await reveal(vscode, uri, 1);
       return;
     }
-    await reveal(vscode, uri, procedure.line, sourceOnly);
+    await reveal(vscode, uri, procedure.line);
     return;
   }
   if (message.type === 'openSchema') {
     const uri = packageUri(contractDocument.uri, message.value);
-    await reveal(vscode, uri, 1, sourceOnly);
+    await reveal(vscode, uri, 1);
     return;
   }
   if (message.type === 'openPredicate') {
@@ -78,7 +78,7 @@ async function openReference(vscode, contractDocument, message, sourceOnly=false
       await vscode.window.showWarningMessage(
         'Predicate "' + message.value + '" was not resolved exactly; opening PredicateSet Source.');
     }
-    await reveal(vscode, uri, line, sourceOnly);
+    await reveal(vscode, uri, line);
   }
 }
 function webviewHtml(webview, token) {
@@ -166,7 +166,7 @@ async function chooseContract(vscode, uri) {
   })), {placeHolder: 'Choose the Contract Source file'});
   return picked?.uri ?? null;
 }
-export function mountContractPreview(vscode,document,panel,{forgetPairOnDispose=true,isCurrent=()=>true}={}) {
+export function mountContractPreview(vscode,document,panel,{isCurrent=()=>true}={}) {
       if (!contractPath(document.uri.path)) {
         void vscode.window.showWarningMessage(
           'Only assurance/contract.yaml is supported by Contract Designer');
@@ -215,24 +215,15 @@ export function mountContractPreview(vscode,document,panel,{forgetPairOnDispose=
       const cleanup=()=>{
         if(disposed)return;
         disposed=true;
-        if(forgetPairOnDispose)forgetSourceViewPair(document.uri);
         changed.dispose();incoming.dispose();releasePanel?.dispose?.();
       };
       releasePanel=panel.onDidDispose(cleanup);
       return {dispose:cleanup};
 }
 export function registerContractEditor(vscode,context) {
-  const provider={
-    async resolveCustomTextEditor(document,panel) {
-      mountContractPreview(vscode,document,panel);
-    }
-  };
-  context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW, provider, {
-    webviewOptions: {retainContextWhenHidden: true}
-  }));
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openContract',
     async uri => {
       const target = await chooseContract(vscode, uri);
-      if (target) await openSourceViewPair(vscode,target);
+      if (target) await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
     }));
 }
