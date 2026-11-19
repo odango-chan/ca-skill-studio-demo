@@ -2447,6 +2447,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       (blocked?" / "+blocked+" blocked":"")+
       " · Compiler / Owner qualification pending";
     fireProblems();
+    // The accepted generation is now available to the Compiler marker
+    // projector; never modify Compiler source evidence or LSP publications.
+    compilerProblemsProvider?.refreshMarkers?.(status.rootUri);
   }
   const compilerProblemsChanged=compilerProblemsProvider?.onDidChange?.(()=>fireProblems());
   if(compilerProblemsChanged)context.subscriptions.push(compilerProblemsChanged);
@@ -2833,7 +2836,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       });
       return exact[0].toString();
     }));
-  return {syncPackages:packages=>packageLanguageLifecycle.sync(packages),attach(doc,post){
+  return {syncPackages:packages=>packageLanguageLifecycle.sync(packages),
+    getAcceptedPackageDiagnostics(rootUri){
+      const state=languagePackages.get(rootUri);
+      const accepted=languagePackageStatuses.get(rootUri);
+      return state&&!state.disposed&&accepted?.generation===state.generation&&
+        accepted.state!=="UNAVAILABLE"&&Array.isArray(accepted.analysisDiagnostics)
+        ?accepted.analysisDiagnostics:[];
+    },
+    attach(doc,post){
     sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();
     const releaseLanguagePackage=attachLanguagePackage(doc);
     return ()=>{if(sessions.get(doc.uri.toString())===post)
