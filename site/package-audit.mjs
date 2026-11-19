@@ -137,6 +137,11 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
   if(!procedureAst)notChecked("PROCEDURE_CHECKS_NOT_CHECKED",FILES.procedure,
     "Procedure structure and reference checks were not run because the file is missing or its YAML could not be parsed","procedure");
   const predIds=new Set(entries(get(predicates,"predicates")).map(pair=>v(pair.key)));
+  const contractVersion=contract?v(get(contract,"apiVersion")):null;
+  if(contractVersion==="connectionagent.io/v1alpha1"||
+     isMap(get(procedureAst,"procedures")))
+    notChecked("V1ALPHA5_LSP_NOT_APPLICABLE",FILES.procedure,
+      "当前源码属于 CA-SL v1alpha1 / legacy procedures Profile；v1alpha5 专用 Language Service 不会解析该语法。Legacy Package Audit 仍继续执行可识别的静态检查","language");
   const procedureModel=procedureAst
     ?projectWorkspace(sources.get(FILES.procedure))
     :{state:"UNAVAILABLE",diagnostics:[]};
@@ -218,6 +223,7 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
   }
 
   // Validate PredicateSet structure independently of Procedure graph projection.
+  let celPredicateCount=0;
   if(predicates){
     const definitions=get(predicates,"predicates");
     if(!isMap(definitions)){
@@ -259,6 +265,7 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
           add("PREDICATE_EVALUATOR_TYPE_MISSING",FILES.predicates,evaluator,
             "Predicate "+id+" 的 evaluator 缺少 type",{severity:"error",domain:"predicates"});
         else if(type==="cel"){
+          celPredicateCount++;
           if(typeof expression!=="string"||!expression.trim())
             add("PREDICATE_EXPRESSION_MISSING",FILES.predicates,evaluator,
               "CEL Predicate "+id+" 的 evaluator 缺少非空 expression",
@@ -449,6 +456,16 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
     }
   }
 
+  if(celPredicateCount)
+    notChecked("CEL_EXPRESSION_SYNTAX_NOT_CHECKED",FILES.predicates,
+      "已检查 "+celPredicateCount+" 个 CEL Predicate 的 expression 字段存在性；当前浏览器端 Legacy Audit 未运行 CEL parser/type checker","predicates");
+  if(predIds.size)
+    notChecked("PREDICATE_RUNTIME_NOT_CHECKED",FILES.predicates,
+      "已检查 Predicate 声明结构与静态引用；没有执行任何 Observation 查询或 Predicate Runtime 求值","predicates");
+  const requiredFacts=values(get(contract,"spec","context","requiredFacts"));
+  if(requiredFacts.length)
+    notChecked("CONTEXT_FACTS_NOT_CHECKED",FILES.contract,
+      "已读取 "+requiredFacts.length+" 个 requiredFacts 标识；其运行时来源、UE/Session 绑定与新鲜度不能由本地 Package 静态检查证明","context");
   if(sources.has(FILES.procedure)&&!contract)
     notChecked("PROCEDURE_CONTRACT_LINKS_NOT_CHECKED",FILES.procedure,
       "Procedure 的 Capability / Contract 引用无法完整核对：Contract 不可用","contract");
