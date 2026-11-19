@@ -972,8 +972,7 @@ export async function runWorkbenchAcceptance({
   let languageServiceStatus="NOT_REQUIRED_NODE_HOST";
   let currentLanguageFeatures=null,semanticTokenEvidence=null;
   if(requireBrowserLsp){
-    // A v1alpha5 Package is intentionally PARTIAL until trusted Owner,
-    // The current source analysis can be READY while trust/Package qualification
+    // A current Package can be source-ready while trust/Package qualification
     // remains unavailable. Verify these independent states without claiming
     // qualification that the bundled NOT_QUALIFIED Example does not have.
     languageServiceStatus=await waitForStatus("READY");
@@ -1253,7 +1252,7 @@ export async function runWorkbenchAcceptance({
   await assertSourceVisualPair(evalJS,sleep,"SKILL.md","v1alpha5 Markdown Source + Preview");
   // The Preview renderer can look correct while native Markdown SOURCE is plain
   // monochrome text. Require actual TextMate styles in the Monaco Source pane;
-  // no v1alpha5 Compiler/LSP or Package qualification is involved.
+  // no current Compiler, Language Service, or Package qualification is involved.
   let markdownTextMate=null;
   for(let attempt=0;attempt<35;attempt++){
     markdownTextMate=await evalJS(`(()=>{
