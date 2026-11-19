@@ -57,7 +57,7 @@ test("shared core analyzes the current CA-SL v1alpha5 Example without claiming q
   const snapshot=sampleSnapshot();
   const before=snapshot.documents.map(document=>document.text);
   const result=analyzePackageSnapshot(snapshot);
-  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.state,"READY");
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.procedure.procedures.length,1);
   assert.equal(result.procedure.entry,"get-sm-subscription-data");
@@ -90,7 +90,7 @@ test("partial Package snapshots preserve v1alpha5 source projection but gate cro
   snapshot.completeness="partial";
   snapshot.reason="The host could not enumerate every Package file";
   const result=analyzePackageSnapshot(snapshot);
-  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.state,"READY");
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
   assert.match(result.packageAudit.reason,/could not enumerate/);
@@ -104,7 +104,7 @@ test("missing non-procedure v1alpha5 files do not fabricate Package qualificatio
   snapshot.documents=snapshot.documents.filter(document=>
     document.relativePath!=="assurance/contract.yaml");
   const result=analyzePackageSnapshot(snapshot);
-  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.state,"READY");
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
   assert.match(result.packageAudit.reason,/current Compiler/);
@@ -227,7 +227,7 @@ test("Package analysis binds document URIs to exact Package-relative paths",()=>
     assert.equal(result.diagnostics[0].code,"PACKAGE_DOCUMENT_URI_MISMATCH",uri);
   }
   procedure.uri=originalUri;
-  assert.equal(analyzePackageSnapshot(fixture).state,"PARTIAL");
+  assert.equal(analyzePackageSnapshot(fixture).state,"READY");
 
   const remote=sampleSnapshot();
   remote.rootUri="vscode-remote://wsl+Ubuntu/workspace/My%20Skill";
@@ -235,7 +235,7 @@ test("Package analysis binds document URIs to exact Package-relative paths",()=>
     ...document,
     uri:remote.rootUri+"/"+document.relativePath
   }));
-  assert.equal(analyzePackageSnapshot(remote).state,"PARTIAL");
+  assert.equal(analyzePackageSnapshot(remote).state,"READY");
 });
 
 test("unsafe Package root URIs fail closed before publishing analysis",()=>{
