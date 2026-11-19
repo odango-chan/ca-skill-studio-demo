@@ -1188,8 +1188,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           state=languagePackages.get(packageRoot.toString());
           if(!state||state.disposed)throw Error("current Package did not attach to Language Service");
           const status=await waitForLanguagePackageStatus(state,state.generation,20000);
-          if(status.state!=="PARTIAL")
-            throw Error("Unqualified fixture must remain editor-only PARTIAL, got "+status.state);
+          if(status.state!=="READY"||status.packageAuditState!=="UNAVAILABLE")
+            throw Error("Current source analysis must be READY while Package qualification remains separate: "+
+              JSON.stringify({state:status.state,packageAuditState:status.packageAuditState,
+                packageAuditReason:status.packageAuditReason}));
           if(state.lastSentSnapshot?.completeness!=="complete")
             throw Error("current-language acceptance snapshot is incomplete: "+
               JSON.stringify(state.lastSentSnapshot));
@@ -1326,7 +1328,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
              !symbols.some(item=>item.name==="final"))
             throw Error("Native Theia Outline did not expose current Node declarations");
           return {
-            status:status.state,snapshotCompleteness:state.lastSentSnapshot.completeness,
+            status:status.state,packageAuditState:status.packageAuditState,
+            snapshotCompleteness:state.lastSentSnapshot.completeness,
             contractPreconditionCompletion:contractGate,
             requestSchemaCompletion:schemaPath,startNodeCompletion:entry,
             predicateCompletion:predicate,
