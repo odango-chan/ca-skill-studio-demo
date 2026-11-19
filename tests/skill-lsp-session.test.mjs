@@ -58,13 +58,18 @@ test("diagnostic conversion uses UTF-16 positions across CRLF, preserving line-o
   assert.equal(exact.severity,2);
 });
 
-test("partial Package emits explicit audit unavailable rather than empty success",()=>{
+test("partial Package reports audit unavailable without inventing a Procedure marker",()=>{
   const input=snapshot();
   const result=diagnosticsFromAnalysis(input,analysis(input,[],"UNAVAILABLE"));
   assert.equal(result.state,"PARTIAL");
-  const warning=result.documents[0].diagnostics.find(x=>x.code==="PACKAGE_AUDIT_UNAVAILABLE");
+  assert.deepEqual(result.documents[0].diagnostics,[]);
+  const warning=result.unlocated.find(x=>x.code==="PACKAGE_AUDIT_UNAVAILABLE");
   assert.ok(warning);
-  assert.equal(warning.severity,2);
+  assert.equal(warning.severity,"warning");
+  assert.equal(warning.status,"not_checked");
+  assert.equal(warning.uri,input.rootUri);
+  assert.equal(warning.relativePath,"");
+  assert.equal(warning.range,undefined);
   assert.match(warning.message,/missing contract/);
 });
 
