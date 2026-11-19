@@ -136,10 +136,10 @@ test("Theia preloads the shared offline Skill Studio color and file icon theme",
   ])assert.ok(statSync(join(themeRoot,path)).size>80,path);
 });
 
-test("The primary Skill Studio extension owns offline YAML/Python TextMate grammars",()=>{
+test("The primary Skill Studio extension owns offline Markdown/YAML/Python TextMate grammars",()=>{
   const primary=join(root,"plugins/odango-chan.ca-skill-studio-ide-spike");
   const manifest=JSON.parse(readFileSync(join(primary,"package.json"),"utf8"));
-  for(const [id,suffix] of [["yaml",".yaml"],["python",".py"]]){
+  for(const [id,suffix] of [["markdown",".md"],["yaml",".yaml"],["python",".py"]]){
     assert.ok(manifest.contributes.languages.some(item=>
       item.id===id&&item.extensions.includes(suffix)),id+" language id");
     assert.ok(manifest.contributes.grammars.some(item=>item.language===id),id+" grammar");
@@ -147,6 +147,9 @@ test("The primary Skill Studio extension owns offline YAML/Python TextMate gramm
     assert.ok(language.configuration.startsWith("./dist/grammars/"),id+" configuration is packaged");
     assert.ok(statSync(join(primary,language.configuration)).size>80,id+" configuration asset");
   }
+  const markdownGrammar=manifest.contributes.grammars.find(item=>item.language==="markdown");
+  assert.equal(markdownGrammar?.scopeName,"text.html.markdown");
+  assert.ok(markdownGrammar.embeddedLanguages?.["meta.embedded.block.frontmatter"]==="yaml");
   for(const grammar of manifest.contributes.grammars){
     assert.ok(grammar.path.startsWith("./dist/grammars/"),grammar.scopeName+" is in primary extension");
     const path=join(primary,grammar.path);

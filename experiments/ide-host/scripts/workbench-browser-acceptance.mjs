@@ -1234,6 +1234,32 @@ export async function runWorkbenchAcceptance({
     missingLink:missingMarkdownLink,csp:blockedMissingView.view.csp
   }));
   await assertSourceVisualPair(evalJS,sleep,"SKILL.md","v1alpha5 Markdown Source + Preview");
+  // The Preview renderer can look correct while native Markdown SOURCE is plain
+  // monochrome text. Require actual TextMate styles in the Monaco Source pane;
+  // no v1alpha5 Compiler/LSP or Package qualification is involved.
+  let markdownTextMate=null;
+  for(let attempt=0;attempt<35;attempt++){
+    markdownTextMate=await evalJS(`(()=>{
+      const editors=[...document.querySelectorAll('.monaco-editor')].filter(node=>{
+        const r=node.getBoundingClientRect();
+        return r.width>150&&r.height>100&&node.querySelector('.view-lines');
+      });
+      const editor=editors.find(node=>
+        node.closest('.lm-Widget')?.textContent?.includes('Studio Markdown Preview Acceptance'))??
+        editors[0];
+      const spans=[...(editor?.querySelectorAll('.view-lines span')??[])];
+      return {visible:Boolean(editor),tokenCount:spans.length,
+        colors:[...new Set(spans.map(node=>getComputedStyle(node).color))],
+        visibleText:editor?.querySelector('.view-lines')?.innerText?.slice(0,160)??''};
+    })()`);
+    if(markdownTextMate?.visible&&markdownTextMate.colors.length>=3)break;
+    await sleep(120);
+  }
+  if(!markdownTextMate?.visible||markdownTextMate.colors.length<3)
+    throw Error("Native Markdown Source TextMate colors missing (Preview is independent): "+
+      JSON.stringify(markdownTextMate));
+  console.log("STUDIO_NATIVE_MARKDOWN_TEXTMATE_CHROMIUM",JSON.stringify(markdownTextMate));
+
 
   const live=await nativeCommand(
     "skillStudio.internal.markdownPreviewLiveUpdateAcceptance",markdownFixture.uri);
