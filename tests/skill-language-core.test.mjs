@@ -120,13 +120,17 @@ test("malformed v1alpha5 Procedure remains visible and fails closed",()=>{
   assert.ok(result.diagnostics.length>0);
 });
 
-test("legacy Procedure syntax is rejected instead of falling back to the historical analyzer",()=>{
+test("historical Procedure syntax receives ordinary current-grammar diagnostics",()=>{
   const snapshot=sampleSnapshot();
   const procedure=snapshot.documents.find(document=>document.relativePath==="assurance/procedure.yaml");
   procedure.text="procedures:\n  legacy:\n    nodes:\n      step:\n        call: ca.sample.read\n";
   const result=analyzePackageSnapshot(snapshot);
-  assert.equal(result.state,"UNAVAILABLE");
-  assert.equal(result.diagnostics[0].code,"UNSUPPORTED_CA_SL_VERSION");
+  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.procedure.state,"UNAVAILABLE");
+  const codes=new Set(result.diagnostics.map(item=>item.code));
+  assert.ok(codes.has("UNKNOWN_FIELD"),JSON.stringify(result.diagnostics));
+  assert.ok(codes.has("SOURCE_ROOT_INVALID"),JSON.stringify(result.diagnostics));
+  assert.ok(!codes.has("UNSUPPORTED_CA_SL_VERSION"));
 });
 
 test("unsafe or duplicate Package paths are rejected before analysis",()=>{
