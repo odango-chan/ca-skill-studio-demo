@@ -5,16 +5,27 @@ import {layoutProcedure} from "../site/graph.mjs";
 import {selectGraphScope,groupRouteEntries} from "../site/layout.mjs";
 import {detailedLayoutAllowed} from "../site/graph-scale.mjs";
 
-function largeYaml(count=300,outcomes=5){
-  const lines=["procedures:","  stress:","    start: node-0","    nodes:"];
-  for(let i=0;i<count-1;i++){
-    lines.push("      node-"+i+":","        call: demo.noop","        'on':");
-    for(let j=0;j<outcomes;j++)
-      lines.push("          OUTCOME_"+j+": node-"+(i+1));
+function largeYaml(count=300){
+  const lines=["start: node-0","nodes:"];
+  for(let i=0;i<count;i++){
+    lines.push("  node-"+i+":","    operation:",
+      "      tool: demo.noop","      arguments: {}","      routes:");
+    let outcomes;
+    if(i===count-1)outcomes=["SUCCEEDED","FAILED","DENIED"];
+    else if(i===count-2)outcomes=["SUCCEEDED","FAILED"];
+    else outcomes=["SUCCEEDED","FAILED","DENIED","COMMITTED","NOT_COMMITTED"];
+    for(const outcome of outcomes){
+      let target;
+      if(i<count-2)target="node-"+(i+1);
+      else if(i===count-2)target=outcome==="SUCCEEDED"?"node-"+(i+1):"FAILED";
+      else target=outcome==="SUCCEEDED"?"UNRESOLVED":
+        outcome==="FAILED"?"FAILED":"SAFE_STOPPED";
+      lines.push("        "+outcome+": "+target);
+    }
   }
-  lines.push("      node-"+(count-1)+":","        terminal: SUCCEEDED");
   return lines.join("\n")+"\n";
 }
+
 test("A5 near-budget 300 Node / 1495 Route projection retains source identity",()=>{
   const p=projectWorkspace(largeYaml());
   assert.equal(p.state,"READY");
@@ -39,8 +50,14 @@ test("A5 small neighbor scope still supports detailed layout with all its Routes
   assert.equal(fallback.positions.size,3);
   assert.equal(groupRouteEntries(scope.routes).reduce((s,x)=>s+x.routes.length,0),10);
 });
-test("A5 over-budget file fails closed rather than displaying an incomplete graph",()=>{
+test("A5 over-budget graph falls back without dropping any current Nodes or Routes",()=>{
   const p=projectWorkspace(largeYaml(302));
-  assert.equal(p.state,"UNAVAILABLE");
-  assert.ok(p.diagnostics.length);
+  assert.equal(p.state,"READY");
+  assert.equal(p.procedure.nodes.length,302);
+  assert.equal(p.procedure.routes.length,1505);
+  const scope=selectGraphScope(p.procedure);
+  assert.equal(detailedLayoutAllowed(scope),false);
+  const fallback=layoutProcedure(p.procedure,"DOWN");
+  assert.equal(fallback.positions.size,302);
+  assert.equal(groupRouteEntries(scope.routes).reduce((sum,item)=>sum+item.routes.length,0),1505);
 });

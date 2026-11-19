@@ -152,7 +152,7 @@ export function diagnosticsFromAnalysis(
 
   // A missing/partial Package is not equivalent to a clean audit. Surface it
   // explicitly in the source editor when an actual Procedure document exists.
-  if (analysis.packageAudit.state === "UNAVAILABLE") {
+  if (analysis.packageAudit.state === "UNAVAILABLE" && analysis.packageAudit.diagnostics.length === 0) {
     const procedure = documents.find(doc => doc.relativePath === "assurance/procedure.yaml");
     if (procedure) {
       indexed.get(procedure.uri)!.diagnostics.push({

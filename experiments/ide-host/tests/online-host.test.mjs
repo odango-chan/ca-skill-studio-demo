@@ -219,7 +219,12 @@ test("SKILL Studio adds one native Theia top-level menu with real extension comm
     "skillStudio.editPhaseInputBinding","skillStudio.editPhaseOutputReference",
     "skillStudio.editPhaseRouteTarget","skillStudio.repairPhaseOutcome",
     "skillStudio.insertNode","skillStudio.deleteNode","skillStudio.addPhaseVerify",
-    "skillStudio.editPhaseVerifyStep","skillStudio.renameNamedPhaseStep",
+    "skillStudio.editPhaseVerifyStep","skillStudio.renameNamedPhaseStep"
+  ]){
+    assert.equal(commandById.has(id),false,id+" is retired from current CA-SL");
+    assert.equal(hiddenPalette.has(id),false,id+" must not survive as a hidden legacy command");
+  }
+  for(const id of [
     "skillStudio.refreshDependency","skillStudio.updateDependencyLock",
     "skillStudio.inspectDependencyContract","skillStudio.removeDependency"
   ])assert.ok(hiddenPalette.has(id),id+" must remain contextual, not global palette noise");

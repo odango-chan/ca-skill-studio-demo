@@ -57,12 +57,12 @@ test("shared core analyzes the current CA-SL v1alpha5 Example without claiming q
   const snapshot=sampleSnapshot();
   const before=snapshot.documents.map(document=>document.text);
   const result=analyzePackageSnapshot(snapshot);
-  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.state,"READY");
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.procedure.procedures.length,1);
   assert.equal(result.procedure.entry,"get-sm-subscription-data");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
-  assert.match(result.packageAudit.reason,/v1alpha5 Compiler/);
+  assert.match(result.packageAudit.reason,/current Compiler/);
   assert.match(result.packageAudit.reason,/Owner.*linking/);
   assert.equal(result.documents.filter(document=>document.pythonOutlineState==="READY").length,3);
   assert.ok(result.scriptReferences.length>=3);
@@ -90,7 +90,7 @@ test("partial Package snapshots preserve v1alpha5 source projection but gate cro
   snapshot.completeness="partial";
   snapshot.reason="The host could not enumerate every Package file";
   const result=analyzePackageSnapshot(snapshot);
-  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.state,"READY");
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
   assert.match(result.packageAudit.reason,/could not enumerate/);
@@ -104,10 +104,48 @@ test("missing non-procedure v1alpha5 files do not fabricate Package qualificatio
   snapshot.documents=snapshot.documents.filter(document=>
     document.relativePath!=="assurance/contract.yaml");
   const result=analyzePackageSnapshot(snapshot);
-  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.state,"READY");
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
-  assert.match(result.packageAudit.reason,/v1alpha5 Compiler/);
+  assert.match(result.packageAudit.reason,/current Compiler/);
+});
+
+test("Language Service includes current Package Audit Script diagnostics with exact scalar ranges",()=>{
+  const snapshot=sampleSnapshot();
+  const predicates=snapshot.documents.find(document=>
+    document.relativePath==="assurance/predicates.yaml");
+  predicates.text=predicates.text.replace(
+    "scripts/validate-subscription-request.py","scripts/missing-script.py");
+  const result=analyzePackageSnapshot(snapshot);
+  const diagnostic=result.diagnostics.find(item=>
+    item.code==="PREDICATE_SCRIPT_NOT_FOUND");
+  assert.ok(diagnostic,JSON.stringify(result.diagnostics));
+  assert.equal(diagnostic.source,"package-audit");
+  assert.equal(diagnostic.relativePath,"assurance/predicates.yaml");
+  assert.ok(diagnostic.range);
+  assert.equal(predicates.text.slice(diagnostic.range.start,diagnostic.range.end),
+    "scripts/missing-script.py");
+  assert.ok(result.packageAudit.diagnostics.includes(diagnostic));
+});
+
+test("missing Procedure does not stop independent Contract and Predicate checks",()=>{
+  const snapshot=sampleSnapshot();
+  snapshot.documents=snapshot.documents.filter(document=>
+    document.relativePath!=="assurance/procedure.yaml");
+  const contract=snapshot.documents.find(document=>
+    document.relativePath==="assurance/contract.yaml");
+  contract.text=contract.text.replace(
+    "requestSchema: schemas/establishment-request.schema.yaml",
+    "requestSchema: ../outside/request.schema.yaml");
+  const result=analyzePackageSnapshot(snapshot);
+  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.procedure.state,"UNAVAILABLE");
+  const codes=new Set(result.diagnostics.map(item=>item.code));
+  assert.ok(codes.has("PACKAGE_CORE_FILE_MISSING"));
+  assert.ok(codes.has("REQUEST_SCHEMA_REFERENCE_INVALID"));
+  assert.ok(!codes.has("UNSUPPORTED_CA_SL_VERSION"));
+  assert.equal(result.documents.length,snapshot.documents.length,
+    "all available Package documents still receive analysis");
 });
 
 test("malformed v1alpha5 Procedure remains visible and fails closed",()=>{
@@ -120,13 +158,30 @@ test("malformed v1alpha5 Procedure remains visible and fails closed",()=>{
   assert.ok(result.diagnostics.length>0);
 });
 
-test("legacy Procedure syntax is rejected instead of falling back to the historical analyzer",()=>{
+test("historical Package source receives ordinary current-grammar diagnostics across files",()=>{
   const snapshot=sampleSnapshot();
+  const contract=snapshot.documents.find(document=>document.relativePath==="assurance/contract.yaml");
+  const predicates=snapshot.documents.find(document=>document.relativePath==="assurance/predicates.yaml");
   const procedure=snapshot.documents.find(document=>document.relativePath==="assurance/procedure.yaml");
+  contract.text="apiVersion: connectionagent.io/v1alpha1\nkind: SkillContract\nmetadata: {}\nspec: {}\n";
+  predicates.text="apiVersion: connectionagent.io/v1alpha1\nkind: PredicateSet\nmetadata: {}\npredicates: {}\n";
   procedure.text="procedures:\n  legacy:\n    nodes:\n      step:\n        call: ca.sample.read\n";
   const result=analyzePackageSnapshot(snapshot);
-  assert.equal(result.state,"UNAVAILABLE");
-  assert.equal(result.diagnostics[0].code,"UNSUPPORTED_CA_SL_VERSION");
+  assert.equal(result.state,"PARTIAL");
+  assert.equal(result.procedure.state,"UNAVAILABLE");
+  const codes=new Set(result.diagnostics.map(item=>item.code));
+  assert.ok(codes.has("UNKNOWN_FIELD"),JSON.stringify(result.diagnostics));
+  assert.ok(codes.has("SOURCE_ROOT_INVALID"),JSON.stringify(result.diagnostics));
+  assert.ok(!codes.has("UNSUPPORTED_CA_SL_VERSION"));
+  const paths=new Set(result.diagnostics.map(item=>item.relativePath));
+  assert.ok(paths.has("assurance/contract.yaml"));
+  assert.ok(paths.has("assurance/predicates.yaml"));
+  assert.ok(paths.has("assurance/procedure.yaml"));
+  const procedureDiagnostic=result.diagnostics.find(item=>
+    item.relativePath==="assurance/procedure.yaml"&&item.code==="UNKNOWN_FIELD"&&item.range);
+  assert.ok(procedureDiagnostic);
+  assert.equal(procedure.text.slice(procedureDiagnostic.range.start,procedureDiagnostic.range.end),
+    "procedures","current grammar diagnostics underline the complete unsupported YAML key");
 });
 
 test("unsafe or duplicate Package paths are rejected before analysis",()=>{
@@ -172,7 +227,7 @@ test("Package analysis binds document URIs to exact Package-relative paths",()=>
     assert.equal(result.diagnostics[0].code,"PACKAGE_DOCUMENT_URI_MISMATCH",uri);
   }
   procedure.uri=originalUri;
-  assert.equal(analyzePackageSnapshot(fixture).state,"PARTIAL");
+  assert.equal(analyzePackageSnapshot(fixture).state,"READY");
 
   const remote=sampleSnapshot();
   remote.rootUri="vscode-remote://wsl+Ubuntu/workspace/My%20Skill";
@@ -180,7 +235,7 @@ test("Package analysis binds document URIs to exact Package-relative paths",()=>
     ...document,
     uri:remote.rootUri+"/"+document.relativePath
   }));
-  assert.equal(analyzePackageSnapshot(remote).state,"PARTIAL");
+  assert.equal(analyzePackageSnapshot(remote).state,"READY");
 });
 
 test("unsafe Package root URIs fail closed before publishing analysis",()=>{

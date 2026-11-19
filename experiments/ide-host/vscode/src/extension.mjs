@@ -3,7 +3,6 @@ import {registerPreviewHost} from "./preview-host.mjs";
 import {mountMarkdownPreview} from "./markdown-preview.mjs";
 
 import {sourceViewType} from "./source-view-pair.mjs";
-import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
 // workers. Do not import node:crypto: the online host has no Node APIs.
@@ -14,9 +13,6 @@ function newNonce(){
   globalThis.crypto.getRandomValues(bytes);
   return [...bytes].map(n=>n.toString(16).padStart(2,"0")).join("");
 }
-import {isProcedurePath,validateRouteProposal,
-  validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
-import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
 import {EXAMPLE_PROJECT_NAME,seedExampleProject} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
@@ -32,6 +28,9 @@ import {registerCompilerIntegration} from "./compiler-integration.mjs";
 import {registerPackageDiagnosticTesting} from "./package-diagnostic-testing.mjs";
 import {registerPackageRouteTesting} from "./package-route-testing.mjs";
 import {iconShapes} from "../../../../site/icons.mjs";
+const MAX_SOURCE_BYTES=1024*1024;
+const isProcedurePath=path=>typeof path==="string"&&
+  /(?:^|\/)assurance\/procedure\.yaml$/.test(path);
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
 // plugin worker; normal VS Code and backend-backed Theia retain host URIs.
@@ -339,14 +338,10 @@ export function activate(context){
           void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB Procedure editor limit"});
           return;
         }
-        // Legacy Packages do not need the v1alpha5 Contract / PredicateSet
-        // visual projection. Avoid extra filesystem reads for the legacy
-        // default Example and keep the Theia virtual filesystem load bounded.
-        let contract={text:null,version:0},predicates={text:null,version:0};
-        if(isV1Alpha5Procedure(text)){
-          contract=await readPackageText("assurance/contract.yaml");
-          predicates=await readPackageText("assurance/predicates.yaml");
-        }
+        // The current source projection always consumes the Package Contract
+        // and PredicateSet. Never choose files or analysis behavior by version.
+        const contract=await readPackageText("assurance/contract.yaml");
+        const predicates=await readPackageText("assurance/predicates.yaml");
         if(disposed||ticket!==pushTicket||document.version!==version)return;
         void webview.postMessage({
           type:"snapshot",text,version,path:document.uri.path,
@@ -407,29 +402,7 @@ export function activate(context){
           }
           return;
         }
-        if(message.type!=="applyRoute"&&message.type!=="applyRouteCreation")return;
-        try{
-          const source=document.getText();
-          const creating=message.type==="applyRouteCreation";
-          const edit=creating
-            ?validateCanvasRouteCreationProposal(source,document.version,message)
-            :validateRouteProposal(source,document.version,message);
-          // Native TextDocument remains the only write owner. Existing Route
-          // edits replace one scalar; new Route creation inserts one exact
-          // source line at a zero-length CST span. Both use native Undo/Save.
-          assertStudioMutation(document.uri,vscode.workspace.workspaceFolders??[],"edit");
-          const patch=new vscode.WorkspaceEdit();
-          patch.replace(document.uri,new vscode.Range(
-            document.positionAt(edit.start),document.positionAt(edit.end)),
-            creating?edit.newText:edit.newTarget);
-          const applied=await vscode.workspace.applyEdit(patch);
-          if(!applied)throw Error("Host rejected WorkspaceEdit");
-          await push();
-          void webview.postMessage({type:"applied",routeId:edit.routeId});
-        }catch(error){
-          void webview.postMessage({type:"error",message:String(error?.message??error)});
-          await push();
-        }
+        return;
       });
       let releasePanel=null,cleaned=false;
       const cleanup=()=>{
@@ -487,7 +460,7 @@ export function activate(context){
   );
   // Keep browser acceptance independent of Extension Host console forwarding.
   // This command is internal (not contributed to the Command Palette) and
-  // returns the authoritative workspace and the two v1alpha5 Skill URIs.
+  // returns the authoritative workspace and the two current Skill URIs.
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.workspaceIdentityAcceptance",async()=>{
       const folders=vscode.workspace.workspaceFolders??[];
@@ -518,28 +491,28 @@ export function activate(context){
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
   const exampleText=progressZh?{
     title:"加载示例项目",
-    replacePrompt:"检测到已有 Example 项目。是否替换为最新 CA-SL v1alpha5 示例？替换将删除整个 Example 目录中的现有内容，包括本地修改和旧版样例。",
+    replacePrompt:"检测到已有 Example 项目。是否替换为最新 当前 CA-SL 示例？替换将删除整个 Example 目录中的现有内容，包括本地修改和旧版样例。",
     replaceAction:"替换 Example",
     cancelAction:"取消",
-    starting:"正在准备 CA-SL v1alpha5 Skills…",
+    starting:"正在准备 current CA-SL Skills…",
     manifest:"正在读取示例清单…",
     files:(completed,total)=>"正在导入示例文件（"+completed+"/"+total+"）…",
     workspace:"正在打开示例工作区…",
     packages:"正在加载 Package Explorer…",
-    procedure:"正在打开 v1alpha5 Procedure…",
+    procedure:"正在打开 current Procedure…",
     success:"示例项目已打开",
     failure:"示例项目载入失败"
   }:{
     title:"Loading example project",
-    replacePrompt:"An Example project already exists. Replace the entire Example folder with the latest CA-SL v1alpha5 sample? This deletes all existing Example contents, including local edits and retired samples.",
+    replacePrompt:"An Example project already exists. Replace the entire Example folder with the latest current CA-SL sample? This deletes all existing Example contents, including local edits and retired samples.",
     replaceAction:"Replace Example",
     cancelAction:"Cancel",
-    starting:"Preparing CA-SL v1alpha5 Skills…",
+    starting:"Preparing current CA-SL Skills…",
     manifest:"Reading example manifests…",
     files:(completed,total)=>"Importing sample files ("+completed+"/"+total+")…",
     workspace:"Opening example workspace…",
     packages:"Preparing Package Explorer…",
-    procedure:"Opening the v1alpha5 Procedure…",
+    procedure:"Opening the current Procedure…",
     success:"Example project opened",
     failure:"Example project failed to load"
   };
@@ -651,11 +624,11 @@ export function activate(context){
               // Keep the established success notification used by Chromium
               // acceptance and report whether the existing Example was replaced.
               void vscode.window.showInformationMessage(
-                "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL v1alpha5 Procedure（DRAFT / NOT_QUALIFIED）。"+
+                "示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL current Procedure（DRAFT / NOT_QUALIFIED）。"+
                 (result.replacedExisting?"已替换原有 Example 内容。":"")+
-                "导入 v1alpha5 Skill 文件 "+result.candidateFiles+" 个。"+
-                (viewOpened&&revealed?"已展开 Package Explorer（两个 CA-SL v1alpha5 Skills）。":
-                  "可在 Explorer → Package Explorer 查看 v1alpha5 Skills。"));
+                "导入当前 CA-SL Skill 文件 "+result.candidateFiles+" 个。"+
+                (viewOpened&&revealed?"已展开 Package Explorer（两个 current CA-SL Skills）。":
+                  "可在 Explorer → Package Explorer 查看当前 CA-SL Skills。"));
               return result;
             }catch(error){
               const message=exampleText.failure+" ["+stage+"]："+String(error?.message??error);
@@ -859,12 +832,12 @@ export function activate(context){
       }));
       const detail=progressZh
         ?((pending.replacedExisting?"已替换原有 Example 内容。":"")+
-          "导入 v1alpha5 Skill 文件 "+pending.candidateFiles+" 个。")
+          "导入当前 CA-SL Skill 文件 "+pending.candidateFiles+" 个。")
         :((pending.replacedExisting?"Replaced the previous Example contents. ":"")+
-          "Imported "+pending.candidateFiles+" CA-SL v1alpha5 Skill files.");
+          "Imported "+pending.candidateFiles+" current CA-SL Skill files.");
       const message=progressZh
-        ?("示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL v1alpha5 Procedure（DRAFT / NOT_QUALIFIED）。"+detail)
-        :("Example project opened: skill-studio-demo/. The CA-SL v1alpha5 Procedure is open (DRAFT / NOT_QUALIFIED). "+detail);
+        ?("示例项目已载入并打开工作区：skill-studio-demo/。默认已打开 CA-SL current Procedure（DRAFT / NOT_QUALIFIED）。"+detail)
+        :("Example project opened: skill-studio-demo/. The CA-SL current Procedure is open (DRAFT / NOT_QUALIFIED). "+detail);
       void vscode.window.showInformationMessage(message);
     }
   }).catch(error=>{

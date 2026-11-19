@@ -33,6 +33,8 @@ export interface PackageSnapshot {
     readonly path: string;
     readonly text: string;
   }[];
+  /** Current project-lock context for the same Package analysis generation. */
+  readonly dependencyContext?: Readonly<Record<string, unknown>>;
   readonly reason?: string;
 }
 
@@ -53,6 +55,9 @@ export interface LanguageDiagnostic {
   readonly confidence: DiagnosticConfidence;
   readonly line?: number;
   readonly range?: SourceOffsetRange;
+  readonly status?: "confirmed" | "not_checked" | "blocked";
+  readonly domain?: string;
+  readonly category?: string;
 }
 
 export interface ProcedureStep {

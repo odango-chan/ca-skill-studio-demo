@@ -1,6 +1,7 @@
 import { scriptNavigationReport } from "../../site/script-navigation.mjs";
 import { pythonTopLevelOutline } from "../../site/python-outline.mjs";
-import { isV1Alpha5Procedure, analyzeV1Alpha5Source } from "./v1alpha5.js";
+import { analyzeCurrentSource } from "./source.js";
+import { auditPackage } from "../../site/package-audit.mjs";
 import type {
   AnalysisState,
   DocumentAnalysis,
@@ -212,15 +213,14 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
 
   const documentsByPath = new Map(normalizedDocuments.map(document => [document.relativePath, document] as const));
   const files = new Map(normalizedDocuments.map(document => [document.relativePath, { text: document.text }] as const));
-  const procedureDocument = documentsByPath.get("assurance/procedure.yaml");
 
-  // CA-SL v1alpha5 is a breaking syntax target. Do not run the v0.2
-  // procedures/call/with Package analyzer against the root start/nodes model.
+  // The current CA-SL grammar is authoritative. Do not run the historical
+  // procedures/call/with Package analyzer.
   // Source projection can supply exact editor locations without any claim
-  // that trusted v1alpha5 ToolCatalog, CapabilityContracts or Host Schema
+  // that trusted ToolCatalog, CapabilityContracts or Host Schema
   // publications have been linked.
-  if (procedureDocument && isV1Alpha5Procedure(procedureDocument.text)) {
-    const projected = analyzeV1Alpha5Source(documentsByPath, snapshot.packageName);
+  {
+    const projected = analyzeCurrentSource(documentsByPath, snapshot.packageName);
     const packageContextComplete = snapshot.completeness === "complete" &&
       projected.procedure.state === "READY";
     const scriptReferences: ScriptReference[] = [];
@@ -321,12 +321,48 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       });
     }
 
+    const packageAuditSource = auditPackage({
+      files,
+      dependencyContext: snapshot.dependencyContext ?? {},
+      completeness: snapshot.completeness,
+      snapshotReason: snapshot.reason ?? ""
+    });
+    const packageAuditDiagnostics: LanguageDiagnostic[] = packageAuditSource.map(item => {
+      const sourceDocument = documentsByPath.get(item.path);
+      return {
+        code: item.code,
+        message: item.message,
+        severity: item.severity,
+        uri: sourceDocument?.uri ?? snapshot.rootUri,
+        relativePath: item.path,
+        source: "package-audit",
+        confidence: "exact",
+        ...(Number.isSafeInteger(item.line) && item.line > 0 ? { line: item.line } : {}),
+        ...(item.sourceRange ? { range: item.sourceRange } : {}),
+        status: item.status,
+        domain: item.domain,
+        category: item.category
+      };
+    });
+    const uncheckedCount = packageAuditDiagnostics.filter(item =>
+      item.status === "not_checked" || item.status === "blocked").length;
+    const errorCount = packageAuditDiagnostics.filter(item =>
+      item.severity === "error").length;
+    const qualificationReason = "Full qualification requires the current Compiler and trusted Owner, Capability and Schema linking";
+    const reasons = [];
+    if (uncheckedCount) reasons.push(
+      uncheckedCount + " Package checks remain NOT_CHECKED or blocked"
+    );
+    if (errorCount) reasons.push(errorCount + " confirmed Package errors");
+    if (snapshot.completeness !== "complete")
+      reasons.push(snapshot.reason ?? "Package snapshot is incomplete");
+    if (uncheckedCount || errorCount || snapshot.completeness !== "complete")
+      reasons.push(qualificationReason);
     const packageAudit: PackageAuditResult = {
-      state: "UNAVAILABLE",
-      reason: snapshot.completeness !== "complete"
-        ? (snapshot.reason ?? "Partial Package snapshot")
-        : "CA-SL v1alpha5 source parsed; static Package qualification requires the v1alpha5 Compiler and trusted Owner/Capability/Schema linking snapshots",
-      diagnostics: []
+      state: snapshot.completeness === "complete" &&
+        uncheckedCount === 0 && errorCount === 0 ? "READY" : "UNAVAILABLE",
+      ...(reasons.length ? { reason: reasons.join("; ") + "; see individual diagnostics" } : {}),
+      diagnostics: packageAuditDiagnostics
     };
     const diagnostics = [
       ...projected.diagnostics,
@@ -335,7 +371,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       ...scriptNavigationDiagnostics
     ];
     return {
-      state: "PARTIAL",
+      state: projected.procedure.state === "READY" ? "READY" : "PARTIAL",
       rootUri: snapshot.rootUri,
       packageName: snapshot.packageName,
       generation: snapshot.generation,
@@ -347,15 +383,6 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       diagnostics
     };
   }
-  // Skill Studio is v1alpha5-only. A Procedure that does not match the
-  // v1alpha5 root graph is rejected rather than being reinterpreted using a
-  // historical analyzer. v1alpha4 remains a normative inheritance baseline,
-  // not a product compatibility mode.
-  return unavailable(snapshot, "UNSUPPORTED_CA_SL_VERSION",
-    "Procedure must use CA-SL connectionagent.io/v1alpha5 top-level start/nodes. " +
-    "Legacy Example content is not migrated automatically; Open Example Project " +
-    "offers a confirmation before replacing the Example.");
-
 
 }
 

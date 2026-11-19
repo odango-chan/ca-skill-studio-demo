@@ -74,9 +74,11 @@ test("Theia host-local semantic token mode avoids a competing LSP provider",asyn
   }
 });
 
-test("legacy persisted Example sends actionable Package status without generic server error",async()=>{
+test("older source is diagnosed by the one current grammar without a version-specific server error",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
-  const rootUri="file:///workspace/persisted-legacy-example";
+  const rootUri="file:///workspace/persisted-old-example";
+  const procedureUri=rootUri+"/assurance/procedure.yaml";
+  const contractUri=rootUri+"/assurance/contract.yaml";
   try{
     worker.postMessage({jsonrpc:"2.0",id:43,method:"initialize",
       params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
@@ -85,6 +87,14 @@ test("legacy persisted Example sends actionable Package status without generic s
     const status=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===rootUri&&message.params?.generation===1);
+    const procedureDiagnostics=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===procedureUri&&
+      message.params?.diagnostics?.some(item=>item.code==="SOURCE_ROOT_INVALID"));
+    const contractDiagnostics=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===contractUri&&
+      message.params?.diagnostics?.some(item=>item.code==="UNKNOWN_FIELD"));
     const duplicateError=expectNoMessage(worker,message=>
       message?.method==="skillStudio/serverError"&&
       message.params?.rootUri===rootUri&&
@@ -92,20 +102,33 @@ test("legacy persisted Example sends actionable Package status without generic s
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
       params:packageSnapshot(1,
         "apiVersion: connectionagent.io/v1alpha1\nprocedures: {}\n",rootUri)});
-    const result=await status;
-    assert.equal(result.params.state,"UNAVAILABLE");
-    assert.match(result.params.reason,/UNSUPPORTED_CA_SL_VERSION/);
-    assert.match(result.params.reason,/start\/nodes/);
-    assert.ok(result.params.unlocated.some(item=>
+    const [result,procedure,contract]=await Promise.all([
+      status,procedureDiagnostics,contractDiagnostics
+    ]);
+    assert.equal(result.params.state,"PARTIAL");
+    assert.equal(result.params.procedureState,"UNAVAILABLE");
+    assert.ok(result.params.publishedDiagnosticCount>0);
+    assert.ok(procedure.params.diagnostics.some(item=>item.code==="SOURCE_ROOT_INVALID"));
+    assert.ok(contract.params.diagnostics.some(item=>item.code==="UNKNOWN_FIELD"));
+    const unsupportedRootKey=procedure.params.diagnostics.find(item=>
+      item.code==="UNKNOWN_FIELD"&&item.message.includes("procedures")&&
+      item.source==="Skill Studio · procedure-projection");
+    assert.ok(unsupportedRootKey,"the current grammar must report the old root key");
+    assert.deepEqual(unsupportedRootKey.range,{
+      start:{line:1,character:0},end:{line:1,character:10}
+    },"the LSP marker must cover the entire YAML key, not one character");
+    assert.ok(result.params.analysisDiagnostics.some(item=>
+      item.relativePath==="assurance/predicates.yaml"&&item.code==="UNKNOWN_FIELD"));
+    assert.ok(!result.params.analysisDiagnostics.some(item=>
       item.code==="UNSUPPORTED_CA_SL_VERSION"));
     assert.equal(await duplicateError,null,
-      "only the exact generation-scoped analysis status should explain a legacy Package");
+      "source defects are ordinary current-grammar diagnostics, not analysis transport failures");
   }finally{
     await worker.terminate();
   }
 });
 
-test("analysis rejection preserves independent v1alpha5 source semantic colors until Package close",async()=>{
+test("source semantic colors remain available when diagnostic snapshot admission is rejected",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   const rootUri="file:///workspace/semantic-rejection";
   const source=[
@@ -201,7 +224,7 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
       message?.method==="textDocument/publishDiagnostics" &&
       message.params?.uri==="file:///workspace/skill/assurance/procedure.yaml" &&
       message.params?.version===1 &&
-      message.params?.diagnostics?.some(item=>item.code==="PROCEDURE_PROJECTION")
+      message.params?.diagnostics?.some(item=>item.code==="YAML_PARSE_ERROR")
     );
     assert.equal(stalePublication,null,"old generation must not republish diagnostics");
     worker.postMessage({
@@ -276,7 +299,7 @@ async function lspRequest(worker,id,method,params) {
   return result.result;
 }
 
-test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbols and Package completions",async()=>{
+test("browser LSP provides current CA-SL Definition, References, Hover, Python symbols and Package completions",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   try{
     worker.postMessage({jsonrpc:"2.0",id:11,method:"initialize",
@@ -297,11 +320,15 @@ test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbol
     const readyStatus=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===snapshot.rootUri&&
-      message.params?.state==="PARTIAL"&&
+      message.params?.generation===snapshot.generation&&
+      message.params?.state==="READY"&&
       message.params?.procedureState==="READY",15000);
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
     const status=await readyStatus;
-    assert.equal(status.params.state,"PARTIAL");
+    assert.equal(status.params.state,"READY",JSON.stringify(status.params));
+    assert.equal(status.params.procedureState,"READY");
+    assert.equal(status.params.packageAuditState,"UNAVAILABLE",
+      "source projection readiness must not imply Package qualification");
 
     const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
     const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
@@ -358,6 +385,42 @@ test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbol
   }
 });
 
+
+test("Package Audit Script diagnostics publish the complete YAML scalar range through LSP",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:61,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
+    await waitForMessage(worker,message=>message?.id===61);
+    worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
+    const snapshot=samplePackageSnapshot();
+    const predicates=snapshot.documents.find(item=>
+      item.relativePath==="assurance/predicates.yaml");
+    const missing="scripts/missing-script.py";
+    predicates.text=predicates.text.replace(
+      "scripts/validate-subscription-request.py",missing);
+    const expectedStart=positionOf(predicates.text,missing);
+    const published=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===predicates.uri&&
+      message.params?.diagnostics?.some(item=>item.code==="PREDICATE_SCRIPT_NOT_FOUND"));
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
+    const result=await published;
+    const diagnostic=result.params.diagnostics.find(item=>
+      item.code==="PREDICATE_SCRIPT_NOT_FOUND");
+    assert.ok(diagnostic);
+    assert.equal(diagnostic.source,"Skill Studio · package-audit");
+    assert.deepEqual(diagnostic.range,{
+      start:expectedStart,
+      end:{line:expectedStart.line,character:expectedStart.character+missing.length}
+    },"editor marker must cover the complete Script path scalar");
+    assert.ok(!result.params.diagnostics.some(item=>
+      item.code==="PREDICATE_SCRIPT_REF_UNDECLARED"),
+      "current Script resolution is Package-relative and does not require localTools");
+  }finally{
+    await worker.terminate();
+  }
+});
 test("browser LSP isolates concurrent Package roots across close and reopen",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   const rootA="file:///workspace/skill-a";

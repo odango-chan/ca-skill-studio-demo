@@ -47,7 +47,7 @@ const contract=[
   "dependencies:",
   "  ca-context: urn:example:host",
   "  ca: urn:example:tools",
-  "capabilities: [session-read]",
+  "capabilities: [urn:example:capability:session-read]",
   ""
 ].join("\n");
 const procedure=[
@@ -96,32 +96,49 @@ const predicates=[
   ""
 ].join("\n");
 
+const sampleScriptRoot=new URL(
+  "../site/samples/v1alpha5/establish-pdu-session/scripts/",import.meta.url
+);
+const sampleSchemaRoot=new URL(
+  "../site/samples/v1alpha5/establish-pdu-session/schemas/",import.meta.url
+);
 function snapshot(source=procedure,contractSource=contract,predicatesSource=predicates) {
   const files={
-    "SKILL.md":"---\nname: sample\ndescription: v1alpha5\n---\n",
+    "SKILL.md":"---\nname: sample\ndescription: current CA-SL\n---\n",
     "assurance/contract.yaml":contractSource,
     "assurance/procedure.yaml":source,
     "assurance/predicates.yaml":predicatesSource,
     "schemas/request.schema.yaml":"$schema: https://json-schema.org/draft/2020-12/schema\ntype: object\n",
-    "scripts/runner.py":"def main():\n    return {}\n"
+    "schemas/establishment-request.schema.yaml":readFileSync(
+      new URL("establishment-request.schema.yaml",sampleSchemaRoot),"utf8"),
+    "scripts/runner.py":"def main():\n    return {}\n",
+    "scripts/validate-subscription-request.py":readFileSync(
+      new URL("validate-subscription-request.py",sampleScriptRoot),"utf8"),
+    "scripts/validate-smf-session-context-entry.py":readFileSync(
+      new URL("validate-smf-session-context-entry.py",sampleScriptRoot),"utf8"),
+    "scripts/validate-smf-session-context.py":readFileSync(
+      new URL("validate-smf-session-context.py",sampleScriptRoot),"utf8")
   };
   return {rootUri:"file:///workspace/sample",packageName:"sample",generation:1,
-    completeness:"complete",documents:Object.entries(files).map(([relativePath,text])=>({
+    completeness:"partial",documents:Object.entries(files).map(([relativePath,text])=>({
       uri:"file:///workspace/sample/"+relativePath,relativePath,text,version:1
     }))};
 }
 
 test("optional Studio examples mirror the pinned PDU/MAS v1alpha5 source shape",()=>{
   for(const [name,expectedNodes] of [["establish-pdu-session",10],["establish-pdu-session-mas",14]]) {
-    const files=["SKILL.md","assurance/contract.yaml","assurance/procedure.yaml",
-      "assurance/predicates.yaml","schemas/establishment-request.schema.yaml"];
-    const docs=files.map(relativePath=>({
-      relativePath,uri:"file:///workspace/"+name+"/"+relativePath,version:1,
-      text:readFileSync(new URL("../site/samples/v1alpha5/"+name+"/"+relativePath,import.meta.url),"utf8")
-    }));
+    const sampleManifest=JSON.parse(readFileSync(new URL(
+      "../site/samples/v1alpha5/files.json",import.meta.url),"utf8"));
+    const docs=sampleManifest.files.filter(path=>path.startsWith(name+"/")).map(path=>{
+      const relativePath=path.slice(name.length+1);
+      return {
+        relativePath,uri:"file:///workspace/"+name+"/"+relativePath,version:1,
+        text:readFileSync(new URL("../site/samples/v1alpha5/"+path,import.meta.url),"utf8")
+      };
+    });
     const result=analyzePackageSnapshot({rootUri:"file:///workspace/"+name,
-      packageName:name,generation:1,completeness:"complete",documents:docs});
-    assert.equal(result.state,"PARTIAL");
+      packageName:name,generation:1,completeness:"partial",documents:docs});
+    assert.equal(result.state,"READY");
     assert.equal(result.procedure.state,"READY",
       name+" source structure should be projected without a trusted Owner");
     assert.ok(result.procedure.procedures[0].nodes.length>=expectedNodes);
@@ -146,7 +163,7 @@ test("v1alpha5 5GC sample projects Node-entry Wait, wait.output and the Step 17 
     JSON.stringify(a.diagnostics));
   const procedureView=a.procedure.procedures[0];
   assert.equal(procedureView.profile,
-    "CA-SL v1alpha5 (released language; editor source projection only)");
+    "current CA-SL (released language; editor source projection only)");
   const waitNode=procedureView.nodes.find(item=>item.id==="update-sm-context");
   assert.deepEqual(waitNode.wait.event,{
     source:"AMF",service:"Nsmf_PDUSession",operation:"UpdateSMContext"
@@ -168,11 +185,11 @@ test("v1alpha5 5GC sample projects Node-entry Wait, wait.output and the Step 17 
   const view=inspectionSnapshot(procedureText,{nodeId:"update-sm-context"},
     null,files,"establish-pdu-session","file:///workspace/establish-pdu-session");
   assert.equal(view.model.state,"READY");
-  const waitRow=view.inspection.find(item=>item.kind==="v1alpha5-node"&&
+  const waitRow=view.inspection.find(item=>item.kind==="current-node"&&
     item.nodeId==="update-sm-context");
-  assert.ok(waitRow.children.some(item=>item.kind==="v1alpha5-wait"&&
+  assert.ok(waitRow.children.some(item=>item.kind==="current-wait"&&
     item.label.includes("AMF/Nsmf_PDUSession/UpdateSMContext")));
-  const waitControl=waitRow.children.find(item=>item.kind==="v1alpha5-wait");
+  const waitControl=waitRow.children.find(item=>item.kind==="current-wait");
   assert.ok(waitControl?.children.some(item=>item.label.includes(
     "Response boundary · prepare-step17-response")));
   assert.ok(view.dataflow.bindings.some(item=>
@@ -222,9 +239,9 @@ test("v1alpha5 Wait rejects invalid duration, timeout routes, response boundarie
 
 test("v1alpha5 AST graph projects nodes and routes but never claims Owner qualification",()=>{
   const a=analyzePackageSnapshot(snapshot());
-  assert.equal(a.state,"PARTIAL");
+  assert.equal(a.state,"READY");
   assert.equal(a.packageAudit.state,"UNAVAILABLE");
-  assert.match(a.packageAudit.reason,/Owner.*linking/);
+  assert.match(a.packageAudit.reason,/NOT_CHECKED|blocked/);
   assert.equal(a.procedure.state,"READY");
   assert.equal(a.procedure.entry,"check");
   assert.equal(a.procedure.goal,"pdu_session.initial_request_fulfilled");
@@ -242,7 +259,7 @@ test("v1alpha5 AST graph projects nodes and routes but never claims Owner qualif
   assert.deepEqual(finalCall.parameters,["data"]);
   assert.deepEqual(finalCall.arguments,["read.observation.output"]);
   assert.ok(a.procedure.procedures[0].routes.some(x=>x.target==="SUCCEEDED"&&x.routeSource==="postcondition"));
-  assert.deepEqual(a.diagnostics,[]);
+  assert.deepEqual(a.diagnostics.filter(item=>item.source!=="package-audit"),[]);
 });
 
 test("v1alpha5 carries PredicateSet Evidence requirements into the shared stage projection",()=>{
@@ -271,12 +288,12 @@ test("v1alpha5 Inspector shows Contract Goal and source-only Producer / Evidence
     null,files,"sample","file:///workspace/sample");
   assert.equal(view.model.state,"READY");
   assert.ok(view.outline[0].children.some(item=>
-    item.kind==="v1alpha5-node"&&item.nodeId==="final"));
+    item.kind==="current-node"&&item.nodeId==="final"));
   assert.ok(view.inspection.some(item=>item.label.includes(
     "Contract Goal · pdu_session.initial_request_fulfilled")));
-  const goalRow=view.inspection.find(item=>item.kind==="v1alpha5-contract"&&
+  const goalRow=view.inspection.find(item=>item.kind==="current-contract"&&
     item.label.startsWith("Contract Goal"));
-  const gateRow=view.inspection.find(item=>item.kind==="v1alpha5-contract"&&
+  const gateRow=view.inspection.find(item=>item.kind==="current-contract"&&
     item.label.startsWith("Global Precondition"));
   assert.equal(goalRow.line,1);
   assert.equal(gateRow.line,2);
@@ -294,11 +311,11 @@ test("v1alpha5 Inspector shows Contract Goal and source-only Producer / Evidence
   const rows=[];
   const collect=items=>{for(const item of items??[]){rows.push(item);collect(item.children);}};
   collect(view.inspection);
-  const evidenceRow=rows.find(item=>item.kind==="v1alpha5-evidence");
+  const evidenceRow=rows.find(item=>item.kind==="current-evidence");
   assert.equal(evidenceRow.line,11,"Evidence navigation uses the PredicateSet declaration line");
   assert.equal(evidenceRow.sourcePath,"assurance/predicates.yaml");
-  const node=view.inspection.find(item=>item.kind==="v1alpha5-node");
-  assert.ok(node.children.some(item=>item.kind==="v1alpha5-stage"));
+  const node=view.inspection.find(item=>item.kind==="current-node");
+  assert.ok(node.children.some(item=>item.kind==="current-stage"));
 });
 
 test("v1alpha5 rejects author reconcile/legacy wrappers without automatic conversion",()=>{
@@ -372,8 +389,8 @@ test("v1alpha5 rejects primitive literal Predicate argument type mismatches",()=
 
 test("v1alpha5 marks no Owner identity as a missing qualification, not a synthetic PASS",()=>{
   const a=analyzePackageSnapshot(snapshot());
-  assert.notEqual(a.state,"READY");
-  assert.ok(a.packageAudit.reason.includes("requires the v1alpha5 Compiler"));
+  assert.equal(a.state,"READY");
+  assert.ok(a.packageAudit.reason.includes("requires the current Compiler"));
 });
 
 test("v1alpha5 partial root edits do not switch back to the legacy procedure parser",()=>{

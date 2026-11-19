@@ -17,8 +17,8 @@ function FocusNode({data}){
     [update,data.id,data.portSignature,data.dimensions?.height]);
   const stage=data.kind==="stage";
   const dims=data.dimensions;
-  const label=data.stage==="preconditions"?"PRE · 前置条件":
-    data.stage==="postconditions"?"POST · 后置条件":
+  const label=data.stage==="precondition"?"PRE · 前置条件":
+    data.stage==="postcondition"?"POST · 后置条件":
     "OP · "+data.original.operator.toUpperCase();
   return <div className={"focus-graph-card "+(stage?"is-stage stage-"+data.stage:
       "is-neighbor role-"+data.role)}

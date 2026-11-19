@@ -1,4 +1,5 @@
 import test from "node:test";
+import {readFileSync} from "node:fs";
 import assert from "node:assert/strict";
 import vm from "node:vm";
 import {registerProjectWelcome} from "../vscode/src/project-welcome.mjs";
@@ -130,6 +131,25 @@ test("Welcome can be explicitly reopened while an existing project workspace is 
   assert.equal(h.handle.getDiagnostics().panelOpen,true);
   assert.equal(h.handle.getDiagnostics().createWebviewPanelAvailable,true);
   assert.equal(h.handle.getDiagnostics().lastError,null);
-  assert.match(h.webview.html,/v1alpha5 candidate examples/,
-    "Welcome must describe the current v1alpha5 Example rather than retired v1alpha4");
+  assert.match(h.webview.html,/current CA-SL 5GC\/MAS reference Skills/,
+    "Welcome must describe the single current CA-SL Example without legacy/version split");
+});
+
+
+test("retired Procedure-AST authoring commands are not exposed in the current host",()=>{
+  const manifest=JSON.parse(readFileSync(
+    new URL("../vscode/package.json",import.meta.url),"utf8"));
+  const retired=[
+    "skillStudio.renameNode","skillStudio.editNodeOperatorValue",
+    "skillStudio.insertNode","skillStudio.deleteNode"
+  ];
+  const commands=new Set(manifest.contributes.commands.map(item=>item.command));
+  for(const command of retired)assert.equal(commands.has(command),false,command);
+  for(const items of Object.values(manifest.contributes.menus??{}))
+    for(const item of items??[])
+      assert.equal(retired.includes(item.command),false,item.command);
+  const workbench=readFileSync(
+    new URL("../vscode/src/workbench.mjs",import.meta.url),"utf8");
+  for(const command of retired)
+    assert.equal(workbench.includes(command),false,command);
 });

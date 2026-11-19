@@ -19,20 +19,15 @@ function file(name,value,{bad=false,bytes=null}={}){
 }
 function sample(path){
   return new Uint8Array(readFileSync(new URL(
-    "./fixtures/legacy-site-samples/packages/establish-pdu-session/"+path,import.meta.url)));
+    "../site/samples/v1alpha5/establish-pdu-session/"+path,import.meta.url)));
 }
-test("E4 session handle: read-only open retains same handle and imports all 16 owner files",async()=>{
+test("E4 session handle: read-only open retains same handle and imports all 8 current Example files",async()=>{
   const paths=[
     "SKILL.md","assurance/contract.yaml","assurance/procedure.yaml",
-    "assurance/predicates.yaml","references/3gpp-procedure.md",
-    "references/session-selection.md","references/failure-handling.md",
-    "schemas/establishment-request.schema.yaml",
-    "schemas/predicate-evaluation-result.schema.yaml",
-    "schemas/selection-input.schema.yaml","schemas/selection.schema.yaml",
-    "schemas/transfer-start-evaluation-input.schema.yaml",
-    "schemas/udm-read-evaluation-input.schema.yaml",
-    "scripts/evaluate_transfer_start.py","scripts/evaluate_udm_read.py",
-    "scripts/select_establishment_configuration.py"
+    "assurance/predicates.yaml","schemas/establishment-request.schema.yaml",
+    "scripts/validate-smf-session-context-entry.py",
+    "scripts/validate-smf-session-context.py",
+    "scripts/validate-subscription-request.py"
   ];
   const tree=new Map();
   for(const path of paths){
@@ -51,7 +46,7 @@ test("E4 session handle: read-only open retains same handle and imports all 16 o
   const handle=toHandle("establish-pdu-session",tree);
   const got=await importDirectoryHandle(handle);
   assert.equal(got.handle,handle);
-  assert.equal(got.workspace.files.size,16);
+  assert.equal(got.workspace.files.size,8);
   assert.equal(got.entry,"assurance/procedure.yaml");
   assert.equal(got.opaqueCount,0);
   for(const path of paths)

@@ -11,7 +11,7 @@ import {proposeCanvasRouteConnection,previewCanvasRouteConnection}
   from "../../../site/route-connect.mjs";
 
 test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and native Source",async()=>{
-  const source=readFileSync("site/samples/packages/establish-pdu-session/assurance/procedure.yaml","utf8");
+  const source=readFileSync("site/samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml","utf8");
   const makeUri=path=>({path,toString(){return "file://"+this.path;},with(change){return makeUri(change.path??this.path);}});
   const uri=makeUri("/workspace/assurance/procedure.yaml");
   const document={uri,text:source,version:21,
@@ -60,8 +60,8 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       },
       fs:{readFile:async uri=>new TextEncoder().encode(readFileSync(
         uri.path.endsWith("/assurance/contract.yaml")
-          ?"site/samples/packages/establish-pdu-session/assurance/contract.yaml"
-          :"site/samples/packages/establish-pdu-session/assurance/predicates.yaml","utf8"))},
+          ?"site/samples/v1alpha5/establish-pdu-session/assurance/contract.yaml"
+          :"site/samples/v1alpha5/establish-pdu-session/assurance/predicates.yaml","utf8"))},
       findFiles:async()=>[uri],
       asRelativePath:file=>file.path
     },
@@ -100,8 +100,10 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   activate(context);
   assert.ok(previewProvider);
   assert.ok(commands.has("skillStudio.openProcedure"));
-  assert.ok(commands.has("skillStudio.renameNode"));
-  assert.ok(commands.has("skillStudio.editNodeOperatorValue"));
+  for(const retired of ["skillStudio.renameNode","skillStudio.editNodeOperatorValue",
+    "skillStudio.insertNode","skillStudio.deleteNode"])
+    assert.equal(commands.has(retired),false,
+      "retired Procedure-AST command must not be exposed: "+retired);
   assert.ok(commands.has("skillStudio.exportPackageZip"));
   const webview={
     cspSource:"vscode-resource:",
@@ -147,10 +149,12 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(posted.at(-1).version,21);
   assert.equal(posted.at(-1).packageRootUri,"file:///workspace");
   assert.equal(posted.at(-1).packageName,"workspace");
-  assert.equal(posted.at(-1).contractText,null,
-    "legacy Procedure snapshots must not trigger extra Contract reads");
-  assert.equal(posted.at(-1).predicatesText,null,
-    "legacy Procedure snapshots must not trigger extra PredicateSet reads");
+  assert.equal(typeof posted.at(-1).contractText,"string",
+    "the current Language Service snapshot must include Contract even when Procedure is invalid");
+  assert.equal(typeof posted.at(-1).predicatesText,"string",
+    "the current Language Service snapshot must include PredicateSet independently");
+  assert.match(posted.at(-1).contractText,/goal:/);
+  assert.match(posted.at(-1).predicatesText,/predicates:/);
   await onMessage({type:"exportPackageZip"});
   assert.ok(registered.some(args=>args[0]==="skillStudio.exportPackageZip"),
     "the native Procedure Webview routes ZIP export to the host command");
@@ -165,7 +169,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(opened.at(-1).opts.viewColumn,1);
 
   assert.ok(document.lineCount>100,"the fixture must count real YAML lines");
-  const sourceLine=source.split(/\r?\n/).findIndex(line=>line.includes("nudm-sdm-subscribe"))+1;
+  const sourceLine=source.split(/\r?\n/).findIndex(line=>line.trim()==="subscribe-sm-data:")+1;
   assert.ok(sourceLine>1,"the selected Node must be below the first YAML line");
   await onMessage({type:"revealSourceLine",line:sourceLine});
   assert.equal(opened.at(-1).doc,document);
@@ -179,122 +183,20 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   assert.equal(posted.at(-1).type,"error");
 
   const model=projectWorkspace(source);
-  let trial=null;
-  for(const procedure of model.procedures.values()){
-    for(const route of procedure.routes){
-      const target=routeTargetChoices(procedure,route.id)[0];
-      if(target){
-        trial=previewTargetPatch(source,procedure.name,route.id,target);
-        break;
-      }
-    }
-    if(trial)break;
-  }
-  assert.ok(trial);
-  const message={type:"applyRoute",expectedVersion:21,baseSource:source,
-    candidateSource:trial.candidateSource,routeId:trial.routeId,
-    procedureId:trial.procedureId,newTarget:trial.newTarget};
-
-  await onMessage({...message,candidateSource:source+"\n# forged"});
-  assert.equal(document.text,source);
-  assert.equal(writes.length,0);
-  assert.equal(posted.at(-2).type,"error");
-  assert.equal(posted.at(-1).type,"snapshot");
-
-  await onMessage(message);
-  assert.equal(document.text,trial.candidateSource);
-  assert.equal(document.version,22);
-  assert.equal(writes.length,1);
-  assert.equal(writes[0].range.start.offset,trial.sourceSpan.start);
-  assert.equal(writes[0].range.end.offset,trial.sourceSpan.end);
-  assert.equal(writes[0].value,trial.newTarget);
-  assert.equal(posted.at(-1).type,"applied");
-  assert.ok(posted.some(x=>x.type==="snapshot"&&x.version===22));
-
-  await onMessage(message);
-  assert.equal(writes.length,1,"stale proposal must not write twice");
-  assert.equal(posted.at(-2).type,"error");
-  assert.equal(posted.at(-1).type,"snapshot");
-
-  // Switch the same host document to a second real fixture with one
-  // observed Outcome intentionally removed. The new Route still requires
-  // a fresh gesture proposal, explicit Outcome, Diff and host revalidation.
-  const ensureSource=readFileSync(
-    "site/samples/packages/ensure-pdu-session/assurance/procedure.yaml","utf8");
-  const ensureModel=projectWorkspace(ensureSource);
-  const existing=ensureModel.procedures.get("ensure-session").routes.find(r=>
-    r.id==="observe-target-session:UNKNOWN"&&r.routeSource==="operator.on");
-  assert.ok(existing);
-  const lineStart=ensureSource.lastIndexOf("\n",existing.sourceSpan.start-1)+1;
-  const lineEnd=ensureSource.indexOf("\n",existing.sourceSpan.end);
-  assert.ok(lineEnd>=0);
-  const missing=ensureSource.slice(0,lineStart)+ensureSource.slice(lineEnd+1);
-  assert.equal(projectWorkspace(missing).state,"READY");
-  document.text=missing;document.version=23;
-  await onMessage({type:"ready"});
-  const intent=proposeCanvasRouteConnection({
-    source:missing,procedureId:"ensure-session",
-    sourceId:"observe-target-session",targetId:"unresolved",
-    sourceHandle:"new-route-out",targetHandle:"in"
+  assert.equal(model.state,"READY");
+  assert.ok(model.procedure.routes.length>0);
+  assert.ok(model.procedure.routes.every(route=>
+    routeTargetChoices(model.procedure,route.id).length===0),
+    "current Stage routes must remain read-only until a current-grammar patch contract is implemented");
+  await onMessage({
+    type:"applyRoute",expectedVersion:21,baseSource:source,
+    candidateSource:source+"\\n# forged",routeId:"forged-route",
+    procedureId:model.procedure.name,newTarget:"FAILED"
   });
-  const createPreview=previewCanvasRouteConnection(missing,intent,"UNKNOWN");
-  const createMessage={
-    type:"applyRouteCreation",expectedVersion:23,baseSource:missing,
-    candidateSource:createPreview.candidateSource,diff:createPreview.diff,
-    procedureId:"ensure-session",sourceId:"observe-target-session",
-    targetId:"unresolved",sourceHandle:"new-route-out",targetHandle:"in",
-    outcome:"UNKNOWN"
-  };
-  await onMessage({...createMessage,candidateSource:missing+"\\n# forged"});
-  assert.equal(document.text,missing);
-  assert.equal(writes.length,1,"forged Route creation must not write");
-  assert.equal(posted.at(-2).type,"error");
-  assert.equal(posted.at(-1).type,"snapshot");
-  await onMessage(createMessage);
-  assert.equal(document.text,createPreview.candidateSource);
-  assert.equal(document.version,24);
-  assert.equal(writes.length,2);
-  assert.equal(writes[1].range.start.offset,createPreview.sourceSpan.start);
-  assert.equal(writes[1].range.end.offset,createPreview.sourceSpan.end);
-  assert.ok(writes[1].value.includes("UNKNOWN: unresolved"));
-  assert.equal(posted.at(-1).type,"applied");
-  await onMessage(createMessage);
-  assert.equal(writes.length,2,"stale Route creation must not insert twice");
-  assert.equal(posted.at(-2).type,"error");
-  assert.equal(posted.at(-1).type,"snapshot");
+  assert.equal(document.text,source);
+  assert.equal(writes.length,0,"unsupported legacy Route patch commands must never mutate current source");
+  assert.equal(posted.at(-1).type,"error");
 
-  // Native Inspector authoring reuses the Classic typed patch modules. A
-  // cancelled confirmation and stale selection never mutate the TextDocument.
-  const selected={procedureId:"ensure-session",nodeId:"create-session",
-    sourceVersion:document.version,documentUri:document.uri.toString()};
-  const beforeOperator=document.text;
-  confirmChoice="取消";
-  await commands.get("skillStudio.editNodeOperatorValue")(selected,"pdu_session.reconcile");
-  assert.equal(document.text,beforeOperator,"cancelled Inspector edit must not write");
-  assert.equal(writes.length,2);
-  confirmChoice="确认并应用";
-  await commands.get("skillStudio.editNodeOperatorValue")(selected,"pdu_session.reconcile");
-  assert.equal(document.version,25);
-  assert.match(document.text,/call: pdu_session\.reconcile/);
-  assert.equal(writes.length,3);
-  assert.equal(writes[2].range.end.offset-writes[2].range.start.offset,
-    "pdu_session.create".length,"Operator edit replaces only its original scalar span");
-
-  await commands.get("skillStudio.editNodeOperatorValue")(
-    {...selected,sourceVersion:24},"pdu_session.create");
-  assert.equal(document.version,25,"stale Inspector selection must not change Source");
-  assert.equal(writes.length,3);
-
-  const renamedId="create-session-renamed";
-  await commands.get("skillStudio.renameNode")({
-    ...selected,sourceVersion:document.version
-  },renamedId);
-  assert.equal(document.version,26);
-  assert.equal(projectWorkspace(document.text).state,"READY");
-  assert.match(document.text,/create-session-renamed:/);
-  assert.doesNotMatch(document.text,/^\\s{6}create-session:/m);
-  assert.doesNotMatch(document.text,/from: create-session\\./);
-  assert.ok(writes.length>3,"Node rename applies its complete non-overlapping CST span set");
 });
 
 

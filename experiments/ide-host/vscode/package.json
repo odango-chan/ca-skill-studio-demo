@@ -27,17 +27,6 @@
     "onCommand:skillStudio.runRouteScenarios",
     "onCommand:skillStudio.exportPackageZip",
     "onCommand:skillStudio.refreshInspection",
-    "onCommand:skillStudio.renameNode",
-    "onCommand:skillStudio.editNodeOperatorValue",
-    "onCommand:skillStudio.editPhaseInputBinding",
-    "onCommand:skillStudio.editPhaseOutputReference",
-    "onCommand:skillStudio.editPhaseRouteTarget",
-    "onCommand:skillStudio.repairPhaseOutcome",
-    "onCommand:skillStudio.insertNode",
-    "onCommand:skillStudio.deleteNode",
-    "onCommand:skillStudio.addPhaseVerify",
-    "onCommand:skillStudio.editPhaseVerifyStep",
-    "onCommand:skillStudio.renameNamedPhaseStep",
     "onCommand:skillStudio.restartLanguageService",
     "onCommand:skillStudio.openContract",
     "onCommand:skillStudio.openPredicates",
@@ -149,50 +138,6 @@
         "command": "skillStudio.refreshInspection",
         "title": "%command.refreshInspection%",
         "category": "SKILL Studio"
-      },
-      {
-        "command": "skillStudio.renameNode",
-        "title": "SKILL Studio: Rename Node"
-      },
-      {
-        "command": "skillStudio.editNodeOperatorValue",
-        "title": "SKILL Studio: Edit Node Operator Value"
-      },
-      {
-        "command": "skillStudio.editPhaseInputBinding",
-        "title": "SKILL Studio: Edit Phase Input Binding"
-      },
-      {
-        "command": "skillStudio.editPhaseOutputReference",
-        "title": "SKILL Studio: Normalize Phase Output Reference"
-      },
-      {
-        "command": "skillStudio.editPhaseRouteTarget",
-        "title": "SKILL Studio: Retarget Existing Phase Failure Route"
-      },
-      {
-        "command": "skillStudio.repairPhaseOutcome",
-        "title": "SKILL Studio: Repair Observed Phase Outcome"
-      },
-      {
-        "command": "skillStudio.insertNode",
-        "title": "SKILL Studio: Insert Node on Route"
-      },
-      {
-        "command": "skillStudio.deleteNode",
-        "title": "SKILL Studio: Delete Node"
-      },
-      {
-        "command": "skillStudio.addPhaseVerify",
-        "title": "SKILL Studio: Add Verify Step"
-      },
-      {
-        "command": "skillStudio.editPhaseVerifyStep",
-        "title": "SKILL Studio: Edit Verify Step"
-      },
-      {
-        "command": "skillStudio.renameNamedPhaseStep",
-        "title": "SKILL Studio: Rename Named Phase Step"
       },
       {
         "command": "skillStudio.restartLanguageService",
@@ -363,136 +308,6 @@
       ],
       "view/item/context": [
         {
-          "command": "skillStudio.renameNode",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
-          "group": "1_node"
-        },
-        {
-          "command": "skillStudio.editNodeOperatorValue",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.node",
-          "group": "2_node"
-        },
-        {
-          "command": "skillStudio.editPhaseInputBinding",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStep",
-          "group": "3_phase"
-        },
-        {
-          "command": "skillStudio.renameNode",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.deletableNode",
-          "group": "1_node"
-        },
-        {
-          "command": "skillStudio.editNodeOperatorValue",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.deletableNode",
-          "group": "2_node"
-        },
-        {
-          "command": "skillStudio.deleteNode",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.deletableNode",
-          "group": "3_node"
-        },
-        {
-          "command": "skillStudio.insertNode",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.route",
-          "group": "1_route"
-        },
-        {
-          "command": "skillStudio.insertNode",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.routeAndPhaseTarget",
-          "group": "1_route"
-        },
-        {
-          "command": "skillStudio.editPhaseRouteTarget",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseRouteTarget",
-          "group": "2_route"
-        },
-        {
-          "command": "skillStudio.editPhaseRouteTarget",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.routeAndPhaseTarget",
-          "group": "2_route"
-        },
-        {
-          "command": "skillStudio.repairPhaseOutcome",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseOutcomeRepair",
-          "group": "6_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseInputBinding",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStepAndVerify",
-          "group": "3_phase"
-        },
-        {
-          "command": "skillStudio.addPhaseVerify",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseWithVerifyAdd",
-          "group": "4_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseVerifyStep",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStep",
-          "group": "5_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseVerifyStep",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseStepAndVerify",
-          "group": "5_phase"
-        },
-        {
-          "command": "skillStudio.renameNamedPhaseStep",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedPhaseStep",
-          "group": "1_phase"
-        },
-        {
-          "command": "skillStudio.renameNamedPhaseStep",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedPhaseStepAndBinding",
-          "group": "1_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseInputBinding",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedPhaseStepAndBinding",
-          "group": "2_phase"
-        },
-        {
-          "command": "skillStudio.renameNamedPhaseStep",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStep",
-          "group": "1_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseVerifyStep",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStep",
-          "group": "2_phase"
-        },
-        {
-          "command": "skillStudio.renameNamedPhaseStep",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStepAndBinding",
-          "group": "1_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseVerifyStep",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStepAndBinding",
-          "group": "2_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseInputBinding",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.namedVerifyStepAndBinding",
-          "group": "3_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseInputBinding",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStepAndBinding",
-          "group": "3_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseVerifyStep",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.verifyStepAndBinding",
-          "group": "4_phase"
-        },
-        {
-          "command": "skillStudio.editPhaseOutputReference",
-          "when": "view == skillStudio.inspection && viewItem == skillStudio.phaseOutputReference",
-          "group": "4_phase"
-        },
-        {
           "command": "skillStudio.inspectDependencyContract",
           "when": "view == skillStudio.packages && viewItem == skillStudio.dependency",
           "group": "1_inspect"
@@ -529,50 +344,6 @@
         }
       ],
       "commandPalette": [
-        {
-          "command": "skillStudio.renameNode",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.editNodeOperatorValue",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.editPhaseInputBinding",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.editPhaseOutputReference",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.editPhaseRouteTarget",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.repairPhaseOutcome",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.insertNode",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.deleteNode",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.addPhaseVerify",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.editPhaseVerifyStep",
-          "when": "false"
-        },
-        {
-          "command": "skillStudio.renameNamedPhaseStep",
-          "when": "false"
-        },
         {
           "command": "skillStudio.refreshDependency",
           "when": "false"

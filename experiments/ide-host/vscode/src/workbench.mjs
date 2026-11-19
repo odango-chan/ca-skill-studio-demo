@@ -3,36 +3,10 @@ import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
-import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
-import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
-import {auditV1Alpha5Package,indexV1Alpha4ToolCatalogCallables}
-  from '../../../../site/v1alpha5-package-audit.mjs';
+import {analyzeCurrentSource} from "../../../../language/core/source.ts";
+import {indexV1Alpha4ToolCatalogCallables}
+  from '../../../../site/package-audit.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
-import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
-import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
-import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from '../../../../site/node-create.mjs';
-import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from '../../../../site/node-delete.mjs';
-import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
-import {phaseOutputReferenceOptions,previewPhaseOutputReference,
-  applyPhaseOutputReference} from '../../../../site/phase-output-refs.mjs';
-import {phaseRouteTargetOptions,previewPhaseRouteTarget,applyPhaseRouteTarget}
-  from '../../../../site/phase-routes.mjs';
-import {phaseOutcomeEditOptions,previewAddObservedPhaseOutcome,
-  previewRenameNoncorePhaseOutcome,previewDeleteNoncorePhaseOutcome,
-  applyAddObservedPhaseOutcome,applyRenameNoncorePhaseOutcome,
-  applyDeleteNoncorePhaseOutcome} from '../../../../site/phase-outcomes.mjs';
-import {phaseVerifyAddOptions,phaseVerifyDeleteOptions,
-  previewAddPhaseVerify,applyAddPhaseVerify,
-  previewDeletePhaseVerify,applyDeletePhaseVerify}
-  from '../../../../site/phase-step-structural.mjs';
-import {adjacentVerifyReorderOptions,previewAdjacentVerifyReorder,
-  applyAdjacentVerifyReorder} from '../../../../site/phase-step-order.mjs';
-import {namedPhaseStepImpactReport,previewNamedPhaseStepRename,
-  applyNamedPhaseStepRename} from '../../../../site/phase-step-rename.mjs';
-import {namedVerifyEditOptions,previewNamePlainVerify,applyNamePlainVerify,
-  previewDeleteUnreferencedNamedVerify,applyDeleteUnreferencedNamedVerify,
-  previewSwapAdjacentNamedVerify,applySwapAdjacentNamedVerify}
-  from '../../../../site/phase-named-verify.mjs';
 import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export.mjs';
 import {resolveLockedDependencies} from "./dependency-service.mjs";
 import {readProjectConfiguration} from "./project-configuration.mjs";
@@ -48,15 +22,24 @@ import {createSemanticTokenDecorationRenderer}
   from "../../lsp-browser/client/src/semantic-token-decorations.mjs";
 import {createPackageLanguageLifecycle}
   from "./package-language-lifecycle.mjs";
+import {LanguageDiagnosticSession} from "../../../../language/lsp/session.ts";
 
 export function registerWorkbench(vscode,context,{prepareToolContract,compilerProblemsProvider}={}){
-  let document=null,selection={},snapshot=null,bindingOptions=[],predicateSnapshot=null,
-    predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,timer,
+  const isTheiaHost=(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
+    /theia/i.test(String(vscode.env?.appName??""));
+  const browserLanguageWorkerAvailable=typeof Worker==="function"&&
+    typeof globalThis.location!=="undefined";
+  const useInProcessLanguageService=isTheiaHost&&!browserLanguageWorkerAvailable;
+  let document=null,selection={},snapshot=null,predicateSnapshot=null,
+    predicateGeneration=0,audit=[],auditStatus="Package Audit · not run",generation=0,
     lastSelectionMessage=null;
+  const localDiagnosticCollection=useInProcessLanguageService&&
+    typeof vscode.languages?.createDiagnosticCollection==="function"
+      ?vscode.languages.createDiagnosticCollection("skillStudioLanguageService"):null;
+  if(localDiagnosticCollection)context.subscriptions.push(localDiagnosticCollection);
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
   const providers=new Map(),treeProviders=new Map(),sessions=new Map(),selections=new Map();
   const markdownPreviewAcceptanceOriginals=new Map();
-  const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
   const languagePackageStatuses=new Map();
@@ -111,9 +94,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     // Every Theia host uses the same source-local CA-SL classifier.
     // Semantic colors must not depend on an LSP Worker, Package diagnostics,
     // trust linking or Compiler. VS Code Web hosts retain LSP-provided tokens.
-    const browserWorkerHost=typeof Worker==="function"&&typeof globalThis.location!=="undefined";
-    const theiaBrowserHost=typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST;
-    if(browserWorkerHost&&!theiaBrowserHost)return;
+    if(browserLanguageWorkerAvailable&&!isTheiaHost)return;
     if(typeof vscode.languages?.registerDocumentSemanticTokensProvider!=="function"||
        typeof vscode.SemanticTokensLegend!=="function"||
        typeof vscode.SemanticTokens!=="function"){
@@ -125,9 +106,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       [...SKILL_SEMANTIC_TOKEN_MODIFIERS]
     );
     let renderer=null;
-    const isTheia=(typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST)||
-      /theia/i.test(String(vscode.env?.appName??""));
-    if(isTheia){
+    if(isTheiaHost){
       try{
         renderer=createSemanticTokenDecorationRenderer(
           vscode,SKILL_SEMANTIC_TOKEN_TYPES,studioLightTheme.semanticTokenColors??{}
@@ -184,7 +163,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     // A terminal Worker failure must never be overwritten by stale READY or
     // another scheduled ANALYZING refresh. Native Source editing is separate.
     if(languageTransportFailure && state!=="UNAVAILABLE" && state!=="IDLE")return;
-    if(typeof Worker!=="function"||typeof globalThis.location==="undefined")return;
+    if(!browserLanguageWorkerAvailable&&!useInProcessLanguageService)return;
     if(!languageStatusItem){
       languageStatusItem=vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left,20);
       languageStatusItem.name="SKILL Studio Language Service";
@@ -197,113 +176,46 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     languageStatusItem.show();
   }
 
-  // Acceptance-only diagnostics are deliberately not contributed to the
-  // Command Palette. The Chromium harness queries this internal command in
-  // both browser-Worker and Node extension-host variants.
-  // Acceptance-only fixture proving the legacy analyzer remains active even
-  // when the v1alpha5 Language Service cannot parse the persisted source shape.
-  // It is entirely in-memory and never writes to the user's Package.
+  // Verify that historical source is diagnosed by the one current grammar.
+  // This is an in-memory negative test, not a compatibility analyzer.
   context.subscriptions.push(vscode.commands.registerCommand(
-    "skillStudio.internal.legacyPackageAuditAcceptance",()=>{
-      const files=new Map([
-        ["assurance/contract.yaml",{text:[
-          "apiVersion: connectionagent.io/v1alpha1",
-          "kind: SkillContract",
-          "metadata:",
-          "  name: legacy-audit-acceptance",
-          "spec:",
-          "  skillType: executable",
-          "  goal: demo.goal",
-          "  entryProcedure: missing-entry",
-          "  inputs:",
-          "    requestSchema: schemas/request.yaml",
-          "  context:",
-          "    requiredFacts: [createdsession_ingress]",
-          "  allowedResources:",
-          "    capabilities: [operation.allowed]",
-          "    localTools: [skill.local]"
-        ].join("\n")}],
-        ["assurance/predicates.yaml",{text:[
-          "apiVersion: connectionagent.io/v1alpha1",
-          "kind: PredicateSet",
-          "metadata:",
-          "  skill: legacy-audit-acceptance",
-          "predicates:",
-          "  demo.eligible:",
-          "    observations:",
-          "      state:",
-          "        ref: demo.state",
-          "        scope: '{\"supi\": subject.supi}'",
-          "        freshness: 5s",
-          "    evaluator:",
-          "      type: cel",
-          "      expression: true"
-        ].join("\n")}],
-        ["assurance/procedure.yaml",{text:[
-          "procedures:",
-          "  entry:",
-          "    inputs:",
-          "      supi:",
-          "        type: string",
-          "        from: context.subject.supi",
-          "    start: start",
-          "    nodes:",
-          "      start:",
-          "        call: operation.missing",
-          "        with:",
-          "          supi:",
-          "            from: input.unknown",
-          "        preconditions:",
-          "          steps:",
-          "            - script: scripts/missing.py",
-          "          'on':",
-          "            FAILED: done",
-          "        postconditions:",
-          "          steps:",
-          "            - verify: demo.missing",
-          "        'on':",
-          "          PASS: absent",
-          "          FAILED: done",
-          "      done:",
-          "        terminal: SUCCEEDED",
-          "      unreachable:",
-          "        terminal: FAILED"
-        ].join("\n")}],
-        ["schemas/request.yaml",{text:[
-          "type: object",
-          "required: [supi, missing]",
-          "properties:",
-          "  supi:",
-          "    type: string"
-        ].join("\n")}]
+    "skillStudio.internal.currentGrammarRejectionAcceptance",()=>{
+      const root="file:///current-grammar-acceptance";
+      const documents=new Map([
+        ["assurance/contract.yaml",{
+          uri:root+"/assurance/contract.yaml",relativePath:"assurance/contract.yaml",
+          version:1,text:"apiVersion: connectionagent.io/v1alpha1\nkind: SkillContract\nmetadata: {}\nspec: {}\n"
+        }],
+        ["assurance/predicates.yaml",{
+          uri:root+"/assurance/predicates.yaml",relativePath:"assurance/predicates.yaml",
+          version:1,text:"apiVersion: connectionagent.io/v1alpha1\nkind: PredicateSet\nmetadata: {}\npredicates: {}\n"
+        }],
+        ["assurance/procedure.yaml",{
+          uri:root+"/assurance/procedure.yaml",relativePath:"assurance/procedure.yaml",
+          version:1,text:"procedures:\n  entry:\n    nodes:\n      start:\n        call: operation.missing\n"
+        }]
       ]);
-      const diagnostics=auditPackageWorkspace({
-        name:"legacy-audit-acceptance",files,completeness:"complete"
-      });
-      const codes=new Set(diagnostics.map(item=>item.code));
-      const required=[
-        "V1ALPHA5_LSP_NOT_APPLICABLE","ENTRY_PROCEDURE",
-        "CAPABILITY_UNDECLARED","INPUT_MISSING","NODE_PREDICATE",
-        "SCRIPT_MISSING","ROUTE_TARGET_MISSING","NODE_UNREACHABLE",
-        "REQUEST_SCHEMA_REQUIRED_UNDECLARED","CEL_EXPRESSION_SYNTAX_NOT_CHECKED",
-        "PREDICATE_RUNTIME_NOT_CHECKED","CONTEXT_FACTS_NOT_CHECKED"
-      ];
+      const result=analyzeCurrentSource(documents,"current-grammar-acceptance");
+      const codes=new Set(result.diagnostics.map(item=>item.code));
+      const required=["UNKNOWN_FIELD","SOURCE_ROOT_INVALID"];
       const missing=required.filter(code=>!codes.has(code));
       if(missing.length)
-        throw Error("Legacy Package Audit omitted expected independent findings: "+
-          JSON.stringify({missing,diagnostics}));
+        throw Error("Current grammar did not report concrete source errors: "+
+          JSON.stringify({missing,diagnostics:result.diagnostics}));
       return {
-        status:"PASS",profile:"connectionagent.io/v1alpha1",
-        errorCount:diagnostics.filter(item=>item.severity==="error").length,
-        warningCount:diagnostics.filter(item=>item.severity==="warning").length,
-        notCheckedCount:diagnostics.filter(item=>item.status==="not_checked").length,
-        diagnosticCount:diagnostics.length,codes:[...codes].sort(),
-        qualification:"NOT_QUALIFIED",sourceMutation:"NONE"
+        status:"PASS",analysis:"CURRENT_GRAMMAR_ONLY",
+        diagnosticCount:result.diagnostics.length,codes:[...codes].sort(),
+        compatibilityFallback:false,sourceMutation:"NONE"
       };
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.semanticTokenDiagnostics",()=>({
       ...semanticTokenDiagnostics,
+      activeDocumentUri:document?.uri?.toString?.()??null,
+      activePackageRootUri:document
+        ?packageRootForProcedure(vscode,document)?.uri?.toString?.()??null:null,
+      activePackageAuditStatus:auditStatus,
+      activePackageAuditDiagnosticCount:audit.length,
       languagePackages:[...languagePackages.values()].map(state=>({
         rootUri:state.key,refs:state.refs,generation:state.generation,
         ticket:state.ticket,disposed:state.disposed,
@@ -318,7 +230,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           ?vscode.languages.getDiagnostics(contractUri).map(item=>({
             code:item.code,message:item.message,severity:item.severity,source:item.source,
             line:(item.range?.start?.line??0)+1,
-            column:(item.range?.start?.character??0)+1
+            column:(item.range?.start?.character??0)+1,
+            endLine:(item.range?.end?.line??0)+1,
+            endColumn:(item.range?.end?.character??0)+1
           })): [];
         const problemItems=(treeProviders.get("problems")?.getChildren?.()??[])
           .flatMap(item=>item.kind==="problem-group"?(item.children??[]):[item]);
@@ -330,11 +244,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           })),
           problems:problemItems.filter(item=>item.kind==="package-diagnostic").map(item=>({
             code:item.code,message:item.message,severity:item.severity,status:item.status,
-            domain:item.domain,path:item.path,line:item.line,column:item.column
+            domain:item.domain,path:item.path,line:item.line,column:item.column,
+            description:item.description
           })),
           editorMarkers
         };
       })(),
+      languageServiceMode:useInProcessLanguageService?"shared-session-in-process":
+        browserLanguageWorkerAvailable?"shared-session-browser-worker":"unavailable",
       languageClientStarted:Boolean(languageClient),
       languageClientPending:Boolean(languageClientPromise),
       languageTransportFailure,
@@ -380,6 +297,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               // Ignore delayed notifications from an old Package generation.
               if(!state||state.disposed||status.generation!==state.generation)return;
               languagePackageStatuses.set(status.rootUri,status);
+              applyLanguageAnalysisStatus(status);
               // "UNAVAILABLE" here is Package analysis, not a dead language
               // Worker. Keep the service state distinct from Package health.
               updateLanguageStatus(
@@ -456,59 +374,68 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         return null;
       }
       const folder=vscode.workspace.getWorkspaceFolder?.(state.procedureDocument.uri);
+      let dependencyContext={
+        available:false,
+        reason:"The Package is not inside an open project workspace"
+      };
       if(folder){
-        const resolved=await resolveLockedDependencies(vscode,folder.uri);
-        const schemas=[];
-        const operations=[];
-        const decoder=new TextDecoder();
-        for(const dependency of resolved.snapshots){
-          if(dependency.kind==="tool-catalog"){
-            const file=dependency.files.find(item=>item.path==="tool-contract.json");
-            if(file){
-              try{
-                const contract=JSON.parse(decoder.decode(decodeBase64(file.bytes)));
-                if(contract.apiVersion==="skillc.tool/v0.1"&&Array.isArray(contract.operations)){
-                  const text=JSON.stringify(contract,null,2);
-                  const uri=prepareToolContract?.(dependency,text)?.toString();
-                  const prefix='\n      "id": ';
-                  for(const item of contract.operations){
-                    if(typeof item?.id!=="string")continue;
-                    const literal=JSON.stringify(item.id);
-                    const offset=text.indexOf(prefix+literal);
-                    const line=offset<0?0:text.slice(0,offset).split("\n").length;
-                    const character=prefix.length;
-                    const location=uri&&offset>=0?{uri,range:{
-                      start:{line,character},
-                      end:{line,character:character+literal.length-2}
-                    }}:undefined;
-                    operations.push({id:item.id,dependencyId:dependency.id,location});
-                  }
-                }
-              }catch(error){
-                console.warn("Cannot read locked Tool contract",dependency.id,error);
-              }
+        try{
+          const project=readProjectConfiguration(vscode,folder.uri);
+          const resolved=await resolveLockedDependencies(vscode,folder.uri);
+          const operations=[],schemas=[],toolCatalogs=[];
+          const decoder=new TextDecoder("utf-8",{fatal:true});
+          for(const dependency of resolved.snapshots??[]){
+            const decoded=(dependency.files??[])
+              .filter(file=>/\.(?:json|ya?ml)$/i.test(file.path))
+              .map(file=>({
+                path:file.path,text:decoder.decode(decodeBase64(file.bytes))
+              }));
+            if(dependency.kind==="tool-catalog"){
+              const catalog=indexV1Alpha4ToolCatalogCallables(dependency.id,decoded);
+              toolCatalogs.push({
+                dependencyId:dependency.id,
+                available:catalog.available,reason:catalog.reason
+              });
+              operations.push(...catalog.operations);
+            }
+            for(const file of decoded){
+              const schemaFile=dependency.kind==="schema-bundle"
+                ?/\.(?:json|ya?ml)$/i.test(file.path)
+                :/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path);
+              if(!schemaFile)continue;
+              schemas.push({dependencyId:dependency.id,path:file.path,text:file.text});
             }
           }
-          if(dependency.kind!=="schema-bundle")continue;
-          for(const file of dependency.files){
-            if(!/\.schema\.(?:json|ya?ml)$/.test(file.path))continue;
-            schemas.push({
-              dependencyId:dependency.id,
-              path:file.path,
-              text:decoder.decode(decodeBase64(file.bytes))
-            });
-          }
+          dependencyContext={
+            available:true,
+            declarations:project.settings.dependencies,
+            snapshots:(resolved.snapshots??[]).map(item=>({id:item.id,kind:item.kind})),
+            diagnostics:resolved.diagnostics??[],
+            operations,toolCatalogs,schemas
+          };
+          snapshot.dependencyOperations=operations;
+          snapshot.dependencySchemas=schemas;
+        }catch(error){
+          dependencyContext={
+            available:false,reason:String(error?.message??error)
+          };
         }
-        snapshot.dependencySchemas=schemas;
-        snapshot.dependencyOperations=operations;
+      }
+      snapshot.dependencyContext=dependencyContext;
+      const activeRoot=document?packageRootForProcedure(vscode,document):null;
+      if(activeRoot?.uri.toString()===state.key){
+        if(snapshot.completeness==="complete"){
+          packageFiles=new Map(snapshot.documents.map(item=>
+            [item.relativePath,{text:item.text}]));
+          packageFilesUri=state.procedureDocument.uri.toString();
+          packageFilesVersion=state.procedureDocument.version;
+        }else{
+          packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
+        }
+        update(state.procedureDocument);
       }
       if(state.disposed||ticket!==state.ticket){
         if(strict)throw Error("Package refresh was superseded during dependency resolution");
-        return null;
-      }
-      const client=await ensureLanguageClient();
-      if(!client||state.disposed||ticket!==state.ticket||languageTransportFailure){
-        if(strict)throw Error("Package refresh lost its active Language Worker");
         return null;
       }
       state.lastSentSnapshot={
@@ -522,6 +449,72 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       };
       updateLanguageStatus("ANALYZING","Analyzing "+snapshot.packageName+
         " · generation "+snapshot.generation);
+      if(useInProcessLanguageService){
+        if(!state.localSession){
+          state.localSession=new LanguageDiagnosticSession({
+            publish(result){
+              if(state.disposed||languagePackages.get(state.key)!==state)return;
+              const diagnostics=(result.diagnostics??[]).map(item=>{
+                const severity=item.severity===1?vscode.DiagnosticSeverity.Error:
+                  item.severity===2?vscode.DiagnosticSeverity.Warning:
+                  (vscode.DiagnosticSeverity.Information??vscode.DiagnosticSeverity.Warning);
+                const range=new vscode.Range(
+                  item.range.start.line,item.range.start.character,
+                  item.range.end.line,item.range.end.character);
+                const diagnostic=new vscode.Diagnostic(range,item.message,severity);
+                diagnostic.code=item.code;
+                diagnostic.source=item.source;
+                return diagnostic;
+              });
+              state.localPublishedCounts.set(result.uri,diagnostics.length);
+              localDiagnosticCollection?.set(vscode.Uri.parse(result.uri),diagnostics);
+            },
+            analysis(_acceptedSnapshot,analysis){
+              state.localAnalysis=analysis;
+            },
+            status(result){
+              if(state.disposed||languagePackages.get(state.key)!==state||
+                 result.generation!==state.generation)return;
+              const analysis=state.localAnalysis?.generation===result.generation
+                ?state.localAnalysis:null;
+              const status={
+                ...result,rootUri:state.key,
+                publishedDiagnosticCount:[...state.localPublishedCounts.values()]
+                  .reduce((total,count)=>total+count,0),
+                procedureState:analysis?.procedure.state??"UNAVAILABLE",
+                procedureDiagnosticCount:analysis?.procedure.diagnostics.length??0,
+                packageAuditState:analysis?.packageAudit.state??"UNAVAILABLE",
+                packageAuditReason:analysis?.packageAudit.reason??null,
+                packageAuditDiagnosticCount:analysis?.packageAudit.diagnostics.length??0,
+                analysisDiagnostics:analysis?.diagnostics??[]
+              };
+              languagePackageStatuses.set(state.key,status);
+              applyLanguageAnalysisStatus(status);
+              updateLanguageStatus(
+                status.state==="UNAVAILABLE"?"PARTIAL":status.state,
+                status.reason??("Package "+state.key+" · generation "+status.generation+
+                  " · "+status.publishedDiagnosticCount+" diagnostics"+
+                  " · Audit "+status.packageAuditState)
+              );
+            }
+          });
+        }
+        const submitted=await state.localSession.submit(snapshot);
+        if(!submitted.accepted&&submitted.reason!=="ANALYSIS_UNAVAILABLE"){
+          if(submitted.reason==="SUPERSEDED"||submitted.reason==="STALE_GENERATION"||
+             submitted.reason==="STALE_DOCUMENT")return null;
+          throw Error("Shared Language Service rejected Package snapshot: "+
+            String(submitted.reason??"unknown reason"));
+        }
+        languagePackageFailure=null;
+        if(snapshot.completeness==="complete")state.transientReadRetries=0;
+        return snapshot;
+      }
+      const client=await ensureLanguageClient();
+      if(!client||state.disposed||ticket!==state.ticket||languageTransportFailure){
+        if(strict)throw Error("Package refresh lost its active Language Worker");
+        return null;
+      }
       client.sendPackageSnapshot(snapshot);
       languagePackageFailure=null;
       // Workspace import can briefly enumerate a file before its content is
@@ -582,12 +575,13 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       void languageClientPromise.then(invalidate).catch(()=>{});
     if(immediate){
       void refreshLanguagePackage(state,ticket,generation);
-      return;
+      return {ticket,generation};
     }
     state.timer=setTimeout(()=>{
       state.timer=null;
       void refreshLanguagePackage(state,ticket,generation);
     },120);
+    return {ticket,generation};
   }
   async function waitForLanguagePackageStatus(state,generation,timeoutMs=20000){
     const started=Date.now();
@@ -696,8 +690,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       semanticTokenDiagnostics.lastPackageAttachReason="document is not a supported assurance/procedure.yaml";
       return ()=>{};
     }
-    if(typeof Worker!=="function"||typeof globalThis.location==="undefined"){
-      semanticTokenDiagnostics.lastPackageAttachReason="browser Worker or location is unavailable";
+    if(!browserLanguageWorkerAvailable&&!useInProcessLanguageService){
+      semanticTokenDiagnostics.lastPackageAttachReason="no supported Language Service runtime is available";
       return ()=>{};
     }
     semanticTokenDiagnostics.lastPackageAttachReason=null;
@@ -715,7 +709,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         root,key,procedureDocument:doc,refs:1,
         generation:languagePackageGenerations.get(key)??0,ticket:0,
         timer:null,disposed:false,subscriptions:[],
-        lastSentSnapshot:null,transientReadRetries:0
+        lastSentSnapshot:null,transientReadRetries:0,
+        localSession:null,localAnalysis:null,localPublishedCounts:new Map()
       };
       languagePackageStatuses.delete(key);
       languagePackages.set(key,state);
@@ -770,6 +765,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       clearTimeout(state.timer);
       for(const subscription of state.subscriptions)subscription.dispose();
       state.subscriptions.length=0;
+      state.localSession?.dispose();
+      state.localSession=null;
       languagePackages.delete(key);
       languagePackageStatuses.delete(key);
       if(languagePackages.size===0)updateLanguageStatus("IDLE","No open Procedure Package");
@@ -1113,21 +1110,21 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   // selected workspace and always removed; user-authored files are untouched.
   if(typeof Worker==="function"&&typeof globalThis.location!=="undefined"){
     context.subscriptions.push(vscode.commands.registerCommand(
-      "skillStudio.internal.v1alpha5LanguageProviderAcceptance",
+      "skillStudio.internal.currentLanguageProviderAcceptance",
       async procedureUriValue=>{
         const sourceUri=vscode.Uri.parse(String(procedureUriValue??""));
         const sourceDocument=await vscode.workspace.openTextDocument(sourceUri);
         const sourceRoot=packageRootForProcedure(vscode,sourceDocument);
-        if(!sourceRoot)throw Error("v1alpha5 acceptance requires an active Skill Package");
+        if(!sourceRoot)throw Error("current-language acceptance requires an active Skill Package");
         const sourcePath=sourceRoot.uri.path.replace(/\/$/,"");
         const workspaceFolder=(vscode.workspace.workspaceFolders??[]).find(folder=>{
           const path=folder.uri.path.replace(/\/$/,"");
           return sourcePath===path||sourcePath.startsWith(path+"/");
         });
-        if(!workspaceFolder)throw Error("v1alpha5 acceptance requires the selected workspace root");
+        if(!workspaceFolder)throw Error("current-language acceptance requires the selected workspace root");
         const suffix=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
         const packageRoot=vscode.Uri.joinPath(
-          workspaceFolder.uri,"skill-studio-v1alpha5-lsp-"+suffix);
+          workspaceFolder.uri,"skill-studio-current-lsp-"+suffix);
         const fs=vscode.workspace.fs;
         const contract=[
           "goal: pdu_session.initial_request_fulfilled",
@@ -1263,12 +1260,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           ]);
           release=attachLanguagePackage(procedureDocument);
           state=languagePackages.get(packageRoot.toString());
-          if(!state||state.disposed)throw Error("v1alpha5 Package did not attach to Language Service");
+          if(!state||state.disposed)throw Error("current Package did not attach to Language Service");
           const status=await waitForLanguagePackageStatus(state,state.generation,20000);
-          if(status.state!=="PARTIAL")
-            throw Error("Unqualified fixture must remain editor-only PARTIAL, got "+status.state);
+          if(status.state!=="READY"||status.packageAuditState!=="UNAVAILABLE")
+            throw Error("Current source analysis must be READY while Package qualification remains separate: "+
+              JSON.stringify({state:status.state,packageAuditState:status.packageAuditState,
+                packageAuditReason:status.packageAuditReason}));
           if(state.lastSentSnapshot?.completeness!=="complete")
-            throw Error("v1alpha5 acceptance snapshot is incomplete: "+
+            throw Error("current-language acceptance snapshot is incomplete: "+
               JSON.stringify(state.lastSentSnapshot));
           const labels=result=>(Array.isArray(result)?result:
             result?.items??result?.suggestions??[]).map(item=>
@@ -1392,7 +1391,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             at(procedureDocument,"scripts/runner.py",5)));
           if(!scriptDefinition.some(item=>
             (item?.uri??item?.targetUri)?.toString()===scriptDocument.uri.toString()))
-            throw Error("Native Theia v1alpha5 Script Definition did not reach its Package-owned file");
+            throw Error("Native Theia current Script Definition did not reach its Package-owned file");
           const symbols=definitionItems(await vscode.commands.executeCommand(
             "vscode.executeDocumentSymbolProvider",procedureDocument.uri));
           if(!symbols.some(item=>item.name==="check")||
@@ -1401,9 +1400,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
              !symbols.some(item=>item.name==="timeout-handler")||
              !symbols.some(item=>item.name==="run-script")||
              !symbols.some(item=>item.name==="final"))
-            throw Error("Native Theia Outline did not expose v1alpha5 Node declarations");
+            throw Error("Native Theia Outline did not expose current Node declarations");
           return {
-            status:status.state,snapshotCompleteness:state.lastSentSnapshot.completeness,
+            status:status.state,packageAuditState:status.packageAuditState,
+            snapshotCompleteness:state.lastSentSnapshot.completeness,
             contractPreconditionCompletion:contractGate,
             requestSchemaCompletion:schemaPath,startNodeCompletion:entry,
             predicateCompletion:predicate,
@@ -1448,7 +1448,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             item.uri.toString()===key)??null
         );
         const lspProcedureDiagnostics=items=>items.filter(item=>
-          String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"&&
+          String(item.code?.value??item.code??"")==="YAML_PARSE_ERROR"&&
           item.source==="Skill Studio · procedure-projection");
         const waitForGeneration=async(state,afterGeneration,expectedState,predicate,label)=>{
           const started=Date.now();
@@ -1510,17 +1510,19 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               diagnostics=>lspProcedureDiagnostics(diagnostics).length===1,
               "Live Procedure diagnostic publication");
             const procedureDiagnostics=lspProcedureDiagnostics(invalid.diagnostics);
-            if(invalid.diagnostics.some(item=>
-              item.source==="Skill Studio · package-audit"||
-              String(item.code?.value??item.code??"")==="PACKAGE_AUDIT_UNAVAILABLE"))
-              throw Error("LSP duplicated Package Audit diagnostics in the native Problems collection");
+            const packageAuditDiagnostics=invalid.diagnostics.filter(item=>
+              item.source==="Skill Studio · package-audit");
+            if(packageAuditDiagnostics.filter(item=>
+              String(item.code?.value??item.code??"")==="PACKAGE_YAML_PARSE_ERROR").length!==1)
+              throw Error("Current Package Audit must publish exactly one matching YAML parse finding");
             const message=procedureDiagnostics[0].message;
-            if(!message.includes("YAML 解析失败"))
-              throw Error("Native Procedure diagnostic did not identify the malformed YAML: "+message);
+            if(!/YAML/i.test(message))
+              throw Error("Current Procedure diagnostic did not identify malformed YAML: "+message);
             return {
-              phase:"publish",appeared:true,code:"PROCEDURE_PROJECTION",
+              phase:"publish",appeared:true,code:"YAML_PARSE_ERROR",
               source:"Skill Studio · procedure-projection",message,
-              generation:invalid.generation,packageAuditDuplicates:0
+              generation:invalid.generation,
+              packageAuditDiagnostics:packageAuditDiagnostics.length
             };
           }catch(error){
             try{
@@ -1528,7 +1530,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
                 const beforeRestore=packageState.generation;
                 await replaceSource(state,state.original);
                 state.temporarySourceApplied=false;
-                await waitForGeneration(state,beforeRestore,"READY",
+                await waitForGeneration(state,beforeRestore,"PARTIAL",
                   diagnostics=>lspProcedureDiagnostics(diagnostics).length===0,
                   "Emergency Procedure Source restoration");
               }
@@ -1582,7 +1584,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               await replaceSource(state,state.original);
               state.temporarySourceApplied=false;
             }
-            const repaired=await waitForGeneration(state,beforeRepair,"READY",
+            const repaired=await waitForGeneration(state,beforeRepair,"PARTIAL",
               diagnostics=>lspProcedureDiagnostics(diagnostics).length===0,
               "Live Procedure diagnostic clear after repair");
             const restoredDocument=currentDocument();
@@ -1634,7 +1636,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             throw Error("L2-D4b diagnostic ownership probe is already active");
           const lsp=languageClient?.diagnosticsForAcceptance(key)??[];
           if(!lsp.some(item=>
-            String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"))
+            String(item.code?.value??item.code??"")==="YAML_PARSE_ERROR"))
             throw Error("L2-D4b requires a live LSP Procedure diagnostic");
           const guard=vscode.languages.createDiagnosticCollection(
             "skill-studio-d4b-control");
@@ -1644,7 +1646,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           probe.source="Skill Studio · editor audit";
           probe.code="D4B_HOST_DIAGNOSTIC_OWNERSHIP";
           guard.set(uri,[probe]);
-          const hostAudit=diagnostics.get(uri)??[];
+          const hostAudit=vscode.languages.getDiagnostics(uri).filter(item=>item.source==="Skill Studio · package-audit");
           d4bDiagnosticGuard.set(key,{uri,guard,
             auditStatusBefore:auditStatus,auditCountBefore:hostAudit.length});
           return {lspDiagnosticPresent:true,hostProbePresent:true,
@@ -1658,11 +1660,11 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           const visible=vscode.languages.getDiagnostics(uri);
           const lspCollectionPresent=languageClient?.hasDiagnosticCollectionForAcceptance()??false;
           const lspStillVisible=visible.some(item=>
-            String(item.code?.value??item.code??"")==="PROCEDURE_PROJECTION"&&
+            String(item.code?.value??item.code??"")==="YAML_PARSE_ERROR"&&
             item.source==="Skill Studio · procedure-projection");
           const hostProbePresent=controls.some(item=>
             String(item.code?.value??item.code??"")==="D4B_HOST_DIAGNOSTIC_OWNERSHIP");
-          const auditAfter=diagnostics.get(uri)??[];
+          const auditAfter=vscode.languages.getDiagnostics(uri).filter(item=>item.source==="Skill Studio · package-audit");
           if(lspCollectionPresent||lspStillVisible||!hostProbePresent)
             throw Error("L2-D4b diagnostic ownership failed: "+JSON.stringify({
               lspCollectionPresent,lspStillVisible,hostProbePresent,
@@ -2264,25 +2266,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     ));
   }
 
-  function currentNode(item){
-    if(!document||!isProcedurePath(document.uri.path))throw Error("No active Procedure Source");
-    const doc=document,source=doc.getText(),version=doc.version;
-    const procedureId=item?.procedureId??selection.procedureId;
-    const nodeId=item?.nodeId??selection.nodeId;
-    if(item?.documentUri&&item.documentUri!==doc.uri.toString())
-      throw Error("Inspector selection belongs to another Source document");
-    if(Number.isSafeInteger(item?.sourceVersion)&&item.sourceVersion!==version)
-      throw Error("Inspector selection is stale; select the Node again");
-    if(typeof procedureId!=="string"||typeof nodeId!=="string")
-      throw Error("Select a Node in the graph or Inspector first");
-    const rootInfo=packageRootForProcedure(vscode,doc);
-    const projected=inspectionSnapshot(source,{procedureId,nodeId},null,null,
-      rootInfo?.name??"skill",rootInfo?.uri?.toString?.()??"file:///skill");
-    const procedure=projected.model.procedures.get(procedureId);
-    if(projected.model.state!=="READY"||!procedure?.nodes.some(n=>n.id===nodeId))
-      throw Error("Selected Node is not present in the current Source");
-    return {doc,source,version,procedureId,nodeId};
-  }
   async function predicateContext(doc){
     const suffix="assurance/procedure.yaml";
     if(!doc.uri.path.endsWith(suffix))return {predicateSource:null,skillName:null};
@@ -2303,537 +2286,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     predicateSnapshot={uri,version,...next};
     fire();
   }
-  function singleSourceChange(preview){
-    const {start,end}=preview.sourceSpan;
-    const delta=preview.candidateSource.length-preview.baseSource.length;
-    if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||
-       start<0||end<start||end>preview.baseSource.length||
-       end+delta<start||end+delta>preview.candidateSource.length)
-      throw Error("Phase Patch Source span is invalid");
-    return [{start,end,
-      oldValue:preview.baseSource.slice(start,end),
-      newValue:preview.candidateSource.slice(start,end+delta)}];
-  }
-  async function confirmAndApply({doc,source,version,preview,changes,verify}){
-    const message=[preview.summary,preview.diff].filter(Boolean).join("\n\n");
-    const choice=await vscode.window.showInformationMessage(
-      message||"确认修改当前 Source",
-      {modal:true},
-      "确认并应用"
-    );
-    if(choice!=="确认并应用")return false;
-    if(document!==doc||doc.version!==version||doc.getText()!==source)
-      throw Error("Source changed after Preview; the edit was discarded");
-    const candidate=await verify(doc.getText());
-    if(candidate!==preview.candidateSource)
-      throw Error("Revalidated Patch does not match the reviewed Preview");
-    if(document!==doc||doc.version!==version||doc.getText()!==source)
-      throw Error("Source changed during Patch revalidation");
-    const edit=new vscode.WorkspaceEdit();
-    const spans=changes(preview);
-    if(!spans.length)throw Error("Patch has no qualified Source spans");
-    for(const span of spans){
-      const insertion=span.start===span.end&&span.oldValue===""&&
-        typeof span.newValue==="string"&&span.newValue.length>0;
-      if(!Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
-         span.start<0||span.end<span.start||span.end>source.length||
-         (span.end===span.start&&!insertion)||
-         typeof span.oldValue!=="string"||typeof span.newValue!=="string"||
-         source.slice(span.start,span.end)!==span.oldValue)
-        throw Error("Patch Source span no longer matches the current document");
-      edit.replace(doc.uri,new vscode.Range(
-        doc.positionAt(span.start),doc.positionAt(span.end)),span.newValue);
-    }
-    assertStudioMutation(doc.uri,vscode.workspace.workspaceFolders??[],"edit");
-     const applied=await vscode.workspace.applyEdit(edit);
-    if(!applied)throw Error("Host rejected WorkspaceEdit");
-    return true;
-  }
-
-  async function editPhaseInputBinding(item,bindingKey,newValue){
-    if(item?.kind!=="phase-step"||typeof item.phaseName!=="string"||
-       !Number.isSafeInteger(item.stepIndex))
-      throw Error("Select an eligible Phase Step in the native Inspector");
-    const ctx=currentNode(item);
-    const options=phaseStepBindingOptions(ctx.source,ctx.procedureId,ctx.nodeId)
-      .filter(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-    if(!options.length)throw Error("This Phase Step has no qualified same-type input bindings");
-    let key=bindingKey;
-    if(typeof key!=="string"){
-      const picked=await vscode.window.showQuickPick(options.map(x=>({
-        label:x.bindingKey,description:x.value,detail:x.inputType+" · "+x.stepName
-      })),{placeHolder:"选择要修改的 Phase Step 输入绑定"});
-      key=picked?.label??picked;
-    }
-    const binding=options.find(x=>x.bindingKey===key);
-    if(!binding)throw Error("Selected binding is not part of the current Phase Step");
-    let value=newValue;
-    if(typeof value!=="string"){
-      value=await vscode.window.showQuickPick(binding.choices.filter(x=>x!==binding.value),{
-        placeHolder:"选择同类型的 Procedure 输入来源"
-      });
-    }
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the Phase binding");
-    const preview=previewPhaseInputBinding(ctx.source,ctx.procedureId,ctx.nodeId,
-      item.phaseName,item.stepIndex,key,value);
-    return confirmAndApply({
-      ...ctx,preview,
-      changes:p=>[{
-        start:p.sourceSpan.start,end:p.sourceSpan.end,
-        oldValue:p.oldValue,newValue:p.newValue
-      }],
-      verify:text=>applyPhaseInputBinding(text,preview)
-    });
-  }
-
-  async function editPhaseOutputReference(item,bindingKey,newValue){
-    if(item?.kind!=='phase-output-reference'||
-       typeof item.phaseName!=='string'||!Number.isSafeInteger(item.stepIndex)||
-       !Number.isSafeInteger(item.sourceVersion))
-      throw Error("Select a current eligible Phase output reference in the native Inspector");
-    const ctx=currentNode(item);
-    const options=phaseOutputReferenceOptions(ctx.source,ctx.procedureId,ctx.nodeId)
-      .filter(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex&&
-        x.bindingKey===(bindingKey??item.bindingKey));
-    if(options.length!==1)throw Error("Output reference is no longer uniquely eligible");
-    const reference=options[0];
-    let value=newValue;
-    if(typeof value!=='string'){
-      const picked=await vscode.window.showQuickPick(
-        reference.choices.filter(choice=>choice!==reference.value).map(choice=>({
-          label:choice,
-          description:choice.startsWith(reference.producerPhase+".")
-            ?"本地 Phase 引用":"完整 Node + Phase 引用",
-          detail:"同一生产 Node / Phase Step / output suffix"
-        })),{placeHolder:"选择同一生产 Step 的输出引用写法"});
-      value=typeof picked==='string'?picked:picked?.label;
-    }
-    if(typeof value!=='string'||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the output reference form");
-    const preview=previewPhaseOutputReference(ctx.source,ctx.procedureId,ctx.nodeId,
-      item.phaseName,item.stepIndex,reference.bindingKey,value);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>[{
-        start:p.sourceSpan.start,end:p.sourceSpan.end,
-        oldValue:p.oldValue,newValue:p.newValue
-      }],
-      verify:text=>applyPhaseOutputReference(text,preview)
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function editPhaseRouteTarget(item,newTarget){
-    if(item?.kind!=='route'||typeof item.routeId!=='string'||
-       !Number.isSafeInteger(item.sourceVersion))
-      throw Error("Select a current eligible Phase failure/unknown Route");
-    const ctx=currentNode(item);
-    const option=phaseRouteTargetOptions(ctx.source,ctx.procedureId,ctx.nodeId)
-      .find(candidate=>candidate.routeId===item.routeId);
-    if(!option?.targets?.length)
-      throw Error("Phase Route has no Source-observed eligible target");
-    let target=newTarget;
-    if(typeof target!=='string'){
-      const picked=await vscode.window.showQuickPick(
-        option.targets.map(value=>({label:value,
-          description:option.phaseName+'.on · '+option.outcome,
-          detail:'来自同 Procedure、同 Phase、同 Outcome 的现有 Route'})),
-        {placeHolder:"选择已在当前 Source 出现的 Phase Route 目标"});
-      target=typeof picked==='string'?picked:picked?.label;
-    }
-    if(typeof target!=='string'||!target.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the Phase Route target");
-    const preview=previewPhaseRouteTarget(ctx.source,ctx.procedureId,
-      item.routeId,target);
-    const applied=await confirmAndApply({
-      ...ctx,preview,changes:singleSourceChange,
-      verify:text=>applyPhaseRouteTarget(text,preview)
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function repairPhaseOutcome(item,requestedAction){
-    if(item?.kind!=='phase-outcome-repair'||typeof item.phaseName!=='string'||
-       !Number.isSafeInteger(item.sourceVersion))
-      throw Error('Select a current eligible Phase Outcome repair in native Inspector');
-    const ctx=currentNode(item);
-    const phase=phaseOutcomeEditOptions(ctx.source,ctx.procedureId,ctx.nodeId)
-      .find(option=>option.phaseName===item.phaseName);
-    if(!phase)throw Error('Phase Outcome Source is not qualified for repair');
-    const actions=[
-      ...phase.adds.map(option=>({mode:'add',outcome:option.outcome,target:option.target,
-        label:'补齐 '+option.outcome,description:'→ '+option.target})),
-      ...phase.renames.map(option=>({mode:'rename',oldOutcome:option.oldOutcome,
-        newOutcome:option.newOutcome,target:option.target,
-        label:'纠正 '+option.oldOutcome+' → '+option.newOutcome,
-        description:'现有目标 '+option.target})),
-      ...phase.deletions.map(option=>({mode:'delete',outcome:option.outcome,
-        target:option.target,label:'删除非核心 '+option.outcome,
-        description:'当前目标 '+option.target}))
-    ];
-    if(!actions.length)throw Error('No owner-observed Phase Outcome repair is available');
-    let choice=requestedAction;
-    if(choice===undefined){
-      const picked=await vscode.window.showQuickPick(actions.map(action=>({
-        label:action.label,description:action.description,
-        detail:'仅修复当前 Source 已证明的 Outcome；不代表 Runtime Outcome 完整性',
-        spec:action
-      })),{placeHolder:'选择可证明的 Phase Outcome 修复'});
-      choice=picked?.spec??null;
-    }
-    if(choice===null)return false;
-    const identity=action=>JSON.stringify([
-      action?.mode??null,action?.outcome??null,action?.oldOutcome??null,
-      action?.newOutcome??null,action?.target??null]);
-    const selected=actions.find(action=>identity(action)===identity(choice));
-    if(!selected)throw Error('Phase Outcome action is not qualified by current Source');
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error('Source changed while selecting Phase Outcome repair');
-    const {source,procedureId,nodeId}=ctx,phaseName=item.phaseName;
-    let preview,verify;
-    if(selected.mode==='add'){
-      preview=previewAddObservedPhaseOutcome(source,procedureId,nodeId,phaseName,
-        selected.outcome,selected.target);
-      verify=text=>applyAddObservedPhaseOutcome(text,preview);
-    }else if(selected.mode==='rename'){
-      preview=previewRenameNoncorePhaseOutcome(source,procedureId,nodeId,phaseName,
-        selected.oldOutcome,selected.newOutcome);
-      verify=text=>applyRenameNoncorePhaseOutcome(text,preview);
-    }else if(selected.mode==='delete'){
-      preview=previewDeleteNoncorePhaseOutcome(source,procedureId,nodeId,phaseName,
-        selected.outcome);
-      verify=text=>applyDeleteNoncorePhaseOutcome(text,preview);
-    }else throw Error('Unsupported Phase Outcome action');
-    const applied=await confirmAndApply({
-      ...ctx,preview,changes:singleSourceChange,verify
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function addPhaseVerify(item,predicate){
-    if(item?.kind!=="phase"||typeof item.phaseName!=="string")
-      throw Error("Select an eligible Phase in the native Inspector");
-    const ctx=currentNode(item);
-    const predicates=await predicateContext(ctx.doc);
-    const options=phaseVerifyAddOptions(ctx.source,ctx.procedureId,ctx.nodeId,
-      predicates.predicateSource,predicates.skillName);
-    const phase=options.find(x=>x.phaseName===item.phaseName);
-    if(!phase){
-      // Diagnostic-only: preserve the structural editer's fail-closed decision
-      // while reporting which source/predicate precondition disqualified it.
-      let detail="unknown";
-      try{
-        previewAddPhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
-          item.phaseName,typeof predicate==="string"?predicate:"createdsession.n4.initial_resources_ready",
-          predicates.predicateSource,predicates.skillName);
-        detail="unexpected preview eligible";
-      }catch(error){detail=String(error?.message??error);}
-      console.warn("STUDIO_PHASE_VERIFY_INELIGIBLE",JSON.stringify({
-        documentVersion:ctx.doc.version,isDirty:ctx.doc.isDirty,
-        sourceBytes:ctx.source.length,
-        predicateBytes:predicates.predicateSource?.length??null,
-        skillName:predicates.skillName,phase:item.phaseName,
-        procedureId:ctx.procedureId,nodeId:ctx.nodeId,detail
-      }));
-      throw Error("Selected Phase has no safe Verify append anchor or available PredicateSet entry");
-    }
-    let value=predicate;
-    if(typeof value!=="string"){
-      const picked=await vscode.window.showQuickPick(phase.choices,{
-        placeHolder:"选择要追加到 Phase 末尾的 Package Predicate"
-      });
-      value=typeof picked==="string"?picked:picked?.value??picked?.label;
-    }
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the new Verify Step");
-    const preview=previewAddPhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
-      item.phaseName,value,predicates.predicateSource,predicates.skillName);
-    const applied=await confirmAndApply({
-      ...ctx,preview,changes:singleSourceChange,
-      verify:text=>applyAddPhaseVerify(text,preview,predicates.predicateSource)
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function editPhaseVerifyStep(item,requestedAction){
-    if(item?.kind!=="phase-step"||item.stepOperator!=="verify"||
-       typeof item.phaseName!=="string"||!Number.isSafeInteger(item.stepIndex))
-      throw Error("Select an eligible Verify Step in the native Inspector");
-    const ctx=currentNode(item);
-    const deletions=phaseVerifyDeleteOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    const reorder=adjacentVerifyReorderOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    const named=namedVerifyEditOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    const at=(rows,index)=>rows.some(x=>x.phaseName===item.phaseName&&x.stepIndex===index);
-    const canName=!item.stepName&&at(named.names,item.stepIndex);
-    const canDelete=at(deletions,item.stepIndex);
-    const canMoveUp=at(reorder,item.stepIndex-1);
-    const canMoveDown=at(reorder,item.stepIndex);
-    const canDeleteNamed=Boolean(item.stepName)&&at(named.deletions,item.stepIndex);
-    const canMoveUpNamed=Boolean(item.stepName)&&at(named.swaps,item.stepIndex-1);
-    const canMoveDownNamed=Boolean(item.stepName)&&at(named.swaps,item.stepIndex);
-    const choices=[
-      ...(canName?[{label:"Name Verify Step",value:"name"}]:[]),
-      ...(canMoveUp||canMoveUpNamed?[{label:"Move Verify Up",value:"move-up"}]:[]),
-      ...(canMoveDown||canMoveDownNamed?[{label:"Move Verify Down",value:"move-down"}]:[]),
-      ...(canDelete||canDeleteNamed?[{label:"Delete Verify Step",value:"delete"}]:[])
-    ];
-    let action=typeof requestedAction==="object"&&requestedAction
-      ?requestedAction.action:requestedAction;
-    let newName=typeof requestedAction==="object"&&requestedAction
-      ?requestedAction.newName:undefined;
-    if(typeof action!=="string"){
-      const picked=await vscode.window.showQuickPick(choices,{
-        placeHolder:"选择此 Verify Step 的安全编辑操作"
-      });
-      action=typeof picked==="string"?picked:picked?.value;
-    }
-    if(!choices.some(x=>x.value===action))return false;
-    if(action==="name"&&typeof newName!=="string"){
-      newName=await vscode.window.showInputBox({
-        value:"verify-"+item.stepValue.split(".").at(-1).replace(/[^A-Za-z0-9_-]/g,"-"),
-        prompt:"为这个 Verify Step 设置稳定名称",
-        placeHolder:"verify-step-name"
-      });
-    }
-    if(action==="name"&&(typeof newName!=="string"||!newName.trim()))return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the Verify Step operation");
-    let preview,verify;
-    if(action==="name"){
-      preview=previewNamePlainVerify(ctx.source,ctx.procedureId,ctx.nodeId,
-        item.phaseName,item.stepIndex,newName);
-      verify=text=>applyNamePlainVerify(text,preview);
-    }else if(action==="delete"&&canDeleteNamed){
-      preview=previewDeleteUnreferencedNamedVerify(ctx.source,ctx.procedureId,
-        ctx.nodeId,item.phaseName,item.stepIndex);
-      verify=text=>applyDeleteUnreferencedNamedVerify(text,preview);
-    }else if(action==="move-up"&&canMoveUpNamed||
-             action==="move-down"&&canMoveDownNamed){
-      const pairIndex=action==="move-up"?item.stepIndex-1:item.stepIndex;
-      preview=previewSwapAdjacentNamedVerify(ctx.source,ctx.procedureId,
-        ctx.nodeId,item.phaseName,pairIndex);
-      verify=text=>applySwapAdjacentNamedVerify(text,preview);
-    }else if(action==="delete"){
-      preview=previewDeletePhaseVerify(ctx.source,ctx.procedureId,ctx.nodeId,
-        item.phaseName,item.stepIndex);
-      verify=text=>applyDeletePhaseVerify(text,preview);
-    }else{
-      const pairIndex=action==="move-up"?item.stepIndex-1:item.stepIndex;
-      preview=previewAdjacentVerifyReorder(ctx.source,ctx.procedureId,ctx.nodeId,
-        item.phaseName,pairIndex);
-      verify=text=>applyAdjacentVerifyReorder(text,preview);
-    }
-    const applied=await confirmAndApply({
-      ...ctx,preview,changes:singleSourceChange,verify
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function renameNamedPhaseStep(item,newName){
-    if(item?.kind!=="phase-step"||typeof item.phaseName!=="string"||
-       !Number.isSafeInteger(item.stepIndex)||typeof item.stepName!=="string"||
-       !item.stepName)
-      throw Error("Select a named Phase Step in the native Inspector");
-    const ctx=currentNode(item);
-    const impact=namedPhaseStepImpactReport(ctx.source,ctx.procedureId,ctx.nodeId)
-      .find(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-    if(!impact?.editEligible||impact.stepName!==item.stepName)
-      throw Error("Named Step references are ambiguous or Source-only");
-    let value=newName;
-    if(typeof value!=="string")value=await vscode.window.showInputBox({
-      value:item.stepName,prompt:"输入新的 Phase Step 名称",
-      placeHolder:"new-step-name"
-    });
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the new Phase Step name");
-    const preview=previewNamedPhaseStepRename(ctx.source,ctx.procedureId,
-      ctx.nodeId,item.phaseName,item.stepIndex,value);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>p.sourceSpans.map(span=>({
-        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
-      })),
-      verify:text=>applyNamedPhaseStepRename(text,preview)
-    });
-    if(applied)update(ctx.doc);
-    return applied;
-  }
-
-  async function insertNode(item,spec){
-    if(item?.kind!=="route"||typeof item.routeId!=="string")
-      throw Error("Select an eligible Route in the native Inspector");
-    const ctx=currentNode(item);
-    const predicates=await predicateContext(ctx.doc);
-    const options=insertNodeOptions(ctx.source,ctx.procedureId,item.routeId,
-      predicates.predicateSource,predicates.skillName);
-    if(!options)throw Error("Selected Route is not eligible for Node insertion");
-    let nodeId=spec?.nodeId;
-    if(typeof nodeId!=="string")
-      nodeId=await vscode.window.showInputBox({
-        value:"new-node",prompt:"输入新 Node ID",placeHolder:"new-node-id"
-      });
-    if(typeof nodeId!=="string"||!nodeId.trim())return false;
-    let operator=spec?.operator;
-    if(typeof operator!=="string"){
-      const choices=[
-        ...(options.terminalValues.length?["terminal"]:[]),
-        "call",...(options.predicates.length?["verify"]:[])
-      ];
-      operator=await vscode.window.showQuickPick(choices,{
-        placeHolder:"选择要插入的 Node Operator"
-      });
-    }
-    if(typeof operator!=="string")return false;
-    let value=spec?.value;
-    if(typeof value!=="string"){
-      if(operator==="terminal"||operator==="verify"){
-        const choices=operator==="terminal"?options.terminalValues:options.predicates;
-        value=await vscode.window.showQuickPick(choices,{
-          placeHolder:operator==="terminal"?"选择 Terminal 状态":"选择 Package Predicate"
-        });
-      }else{
-        value=await vscode.window.showInputBox({
-          value:"sbi.new.operation",prompt:"输入新 Node 的 Call operation"
-        });
-      }
-    }
-    if(typeof value!=="string"||!value.trim())return false;
-    let outcome=operator==="terminal"?"":spec?.outcome;
-    if(operator!=="terminal"&&typeof outcome!=="string")
-      outcome=await vscode.window.showInputBox({
-        value:operator==="verify"?"PASS":"COMMITTED",
-        prompt:"输入新 Node 的 Outcome"
-      });
-    if(operator!=="terminal"&&typeof outcome!=="string")return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the new Node");
-    const preview=previewNodeInsert(ctx.source,ctx.procedureId,item.routeId,
-      {nodeId,operator,value,outcome},
-      predicates.predicateSource,predicates.skillName);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>p.sourceSpans.map(span=>({
-        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
-      })),
-      verify:async text=>{
-        const current=await predicateContext(ctx.doc);
-        return applyNodeInsert(text,preview,current.predicateSource,current.skillName);
-      }
-    });
-    if(applied){
-      const nextSelection={procedureId:ctx.procedureId,nodeId:preview.nodeId};
-      selections.set(ctx.doc.uri.toString(),nextSelection);
-      update(ctx.doc,nextSelection);
-    }
-    return applied;
-  }
-
-  async function deleteNode(item,redirectTarget){
-    if(item?.kind!=="node")
-      throw Error("Select a Node in the native Inspector");
-    const ctx=currentNode(item);
-    const options=deleteNodeOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    if(!options)throw Error("Selected Node is not eligible for safe deletion");
-    let target=redirectTarget;
-    if(typeof target!=="string"){
-      target=options.targets.length===1?options.targets[0]:
-        await vscode.window.showQuickPick(options.targets,{
-          placeHolder:"选择删除 Node 后的 Route 重定向目标"
-        });
-    }
-    if(typeof target!=="string")return false;
-    if(!options.targets.includes(target))
-      throw Error("Redirect target is not in the qualified deletion choices");
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the redirect target");
-    const preview=previewNodeDelete(ctx.source,ctx.procedureId,ctx.nodeId,target);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>p.sourceSpans.map(span=>({
-        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
-      })),
-      verify:text=>applyNodeDelete(text,preview)
-    });
-    if(applied){
-      const nextSelection={procedureId:ctx.procedureId,nodeId:target};
-      selections.set(ctx.doc.uri.toString(),nextSelection);
-      update(ctx.doc,nextSelection);
-    }
-    return applied;
-  }
-
-  async function renameNode(item,newId){
-    const ctx=currentNode(item);
-    let value=newId;
-    if(typeof value!=="string")value=await vscode.window.showInputBox({
-      value:ctx.nodeId,prompt:"输入新的 Node ID",placeHolder:"new-node-id"
-    });
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the new Node ID");
-    const preview=previewNodeRename(ctx.source,ctx.procedureId,ctx.nodeId,value);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>p.sourceSpans.map(span=>({
-        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
-      })),
-      verify:text=>applyNodeRename(text,preview)
-    });
-    if(applied){
-      const nextSelection={procedureId:ctx.procedureId,nodeId:value};
-      selections.set(ctx.doc.uri.toString(),nextSelection);
-      update(ctx.doc,nextSelection);
-    }
-    return applied;
-  }
-  async function editNodeOperatorValue(item,newValue){
-    const ctx=currentNode(item);
-    const predicates=await predicateContext(ctx.doc);
-    const state=nodeAttributeState(ctx.source,ctx.procedureId,ctx.nodeId,
-      predicates.predicateSource,predicates.skillName);
-    if(!state?.operator)
-      throw Error("This Operator is Source-only or has no qualified Package choices");
-    let value=newValue;
-    if(typeof value!=="string"){
-      value=state.operator.type==="select"
-        ?await vscode.window.showQuickPick(state.operator.values,{
-          placeHolder:"选择 "+state.operator.operator+" Operator 值"
-        })
-        :await vscode.window.showInputBox({
-          value:state.operator.value,prompt:"输入新的 "+state.operator.operator+" Operator 值"
-        });
-    }
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the Operator value");
-    const preview=previewNodeOperatorValue(ctx.source,ctx.procedureId,ctx.nodeId,
-      value,predicates.predicateSource,predicates.skillName);
-    return confirmAndApply({
-      ...ctx,preview,
-      changes:p=>[{
-        start:p.sourceSpan.start,end:p.sourceSpan.end,
-        oldValue:p.oldValue,newValue:p.newValue
-      }],
-      verify:async text=>{
-        const current=await predicateContext(ctx.doc);
-        return applyNodeOperatorValue(text,preview,
-          current.predicateSource,current.skillName);
-      }
-    });
-  }
-
-  context.subscriptions.push(diagnostics);
   const problemDomainLabels={
     source:"Source",package:"Package",dependencies:"Dependencies",tools:"Tools",
     capabilities:"Capabilities",schemas:"Schemas",predicates:"Predicates",
@@ -2841,10 +2293,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   };
   function problemTreeChildren(){
     const groups=new Map();
-    const diagnostics=[
-      ...(snapshot?.problems??[]),...audit,
-      ...(compilerProblemsProvider?.getProblems?.()??[])
-    ];
+    const diagnostics=[...audit,...(compilerProblemsProvider?.getProblems?.()??[])];
     const merged=new Map();
     for(const diagnostic of diagnostics){
       const kind=diagnostic.kind??"problem";
@@ -2868,12 +2317,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           children:[]
         });
       }
+      const sourcePath=diagnostic.path??diagnostic.relativePath??diagnostic.sourcePath;
+      const description=[sourcePath,diagnostic.line?("L"+diagnostic.line):null]
+        .filter(Boolean).join(" · ");
       groups.get(domain).children.push({
-        kind,label:diagnostic.message,message:diagnostic.message,
+        kind,label:diagnostic.message,message:diagnostic.message,description,
         line:diagnostic.line,column:diagnostic.column,uri:diagnostic.uri,
         code:diagnostic.code,severity:diagnostic.severity,
         status:diagnostic.status,domain,category:diagnostic.category,
-        path:diagnostic.path,sourcePath:diagnostic.sourcePath,
+        path:sourcePath,sourcePath:diagnostic.sourcePath,
         locationKind:diagnostic.locationKind,phase:diagnostic.phase,
         source:diagnostic.source,children:[]
       });
@@ -2882,8 +2334,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       const errors=group.children.filter(item=>item.severity==="error").length;
       const warnings=group.children.filter(item=>item.severity==="warning").length;
       const notChecked=group.children.filter(item=>item.status==="not_checked").length;
-      group.description=errors+" errors · "+warnings+" warnings"+
-        (notChecked?" · "+notChecked+" NOT_CHECKED":"");
+      const affectedFiles=new Set(group.children.map(item=>
+        item.path??item.uri?.toString?.()).filter(Boolean)).size;
+      group.description=errors+" errors · "+warnings+" warnings · "+
+        affectedFiles+" files"+(notChecked?" · "+notChecked+" NOT_CHECKED":"");
     }
     return [{kind:"problem-status",label:auditStatus,children:[]},...groups.values()];
   }
@@ -2928,117 +2382,19 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             item.source??'Skill Studio · Package Audit'
           ].filter(Boolean).join('\n');
         }
-        if(item.kind==='node'){
-          const deletable=id==='inspection'&&document&&
-            deleteNodeOptions(document.getText(),item.procedureId,item.nodeId);
-          tree.contextValue=deletable?'skillStudio.deletableNode':'skillStudio.node';
-          item.sourceVersion=document?.version;item.documentUri=document?.uri.toString();
-          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
-        }
-        if(item.kind==='v1alpha5-node'&&document){
-          tree.contextValue='skillStudio.v1alpha5Node';
+        if(item.kind==='current-node'&&document){
+          tree.contextValue='skillStudio.currentNode';
           item.sourceVersion=document.version;item.documentUri=document.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
-        }
-        if(item.kind==='route'&&id==='inspection'&&document){
-          const canInsert=Boolean(insertNodeOptions(
-            document.getText(),item.procedureId,item.routeId));
-          const canRetarget=Array.isArray(item.phaseTargetChoices)&&
-            item.phaseTargetChoices.length>0;
-          if(canRetarget)
-            tree.contextValue=canInsert
-              ?'skillStudio.routeAndPhaseTarget':'skillStudio.phaseRouteTarget';
-          else if(canInsert)tree.contextValue='skillStudio.route';
-          if(canInsert||canRetarget){
-            item.sourceVersion=document.version;
-            item.documentUri=document.uri.toString();
-            for(const key of ['procedureId','nodeId','routeId','phaseName',
-              'routeSource','outcome','target','phaseTargetChoices'])
-              tree[key]=item[key];
-            tree.sourceVersion=item.sourceVersion;
-            tree.documentUri=item.documentUri;
-          }
-        }
-        if(item.kind==='phase'&&id==='inspection'&&document){
-          const cached=predicateSnapshot?.uri===document.uri.toString()&&
-            predicateSnapshot.version===document.version?predicateSnapshot:null;
-          const canAdd=cached&&phaseVerifyAddOptions(document.getText(),
-            item.procedureId,item.nodeId,cached.predicateSource,cached.skillName)
-            .some(x=>x.phaseName===item.phaseName);
-          tree.contextValue=canAdd?'skillStudio.phaseWithVerifyAdd':'skillStudio.phase';
-          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
-          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.phaseName=item.phaseName;tree.sourceVersion=item.sourceVersion;
-          tree.documentUri=item.documentUri;
-        }
-        if(item.kind==='phase-step'&&id==='inspection'&&document){
-          const source=document.getText();
-          const hasBinding=bindingOptions.some(x=>
-            x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          const deletable=item.stepOperator==='verify'&&
-            phaseVerifyDeleteOptions(source,item.procedureId,item.nodeId).some(x=>
-              x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          const reorder=item.stepOperator==='verify'
-            ?adjacentVerifyReorderOptions(source,item.procedureId,item.nodeId):[];
-          const canMoveUp=reorder.some(x=>x.phaseName===item.phaseName&&
-            x.stepIndex===item.stepIndex-1);
-          const canMoveDown=reorder.some(x=>x.phaseName===item.phaseName&&
-            x.stepIndex===item.stepIndex);
-          const canEditVerify=deletable||canMoveUp||canMoveDown;
-          const namedVerify=namedVerifyEditOptions(source,item.procedureId,item.nodeId);
-          const canNameVerify=item.stepOperator==='verify'&&!item.stepName&&
-            namedVerify.names.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          const canDeleteNamedVerify=item.stepOperator==='verify'&&Boolean(item.stepName)&&
-            namedVerify.deletions.some(x=>x.phaseName===item.phaseName&&x.stepIndex===item.stepIndex);
-          const namedReorder=item.stepOperator==='verify'&&Boolean(item.stepName)&&
-            namedVerify.swaps.some(x=>x.phaseName===item.phaseName&&
-              (x.stepIndex===item.stepIndex||x.stepIndex===item.stepIndex-1));
-          const namedStep=item.stepName?namedPhaseStepImpactReport(source,
-            item.procedureId,item.nodeId).find(x=>x.phaseName===item.phaseName&&
-              x.stepIndex===item.stepIndex&&x.stepName===item.stepName):null;
-          const canRenameNamed=Boolean(namedStep?.editEligible);
-          if(item.stepOperator==='verify'&&(canDeleteNamedVerify||namedReorder)){
-            tree.contextValue=hasBinding?'skillStudio.namedVerifyStepAndBinding':'skillStudio.namedVerifyStep';
-          }else if(canRenameNamed){
-            tree.contextValue=hasBinding?'skillStudio.namedPhaseStepAndBinding':'skillStudio.namedPhaseStep';
-          }else if(item.stepOperator==='verify'&&(canNameVerify||canEditVerify)){
-            tree.contextValue=hasBinding?'skillStudio.verifyStepAndBinding':'skillStudio.verifyStep';
-          }else{
-            tree.contextValue=hasBinding
-              ?(canEditVerify?'skillStudio.phaseStepAndVerify':'skillStudio.phaseStep')
-              :(canEditVerify?'skillStudio.verifyStep':'skillStudio.phaseStepPlain');
-          }
-          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
-          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.phaseName=item.phaseName;tree.stepIndex=item.stepIndex;
-          tree.stepName=item.stepName;tree.stepOperator=item.stepOperator;
-          tree.stepValue=item.stepValue;
-          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
-        }
-        if(item.kind==='phase-outcome-repair'&&id==='inspection'&&document){
-          tree.contextValue='skillStudio.phaseOutcomeRepair';
-          item.sourceVersion=document.version;
-          item.documentUri=document.uri.toString();
-          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.phaseName=item.phaseName;tree.sourceVersion=item.sourceVersion;
-          tree.documentUri=item.documentUri;
-        }
-        if(item.kind==='phase-output-reference'&&id==='inspection'&&document){
-          tree.contextValue='skillStudio.phaseOutputReference';
-          item.sourceVersion=document.version;item.documentUri=document.uri.toString();
-          for(const key of ['procedureId','nodeId','phaseName','stepIndex',
-            'bindingKey','currentValue','choices','producerPhase','producerStep',
-            'producerStepIndex','outputSuffix'])
-            tree[key]=item[key];
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
         }
         if(document&&item.line&&item.kind!=='compiler-diagnostic'){
           const rootInfo=packageRootForProcedure(vscode,document);
-          const uri=item.sourcePath&&rootInfo?.uri
-            ?vscode.Uri.joinPath(rootInfo.uri,...item.sourcePath.split("/"))
-            :typeof item.uri==="string"?vscode.Uri.parse(item.uri):item.uri??document.uri;
+          const uri=item.uri
+            ?(typeof item.uri==="string"?vscode.Uri.parse(item.uri):item.uri)
+            :item.sourcePath&&rootInfo?.uri
+              ?vscode.Uri.joinPath(rootInfo.uri,...item.sourcePath.split("/"))
+              :document.uri;
           tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',
             arguments:[{...item,uri,version:document.version,
               sourceVersion:document.version,documentUri:document.uri.toString(),
@@ -3053,6 +2409,35 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   // Audit status belongs to Problems. Do not refresh Inspector/Outline for
   // status-only changes: their Source-backed selection must remain stable.
   const fireProblems=()=>providers.get('problems')?.fire();
+  function applyLanguageAnalysisStatus(status){
+    const rootInfo=document?packageRootForProcedure(vscode,document):null;
+    if(!rootInfo||status?.rootUri!==rootInfo.uri.toString())return;
+    const sourceDiagnostics=Array.isArray(status.analysisDiagnostics)
+      ?status.analysisDiagnostics:[];
+    audit=sourceDiagnostics.map(item=>{
+      const relativePath=item.relativePath??"";
+      const uri=relativePath
+        ?vscode.Uri.joinPath(rootInfo.uri,...relativePath.split("/"))
+        :rootInfo.uri;
+      return {
+        kind:"package-diagnostic",code:item.code,message:item.message,
+        severity:item.severity,status:item.status,domain:item.domain??"source",
+        category:item.category,path:relativePath,relativePath,
+        sourcePath:relativePath,line:item.line,column:item.column,
+        range:item.range,uri,source:item.source
+      };
+    });
+    const errors=audit.filter(item=>item.severity==="error").length;
+    const warnings=audit.filter(item=>item.severity==="warning").length;
+    const notChecked=audit.filter(item=>item.status==="not_checked").length;
+    const blocked=audit.filter(item=>item.status==="blocked").length;
+    const affectedFiles=new Set(audit.map(item=>item.path).filter(Boolean)).size;
+    auditStatus="Package Audit · "+errors+" errors / "+warnings+" warnings / "+
+      affectedFiles+" files / "+notChecked+" NOT_CHECKED"+
+      (blocked?" / "+blocked+" blocked":"")+
+      " · Compiler / Owner qualification pending";
+    fireProblems();
+  }
   const compilerProblemsChanged=compilerProblemsProvider?.onDidChange?.(()=>fireProblems());
   if(compilerProblemsChanged)context.subscriptions.push(compilerProblemsChanged);
   function update(doc,choice){
@@ -3065,7 +2450,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     const changed=!same||snapshot?.text!==text||next.procedureId!==selection.procedureId||
       next.nodeId!==selection.nodeId||snapshot?.evidenceStamp!==evidenceStamp;
     if(!same){
-      generation++;audit=[];diagnostics.clear();
+      generation++;audit=[];
       packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
       predicateSnapshot=null;predicateGeneration++;
     }
@@ -3080,150 +2465,39 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       snapshot={...inspectionSnapshot(text,selection,projected,evidenceFiles,
         rootInfo?.name??"skill",rootInfo?.uri?.toString?.()??"file:///skill"),
         text,evidenceStamp};
-      const v1alpha5=[...(snapshot.model?.procedures?.values?.()??[])]
-        .some(procedure=>String(procedure.profile??"").includes("v1alpha5"));
-      bindingOptions=!v1alpha5&&snapshot.model.state==='READY'&&
-        selection.procedureId&&selection.nodeId
-        ?phaseStepBindingOptions(text,selection.procedureId,selection.nodeId):[];
       fire();
     }
+    const activeRoot=packageRootForProcedure(vscode,doc);
+    const activeStatus=activeRoot&&languagePackageStatuses.get(activeRoot.uri.toString());
+    if(activeStatus)applyLanguageAnalysisStatus(activeStatus);
   }
   async function auditCurrent(){
-    if(!document)return;
-    // An explicit audit supersedes a pending debounced audit. One shared,
-    // bounded Package snapshot feeds Source projection and Package diagnostics.
-    clearTimeout(timer);timer=undefined;
-    const doc=document,version=doc.version,ticket=++generation;
-    auditStatus="Package Audit · running";fireProblems();
-    try{
-      let packageSnapshot;
-      for(let attempt=0;attempt<3;attempt++){
-        packageSnapshot=await collectPackageSnapshot(vscode,doc,ticket);
-        if(ticket!==generation||document!==doc||doc.version!==version)return;
-        const transient=packageSnapshot.completeness==="partial"&&
-          /ENOENT|EntryNotFound|FileNotFound/.test(packageSnapshot.reason??"");
-        if(!transient||attempt===2)break;
-        await new Promise(resolve=>setTimeout(resolve,100*(attempt+1)));
-      }
-      const files=new Map(packageSnapshot.documents.map(item=>
-        [item.relativePath,{text:item.text}]));
-      const uris=new Map(packageSnapshot.documents.map(item=>
-        [item.relativePath,vscode.Uri.parse(item.uri)]));
-      const v1alpha5=isV1Alpha5Procedure(doc.getText());
-      let v1alpha5DependencyContext={available:false};
-      if(v1alpha5){
-        const folder=vscode.workspace.getWorkspaceFolder?.(doc.uri);
-        if(folder){
-          try{
-            const project=readProjectConfiguration(vscode,folder.uri);
-            const resolved=await resolveLockedDependencies(vscode,folder.uri);
-            const operations=[],schemas=[],toolCatalogs=[];
-            const decoder=new TextDecoder("utf-8",{fatal:true});
-            for(const dependency of resolved.snapshots??[]){
-              const decoded=(dependency.files??[])
-                .filter(file=>/\.(?:json|ya?ml)$/i.test(file.path))
-                .map(file=>({
-                  path:file.path,text:decoder.decode(decodeBase64(file.bytes))
-                }));
-              if(dependency.kind==="tool-catalog"){
-                // CA-SL v1alpha5 inherits exact ToolCatalog v1alpha4 (F.1).
-                // A checksum-verified file is not an Owner qualification.
-                const catalog=indexV1Alpha4ToolCatalogCallables(dependency.id,decoded);
-                toolCatalogs.push({dependencyId:dependency.id,
-                  available:catalog.available,reason:catalog.reason});
-                operations.push(...catalog.operations);
-              }
-              for(const file of decoded){
-                const schemaFile=dependency.kind==="schema-bundle"
-                  ?/\.(?:json|ya?ml)$/i.test(file.path)
-                  :/(?:^|\/)schemas\/.*\.(?:json|ya?ml)$/i.test(file.path);
-                if(!schemaFile)continue;
-                schemas.push({dependencyId:dependency.id,path:file.path,text:file.text});
-              }
-            }
-            v1alpha5DependencyContext={
-              available:true,declarations:project.settings.dependencies,
-              snapshots:resolved.snapshots,diagnostics:resolved.diagnostics,
-              operations,toolCatalogs,schemas
-            };
-          }catch(error){
-            v1alpha5DependencyContext={
-              available:false,reason:String(error?.message??error)
-            };
-          }
-        }else{
-          v1alpha5DependencyContext={
-            available:false,reason:"The Package is not inside an open project workspace"
-          };
-        }
-      }
-
-      let results;
-      if(v1alpha5){
-        results=auditV1Alpha5Package({
-          files,dependencyContext:v1alpha5DependencyContext,
-          completeness:packageSnapshot.completeness,
-          snapshotReason:packageSnapshot.reason
-        });
-      }else{
-        // Legacy analysis is deliberately best-effort and multi-pass. A partial
-        // snapshot or one malformed companion file must not suppress checks on
-        // every other source file; the audit emits NOT_CHECKED reasons per gap.
-        results=auditPackageWorkspace({
-          name:packageSnapshot.packageName,files,
-          completeness:packageSnapshot.completeness,
-          snapshotReason:packageSnapshot.reason
-        },doc.getText());
-      }
-      if(ticket!==generation||document!==doc||doc.version!==version)return;
-      audit=results.map(item=>({...item,uri:uris.get(item.path)??doc.uri}));
-      const errors=audit.filter(item=>item.severity==="error").length;
-      const warnings=audit.filter(item=>item.severity==="warning").length;
-      const notChecked=audit.filter(item=>item.status==="not_checked").length;
-      auditStatus="Package Audit · "+errors+" errors / "+warnings+" warnings / "+
-        notChecked+" NOT_CHECKED"+
-        (v1alpha5?" · Compiler / Owner qualification pending":"");
-      diagnostics.clear();
-      if(packageSnapshot.completeness==="complete"){
-        packageFiles=files;packageFilesUri=doc.uri.toString();packageFilesVersion=version;
-      }else{
-        packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
-      }
-      update(doc);
-      for(const uri of new Set(audit.map(item=>item.uri))){
-        const located=audit.filter(item=>item.uri===uri&&
-          Number.isSafeInteger(item.line)&&item.line>0&&
-          Number.isSafeInteger(item.column)&&item.column>0);
-        if(!located.length)continue;
-        diagnostics.set(uri,located.map(item=>{
-          const line=item.line-1,column=item.column-1;
-          const severity=item.severity==="error"?vscode.DiagnosticSeverity.Error:
-            item.severity==="information"
-              ?(vscode.DiagnosticSeverity.Information??vscode.DiagnosticSeverity.Warning)
-              :vscode.DiagnosticSeverity.Warning;
-          const diagnostic=new vscode.Diagnostic(
-            new vscode.Range(line,column,line,column+1),item.message,severity);
-          diagnostic.source=item.source??'Skill Studio · editor audit';
-          diagnostic.code=item.code;return diagnostic;
-        }));
-      }
-      fireProblems();
-    }catch(error){
-      if(ticket!==generation)return;
-      packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
-      auditStatus='Package Audit · unavailable';
-      audit=[{kind:'package-diagnostic',message:'Audit unavailable: '+error.message,
-        line:1,column:1,uri:doc.uri,code:'PACKAGE_AUDIT_UNAVAILABLE',
-        severity:'error',status:'blocked',domain:'package',category:'snapshot'}];
-      diagnostics.clear();update(doc);fireProblems();
-    }
+    const doc=document;
+    if(!doc)throw Error("Open a current Skill Package before running Package Audit");
+    const rootInfo=packageRootForProcedure(vscode,doc);
+    if(!rootInfo)throw Error("Current document is not assurance/procedure.yaml");
+    const state=languagePackages.get(rootInfo.uri.toString());
+    if(!state)throw Error("Package is not attached to the current Language Service: "+
+      JSON.stringify({activeDocument:doc.uri.toString(),activeRoot:rootInfo.uri.toString(),
+        attachedPackages:[...languagePackages.keys()]}));
+    audit=[];auditStatus="Package Audit · pending";fireProblems();
+    const request=scheduleLanguagePackageRefresh(state,true);
+    const status=await waitForLanguagePackageStatus(state,request.generation);
+    applyLanguageAnalysisStatus(status);
+    return {requested:true,rootUri:state.key,generation:request.generation,status:status.state,
+      packageAuditState:status.packageAuditState};
   }
   function scheduleAudit(){
-    generation++;clearTimeout(timer);
-    packageFiles=null;packageFilesUri=null;packageFilesVersion=-1;
-    auditStatus="Package Audit · pending";audit=[];diagnostics.clear();
-    if(document)update(document);
-    timer=setTimeout(()=>void auditCurrent(),350);fireProblems();
+    generation++;
+    const rootInfo=document?packageRootForProcedure(vscode,document):null;
+    const state=rootInfo?languagePackages.get(rootInfo.uri.toString()):null;
+    const accepted=state&&languagePackageStatuses.get(state.key);
+    if(accepted&&accepted.generation===state.generation){
+      applyLanguageAnalysisStatus(accepted);
+      return;
+    }
+    audit=[];auditStatus=state?"Package Audit · pending":"Package Audit · not attached";
+    fireProblems();
   }
   async function preparePackageZip(){
     const doc=document,suffix='assurance/procedure.yaml';
@@ -3284,7 +2558,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       'Package ZIP 已准备好；请在 Procedure 画布上点击“下载 ZIP”。');
     return true;
   }
-  context.subscriptions.push({dispose(){clearTimeout(timer);generation++;sessions.clear();selections.clear();}},
+  context.subscriptions.push({dispose(){generation++;sessions.clear();selections.clear();}},
     vscode.commands.registerCommand('skillStudio.revealInspection',async item=>{
       if(!document||item.version!==document.version||
          (item.auditGeneration!==undefined&&item.auditGeneration!==generation))return;
@@ -3305,53 +2579,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
     }),
     vscode.commands.registerCommand('skillStudio.refreshInspection',()=>{if(document){update(document);scheduleAudit();}}),
-    vscode.commands.registerCommand('skillStudio.renameNode',async(item,newId)=>{
-      try{return await renameNode(item,newId);}
-      catch(error){await vscode.window.showWarningMessage('Node 重命名未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editNodeOperatorValue',async(item,newValue)=>{
-      try{return await editNodeOperatorValue(item,newValue);}
-      catch(error){await vscode.window.showWarningMessage('Operator 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editPhaseInputBinding',async(item,bindingKey,newValue)=>{
-      try{return await editPhaseInputBinding(item,bindingKey,newValue);}
-      catch(error){await vscode.window.showWarningMessage('Phase Binding 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editPhaseOutputReference',async(item,bindingKey,newValue)=>{
-      try{return await editPhaseOutputReference(item,bindingKey,newValue);}
-      catch(error){await vscode.window.showWarningMessage('Phase Output Reference 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editPhaseRouteTarget',async(item,newTarget)=>{
-      try{return await editPhaseRouteTarget(item,newTarget);}
-      catch(error){await vscode.window.showWarningMessage('Phase Route 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.repairPhaseOutcome',async(item,requestedAction)=>{
-      try{return await repairPhaseOutcome(item,requestedAction);}
-      catch(error){
-        await vscode.window.showWarningMessage('Phase Outcome 修复未执行：'+error.message);
-        return false;
-      }
-    }),
-    vscode.commands.registerCommand('skillStudio.addPhaseVerify',async(item,predicate)=>{
-      try{return await addPhaseVerify(item,predicate);}
-      catch(error){await vscode.window.showWarningMessage('新增 Verify Step 未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editPhaseVerifyStep',async(item,action)=>{
-      try{return await editPhaseVerifyStep(item,action);}
-      catch(error){await vscode.window.showWarningMessage('Verify Step 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.renameNamedPhaseStep',async(item,newName)=>{
-      try{return await renameNamedPhaseStep(item,newName);}
-      catch(error){await vscode.window.showWarningMessage('Phase Step 重命名未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.insertNode',async(item,spec)=>{
-      try{return await insertNode(item,spec);}
-      catch(error){await vscode.window.showWarningMessage('Node 插入未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.deleteNode',async(item,redirectTarget)=>{
-      try{return await deleteNode(item,redirectTarget);}
-      catch(error){await vscode.window.showWarningMessage('Node 删除未执行：'+error.message);return false;}
-    }),
     vscode.workspace.onDidChangeTextDocument(e=>{
       if(!document||!insideCurrentPackage(e.document?.uri))return;
       if(isProcedurePath(e.document.uri.path)&&document.uri.toString()===e.document.uri.toString())
@@ -3393,8 +2620,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     if(!document)return;
     const workspace=vscode.workspace.getWorkspaceFolder?.(document.uri)?.uri;
     if(!event?.affectsConfiguration||
-       event.affectsConfiguration("connectionAgent.skillStudio",workspace))
-      scheduleAudit();
+       event.affectsConfiguration("connectionAgent.skillStudio",workspace)){
+      const rootInfo=packageRootForProcedure(vscode,document);
+      const state=rootInfo?languagePackages.get(rootInfo.uri.toString()):null;
+      if(state)scheduleLanguagePackageRefresh(state,true);
+      else scheduleAudit();
+    }
   });
   // The pinned Markdown language extension is separate from the right-side
   // Studio Preview. Activation should be verified explicitly, not inferred

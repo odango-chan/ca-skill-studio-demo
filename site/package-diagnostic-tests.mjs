@@ -1,4 +1,4 @@
-import {auditV1Alpha5Package} from "./v1alpha5-package-audit.mjs";
+import {auditPackage} from "./package-audit.mjs";
 
 // Studio regression fixtures, NOT CA-SL source syntax or Runtime qualification.
 // PASS means an expected diagnostic was detected on a synthetic in-memory
@@ -126,12 +126,12 @@ export function runDiagnosticRegressionCase(id,{files}={}){
   });
   const copy=clonePackage(files);
   if(!copy||REQUIRED.some(path=>!copy.has(path)))
-    return notRun("Complete v1alpha5 Contract/Procedure/PredicateSet source is unavailable");
+    return notRun("Complete current CA-SL Contract/Procedure/PredicateSet source is unavailable");
   let setup;
   try{setup=setupCase(id,copy);}
   catch(error){return notRun("Fixture setup was not applicable: "+String(error?.message??error));}
   if(!setup)return notRun("The current Package has no matching source anchor for this regression fixture");
-  const diagnostics=auditV1Alpha5Package({
+  const diagnostics=auditPackage({
     files:copy,dependencyContext:setup.dependencyContext,
     completeness:setup.completeness,
     snapshotReason:setup.completeness==="partial"?"Synthetic missing Schema":""

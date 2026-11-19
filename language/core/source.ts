@@ -1,28 +1,25 @@
 /**
- * CA-SL v1alpha4 source-shape projection for editor diagnostics.
- * Frozen source: ca-skills@7f84393ee8c395e4d8c39a74cb5000a1f896588d.
+ * Current CA-SL source projection for editor diagnostics.
+ * Normative source: ca-skills@0abfd0e1ab99f481a4ae01f3f47efc54783dd5e5 (v1alpha5 release, PR #66).
+ * Current Example source: ca-skills@de8d9f667dd1a445c3f6378e0ca793d7407d2036 (main).
  *
  * This intentionally does not link Owner/Catalog/Capabilities or claim
  * Compiler/Host qualification. Missing trust always stays explicit.
  */
 import { parseDocument, isMap, isScalar, isSeq } from "yaml";
-import type { PackageDocumentSnapshot, LanguageDiagnostic, ProcedureProjection, ProcedureNode, ProcedureRoute } from "./types.js";
+import type { PackageDocumentSnapshot, LanguageDiagnostic, ProcedureProjection, ProcedureNode, ProcedureRoute, ProcedureWait } from "./types.js";
 
 const CONTRACT_FIELDS = new Set(["goal","precondition","requestSchema","contextSchema","dependencies","capabilities","limits"]);
 const STAGES = ["precondition","operation","observation","postcondition"] as const;
 const TERMINALS = new Set(["SUCCEEDED","FAILED","UNRESOLVED","SAFE_STOPPED"]);
-const OLD_FIELDS = new Set(["procedures","with","call","verify","reconcile","resolve","preconditions","postconditions","on","terminal","entryProcedure","apiVersion","kind","metadata","target"]);
 const EVAL_FIELDS = new Set(["parameters","evidence","evaluator"]);
-
-export function isV1Alpha4Procedure(text: string): boolean {
-  // Detect incomplete authoring snapshots too: deleting one root key in the editor
-  // must not silently re-route the document into the legacy v0.2 analyzer.
-  return /^(?:start|nodes):[ \t]*/m.test(text);
-}
+const WAIT_TERMINALS = new Set(["FAILED","UNRESOLVED","SAFE_STOPPED"]);
+const NODE_ID = /^[A-Za-z][A-Za-z0-9_-]*$/;
+const WAIT_DURATION = /^P(?:(?:[1-9][0-9]*D)(?:T(?:[1-9][0-9]*H(?:(?:[1-9][0-9]*M)(?:[1-9][0-9]*S)?)?|[1-9][0-9]*M(?:[1-9][0-9]*S)?|[1-9][0-9]*S))?|T(?:[1-9][0-9]*H(?:(?:[1-9][0-9]*M)(?:[1-9][0-9]*S)?)?|[1-9][0-9]*M(?:[1-9][0-9]*S)?|[1-9][0-9]*S))$/;
 
 type SyntaxResult = {root: any; document: PackageDocumentSnapshot} | null;
 
-export function analyzeV1Alpha4Source(
+export function analyzeCurrentSource(
   documents: ReadonlyMap<string, PackageDocumentSnapshot>,
   packageName: string
 ): {procedure: ProcedureProjection; diagnostics: LanguageDiagnostic[]} {
@@ -30,9 +27,14 @@ export function analyzeV1Alpha4Source(
   function add(document: PackageDocumentSnapshot, code: string, message: string, item?: any, severity: "error" | "warning"="error") {
     const position = Array.isArray(item?.range) && Number.isInteger(item.range[0]) ? item.range[0] : 0;
     const line = document.text.slice(0, position).split("\n").length;
+    const span=Array.isArray(item?.range)&&
+      Number.isSafeInteger(item.range[0])&&Number.isSafeInteger(item.range[1])&&
+      item.range[0]>=0&&item.range[1]>=item.range[0]
+        ?{start:item.range[0],end:item.range[1]}:undefined;
     diagnostics.push({
       code, message, severity, uri:document.uri,
-      relativePath:document.relativePath, source:"procedure-projection", confidence:"exact", line
+      relativePath:document.relativePath, source:"procedure-projection", confidence:"exact", line,
+      ...(span?{range:span}:{})
     });
   }
   function parse(path: string): SyntaxResult {
@@ -53,7 +55,7 @@ export function analyzeV1Alpha4Source(
       return null;
     }
     if (!isMap(parsed.contents)) {
-      add(document,"SOURCE_ROOT_INVALID","CA-SL v1alpha4 "+path+" must have a mapping root");
+      add(document,"SOURCE_ROOT_INVALID","current CA-SL "+path+" must have a mapping root");
       return null;
     }
     return {root:parsed.contents,document};
@@ -65,7 +67,7 @@ export function analyzeV1Alpha4Source(
     }
     for (const pair of root.items) {
       const key = isScalar(pair.key) ? String(pair.key.value) : "";
-      if (!allowed.has(key)) add(document,OLD_FIELDS.has(key)?"UNKNOWN_FIELD":"UNKNOWN_FIELD","Unsupported CA-SL v1alpha4 field: "+key,pair.key);
+      if (!allowed.has(key)) add(document,"UNKNOWN_FIELD","Unsupported field in the current CA-SL grammar: "+key,pair.key);
     }
   }
   function scalar(node: any): string {
@@ -77,6 +79,86 @@ export function analyzeV1Alpha4Source(
   function lineAt(document:PackageDocumentSnapshot,item:any):number {
     const offset=Array.isArray(item?.range)?item.range[0]:0;
     return document.text.slice(0,offset).split("\n").length;
+  }
+  function parseWait(waitNode:any,nodeId:string,declared:ReadonlySet<string>,procedureDocument:PackageDocumentSnapshot):ProcedureWait|null {
+    if(!isMap(waitNode)){
+      add(procedureDocument,"WAIT_DECLARATION_INVALID","Node wait must be a mapping",waitNode);
+      return null;
+    }
+    props(waitNode,procedureDocument,new Set(["event","timeout","response","routes"]));
+    const eventNode=waitNode.get("event",true);
+    let source="",service="",operation="";
+    if(!isMap(eventNode)){
+      add(procedureDocument,"WAIT_DECLARATION_INVALID","wait.event must declare source, service and operation",eventNode??waitNode);
+    }else{
+      props(eventNode,procedureDocument,new Set(["source","service","operation"]));
+      source=scalar(eventNode.get("source",true));
+      service=scalar(eventNode.get("service",true));
+      operation=scalar(eventNode.get("operation",true));
+      if(!source||!service||!operation)
+        add(procedureDocument,"WAIT_DECLARATION_INVALID","wait.event requires nonempty source, service and operation strings",eventNode);
+    }
+    const timeoutNode=waitNode.get("timeout",true);
+    const timeout=scalar(timeoutNode);
+    if(!timeout||!WAIT_DURATION.test(timeout)||timeout.endsWith("T")||!/[1-9]/.test(timeout))
+      add(procedureDocument,"WAIT_TIMEOUT_INVALID","wait.timeout must be a positive fixed ISO 8601 duration (for example PT30S or P1DT2H30M)",timeoutNode??waitNode);
+    let responseAfter="";
+    let responseAfterLine:number|undefined;
+    const responseNode=waitNode.get("response",true);
+    if(responseNode!==undefined){
+      if(!isMap(responseNode)){
+        add(procedureDocument,"WAIT_DECLARATION_INVALID","wait.response must be a mapping",responseNode);
+      }else{
+        props(responseNode,procedureDocument,new Set(["after"]));
+        const afterNode=responseNode.get("after",true);
+        if(afterNode!==undefined){
+          responseAfter=scalar(afterNode);
+          responseAfterLine=lineAt(procedureDocument,afterNode);
+          if(!NODE_ID.test(responseAfter)||TERMINALS.has(responseAfter)||responseAfter==="context"||
+             !declared.has(responseAfter))
+            add(procedureDocument,"WAIT_RESPONSE_BOUNDARY_INVALID","wait.response.after must name a declared non-terminal Node",afterNode);
+        }
+      }
+    }
+    const routesNode=waitNode.get("routes",true);
+    let timeoutTarget="";
+    let timeoutRouteLine=lineAt(procedureDocument,routesNode??waitNode);
+    if(!isMap(routesNode)){
+      add(procedureDocument,"WAIT_TIMEOUT_ROUTE_INVALID","wait.routes must contain exactly one TIMEOUT route",routesNode??waitNode);
+    }else{
+      if(routesNode.items.length!==1||!routesNode.has("TIMEOUT"))
+        add(procedureDocument,"WAIT_TIMEOUT_ROUTE_INVALID","wait.routes must contain exactly one TIMEOUT route",routesNode);
+      for(const route of routesNode.items){
+        const outcome=scalar(route.key),target=scalar(route.value);
+        if(outcome!=="TIMEOUT")
+          add(procedureDocument,"WAIT_TIMEOUT_ROUTE_INVALID","TIMEOUT is the only permitted wait.routes key",route.key);
+        else{
+          timeoutTarget=target;
+          timeoutRouteLine=lineAt(procedureDocument,route.key);
+          if(!target||TERMINALS.has(target)&&!WAIT_TERMINALS.has(target)||
+             !WAIT_TERMINALS.has(target)&&!NODE_ID.test(target))
+            add(procedureDocument,"WAIT_TIMEOUT_ROUTE_INVALID","TIMEOUT must target a declared Node, FAILED, UNRESOLVED or SAFE_STOPPED",route.value);
+          else if(NODE_ID.test(target)&&!WAIT_TERMINALS.has(target)&&!declared.has(target))
+            add(procedureDocument,"CONTROL_FLOW_DANGLING","Wait TIMEOUT target does not identify a declared Node: "+target,route.value);
+        }
+      }
+    }
+    if(!source||!service||!operation||!timeout||!timeoutTarget)return null;
+    return {
+      event:{source,service,operation},timeout,timeoutTarget,
+      ...(responseAfter?{responseAfter,responseAfterLine}:{}),
+      line:lineAt(procedureDocument,waitNode),
+      eventLine:lineAt(procedureDocument,eventNode),
+      timeoutLine:lineAt(procedureDocument,timeoutNode),
+      timeoutRouteLine
+    };
+  }
+
+  function routesNodeRange(node:any):[number,number]|null {
+    const routes=isMap(node)?node.get("routes",true):null;
+    const timeout:any=isMap(routes)
+      ?routes.items.find((item:any)=>scalar(item.key)==="TIMEOUT"):null;
+    return Array.isArray(timeout?.key?.range)?timeout.key.range:null;
   }
 
   const c=parse("assurance/contract.yaml");
@@ -104,7 +186,7 @@ export function analyzeV1Alpha4Source(
       props(item.value,predicates.document,EVAL_FIELDS);
       const predicateId=scalar(item.key);
       const parameters=isMap(item.value)?item.value.get("parameters",true):null;
-      // An empty list is the explicit zero-parameter signature in v1alpha4.
+      // An empty list is the explicit zero-parameter signature in the current grammar.
       if (!isSeq(parameters) || parameters.items.some((x:any)=>!isMap(x)||x.items.length!==1))
         add(predicates.document,"PREDICATE_GROUP_INVALID","Predicate parameters must be an ordered list of one-key mappings (an empty list declares zero parameters)",parameters??item.value);
       else if(predicateId)predicateSignatures.set(predicateId,parameters.items);
@@ -164,10 +246,33 @@ export function analyzeV1Alpha4Source(
       add(p.document,"NODE_ID_RESERVED","Node has missing or reserved identifier",item.key);
       continue;
     }
-    props(body,p.document,new Set(STAGES));
+    props(body,p.document,new Set([...STAGES,"wait"]));
     const stageNames=STAGES.filter(x=>isMap(body)&&body.has(x));
-    if (!stageNames.length) add(p.document,"SOURCE_ROOT_INVALID","Node must declare at least one stage",body);
-    if (stageNames.length)firstStage.set(id,id+"."+stageNames[0]);
+    const waitNode=isMap(body)?body.get("wait",true):undefined;
+    const hasWait=waitNode!==undefined;
+    const wait=hasWait?parseWait(waitNode,id,declared,p.document):null;
+    const globalGate=contractGate===id+".precondition";
+    const stagesAfterEntryGate=stageNames.filter(stage=>!(globalGate&&stage==="precondition"));
+    if(hasWait&&!stagesAfterEntryGate.length)
+      add(p.document,"WAIT_NODE_STAGE_REQUIRED","A Wait-bearing Node must declare at least one business stage after its entry gate",body);
+    else if(!hasWait&&!stageNames.length)
+      add(p.document,"SOURCE_ROOT_INVALID","Node must declare at least one stage",body);
+    if(hasWait){
+      firstStage.set(id,globalGate&&stageNames.includes("precondition")
+        ?id+".precondition":id+".wait");
+      const acceptedStage=stagesAfterEntryGate[0];
+      const waitOutgoing=acceptedStage?[id+"."+acceptedStage]:[];
+      if(wait&&declared.has(wait.timeoutTarget))waitOutgoing.push(wait.timeoutTarget);
+      adjacency.set(id+".wait",waitOutgoing);
+      if(wait){
+        routes.push({
+          id:id+".wait.TIMEOUT",source:id,outcome:"TIMEOUT",target:wait.timeoutTarget,
+          routeSource:"wait",line:wait.timeoutRouteLine,
+          sourceSpan:{start:(routesNodeRange(waitNode)??[0,0])[0],end:(routesNodeRange(waitNode)??[0,0])[1]},
+          patchable:false
+        });
+      }
+    }else if(stageNames.length)firstStage.set(id,id+"."+stageNames[0]);
     for (const stage of stageNames) {
       const outgoing:string[]=[];
       const part=body.get(stage,true);
@@ -260,11 +365,13 @@ export function analyzeV1Alpha4Source(
         add(p.document,"ROUTE_OUTCOME_MISSING","Procedure Script requires FAILED route",part);
       const next=stageNames[stageNames.indexOf(stage)+1];
       const normal=(stage==="precondition"||stage==="postcondition")?"PASS":"SUCCEEDED";
-      if(next){
+      const nextControl=hasWait&&globalGate&&stage==="precondition"
+        ?id+".wait":(next?id+"."+next:null);
+      if(nextControl){
         if(isMap(rawRoutes)&&rawRoutes.has(normal))
           add(p.document,"ROUTE_NORMAL_OUTCOME_NOT_ALLOWED",
-            "Normal "+normal+" outcome advances to the next stage and must not be routed explicitly",rawRoutes.get(normal,true));
-        else outgoing.push(id+"."+next);
+            "Normal "+normal+" outcome advances to the next stage/control and must not be routed explicitly",rawRoutes.get(normal,true));
+        else outgoing.push(nextControl);
       }else if(!isMap(rawRoutes)||!rawRoutes.has(normal)){
         add(p.document,"ROUTE_OUTCOME_MISSING",
           "Final "+stage+" stage requires "+normal+" route",part);
@@ -313,8 +420,10 @@ export function analyzeV1Alpha4Source(
       };
     });
     nodes.push({
-      id, operator:"node",value:stageNames.join(" → "),
+      id, operator:"node",
+      value:(wait?"WAIT · "+wait.event.source+"/"+wait.event.service+"/"+wait.event.operation+" · ":"")+stageNames.join(" → "),
       line:lineAt(p.document,item.key),phases:[],children:[],stages,
+      ...(wait?{wait}:{}),
       globalPrecondition:contractGate===id+".precondition",
       finalGoal:false
     });
@@ -392,7 +501,7 @@ export function analyzeV1Alpha4Source(
     finalPostconditionNodes,
     procedures:[{
       name:packageName,start,nodes,routes,children:[],
-      line:1,profile:"CA-SL v1alpha4 (editor source projection only)"
+      line:1,profile:"current CA-SL (released language; editor source projection only)"
     }]
   };
   return {procedure:projection,diagnostics};

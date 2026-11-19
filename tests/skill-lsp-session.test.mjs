@@ -169,23 +169,23 @@ test("failed analysis clears previous diagnostics and exposes explicit unavailab
   assert.equal(statuses.at(-1).state,"UNAVAILABLE");
 });
 
-test("legacy Procedure reports its exact unsupported-version cause, not an opaque analyzer failure",async()=>{
+test("historical Procedure is accepted by the current analyzer and published as ordinary source diagnostics",async()=>{
   const statuses=[],publications=[];
   const session=new LanguageDiagnosticSession({
     publish:x=>publications.push(x),status:x=>statuses.push(x)
   });
-  const legacy=snapshot(1,1,[
+  const historical=snapshot(1,1,[
     "apiVersion: connectionagent.io/v1alpha1",
     "kind: Procedure",
     "procedures:",
     "  - name: old",
     ""
   ].join("\n"));
-  const result=await session.submit(legacy);
-  assert.deepEqual(result,{accepted:false,reason:"ANALYSIS_UNAVAILABLE"});
-  assert.equal(statuses.at(-1).state,"UNAVAILABLE");
-  assert.match(statuses.at(-1).reason,/UNSUPPORTED_CA_SL_VERSION/);
-  assert.match(statuses.at(-1).reason,/top-level start\/nodes/);
-  assert.equal(statuses.at(-1).unlocated[0].code,"UNSUPPORTED_CA_SL_VERSION");
-  assert.deepEqual(publications,[],"legacy source must not invent valid Problem markers");
+  const result=await session.submit(historical);
+  assert.deepEqual(result,{accepted:true});
+  assert.equal(statuses.at(-1).state,"PARTIAL");
+  const codes=publications.flatMap(item=>item.diagnostics).map(item=>item.code);
+  assert.ok(codes.includes("UNKNOWN_FIELD"),JSON.stringify(publications));
+  assert.ok(codes.includes("SOURCE_ROOT_INVALID"),JSON.stringify(publications));
+  assert.ok(!codes.includes("UNSUPPORTED_CA_SL_VERSION"));
 });

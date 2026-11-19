@@ -1,110 +1,76 @@
-# Skill Studio Browser LSP · L2-B
+# Skill Studio Language Service · Shared Session Architecture
 
-**Status:** browser client/server implementation candidate. A successful build and
-Node Worker protocol test do not by themselves qualify the real Theia 1.76 Pages
-host; live host acceptance remains a separate gate.
+**Status:** one current CA-SL analysis pipeline, accepted in IDE Host, Theia Browser Host and Theia Browser-Only Chromium workflows.
 
-## Architecture
+## Product invariant
+
+Skill Studio has one authoritative Language Service implementation:
+
+- one current CA-SL source grammar in `language/core/source.ts`;
+- one Package analyzer in `site/package-audit.mjs`;
+- one generation-safe `LanguageDiagnosticSession` in `language/lsp/session.ts`;
+- one `analyzePackageSnapshot` pipeline in `language/core/index.ts`.
+
+There is no version-selected Server, legacy analyzer, old grammar fallback, automatic downgrade or migration-on-open. Every Package is analyzed with the current grammar. Old or malformed source produces ordinary source diagnostics from that grammar. API-version metadata may itself be diagnosed, but never selects an analyzer.
+
+## Runtime adapters
+
+The host runtime changes only how the shared session is invoked. It does not change parsing, linking, diagnostics or qualification semantics.
 
 ```text
-Theia / VS Code browser extension host
-  ├─ Native TextDocument + workspace.fs (single Source authority)
+VS Code / Theia extension host
+  ├─ Source-owned workspace IO
   ├─ bounded Package snapshot collector
-  │    ├─ open unsaved documents override persisted bytes
+  │    ├─ unsaved TextDocuments override persisted bytes
   │    ├─ max 500 files, 1 MiB per text file, 4 MiB aggregate text
-  │    └─ incomplete enumeration/read => PARTIAL / UNAVAILABLE
-  └─ vscode-languageclient/browser 9.0.1
-       │ JSON-RPC over Worker postMessage
-       ▼
-    Dedicated browser Worker
-      ├─ vscode-languageserver/browser 9.0.1
-      ├─ LanguageDiagnosticSession (shared L2-A generation gate)
-      └─ Skill Language Core (read-only analysis)
-           └─ textDocument/publishDiagnostics
+  │    └─ incomplete enumeration/read remains explicit
+  │
+  ├─ Browser runtime
+  │    └─ vscode-languageclient/browser
+  │         └─ dedicated Worker transport
+  │              └─ LanguageDiagnosticSession
+  │
+  └─ Theia backend Node extension host
+       └─ LanguageDiagnosticSession in-process
 ```
 
-The extension host remains the only owner of workspace IO and Source edits.
-The Worker cannot access the workspace filesystem and never writes files.
-The language server advertises `TextDocumentSyncKind.None`: the host sends
-bounded Package snapshots through `skillStudio/packageSnapshot`, avoiding a
-second competing TextDocument store. `skillStudio/packageClose` disposes the
-Package session and clears its published diagnostics.
+Both paths invoke the same TypeScript session and current Package analyzer. The in-process Theia adapter is not a second Server or parser; it is the same session used without a browser Worker when the Node extension host has no browser `Worker`/ `location` globals.
 
-## Protocol
+The extension host remains the only owner of workspace IO and Source edits. The Worker cannot access the workspace filesystem and never writes files. The browser LSP advertises `TextDocumentSyncKind.None`; the host sends bounded Package snapshots through `skillStudio/packageSnapshot`. `skillStudio/packageClose` disposes the Package session and clears published diagnostics.
 
-- `skillStudio/packageSnapshot`: one Package snapshot with exact root URI,
-  Package name, monotonically increasing generation, completeness and bounded
-  document text/version records.
-- `skillStudio/packageClose`: closes one Package session and clears its
-  diagnostics.
-- `skillStudio/analysisStatus`: returns READY / PARTIAL / UNAVAILABLE,
-  generation and unlocated findings.
-- `skillStudio/serverError`: reports transport or request rejection.
+## Package analysis and diagnostics
 
-The client starts lazily when the visual Procedure editor attaches. It resends
-snapshots after unsaved text changes, document open/close and workspace file
-create/delete/rename events. A debounce coalesces bursts; the session rejects
-out-of-order generations and stale open-document versions.
+Each accepted Package generation runs the same pipeline:
 
-## Diagnostic ownership
+1. parse Contract, PredicateSet and Procedure using the current CA-SL grammar;
+2. produce the current source projection and exact source locations;
+3. run current Package checks for Script, Schema, dependency, Capability, Tool and Evidence references;
+4. preserve unqualified trust/runtime checks as explicit `NOT_CHECKED` or blocked findings;
+5. publish one authoritative diagnostic set to Problems and editor markers.
 
-For this integration increment, the LSP server publishes Procedure projection,
-script-navigation and Python-outline diagnostics. The existing host-owned
-Package Audit DiagnosticCollection remains responsible for Package Audit
-warnings. This intentional split prevents duplicate Problems entries while
-the old audit UI remains in place. Unlocated or heuristic findings are not
-upgraded into exact source ranges.
+The Browser Worker publishes LSP diagnostics. The Theia Node host publishes the same session diagnostics through its native DiagnosticCollection. Both feed the same Problems tree, including Package-relative file path and line. YAML scalar ranges cover the complete source span; line-only findings do not receive invented editor locations.
 
-## Implementation language and build
+Source-analysis readiness and Package qualification are separate. A source-ready Procedure can report Language Service `READY` while Package qualification remains `UNAVAILABLE` because dependencies, trusted Owner/Capability declarations or Compiler evidence are absent. This is not a Worker failure and must not suppress source diagnostics.
 
-The semantic analysis and generation-safe session are TypeScript
-(`language/core`, `language/lsp`). The VS Code extension and the thin browser
-JSON-RPC transport adapters are ESM JavaScript, matching the existing
-`.mjs` extension host. They contain no duplicate Skill semantics; esbuild
-bundles the TypeScript core/session into the browser Worker. No Python runtime,
-Node filesystem API or backend service runs inside the browser Worker.
+## Generation and lifecycle
 
-The client and server use the official browser entry points from the
-VS Code LSP SDK, pinned to `vscode-languageclient@9.0.1` and
-`vscode-languageserver@9.0.1`. Their isolated package locks are installed
-before the IDE spike build. The server is bundled as a classic browser Worker
-asset inside the extension distribution. The Theia Pages adapter preserves the
-existing repository base path when resolving `hostedPlugin` Worker assets.
+- `skillStudio/packageSnapshot`: one Package snapshot with exact root URI, Package name, monotonically increasing generation, completeness and bounded document text/version records.
+- `skillStudio/packageClose`: closes one Package session and clears diagnostics.
+- `skillStudio/analysisStatus`: reports source readiness, component states, generation and unlocated findings.
+- `skillStudio/serverError`: reports transport/request failures only; source defects remain diagnostics.
 
-## Current limits and acceptance gates
+The client refreshes snapshots after unsaved text changes, document open/close and workspace file create/delete/rename events. A debounce coalesces bursts; the session rejects out-of-order generations and stale open-document versions. The explicit Package Audit command waits for the requested generation to be accepted before returning.
 
-This is the first real LSP transport slice, not a complete language feature
-suite. Completion, hover, definition/references, semantic tokens, YAML schema
-binding and Python type analysis are not implemented. Exact token ranges must
-be added before navigation can be advertised; L1 deliberately marks legacy
-line-only references as non-navigable.
+## Implementation and acceptance
 
-The automated Worker test runs the actual browser server bundle in a Worker
-GlobalScope-compatible harness and exercises initialize, diagnostics publish
-and Package close/clear. In addition, the browser-only Theia 1.76 Chromium
-workflow now opens the real CustomEditor and requires the native status bar to
-reach `SKILL LSP: READY` after a Package snapshot. This proves nested Worker
-startup, the Pages base-path URL rewrite, LanguageClient initialization and
-one successful end-to-end Package analysis in the browser-only host.
+The semantic analysis and generation-safe session are TypeScript (`language/core`, `language/lsp`). The VS Code extension and thin transport adapters are ESM JavaScript. The Browser Worker and Node extension-host adapter contain no duplicate Skill semantics.
 
-The backend-backed Theia workflow uses a Node Extension Host, not the browser
-Worker host. This L2-B slice intentionally does not start the browser client
-there; it retains the existing host diagnostics and Source behavior. A Node
-LSP transport can be added separately if desktop/backend parity is required.
+Acceptance covers:
+- current source diagnostics, completion, hover, definition/references and document symbols in the browser Worker host;
+- the same Package Audit findings, Problems items and exact editor markers in the Theia Node extension host;
+- current-grammar diagnostics for historical/malformed source without `UNSUPPORTED_CA_SL_VERSION` or a compatibility analyzer;
+- independent Package errors and `NOT_CHECKED` reasons across all Package files;
+- generation ordering, close/reopen cleanup and stale-result rejection;
+- no automatic migration or mutation of user source.
 
-The L2-C language-feature protocol coverage is extended by [L2-D1 real editor-provider acceptance](skill-lsp-l2d-editor-acceptance.md): the browser-only Chromium host invokes Definition, Hover, References, Document Symbols and Completion through Theia's public VS Code command registry. This does not change the host matrix above: backend-backed Theia remains the Node extension-host path and is not required to start the browser Worker.
-
-Still required before broad language-feature acceptance:
-
-1. verify Procedure diagnostics appear in native Problems and disappear after
-   repair, not only in the Worker protocol test;
-2. verify edits in open unsaved contract/predicate/Python files refresh the
-   Package, including newly created unsaved files;
-3. rapid edits discard older generations; close/reopen and Package switch clear
-   prior diagnostics;
-4. worker failure degrades visibly without blocking native YAML/Python editing;
-5. no duplicate Package Audit warnings and no change to Source/Visual Patch
-   ownership.
-
-No production Pages deployment, PR merge, Runtime authority or 5GC operation is
-part of this slice.
+A successful editor analysis is not Compiler, Owner, Capability, Deployment or Runtime qualification.
