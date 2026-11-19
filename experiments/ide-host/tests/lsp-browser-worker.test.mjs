@@ -299,7 +299,7 @@ async function lspRequest(worker,id,method,params) {
   return result.result;
 }
 
-test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbols and Package completions",async()=>{
+test("browser LSP provides current CA-SL Definition, References, Hover, Python symbols and Package completions",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   try{
     worker.postMessage({jsonrpc:"2.0",id:11,method:"initialize",
@@ -324,6 +324,9 @@ test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbol
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
     const status=await readyStatus;
     assert.equal(status.params.state,"READY",JSON.stringify(status.params));
+    assert.equal(status.params.procedureState,"READY");
+    assert.equal(status.params.packageAuditState,"UNAVAILABLE",
+      "source projection readiness must not imply Package qualification");
 
     const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
     const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
@@ -380,6 +383,42 @@ test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbol
   }
 });
 
+
+test("Package Audit Script diagnostics publish the complete YAML scalar range through LSP",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:61,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
+    await waitForMessage(worker,message=>message?.id===61);
+    worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
+    const snapshot=samplePackageSnapshot();
+    const predicates=snapshot.documents.find(item=>
+      item.relativePath==="assurance/predicates.yaml");
+    const missing="scripts/missing-script.py";
+    predicates.text=predicates.text.replace(
+      "scripts/validate-subscription-request.py",missing);
+    const expectedStart=positionOf(predicates.text,missing);
+    const published=waitForMessage(worker,message=>
+      message?.method==="textDocument/publishDiagnostics"&&
+      message.params?.uri===predicates.uri&&
+      message.params?.diagnostics?.some(item=>item.code==="PREDICATE_SCRIPT_NOT_FOUND"));
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
+    const result=await published;
+    const diagnostic=result.params.diagnostics.find(item=>
+      item.code==="PREDICATE_SCRIPT_NOT_FOUND");
+    assert.ok(diagnostic);
+    assert.equal(diagnostic.source,"Skill Studio · package-audit");
+    assert.deepEqual(diagnostic.range,{
+      start:expectedStart,
+      end:{line:expectedStart.line,character:expectedStart.character+missing.length}
+    },"editor marker must cover the complete Script path scalar");
+    assert.ok(!result.params.diagnostics.some(item=>
+      item.code==="PREDICATE_SCRIPT_REF_UNDECLARED"),
+      "current Script resolution is Package-relative and does not require localTools");
+  }finally{
+    await worker.terminate();
+  }
+});
 test("browser LSP isolates concurrent Package roots across close and reopen",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   const rootA="file:///workspace/skill-a";
