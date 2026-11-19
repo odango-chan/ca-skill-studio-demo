@@ -2,6 +2,7 @@ import { ContainerModule } from '@theia/core/shared/inversify';
 import { CorePreferences } from '@theia/core/lib/common/core-preferences';
 import { MAIN_AREA_CLASS } from '@theia/core/lib/browser/shell/application-shell';
 import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
+import type { DockPanel } from '@lumino/widgets';
 import { constrainMainEditorPanelOptions, isMainEditorPanelOptions } from './fixed-editor-panel-policy.mjs';
 
 const FIXED_LAYOUT_TEST_QUERY = 'skillStudioFixedLayoutTest';
@@ -21,7 +22,7 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
     }
 
     rebind(TheiaDockPanel.Factory).toFactory(({ container }) => (
-        options?: TheiaDockPanel.IOptions,
+        options?: DockPanel.IOptions | TheiaDockPanel.IOptions,
         maximizeCallback?: (area: TheiaDockPanel) => void
     ) => {
         const isMainEditor = isMainEditorPanelOptions(options, MAIN_AREA_CLASS);
