@@ -1194,7 +1194,10 @@ export async function runWorkbenchAcceptance({
     view.bodyText.includes("UPDATED")&&!view.bodyText.includes("INITIAL"),
     "v1alpha5 Markdown unsaved Source update");
   const previewScrollStart=await evaluateStudioMarkdown(blockedMissingView,
-    "(()=>{window.scrollTo(0,document.body.scrollHeight*0.72);return {height:document.body.scrollHeight,scrollY:window.scrollY};})()");
+    "(()=>new Promise(resolve=>{window.scrollTo(0,document.body.scrollHeight*0.72);"+
+      "setTimeout(()=>resolve({height:document.body.scrollHeight,scrollY:window.scrollY,"+
+      "lastScroll:window.__skillStudioLastPreviewScroll??null,"+
+      "lastAck:window.__skillStudioLastPreviewScrollAck??null}),180);}))()");
   if(!(previewScrollStart?.height>1000)||!(previewScrollStart?.scrollY>0))
     throw Error("Markdown Preview fixture did not scroll to a non-zero position: "+
       JSON.stringify(previewScrollStart));
@@ -1206,8 +1209,11 @@ export async function runWorkbenchAcceptance({
     await sleep(80);
   }
   if((sourceAfterPreviewScroll?.visibleRanges?.[0]?.start??1)<=35)
+    const scrollDiagnostics=await evaluateStudioMarkdown(blockedMissingView,
+      "({lastScroll:window.__skillStudioLastPreviewScroll??null,"+
+      "lastAck:window.__skillStudioLastPreviewScrollAck??null,scrollY:window.scrollY})");
     throw Error("Markdown Preview scrolling did not reveal the matching Source lines: "+
-      JSON.stringify(sourceAfterPreviewScroll));
+      JSON.stringify({sourceAfterPreviewScroll,previewScrollStart,scrollDiagnostics}));
   await evaluateStudioMarkdown(blockedMissingView,"(()=>{window.scrollTo(0,0);return true;})()");
   await waitStudioMarkdown(view=>view.scrollY===0,"reset Markdown Preview scroll before reverse sync");
   const sourceReveal=await nativeCommand(
