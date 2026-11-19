@@ -166,7 +166,6 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
       if (!started || stopped || terminalFailure)
         throw new Error("Language Worker unavailable: " + (terminalFailure ?? "not running"));
       client.sendNotification(PACKAGE_SNAPSHOT_NOTIFICATION, snapshot);
-      refreshTheiaSemanticTokens();
     },
     provideCompletion(uri,position) {
       if(!started||stopped||terminalFailure)
@@ -180,7 +179,6 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
     closePackage(rootUri) {
       if (!started || stopped || terminalFailure) return;
       client.sendNotification(PACKAGE_CLOSE_NOTIFICATION, { rootUri });
-      refreshTheiaSemanticTokens();
     },
     hasDiagnosticCollectionForAcceptance(){
       return Boolean(client.diagnostics);
