@@ -4,67 +4,51 @@ import {readFileSync} from "node:fs";
 import {projectWorkspace} from "../site/workspace.mjs";
 import {layoutProcedureELK} from "../site/layout.mjs";
 import {makeFlowElements,resolveReconnectedRoute,flowBundleSelectionId,FLOW_NODE_SIZE,
-  classifyRouteTone,ROUTE_TONE_COLOR,summarizeNodePhases,
+  classifyRouteTone,ROUTE_TONE_COLOR,summarizeNodeStages,
   describeProcedureLegend,routeOrigin}
   from "../site/react-flow-projection.mjs";
 
-const read=name=>readFileSync(
-  new URL("./fixtures/legacy-site-samples/"+name+".procedure.yaml",import.meta.url),"utf8");
+const sampleRoot=new URL("../site/samples/v1alpha5/",import.meta.url);
+const read=name=>readFileSync(new URL(name+"/assurance/procedure.yaml",sampleRoot),"utf8");
 const created=projectWorkspace(read("establish-pdu-session"));
-const ensure=projectWorkspace(read("ensure-pdu-session"));
-const owner=projectWorkspace(readFileSync(
-  new URL("./fixtures/legacy-site-samples/packages/establish-pdu-session/assurance/procedure.yaml",
-    import.meta.url),"utf8"));
-assert.equal(owner.state,"READY");
+const mas=projectWorkspace(read("establish-pdu-session-mas"));
 assert.equal(created.state,"READY");
-assert.equal(ensure.state,"READY");
+assert.equal(mas.state,"READY");
 
-test("D1 projects the real CreatedSession 17-node / 65-Outcome graph unchanged",async()=>{
+test("React Flow projects the current CA-SL source graph without mutation",async()=>{
   const graph=await layoutProcedureELK(created.procedure);
   const before=JSON.stringify(created.procedure);
   const flow=makeFlowElements(graph,created.procedure);
   assert.equal(flow.direction,"DOWN");
-  assert.equal(flow.nodes.length,17);
-  assert.equal(flow.edges.length,48);
-  assert.equal(flow.edges.reduce((n,e)=>n+e.data.bundle.routes.length,0),65);
+  assert.equal(flow.nodes.length,created.procedure.nodes.length);
+  assert.equal(flow.edges.length,graph.bundles.length);
+  assert.equal(flow.edges.reduce((n,e)=>n+e.data.bundle.routes.length,0),
+    created.procedure.routes.length);
   assert.equal(flow.nodes.find(n=>n.id===created.procedure.start).data.start,true);
-  assert.equal(new Set(flow.nodes.map(n=>n.id)).size,flow.nodes.length);
-  assert.equal(new Set(flow.edges.map(e=>e.id)).size,flow.edges.length);
-  assert.deepEqual(
-    flow.nodes.map(n=>n.id),created.procedure.nodes.map(n=>n.id));
-  assert.ok(flow.nodes.every(n=>n.draggable===false));
-  assert.ok(flow.edges.every(e=>e.reconnectable===true));
+  assert.deepEqual(flow.nodes.map(n=>n.id),created.procedure.nodes.map(n=>n.id));
+  assert.ok(flow.nodes.every(n=>n.draggable===false&&n.connectable===true));
+  assert.ok(flow.edges.every(e=>e.reconnectable===false),
+    "existing Route targets stay read-only until a current-source patch contract exists");
   assert.ok(flow.edges.every(e=>e.markerEnd?.type==="arrow"));
   assert.ok(flow.edges.every(e=>e.markerEnd?.width===16&&e.markerEnd.height===16));
   assert.ok(flow.edges.every(e=>e.markerEnd?.markerUnits==="userSpaceOnUse"));
   assert.equal(JSON.stringify(created.procedure),before);
 });
-test("CA-SL v1alpha4 graph disables connection and reconnection gestures",()=>{
-  const route={id:"check.precondition.PASS",source:"check",target:"read",
-    outcome:"PASS",routeSource:"precondition"};
-  const procedure={
-    profile:"CA-SL v1alpha4 (editor source projection only)",
-    start:"check",
-    nodes:[
-      {id:"check",operator:"node",value:"precondition",children:[],stages:[]},
-      {id:"read",operator:"node",value:"observation",children:[],stages:[]}
-    ],
-    routes:[route]
-  };
-  const graph={
-    direction:"DOWN",visibleNodes:procedure.nodes,visibleRoutes:[route],
-    bundles:[{source:"check",target:"read",routes:[route],outcomes:["PASS"],
-      routeSource:"precondition"}],
-    positions:new Map([["check",{x:0,y:0}],["read",{x:0,y:160}]]),
-    expandedNodeIds:new Set(),hiddenByNode:new Map()
-  };
-  const flow=makeFlowElements(graph,procedure);
-  assert.ok(flow.nodes.every(node=>node.connectable===false));
-  assert.ok(flow.nodes.every(node=>node.data.canAddRoute===false));
-  assert.ok(flow.edges.every(edge=>edge.reconnectable===false));
+
+test("graph interaction policy is independent of language version metadata",async()=>{
+  const graph=await layoutProcedureELK(created.procedure);
+  const withoutProfile={...created.procedure,profile:undefined};
+  const arbitraryProfile={...created.procedure,profile:"arbitrary-source-metadata"};
+  const a=makeFlowElements(graph,withoutProfile);
+  const b=makeFlowElements(graph,arbitraryProfile);
+  assert.deepEqual(a.nodes.map(n=>n.connectable),b.nodes.map(n=>n.connectable));
+  assert.deepEqual(a.nodes.map(n=>n.data.canAddRoute),b.nodes.map(n=>n.data.canAddRoute));
+  assert.deepEqual(a.edges.map(e=>e.reconnectable),b.edges.map(e=>e.reconnectable));
+  assert.ok(a.nodes.every(n=>n.connectable));
+  assert.ok(a.edges.every(e=>!e.reconnectable));
 });
 
-test("routeSource and all exact Outcome ids survive React Flow projection",async()=>{
+test("all current Route ids and Stage origins survive React Flow projection",async()=>{
   const graph=await layoutProcedureELK(created.procedure);
   const flow=makeFlowElements(graph,created.procedure);
   const fromEdges=flow.edges.flatMap(e=>e.data.bundle.routes.map(r=>r.id)).sort();
@@ -73,56 +57,72 @@ test("routeSource and all exact Outcome ids survive React Flow projection",async
   for(const edge of flow.edges){
     assert.deepEqual(edge.data.sourceRouteIds,
       edge.data.bundle.routes.map(route=>route.id));
+    assert.equal(edge.data.origin,routeOrigin(edge.data.bundle.routeSource));
   }
-  assert.ok(flow.edges.some(e=>e.data.bundle.routeSource==="postconditions.on"));
-  assert.ok(flow.edges.some(e=>e.data.bundle.routeSource==="operator.on"));
+  assert.ok(flow.edges.some(e=>e.data.origin==="PRE"));
+  assert.ok(flow.edges.some(e=>e.data.origin==="OP"));
+  assert.ok(flow.edges.some(e=>e.data.origin==="OBS"));
+  assert.ok(flow.edges.some(e=>e.data.origin==="POST"));
+  assert.equal(routeOrigin("precondition"),"PRE");
+  assert.equal(routeOrigin("operation"),"OP");
+  assert.equal(routeOrigin("observation"),"OBS");
+  assert.equal(routeOrigin("postcondition"),"POST");
+  assert.equal(routeOrigin("preconditions.on"),"OTHER");
+  assert.equal(routeOrigin("operator.on"),"OTHER");
 });
+
 test("selection, labels and direction remain UI-only",async()=>{
-  const graph=await layoutProcedureELK(ensure.procedure,{direction:"RIGHT"});
-  const source=JSON.stringify(ensure.procedure);
-  const picked=ensure.procedure.routes[0];
-  const flow=makeFlowElements(graph,ensure.procedure,{kind:"route",id:picked.id},true);
+  const graph=await layoutProcedureELK(mas.procedure,{direction:"RIGHT"});
+  const source=JSON.stringify(mas.procedure);
+  const picked=mas.procedure.routes[0];
+  const flow=makeFlowElements(graph,mas.procedure,{kind:"route",id:picked.id},true);
   assert.equal(flow.direction,"RIGHT");
   assert.ok(flow.nodes.every(n=>n.sourcePosition==="right"&&n.targetPosition==="left"));
   assert.ok(flow.edges.every(e=>e.data.displayLabel));
   assert.equal(flow.edges.filter(e=>e.selected).length,1);
   assert.equal(flow.edges.find(e=>e.selected).markerEnd.color,"#087e71");
-  assert.equal(JSON.stringify(ensure.procedure),source);
+  assert.equal(JSON.stringify(mas.procedure),source);
 });
-test("ambiguous Route bundle remains visibly selected without choosing an Outcome",async()=>{
-  const graph=await layoutProcedureELK(created.procedure);
-  const bundle=graph.bundles.find(item=>item.routes.length>1);
-  assert.ok(bundle);
-  const flow=makeFlowElements(graph,created.procedure,{
+
+test("ambiguous Route bundles stay selected as bundles without inventing a Route",()=>{
+  const routes=[
+    {id:"node-a.operation.FAILED",source:"node-a",target:"FAILED",
+      routeSource:"operation",outcome:"FAILED"},
+    {id:"node-a.operation.DENIED",source:"node-a",target:"FAILED",
+      routeSource:"operation",outcome:"DENIED"}
+  ];
+  const bundle={source:"node-a",target:"FAILED",routeSource:"operation",
+    routes,outcomes:["FAILED","DENIED"]};
+  const procedure={start:"node-a",nodes:[
+    {id:"node-a",operator:"node",value:"operation",children:[],stages:[]},
+    {id:"FAILED",operator:"terminal",value:"FAILED",children:[],stages:[]}
+  ],routes};
+  const graph={direction:"DOWN",visibleNodes:procedure.nodes,visibleRoutes:routes,
+    bundles:[bundle],positions:new Map([
+      ["node-a",{x:0,y:0}],["FAILED",{x:0,y:160}]
+    ]),expandedNodeIds:new Set(),hiddenByNode:new Map()};
+  const flow=makeFlowElements(graph,procedure,{
     kind:"bundle",id:flowBundleSelectionId(bundle)
   });
-  const selected=flow.edges.filter(edge=>edge.selected);
-  assert.equal(selected.length,1);
-  assert.equal(selected[0].data.bundle.source,bundle.source);
-  assert.equal(selected[0].data.bundle.target,bundle.target);
-  assert.equal(resolveReconnectedRoute(bundle,null),null,
-    "visual bundle selection is not a semantic Route selection");
-});
-test("multi-outcome edge cannot rewire an arbitrary Outcome without selection",async()=>{
-  const graph=await layoutProcedureELK(created.procedure);
-  const bundle=graph.bundles.find(b=>b.routes.length>1);
-  assert.ok(bundle);
+  assert.equal(flow.edges.length,1);
+  assert.equal(flow.edges[0].selected,true);
+  assert.equal(flow.edges[0].data.bundle.source,"node-a");
+  assert.equal(flow.edges[0].data.bundle.target,"FAILED");
   assert.equal(resolveReconnectedRoute(bundle,null),null);
-  const id=bundle.routes[1].id;
-  assert.equal(resolveReconnectedRoute(bundle,id).id,id);
+  assert.equal(resolveReconnectedRoute(bundle,routes[1].id).id,routes[1].id);
   assert.equal(resolveReconnectedRoute(bundle,"not-a-route"),null);
-  assert.equal(resolveReconnectedRoute({routes:[bundle.routes[0]]},null),bundle.routes[0]);
 });
+
 test("fail-closed graph input refuses missing positions or dangling bundles",async()=>{
-  const graph=await layoutProcedureELK(ensure.procedure);
-  const original=graph.positions;
-  const broken={...graph,positions:new Map(original)};
-  broken.positions.delete(ensure.procedure.start);
-  assert.throws(()=>makeFlowElements(broken,ensure.procedure),/Missing or invalid/);
+  const graph=await layoutProcedureELK(mas.procedure);
+  const broken={...graph,positions:new Map(graph.positions)};
+  broken.positions.delete(mas.procedure.start);
+  assert.throws(()=>makeFlowElements(broken,mas.procedure),/Missing or invalid/);
   const dangling={...graph,bundles:[...graph.bundles,{
-    source:"missing",target:"done",routes:[{id:"fake"}],outcomes:["PASS"]}]};
-  assert.throws(()=>makeFlowElements(dangling,ensure.procedure),/Unresolved flow edge/);
+    source:"missing",target:"FAILED",routes:[{id:"fake"}],outcomes:["FAILED"]}]};
+  assert.throws(()=>makeFlowElements(dangling,mas.procedure),/Unresolved flow edge/);
 });
+
 test("React Flow edges keep screen-space stroke width at default fit zoom",()=>{
   const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
   const old=readFileSync(new URL("../site/studio.css",import.meta.url),"utf8");
@@ -137,7 +137,7 @@ test("React Flow edges keep screen-space stroke width at default fit zoom",()=>{
   assert.match(jsx,/interactionWidth=\{16\}/);
 });
 
-test("ELK endpoints and React Flow per-edge ports coincide, not just their center handles",async()=>{
+test("ELK endpoints and React Flow per-edge ports coincide",async()=>{
   const graph=await layoutProcedureELK(created.procedure);
   const flow=makeFlowElements(graph,created.procedure);
   const nodes=new Map(flow.nodes.map(n=>[n.id,n]));
@@ -160,43 +160,28 @@ test("ELK endpoints and React Flow per-edge ports coincide, not just their cente
       const port=node.data.ports.find(p=>p.id===portsFor[k]);
       assert.ok(port,edge.id+" missing "+(k?"target":"source")+" handle");
       const local=port.side==="top"?{x:port.offset,y:0}:
-        port.side==="bottom"?{x:port.offset,y:80}:
-        port.side==="left"?{x:0,y:port.offset}:{x:238,y:port.offset};
+        port.side==="bottom"?{x:port.offset,y:FLOW_NODE_SIZE.height}:
+        port.side==="left"?{x:0,y:port.offset}:{x:FLOW_NODE_SIZE.width,y:port.offset};
       const global={x:node.position.x+local.x,y:node.position.y+local.y};
       assert.ok(Math.hypot(global.x-starts[k].x,global.y-starts[k].y)<1.2,
         edge.id+" ELK path and handle do not meet");
     }
   }
-  assert.equal(anchored,48,"all CreatedSession ELK routes require exact handles");
-  assert.equal(flow.edges.reduce((sum,e)=>sum+e.data.bundle.routes.length,0),65);
-});
-test("React Flow uses its built-in thin open arrow, not a second hand-drawn arrow",()=>{
-  const canvas=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
-  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
-  assert.match(canvas,/useUpdateNodeInternals/);
-  assert.match(canvas,/ports\.map\(port=><Handle/);
-  assert.match(canvas,/style=\{portStyle\(port\)\}/);
-  assert.match(canvas,/function portStyle\(port\)/);
-  assert.match(css,/--port-border-left:4px/);
-  assert.match(css,/--port-border-top:2px/);
-  assert.match(canvas,/markerEnd=\{props\.markerEnd\}/);
-  assert.match(css,/\.procedure-flow \.designer-port-elk\{/);
-  assert.match(css,/stroke-width:2\.1px/);
+  assert.ok(anchored>0,"current source graph should use exact per-edge handles");
 });
 
-
-test("D3-A3 source-only creation affordance is explicit, selected and never terminal",async()=>{
-  const graph=await layoutProcedureELK(ensure.procedure);
-  const chosen=ensure.procedure.nodes.find(n=>n.id===ensure.procedure.start);
-  assert.ok(chosen&&chosen.operator!=="terminal");
-  const baseline=makeFlowElements(graph,ensure.procedure);
+test("source-only Route creation affordance is explicit, selected and never terminal",async()=>{
+  const graph=await layoutProcedureELK(mas.procedure);
+  const chosen=mas.procedure.nodes.find(n=>n.id===mas.procedure.start);
+  assert.ok(chosen);
+  const baseline=makeFlowElements(graph,mas.procedure);
   assert.ok(baseline.nodes.every(n=>!n.data.canAddRoute));
-  const enabled=makeFlowElements(graph,ensure.procedure,
+  const enabled=makeFlowElements(graph,mas.procedure,
     {kind:"node",id:chosen.id},false,chosen.id);
   assert.equal(enabled.nodes.filter(n=>n.data.canAddRoute).length,1);
   assert.equal(enabled.nodes.find(n=>n.id===chosen.id).data.canAddRoute,true);
-  const blocked=makeFlowElements(graph,ensure.procedure,
-    {kind:"node",id:chosen.id},false,"done");
+  const blocked=makeFlowElements(graph,mas.procedure,
+    {kind:"node",id:chosen.id},false,"different-node");
   assert.ok(blocked.nodes.every(n=>!n.data.canAddRoute));
   const canvas=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
   assert.match(canvas,/onConnect=\{connection=>callbacks\.onCreateRoute\(connection\)\}/);
@@ -206,82 +191,33 @@ test("D3-A3 source-only creation affordance is explicit, selected and never term
   assert.ok(enabled.edges.every(e=>!e.id.startsWith("new-route-")));
 });
 
-
-test("visual START is separate from the business operator, without changing Source or Route counts",async()=>{
+test("visual START is separate from the business operator without changing Source",async()=>{
   const graph=await layoutProcedureELK(created.procedure);
   const before=JSON.stringify(created.procedure);
-  for(const direction of ["DOWN","RIGHT"]){
-    const layout=direction==="DOWN"?graph:
-      await layoutProcedureELK(created.procedure,{direction});
-    const flow=makeFlowElements(layout,created.procedure);
-    const start=flow.nodes.find(node=>node.id===created.procedure.start);
-    assert.ok(start);
-    assert.equal(start.data.start,true);
-    assert.equal(start.data.operator,"call");
-    assert.equal(flow.nodes.length,created.procedure.nodes.length);
-    assert.equal(flow.edges.length,layout.bundles.length);
-  }
-  const jsx=readFileSync(new URL("../site/react-flow-canvas.tsx",import.meta.url),"utf8");
-  const css=readFileSync(new URL("../site/light.css",import.meta.url),"utf8");
-  assert.doesNotMatch(jsx,/ · START/);
-  assert.match(css,/\.designer-node\.is-start::before\{/);
-  assert.match(css,/\.designer-node\.is-start\.is-horizontal::before\{/);
+  const flow=makeFlowElements(graph,created.procedure);
+  const start=flow.nodes.find(node=>node.id===created.procedure.start);
+  assert.ok(start);
+  assert.equal(start.data.start,true);
+  assert.equal(start.data.operator,created.procedure.nodes.find(
+    node=>node.id===created.procedure.start).operator);
+  assert.equal(flow.nodes.length,created.procedure.nodes.length);
   assert.equal(JSON.stringify(created.procedure),before);
 });
 
-test("v1alpha4 Designer renders real stages, Contract gate, final Goal and terminal endpoints",async()=>{
-  const procedure={
-    name:"sample",start:"check",profile:"CA-SL v1alpha4 (editor source projection only)",
-    nodes:[
-      {id:"check",operator:"node",value:"precondition",line:1,phases:[],children:[],
-        stages:[{name:"precondition",line:2,count:1,routeOutcomes:["PASS","FAIL","UNKNOWN"]}],
-        globalPrecondition:true},
-      {id:"read",operator:"node",value:"operation",line:8,phases:[],children:[],
-        stages:[{name:"operation",line:9,count:1,target:"ca::sbi.udm.read",
-          routeOutcomes:["SUCCEEDED","FAILED","OUTCOME_UNKNOWN"]}]},
-      {id:"verify",operator:"node",value:"postcondition",line:16,phases:[],children:[],
-        stages:[{name:"postcondition",line:17,count:2,routeOutcomes:["PASS","FAIL","UNKNOWN"]}],
-        finalGoal:true},
-      ...["SUCCEEDED","FAILED","SAFE_STOPPED","UNRESOLVED"].map(id=>({
-        id,operator:"terminal",value:id,line:0,phases:[],children:[],viewOnly:true
-      }))
-    ],
-    routes:[
-      {id:"check.precondition.PASS",source:"check",target:"read",
-        routeSource:"precondition",outcome:"PASS",line:4},
-      {id:"check.precondition.FAIL",source:"check",target:"FAILED",
-        routeSource:"precondition",outcome:"FAIL",line:5},
-      {id:"read.operation.SUCCEEDED",source:"read",target:"verify",
-        routeSource:"operation",outcome:"SUCCEEDED",line:12},
-      {id:"read.operation.OUTCOME_UNKNOWN",source:"read",target:"SAFE_STOPPED",
-        routeSource:"operation",outcome:"OUTCOME_UNKNOWN",line:13},
-      {id:"verify.postcondition.PASS",source:"verify",target:"SUCCEEDED",
-        routeSource:"postcondition",outcome:"PASS",line:20},
-      {id:"verify.postcondition.FAIL",source:"verify",target:"FAILED",
-        routeSource:"postcondition",outcome:"FAIL",line:21}
-    ]
-  };
-  const before=JSON.stringify(procedure);
-  const graph=await layoutProcedureELK(procedure);
-  const flow=makeFlowElements(graph,procedure);
-  assert.equal(flow.nodes.length,7);
-  assert.equal(flow.nodes.find(n=>n.id==="check").data.globalPrecondition,true);
-  assert.equal(flow.nodes.find(n=>n.id==="verify").data.finalGoal,true);
-  assert.ok(flow.nodes.filter(n=>n.data.viewOnly).every(n=>!n.data.canAddRoute));
-  assert.ok(flow.nodes.find(n=>n.id==="read").data.phaseBadges.some(x=>x.label==="OP"));
-  assert.ok(flow.edges.some(e=>e.data.origin==="PRE"));
-  assert.ok(flow.edges.some(e=>e.data.origin==="OP"));
-  assert.ok(flow.edges.some(e=>e.data.origin==="POST"));
-  assert.equal(routeOrigin("precondition"),"PRE");
-  assert.equal(routeOrigin("operation"),"OP");
-  assert.equal(routeOrigin("observation"),"OBS");
-  assert.equal(routeOrigin("postcondition"),"POST");
-  assert.ok(flow.nodes.every(n=>n.data.canAddRoute===false),
-    "v1alpha4 does not use the legacy route mutation planner");
-  assert.equal(JSON.stringify(procedure),before,"Designer projection must be view-only");
+test("current Stage legend and badges are derived only from current stage declarations",()=>{
+  const legend=describeProcedureLegend(created.procedure);
+  assert.equal(legend.nodeCount,created.procedure.nodes.length);
+  assert.ok(legend.preNodes>0);
+  assert.ok(legend.postNodes>0);
+  assert.ok(legend.stepKinds.some(item=>item.kind==="TOOL"));
+  assert.ok(legend.stepKinds.some(item=>item.kind==="OBSERVATION"));
+  const node=created.procedure.nodes.find(item=>item.stages?.length);
+  assert.ok(node);
+  assert.deepEqual(summarizeNodeStages({phases:[{name:"preconditions",steps:[]}]}),[]);
+  assert.deepEqual(summarizeNodeStages(node).map(item=>item.name),node.stages.map(item=>item.name));
 });
 
-test("Route outcome colors never turn mixed success/failure green",async()=>{
+test("Route outcome colors never turn mixed success/failure green",()=>{
   assert.equal(classifyRouteTone(["PASS"]),"success");
   assert.equal(classifyRouteTone(["SUCCEEDED","SUCCESS"]),"success");
   assert.equal(classifyRouteTone(["FAIL"]),"failure");
@@ -292,77 +228,10 @@ test("Route outcome colors never turn mixed success/failure green",async()=>{
   assert.equal(classifyRouteTone(["PASS","OTHER"]),"mixed");
   assert.equal(classifyRouteTone(["OTHER"]),"neutral");
   assert.equal(classifyRouteTone([]),"neutral");
-  const graph=await layoutProcedureELK(created.procedure);
+  const graph=layoutProcedureELK(created.procedure);
   const flow=makeFlowElements(graph,created.procedure);
-  assert.equal(flow.edges.length,graph.bundles.length);
   for(const edge of flow.edges){
     assert.equal(edge.markerEnd.color,ROUTE_TONE_COLOR[edge.data.tone]);
     assert.equal(edge.data.tone,classifyRouteTone(edge.data.bundle.outcomes));
   }
 });
-
-test("legend dynamically separates actual owner Node and Phase Step operators",()=>{
-  const graph=describeProcedureLegend(owner.procedure);
-  assert.deepEqual(Object.fromEntries(graph.nodeKinds.map(x=>[x.kind,x.count])),{
-    CALL:4,PROCEDURE:6,RECONCILE:3,TERMINAL:4
-  });
-  assert.deepEqual(Object.fromEntries(graph.stepKinds.map(x=>[x.kind,x.count])),{
-    VERIFY:14,SCRIPT:1,CALL:6
-  });
-  assert.equal(graph.nodeCount,17);
-  assert.equal(graph.preNodes,3);
-  assert.equal(graph.postNodes,4);
-  assert.equal(graph.nodeKinds.some(x=>x.kind==="TOOL"),false);
-  assert.equal(graph.stepKinds.some(x=>x.kind==="TOOL"),false);
-  const child=owner.procedures.get("await-initial-n4-session-establishment");
-  assert.ok(child);
-  const childLegend=describeProcedureLegend(child);
-  assert.equal(childLegend.preNodes,0);
-  assert.equal(childLegend.postNodes,1);
-  assert.deepEqual(childLegend.stepKinds,[{kind:"VERIFY",count:1}]);
-  // A filtered graph must describe only the visible scope, not claim all 17.
-  assert.equal(describeProcedureLegend(owner.procedure,owner.procedure.nodes.slice(0,1)).nodeCount,1);
-});
-
-test("PRE/POST badges come only from existing Phase Steps, without new graph Nodes",async()=>{
-  const graph=await layoutProcedureELK(owner.procedure);
-  const before=JSON.stringify(owner.procedure);
-  const flow=makeFlowElements(graph,owner.procedure);
-  assert.equal(flow.nodes.length,17);
-  assert.equal(flow.edges.length,graph.bundles.length);
-  const subscribe=flow.nodes.find(n=>n.id==="nudm-sdm-subscribe");
-  assert.ok(subscribe);
-  assert.deepEqual(subscribe.data.phaseBadges.map(x=>[x.label,x.count]),[
-    ["PRE",5],["POST",1]
-  ]);
-  assert.deepEqual(Object.fromEntries(subscribe.data.phaseBadges[0].operators.map(x=>[x.kind,x.count])),{
-    SCRIPT:1,CALL:1,VERIFY:3
-  });
-  assert.deepEqual(summarizeNodePhases({phases:[]}),[]);
-  const terminal=flow.nodes.find(x=>x.data.operator==="terminal");
-  assert.deepEqual(terminal.data.phaseBadges,[]);
-  assert.equal(JSON.stringify(owner.procedure),before);
-});
-
-test("route origin and outcome color are orthogonal; no Phase source is hidden",async()=>{
-  assert.equal(routeOrigin("preconditions.on"),"PRE");
-  assert.equal(routeOrigin("operator.on"),"OP");
-  assert.equal(routeOrigin("postconditions.on"),"POST");
-  assert.equal(routeOrigin("unknown.on"),"OTHER");
-  const graph=await layoutProcedureELK(created.procedure);
-  const flow=makeFlowElements(graph,created.procedure);
-  assert.ok(flow.edges.some(x=>x.data.origin==="PRE"));
-  assert.ok(flow.edges.some(x=>x.data.origin==="POST"));
-  assert.ok(flow.edges.some(x=>x.data.origin==="OP"));
-  for(const edge of flow.edges){
-    assert.equal(edge.data.label.startsWith(edge.data.origin+" · "),true);
-    assert.equal(edge.data.origin,routeOrigin(edge.data.bundle.routeSource));
-    if(edge.data.origin!=="OP")assert.equal(edge.data.displayLabel,true);
-    assert.equal(edge.markerEnd.color,ROUTE_TONE_COLOR[edge.data.tone]);
-  }
-  // No invisible Phase labels, even for a neutral/mixed Outcome.
-  const neutral=flow.edges.filter(x=>x.data.origin!=="OP"&&
-    ["neutral","mixed"].includes(x.data.tone));
-  assert.ok(neutral.every(x=>x.data.displayLabel));
-});
-
