@@ -2417,7 +2417,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     if(!rootInfo||status?.rootUri!==rootInfo.uri.toString())return;
     const sourceDiagnostics=Array.isArray(status.analysisDiagnostics)
       ?status.analysisDiagnostics:[];
-    audit=sourceDiagnostics.map(item=>{
+    // The LSP may report a Package-level availability problem without any
+    // source location. Keep it visible in Problems but never link it to line 1.
+    const unlocatedAudit=Array.isArray(status.unlocated)
+      ?status.unlocated.filter(item=>item.code==="PACKAGE_AUDIT_UNAVAILABLE"&&
+        !sourceDiagnostics.some(source=>source.code===item.code)):[];
+    audit=[...sourceDiagnostics,...unlocatedAudit].map(item=>{
       const relativePath=item.relativePath??"";
       const segments=relativePath.split("/");
       const candidate=relativePath&&!relativePath.startsWith("/")&&
