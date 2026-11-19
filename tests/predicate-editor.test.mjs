@@ -24,7 +24,7 @@ const source = [
   ''
 ].join('\n');
 
-test('Predicate custom editor renders v1alpha5 Parameters, Evidence and Evaluator', async () => {
+test('Predicate Preview renderer presents v1alpha5 Parameters, Evidence and Evaluator', async () => {
   let customEditorRegistrations=0;
   const commands = new Map();
   const context = {subscriptions: []};
