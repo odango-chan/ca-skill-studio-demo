@@ -310,8 +310,10 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               // Ignore delayed notifications from an old Package generation.
               if(!state||state.disposed||status.generation!==state.generation)return;
               languagePackageStatuses.set(status.rootUri,status);
+              // "UNAVAILABLE" here is Package analysis, not a dead language
+              // Worker. Keep the service state distinct from Package health.
               updateLanguageStatus(
-                status.state,
+                status.state==="UNAVAILABLE"?"PARTIAL":status.state,
                 status.reason||(status.state==="PARTIAL" ?
                   ("Package "+status.rootUri+" · generation "+status.generation+
                     " · Procedure "+(status.procedureState??"unknown")+
@@ -325,7 +327,23 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             onError:error=>{
               if(epoch!==languageClientEpoch)return;
               console.warn("Skill Studio Language Service",error);
-              updateLanguageStatus("ERROR",String(error?.message??error));
+              const reason=String(error?.message??error);
+              if(typeof error?.rootUri==="string"){
+                const state=languagePackages.get(error.rootUri);
+                // A delayed failure from a superseded Package generation must
+                // not downgrade the currently selected Source or Worker.
+                if(!state||state.disposed||
+                   (Number.isSafeInteger(error.generation)&&
+                    error.generation!==state.generation))return;
+                languagePackageFailure={
+                  rootUri:error.rootUri,generation:state.generation,
+                  reason
+                };
+                updateLanguageStatus("PARTIAL",
+                  "Package analysis failed; source coloring remains available: "+reason);
+                return;
+              }
+              updateLanguageStatus("ERROR",reason);
             },
             onFatal:error=>{
               if(epoch!==languageClientEpoch||languageTransportFailure)return;
