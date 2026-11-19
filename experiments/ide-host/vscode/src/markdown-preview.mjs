@@ -92,6 +92,7 @@ function markdownViewHtml(webview,style,sessionKey){
           scrollFragment(data.fragment);
         }else if(data.type==="previewScrollAck"&&uri===data.uri){
           window.__skillStudioLastPreviewScrollAck=data;
+          document.documentElement.dataset.studioLastPreviewScrollAck=JSON.stringify(data);
         }else if(data.type==="error"&&uri===data.uri){
           status.textContent=data.message;
         }
@@ -118,7 +119,9 @@ function markdownViewHtml(webview,style,sessionKey){
           const line=firstVisible(),now=Date.now();
           if(now-lastPreviewSent<80)return;
           lastPreviewSent=now;
-          window.__skillStudioLastPreviewScroll={line,version,scrollY:window.scrollY,at:now};
+          const diagnostic={line,version,scrollY:window.scrollY,at:now};
+          window.__skillStudioLastPreviewScroll=diagnostic;
+          document.documentElement.dataset.studioLastPreviewScroll=JSON.stringify(diagnostic);
           api.postMessage({type:"previewScroll",sessionKey:key,uri,version,line});
         });
       },{passive:true});
