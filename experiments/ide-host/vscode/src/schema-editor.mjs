@@ -1,5 +1,5 @@
 import {openNativeSource,revealNativeSourceLine} from './native-source.mjs';
-import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
+
 import {projectJsonSchema, resolveSchemaPointer} from '../../../../site/schema-projection.mjs';
 
 export const SCHEMA_VIEW = 'skillStudio.schemaPreview';
@@ -38,10 +38,10 @@ export function localSchemaReference(uri, ref) {
   const target = uri.with({path:parent+'/'+file});
   return {uri:target,pointer};
 }
-async function reveal(vscode, uri, line, sourceOnly=false) {
-  return sourceOnly?revealNativeSourceLine(vscode,uri,line):openSourceViewPair(vscode,uri,{line});
+async function reveal(vscode,uri,line) {
+  return revealNativeSourceLine(vscode,uri,line);
 }
-async function followReference(vscode, document, projection, sourcePointer, sourceOnly=false) {
+async function followReference(vscode,document,projection,sourcePointer) {
   if (projection.state === 'SOURCE_ONLY') return;
   const entry = projection.allRefs.find(x => x.sourcePointer === sourcePointer);
   if (!entry || typeof entry.reference !== 'string') {
@@ -61,7 +61,7 @@ async function followReference(vscode, document, projection, sourcePointer, sour
       'Schema $ref does not uniquely resolve in the current target Source: '+entry.reference);
     return;
   }
-  await reveal(vscode,target.uri,resolved.line,sourceOnly);
+  await reveal(vscode,target.uri,resolved.line);
 }
 function html(token) {
   const csp = "default-src 'none'; img-src data:; style-src 'nonce-" + token +
@@ -151,7 +151,7 @@ async function chooseSchema(vscode, uri) {
   })),{placeHolder:'Select a JSON Schema source'});
   return picked?.uri??null;
 }
-export function mountSchemaPreview(vscode,document,panel,{forgetPairOnDispose=true,isCurrent=()=>true}={}) {
+export function mountSchemaPreview(vscode,document,panel,{isCurrent=()=>true}={}) {
       if (!isSkillSchema(document.uri.path)) {
         void vscode.window.showWarningMessage('Only Skill schemas/*.schema.yaml is supported');
         return {dispose(){}};
@@ -182,10 +182,10 @@ export function mountSchemaPreview(vscode,document,panel,{forgetPairOnDispose=tr
               viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
             });
           } else if(message.type==='revealLine') {
-            await reveal(vscode,document.uri,message.value,!forgetPairOnDispose);
+            await reveal(vscode,document.uri,message.value);
           } else if(message.type==='followReference'){
             const projection=projectJsonSchema(document.getText());
-            await followReference(vscode,document,projection,message.value,!forgetPairOnDispose);
+            await followReference(vscode,document,projection,message.value);
           }
         }catch(e) {
           await vscode.window.showWarningMessage('Schema Designer: '+String(e?.message??e));
@@ -195,23 +195,15 @@ export function mountSchemaPreview(vscode,document,panel,{forgetPairOnDispose=tr
       const cleanup=()=>{
         if(disposed)return;
         disposed=true;
-        if(forgetPairOnDispose)forgetSourceViewPair(document.uri);
         onChange.dispose();onMessage.dispose();releasePanel?.dispose?.();
       };
       releasePanel=panel.onDidDispose(cleanup);
       return {dispose:cleanup};
 }
 export function registerSchemaEditor(vscode,context) {
-  const provider={
-    async resolveCustomTextEditor(document,panel) {
-      mountSchemaPreview(vscode,document,panel);
-    }
-  };
-  context.subscriptions.push(vscode.window.registerCustomEditorProvider(
-    SCHEMA_VIEW,provider,{webviewOptions:{retainContextWhenHidden:true}}));
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openSchema',
     async uri=>{
       const target=await chooseSchema(vscode,uri);
-      if(target)await openSourceViewPair(vscode,target);
+      if(target)await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
     }));
 }
