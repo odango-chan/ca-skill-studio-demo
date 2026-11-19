@@ -416,6 +416,34 @@
           "when": "false"
         },
         {
+          "command": "skillStudio.editPhaseInputBinding",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.editPhaseOutputReference",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.editPhaseRouteTarget",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.repairPhaseOutcome",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.addPhaseVerify",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.editPhaseVerifyStep",
+          "when": "false"
+        },
+        {
+          "command": "skillStudio.renameNamedPhaseStep",
+          "when": "false"
+        },
+        {
           "command": "skillStudio.refreshDependency",
           "when": "false"
         },
