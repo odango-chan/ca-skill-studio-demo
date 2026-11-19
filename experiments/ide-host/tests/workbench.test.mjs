@@ -271,8 +271,12 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
         if(v1alpha5Mode&&pattern?.pattern==='**/*')
           return v1SampleManifest.files.filter(path=>path.startsWith('establish-pdu-session/'))
             .map(path=>uri('/workspace/establish-pdu-session/'+path.slice('establish-pdu-session/'.length)));
-        return ['assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml','SKILL.md']
-          .map(p=>uri('/workspace/establish-pdu-session/'+p));
+        return [
+          'assurance/procedure.yaml','assurance/contract.yaml','assurance/predicates.yaml',
+          'SKILL.md','schemas/establishment-request.schema.yaml',
+          'scripts/select_establishment_configuration.py','scripts/evaluate_udm_read.py',
+          'scripts/evaluate_transfer_start.py'
+        ].map(p=>uri('/workspace/establish-pdu-session/'+p));
       },
       getConfiguration:(section)=>({get:(key,fallback)=>section==='connectionAgent.skillStudio'
         ?({skillsRoot:'skills',dependencies:[],
