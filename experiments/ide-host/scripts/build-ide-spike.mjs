@@ -35,7 +35,7 @@ await build({
 });
 // The same source also builds as a VS Code Web extension: no Node APIs.
 // "browser" in extension package.json selects this entry for vscode.dev and
-// browser-only Theia; real host activation/CustomEditor remains unverified.
+// browser-only Theia; real host activation of the shared Preview View is verified separately.
 await build({
   entryPoints:[join(root,"src/extension.mjs")],
   outfile:join(root,"dist/extension-web.cjs"),
