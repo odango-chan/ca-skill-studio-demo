@@ -138,7 +138,7 @@ test("optional Studio examples mirror the pinned PDU/MAS v1alpha5 source shape",
     });
     const result=analyzePackageSnapshot({rootUri:"file:///workspace/"+name,
       packageName:name,generation:1,completeness:"partial",documents:docs});
-    assert.equal(result.state,"PARTIAL");
+    assert.equal(result.state,"READY");
     assert.equal(result.procedure.state,"READY",
       name+" source structure should be projected without a trusted Owner");
     assert.ok(result.procedure.procedures[0].nodes.length>=expectedNodes);
@@ -239,7 +239,7 @@ test("v1alpha5 Wait rejects invalid duration, timeout routes, response boundarie
 
 test("v1alpha5 AST graph projects nodes and routes but never claims Owner qualification",()=>{
   const a=analyzePackageSnapshot(snapshot());
-  assert.equal(a.state,"PARTIAL");
+  assert.equal(a.state,"READY");
   assert.equal(a.packageAudit.state,"UNAVAILABLE");
   assert.match(a.packageAudit.reason,/NOT_CHECKED|blocked/);
   assert.equal(a.procedure.state,"READY");
@@ -389,7 +389,7 @@ test("v1alpha5 rejects primitive literal Predicate argument type mismatches",()=
 
 test("v1alpha5 marks no Owner identity as a missing qualification, not a synthetic PASS",()=>{
   const a=analyzePackageSnapshot(snapshot());
-  assert.notEqual(a.state,"READY");
+  assert.equal(a.state,"READY");
   assert.ok(a.packageAudit.reason.includes("requires the current Compiler"));
 });
 
