@@ -3,8 +3,7 @@ import {openNativeSource} from "./native-source.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
-import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
-import {auditPackageWorkspace} from '../../../../site/package-audit.mjs';
+import {analyzeV1Alpha5Source} from "../../../../language/core/v1alpha5.ts";
 import {auditV1Alpha5Package,indexV1Alpha4ToolCatalogCallables}
   from '../../../../site/v1alpha5-package-audit.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
@@ -197,108 +196,36 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     languageStatusItem.show();
   }
 
-  // Acceptance-only diagnostics are deliberately not contributed to the
-  // Command Palette. The Chromium harness queries this internal command in
-  // both browser-Worker and Node extension-host variants.
-  // Acceptance-only fixture proving the legacy analyzer remains active even
-  // when the v1alpha5 Language Service cannot parse the persisted source shape.
-  // It is entirely in-memory and never writes to the user's Package.
+  // Verify that historical source is diagnosed by the one current grammar.
+  // This is an in-memory negative test, not a compatibility analyzer.
   context.subscriptions.push(vscode.commands.registerCommand(
-    "skillStudio.internal.legacyPackageAuditAcceptance",()=>{
-      const files=new Map([
-        ["assurance/contract.yaml",{text:[
-          "apiVersion: connectionagent.io/v1alpha1",
-          "kind: SkillContract",
-          "metadata:",
-          "  name: legacy-audit-acceptance",
-          "spec:",
-          "  skillType: executable",
-          "  goal: demo.goal",
-          "  entryProcedure: missing-entry",
-          "  inputs:",
-          "    requestSchema: schemas/request.yaml",
-          "  context:",
-          "    requiredFacts: [createdsession_ingress]",
-          "  allowedResources:",
-          "    capabilities: [operation.allowed]",
-          "    localTools: [skill.local]"
-        ].join("\n")}],
-        ["assurance/predicates.yaml",{text:[
-          "apiVersion: connectionagent.io/v1alpha1",
-          "kind: PredicateSet",
-          "metadata:",
-          "  skill: legacy-audit-acceptance",
-          "predicates:",
-          "  demo.eligible:",
-          "    observations:",
-          "      state:",
-          "        ref: demo.state",
-          "        scope: '{\"supi\": subject.supi}'",
-          "        freshness: 5s",
-          "    evaluator:",
-          "      type: cel",
-          "      expression: true"
-        ].join("\n")}],
-        ["assurance/procedure.yaml",{text:[
-          "procedures:",
-          "  entry:",
-          "    inputs:",
-          "      supi:",
-          "        type: string",
-          "        from: context.subject.supi",
-          "    start: start",
-          "    nodes:",
-          "      start:",
-          "        call: operation.missing",
-          "        with:",
-          "          supi:",
-          "            from: input.unknown",
-          "        preconditions:",
-          "          steps:",
-          "            - script: scripts/missing.py",
-          "          'on':",
-          "            FAILED: done",
-          "        postconditions:",
-          "          steps:",
-          "            - verify: demo.missing",
-          "        'on':",
-          "          PASS: absent",
-          "          FAILED: done",
-          "      done:",
-          "        terminal: SUCCEEDED",
-          "      unreachable:",
-          "        terminal: FAILED"
-        ].join("\n")}],
-        ["schemas/request.yaml",{text:[
-          "type: object",
-          "required: [supi, missing]",
-          "properties:",
-          "  supi:",
-          "    type: string"
-        ].join("\n")}]
+    "skillStudio.internal.currentGrammarRejectionAcceptance",()=>{
+      const root="file:///current-grammar-acceptance";
+      const documents=new Map([
+        ["assurance/contract.yaml",{
+          uri:root+"/assurance/contract.yaml",relativePath:"assurance/contract.yaml",
+          version:1,text:"apiVersion: connectionagent.io/v1alpha1\nkind: SkillContract\nmetadata: {}\nspec: {}\n"
+        }],
+        ["assurance/predicates.yaml",{
+          uri:root+"/assurance/predicates.yaml",relativePath:"assurance/predicates.yaml",
+          version:1,text:"apiVersion: connectionagent.io/v1alpha1\nkind: PredicateSet\nmetadata: {}\npredicates: {}\n"
+        }],
+        ["assurance/procedure.yaml",{
+          uri:root+"/assurance/procedure.yaml",relativePath:"assurance/procedure.yaml",
+          version:1,text:"procedures:\n  entry:\n    nodes:\n      start:\n        call: operation.missing\n"
+        }]
       ]);
-      const diagnostics=auditPackageWorkspace({
-        name:"legacy-audit-acceptance",files,completeness:"complete"
-      });
-      const codes=new Set(diagnostics.map(item=>item.code));
-      const required=[
-        "V1ALPHA5_LSP_NOT_APPLICABLE","ENTRY_PROCEDURE",
-        "CAPABILITY_UNDECLARED","INPUT_MISSING","NODE_PREDICATE",
-        "SCRIPT_MISSING","ROUTE_TARGET_MISSING","NODE_UNREACHABLE",
-        "REQUEST_SCHEMA_REQUIRED_UNDECLARED","CEL_EXPRESSION_SYNTAX_NOT_CHECKED",
-        "PREDICATE_RUNTIME_NOT_CHECKED","CONTEXT_FACTS_NOT_CHECKED"
-      ];
+      const result=analyzeV1Alpha5Source(documents,"current-grammar-acceptance");
+      const codes=new Set(result.diagnostics.map(item=>item.code));
+      const required=["UNKNOWN_FIELD","SOURCE_ROOT_INVALID"];
       const missing=required.filter(code=>!codes.has(code));
       if(missing.length)
-        throw Error("Legacy Package Audit omitted expected independent findings: "+
-          JSON.stringify({missing,diagnostics}));
+        throw Error("Current grammar did not report concrete source errors: "+
+          JSON.stringify({missing,diagnostics:result.diagnostics}));
       return {
-        status:"PASS",profile:"connectionagent.io/v1alpha1",
-        errorCount:diagnostics.filter(item=>item.severity==="error").length,
-        warningCount:diagnostics.filter(item=>item.severity==="warning").length,
-        notCheckedCount:diagnostics.filter(item=>item.status==="not_checked").length,
-        diagnosticCount:diagnostics.length,codes:[...codes].sort(),
-        qualification:"NOT_QUALIFIED",sourceMutation:"NONE"
+        status:"PASS",analysis:"CURRENT_GRAMMAR_ONLY",
+        diagnosticCount:result.diagnostics.length,codes:[...codes].sort(),
+        compatibilityFallback:false,sourceMutation:"NONE"
       };
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
@@ -3109,9 +3036,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         [item.relativePath,{text:item.text}]));
       const uris=new Map(packageSnapshot.documents.map(item=>
         [item.relativePath,vscode.Uri.parse(item.uri)]));
-      const v1alpha5=isV1Alpha5Procedure(doc.getText());
-      let v1alpha5DependencyContext={available:false};
-      if(v1alpha5){
+      let dependencyContext={available:false};
+      {
         const folder=vscode.workspace.getWorkspaceFolder?.(doc.uri);
         if(folder){
           try{
@@ -3141,40 +3067,28 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
                 schemas.push({dependencyId:dependency.id,path:file.path,text:file.text});
               }
             }
-            v1alpha5DependencyContext={
+            dependencyContext={
               available:true,declarations:project.settings.dependencies,
               snapshots:resolved.snapshots,diagnostics:resolved.diagnostics,
               operations,toolCatalogs,schemas
             };
           }catch(error){
-            v1alpha5DependencyContext={
+            dependencyContext={
               available:false,reason:String(error?.message??error)
             };
           }
         }else{
-          v1alpha5DependencyContext={
+          dependencyContext={
             available:false,reason:"The Package is not inside an open project workspace"
           };
         }
       }
 
-      let results;
-      if(v1alpha5){
-        results=auditV1Alpha5Package({
-          files,dependencyContext:v1alpha5DependencyContext,
-          completeness:packageSnapshot.completeness,
-          snapshotReason:packageSnapshot.reason
-        });
-      }else{
-        // Legacy analysis is deliberately best-effort and multi-pass. A partial
-        // snapshot or one malformed companion file must not suppress checks on
-        // every other source file; the audit emits NOT_CHECKED reasons per gap.
-        results=auditPackageWorkspace({
-          name:packageSnapshot.packageName,files,
-          completeness:packageSnapshot.completeness,
-          snapshotReason:packageSnapshot.reason
-        },doc.getText());
-      }
+      const results=auditV1Alpha5Package({
+        files,dependencyContext,
+        completeness:packageSnapshot.completeness,
+        snapshotReason:packageSnapshot.reason
+      });
       if(ticket!==generation||document!==doc||doc.version!==version)return;
       audit=results.map(item=>({...item,uri:uris.get(item.path)??doc.uri}));
       const errors=audit.filter(item=>item.severity==="error").length;
@@ -3182,7 +3096,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       const notChecked=audit.filter(item=>item.status==="not_checked").length;
       auditStatus="Package Audit · "+errors+" errors / "+warnings+" warnings / "+
         notChecked+" NOT_CHECKED"+
-        (v1alpha5?" · Compiler / Owner qualification pending":"");
+        " · Compiler / Owner qualification pending";
       diagnostics.clear();
       if(packageSnapshot.completeness==="complete"){
         packageFiles=files;packageFilesUri=doc.uri.toString();packageFilesVersion=version;
