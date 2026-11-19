@@ -1085,8 +1085,15 @@ export async function runWorkbenchAcceptance({
      packageAudit.problems.some(item=>item.code==="PREDICATE_SCRIPT_REF_UNDECLARED")||
      !packageAudit.problems.some(item=>item.code==="EVIDENCE_GUARANTEE_NOT_CHECKED")||
      !packageAudit.problems.some(item=>item.code==="DEPENDENCY_NOT_CONFIGURED"))
-    throw Error("v1alpha5 Package diagnostics must reach Problems and editor markers without Compiler qualification: "+
-      JSON.stringify({packageAudit,expectedCapabilityId}));
+    throw Error("Current Package diagnostics must reach Problems and editor markers without Compiler qualification: "+
+      JSON.stringify({packageAudit,expectedCapabilityId,
+        activeDocumentUri:packageDiagnosticState?.activeDocumentUri,
+        activePackageRootUri:packageDiagnosticState?.activePackageRootUri,
+        activePackageAuditStatus:packageDiagnosticState?.activePackageAuditStatus,
+        attachedPackages:packageDiagnosticState?.languagePackages?.map(item=>item.rootUri),
+        packageStatuses:packageDiagnosticState?.packageStatuses?.map(item=>({
+          rootUri:item.rootUri,generation:item.generation,state:item.state
+        }))}));
   console.log("STUDIO_CURRENT_LANGUAGE_PACKAGE_DIAGNOSTICS_CHROMIUM",JSON.stringify({
     status:packageAudit.status,
     capabilityProblem,capabilityMarker,
