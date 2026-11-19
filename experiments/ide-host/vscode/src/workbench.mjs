@@ -2307,7 +2307,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           children:[]
         });
       }
-      const sourcePath=diagnostic.path??diagnostic.relativePath??diagnostic.sourcePath;
+      // Display owning Package-relative locations even for Compiler records
+      // whose raw Diagnostic.path is prefixed with skills/<package>/.
+      const sourcePath=diagnostic.sourcePath??diagnostic.relativePath??diagnostic.path;
       const description=[sourcePath,diagnostic.line?("L"+diagnostic.line):null]
         .filter(Boolean).join(" · ");
       groups.get(domain).children.push({
