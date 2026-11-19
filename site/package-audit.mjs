@@ -57,11 +57,16 @@ function add(list,path,parsed,node,code,message,{
 }={}){
   if(list.length>=400)return;
   const location=sourceLocation(parsed,node);
+  const sourceRange=Array.isArray(node?.range)&&
+    Number.isSafeInteger(node.range[0])&&Number.isSafeInteger(node.range[1])&&
+    node.range[0]>=0&&node.range[1]>=node.range[0]
+      ?{start:node.range[0],end:node.range[1]}:null;
   const id=[code,path,location.line,location.column,message].join("|");
   if(list.some(item=>item.id===id))return;
   list.push(Object.freeze({
     id,kind:"package-diagnostic",code,message,severity,status,domain,category,
     path,relativePath:path,...location,
+    ...(sourceRange?{sourceRange}:{}),
     source:"Skill Studio · Package Audit"
   }));
 }
