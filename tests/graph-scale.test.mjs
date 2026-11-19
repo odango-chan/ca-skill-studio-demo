@@ -23,7 +23,7 @@ function largeYaml(count=300){
       lines.push("        "+outcome+": "+target);
     }
   }
-  return lines.join("\\n")+"\\n";
+  return lines.join("\n")+"\n";
 }
 
 test("A5 near-budget 300 Node / 1495 Route projection retains source identity",()=>{
