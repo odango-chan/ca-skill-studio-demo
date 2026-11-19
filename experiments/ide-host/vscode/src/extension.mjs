@@ -16,7 +16,6 @@ function newNonce(){
 }
 import {isProcedurePath,validateRouteProposal,
   validateCanvasRouteCreationProposal,MAX_SOURCE_BYTES} from "./bridge.mjs";
-import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
 import {EXAMPLE_PROJECT_NAME,seedExampleProject} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
@@ -339,14 +338,10 @@ export function activate(context){
           void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB Procedure editor limit"});
           return;
         }
-        // Legacy Packages do not need the v1alpha5 Contract / PredicateSet
-        // visual projection. Avoid extra filesystem reads for the legacy
-        // default Example and keep the Theia virtual filesystem load bounded.
-        let contract={text:null,version:0},predicates={text:null,version:0};
-        if(isV1Alpha5Procedure(text)){
-          contract=await readPackageText("assurance/contract.yaml");
-          predicates=await readPackageText("assurance/predicates.yaml");
-        }
+        // The current source projection always consumes the Package Contract
+        // and PredicateSet. Never choose files or analysis behavior by version.
+        const contract=await readPackageText("assurance/contract.yaml");
+        const predicates=await readPackageText("assurance/predicates.yaml");
         if(disposed||ticket!==pushTicket||document.version!==version)return;
         void webview.postMessage({
           type:"snapshot",text,version,path:document.uri.path,
