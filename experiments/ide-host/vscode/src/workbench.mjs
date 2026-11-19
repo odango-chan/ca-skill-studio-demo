@@ -11,7 +11,7 @@ import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.
 import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
 import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from '../../../../site/node-create.mjs';
 import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from '../../../../site/node-delete.mjs';
-import {previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
+import {phaseStepBindingOptions,previewPhaseInputBinding,applyPhaseInputBinding} from '../../../../site/phase-bindings.mjs';
 import {phaseOutputReferenceOptions,previewPhaseOutputReference,
   applyPhaseOutputReference} from '../../../../site/phase-output-refs.mjs';
 import {phaseRouteTargetOptions,previewPhaseRouteTarget,applyPhaseRouteTarget}
