@@ -138,8 +138,14 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   });
   client.onNotification(ANALYSIS_STATUS_NOTIFICATION, status => {
     if (!terminalFailure) handlers.onStatus?.(status);
-    if (status?.state === "UNAVAILABLE" && status?.reason)
-      output.appendLine("Analysis unavailable: " + status.reason);
+    if (status?.state === "UNAVAILABLE" && status?.reason) {
+      const details=Array.isArray(status.unlocated)
+        ?status.unlocated.slice(0,4).map(item=>
+          String(item.code??"LANGUAGE")+": "+String(item.message??"")).join("; ")
+        :"";
+      output.appendLine("Analysis unavailable: " + status.reason+
+        (details?" · "+details:""));
+    }
   });
   client.onNotification(SERVER_ERROR_NOTIFICATION, error => {
     if (!terminalFailure) handlers.onError?.(error);
