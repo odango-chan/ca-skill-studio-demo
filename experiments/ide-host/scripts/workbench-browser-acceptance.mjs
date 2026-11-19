@@ -663,6 +663,9 @@ export async function runWorkbenchAcceptance({
               "map(link=>link.href||link.getAttribute('href')||'');"+
               "return {url:location.href,title:document.title,"+
               "bodyText:document.body?.innerText??'',"+
+              "studioMarkdownStatus:document.querySelector('#studio-status')?.textContent??'',"+
+              "markdownBlockCount:document.querySelectorAll('.studio-markdown-block[data-source-line]').length,"+
+              "scrollY:window.scrollY,"+
               "procedureRoot:!!root,graphNodes:document.querySelectorAll('.react-flow__node').length,"+
               "graphEdges:document.querySelectorAll('.react-flow__edge').length,"+
               "procedureValue:document.querySelector('#procedureList')?.value??null,"+
@@ -670,15 +673,17 @@ export async function runWorkbenchAcceptance({
               "timing:root?.dataset.studioTiming??null,"+
               "cards:[...document.querySelectorAll('.card h2')].map(el=>el.textContent.trim()),"+
               "heading:heading?.textContent?.trim()??null,"+
-              "nativePreviewRoot:Boolean(document.body&&styles.some(url=>url.includes('/media/studio-markdown-preview.css'))),"+
+              "studioMarkdownPreviewRoot:Boolean(document.querySelector('#studio-content')&&"+
+              "styles.some(url=>url.includes('/media/studio-markdown-preview.css'))),"+
               "styles,headingColor:heading?getComputedStyle(heading).color:null,"+
               "maxWidth:document.body?getComputedStyle(document.body).maxWidth:null,"+
               "anchorDetails:[...document.querySelectorAll('a')].map(anchor=>({"+
-              "text:anchor.textContent.trim(),href:anchor.getAttribute('href'),resolvedHref:anchor.href})),"+
+              "text:anchor.textContent.trim(),href:anchor.getAttribute('href'),"+
+              "dataStudioHref:anchor.getAttribute('data-studio-href'),resolvedHref:anchor.href})),"+
               "imageCount:document.querySelectorAll('img').length,"+
               "scriptMarkers:[...document.scripts].filter(script=>"+
-              "script.textContent.includes('skillStudioNativeMarkdownXss')).length,"+
-              "scriptExecuted:window.skillStudioNativeMarkdownXss===true,"+
+              "script.textContent.includes('skillStudioMarkdownXss')).length,"+
+              "scriptExecuted:window.skillStudioMarkdownXss===true,"+
               "csp:document.querySelector('meta[http-equiv=\"Content-Security-Policy\" i]')?.content??''"+
               "};})()"
           });
@@ -686,7 +691,7 @@ export async function runWorkbenchAcceptance({
           if(!view)continue;
           latest.candidates.push({url:frame.url,title:view.title,
             procedureValue:view.procedureValue,heading:view.heading,
-            nodes:view.graphNodes,preview:view.nativePreviewRoot});
+            nodes:view.graphNodes,preview:view.studioMarkdownPreviewRoot});
           if(predicate(view)){
             view.contextId=world.executionContextId;
             view.frameId=frame.id;
@@ -698,8 +703,8 @@ export async function runWorkbenchAcceptance({
     }
     throw Error(label+" did not appear in the real Theia workbench: "+JSON.stringify(latest));
   };
-  const waitNativeMarkdown=(predicate,label,attempts=100)=>
-    waitWebview(view=>view.nativePreviewRoot&&predicate(view),label,attempts);
+  const waitStudioMarkdown=(predicate,label,attempts=100)=>
+    waitWebview(view=>view.studioMarkdownPreviewRoot&&predicate(view),label,attempts);
   const openPackageFile=async(id,relativePath)=>{
     const packageRoot=defaultProcedureUri.replace(/\/assurance\/procedure\.yaml$/,"");
     const target=packageRoot+"/"+relativePath;
@@ -1121,7 +1126,7 @@ export async function runWorkbenchAcceptance({
     "skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance",skillGuideUri,1);
   if(nativeMarkdownUri!==skillGuideUri)
     throw Error("Native Markdown did not open the exact v1alpha5 Skill guide: "+nativeMarkdownUri);
-  const nativeMarkdown=await waitNativeMarkdown(view=>
+  const nativeMarkdown=await waitStudioMarkdown(view=>
     view.heading?.includes("Establish PDU Session")&&
     view.styles.some(url=>url.includes("/media/studio-markdown-preview.css")),
     "v1alpha5 native Markdown Preview");
@@ -1163,7 +1168,7 @@ export async function runWorkbenchAcceptance({
   if(secondMarkdownUri!==mappingUri)
     throw Error("Native Markdown did not open the v1alpha5 MAS reference document: "+
       JSON.stringify(secondMarkdownUri));
-  const secondMarkdown=await waitNativeMarkdown(view=>
+  const secondMarkdown=await waitStudioMarkdown(view=>
     view.heading?.includes("OpenAMSM source mapping")&&
     view.styles.some(url=>url.includes("/media/studio-markdown-preview.css")),
     "v1alpha5 MAS reference Markdown Preview");
@@ -1179,7 +1184,7 @@ export async function runWorkbenchAcceptance({
   const liveUri=await nativeCommand(
     "skillStudio.internal.nativeMarkdownLiveUpdateAcceptance",skillGuideUri);
   try{
-    const live=await waitNativeMarkdown(view=>
+    const live=await waitStudioMarkdown(view=>
       view.heading==="Native Markdown Live Update Probe",
       "v1alpha5 Markdown unsaved Source update");
     const settings=await nativeCommand("skillStudio.internal.nativeMarkdownSettingsAcceptance");
@@ -1194,13 +1199,13 @@ export async function runWorkbenchAcceptance({
     await nativeCommand("core.undo");
     await nativeCommand("skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance",liveUri);
   }
-  await waitNativeMarkdown(view=>view.heading?.includes("Establish PDU Session"),
+  await waitStudioMarkdown(view=>view.heading?.includes("Establish PDU Session"),
     "restored v1alpha5 Skill Markdown Preview");
 
   const securityUri=await nativeCommand(
     "skillStudio.internal.nativeMarkdownSecurityAcceptance",skillGuideUri);
   try{
-    const security=await waitNativeMarkdown(view=>
+    const security=await waitStudioMarkdown(view=>
       view.heading==="Native Markdown Security Probe",
       "v1alpha5 Markdown security probe");
     const safeLink=security.view.anchorDetails.find(anchor=>
