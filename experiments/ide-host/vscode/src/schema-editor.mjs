@@ -200,7 +200,7 @@ export function mountSchemaPreview(vscode,document,panel,{isCurrent=()=>true}={}
       releasePanel=panel.onDidDispose(cleanup);
       return {dispose:cleanup};
 }
-export function registerSchemaEditor(vscode,context) {
+export function registerSchemaCommands(vscode,context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openSchema',
     async uri=>{
       const target=await chooseSchema(vscode,uri);
