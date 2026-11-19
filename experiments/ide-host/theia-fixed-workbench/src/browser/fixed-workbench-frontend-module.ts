@@ -6,9 +6,12 @@ import { CorePreferences } from '@theia/core/lib/common/core-preferences';
 import { MAIN_AREA_CLASS } from '@theia/core/lib/browser/shell/application-shell';
 import { TheiaDockPanel } from '@theia/core/lib/browser/shell/theia-dock-panel';
 import type { DockPanel } from '@lumino/widgets';
-import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference, hasVisibleSourceEditor } from './fixed-editor-panel-policy.mjs';
+import { PluginViewRegistry } from '@theia/plugin-ext/lib/main/browser/view/plugin-view-registry';
+import { constrainMainEditorPanelOptions, isMainEditorPanelOptions, createPreviewAutoRevealPreference, hasVisualizableSourceEditor } from './fixed-editor-panel-policy.mjs';
 
 const PREVIEW_CONTAINER_WIDGET_ID = 'plugin-view-container:workbench.view.extension.skillStudioInspector';
+const PREVIEW_VIEW_ID = 'skillStudio.preview';
+const PREVIEW_WIDGET_ID = 'plugin-view:skillStudio.preview';
 
 export default new ContainerModule((bind, unbind, isBound, rebind) => {
     // Theia does not expose VS Code's generated workbench.view.extension.*
@@ -17,6 +20,7 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
     // can resolve on both backend and browser-only Theia.
     bind(FrontendApplicationContribution).toDynamicValue(({ container }) => {
         const state = container.get(FrontendApplicationStateService);
+        const pluginViews = container.get(PluginViewRegistry);
         let stopped = false;
         let added: { dispose(): void } | undefined;
         let changed: { dispose(): void } | undefined;
@@ -37,6 +41,8 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                 // tab's intentional hide/resize choice.
                 const autoReveal = createPreviewAutoRevealPreference(storage, window.location.hash);
                 let revealInFlight = false;
+                let selectingPreview = false;
+                let lastSourceWidgetId = '';
                 let attempts = 0;
                 let lastOutcome = 'not-attempted';
                 const getStatus = () => {
@@ -45,9 +51,12 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                         attempts,
                         lastOutcome,
                         autoRevealPending: autoReveal.shouldReveal(),
-                        sourceVisible: hasVisibleSourceEditor(shell.getWidgets('main')),
+                        sourceVisible: hasVisualizableSourceEditor(shell.getWidgets('main')),
+                        sourceWidgetId: shell.getCurrentWidget('main')?.id ?? null,
                         containerExists: !!container,
                         containerVisible: !!container?.isVisible,
+                        previewViewExists: !!shell.getWidgetById(PREVIEW_WIDGET_ID),
+                        previewViewVisible: !!shell.getWidgetById(PREVIEW_WIDGET_ID)?.isVisible,
                         rightExpanded: shell.isExpanded('right'),
                         appState: state.state
                     };
@@ -57,13 +66,24 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                 (window as unknown as {
                     __skillStudioPreviewActivation?: () => ReturnType<typeof getStatus>;
                 }).__skillStudioPreviewActivation = getStatus;
+                const revealView = () => {
+                    if (stopped || selectingPreview) return;
+                    selectingPreview = true;
+                    // Selecting the Inspector container is not enough: it may
+                    // contain an expanded Inspector and a collapsed Preview.
+                    // Theia's PluginViewRegistry opens the exact contributed
+                    // WebviewView without allocating a second EditorGroup.
+                    void pluginViews.openView(PREVIEW_VIEW_ID, { reveal: true })
+                        .catch(error => console.warn('SKILL Studio Preview view could not be revealed:', error))
+                        .finally(() => { selectingPreview = false; });
+                };
                 const reveal = () => {
                     // First-run Welcome does not open a Source document. Marking
                     // the Preview as auto-revealed before the Example workspace
                     // reload caused Theia to restore a hidden right sidebar on
                     // the second page load and skip Preview activation forever.
                     if (stopped || !autoReveal.shouldReveal() || revealInFlight ||
-                        !hasVisibleSourceEditor(shell.getWidgets('main'))) {
+                        !hasVisualizableSourceEditor(shell.getWidgets('main'))) {
                         return;
                     }
                     const container = shell.getWidgetById(PREVIEW_CONTAINER_WIDGET_ID);
@@ -81,10 +101,13 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                         // content itself to accept focus.
                         shell.expandPanel('right');
                         void shell.revealWidget(PREVIEW_CONTAINER_WIDGET_ID)
-                            .then(revealed => {
+                            .then(async revealed => {
+                                if (stopped || !revealed) return;
+                                const preview = await pluginViews.openView(PREVIEW_VIEW_ID, { reveal: true });
                                 if (stopped) return;
-                                const visible = !!revealed && container.isVisible &&
-                                    shell.isExpanded('right');
+                                const visible = !!preview && container.isVisible &&
+                                    shell.isExpanded('right') &&
+                                    !!shell.getWidgetById(PREVIEW_WIDGET_ID)?.isVisible;
                                 lastOutcome = visible ? 'visible' : 'still-hidden';
                                 if (!visible) return;
                                 // Persist success only after a real Source and
@@ -112,15 +135,38 @@ export default new ContainerModule((bind, unbind, isBound, rebind) => {
                 // Listen for Source widgets after that handoff, not just for
                 // the creation of the Preview container on the Welcome page.
                 const ready = state.reachedState('ready');
+                const sourceChanged = () => {
+                    const current = shell.getCurrentWidget('main');
+                    if (!current || !hasVisualizableSourceEditor([current])) return;
+                    if (current.id === lastSourceWidgetId) return;
+                    lastSourceWidgetId = current.id;
+                    if (autoReveal.shouldReveal()) {
+                        reveal();
+                    } else if (shell.isExpanded('right')) {
+                        // The user may have the Inspector subview selected.
+                        // Follow each new YAML/Markdown Source with the actual
+                        // Preview subview, but never reopen a deliberately
+                        // collapsed Secondary Sidebar.
+                        revealView();
+                    }
+                };
                 added = shell.onDidAddWidget(widget => {
-                    if (widget.id === PREVIEW_CONTAINER_WIDGET_ID || !!(widget as { editor?: unknown }).editor) {
-                        void ready.then(reveal);
+                    if (widget.id === PREVIEW_CONTAINER_WIDGET_ID) {
+                        void ready.then(() => {
+                            reveal();
+                            sourceChanged();
+                        });
+                    } else if (!!(widget as { editor?: unknown }).editor) {
+                        void ready.then(sourceChanged);
                     }
                 });
                 changed = shell.onDidChangeCurrentWidget(() => {
-                    void ready.then(reveal);
+                    void ready.then(sourceChanged);
                 });
-                void ready.then(reveal);
+                void ready.then(() => {
+                    reveal();
+                    sourceChanged();
+                });
             },
             onStop() {
                 stopped = true;

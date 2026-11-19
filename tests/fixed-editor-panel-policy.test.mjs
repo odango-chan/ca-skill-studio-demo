@@ -5,7 +5,8 @@ import {
   constrainMainEditorPanelOptions,
   isMainEditorPanelOptions,
   createPreviewAutoRevealPreference,
-  hasVisibleSourceEditor
+  hasVisibleSourceEditor,
+  hasVisualizableSourceEditor
 } from "../experiments/ide-host/theia-fixed-workbench/src/browser/fixed-editor-panel-policy.mjs";
 
 const MAIN = "theia-app-main";
@@ -140,4 +141,31 @@ test("production Preview initialization uses tab-scoped storage, never origin-wi
   assert.match(source,/storage = window\.sessionStorage;/);
   assert.match(source,/createPreviewAutoRevealPreference\(storage, window\.location\.hash\)/);
   assert.doesNotMatch(source,/storage = window\.localStorage;/);
+});
+
+test("only authored YAML Designers and Markdown auto-open a contextual Preview", () => {
+  const make = (path, hidden = false) => ({
+    editor: { uri: { toString() { return "file:///workspace/" + path; } } },
+    isHidden: hidden
+  });
+  assert.equal(hasVisualizableSourceEditor([make("skills/a/assurance/procedure.yaml")]),true);
+  assert.equal(hasVisualizableSourceEditor([make("skills/a/assurance/contract.yaml")]),true);
+  assert.equal(hasVisualizableSourceEditor([make("skills/a/assurance/predicates.yaml")]),true);
+  assert.equal(hasVisualizableSourceEditor([make("skills/a/schemas/request.schema.yaml")]),true);
+  assert.equal(hasVisualizableSourceEditor([make("skills/a/SKILL.md")]),true);
+  assert.equal(hasVisualizableSourceEditor([make("scripts/example.py")]),false);
+  assert.equal(hasVisualizableSourceEditor([make("reference/other.yaml")]),false);
+  assert.equal(hasVisualizableSourceEditor([make("skills/a/assurance/procedure.yaml",true)]),false);
+});
+
+test("Theia Source lifecycle reveals the exact Preview view, not only its Inspector container", () => {
+  const content = readFileSync(
+    "experiments/ide-host/theia-fixed-workbench/src/browser/fixed-workbench-frontend-module.ts",
+    "utf8");
+  assert.match(content,/pluginViews\.openView\(PREVIEW_VIEW_ID, \{ reveal: true \}\)/);
+  assert.match(content,/previewViewVisible:/);
+  assert.match(content,/shell\.getCurrentWidget\('main'\)/);
+  assert.match(content,/shell\.isExpanded\('right'\)/);
+  assert.match(content,/hasVisualizableSourceEditor\(\[current\]\)/);
+  assert.doesNotMatch(content,/vscode\.openWith/);
 });
