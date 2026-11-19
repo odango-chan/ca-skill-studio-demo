@@ -1089,18 +1089,18 @@ export async function runWorkbenchAcceptance({
     problemCount:packageAudit.problems.length,
     diagnosticCount:packageAudit.diagnostics.length
   }));
-  const legacyPackageAudit=await nativeCommand(
-    "skillStudio.internal.legacyPackageAuditAcceptance");
-  if(legacyPackageAudit?.status!=="PASS"||
-     legacyPackageAudit.profile!=="connectionagent.io/v1alpha1"||
-     legacyPackageAudit.errorCount<8||
-     legacyPackageAudit.notCheckedCount<4||
-     legacyPackageAudit.qualification!=="NOT_QUALIFIED"||
-     legacyPackageAudit.sourceMutation!=="NONE")
-    throw Error("Legacy v1alpha1 Package Audit did not report independent findings and explicit NOT_CHECKED reasons: "+
-      JSON.stringify(legacyPackageAudit));
-  console.log("STUDIO_LEGACY_PACKAGE_DIAGNOSTICS_CHROMIUM",
-    JSON.stringify(legacyPackageAudit));
+  const currentGrammar=await nativeCommand(
+    "skillStudio.internal.currentGrammarRejectionAcceptance");
+  if(currentGrammar?.status!=="PASS"||
+     currentGrammar.analysis!=="CURRENT_GRAMMAR_ONLY"||
+     currentGrammar.compatibilityFallback!==false||
+     !currentGrammar.codes?.includes("UNKNOWN_FIELD")||
+     !currentGrammar.codes?.includes("SOURCE_ROOT_INVALID")||
+     currentGrammar.sourceMutation!=="NONE")
+    throw Error("Historical source was not rejected by the one current grammar: "+
+      JSON.stringify(currentGrammar));
+  console.log("STUDIO_CURRENT_GRAMMAR_REJECTION_CHROMIUM",
+    JSON.stringify(currentGrammar));
   // Run in-memory static diagnostic regression cases. These results belong
   // to the native Test Explorer, never to Source Problems or Runtime Evidence.
   const offlineTests=await nativeCommand("skillStudio.runDiagnosticTests");
