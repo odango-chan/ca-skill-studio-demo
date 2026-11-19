@@ -404,39 +404,6 @@ window.addEventListener("resize",()=>{
 $("openSource").addEventListener("click",()=>vscode.postMessage({type:"openSource"}));
 $("nodeFocusReturn").addEventListener("click",closeNodeFocus);
 $("nodeFocusFit").addEventListener("click",()=>nodeFocusCanvas.fit());
-$("preview").addEventListener("click",()=>{
-  const procedure=getProcedure();
-  if(!procedure)return;
-  try{
-    const preview=previewTargetPatch(state.text,state.procedureId,
-      $("routeList").value,$("targetList").value);
-    state.pending=preview;
-    $("diff").textContent=preview.diff;
-    $("commit").disabled=false;
-    status("只生成 Diff；尚未修改文件。请检查后显式确认。");
-  }catch(error){
-    state.pending=null;$("commit").disabled=true;
-    status("Patch 预览失败："+String(error?.message??error));
-  }
-});
-$("commit").addEventListener("click",()=>{
-  const p=state.pending;if(!p)return;
-  $("commit").disabled=true;
-  if(state.pendingKind==="create"&&state.routeProposal){
-    const route=state.routeProposal;
-    vscode.postMessage({type:"applyRouteCreation",expectedVersion:state.version,
-      baseSource:state.text,candidateSource:p.candidateSource,diff:p.diff,
-      procedureId:route.intent.procedureId,sourceId:route.intent.sourceId,
-      targetId:route.intent.targetId,sourceHandle:route.sourceHandle,
-      targetHandle:route.targetHandle,outcome:$("newRouteOutcome").value});
-  }else{
-    vscode.postMessage({type:"applyRoute",expectedVersion:state.version,
-      baseSource:state.text,candidateSource:p.candidateSource,
-      procedureId:state.procedureId,routeId:$("routeList").value,
-      newTarget:$("targetList").value});
-  }
-  status("已提交 Patch 请求；等待原生 TextDocument 确认…");
-});
 $("exportPackageZip").addEventListener("click",()=>{
   vscode.postMessage({type:"exportPackageZip"});
   status("正在读取当前 Package 并准备 ZIP；不会写入磁盘或覆盖原文件…");
