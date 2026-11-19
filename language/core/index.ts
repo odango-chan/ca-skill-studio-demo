@@ -1,6 +1,6 @@
 import { scriptNavigationReport } from "../../site/script-navigation.mjs";
 import { pythonTopLevelOutline } from "../../site/python-outline.mjs";
-import { analyzeV1Alpha5Source } from "./v1alpha5.js";
+import { analyzeV1Alpha5Source } from "./source.js";
 import type {
   AnalysisState,
   DocumentAnalysis,
@@ -325,7 +325,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       state: "UNAVAILABLE",
       reason: snapshot.completeness !== "complete"
         ? (snapshot.reason ?? "Partial Package snapshot")
-        : "CA-SL v1alpha5 source parsed; static Package qualification requires the v1alpha5 Compiler and trusted Owner/Capability/Schema linking snapshots",
+        : "CA-SL current CA-SL source parsed; static Package qualification requires the current Compiler and trusted Owner/Capability/Schema linking snapshots",
       diagnostics: []
     };
     const diagnostics = [
