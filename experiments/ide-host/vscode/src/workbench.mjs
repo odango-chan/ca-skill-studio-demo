@@ -299,8 +299,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             },
             onError:error=>{
               if(epoch!==languageClientEpoch)return;
-              console.warn("Skill Studio Language Service",error);
-              updateLanguageStatus("ERROR",String(error?.message??error));
+              const detail=String(error?.message??error);
+              languagePackageFailure=detail;
+              console.warn("Skill Studio Package analysis",error);
+              // This notification reports a Package analysis failure, not a
+              // broken LSP transport. Keep the live language service PARTIAL;
+              // source-local syntax and semantic highlighting remain available.
+              updateLanguageStatus("PARTIAL",
+                "Package analysis failed: "+detail+
+                "; source-local highlighting remains available");
             },
             onFatal:error=>{
               if(epoch!==languageClientEpoch||languageTransportFailure)return;
