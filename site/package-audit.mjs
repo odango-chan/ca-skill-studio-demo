@@ -43,45 +43,108 @@ function collectActions(node,fn){
 }
 export function auditPackageWorkspace(workspace,procedureOverride=null){
   const fileMap=workspace?.files;
-  if(!(fileMap instanceof Map)||
-     ![FILES.procedure,FILES.contract,FILES.predicates]
-       .every(path=>typeof fileMap.get(path)?.text==="string"))return [];
-  const sources=new Map([...fileMap].map(([path,file])=>[
-    path,path===FILES.procedure&&typeof procedureOverride==="string"?
-      procedureOverride:file.text
-  ]));
-  const diagnostics=[],parsed=new Map(),counters=new Map();
-  const warn=(code,path,node,message)=>{
-    if(diagnostics.length>=80)return;
+  const diagnostics=[],parsed=new Map(),counters=new Map(),sources=new Map();
+  const completeness=workspace?.completeness??"complete";
+  const add=(code,path,node,message,{severity="warning",status="confirmed",
+    domain="source",category="structure"}={})=>{
+    if(diagnostics.length>=300)return;
     const counter=counters.get(path);
-    const line=counter&&node?.range?counter.linePos(node.range[0]).line||1:1;
+    const position=counter&&node?.range?counter.linePos(node.range[0]):null;
     diagnostics.push(Object.freeze({
-      severity:"warning",code,path,line,message
+      kind:"package-diagnostic",severity,status,code,path,relativePath:path,
+      line:position?.line||1,column:position?.col||1,message,domain,category,
+      source:"Skill Studio · Legacy Package Audit"
     }));
   };
-  for(const path of [FILES.contract,FILES.predicates,FILES.procedure]){
+  const warn=(code,path,node,message)=>add(code,path,node,message);
+  const notChecked=(code,path,message,domain="package")=>add(code,path,null,message,{
+    severity:"warning",status:"not_checked",domain,category:"analysis"
+  });
+  if(!(fileMap instanceof Map)){
+    notChecked("PACKAGE_INVENTORY_UNAVAILABLE",FILES.procedure,
+      "Package file inventory is unavailable; no source or cross-file checks were run");
+    return Object.freeze(diagnostics);
+  }
+  for(const [path,file] of fileMap){
+    if(typeof path!=="string"||typeof file?.text!=="string"){
+      notChecked("PACKAGE_FILE_UNREADABLE",FILES.procedure,
+        "At least one Package entry has no readable text; affected checks were not run");
+      continue;
+    }
+    sources.set(path,path===FILES.procedure&&typeof procedureOverride==="string"?
+      procedureOverride:file.text);
+  }
+  const required=[FILES.procedure,FILES.contract,FILES.predicates];
+  for(const path of required){
+    if(sources.has(path))continue;
+    const observedMissing=completeness==="complete";
+    add(observedMissing?"CORE_FILE_MISSING":"CORE_FILE_NOT_OBSERVED",
+      path,null,observedMissing
+        ?"Required Package source file is missing: "+path
+        :"Cannot confirm whether required Package source file exists because the Package inventory is "+completeness,
+      {severity:observedMissing?"error":"warning",
+       status:observedMissing?"confirmed":"not_checked",
+       domain:"package",category:"inventory"});
+  }
+  // Parse every available YAML file independently. One malformed file must
+  // not prevent syntax checks or source-local checks in its siblings.
+  for(const [path,text] of sources){
+    if(!/\.ya?ml$/i.test(path))continue;
     const counter=new LineCounter();
     counters.set(path,counter);
-    const doc=parseDocument(sources.get(path),{
+    const doc=parseDocument(text,{
       version:"1.2",schema:"core",strict:true,uniqueKeys:true,
       stringKeys:true,lineCounter:counter,logLevel:"silent"
     });
     if(doc.errors.length){
-      const err=doc.errors[0];
-      warn("YAML_PARSE",path,err.pos?
-        {range:[err.pos[0],err.pos[1]]}:null,"YAML 无法解析："+err.message);
-      return Object.freeze(diagnostics);
+      for(const err of doc.errors){
+        add("YAML_PARSE",path,err.pos?
+          {range:[err.pos[0],err.pos[1]]}:null,"YAML 无法解析："+err.message,
+          {severity:"error",domain:"syntax",category:"yaml"});
+      }
+      continue;
     }
     parsed.set(path,doc.contents);
+  }
+  // JSON source is independent of YAML/Procedure analysis too.
+  for(const [path,text] of sources){
+    if(!/\.json$/i.test(path))continue;
+    try{JSON.parse(text);}
+    catch(error){
+      const match=String(error?.message??"").match(/position\s+(\d+)/i);
+      const offset=match?Number(match[1]):0;
+      const prefix=text.slice(0,offset),line=prefix.split(/\r\n|\r|\n/).length;
+      const column=offset-(Math.max(prefix.lastIndexOf("\n"),prefix.lastIndexOf("\r"))+1)+1;
+      diagnostics.push(Object.freeze({
+        kind:"package-diagnostic",severity:"error",status:"confirmed",
+        code:"JSON_PARSE",path,relativePath:path,line,column,
+        message:"JSON 无法解析："+String(error?.message??error),
+        domain:"syntax",category:"json",source:"Skill Studio · Legacy Package Audit"
+      }));
+    }
   }
   const contract=parsed.get(FILES.contract);
   const predicates=parsed.get(FILES.predicates);
   const procedureAst=parsed.get(FILES.procedure);
+  if(!contract)notChecked("CONTRACT_CHECKS_NOT_CHECKED",FILES.contract,
+    "Contract checks were not run because the file is missing or its YAML could not be parsed");
+  if(!predicates)notChecked("PREDICATE_CHECKS_NOT_CHECKED",FILES.predicates,
+    "PredicateSet checks were not run because the file is missing or its YAML could not be parsed","predicates");
+  if(!procedureAst)notChecked("PROCEDURE_CHECKS_NOT_CHECKED",FILES.procedure,
+    "Procedure structure and reference checks were not run because the file is missing or its YAML could not be parsed","procedure");
   const predIds=new Set(entries(get(predicates,"predicates")).map(pair=>v(pair.key)));
-  const procedureModel=projectWorkspace(sources.get(FILES.procedure));
-  // Procedure projection itself reports the authoritative source errors.
-  if(procedureModel.state!=="READY")return Object.freeze(diagnostics);
-  const ids=new Set(procedureModel.procedures.keys());
+  const procedureModel=procedureAst
+    ?projectWorkspace(sources.get(FILES.procedure))
+    :{state:"UNAVAILABLE",diagnostics:[]};
+  if(procedureAst&&procedureModel.state!=="READY"){
+    const detail=procedureModel.diagnostics?.[0]?.message??"legacy graph projection unavailable";
+    notChecked("PROCEDURE_GRAPH_PROJECTION_NOT_CHECKED",FILES.procedure,
+      "The visual graph projection could not be built: "+detail+
+      ". Independent YAML, metadata and reference checks continue.","procedure");
+  }
+  const procedureRoot=get(procedureAst,"procedures");
+  const procedureEntries=entries(procedureRoot);
+  const ids=new Set(procedureEntries.map(pair=>v(pair.key)));
   const contractName=v(get(contract,"metadata","name"));
   const predName=v(get(predicates,"metadata","skill"));
   if(contractName!==workspace.name)
