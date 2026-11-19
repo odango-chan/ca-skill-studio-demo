@@ -1078,7 +1078,13 @@ export async function runWorkbenchAcceptance({
   if(!String(packageAudit?.status??"").includes("NOT_CHECKED")||
      !capabilityProblem||capabilityProblem.status!=="not_checked"||
      capabilityProblem.domain!=="capabilities"||!(capabilityProblem.line>0)||
+     !String(capabilityProblem.description??"").includes("assurance/contract.yaml")||
+     !String(capabilityProblem.description??"").includes("L")||
      !capabilityMarker||capabilityMarker.line!==capabilityProblem.line||
+     capabilityMarker.endLine!==capabilityMarker.line||
+     capabilityMarker.endColumn-capabilityMarker.column!==expectedCapabilityId.length||
+     !/\\d+ files/.test(packageAudit.status)||
+     packageAudit.problems.some(item=>item.code==="PREDICATE_SCRIPT_REF_UNDECLARED")||
      !packageAudit.problems.some(item=>item.code==="EVIDENCE_GUARANTEE_NOT_CHECKED")||
      !packageAudit.problems.some(item=>item.code==="DEPENDENCY_NOT_CONFIGURED"))
     throw Error("v1alpha5 Package diagnostics must reach Problems and editor markers without Compiler qualification: "+
