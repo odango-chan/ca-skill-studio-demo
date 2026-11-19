@@ -58,6 +58,21 @@ function packageSnapshot(generation, procedureText, rootUri = "file:///workspace
   };
 }
 
+test("Theia host-local semantic token mode avoids registering a competing LSP provider",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:5,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{},
+        initializationOptions:{disableSemanticTokens:true}}});
+    const initialized=await waitForMessage(worker,message=>message?.id===5);
+    assert.equal(initialized.result.capabilities.semanticTokensProvider,undefined);
+    assert.equal(initialized.result.capabilities.definitionProvider,true);
+    assert.equal(initialized.result.capabilities.referencesProvider,true);
+  }finally{
+    await worker.terminate();
+  }
+});
+
 test("browser LSP Worker initializes, publishes diagnostics and clears a closed Package",async()=>{
   const worker = new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   try {
