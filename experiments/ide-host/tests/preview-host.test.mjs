@@ -83,6 +83,55 @@ test("disposed and replaced Preview WebviewViews cannot retain old Source sessio
   assert.equal(controller.state.attached,false);
 });
 
+test("Markdown Source activates native language features without opening the native Preview CustomEditor",async()=>{
+  let activeListener=null,activationCount=0,markdownMounts=0,markdownActive=false;
+  const calls=[],context={subscriptions:[]};
+  const extension={
+    get isActive(){return markdownActive;},
+    async activate(){activationCount++;markdownActive=true;return {};}
+  };
+  const vscode={
+    env:{uriScheme:"theia"},
+    extensions:{getExtension(id){
+      assert.equal(id,"vscode.markdown-language-features");return extension;
+    }},
+    commands:{executeCommand:async id=>{calls.push(id);return true;}},
+    window:{
+      activeTextEditor:null,
+      registerWebviewViewProvider(id,provider){
+        assert.equal(id,PREVIEW_VIEW_ID);return {dispose(){}};
+      },
+      onDidChangeActiveTextEditor(listener){activeListener=listener;return {dispose(){}};}
+    }
+  };
+  const controller=registerPreviewHost(vscode,context,{
+    mountMarkdown(document){
+      markdownMounts++;
+      return {dispose(){}};
+    }
+  });
+  const view=makeView();
+  view.onDidDispose=()=>({dispose(){}});
+  const providerRegistration=context.subscriptions.find(item=>item&&typeof item.dispose==="function");
+  assert.ok(providerRegistration);
+  const markdown=doc("/skills/demo/SKILL.md");
+  activeListener({document:markdown});
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  assert.equal(activationCount,1,
+    "the Markdown language extension is explicitly activated after Source selection");
+  assert.equal(markdownMounts,0,
+    "the shared Preview is mounted only after its WebviewView resolves");
+  controller.resolve(view,markdown);
+  assert.equal(markdownMounts,1);
+  activeListener({document:doc("/skills/demo/references/guide.md")});
+  await Promise.resolve();await Promise.resolve();
+  assert.equal(activationCount,1,"subsequent Markdown Source files reuse the active language extension");
+  assert.equal(markdownMounts,2);
+  assert.deepEqual(calls,[],
+    "Markdown activation must not invoke vscode.openWith or native Markdown Preview commands");
+  controller.dispose();
+});
+
 test("active visual Source reveals the collapsed right Inspector and mounts the Preview View",async()=>{
   const calls=[],sessions=[];
   let provider=null,activeListener=null;
