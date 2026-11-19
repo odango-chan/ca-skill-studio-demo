@@ -1112,15 +1112,15 @@ export async function runWorkbenchAcceptance({
         inspectorContainer:await evalJS("(()=>{const el=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');return {text:el?.innerText??'',html:el?.innerHTML?.slice(-3500)??'',visible:!!el&&el.getBoundingClientRect().width>0};})()") }));
   console.log("STUDIO_V1ALPHA5_INSPECTOR_CHROMIUM",JSON.stringify(phaseEvidence));
 
-  // A single native EditorGroup test covers Procedure/Contract/Predicate/Schema
-  // visuals followed by ordinary Python/YAML Source tabs and a second Skill.
+  // One Main EditorGroup must contain every Source document. Visual projections
+  // live only in the independent right-side Preview WebviewView.
   const editorGroupPlacement=await nativeCommand("skillStudio.internal.editorGroupAcceptance");
   if(!(editorGroupPlacement?.openedVisualCount>=3)||
-     !(editorGroupPlacement?.groupCount>=1)||editorGroupPlacement.groupCount>2||
-     editorGroupPlacement?.maxViewColumn>2||
+     editorGroupPlacement?.groupCount!==1||
+     editorGroupPlacement?.maxViewColumn>1||
      editorGroupPlacement?.pythonColumn!==1||
      editorGroupPlacement?.ordinaryYamlColumn!==1)
-    throw Error("v1alpha5 editor groups did not remain a stable two-column layout: "+
+    throw Error("v1alpha5 Sources escaped the single Main Editor group: "+
       JSON.stringify(editorGroupPlacement));
   console.log("STUDIO_V1ALPHA5_EDITOR_GROUPS_CHROMIUM",JSON.stringify(editorGroupPlacement));
 
