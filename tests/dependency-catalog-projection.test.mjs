@@ -72,6 +72,11 @@ test("ToolCatalog v1alpha4 callable declarations are projected without Owner qua
     owner:"openamsm-smf",effect:"READ"}]);
   assert.equal(catalog.operations[0].trusted,undefined,
     "the declaration-only index must never manufacture Owner trust");
+  assert.equal(catalog.operations[0].catalogPath,"catalog.yaml");
+  const span=catalog.operations[0].idRange;
+  assert.ok(span&&span.start<span.end);
+  assert.equal(goodCatalog.slice(span.start,span.end),"context.smf.session.read",
+    "Inspect must target the exact callable ID in the pinned YAML, not legacy JSON");
 });
 
 test("old skillc.tool/v0.1 JSON is no longer accepted as a callable declaration",()=>{
