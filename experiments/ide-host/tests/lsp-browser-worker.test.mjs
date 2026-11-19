@@ -74,6 +74,37 @@ test("Theia host-local semantic token mode avoids a competing LSP provider",asyn
   }
 });
 
+test("legacy persisted Example sends actionable Package status without generic server error",async()=>{
+  const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
+  const rootUri="file:///workspace/persisted-legacy-example";
+  try{
+    worker.postMessage({jsonrpc:"2.0",id:43,method:"initialize",
+      params:{processId:null,rootUri:"file:///workspace",capabilities:{}}});
+    await waitForMessage(worker,message=>message?.id===43);
+    worker.postMessage({jsonrpc:"2.0",method:"initialized",params:{}});
+    const status=waitForMessage(worker,message=>
+      message?.method==="skillStudio/analysisStatus"&&
+      message.params?.rootUri===rootUri&&message.params?.generation===1);
+    const duplicateError=expectNoMessage(worker,message=>
+      message?.method==="skillStudio/serverError"&&
+      message.params?.rootUri===rootUri&&
+      String(message.params?.message??"").includes("ANALYSIS_UNAVAILABLE"),300);
+    worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",
+      params:packageSnapshot(1,
+        "apiVersion: connectionagent.io/v1alpha1\nprocedures: {}\n",rootUri)});
+    const result=await status;
+    assert.equal(result.params.state,"UNAVAILABLE");
+    assert.match(result.params.reason,/UNSUPPORTED_CA_SL_VERSION/);
+    assert.match(result.params.reason,/start\/nodes/);
+    assert.ok(result.params.unlocated.some(item=>
+      item.code==="UNSUPPORTED_CA_SL_VERSION"));
+    assert.equal(await duplicateError,null,
+      "only the exact generation-scoped analysis status should explain a legacy Package");
+  }finally{
+    await worker.terminate();
+  }
+});
+
 test("analysis rejection preserves independent v1alpha5 source semantic colors until Package close",async()=>{
   const worker=new Worker(workerEntry,{workerData:{serverUrl:serverBundle}});
   const rootUri="file:///workspace/semantic-rejection";
