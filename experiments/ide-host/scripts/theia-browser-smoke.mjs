@@ -619,10 +619,15 @@ try{
       '.theia-notification-list-item,.theia-notification-message'
     )].some(node=>{
       const message=node.innerText;
-      return (message.includes('示例项目已载入并打开工作区：skill-studio-demo/')&&
-        message.includes('默认已打开 CA-SL v1alpha5 Procedure（DRAFT / NOT_QUALIFIED）'))||
-        (message.includes('Example project opened: skill-studio-demo/')&&
-        message.includes('CA-SL v1alpha5 Procedure is open (DRAFT / NOT_QUALIFIED)'));
+      const chineseCurrentProcedure=
+        message.includes('示例项目已载入并打开工作区：skill-studio-demo/')&&
+        message.includes('默认已打开')&&message.includes('Procedure')&&
+        message.includes('DRAFT / NOT_QUALIFIED');
+      const englishCurrentProcedure=
+        message.includes('Example project opened: skill-studio-demo/')&&
+        message.includes('CA-SL current Procedure is open')&&
+        message.includes('DRAFT / NOT_QUALIFIED');
+      return chineseCurrentProcedure||englishCurrentProcedure;
     })`);
     if(exampleLoadReady)break;
     await sleep(150);
