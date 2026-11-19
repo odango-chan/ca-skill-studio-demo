@@ -142,7 +142,7 @@ function classifyV1Alpha5Tokens(text, relativePath) {
 function classifyLegacySkillSource(text, relativePath) {
   const segments=relativePath.split("/").filter(Boolean);
   if(segments.some(part=>part==="."||part==="..") ||
-      !/(?:^|\\/)assurance\\/(?:procedure|contract|predicates)\\.yaml$/.test(relativePath))
+      !/(?:^|\/)assurance\/(?:procedure|contract|predicates)\.yaml$/.test(relativePath))
     return [];
   let doc;
   try {
