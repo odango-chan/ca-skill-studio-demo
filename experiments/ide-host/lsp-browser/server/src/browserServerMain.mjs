@@ -1006,7 +1006,8 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
     const result = await session.submit(snapshot);
     if (!result.accepted && result.reason !== "SUPERSEDED" &&
         result.reason !== "STALE_GENERATION" &&
-        result.reason !== "STALE_DOCUMENT") {
+        result.reason !== "STALE_DOCUMENT" &&
+        result.reason !== "ANALYSIS_UNAVAILABLE") {
       // Source snapshots are the independent input to semantic coloring.
       // A rejected diagnostic analysis must never evict the accepted source.
       // Also guard by identity so a late failure cannot clear a newer generation.
