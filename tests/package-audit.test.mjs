@@ -50,25 +50,27 @@ test("A5 checks Contract entry, PredicateSet skill and missing schema",()=>{
 });
 test("A5 detects unsupported Call and a missing Predicate without refusing authored Source",()=>{
   const w=fixture("ensure-pdu-session");
+  const baseline=audit(w);
   const before=w.files.get("assurance/procedure.yaml").text;
   const changed=applyNodeOperatorValue(before,
     previewNodeOperatorValue(before,"ensure-session","create-session","unlisted.operation"));
   const issues=auditPackageWorkspace(w,changed);
   assert.ok(codes(issues).includes("CAPABILITY_UNDECLARED"));
-  assert.deepEqual(audit(w),[],"Preview must not mutate Package");
+  assert.deepEqual(audit(w),baseline,"Preview must not mutate Package");
   w.files.get("assurance/procedure.yaml").text=changed.replace(
     "verify: pdu_session.target.satisfied","verify: bogus.predicate");
   assert.ok(codes(audit(w)).includes("NODE_PREDICATE"));
 });
 test("A5 flags obvious mismatched input binding as heuristic, not Runtime truth",()=>{
   const w=fixture("ensure-pdu-session");
+  const baseline=audit(w);
   const before=w.files.get("assurance/procedure.yaml").text;
   const changed=applyNodeBindingFrom(before,
     previewNodeBindingFrom(before,"ensure-session","create-session","supi","input.dnn"));
   const issues=auditPackageWorkspace(w,changed);
   assert.ok(codes(issues).includes("INPUT_BINDING_SUSPECT"));
   assert.match(issues.find(x=>x.code==="INPUT_BINDING_SUSPECT").message,/人工确认/);
-  assert.deepEqual(audit(w),[]);
+  assert.deepEqual(audit(w),baseline);
 });
 test("A5 reports unknown input source, absent producer and missing script",()=>{
   const w=fixture("establish-pdu-session");
