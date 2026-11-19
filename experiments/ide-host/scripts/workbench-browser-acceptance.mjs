@@ -1196,8 +1196,8 @@ export async function runWorkbenchAcceptance({
   const previewScrollStart=await evaluateStudioMarkdown(blockedMissingView,
     "(()=>new Promise(resolve=>{window.scrollTo(0,document.body.scrollHeight*0.72);"+
       "setTimeout(()=>resolve({height:document.body.scrollHeight,scrollY:window.scrollY,"+
-      "lastScroll:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScroll??"null")}catch{return null}})(),"+
-      "lastAck:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScrollAck??"null")}catch{return null}})()}),180);}))()");
+      "lastScroll:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScroll??'null')}catch{return null}})(),"+
+      "lastAck:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScrollAck??'null')}catch{return null}})()}),180);}))()");
   if(!(previewScrollStart?.height>1000)||!(previewScrollStart?.scrollY>0))
     throw Error("Markdown Preview fixture did not scroll to a non-zero position: "+
       JSON.stringify(previewScrollStart));
@@ -1210,8 +1210,8 @@ export async function runWorkbenchAcceptance({
   }
   if((sourceAfterPreviewScroll?.visibleRanges?.[0]?.start??1)<=35){
     const scrollDiagnostics=await evaluateStudioMarkdown(blockedMissingView,
-      "({lastScroll:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScroll??"null")}catch{return null}})(),"+
-      "lastAck:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScrollAck??"null")}catch{return null}})(),scrollY:window.scrollY})");
+      "({lastScroll:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScroll??'null')}catch{return null}})(),"+
+      "lastAck:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScrollAck??'null')}catch{return null}})(),scrollY:window.scrollY})");
     throw Error("Markdown Preview scrolling did not reveal the matching Source lines: "+
       JSON.stringify({sourceAfterPreviewScroll,previewScrollStart,scrollDiagnostics}));
   }
