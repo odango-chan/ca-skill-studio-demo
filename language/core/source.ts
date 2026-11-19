@@ -27,9 +27,14 @@ export function analyzeCurrentSource(
   function add(document: PackageDocumentSnapshot, code: string, message: string, item?: any, severity: "error" | "warning"="error") {
     const position = Array.isArray(item?.range) && Number.isInteger(item.range[0]) ? item.range[0] : 0;
     const line = document.text.slice(0, position).split("\n").length;
+    const span=Array.isArray(item?.range)&&
+      Number.isSafeInteger(item.range[0])&&Number.isSafeInteger(item.range[1])&&
+      item.range[0]>=0&&item.range[1]>=item.range[0]
+        ?{start:item.range[0],end:item.range[1]}:undefined;
     diagnostics.push({
       code, message, severity, uri:document.uri,
-      relativePath:document.relativePath, source:"procedure-projection", confidence:"exact", line
+      relativePath:document.relativePath, source:"procedure-projection", confidence:"exact", line,
+      ...(span?{range:span}:{})
     });
   }
   function parse(path: string): SyntaxResult {
