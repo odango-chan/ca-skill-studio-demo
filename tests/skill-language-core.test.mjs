@@ -62,7 +62,7 @@ test("shared core analyzes the current CA-SL v1alpha5 Example without claiming q
   assert.equal(result.procedure.procedures.length,1);
   assert.equal(result.procedure.entry,"get-sm-subscription-data");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
-  assert.match(result.packageAudit.reason,/v1alpha5 Compiler/);
+  assert.match(result.packageAudit.reason,/current Compiler/);
   assert.match(result.packageAudit.reason,/Owner.*linking/);
   assert.equal(result.documents.filter(document=>document.pythonOutlineState==="READY").length,3);
   assert.ok(result.scriptReferences.length>=3);
@@ -107,7 +107,7 @@ test("missing non-procedure v1alpha5 files do not fabricate Package qualificatio
   assert.equal(result.state,"PARTIAL");
   assert.equal(result.procedure.state,"READY");
   assert.equal(result.packageAudit.state,"UNAVAILABLE");
-  assert.match(result.packageAudit.reason,/v1alpha5 Compiler/);
+  assert.match(result.packageAudit.reason,/current Compiler/);
 });
 
 test("malformed v1alpha5 Procedure remains visible and fails closed",()=>{
