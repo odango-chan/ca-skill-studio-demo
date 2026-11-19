@@ -2978,9 +2978,11 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
         }
         if(document&&item.line&&item.kind!=='compiler-diagnostic'){
           const rootInfo=packageRootForProcedure(vscode,document);
-          const uri=item.sourcePath&&rootInfo?.uri
-            ?vscode.Uri.joinPath(rootInfo.uri,...item.sourcePath.split("/"))
-            :typeof item.uri==="string"?vscode.Uri.parse(item.uri):item.uri??document.uri;
+          const uri=item.uri
+            ?(typeof item.uri==="string"?vscode.Uri.parse(item.uri):item.uri)
+            :item.sourcePath&&rootInfo?.uri
+              ?vscode.Uri.joinPath(rootInfo.uri,...item.sourcePath.split("/"))
+              :document.uri;
           tree.command={command:'skillStudio.revealInspection',title:'Reveal Source',
             arguments:[{...item,uri,version:document.version,
               sourceVersion:document.version,documentUri:document.uri.toString(),
@@ -3067,7 +3069,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     if(!state)throw Error("Package is not attached to the current Language Service");
     audit=[];auditStatus="Package Audit · pending";fireProblems();
     scheduleLanguagePackageRefresh(state,true);
-    return {requested:true,rootUri:state.key,generation:state.generation+1};
+    return {requested:true,rootUri:state.key,generation:state.generation};
   }
   function scheduleAudit(){
     generation++;
@@ -3249,8 +3251,12 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     if(!document)return;
     const workspace=vscode.workspace.getWorkspaceFolder?.(document.uri)?.uri;
     if(!event?.affectsConfiguration||
-       event.affectsConfiguration("connectionAgent.skillStudio",workspace))
-      scheduleAudit();
+       event.affectsConfiguration("connectionAgent.skillStudio",workspace)){
+      const rootInfo=packageRootForProcedure(vscode,document);
+      const state=rootInfo?languagePackages.get(rootInfo.uri.toString()):null;
+      if(state)scheduleLanguagePackageRefresh(state,true);
+      else scheduleAudit();
+    }
   });
   // The pinned Markdown language extension is separate from the right-side
   // Studio Preview. Activation should be verified explicitly, not inferred
