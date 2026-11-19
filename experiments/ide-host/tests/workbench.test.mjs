@@ -35,7 +35,7 @@ test("visual inspection uses the current CA-SL projection for the released Examp
   assert.ok(!result.problems.some(item=>item.code==="UNSUPPORTED_CA_SL_VERSION"));
 });
 
-test("historical syntax is not projected by a compatibility graph parser",()=>{
+test("historical syntax receives ordinary errors from the current grammar",()=>{
   const files=new Map([
     ["assurance/contract.yaml",{text:
       "apiVersion: connectionagent.io/v1alpha1\nkind: SkillContract\nmetadata: {}\nspec: {}\n"}],
