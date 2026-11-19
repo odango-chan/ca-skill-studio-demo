@@ -1,7 +1,7 @@
 // Build the shared VS Code-compatible extension bundles used by Theia and optional local hosts.
 // This step creates extension assets only; Theia app builds and Pages releases are separate.
 import {build} from "esbuild";
-import {mkdir,rm,cp,readFile,appendFile,writeFile} from "node:fs/promises";
+import {mkdir,rm,cp,readFile,appendFile,writeFile,stat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {dirname,join} from "node:path";
 const root="experiments/ide-host/vscode";
@@ -15,6 +15,39 @@ await cp(join(root,"src/compiler-worker.js"),join(root,"dist/compiler-worker.js"
 // The pinned native Markdown extension owns Preview rendering; Studio supplies its shared theme.
 await cp("extensions/skill-studio-theme/styles/markdown-preview.css",
   join(root,"media/native-markdown-preview.css"));
+
+// YAML and Python TextMate grammars are owned by the primary extension.
+// Keep the standalone language package as the upstream asset/metadata source,
+// but stage its grammar files inside the extension that Theia always loads.
+const syntaxPackageRoot="extensions/skill-studio-languages";
+const syntaxSourceManifest=JSON.parse(await readFile(
+  join(syntaxPackageRoot,"package.json"),"utf8"));
+const primaryManifest=JSON.parse(await readFile(join(root,"package.json"),"utf8"));
+for(const language of ["yaml","python"]){
+  if(!primaryManifest.contributes?.languages?.some(item=>item.id===language)||
+     !primaryManifest.contributes?.grammars?.some(item=>item.language===language))
+    throw Error("Primary Skill Studio extension is missing "+language+" contributions");
+}
+await cp(join(syntaxPackageRoot,"upstream"),join(root,"media","languages"),
+  {recursive:true});
+await cp(join(syntaxPackageRoot,"LICENSE.txt"),
+  join(root,"media","languages","LICENSE.txt"));
+const missingGrammarAssets=[];
+for(const grammar of primaryManifest.contributes.grammars){
+  if(!String(grammar.path??"").startsWith("./media/languages/"))
+    throw Error("Primary extension grammar path must remain package-local: "+grammar.path);
+  const asset=join(root,grammar.path);
+  try{
+    const info=await stat(asset);
+    if(!info.isFile()||info.size<100)missingGrammarAssets.push(grammar.path);
+  }catch{missingGrammarAssets.push(grammar.path);}
+}
+if(missingGrammarAssets.length)
+  throw Error("Primary extension TextMate assets missing: "+missingGrammarAssets.join(", "));
+console.log("STUDIO_PRIMARY_EXTENSION_SYNTAX_ASSETS",JSON.stringify({
+  languages:["yaml","python"],grammarCount:primaryManifest.contributes.grammars.length,
+  owner:"ca-skill-studio-ide-spike",independentOfLsp:true
+}));
 
 // The browser LSP server is a separate classic Worker bundle. It imports the
 // same transport-neutral LanguageDiagnosticSession as the host tests; no Node
