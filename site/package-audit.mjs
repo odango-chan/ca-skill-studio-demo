@@ -1,579 +1,690 @@
 import {parseDocument,LineCounter,isMap,isSeq,isScalar} from "yaml";
-import {projectWorkspace} from "./workspace.mjs";
 
-// Conservative editor diagnostics only. No Runtime, capability discovery,
-// schema typing or production Skill validation is inferred from these checks.
 const FILES=Object.freeze({
-  procedure:"assurance/procedure.yaml",
   contract:"assurance/contract.yaml",
+  procedure:"assurance/procedure.yaml",
   predicates:"assurance/predicates.yaml"
 });
-const NAME=/^[A-Za-z_][A-Za-z0-9_.-]*$/;
-function values(node){
-  return isSeq(node)?node.items.map(n=>isScalar(n)?n.value:null)
-    .filter(x=>typeof x==="string"):[];
-}
-function entries(node){
-  return isMap(node)?node.items:[];
-}
-function v(node){return isScalar(node)?node.value:null;}
-function get(node,...path){
-  let n=node;
-  for(const part of path){
-    if(!isMap(n))return null;
-    n=n.get(part,true);
+const ALIAS=/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+const QUALIFIED_REF=/^([a-z][a-z0-9]*(?:-[a-z0-9]+)*)::(.+)$/;
+const TOOL_REF=/^([a-z][a-z0-9]*(?:-[a-z0-9]+)*)::([A-Za-z0-9_][A-Za-z0-9_.-]*)$/;
+const STAGES=["precondition","operation","observation","postcondition"];
+const scalar=node=>isScalar(node)&&typeof node.value==="string"?node.value:null;
+const entries=node=>isMap(node)?node.items:[];
+const get=(node,key)=>isMap(node)?node.get(key,true):null;
+const safePath=value=>typeof value==="string"&&value.length>0&&value.length<=240&&
+  !value.startsWith("/")&&!/^[A-Za-z]:/.test(value)&&!value.includes("\\")&&
+  !/[\u0000-\u001f:*?"<>|]/.test(value)&&
+  value.split("/").every(part=>part&&part!=="."&&part!=="..");
+
+function parseYaml(path,file,diagnostics){
+  if(typeof file?.text!=="string")return null;
+  const counter=new LineCounter();
+  let document;
+  try{
+    document=parseDocument(file.text,{
+      version:"1.2",schema:"core",strict:true,uniqueKeys:true,
+      stringKeys:true,keepSourceTokens:true,lineCounter:counter,logLevel:"silent"
+    });
+  }catch(error){
+    add(diagnostics,path,null,null,"PACKAGE_YAML_PARSE_ERROR",
+      "Cannot parse "+path+": "+String(error?.message??error),
+      {domain:"source",status:"confirmed",severity:"error"});
+    return null;
   }
-  return n??null;
-}
-function normalized(s){return String(s).replace(/[^a-zA-Z0-9]/g,"").toLowerCase();}
-function collectActions(node,fn){
-  if(isMap(node)){
-    for(const pair of node.items){
-      const field=v(pair.key),value=pair.value;
-      if(field==="from"||field==="call"||field==="tool"||
-         field==="verify"||field==="predicate"||field==="script"||field==="procedure"){
-        if(isScalar(value)&&typeof value.value==="string")
-          fn(field,value,node);
-      }
-      collectActions(value,fn);
-    }
-  }else if(isSeq(node)){
-    for(const item of node.items)collectActions(item,fn);
+  const parsed={root:isMap(document.contents)?document.contents:null,counter,text:file.text};
+  for(const error of document.errors??[]){
+    const node={range:[error.pos?.[0]??0,error.pos?.[1]??error.pos?.[0]??0]};
+    add(diagnostics,path,parsed,node,"PACKAGE_YAML_PARSE_ERROR",
+      "Cannot parse "+path+": "+error.message,
+      {domain:"source",status:"confirmed",severity:"error"});
   }
+  if(!parsed.root){
+    add(diagnostics,path,parsed,document.contents,"PACKAGE_YAML_ROOT_INVALID",
+      path+" must have a YAML mapping root",
+      {domain:"source",status:"confirmed",severity:"error"});
+    return null;
+  }
+  return parsed;
 }
-export function auditPackageWorkspace(workspace,procedureOverride=null){
-  const fileMap=workspace?.files;
-  const diagnostics=[],parsed=new Map(),counters=new Map(),sources=new Map();
-  const completeness=workspace?.completeness??"complete";
-  const add=(code,path,node,message,{severity="warning",status="confirmed",
-    domain="source",category="structure"}={})=>{
-    if(diagnostics.length>=300)return;
-    const counter=counters.get(path);
-    const position=counter&&node?.range?counter.linePos(node.range[0]):null;
-    const diagnostic={
-      kind:"package-diagnostic",severity,status,code,path,relativePath:path,
-      message,domain,category,source:"Skill Studio · Package Audit"
-    };
-    // Do not invent line 1 for Package-level or NOT_CHECKED results. They stay
-    // visible in Problems but receive no misleading editor marker.
-    if(position?.line>0&&position?.col>0){
-      diagnostic.line=position.line;
-      diagnostic.column=position.col;
+function sourceLocation(parsed,node){
+  const offset=Array.isArray(node?.range)?node.range[0]:0;
+  const position=parsed?.counter?.linePos?.(offset)??{line:1,col:1};
+  return {line:position.line||1,column:position.col||1};
+}
+function add(list,path,parsed,node,code,message,{
+  severity="error",status="confirmed",domain="package",category="reference"
+}={}){
+  if(list.length>=400)return;
+  const location=sourceLocation(parsed,node);
+  const id=[code,path,location.line,location.column,message].join("|");
+  if(list.some(item=>item.id===id))return;
+  list.push(Object.freeze({
+    id,kind:"package-diagnostic",code,message,severity,status,domain,category,
+    path,relativePath:path,...location,
+    source:"Skill Studio · Package Audit"
+  }));
+}
+function resolverMessage(diagnostics,id){
+  const item=(diagnostics??[]).find(value=>value.dependencyId===id);
+  return item?.message??"No verified immutable dependency snapshot is available";
+}
+function schemaIds(text){
+  let parsed;
+  try{
+    parsed=parseDocument(text,{version:"1.2",schema:"core",strict:true,
+      uniqueKeys:true,stringKeys:true,logLevel:"silent"});
+  }catch{return {ids:[],parseable:false};}
+  if(parsed.errors.length||!isMap(parsed.contents))return {ids:[],parseable:false};
+  const ids=[];
+  for(const key of ["$id","id","schemaId"]){
+    const value=scalar(parsed.contents.get(key,true));
+    if(value)ids.push(value);
+  }
+  return {ids,parseable:true};
+}
+/**
+ * Index callable identities from a previously verified immutable snapshot.
+ * the current CA-SL language contract inherits ToolCatalog v1alpha4 (F.1); a legacy skillc.tool/v0.1
+ * JSON file or an arbitrary 'operations' list is never a trusted substitute.
+ *
+ * This index proves only structural declaration presence. It does not qualify
+ * Owner identity, Capability authorization, Schema typing or runtime effects.
+ */
+export function indexV1Alpha4ToolCatalogCallables(dependencyId,files){
+  const fail=reason=>({dependencyId,available:false,reason,operations:[]});
+  if(!Array.isArray(files))return fail("The verified snapshot has no file inventory");
+  const operations=[];
+  let catalogCount=0;
+  for(const file of [...files].sort((a,b)=>String(a.path).localeCompare(String(b.path)))){
+    if(typeof file.path!=="string"||!/\.(?:json|ya?ml)$/i.test(file.path))continue;
+    const filenameHint=/(?:^|\/)tool[-_]?catalog(?:[.-]|$)/i.test(file.path);
+    if(typeof file.text!=="string"){
+      if(filenameHint)return fail("ToolCatalog "+file.path+" has no decodable text");
+      continue;
     }
-    diagnostics.push(Object.freeze(diagnostic));
-  };
-  const warn=(code,path,node,message)=>add(code,path,node,message);
-  const notChecked=(code,path,message,domain="package")=>add(code,path,null,message,{
-    severity:"warning",status:"not_checked",domain,category:"analysis"
+    let document;
+    try{
+      document=parseDocument(file.text,{version:"1.2",schema:"core",
+        strict:true,uniqueKeys:true,stringKeys:true,logLevel:"silent"});
+    }catch(error){
+      if(filenameHint)return fail("ToolCatalog "+file.path+" is unreadable: "+String(error?.message??error));
+      continue;
+    }
+    const root=document.contents;
+    const kind=scalar(get(root,"kind"));
+    if(kind!=="ToolCatalog"&&!filenameHint)continue;
+    if(document.errors?.length||!isMap(root))
+      return fail("ToolCatalog "+file.path+" has invalid YAML/JSON syntax");
+    if(kind!=="ToolCatalog")
+      return fail("ToolCatalog "+file.path+" must declare kind: ToolCatalog");
+    if(scalar(get(root,"apiVersion"))!=="connectionagent.io/toolcatalog/v1alpha4")
+      return fail("ToolCatalog "+file.path+" requires apiVersion connectionagent.io/toolcatalog/v1alpha4; no legacy fallback");
+    const owner=scalar(get(get(root,"metadata"),"owner"));
+    const contracts=get(get(root,"spec"),"contracts");
+    if(!owner?.trim()||!isSeq(contracts)||contracts.items.length===0)
+      return fail("ToolCatalog "+file.path+" requires metadata.owner and nonempty spec.contracts");
+    catalogCount++;
+    for(const item of contracts.items){
+      const id=scalar(get(item,"id")),callableKind=scalar(get(item,"kind"));
+      const effect=scalar(get(item,"effect")),output=get(get(item,"outputSchema"),"$ref");
+      const input=get(get(item,
+        callableKind==="observation"?"queryContextSchema":"inputSchema"),"$ref");
+      const outcomes=get(item,"ownerOutcomes");
+      const validOutcomes=isSeq(outcomes)&&outcomes.items.some(v=>scalar(v)==="SUCCEEDED");
+      if(!isMap(item)||!id?.trim()||
+         !["operation","observation"].includes(callableKind)||
+         !["READ","MUTATION"].includes(effect)||
+         (callableKind==="observation"&&effect!=="READ")||
+         !scalar(output)||!scalar(input)||!validOutcomes)
+        return fail("ToolCatalog "+file.path+" has an invalid callable identity or required F.1 fields");
+      if(callableKind==="observation"&&get(item,"inputSchema")!=null||
+         callableKind==="operation"&&get(item,"queryContextSchema")!=null)
+        return fail("ToolCatalog "+file.path+" mixes Operation and Observation input Schema fields");
+      operations.push({dependencyId,id,kind:callableKind,owner,effect});
+    }
+  }
+  if(!catalogCount)
+    return fail("No v1alpha4 ToolCatalog declaration is present in the locked snapshot");
+  return {dependencyId,available:true,operations};
+}
+
+function addNotChecked(list,path,parsed,node,code,message,domain){
+  add(list,path,parsed,node,code,message,{
+    severity:"warning",status:"not_checked",domain,category:"linking"
   });
-  if(completeness!=="complete")
-    notChecked("PACKAGE_SNAPSHOT_INCOMPLETE",FILES.procedure,
-      "Package inventory is "+completeness+"; only the captured files can be checked"+
-      (workspace?.snapshotReason?": "+workspace.snapshotReason:""));
-  if(!(fileMap instanceof Map)){
-    notChecked("PACKAGE_INVENTORY_UNAVAILABLE",FILES.procedure,
-      "Package file inventory is unavailable; no source or cross-file checks were run");
+}
+function addBlocked(list,path,parsed,node,code,message,domain){
+  add(list,path,parsed,node,code,message,{
+    severity:"error",status:"blocked",domain,category:"linking"
+  });
+}
+
+/**
+ * Bounded, read-only current CA-SL Package checks. This is not Compiler Check,
+ * Owner qualification, Capability authorization or Runtime execution.
+ *
+ * External declarations are checked only when their exact trusted snapshot is
+ * supplied. Missing trust inputs produce visible NOT_CHECKED diagnostics.
+ */
+export function auditPackage({
+  files,dependencyContext={},completeness="complete",snapshotReason=""
+}={}){
+  const diagnostics=[];
+  if(!(files instanceof Map)){
+    add(diagnostics,FILES.procedure,null,null,"PACKAGE_INVENTORY_UNAVAILABLE",
+      "The complete Package file inventory is unavailable",
+      {severity:"warning",status:"not_checked",domain:"package",category:"snapshot"});
     return Object.freeze(diagnostics);
   }
-  for(const [path,file] of fileMap){
-    if(typeof path!=="string"||typeof file?.text!=="string"){
-      notChecked("PACKAGE_FILE_UNREADABLE",FILES.procedure,
-        "At least one Package entry has no readable text; affected checks were not run");
-      continue;
-    }
-    sources.set(path,path===FILES.procedure&&typeof procedureOverride==="string"?
-      procedureOverride:file.text);
+
+  if(completeness!=="complete"){
+    add(diagnostics,FILES.procedure,null,null,"PACKAGE_SNAPSHOT_INCOMPLETE",
+      "Package checks are partial; missing files and exports cannot be treated as confirmed defects"+
+        (snapshotReason?": "+snapshotReason:""),
+      {severity:"warning",status:"not_checked",domain:"package",category:"snapshot"});
   }
-  const required=[FILES.procedure,FILES.contract,FILES.predicates];
-  for(const path of required){
-    if(sources.has(path))continue;
-    const observedMissing=completeness==="complete";
-    add(observedMissing?"CORE_FILE_MISSING":"CORE_FILE_NOT_OBSERVED",
-      path,null,observedMissing
-        ?"Required Package source file is missing: "+path
-        :"Cannot confirm whether required Package source file exists because the Package inventory is "+completeness,
-      {severity:observedMissing?"error":"warning",
-       status:observedMissing?"confirmed":"not_checked",
-       domain:"package",category:"inventory"});
-  }
-  // Parse every available YAML file independently. One malformed file must
-  // not prevent syntax checks or source-local checks in its siblings.
-  for(const [path,text] of sources){
-    if(!/\.ya?ml$/i.test(path))continue;
-    const counter=new LineCounter();
-    counters.set(path,counter);
-    const doc=parseDocument(text,{
-      version:"1.2",schema:"core",strict:true,uniqueKeys:true,
-      stringKeys:true,lineCounter:counter,logLevel:"silent"
-    });
-    if(doc.errors.length){
-      for(const err of doc.errors){
-        add("YAML_PARSE",path,err.pos?
-          {range:[err.pos[0],err.pos[1]]}:null,"YAML 无法解析："+err.message,
-          {severity:"error",domain:"syntax",category:"yaml"});
+
+  const parsed=new Map();
+  for(const path of Object.values(FILES)){
+    const file=files.get(path);
+    if(!file||typeof file.text!=="string"){
+      if(completeness==="complete"){
+        add(diagnostics,FILES.procedure,null,null,"PACKAGE_CORE_FILE_MISSING",
+          "Required current CA-SL Package file is missing: "+path,
+          {severity:"error",status:"confirmed",domain:"package",category:"inventory"});
       }
       continue;
     }
-    parsed.set(path,doc.contents);
-  }
-  // JSON source is independent of YAML/Procedure analysis too.
-  for(const [path,text] of sources){
-    if(!/\.json$/i.test(path))continue;
-    try{JSON.parse(text);}
-    catch(error){
-      const match=String(error?.message??"").match(/position\s+(\d+)/i);
-      const offset=match?Number(match[1]):0;
-      const prefix=text.slice(0,offset),line=prefix.split(/\r\n|\r|\n/).length;
-      const column=offset-(Math.max(prefix.lastIndexOf("\n"),prefix.lastIndexOf("\r"))+1)+1;
-      diagnostics.push(Object.freeze({
-        kind:"package-diagnostic",severity:"error",status:"confirmed",
-        code:"JSON_PARSE",path,relativePath:path,line,column,
-        message:"JSON 无法解析："+String(error?.message??error),
-        domain:"syntax",category:"json",source:"Skill Studio · Legacy Package Audit"
-      }));
-    }
+    const result=parseYaml(path,file,diagnostics);
+    if(result)parsed.set(path,result);
   }
   const contract=parsed.get(FILES.contract);
+  const procedure=parsed.get(FILES.procedure);
   const predicates=parsed.get(FILES.predicates);
-  const procedureAst=parsed.get(FILES.procedure);
-  if(!contract)notChecked("CONTRACT_CHECKS_NOT_CHECKED",FILES.contract,
-    "Contract checks were not run because the file is missing or its YAML could not be parsed");
-  if(!predicates)notChecked("PREDICATE_CHECKS_NOT_CHECKED",FILES.predicates,
-    "PredicateSet checks were not run because the file is missing or its YAML could not be parsed","predicates");
-  if(!procedureAst)notChecked("PROCEDURE_CHECKS_NOT_CHECKED",FILES.procedure,
-    "Procedure structure and reference checks were not run because the file is missing or its YAML could not be parsed","procedure");
-  const predIds=new Set(entries(get(predicates,"predicates")).map(pair=>v(pair.key)));
-  const contractVersion=contract?v(get(contract,"apiVersion")):null;
-  if(contractVersion==="connectionagent.io/v1alpha1"||
-     isMap(get(procedureAst,"procedures")))
-    notChecked("V1ALPHA5_LSP_NOT_APPLICABLE",FILES.procedure,
-      "当前源码属于 CA-SL v1alpha1 / legacy procedures Profile；v1alpha5 专用 Language Service 不会解析该语法。Legacy Package Audit 仍继续执行可识别的静态检查","language");
-  const procedureModel=procedureAst
-    ?projectWorkspace(sources.get(FILES.procedure))
-    :{state:"UNAVAILABLE",diagnostics:[]};
-  if(procedureAst&&procedureModel.state!=="READY"){
-    const detail=procedureModel.diagnostics?.[0]?.message??"legacy graph projection unavailable";
-    notChecked("PROCEDURE_GRAPH_PROJECTION_NOT_CHECKED",FILES.procedure,
-      "The visual graph projection could not be built: "+detail+
-      ". Independent YAML, metadata and reference checks continue.","procedure");
+  if(!contract||!procedure||!predicates)
+    return Object.freeze(sortDiagnostics(diagnostics));
+
+  const declarations=Array.isArray(dependencyContext.declarations)
+    ?dependencyContext.declarations:[];
+  const snapshots=Array.isArray(dependencyContext.snapshots)
+    ?dependencyContext.snapshots:[];
+  const dependencyDiagnostics=Array.isArray(dependencyContext.diagnostics)
+    ?dependencyContext.diagnostics:[];
+  const operations=Array.isArray(dependencyContext.operations)
+    ?dependencyContext.operations:[];
+  const toolCatalogs=Array.isArray(dependencyContext.toolCatalogs)
+    ?dependencyContext.toolCatalogs:[];
+  const schemas=Array.isArray(dependencyContext.schemas)
+    ?dependencyContext.schemas:[];
+  const capabilityDeclarations=Array.isArray(dependencyContext.capabilityDeclarations)
+    ?dependencyContext.capabilityDeclarations:null;
+  const capabilityDeclarationsComplete=dependencyContext.capabilityDeclarationsComplete===true;
+  const evidenceDeclarations=Array.isArray(dependencyContext.evidenceDeclarations)
+    ?dependencyContext.evidenceDeclarations:null;
+  const evidenceDeclarationsComplete=dependencyContext.evidenceDeclarationsComplete===true;
+  const contextAvailable=dependencyContext.available===true;
+  const declarationById=new Map(declarations.map(item=>[item.id,item]));
+  const snapshotById=new Map(snapshots.map(item=>[item.id,item]));
+  const contractDependencies=new Map();
+  const dependencyNode=get(contract.root,"dependencies");
+
+  if(dependencyNode!=null&&!isMap(dependencyNode)){
+    add(diagnostics,FILES.contract,contract,dependencyNode,
+      "DEPENDENCIES_INVALID","Contract dependencies must be a mapping");
+  }else{
+    for(const pair of entries(dependencyNode)){
+      const alias=scalar(pair.key),reference=scalar(pair.value);
+      if(!alias||!ALIAS.test(alias)){
+        add(diagnostics,FILES.contract,contract,pair.key,
+          "DEPENDENCY_ALIAS_INVALID","Dependency alias must use lowercase kebab-case");
+        continue;
+      }
+      if(!reference){
+        add(diagnostics,FILES.contract,contract,pair.value,
+          "DEPENDENCY_REFERENCE_INVALID","Dependency "+alias+" must reference a non-empty package identity");
+        continue;
+      }
+      contractDependencies.set(alias,{reference,node:pair.value,key:pair.key});
+      if(!contextAvailable){
+        addNotChecked(diagnostics,FILES.contract,contract,pair.value,
+          "DEPENDENCY_LINK_NOT_CHECKED",
+          "Dependency "+alias+" ("+reference+") cannot be compared with a project lock because Dependency Service state is unavailable"+
+            (dependencyContext.reason?": "+dependencyContext.reason:""),
+          "dependencies");
+        continue;
+      }
+      const declaration=declarationById.get(alias);
+      if(!declaration){
+        add(diagnostics,FILES.contract,contract,pair.value,
+          "DEPENDENCY_NOT_CONFIGURED",
+          "Contract dependency "+alias+" ("+reference+") has no matching project dependency declaration",
+          {domain:"dependencies",category:"linking"});
+        continue;
+      }
+      if(!snapshotById.has(alias)){
+        addBlocked(diagnostics,FILES.contract,contract,pair.value,
+          "DEPENDENCY_SNAPSHOT_UNAVAILABLE",
+          "Dependency "+alias+" has no verified immutable snapshot: "+
+            resolverMessage(dependencyDiagnostics,alias),
+          "dependencies");
+      }
+    }
   }
-  const procedureRoot=get(procedureAst,"procedures");
-  const procedureEntries=entries(procedureRoot);
-  const ids=new Set(procedureEntries.map(pair=>v(pair.key)));
-  const contractName=contract?v(get(contract,"metadata","name")):null;
-  const predName=predicates?v(get(predicates,"metadata","skill")):null;
-  if(contract){
-    if(contractName!==workspace?.name)
-      warn("CONTRACT_NAME",FILES.contract,get(contract,"metadata","name"),
-        "Contract metadata.name 与当前 Package 不一致");
-    if(v(get(contract,"kind"))&&v(get(contract,"kind"))!=="SkillContract")
-      add("CONTRACT_KIND_INVALID",FILES.contract,get(contract,"kind"),
-        "Contract kind 必须为 SkillContract",{severity:"error",domain:"contract"});
-    const apiVersion=v(get(contract,"apiVersion"));
-    if(apiVersion&&apiVersion!=="connectionagent.io/v1alpha1")
-      warn("CONTRACT_API_VERSION_UNRECOGNIZED",FILES.contract,get(contract,"apiVersion"),
-        "Legacy analyzer detected an unexpected Contract apiVersion: "+apiVersion);
-  }
-  if(predicates){
-    if(predName&&predName!==workspace?.name)
-      warn("PREDICATE_SKILL",FILES.predicates,get(predicates,"metadata","skill"),
-        "PredicateSet 的 Skill 名称与当前 Package 不一致");
-    if(predName&&contractName&&predName!==contractName)
-      warn("PREDICATE_CONTRACT_NAME_MISMATCH",FILES.predicates,get(predicates,"metadata","skill"),
-        "PredicateSet 的 Skill 名称与 Contract metadata.name 不一致");
-    if(v(get(predicates,"kind"))&&v(get(predicates,"kind"))!=="PredicateSet")
-      add("PREDICATE_KIND_INVALID",FILES.predicates,get(predicates,"kind"),
-        "PredicateSet kind 必须为 PredicateSet",{severity:"error",domain:"predicates"});
-    const apiVersion=v(get(predicates,"apiVersion"));
-    const contractVersion=v(get(contract,"apiVersion"));
-    if(apiVersion&&contractVersion&&apiVersion!==contractVersion)
-      add("API_VERSION_MISMATCH",FILES.predicates,get(predicates,"apiVersion"),
-        "Contract 与 PredicateSet apiVersion 不一致",{severity:"error",domain:"language"});
-  }
-  const entry=contract?v(get(contract,"spec","entryProcedure")):null;
-  if(contract&&typeof entry==="string"&&!ids.has(entry))
-    add("ENTRY_PROCEDURE",FILES.contract,get(contract,"spec","entryProcedure"),
-      "Contract entryProcedure 不存在："+entry,{severity:"error",domain:"contract"});
-  if(contract&&!entry)
-    add("ENTRY_PROCEDURE_MISSING",FILES.contract,get(contract,"spec"),
-      "Contract 缺少 spec.entryProcedure",{severity:"error",domain:"contract"});
-  const schema=contract?v(get(contract,"spec","inputs","requestSchema")):null;
-  if(typeof schema==="string"&&!sources.has(schema))
-    add("REQUEST_SCHEMA",FILES.contract,get(contract,"spec","inputs","requestSchema"),
-      "Contract Schema 文件未包含在 Package："+schema,
-      {severity:"error",domain:"schemas"});
-  else if(typeof schema==="string"){
-    const schemaNode=parsed.get(schema);
-    if(!schemaNode){
-      notChecked("REQUEST_SCHEMA_CHECKS_NOT_CHECKED",schema,
-        "Request Schema 文件存在于快照中，但其 YAML/JSON 无法解析或未被当前解析器识别","schemas");
+
+  const capabilityNode=get(contract.root,"capabilities");
+  if(capabilityNode!=null){
+    if(!isSeq(capabilityNode)){
+      add(diagnostics,FILES.contract,contract,capabilityNode,
+        "CAPABILITY_GRANTS_INVALID","Contract capabilities must be an ordered list",
+        {domain:"capabilities",category:"structure"});
     }else{
-      if(!isMap(schemaNode)||v(get(schemaNode,"type"))!=="object"||
-         !isMap(get(schemaNode,"properties")))
-        add("REQUEST_SCHEMA_SHAPE_INVALID",schema,schemaNode,
-          "Request Schema 必须是声明 type: object 与 properties mapping 的 JSON Schema",
-          {severity:"error",domain:"schemas"});
-      const properties=get(schemaNode,"properties"),requiredFields=values(get(schemaNode,"required"));
-      for(const field of requiredFields){
-        if(!get(properties,field))
-          add("REQUEST_SCHEMA_REQUIRED_UNDECLARED",schema,get(schemaNode,"required"),
-            "Request Schema required 引用了未声明的 property："+field,
-            {severity:"error",domain:"schemas"});
-      }
-      if(isMap(properties))for(const property of properties.items){
-        if(!isMap(property.value)||typeof v(get(property.value,"type"))!=="string")
-          add("REQUEST_SCHEMA_PROPERTY_INVALID",schema,property.value,
-            "Request Schema property "+v(property.key)+" 缺少有效的 type",
-            {severity:"error",domain:"schemas"});
-      }
-    }
-  }else if(contract){
-    notChecked("REQUEST_SCHEMA_NOT_DECLARED",FILES.contract,
-      "Contract 未声明 spec.inputs.requestSchema；Schema 约束未检查","schemas");
-  }
-  const allowed=new Set([
-    ...values(get(contract,"spec","allowedResources","capabilities")),
-    ...values(get(contract,"spec","allowedResources","localTools"))
-  ]);
-  if(contract){
-    const spec=get(contract,"spec");
-    if(!isMap(spec))
-      add("CONTRACT_SPEC_INVALID",FILES.contract,spec??contract,
-        "SkillContract 缺少 spec mapping",{severity:"error",domain:"contract"});
-    else{
-      if(typeof v(get(spec,"goal"))!=="string"||!v(get(spec,"goal")))
-        add("CONTRACT_GOAL_MISSING",FILES.contract,spec,
-          "SkillContract spec.goal 缺失",{severity:"error",domain:"contract"});
-      if(typeof v(get(spec,"skillType"))!=="string"||!v(get(spec,"skillType")))
-        add("CONTRACT_SKILL_TYPE_MISSING",FILES.contract,spec,
-          "SkillContract spec.skillType 缺失",{severity:"error",domain:"contract"});
-      const resources=get(spec,"allowedResources");
-      if(resources!==null&&!isMap(resources))
-        add("ALLOWED_RESOURCES_INVALID",FILES.contract,resources,
-          "Contract spec.allowedResources 必须是 mapping",{severity:"error",domain:"capabilities"});
-    }
-  }
-  // Contract's explicit predicate references.
-  if(contract&&predicates){
-    for(const section of ["preconditions","postconditions"]){
-      const records=get(contract,"spec",section);
-      if(records!==null&&!isSeq(records)){
-        add("CONTRACT_PREDICATE_SECTION_INVALID",FILES.contract,records,
-          "Contract spec."+section+" 必须是列表",{severity:"error",domain:"contract"});
-        continue;
-      }
-      for(const record of (isSeq(records)?records.items:[])){
-        const ref=get(record,"predicate");
-        if(typeof v(ref)==="string"&&!predIds.has(v(ref)))
-          add("CONTRACT_PREDICATE",FILES.contract,ref,
-            "Contract 引用了未定义 Predicate："+v(ref),
-            {severity:"error",domain:"predicates"});
-      }
-    }
-  }else if(contract&&!predicates){
-    notChecked("CONTRACT_PREDICATE_LINKS_NOT_CHECKED",FILES.contract,
-      "Contract Predicate 引用无法核对：PredicateSet 缺失或 YAML 解析失败","predicates");
-  }
-
-  // Validate PredicateSet structure independently of Procedure graph projection.
-  let celPredicateCount=0;
-  if(predicates){
-    const definitions=get(predicates,"predicates");
-    if(!isMap(definitions)){
-      add("PREDICATE_SET_INVALID",FILES.predicates,definitions,
-        "PredicateSet 必须包含 predicates mapping",{severity:"error",domain:"predicates"});
-    }else for(const pair of definitions.items){
-      const id=v(pair.key),body=pair.value;
-      if(!isMap(body)){
-        add("PREDICATE_DEFINITION_INVALID",FILES.predicates,body,
-          "Predicate "+id+" 必须是 mapping",{severity:"error",domain:"predicates"});
-        continue;
-      }
-      const observations=get(body,"observations"),evaluator=get(body,"evaluator");
-      if(!isMap(observations)||observations.items.length===0)
-        add("PREDICATE_OBSERVATIONS_INVALID",FILES.predicates,observations??body,
-          "Predicate "+id+" 必须声明非空 observations mapping",
-          {severity:"error",domain:"predicates"});
-      else for(const observation of observations.items){
-        if(!isMap(observation.value)){
-          add("OBSERVATION_INVALID",FILES.predicates,observation.value,
-            "Predicate "+id+" 的 Observation "+v(observation.key)+" 必须是 mapping",
-            {severity:"error",domain:"observations"});
+      const seen=new Set();
+      for(const item of capabilityNode.items){
+        const id=scalar(item);
+        if(!id||!id.startsWith("urn:")){
+          add(diagnostics,FILES.contract,contract,item,
+            "CAPABILITY_GRANT_INVALID","Capability grant must be a non-empty URN CapabilityId",
+            {domain:"capabilities",category:"structure"});
           continue;
         }
-        for(const field of ["ref","scope","freshness"]){
-          if(typeof v(get(observation.value,field))!=="string")
-            add("OBSERVATION_FIELD_MISSING",FILES.predicates,observation.value,
-              "Predicate "+id+" 的 Observation "+v(observation.key)+" 缺少字符串字段 "+field,
-              {severity:"error",domain:"observations"});
+        if(seen.has(id)){
+          add(diagnostics,FILES.contract,contract,item,
+            "CAPABILITY_GRANT_DUPLICATE","Capability grant is duplicated: "+id,
+            {domain:"capabilities",category:"linking"});
+          continue;
+        }
+        seen.add(id);
+        if(!capabilityDeclarations){
+          addNotChecked(diagnostics,FILES.contract,contract,item,
+            "CAPABILITY_GRANT_NOT_CHECKED",
+            "Capability grant "+id+" has no trusted CapabilityContracts declaration set in the current Studio snapshot; declaration uniqueness and Owner binding are NOT_CHECKED",
+            "capabilities");
+          continue;
+        }
+        const matches=capabilityDeclarations.filter(value=>value?.id===id);
+        if(matches.length>1){
+          add(diagnostics,FILES.contract,contract,item,
+            "CAPABILITY_DECLARATION_AMBIGUOUS",
+            "Multiple trusted CapabilityContracts declarations match "+id,
+            {domain:"capabilities",category:"linking"});
+        }else if(!capabilityDeclarationsComplete){
+          addNotChecked(diagnostics,FILES.contract,contract,item,
+            matches.length===0?"CAPABILITY_DECLARATION_NOT_CHECKED":"CAPABILITY_DECLARATION_SET_INCOMPLETE",
+            matches.length===0
+              ?"No match for "+id+" was found in the partial CapabilityContracts snapshot; absence is NOT_CHECKED"
+              :"Capability "+id+" has a candidate declaration, but the CapabilityContracts snapshot is incomplete; uniqueness and Owner binding are NOT_CHECKED",
+            "capabilities");
+        }else if(matches.length===0){
+          add(diagnostics,FILES.contract,contract,item,
+            "CAPABILITY_DECLARATION_NOT_FOUND",
+            "No trusted CapabilityContracts declaration matches "+id,
+            {domain:"capabilities",category:"linking"});
+        }else if(matches[0].trusted!==true){
+          addNotChecked(diagnostics,FILES.contract,contract,item,
+            "CAPABILITY_OWNER_NOT_VERIFIED",
+            "Capability "+id+" has a declaration, but its Owner publication is not trusted; authorization is NOT_CHECKED",
+            "capabilities");
         }
       }
-      if(!isMap(evaluator))
-        add("PREDICATE_EVALUATOR_INVALID",FILES.predicates,evaluator??body,
-          "Predicate "+id+" 缺少 evaluator mapping",
-          {severity:"error",domain:"predicates"});
-      else{
-        const type=v(get(evaluator,"type")),expression=v(get(evaluator,"expression"));
-        if(typeof type!=="string"||!type)
-          add("PREDICATE_EVALUATOR_TYPE_MISSING",FILES.predicates,evaluator,
-            "Predicate "+id+" 的 evaluator 缺少 type",{severity:"error",domain:"predicates"});
-        else if(type==="cel"){
-          celPredicateCount++;
-          if(typeof expression!=="string"||!expression.trim())
-            add("PREDICATE_EXPRESSION_MISSING",FILES.predicates,evaluator,
-              "CEL Predicate "+id+" 的 evaluator 缺少非空 expression",
-              {severity:"error",domain:"predicates"});
-        }else if(type==="script"){
-          const reference=v(get(evaluator,"ref"));
-          if(typeof reference!=="string"||!reference.trim())
-            add("PREDICATE_SCRIPT_REF_MISSING",FILES.predicates,evaluator,
-              "Script Predicate "+id+" 的 evaluator 缺少 ref",
-              {severity:"error",domain:"predicates"});
-          else if(contract&&!values(get(contract,"spec","allowedResources","localTools")).includes(reference))
-            add("PREDICATE_SCRIPT_REF_UNDECLARED",FILES.predicates,get(evaluator,"ref"),
-              "Predicate "+id+" 引用了未在 Contract localTools 声明的 Script："+reference,
-              {severity:"error",domain:"scripts"});
+    }
+  }
+
+  const requestSchema=get(contract.root,"requestSchema");
+  if(requestSchema!=null){
+    const requestSchemaPath=scalar(requestSchema);
+    if(!requestSchemaPath||!safePath(requestSchemaPath)){
+      add(diagnostics,FILES.contract,contract,requestSchema,
+        "REQUEST_SCHEMA_REFERENCE_INVALID",
+        "Contract requestSchema must be a safe Package-relative path",
+        {domain:"schemas",category:"reference"});
+    }else if(!files.has(requestSchemaPath)){
+      if(completeness==="complete"){
+        add(diagnostics,FILES.contract,contract,requestSchema,
+          "REQUEST_SCHEMA_NOT_FOUND",
+          "Request Schema is not present in the complete Package snapshot: "+requestSchemaPath,
+          {domain:"schemas",category:"linking"});
+      }else{
+        addNotChecked(diagnostics,FILES.contract,contract,requestSchema,
+          "REQUEST_SCHEMA_NOT_CHECKED",
+          "Cannot confirm whether Request Schema exists because the Package snapshot is incomplete: "+requestSchemaPath,
+          "schemas");
+      }
+    }
+  }
+
+  const checkSchemaReference=(path,source,node,reference,label)=>{
+    if(typeof reference!=="string")return;
+    const match=QUALIFIED_REF.exec(reference);
+    if(!match){
+      if(!safePath(reference)){
+        add(diagnostics,path,source,node,"SCHEMA_REFERENCE_INVALID",
+          label+" must be a safe Package-relative path or dependencyAlias::SchemaId",
+          {domain:"schemas",category:"reference"});
+      }else if(!files.has(reference)){
+        if(completeness==="complete"){
+          add(diagnostics,path,source,node,"SCHEMA_DECLARATION_NOT_FOUND",
+            label+" is not present in the complete Package snapshot: "+reference,
+            {domain:"schemas",category:"linking"});
         }else{
-          add("PREDICATE_EVALUATOR_TYPE_UNSUPPORTED",FILES.predicates,get(evaluator,"type"),
-            "Predicate "+id+" 使用无法由当前 Legacy Audit 检查的 evaluator.type："+type,
-            {severity:"warning",status:"not_checked",domain:"predicates",category:"analysis"});
+          addNotChecked(diagnostics,path,source,node,"SCHEMA_REFERENCE_NOT_CHECKED",
+            "Cannot confirm local Schema reference because the Package snapshot is incomplete: "+reference,
+            "schemas");
         }
       }
+      return;
     }
-  }
+    const [,alias,id]=match;
+    if(!contractDependencies.has(alias)){
+      add(diagnostics,path,source,node,"SCHEMA_DEPENDENCY_UNDECLARED",
+        label+" references undeclared dependency alias "+alias,
+        {domain:"schemas",category:"linking"});
+      return;
+    }
+    if(!contextAvailable){
+      addNotChecked(diagnostics,path,source,node,"SCHEMA_LINK_NOT_CHECKED",
+        label+" references "+alias+"::"+id+
+          ", but project Dependency Service state is unavailable; export resolution is NOT_CHECKED",
+        "schemas");
+      return;
+    }
+    const declaration=declarationById.get(alias);
+    const snapshot=snapshotById.get(alias);
+    if(!declaration||!snapshot){
+      addBlocked(diagnostics,path,source,node,"SCHEMA_DEPENDENCY_UNAVAILABLE",
+        label+" cannot resolve "+alias+"::"+id+": "+
+          resolverMessage(dependencyDiagnostics,alias),
+        "schemas");
+      return;
+    }
+    const candidates=schemas.filter(item=>item.dependencyId===alias);
+    if(!candidates.length){
+      addNotChecked(diagnostics,path,source,node,"SCHEMA_EXPORT_NOT_CHECKED",
+        label+" references "+alias+"::"+id+
+          ", but the locked Schema Bundle has no parsed Schema documents available to this Studio linker",
+        "schemas");
+      return;
+    }
+    const parsedSchemas=candidates.map(item=>schemaIds(item.text));
+    if(parsedSchemas.some(item=>!item.parseable)){
+      addBlocked(diagnostics,path,source,node,"SCHEMA_BUNDLE_PARSE_INCOMPLETE",
+        "One or more Schema documents in dependency "+alias+" could not be parsed; "+id+" cannot be resolved reliably",
+        "schemas");
+      return;
+    }
+    const matches=parsedSchemas.flatMap(item=>item.ids).filter(value=>value===id);
+    if(matches.length===0){
+      if(parsedSchemas.some(item=>item.ids.length===0)){
+        addNotChecked(diagnostics,path,source,node,"SCHEMA_EXPORT_SHAPE_NOT_CHECKED",
+          "Schema documents in "+alias+" do not expose a supported top-level SchemaId field; "+id+" remains NOT_CHECKED",
+          "schemas");
+      }else{
+        add(diagnostics,path,source,node,"SCHEMA_DECLARATION_NOT_FOUND",
+          label+" has no exact SchemaId declaration in the locked "+alias+" snapshot: "+id,
+          {domain:"schemas",category:"linking"});
+      }
+    }else if(matches.length>1){
+      add(diagnostics,path,source,node,"SCHEMA_DECLARATION_AMBIGUOUS",
+        label+" resolves to multiple declarations in the locked "+alias+" snapshot: "+id,
+        {domain:"schemas",category:"linking"});
+    }
+  };
 
-  const operators=new Set(["call","verify","terminal","procedure","reconcile","tool","script","predicate"]);
-  const referencedScripts=new Set();
-  if(procedureAst){
-    if(!isMap(procedureRoot)||procedureEntries.length===0){
-      add("PROCEDURES_ROOT_INVALID",FILES.procedure,procedureRoot,
-        "Legacy Procedure 必须包含非空 procedures mapping",
-        {severity:"error",domain:"procedure"});
-    }
-    for(const pair of procedureEntries){
-      const procId=v(pair.key),procNode=pair.value;
-      if(!isMap(procNode)){
-        add("PROCEDURE_INVALID",FILES.procedure,procNode,
-          "Procedure "+procId+" 必须是 mapping",{severity:"error",domain:"procedure"});
-        continue;
-      }
-      const nodes=get(procNode,"nodes"),inputs=get(procNode,"inputs");
-      if(!isMap(nodes)){
-        add("PROCEDURE_NODES_INVALID",FILES.procedure,nodes??procNode,
-          "Procedure "+procId+" 缺少 nodes mapping",{severity:"error",domain:"procedure"});
-        continue;
-      }
-      const nodeEntries=nodes.items,nodeIds=new Set(nodeEntries.map(item=>v(item.key)));
-      if(inputs!==null&&!isMap(inputs))
-        add("PROCEDURE_INPUTS_INVALID",FILES.procedure,inputs,
-          "Procedure "+procId+" 的 inputs 必须是 mapping",{severity:"error",domain:"procedure"});
-      if(isMap(inputs))for(const input of inputs.items){
-        if(!isMap(input.value))
-          add("PROCEDURE_INPUT_INVALID",FILES.procedure,input.value,
-            "Procedure "+procId+" 的 input "+v(input.key)+" 必须是 mapping",
-            {severity:"error",domain:"procedure"});
-        else{
-          if(typeof v(get(input.value,"type"))!=="string")
-            add("PROCEDURE_INPUT_TYPE_MISSING",FILES.procedure,input.value,
-              "Procedure "+procId+" 的 input "+v(input.key)+" 缺少 type",
-              {severity:"error",domain:"procedure"});
-          if(typeof v(get(input.value,"from"))!=="string")
-            add("PROCEDURE_INPUT_SOURCE_MISSING",FILES.procedure,input.value,
-              "Procedure "+procId+" 的 input "+v(input.key)+" 缺少 from",
-              {severity:"error",domain:"procedure"});
+  const contextSchema=get(contract.root,"contextSchema");
+  if(contextSchema!=null)
+    checkSchemaReference(FILES.contract,contract,contextSchema,
+      scalar(contextSchema),"Contract contextSchema");
+
+  const predicateRoot=get(predicates.root,"predicates");
+  const predicateIds=new Set(entries(predicateRoot).map(pair=>scalar(pair.key)).filter(Boolean));
+  if(isMap(predicateRoot)){
+    for(const pair of predicateRoot.items){
+      const predicateId=scalar(pair.key),body=pair.value;
+      const parameters=get(body,"parameters");
+      if(isSeq(parameters))for(const parameter of parameters.items){
+        if(!isMap(parameter))continue;
+        for(const item of parameter.items){
+          const type=scalar(item.value);
+          if(type&&QUALIFIED_REF.test(type))
+            checkSchemaReference(FILES.predicates,predicates,item.value,type,
+              "Predicate "+predicateId+" parameter "+String(scalar(item.key)));
         }
       }
-      const applicability=get(procNode,"applicability");
-      const applicabilityPredicates=get(applicability,"predicates");
-      if(applicability!==null&&!isMap(applicability))
-        add("PROCEDURE_APPLICABILITY_INVALID",FILES.procedure,applicability,
-          "Procedure "+procId+" 的 applicability 必须是 mapping",
-          {severity:"error",domain:"procedure"});
-      if(applicabilityPredicates!==null&&!isMap(applicabilityPredicates))
-        add("PROCEDURE_APPLICABILITY_PREDICATES_INVALID",FILES.procedure,applicabilityPredicates,
-          "Procedure "+procId+" 的 applicability.predicates 必须是 mapping",
-          {severity:"error",domain:"predicates"});
-      if(isMap(applicabilityPredicates))for(const predicate of applicabilityPredicates.items){
-        const id=v(predicate.key);
-        if(predicates&&!predIds.has(id))
-          add("APPLICABILITY_PREDICATE_NOT_FOUND",FILES.procedure,predicate.key,
-            "Procedure "+procId+" applicability 引用了未定义 Predicate："+id,
-            {severity:"error",domain:"predicates"});
-        else if(!predicates)
-          notChecked("APPLICABILITY_PREDICATE_NOT_CHECKED",FILES.procedure,
-            "Cannot resolve applicability Predicate "+id+" because PredicateSet is unavailable","predicates");
+      const evidence=get(body,"evidence");
+      const requirements=get(evidence,"requires");
+      if(requirements!=null&&!isMap(requirements)){
+        add(diagnostics,FILES.predicates,predicates,requirements,
+          "EVIDENCE_REQUIREMENTS_INVALID",
+          "Predicate "+predicateId+" evidence.requires must be a mapping",
+          {domain:"evidence",category:"structure"});
       }
-      const inputKeys=new Set(entries(inputs).map(item=>v(item.key)));
-      const inputByNormalized=new Map([...inputKeys].map(key=>[normalized(key),key]));
-      const startNode=v(get(procNode,"start"));
-      if(!startNode)
-        add("PROCEDURE_START_MISSING",FILES.procedure,procNode,
-          "Procedure "+procId+" 缺少 start",{severity:"error",domain:"procedure"});
-      else if(!nodeIds.has(startNode))
-        add("PROCEDURE_START_NOT_FOUND",FILES.procedure,get(procNode,"start"),
-          "Procedure "+procId+" 的 start 指向不存在的 Node："+startNode,
-          {severity:"error",domain:"procedure"});
-      const adjacency=new Map(nodeEntries.map(item=>[v(item.key),[]]));
-      for(const nodePair of nodeEntries){
-        const nodeId=v(nodePair.key),node=nodePair.value;
-        if(!isMap(node)){
-          add("NODE_INVALID",FILES.procedure,node,
-            "Node "+procId+"/"+nodeId+" 必须是 mapping",
-            {severity:"error",domain:"procedure"});
+      if(isMap(requirements))for(const requirement of requirements.items){
+        if(!isSeq(requirement.value)){
+          add(diagnostics,FILES.predicates,predicates,requirement.value,
+            "EVIDENCE_REFERENCE_INVALID",
+            "Evidence requirements for "+String(scalar(requirement.key))+" must be an ordered list",
+            {domain:"evidence",category:"structure"});
           continue;
         }
-        const nodeOperators=node.items.filter(item=>operators.has(v(item.key)));
-        if(nodeOperators.length!==1)
-          add("NODE_OPERATOR_COUNT",FILES.procedure,node,
-            "Node "+procId+"/"+nodeId+" 必须且只能声明一个 Operator；当前为 "+nodeOperators.length,
-            {severity:"error",domain:"procedure"});
-        const validateRoutes=(routeNode,routeLabel)=>{
-          if(routeNode===null)return;
-          if(!isMap(routeNode)){
-            add("ROUTES_INVALID",FILES.procedure,routeNode,
-              procId+"/"+nodeId+" 的 "+routeLabel+" 必须是 mapping",
-              {severity:"error",domain:"procedure"});
-            return;
-          }
-          for(const route of routeNode.items){
-            const target=v(route.value);
-            if(typeof target!=="string"||!target){
-              add("ROUTE_TARGET_INVALID",FILES.procedure,route.value,
-                procId+"/"+nodeId+" 的 "+routeLabel+"."+v(route.key)+" 必须指向 Node ID",
-                {severity:"error",domain:"procedure"});
-            }else if(!nodeIds.has(target)){
-              add("ROUTE_TARGET_MISSING",FILES.procedure,route.value,
-                procId+"/"+nodeId+" 的 "+routeLabel+" 指向不存在的 Node："+target,
-                {severity:"error",domain:"procedure"});
-            }else adjacency.get(nodeId)?.push(target);
-          }
-        };
-        validateRoutes(get(node,"on"),"on");
-        for(const phaseName of ["preconditions","postconditions"]){
-          const phase=get(node,phaseName);
-          if(phase===null)continue;
-          if(!isMap(phase)){
-            add("PHASE_INVALID",FILES.procedure,phase,
-              procId+"/"+nodeId+" 的 "+phaseName+" 必须是 mapping",
-              {severity:"error",domain:"procedure"});
+        for(const item of requirement.value.items){
+          const reference=scalar(item);
+          const match=reference?QUALIFIED_REF.exec(reference):null;
+          if(!match){
+            add(diagnostics,FILES.predicates,predicates,item,
+              "EVIDENCE_REFERENCE_INVALID",
+              "Evidence reference must use dependencyAlias::EvidenceId: "+String(reference??""),
+              {domain:"evidence",category:"reference"});
             continue;
           }
-          const steps=get(phase,"steps");
-          if(steps!==null&&!isSeq(steps))
-            add("PHASE_STEPS_INVALID",FILES.procedure,steps,
-              procId+"/"+nodeId+" 的 "+phaseName+".steps 必须是有序列表",
-              {severity:"error",domain:"procedure"});
-          for(const step of (isSeq(steps)?steps.items:[])){
-            if(!isMap(step)){
-              add("PHASE_STEP_INVALID",FILES.procedure,step,
-                procId+"/"+nodeId+" 的 "+phaseName+" Step 必须是 mapping",
-                {severity:"error",domain:"procedure"});
-              continue;
-            }
-            const stepOperators=step.items.filter(item=>operators.has(v(item.key)));
-            if(stepOperators.length!==1)
-              add("PHASE_STEP_OPERATOR_COUNT",FILES.procedure,step,
-                procId+"/"+nodeId+" 的 "+phaseName+" Step 必须且只能包含一个 Operator",
-                {severity:"error",domain:"procedure"});
-          }
-          validateRoutes(get(phase,"on"),phaseName+".on");
-        }
-        collectActions(node,(field,scalar)=>{
-          const value=v(scalar);
-          if(field==="verify"||field==="predicate"){
-            if(predicates&&!predIds.has(value))
-              add("NODE_PREDICATE",FILES.procedure,scalar,
-                procId+"/"+nodeId+" 使用未定义 Predicate："+value,
-                {severity:"error",domain:"predicates"});
-            else if(!predicates)
-              notChecked("NODE_PREDICATE_NOT_CHECKED",FILES.procedure,
-                "Cannot resolve Predicate "+value+" because PredicateSet is unavailable","predicates");
-          }else if(field==="call"||field==="tool"){
-            if(contract&&!allowed.has(value))
-              add("CAPABILITY_UNDECLARED",FILES.procedure,scalar,
-                procId+"/"+nodeId+" 的 "+field+" 未列入 Contract capabilities/localTools："+value,
-                {severity:"error",domain:"capabilities"});
-            else if(!contract)
-              notChecked("CAPABILITY_DECLARATION_NOT_CHECKED",FILES.procedure,
-                "Cannot resolve "+field+" "+value+" because Contract is unavailable","capabilities");
-          }else if(field==="procedure"){
-            if(!ids.has(value))
-              add("CHILD_PROCEDURE_NOT_FOUND",FILES.procedure,scalar,
-                procId+"/"+nodeId+" 引用了不存在的 Child Procedure："+value,
-                {severity:"error",domain:"procedure"});
-          }else if(field==="script"){
-            if(/\.py$/i.test(value))referencedScripts.add(value);
-            if(!sources.has(value))
-              add("SCRIPT_MISSING",FILES.procedure,scalar,
-                procId+"/"+nodeId+" 的脚本不在当前 Package："+value,
-                {severity:"error",domain:"scripts"});
-          }else if(field==="from"){
-            if(value.startsWith("input.")){
-              const key=value.slice(6);
-              if(!inputKeys.has(key))
-                add("INPUT_MISSING",FILES.procedure,scalar,
-                  procId+"/"+nodeId+" 引用了未声明 Procedure input："+key,
-                  {severity:"error",domain:"procedure"});
-            }else{
-              const match=value.match(/^([A-Za-z_][A-Za-z0-9_-]*)\.(?:output(?:\.|$)|preconditions\.|postconditions\.)/);
-              if(match&&!nodeIds.has(match[1])&&!["preconditions","postconditions"].includes(match[1]))
-                add("PRODUCER_MISSING",FILES.procedure,scalar,
-                  procId+"/"+nodeId+" 引用了不存在的 Node："+match[1],
-                  {severity:"error",domain:"procedure"});
+          const alias=match[1];
+          if(!contractDependencies.has(alias)){
+            add(diagnostics,FILES.predicates,predicates,item,
+              "EVIDENCE_DEPENDENCY_UNDECLARED",
+              "Evidence reference "+reference+" uses undeclared dependency alias "+alias,
+              {domain:"evidence",category:"linking"});
+          }else if(!evidenceDeclarations){
+            addNotChecked(diagnostics,FILES.predicates,predicates,item,
+              "EVIDENCE_GUARANTEE_NOT_CHECKED",
+              "Evidence guarantee "+reference+
+                " requires a trusted Owner Evidence declaration; the current Studio snapshot cannot verify it",
+              "evidence");
+          }else{
+            const matches=evidenceDeclarations.filter(value=>
+              value?.id===reference||value?.id===match[2]);
+            if(matches.length>1){
+              add(diagnostics,FILES.predicates,predicates,item,
+                "EVIDENCE_DECLARATION_AMBIGUOUS",
+                "Multiple trusted Owner Evidence declarations match "+reference,
+                {domain:"evidence",category:"linking"});
+            }else if(!evidenceDeclarationsComplete){
+              addNotChecked(diagnostics,FILES.predicates,predicates,item,
+                matches.length===0?"EVIDENCE_DECLARATION_NOT_CHECKED":"EVIDENCE_DECLARATION_SET_INCOMPLETE",
+                matches.length===0
+                  ?"No match for "+reference+" was found in the partial Owner Evidence snapshot; absence is NOT_CHECKED"
+                  :"Evidence "+reference+" has a candidate declaration, but the Owner Evidence snapshot is incomplete; uniqueness and Owner binding are NOT_CHECKED",
+                "evidence");
+            }else if(matches.length===0){
+              add(diagnostics,FILES.predicates,predicates,item,
+                "EVIDENCE_DECLARATION_NOT_FOUND",
+                "No trusted Owner Evidence declaration matches "+reference,
+                {domain:"evidence",category:"linking"});
+            }else if(matches[0].trusted!==true){
+              addNotChecked(diagnostics,FILES.predicates,predicates,item,
+                "EVIDENCE_OWNER_NOT_VERIFIED",
+                "Evidence "+reference+" is declared but its Owner publication is not trusted",
+                "evidence");
             }
           }
-        });
-        const withMap=get(node,"with");
-        for(const bind of entries(withMap)){
-          const key=v(bind.key),ref=get(bind.value,"from"),target=v(ref);
-          const matching=inputByNormalized.get(normalized(key));
-          if(matching&&typeof target==="string"&&target.startsWith("input.")&&
-             target!=="input."+matching)
-            warn("INPUT_BINDING_SUSPECT",FILES.procedure,ref,
-              procId+"/"+nodeId+" 的 with."+key+
-              " 通常对应 input."+matching+"，当前却绑定 "+target+
-              "；这是启发式提示，需要人工确认类型与语义");
         }
       }
-      if(startNode&&nodeIds.has(startNode)){
-        const reachable=new Set([startNode]),queue=[startNode];
-        while(queue.length){
-          const current=queue.shift();
-          for(const target of adjacency.get(current)??[]){
-            if(!reachable.has(target)){reachable.add(target);queue.push(target);}
+      const evaluator=get(body,"evaluator");
+      if(scalar(get(evaluator,"type"))==="script"){
+        const script=get(evaluator,"script"),scriptPath=scalar(script);
+        if(!scriptPath||!safePath(scriptPath)){
+          add(diagnostics,FILES.predicates,predicates,script,
+            "PREDICATE_SCRIPT_REFERENCE_INVALID",
+            "Predicate "+predicateId+" Script must be a safe Package-relative path",
+            {domain:"predicates",category:"reference"});
+        }else if(!files.has(scriptPath)){
+          if(completeness==="complete"){
+            add(diagnostics,FILES.predicates,predicates,script,
+              "PREDICATE_SCRIPT_NOT_FOUND",
+              "Predicate "+predicateId+" Script is not present in the complete Package snapshot: "+scriptPath,
+              {domain:"predicates",category:"linking"});
+          }else{
+            addNotChecked(diagnostics,FILES.predicates,predicates,script,
+              "PREDICATE_SCRIPT_NOT_CHECKED",
+              "Cannot confirm Predicate Script existence because the Package snapshot is incomplete: "+scriptPath,
+              "predicates");
           }
-        }
-        for(const item of nodeEntries){
-          const id=v(item.key);
-          if(!reachable.has(id))
-            warn("NODE_UNREACHABLE",FILES.procedure,item.key,
-              "Node "+procId+"/"+id+" 无法从 start "+startNode+" 到达");
         }
       }
     }
   }
 
-  if(celPredicateCount)
-    notChecked("CEL_EXPRESSION_SYNTAX_NOT_CHECKED",FILES.predicates,
-      "已检查 "+celPredicateCount+" 个 CEL Predicate 的 expression 字段存在性；当前浏览器端 Legacy Audit 未运行 CEL parser/type checker","predicates");
-  if(predIds.size)
-    notChecked("PREDICATE_RUNTIME_NOT_CHECKED",FILES.predicates,
-      "已检查 Predicate 声明结构与静态引用；没有执行任何 Observation 查询或 Predicate Runtime 求值","predicates");
-  const requiredFacts=values(get(contract,"spec","context","requiredFacts"));
-  if(requiredFacts.length)
-    notChecked("CONTEXT_FACTS_NOT_CHECKED",FILES.contract,
-      "已读取 "+requiredFacts.length+" 个 requiredFacts 标识；其运行时来源、UE/Session 绑定与新鲜度不能由本地 Package 静态检查证明","context");
-  if(sources.has(FILES.procedure)&&!contract)
-    notChecked("PROCEDURE_CONTRACT_LINKS_NOT_CHECKED",FILES.procedure,
-      "Procedure 的 Capability / Contract 引用无法完整核对：Contract 不可用","contract");
-  if(sources.has(FILES.procedure)&&!predicates)
-    notChecked("PROCEDURE_PREDICATE_LINKS_NOT_CHECKED",FILES.procedure,
-      "Procedure 的 Predicate 引用无法完整核对：PredicateSet 不可用","predicates");
-  if(referencedScripts.size)
-    notChecked("PYTHON_SYNTAX_NOT_CHECKED",FILES.procedure,
-      "已检查 "+referencedScripts.size+" 个脚本引用的文件存在性；Python 语法/类型未由当前浏览器端 Package Audit 执行","scripts");
-  if(allowed.size)
-    notChecked("CAPABILITY_AUTHORIZATION_NOT_CHECKED",FILES.contract,
-      "已检查 Capability 是否在本地 Contract 声明；Owner 身份、发布证明与运行授权不在本地静态检查范围内","capabilities");
-  return Object.freeze(diagnostics);
+  const nodes=get(procedure.root,"nodes");
+  const declaredNodes=new Map(entries(nodes).map(pair=>[scalar(pair.key),pair.value]));
+  const checkProducer=(path,source,node,value)=>{
+    if(typeof value!=="string")return;
+    const match=/^([A-Za-z][A-Za-z0-9_-]*)\.(operation|observation|wait)\.output(?:\.|$)/.exec(value);
+    if(!match)return;
+    const [,producer,stage]=match;
+    const body=declaredNodes.get(producer);
+    if(!body){
+      add(diagnostics,path,source,node,"PRODUCER_NODE_NOT_FOUND",
+        "Source reference "+value+" names an undeclared Node: "+producer,
+        {domain:"procedure",category:"linking"});
+      return;
+    }
+    if(stage==="wait"?get(body,"wait")==null:get(body,stage)==null){
+      add(diagnostics,path,source,node,"PRODUCER_STAGE_NOT_FOUND",
+        "Source reference "+value+" names a Node without the declared "+stage+" stage/control",
+        {domain:"procedure",category:"linking"});
+    }
+  };
+  const checkTool=(nodeId,path,source,node,value)=>{
+    if(value===null)return;
+    const match=typeof value==="string"?TOOL_REF.exec(value):null;
+    if(!match){
+      add(diagnostics,path,source,node,"TOOL_REFERENCE_INVALID",
+        "Tool reference must use dependencyAlias::callableId: "+String(value??""),
+        {domain:"tools",category:"reference"});
+      return;
+    }
+    const [,alias,callableId]=match;
+    if(!contractDependencies.has(alias)){
+      add(diagnostics,path,source,node,"TOOL_DEPENDENCY_UNDECLARED",
+        "Node "+nodeId+" references Tool "+value+
+          " but Contract.dependencies does not declare alias "+alias,
+        {domain:"tools",category:"linking"});
+      return;
+    }
+    if(!contextAvailable){
+      addNotChecked(diagnostics,path,source,node,"TOOL_LINK_NOT_CHECKED",
+        "Tool "+value+" cannot be checked because project Dependency Service state is unavailable",
+        "tools");
+      return;
+    }
+    const declaration=declarationById.get(alias);
+    const snapshot=snapshotById.get(alias);
+    if(!declaration){
+      add(diagnostics,path,source,node,"DEPENDENCY_NOT_CONFIGURED",
+        "Tool "+value+" uses dependency "+alias+" which is not configured in this project",
+        {domain:"tools",category:"linking"});
+      return;
+    }
+    if(!snapshot){
+      addBlocked(diagnostics,path,source,node,"TOOL_DEPENDENCY_UNAVAILABLE",
+        "Tool "+value+" has no verified locked dependency "+alias+": "+
+          resolverMessage(dependencyDiagnostics,alias),
+        "tools");
+      return;
+    }
+    if(declaration.kind!=="tool-catalog"){
+      add(diagnostics,path,source,node,"TOOL_DEPENDENCY_KIND_MISMATCH",
+        "Tool "+value+" requires a Tool Catalog dependency, but "+alias+
+          " is declared as "+declaration.kind,
+        {domain:"tools",category:"linking"});
+      return;
+    }
+    const catalog=toolCatalogs.find(item=>item.dependencyId===alias);
+    if(catalog&&!catalog.available){
+      addBlocked(diagnostics,path,source,node,"TOOL_CATALOG_UNAVAILABLE",
+        "Locked Tool Catalog "+alias+" cannot be read: "+String(catalog.reason??"unknown catalog error"),
+        "tools");
+      return;
+    }
+    if(!catalog){
+      addNotChecked(diagnostics,path,source,node,"TOOL_CATALOG_NOT_CHECKED",
+        "Locked Tool Catalog "+alias+" has not been parsed by this Studio build; callable "+callableId+" is NOT_CHECKED",
+        "tools");
+      return;
+    }
+    const matches=operations.filter(item=>item.dependencyId===alias&&item.id===callableId);
+    if(matches.length===0){
+      add(diagnostics,path,source,node,"TOOL_DECLARATION_NOT_FOUND",
+        "Tool "+value+" has no matching callable declaration in the locked "+alias+" Tool Catalog",
+        {domain:"tools",category:"linking"});
+    }else if(matches.length>1){
+      add(diagnostics,path,source,node,"TOOL_DECLARATION_AMBIGUOUS",
+        "Tool "+value+" has multiple callable declarations in the locked "+alias+" Tool Catalog",
+        {domain:"tools",category:"linking"});
+    }
+  };
+
+  for(const nodePair of entries(nodes)){
+    const nodeId=scalar(nodePair.key),body=nodePair.value;
+    for(const stageName of STAGES){
+      const stage=get(body,stageName);
+      if(!isMap(stage))continue;
+      const tool=get(stage,"tool");
+      if(tool!=null)checkTool(nodeId,FILES.procedure,procedure,tool,scalar(tool));
+      const script=get(stage,"script"),scriptPath=scalar(script);
+      if(script!=null){
+        if(!scriptPath||!safePath(scriptPath)){
+          add(diagnostics,FILES.procedure,procedure,script,
+            "PROCEDURE_SCRIPT_REFERENCE_INVALID",
+            "Node "+nodeId+" Script must be a safe Package-relative path",
+            {domain:"procedure",category:"reference"});
+        }else if(!files.has(scriptPath)){
+          if(completeness==="complete"){
+            add(diagnostics,FILES.procedure,procedure,script,
+              "PROCEDURE_SCRIPT_NOT_FOUND",
+              "Node "+nodeId+" Script is not present in the complete Package snapshot: "+scriptPath,
+              {domain:"procedure",category:"linking"});
+          }else{
+            addNotChecked(diagnostics,FILES.procedure,procedure,script,
+              "PROCEDURE_SCRIPT_NOT_CHECKED",
+              "Cannot confirm Script existence because the Package snapshot is incomplete: "+scriptPath,
+              "procedure");
+          }
+        }
+      }
+      const argumentsNode=get(stage,"arguments");
+      if(isMap(argumentsNode))for(const argument of argumentsNode.items)
+        checkProducer(FILES.procedure,procedure,argument.value,scalar(argument.value));
+      const calls=get(stage,"predicates");
+      if(isSeq(calls))for(const call of calls.items){
+        const predicate=get(call,"predicate"),predicateId=scalar(predicate);
+        if(predicateId&&!predicateIds.has(predicateId)){
+          add(diagnostics,FILES.procedure,procedure,predicate,
+            "PREDICATE_REFERENCE_NOT_FOUND",
+            "Node "+nodeId+" references an undeclared Predicate: "+predicateId,
+            {domain:"predicates",category:"linking"});
+        }
+        const argumentsList=get(call,"arguments");
+        if(isSeq(argumentsList))for(const argument of argumentsList.items)
+          checkProducer(FILES.procedure,procedure,argument,scalar(argument));
+      }
+    }
+  }
+
+  return Object.freeze(sortDiagnostics(diagnostics));
 }
+function sortDiagnostics(items){
+  return [...items].sort((a,b)=>
+    a.path.localeCompare(b.path)||a.line-b.line||a.column-b.column||
+    a.code.localeCompare(b.code)||a.message.localeCompare(b.message));
+}
+
+export const PACKAGE_AUDIT_FILES=FILES;
