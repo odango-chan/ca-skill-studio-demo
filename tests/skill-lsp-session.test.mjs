@@ -168,3 +168,24 @@ test("failed analysis clears previous diagnostics and exposes explicit unavailab
   assert.equal(published.at(-1).diagnostics.length,0);
   assert.equal(statuses.at(-1).state,"UNAVAILABLE");
 });
+
+test("legacy Procedure reports its exact unsupported-version cause, not an opaque analyzer failure",async()=>{
+  const statuses=[],publications=[];
+  const session=new LanguageDiagnosticSession({
+    publish:x=>publications.push(x),status:x=>statuses.push(x)
+  });
+  const legacy=snapshot(1,1,[
+    "apiVersion: connectionagent.io/v1alpha1",
+    "kind: Procedure",
+    "procedures:",
+    "  - name: old",
+    ""
+  ].join("\\n"));
+  const result=await session.submit(legacy);
+  assert.deepEqual(result,{accepted:false,reason:"ANALYSIS_UNAVAILABLE"});
+  assert.equal(statuses.at(-1).state,"UNAVAILABLE");
+  assert.match(statuses.at(-1).reason,/UNSUPPORTED_CA_SL_VERSION/);
+  assert.match(statuses.at(-1).reason,/top-level start\\/nodes/);
+  assert.equal(statuses.at(-1).unlocated[0].code,"UNSUPPORTED_CA_SL_VERSION");
+  assert.deepEqual(publications,[],"legacy source must not invent valid Problem markers");
+});
