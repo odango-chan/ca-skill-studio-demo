@@ -357,8 +357,16 @@ test('Native views track unsaved Source, audit Package, reject stale selection a
     'only the user-facing Package Preview command is registered');
   assert.equal(commands.has('skillStudio.previewMarkdown'),false,
     'Studio does not contribute a duplicate Markdown Preview command');
-  assert.ok(commands.has('skillStudio.internal.nativeMarkdownPreviewAcceptance'));
-  assert.ok(commands.has('skillStudio.internal.nativeMarkdownSettingsAcceptance'));
+  assert.ok(commands.has('skillStudio.internal.markdownPreviewOpenAcceptance'));
+  assert.ok(commands.has('skillStudio.internal.markdownPreviewAcceptance'));
+  assert.ok(commands.has('skillStudio.internal.markdownPreviewLiveUpdateAcceptance'));
+  assert.ok(commands.has('skillStudio.internal.markdownPreviewSourceStateAcceptance'));
+  assert.ok(commands.has('skillStudio.internal.markdownPreviewRevealSourceAcceptance'));
+  assert.ok(commands.has('skillStudio.internal.restoreMarkdownPreviewAcceptance'));
+  assert.equal(commands.has('skillStudio.internal.nativeMarkdownPreviewAcceptance'),false,
+    'native Markdown Preview orchestration was replaced by the shared Studio Preview host');
+  assert.equal(commands.has('skillStudio.internal.nativeMarkdownSettingsAcceptance'),false,
+    'native Markdown Preview settings are no longer part of the shared Preview host');
   assert.equal(commands.has('skillStudio.internal.nativeMarkdownScrollDiagnosticsAcceptance'),false,
     'synthetic revealRange scroll instrumentation is not shipped in the workbench');
   await commands.get(item.command.command)(...item.command.arguments);
