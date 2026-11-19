@@ -33,7 +33,6 @@ import {registerCompilerIntegration} from "./compiler-integration.mjs";
 import {registerPackageDiagnosticTesting} from "./package-diagnostic-testing.mjs";
 import {registerPackageRouteTesting} from "./package-route-testing.mjs";
 import {iconShapes} from "../../../../site/icons.mjs";
-const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
 // plugin worker; normal VS Code and backend-backed Theia retain host URIs.
@@ -96,7 +95,7 @@ export function activate(context){
   registerSchemaCommands(vscode,context);
   function mountProcedurePreview(document,panel,{isCurrent=()=>true}={}){
       if(!isProcedurePath(document.uri.path)){
-        vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
+        vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure Preview");
         return;
       }
       const openedAt=performance.now();
@@ -326,14 +325,6 @@ export function activate(context){
       releasePanel=panel.onDidDispose(cleanup);
       return {dispose:cleanup};
   }
-  const provider={
-    async resolveCustomTextEditor(document,panel){
-      mountProcedurePreview(document,panel);
-    }
-  };
-  context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
-    webviewOptions:{retainContextWhenHidden:true}
-  }));
   // The single right-side Preview Host owns all contextual visualizations.
   // Visual open commands reveal only the native Source editor; the Preview
   // follows active Source documents without creating another EditorGroup.
