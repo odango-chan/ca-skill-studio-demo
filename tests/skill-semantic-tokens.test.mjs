@@ -135,7 +135,8 @@ test("persisted v1alpha1 Example retains editor-only semantic colors despite uns
   const procedureTokens=observed(legacyProcedure,"skills/establish-pdu-session/assurance/procedure.yaml");
   tokenFor(legacyProcedure,procedureTokens,"ue-requested-pdu-session-establishment",
     "skillStep","declaration");
-  tokenFor(legacyProcedure,procedureTokens,"nudm-sdm-get","skillStep","declaration");
+  tokenFor(legacyProcedure,procedureTokens,"nudm-sdm-get","skillStep","declaration",
+    legacyProcedure.indexOf("nodes:"));
   tokenFor(legacyProcedure,procedureTokens,"sbi.udm.sm_data.get","skillOperation","reference");
   tokenFor(legacyProcedure,procedureTokens,"PASS","skillOutcome");
   const legacyPredicates=readFileSync(new URL(base+"predicates.yaml",import.meta.url),"utf8");
