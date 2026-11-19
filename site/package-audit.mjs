@@ -195,7 +195,7 @@ export function auditPackage({
     const file=files.get(path);
     if(!file||typeof file.text!=="string"){
       if(completeness==="complete"){
-        add(diagnostics,FILES.procedure,null,null,"PACKAGE_CORE_FILE_MISSING",
+        add(diagnostics,path,null,null,"PACKAGE_CORE_FILE_MISSING",
           "Required current CA-SL Package file is missing: "+path,
           {severity:"error",status:"confirmed",domain:"package",category:"inventory"});
       }
