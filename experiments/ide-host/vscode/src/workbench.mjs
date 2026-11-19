@@ -1,7 +1,6 @@
 import {openNativeSource} from "./native-source.mjs";
-import {openSourceViewPair} from "./source-view-pair.mjs";
+
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
-import {prepareNativeMarkdownPackagePolicy} from "./markdown-link-policy.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import {inspectionSnapshot} from './inspection.mjs';
 import {isV1Alpha5Procedure} from "../../../../language/core/v1alpha5.ts";
@@ -56,9 +55,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     lastSelectionMessage=null;
   let packageFiles=null,packageFilesUri=null,packageFilesVersion=-1;
   const providers=new Map(),treeProviders=new Map(),sessions=new Map(),selections=new Map();
-  const nativeMarkdownSecurityOriginals=new Map(),nativeMarkdownLiveOriginals=new Map(),
-    nativeMarkdownOpening=new Set();
-  let nativeMarkdownWorkerDiagnostics=null;
+  const markdownPreviewAcceptanceOriginals=new Map();
   const diagnostics=vscode.languages.createDiagnosticCollection('skill-studio');
   const languagePackages=new Map();
   const languagePackageGenerations=new Map();
@@ -956,9 +953,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           schemaCompletion="EstablishmentSelectionInput";
         }
         // The native provider probe opened a Python editor. Restore the
-        // Procedure CustomEditor so subsequent workbench actions (notably
-        // native Undo) continue to target the visual editor under test.
-        await openSourceViewPair(vscode,procedureUri);
+        // authoritative Procedure Source; the right Preview follows it.
+        await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
         return {
           definition:scriptPath,
           yamlDefinitions:{
@@ -1512,7 +1508,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             };
           }finally{
             languageDiagnosticAcceptance.delete(key);
-            await openSourceViewPair(vscode,procedureUri);
+            await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
           }
         }
         throw Error("Unknown live diagnostic acceptance phase: "+String(phase));
@@ -1663,7 +1659,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             return {phase,restored:true,originalDiskUnchanged:true};
           }finally{
             languageRecoveryAcceptance.delete(key);
-            await openSourceViewPair(vscode,procedureUri);
+            await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
           }
         }
         if(phase==="verify-and-restore"){
@@ -1733,7 +1729,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               if(generation<=before)throw Error("Post-recovery restoration did not advance Package generation");
             }catch(error){cleanup.push(String(error?.message??error));}
             languageRecoveryAcceptance.delete(key);
-            try{await openSourceViewPair(vscode,procedureUri);}
+            try{await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});}
             catch(error){cleanup.push("Procedure focus: "+String(error?.message??error));}
             if(cleanup.length)throw Error("L2-D4b recovery cleanup failed: "+cleanup.join("; "));
           }
@@ -2080,7 +2076,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
                 throw Error("clean Source state was not restored");
             }catch(error){problems.push("clean "+entry.name+": "+String(error?.message??error));}
           }
-          try{await openSourceViewPair(vscode,procedureUri);}
+          try{await openNativeSource(vscode,procedureUri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});}
           catch(error){problems.push("Procedure focus: "+String(error?.message??error));}
           if(problems.length)throw Error("L2-D3 cleanup: "+problems.join("; "));
         }
@@ -3309,415 +3305,155 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
        event.affectsConfiguration("connectionAgent.skillStudio",workspace))
       scheduleAudit();
   });
-  async function activateNativeMarkdownExtension(){
-    const markdownExtension=vscode.extensions?.getExtension?.(
-      'vscode.markdown-language-features');
-    if(!markdownExtension)
-      throw Error('Pinned built-in vscode.markdown-language-features extension is not installed');
-    let activationState='pending',activationError=null;
-    const activation=Promise.resolve(markdownExtension.activate()).then(
-      ()=>{activationState='ready';},
-      error=>{activationState='failed';activationError=String(error?.message??error);}
-    );
-    const activationResult=await Promise.race([
-      activation.then(()=>activationState),
-      new Promise(resolve=>setTimeout(()=>resolve('timeout'),5000))
-    ]);
-    if(activationResult!=='ready')
-      throw Error('Built-in Markdown extension activation '+activationResult+
-        '; isActive='+String(markdownExtension.isActive)+
-        '; error='+String(activationError??'none'));
-    return {markdownExtension,activationResult};
+  // The pinned Markdown language extension is separate from the right-side
+  // Studio Preview. Activation should be verified explicitly, not inferred
+  // from whether it eagerly starts an optional Markdown preview Worker.
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.nativeMarkdownLanguageActivationAcceptance",async()=>{
+      const extension=vscode.extensions?.getExtension?.(
+        "vscode.markdown-language-features");
+      if(!extension)throw Error("Pinned native Markdown language extension is missing");
+      const activated=await Promise.race([
+        Promise.resolve(extension.activate()).then(()=>true),
+        new Promise((_,reject)=>setTimeout(()=>reject(
+          Error("Native Markdown language extension activation timed out")),8000))
+      ]);
+      if(!activated||!extension.isActive)
+        throw Error("Pinned Markdown language extension did not become active");
+      const commands=await vscode.commands.getCommands(true);
+      return {id:extension.id,isActive:extension.isActive,
+        languageId:"markdown",
+        commands:commands.filter(id=>id.startsWith("markdown.")).slice(0,40),
+        workerStartup:"lazy-not-required-for-studio-preview"};
+    }));
+  async function findMarkdownAcceptanceDocument(skillName,relativePath){
+    const name=typeof skillName==="string"?skillName:"establish-pdu-session";
+    const target=typeof relativePath==="string"?relativePath:"SKILL.md";
+    if(!/^[a-z0-9-]+$/.test(name))throw Error("Invalid Skill sample name");
+    if(!/^(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(target))
+      throw Error("Markdown acceptance target must be a known Package-local Markdown path");
+    const matches=await vscode.workspace.findFiles(
+      "**/"+name+"/"+target,"**/node_modules/**",5);
+    const suffix="/"+name+"/"+target;
+    const exact=matches.filter(item=>item.path.endsWith(suffix));
+    if(exact.length!==1)
+      throw Error("Expected exactly one "+name+"/"+target+" in the active Workspace");
+    const doc=await vscode.workspace.openTextDocument(exact[0]);
+    if(doc.languageId!=="markdown")
+      throw Error("Markdown Source language service was not selected: "+doc.languageId);
+    return doc;
   }
-  function resolveNativeMarkdownWorkerUrl(workerUri){
-    const locationHref=globalThis.location?.href;
-    if(!locationHref)return workerUri.toString();
-    try{
-      const appBase=new URL('.',locationHref);
-      const resolved=new URL(workerUri.toString(),appBase);
-      const basePath=appBase.pathname.replace(/\/$/,'');
-      // Theia's hosted-plugin URI can resolve from the origin root even when
-      // the workbench is deployed as a GitHub Pages project site. Keep the
-      // Worker inside the actual application base path.
-      if(basePath&&resolved.origin===appBase.origin&&
-         resolved.pathname.startsWith('/hostedPlugin/')&&
-         !resolved.pathname.startsWith(basePath+'/')){
-        resolved.pathname=basePath+resolved.pathname;
-      }
-      return resolved.toString();
-    }catch{
-      return workerUri.toString();
-    }
+  async function showMarkdownSource(doc){
+    await vscode.window.showTextDocument(doc,{
+      viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:false
+    });
+    await new Promise(resolve=>setTimeout(resolve,0));
   }
-  // Resource probing is acceptance-only. Normal Markdown opening should not
-  // issue an extra HEAD request on every preview launch.
-  async function probeNativeMarkdownWorker(markdownExtension){
-    let workerProbe='not-applicable';
-    if(typeof Worker==='function'&&typeof globalThis.location!=='undefined'){
-      const workerUri=vscode.Uri.joinPath(markdownExtension.extensionUri,
-        'dist','browser','serverWorkerMain.js');
-      const workerUrl=resolveNativeMarkdownWorkerUrl(workerUri);
-      try{
-        const response=await fetch(workerUrl,{method:'HEAD'});
-        workerProbe={uri:workerUrl,status:response.status,ok:response.ok};
-      }catch(error){
-        workerProbe={uri:workerUrl,error:String(error?.message??error)};
-      }
-      nativeMarkdownWorkerDiagnostics={
-        extensionUri:markdownExtension.extensionUri.toString(),
-        workerUri:workerUrl,workerProbe
-      };
-    }
-    return workerProbe;
-  }
-  const isNativeMarkdownPath=path=>/\.(?:md|markdown)$/i.test(path??"");
-  async function openNativeMarkdownPreview(uri){
-    uri=uri??vscode.window.activeTextEditor?.document.uri;
-    if(!uri||!isNativeMarkdownPath(uri.path))return false;
-    const key=uri.toString();
-    if(nativeMarkdownOpening.has(key))return true;
-    nativeMarkdownOpening.add(key);
-    let paired=false;
-    try{
-      let doc=await vscode.workspace.openTextDocument(uri);
-      // Newly imported or just-created Markdown files can briefly be classified
-      // as Plain Text by browser-only Theia before its file-type association
-      // catches up. Set the language explicitly before invoking the built-in
-      // Markdown Preview command.
-      if(doc.languageId!=='markdown'&&
-         typeof vscode.languages.setTextDocumentLanguage==='function')
-        doc=await vscode.languages.setTextDocumentLanguage(doc,'markdown');
-      // Theia's browser plugin host does not consistently activate contributed
-      // Markdown preview commands from their implicit activation events. Load
-      // the exact pinned built-in extension and verify its command registration
-      // before treating a successful Source open as a native Preview launch.
-      await activateNativeMarkdownExtension();
-      const markdownCommands=await vscode.commands.getCommands(true);
-      if(!markdownCommands.includes('markdown.showPreview'))
-        throw Error('Built-in Markdown extension activated without registering markdown.showPreview');
-      // Keep Source as the editable authority in the first editor group.
-      // Theia can retain the original right-group Source tab when the same
-      // document is shown in column one. Move the active tab when supported,
-      // then explicitly close any remaining duplicate Source tabs outside the
-      // first group. This is safe because the first-group Source is already
-      // visible and is the one authoritative editable document.
-      const activeSource=vscode.window.activeTextEditor;
-      if(activeSource?.document?.uri?.toString()===key&&
-         activeSource.viewColumn!==vscode.ViewColumn.One){
-        try{
-          await vscode.commands.executeCommand('workbench.action.moveEditorToFirstGroup');
-        }catch{/* Tab-group cleanup below is the deterministic fallback. */}
-      }
-      await vscode.window.showTextDocument(doc,{
-        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:false
-      });
-      const tabGroups=vscode.window.tabGroups;
-      // Theia can prompt to save a dirty Source when closing a duplicate
-      // tab even though the same TextDocument remains open in column One.
-      // Never trigger a destructive save dialog as part of auto-pairing.
-      if(!doc.isDirty&&typeof tabGroups?.close==='function'&&Array.isArray(tabGroups.all)){
-        const duplicateSourceTabs=tabGroups.all
-          .filter(group=>group.viewColumn!==vscode.ViewColumn.One)
-          .flatMap(group=>group.tabs??[])
-          .filter(tab=>tab.input?.uri?.toString?.()===key);
-        if(duplicateSourceTabs.length)
-          await tabGroups.close(duplicateSourceTabs,true);
-      }
-      // Resolve the exact Skill Package root, inventory local files, and reject
-      // symlinked targets before the native Markdown engine renders any links.
-      const policyReady=await prepareNativeMarkdownPackagePolicy(vscode,uri);
-      if(!policyReady){
-        void vscode.window.showWarningMessage(
-          '无法验证当前 Markdown 文件所属 Package 或文件清单，已拒绝打开原生预览。');
-        return false;
-      }
-      // The native CustomEditor is stable per resource. Never reopen an
-      // existing preview while its Webview or editor command is still settling:
-      // redundant openWith calls can stall subsequent WorkspaceEdit commands.
-      const existingPreview=(vscode.window.tabGroups?.all??[]).some(group=>
-        group.viewColumn===vscode.ViewColumn.Two&&
-        (group.tabs??[]).some(tab=>
-          tab.input?.uri?.toString?.()===key&&
-          tab.input?.viewType==='vscode.markdown.preview.editor'));
-      if(existingPreview){
-        nativeMarkdownOpening.delete(key);
-        paired=true;
-        return true;
-      }
-      // Never use markdown.showPreviewToSide here: its Beside placement is
-      // relative to the currently focused group and can insert a THIRD group
-      // when a Designer already occupies the right side. The native Markdown
-      // extension also contributes a preview CustomEditor. Open that exact
-      // built-in editor in our shared Visual column explicitly.
-      // Do not await Webview initialization: hosts may settle only after render.
-      const opening=vscode.commands.executeCommand('vscode.openWith',uri,
-        'vscode.markdown.preview.editor',{
-          viewColumn:vscode.ViewColumn.Two,preserveFocus:true,preview:false
-        });
-      paired=true;
-      // Some Theia PluginHost builds leave the Preview command promise pending
-      // after the webview is created. Never let that implementation detail keep
-      // this URI permanently marked as opening: a later Source activation must
-      // be able to retarget the singleton native Preview back to this document.
-      const releaseOpening=()=>nativeMarkdownOpening.delete(key);
-      setTimeout(releaseOpening,500);
-      void Promise.resolve(opening).then(
-        releaseOpening,
-        error=>{
-          releaseOpening();
-          void vscode.window.showWarningMessage(
-            '原生 Markdown 预览未能打开：'+String(error?.message??error));
-        }
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.markdownPreviewOpenAcceptance",async(skillName,relativePath)=>{
+      const doc=await findMarkdownAcceptanceDocument(skillName,relativePath);
+      await showMarkdownSource(doc);
+      return doc.uri.toString();
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.markdownPreviewAcceptance",async skillName=>{
+      const doc=await findMarkdownAcceptanceDocument(skillName,"SKILL.md");
+      const key=doc.uri.toString();
+      if(markdownPreviewAcceptanceOriginals.has(key))
+        throw Error("Markdown Preview acceptance fixture is already active");
+      const original=doc.getText();
+      markdownPreviewAcceptanceOriginals.set(key,original);
+      await showMarkdownSource(doc);
+      const sections=Array.from({length:90},(_,index)=>
+        "## Studio Scroll Section "+(index+1)+"\n\n"+
+        "This paragraph provides stable source lines and preview height for real bidirectional scroll synchronization.\n"
       );
-      return true;
-    }finally{
-      // The native Preview command owns the suppression lifetime after it has
-      // been started. Failed Source preparation still releases it immediately.
-      if(!paired)nativeMarkdownOpening.delete(key);
-    }
-  }
-  // Shared acceptance contract for the entire Studio workbench, not just
-  // a particular Source/Preview pair. All native editors and CustomEditors
-  // must reuse groups One and Two even in a mixed open sequence.
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.twoColumnLayoutAcceptance',()=>({
-      groups:(vscode.window.tabGroups?.all??[]).map(group=>({
-        column:group.viewColumn,
-        tabs:(group.tabs??[]).map(tab=>({
-          label:tab.label,
-          uri:tab.input?.uri?.toString?.()??null,
-          viewType:tab.input?.viewType??null
-        }))
-      })),
-      editors:(vscode.window.visibleTextEditors??[]).map(editor=>({
-        uri:editor.document.uri.toString(),column:editor.viewColumn
-      }))
-    })));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownActivationStateAcceptance',()=>{
-      const markdownExtension=vscode.extensions?.getExtension?.(
-        'vscode.markdown-language-features');
-      return {
-        installed:Boolean(markdownExtension),
-        isActive:Boolean(markdownExtension?.isActive)
-      };
-    }));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownWorkerStartupAcceptance',async()=>{
-      const {markdownExtension,activationResult}=
-        await activateNativeMarkdownExtension();
-      const workerProbe=await probeNativeMarkdownWorker(markdownExtension);
-      return {
-        extensionUri:markdownExtension.extensionUri.toString(),
-        isActive:markdownExtension.isActive,
-        workerAvailable:typeof Worker==='function',
-        activationResult,workerProbe
-      };
-    }));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownWorkerDiagnostics',()=>nativeMarkdownWorkerDiagnostics));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownPreviewAcceptance',async(skillName,relativePath)=>{
-      const name=typeof skillName==='string'?skillName:'establish-pdu-session';
-      const targetPath=typeof relativePath==='string'?relativePath:'SKILL.md';
-      if(!/^[a-z0-9-]+$/.test(name))throw Error('Invalid Skill sample name');
-      if(!/^(?:SKILL\.md|references\/[a-z0-9-]+\.md)$/i.test(targetPath))
-        throw Error('Markdown acceptance target must be a known Package-local Markdown path');
-      const matches=await vscode.workspace.findFiles(
-        '**/'+name+'/'+targetPath,'**/node_modules/**',5);
-      const suffix='/'+name+'/'+targetPath;
-      const exact=matches.filter(item=>item.path.endsWith(suffix));
-      if(exact.length!==1)
-        throw Error('Expected exactly one '+name+'/'+targetPath+' in the active Workspace');
-      const opened=await openNativeMarkdownPreview(exact[0]);
-      return opened?exact[0].toString():null;
-    }));
-  context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance',
-    async(rawUri,openColumn)=>{
-      const target=vscode.Uri.parse(String(rawUri??''));
-      if(openColumn!==1&&openColumn!==2)
-        throw Error('Markdown acceptance editor column must be one or two');
-      const workspaceFolder=vscode.workspace.getWorkspaceFolder(target);
-      if(!workspaceFolder)
-        throw Error('Markdown acceptance URI must be inside the active workspace');
-      // Check the package-local path shape without rescanning the workspace.
-      // openNativeMarkdownPreview applies the authoritative inventoried-file,
-      // Package-root and symlink policy before rendering the document.
-      if(!/\/skills\/[a-z0-9-]+\/(?:SKILL\.md|(?:[a-z0-9-]+\/)*[a-z0-9-]+\.md)$/i.test(target.path))
-        throw Error('Markdown acceptance URI must identify a Markdown file inside a Skill Package: '+
-          JSON.stringify({target:target.toString(),workspaceRoot:workspaceFolder.uri.toString()}));
-      try{await vscode.workspace.fs.stat(target);}
-      catch{throw Error('Markdown acceptance target does not exist: '+target.toString());}
-      // Open only the editable Source. The active-editor listener must create
-      // its native Preview and normalize this right-column open back to the
-      // fixed Source-left / Preview-right layout.
-      await vscode.commands.executeCommand('vscode.open',target,{
-        viewColumn:openColumn===2?vscode.ViewColumn.Two:vscode.ViewColumn.One,
-        preview:false
-      });
-      return target.toString();
-    }));
-    context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownLiveUpdateAcceptance',async rawUri=>{
-      const target=vscode.Uri.parse(String(rawUri??''));
-      if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
-        throw Error('Live-update acceptance requires the exact v1alpha5 5GC Skill guide URI');
-      const key=target.toString();
-      const doc=await vscode.workspace.openTextDocument(target);
-      if(doc.languageId!=='markdown')
-        throw Error('The conventional Skill guide is not registered as Markdown: '+doc.languageId);
-      if(nativeMarkdownLiveOriginals.has(key))
-        throw Error('Native Markdown live-update acceptance is already active');
-      // Model the real user returning to the already-open SKILL.md Source tab.
-      // The active-editor listener must retarget the single native Preview to
-      // this Source before the unsaved edit is applied.
-      await vscode.window.showTextDocument(doc,{
-        viewColumn:vscode.ViewColumn.One,preview:false,preserveFocus:false
-      });
-      await new Promise(resolve=>setTimeout(resolve,0));
-      await openNativeMarkdownPreview(target);
-      const original=doc.getText();
-      nativeMarkdownLiveOriginals.set(key,original);
-      const longTail=Array.from({length:80},(_,index)=>
-        '## Native Markdown Scroll Section '+(index+1)+'\n\n'+
-        'This paragraph provides stable source lines and preview height for real bidirectional scroll synchronization acceptance.\n'
-      ).join('\n');
-      const source='# Native Markdown Live Update Probe\n\n'+original+'\n\n'+longTail;
+      const fixture=[
+        "# Studio Markdown Preview Acceptance",
+        "",
+        "The **INITIAL** source-backed Markdown preview is live.",
+        "",
+        "| Field | Value |",
+        "| --- | --- |",
+        "| Renderer | Marked GFM |",
+        "| Owner | Skill Studio |",
+        "",
+        "[Safe package reference](assurance/contract.yaml)",
+        "[Traversal package reference](../../outside.md)",
+        "[Missing package reference](missing.md)",
+        "[External reference](https://example.com)",
+        "![Remote image](https://example.invalid/markdown-pixel.png)",
+        "",
+        "<script>window.skillStudioMarkdownXss = true;</script>",
+        "",
+        ...sections
+      ].join("\n");
       const edit=new vscode.WorkspaceEdit();
-      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(original.length)),source);
+      edit.replace(doc.uri,new vscode.Range(doc.positionAt(0),doc.positionAt(original.length)),fixture);
       const applied=await vscode.workspace.applyEdit(edit);
       if(!applied){
-        nativeMarkdownLiveOriginals.delete(key);
-        throw Error('Could not apply the temporary native Markdown live-update fixture');
+        markdownPreviewAcceptanceOriginals.delete(key);
+        throw Error("Could not apply the temporary Markdown Preview fixture");
       }
-      return key;
-    }));
-    context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance',async rawUri=>{
-      const target=vscode.Uri.parse(String(rawUri??''));
-      if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
-        throw Error('Refusing to restore a non-v1alpha5 5GC Skill guide');
-      const key=target.toString();
-      const original=nativeMarkdownLiveOriginals.get(key);
-      if(typeof original!=='string')
-        throw Error('No original Markdown content is recorded for the live-update fixture');
-      const doc=await vscode.workspace.openTextDocument(target);
-      if(doc.getText()!==original)
-        throw Error('Native Markdown Undo did not restore the exact original Source');
-      nativeMarkdownLiveOriginals.delete(key);
-      return true;
-    }));
-    context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownSecurityAcceptance',async rawUri=>{
-      const target=vscode.Uri.parse(String(rawUri??''));
-      if(!target.path.endsWith('/skills/establish-pdu-session/SKILL.md'))
-        throw Error('Security acceptance requires the exact v1alpha5 5GC Skill guide URI');
-      const doc=await vscode.workspace.openTextDocument(target);
-      if(doc.languageId!=='markdown')
-        throw Error('Existing reference is not registered as Markdown: '+doc.languageId);
-      const original=doc.getText();
-      if(nativeMarkdownSecurityOriginals.has(target.toString()))
-        throw Error('Native Markdown security probe is already active');
-      nativeMarkdownSecurityOriginals.set(target.toString(),original);
-      const source=[
-        '# Native Markdown Security Probe',
-        '',
-        '<script>window.skillStudioNativeMarkdownXss = true;</script>',
-        '<img src="https://example.invalid/raw-html-pixel.png" onerror="window.skillStudioNativeMarkdownXss = true">',
-        '',
-        '[Safe package reference](assurance/contract.yaml)',
-        '[Escaping package link](../../outside.md)',
-        '[Missing package link](missing.md)',
-        '![Remote pixel](https://example.invalid/markdown-pixel.png)',
-        ''
-      ].join('\n');
-      const edit=new vscode.WorkspaceEdit();
-      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(original.length)),source);
-      const applied=await vscode.workspace.applyEdit(edit);
-      if(!applied){
-        nativeMarkdownSecurityOriginals.delete(target.toString());
-        throw Error('Could not apply the temporary native Markdown security probe');
-      }
-      const opened=await openNativeMarkdownPreview(target);
-      if(!opened){
-        const restore=new vscode.WorkspaceEdit();
-        const changed=await vscode.workspace.openTextDocument(target);
-        restore.replace(target,new vscode.Range(changed.positionAt(0),changed.positionAt(changed.getText().length)),original);
-        await vscode.workspace.applyEdit(restore);
-        nativeMarkdownSecurityOriginals.delete(target.toString());
-        throw Error('Native Markdown security probe could not establish a safe Package inventory');
-      }
-      return target.toString();
-    }));
-    context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.removeNativeMarkdownSecurityAcceptance',async rawUri=>{
-      const target=vscode.Uri.parse(String(rawUri??''));
-      const suffix='/skills/establish-pdu-session/SKILL.md';
-      if(!target.path.endsWith(suffix))
-        throw Error('Refusing to restore a non-fixture Skill guide');
-      const original=nativeMarkdownSecurityOriginals.get(target.toString());
-      if(typeof original!=='string')
-        throw Error('No original Skill guide content is recorded for this security probe');
-      const doc=await vscode.workspace.openTextDocument(target);
-      const edit=new vscode.WorkspaceEdit();
-      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),original);
-      const restored=await vscode.workspace.applyEdit(edit);
-      if(!restored)throw Error('Could not restore the original Skill guide after security probe');
-      nativeMarkdownSecurityOriginals.delete(target.toString());
-      // The probe changed only document contents. The Package inventory and
-      // link policy established before Preview creation are still valid.
-      return true;
+      return {uri:key,version:doc.version,lineCount:doc.lineCount};
     }));
   context.subscriptions.push(vscode.commands.registerCommand(
-    'skillStudio.internal.nativeMarkdownSettingsAcceptance',()=>({
-      scrollEditorWithPreview:vscode.workspace.getConfiguration('markdown.preview')
-        .get('scrollEditorWithPreview'),
-      scrollPreviewWithEditor:vscode.workspace.getConfiguration('markdown.preview')
-        .get('scrollPreviewWithEditor'),
-      markEditorSelection:vscode.workspace.getConfiguration('markdown.preview')
-        .get('markEditorSelection'),
-      activeEditor:vscode.window.activeTextEditor?.document.uri.toString()??null,
-      visibleEditors:vscode.window.visibleTextEditors.map(editor=>({
-        uri:editor.document.uri.toString(),viewColumn:editor.viewColumn,
+    "skillStudio.internal.markdownPreviewLiveUpdateAcceptance",async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??""));
+      const key=target.toString(),doc=await vscode.workspace.openTextDocument(target);
+      if(!markdownPreviewAcceptanceOriginals.has(key))
+        throw Error("No original Markdown fixture is recorded for live-update acceptance");
+      const original=doc.getText();
+      if(!original.includes("**INITIAL**"))
+        throw Error("Markdown Preview fixture marker is missing");
+      const updated=original.replace("**INITIAL**","**UPDATED**");
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(original.length)),updated);
+      if(!await vscode.workspace.applyEdit(edit))
+        throw Error("Could not apply the Markdown Preview live update");
+      return {uri:key,version:doc.version};
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.markdownPreviewSourceStateAcceptance",async rawUri=>{
+      const key=String(rawUri??"");
+      const editor=(vscode.window.visibleTextEditors??[]).find(item=>
+        item.document.uri.toString()===key);
+      if(!editor)throw Error("Markdown Source editor is not visible: "+key);
+      return {uri:key,version:editor.document.version,
         visibleRanges:editor.visibleRanges.map(range=>({
-          start:range.start.line,end:range.end.line
-        }))
-      }))
-    })));
-  // Opening Markdown in the native Explorer/editor automatically creates its
-  // paired read-only Preview. The timer lets an explicit Preview command finish
-  // first; its panel is then already registered and no duplicate is opened.
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
-    const target=editor?.document?.uri;
-    if(!target||!isNativeMarkdownPath(target.path))return;
-    const key=target.toString();
-    setTimeout(()=>{
-      if(nativeMarkdownOpening.has(key))return;
-      if(vscode.window.activeTextEditor?.document.uri.toString()!==key)return;
-      void openNativeMarkdownPreview(target).catch(error=>{
-        void vscode.window.showWarningMessage(
-          '原生 Markdown 预览未能打开：'+String(error?.message??error));
-      });
-    },0);
-  }));
-  // An editor restored before extension activation does not emit a new active
-  // editor event. Apply the same default pairing to that already-active Source.
-  const initiallyActiveMarkdown=vscode.window.activeTextEditor?.document;
-  if(initiallyActiveMarkdown&&isNativeMarkdownPath(initiallyActiveMarkdown.uri.path)){
-    const target=initiallyActiveMarkdown.uri,key=target.toString();
-    setTimeout(()=>{
-      if(vscode.window.activeTextEditor?.document.uri.toString()===key)
-        void openNativeMarkdownPreview(target);
-    },0);
-  }
-  if(typeof vscode.workspace.onDidCloseTextDocument==='function'){
-    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document=>{
-      if(!isNativeMarkdownPath(document.uri.path))return;
-      const key=document.uri.toString();
-      nativeMarkdownOpening.delete(key);
+          start:range.start.line+1,end:range.end.line+1
+        }))};
     }));
-  }
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.markdownPreviewRevealSourceAcceptance",async(rawUri,line)=>{
+      const key=String(rawUri??"");
+      const editor=(vscode.window.visibleTextEditors??[]).find(item=>
+        item.document.uri.toString()===key);
+      if(!editor)throw Error("Markdown Source editor is not visible: "+key);
+      if(!Number.isSafeInteger(line)||line<1||line>editor.document.lineCount)
+        throw Error("Markdown Source scroll line is outside the current document");
+      const position=new vscode.Position(line-1,0);
+      editor.revealRange(new vscode.Range(position,position),
+        vscode.TextEditorRevealType.AtTop);
+      return {uri:key,line,version:editor.document.version};
+    }));
+  context.subscriptions.push(vscode.commands.registerCommand(
+    "skillStudio.internal.restoreMarkdownPreviewAcceptance",async rawUri=>{
+      const target=vscode.Uri.parse(String(rawUri??""));
+      const key=target.toString(),original=markdownPreviewAcceptanceOriginals.get(key);
+      if(typeof original!=="string")
+        throw Error("No original Markdown Source content is recorded for restoration");
+      const doc=await vscode.workspace.openTextDocument(target),current=doc.getText();
+      const edit=new vscode.WorkspaceEdit();
+      edit.replace(target,new vscode.Range(doc.positionAt(0),doc.positionAt(current.length)),original);
+      if(!await vscode.workspace.applyEdit(edit))
+        throw Error("Could not restore the original Markdown Source");
+      markdownPreviewAcceptanceOriginals.delete(key);
+      return {uri:key,version:doc.version};
+    }));
+  // Markdown Source activation is now observed by skillStudio.preview.
+  // The native Markdown language extension remains installed for language
+  // features; do not auto-create its CustomEditor Preview or editor groups.
   // Internal acceptance probe reports the authoritative VS Code TextDocument
   // version; the custom-editor webview's display revision is not that version.
   context.subscriptions.push(vscode.commands.registerCommand(
@@ -3753,7 +3489,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   return {syncPackages:packages=>packageLanguageLifecycle.sync(packages),attach(doc,post){
     sessions.set(doc.uri.toString(),post);update(doc);scheduleAudit();
     const releaseLanguagePackage=attachLanguagePackage(doc);
-    return ()=>{sessions.delete(doc.uri.toString());releaseLanguagePackage();};
+    return ()=>{if(sessions.get(doc.uri.toString())===post)
+      sessions.delete(doc.uri.toString());releaseLanguagePackage();};
   },select(doc,message){
     lastSelectionMessage={
       messageVersion:message.version,documentVersion:doc.version,

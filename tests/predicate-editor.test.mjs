@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {registerPredicateEditor} from '../experiments/ide-host/vscode/src/predicate-editor.mjs';
+import {registerPredicateCommands,mountPredicatePreview} from '../experiments/ide-host/vscode/src/predicate-editor.mjs';
 
 const source = [
   '# CA-SL v1alpha5 PredicateSet',
@@ -24,15 +24,15 @@ const source = [
   ''
 ].join('\n');
 
-test('Predicate custom editor renders v1alpha5 Parameters, Evidence and Evaluator', async () => {
-  const registrations = new Map();
+test('Predicate Preview renderer presents v1alpha5 Parameters, Evidence and Evaluator', async () => {
+  let customEditorRegistrations=0;
   const commands = new Map();
   const context = {subscriptions: []};
   let changeHandler, messageHandler, disposeHandler;
   const vscode = {
     window: {
-      registerCustomEditorProvider: (view, provider, options) => {
-        registrations.set(view, {provider, options});
+      registerCustomEditorProvider: () => {
+        customEditorRegistrations++;
         return {dispose() {}};
       }
     },
@@ -49,11 +49,10 @@ test('Predicate custom editor renders v1alpha5 Parameters, Evidence and Evaluato
       }
     }
   };
-  registerPredicateEditor(vscode, context);
-  assert.ok(registrations.has('skillStudio.predicatePreview'));
+  registerPredicateCommands(vscode,context);
   assert.ok(commands.has('skillStudio.openPredicates'));
-  assert.equal(registrations.get('skillStudio.predicatePreview')
-    .options.webviewOptions.retainContextWhenHidden, true);
+  assert.equal(customEditorRegistrations,0,
+    'Predicate visualizer is mounted by the shared Preview Host, not a CustomEditor');
 
   let text = source;
   const uri = {path: '/workspace/demo/assurance/predicates.yaml',
@@ -63,13 +62,12 @@ test('Predicate custom editor renders v1alpha5 Parameters, Evidence and Evaluato
     getText: () => text};
   const messages = [];
   const webview = {
-    options: null, html: '',
+    options: null, html: '', cspSource:'vscode-resource:',
     postMessage: async message => {messages.push(message);return true;},
     onDidReceiveMessage: handler => {messageHandler = handler;return {dispose(){}};}
   };
   const panel = {webview, onDidDispose: handler => {disposeHandler = handler;}};
-  await registrations.get('skillStudio.predicatePreview').provider
-    .resolveCustomTextEditor(document, panel);
+  await mountPredicatePreview(vscode,document,panel);
 
   assert.equal(webview.options.enableScripts, true);
   assert.equal(webview.options.localResourceRoots.length, 0);

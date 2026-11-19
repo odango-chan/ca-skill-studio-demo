@@ -23,27 +23,28 @@ test("Theia online target is a real backend-free 1.76 browser-only app",()=>{
   assert.equal(app.theiaPlugins["vscode.markdown-language-features"],markdownPlugin);
   const browserApp=JSON.parse(readFileSync(join(root,"../theia-browser/package.json"),"utf8"));
   assert.equal(browserApp.theiaPlugins["vscode.markdown-language-features"],markdownPlugin,
-    "Browser-Only and backend Theia must use the same scroll-sync-fixed Markdown extension");
-  assert.equal(app.theia.frontend.config.preferences["markdown.preview.scrollEditorWithPreview"],true);
-  assert.equal(app.theia.frontend.config.preferences["markdown.preview.scrollPreviewWithEditor"],true);
+    "Browser-Only and backend Theia must use the same native Markdown language extension");
+  assert.equal(app.theia.frontend.config.preferences["markdown.preview.scrollEditorWithPreview"],undefined);
+  assert.equal(app.theia.frontend.config.preferences["markdown.preview.scrollPreviewWithEditor"],undefined);
 });
 test("Theia plugin is the exact Web extension, with native editor + view contributions",()=>{
   const app=JSON.parse(readFileSync(join(root,"package.json"),"utf8"));
   const plugin=JSON.parse(readFileSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike/package.json"),"utf8"));
   assert.ok(plugin.browser?.endsWith("extension-theia.js"));
-  assert.equal(plugin.contributes["markdown.markdownItPlugins"],true);
+  assert.equal(plugin.contributes["markdown.markdownItPlugins"],undefined,
+    "the native Markdown Preview plugin hook is no longer used");
   assert.ok(plugin.contributes.languages?.some(language=>
     language.id==="markdown"&&language.extensions?.includes(".md")),
-    "native Markdown preview requires registered language ID in Theia");
-  assert.deepEqual(plugin.contributes["markdown.previewStyles"],["./media/native-markdown-preview.css"]);
+    "native Markdown language features retain the Markdown language ID in Theia");
+  assert.equal(plugin.contributes["markdown.previewStyles"],undefined,
+    "Studio Preview owns its stylesheet and rendering lifecycle");
   assert.ok(!plugin.contributes.commands.some(command=>command.command==="skillStudio.previewMarkdown"),
     "Markdown Preview is owned by the native extension, not a duplicate Studio command");
   for(const menu of Object.values(plugin.contributes.menus??{}))
     assert.ok(!menu.some(item=>item.command==="skillStudio.previewMarkdown"),
       "Studio must not contribute a duplicate Markdown Preview menu entry");
-  const editorViews=new Set(plugin.contributes.customEditors.map(x=>x.viewType));
-  for(const view of ["skillStudio.procedurePreview","skillStudio.contractPreview",
-    "skillStudio.predicatePreview","skillStudio.schemaPreview"])assert.ok(editorViews.has(view),view);
+  assert.equal(plugin.contributes.customEditors,undefined,
+    "visualizers must not create Main Editor CustomEditors");
   const explorerViews=new Set((plugin.contributes.views.explorer??[]).map(x=>x.id));
   const secondaryViews=new Set(plugin.contributes.views.skillStudioInspector.map(x=>x.id));
   const secondaryContainers=plugin.contributes.viewsContainers.secondarySidebar??[];
@@ -52,6 +53,8 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   ],"authoring/navigation views are contributed directly below native File Explorer");
   assert.ok(!explorerViews.has("skillStudio.evidence"),"Data Flow belongs to right-side Inspector, not a separate Evidence view");
   assert.ok(!plugin.activationEvents.includes("onView:skillStudio.evidence"));
+  assert.ok(secondaryViews.has("skillStudio.preview"),
+    "all visualizers use the single right-side Preview WebviewView");
   assert.ok(secondaryViews.has("skillStudio.inspection"),
     "Inspector view must be contributed to the native right-side container");
   assert.ok(secondaryContainers.some(x=>x.id==="skillStudioInspector"),
@@ -71,8 +74,8 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
   assert.ok(plugin.activationEvents.includes("onView:skillStudio.packages"));
   assert.ok(plugin.contributes.menus["view/title"].some(x=>
     x.command==="skillStudio.refreshPackages"&&x.when==="view == skillStudio.packages"));
-  assert.ok(plugin.contributes.customEditors.every(x=>x.priority==="option"),
-    "native YAML Source remains the default editor; Designer is opened by the shared pairing host");
+  assert.equal(plugin.contributes.customEditors,undefined,
+    "native Source is the only Main Editor surface; visualizers are hosted in the shared Preview View");
   assert.equal(app.theia.frontend.config.preferences["workbench.editorAssociations"],undefined,
     "Theia must not bypass the native Source-first pairing flow with forced CustomEditor associations");
   assert.ok(plugin.activationEvents.includes("onStartupFinished"),
@@ -101,7 +104,7 @@ test("Theia plugin is the exact Web extension, with native editor + view contrib
     "samples/v1alpha5/files.json","samples/v1alpha5/README.md",
     "samples/v1alpha5/establish-pdu-session/assurance/procedure.yaml",
     "samples/v1alpha5/establish-pdu-session-mas/assurance/procedure.yaml",
-    "media/native-markdown-preview.css"])
+    "media/studio-markdown-preview.css"])
     assert.ok(statSync(join(root,"plugins/odango-chan.ca-skill-studio-ide-spike",f)).size>(f.endsWith("files.json")?50:1000),f);
 });
 test("Trial is isolated from existing Pages distribution",()=>{

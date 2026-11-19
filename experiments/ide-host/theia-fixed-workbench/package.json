@@ -1,0 +1,14 @@
+{
+  "name": "@odango-chan/skill-studio-fixed-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "theiaExtensions": [
+    {
+      "frontend": "lib/browser/fixed-workbench-frontend-module"
+    }
+  ],
+  "dependencies": {
+    "@theia/core": "1.76.0"
+  }
+}

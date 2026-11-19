@@ -1,8 +1,7 @@
-import {openNativeSource} from './native-source.mjs';
-import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
+import {openNativeSource,revealNativeSourceLine} from './native-source.mjs';
+
 import {projectJsonSchema, resolveSchemaPointer} from '../../../../site/schema-projection.mjs';
 
-export const SCHEMA_VIEW = 'skillStudio.schemaPreview';
 const SCHEMA_PATH = /\/schemas\/(?:[^/]+\/)*[^/]+\.schema\.ya?ml$/i;
 const LOCAL_FILE = /^[A-Za-z0-9_-]+(?:[._-][A-Za-z0-9_-]+)*\.schema\.ya?ml$/;
 
@@ -38,10 +37,10 @@ export function localSchemaReference(uri, ref) {
   const target = uri.with({path:parent+'/'+file});
   return {uri:target,pointer};
 }
-async function reveal(vscode, uri, line) {
-  return openSourceViewPair(vscode,uri,{line});
+async function reveal(vscode,uri,line) {
+  return revealNativeSourceLine(vscode,uri,line);
 }
-async function followReference(vscode, document, projection, sourcePointer) {
+async function followReference(vscode,document,projection,sourcePointer) {
   if (projection.state === 'SOURCE_ONLY') return;
   const entry = projection.allRefs.find(x => x.sourcePointer === sourcePointer);
   if (!entry || typeof entry.reference !== 'string') {
@@ -151,19 +150,17 @@ async function chooseSchema(vscode, uri) {
   })),{placeHolder:'Select a JSON Schema source'});
   return picked?.uri??null;
 }
-export function registerSchemaEditor(vscode,context) {
-  const provider = {
-    async resolveCustomTextEditor(document,panel) {
+export function mountSchemaPreview(vscode,document,panel,{isCurrent=()=>true}={}) {
       if (!isSkillSchema(document.uri.path)) {
-        await vscode.window.showWarningMessage('Only Skill schemas/*.schema.yaml is supported');
-        return;
+        void vscode.window.showWarningMessage('Only Skill schemas/*.schema.yaml is supported');
+        return {dispose(){}};
       }
       const webview = panel.webview;
       webview.options={enableScripts:true,localResourceRoots:[]};
       webview.html=html(nonce());
       let disposed=false, ready=false;
       const push=()=>{
-        if(disposed||!ready)return;
+        if(disposed||!ready||!isCurrent())return;
         const projection=projectJsonSchema(document.getText());
         void webview.postMessage({type:'snapshot',version:document.version,
           packageName:schemaPackageName(document.uri),projection});
@@ -172,7 +169,7 @@ export function registerSchemaEditor(vscode,context) {
         if(e.document.uri.toString()===document.uri.toString())push();
       });
       const onMessage=webview.onDidReceiveMessage(async message=>{
-        if(disposed||!message||typeof message!=='object')return;
+        if(disposed||!isCurrent()||!message||typeof message!=='object')return;
         if(message.type==='ready'){ready=true;push();return;}
         if(message.version!==document.version){
           void webview.postMessage({type:'error',message:'Schema Source 已变化，请使用最新字段视图。'});
@@ -193,14 +190,19 @@ export function registerSchemaEditor(vscode,context) {
           await vscode.window.showWarningMessage('Schema Designer: '+String(e?.message??e));
         }
       });
-      panel.onDidDispose(()=>{disposed=true;forgetSourceViewPair(document.uri);onChange.dispose();onMessage.dispose();});
-    }
-  };
-  context.subscriptions.push(vscode.window.registerCustomEditorProvider(
-    SCHEMA_VIEW,provider,{webviewOptions:{retainContextWhenHidden:true}}));
+      let releasePanel=null;
+      const cleanup=()=>{
+        if(disposed)return;
+        disposed=true;
+        onChange.dispose();onMessage.dispose();releasePanel?.dispose?.();
+      };
+      releasePanel=panel.onDidDispose(cleanup);
+      return {dispose:cleanup};
+}
+export function registerSchemaCommands(vscode,context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openSchema',
     async uri=>{
       const target=await chooseSchema(vscode,uri);
-      if(target)await openSourceViewPair(vscode,target);
+      if(target)await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
     }));
 }

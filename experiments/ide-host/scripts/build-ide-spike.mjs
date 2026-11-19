@@ -36,9 +36,9 @@ for(const language of syntaxManifest.contributes?.languages??[]){
 // Keep the Go/WASM Compiler adapter as a separate classic Worker entry; the
 // pinned wasm_exec.js and skillc.wasm are staged by the CI Go build step.
 await cp(join(root,"src/compiler-worker.js"),join(root,"dist/compiler-worker.js"));
-// The pinned native Markdown extension owns Preview rendering; Studio supplies its shared theme.
+// The pinned Markdown extension owns native Source language services; the shared Studio Preview Host owns rendering.
 await cp("extensions/skill-studio-theme/styles/markdown-preview.css",
-  join(root,"media/native-markdown-preview.css"));
+  join(root,"media/studio-markdown-preview.css"));
 
 // The browser LSP server is a separate classic Worker bundle. It imports the
 // same transport-neutral LanguageDiagnosticSession as the host tests; no Node
@@ -60,7 +60,7 @@ await build({
 });
 // The same source also builds as a VS Code Web extension: no Node APIs.
 // "browser" in extension package.json selects this entry for vscode.dev and
-// browser-only Theia; real host activation/CustomEditor remains unverified.
+// browser-only Theia; real host activation of the shared Preview View is verified separately.
 await build({
   entryPoints:[join(root,"src/extension.mjs")],
   outfile:join(root,"dist/extension-web.cjs"),

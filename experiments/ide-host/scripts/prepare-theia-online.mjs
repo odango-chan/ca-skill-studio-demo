@@ -1,4 +1,4 @@
-// Stage the Procedure, Contract, Predicate and Schema Web extension plus standalone theme into
+// Stage the shared Source-backed Preview Web extension plus standalone theme into
 // the isolated Theia browser-only application. Both are built-in plugins.
 import {cp,mkdir,readFile,rm,stat,writeFile} from "node:fs/promises";
 import {join} from "node:path";
@@ -6,14 +6,12 @@ const app="experiments/ide-host/theia-online";
 const ext="experiments/ide-host/vscode";
 const target=join(app,"plugins","odango-chan.ca-skill-studio-ide-spike");
 const manifest=JSON.parse(await readFile(join(ext,"package.json"),"utf8"));
-if(!manifest.browser||!manifest.contributes?.customEditors?.length)
-  throw Error("VS Code Web extension entry or CustomEditor missing");
-const requiredEditors=["skillStudio.procedurePreview","skillStudio.contractPreview",
-  "skillStudio.predicatePreview","skillStudio.schemaPreview"];
-const editorViews=new Set(manifest.contributes.customEditors.map(x=>x.viewType));
-for(const view of requiredEditors)if(!editorViews.has(view))
-  throw Error("Required visual editor is missing from prepared Web extension: "+view);
-for(const source of [manifest.browser,"./dist/extension-theia.js","./dist/skill-language-server.js","./dist/compiler-worker.js","./dist/skillc.wasm","./dist/wasm_exec.js",join("media","procedure.js"),join("media","procedure.css")]){
+if(!manifest.browser||manifest.contributes?.customEditors?.length)
+  throw Error("VS Code Web extension must use native Source plus the shared Preview View; legacy CustomEditors are forbidden");
+const previewViews=manifest.contributes?.views?.skillStudioInspector??[];
+if(!previewViews.some(view=>view.id==="skillStudio.preview"&&view.type==="webview"))
+  throw Error("Shared right-side skillStudio.preview WebviewView is missing from the prepared Web extension");
+for(const source of [manifest.browser,"./dist/extension-theia.js","./dist/skill-language-server.js","./dist/compiler-worker.js","./dist/skillc.wasm","./dist/wasm_exec.js",join("media","procedure.js"),join("media","procedure.css"),join("media","studio-markdown-preview.css")]){
   const info=await stat(join(ext,source));
   if(!info.isFile()||info.size<1000)throw Error("Missing built Web extension file: "+source);
 }
@@ -29,7 +27,7 @@ await cp(join(ext,"icons"),join(target,"icons"),{recursive:true});
 await cp(join(ext,"samples"),join(target,"samples"),{recursive:true});
 console.log("STUDIO_THEIA_PREPARED_WEB_EXTENSION",JSON.stringify({
   app,target,name:manifest.name,browser:prepared.browser,
-  customEditors:manifest.contributes.customEditors.map(x=>x.viewType)
+  previewView:"skillStudio.preview",legacyCustomEditors:0
 }));
 
 const themeSource="extensions/skill-studio-theme";

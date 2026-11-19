@@ -1,10 +1,9 @@
-import {openNativeSource} from './native-source.mjs';
-import {openSourceViewPair,forgetSourceViewPair} from './source-view-pair.mjs';
+import {openNativeSource,revealNativeSourceLine} from './native-source.mjs';
+
 import {projectSkillContract} from '../../../../site/contract-projection.mjs';
 import {projectWorkspace} from '../../../../site/workspace.mjs';
 import {parseDocument, LineCounter, isMap, isScalar} from 'yaml';
 
-const VIEW = 'skillStudio.contractPreview';
 const SUFFIX = '/assurance/contract.yaml';
 
 function nonce() {
@@ -43,10 +42,10 @@ function predicateLine(source, predicateId) {
   }
   return 1;
 }
-async function reveal(vscode, uri, line) {
-  return openSourceViewPair(vscode,uri,{line});
+async function reveal(vscode,uri,line) {
+  return revealNativeSourceLine(vscode,uri,line);
 }
-async function openReference(vscode, contractDocument, message) {
+async function openReference(vscode,contractDocument,message) {
   const root = packageRoot(contractDocument.uri);
   if (message.type === 'openProcedure') {
     if (typeof message.value !== 'string') throw new Error('Procedure ID is missing');
@@ -166,13 +165,11 @@ async function chooseContract(vscode, uri) {
   })), {placeHolder: 'Choose the Contract Source file'});
   return picked?.uri ?? null;
 }
-export function registerContractEditor(vscode, context) {
-  const provider = {
-    async resolveCustomTextEditor(document, panel) {
+export function mountContractPreview(vscode,document,panel,{isCurrent=()=>true}={}) {
       if (!contractPath(document.uri.path)) {
-        await vscode.window.showWarningMessage(
+        void vscode.window.showWarningMessage(
           'Only assurance/contract.yaml is supported by Contract Designer');
-        return;
+        return {dispose(){}};
       }
       const webview = panel.webview;
       webview.options = {enableScripts: true, localResourceRoots: []};
@@ -180,7 +177,7 @@ export function registerContractEditor(vscode, context) {
       webview.html = webviewHtml(webview, token);
       let disposed = false, ready = false;
       const push = () => {
-        if (disposed || !ready) return;
+        if (disposed || !ready || !isCurrent()) return;
         const text = document.getText();
         const projection = projectSkillContract(text,{name:packageRoot(document.uri).split('/').pop()});
         void webview.postMessage({type: 'snapshot', text, version: document.version,
@@ -190,7 +187,7 @@ export function registerContractEditor(vscode, context) {
         if (event.document.uri.toString() === document.uri.toString()) push();
       });
       const incoming = webview.onDidReceiveMessage(async message => {
-        if (disposed || !message || typeof message !== 'object') return;
+        if (disposed || !isCurrent() || !message || typeof message !== 'object') return;
         if (message.type === 'ready') {ready = true; push(); return;}
         if (message.version !== document.version) {
           void webview.postMessage({type: 'error',
@@ -204,29 +201,28 @@ export function registerContractEditor(vscode, context) {
               viewColumn: vscode.ViewColumn.One, preserveFocus: false, preview: false
             });
           } else if (message.type === 'revealLine') {
-            await reveal(vscode, document.uri, message.value);
+            await reveal(vscode, document.uri, message.value, !forgetPairOnDispose);
           } else if (['openProcedure', 'openSchema', 'openPredicate'].includes(message.type)) {
-            await openReference(vscode, document, message);
+            await openReference(vscode, document, message, !forgetPairOnDispose);
           }
         } catch (error) {
           await vscode.window.showWarningMessage(
             'Contract Designer: ' + String(error?.message ?? error));
         }
       });
-      panel.onDidDispose(() => {
-        disposed = true;
-        forgetSourceViewPair(document.uri);
-        changed.dispose();
-        incoming.dispose();
-      });
-    }
-  };
-  context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW, provider, {
-    webviewOptions: {retainContextWhenHidden: true}
-  }));
+      let releasePanel=null;
+      const cleanup=()=>{
+        if(disposed)return;
+        disposed=true;
+        changed.dispose();incoming.dispose();releasePanel?.dispose?.();
+      };
+      releasePanel=panel.onDidDispose(cleanup);
+      return {dispose:cleanup};
+}
+export function registerContractCommands(vscode,context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openContract',
     async uri => {
       const target = await chooseContract(vscode, uri);
-      if (target) await openSourceViewPair(vscode,target);
+      if (target) await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
     }));
 }

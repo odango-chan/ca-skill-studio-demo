@@ -112,7 +112,10 @@ test("Theia is the only published host and Classic has no runtime entrypoint",()
   assert.ok(!existsSync(resolve(root,"site/index.html")));
   assert.ok(!existsSync(resolve(root,"site/app.mjs")));
   assert.ok(!existsSync(resolve(root,"scripts/build.mjs")));
-  assert.ok(manifest.contributes.customEditors.some(x=>x.viewType==="skillStudio.procedurePreview"));
+  assert.equal(manifest.contributes.customEditors,undefined,
+    "visualizers are not registered as Main Editor CustomEditors");
+  assert.ok(manifest.contributes.views.skillStudioInspector.some(x=>x.id==="skillStudio.preview"),
+    "the only visualizer entrypoint is the shared right-side Preview View");
   assert.ok(manifest.contributes.views.explorer.some(x=>x.id==="skillStudio.packages"));
 });
 

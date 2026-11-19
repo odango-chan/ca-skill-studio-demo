@@ -22,7 +22,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   const listeners=new Set(),commands=new Map(),posted=[],writes=[],opened=[],registered=[],revealed=[];
   let confirmChoice="确认并应用";
   const textEditor={document,viewColumn:1,selection:null,revealRange(range,kind){revealed.push({range,kind});}};
-  let provider=null,onMessage=null;
+  let previewProvider=null,onMessage=null;
   class WorkspaceEdit{
     constructor(){this.changes=[];}
     replace(file,range,value){this.change={file,range,value};this.changes.push(this.change);}
@@ -69,9 +69,11 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       createOutputChannel:()=>({appendLine(){},show(){},dispose(){}}),
       visibleTextEditors:[textEditor],
       registerTreeDataProvider:()=>({dispose(){}}),
+      registerWebviewViewProvider:(id,provider,_options)=>{
+        assert.equal(id,"skillStudio.preview");previewProvider=provider;return {dispose(){}};
+      },
       onDidChangeActiveTextEditor:()=>({dispose(){}}),
       activeTextEditor:{document},
-      registerCustomEditorProvider(_name,p){provider=p;return{dispose(){}};},
       showWarningMessage:()=>{},
       showInformationMessage:async()=>confirmChoice,
       showInputBox:async()=>"unused-node-value",
@@ -96,7 +98,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
   }
   const context={extensionUri:makeUri("/extension"),globalStorageUri:makeUri("/global-storage"),subscriptions:[]};
   activate(context);
-  assert.ok(provider);
+  assert.ok(previewProvider);
   assert.ok(commands.has("skillStudio.openProcedure"));
   assert.ok(commands.has("skillStudio.renameNode"));
   assert.ok(commands.has("skillStudio.editNodeOperatorValue"));
@@ -108,8 +110,10 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
     postMessage:async data=>{posted.push(data);return true;},
     onDidReceiveMessage:cb=>{onMessage=cb;return{dispose(){}};}
   };
-  const panel={webview,reveal:(column,preserveFocus)=>registered.push(['panel.reveal',column,preserveFocus]),onDidChangeViewState:()=>({dispose(){}}),onDidDispose:()=>({dispose(){}})};
-  await provider.resolveCustomTextEditor(document,panel);
+  const view={visible:true,webview,
+    onDidChangeVisibility:()=>({dispose(){}}),
+    onDidDispose:()=>({dispose(){}})};
+  await previewProvider.resolveWebviewView(view);
   assert.match(webview.html,/Content-Security-Policy/);
   assert.ok(webview.html.includes("procedure.js"));
   assert.ok(webview.html.includes("procedure.css"));
@@ -310,5 +314,8 @@ test("Skill Studio authoring views live in native Explorer while Inspector stays
     "Inspector keeps its native right-side Secondary Sidebar container");
   assert.deepEqual(manifest.contributes.views.skillStudioInspector?.map(view=>[
     view.id,view.name
-  ]),[["skillStudio.inspection","Inspector"]]);
+  ]),[
+    ["skillStudio.preview","Preview"],
+    ["skillStudio.inspection","Inspector"]
+  ]);
 });

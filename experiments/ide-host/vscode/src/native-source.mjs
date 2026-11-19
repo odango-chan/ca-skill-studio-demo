@@ -12,3 +12,21 @@ export async function openNativeSource(vscode,uri,options){
     }
   }
 }
+
+/**
+ * Open a Source line without invoking a Designer CustomEditor. Used by the
+ * independent right-side Preview View to keep navigation in the one Source
+ * editor group. Do not create a second editor group from Preview links.
+ */
+export async function revealNativeSourceLine(vscode,uri,line=1){
+  const document=await vscode.workspace.openTextDocument(uri);
+  const safeLine=Number.isSafeInteger(line)&&line>0&&line<=document.lineCount?line:1;
+  const position=new vscode.Position(safeLine-1,0);
+  const selection=new vscode.Range(position,position);
+  return openNativeSource(vscode,uri,{
+    viewColumn:vscode.ViewColumn.One,
+    preserveFocus:false,
+    preview:false,
+    selection
+  });
+}

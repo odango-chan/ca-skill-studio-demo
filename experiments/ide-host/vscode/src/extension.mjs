@@ -1,6 +1,8 @@
 import {openNativeSource} from "./native-source.mjs";
-import {createSourceOnlyEditorNormalizer} from "./editor-group-placement.mjs";
-import {openSourceViewPair,sourceViewType,hasSourceViewPair,forgetSourceViewPair} from "./source-view-pair.mjs";
+import {registerPreviewHost} from "./preview-host.mjs";
+import {mountMarkdownPreview} from "./markdown-preview.mjs";
+
+import {sourceViewType} from "./source-view-pair.mjs";
 import {assertStudioMutation} from "./project-policy.mjs";
 import * as vscode from "vscode";
 // Web Crypto is available in both modern Node extension hosts and browser
@@ -19,19 +21,17 @@ import {EXAMPLE_PROJECT_NAME,seedExampleProject} from "./sample-loader.mjs";
 import {openProjectFolder,isSingleFolderWorkspace,restorePendingExampleProject,PENDING_EXAMPLE_OPEN_KEY} from "./project-navigation.mjs";
 import {registerProjectWelcome} from "./project-welcome.mjs";
 
-import {extendMarkdownIt} from "./markdown-link-policy.mjs";
 import {registerWorkbench} from "./workbench.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
-import {registerContractEditor} from "./contract-editor.mjs";
-import {registerPredicateEditor} from "./predicate-editor.mjs";
-import {registerSchemaEditor} from "./schema-editor.mjs";
+import {registerContractCommands,mountContractPreview} from "./contract-editor.mjs";
+import {registerPredicateCommands,mountPredicatePreview} from "./predicate-editor.mjs";
+import {registerSchemaCommands,mountSchemaPreview} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
 import {registerDependencyIntegration} from "./dependency-integration.mjs";
 import {registerCompilerIntegration} from "./compiler-integration.mjs";
 import {registerPackageDiagnosticTesting} from "./package-diagnostic-testing.mjs";
 import {registerPackageRouteTesting} from "./package-route-testing.mjs";
 import {iconShapes} from "../../../../site/icons.mjs";
-const VIEW="skillStudio.procedurePreview";
 // Theia's browser-only static build can omit its Pages subpath when creating
 // webview resource URLs. Restrict the workaround to the same-origin static
 // plugin worker; normal VS Code and backend-backed Theia retain host URIs.
@@ -57,8 +57,6 @@ function toolbarIconButton(id,name,label,{pressed=false}={}){
     (pressed?' aria-pressed="false"':'')+'>'+svgIcon(name)+'</button>';
 }
 export function activate(context){
-  // Register Welcome first. A failure in Compiler, Dependency or semantic
-  // token integration must never prevent users from reopening the project UI.
   let workbench=null,packageOverview=null,projectWelcome=null,workbenchReady=false;
   const activationFailures=[];
   const activationComponents=Object.create(null);
@@ -88,6 +86,8 @@ export function activate(context){
       return fallback;
     }
   };
+  // Welcome must be registered before optional editors and providers. A failure
+  // in Compiler, Preview or semantic highlighting must not strand the user.
   projectWelcome=registerSafely("Welcome",()=>registerProjectWelcome(vscode,context));
   if(!projectWelcome){
     registerSafely("Welcome fallback",()=>context.subscriptions.push(
@@ -187,35 +187,29 @@ export function activate(context){
       compilerProblemsProvider:compilerIntegration.problems
     }),unavailableWorkbench);
   workbenchReady=workbench!==unavailableWorkbench;
-  // Diagnostic regression results live in the native Test Explorer (when the
-  // host exposes Testing API), never in the Problems or Runtime evidence views.
   registerSafely("Package diagnostic tests",()=>registerPackageDiagnosticTesting(vscode,context,{
-    getActiveProcedure:()=>
-      workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
+    getActiveProcedure:()=>workbench?.getActiveDocument?.()??
+      vscode.window.activeTextEditor?.document??null
   }));
   registerSafely("Package route tests",()=>registerPackageRouteTesting(vscode,context,{
-    getActiveProcedure:()=>
-      workbench?.getActiveDocument?.()??vscode.window.activeTextEditor?.document??null
+    getActiveProcedure:()=>workbench?.getActiveDocument?.()??
+      vscode.window.activeTextEditor?.document??null
   }));
-  registerSafely("Contract Editor",()=>registerContractEditor(vscode,context));
-  registerSafely("Predicate Editor",()=>registerPredicateEditor(vscode,context));
-  registerSafely("Schema Editor",()=>registerSchemaEditor(vscode,context));
-  // Keep the extension host alive if a later, non-core editor/menu contribution
-  // fails. The already registered Welcome and diagnostic command remain usable.
-  try{
-  const provider={
-    async resolveCustomTextEditor(document,panel){
+  registerSafely("Contract Commands",()=>registerContractCommands(vscode,context));
+  registerSafely("Predicate Commands",()=>registerPredicateCommands(vscode,context));
+  registerSafely("Schema Commands",()=>registerSchemaCommands(vscode,context));
+  function mountProcedurePreview(document,panel,{isCurrent=()=>true}={}){
       if(!isProcedurePath(document.uri.path)){
-        vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure visual editor");
+        vscode.window.showWarningMessage("Only assurance/procedure.yaml is supported by the Procedure Preview");
         return;
       }
       if(!workbenchReady){
         const details=activationFailures.map(item=>
           item.component+": "+item.message).join("\n")||
-          "The Procedure workbench did not initialize.";
+          "The Procedure Preview did not initialize.";
         panel.webview.options={enableScripts:false};
         panel.webview.html='<!doctype html><html lang="en"><meta charset="utf-8">'+
-          '<body><main><h2>SKILL Studio Workbench unavailable</h2>'+
+          '<body><main><h2>SKILL Studio Preview unavailable</h2>'+
           '<p>Source files remain available. Open Activation Diagnostics to inspect the failed component.</p>'+
           '<pre>'+escaped(details)+'</pre></main></body></html>';
         return;
@@ -223,9 +217,8 @@ export function activate(context){
       const openedAt=performance.now();
       const webview=panel.webview;
       const detach=workbench.attach(document,message=>webview.postMessage(message));
-      // Source is the active editor after the fixed split is established, so
-      // initialize the Procedure workbench explicitly instead of relying on
-      // the visual Webview becoming the active tab.
+      // Source remains the sole Main Editor. The right Preview WebviewView
+      // is not an Editor tab, so initialize the workbench from the Source document.
       workbench.activate(document);
       let wasActive=panel.active;
       const viewState=panel.onDidChangeViewState(()=>{
@@ -340,7 +333,7 @@ export function activate(context){
         }catch{return {text:null,version:0};}
       };
       const push=async()=>{
-        if(disposed||!ready)return;
+        if(disposed||!ready||!isCurrent())return;
         const ticket=++pushTicket,version=document.version,text=document.getText();
         if(text.length>MAX_SOURCE_BYTES){
           void webview.postMessage({type:"error",message:"Source exceeds the 1 MiB Procedure editor limit"});
@@ -371,7 +364,7 @@ export function activate(context){
         if(relatedPaths.has(event.document.uri.path))void push();
       });
       const incoming=webview.onDidReceiveMessage(async message=>{
-        if(disposed||typeof message!=="object"||!message)return;
+        if(disposed||!isCurrent()||typeof message!=="object"||!message)return;
         if(message.type==="selection"){
           // A visible Procedure editor can lose active status when the user
           // opens the Inspector sidebar. Its real graph selection still belongs
@@ -438,15 +431,27 @@ export function activate(context){
           await push();
         }
       });
-      panel.onDidDispose(()=>{
-        disposed=true;forgetSourceViewPair(document.uri);
+      let releasePanel=null,cleaned=false;
+      const cleanup=()=>{
+        if(cleaned)return;
+        cleaned=true;disposed=true;
         detach();viewState.dispose();changed.dispose();incoming.dispose();
-      });
-    }
-  };
-  context.subscriptions.push(vscode.window.registerCustomEditorProvider(VIEW,provider,{
-    webviewOptions:{retainContextWhenHidden:true}
+        releasePanel?.dispose?.();
+      };
+      releasePanel=panel.onDidDispose(cleanup);
+      return {dispose:cleanup};
+  }
+  // The single right-side Preview Host owns all contextual visualizations.
+  // Visual open commands reveal only the native Source editor; the Preview
+  // follows active Source documents without creating another EditorGroup.
+  registerSafely("Preview Host",()=>registerPreviewHost(vscode,context,{
+    mountProcedure:mountProcedurePreview,
+    mountContract:(document,panel,options)=>mountContractPreview(vscode,document,panel,options),
+    mountPredicate:(document,panel,options)=>mountPredicatePreview(vscode,document,panel,options),
+    mountSchema:(document,panel,options)=>mountSchemaPreview(vscode,document,panel,options),
+    mountMarkdown:(document,panel,options)=>mountMarkdownPreview(vscode,context,document,panel,options)
   }));
+  try{
   const projectText=value=>vscode.l10n?.t(value)??value;
   context.subscriptions.push(
     vscode.commands.registerCommand("skillStudio.newProject",async()=>{
@@ -509,6 +514,7 @@ export function activate(context){
     }
   ));
   let exampleLoadPromise=null;
+  let projectWelcome=null;
   const progressZh=String(vscode.env?.language??"en").toLowerCase().startsWith("zh");
   const exampleText=progressZh?{
     title:"加载示例项目",
@@ -623,7 +629,7 @@ export function activate(context){
               }
               stage="open-procedure";
               report(exampleText.procedure);
-              // Preserve the established Source/Visual pairing and editor focus.
+              // Open the authoritative native Source; the shared right Preview follows it.
               const confirmedFolders=(vscode.workspace.workspaceFolders??[])
                 .map(folder=>folder.uri.toString());
               if(!confirmedFolders.includes(result.root.toString()))
@@ -637,7 +643,7 @@ export function activate(context){
                 workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
                 workspaceFolders:confirmedFolders,
                 defaultProcedure:result.procedure.toString(),
-                editor:VIEW
+                editor:"native-source",preview:"skillStudio.preview"
               }));
               projectWelcome?.setImportStatus({
                 state:"success",message:exampleText.success
@@ -712,50 +718,17 @@ export function activate(context){
         }
       }
       if(!isProcedurePath(target.path))return;
-      await openSourceViewPair(vscode,target);
+      await openNativeSource(vscode,target,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
     }));
-  const pairActiveYamlSource=uri=>{
-    if(!uri||!sourceViewType(uri)||hasSourceViewPair(uri))return;
-    void openSourceViewPair(vscode,uri).catch(error=>{
-      console.warn("SKILL Studio Source/Visual pairing failed:",String(error?.message??error));
-      void vscode.window.showWarningMessage(
-        "无法打开对应的 Skill Designer；原始 Source 仍可继续编辑。");
-    });
-  };
-  // Keep ordinary editable documents in the primary Source group. Without
-  // this normalization, opening a Python/unsupported YAML file while a
-  // Designer is focused inherits the right-hand Visual group; the next
-  // Source/Visual pair can then cause Theia to create a third editor column.
-  // Paired YAML is deliberately excluded because openSourceViewPair owns its
-  // two fixed positions. Moving an ordinary tab preserves its TextDocument,
-  // dirty state, native Undo history and editor identity.
-  const normalizeSourceOnlyEditor=createSourceOnlyEditorNormalizer(vscode,{
-    sourceViewType,hasSourceViewPair,
-    onError:error=>console.warn(
-      "SKILL Studio could not return a Source-only editor to the primary group:",
-      String(error?.message??error))
-  });
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor=>{
-    pairActiveYamlSource(editor?.document?.uri);
-    normalizeSourceOnlyEditor(editor);
-  }));
-  // A restored YAML Source may already be active before onStartupFinished
-  // activates this extension, so apply the same pairing once after activation.
-  const initiallyActiveYaml=vscode.window.activeTextEditor?.document?.uri;
-  if(initiallyActiveYaml)setTimeout(()=>{
-    if(vscode.window.activeTextEditor?.document?.uri?.toString()===initiallyActiveYaml.toString()){
-      pairActiveYamlSource(initiallyActiveYaml);
-      // Also normalize a Source-only document restored by the host before
-      // extension activation (there is no active-editor event in that case).
-      normalizeSourceOnlyEditor(vscode.window.activeTextEditor);
-    }
-  },0);
-  // Real-Chromium acceptance only: exercise several Designer tabs followed by
-  // ordinary Python/YAML Source documents while the Visual group is focused.
+  // The right-side Preview Host follows the active TextEditor itself.
+  // Do not reopen a Source file from active-editor callbacks or move tabs
+  // between groups after the fact: those repairs caused the third-column
+  // regression and can trigger recursive open events.
+  // Real-Chromium acceptance only: exercise multiple visualizable Source tabs
+  // followed by ordinary Python/YAML Source documents in the same editor group.
   // The command is deliberately not contributed to the user command palette.
-  // Acceptance-only native Python Source activation. This is intentionally
-  // independent of Quick Open focus (which may be owned by Compiler Output).
-  // Only the pinned Example's known source file can be selected here.
+  // Real-Chromium acceptance opens the exact Example Python Source file
+  // directly, independent of Quick Open focus or Compiler Output ownership.
   context.subscriptions.push(vscode.commands.registerCommand(
     "skillStudio.internal.openPythonSyntaxAcceptance",async()=>{
       const folders=vscode.workspace.workspaceFolders??[];
@@ -805,13 +778,13 @@ export function activate(context){
       }
       const firstRoot=procedureRoots[0].root;
       const firstPackageVisuals=visualUris.filter(uri=>uri.path.startsWith(firstRoot.path+"/"));
-      for(const uri of firstPackageVisuals)await openSourceViewPair(vscode,uri);
+      for(const uri of firstPackageVisuals)await openNativeSource(vscode,uri,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
       const pythonFiles=await vscode.workspace.findFiles(
         "**/scripts/validate-subscription-request.py","**/node_modules/**",5);
       if(!pythonFiles.length)throw Error("CA-SL v1alpha5 Python acceptance fixture is missing");
       const python=await vscode.workspace.openTextDocument(pythonFiles[0]);
       await vscode.window.showTextDocument(python,{
-        viewColumn:vscode.ViewColumn.Two,preserveFocus:false,preview:false
+        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
       const waitForPrimary=async uri=>{
         const started=Date.now();
@@ -821,7 +794,7 @@ export function activate(context){
           if(editor?.viewColumn===vscode.ViewColumn.One)return editor;
           await new Promise(resolve=>setTimeout(resolve,25));
         }
-        throw Error("Source-only editor was not normalized into the primary group: "+uri.toString());
+        throw Error("Source-only editor did not open in the primary group: "+uri.toString());
       };
       const pythonColumn=(await waitForPrimary(python.uri)).viewColumn;
       // Use a saved, temporary ordinary YAML file rather than an Untitled
@@ -838,16 +811,15 @@ export function activate(context){
       if(yamlDocument.isDirty)
         throw Error("Temporary YAML fixture remained dirty after save");
       await vscode.window.showTextDocument(yamlDocument,{
-        viewColumn:vscode.ViewColumn.Two,preserveFocus:false,preview:false
+        viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false
       });
       const ordinaryYamlColumn=(await waitForPrimary(yamlDocument.uri)).viewColumn;
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
       await vscode.workspace.fs.delete(yamlUri);
-      // Open a second Package's Designer after the Source-only tabs have been
-      // normalized. This catches the original two-to-three-column regression.
+      // Opening a second Skill's Source must not create another EditorGroup.
       const secondProcedure=procedures.find(uri=>
         !uri.path.startsWith(firstRoot.path+"/"));
-      if(secondProcedure)await openSourceViewPair(vscode,secondProcedure);
+      if(secondProcedure)await openNativeSource(vscode,secondProcedure,{viewColumn:vscode.ViewColumn.One,preserveFocus:false,preview:false});
       const groups=(vscode.window.tabGroups?.all??[]).map(group=>({
         viewColumn:group.viewColumn,tabCount:group.tabs?.length??0
       }));
@@ -860,8 +832,7 @@ export function activate(context){
         groups,visibleEditors,maxViewColumn,
         pythonColumn,ordinaryYamlColumn};
     }));
-  // Welcome was registered before optional integrations so it remains
-  // reachable even when a downstream provider fails during activation.
+  // Welcome was registered first so it remains available after optional failures.
   // Open Example switches to a named folder, which restarts the extension host.
   // Complete the user-requested default Procedure open only after the new
   // single-folder workspace is active; never auto-open on unrelated projects.
@@ -883,7 +854,7 @@ export function activate(context){
         workspaceFile:vscode.workspace.workspaceFile?.toString?.()??null,
         workspaceFolders:folders,
         defaultProcedure:pending.procedure,
-        editor:VIEW
+        editor:"native-source",preview:"skillStudio.preview"
       }));
       const detail=progressZh
         ?((pending.replacedExisting?"已替换原有 Example 内容。":"")+
@@ -901,10 +872,11 @@ export function activate(context){
       "SKILL Studio could not finish opening the Example Procedure: "+
       String(error?.message??error));
   });
-  return {extendMarkdownIt};
+  return {};
   }catch(error){
     recordActivationFailure("Remaining Workbench Contributions",error);
-    return {extendMarkdownIt};
+    return {};
   }
+
 }
 export function deactivate(){}

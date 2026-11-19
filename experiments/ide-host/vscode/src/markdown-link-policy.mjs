@@ -189,3 +189,33 @@ export async function prepareNativeMarkdownPackagePolicy(vscode,uri){
     return deny();
   }
 }
+
+/**
+ * Resolve a preview click only against the exact inventoried Package.
+ * The Webview never receives filesystem URIs or performs URL navigation.
+ */
+export function resolveNativeMarkdownPackageLink(uri,href){
+  if(typeof href!=="string"||href.length===0||href.length>2048)return null;
+  if(href.startsWith("#"))return {kind:"fragment",fragment:href.slice(1)};
+  if(/^(?:https?:|mailto:|tel:)/i.test(href)){
+    if(/[\u0000-\u001f\u007f]/.test(href))return null;
+    return {kind:"external",href};
+  }
+  const policy=policies.get(uriKey(uri));
+  if(!policy||policy.denyAll||
+     !isAllowedPackageRelativeLink(href,policy.currentDirRelative,policy.allowedFiles))
+    return null;
+  const rawPath=href.split(/[?#]/,1)[0];
+  const segments=(policy.currentDirRelative??"").split("/").filter(Boolean);
+  try{
+    for(const raw of rawPath.split("/")){
+      if(!raw||raw===".")continue;
+      const part=decodeURIComponent(raw);
+      if(part==="..")segments.pop();
+      else segments.push(part);
+    }
+  }catch{return null;}
+  const relativePath=segments.join("/");
+  if(!policy.allowedFiles.has(relativePath))return null;
+  return {kind:"package",relativePath,path:policy.rootPath+"/"+relativePath};
+}

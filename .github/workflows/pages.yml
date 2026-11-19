@@ -174,6 +174,8 @@ jobs:
         working-directory: ide-source
         run: |
           npm install --prefix experiments/ide-host/theia-online --no-audit --no-fund --ignore-scripts
+          node experiments/ide-host/scripts/link-fixed-workbench-core.mjs experiments/ide-host/theia-online
+          npm run build:fixed-workbench --prefix experiments/ide-host/theia-online
           # Fetch the pinned native Markdown language-features VSIX declared by
           # the Theia app before building the frontend. The Pages build consumes
           # its unpacked extension assets when preparing the static Preview.

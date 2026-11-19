@@ -1,41 +1,101 @@
-// Runs against actual Theia DOM and CustomEditor frames, never a host mock.
-// All browser acceptance fixtures use the pinned CA-SL v1alpha5 sample set.
+// Runs against actual Theia DOM. Source stays in the single Main Editor group;
+// its contextual visualizer is a WebviewView in the right Secondary Sidebar.
 export async function assertSourceVisualPair(evalJS,sleep,filename,label){
   let state;
-  for(let attempt=0;attempt<30;attempt++){
+  for(let attempt=0;attempt<40;attempt++){
     state=await evalJS(`(()=>{
       const c=window.theia.container;
       const key=[...c._bindingDictionary._map.keys()].find(k=>
         typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);
       if(!key)throw Error('Theia shell missing');
-      const shell=c.get(key),bars=shell.mainAreaTabBars;
-      return shell.getWidgets('main').map(widget=>{
+      const shell=c.get(key);
+      const commandKey=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      const registry=commandKey?c.get(commandKey):null;
+      const commandIds=[
+        'workbench.view.extension.skillStudioInspector',
+        'workbench.action.focusAuxiliaryBar',
+        'workbench.action.toggleAuxiliaryBar',
+        'workbench.action.focusSideBar',
+        'workbench.action.toggleSidebar'
+      ].map(id=>({id,registered:Boolean(registry?.getCommand?.(id))}));
+      const availableViewCommands=(registry?.getCommands?.()??[])
+        .map(item=>typeof item==='string'?item:item?.id??item?.commandId??'')
+        .filter(id=>/view|sidebar|auxiliary|container|widget/i.test(id)).slice(0,180);
+      const inspect=(area,widget)=>{
+        const node=widget.node,rect=node?.getBoundingClientRect?.();
+        const visible=!!rect&&rect.width>0&&rect.height>0&&!widget.isHidden;
+        const nested=[...(node?.querySelectorAll?.('.lm-Widget')??[])];
+        const elements=[node,...nested].filter(Boolean);
+        const webviews=elements.flatMap(el=>[...(el.querySelectorAll?.('iframe')??[])])
+          .map(frame=>{const r=frame.getBoundingClientRect();return {
+            src:frame.getAttribute('src')??'',title:frame.title??'',
+            visible:r.width>0&&r.height>0,
+            rect:{x:r.x,y:r.y,width:r.width,height:r.height}
+          };}).filter(frame=>frame.visible);
+        return {id:widget.id??node?.id??null,area,viewId:widget.viewId??null,
+          title:widget.title?.label??widget.title?.caption??null,
+          className:typeof node?.className==='string'?node.className:'',
+          text:(node?.innerText??'').slice(0,160),visible,
+          rect:rect?{x:rect.x,y:rect.y,width:rect.width,height:rect.height}:null,
+          webviews};
+      };
+      const bars=shell.mainAreaTabBars??[];
+      const main=shell.getWidgets('main').map(widget=>{
         const uri=widget.editor?.uri??widget.resource;
-        if(!uri?.path?.toString().endsWith('/'+${JSON.stringify(filename)}))return null;
-        const rect=widget.node.getBoundingClientRect();
-        return {id:widget.id,uri:uri.toString(),
+        const rect=widget.node?.getBoundingClientRect?.();
+        return {id:widget.id,uri:uri?.toString?.()??null,
           kind:widget.editor?'source':widget.viewType??'unknown',
           column:bars.findIndex(bar=>bar.titles.some(title=>title.owner===widget))+1,
-          visible:!widget.isHidden&&rect.width>0&&rect.height>0,
-          rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}};
-      }).filter(Boolean);
+          visible:!widget.isHidden&&!!rect&&rect.width>0&&rect.height>0,
+          rect:rect?{x:rect.x,y:rect.y,width:rect.width,height:rect.height}:null};
+      });
+      const right=shell.getWidgets('right').map(widget=>inspect('right',widget));
+      const left=shell.getWidgets('left').map(widget=>inspect('left',widget));
+      const source=main.filter(widget=>widget.kind==='source'&&widget.visible&&
+        widget.uri?.endsWith('/'+${JSON.stringify(filename)}));
+      const preview=[...right,...left].flatMap(widget=>[
+        {widget,frame:null},...widget.webviews.map(frame=>({widget,frame}))
+      ]).filter(item=>item.widget.visible&&item.frame?.visible&&
+        item.frame.rect.x>=0);
+      const sourceRight=source[0]?.rect?.x+source[0]?.rect?.width;
+      const rightPreview=preview.find(item=>item.frame.rect.x>=sourceRight-2);
+      const tabBars=bars.map(bar=>{
+        const r=bar.node?.getBoundingClientRect?.();
+        return {visible:!!r&&r.width>0&&r.height>0,
+          tabs:bar.titles?.length??0,
+          rect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};
+      });
+      // The fixed Theia Main Editor uses single-document mode, which
+      // intentionally has no tab bar. Count its single Main Editor panel as
+      // one group when a Source widget is visible; do not mistake tabBarCount=0
+      // for the absence of an Editor group.
+      const visibleTabBarCount=tabBars.filter(x=>x.visible).length;
+      const visibleEditorGroups=visibleTabBarCount>0
+        ?visibleTabBarCount
+        :(main.some(widget=>widget.visible)?1:0);
+      return {main,right,left,source,preview,selectedPreview:rightPreview??null,
+        previewActivation:window.__skillStudioPreviewActivation?.()??null,
+        commandIds,availableViewCommands,tabBars,visibleEditorGroups};
     })()`);
-    // Theia may retain a hidden duplicate CodeEditor widget for the same
-    // URI while the CustomEditor owns the visible second column. The contract
-    // is exactly one VISIBLE native Source beside the visible Designer.
-    const sources=state.filter(w=>w.kind==='source'&&w.visible);
-    const visuals=state.filter(w=>w.kind.startsWith('skillStudio.')&&w.visible);
-    if(sources.length===1&&visuals.length===1&&sources[0].uri===visuals[0].uri&&
-       sources[0].column===1&&visuals[0].column===2&&
-       sources[0].visible&&visuals[0].visible&&
-       sources[0].rect.x+sources[0].rect.width<=visuals[0].rect.x+2){
-      const evidence={filename,label,source:sources[0],visual:visuals[0]};
-      console.log('STUDIO_YAML_SOURCE_VISUAL_PAIR_CHROMIUM',JSON.stringify(evidence));
+    const source=state.source??[];
+    const preview=state.selectedPreview;
+    // Preview is deliberately NOT a Main Editor widget. It must be a visible
+    // Webview iframe hosted in the right-hand sidebar, beyond the Source pane.
+    if(source.length===1&&source[0].column===1&&preview&&
+       state.visibleEditorGroups===1&&
+       source[0].rect.x+source[0].rect.width<=preview.frame.rect.x+2){
+      const evidence={filename,label,source:source[0],preview:{
+        area:preview.widget.area,id:preview.widget.id,viewId:preview.widget.viewId,
+        title:preview.widget.title,frame:preview.frame
+      },visibleEditorGroups:state.visibleEditorGroups};
+      console.log('STUDIO_YAML_SOURCE_PREVIEW_CHROMIUM',JSON.stringify(evidence));
       return evidence;
     }
-    await sleep(100);
+    await sleep(120);
   }
-  throw Error(label+' requires one visible native Source in column one and its Designer in column two: '+JSON.stringify(state));
+  throw Error(label+' requires exactly one Main Editor Source group and a visible right-side Preview WebviewView: '+JSON.stringify(state));
 }
 
 export async function runPackageOverviewAcceptance({command,evalJS,sleep,requireEditor}) {
@@ -612,6 +672,9 @@ export async function runWorkbenchAcceptance({
               "map(link=>link.href||link.getAttribute('href')||'');"+
               "return {url:location.href,title:document.title,"+
               "bodyText:document.body?.innerText??'',"+
+              "studioMarkdownStatus:document.querySelector('#studio-status')?.textContent??'',"+
+              "markdownBlockCount:document.querySelectorAll('.studio-markdown-block[data-source-line]').length,"+
+              "scrollY:window.scrollY,"+
               "procedureRoot:!!root,graphNodes:document.querySelectorAll('.react-flow__node').length,"+
               "graphEdges:document.querySelectorAll('.react-flow__edge').length,"+
               "procedureValue:document.querySelector('#procedureList')?.value??null,"+
@@ -619,15 +682,17 @@ export async function runWorkbenchAcceptance({
               "timing:root?.dataset.studioTiming??null,"+
               "cards:[...document.querySelectorAll('.card h2')].map(el=>el.textContent.trim()),"+
               "heading:heading?.textContent?.trim()??null,"+
-              "nativePreviewRoot:Boolean(document.body&&styles.some(url=>url.includes('/media/native-markdown-preview.css'))),"+
+              "studioMarkdownPreviewRoot:Boolean(document.querySelector('#studio-content')&&"+
+              "styles.some(url=>url.includes('/media/studio-markdown-preview.css'))),"+
               "styles,headingColor:heading?getComputedStyle(heading).color:null,"+
               "maxWidth:document.body?getComputedStyle(document.body).maxWidth:null,"+
               "anchorDetails:[...document.querySelectorAll('a')].map(anchor=>({"+
-              "text:anchor.textContent.trim(),href:anchor.getAttribute('href'),resolvedHref:anchor.href})),"+
+              "text:anchor.textContent.trim(),href:anchor.getAttribute('href'),"+
+              "dataStudioHref:anchor.getAttribute('data-studio-href'),resolvedHref:anchor.href})),"+
               "imageCount:document.querySelectorAll('img').length,"+
               "scriptMarkers:[...document.scripts].filter(script=>"+
-              "script.textContent.includes('skillStudioNativeMarkdownXss')).length,"+
-              "scriptExecuted:window.skillStudioNativeMarkdownXss===true,"+
+              "script.textContent.includes('skillStudioMarkdownXss')).length,"+
+              "scriptExecuted:window.skillStudioMarkdownXss===true,"+
               "csp:document.querySelector('meta[http-equiv=\"Content-Security-Policy\" i]')?.content??''"+
               "};})()"
           });
@@ -635,7 +700,7 @@ export async function runWorkbenchAcceptance({
           if(!view)continue;
           latest.candidates.push({url:frame.url,title:view.title,
             procedureValue:view.procedureValue,heading:view.heading,
-            nodes:view.graphNodes,preview:view.nativePreviewRoot});
+            nodes:view.graphNodes,preview:view.studioMarkdownPreviewRoot});
           if(predicate(view)){
             view.contextId=world.executionContextId;
             view.frameId=frame.id;
@@ -647,8 +712,17 @@ export async function runWorkbenchAcceptance({
     }
     throw Error(label+" did not appear in the real Theia workbench: "+JSON.stringify(latest));
   };
-  const waitNativeMarkdown=(predicate,label,attempts=100)=>
-    waitWebview(view=>view.nativePreviewRoot&&predicate(view),label,attempts);
+  const waitStudioMarkdown=(predicate,label,attempts=100)=>
+    waitWebview(view=>view.studioMarkdownPreviewRoot&&predicate(view),label,attempts);
+  const evaluateStudioMarkdown=async(preview,expression)=>{
+    const result=await command("Runtime.evaluate",{
+      contextId:preview.contextId,returnByValue:true,awaitPromise:true,expression
+    });
+    if(result.exceptionDetails)
+      throw Error("Markdown Preview evaluation failed: "+
+        (result.exceptionDetails.exception?.description??result.exceptionDetails.text));
+    return result.result?.value;
+  };
   const openPackageFile=async(id,relativePath)=>{
     const packageRoot=defaultProcedureUri.replace(/\/assurance\/procedure\.yaml$/,"");
     const target=packageRoot+"/"+relativePath;
@@ -1073,127 +1147,151 @@ export async function runWorkbenchAcceptance({
         inspectorContainer:await evalJS("(()=>{const el=document.getElementById('plugin-view-container:workbench.view.extension.skillStudioInspector');return {text:el?.innerText??'',html:el?.innerHTML?.slice(-3500)??'',visible:!!el&&el.getBoundingClientRect().width>0};})()") }));
   console.log("STUDIO_V1ALPHA5_INSPECTOR_CHROMIUM",JSON.stringify(phaseEvidence));
 
-  // A single native EditorGroup test covers Procedure/Contract/Predicate/Schema
-  // visuals followed by ordinary Python/YAML Source tabs and a second Skill.
+  // One Main EditorGroup must contain every Source document. Visual projections
+  // live only in the independent right-side Preview WebviewView.
   const editorGroupPlacement=await nativeCommand("skillStudio.internal.editorGroupAcceptance");
   if(!(editorGroupPlacement?.openedVisualCount>=3)||
-     !(editorGroupPlacement?.groupCount>=1)||editorGroupPlacement.groupCount>2||
-     editorGroupPlacement?.maxViewColumn>2||
+     editorGroupPlacement?.groupCount!==1||
+     editorGroupPlacement?.maxViewColumn>1||
      editorGroupPlacement?.pythonColumn!==1||
      editorGroupPlacement?.ordinaryYamlColumn!==1)
-    throw Error("v1alpha5 editor groups did not remain a stable two-column layout: "+
+    throw Error("v1alpha5 Sources escaped the single Main Editor group: "+
       JSON.stringify(editorGroupPlacement));
   console.log("STUDIO_V1ALPHA5_EDITOR_GROUPS_CHROMIUM",JSON.stringify(editorGroupPlacement));
 
-  // Native Markdown is the VS Code Markdown extension, with one shared
-  // Source-left / Preview-right layout for both v1alpha5 Skill documents.
+  // Markdown Source remains native; all rendering, links and scrolling belong
+  // to the single right-side Studio Preview WebviewView.
   const skillGuideUri=defaultProcedureUri.replace(
     /\/assurance\/procedure\.yaml$/,"/SKILL.md");
+  const markdownFixture=await nativeCommand(
+    "skillStudio.internal.markdownPreviewAcceptance","establish-pdu-session");
+  if(markdownFixture?.uri!==skillGuideUri||!(markdownFixture.lineCount>150))
+    throw Error("Studio Markdown Preview fixture did not open the exact v1alpha5 Skill guide: "+
+      JSON.stringify(markdownFixture));
+  const markdownPreview=await waitStudioMarkdown(view=>
+    view.heading==="Studio Markdown Preview Acceptance"&&
+    view.bodyText.includes("INITIAL")&&view.bodyText.includes("Renderer")&&
+    view.markdownBlockCount>=80,
+    "v1alpha5 shared Markdown Preview");
+  if(markdownPreview.view.imageCount!==0||
+     markdownPreview.view.scriptMarkers!==0||
+     markdownPreview.view.scriptExecuted||
+     !markdownPreview.view.csp.includes("default-src 'none'")||
+     markdownPreview.view.studioMarkdownStatus.includes("inventory unavailable")||
+     markdownPreview.view.studioMarkdownStatus.includes("Preview unavailable"))
+    throw Error("Studio Markdown Preview did not enforce its safe Package-backed projection: "+
+      JSON.stringify(markdownPreview.view));
+  const safeMarkdownLink=markdownPreview.view.anchorDetails.find(anchor=>
+    anchor.text==="Safe package reference");
+  const traversalMarkdownLink=markdownPreview.view.anchorDetails.find(anchor=>
+    anchor.text==="Traversal package reference");
+  const missingMarkdownLink=markdownPreview.view.anchorDetails.find(anchor=>
+    anchor.text==="Missing package reference");
+  if(!safeMarkdownLink||safeMarkdownLink.dataStudioHref!=="assurance/contract.yaml"||
+     safeMarkdownLink.href!==null||!traversalMarkdownLink||
+     traversalMarkdownLink.dataStudioHref!=="../../outside.md"||
+     !missingMarkdownLink||missingMarkdownLink.dataStudioHref!=="missing.md")
+    throw Error("Studio Markdown Preview did not preserve guarded Package link targets: "+
+      JSON.stringify(markdownPreview.view.anchorDetails));
+  const blockedTraversal=await evaluateStudioMarkdown(markdownPreview,
+    "(()=>{const a=[...document.querySelectorAll('[data-studio-href]')].find(x=>x.dataset.studioHref==='../../outside.md');if(a)a.click();return true;})()");
+  if(!blockedTraversal)throw Error("Could not dispatch traversal-link security probe");
+  const blockedTraversalView=await waitStudioMarkdown(view=>
+    view.studioMarkdownStatus.includes("Blocked unverified Package link."),
+    "blocked Markdown Package traversal link");
+  await evaluateStudioMarkdown(blockedTraversalView,
+    "(()=>{const a=[...document.querySelectorAll('[data-studio-href]')].find(x=>x.dataset.studioHref==='missing.md');if(a)a.click();return true;})()");
+  const blockedMissingView=await waitStudioMarkdown(view=>
+    view.studioMarkdownStatus.includes("Blocked unverified Package link."),
+    "blocked missing Markdown Package link");
+  console.log("STUDIO_V1ALPHA5_MARKDOWN_SECURITY_CHROMIUM",JSON.stringify({
+    uri:markdownFixture.uri,images:blockedMissingView.view.imageCount,
+    scripts:blockedMissingView.view.scriptMarkers,scriptExecuted:blockedMissingView.view.scriptExecuted,
+    safeLink:safeMarkdownLink,traversalLink:traversalMarkdownLink,
+    missingLink:missingMarkdownLink,csp:blockedMissingView.view.csp
+  }));
+  await assertSourceVisualPair(evalJS,sleep,"SKILL.md","v1alpha5 Markdown Source + Preview");
+
+  const live=await nativeCommand(
+    "skillStudio.internal.markdownPreviewLiveUpdateAcceptance",markdownFixture.uri);
+  if(live?.version<=markdownFixture.version)
+    throw Error("Markdown live update did not advance the Source version: "+JSON.stringify(live));
+  const updatedMarkdown=await waitStudioMarkdown(view=>
+    view.heading==="Studio Markdown Preview Acceptance"&&
+    view.bodyText.includes("UPDATED")&&!view.bodyText.includes("INITIAL"),
+    "v1alpha5 Markdown unsaved Source update");
+  const previewScrollStart=await evaluateStudioMarkdown(blockedMissingView,
+    "(()=>new Promise(resolve=>{window.scrollTo(0,document.body.scrollHeight*0.72);"+
+      "setTimeout(()=>resolve({height:document.body.scrollHeight,scrollY:window.scrollY,"+
+      "lastScroll:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScroll??'null')}catch{return null}})(),"+
+      "lastAck:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScrollAck??'null')}catch{return null}})()}),180);}))()");
+  if(!(previewScrollStart?.height>1000)||!(previewScrollStart?.scrollY>0))
+    throw Error("Markdown Preview fixture did not scroll to a non-zero position: "+
+      JSON.stringify(previewScrollStart));
+  let sourceAfterPreviewScroll=null;
+  for(let attempt=0;attempt<50;attempt++){
+    sourceAfterPreviewScroll=await nativeCommand(
+      "skillStudio.internal.markdownPreviewSourceStateAcceptance",markdownFixture.uri);
+    if((sourceAfterPreviewScroll?.visibleRanges?.[0]?.start??1)>35)break;
+    await sleep(80);
+  }
+  if((sourceAfterPreviewScroll?.visibleRanges?.[0]?.start??1)<=35){
+    const scrollDiagnostics=await evaluateStudioMarkdown(blockedMissingView,
+      "({lastScroll:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScroll??'null')}catch{return null}})(),"+
+      "lastAck:(()=>{try{return JSON.parse(document.documentElement.dataset.studioLastPreviewScrollAck??'null')}catch{return null}})(),scrollY:window.scrollY})");
+    throw Error("Markdown Preview scrolling did not reveal the matching Source lines: "+
+      JSON.stringify({sourceAfterPreviewScroll,previewScrollStart,scrollDiagnostics}));
+  }
+  const previewBeforeSourceReveal=await evaluateStudioMarkdown(blockedMissingView,
+    "window.scrollY");
+  const sourceReveal=await nativeCommand(
+    "skillStudio.internal.markdownPreviewRevealSourceAcceptance",markdownFixture.uri,120);
+  if(sourceReveal?.line!==120)throw Error("Could not reveal Markdown Source line 120");
+  const sourceToPreview=await waitStudioMarkdown(view=>
+    view.scrollY>0&&view.scrollY!==previewBeforeSourceReveal,
+    "Markdown Source-to-Preview scroll synchronization");
+  if(!(sourceToPreview.view.scrollY>0)||
+     sourceToPreview.view.scrollY===previewBeforeSourceReveal)
+    throw Error("Markdown Source scrolling did not move the right Preview: "+
+      JSON.stringify({previewBeforeSourceReveal,sourceToPreview:sourceToPreview.view.scrollY}));
+  const markdownEvidence={
+    uri:markdownFixture.uri,initialVersion:markdownFixture.version,
+    updatedVersion:live.version,blocks:updatedMarkdown.view.markdownBlockCount,
+    previewScrollHeight:previewScrollStart.height,previewScrollY:previewScrollStart.scrollY,
+    sourceAfterPreviewScroll,sourceReveal,previewScrollAfterSource:sourceToPreview.view.scrollY,
+    security:{images:blockedMissingView.view.imageCount,
+      scripts:blockedMissingView.view.scriptMarkers,
+      scriptExecuted:blockedMissingView.view.scriptExecuted,
+      safeLink:safeMarkdownLink,traversalLink:traversalMarkdownLink,
+      missingLink:missingMarkdownLink}
+  };
+  console.log("STUDIO_V1ALPHA5_MARKDOWN_PREVIEW_CHROMIUM",JSON.stringify(markdownEvidence));
+  await nativeCommand("skillStudio.internal.restoreMarkdownPreviewAcceptance",markdownFixture.uri);
+  const restoredMarkdown=await waitStudioMarkdown(view=>
+    view.heading?.includes("Establish PDU Session"),
+    "restored v1alpha5 Skill Markdown Preview");
+  if(!restoredMarkdown.view.bodyText.includes("establish-pdu-session"))
+    throw Error("Restored Markdown Preview does not show the original Skill guide");
+
   const mappingUri=defaultProcedureUri.replace(
     "/skills/establish-pdu-session/assurance/procedure.yaml",
     "/skills/establish-pdu-session-mas/references/openamsm-operation-mapping.md");
-  const nativeMarkdownUri=await nativeCommand(
-    "skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance",skillGuideUri,1);
-  if(nativeMarkdownUri!==skillGuideUri)
-    throw Error("Native Markdown did not open the exact v1alpha5 Skill guide: "+nativeMarkdownUri);
-  const nativeMarkdown=await waitNativeMarkdown(view=>
-    view.heading?.includes("Establish PDU Session")&&
-    view.styles.some(url=>url.includes("/media/native-markdown-preview.css")),
-    "v1alpha5 native Markdown Preview");
-  if(nativeMarkdown.view.headingColor!=="rgb(12, 142, 123)"||
-     nativeMarkdown.view.maxWidth!=="980px")
-    throw Error("v1alpha5 Markdown Preview did not apply the shared Studio theme: "+
-      JSON.stringify(nativeMarkdown.view));
-  if(requireBrowserLsp){
-    const markdownStartup=await nativeCommand(
-      "skillStudio.internal.nativeMarkdownWorkerStartupAcceptance");
-    if(!markdownStartup?.isActive||markdownStartup.activationResult!=="ready"||
-       !markdownStartup.workerAvailable||markdownStartup.workerProbe?.ok!==true||
-       markdownStartup.workerProbe?.status!==200)
-      throw Error("Native Markdown Language Server did not start cleanly: "+
-        JSON.stringify(markdownStartup));
-  }
-  const markdownDiagnostics=await nativeCommand(
-    "skillStudio.internal.nativeMarkdownWorkerDiagnostics");
-  const assertTwoColumns=async(stage,uri)=>{
-    const layout=await nativeCommand("skillStudio.internal.twoColumnLayoutAcceptance");
-    const columns=layout?.groups?.map(group=>group.column)??[];
-    if(!columns.length||columns.length>2||columns.some(col=>col!==1&&col!==2)||
-       layout.editors?.some(editor=>editor.column!==1&&editor.column!==2))
-      throw Error("Unexpected editor group after "+stage+": "+JSON.stringify(layout));
-    if(uri){
-      const source=layout.groups.find(group=>group.column===1)?.tabs?.find(tab=>
-        tab.uri===uri&&!tab.viewType);
-      const preview=layout.groups.find(group=>group.column===2)?.tabs?.find(tab=>
-        tab.uri===uri&&tab.viewType==="vscode.markdown.preview.editor");
-      if(!source||!preview)
-        throw Error("Markdown Source/Preview did not occupy columns 1/2 after "+stage+": "+
-          JSON.stringify(layout));
-    }
-    return layout;
-  };
-  const markdownLayout=await assertTwoColumns("initial v1alpha5 Markdown Preview",nativeMarkdownUri);
   const secondMarkdownUri=await nativeCommand(
-    "skillStudio.internal.nativeMarkdownOpenFromColumnAcceptance",mappingUri,2);
+    "skillStudio.internal.markdownPreviewOpenAcceptance",
+    "establish-pdu-session-mas","references/openamsm-operation-mapping.md");
   if(secondMarkdownUri!==mappingUri)
-    throw Error("Native Markdown did not open the v1alpha5 MAS reference document: "+
+    throw Error("Studio Markdown Preview did not open the exact MAS Package reference: "+
       JSON.stringify(secondMarkdownUri));
-  const secondMarkdown=await waitNativeMarkdown(view=>
-    view.heading?.includes("OpenAMSM source mapping")&&
-    view.styles.some(url=>url.includes("/media/native-markdown-preview.css")),
+  const secondMarkdown=await waitStudioMarkdown(view=>
+    view.heading?.includes("OpenAMSM source mapping"),
     "v1alpha5 MAS reference Markdown Preview");
-  const secondMarkdownLayout=await assertTwoColumns(
-    "second v1alpha5 Markdown source opened from the right group",secondMarkdownUri);
-  const nativeMarkdownEvidence={
-    uri:nativeMarkdownUri,preview:nativeMarkdown.view,layout:markdownLayout,
-    secondUri:secondMarkdownUri,secondPreview:secondMarkdown.view,
-    secondLayout:secondMarkdownLayout,workerDiagnostics:markdownDiagnostics
-  };
-  console.log("STUDIO_V1ALPHA5_NATIVE_MARKDOWN_CHROMIUM",JSON.stringify(nativeMarkdownEvidence));
-
-  const liveUri=await nativeCommand(
-    "skillStudio.internal.nativeMarkdownLiveUpdateAcceptance",skillGuideUri);
-  try{
-    const live=await waitNativeMarkdown(view=>
-      view.heading==="Native Markdown Live Update Probe",
-      "v1alpha5 Markdown unsaved Source update");
-    const settings=await nativeCommand("skillStudio.internal.nativeMarkdownSettingsAcceptance");
-    if(settings?.scrollEditorWithPreview!==true||settings?.scrollPreviewWithEditor!==true)
-      throw Error("Native Markdown bidirectional scroll settings are not enabled: "+
-        JSON.stringify(settings));
-    console.log("STUDIO_V1ALPHA5_MARKDOWN_LIVE_UPDATE_CHROMIUM",JSON.stringify({
-      uri:liveUri,preview:live.view,scrollEditorWithPreview:settings.scrollEditorWithPreview,
-      scrollPreviewWithEditor:settings.scrollPreviewWithEditor
-    }));
-  }finally{
-    await nativeCommand("core.undo");
-    await nativeCommand("skillStudio.internal.restoreNativeMarkdownLiveUpdateAcceptance",liveUri);
-  }
-  await waitNativeMarkdown(view=>view.heading?.includes("Establish PDU Session"),
-    "restored v1alpha5 Skill Markdown Preview");
-
-  const securityUri=await nativeCommand(
-    "skillStudio.internal.nativeMarkdownSecurityAcceptance",skillGuideUri);
-  try{
-    const security=await waitNativeMarkdown(view=>
-      view.heading==="Native Markdown Security Probe",
-      "v1alpha5 Markdown security probe");
-    const safeLink=security.view.anchorDetails.find(anchor=>
-      anchor.text==="Safe package reference");
-    const blockedLinks=security.view.anchorDetails.filter(anchor=>
-      anchor.text==="Escaping package link"||anchor.text==="Missing package link");
-    if(security.view.imageCount!==0||security.view.scriptMarkers!==0||
-       security.view.scriptExecuted||!safeLink||
-       safeLink.href!=="assurance/contract.yaml"||blockedLinks.length||
-       !security.view.csp.includes("default-src 'none'")||
-       /script-src[^;]*unsafe-inline/.test(security.view.csp))
-      throw Error("Native Markdown package security boundary failed: "+
-        JSON.stringify(security.view));
-    console.log("STUDIO_V1ALPHA5_MARKDOWN_SECURITY_CHROMIUM",
-      JSON.stringify(security.view));
-  }finally{
-    await nativeCommand("skillStudio.internal.removeNativeMarkdownSecurityAcceptance",securityUri);
-  }
+  await assertSourceVisualPair(evalJS,sleep,"openamsm-operation-mapping.md",
+    "v1alpha5 MAS Markdown Source + Preview");
+  console.log("STUDIO_V1ALPHA5_MARKDOWN_SHARED_HOST_CHROMIUM",JSON.stringify({
+    firstUri:markdownFixture.uri,secondUri:secondMarkdownUri,
+    secondHeading:secondMarkdown.view.heading,
+    visibleEditorGroups:secondMarkdown.visibleEditorGroups??1
+  }));
 
   // The native Contract, Predicate and Schema Designers render the v1alpha5
   // source files from the same Skill Package and retain native Source pairing.
@@ -1346,7 +1444,7 @@ export async function runWorkbenchAcceptance({
     dualSkillExplorer,packageOverview:packageOverviewEvidence.evidence,
     graphEditability,canvasToolbar,
     v1alpha5LanguageFeatures,semanticTokenEvidence,
-    nativeMarkdownEvidence,designerEvidence:{
+    markdownEvidence,designerEvidence:{
       contract:contract.view,predicates:predicates.view,schema:schema.view
     }
   };
