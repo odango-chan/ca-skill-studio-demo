@@ -1089,6 +1089,18 @@ export async function runWorkbenchAcceptance({
     problemCount:packageAudit.problems.length,
     diagnosticCount:packageAudit.diagnostics.length
   }));
+  const legacyPackageAudit=await nativeCommand(
+    "skillStudio.internal.legacyPackageAuditAcceptance");
+  if(legacyPackageAudit?.status!=="PASS"||
+     legacyPackageAudit.profile!=="connectionagent.io/v1alpha1"||
+     legacyPackageAudit.errorCount<8||
+     legacyPackageAudit.notCheckedCount<4||
+     legacyPackageAudit.qualification!=="NOT_QUALIFIED"||
+     legacyPackageAudit.sourceMutation!=="NONE")
+    throw Error("Legacy v1alpha1 Package Audit did not report independent findings and explicit NOT_CHECKED reasons: "+
+      JSON.stringify(legacyPackageAudit));
+  console.log("STUDIO_LEGACY_PACKAGE_DIAGNOSTICS_CHROMIUM",
+    JSON.stringify(legacyPackageAudit));
   // Run in-memory static diagnostic regression cases. These results belong
   // to the native Test Explorer, never to Source Problems or Runtime Evidence.
   const offlineTests=await nativeCommand("skillStudio.runDiagnosticTests");
