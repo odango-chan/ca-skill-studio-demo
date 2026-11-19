@@ -373,7 +373,7 @@ test("v1alpha5 rejects primitive literal Predicate argument type mismatches",()=
 test("v1alpha5 marks no Owner identity as a missing qualification, not a synthetic PASS",()=>{
   const a=analyzePackageSnapshot(snapshot());
   assert.notEqual(a.state,"READY");
-  assert.ok(a.packageAudit.reason.includes("requires the v1alpha5 Compiler"));
+  assert.ok(a.packageAudit.reason.includes("requires the current Compiler"));
 });
 
 test("v1alpha5 partial root edits do not switch back to the legacy procedure parser",()=>{
