@@ -84,6 +84,31 @@ test("A5 reports unknown input source, absent producer and missing script",()=>{
   assert.ok(codes(issues).includes("PRODUCER_MISSING"));
   assert.ok(codes(issues).includes("SCRIPT_MISSING"));
 });
+test("persisted v1alpha1 Package reports independent defects across all source domains",()=>{
+  const w=fixture("establish-pdu-session");
+  w.files.get("assurance/contract.yaml").text=w.files.get("assurance/contract.yaml").text
+    .replace("name: establish-pdu-session","name: wrong-package")
+    .replace("entryProcedure: ue-requested-pdu-session-establishment","entryProcedure: missing-entry")
+    .replace("schemas/establishment-request.schema.yaml","schemas/missing-request.yaml");
+  w.files.get("assurance/predicates.yaml").text=w.files.get("assurance/predicates.yaml").text
+    .replace("skill: establish-pdu-session","skill: wrong-package")
+    .replace("createdsession.udm.subscription_usable:","createdsession.udm.subscription_usable_renamed:");
+  w.files.get("assurance/procedure.yaml").text=w.files.get("assurance/procedure.yaml").text
+    .replace("call: sbi.udm.sm_data.get","call: sbi.udm.sm_data.missing")
+    .replace("from: input.ue-ref","from: input.unknown-ue")
+    .replace("from: nudm-sdm-get.output","from: missing-producer.output")
+    .replace("verify: createdsession.udm.subscription_usable","verify: missing.predicate")
+    .replace("scripts/select_establishment_configuration.py","scripts/missing-selection.py")
+    .replace("PASS: nudm-sdm-subscribe","PASS: missing-route-target");
+  const issues=audit(w);
+  const confirmedErrors=issues.filter(item=>item.status==="confirmed"&&item.severity==="error");
+  assert.ok(confirmedErrors.length>=8,JSON.stringify(issues));
+  for(const code of ["CONTRACT_NAME","PREDICATE_SKILL","ENTRY_PROCEDURE",
+    "REQUEST_SCHEMA","CAPABILITY_UNDECLARED","INPUT_MISSING","PRODUCER_MISSING",
+    "NODE_PREDICATE","SCRIPT_MISSING","ROUTE_TARGET_MISSING"])
+    assert.ok(codes(issues).includes(code),code+" missing from "+JSON.stringify(codes(issues)));
+});
+
 test("partial inventory and malformed YAML never become an empty successful audit",()=>{
   const partial=createFileWorkspace("single",[{path:"assurance/procedure.yaml",text:"bad: ["}]);
   const partialIssues=auditPackageWorkspace({...partial,completeness:"partial"});
