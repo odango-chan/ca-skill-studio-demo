@@ -973,11 +973,22 @@ try{
      activationDiagnostics.components?.Workbench!=="READY"||
      activationDiagnostics.components?.["Package Explorer"]!=="READY"||
      activationDiagnostics.packageInventory?.packageCount!==2||
-     activationDiagnostics.packageInventory?.state!=="ready")
-    throw Error("The primary extension did not report a healthy activation: "+
-      JSON.stringify(activationDiagnostics).slice(0,3000));
+     activationDiagnostics.packageInventory?.state!=="ready"||
+     !/^[0-9a-f]{40}$/.test(activationDiagnostics.buildId??"")||
+     activationDiagnostics.welcomeCommandRegistered!==true||
+     activationDiagnostics.welcome?.createWebviewPanelAvailable!==true||
+     activationDiagnostics.semanticTokens?.registered!==true||
+     activationDiagnostics.semanticTokens?.renderer!=="theia-text-editor-decoration"||
+     !(activationDiagnostics.semanticTokens?.requests>0)||
+     !(activationDiagnostics.semanticTokens?.renderedTokenCount>0)||
+     activationDiagnostics.semanticTokens?.renderError)
+    throw Error("The primary extension did not report healthy activation, Welcome and semantic highlighting: "+
+      JSON.stringify(activationDiagnostics).slice(0,3500));
   console.log("STUDIO_ACTIVATION_DIAGNOSTICS_CHROMIUM",JSON.stringify({
+    buildId:activationDiagnostics.buildId,
     components:activationDiagnostics.components,
+    welcome:activationDiagnostics.welcome,
+    semanticTokens:activationDiagnostics.semanticTokens,
     packageInventory:activationDiagnostics.packageInventory
   }));
 
