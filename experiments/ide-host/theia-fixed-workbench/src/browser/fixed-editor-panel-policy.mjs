@@ -12,17 +12,19 @@ export function constrainMainEditorPanelOptions(options, mainAreaClass) {
   };
 }
 
-const PREVIEW_AUTO_REVEAL_KEY = "skill-studio.preview.auto-revealed.v1";
+const PREVIEW_AUTO_REVEAL_KEY = "skill-studio.preview.auto-revealed.v2";
 
 /**
- * Reveal the contextual Preview automatically only on the first successful
- * browser-profile launch. Later launches leave the native Theia layout alone,
- * so a user's deliberate hide / resize choice survives reloads.
+ * Reveal the contextual Preview once per browser tab and workspace. A
+ * site-wide localStorage flag is incorrect: showing Markdown in tab A must
+ * not suppress the first YAML Preview in tab B. Pass sessionStorage from the
+ * frontend so a manual hide still survives a reload of the same tab.
  */
-export function createPreviewAutoRevealPreference(storage) {
+export function createPreviewAutoRevealPreference(storage, workspaceId = "") {
+  const key = PREVIEW_AUTO_REVEAL_KEY + ":" + String(workspaceId);
   let revealed = false;
   try {
-    revealed = storage?.getItem(PREVIEW_AUTO_REVEAL_KEY) === "1";
+    revealed = storage?.getItem(key) === "1";
   } catch {
     // Storage can be unavailable in privacy-restricted browser contexts.
   }
@@ -33,7 +35,7 @@ export function createPreviewAutoRevealPreference(storage) {
     markRevealed() {
       revealed = true;
       try {
-        storage?.setItem(PREVIEW_AUTO_REVEAL_KEY, "1");
+        storage?.setItem(key, "1");
       } catch {
         // The in-memory guard still prevents duplicate reveals this session.
       }
