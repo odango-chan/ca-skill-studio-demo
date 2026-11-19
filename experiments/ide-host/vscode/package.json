@@ -621,7 +621,7 @@
           "id": "skillStudio.preview",
           "name": "Preview",
           "type": "webview",
-          "visibility": "hidden"
+          "visibility": "visible"
         },
         {
           "id": "skillStudio.inspection",
