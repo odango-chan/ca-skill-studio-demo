@@ -693,7 +693,7 @@ export async function runWorkbenchAcceptance({
         const spans=[...editor.querySelectorAll(".view-lines span")]
           .filter(span=>String(span.textContent??"").trim().length>0);
         const tokenClasses=[...new Set(spans.flatMap(span=>
-          [...span.classList].filter(name=>/^mtk\d+$/.test(name))))];
+          [...span.classList].filter(name=>/^mtk\\d+$/.test(name))))];
         const colors=[...new Set(spans.map(span=>getComputedStyle(span).color)
           .filter(color=>color&&color!=="rgba(0, 0, 0, 0)"))];
         return {found:true,visibleTokenSpans:spans.length,tokenClasses,
