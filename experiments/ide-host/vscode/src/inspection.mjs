@@ -50,27 +50,27 @@ function currentInspectionSnapshot(text,selection,files,packageName,packageRootU
   const outline=[row(procedure.name,procedure.nodes[0]?.line??1,
     procedure.nodes.map(node=>row(node.id,node.line,[
       ...(node.wait?[row("Wait · "+node.wait.event.source+"/"+node.wait.event.service+"/"+node.wait.event.operation,
-        node.wait.line,[],{kind:"v1alpha5-wait",
+        node.wait.line,[],{kind:"current-wait",
           description:"Timeout "+node.wait.timeout+" · TIMEOUT → "+node.wait.timeoutTarget+
             (node.wait.responseAfter?" · response after "+node.wait.responseAfter:"")})]:[]),
       ...(node.stages??[]).map(stage=>row(stage.name,stage.line,[],{
-        kind:"v1alpha5-stage",description:[stage.target,
+        kind:"current-stage",description:[stage.target,
           (stage.routeOutcomes??[]).join(" / ")].filter(Boolean).join(" · ")
       }))
     ],{
         description:(node.wait?("WAIT · "+node.wait.event.source+"/"+node.wait.event.service+"/"+node.wait.event.operation+" · "):"")+
           (node.stages??[]).map(stage=>stage.name).join(" → "),
-        procedureId:procedure.name,nodeId:node.id,kind:"v1alpha5-node"
-      })),{description:procedure.nodes.length+" Nodes · CA-SL v1alpha5",
+        procedureId:procedure.name,nodeId:node.id,kind:"current-node"
+      })),{description:procedure.nodes.length+" Nodes · current CA-SL",
         procedureId:procedure.name})];
   const contractRows=[
     row("Contract Goal · "+display(projection.goal),projection.goalLine??1,[],{
-      kind:"v1alpha5-contract",sourcePath:"assurance/contract.yaml",
+      kind:"current-contract",sourcePath:"assurance/contract.yaml",
       description:"Read-only Contract goal declaration"
     }),
     row("Global Precondition · "+display(projection.precondition),
       projection.preconditionLine??1,[],{
-        kind:"v1alpha5-contract",sourcePath:"assurance/contract.yaml",
+        kind:"current-contract",sourcePath:"assurance/contract.yaml",
         description:"Contract-level precondition reference"
       })
   ];
@@ -80,16 +80,16 @@ function currentInspectionSnapshot(text,selection,files,packageName,packageRootU
     "Node-entry Wait · "+node.wait.event.source+"/"+node.wait.event.service+"/"+node.wait.event.operation,
     node.wait.line,[
       row("Timeout · "+node.wait.timeout,node.wait.timeoutLine,[],{
-        kind:"v1alpha5-wait",description:"Fixed event-wait deadline; no polling loop"
+        kind:"current-wait",description:"Fixed event-wait deadline; no polling loop"
       }),
       row("TIMEOUT → "+node.wait.timeoutTarget,node.wait.timeoutRouteLine,[],{
-        kind:"v1alpha5-wait",description:"Wait-control edge; not a business Stage Outcome"
+        kind:"current-wait",description:"Wait-control edge; not a business Stage Outcome"
       }),
       ...(node.wait.responseAfter?[row("Response boundary · "+node.wait.responseAfter,
         node.wait.responseAfterLine??node.wait.line,[],{
-          kind:"v1alpha5-wait",description:"Paired response commits at this Node completion"
+          kind:"current-wait",description:"Paired response commits at this Node completion"
         })]:[])
-    ],{kind:"v1alpha5-wait",
+    ],{kind:"current-wait",
       description:"Exact Ingress event selector; wait.output is available only on the accepted-event path"
     })]:[];
   const stageRows=(node?.stages??[]).map(stage=>{
@@ -100,7 +100,7 @@ function currentInspectionSnapshot(text,selection,files,packageName,packageRootU
         value:argument.value,line:argument.line,...source,evidenceRequirements:[]};
       bindings.push(binding);
       children.push(row("Argument · "+argument.name,argument.line,[],{
-        kind:"v1alpha5-flow",
+        kind:"current-flow",
         description:argument.value+" · "+source.description
       }));
     }
@@ -116,13 +116,13 @@ function currentInspectionSnapshot(text,selection,files,packageName,packageRootU
           line,...source,evidenceRequirements:requirements};
         bindings.push(binding);
         callChildren.push(row(parameter+" ← "+value,line,[],{
-          kind:"v1alpha5-flow",description:source.description
+          kind:"current-flow",description:source.description
         }));
       });
       if(call.evidenceLocations?.length){
         for(const location of call.evidenceLocations)
           callChildren.push(row("Evidence required · "+location.evidence,location.line,[],{
-            kind:"v1alpha5-evidence",sourcePath:"assurance/predicates.yaml",
+            kind:"current-evidence",sourcePath:"assurance/predicates.yaml",
             description:"PredicateSet requires this Evidence for "+location.parameter+
               " · Owner guarantee / Producer satisfaction not qualified"
           }));
@@ -130,37 +130,37 @@ function currentInspectionSnapshot(text,selection,files,packageName,packageRootU
         for(const requirement of call.evidenceRequirements)
           for(const evidence of requirement.evidence)
             callChildren.push(row("Evidence required · "+evidence,call.line,[],{
-              kind:"v1alpha5-evidence",
+              kind:"current-evidence",
               description:"PredicateSet requires this Evidence for "+requirement.parameter+
                 " · Owner guarantee / Producer satisfaction not qualified"
             }));
       }
       children.push(row("Predicate · "+call.predicate,call.line,callChildren,{
-        kind:"v1alpha5-call",
+        kind:"current-call",
         description:"Positional arguments · "+call.arguments.length
       }));
     }
     return row(stage.name,stage.line,children,{
-      kind:"v1alpha5-stage",
+      kind:"current-stage",
       description:[stage.target,(stage.routeOutcomes??[]).join(" / ")]
         .filter(Boolean).join(" · ")
     });
   });
   const routeRows=procedure.routes.filter(route=>route.source===node?.id)
     .map(route=>row(route.routeSource+" · "+route.outcome+" → "+route.target,
-      route.line,[],{kind:"v1alpha5-route"}));
+      route.line,[],{kind:"current-route"}));
   const dataflowRows=bindings.map(binding=>row(
     binding.consumer+" ← "+binding.value,binding.line,[],{
-      kind:"v1alpha5-flow",description:binding.description
+      kind:"current-flow",description:binding.description
     }));
   const inspection=node?[
     ...contractRows,
     row(node.id,node.line,[...waitRows,...stageRows,...routeRows],{
       description:"Node · "+(node.wait?"Wait · ":"")+(node.stages??[]).map(stage=>stage.name).join(" → "),
-      kind:"v1alpha5-node",procedureId:procedure.name,nodeId:node.id
+      kind:"current-node",procedureId:procedure.name,nodeId:node.id
     }),
     row("Data Flow · "+bindings.length+" arguments",node.line,dataflowRows,{
-      kind:"v1alpha5-dataflow",
+      kind:"current-dataflow",
       description:"Source lineage only · imported Owner Schema / Evidence guarantees are not linked"
     })
   ]:[...contractRows,row(procedure.name,1,[],{
