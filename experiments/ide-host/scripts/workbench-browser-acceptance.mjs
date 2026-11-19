@@ -661,8 +661,16 @@ export async function runWorkbenchAcceptance({
     for(let i=0;i<attempts;i++){
       status=await evalJS("document.body.innerText.match(/SKILL LSP: (READY|PARTIAL|UNAVAILABLE|ERROR|ANALYZING|STARTED|STARTING|IDLE)/)?.[0]??''");
       if(status==="SKILL LSP: "+expected)return status;
-      if(status==="SKILL LSP: ERROR"||status==="SKILL LSP: UNAVAILABLE")
-        throw Error("Skill Language Service entered a terminal state: "+status);
+      if(status==="SKILL LSP: ERROR"||status==="SKILL LSP: UNAVAILABLE"){
+        let diagnostics=null;
+        try{
+          diagnostics=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
+        }catch(error){diagnostics=String(error?.message??error);}
+        throw Error("Skill Language Service entered a non-ready state: "+
+          JSON.stringify({status,packageStatuses:diagnostics?.packageStatuses,
+            languageTransportFailure:diagnostics?.languageTransportFailure,
+            languagePackageFailure:diagnostics?.languagePackageFailure}));
+      }
       await sleep(100);
     }
     throw Error("Skill Language Service did not reach "+expected+": "+status);
