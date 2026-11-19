@@ -258,8 +258,8 @@ if(missingSyntaxAssets.length)
   throw Error("Static primary extension syntax assets missing: "+missingSyntaxAssets.join(", "));
 const retiredSyntaxPlugin=join(root,"hostedPlugin","odango_chan_skill_studio_languages");
 await rm(retiredSyntaxPlugin,{recursive:true,force:true});
-const hostedPluginList=await readFile(join(root,"hostedPlugin","list.json"),"utf8");
-if(hostedPluginList.includes("skill-studio-languages"))
+const hostedPluginRegistryText=await readFile(join(root,"hostedPlugin","list.json"),"utf8");
+if(hostedPluginRegistryText.includes("skill-studio-languages"))
   throw Error("Standalone syntax plugin remains in the static hostedPlugin registry");
 console.log("STUDIO_THEIA_STATIC_PRIMARY_EXTENSION_SYNTAX_ASSETS",JSON.stringify({
   pluginTarget,languages:["yaml","python"],
