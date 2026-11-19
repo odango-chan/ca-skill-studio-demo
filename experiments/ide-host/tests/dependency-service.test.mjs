@@ -63,7 +63,7 @@ function host(){
 }
 test("pinned built-in snapshot persists, reloads and is verified byte for byte",async()=>{
   const h=host(),acquired=await acquireBuiltin({
-    bundleId:"studio-example-tools",version:"1.0.0"});
+    bundleId:"studio-example-toolcatalog",version:"1.0.0"});
   assert.equal((await resolveLockedDependencies(h.vscode,h.root)).status,"READY");
   await assert.rejects(applyDependency(h.vscode,h.root,"example",acquired,
     {confirm:async()=>false}),/confirmation required/);
@@ -88,7 +88,7 @@ test("pinned built-in snapshot persists, reloads and is verified byte for byte",
 });
 test("Refresh is observation-only; Update Lock requires confirmation",async()=>{
   const h=host(),initial=await acquireBuiltin({
-    bundleId:"studio-example-tools",version:"1.0.0"});
+    bundleId:"studio-example-toolcatalog",version:"1.0.0"});
   await applyDependency(h.vscode,h.root,"example",initial,{confirm:async()=>true});
   const old=JSON.stringify(h.values.dependencyLock);
   const before=h.updates.length;
@@ -107,7 +107,7 @@ test("Refresh is observation-only; Update Lock requires confirmation",async()=>{
 });
 test("config pair failure is UNCERTAIN, never READY",async()=>{
   const h=host(),initial=await acquireBuiltin({
-    bundleId:"studio-example-tools",version:"1.0.0"});
+    bundleId:"studio-example-toolcatalog",version:"1.0.0"});
   h.setFailLockWrite(true);
   await assert.rejects(applyDependency(h.vscode,h.root,"example",initial,
     {confirm:async()=>true}),/UNCERTAIN/);
@@ -116,9 +116,17 @@ test("config pair failure is UNCERTAIN, never READY",async()=>{
 
 test("Upload Refresh observes drift but never mutates existing Lock",async()=>{
   const h=host(),encoder=new TextEncoder();
-  const input=a=>encoder.encode(JSON.stringify({apiVersion:"skillc.tool/v0.1",
-    operations:[{id:a,inputSchema:{type:"object"},effect:{
-      classification:"UNKNOWN",authority:"UNVERIFIED"}}]}));
+  const input=a=>encoder.encode(JSON.stringify({
+    apiVersion:"connectionagent.io/toolcatalog/v1alpha4",
+    kind:"ToolCatalog",
+    metadata:{owner:"example-unqualified-owner"},
+    spec:{contracts:[{
+      id:a,kind:"operation",effect:"READ",
+      inputSchema:{"$ref":"#/schemas/input"},
+      outputSchema:{"$ref":"#/schemas/output"},
+      ownerOutcomes:["SUCCEEDED","FAILED"]
+    }]}
+  }));
   const initial=await acquireUpload({upload:"uploaded-tools",format:"json",
     rawBytes:input("alpha")});
   const changed=await acquireUpload({upload:"uploaded-tools",format:"json",
