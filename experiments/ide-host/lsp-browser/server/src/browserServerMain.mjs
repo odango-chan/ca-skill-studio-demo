@@ -1007,18 +1007,21 @@ connection.onNotification(PACKAGE_SNAPSHOT_NOTIFICATION, async snapshot => {
     if (!result.accepted && result.reason !== "SUPERSEDED" &&
         result.reason !== "STALE_GENERATION" &&
         result.reason !== "STALE_DOCUMENT") {
-      packageAnalyses.delete(rootUri);
+      // Source snapshots are the independent input to semantic coloring.
+      // A rejected diagnostic analysis must never evict the accepted source.
+      // Also guard by identity so a late failure cannot clear a newer generation.
       if(packageSnapshots.get(rootUri)===snapshot){
-        packageSnapshots.delete(rootUri);
+        packageAnalyses.delete(rootUri);
         symbolIndexes.delete(rootUri);
       }
       refreshSemanticTokens();
       reportError("Package analysis rejected: " + result.reason, rootUri);
     }
   } catch (error) {
-    packageAnalyses.delete(rootUri);
+    // Keep the latest accepted source snapshot available to the token provider.
+    // A failure from an older asynchronous analysis must not touch newer state.
     if(packageSnapshots.get(rootUri)===snapshot){
-      packageSnapshots.delete(rootUri);
+      packageAnalyses.delete(rootUri);
       symbolIndexes.delete(rootUri);
     }
     refreshSemanticTokens();
