@@ -23,9 +23,9 @@ import {registerProjectWelcome} from "./project-welcome.mjs";
 import {extendMarkdownIt} from "./markdown-link-policy.mjs";
 import {registerWorkbench} from "./workbench.mjs";
 import {staticPreviewResourceUrl} from "./webview-resource-url.mjs";
-import {registerContractEditor} from "./contract-editor.mjs";
-import {registerPredicateEditor} from "./predicate-editor.mjs";
-import {registerSchemaEditor} from "./schema-editor.mjs";
+import {registerContractEditor,mountContractPreview} from "./contract-editor.mjs";
+import {registerPredicateEditor,mountPredicatePreview} from "./predicate-editor.mjs";
+import {registerSchemaEditor,mountSchemaPreview} from "./schema-editor.mjs";
 import {registerPackageOverview} from "./package-overview.mjs";
 import {registerDependencyIntegration} from "./dependency-integration.mjs";
 import {registerCompilerIntegration} from "./compiler-integration.mjs";
@@ -338,7 +338,12 @@ export function activate(context){
   // Experimental right-side Preview Host shares the exact Procedure webview,
   // parser and Source-backed mutation path with the established CustomEditor.
   // The view stays hidden until the fixed layout migration is accepted.
-  registerPreviewHost(vscode,context,{mountProcedure:mountProcedurePreview});
+  registerPreviewHost(vscode,context,{
+    mountProcedure:mountProcedurePreview,
+    mountContract:(document,panel,options)=>mountContractPreview(vscode,document,panel,options),
+    mountPredicate:(document,panel,options)=>mountPredicatePreview(vscode,document,panel,options),
+    mountSchema:(document,panel,options)=>mountSchemaPreview(vscode,document,panel,options)
+  });
   const projectText=value=>vscode.l10n?.t(value)??value;
   context.subscriptions.push(
     vscode.commands.registerCommand("skillStudio.newProject",async()=>{
