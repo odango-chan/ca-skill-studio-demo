@@ -510,12 +510,13 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       void languageClientPromise.then(invalidate).catch(()=>{});
     if(immediate){
       void refreshLanguagePackage(state,ticket,generation);
-      return;
+      return {ticket,generation};
     }
     state.timer=setTimeout(()=>{
       state.timer=null;
       void refreshLanguagePackage(state,ticket,generation);
     },120);
+    return {ticket,generation};
   }
   async function waitForLanguagePackageStatus(state,generation,timeoutMs=20000){
     const started=Date.now();
@@ -2647,10 +2648,15 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     const rootInfo=packageRootForProcedure(vscode,doc);
     if(!rootInfo)throw Error("Current document is not assurance/procedure.yaml");
     const state=languagePackages.get(rootInfo.uri.toString());
-    if(!state)throw Error("Package is not attached to the current Language Service");
+    if(!state)throw Error("Package is not attached to the current Language Service: "+
+      JSON.stringify({activeDocument:doc.uri.toString(),activeRoot:rootInfo.uri.toString(),
+        attachedPackages:[...languagePackages.keys()]}));
     audit=[];auditStatus="Package Audit · pending";fireProblems();
-    scheduleLanguagePackageRefresh(state,true);
-    return {requested:true,rootUri:state.key,generation:state.generation};
+    const request=scheduleLanguagePackageRefresh(state,true);
+    const status=await waitForLanguagePackageStatus(state,request.generation);
+    applyLanguageAnalysisStatus(status);
+    return {requested:true,rootUri:state.key,generation:request.generation,status:status.state,
+      packageAuditState:status.packageAuditState};
   }
   function scheduleAudit(){
     generation++;
