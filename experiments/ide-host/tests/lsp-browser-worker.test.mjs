@@ -320,11 +320,11 @@ test("browser LSP provides v1alpha5 Definition, References, Hover, Python symbol
     const readyStatus=waitForMessage(worker,message=>
       message?.method==="skillStudio/analysisStatus"&&
       message.params?.rootUri===snapshot.rootUri&&
-      message.params?.state==="PARTIAL"&&
+      message.params?.state==="READY"&&
       message.params?.procedureState==="READY",15000);
     worker.postMessage({jsonrpc:"2.0",method:"skillStudio/packageSnapshot",params:snapshot});
     const status=await readyStatus;
-    assert.equal(status.params.state,"PARTIAL");
+    assert.equal(status.params.state,"READY");
 
     const procedure=snapshot.documents.find(x=>x.relativePath==="assurance/procedure.yaml");
     const contract=snapshot.documents.find(x=>x.relativePath==="assurance/contract.yaml");
@@ -425,8 +425,8 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
     const [statusA,statusB,publishedA,publishedB]=await Promise.all([
       statusAWait,statusBWait,diagnosticAWait,diagnosticBWait
     ]);
-    assert.equal(statusA.params.state,"PARTIAL");
-    assert.equal(statusB.params.state,"PARTIAL");
+    assert.equal(statusA.params.state,"READY");
+    assert.equal(statusB.params.state,"READY");
     assert.ok(publishedA.params.diagnostics.length>0);
     assert.ok(publishedB.params.diagnostics.length>0);
 
@@ -454,7 +454,7 @@ test("browser LSP isolates concurrent Package roots across close and reopen",asy
     const [reopened,republishedA]=await Promise.all([
       reopenedStatusWait,republishedAWait
     ]);
-    assert.equal(reopened.params.state,"PARTIAL");
+    assert.equal(reopened.params.state,"READY");
     assert.ok(republishedA.params.diagnostics.length>0);
     const bStillOwned=await expectNoMessage(worker,message=>
       diagnosticFor(procedureB)(message)&&message.params.diagnostics.length===0,250);
