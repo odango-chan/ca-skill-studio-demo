@@ -17,7 +17,7 @@ const local=(changes={})=>({
 });
 const accepted=(changes={})=>({
   code:"YAML_PARSE_ERROR",source:"package-audit",status:"confirmed",
-  severity:"error",uri,line:9,...changes
+  severity:"error",confidence:"exact",uri,line:9,...changes
 });
 
 test("confirmed local LSP marker shadows exactly matching Compiler squiggle",()=>{
@@ -40,6 +40,8 @@ test("unavailable/stale Language Service findings cannot shadow an authoritative
   assert.equal(compilerMarkerShadowed(compiler(),[local()],[accepted({uri:"file:///elsewhere"})]),false);
   assert.equal(compilerMarkerShadowed(compiler(),[local()],[accepted({status:"not_checked"})]),false);
   assert.equal(compilerMarkerShadowed(compiler(),[local()],[accepted({status:"blocked"})]),false);
+  assert.equal(compilerMarkerShadowed(compiler(),[local()],[accepted({confidence:"heuristic"})]),false);
+  assert.equal(compilerMarkerShadowed(compiler(),[local()],[accepted({confidence:"unknown"})]),false);
   assert.equal(compilerMarkerShadowed(compiler(),[local()],[
     accepted(),accepted({status:"not_checked"})
   ]),false,"an unresolved duplicate at the same code/line cannot be silently hidden");
