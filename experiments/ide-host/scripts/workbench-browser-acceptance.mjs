@@ -670,7 +670,7 @@ export async function runWorkbenchAcceptance({
               "timing:root?.dataset.studioTiming??null,"+
               "cards:[...document.querySelectorAll('.card h2')].map(el=>el.textContent.trim()),"+
               "heading:heading?.textContent?.trim()??null,"+
-              "nativePreviewRoot:Boolean(document.body&&styles.some(url=>url.includes('/media/native-markdown-preview.css'))),"+
+              "nativePreviewRoot:Boolean(document.body&&styles.some(url=>url.includes('/media/studio-markdown-preview.css'))),"+
               "styles,headingColor:heading?getComputedStyle(heading).color:null,"+
               "maxWidth:document.body?getComputedStyle(document.body).maxWidth:null,"+
               "anchorDetails:[...document.querySelectorAll('a')].map(anchor=>({"+
@@ -1123,7 +1123,7 @@ export async function runWorkbenchAcceptance({
     throw Error("Native Markdown did not open the exact v1alpha5 Skill guide: "+nativeMarkdownUri);
   const nativeMarkdown=await waitNativeMarkdown(view=>
     view.heading?.includes("Establish PDU Session")&&
-    view.styles.some(url=>url.includes("/media/native-markdown-preview.css")),
+    view.styles.some(url=>url.includes("/media/studio-markdown-preview.css")),
     "v1alpha5 native Markdown Preview");
   if(nativeMarkdown.view.headingColor!=="rgb(12, 142, 123)"||
      nativeMarkdown.view.maxWidth!=="980px")
@@ -1165,7 +1165,7 @@ export async function runWorkbenchAcceptance({
       JSON.stringify(secondMarkdownUri));
   const secondMarkdown=await waitNativeMarkdown(view=>
     view.heading?.includes("OpenAMSM source mapping")&&
-    view.styles.some(url=>url.includes("/media/native-markdown-preview.css")),
+    view.styles.some(url=>url.includes("/media/studio-markdown-preview.css")),
     "v1alpha5 MAS reference Markdown Preview");
   const secondMarkdownLayout=await assertTwoColumns(
     "second v1alpha5 Markdown source opened from the right group",secondMarkdownUri);
