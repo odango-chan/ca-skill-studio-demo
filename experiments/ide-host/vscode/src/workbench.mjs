@@ -3066,24 +3066,14 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
           completeness:packageSnapshot.completeness,
           snapshotReason:packageSnapshot.reason
         });
-      }else if(packageSnapshot.completeness!=="complete"){
-        results=[{
-          kind:'package-diagnostic',
-          message:'Legacy Package Audit was not run because the Package snapshot is incomplete'+
-            (packageSnapshot.reason?': '+packageSnapshot.reason:''),
-          path:'assurance/procedure.yaml',line:1,column:1,
-          code:'PACKAGE_SNAPSHOT_INCOMPLETE',severity:'warning',
-          status:'not_checked',domain:'package',category:'snapshot'
-        }];
-      }else if(missing.length){
-        results=missing.map(path=>({
-          kind:'package-diagnostic',message:'Audit unavailable: missing '+path,
-          path:'assurance/procedure.yaml',line:1,column:1,code:'AUDIT_INCOMPLETE',
-          severity:'error',status:'blocked',domain:'package',category:'inventory'
-        }));
       }else{
+        // Legacy analysis is deliberately best-effort and multi-pass. A partial
+        // snapshot or one malformed companion file must not suppress checks on
+        // every other source file; the audit emits NOT_CHECKED reasons per gap.
         results=auditPackageWorkspace({
-          name:packageSnapshot.packageName,files
+          name:packageSnapshot.packageName,files,
+          completeness:packageSnapshot.completeness,
+          snapshotReason:packageSnapshot.reason
         },doc.getText());
       }
       if(ticket!==generation||document!==doc||doc.version!==version)return;
@@ -3094,7 +3084,8 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       auditStatus=v1alpha5
         ?"v1alpha5 Package Audit · "+errors+" errors / "+warnings+" warnings / "+
           notChecked+" NOT_CHECKED · Compiler / Owner qualification pending"
-        :"Package Audit · "+errors+" errors / "+warnings+" warnings";
+        :"Legacy Package Audit · "+errors+" errors / "+warnings+" warnings / "+
+          notChecked+" NOT_CHECKED";
       diagnostics.clear();
       if(packageSnapshot.completeness==="complete"){
         packageFiles=files;packageFilesUri=doc.uri.toString();packageFilesVersion=version;
