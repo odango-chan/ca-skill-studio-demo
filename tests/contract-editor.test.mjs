@@ -17,7 +17,7 @@ const contract = [
   ''
 ].join('\n');
 
-test('Contract custom editor renders a nonce-protected v1alpha5 read-only projection', async () => {
+test('Contract Preview renderer presents a nonce-protected v1alpha5 read-only projection', async () => {
   let customEditorRegistrations=0;
   const commands = new Map();
   const context = {subscriptions: []};
