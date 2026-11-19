@@ -9,6 +9,17 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
         typeof k==='function'&&k.prototype?.activateWidget&&k.prototype?.addWidget);
       if(!key)throw Error('Theia shell missing');
       const shell=c.get(key);
+      const commandKey=[...c._bindingDictionary._map.keys()].find(k=>
+        typeof k==='function'&&k.prototype?.executeCommand&&
+        k.prototype?.registerCommand&&k.prototype?.getCommand);
+      const registry=commandKey?c.get(commandKey):null;
+      const commandIds=[
+        'workbench.view.extension.skillStudioInspector',
+        'workbench.action.focusAuxiliaryBar',
+        'workbench.action.toggleAuxiliaryBar',
+        'workbench.action.focusSideBar',
+        'workbench.action.toggleSidebar'
+      ].map(id=>({id,registered:Boolean(registry?.getCommand?.(id))}));
       const inspect=(area,widget)=>{
         const node=widget.node,rect=node?.getBoundingClientRect?.();
         const visible=!!rect&&rect.width>0&&rect.height>0&&!widget.isHidden;
@@ -54,7 +65,7 @@ export async function assertSourceVisualPair(evalJS,sleep,filename,label){
           rect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};
       });
       return {main,right,left,source,preview,selectedPreview:rightPreview??null,
-        tabBars,visibleEditorGroups:tabBars.filter(x=>x.visible).length};
+        commandIds,tabBars,visibleEditorGroups:tabBars.filter(x=>x.visible).length};
     })()`);
     const source=state.source??[];
     const preview=state.selectedPreview;
