@@ -109,7 +109,7 @@ function markdownViewHtml(webview,style,sessionKey){
           event.preventDefault();
       });
       window.addEventListener("scroll",()=>{
-        if(Date.now()-lastHostScroll<450||!uri||version<0)return;
+        if(Date.now()-lastHostScroll<120||!uri||version<0)return;
         if(scrollFrame)cancelAnimationFrame(scrollFrame);
         scrollFrame=requestAnimationFrame(()=>{
           scrollFrame=0;
