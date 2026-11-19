@@ -3,7 +3,6 @@ import {analyzeCurrentSource}
 
 // UI adapter only: every fact below comes from the shared language source projection.
 const row=(label,line,children=[],extra={})=>({label,line,children,...extra});
-  a.bindingKey===b.bindingKey;
 const display=value=>value===undefined||value===null||value===''?'未声明':String(value);
 function classifyCurrentSource(value){
   const raw=String(value??"").trim();
