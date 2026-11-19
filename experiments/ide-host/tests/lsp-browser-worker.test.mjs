@@ -217,7 +217,7 @@ test("browser LSP Worker initializes, publishes diagnostics and clears a closed 
       message?.method==="textDocument/publishDiagnostics" &&
       message.params?.uri==="file:///workspace/skill/assurance/procedure.yaml" &&
       message.params?.version===1 &&
-      message.params?.diagnostics?.some(item=>item.code==="PROCEDURE_PROJECTION")
+      message.params?.diagnostics?.some(item=>item.code==="YAML_PARSE_ERROR")
     );
     assert.equal(stalePublication,null,"old generation must not republish diagnostics");
     worker.postMessage({
