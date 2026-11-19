@@ -22,7 +22,7 @@ test("current CA-SL Example graph is projected from the latest source grammar",(
   assert.equal(model.procedures.size,1);
   assert.equal(model.procedure.nodes.length,10);
   assert.ok(model.procedure.routes.length>0);
-  assert.equal(model.procedure.entry,model.procedure.name);
+  assert.equal(model.entry,model.procedure.name);
 });
 
 test("current Stage routes remain read-only until a current-grammar patch contract exists",()=>{
