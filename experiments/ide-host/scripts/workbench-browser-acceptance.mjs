@@ -1159,13 +1159,13 @@ export async function runWorkbenchAcceptance({
     throw Error("Studio Markdown Preview did not preserve guarded Package link targets: "+
       JSON.stringify(markdownPreview.view.anchorDetails));
   const blockedTraversal=await evaluateStudioMarkdown(markdownPreview,
-    "(()=>{document.querySelector('[data-studio-href=\\"../../outside.md\\"]')?.click();return true;})()");
+    "(()=>{const a=[...document.querySelectorAll('[data-studio-href]')].find(x=>x.dataset.studioHref==='../../outside.md');if(a)a.click();return true;})()");
   if(!blockedTraversal)throw Error("Could not dispatch traversal-link security probe");
   const blockedTraversalView=await waitStudioMarkdown(view=>
     view.studioMarkdownStatus.includes("Blocked unverified Package link."),
     "blocked Markdown Package traversal link");
   await evaluateStudioMarkdown(blockedTraversalView,
-    "(()=>{document.querySelector('[data-studio-href=\\"missing.md\\"]')?.click();return true;})()");
+    "(()=>{const a=[...document.querySelectorAll('[data-studio-href]')].find(x=>x.dataset.studioHref==='missing.md');if(a)a.click();return true;})()");
   const blockedMissingView=await waitStudioMarkdown(view=>
     view.studioMarkdownStatus.includes("Blocked unverified Package link."),
     "blocked missing Markdown Package link");
