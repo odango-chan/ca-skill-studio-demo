@@ -76,6 +76,47 @@ export function createSkillLanguageClient(vscode, context, handlers = {}) {
   worker.addEventListener("messageerror", () => {
     fatal("Browser language Worker message could not be decoded", { stopClient: true });
   });
+  // Register the cross-language Definition adapter before LanguageClient
+  // installs its generic providers. For a Python Skill entrypoint, the
+  // Package index knows the authoritative YAML caller range; return that
+  // location first so native Go to Definition / Ctrl-click / Peek prefers
+  // the Skill declaration over a Python provider's same-file symbol result.
+  // Returning undefined preserves ordinary Python Definition behavior.
+  let crossLanguageDefinitionRegistration = null;
+  if (typeof vscode.languages?.registerDefinitionProvider === "function") {
+    crossLanguageDefinitionRegistration = vscode.languages.registerDefinitionProvider(
+      { scheme: "file", pattern: "**/*.py" },
+      {
+        async provideDefinition(document, position, cancellationToken) {
+          if (stopped || terminalFailure || !started ||
+              cancellationToken?.isCancellationRequested) return undefined;
+          try {
+            const result = await client.sendRequest("textDocument/definition", {
+              textDocument: { uri: document.uri.toString() },
+              position: { line: position.line, character: position.character }
+            }, cancellationToken);
+            if (cancellationToken?.isCancellationRequested) return undefined;
+            const locations = (Array.isArray(result) ? result : result ? [result] : [])
+              .filter(item => typeof item?.uri === "string" &&
+                /\.ya?ml$/i.test(item.uri) && item.range?.start && item.range?.end)
+              .map(item => new vscode.Location(
+                vscode.Uri.parse(item.uri),
+                new vscode.Range(
+                  item.range.start.line, item.range.start.character,
+                  item.range.end.line, item.range.end.character
+                )
+              ));
+            return locations.length ? locations : undefined;
+          } catch (error) {
+            output.appendLine("Cross-language Definition request failed: " +
+              String(error?.message ?? error));
+            return undefined;
+          }
+        }
+      }
+    );
+  }
+
   client = new LanguageClient(
     "skillStudioLanguageService",
     "Skill Studio Language Service",
