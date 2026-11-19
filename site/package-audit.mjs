@@ -50,11 +50,17 @@ export function auditPackageWorkspace(workspace,procedureOverride=null){
     if(diagnostics.length>=300)return;
     const counter=counters.get(path);
     const position=counter&&node?.range?counter.linePos(node.range[0]):null;
-    diagnostics.push(Object.freeze({
+    const diagnostic={
       kind:"package-diagnostic",severity,status,code,path,relativePath:path,
-      line:position?.line||1,column:position?.col||1,message,domain,category,
-      source:"Skill Studio · Package Audit"
-    }));
+      message,domain,category,source:"Skill Studio · Package Audit"
+    };
+    // Do not invent line 1 for Package-level or NOT_CHECKED results. They stay
+    // visible in Problems but receive no misleading editor marker.
+    if(position?.line>0&&position?.col>0){
+      diagnostic.line=position.line;
+      diagnostic.column=position.col;
+    }
+    diagnostics.push(Object.freeze(diagnostic));
   };
   const warn=(code,path,node,message)=>add(code,path,node,message);
   const notChecked=(code,path,message,domain="package")=>add(code,path,null,message,{
