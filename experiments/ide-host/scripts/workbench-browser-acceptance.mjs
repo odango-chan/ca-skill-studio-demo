@@ -667,6 +667,42 @@ export async function runWorkbenchAcceptance({
     }
     throw Error("Skill Language Service did not reach "+expected+": "+status);
   };
+  const waitForTextMateTokens=async(relativePath,expectedLanguage,anchor)=>{
+    const opened=await nativeCommand(
+      "skillStudio.internal.openSyntaxAcceptanceSource",defaultProcedureUri,relativePath);
+    if(opened?.languageId!==expectedLanguage)
+      throw Error("Syntax source has the wrong language ID: "+
+        JSON.stringify({relativePath,expectedLanguage,opened}));
+    let evidence=null;
+    for(let attempt=0;attempt<80;attempt++){
+      evidence=await evalJS(`(()=> {
+        const anchor=${JSON.stringify(anchor)};
+        const editors=[...document.querySelectorAll(".monaco-editor")]
+          .filter(editor=>editor.offsetWidth>0&&editor.offsetHeight>0);
+        const editor=editors.find(item=>
+          (item.querySelector(".view-lines")?.innerText??"").includes(anchor));
+        if(!editor)return {editorCount:editors.length,found:false};
+        const spans=[...editor.querySelectorAll(".view-lines span")]
+          .filter(span=>String(span.textContent??"").trim().length>0);
+        const tokenClasses=[...new Set(spans.flatMap(span=>
+          [...span.classList].filter(name=>/^mtk\\d+$/.test(name))))];
+        const colors=[...new Set(spans.map(span=>getComputedStyle(span).color)
+          .filter(color=>color&&color!=="rgba(0, 0, 0, 0)"))];
+        return {found:true,visibleTokenSpans:spans.length,tokenClasses,
+          colorCount:colors.length,colors:colors.slice(0,12),
+          samples:spans.slice(0,10).map(span=>({
+            text:span.textContent,className:span.className,
+            color:getComputedStyle(span).color
+          }))};
+      })()`);
+      if(evidence?.found&&evidence.tokenClasses?.length>=2&&evidence.colorCount>=2)break;
+      await sleep(100);
+    }
+    if(!evidence?.found||evidence.tokenClasses?.length<2||evidence.colorCount<2)
+      throw Error("Real TextMate tokenization is missing for "+relativePath+": "+
+        JSON.stringify({opened,evidence}));
+    return {relativePath,languageId:opened.languageId,...evidence};
+  };
 
   const started=Date.now();
   const procedurePair=await assertSourceVisualPair(
@@ -675,6 +711,43 @@ export async function runWorkbenchAcceptance({
   if(sourceState?.uri!==defaultProcedureUri||!Number.isSafeInteger(sourceState.version))
     throw Error("Native Source is not the exact v1alpha5 Procedure TextDocument: "+
       JSON.stringify({expected:defaultProcedureUri,sourceState,procedurePair}));
+
+  // Theia has a browser Worker for LSP, but semantic coloring must be computed
+  // by the host-local canonical classifier before any analysis result is needed.
+  let sourceLocalSemanticTokenEvidence=null;
+  for(let attempt=0;attempt<80;attempt++){
+    sourceLocalSemanticTokenEvidence=await nativeCommand(
+      "skillStudio.internal.semanticTokenDiagnostics");
+    if(sourceLocalSemanticTokenEvidence?.registered===true&&
+       sourceLocalSemanticTokenEvidence?.transport==="extension-host"&&
+       sourceLocalSemanticTokenEvidence?.lastUri===defaultProcedureUri&&
+       sourceLocalSemanticTokenEvidence?.lastTokenCount>0)break;
+    await sleep(100);
+  }
+  if(sourceLocalSemanticTokenEvidence?.registered!==true||
+     sourceLocalSemanticTokenEvidence?.transport!=="extension-host"||
+     sourceLocalSemanticTokenEvidence?.lastUri!==defaultProcedureUri||
+     !(sourceLocalSemanticTokenEvidence?.lastTokenCount>0)||
+     sourceLocalSemanticTokenEvidence?.renderer!=="theia-text-editor-decoration"||
+     !(sourceLocalSemanticTokenEvidence?.renderedTokenCount>0)||
+     !(sourceLocalSemanticTokenEvidence?.renderedTypeCount>=2)||
+     sourceLocalSemanticTokenEvidence?.renderError)
+    throw Error("Theia v1alpha5 source-local semantic highlighting failed: "+
+      JSON.stringify(sourceLocalSemanticTokenEvidence));
+  console.log("STUDIO_V1ALPHA5_SOURCE_LOCAL_SEMANTIC_TOKENS_CHROMIUM",
+    JSON.stringify(sourceLocalSemanticTokenEvidence));
+
+  const yamlTextMateEvidence=await waitForTextMateTokens(
+    "schemas/establishment-request.schema.yaml","yaml","type:");
+  const pythonTextMateEvidence=await waitForTextMateTokens(
+    "scripts/build_pcf_policy_inputs.py","python","from typing import");
+  await nativeCommand("skillStudio.internal.openSyntaxAcceptanceSource",
+    defaultProcedureUri,"__restore__");
+  await sleep(200);
+  const syntaxHighlightingEvidence={yaml:yamlTextMateEvidence,python:pythonTextMateEvidence};
+  console.log("STUDIO_YAML_PYTHON_TEXTMATE_CHROMIUM",
+    JSON.stringify(syntaxHighlightingEvidence));
+
   const initialGraph=await waitWebview(view=>
     view.procedureRoot&&view.procedureValue==="establish-pdu-session"&&view.graphNodes>0,
     "default v1alpha5 Procedure graph");
@@ -934,6 +1007,7 @@ export async function runWorkbenchAcceptance({
         JSON.stringify(v1alpha5LanguageFeatures));
     semanticTokenEvidence=await nativeCommand("skillStudio.internal.semanticTokenDiagnostics");
     if(semanticTokenEvidence?.registered!==true||
+       semanticTokenEvidence?.transport!=="extension-host"||
        !(semanticTokenEvidence?.lastTokenCount>0)||
        semanticTokenEvidence?.renderer!=="theia-text-editor-decoration"||
        !(semanticTokenEvidence?.renderedTokenCount>0)||
@@ -1320,6 +1394,7 @@ export async function runWorkbenchAcceptance({
     dualSkillExplorer,packageOverview:packageOverviewEvidence.evidence,
     graphEditability,canvasToolbar,
     v1alpha5LanguageFeatures,semanticTokenEvidence,
+    sourceLocalSemanticTokenEvidence,syntaxHighlightingEvidence,
     nativeMarkdownEvidence,designerEvidence:{
       contract:contract.view,predicates:predicates.view,schema:schema.view
     }
