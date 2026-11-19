@@ -7,10 +7,6 @@ import {analyzeCurrentSource} from "../../../../language/core/source.ts";
 import {indexV1Alpha4ToolCatalogCallables}
   from '../../../../site/package-audit.mjs';
 import {isProcedurePath,MAX_SOURCE_BYTES} from './bridge.mjs';
-import {previewNodeRename,applyNodeRename} from '../../../../site/node-designer.mjs';
-import {nodeAttributeState,previewNodeOperatorValue,applyNodeOperatorValue} from '../../../../site/node-attributes.mjs';
-import {insertNodeOptions,previewNodeInsert,applyNodeInsert} from '../../../../site/node-create.mjs';
-import {deleteNodeOptions,previewNodeDelete,applyNodeDelete} from '../../../../site/node-delete.mjs';
 import {buildPackageZip,bytesToBase64} from '../../../../site/package-zip-export.mjs';
 import {resolveLockedDependencies} from "./dependency-service.mjs";
 import {readProjectConfiguration} from "./project-configuration.mjs";
@@ -2270,25 +2266,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     ));
   }
 
-  function currentNode(item){
-    if(!document||!isProcedurePath(document.uri.path))throw Error("No active Procedure Source");
-    const doc=document,source=doc.getText(),version=doc.version;
-    const procedureId=item?.procedureId??selection.procedureId;
-    const nodeId=item?.nodeId??selection.nodeId;
-    if(item?.documentUri&&item.documentUri!==doc.uri.toString())
-      throw Error("Inspector selection belongs to another Source document");
-    if(Number.isSafeInteger(item?.sourceVersion)&&item.sourceVersion!==version)
-      throw Error("Inspector selection is stale; select the Node again");
-    if(typeof procedureId!=="string"||typeof nodeId!=="string")
-      throw Error("Select a Node in the graph or Inspector first");
-    const rootInfo=packageRootForProcedure(vscode,doc);
-    const projected=inspectionSnapshot(source,{procedureId,nodeId},null,null,
-      rootInfo?.name??"skill",rootInfo?.uri?.toString?.()??"file:///skill");
-    const procedure=projected.model.procedures.get(procedureId);
-    if(projected.model.state!=="READY"||!procedure?.nodes.some(n=>n.id===nodeId))
-      throw Error("Selected Node is not present in the current Source");
-    return {doc,source,version,procedureId,nodeId};
-  }
   async function predicateContext(doc){
     const suffix="assurance/procedure.yaml";
     if(!doc.uri.path.endsWith(suffix))return {predicateSource:null,skillName:null};
@@ -2309,205 +2286,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
     predicateSnapshot={uri,version,...next};
     fire();
   }
-  async function confirmAndApply({doc,source,version,preview,changes,verify}){
-    const message=[preview.summary,preview.diff].filter(Boolean).join("\n\n");
-    const choice=await vscode.window.showInformationMessage(
-      message||"确认修改当前 Source",
-      {modal:true},
-      "确认并应用"
-    );
-    if(choice!=="确认并应用")return false;
-    if(document!==doc||doc.version!==version||doc.getText()!==source)
-      throw Error("Source changed after Preview; the edit was discarded");
-    const candidate=await verify(doc.getText());
-    if(candidate!==preview.candidateSource)
-      throw Error("Revalidated Patch does not match the reviewed Preview");
-    if(document!==doc||doc.version!==version||doc.getText()!==source)
-      throw Error("Source changed during Patch revalidation");
-    const edit=new vscode.WorkspaceEdit();
-    const spans=changes(preview);
-    if(!spans.length)throw Error("Patch has no qualified Source spans");
-    for(const span of spans){
-      const insertion=span.start===span.end&&span.oldValue===""&&
-        typeof span.newValue==="string"&&span.newValue.length>0;
-      if(!Number.isSafeInteger(span.start)||!Number.isSafeInteger(span.end)||
-         span.start<0||span.end<span.start||span.end>source.length||
-         (span.end===span.start&&!insertion)||
-         typeof span.oldValue!=="string"||typeof span.newValue!=="string"||
-         source.slice(span.start,span.end)!==span.oldValue)
-        throw Error("Patch Source span no longer matches the current document");
-      edit.replace(doc.uri,new vscode.Range(
-        doc.positionAt(span.start),doc.positionAt(span.end)),span.newValue);
-    }
-    assertStudioMutation(doc.uri,vscode.workspace.workspaceFolders??[],"edit");
-     const applied=await vscode.workspace.applyEdit(edit);
-    if(!applied)throw Error("Host rejected WorkspaceEdit");
-    return true;
-  }
-
-  async function insertNode(item,spec){
-    if(item?.kind!=="route"||typeof item.routeId!=="string")
-      throw Error("Select an eligible Route in the native Inspector");
-    const ctx=currentNode(item);
-    const predicates=await predicateContext(ctx.doc);
-    const options=insertNodeOptions(ctx.source,ctx.procedureId,item.routeId,
-      predicates.predicateSource,predicates.skillName);
-    if(!options)throw Error("Selected Route is not eligible for Node insertion");
-    let nodeId=spec?.nodeId;
-    if(typeof nodeId!=="string")
-      nodeId=await vscode.window.showInputBox({
-        value:"new-node",prompt:"输入新 Node ID",placeHolder:"new-node-id"
-      });
-    if(typeof nodeId!=="string"||!nodeId.trim())return false;
-    let operator=spec?.operator;
-    if(typeof operator!=="string"){
-      const choices=[
-        ...(options.terminalValues.length?["terminal"]:[]),
-        "call",...(options.predicates.length?["verify"]:[])
-      ];
-      operator=await vscode.window.showQuickPick(choices,{
-        placeHolder:"选择要插入的 Node Operator"
-      });
-    }
-    if(typeof operator!=="string")return false;
-    let value=spec?.value;
-    if(typeof value!=="string"){
-      if(operator==="terminal"||operator==="verify"){
-        const choices=operator==="terminal"?options.terminalValues:options.predicates;
-        value=await vscode.window.showQuickPick(choices,{
-          placeHolder:operator==="terminal"?"选择 Terminal 状态":"选择 Package Predicate"
-        });
-      }else{
-        value=await vscode.window.showInputBox({
-          value:"sbi.new.operation",prompt:"输入新 Node 的 Call operation"
-        });
-      }
-    }
-    if(typeof value!=="string"||!value.trim())return false;
-    let outcome=operator==="terminal"?"":spec?.outcome;
-    if(operator!=="terminal"&&typeof outcome!=="string")
-      outcome=await vscode.window.showInputBox({
-        value:operator==="verify"?"PASS":"COMMITTED",
-        prompt:"输入新 Node 的 Outcome"
-      });
-    if(operator!=="terminal"&&typeof outcome!=="string")return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the new Node");
-    const preview=previewNodeInsert(ctx.source,ctx.procedureId,item.routeId,
-      {nodeId,operator,value,outcome},
-      predicates.predicateSource,predicates.skillName);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>p.sourceSpans.map(span=>({
-        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
-      })),
-      verify:async text=>{
-        const current=await predicateContext(ctx.doc);
-        return applyNodeInsert(text,preview,current.predicateSource,current.skillName);
-      }
-    });
-    if(applied){
-      const nextSelection={procedureId:ctx.procedureId,nodeId:preview.nodeId};
-      selections.set(ctx.doc.uri.toString(),nextSelection);
-      update(ctx.doc,nextSelection);
-    }
-    return applied;
-  }
-
-  async function deleteNode(item,redirectTarget){
-    if(item?.kind!=="node")
-      throw Error("Select a Node in the native Inspector");
-    const ctx=currentNode(item);
-    const options=deleteNodeOptions(ctx.source,ctx.procedureId,ctx.nodeId);
-    if(!options)throw Error("Selected Node is not eligible for safe deletion");
-    let target=redirectTarget;
-    if(typeof target!=="string"){
-      target=options.targets.length===1?options.targets[0]:
-        await vscode.window.showQuickPick(options.targets,{
-          placeHolder:"选择删除 Node 后的 Route 重定向目标"
-        });
-    }
-    if(typeof target!=="string")return false;
-    if(!options.targets.includes(target))
-      throw Error("Redirect target is not in the qualified deletion choices");
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the redirect target");
-    const preview=previewNodeDelete(ctx.source,ctx.procedureId,ctx.nodeId,target);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>p.sourceSpans.map(span=>({
-        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
-      })),
-      verify:text=>applyNodeDelete(text,preview)
-    });
-    if(applied){
-      const nextSelection={procedureId:ctx.procedureId,nodeId:target};
-      selections.set(ctx.doc.uri.toString(),nextSelection);
-      update(ctx.doc,nextSelection);
-    }
-    return applied;
-  }
-
-  async function renameNode(item,newId){
-    const ctx=currentNode(item);
-    let value=newId;
-    if(typeof value!=="string")value=await vscode.window.showInputBox({
-      value:ctx.nodeId,prompt:"输入新的 Node ID",placeHolder:"new-node-id"
-    });
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the new Node ID");
-    const preview=previewNodeRename(ctx.source,ctx.procedureId,ctx.nodeId,value);
-    const applied=await confirmAndApply({
-      ...ctx,preview,
-      changes:p=>p.sourceSpans.map(span=>({
-        start:span.start,end:span.end,oldValue:span.oldValue,newValue:span.newValue
-      })),
-      verify:text=>applyNodeRename(text,preview)
-    });
-    if(applied){
-      const nextSelection={procedureId:ctx.procedureId,nodeId:value};
-      selections.set(ctx.doc.uri.toString(),nextSelection);
-      update(ctx.doc,nextSelection);
-    }
-    return applied;
-  }
-  async function editNodeOperatorValue(item,newValue){
-    const ctx=currentNode(item);
-    const predicates=await predicateContext(ctx.doc);
-    const state=nodeAttributeState(ctx.source,ctx.procedureId,ctx.nodeId,
-      predicates.predicateSource,predicates.skillName);
-    if(!state?.operator)
-      throw Error("This Operator is Source-only or has no qualified Package choices");
-    let value=newValue;
-    if(typeof value!=="string"){
-      value=state.operator.type==="select"
-        ?await vscode.window.showQuickPick(state.operator.values,{
-          placeHolder:"选择 "+state.operator.operator+" Operator 值"
-        })
-        :await vscode.window.showInputBox({
-          value:state.operator.value,prompt:"输入新的 "+state.operator.operator+" Operator 值"
-        });
-    }
-    if(typeof value!=="string"||!value.trim())return false;
-    if(ctx.doc.version!==ctx.version||ctx.doc.getText()!==ctx.source)
-      throw Error("Source changed while choosing the Operator value");
-    const preview=previewNodeOperatorValue(ctx.source,ctx.procedureId,ctx.nodeId,
-      value,predicates.predicateSource,predicates.skillName);
-    return confirmAndApply({
-      ...ctx,preview,
-      changes:p=>[{
-        start:p.sourceSpan.start,end:p.sourceSpan.end,
-        oldValue:p.oldValue,newValue:p.newValue
-      }],
-      verify:async text=>{
-        const current=await predicateContext(ctx.doc);
-        return applyNodeOperatorValue(text,preview,
-          current.predicateSource,current.skillName);
-      }
-    });
-  }
-
   const problemDomainLabels={
     source:"Source",package:"Package",dependencies:"Dependencies",tools:"Tools",
     capabilities:"Capabilities",schemas:"Schemas",predicates:"Predicates",
@@ -2604,32 +2382,11 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
             item.source??'Skill Studio · Package Audit'
           ].filter(Boolean).join('\n');
         }
-        if(item.kind==='node'){
-          const deletable=id==='inspection'&&document&&
-            deleteNodeOptions(document.getText(),item.procedureId,item.nodeId);
-          tree.contextValue=deletable?'skillStudio.deletableNode':'skillStudio.node';
-          item.sourceVersion=document?.version;item.documentUri=document?.uri.toString();
-          tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
-          tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
-        }
         if(item.kind==='current-node'&&document){
           tree.contextValue='skillStudio.currentNode';
           item.sourceVersion=document.version;item.documentUri=document.uri.toString();
           tree.procedureId=item.procedureId;tree.nodeId=item.nodeId;
           tree.sourceVersion=item.sourceVersion;tree.documentUri=item.documentUri;
-        }
-        if(item.kind==='route'&&id==='inspection'&&document){
-          const canInsert=Boolean(insertNodeOptions(
-            document.getText(),item.procedureId,item.routeId));
-          if(canInsert){
-            tree.contextValue='skillStudio.route';
-            item.sourceVersion=document.version;
-            item.documentUri=document.uri.toString();
-            for(const key of ['procedureId','nodeId','routeId'])
-              tree[key]=item[key];
-            tree.sourceVersion=item.sourceVersion;
-            tree.documentUri=item.documentUri;
-          }
         }
         if(document&&item.line&&item.kind!=='compiler-diagnostic'){
           const rootInfo=packageRootForProcedure(vscode,document);
@@ -2822,22 +2579,6 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       }
     }),
     vscode.commands.registerCommand('skillStudio.refreshInspection',()=>{if(document){update(document);scheduleAudit();}}),
-    vscode.commands.registerCommand('skillStudio.renameNode',async(item,newId)=>{
-      try{return await renameNode(item,newId);}
-      catch(error){await vscode.window.showWarningMessage('Node 重命名未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.editNodeOperatorValue',async(item,newValue)=>{
-      try{return await editNodeOperatorValue(item,newValue);}
-      catch(error){await vscode.window.showWarningMessage('Operator 修改未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.insertNode',async(item,spec)=>{
-      try{return await insertNode(item,spec);}
-      catch(error){await vscode.window.showWarningMessage('Node 插入未执行：'+error.message);return false;}
-    }),
-    vscode.commands.registerCommand('skillStudio.deleteNode',async(item,redirectTarget)=>{
-      try{return await deleteNode(item,redirectTarget);}
-      catch(error){await vscode.window.showWarningMessage('Node 删除未执行：'+error.message);return false;}
-    }),
     vscode.workspace.onDidChangeTextDocument(e=>{
       if(!document||!insideCurrentPackage(e.document?.uri))return;
       if(isProcedurePath(e.document.uri.path)&&document.uri.toString()===e.document.uri.toString())
