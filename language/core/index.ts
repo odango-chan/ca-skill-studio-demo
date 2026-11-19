@@ -1,6 +1,6 @@
 import { scriptNavigationReport } from "../../site/script-navigation.mjs";
 import { pythonTopLevelOutline } from "../../site/python-outline.mjs";
-import { isV1Alpha5Procedure, analyzeV1Alpha5Source } from "./v1alpha5.js";
+import { analyzeV1Alpha5Source } from "./v1alpha5.js";
 import type {
   AnalysisState,
   DocumentAnalysis,
@@ -219,7 +219,7 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
   // Source projection can supply exact editor locations without any claim
   // that trusted v1alpha5 ToolCatalog, CapabilityContracts or Host Schema
   // publications have been linked.
-  if (procedureDocument && isV1Alpha5Procedure(procedureDocument.text)) {
+  if (procedureDocument) {
     const projected = analyzeV1Alpha5Source(documentsByPath, snapshot.packageName);
     const packageContextComplete = snapshot.completeness === "complete" &&
       projected.procedure.state === "READY";
@@ -347,14 +347,10 @@ export function analyzePackageSnapshot(snapshot: PackageSnapshot): SkillLanguage
       diagnostics
     };
   }
-  // Skill Studio is v1alpha5-only. A Procedure that does not match the
-  // v1alpha5 root graph is rejected rather than being reinterpreted using a
-  // historical analyzer. v1alpha4 remains a normative inheritance baseline,
-  // not a product compatibility mode.
-  return unavailable(snapshot, "UNSUPPORTED_CA_SL_VERSION",
-    "Procedure must use CA-SL connectionagent.io/v1alpha5 top-level start/nodes. " +
-    "Legacy Example content is not migrated automatically; Open Example Project " +
-    "offers a confirmation before replacing the Example.");
+  // Every Package is analyzed by the current grammar. A missing Procedure is a
+  // concrete Package defect, not a language-version selection failure.
+  return unavailable(snapshot, "PROCEDURE_FILE_MISSING",
+    "Package is missing assurance/procedure.yaml");
 
 
 }
