@@ -69,6 +69,7 @@ test("Bundled CustomTextEditor uses native document, guarded WorkspaceEdit and n
       createOutputChannel:()=>({appendLine(){},show(){},dispose(){}}),
       visibleTextEditors:[textEditor],
       registerTreeDataProvider:()=>({dispose(){}}),
+      registerWebviewViewProvider:(_id,_provider,_options)=>({dispose(){}}),
       onDidChangeActiveTextEditor:()=>({dispose(){}}),
       activeTextEditor:{document},
       registerCustomEditorProvider(_name,p){provider=p;return{dispose(){}};},
@@ -310,5 +311,8 @@ test("Skill Studio authoring views live in native Explorer while Inspector stays
     "Inspector keeps its native right-side Secondary Sidebar container");
   assert.deepEqual(manifest.contributes.views.skillStudioInspector?.map(view=>[
     view.id,view.name
-  ]),[["skillStudio.inspection","Inspector"]]);
+  ]),[
+    ["skillStudio.preview","Preview"],
+    ["skillStudio.inspection","Inspector"]
+  ]);
 });
