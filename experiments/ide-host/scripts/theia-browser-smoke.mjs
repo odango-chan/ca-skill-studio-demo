@@ -774,7 +774,7 @@ try{
     item.view?.procedureRoot&&item.view.procedureValue==="establish-pdu-session");
   const defaultWebviewView=defaultGraphFrame?.view??null;
   if(requireEditor&&(!defaultGraphFrame||!(defaultWebviewView?.graphNodes>0)))
-    throw Error("The default CA-SL v1alpha5 Procedure did not render: "+
+    throw Error("The default CA-SL Procedure did not render: "+
       JSON.stringify({webviewFrames:webviewFrames.map(item=>({
         url:item.frame.url,error:item.error,view:item.view
       }))}));
@@ -964,14 +964,14 @@ try{
     throw Error("Theia status bar is not Studio Light: "+JSON.stringify(afterImport.statusBar));
   const importedNotification=afterImport.notificationText.some(message=>
     (message.includes("示例项目已载入并打开工作区：skill-studio-demo/")&&
-     message.includes("默认已打开 CA-SL v1alpha5 Procedure（DRAFT / NOT_QUALIFIED）")&&
-     message.includes("导入 v1alpha5 Skill 文件 14 个"))||
+     message.includes("默认已打开 CA-SL current Procedure（DRAFT / NOT_QUALIFIED）")&&
+     message.includes("导入当前 CA-SL Skill 文件 14 个"))||
     (message.includes("Example project opened: skill-studio-demo/")&&
-     message.includes("CA-SL v1alpha5 Procedure is open (DRAFT / NOT_QUALIFIED)")&&
-     message.includes("Imported 14 CA-SL v1alpha5 Skill files")));
+     message.includes("CA-SL current Procedure is open (DRAFT / NOT_QUALIFIED)")&&
+     message.includes("Imported 14 current CA-SL Skill files")));
   if(!importedNotification||!afterImport.explorerText.includes("skills")||
      !afterImport.explorerText.includes("establish-pdu-session"))
-    throw Error("Theia did not open the v1alpha5 Example project: "+
+    throw Error("Theia did not open the current CA-SL Example project: "+
       JSON.stringify({afterImport,registeredCommands}).slice(0,3500));
   if(requireEditor&&(!defaultWebviewView?.procedureRoot||
       defaultWebviewView.graphNodes<1||
