@@ -20,13 +20,13 @@ test("React Flow projects the current CA-SL source graph without mutation",async
   const before=JSON.stringify(created.procedure);
   const flow=makeFlowElements(graph,created.procedure);
   assert.equal(flow.direction,"DOWN");
-  assert.equal(flow.nodes.length,created.procedure.nodes.length);
+  assert.equal(flow.nodes.length,(graph.visibleNodes??created.procedure.nodes).length);
   assert.equal(flow.edges.length,graph.bundles.length);
   assert.equal(flow.edges.reduce((n,e)=>n+e.data.bundle.routes.length,0),
     created.procedure.routes.length);
   assert.equal(flow.nodes.find(n=>n.id===created.procedure.start).data.start,true);
   assert.deepEqual(flow.nodes.map(n=>n.id),created.procedure.nodes.map(n=>n.id));
-  assert.ok(flow.nodes.every(n=>n.draggable===false&&n.connectable===true));
+  assert.ok(flow.nodes.every(n=>n.draggable===false&&\n    n.connectable===!n.data.terminal&&!n.data.viewOnly));
   assert.ok(flow.edges.every(e=>e.reconnectable===false),
     "existing Route targets stay read-only until a current-source patch contract exists");
   assert.ok(flow.edges.every(e=>e.markerEnd?.type==="arrow"));
@@ -44,7 +44,7 @@ test("graph interaction policy is independent of language version metadata",asyn
   assert.deepEqual(a.nodes.map(n=>n.connectable),b.nodes.map(n=>n.connectable));
   assert.deepEqual(a.nodes.map(n=>n.data.canAddRoute),b.nodes.map(n=>n.data.canAddRoute));
   assert.deepEqual(a.edges.map(e=>e.reconnectable),b.edges.map(e=>e.reconnectable));
-  assert.ok(a.nodes.every(n=>n.connectable));
+  assert.ok(a.nodes.every(n=>n.connectable===!n.data.terminal&&!n.data.viewOnly));
   assert.ok(a.edges.every(e=>!e.reconnectable));
 });
 
@@ -200,7 +200,7 @@ test("visual START is separate from the business operator without changing Sourc
   assert.equal(start.data.start,true);
   assert.equal(start.data.operator,created.procedure.nodes.find(
     node=>node.id===created.procedure.start).operator);
-  assert.equal(flow.nodes.length,created.procedure.nodes.length);
+  assert.equal(flow.nodes.length,(graph.visibleNodes??created.procedure.nodes).length);
   assert.equal(JSON.stringify(created.procedure),before);
 });
 
@@ -228,7 +228,7 @@ test("Route outcome colors never turn mixed success/failure green",()=>{
   assert.equal(classifyRouteTone(["PASS","OTHER"]),"mixed");
   assert.equal(classifyRouteTone(["OTHER"]),"neutral");
   assert.equal(classifyRouteTone([]),"neutral");
-  const graph=layoutProcedureELK(created.procedure);
+  const graph=await layoutProcedureELK(created.procedure);
   const flow=makeFlowElements(graph,created.procedure);
   for(const edge of flow.edges){
     assert.equal(edge.markerEnd.color,ROUTE_TONE_COLOR[edge.data.tone]);
