@@ -132,9 +132,14 @@ export function registerPreviewHost(vscode,context,renderers) {
   // first visualizable Source becomes active; otherwise the WebviewView never
   // resolves and the preview silently remains an inactive EditorGroup iframe.
   const containerCommand="workbench.view.extension.skillStudioInspector";
+  const isTheiaHost=vscode.env?.uriScheme==="theia"||
+    (typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST);
   let lastDocument=vscode.window.activeTextEditor?.document??null;
   let revealInFlight=null;
   const revealContainer=()=>{
+    // Theia's generated view-container commands are not exposed to the plugin
+    // host. Its native ApplicationShell contribution opens this container.
+    if(isTheiaHost)return Promise.resolve();
     if(revealInFlight)return revealInFlight;
     revealInFlight=Promise.resolve(vscode.commands.executeCommand(containerCommand))
       .catch(error=>console.warn("SKILL Studio could not reveal Preview container:",
