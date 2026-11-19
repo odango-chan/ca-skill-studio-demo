@@ -220,7 +220,7 @@ export function mountContractPreview(vscode,document,panel,{isCurrent=()=>true}=
       releasePanel=panel.onDidDispose(cleanup);
       return {dispose:cleanup};
 }
-export function registerContractEditor(vscode,context) {
+export function registerContractCommands(vscode,context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openContract',
     async uri => {
       const target = await chooseContract(vscode, uri);
