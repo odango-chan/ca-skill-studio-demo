@@ -91,17 +91,22 @@ console.log("STUDIO_THEIA_LSP_WORKER_ASSET",JSON.stringify({
 // right-side Preview WebviewView. No visualizer may register a Main Editor
 // CustomEditor or rely on per-file editor association globs.
 const manifest=JSON.parse(readFileSync("experiments/ide-host/vscode/package.json","utf8"));
-const previewViews=manifest.contributes?.views?.skillStudioInspector??[];
+const previewViews=manifest.contributes?.views?.skillStudioPreview??[];
+const inspectorViews=manifest.contributes?.views?.skillStudioInspector??[];
 const secondaryContainers=manifest.contributes?.viewsContainers?.secondarySidebar??[];
 if(manifest.contributes?.customEditors?.length)
   throw Error("Theia shared Preview architecture must not register Main Editor CustomEditors");
 if(!previewViews.some(view=>view.id==="skillStudio.preview"&&view.type==="webview"))
-  throw Error("Theia shared right-side Preview WebviewView contribution is missing");
-if(!secondaryContainers.some(container=>container.id==="skillStudioInspector"))
-  throw Error("Theia right-side Inspector container contribution is missing");
+  throw Error("Theia dedicated right-side Preview WebviewView contribution is missing");
+if(!inspectorViews.some(view=>view.id==="skillStudio.inspection")||
+   inspectorViews.some(view=>view.id==="skillStudio.preview"))
+  throw Error("Theia Inspector must not stack the Preview Webview underneath it");
+if(secondaryContainers.map(x=>x.id).join(",")!=="skillStudioPreview,skillStudioInspector")
+  throw Error("Dedicated Preview must be first, independently selectable from Inspector");
 if(!manifest.activationEvents?.includes("onView:skillStudio.preview"))
   throw Error("Theia Preview WebviewView activation event is missing");
-console.log("STUDIO_SHARED_PREVIEW_VIEW_CONTRIBUTION_PASS",JSON.stringify({
-  previewView:"skillStudio.preview",container:"skillStudioInspector",
+console.log("STUDIO_DEDICATED_PREVIEW_VIEW_CONTRIBUTION_PASS",JSON.stringify({
+  previewView:"skillStudio.preview",previewContainer:"skillStudioPreview",
+  inspectorContainer:"skillStudioInspector",
   legacyCustomEditors:manifest.contributes?.customEditors?.length??0
 }));
