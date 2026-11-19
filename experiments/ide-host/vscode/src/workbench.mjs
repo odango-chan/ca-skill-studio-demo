@@ -307,6 +307,7 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
               // Ignore delayed notifications from an old Package generation.
               if(!state||state.disposed||status.generation!==state.generation)return;
               languagePackageStatuses.set(status.rootUri,status);
+              applyLanguageAnalysisStatus(status);
               // "UNAVAILABLE" here is Package analysis, not a dead language
               // Worker. Keep the service state distinct from Package health.
               updateLanguageStatus(
@@ -2987,6 +2988,35 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
   // Audit status belongs to Problems. Do not refresh Inspector/Outline for
   // status-only changes: their Source-backed selection must remain stable.
   const fireProblems=()=>providers.get('problems')?.fire();
+  function applyLanguageAnalysisStatus(status){
+    const rootInfo=document?packageRootForProcedure(vscode,document):null;
+    if(!rootInfo||status?.rootUri!==rootInfo.uri.toString())return;
+    const sourceDiagnostics=Array.isArray(status.analysisDiagnostics)
+      ?status.analysisDiagnostics:[];
+    audit=sourceDiagnostics.map(item=>{
+      const relativePath=item.relativePath??"";
+      const uri=relativePath
+        ?vscode.Uri.joinPath(rootInfo.uri,...relativePath.split("/"))
+        :rootInfo.uri;
+      return {
+        kind:"package-diagnostic",code:item.code,message:item.message,
+        severity:item.severity,status:item.status,domain:item.domain??"source",
+        category:item.category,path:relativePath,relativePath,
+        sourcePath:relativePath,line:item.line,column:item.column,
+        range:item.range,uri,source:item.source
+      };
+    });
+    const errors=audit.filter(item=>item.severity==="error").length;
+    const warnings=audit.filter(item=>item.severity==="warning").length;
+    const notChecked=audit.filter(item=>item.status==="not_checked").length;
+    const blocked=audit.filter(item=>item.status==="blocked").length;
+    const affectedFiles=new Set(audit.map(item=>item.path).filter(Boolean)).size;
+    auditStatus="Package Audit · "+errors+" errors / "+warnings+" warnings / "+
+      affectedFiles+" files / "+notChecked+" NOT_CHECKED"+
+      (blocked?" / "+blocked+" blocked":"")+
+      " · Compiler / Owner qualification pending";
+    fireProblems();
+  }
   const compilerProblemsChanged=compilerProblemsProvider?.onDidChange?.(()=>fireProblems());
   if(compilerProblemsChanged)context.subscriptions.push(compilerProblemsChanged);
   function update(doc,choice){
@@ -3017,6 +3047,9 @@ export function registerWorkbench(vscode,context,{prepareToolContract,compilerPr
       bindingOptions=[];
       fire();
     }
+    const activeRoot=packageRootForProcedure(vscode,doc);
+    const activeStatus=activeRoot&&languagePackageStatuses.get(activeRoot.uri.toString());
+    if(activeStatus)applyLanguageAnalysisStatus(activeStatus);
   }
   async function auditCurrent(){
     if(!document)return;
