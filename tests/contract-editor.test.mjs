@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {registerContractEditor} from '../experiments/ide-host/vscode/src/contract-editor.mjs';
+import {registerContractCommands,mountContractPreview} from '../experiments/ide-host/vscode/src/contract-editor.mjs';
 
 const contract = [
   '# CA-SL v1alpha5 Contract',
@@ -18,14 +18,14 @@ const contract = [
 ].join('\n');
 
 test('Contract custom editor renders a nonce-protected v1alpha5 read-only projection', async () => {
-  const registrations = new Map();
+  let customEditorRegistrations=0;
   const commands = new Map();
   const context = {subscriptions: []};
   let changeHandler, messageHandler, disposeHandler;
   const vscode = {
     window: {
-      registerCustomEditorProvider: (view, provider, options) => {
-        registrations.set(view, {provider, options});
+      registerCustomEditorProvider: () => {
+        customEditorRegistrations++;
         return {dispose() {}};
       }
     },
@@ -42,11 +42,10 @@ test('Contract custom editor renders a nonce-protected v1alpha5 read-only projec
       }
     }
   };
-  registerContractEditor(vscode, context);
-  assert.ok(registrations.has('skillStudio.contractPreview'));
+  registerContractCommands(vscode,context);
   assert.ok(commands.has('skillStudio.openContract'));
-  assert.equal(registrations.get('skillStudio.contractPreview')
-    .options.webviewOptions.retainContextWhenHidden, true);
+  assert.equal(customEditorRegistrations,0,
+    'Contract visualizer is mounted by the shared Preview Host, not a CustomEditor');
 
   let text = contract;
   const uri = {path: '/workspace/demo/assurance/contract.yaml',
@@ -55,13 +54,12 @@ test('Contract custom editor renders a nonce-protected v1alpha5 read-only projec
     getText: () => text};
   const messages = [];
   const webview = {
-    options: null, html: '',
+    options: null, html: '', cspSource:'vscode-resource:',
     postMessage: async message => {messages.push(message);return true;},
     onDidReceiveMessage: handler => {messageHandler = handler;return {dispose(){}};}
   };
   const panel = {webview, onDidDispose: handler => {disposeHandler = handler;}};
-  await registrations.get('skillStudio.contractPreview').provider
-    .resolveCustomTextEditor(document, panel);
+  await mountContractPreview(vscode,document,panel);
 
   assert.equal(webview.options.enableScripts, true);
   assert.equal(webview.options.localResourceRoots.length, 0);
