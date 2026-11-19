@@ -132,7 +132,7 @@ export function mountMarkdownPreview(vscode,context,document,panel,{isCurrent=()
   const webview=panel.webview,media=vscode.Uri.joinPath(context.extensionUri,"media");
   const sessionKey=nonce(),uri=document.uri.toString();
   const css=staticPreviewResourceUrl(
-    webview.asWebviewUri(vscode.Uri.joinPath(media,"native-markdown-preview.css")),
+    webview.asWebviewUri(vscode.Uri.joinPath(media,"studio-markdown-preview.css")),
     context.extensionUri);
   webview.options={enableScripts:true,localResourceRoots:[media]};
   webview.html=markdownViewHtml(webview,css,sessionKey);
