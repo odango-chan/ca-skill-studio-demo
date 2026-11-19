@@ -4,7 +4,6 @@ import {projectSkillContract} from '../../../../site/contract-projection.mjs';
 import {projectWorkspace} from '../../../../site/workspace.mjs';
 import {parseDocument, LineCounter, isMap, isScalar} from 'yaml';
 
-const VIEW = 'skillStudio.contractPreview';
 const SUFFIX = '/assurance/contract.yaml';
 
 function nonce() {
