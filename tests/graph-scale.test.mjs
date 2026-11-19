@@ -5,16 +5,27 @@ import {layoutProcedure} from "../site/graph.mjs";
 import {selectGraphScope,groupRouteEntries} from "../site/layout.mjs";
 import {detailedLayoutAllowed} from "../site/graph-scale.mjs";
 
-function largeYaml(count=300,outcomes=5){
-  const lines=["procedures:","  stress:","    start: node-0","    nodes:"];
-  for(let i=0;i<count-1;i++){
-    lines.push("      node-"+i+":","        call: demo.noop","        'on':");
-    for(let j=0;j<outcomes;j++)
-      lines.push("          OUTCOME_"+j+": node-"+(i+1));
+function largeYaml(count=300){
+  const lines=["start: node-0","nodes:"];
+  for(let i=0;i<count;i++){
+    lines.push("  node-"+i+":","    operation:",
+      "      tool: demo.noop","      arguments: {}","      routes:");
+    let outcomes;
+    if(i===count-1)outcomes=["SUCCEEDED","FAILED","DENIED"];
+    else if(i===count-2)outcomes=["SUCCEEDED","FAILED"];
+    else outcomes=["SUCCEEDED","FAILED","DENIED","COMMITTED","NOT_COMMITTED"];
+    for(const outcome of outcomes){
+      let target;
+      if(i<count-2)target="node-"+(i+1);
+      else if(i===count-2)target=outcome==="SUCCEEDED"?"node-"+(i+1):"FAILED";
+      else target=outcome==="SUCCEEDED"?"UNRESOLVED":
+        outcome==="FAILED"?"FAILED":"SAFE_STOPPED";
+      lines.push("        "+outcome+": "+target);
+    }
   }
-  lines.push("      node-"+(count-1)+":","        terminal: SUCCEEDED");
-  return lines.join("\n")+"\n";
+  return lines.join("\\n")+"\\n";
 }
+
 test("A5 near-budget 300 Node / 1495 Route projection retains source identity",()=>{
   const p=projectWorkspace(largeYaml());
   assert.equal(p.state,"READY");
