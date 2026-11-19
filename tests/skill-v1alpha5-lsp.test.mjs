@@ -146,7 +146,7 @@ test("v1alpha5 5GC sample projects Node-entry Wait, wait.output and the Step 17 
     JSON.stringify(a.diagnostics));
   const procedureView=a.procedure.procedures[0];
   assert.equal(procedureView.profile,
-    "CA-SL v1alpha5 (released language; editor source projection only)");
+    "current CA-SL (released language; editor source projection only)");
   const waitNode=procedureView.nodes.find(item=>item.id==="update-sm-context");
   assert.deepEqual(waitNode.wait.event,{
     source:"AMF",service:"Nsmf_PDUSession",operation:"UpdateSMContext"
@@ -168,11 +168,11 @@ test("v1alpha5 5GC sample projects Node-entry Wait, wait.output and the Step 17 
   const view=inspectionSnapshot(procedureText,{nodeId:"update-sm-context"},
     null,files,"establish-pdu-session","file:///workspace/establish-pdu-session");
   assert.equal(view.model.state,"READY");
-  const waitRow=view.inspection.find(item=>item.kind==="v1alpha5-node"&&
+  const waitRow=view.inspection.find(item=>item.kind==="current-node"&&
     item.nodeId==="update-sm-context");
-  assert.ok(waitRow.children.some(item=>item.kind==="v1alpha5-wait"&&
+  assert.ok(waitRow.children.some(item=>item.kind==="current-wait"&&
     item.label.includes("AMF/Nsmf_PDUSession/UpdateSMContext")));
-  const waitControl=waitRow.children.find(item=>item.kind==="v1alpha5-wait");
+  const waitControl=waitRow.children.find(item=>item.kind==="current-wait");
   assert.ok(waitControl?.children.some(item=>item.label.includes(
     "Response boundary · prepare-step17-response")));
   assert.ok(view.dataflow.bindings.some(item=>
@@ -271,12 +271,12 @@ test("v1alpha5 Inspector shows Contract Goal and source-only Producer / Evidence
     null,files,"sample","file:///workspace/sample");
   assert.equal(view.model.state,"READY");
   assert.ok(view.outline[0].children.some(item=>
-    item.kind==="v1alpha5-node"&&item.nodeId==="final"));
+    item.kind==="current-node"&&item.nodeId==="final"));
   assert.ok(view.inspection.some(item=>item.label.includes(
     "Contract Goal · pdu_session.initial_request_fulfilled")));
-  const goalRow=view.inspection.find(item=>item.kind==="v1alpha5-contract"&&
+  const goalRow=view.inspection.find(item=>item.kind==="current-contract"&&
     item.label.startsWith("Contract Goal"));
-  const gateRow=view.inspection.find(item=>item.kind==="v1alpha5-contract"&&
+  const gateRow=view.inspection.find(item=>item.kind==="current-contract"&&
     item.label.startsWith("Global Precondition"));
   assert.equal(goalRow.line,1);
   assert.equal(gateRow.line,2);
@@ -294,11 +294,11 @@ test("v1alpha5 Inspector shows Contract Goal and source-only Producer / Evidence
   const rows=[];
   const collect=items=>{for(const item of items??[]){rows.push(item);collect(item.children);}};
   collect(view.inspection);
-  const evidenceRow=rows.find(item=>item.kind==="v1alpha5-evidence");
+  const evidenceRow=rows.find(item=>item.kind==="current-evidence");
   assert.equal(evidenceRow.line,11,"Evidence navigation uses the PredicateSet declaration line");
   assert.equal(evidenceRow.sourcePath,"assurance/predicates.yaml");
-  const node=view.inspection.find(item=>item.kind==="v1alpha5-node");
-  assert.ok(node.children.some(item=>item.kind==="v1alpha5-stage"));
+  const node=view.inspection.find(item=>item.kind==="current-node");
+  assert.ok(node.children.some(item=>item.kind==="current-stage"));
 });
 
 test("v1alpha5 rejects author reconcile/legacy wrappers without automatic conversion",()=>{
