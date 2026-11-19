@@ -31,26 +31,21 @@ function unpack(zip){
   return entries;
 }
 const sample=(file)=>readFileSync(new URL(
-  "./fixtures/legacy-site-samples/packages/establish-pdu-session/"+file,import.meta.url));
+  "../site/samples/v1alpha5/establish-pdu-session/"+file,import.meta.url));
 
-test("E4-A1 selects the real 16-file Skill and retains Procedure/Reference Source",async()=>{
+test("E4-A1 selects the current 8-file Skill and retains Procedure/Reference Source",async()=>{
   const paths=[
     "SKILL.md","assurance/contract.yaml","assurance/procedure.yaml",
-    "assurance/predicates.yaml","references/3gpp-procedure.md",
-    "references/session-selection.md","references/failure-handling.md",
-    "schemas/establishment-request.schema.yaml",
-    "schemas/predicate-evaluation-result.schema.yaml",
-    "schemas/selection-input.schema.yaml","schemas/selection.schema.yaml",
-    "schemas/transfer-start-evaluation-input.schema.yaml",
-    "schemas/udm-read-evaluation-input.schema.yaml",
-    "scripts/evaluate_transfer_start.py","scripts/evaluate_udm_read.py",
-    "scripts/select_establishment_configuration.py"
+    "assurance/predicates.yaml","schemas/establishment-request.schema.yaml",
+    "scripts/validate-smf-session-context-entry.py",
+    "scripts/validate-smf-session-context.py",
+    "scripts/validate-subscription-request.py"
   ];
   const selectedFiles=paths.map(p=>selected("establish-pdu-session/"+p,
     new Uint8Array(sample(p))));
   const {workspace,entry,opaqueCount}=await importDirectoryFiles(selectedFiles);
   assert.equal(workspace.name,"establish-pdu-session");
-  assert.equal(workspace.files.size,16);
+  assert.equal(workspace.files.size,8);
   assert.equal(entry,"assurance/procedure.yaml");
   assert.equal(opaqueCount,0);
   assert.equal(projectWorkspace(workspace.files.get(entry).text).state,"READY");
