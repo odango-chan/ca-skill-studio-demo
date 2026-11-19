@@ -123,10 +123,13 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
     await evalJS(expression);
     await sleep(320);
   };
+  // Only compare the PRIMARY (left) Activity Bar. A standalone Preview
+  // now owns a distinct RIGHT-side tab, whose active label must never be
+  // mistaken for the Explorer/Search tab being restored by this scenario.
   const activityState=await evalJS(
     "(()=>{const tabs=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
     ".filter(x=>x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&"+
-    "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&"+
+    "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth/2&&"+
     "x.getBoundingClientRect().y<innerHeight);"+
     "const active=tabs.find(x=>x.classList.contains('theia-mod-active'));"+
     "const r=active?.getBoundingClientRect();"+
@@ -595,7 +598,7 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
       "(()=>{const tabs=[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
       ".filter(x=>x.textContent.trim()==="+JSON.stringify(previous.label)+"&&"+
       "x.getBoundingClientRect().width>0&&x.getBoundingClientRect().x>=0&&"+
-      "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth&&"+
+      "x.getBoundingClientRect().y>=0&&x.getBoundingClientRect().x<innerWidth/2&&"+
       "x.getBoundingClientRect().y<innerHeight);"+
       "const el=tabs.sort((a,b)=>Math.abs(a.getBoundingClientRect().x+"+
       "a.getBoundingClientRect().width/2-"+previous.x+")-"+
@@ -608,7 +611,8 @@ export async function runPackageOverviewAcceptance({command,evalJS,sleep,require
   }
   const restored=await evalJS(
     "(()=>[...document.querySelectorAll('.theia-app-sides .lm-TabBar-tab')]"+
-    ".find(x=>x.classList.contains('theia-mod-active'))?.textContent.trim()??null)()");
+    ".find(x=>x.classList.contains('theia-mod-active')&&"+
+    "x.getBoundingClientRect().x<innerWidth/2)?.textContent.trim()??null)()");
   if(previous&&previous.label!=='Skill Studio'&&restored!==previous.label)
     throw Error('Package Overview did not restore the previous Activity Bar view: '+
       JSON.stringify({previous,restored,restoredActivity}));
