@@ -158,7 +158,7 @@ test("first visual Source reveals Preview, then the user's hidden preference is 
     }
   });
   await Promise.resolve();await Promise.resolve();
-  assert.equal(calls.filter(x=>x==="workbench.view.extension.skillStudioInspector").length,1,
+  assert.equal(calls.filter(x=>x==="workbench.view.extension.skillStudioPreview").length,1,
     "the default Preview container is revealed for the first visual Source");
   assert.ok(provider);
   const view=makeView();
@@ -175,7 +175,7 @@ test("first visual Source reveals Preview, then the user's hidden preference is 
     "a deliberate hide is persisted");
   activeListener({document:doc("/skills/demo/assurance/contract.yaml")});
   await Promise.resolve();await Promise.resolve();
-  assert.equal(calls.filter(x=>x==="workbench.view.extension.skillStudioInspector").length,1,
+  assert.equal(calls.filter(x=>x==="workbench.view.extension.skillStudioPreview").length,1,
     "switching to another visual Source must not undo the user's hide choice");
 
   // A manual reopen from the native View menu is observed and persisted.
@@ -184,7 +184,7 @@ test("first visual Source reveals Preview, then the user's hidden preference is 
   view.setVisible(false);
   activeListener({document:doc("/skills/demo/assurance/predicates.yaml")});
   await Promise.resolve();await Promise.resolve();
-  assert.equal(calls.filter(x=>x==="workbench.view.extension.skillStudioInspector").length,1);
+  assert.equal(calls.filter(x=>x==="workbench.view.extension.skillStudioPreview").length,1);
   controller.dispose();
 });
 

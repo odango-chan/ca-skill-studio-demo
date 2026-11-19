@@ -12,7 +12,8 @@ export function constrainMainEditorPanelOptions(options, mainAreaClass) {
   };
 }
 
-const PREVIEW_AUTO_REVEAL_KEY = "skill-studio.preview.auto-revealed.v2";
+// v3 migrates the old shared Inspector/Preview layout to an independent view.
+const PREVIEW_AUTO_REVEAL_KEY = "skill-studio.preview.auto-revealed.v3";
 
 /**
  * Reveal the contextual Preview once per browser tab and workspace. A

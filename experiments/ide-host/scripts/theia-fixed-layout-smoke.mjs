@@ -128,7 +128,7 @@ try{
   // after tab A had successfully opened Markdown.
   const originalTab=await evaluate(`(()=>{
     const id=window.location.hash;
-    const key="skill-studio.preview.auto-revealed.v2:"+id;
+    const key="skill-studio.preview.auto-revealed.v3:"+id;
     window.localStorage.setItem("skill-studio.preview.auto-revealed.v1","1");
     window.sessionStorage.setItem(key,"1");
     return {url:window.location.href,key,
@@ -151,7 +151,7 @@ try{
       expression:`(()=>{
         const probe=window.__skillStudioPreviewActivation;
         if(typeof probe!=="function")return null;
-        const key="skill-studio.preview.auto-revealed.v2:"+window.location.hash;
+        const key="skill-studio.preview.auto-revealed.v3:"+window.location.hash;
         return {url:window.location.href,key,
           legacyFlag:window.localStorage.getItem("skill-studio.preview.auto-revealed.v1"),
           tabFlag:window.sessionStorage.getItem(key),

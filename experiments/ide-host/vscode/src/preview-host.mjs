@@ -131,7 +131,7 @@ export function registerPreviewHost(vscode,context,renderers) {
   // collapsed Secondary Sidebar container. Reveal the container when the
   // first visualizable Source becomes active; otherwise the WebviewView never
   // resolves and the preview silently remains an inactive EditorGroup iframe.
-  const containerCommand="workbench.view.extension.skillStudioInspector";
+  const containerCommand="workbench.view.extension.skillStudioPreview";
   const isTheiaHost=vscode.env?.uriScheme==="theia"||
     (typeof STUDIO_THEIA_HOST!=="undefined"&&STUDIO_THEIA_HOST);
   let lastDocument=vscode.window.activeTextEditor?.document??null;
