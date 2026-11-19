@@ -188,4 +188,4 @@ test("historical Procedure is accepted by the current analyzer and published as 
   assert.ok(codes.includes("UNKNOWN_FIELD"),JSON.stringify(publications));
   assert.ok(codes.includes("SOURCE_ROOT_INVALID"),JSON.stringify(publications));
   assert.ok(!codes.includes("UNSUPPORTED_CA_SL_VERSION"));
-});;
+});
