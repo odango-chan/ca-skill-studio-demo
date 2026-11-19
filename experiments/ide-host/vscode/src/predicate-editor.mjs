@@ -166,7 +166,7 @@ export function mountPredicatePreview(vscode,document,panel,{isCurrent=()=>true}
       releasePanel=panel.onDidDispose(cleanup);
       return {dispose:cleanup};
 }
-export function registerPredicateEditor(vscode,context) {
+export function registerPredicateCommands(vscode,context) {
   context.subscriptions.push(vscode.commands.registerCommand('skillStudio.openPredicates',
     async uri => {
       const target = await choosePredicateSet(vscode, uri);
