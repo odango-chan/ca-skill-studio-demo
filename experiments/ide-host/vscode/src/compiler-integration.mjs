@@ -390,6 +390,8 @@ export function registerCompilerIntegration(vscode,context,{
       if(!Array.isArray(result))throw new Error("Compiler Check returned an invalid Diagnostic[] response");
       if(!resultGate.isCurrent(rootKey,revision)){
         output.appendLine("Compiler Check result discarded: Source or Package state changed during the request");
+        void vscode.window.showWarningMessage(
+          "Compiler Check result is stale because Skill Source or project dependencies changed. Run Check again.");
         return null;
       }
       publishDiagnostics(prepared.root.uri,prepared.root.name,
@@ -433,6 +435,8 @@ export function registerCompilerIntegration(vscode,context,{
       }
       if(!resultGate.isCurrent(rootKey,revision)){
         output.appendLine("Compiler Build result discarded: Source or Package state changed during the request");
+        void vscode.window.showWarningMessage(
+          "Compiler Build result is stale because Skill Source or project dependencies changed. Run Build again.");
         return null;
       }
       publishDiagnostics(prepared.root.uri,prepared.root.name,
