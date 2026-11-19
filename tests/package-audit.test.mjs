@@ -109,6 +109,11 @@ test("local Schema, Script, Predicate, Tool and producer references are checked"
   assert.ok(codes(diagnostics).includes("PREDICATE_REFERENCE_NOT_FOUND"));
   assert.ok(codes(diagnostics).includes("PRODUCER_NODE_NOT_FOUND"));
   assert.ok(codes(diagnostics).includes("PREDICATE_SCRIPT_NOT_FOUND"));
+  const scriptDiagnostic=find(diagnostics,"PREDICATE_SCRIPT_NOT_FOUND","missing-script.py");
+  assert.ok(scriptDiagnostic?.sourceRange);
+  assert.equal(predicates.text.slice(scriptDiagnostic.sourceRange.start,
+    scriptDiagnostic.sourceRange.end),"scripts/missing-script.py",
+    "Package Audit must preserve the complete YAML scalar span");
 });
 
 test("a complete inventory confirms a missing local Schema, partial inventory does not",()=>{
